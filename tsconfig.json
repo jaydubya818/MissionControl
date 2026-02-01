@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022"],
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "paths": {
+      "@mission-control/shared": ["./packages/shared/src"],
+      "@mission-control/state-machine": ["./packages/state-machine/src"],
+      "@mission-control/policy-engine": ["./packages/policy-engine/src"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".next"]
+}

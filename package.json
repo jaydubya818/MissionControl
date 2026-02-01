@@ -1,0 +1,37 @@
+{
+  "name": "mission-control",
+  "version": "0.9.0",
+  "private": true,
+  "description": "Mission Control for OpenClaw - Autonomous agent orchestration and observability",
+  "author": "Jarrett West",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npx convex dev\" \"turbo run dev --filter=mission-control-ui\"",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "setup": "npm install && npm run build",
+    "convex:dev": "npx convex dev",
+    "convex:deploy": "npx convex deploy",
+    "convex:seed": "npx convex run seed:run"
+  },
+  "dependencies": {
+    "convex": "^1.14.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "turbo": "^1.11.2",
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
