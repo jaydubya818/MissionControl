@@ -216,8 +216,15 @@ exports.postReview = (0, server_1.mutation)({
         authorType: values_1.v.string(),
         authorAgentId: values_1.v.optional(values_1.v.id("agents")),
         authorUserId: values_1.v.optional(values_1.v.string()),
-        decision: values_1.v.string(), // "APPROVE", "REQUEST_CHANGES", "REJECT"
+        reviewType: values_1.v.union(values_1.v.literal("PRAISE"), values_1.v.literal("REFUTE"), values_1.v.literal("CHANGESET"), values_1.v.literal("APPROVE"), values_1.v.literal("REQUEST_CHANGES"), // Legacy support
+        values_1.v.literal("REJECT") // Legacy support
+        ),
         comments: values_1.v.string(),
+        changeset: values_1.v.optional(values_1.v.array(values_1.v.object({
+            file: values_1.v.string(),
+            change: values_1.v.string(),
+            lineNumber: values_1.v.optional(values_1.v.number()),
+        }))),
         checklist: values_1.v.optional(values_1.v.array(values_1.v.object({
             label: values_1.v.string(),
             checked: values_1.v.boolean(),
@@ -226,12 +233,31 @@ exports.postReview = (0, server_1.mutation)({
         idempotencyKey: values_1.v.optional(values_1.v.string()),
     },
     handler: async (ctx, args) => {
-        const decisionEmoji = {
+        const task = await ctx.db.get(args.taskId);
+        if (!task) {
+            throw new Error("Task not found");
+        }
+        const reviewTypeEmoji = {
+            PRAISE: "🌟",
+            REFUTE: "🤔",
+            CHANGESET: "📝",
             APPROVE: "✅",
             REQUEST_CHANGES: "🔄",
             REJECT: "❌",
         };
-        let content = `## Review: ${decisionEmoji[args.decision] || "📝"} ${args.decision}\n\n${args.comments}`;
+        let content = `## Review: ${reviewTypeEmoji[args.reviewType] || "📝"} ${args.reviewType}\n\n${args.comments}`;
+        // Add changeset if provided
+        if (args.changeset && args.changeset.length > 0) {
+            content += `\n\n### Requested Changes\n`;
+            for (const change of args.changeset) {
+                content += `\n📝 **${change.file}**`;
+                if (change.lineNumber) {
+                    content += ` (line ${change.lineNumber})`;
+                }
+                content += `\n   ${change.change}\n`;
+            }
+        }
+        // Add checklist if provided
         if (args.checklist) {
             content += "\n\n### Checklist\n";
             for (const item of args.checklist) {
@@ -240,7 +266,7 @@ exports.postReview = (0, server_1.mutation)({
                     content += ` — ${item.note}`;
             }
         }
-        return await postMessageInternal(ctx, {
+        const messageId = await postMessageInternal(ctx, {
             taskId: args.taskId,
             authorType: args.authorType,
             authorAgentId: args.authorAgentId,
@@ -248,6 +274,56 @@ exports.postReview = (0, server_1.mutation)({
             type: "REVIEW",
             content,
             idempotencyKey: args.idempotencyKey,
+            metadata: {
+                reviewType: args.reviewType,
+                changeset: args.changeset,
+            },
         });
+        // Handle review type actions
+        if (args.reviewType === "CHANGESET" || args.reviewType === "REQUEST_CHANGES") {
+            // Move task back to IN_PROGRESS for revisions
+            await ctx.db.patch(args.taskId, {
+                status: "IN_PROGRESS",
+                reviewCycles: task.reviewCycles + 1,
+            });
+            // Create transition record
+            await ctx.db.insert("taskTransitions", {
+                projectId: task.projectId,
+                idempotencyKey: args.idempotencyKey || `review-changeset-${args.taskId}-${Date.now()}`,
+                taskId: args.taskId,
+                fromStatus: task.status,
+                toStatus: "IN_PROGRESS",
+                actorType: args.authorType,
+                actorAgentId: args.authorAgentId,
+                actorUserId: args.authorUserId,
+                reason: "Changes requested in review",
+            });
+        }
+        else if (args.reviewType === "APPROVE" && args.authorAgentId) {
+            // Create approval record for REVIEW → DONE
+            await ctx.db.insert("approvals", {
+                projectId: task.projectId,
+                taskId: args.taskId,
+                requestorAgentId: args.authorAgentId,
+                actionType: "COMPLETE_TASK",
+                actionSummary: "Complete task after review approval",
+                riskLevel: "YELLOW",
+                status: "PENDING",
+                estimatedCost: 0,
+                justification: `Reviewer approved deliverable`,
+                expiresAt: Date.now() + 1440 * 60 * 1000, // 24 hours
+            });
+        }
+        else if (args.reviewType === "REFUTE") {
+            // Increment review cycles for loop detection
+            await ctx.db.patch(args.taskId, {
+                reviewCycles: task.reviewCycles + 1,
+            });
+        }
+        else if (args.reviewType === "PRAISE") {
+            // Just record the praise, no state change
+            // Could increment a "praise count" metric if desired
+        }
+        return messageId;
     },
 });

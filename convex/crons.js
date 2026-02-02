@@ -19,4 +19,11 @@ crons.interval("detect loops", { minutes: 15 }, api_1.internal.loops.detectLoops
 crons.daily("daily standup report", { hourUTC: 9, minuteUTC: 0 }, api_1.api.standup.runDaily);
 // Daily CEO brief to Telegram at 09:00 UTC
 crons.daily("daily CEO brief", { hourUTC: 9, minuteUTC: 0 }, api_1.internal.telegram.prepareDailyCEOBrief);
+// Auto-route execution requests every 5 minutes
+// Note: executorRouter.autoRoute will be available after next convex push
+// crons.interval(
+//   "auto-route executions",
+//   { minutes: 5 },
+//   internal.executorRouter.autoRoute
+// );
 exports.default = crons;

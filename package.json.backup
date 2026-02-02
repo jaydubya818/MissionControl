@@ -10,7 +10,7 @@
     "apps/*"
   ],
   "scripts": {
-    "start": "node packages/agent-runner/dist/run.js",
+    "start": "node packages/telegram-bot/dist/index.js",
     "dev": "concurrently \"npx convex dev\" \"turbo run dev --filter=mission-control-ui\"",
     "dev:ui": "pnpm --filter mission-control-ui dev",
     "build": "turbo run build",

@@ -6,7 +6,7 @@
  * task.status can ONLY change through the transition function.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.assign = exports.transition = exports.create = exports.getWithTimeline = exports.search = exports.getAllowedTransitionsForHuman = exports.listAll = exports.listByStatus = exports.get = void 0;
+exports.assign = exports.transition = exports.create = exports.getWithTimeline = exports.exportIncidentReport = exports.search = exports.updateThreadRef = exports.getAllowedTransitionsForHuman = exports.listAll = exports.listByStatus = exports.get = void 0;
 const values_1 = require("convex/values");
 const server_1 = require("./_generated/server");
 const api_1 = require("./_generated/api");
@@ -120,6 +120,19 @@ exports.getAllowedTransitionsForHuman = (0, server_1.query)({
         return map;
     },
 });
+/** Update task threadRef (for Telegram thread-per-task) */
+exports.updateThreadRef = (0, server_1.mutation)({
+    args: {
+        taskId: values_1.v.id("tasks"),
+        threadRef: values_1.v.string(),
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.taskId, {
+            threadRef: args.threadRef,
+        });
+        return { success: true };
+    },
+});
 /** Search tasks by title and description */
 exports.search = (0, server_1.query)({
     args: {
@@ -155,6 +168,199 @@ exports.search = (0, server_1.query)({
             return 0;
         });
         return filtered.slice(0, limit);
+    },
+});
+/** Export task as incident report (markdown) */
+exports.exportIncidentReport = (0, server_1.query)({
+    args: { taskId: values_1.v.id("tasks") },
+    handler: async (ctx, args) => {
+        const task = await ctx.db.get(args.taskId);
+        if (!task)
+            return null;
+        const transitions = await ctx.db
+            .query("taskTransitions")
+            .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+            .order("asc")
+            .collect();
+        const messages = await ctx.db
+            .query("messages")
+            .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+            .order("asc")
+            .collect();
+        const runs = await ctx.db
+            .query("runs")
+            .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+            .order("asc")
+            .collect();
+        const approvals = await ctx.db
+            .query("approvals")
+            .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+            .order("asc")
+            .collect();
+        const toolCalls = [];
+        for (const run of runs) {
+            const calls = await ctx.db
+                .query("toolCalls")
+                .withIndex("by_run", (q) => q.eq("runId", run._id))
+                .collect();
+            toolCalls.push(...calls);
+        }
+        // Get agents
+        const agentIds = new Set([
+            ...task.assigneeIds,
+            ...messages.map((m) => m.authorAgentId).filter(Boolean),
+            ...runs.map((r) => r.agentId),
+        ]);
+        const agents = await Promise.all(Array.from(agentIds).map(id => ctx.db.get(id)));
+        const agentMap = new Map(agents.filter((a) => a !== null).map(a => [a._id, a]));
+        // Build markdown report
+        let report = `# Incident Report: ${task.title}\n\n`;
+        report += `**Task ID:** ${task._id}\n`;
+        report += `**Status:** ${task.status}\n`;
+        report += `**Priority:** ${task.priority}\n`;
+        report += `**Type:** ${task.type}\n`;
+        report += `**Created:** ${new Date(task._creationTime).toISOString()}\n`;
+        report += `**Cost:** $${task.actualCost.toFixed(2)}`;
+        if (task.budgetAllocated) {
+            report += ` / $${task.budgetAllocated.toFixed(2)} budget`;
+        }
+        report += `\n\n`;
+        // Description
+        if (task.description) {
+            report += `## Description\n\n${task.description}\n\n`;
+        }
+        // Assignees
+        if (task.assigneeIds.length > 0) {
+            report += `## Assignees\n\n`;
+            for (const id of task.assigneeIds) {
+                const agent = agentMap.get(id);
+                report += `- ${agent?.emoji || "🤖"} ${agent?.name || "Unknown"} (${agent?.role})\n`;
+            }
+            report += `\n`;
+        }
+        // Timeline
+        report += `## Timeline\n\n`;
+        // Combine all events
+        const events = [];
+        for (const t of transitions) {
+            events.push({ ts: t._creationTime, type: "transition", data: t });
+        }
+        for (const m of messages) {
+            events.push({ ts: m._creationTime, type: "message", data: m });
+        }
+        for (const r of runs) {
+            events.push({ ts: r.startedAt, type: "run", data: r });
+        }
+        for (const tc of toolCalls) {
+            events.push({ ts: tc.startedAt, type: "toolCall", data: tc });
+        }
+        for (const a of approvals) {
+            events.push({ ts: a._creationTime, type: "approval", data: a });
+        }
+        // Sort chronologically
+        events.sort((a, b) => a.ts - b.ts);
+        // Format events
+        for (const event of events) {
+            const time = new Date(event.ts).toISOString();
+            switch (event.type) {
+                case "transition":
+                    report += `### ${time} — Transition\n`;
+                    report += `**${event.data.fromStatus}** → **${event.data.toStatus}**\n`;
+                    if (event.data.reason) {
+                        report += `Reason: ${event.data.reason}\n`;
+                    }
+                    report += `\n`;
+                    break;
+                case "message":
+                    const author = event.data.authorUserId ||
+                        (event.data.authorAgentId ? agentMap.get(event.data.authorAgentId)?.name : null) ||
+                        "Unknown";
+                    report += `### ${time} — ${event.data.type}\n`;
+                    report += `**Author:** ${author}\n\n`;
+                    report += `${event.data.content}\n\n`;
+                    break;
+                case "run":
+                    const agent = agentMap.get(event.data.agentId);
+                    report += `### ${time} — Run\n`;
+                    report += `**Agent:** ${agent?.name || "Unknown"}\n`;
+                    report += `**Model:** ${event.data.model}\n`;
+                    report += `**Status:** ${event.data.status}\n`;
+                    report += `**Cost:** $${event.data.costUsd.toFixed(3)}\n`;
+                    if (event.data.durationMs) {
+                        report += `**Duration:** ${(event.data.durationMs / 1000).toFixed(1)}s\n`;
+                    }
+                    report += `\n`;
+                    break;
+                case "toolCall":
+                    report += `### ${time} — Tool Call\n`;
+                    report += `**Tool:** ${event.data.toolName}\n`;
+                    report += `**Risk:** ${event.data.riskLevel}\n`;
+                    report += `**Status:** ${event.data.status}\n`;
+                    if (event.data.inputPreview) {
+                        report += `**Input:** ${event.data.inputPreview.slice(0, 100)}...\n`;
+                    }
+                    report += `\n`;
+                    break;
+                case "approval":
+                    report += `### ${time} — Approval\n`;
+                    report += `**Action:** ${event.data.actionSummary}\n`;
+                    report += `**Risk:** ${event.data.riskLevel}\n`;
+                    report += `**Status:** ${event.data.status}\n`;
+                    if (event.data.decisionReason) {
+                        report += `**Decision:** ${event.data.decisionReason}\n`;
+                    }
+                    report += `\n`;
+                    break;
+            }
+        }
+        // Deliverable
+        if (task.deliverable) {
+            report += `## Deliverable\n\n`;
+            if (task.deliverable.summary) {
+                report += `${task.deliverable.summary}\n\n`;
+            }
+            if (task.deliverable.artifactIds && task.deliverable.artifactIds.length > 0) {
+                report += `**Artifacts:**\n`;
+                for (const id of task.deliverable.artifactIds) {
+                    report += `- ${id}\n`;
+                }
+                report += `\n`;
+            }
+        }
+        // Blocked reason
+        if (task.blockedReason) {
+            report += `## Blocked\n\n`;
+            report += `**Reason:** ${task.blockedReason}\n\n`;
+        }
+        // Cost breakdown
+        report += `## Cost Breakdown\n\n`;
+        report += `**Total Cost:** $${task.actualCost.toFixed(2)}\n`;
+        if (task.budgetAllocated) {
+            report += `**Budget:** $${task.budgetAllocated.toFixed(2)}\n`;
+            report += `**Remaining:** $${(task.budgetRemaining || 0).toFixed(2)}\n`;
+        }
+        report += `**Runs:** ${runs.length}\n`;
+        report += `**Review Cycles:** ${task.reviewCycles}\n\n`;
+        // Run details
+        if (runs.length > 0) {
+            report += `### Runs\n\n`;
+            for (const run of runs) {
+                const agent = agentMap.get(run.agentId);
+                report += `- ${agent?.name || "Agent"} · ${run.model} · `;
+                report += `$${run.costUsd.toFixed(3)} · `;
+                report += `${run.status}`;
+                if (run.durationMs) {
+                    report += ` · ${(run.durationMs / 1000).toFixed(1)}s`;
+                }
+                report += `\n`;
+            }
+            report += `\n`;
+        }
+        // Footer
+        report += `---\n\n`;
+        report += `**Report Generated:** ${new Date().toISOString()}\n`;
+        report += `**Generated by:** Mission Control\n`;
+        return report;
     },
 });
 exports.getWithTimeline = (0, server_1.query)({
