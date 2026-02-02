@@ -35,7 +35,7 @@ export class AgentBot {
 
   async start() {
     // Find the agent in the database
-    const agents = await this.convex.query(api.agents.list, { projectId: undefined });
+    const agents = await this.convex.query(api.agents.listAll, {});
     const agent = agents.find((a: any) => a.name === this.agentName);
 
     if (!agent) {

@@ -148,6 +148,19 @@ export const listAll = query({
   },
 });
 
+/** List tasks assigned to a specific agent */
+export const listByAgent = query({
+  args: {
+    agentId: v.id("agents"),
+  },
+  handler: async (ctx, args) => {
+    const tasks = await ctx.db.query("tasks").collect();
+    return tasks.filter(task =>
+      task.assigneeIds && task.assigneeIds.includes(args.agentId)
+    );
+  },
+});
+
 /** Allowed toStatus values for actor HUMAN per fromStatus (for UI "Move to" menu) */
 export const getAllowedTransitionsForHuman = query({
   args: {},
