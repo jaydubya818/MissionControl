@@ -178,6 +178,12 @@ export default defineSchema({
     status: taskStatus,
     priority: taskPriority,
     
+    // Telegram thread reference
+    threadRef: v.optional(v.object({
+      chatId: v.string(),
+      threadId: v.string(),
+    })),
+    
     // Assignment
     creatorAgentId: v.optional(v.id("agents")),
     assigneeIds: v.array(v.id("agents")),
