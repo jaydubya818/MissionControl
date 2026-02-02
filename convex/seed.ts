@@ -48,124 +48,49 @@ export const seedV0 = mutation({
     // =========================================================================
     
     const agentConfigs = [
-      // SOFIE - Chief Agent Officer (CAO)
-      // Sofie is the top-level authority for Mission Control execution.
-      // All agents report to Sofie. Sofie owns:
-      // - Task triage + assignment
-      // - Approval decisions (directly or via policy automation she configures)
-      // - Dispute resolution (refute loops/conflicting recommendations)
-      // - Escalation handling (budget spikes/policy violations/incidents)
+      // COACH - Fitness & Productivity (Telegram Bot)
       {
-        name: "Sofie",
-        emoji: "👑",
-        role: "LEAD",
-        allowedTaskTypes: [], // All types - CAO has full access
-        budgetDaily: 25.00,
-        budgetPerRun: 3.00,
-        canSpawn: true,
-        maxSubAgents: 10,
-        isCAO: true, // Chief Agent Officer marker
-      },
-      // INTERNS
-      {
-        name: "Scout",
-        emoji: "🔍",
-        role: "INTERN",
-        allowedTaskTypes: ["CUSTOMER_RESEARCH", "SEO_RESEARCH"],
-        budgetDaily: 2.00,
-        budgetPerRun: 0.25,
-        canSpawn: false,
-      },
-      {
-        name: "Scribe",
-        emoji: "✍️",
-        role: "INTERN",
-        allowedTaskTypes: ["DOCS", "CONTENT"],
-        budgetDaily: 2.00,
-        budgetPerRun: 0.25,
-        canSpawn: false,
-      },
-      {
-        name: "Fetch",
-        emoji: "📦",
-        role: "INTERN",
-        allowedTaskTypes: ["OPS"],
-        budgetDaily: 2.00,
-        budgetPerRun: 0.25,
-        canSpawn: false,
-      },
-      {
-        name: "Echo",
-        emoji: "📢",
-        role: "INTERN",
-        allowedTaskTypes: ["SOCIAL"],
-        budgetDaily: 2.00,
-        budgetPerRun: 0.25,
-        canSpawn: false,
-      },
-      
-      // SPECIALISTS
-      {
-        name: "Pixel",
-        emoji: "🎨",
+        name: "Coach",
+        emoji: "🏋️",
         role: "SPECIALIST",
-        allowedTaskTypes: ["CONTENT", "SOCIAL"],
+        allowedTaskTypes: ["OPS", "CONTENT", "CUSTOMER_RESEARCH"],
         budgetDaily: 5.00,
         budgetPerRun: 0.75,
         canSpawn: true,
         maxSubAgents: 2,
       },
+      // CASEY - Operations & Documentation (Telegram Bot)
       {
-        name: "Atlas",
-        emoji: "🗺️",
+        name: "Casey",
+        emoji: "📋",
         role: "SPECIALIST",
-        allowedTaskTypes: ["SEO_RESEARCH", "CUSTOMER_RESEARCH"],
+        allowedTaskTypes: ["DOCS", "OPS", "CONTENT"],
         budgetDaily: 5.00,
         budgetPerRun: 0.75,
         canSpawn: true,
         maxSubAgents: 2,
       },
+      // ALEX - Engineering & Development (Telegram Bot)
       {
-        name: "Cipher",
-        emoji: "🔐",
+        name: "Alex",
+        emoji: "💻",
         role: "SPECIALIST",
-        allowedTaskTypes: ["ENGINEERING"],
+        allowedTaskTypes: ["ENGINEERING", "DOCS"],
         budgetDaily: 5.00,
         budgetPerRun: 0.75,
         canSpawn: true,
         maxSubAgents: 2,
       },
+      // JORDAN - Media & Creative (Telegram Bot)
       {
-        name: "Hermes",
-        emoji: "💬",
+        name: "Jordan",
+        emoji: "🎧",
         role: "SPECIALIST",
-        allowedTaskTypes: ["EMAIL_MARKETING", "SOCIAL"],
+        allowedTaskTypes: ["SOCIAL", "CONTENT", "EMAIL_MARKETING"],
         budgetDaily: 5.00,
         budgetPerRun: 0.75,
         canSpawn: true,
         maxSubAgents: 2,
-      },
-      
-      // LEADS
-      {
-        name: "Nova",
-        emoji: "⭐",
-        role: "LEAD",
-        allowedTaskTypes: [], // All types
-        budgetDaily: 12.00,
-        budgetPerRun: 1.50,
-        canSpawn: true,
-        maxSubAgents: 5,
-      },
-      {
-        name: "Sage",
-        emoji: "🧙",
-        role: "LEAD",
-        allowedTaskTypes: [], // All types
-        budgetDaily: 12.00,
-        budgetPerRun: 1.50,
-        canSpawn: true,
-        maxSubAgents: 5,
       },
     ];
 
@@ -214,7 +139,7 @@ export const seedV0 = mutation({
         type: "CONTENT",
         status: "ASSIGNED",
         priority: 2,
-        assigneeNames: ["Scribe"],
+        assigneeNames: ["Jordan"],
         labels: ["content", "blog"],
       },
       
@@ -225,7 +150,7 @@ export const seedV0 = mutation({
         type: "DOCS",
         status: "IN_PROGRESS",
         priority: 2,
-        assigneeNames: ["Scribe"],
+        assigneeNames: ["Casey"],
         workPlan: {
           bullets: [
             "Audit existing API docs for outdated information",
@@ -244,8 +169,8 @@ export const seedV0 = mutation({
         type: "SOCIAL",
         status: "REVIEW",
         priority: 2,
-        assigneeNames: ["Pixel"],
-        reviewerName: "Nova",
+        assigneeNames: ["Jordan"],
+        reviewerName: "Coach",
         workPlan: {
           bullets: [
             "Research trending formats on Twitter/LinkedIn",
@@ -268,7 +193,7 @@ export const seedV0 = mutation({
         type: "EMAIL_MARKETING",
         status: "NEEDS_APPROVAL",
         priority: 1,
-        assigneeNames: ["Hermes"],
+        assigneeNames: ["Jordan"],
         labels: ["email", "automation", "high-priority"],
       },
       
@@ -279,7 +204,7 @@ export const seedV0 = mutation({
         type: "ENGINEERING",
         status: "BLOCKED",
         priority: 1,
-        assigneeNames: ["Cipher"],
+        assigneeNames: ["Alex"],
         blockedReason: "Waiting for Stripe API keys from finance team",
         labels: ["engineering", "payments", "blocked"],
       },
@@ -291,7 +216,7 @@ export const seedV0 = mutation({
         type: "OPS",
         status: "DONE",
         priority: 3,
-        assigneeNames: ["Fetch"],
+        assigneeNames: ["Casey"],
         completedAt: Date.now() - 2 * 24 * 60 * 60 * 1000, // 2 days ago
         labels: ["ops", "onboarding"],
       },
@@ -361,7 +286,7 @@ export const seedV0 = mutation({
         projectId,
         taskId: inProgressTask.id,
         authorType: "AGENT",
-        authorAgentId: agentIds["Scribe"],
+        authorAgentId: agentIds["Casey"],
         type: "WORK_PLAN",
         content: "## Work Plan\n\n1. Audit existing API docs for outdated information\n2. Document new /agents and /tasks endpoints\n3. Add curl examples for each endpoint\n4. Update authentication section\n\n**Estimated Duration:** 4 hours",
       });
@@ -370,7 +295,7 @@ export const seedV0 = mutation({
         projectId,
         taskId: inProgressTask.id,
         authorType: "AGENT",
-        authorAgentId: agentIds["Scribe"],
+        authorAgentId: agentIds["Casey"],
         type: "PROGRESS",
         content: "**Progress: 40%**\n\nCompleted audit of existing docs. Found 3 deprecated endpoints and 2 missing new ones. Starting documentation of /agents endpoint now.",
       });
@@ -383,7 +308,7 @@ export const seedV0 = mutation({
         projectId,
         taskId: reviewTask.id,
         authorType: "AGENT",
-        authorAgentId: agentIds["Pixel"],
+        authorAgentId: agentIds["Jordan"],
         type: "ARTIFACT",
         content: "## Deliverable: Social Media Campaign\n\nAttached 10 posts with copy and image prompts. Ready for review.",
         artifacts: [
@@ -416,9 +341,9 @@ export const seedV0 = mutation({
         reviewToDoneRequiresApproval: true,
         budgetExceededRequiresApproval: true,
         redToolsRequireApproval: true,
-        // Sofie (CAO) authority rules
-        caoAgentName: "Sofie",
-        caoApprovalRequired: true,
+        // CAO authority rules (disabled - using team model)
+        caoAgentName: null,
+        caoApprovalRequired: false,
       },
       toolRiskMap: {
         // GREEN - safe
