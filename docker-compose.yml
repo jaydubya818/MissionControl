@@ -1,0 +1,25 @@
+# Mission Control UI — Docker Compose
+#
+# Prerequisites:
+# 1. Convex: run `npx convex codegen` (or `pnpm dev` once) so convex/_generated exists.
+# 2. Set VITE_CONVEX_URL to your Convex deployment URL (e.g. from Convex dashboard).
+#
+# Build and run:
+#   export VITE_CONVEX_URL=https://your-deployment.convex.cloud
+#   docker compose build
+#   docker compose up -d
+#
+# UI will be at http://localhost:3000
+
+services:
+  mission-control-ui:
+    build:
+      context: .
+      dockerfile: apps/mission-control-ui/Dockerfile
+      args:
+        VITE_CONVEX_URL: ${VITE_CONVEX_URL:-}
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_CONVEX_URL=${VITE_CONVEX_URL}
+    restart: unless-stopped

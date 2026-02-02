@@ -252,3 +252,28 @@ Always use the appropriate checklist template (see end of this doc).
 | Request approval | `mc approval request --task <id> ...` |
 | Check policy | `mc policy check --action-type <type> ...` |
 | Get my status | `mc agent status` |
+
+---
+
+## Convex API Reference (Mission Control)
+
+When integrating with Mission Control’s Convex backend, use these function names:
+
+| Action | Convex API |
+|--------|------------|
+| Register | `api.agents.register` (name, role, workspacePath, allowedTaskTypes, …) |
+| Heartbeat | `api.agents.heartbeat` (agentId, …) → returns `pendingTasks`, `claimableTasks`, `pendingNotifications`, `pendingApprovals` |
+| List tasks by status | `api.tasks.listByStatus` (status, limit) |
+| Claim / assign | `api.tasks.assign` (taskId, agentIds: [myAgentId], actorType: "AGENT", idempotencyKey) |
+| Transition task | `api.tasks.transition` (taskId, toStatus, actorType, actorAgentId, idempotencyKey, workPlan/deliverable/reviewChecklist as needed) |
+| Post work plan | `api.messages.postWorkPlan` (taskId, agentId, bullets, …) |
+| Post progress | `api.messages.postProgress` (taskId, agentId, content, …) |
+| Post comment | `api.messages.post` (taskId, authorType: "AGENT", authorAgentId, type: "COMMENT", content, mentions?: ["AgentName"]) |
+| List my notifications | `api.notifications.listByAgent` (agentId, unreadOnly) |
+| Mark notifications read | `api.notifications.markAllReadForAgent` (agentId) |
+| Request approval | `api.approvals.request` (requestorAgentId, actionType, actionSummary, riskLevel, justification, …) |
+| Check policy | `api.policy.evaluate` (agentId, actionType, toolName/transitionTo/…) |
+| Memory (WORKING.md, etc.) | `api.agentDocuments.set` / `api.agentDocuments.get` (agentId, type: "WORKING_MD" \| "DAILY_NOTE" \| "SESSION_MEMORY") |
+| Subscribe to thread | `api.subscriptions.subscribe` (agentId, taskId) |
+
+All mutations require an `idempotencyKey` where documented (e.g. transition, assign) for safe retries.

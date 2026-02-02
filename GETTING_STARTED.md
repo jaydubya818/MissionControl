@@ -20,11 +20,14 @@ Mission Control is now in **Phase 1 (Foundation)** with the following completed:
 - **Type System** - Complete types for all entities
 - **State Machine** - Deterministic task transitions with validator
 - **Policy Engine** - Risk classification and approval logic
-- **Database Schema** - Convex schema with 10 tables
+- **Database Schema** - Convex schema with 13 tables
+- **Multi-Project Support** - Projects table with projectId on all entities
+- **React UI** - Kanban, TaskDrawer, Sidebar, LiveFeed, Modals
 
 ### ✅ Documentation
 - **README.md** - Project overview and quick start
 - **RUNBOOK.md** - Operational procedures
+- **MULTI_PROJECT_MODEL.md** - Multi-project architecture
 - **This File** - Getting started guide
 
 ---
@@ -189,7 +192,28 @@ cd packages/shared && npm run typecheck
 
 ## Key Concepts to Understand
 
-### 1. Task State Machine
+### 1. Multi-Project Workspaces
+
+Mission Control supports multiple projects (workspaces). Every entity is scoped to a project:
+
+- **Project Switcher** - UI header dropdown to switch between projects
+- **Scoped Queries** - All list queries accept optional `projectId`
+- **Per-Project Policies** - Projects can have policy defaults
+
+**Key Files:**
+- `convex/projects.ts` - Project CRUD operations
+- `docs/MULTI_PROJECT_MODEL.md` - Complete documentation
+
+### 2. Sofie as CAO (Chief Agent Officer)
+
+**Sofie** is the top-level authority for Mission Control execution:
+
+- All agents report to Sofie
+- Sofie owns: task triage, approval decisions, dispute resolution, escalation handling
+- No agent may self-promote autonomy or execute RED actions without approval
+- DB is canonical; if instructions conflict, Sofie wins
+
+### 4. Task State Machine
 
 Tasks flow through a deterministic state machine:
 
@@ -212,7 +236,7 @@ INBOX → ASSIGNED → IN_PROGRESS → REVIEW → DONE
 - Complete rules in `packages/state-machine/src/transitions.ts`
 - Used by Convex mutations to enforce transitions
 
-### 2. Policy Engine
+### 5. Policy Engine
 
 Classifies tool actions by risk and determines approval requirements:
 
@@ -232,7 +256,7 @@ Classifies tool actions by risk and determines approval requirements:
 - Allowlists in `packages/policy-engine/src/allowlists.ts`
 - Policy rules in `packages/policy-engine/src/rules.ts`
 
-### 3. Budgets & Cost Containment
+### 6. Budgets & Cost Containment
 
 Three levels of budget enforcement:
 
@@ -249,7 +273,7 @@ Three levels of budget enforcement:
 - Budget checks in Convex mutations
 - Budget enforcer daemon in `packages/workers`
 
-### 4. Observability
+### 7. Observability
 
 Complete audit trail of all activity:
 

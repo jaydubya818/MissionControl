@@ -5,7 +5,7 @@
  */
 
 import { TaskStatus, TransitionActor } from "@mission-control/shared";
-import { findTransitionRule, isValidTransition } from "./transitions";
+import { findTransitionRule, isValidTransition, TRANSITION_RULES } from "./transitions";
 import { getRequiredArtifacts, isTerminalStatus } from "./states";
 
 export interface ValidationResult {
@@ -117,13 +117,12 @@ export function getValidNextStatuses(
   from: TaskStatus,
   actor: TransitionActor
 ): TaskStatus[] {
-  const rules = require("./transitions").TRANSITION_RULES;
-  return rules
+  return TRANSITION_RULES
     .filter(
-      (rule: any) =>
+      (rule) =>
         rule.from === from && rule.allowedActors.includes(actor)
     )
-    .map((rule: any) => rule.to);
+    .map((rule) => rule.to);
 }
 
 /**

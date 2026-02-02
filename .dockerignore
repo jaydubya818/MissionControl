@@ -1,0 +1,8 @@
+node_modules
+.git
+*.log
+.env.local
+.env
+.turbo
+apps/mission-control-ui/dist
+packages/*/dist

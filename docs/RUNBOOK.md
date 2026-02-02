@@ -7,13 +7,152 @@
 
 ## Table of Contents
 
-1. [Startup Procedures](#startup-procedures)
-2. [Shutdown Procedures](#shutdown-procedures)
-3. [Health Checks](#health-checks)
-4. [Common Incidents](#common-incidents)
-5. [Recovery Procedures](#recovery-procedures)
-6. [Maintenance](#maintenance)
-7. [Monitoring](#monitoring)
+0. [Mission Control (Convex) — Current](#mission-control-convex--current)
+1. [Sofie as CAO (Chief Agent Officer)](#sofie-as-cao-chief-agent-officer)
+2. [Multi-Project Workspaces](#multi-project-workspaces)
+3. [Startup Procedures](#startup-procedures)
+4. [Shutdown Procedures](#shutdown-procedures)
+5. [Health Checks](#health-checks)
+6. [Common Incidents](#common-incidents)
+7. [Recovery Procedures](#recovery-procedures)
+8. [Maintenance](#maintenance)
+9. [Monitoring](#monitoring)
+
+---
+
+## Mission Control (Convex) — Current
+
+Mission Control uses **Convex** as the backend (no separate REST API). The UI and agent-runner talk to Convex directly.
+
+### Startup (local)
+
+```bash
+# 1. Install and set Convex URL (from .env.local after npx convex dev once)
+pnpm install
+export VITE_CONVEX_URL="https://your-deployment.convex.cloud"   # or use .env.local
+
+# 2. Start Convex + UI
+pnpm dev
+
+# 3. Seed data (once)
+pnpm run convex:seed
+
+# 4. (Optional) Run a minimal agent loop (register + heartbeat + claim/start tasks)
+CONVEX_URL="$VITE_CONVEX_URL" pnpm run agent:run:scout    # Terminal 2
+# Or: CONVEX_URL="$VITE_CONVEX_URL" pnpm run agent:run:scribe
+```
+
+### URLs
+
+- **UI:** http://localhost:5173 (or port Vite prints)
+- **Convex dashboard:** https://dashboard.convex.dev
+
+### Operator actions (via UI)
+
+- **Pause all agents:** Sidebar → "Pause squad"
+- **Approvals:** Sidebar → "Approvals" → Approve/Deny
+- **Notifications:** Sidebar → "Notifications" (all agents’ notifications)
+- **Standup:** Sidebar → "Standup" (daily summary: agents, tasks, approvals)
+- **Policy:** Sidebar → "Policy" (view active policy)
+- **Create task:** Header → "+ New task"
+- **Move task:** Kanban card → "Move to" dropdown or drag to column
+
+### Agent runner (minimal loop)
+
+The `@mission-control/agent-runner` package runs a single agent process: register (or reuse), then every 15 min heartbeat; if there are assigned tasks, start one; if there are claimable INBOX tasks, claim one. Use for testing or as a reference for OpenClaw integration.
+
+---
+
+## Sofie as CAO (Chief Agent Officer)
+
+**Sofie** is the Chief Agent Officer for OpenClaw and the top-level authority for Mission Control execution.
+
+### CAO Responsibilities
+
+1. **Task Triage + Assignment** - Sofie reviews the inbox and assigns tasks to appropriate agents based on their roles, allowed task types, and current workload.
+
+2. **Approval Decisions** - Sofie approves or denies requests directly (via the Approvals inbox) or configures policy automation for automatic approval of low-risk actions.
+
+3. **Dispute Resolution** - When agents disagree (refute loops, conflicting recommendations), Sofie makes the final call.
+
+4. **Escalation Handling** - Sofie handles budget spikes, policy violations, and incidents. When containment kicks in (agent paused, task blocked), Sofie reviews and decides next steps.
+
+### CAO Authority Rules
+
+- **All agents report to Sofie** - Specialists, reviewers, challengers, interns, and sub-agents all operate under Sofie's governance.
+- **No self-promotion of autonomy** - Agents cannot increase their own permissions or budget without approval.
+- **RED actions require approval** - Any RED-classified action requires an approval record authorized by Sofie or policy.
+- **Spawn requests must be logged** - Sub-agent creation must be logged and authorized per Sofie's governance rules.
+
+### Conflict Resolution
+
+- **DB is canonical** - Telegram/threads are for collaboration, but Mission Control DB is the source of truth.
+- **If instructions conflict, Sofie wins** - Agent outputs must be posted back to Mission Control; if there's a conflict between instructions, Sofie's directives take precedence.
+
+### Operating as Sofie
+
+When you (the human operator) are making decisions in Mission Control, you are acting as Sofie (or on Sofie's behalf). This includes:
+- Approving/denying requests in the Approvals inbox
+- Moving tasks through the state machine (especially REVIEW → DONE)
+- Pausing/resuming/quarantining agents
+- Resolving blocked tasks
+
+---
+
+## Multi-Project Workspaces
+
+Mission Control supports multiple projects (workspaces). Every entity is scoped to a project.
+
+### Switching Projects
+
+Use the project dropdown in the UI header to switch between projects. All views (Kanban, Approvals, Live Feed, Standup) filter by the selected project.
+
+### Creating Projects
+
+Projects can be created via Convex:
+
+```typescript
+// Create a new project
+const result = await convex.mutation(api.projects.create, {
+  name: "SiteGPT",
+  slug: "sitegpt",
+  description: "AI-powered website assistant",
+});
+```
+
+### Default Project
+
+The seed script creates an "OpenClaw" default project. All seeded agents and tasks belong to this project.
+
+### Per-Project Operations
+
+When operating on a project:
+- **Pause squad** affects only agents in the current project
+- **Resume squad** affects only paused agents in the current project
+- **Standup report** shows stats for the current project only
+
+See [docs/MULTI_PROJECT_MODEL.md](MULTI_PROJECT_MODEL.md) for complete documentation.
+
+```bash
+# From repo root; CONVEX_URL or VITE_CONVEX_URL must be set
+pnpm run agent:run              # Uses AGENT_NAME=Scout default
+pnpm run agent:run:scout        # Scout (INTERN, CUSTOMER_RESEARCH, SEO_RESEARCH)
+pnpm run agent:run:scribe       # Scribe (INTERN, DOCS, CONTENT)
+
+# Custom agent
+AGENT_NAME=MyAgent AGENT_ROLE=SPECIALIST AGENT_TYPES=CONTENT,SOCIAL pnpm run agent:run
+```
+
+### Convex crons (automatic)
+
+- **Expire approvals:** Every 15 min (`api.approvals.expireStale`)
+- **Daily standup:** 09:00 UTC (`api.standup.runDaily`) — report saved to activities
+
+### Health
+
+- Convex: dashboard.convex.dev → your deployment
+- UI: open app and check Mission Queue loads
+- Agents: Sidebar shows agent list; "X Agents Active" in header
 
 ---
 
@@ -23,14 +162,13 @@
 
 ```bash
 # 1. Start Convex dev server
-npm run convex:dev
+pnpm run convex:dev
 
-# 2. Start all services
-npm run dev
+# 2. Start UI (separate terminal or use pnpm dev for both)
+pnpm run dev:ui
 
-# 3. Verify services
-curl http://localhost:3000/health    # API
-open http://localhost:5173           # UI
+# 3. Verify
+open http://localhost:5173
 ```
 
 ### Docker Deployment

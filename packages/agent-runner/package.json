@@ -1,0 +1,23 @@
+{
+  "name": "@mission-control/agent-runner",
+  "version": "0.9.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal agent loop: register, heartbeat, claim tasks, transition (for OpenClaw integration)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/run.js",
+    "run": "tsx src/run.ts",
+    "run:scout": "AGENT_NAME=Scout AGENT_ROLE=INTERN AGENT_TYPES=CUSTOMER_RESEARCH,SEO_RESEARCH tsx src/run.ts",
+    "run:scribe": "AGENT_NAME=Scribe AGENT_ROLE=INTERN AGENT_TYPES=DOCS,CONTENT tsx src/run.ts"
+  },
+  "dependencies": {
+    "convex": "^1.14.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

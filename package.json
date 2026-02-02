@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"npx convex dev\" \"turbo run dev --filter=mission-control-ui\"",
+    "dev:ui": "pnpm --filter mission-control-ui dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
@@ -19,7 +20,10 @@
     "setup": "npm install && npm run build",
     "convex:dev": "npx convex dev",
     "convex:deploy": "npx convex deploy",
-    "convex:seed": "npx convex run seed:run"
+    "convex:seed": "npx convex run seed:seedV0",
+    "agent:run": "pnpm --filter @mission-control/agent-runner run",
+    "agent:run:scout": "AGENT_NAME=Scout AGENT_ROLE=INTERN AGENT_TYPES=CUSTOMER_RESEARCH,SEO_RESEARCH pnpm --filter @mission-control/agent-runner run",
+    "agent:run:scribe": "AGENT_NAME=Scribe AGENT_ROLE=INTERN AGENT_TYPES=DOCS,CONTENT pnpm --filter @mission-control/agent-runner run"
   },
   "dependencies": {
     "convex": "^1.14.0"

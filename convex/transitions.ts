@@ -1,9 +1,12 @@
 /**
- * Task transition event append-only. Task status MUST be updated only via tasks.transitionTaskStatus.
+ * Task transition event append-only.
+ * Task status MUST be updated only via tasks.transitionTaskStatus.
  */
 
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { mutation } from "./_generated/server";
+import { v } from "convex/values";
 
 export async function appendTransition(
   ctx: MutationCtx,
@@ -11,28 +14,49 @@ export async function appendTransition(
     taskId: Id<"tasks">;
     fromStatus: string;
     toStatus: string;
-    actor: "agent" | "human" | "system";
-    actorId?: string;
+    actorType: "AGENT" | "HUMAN" | "SYSTEM";
+    actorAgentId?: Id<"agents">;
+    actorUserId?: string;
     reason?: string;
-    artifactsProvided?: string[];
+    artifactsSnapshot?: any;
     idempotencyKey: string;
   }
-): Promise<Id<"taskTransitions">> => {
+): Promise<Id<"taskTransitions">> {
   const existing = await ctx.db
     .query("taskTransitions")
-    .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", args.idempotencyKey))
+    .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", args.idempotencyKey))
     .unique();
+
   if (existing) {
     return existing._id;
   }
+
   return await ctx.db.insert("taskTransitions", {
     taskId: args.taskId,
     fromStatus: args.fromStatus,
     toStatus: args.toStatus,
-    actor: args.actor,
-    actorId: args.actorId,
+    actorType: args.actorType,
+    actorAgentId: args.actorAgentId,
+    actorUserId: args.actorUserId,
     reason: args.reason,
-    artifactsProvided: args.artifactsProvided,
+    artifactsSnapshot: args.artifactsSnapshot,
     idempotencyKey: args.idempotencyKey,
   });
 }
+
+export const transitions_append = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    fromStatus: v.string(),
+    toStatus: v.string(),
+    actorType: v.union(v.literal("AGENT"), v.literal("HUMAN"), v.literal("SYSTEM")),
+    actorAgentId: v.optional(v.id("agents")),
+    actorUserId: v.optional(v.string()),
+    reason: v.optional(v.string()),
+    artifactsSnapshot: v.optional(v.any()),
+    idempotencyKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await appendTransition(ctx, args);
+  },
+});
