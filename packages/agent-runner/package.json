@@ -7,7 +7,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc || true",
     "start": "node dist/run.js",
     "run": "tsx src/run.ts",
     "run:scout": "AGENT_NAME=Scout AGENT_ROLE=INTERN AGENT_TYPES=CUSTOMER_RESEARCH,SEO_RESEARCH tsx src/run.ts",

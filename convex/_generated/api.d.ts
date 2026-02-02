@@ -28,6 +28,7 @@ import type * as projects from "../projects.js";
 import type * as runs from "../runs.js";
 import type * as search from "../search.js";
 import type * as seed from "../seed.js";
+import type * as setupProjects from "../setupProjects.js";
 import type * as standup from "../standup.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as taskRouter from "../taskRouter.js";
@@ -63,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   runs: typeof runs;
   search: typeof search;
   seed: typeof seed;
+  setupProjects: typeof setupProjects;
   standup: typeof standup;
   subscriptions: typeof subscriptions;
   taskRouter: typeof taskRouter;
