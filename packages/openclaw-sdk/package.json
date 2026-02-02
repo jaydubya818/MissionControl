@@ -1,0 +1,29 @@
+{
+  "name": "@mission-control/openclaw-sdk",
+  "version": "1.0.0",
+  "description": "OpenClaw integration SDK for Mission Control",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "example:simple": "tsx examples/simple-agent.ts",
+    "example:approval": "tsx examples/approval-agent.ts"
+  },
+  "keywords": [
+    "openclaw",
+    "mission-control",
+    "agent",
+    "automation"
+  ],
+  "author": "Mission Control",
+  "license": "MIT",
+  "dependencies": {
+    "convex": "^1.16.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

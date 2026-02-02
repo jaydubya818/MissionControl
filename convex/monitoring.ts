@@ -6,7 +6,6 @@
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { api } from "./_generated/api";
 
 // ============================================================================
 // ERROR LOGGING

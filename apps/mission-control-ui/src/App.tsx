@@ -16,6 +16,7 @@ import { SearchBar } from "./SearchBar";
 import { AgentDashboard } from "./AgentDashboard";
 import { KanbanFilters } from "./KanbanFilters";
 import { CostAnalytics } from "./CostAnalytics";
+import { AnalyticsDashboard } from "./AnalyticsDashboard";
 
 // ============================================================================
 // PROJECT CONTEXT
@@ -98,6 +99,7 @@ export default function App() {
   const [showStandup, setShowStandup] = useState(false);
   const [showAgentDashboard, setShowAgentDashboard] = useState(false);
   const [showCostAnalytics, setShowCostAnalytics] = useState(false);
+  const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
   const [kanbanFilters, setKanbanFilters] = useState<{
     agents: string[];
     priorities: number[];
@@ -176,6 +178,8 @@ export default function App() {
       setShowAgentDashboard={setShowAgentDashboard}
       showCostAnalytics={showCostAnalytics}
       setShowCostAnalytics={setShowCostAnalytics}
+      showAdvancedAnalytics={showAdvancedAnalytics}
+      setShowAdvancedAnalytics={setShowAdvancedAnalytics}
       kanbanFilters={kanbanFilters}
       setKanbanFilters={setKanbanFilters}
       handlePauseSquad={handlePauseSquad}
@@ -206,6 +210,8 @@ function AppContent({
   setShowAgentDashboard,
   showCostAnalytics,
   setShowCostAnalytics,
+  showAdvancedAnalytics,
+  setShowAdvancedAnalytics,
   kanbanFilters,
   setKanbanFilters,
   handlePauseSquad,
@@ -231,6 +237,8 @@ function AppContent({
   setShowAgentDashboard: (v: boolean) => void;
   showCostAnalytics: boolean;
   setShowCostAnalytics: (v: boolean) => void;
+  showAdvancedAnalytics: boolean;
+  setShowAdvancedAnalytics: (v: boolean) => void;
   kanbanFilters: {
     agents: string[];
     priorities: number[];
@@ -294,6 +302,23 @@ function AppContent({
             }}
           >
             💰 Costs
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAdvancedAnalytics(true)}
+            style={{
+              padding: "6px 12px",
+              background: "#f59e0b",
+              border: "1px solid #d97706",
+              borderRadius: 6,
+              color: "#fff",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              marginRight: "8px",
+            }}
+          >
+            📈 Analytics
           </button>
           <button type="button" className="app-header-docs">
             Docs
@@ -376,6 +401,13 @@ function AppContent({
         <CostAnalytics
           projectId={projectId}
           onClose={() => setShowCostAnalytics(false)}
+        />
+      )}
+
+      {showAdvancedAnalytics && (
+        <AnalyticsDashboard
+          projectId={projectId}
+          onClose={() => setShowAdvancedAnalytics(false)}
         />
       )}
       

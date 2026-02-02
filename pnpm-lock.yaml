@@ -69,6 +69,22 @@ importers:
         specifier: ^5.3.3
         version: 5.9.3
 
+  packages/openclaw-sdk:
+    dependencies:
+      convex:
+        specifier: ^1.16.5
+        version: 1.31.7(react@18.3.1)
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.30
+      tsx:
+        specifier: ^4.7.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   packages/policy-engine:
     dependencies:
       '@mission-control/shared':

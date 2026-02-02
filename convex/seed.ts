@@ -48,6 +48,17 @@ export const seedV0 = mutation({
     // =========================================================================
     
     const agentConfigs = [
+      // SOFIE - Chief Agent Officer (CAO) - Top-level orchestrator
+      {
+        name: "Sofie",
+        emoji: "🎯",
+        role: "LEAD",
+        allowedTaskTypes: ["STRATEGIC", "OPS", "CONTENT", "ENGINEERING", "DOCS", "SOCIAL", "CUSTOMER_RESEARCH", "EMAIL_MARKETING"],
+        budgetDaily: 12.00,
+        budgetPerRun: 1.50,
+        canSpawn: true,
+        maxSubAgents: 4,
+      },
       // COACH - Fitness & Productivity (Telegram Bot)
       {
         name: "Coach",
@@ -341,9 +352,9 @@ export const seedV0 = mutation({
         reviewToDoneRequiresApproval: true,
         budgetExceededRequiresApproval: true,
         redToolsRequireApproval: true,
-        // CAO authority rules (disabled - using team model)
-        caoAgentName: null,
-        caoApprovalRequired: false,
+        // CAO authority rules - Sofie as Chief Agent Officer
+        caoAgentName: "Sofie",
+        caoApprovalRequired: true,
       },
       toolRiskMap: {
         // GREEN - safe

@@ -21,7 +21,7 @@ export const check = query({
     
     // Try to query database
     try {
-      const projects = await ctx.db.query("projects").take(1);
+      await ctx.db.query("projects").take(1);
       
       return {
         status: "healthy",
