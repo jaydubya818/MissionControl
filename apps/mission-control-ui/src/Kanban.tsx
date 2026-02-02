@@ -11,6 +11,8 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  useDroppable,
+  useDraggable,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -298,7 +300,6 @@ function Column({
   onSelectTask: (id: Id<"tasks">) => void;
   onMoveTo: (taskId: Id<"tasks">, fromStatus: string, toStatus: string) => void;
 }) {
-  const { useDroppable } = require("@dnd-kit/core");
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
   return (
@@ -375,7 +376,6 @@ function Card({
   onSelect: () => void;
   onMoveTo: (toStatus: string) => void;
 }) {
-  const { useDraggable } = require("@dnd-kit/core");
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task._id,
     disabled: allowedToStatuses.length === 0,
