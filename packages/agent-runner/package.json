@@ -1,6 +1,6 @@
 {
   "name": "@mission-control/agent-runner",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "type": "module",
   "description": "Minimal agent loop: register, heartbeat, claim tasks, transition (for OpenClaw integration)",
