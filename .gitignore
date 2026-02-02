@@ -48,3 +48,4 @@ convex/_generated/
 .cache/
 temp/
 tmp/
+.vercel

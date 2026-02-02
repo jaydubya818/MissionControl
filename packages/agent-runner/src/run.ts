@@ -6,7 +6,9 @@
  */
 
 import { ConvexHttpClient } from "convex/browser";
+// @ts-ignore - ESM resolution issue with tsx
 import { api } from "../../../convex/_generated/api.js";
+// @ts-ignore
 import type { Id } from "../../../convex/_generated/dataModel.js";
 
 const CONVEX_URL = process.env.CONVEX_URL ?? process.env.VITE_CONVEX_URL ?? "";
@@ -15,6 +17,7 @@ const AGENT_ROLE = process.env.AGENT_ROLE ?? "INTERN";
 const AGENT_WORKSPACE = process.env.AGENT_WORKSPACE ?? `/tmp/mc-agent-${AGENT_NAME.toLowerCase()}`;
 const AGENT_TYPES = (process.env.AGENT_TYPES ?? "CUSTOMER_RESEARCH,SEO_RESEARCH").split(",").map((s) => s.trim());
 const HEARTBEAT_INTERVAL_MS = parseInt(process.env.HEARTBEAT_INTERVAL_MS ?? "900000", 10); // 15 min default
+const PROJECT_SLUG = process.env.PROJECT_SLUG ?? "openclaw"; // Default project
 
 if (!CONVEX_URL) {
   console.error("Set CONVEX_URL or VITE_CONVEX_URL");
@@ -23,13 +26,21 @@ if (!CONVEX_URL) {
 
 const client = new ConvexHttpClient(CONVEX_URL);
 
-async function getOrRegisterAgent(): Promise<Id<"agents">> {
+async function getOrRegisterAgent(): Promise<{ agentId: Id<"agents">; projectId: Id<"projects"> }> {
+  // Get project by slug
+  const project = await client.query(api.projects.getBySlug, { slug: PROJECT_SLUG });
+  if (!project) {
+    throw new Error(`Project "${PROJECT_SLUG}" not found. Create it first or set PROJECT_SLUG env var.`);
+  }
+  
   const existing = await client.query(api.agents.getByName, { name: AGENT_NAME });
   if (existing) {
-    console.log(`[${AGENT_NAME}] Already registered: ${existing._id}`);
-    return existing._id;
+    console.log(`[${AGENT_NAME}] Already registered: ${existing._id} (Project: ${project.name})`);
+    return { agentId: existing._id, projectId: project._id };
   }
+  
   const result = await client.mutation(api.agents.register, {
+    projectId: project._id,
     name: AGENT_NAME,
     role: AGENT_ROLE,
     workspacePath: AGENT_WORKSPACE,
@@ -37,8 +48,8 @@ async function getOrRegisterAgent(): Promise<Id<"agents">> {
     emoji: process.env.AGENT_EMOJI,
   });
   const agent = (result as { agent: { _id: Id<"agents"> } }).agent;
-  console.log(`[${AGENT_NAME}] Registered: ${agent._id}`);
-  return agent._id;
+  console.log(`[${AGENT_NAME}] Registered: ${agent._id} (Project: ${project.name})`);
+  return { agentId: agent._id, projectId: project._id };
 }
 
 async function heartbeat(agentId: Id<"agents">) {
@@ -120,8 +131,9 @@ async function runLoop(agentId: Id<"agents">) {
 }
 
 async function main() {
-  const agentId = await getOrRegisterAgent();
+  const { agentId, projectId } = await getOrRegisterAgent();
   console.log(`[${AGENT_NAME}] Heartbeat every ${HEARTBEAT_INTERVAL_MS / 1000}s`);
+  console.log(`[${AGENT_NAME}] Project: ${PROJECT_SLUG} (${projectId})`);
 
   const tick = () => runLoop(agentId).catch((e) => console.error(`[${AGENT_NAME}]`, e));
   await tick();

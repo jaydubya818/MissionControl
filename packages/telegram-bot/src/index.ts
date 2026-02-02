@@ -26,6 +26,7 @@ import {
   handleResumeSquad,
   handleQuarantine,
 } from "./commands/squad.js";
+import { handleThreadReply } from "./threads.js";
 
 dotenv.config();
 
@@ -118,6 +119,21 @@ bot.command("start", async (ctx) => {
     `I'm your command bus for managing OpenClaw agents.\n\n` +
     `Type /help to see available commands.`
   );
+});
+
+// ============================================================================
+// THREAD REPLIES
+// ============================================================================
+
+// Handle replies to task threads
+bot.on("message", async (ctx) => {
+  // Skip if it's a command
+  if (ctx.message && "text" in ctx.message && ctx.message.text?.startsWith("/")) {
+    return;
+  }
+  
+  // Handle thread replies
+  await handleThreadReply(convex, ctx.message);
 });
 
 // ============================================================================

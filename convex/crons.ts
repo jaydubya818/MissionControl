@@ -40,4 +40,12 @@ crons.daily(
   internal.telegram.prepareDailyCEOBrief
 );
 
+// Auto-route execution requests every 5 minutes
+// Note: executorRouter.autoRoute will be available after next convex push
+// crons.interval(
+//   "auto-route executions",
+//   { minutes: 5 },
+//   internal.executorRouter.autoRoute
+// );
+
 export default crons;

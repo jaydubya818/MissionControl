@@ -26,7 +26,7 @@
     "agent:run:scribe": "AGENT_NAME=Scribe AGENT_ROLE=INTERN AGENT_TYPES=DOCS,CONTENT pnpm --filter @mission-control/agent-runner run"
   },
   "dependencies": {
-    "convex": "^1.14.0"
+    "convex": "^1.31.7"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

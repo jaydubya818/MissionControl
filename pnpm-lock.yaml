@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       convex:
-        specifier: ^1.14.0
+        specifier: ^1.31.7
         version: 1.31.7(react@18.3.1)
     devDependencies:
       concurrently:
