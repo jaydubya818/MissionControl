@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd apps/mission-control-ui && pnpm build",
+  "outputDirectory": "apps/mission-control-ui/dist",
+  "installCommand": "pnpm install",
+  "framework": null,
+  "devCommand": "pnpm dev"
+}
