@@ -15,11 +15,36 @@ body {
    MOBILE RESPONSIVE
    ============================================================================ */
 
+/* Touch-friendly buttons (minimum 44x44px) */
+button,
+.app-header-button,
+.app-header-docs,
+.live-feed-filter-btn,
+.agent-row {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+  .live-feed {
+    width: 280px;
+    min-width: 280px;
+  }
+  
+  .agents-sidebar {
+    width: 240px;
+    min-width: 240px;
+  }
+}
+
+/* Mobile (< 768px) */
 @media (max-width: 768px) {
   .app-header {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
+    padding: 12px 16px;
   }
   
   .app-header-title {
@@ -27,10 +52,11 @@ body {
   }
   
   .app-header-metrics {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
     margin-left: 0;
+    font-size: 0.75rem;
   }
   
   .app-header-right {
@@ -38,9 +64,15 @@ body {
     gap: 8px;
   }
   
+  .app-header-button {
+    padding: 10px 14px;
+    font-size: 0.8rem;
+  }
+  
   .kanban-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    padding: 12px;
   }
   
   .kanban-column {
@@ -50,8 +82,71 @@ body {
   .live-feed {
     display: none !important;
   }
+  
+  .agents-sidebar {
+    position: fixed;
+    left: -100%;
+    top: 0;
+    bottom: 0;
+    z-index: 1000;
+    transition: left 0.3s;
+    box-shadow: 2px 0 12px rgba(0,0,0,0.3);
+  }
+  
+  .agents-sidebar.open {
+    left: 0;
+  }
+  
+  .mobile-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+    display: none;
+  }
+  
+  .mobile-overlay.open {
+    display: block;
+  }
+  
+  /* Mobile bottom navigation */
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #1e293b;
+    border-top: 1px solid #334155;
+    display: flex;
+    justify-content: space-around;
+    padding: 8px;
+    z-index: 100;
+  }
+  
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.7rem;
+    cursor: pointer;
+    min-width: 60px;
+  }
+  
+  .mobile-nav-item.active {
+    color: #3b82f6;
+  }
+  
+  .mobile-nav-icon {
+    font-size: 1.2rem;
+  }
 }
 
+/* Small mobile (< 640px) */
 @media (max-width: 640px) {
   .app-header-docs {
     display: none;
@@ -61,13 +156,36 @@ body {
     font-size: 0.7rem;
   }
   
-  .kanban-column {
-    min-width: 240px !important;
+  .app-header-status {
+    font-size: 0.7rem;
   }
   
-  .sidebar {
-    width: 100%;
-    max-width: 280px;
+  .kanban-column {
+    min-width: 260px !important;
+  }
+  
+  .app-header-button {
+    padding: 8px 12px;
+    font-size: 0.75rem;
+  }
+  
+  /* Stack metrics vertically on very small screens */
+  .app-header-metrics {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* Landscape mobile */
+@media (max-height: 600px) and (orientation: landscape) {
+  .mobile-nav {
+    display: none;
+  }
+  
+  .agents-sidebar {
+    width: 200px;
+    min-width: 200px;
   }
 }
 

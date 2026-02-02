@@ -30,9 +30,11 @@ import type * as search from "../search.js";
 import type * as seed from "../seed.js";
 import type * as standup from "../standup.js";
 import type * as subscriptions from "../subscriptions.js";
+import type * as taskRouter from "../taskRouter.js";
 import type * as tasks from "../tasks.js";
 import type * as telegram from "../telegram.js";
 import type * as transitions from "../transitions.js";
+import type * as webhooks from "../webhooks.js";
 
 import type {
   ApiFromModules,
@@ -63,9 +65,11 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   standup: typeof standup;
   subscriptions: typeof subscriptions;
+  taskRouter: typeof taskRouter;
   tasks: typeof tasks;
   telegram: typeof telegram;
   transitions: typeof transitions;
+  webhooks: typeof webhooks;
 }>;
 
 /**

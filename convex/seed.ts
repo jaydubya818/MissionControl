@@ -59,6 +59,28 @@ export const seedV0 = mutation({
         canSpawn: true,
         maxSubAgents: 4,
       },
+      // PERRY - Chief Operating Officer (COO) - Operations lead for SellerFi
+      {
+        name: "Perry",
+        emoji: "📊",
+        role: "LEAD",
+        allowedTaskTypes: ["OPS", "STRATEGIC", "DOCS", "CUSTOMER_RESEARCH"],
+        budgetDaily: 12.00,
+        budgetPerRun: 1.50,
+        canSpawn: true,
+        maxSubAgents: 3,
+      },
+      // SELLERFI - Developer/Programmer - SellerFi platform development
+      {
+        name: "SellerFi",
+        emoji: "⚡",
+        role: "SPECIALIST",
+        allowedTaskTypes: ["ENGINEERING", "DOCS", "OPS"],
+        budgetDaily: 5.00,
+        budgetPerRun: 0.75,
+        canSpawn: true,
+        maxSubAgents: 2,
+      },
       // COACH - Fitness & Productivity (Telegram Bot)
       {
         name: "Coach",

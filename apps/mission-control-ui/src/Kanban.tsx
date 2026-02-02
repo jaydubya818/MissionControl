@@ -3,6 +3,17 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useToast } from "./Toast";
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 
 const COLUMNS: { status: string; label: string; color: string }[] = [
   { status: "INBOX", label: "Inbox", color: "#6366f1" },
@@ -59,11 +70,33 @@ export function Kanban({
     types: string[];
   };
 }) {
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [lastMove, setLastMove] = useState<{
+    taskId: Id<"tasks">;
+    fromStatus: string;
+    toStatus: string;
+  } | null>(null);
+  
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
   const allowedMap = useQuery(api.tasks.getAllowedTransitionsForHuman);
   const transitionTask = useMutation(api.tasks.transition);
   const { toast } = useToast();
+  
+  // Configure sensors for both mouse and touch
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required to start drag
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250, // 250ms hold required for touch
+        tolerance: 5,
+      },
+    })
+  );
 
   if (tasks === undefined || agents === undefined) {
     return <div style={{ padding: 24 }}>Loading tasks…</div>;
@@ -97,8 +130,10 @@ export function Kanban({
   const agentMap = new Map(agents.map((a: Doc<"agents">) => [a._id, a]));
   const byStatus = (status: string) => filteredTasks.filter((t: Doc<"tasks">) => t.status === status);
 
-  const handleMoveTo = async (taskId: Id<"tasks">, _fromStatus: string, toStatus: string) => {
+  const handleMoveTo = async (taskId: Id<"tasks">, fromStatus: string, toStatus: string) => {
     try {
+      setLastMove({ taskId, fromStatus, toStatus });
+      
       const result = await transitionTask({
         taskId,
         toStatus,
@@ -106,32 +141,141 @@ export function Kanban({
         actorUserId: "operator",
         idempotencyKey: `ui-${taskId}-${toStatus}-${Date.now()}`,
       });
+      
       if (result && typeof result === "object" && "success" in result && !result.success) {
         const err = (result as { errors?: { message: string }[] }).errors?.[0]?.message ?? "Transition failed";
         toast(err, true);
+      } else {
+        toast(`Moved to ${STATUS_LABELS[toStatus]}`);
       }
     } catch (e) {
       toast(e instanceof Error ? e.message : "Transition failed", true);
     }
   };
+  
+  const handleUndo = async () => {
+    if (!lastMove) return;
+    
+    try {
+      await transitionTask({
+        taskId: lastMove.taskId,
+        toStatus: lastMove.fromStatus,
+        actorType: "HUMAN",
+        actorUserId: "operator",
+        idempotencyKey: `undo-${lastMove.taskId}-${Date.now()}`,
+      });
+      toast("Undone");
+      setLastMove(null);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Undo failed", true);
+    }
+  };
+  
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = filteredTasks.find((t) => t._id === event.active.id);
+    if (task) {
+      setActiveTask(task as Task);
+    }
+  };
+  
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveTask(null);
+    
+    const { active, over } = event;
+    
+    if (!over || active.id === over.id) return;
+    
+    const task = filteredTasks.find((t) => t._id === active.id);
+    const toStatus = over.id as string;
+    
+    if (!task) return;
+    
+    const allowed = allowedMap?.[task.status] ?? [];
+    if (!allowed.includes(toStatus)) {
+      toast("Transition not allowed", true);
+      return;
+    }
+    
+    handleMoveTo(task._id, task.status, toStatus);
+  };
 
   return (
-    <div style={{ display: "flex", gap: 12, overflowX: "auto", minHeight: 500, paddingBottom: 16 }}>
-      {COLUMNS.map((col) => (
-        <Column
-          key={col.status}
-          title={col.label}
-          color={col.color}
-          status={col.status}
-          tasks={byStatus(col.status) as Task[]}
-          agentMap={agentMap}
-          allowedMap={allowedMap ?? {}}
-          onSelectTask={onSelectTask}
-          onMoveTo={handleMoveTo}
-          onDrop={handleMoveTo}
-        />
-      ))}
-    </div>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div style={{ position: "relative" }}>
+        {/* Undo button */}
+        {lastMove && (
+          <div style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            zIndex: 100,
+          }}>
+            <button
+              onClick={handleUndo}
+              style={{
+                padding: "12px 20px",
+                background: "#3b82f6",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                fontSize: "0.875rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              ↶ Undo
+            </button>
+          </div>
+        )}
+        
+        <div style={{ display: "flex", gap: 12, overflowX: "auto", minHeight: 500, paddingBottom: 16 }}>
+          {COLUMNS.map((col) => (
+            <Column
+              key={col.status}
+              title={col.label}
+              color={col.color}
+              status={col.status}
+              tasks={byStatus(col.status) as Task[]}
+              agentMap={agentMap}
+              allowedMap={allowedMap ?? {}}
+              onSelectTask={onSelectTask}
+              onMoveTo={handleMoveTo}
+            />
+          ))}
+        </div>
+      </div>
+      
+      {/* Drag overlay */}
+      <DragOverlay>
+        {activeTask ? (
+          <div style={{
+            padding: "12px",
+            background: "#0f172a",
+            border: "2px solid #3b82f6",
+            borderRadius: 6,
+            color: "#e2e8f0",
+            fontSize: "0.875rem",
+            minWidth: 240,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+            opacity: 0.95,
+          }}>
+            <div style={{ fontWeight: 500, marginBottom: 8 }}>{activeTask.title}</div>
+            <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>
+              {activeTask.type} • P{activeTask.priority}
+            </div>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
 
@@ -144,7 +288,6 @@ function Column({
   allowedMap,
   onSelectTask,
   onMoveTo,
-  onDrop,
 }: {
   title: string;
   color: string;
@@ -154,41 +297,22 @@ function Column({
   allowedMap: Record<string, string[]>;
   onSelectTask: (id: Id<"tasks">) => void;
   onMoveTo: (taskId: Id<"tasks">, fromStatus: string, toStatus: string) => void;
-  onDrop: (taskId: Id<"tasks">, fromStatus: string, toStatus: string) => void;
 }) {
-  const [dragOver, setDragOver] = useState(false);
-  const canAccept = (fromStatus: string) => (allowedMap[fromStatus] ?? []).includes(status);
+  const { useDroppable } = require("@dnd-kit/core");
+  const { setNodeRef, isOver } = useDroppable({ id: status });
 
   return (
     <div
+      ref={setNodeRef}
       style={{
         minWidth: 260,
         maxWidth: 260,
-        background: dragOver ? "#25334d" : "#1e293b",
+        background: isOver ? "#25334d" : "#1e293b",
         borderRadius: 8,
-        border: dragOver ? `2px dashed ${color}` : "1px solid #334155",
+        border: isOver ? `2px dashed ${color}` : "1px solid #334155",
         display: "flex",
         flexDirection: "column",
         transition: "background 0.15s, border 0.15s",
-      }}
-      onDragOver={(e) => {
-        const taskId = e.dataTransfer.getData("taskId") as Id<"tasks"> | "";
-        const fromStatus = e.dataTransfer.getData("fromStatus") || "";
-        if (taskId && fromStatus && canAccept(fromStatus)) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-          setDragOver(true);
-        }
-      }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const taskId = e.dataTransfer.getData("taskId") as Id<"tasks"> | "";
-        const fromStatus = e.dataTransfer.getData("fromStatus") || "";
-        if (taskId && fromStatus && status !== fromStatus && canAccept(fromStatus)) {
-          onDrop(taskId, fromStatus, status);
-        }
       }}
     >
       <div
@@ -251,20 +375,28 @@ function Card({
   onSelect: () => void;
   onMoveTo: (toStatus: string) => void;
 }) {
+  const { useDraggable } = require("@dnd-kit/core");
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task._id,
+    disabled: allowedToStatuses.length === 0,
+  });
+  
   const priority = PRIORITY_LABELS[task.priority] || PRIORITY_LABELS[3];
   const assignees = task.assigneeIds
     .map((id) => agentMap.get(id))
     .filter(Boolean);
 
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : undefined;
+
   return (
     <div
-      draggable={allowedToStatuses.length > 0}
-      onDragStart={(e) => {
-        e.dataTransfer.setData("taskId", task._id);
-        e.dataTransfer.setData("fromStatus", task.status);
-        e.dataTransfer.effectAllowed = "move";
-      }}
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
       style={{
+        ...style,
         width: "100%",
         padding: "12px",
         marginBottom: 8,
@@ -273,11 +405,12 @@ function Card({
         borderRadius: 6,
         color: "#e2e8f0",
         fontSize: "0.875rem",
-        transition: "border-color 0.15s",
+        transition: "border-color 0.15s, opacity 0.15s",
         cursor: allowedToStatuses.length > 0 ? "grab" : "pointer",
+        opacity: isDragging ? 0.5 : 1,
       }}
-      onMouseOver={(e) => (e.currentTarget.style.borderColor = "#475569")}
-      onMouseOut={(e) => (e.currentTarget.style.borderColor = "#334155")}
+      onMouseOver={(e) => !isDragging && (e.currentTarget.style.borderColor = "#475569")}
+      onMouseOut={(e) => !isDragging && (e.currentTarget.style.borderColor = "#334155")}
     >
       <div
         role="button"

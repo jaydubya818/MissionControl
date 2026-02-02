@@ -709,4 +709,71 @@ export default defineSchema({
     .index("by_name", ["name"])
     .index("by_project", ["projectId"])
     .index("by_project_active", ["projectId", "active"]),
+  
+  // ============================================================================
+  // WEBHOOKS
+  // ============================================================================
+  
+  webhooks: defineTable({
+    projectId: v.optional(v.id("projects")),
+    
+    name: v.string(),
+    url: v.string(),
+    secret: v.string(), // For HMAC signature
+    
+    // Events to subscribe to
+    events: v.array(v.string()),
+    
+    // Filters
+    filters: v.optional(v.object({
+      taskTypes: v.optional(v.array(v.string())),
+      agentIds: v.optional(v.array(v.id("agents"))),
+      statuses: v.optional(v.array(v.string())),
+    })),
+    
+    // Status
+    active: v.boolean(),
+    
+    // Stats
+    deliveryCount: v.number(),
+    failureCount: v.number(),
+    lastDeliveryAt: v.optional(v.number()),
+    lastFailureAt: v.optional(v.number()),
+    
+    createdBy: v.optional(v.string()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_active", ["active"])
+    .index("by_project_active", ["projectId", "active"]),
+  
+  webhookDeliveries: defineTable({
+    webhookId: v.id("webhooks"),
+    projectId: v.optional(v.id("projects")),
+    
+    event: v.string(),
+    payload: v.any(),
+    
+    // Delivery
+    url: v.string(),
+    status: v.union(
+      v.literal("PENDING"),
+      v.literal("DELIVERED"),
+      v.literal("FAILED"),
+      v.literal("RETRYING")
+    ),
+    
+    attempts: v.number(),
+    maxAttempts: v.number(),
+    nextRetryAt: v.optional(v.number()),
+    
+    // Response
+    responseStatus: v.optional(v.number()),
+    responseBody: v.optional(v.string()),
+    error: v.optional(v.string()),
+    
+    deliveredAt: v.optional(v.number()),
+  })
+    .index("by_webhook", ["webhookId"])
+    .index("by_status", ["status"])
+    .index("by_next_retry", ["nextRetryAt"]),
 });
