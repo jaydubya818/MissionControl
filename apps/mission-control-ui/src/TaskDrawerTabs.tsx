@@ -9,6 +9,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useState } from "react";
 import { PeerReviewPanel } from "./PeerReviewPanel";
+import { ExportReportButton } from "./ExportReportButton";
 
 type Tab = "overview" | "timeline" | "artifacts" | "approvals" | "cost" | "reviews";
 
@@ -93,7 +94,7 @@ export function TaskDrawerTabs({
       {/* Header */}
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #334155" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
+          <div style={{ flex: 1 }}>
             <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>{task.title}</h2>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <StatusBadge status={task.status} />
@@ -101,7 +102,10 @@ export function TaskDrawerTabs({
               <span style={tagStyle}>P{task.priority}</span>
             </div>
           </div>
-          <button onClick={onClose} style={closeButtonStyle}>×</button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <ExportReportButton taskId={taskId} />
+            <button onClick={onClose} style={closeButtonStyle}>×</button>
+          </div>
         </div>
       </div>
 

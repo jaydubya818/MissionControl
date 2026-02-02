@@ -1,8 +1,5 @@
-/**
- * PM2 Ecosystem Configuration
- * 
- * Manages all Mission Control agents
- */
+// PM2 Ecosystem Configuration
+// Manages all Mission Control agents
 
 module.exports = {
   apps: [

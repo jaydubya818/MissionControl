@@ -19,6 +19,11 @@ import { CostAnalytics } from "./CostAnalytics";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { HealthDashboard } from "./HealthDashboard";
 import { MonitoringDashboard } from "./MonitoringDashboard";
+import { QuickActionsMenu } from "./QuickActionsMenu";
+import { CommandPalette } from "./CommandPalette";
+import { KeyboardShortcutsHelp, useKeyboardShortcuts } from "./KeyboardShortcuts";
+import { DashboardOverview } from "./DashboardOverview";
+import { ActivityFeedModal } from "./ActivityFeed";
 
 // ============================================================================
 // PROJECT CONTEXT
@@ -104,6 +109,10 @@ export default function App() {
   const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
   const [showHealthDashboard, setShowHealthDashboard] = useState(false);
   const [showMonitoringDashboard, setShowMonitoringDashboard] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [showDashboardOverview, setShowDashboardOverview] = useState(false);
+  const [showActivityFeed, setShowActivityFeed] = useState(false);
   const [kanbanFilters, setKanbanFilters] = useState<{
     agents: string[];
     priorities: number[];
@@ -127,6 +136,14 @@ export default function App() {
   const pauseAll = useMutation(api.agents.pauseAll);
   const resumeAll = useMutation(api.agents.resumeAll);
   const { toast } = useToast();
+  
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onNewTask: () => setShowCreateTask(true),
+    onSearch: () => setShowCommandPalette(true),
+    onApprovals: () => setShowApprovals(true),
+    onAgents: () => setShowAgentDashboard(true),
+  });
   
   // Provide project context
   const projectContextValue = { projectId, setProjectId, project };
@@ -188,6 +205,14 @@ export default function App() {
       setShowHealthDashboard={setShowHealthDashboard}
       showMonitoringDashboard={showMonitoringDashboard}
       setShowMonitoringDashboard={setShowMonitoringDashboard}
+      showCommandPalette={showCommandPalette}
+      setShowCommandPalette={setShowCommandPalette}
+      showKeyboardHelp={showKeyboardHelp}
+      setShowKeyboardHelp={setShowKeyboardHelp}
+      showDashboardOverview={showDashboardOverview}
+      setShowDashboardOverview={setShowDashboardOverview}
+      showActivityFeed={showActivityFeed}
+      setShowActivityFeed={setShowActivityFeed}
       kanbanFilters={kanbanFilters}
       setKanbanFilters={setKanbanFilters}
       handlePauseSquad={handlePauseSquad}
@@ -224,6 +249,14 @@ function AppContent({
   setShowHealthDashboard,
   showMonitoringDashboard,
   setShowMonitoringDashboard,
+  showCommandPalette,
+  setShowCommandPalette,
+  showKeyboardHelp,
+  setShowKeyboardHelp,
+  showDashboardOverview,
+  setShowDashboardOverview,
+  showActivityFeed,
+  setShowActivityFeed,
   kanbanFilters,
   setKanbanFilters,
   handlePauseSquad,
@@ -255,6 +288,14 @@ function AppContent({
   setShowHealthDashboard: (v: boolean) => void;
   showMonitoringDashboard: boolean;
   setShowMonitoringDashboard: (v: boolean) => void;
+  showCommandPalette: boolean;
+  setShowCommandPalette: (v: boolean) => void;
+  showKeyboardHelp: boolean;
+  setShowKeyboardHelp: (v: boolean) => void;
+  showDashboardOverview: boolean;
+  setShowDashboardOverview: (v: boolean) => void;
+  showActivityFeed: boolean;
+  setShowActivityFeed: (v: boolean) => void;
   kanbanFilters: {
     agents: string[];
     priorities: number[];
@@ -370,6 +411,57 @@ function AppContent({
           >
             📊 Monitor
           </button>
+          <button
+            type="button"
+            onClick={() => setShowDashboardOverview(true)}
+            style={{
+              padding: "6px 12px",
+              background: "#06b6d4",
+              border: "1px solid #0891b2",
+              borderRadius: 6,
+              color: "#fff",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              marginRight: "8px",
+            }}
+          >
+            📊 Overview
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowActivityFeed(true)}
+            style={{
+              padding: "6px 12px",
+              background: "#ec4899",
+              border: "1px solid #db2777",
+              borderRadius: 6,
+              color: "#fff",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              marginRight: "8px",
+            }}
+          >
+            📋 Activity
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowKeyboardHelp(true)}
+            style={{
+              padding: "6px 12px",
+              background: "#64748b",
+              border: "1px solid #475569",
+              borderRadius: 6,
+              color: "#fff",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              marginRight: "8px",
+            }}
+          >
+            ⌨️
+          </button>
           <button type="button" className="app-header-docs">
             Docs
           </button>
@@ -472,6 +564,46 @@ function AppContent({
           onClose={() => setShowMonitoringDashboard(false)}
         />
       )}
+      {showCommandPalette && (
+        <CommandPalette
+          projectId={projectId}
+          onClose={() => setShowCommandPalette(false)}
+          onSelectTask={setSelectedTaskId}
+          onCreateTask={() => {
+            setShowCommandPalette(false);
+            setShowCreateTask(true);
+          }}
+          onOpenApprovals={() => {
+            setShowCommandPalette(false);
+            setShowApprovals(true);
+          }}
+          onOpenAgents={() => {
+            setShowCommandPalette(false);
+            setShowAgentDashboard(true);
+          }}
+        />
+      )}
+      {showKeyboardHelp && (
+        <KeyboardShortcutsHelp onClose={() => setShowKeyboardHelp(false)} />
+      )}
+      {showDashboardOverview && (
+        <DashboardOverview
+          projectId={projectId}
+          onClose={() => setShowDashboardOverview(false)}
+        />
+      )}
+      {showActivityFeed && (
+        <ActivityFeedModal
+          projectId={projectId}
+          onClose={() => setShowActivityFeed(false)}
+        />
+      )}
+      
+      {/* Quick Actions Menu */}
+      <QuickActionsMenu
+        projectId={projectId}
+        onCreateTask={() => setShowCreateTask(true)}
+      />
       
       {/* Error Boundary wraps everything */}
     </div>
