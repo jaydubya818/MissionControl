@@ -15,6 +15,7 @@ import { useToast } from "./Toast";
 import { SearchBar } from "./SearchBar";
 import { AgentDashboard } from "./AgentDashboard";
 import { KanbanFilters } from "./KanbanFilters";
+import { CostAnalytics } from "./CostAnalytics";
 
 // ============================================================================
 // PROJECT CONTEXT
@@ -96,7 +97,7 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showStandup, setShowStandup] = useState(false);
   const [showAgentDashboard, setShowAgentDashboard] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [showCostAnalytics, setShowCostAnalytics] = useState(false);
   const [kanbanFilters, setKanbanFilters] = useState<{
     agents: string[];
     priorities: number[];
@@ -171,8 +172,12 @@ export default function App() {
       setShowNotifications={setShowNotifications}
       showStandup={showStandup}
       setShowStandup={setShowStandup}
-      searchQuery={searchQuery}
-      setSearchQuery={setSearchQuery}
+      showAgentDashboard={showAgentDashboard}
+      setShowAgentDashboard={setShowAgentDashboard}
+      showCostAnalytics={showCostAnalytics}
+      setShowCostAnalytics={setShowCostAnalytics}
+      kanbanFilters={kanbanFilters}
+      setKanbanFilters={setKanbanFilters}
       handlePauseSquad={handlePauseSquad}
       handleResumeSquad={handleResumeSquad}
       timeStr={timeStr}
@@ -197,8 +202,12 @@ function AppContent({
   setShowNotifications,
   showStandup,
   setShowStandup,
-  searchQuery,
-  setSearchQuery,
+  showAgentDashboard,
+  setShowAgentDashboard,
+  showCostAnalytics,
+  setShowCostAnalytics,
+  kanbanFilters,
+  setKanbanFilters,
   handlePauseSquad,
   handleResumeSquad,
   timeStr,
@@ -218,8 +227,16 @@ function AppContent({
   setShowNotifications: (v: boolean) => void;
   showStandup: boolean;
   setShowStandup: (v: boolean) => void;
-  searchQuery: string;
-  setSearchQuery: (v: string) => void;
+  showAgentDashboard: boolean;
+  setShowAgentDashboard: (v: boolean) => void;
+  showCostAnalytics: boolean;
+  setShowCostAnalytics: (v: boolean) => void;
+  kanbanFilters: {
+    agents: string[];
+    priorities: number[];
+    types: string[];
+  };
+  setKanbanFilters: (v: { agents: string[]; priorities: number[]; types: string[] }) => void;
   handlePauseSquad: () => void;
   handleResumeSquad: () => void;
   timeStr: string;
@@ -261,7 +278,24 @@ function AppContent({
               marginRight: "8px",
             }}
           >
-            📊 Dashboard
+            📊 Agents
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCostAnalytics(true)}
+            style={{
+              padding: "6px 12px",
+              background: "#8b5cf6",
+              border: "1px solid #7c3aed",
+              borderRadius: 6,
+              color: "#fff",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              marginRight: "8px",
+            }}
+          >
+            💰 Costs
           </button>
           <button type="button" className="app-header-docs">
             Docs
@@ -340,6 +374,14 @@ function AppContent({
           onClose={() => setShowAgentDashboard(false)}
         />
       )}
+      {showCostAnalytics && (
+        <CostAnalytics
+          projectId={projectId}
+          onClose={() => setShowCostAnalytics(false)}
+        />
+      )}
+      
+      {/* Error Boundary wraps everything */}
     </div>
   );
 }

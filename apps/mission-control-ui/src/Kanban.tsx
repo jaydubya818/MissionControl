@@ -49,9 +49,15 @@ const STATUS_LABELS: Record<string, string> = {
 export function Kanban({ 
   projectId,
   onSelectTask,
+  filters,
 }: { 
   projectId: Id<"projects"> | null;
   onSelectTask: (id: Id<"tasks">) => void;
+  filters?: {
+    agents: string[];
+    priorities: number[];
+    types: string[];
+  };
 }) {
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
@@ -63,8 +69,33 @@ export function Kanban({
     return <div style={{ padding: 24 }}>Loading tasks…</div>;
   }
 
+  // Apply filters
+  const filteredTasks = tasks.filter((task) => {
+    if (!filters) return true;
+    
+    // Filter by agent
+    if (filters.agents.length > 0) {
+      const hasMatchingAgent = task.assigneeIds.some((id) =>
+        filters.agents.includes(id)
+      );
+      if (!hasMatchingAgent && task.assigneeIds.length > 0) return false;
+    }
+    
+    // Filter by priority
+    if (filters.priorities.length > 0) {
+      if (!filters.priorities.includes(task.priority)) return false;
+    }
+    
+    // Filter by type
+    if (filters.types.length > 0) {
+      if (!filters.types.includes(task.type)) return false;
+    }
+    
+    return true;
+  });
+
   const agentMap = new Map(agents.map((a: Doc<"agents">) => [a._id, a]));
-  const byStatus = (status: string) => tasks.filter((t: Doc<"tasks">) => t.status === status);
+  const byStatus = (status: string) => filteredTasks.filter((t: Doc<"tasks">) => t.status === status);
 
   const handleMoveTo = async (taskId: Id<"tasks">, _fromStatus: string, toStatus: string) => {
     try {

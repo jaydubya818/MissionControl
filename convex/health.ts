@@ -70,7 +70,7 @@ export const ready = query({
       checks.agents = agents.length > 0;
       
       // Check policy exists
-      const policies = await ctx.db.query("policy").take(1);
+      const policies = await ctx.db.query("policies").take(1);
       checks.policy = policies.length > 0;
       
       const allReady = Object.values(checks).every((v) => v);
@@ -225,7 +225,7 @@ export const status = query({
       status: a.status,
       spendToday: a.spendToday,
       budgetDaily: a.budgetDaily,
-      lastHeartbeat: a.lastHeartbeat,
+      lastHeartbeat: a.lastHeartbeatAt,
     }));
     
     return {
@@ -238,7 +238,7 @@ export const status = query({
       })),
       recentAlerts: recentAlerts.map((a) => ({
         severity: a.severity,
-        message: a.message,
+        message: a.title,
         timestamp: a._creationTime,
       })),
       agents: agentStatuses,

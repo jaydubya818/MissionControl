@@ -47,12 +47,22 @@ export const listByTask = query({
 });
 
 export const listRecent = query({
-  args: { limit: v.optional(v.number()) },
+  args: {
+    projectId: v.optional(v.id("projects")),
+    limit: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
-    return await ctx.db
+    let runs = await ctx.db
       .query("runs")
       .order("desc")
       .take(args.limit ?? 100);
+    
+    // Filter by project if provided
+    if (args.projectId) {
+      runs = runs.filter((r) => r.projectId === args.projectId);
+    }
+    
+    return runs;
   },
 });
 

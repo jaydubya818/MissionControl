@@ -11,6 +11,66 @@ body {
   min-height: 100vh;
 }
 
+/* ============================================================================
+   MOBILE RESPONSIVE
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .app-header-title {
+    font-size: 1rem;
+  }
+  
+  .app-header-metrics {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-left: 0;
+  }
+  
+  .app-header-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .kanban-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .kanban-column {
+    min-width: 280px !important;
+  }
+  
+  .live-feed {
+    display: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-header-docs {
+    display: none;
+  }
+  
+  .app-header-time {
+    font-size: 0.7rem;
+  }
+  
+  .kanban-column {
+    min-width: 240px !important;
+  }
+  
+  .sidebar {
+    width: 100%;
+    max-width: 280px;
+  }
+}
+
 /* Header (reference: MISSION CONTROL, search, metrics, Docs, time, ONLINE) */
 .app-header {
   padding: 12px 20px;

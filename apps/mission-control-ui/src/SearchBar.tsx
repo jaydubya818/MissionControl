@@ -16,7 +16,7 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
   const results = useQuery(
     api.search.searchAll,
     query.length >= 2 && projectId
-      ? { projectId, query, limit: 10 }
+      ? { projectId: projectId as any, query, limit: 10 }
       : "skip"
   );
 
@@ -24,7 +24,7 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
   const suggestions = useQuery(
     api.search.getSuggestions,
     query.length >= 2 && projectId
-      ? { projectId, prefix: query }
+      ? { projectId: projectId as any, prefix: query }
       : "skip"
   );
 
