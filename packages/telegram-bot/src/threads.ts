@@ -6,7 +6,7 @@
 
 import type { Telegraf } from "telegraf";
 import { ConvexHttpClient } from "convex/browser";
-import { api } from "../../../convex/_generated/api";
+import { api } from "../../../convex/_generated/api.js";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;

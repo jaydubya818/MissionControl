@@ -78,6 +78,7 @@ export declare const listByTask: import("convex/server").RegisteredQuery<"public
     costUsd: number;
 }[]>>;
 export declare const listRecent: import("convex/server").RegisteredQuery<"public", {
+    projectId?: import("convex/values").GenericId<"projects"> | undefined;
     limit?: number | undefined;
 }, Promise<{
     _id: import("convex/values").GenericId<"runs">;

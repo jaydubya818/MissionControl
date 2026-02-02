@@ -44,122 +44,49 @@ exports.seedV0 = (0, server_1.mutation)({
         // AGENTS (11 total: 4 INTERN, 4 SPECIALIST, 3 LEAD including Sofie as CAO)
         // =========================================================================
         const agentConfigs = [
-            // SOFIE - Chief Agent Officer (CAO)
-            // Sofie is the top-level authority for Mission Control execution.
-            // All agents report to Sofie. Sofie owns:
-            // - Task triage + assignment
-            // - Approval decisions (directly or via policy automation she configures)
-            // - Dispute resolution (refute loops/conflicting recommendations)
-            // - Escalation handling (budget spikes/policy violations/incidents)
+            // COACH - Fitness & Productivity (Telegram Bot)
             {
-                name: "Sofie",
-                emoji: "👑",
-                role: "LEAD",
-                allowedTaskTypes: [], // All types - CAO has full access
-                budgetDaily: 25.00,
-                budgetPerRun: 3.00,
-                canSpawn: true,
-                maxSubAgents: 10,
-                isCAO: true, // Chief Agent Officer marker
-            },
-            // INTERNS
-            {
-                name: "Scout",
-                emoji: "🔍",
-                role: "INTERN",
-                allowedTaskTypes: ["CUSTOMER_RESEARCH", "SEO_RESEARCH"],
-                budgetDaily: 2.00,
-                budgetPerRun: 0.25,
-                canSpawn: false,
-            },
-            {
-                name: "Scribe",
-                emoji: "✍️",
-                role: "INTERN",
-                allowedTaskTypes: ["DOCS", "CONTENT"],
-                budgetDaily: 2.00,
-                budgetPerRun: 0.25,
-                canSpawn: false,
-            },
-            {
-                name: "Fetch",
-                emoji: "📦",
-                role: "INTERN",
-                allowedTaskTypes: ["OPS"],
-                budgetDaily: 2.00,
-                budgetPerRun: 0.25,
-                canSpawn: false,
-            },
-            {
-                name: "Echo",
-                emoji: "📢",
-                role: "INTERN",
-                allowedTaskTypes: ["SOCIAL"],
-                budgetDaily: 2.00,
-                budgetPerRun: 0.25,
-                canSpawn: false,
-            },
-            // SPECIALISTS
-            {
-                name: "Pixel",
-                emoji: "🎨",
+                name: "Coach",
+                emoji: "🏋️",
                 role: "SPECIALIST",
-                allowedTaskTypes: ["CONTENT", "SOCIAL"],
+                allowedTaskTypes: ["OPS", "CONTENT", "CUSTOMER_RESEARCH"],
                 budgetDaily: 5.00,
                 budgetPerRun: 0.75,
                 canSpawn: true,
                 maxSubAgents: 2,
             },
+            // CASEY - Operations & Documentation (Telegram Bot)
             {
-                name: "Atlas",
-                emoji: "🗺️",
+                name: "Casey",
+                emoji: "📋",
                 role: "SPECIALIST",
-                allowedTaskTypes: ["SEO_RESEARCH", "CUSTOMER_RESEARCH"],
+                allowedTaskTypes: ["DOCS", "OPS", "CONTENT"],
                 budgetDaily: 5.00,
                 budgetPerRun: 0.75,
                 canSpawn: true,
                 maxSubAgents: 2,
             },
+            // ALEX - Engineering & Development (Telegram Bot)
             {
-                name: "Cipher",
-                emoji: "🔐",
+                name: "Alex",
+                emoji: "💻",
                 role: "SPECIALIST",
-                allowedTaskTypes: ["ENGINEERING"],
+                allowedTaskTypes: ["ENGINEERING", "DOCS"],
                 budgetDaily: 5.00,
                 budgetPerRun: 0.75,
                 canSpawn: true,
                 maxSubAgents: 2,
             },
+            // JORDAN - Media & Creative (Telegram Bot)
             {
-                name: "Hermes",
-                emoji: "💬",
+                name: "Jordan",
+                emoji: "🎧",
                 role: "SPECIALIST",
-                allowedTaskTypes: ["EMAIL_MARKETING", "SOCIAL"],
+                allowedTaskTypes: ["SOCIAL", "CONTENT", "EMAIL_MARKETING"],
                 budgetDaily: 5.00,
                 budgetPerRun: 0.75,
                 canSpawn: true,
                 maxSubAgents: 2,
-            },
-            // LEADS
-            {
-                name: "Nova",
-                emoji: "⭐",
-                role: "LEAD",
-                allowedTaskTypes: [], // All types
-                budgetDaily: 12.00,
-                budgetPerRun: 1.50,
-                canSpawn: true,
-                maxSubAgents: 5,
-            },
-            {
-                name: "Sage",
-                emoji: "🧙",
-                role: "LEAD",
-                allowedTaskTypes: [], // All types
-                budgetDaily: 12.00,
-                budgetPerRun: 1.50,
-                canSpawn: true,
-                maxSubAgents: 5,
             },
         ];
         const agentIds = {};
@@ -203,7 +130,7 @@ exports.seedV0 = (0, server_1.mutation)({
                 type: "CONTENT",
                 status: "ASSIGNED",
                 priority: 2,
-                assigneeNames: ["Scribe"],
+                assigneeNames: ["Jordan"],
                 labels: ["content", "blog"],
             },
             // IN_PROGRESS
@@ -213,7 +140,7 @@ exports.seedV0 = (0, server_1.mutation)({
                 type: "DOCS",
                 status: "IN_PROGRESS",
                 priority: 2,
-                assigneeNames: ["Scribe"],
+                assigneeNames: ["Casey"],
                 workPlan: {
                     bullets: [
                         "Audit existing API docs for outdated information",
@@ -387,9 +314,9 @@ exports.seedV0 = (0, server_1.mutation)({
                 reviewToDoneRequiresApproval: true,
                 budgetExceededRequiresApproval: true,
                 redToolsRequireApproval: true,
-                // Sofie (CAO) authority rules
-                caoAgentName: "Sofie",
-                caoApprovalRequired: true,
+                // CAO authority rules (disabled - using team model)
+                caoAgentName: null,
+                caoApprovalRequired: false,
             },
             toolRiskMap: {
                 // GREEN - safe

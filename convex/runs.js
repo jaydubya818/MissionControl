@@ -44,12 +44,20 @@ exports.listByTask = (0, server_1.query)({
     },
 });
 exports.listRecent = (0, server_1.query)({
-    args: { limit: values_1.v.optional(values_1.v.number()) },
+    args: {
+        projectId: values_1.v.optional(values_1.v.id("projects")),
+        limit: values_1.v.optional(values_1.v.number()),
+    },
     handler: async (ctx, args) => {
-        return await ctx.db
+        let runs = await ctx.db
             .query("runs")
             .order("desc")
             .take(args.limit ?? 100);
+        // Filter by project if provided
+        if (args.projectId) {
+            runs = runs.filter((r) => r.projectId === args.projectId);
+        }
+        return runs;
     },
 });
 // ============================================================================
