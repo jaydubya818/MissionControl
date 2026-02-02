@@ -138,7 +138,7 @@ bot.on("message", async (ctx) => {
 
 // Handle inline button callbacks
 bot.on("callback_query", async (ctx) => {
-  const data = ctx.callbackQuery.data;
+  const data = 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
   
   if (!data) {
     await ctx.answerCbQuery("No data received");
@@ -180,7 +180,7 @@ bot.on("callback_query", async (ctx) => {
 // ============================================================================
 
 bot.on("callback_query", async (ctx) => {
-  const data = ctx.callbackQuery.data;
+  const data = 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
   
   if (!data) {
     await ctx.answerCbQuery("No data received");

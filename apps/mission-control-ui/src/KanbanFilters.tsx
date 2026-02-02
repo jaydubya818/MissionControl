@@ -60,29 +60,41 @@ export function KanbanFilters({ projectId, filters, onFiltersChange }: KanbanFil
   const hasFilters = filters.agents.length > 0 || filters.priorities.length > 0 || filters.types.length > 0;
   
   return (
-    <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
-      <div className="flex items-center gap-6 flex-wrap">
+    <div
+      style={{
+        background: "#1e293b",
+        borderBottom: "1px solid #334155",
+        padding: "12px 20px",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
         {/* Priority Filters */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "#94a3b8" }}>
             Priority:
           </span>
           {[1, 2, 3].map((priority) => {
             const isActive = filters.priorities.includes(priority);
             const colors = {
-              1: "border-red-500 text-red-700 dark:text-red-400",
-              2: "border-orange-500 text-orange-700 dark:text-orange-400",
-              3: "border-blue-500 text-blue-700 dark:text-blue-400",
+              1: { bg: "#ef4444", text: "#fff" },
+              2: { bg: "#f97316", text: "#fff" },
+              3: { bg: "#3b82f6", text: "#fff" },
             };
+            const color = colors[priority as keyof typeof colors];
             return (
               <button
                 key={priority}
                 onClick={() => togglePriority(priority)}
-                className={`px-3 py-1 text-xs rounded-full border-2 transition-all ${
-                  isActive
-                    ? `${colors[priority as keyof typeof colors]} bg-opacity-20`
-                    : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400"
-                }`}
+                style={{
+                  padding: "4px 12px",
+                  fontSize: "0.75rem",
+                  borderRadius: "12px",
+                  border: "none",
+                  background: isActive ? color.bg : "#334155",
+                  color: isActive ? color.text : "#94a3b8",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
               >
                 P{priority}
               </button>
@@ -91,31 +103,36 @@ export function KanbanFilters({ projectId, filters, onFiltersChange }: KanbanFil
         </div>
         
         {/* Agent Filters */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "#94a3b8" }}>
             Agents:
           </span>
-          <div className="flex items-center gap-1 flex-wrap max-w-md">
-            {agents.slice(0, 6).map((agent) => {
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap", maxWidth: "400px" }}>
+            {agents.slice(0, 5).map((agent) => {
               const isActive = filters.agents.includes(agent._id);
               return (
                 <button
                   key={agent._id}
                   onClick={() => toggleAgent(agent._id)}
-                  className={`px-2 py-1 text-xs rounded transition-all ${
-                    isActive
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  }`}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "0.75rem",
+                    borderRadius: "6px",
+                    border: "none",
+                    background: isActive ? "#3b82f6" : "#334155",
+                    color: isActive ? "#fff" : "#94a3b8",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
                   title={agent.name}
                 >
-                  {agent.emoji || "🤖"} {agent.name}
+                  {agent.emoji || "🤖"}
                 </button>
               );
             })}
-            {agents.length > 6 && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                +{agents.length - 6} more
+            {agents.length > 5 && (
+              <span style={{ fontSize: "0.7rem", color: "#64748b" }}>
+                +{agents.length - 5}
               </span>
             )}
           </div>
@@ -123,30 +140,35 @@ export function KanbanFilters({ projectId, filters, onFiltersChange }: KanbanFil
         
         {/* Type Filters */}
         {taskTypes.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "#94a3b8" }}>
               Type:
             </span>
-            <div className="flex items-center gap-1 flex-wrap max-w-md">
-              {taskTypes.slice(0, 5).map((type) => {
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap", maxWidth: "400px" }}>
+              {taskTypes.slice(0, 4).map((type) => {
                 const isActive = filters.types.includes(type);
                 return (
                   <button
                     key={type}
                     onClick={() => toggleType(type)}
-                    className={`px-2 py-1 text-xs rounded transition-all ${
-                      isActive
-                        ? "bg-purple-500 text-white"
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                    }`}
+                    style={{
+                      padding: "4px 8px",
+                      fontSize: "0.7rem",
+                      borderRadius: "6px",
+                      border: "none",
+                      background: isActive ? "#8b5cf6" : "#334155",
+                      color: isActive ? "#fff" : "#94a3b8",
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
                   >
                     {type}
                   </button>
                 );
               })}
-              {taskTypes.length > 5 && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  +{taskTypes.length - 5} more
+              {taskTypes.length > 4 && (
+                <span style={{ fontSize: "0.7rem", color: "#64748b" }}>
+                  +{taskTypes.length - 4}
                 </span>
               )}
             </div>
@@ -157,22 +179,21 @@ export function KanbanFilters({ projectId, filters, onFiltersChange }: KanbanFil
         {hasFilters && (
           <button
             onClick={clearFilters}
-            className="ml-auto px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 underline"
+            style={{
+              marginLeft: "auto",
+              padding: "4px 12px",
+              fontSize: "0.75rem",
+              color: "#94a3b8",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
           >
-            Clear all filters
+            Clear filters
           </button>
         )}
       </div>
-      
-      {/* Active Filters Summary */}
-      {hasFilters && (
-        <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          Showing tasks with:{" "}
-          {filters.priorities.length > 0 && `P${filters.priorities.join(", P")} `}
-          {filters.agents.length > 0 && `${filters.agents.length} agent(s) `}
-          {filters.types.length > 0 && `${filters.types.length} type(s)`}
-        </div>
-      )}
     </div>
   );
 }

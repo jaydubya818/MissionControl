@@ -76,7 +76,7 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
   };
 
   return (
-    <div className="relative w-full max-w-2xl">
+    <div className="relative w-full" style={{ maxWidth: "400px" }}>
       {/* Search Input */}
       <div className="relative">
         <input
@@ -85,11 +85,27 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => query.length >= 2 && setIsOpen(true)}
-          placeholder="Search tasks... (type at least 2 characters)"
-          className="w-full px-4 py-2 pl-10 pr-4 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+          placeholder="Search tasks..."
+          style={{
+            width: "100%",
+            padding: "6px 12px 6px 32px",
+            background: "#0f172a",
+            border: "1px solid #334155",
+            borderRadius: "6px",
+            color: "#e2e8f0",
+            fontSize: "0.85rem",
+            outline: "none",
+          }}
         />
         <svg
-          className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+          style={{
+            position: "absolute",
+            left: "10px",
+            top: "8px",
+            height: "16px",
+            width: "16px",
+            color: "#64748b",
+          }}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -107,9 +123,18 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
               setQuery("");
               setIsOpen(false);
             }}
-            className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+            style={{
+              position: "absolute",
+              right: "8px",
+              top: "6px",
+              color: "#64748b",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "2px",
+            }}
           >
-            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+            <svg style={{ height: "16px", width: "16px" }} fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"
                 d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -120,30 +145,31 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
         )}
       </div>
 
-      {/* Suggestions (autocomplete) */}
-      {query.length >= 2 && suggestions && suggestions.length > 0 && !isOpen && (
-        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
-          <div className="p-2 text-xs text-gray-500 dark:text-gray-400">
-            Suggestions:
-          </div>
-          <div className="flex flex-wrap gap-2 p-2">
-            {suggestions.map((suggestion, i) => (
-              <button
-                key={i}
-                onClick={() => setQuery(suggestion)}
-                className="px-2 py-1 text-sm bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Search Results */}
       {isOpen && results && results.length > 0 && (
-        <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-96 overflow-y-auto">
-          <div className="p-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+        <div
+          style={{
+            position: "absolute",
+            zIndex: 1000,
+            width: "100%",
+            marginTop: "4px",
+            background: "#1e293b",
+            border: "1px solid #334155",
+            borderRadius: "8px",
+            boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+            maxHeight: "400px",
+            overflowY: "auto",
+          }}
+        >
+          <div
+            style={{
+              padding: "8px 12px",
+              fontSize: "0.75rem",
+              color: "#94a3b8",
+              borderBottom: "1px solid #334155",
+            }}
+          >
             Found {results.length} result{results.length !== 1 ? "s" : ""}
           </div>
           {results.map((result, i) => {
@@ -165,39 +191,51 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
               <button
                 key={task._id}
                 onClick={() => handleResultClick(task._id)}
-                className={`w-full text-left p-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0 ${
-                  isSelected ? "bg-blue-50 dark:bg-gray-700" : ""
-                }`}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "12px",
+                  background: isSelected ? "#334155" : "transparent",
+                  border: "none",
+                  borderBottom: "1px solid #334155",
+                  cursor: "pointer",
+                  transition: "background 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) e.currentTarget.style.background = "#1e293b";
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) e.currentTarget.style.background = "transparent";
+                }}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 500, fontSize: "0.875rem", color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {highlightMatch(task.title, query)}
                     </div>
                     {task.description && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                      <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                         {highlightMatch(task.description, query)}
                       </div>
                     )}
-                    <div className="flex items-center gap-2 mt-2 text-xs">
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", fontSize: "0.75rem" }}>
                       <span
-                        className={`px-2 py-0.5 rounded-full ${
-                          statusColors[task.status] || "bg-gray-100 text-gray-800"
-                        }`}
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: "12px",
+                          background: "#334155",
+                          color: "#94a3b8",
+                          fontSize: "0.7rem",
+                        }}
                       >
                         {task.status}
                       </span>
-                      <span className="text-gray-500 dark:text-gray-400">
+                      <span style={{ color: "#64748b" }}>
                         {task.type}
                       </span>
-                      <span className="text-gray-500 dark:text-gray-400">
+                      <span style={{ color: "#64748b" }}>
                         P{task.priority}
                       </span>
-                      {result.score && (
-                        <span className="text-gray-400 dark:text-gray-500 ml-auto">
-                          Score: {result.score.toFixed(1)}
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -209,17 +247,22 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
 
       {/* No Results */}
       {isOpen && results && results.length === 0 && query.length >= 2 && (
-        <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 text-center text-gray-500 dark:text-gray-400">
+        <div
+          style={{
+            position: "absolute",
+            zIndex: 1000,
+            width: "100%",
+            marginTop: "4px",
+            background: "#1e293b",
+            border: "1px solid #334155",
+            borderRadius: "8px",
+            padding: "16px",
+            textAlign: "center",
+            color: "#94a3b8",
+            fontSize: "0.875rem",
+          }}
+        >
           No tasks found for "{query}"
-        </div>
-      )}
-
-      {/* Keyboard Shortcuts Hint */}
-      {isOpen && results && results.length > 0 && (
-        <div className="absolute z-10 right-0 mt-2 text-xs text-gray-400 dark:text-gray-500">
-          <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">↑↓</kbd> navigate
-          <kbd className="ml-2 px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">Enter</kbd> select
-          <kbd className="ml-2 px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">Esc</kbd> close
         </div>
       )}
     </div>
