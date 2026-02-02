@@ -12,6 +12,9 @@ import { PolicyModal } from "./PolicyModal";
 import { NotificationsModal } from "./NotificationsModal";
 import { StandupModal } from "./StandupModal";
 import { useToast } from "./Toast";
+import { SearchBar } from "./SearchBar";
+import { AgentDashboard } from "./AgentDashboard";
+import { KanbanFilters } from "./KanbanFilters";
 
 // ============================================================================
 // PROJECT CONTEXT
@@ -92,7 +95,13 @@ export default function App() {
   const [showPolicy, setShowPolicy] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showStandup, setShowStandup] = useState(false);
+  const [showAgentDashboard, setShowAgentDashboard] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [kanbanFilters, setKanbanFilters] = useState<{
+    agents: string[];
+    priorities: number[];
+    types: string[];
+  }>({ agents: [], priorities: [], types: [] });
   
   // Get current project details
   const project = useQuery(
@@ -224,19 +233,36 @@ function AppContent({
       <header className="app-header">
         <h1 className="app-header-title">Mission Control</h1>
         <ProjectSwitcher />
-        <input
-          type="text"
-          className="app-header-search"
-          placeholder="Search tasks..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          aria-label="Search"
-        />
+        <div style={{ flex: 1, maxWidth: "600px", margin: "0 20px" }}>
+          <SearchBar
+            projectId={projectId ?? undefined}
+            onResultClick={(taskId) => {
+              setSelectedTaskId(taskId as Id<"tasks">);
+            }}
+          />
+        </div>
         <div className="app-header-metrics">
           <span>{activeCount} Agents Active</span>
           <span>{taskCount} Tasks in Queue</span>
         </div>
         <div className="app-header-right">
+          <button
+            type="button"
+            onClick={() => setShowAgentDashboard(true)}
+            style={{
+              padding: "6px 12px",
+              background: "#10b981",
+              border: "1px solid #059669",
+              borderRadius: 6,
+              color: "#fff",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              marginRight: "8px",
+            }}
+          >
+            📊 Dashboard
+          </button>
           <button type="button" className="app-header-docs">
             Docs
           </button>
@@ -277,7 +303,16 @@ function AppContent({
         />
         <main style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
           <h2 className="mission-queue-header">Mission Queue</h2>
-          <Kanban projectId={projectId} onSelectTask={setSelectedTaskId} />
+          <KanbanFilters
+            projectId={projectId}
+            filters={kanbanFilters}
+            onFiltersChange={setKanbanFilters}
+          />
+          <Kanban
+            projectId={projectId}
+            onSelectTask={setSelectedTaskId}
+            filters={kanbanFilters}
+          />
         </main>
         <LiveFeed projectId={projectId} />
       </div>
@@ -299,6 +334,12 @@ function AppContent({
         />
       )}
       {showStandup && <StandupModal projectId={projectId} onClose={() => setShowStandup(false)} />}
+      {showAgentDashboard && (
+        <AgentDashboard
+          projectId={projectId}
+          onClose={() => setShowAgentDashboard(false)}
+        />
+      )}
     </div>
   );
 }

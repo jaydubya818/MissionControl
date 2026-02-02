@@ -36,23 +36,38 @@ export async function handleMyApprovals(ctx: BotContext) {
     const agents = await ctx.convex.query(api.agents.listAll, { projectId });
     const agentMap = new Map(agents.map((a: any) => [a._id, a]));
     
-    let message = `⏳ **Pending Approvals** (${approvals.length}):\n\n`;
-    
+    // Send each approval as a separate message with inline buttons
     for (const approval of approvals) {
       const agent = agentMap.get(approval.requestorAgentId) as any;
       const riskEmoji = approval.riskLevel === "RED" ? "🔴" : "🟡";
       const id = approval._id.slice(-6);
       
-      message += `${riskEmoji} **#${id}** ${approval.actionSummary}\n`;
-      message += `  └ Requested by: ${agent?.name || "Unknown"}\n`;
-      message += `  └ Risk: ${approval.riskLevel}\n`;
+      let message = `${riskEmoji} **Approval Request #${id}**\n\n`;
+      message += `**Action:** ${approval.actionSummary}\n`;
+      message += `**Agent:** ${agent?.name || "Unknown"}\n`;
+      message += `**Risk:** ${approval.riskLevel}\n`;
       if (approval.estimatedCost) {
-        message += `  └ Cost: $${approval.estimatedCost.toFixed(2)}\n`;
+        message += `**Cost:** $${approval.estimatedCost.toFixed(2)}\n`;
       }
-      message += `  └ /approve ${id} or /deny ${id} <reason>\n\n`;
+      if (approval.justification) {
+        message += `**Reason:** ${approval.justification}\n`;
+      }
+      
+      // Create inline keyboard with approve/deny buttons
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "✅ Approve", callback_data: `approve:${approval._id}` },
+            { text: "❌ Deny", callback_data: `deny:${approval._id}` },
+          ],
+        ],
+      };
+      
+      await ctx.reply(message, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
     }
-    
-    await ctx.reply(message, { parse_mode: "Markdown" });
   } catch (error) {
     console.error("Error in /my_approvals:", error);
     await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`);

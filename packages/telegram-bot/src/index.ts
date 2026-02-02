@@ -136,6 +136,88 @@ bot.on("message", async (ctx) => {
   await handleThreadReply(convex, ctx.message);
 });
 
+// Handle inline button callbacks
+bot.on("callback_query", async (ctx) => {
+  const data = ctx.callbackQuery.data;
+  
+  if (!data) {
+    await ctx.answerCbQuery("No data received");
+    return;
+  }
+  
+  // Parse callback data
+  const [action, approvalId] = data.split(":");
+  
+  if (action === "approve") {
+    try {
+      await convex.mutation(api.approvals.approve, {
+        approvalId: approvalId as any,
+        decidedByAgentId: undefined, // Human approval
+        reason: "Approved via Telegram",
+      });
+      
+      await ctx.answerCbQuery("✅ Approved!");
+      await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+      await ctx.reply(`✅ Approval ${approvalId} has been approved.`);
+    } catch (error) {
+      await ctx.answerCbQuery("❌ Error approving");
+      await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  } else if (action === "deny") {
+    // For deny, we need a reason - prompt user
+    await ctx.answerCbQuery("Use /deny command with reason");
+    await ctx.reply(
+      `To deny this approval, use:\n\`/deny ${approvalId} <your reason>\``,
+      { parse_mode: "Markdown" }
+    );
+  } else {
+    await ctx.answerCbQuery("Unknown action");
+  }
+});
+
+// ============================================================================
+// INLINE BUTTON CALLBACKS
+// ============================================================================
+
+bot.on("callback_query", async (ctx) => {
+  const data = ctx.callbackQuery.data;
+  
+  if (!data) {
+    await ctx.answerCbQuery("No data received");
+    return;
+  }
+  
+  try {
+    // Parse callback data
+    const [action, approvalId] = data.split(":");
+    
+    if (action === "approve") {
+      await convex.mutation(api.approvals.approve, {
+        approvalId: approvalId as any,
+        decidedByUserId: ctx.from?.username || ctx.from?.id.toString() || "operator",
+        reason: "Approved via Telegram inline button",
+      });
+      
+      await ctx.answerCbQuery("✅ Approved!");
+      await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+      await ctx.reply(`✅ Approval ${approvalId.slice(-6)} has been approved.`);
+    } else if (action === "deny") {
+      // For deny, we need a reason - prompt user
+      await ctx.answerCbQuery("Use /deny command with reason");
+      await ctx.reply(
+        `To deny this approval, use:\n\`/deny ${approvalId.slice(-6)} <your reason>\``,
+        { parse_mode: "Markdown" }
+      );
+    } else {
+      await ctx.answerCbQuery("Unknown action");
+    }
+  } catch (error) {
+    console.error("Error handling callback:", error);
+    await ctx.answerCbQuery("❌ Error");
+    await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
+});
+
 // ============================================================================
 // ERROR HANDLING
 // ============================================================================
