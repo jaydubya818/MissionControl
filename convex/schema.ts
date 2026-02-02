@@ -234,10 +234,7 @@ export default defineSchema({
     
     // Block reason
     blockedReason: v.optional(v.string()),
-    
-    // Telegram thread reference (for thread-per-task)
-    threadRef: v.optional(v.string()),
-    
+
     // Redaction tracking
     redactedFields: v.optional(v.array(v.string())),
     

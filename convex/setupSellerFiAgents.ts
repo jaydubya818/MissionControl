@@ -4,9 +4,9 @@
  * Run with: npx convex run setupSellerFiAgents:createSellerFiAgents
  */
 
-import { internalMutation } from "./_generated/server";
+import { mutation } from "./_generated/server";
 
-export const createSellerFiAgents = internalMutation({
+export const createSellerFiAgents = mutation({
   args: {},
   handler: async (ctx) => {
     const results = [];
