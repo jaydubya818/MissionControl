@@ -20,7 +20,7 @@ export function AgentDashboard({ projectId, onClose }: AgentDashboardProps) {
   
   const runs = useQuery(
     api.runs.listRecent,
-    projectId ? { projectId: projectId as any, limit: 1000 } : { limit: 1000 }
+    { limit: 1000 }
   );
 
   if (!agents || !tasks || !runs) {

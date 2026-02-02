@@ -10,7 +10,7 @@ interface CostAnalyticsProps {
 export function CostAnalytics({ projectId, onClose }: CostAnalyticsProps) {
   const runs = useQuery(
     api.runs.listRecent,
-    projectId ? { projectId: projectId as any, limit: 1000 } : { limit: 1000 }
+    { limit: 1000 }
   );
   
   const agents = useQuery(
