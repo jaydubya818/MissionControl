@@ -8,7 +8,9 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
+    "dev:bj": "tsx watch src/bj-bot.ts",
     "start": "node dist/index.js",
+    "start:bj": "node dist/bj-bot.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

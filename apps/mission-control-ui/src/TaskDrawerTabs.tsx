@@ -8,8 +8,9 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useState } from "react";
+import { PeerReviewPanel } from "./PeerReviewPanel";
 
-type Tab = "overview" | "timeline" | "artifacts" | "approvals" | "cost";
+type Tab = "overview" | "timeline" | "artifacts" | "approvals" | "cost" | "reviews";
 
 export function TaskDrawerTabs({
   taskId,
@@ -121,6 +122,9 @@ export function TaskDrawerTabs({
         <TabButton active={activeTab === "cost"} onClick={() => setActiveTab("cost")}>
           Cost
         </TabButton>
+        <TabButton active={activeTab === "reviews"} onClick={() => setActiveTab("reviews")}>
+          Reviews
+        </TabButton>
       </div>
 
       {/* Tab Content */}
@@ -145,6 +149,9 @@ export function TaskDrawerTabs({
         )}
         {activeTab === "artifacts" && (
           <ArtifactsTab task={task} messages={messages} />
+        )}
+        {activeTab === "reviews" && (
+          <PeerReviewPanel taskId={taskId} projectId={task.projectId} />
         )}
         {activeTab === "approvals" && (
           <ApprovalsTab approvals={approvals} agentMap={agentMap} />
