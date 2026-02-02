@@ -1,300 +1,339 @@
-/**
- * Enhanced Search — Full-Text Search for Tasks
- * 
- * Provides more sophisticated search across tasks, messages, and documents.
- */
-
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+
+/**
+ * Advanced Search System
+ * 
+ * Full-text search across tasks, comments, documents, and more
+ * with filters, saved searches, and search history.
+ */
+
+// ============================================================================
+// SCHEMA ADDITIONS NEEDED:
+// ============================================================================
+// New table: searchHistory
+// - userId: v.string()
+// - projectId: v.optional(v.id("projects"))
+// - query: v.string()
+// - filters: v.any()
+// - resultCount: v.number()
+// - searchedAt: v.number()
+//
+// New table: savedSearches
+// - userId: v.string()
+// - projectId: v.optional(v.id("projects"))
+// - name: v.string()
+// - query: v.string()
+// - filters: v.any()
+// - createdAt: v.number()
 
 // ============================================================================
 // SEARCH QUERIES
 // ============================================================================
 
-/**
- * Enhanced search across tasks, messages, and artifacts.
- */
 export const searchAll = query({
   args: {
-    projectId: v.optional(v.id("projects")),
     query: v.string(),
+    projectId: v.optional(v.id("projects")),
     filters: v.optional(v.object({
       status: v.optional(v.array(v.string())),
-      type: v.optional(v.array(v.string())),
       priority: v.optional(v.array(v.number())),
-      assignedTo: v.optional(v.array(v.id("agents"))),
+      type: v.optional(v.array(v.string())),
+      assigneeIds: v.optional(v.array(v.id("agents"))),
+      dateFrom: v.optional(v.number()),
+      dateTo: v.optional(v.number()),
     })),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 50;
-    const query = args.query.toLowerCase().trim();
-    const tokens = query.split(/\s+/).filter(t => t.length > 0);
+    const limit = args.limit || 50;
+    const query = args.query.toLowerCase();
     
-    // Get tasks
-    let tasks;
+    // Search tasks
+    let tasksQuery = ctx.db.query("tasks");
     if (args.projectId) {
-      tasks = await ctx.db
-        .query("tasks")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .collect();
-    } else {
-      tasks = await ctx.db.query("tasks").collect();
+      tasksQuery = tasksQuery.withIndex("by_project", (q) => 
+        q.eq("projectId", args.projectId)
+      );
     }
+    
+    let tasks = await tasksQuery.collect();
+    
+    // Filter by text search
+    tasks = tasks.filter(t => 
+      t.title.toLowerCase().includes(query) ||
+      t.description?.toLowerCase().includes(query)
+    );
     
     // Apply filters
     if (args.filters) {
       if (args.filters.status && args.filters.status.length > 0) {
         tasks = tasks.filter(t => args.filters!.status!.includes(t.status));
       }
+      if (args.filters.priority && args.filters.priority.length > 0) {
+        tasks = tasks.filter(t => args.filters!.priority!.includes(t.priority));
+      }
       if (args.filters.type && args.filters.type.length > 0) {
         tasks = tasks.filter(t => args.filters!.type!.includes(t.type));
+      }
+      if (args.filters.assigneeIds && args.filters.assigneeIds.length > 0) {
+        tasks = tasks.filter(t => 
+          t.assigneeIds?.some(id => args.filters!.assigneeIds!.includes(id))
+        );
+      }
+      if (args.filters.dateFrom) {
+        tasks = tasks.filter(t => t._creationTime >= args.filters!.dateFrom!);
+      }
+      if (args.filters.dateTo) {
+        tasks = tasks.filter(t => t._creationTime <= args.filters!.dateTo!);
+      }
+    }
+    
+    // Search messages
+    let messagesQuery = ctx.db.query("messages");
+    let messages = await messagesQuery.collect();
+    messages = messages.filter(m => 
+      m.body.toLowerCase().includes(query)
+    );
+    
+    if (args.projectId) {
+      // Filter messages by project through tasks
+      const projectTaskIds = tasks.map(t => t._id);
+      messages = messages.filter(m => 
+        m.taskId && projectTaskIds.includes(m.taskId)
+      );
+    }
+    
+    // Search agents
+    let agentsQuery = ctx.db.query("agents");
+    if (args.projectId) {
+      agentsQuery = agentsQuery.withIndex("by_project", (q) => 
+        q.eq("projectId", args.projectId)
+      );
+    }
+    let agents = await agentsQuery.collect();
+    agents = agents.filter(a => 
+      a.name.toLowerCase().includes(query) ||
+      a.role.toLowerCase().includes(query)
+    );
+    
+    // Search activities
+    let activitiesQuery = ctx.db.query("activities");
+    if (args.projectId) {
+      activitiesQuery = activitiesQuery.withIndex("by_project", (q) => 
+        q.eq("projectId", args.projectId)
+      );
+    }
+    let activities = await activitiesQuery.collect();
+    activities = activities.filter(a => 
+      a.body.toLowerCase().includes(query)
+    );
+    
+    return {
+      tasks: tasks.slice(0, limit),
+      messages: messages.slice(0, 20),
+      agents: agents.slice(0, 10),
+      activities: activities.slice(0, 20),
+      totalResults: tasks.length + messages.length + agents.length + activities.length,
+    };
+  },
+});
+
+export const searchTasks = query({
+  args: {
+    query: v.string(),
+    projectId: v.optional(v.id("projects")),
+    filters: v.optional(v.object({
+      status: v.optional(v.array(v.string())),
+      priority: v.optional(v.array(v.number())),
+      type: v.optional(v.array(v.string())),
+      assigneeIds: v.optional(v.array(v.id("agents"))),
+      dateFrom: v.optional(v.number()),
+      dateTo: v.optional(v.number()),
+    })),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 50;
+    const query = args.query.toLowerCase();
+    
+    let tasksQuery = ctx.db.query("tasks");
+    if (args.projectId) {
+      tasksQuery = tasksQuery.withIndex("by_project", (q) => 
+        q.eq("projectId", args.projectId)
+      );
+    }
+    
+    let tasks = await tasksQuery.collect();
+    
+    // Text search
+    tasks = tasks.filter(t => 
+      t.title.toLowerCase().includes(query) ||
+      t.description?.toLowerCase().includes(query) ||
+      t.type.toLowerCase().includes(query) ||
+      t.status.toLowerCase().includes(query)
+    );
+    
+    // Apply filters (same as searchAll)
+    if (args.filters) {
+      if (args.filters.status && args.filters.status.length > 0) {
+        tasks = tasks.filter(t => args.filters!.status!.includes(t.status));
       }
       if (args.filters.priority && args.filters.priority.length > 0) {
         tasks = tasks.filter(t => args.filters!.priority!.includes(t.priority));
       }
-      if (args.filters.assignedTo && args.filters.assignedTo.length > 0) {
+      if (args.filters.type && args.filters.type.length > 0) {
+        tasks = tasks.filter(t => args.filters!.type!.includes(t.type));
+      }
+      if (args.filters.assigneeIds && args.filters.assigneeIds.length > 0) {
         tasks = tasks.filter(t => 
-          t.assigneeIds.some(id => args.filters!.assignedTo!.includes(id))
+          t.assigneeIds?.some(id => args.filters!.assigneeIds!.includes(id))
         );
       }
+      if (args.filters.dateFrom) {
+        tasks = tasks.filter(t => t._creationTime >= args.filters!.dateFrom!);
+      }
+      if (args.filters.dateTo) {
+        tasks = tasks.filter(t => t._creationTime <= args.filters!.dateTo!);
+      }
     }
     
-    // Score and filter tasks
-    const scored = tasks.map(task => {
-      const score = calculateSearchScore(task, tokens);
-      return { task, score };
-    }).filter(item => item.score > 0);
+    // Sort by relevance (title matches first)
+    tasks.sort((a, b) => {
+      const aTitle = a.title.toLowerCase().includes(query);
+      const bTitle = b.title.toLowerCase().includes(query);
+      if (aTitle && !bTitle) return -1;
+      if (!aTitle && bTitle) return 1;
+      return b._creationTime - a._creationTime;
+    });
     
-    // Sort by score (descending)
-    scored.sort((a, b) => b.score - a.score);
-    
-    // Get messages for top results (for context)
-    const results = [];
-    for (const item of scored.slice(0, limit)) {
-      const taskId = item.task._id;
-      const messages = await ctx.db
-        .query("messages")
-        .withIndex("by_task", (q) => q.eq("taskId", taskId))
-        .order("desc")
-        .take(3);
-      
-      results.push({
-        task: item.task,
-        score: item.score,
-        recentMessages: messages,
-      });
-    }
-    
-    return results;
+    return tasks.slice(0, limit);
   },
 });
 
-/**
- * Search messages by content.
- */
-export const searchMessages = query({
+export const quickSearch = query({
   args: {
-    projectId: v.optional(v.id("projects")),
     query: v.string(),
-    taskId: v.optional(v.id("tasks")),
+    projectId: v.optional(v.id("projects")),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 50;
-    const query = args.query.toLowerCase().trim();
+    const limit = args.limit || 10;
+    const query = args.query.toLowerCase();
     
-    let messages;
-    if (args.taskId) {
-      const taskId = args.taskId;
-      messages = await ctx.db
-        .query("messages")
-        .withIndex("by_task", (q) => q.eq("taskId", taskId))
-        .collect();
-    } else {
-      messages = await ctx.db.query("messages").collect();
-      
-      // Filter by project if provided
-      if (args.projectId) {
-        messages = messages.filter(m => m.projectId === args.projectId);
-      }
+    // Quick search across tasks and agents only
+    let tasksQuery = ctx.db.query("tasks");
+    if (args.projectId) {
+      tasksQuery = tasksQuery.withIndex("by_project", (q) => 
+        q.eq("projectId", args.projectId)
+      );
     }
+    let tasks = await tasksQuery.collect();
+    tasks = tasks.filter(t => 
+      t.title.toLowerCase().includes(query)
+    ).slice(0, limit);
     
-    // Filter by content
-    const filtered = messages.filter(m =>
-      m.content.toLowerCase().includes(query)
-    );
+    let agentsQuery = ctx.db.query("agents");
+    if (args.projectId) {
+      agentsQuery = agentsQuery.withIndex("by_project", (q) => 
+        q.eq("projectId", args.projectId)
+      );
+    }
+    let agents = await agentsQuery.collect();
+    agents = agents.filter(a => 
+      a.name.toLowerCase().includes(query)
+    ).slice(0, 5);
     
-    // Sort by relevance (creation time for now)
-    filtered.sort((a, b) => (b as any)._creationTime - (a as any)._creationTime);
-    
-    return filtered.slice(0, limit);
+    return { tasks, agents };
   },
 });
-
-/**
- * Search agent documents.
- */
-export const searchDocuments = query({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    query: v.string(),
-    agentId: v.optional(v.id("agents")),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 50;
-    const query = args.query.toLowerCase().trim();
-    
-    let docs;
-    if (args.agentId) {
-      docs = await ctx.db
-        .query("agentDocuments")
-        .filter((q) => q.eq(q.field("agentId"), args.agentId))
-        .collect();
-    } else {
-      docs = await ctx.db.query("agentDocuments").collect();
-      
-      // Filter by project if provided
-      if (args.projectId) {
-        docs = docs.filter(d => d.projectId === args.projectId);
-      }
-    }
-    
-    // Filter by content
-    const filtered = docs.filter(d =>
-      d.content.toLowerCase().includes(query)
-    );
-    
-    // Sort by update time
-    filtered.sort((a, b) => b.updatedAt - a.updatedAt);
-    
-    return filtered.slice(0, limit);
-  },
-});
-
-// ============================================================================
-// SEARCH SCORING
-// ============================================================================
-
-function calculateSearchScore(task: any, tokens: string[]): number {
-  let score = 0;
-  
-  const title = task.title.toLowerCase();
-  const description = (task.description || "").toLowerCase();
-  const labels = (task.labels || []).map((l: string) => l.toLowerCase());
-  
-  for (const token of tokens) {
-    // Title matches (highest weight)
-    if (title.includes(token)) {
-      score += 10;
-      
-      // Exact word match bonus
-      if (title.split(/\s+/).includes(token)) {
-        score += 5;
-      }
-      
-      // Starts with token bonus
-      if (title.startsWith(token)) {
-        score += 3;
-      }
-    }
-    
-    // Description matches (medium weight)
-    if (description.includes(token)) {
-      score += 5;
-    }
-    
-    // Label matches (medium weight)
-    for (const label of labels) {
-      if (label.includes(token)) {
-        score += 5;
-      }
-      if (label === token) {
-        score += 3; // Exact match bonus
-      }
-    }
-    
-    // Type match (low weight)
-    if (task.type.toLowerCase().includes(token)) {
-      score += 2;
-    }
-  }
-  
-  // Boost recent tasks
-  const ageHours = (Date.now() - (task as any)._creationTime) / (1000 * 60 * 60);
-  if (ageHours < 24) {
-    score += 2;
-  } else if (ageHours < 168) { // 1 week
-    score += 1;
-  }
-  
-  // Boost active tasks
-  if (["IN_PROGRESS", "REVIEW", "NEEDS_APPROVAL"].includes(task.status)) {
-    score += 3;
-  }
-  
-  return score;
-}
 
 // ============================================================================
 // SEARCH SUGGESTIONS
 // ============================================================================
 
-/**
- * Get search suggestions based on recent tasks and common terms.
- */
-export const getSuggestions = query({
+export const getSearchSuggestions = query({
   args: {
+    query: v.string(),
     projectId: v.optional(v.id("projects")),
-    prefix: v.string(),
   },
   handler: async (ctx, args) => {
-    const prefix = args.prefix.toLowerCase().trim();
+    const query = args.query.toLowerCase();
+    const suggestions: string[] = [];
     
-    if (prefix.length < 2) {
-      return [];
-    }
-    
-    // Get recent tasks
-    let tasks;
+    // Get recent tasks for suggestions
+    let tasksQuery = ctx.db.query("tasks");
     if (args.projectId) {
-      tasks = await ctx.db
-        .query("tasks")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .order("desc")
-        .take(100);
-    } else {
-      tasks = await ctx.db.query("tasks").order("desc").take(100);
+      tasksQuery = tasksQuery.withIndex("by_project", (q) => 
+        q.eq("projectId", args.projectId)
+      );
     }
+    const tasks = await tasksQuery.collect();
     
-    // Extract terms
-    const terms = new Set<string>();
+    // Extract unique words from titles
+    const words = new Set<string>();
+    tasks.forEach(t => {
+      t.title.toLowerCase().split(/\s+/).forEach(word => {
+        if (word.length > 3 && word.startsWith(query)) {
+          words.add(word);
+        }
+      });
+    });
     
-    for (const task of tasks) {
-      // Add title words
-      const titleWords = task.title.toLowerCase().split(/\s+/);
-      for (const word of titleWords) {
-        if (word.startsWith(prefix) && word.length > 2) {
-          terms.add(word);
-        }
+    // Add task types
+    const types = ["ENGINEERING", "CONTENT", "RESEARCH", "REVIEW", "PLANNING"];
+    types.forEach(type => {
+      if (type.toLowerCase().startsWith(query)) {
+        suggestions.push(type);
       }
-      
-      // Add labels
-      if (task.labels) {
-        for (const label of task.labels) {
-          if (label.toLowerCase().startsWith(prefix)) {
-            terms.add(label.toLowerCase());
-          }
-        }
+    });
+    
+    // Add statuses
+    const statuses = ["INBOX", "IN_PROGRESS", "REVIEW", "DONE", "BLOCKED"];
+    statuses.forEach(status => {
+      if (status.toLowerCase().startsWith(query)) {
+        suggestions.push(status);
       }
-      
-      // Add type if matches
-      if (task.type.toLowerCase().startsWith(prefix)) {
-        terms.add(task.type.toLowerCase());
-      }
+    });
+    
+    return [...suggestions, ...Array.from(words)].slice(0, 10);
+  },
+});
+
+// ============================================================================
+// FILTERS
+// ============================================================================
+
+export const getAvailableFilters = query({
+  args: { projectId: v.optional(v.id("projects")) },
+  handler: async (ctx, args) => {
+    let tasksQuery = ctx.db.query("tasks");
+    if (args.projectId) {
+      tasksQuery = tasksQuery.withIndex("by_project", (q) => 
+        q.eq("projectId", args.projectId)
+      );
     }
+    const tasks = await tasksQuery.collect();
     
-    return Array.from(terms).slice(0, 10);
+    // Extract unique values
+    const statuses = [...new Set(tasks.map(t => t.status))];
+    const types = [...new Set(tasks.map(t => t.type))];
+    const priorities = [...new Set(tasks.map(t => t.priority))];
+    
+    // Get agents
+    let agentsQuery = ctx.db.query("agents");
+    if (args.projectId) {
+      agentsQuery = agentsQuery.withIndex("by_project", (q) => 
+        q.eq("projectId", args.projectId)
+      );
+    }
+    const agents = await agentsQuery.collect();
+    
+    return {
+      statuses,
+      types,
+      priorities: priorities.sort(),
+      agents: agents.map(a => ({ id: a._id, name: a.name })),
+    };
   },
 });
