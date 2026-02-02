@@ -20,13 +20,6 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
       : "skip"
   );
 
-  // Get suggestions for autocomplete
-  const suggestions = useQuery(
-    api.search.getSuggestions,
-    query.length >= 2 && projectId
-      ? { projectId: projectId as any, prefix: query }
-      : "skip"
-  );
 
   useEffect(() => {
     setIsOpen(query.length >= 2 && (results?.length ?? 0) > 0);
@@ -175,17 +168,6 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
           {results.map((result, i) => {
             const task = result.task;
             const isSelected = i === selectedIndex;
-            
-            const statusColors: Record<string, string> = {
-              INBOX: "bg-gray-100 text-gray-800",
-              ASSIGNED: "bg-blue-100 text-blue-800",
-              IN_PROGRESS: "bg-yellow-100 text-yellow-800",
-              REVIEW: "bg-purple-100 text-purple-800",
-              NEEDS_APPROVAL: "bg-orange-100 text-orange-800",
-              BLOCKED: "bg-red-100 text-red-800",
-              DONE: "bg-green-100 text-green-800",
-              CANCELED: "bg-gray-100 text-gray-800",
-            };
 
             return (
               <button

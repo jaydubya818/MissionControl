@@ -250,14 +250,12 @@ function AppContent({
       <header className="app-header">
         <h1 className="app-header-title">Mission Control</h1>
         <ProjectSwitcher />
-        <div style={{ flex: 1, maxWidth: "600px", margin: "0 20px" }}>
-          <SearchBar
-            projectId={projectId ?? undefined}
-            onResultClick={(taskId) => {
-              setSelectedTaskId(taskId as Id<"tasks">);
-            }}
-          />
-        </div>
+        <SearchBar
+          projectId={projectId ?? undefined}
+          onResultClick={(taskId) => {
+            setSelectedTaskId(taskId as Id<"tasks">);
+          }}
+        />
         <div className="app-header-metrics">
           <span>{activeCount} Agents Active</span>
           <span>{taskCount} Tasks in Queue</span>
