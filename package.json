@@ -13,7 +13,7 @@
     "start": "node packages/telegram-bot/dist/index.js",
     "dev": "concurrently \"npx convex dev\" \"turbo run dev --filter=mission-control-ui\"",
     "dev:ui": "pnpm --filter mission-control-ui dev",
-    "build": "pnpm --filter @mission-control/agent-runner build",
+    "build": "pnpm --filter @mission-control/telegram-bot build",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
