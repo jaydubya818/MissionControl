@@ -1,14 +1,18 @@
 import type { Doc } from "../../../convex/_generated/dataModel";
 import { motion } from "framer-motion";
+import { useState } from "react";
+import { QuickEditModal } from "./QuickEditModal";
 
 interface TaskCardProps {
   task: Doc<"tasks">;
   agents?: Doc<"agents">[];
   onClick: () => void;
   isDragging?: boolean;
+  onUpdate?: () => void;
 }
 
-export function TaskCard({ task, agents, onClick, isDragging }: TaskCardProps) {
+export function TaskCard({ task, agents, onClick, isDragging, onUpdate }: TaskCardProps) {
+  const [showQuickEdit, setShowQuickEdit] = useState(false);
   const assignedAgent = agents?.find(a => task.assigneeIds?.includes(a._id));
   
   const priorityColors = {
@@ -32,15 +36,20 @@ export function TaskCard({ task, agents, onClick, isDragging }: TaskCardProps) {
   const colors = priorityColors[task.priority as keyof typeof priorityColors] || priorityColors[3];
   
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      style={{
+    <>
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={onClick}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          setShowQuickEdit(true);
+        }}
+        style={{
         background: colors.bg,
         border: `1px solid ${colors.border}`,
         borderRadius: "8px",
@@ -74,9 +83,28 @@ export function TaskCard({ task, agents, onClick, isDragging }: TaskCardProps) {
             P{task.priority}
           </span>
         </div>
-        <span style={{ fontSize: "10px", color: "#64748b" }}>
-          {task._id.slice(-6)}
-        </span>
+        <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowQuickEdit(true);
+            }}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#64748b",
+              fontSize: "14px",
+              cursor: "pointer",
+              padding: "2px 4px",
+            }}
+            title="Edit task (or double-click card)"
+          >
+            ✏️
+          </button>
+          <span style={{ fontSize: "10px", color: "#64748b" }}>
+            {task._id.slice(-6)}
+          </span>
+        </div>
       </div>
 
       {/* Title */}
@@ -131,5 +159,16 @@ export function TaskCard({ task, agents, onClick, isDragging }: TaskCardProps) {
         )}
       </div>
     </motion.div>
+    
+    {showQuickEdit && (
+      <QuickEditModal
+        task={task}
+        onClose={() => setShowQuickEdit(false)}
+        onSave={() => {
+          if (onUpdate) onUpdate();
+        }}
+      />
+    )}
+    </>
   );
 }

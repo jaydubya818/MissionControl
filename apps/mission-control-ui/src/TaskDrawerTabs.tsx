@@ -10,6 +10,7 @@ import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useState } from "react";
 import { PeerReviewPanel } from "./PeerReviewPanel";
 import { ExportReportButton } from "./ExportReportButton";
+import { TaskEditMode } from "./TaskEditMode";
 
 type Tab = "overview" | "timeline" | "artifacts" | "approvals" | "cost" | "reviews";
 
@@ -21,6 +22,7 @@ export function TaskDrawerTabs({
   onClose: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [isEditMode, setIsEditMode] = useState(false);
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
   
@@ -103,12 +105,40 @@ export function TaskDrawerTabs({
             </div>
           </div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <ExportReportButton taskId={taskId} />
+            {!isEditMode && (
+              <>
+                <button
+                  onClick={() => setIsEditMode(true)}
+                  style={{
+                    padding: "8px 16px",
+                    background: "#3b82f6",
+                    border: "none",
+                    borderRadius: "6px",
+                    color: "white",
+                    fontSize: "14px",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  ✏️ Edit
+                </button>
+                <ExportReportButton taskId={taskId} />
+              </>
+            )}
             <button onClick={onClose} style={closeButtonStyle}>×</button>
           </div>
         </div>
       </div>
 
+      {/* Edit Mode or Tabs */}
+      {isEditMode ? (
+        <TaskEditMode
+          task={task}
+          onSave={() => setIsEditMode(false)}
+          onCancel={() => setIsEditMode(false)}
+        />
+      ) : (
+        <>
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: "1px solid #334155", padding: "0 20px" }}>
         <TabButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")}>
@@ -200,6 +230,8 @@ export function TaskDrawerTabs({
           {loading ? "Posting..." : "Post comment"}
         </button>
       </div>
+      </>
+      )}
     </Drawer>
   );
 }
