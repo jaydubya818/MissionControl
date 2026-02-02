@@ -38,7 +38,7 @@ Thumbs.db
 
 # Convex
 .convex/
-convex/_generated/
+# convex/_generated/ - included for Railway deployment
 
 # Turbo
 .turbo/
