@@ -10,6 +10,7 @@
     "apps/*"
   ],
   "scripts": {
+    "start": "node packages/telegram-bot/dist/index.js",
     "dev": "concurrently \"npx convex dev\" \"turbo run dev --filter=mission-control-ui\"",
     "dev:ui": "pnpm --filter mission-control-ui dev",
     "build": "turbo run build",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
+    "tsx": "^4.7.0",
     "turbo": "^1.11.2",
     "typescript": "^5.3.3"
   },
