@@ -77,6 +77,20 @@ const riskLevel = v.union(
   v.literal("RED")
 );
 
+const reviewType = v.union(
+  v.literal("PRAISE"),
+  v.literal("REFUTE"),
+  v.literal("CHANGESET"),
+  v.literal("APPROVE")
+);
+
+const reviewStatus = v.union(
+  v.literal("PENDING"),
+  v.literal("ACCEPTED"),
+  v.literal("REJECTED"),
+  v.literal("SUPERSEDED")
+);
+
 // ============================================================================
 // SCHEMA
 // ============================================================================
@@ -776,4 +790,64 @@ export default defineSchema({
     .index("by_webhook", ["webhookId"])
     .index("by_status", ["status"])
     .index("by_next_retry", ["nextRetryAt"]),
+  
+  // ============================================================================
+  // PEER REVIEWS
+  // ============================================================================
+  
+  reviews: defineTable({
+    projectId: v.id("projects"),
+    taskId: v.id("tasks"),
+    
+    // Review metadata
+    type: reviewType,
+    status: reviewStatus,
+    
+    // Reviewer
+    reviewerAgentId: v.optional(v.id("agents")),
+    reviewerUserId: v.optional(v.string()),
+    
+    // Target (what's being reviewed)
+    targetType: v.union(
+      v.literal("TASK"),
+      v.literal("DELIVERABLE"),
+      v.literal("ARTIFACT"),
+      v.literal("CODE_CHANGE")
+    ),
+    targetId: v.optional(v.string()),
+    
+    // Review content
+    summary: v.string(),
+    details: v.optional(v.string()),
+    score: v.optional(v.number()), // 1-10 for PRAISE
+    severity: v.optional(v.union(
+      v.literal("MINOR"),
+      v.literal("MAJOR"),
+      v.literal("CRITICAL")
+    )), // For REFUTE
+    
+    // For CHANGESET type
+    changeset: v.optional(v.object({
+      files: v.array(v.object({
+        path: v.string(),
+        action: v.union(v.literal("ADD"), v.literal("MODIFY"), v.literal("DELETE")),
+        diff: v.optional(v.string()),
+      })),
+      description: v.string(),
+    })),
+    
+    // Response/resolution
+    responseBy: v.optional(v.id("agents")),
+    responseText: v.optional(v.string()),
+    resolvedAt: v.optional(v.number()),
+    
+    // Metadata
+    metadata: v.optional(v.any()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_task", ["taskId"])
+    .index("by_status", ["status"])
+    .index("by_type", ["type"])
+    .index("by_reviewer", ["reviewerAgentId"])
+    .index("by_task_status", ["taskId", "status"]),
 });
