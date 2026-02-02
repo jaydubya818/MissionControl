@@ -1,0 +1,106 @@
+#!/bin/bash
+# mc - Mission Control CLI helper
+# Usage: mc <command> [args]
+
+MC_DIR="/Users/jaywest/MissionControl"
+CONVEX_URL="https://different-gopher-55.convex.cloud"
+SELLERFI_PROJECT="ks70tcsz3a9g2xhqztpsff71qd80ddmh"
+
+cd "$MC_DIR"
+
+case "$1" in
+  tasks|t)
+    # List tasks for a project
+    PROJECT="${2:-$SELLERFI_PROJECT}"
+    STATUS="${3:-INBOX}"
+    npx convex run tasks:listByStatus "{\"projectId\":\"$PROJECT\",\"status\":\"$STATUS\"}" 2>/dev/null | jq -r '.[] | "\(._id) [\(.status)] \(.title)"'
+    ;;
+    
+  task)
+    # Get task details
+    npx convex run tasks:get "{\"taskId\":\"$2\"}" 2>/dev/null | jq '.'
+    ;;
+    
+  claim)
+    # Claim a task
+    TASK="$2"
+    AGENT="${3:-}"
+    if [ -z "$AGENT" ]; then
+      AGENT=$(npx convex run agents:getByName '{"name":"Dev"}' 2>/dev/null | jq -r '._id')
+    fi
+    TS=$(date +%s)
+    npx convex run tasks:assign "{\"taskId\":\"$TASK\",\"agentIds\":[\"$AGENT\"],\"actorType\":\"AGENT\",\"idempotencyKey\":\"claim-$TASK-$TS\"}" 2>/dev/null
+    echo "Claimed task $TASK for agent $AGENT"
+    ;;
+    
+  start)
+    # Start a task (ASSIGNED → IN_PROGRESS)
+    TASK="$2"
+    AGENT="${3:-}"
+    if [ -z "$AGENT" ]; then
+      AGENT=$(npx convex run agents:getByName '{"name":"Dev"}' 2>/dev/null | jq -r '._id')
+    fi
+    TS=$(date +%s)
+    npx convex run messages:postWorkPlan "{\"taskId\":\"$TASK\",\"agentId\":\"$AGENT\",\"bullets\":[\"1. Analyze requirements\",\"2. Implement/test\",\"3. Verify and commit\"],\"estimatedCost\":0.5,\"idempotencyKey\":\"workplan-$TASK-$TS\"}" 2>/dev/null
+    npx convex run tasks:transition "{\"taskId\":\"$TASK\",\"toStatus\":\"IN_PROGRESS\",\"actorType\":\"AGENT\",\"actorAgentId\":\"$AGENT\",\"idempotencyKey\":\"start-$TASK-$TS\",\"workPlan\":{\"bullets\":[\"1. Analyze\",\"2. Implement\",\"3. Verify\"],\"estimatedCost\":0.5}}" 2>/dev/null
+    echo "Started task $TASK"
+    ;;
+    
+  progress|p)
+    # Post progress comment
+    TASK="$2"
+    shift 2
+    MSG="$*"
+    AGENT=$(npx convex run agents:getByName '{"name":"Dev"}' 2>/dev/null | jq -r '._id')
+    TS=$(date +%s)
+    npx convex run comments:post "{\"taskId\":\"$TASK\",\"authorType\":\"AGENT\",\"authorAgentId\":\"$AGENT\",\"content\":\"$MSG\",\"idempotencyKey\":\"progress-$TASK-$TS\"}" 2>/dev/null
+    echo "Posted progress"
+    ;;
+    
+  complete|done)
+    # Complete a task (IN_PROGRESS → REVIEW)
+    TASK="$2"
+    shift 2
+    SUMMARY="${*:-Task completed successfully}"
+    AGENT=$(npx convex run agents:getByName '{"name":"Dev"}' 2>/dev/null | jq -r '._id')
+    TS=$(date +%s)
+    npx convex run tasks:transition "{\"taskId\":\"$TASK\",\"toStatus\":\"REVIEW\",\"actorType\":\"AGENT\",\"actorAgentId\":\"$AGENT\",\"idempotencyKey\":\"review-$TASK-$TS\",\"deliverable\":{\"summary\":\"$SUMMARY\",\"artifactIds\":[]}}" 2>/dev/null
+    echo "Task $TASK moved to REVIEW"
+    ;;
+    
+  agents)
+    # List agents
+    PROJECT="${2:-$SELLERFI_PROJECT}"
+    npx convex run agents:listAll '{}' 2>/dev/null | jq -r '.[] | select(.projectId=="'"$PROJECT"'") | "\(._id) \(.emoji // "🤖") \(.name) [\(.status)]"'
+    ;;
+    
+  projects)
+    # List projects
+    npx convex run projects:list '{}' 2>/dev/null | jq -r '.[] | "\(.slug): \(._id)"'
+    ;;
+    
+  inbox)
+    # Quick inbox view for SellerFi
+    echo "=== SellerFi Inbox ==="
+    npx convex run tasks:listByStatus "{\"projectId\":\"$SELLERFI_PROJECT\",\"status\":\"INBOX\"}" 2>/dev/null | jq -r '.[] | "• \(._id[0:8])... \(.title)"'
+    ;;
+    
+  help|*)
+    echo "mc - Mission Control CLI"
+    echo ""
+    echo "Usage: mc <command> [args]"
+    echo ""
+    echo "Commands:"
+    echo "  tasks [project] [status]  - List tasks (default: SellerFi INBOX)"
+    echo "  task <id>                 - Get task details"
+    echo "  claim <id> [agent]        - Claim a task"
+    echo "  start <id> [agent]        - Start working on task"
+    echo "  progress <id> <msg>       - Post progress update"
+    echo "  complete <id> [summary]   - Complete task → REVIEW"
+    echo "  agents [project]          - List agents"
+    echo "  projects                  - List projects"
+    echo "  inbox                     - Quick SellerFi inbox"
+    echo ""
+    echo "SellerFi Project ID: $SELLERFI_PROJECT"
+    ;;
+esac

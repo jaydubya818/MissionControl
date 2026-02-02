@@ -17,6 +17,8 @@ import { AgentDashboard } from "./AgentDashboard";
 import { KanbanFilters } from "./KanbanFilters";
 import { CostAnalytics } from "./CostAnalytics";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
+import { HealthDashboard } from "./HealthDashboard";
+import { MonitoringDashboard } from "./MonitoringDashboard";
 
 // ============================================================================
 // PROJECT CONTEXT
@@ -100,6 +102,8 @@ export default function App() {
   const [showAgentDashboard, setShowAgentDashboard] = useState(false);
   const [showCostAnalytics, setShowCostAnalytics] = useState(false);
   const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
+  const [showHealthDashboard, setShowHealthDashboard] = useState(false);
+  const [showMonitoringDashboard, setShowMonitoringDashboard] = useState(false);
   const [kanbanFilters, setKanbanFilters] = useState<{
     agents: string[];
     priorities: number[];
@@ -180,6 +184,10 @@ export default function App() {
       setShowCostAnalytics={setShowCostAnalytics}
       showAdvancedAnalytics={showAdvancedAnalytics}
       setShowAdvancedAnalytics={setShowAdvancedAnalytics}
+      showHealthDashboard={showHealthDashboard}
+      setShowHealthDashboard={setShowHealthDashboard}
+      showMonitoringDashboard={showMonitoringDashboard}
+      setShowMonitoringDashboard={setShowMonitoringDashboard}
       kanbanFilters={kanbanFilters}
       setKanbanFilters={setKanbanFilters}
       handlePauseSquad={handlePauseSquad}
@@ -239,6 +247,10 @@ function AppContent({
   setShowCostAnalytics: (v: boolean) => void;
   showAdvancedAnalytics: boolean;
   setShowAdvancedAnalytics: (v: boolean) => void;
+  showHealthDashboard: boolean;
+  setShowHealthDashboard: (v: boolean) => void;
+  showMonitoringDashboard: boolean;
+  setShowMonitoringDashboard: (v: boolean) => void;
   kanbanFilters: {
     agents: string[];
     priorities: number[];
@@ -319,6 +331,40 @@ function AppContent({
             }}
           >
             📈 Analytics
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowHealthDashboard(true)}
+            style={{
+              padding: "6px 12px",
+              background: "#10b981",
+              border: "1px solid #059669",
+              borderRadius: 6,
+              color: "#fff",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              marginRight: "8px",
+            }}
+          >
+            🏥 Health
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowMonitoringDashboard(true)}
+            style={{
+              padding: "6px 12px",
+              background: "#ef4444",
+              border: "1px solid #dc2626",
+              borderRadius: 6,
+              color: "#fff",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              marginRight: "8px",
+            }}
+          >
+            📊 Monitor
           </button>
           <button type="button" className="app-header-docs">
             Docs
@@ -408,6 +454,18 @@ function AppContent({
         <AnalyticsDashboard
           projectId={projectId}
           onClose={() => setShowAdvancedAnalytics(false)}
+        />
+      )}
+      {showHealthDashboard && (
+        <HealthDashboard
+          projectId={projectId}
+          onClose={() => setShowHealthDashboard(false)}
+        />
+      )}
+      {showMonitoringDashboard && (
+        <MonitoringDashboard
+          projectId={projectId}
+          onClose={() => setShowMonitoringDashboard(false)}
         />
       )}
       
