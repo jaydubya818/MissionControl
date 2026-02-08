@@ -1,0 +1,117 @@
+# Mission Control -- Cursor Rules
+# This file is read automatically by Cursor at the start of every session.
+# It defines the project context, conventions, and constraints that AI must follow.
+
+## Project Identity
+
+Mission Control is a self-hosted orchestration and observability control plane for autonomous AI agent squads. Version 0.9.0. Foundation phase complete; building toward agent runtime and multi-model orchestration.
+
+## Architecture
+
+- **Monorepo:** pnpm workspaces + Turborepo
+- **Frontend:** React 18 + TypeScript 5.3 + Vite 5 (apps/mission-control-ui)
+- **Backend:** Convex serverless functions (convex/). There is NO Express server. There is NO REST API.
+- **Database:** Convex (source of truth: convex/schema.ts, 18 tables)
+- **Real-time:** Convex reactive subscriptions via useQuery/useMutation hooks. No WebSocket/SSE code.
+- **Background jobs:** Convex cron jobs (convex/crons.ts). No standalone worker processes.
+- **Styling:** Inline React styles + global CSS (apps/mission-control-ui/src/index.css). No Tailwind. No CSS-in-JS.
+- **Package manager:** pnpm 9+
+- **Node version:** 18+
+
+## Source of Truth Documents
+
+- PRD and roadmap: docs/PRD_V2.md
+- Database schema: convex/schema.ts
+- Tech stack versions: docs/TECH_STACK.md
+- Design system: docs/FRONTEND_GUIDELINES.md
+- User flows: docs/APP_FLOW.md
+- Backend API surface: docs/BACKEND_STRUCTURE.md
+- Session progress: progress.txt
+
+Read progress.txt at the start of every session to understand what was last worked on.
+
+## Package Map
+
+Existing packages:
+- packages/shared -- Shared TypeScript types and utilities (@mission-control/shared)
+- packages/state-machine -- Task state validator, 8-state lifecycle (@mission-control/state-machine)
+- packages/policy-engine -- Risk classification (GREEN/YELLOW/RED) and approval logic (@mission-control/policy-engine)
+- packages/agent-runner -- Proto-runtime: agent registration, heartbeat, task claiming (@mission-control/agent-runner)
+- packages/openclaw-sdk -- SDK for external agent integration (@mission-control/openclaw-sdk)
+- packages/telegram-bot -- Telegram bot for commands, approvals, notifications (@mission-control/telegram-bot)
+
+Planned (not yet created):
+- packages/coordinator -- Central orchestrator (Phase 2)
+- packages/agent-runtime -- Full agent lifecycle, evolves agent-runner (Phase 2)
+- packages/model-router -- Multi-model abstraction, Claude-only first (Phase 3)
+- packages/memory -- Persistent learning system (Phase 2)
+- packages/context-router -- Intent detection and routing (Phase 3)
+
+## Task State Machine
+
+8 states: INBOX, ASSIGNED, IN_PROGRESS, REVIEW, NEEDS_APPROVAL, BLOCKED, DONE, CANCELED
+- DONE and CANCELED are terminal states
+- Transitions enforced by packages/state-machine
+- NEEDS_APPROVAL is triggered by budget exceed or RED/YELLOW tool calls
+- All transitions require idempotency keys
+
+## Convex Conventions
+
+- Schema defined in convex/schema.ts. Do NOT add tables without updating the schema.
+- Queries are read-only. Mutations write data. Actions can call external APIs.
+- All public functions use `v.` validators for arguments.
+- Most tables have a projectId field for multi-project scoping.
+- Use idempotencyKey on creates to prevent duplicates.
+- Log important actions to the activities table.
+- Cron jobs defined in convex/crons.ts.
+
+## Frontend Conventions
+
+- All components in apps/mission-control-ui/src/
+- No component library (no MUI, no Chakra). Custom components only.
+- Dark theme: backgrounds #0f172a (page), #1e293b (cards), #334155 (borders)
+- Text: #e2e8f0 (primary), #94a3b8 (secondary), #64748b (muted)
+- Accents: blue #3b82f6, green #10b981, orange #f59e0b, purple #8b5cf6, red #ef4444
+- Font: system-ui, -apple-system, sans-serif
+- Border radius: 6px default, 8px for cards, 10-12px for modals
+- Use inline styles (not className for custom styles). Global styles in index.css only for layout/responsive.
+- Animations via framer-motion
+- Drag-and-drop via @dnd-kit
+- Convex data via useQuery/useMutation hooks
+
+## Coding Standards
+
+- TypeScript strict mode everywhere
+- No any types in new code (existing code has some v.any() in schema -- do not add more)
+- Prefer named exports over default exports
+- Functions over classes for new code
+- All Convex functions must validate inputs
+- Error messages should be human-readable
+
+## What NOT to Do
+
+- Do NOT create an Express server or REST API (the backend is Convex)
+- Do NOT add Tailwind (the project uses inline styles)
+- Do NOT add a CSS-in-JS library
+- Do NOT add new npm dependencies without discussing first
+- Do NOT modify convex/schema.ts without updating docs/BACKEND_STRUCTURE.md
+- Do NOT hardcode colors -- reference docs/FRONTEND_GUIDELINES.md
+- Do NOT skip idempotency keys on Convex mutations that create records
+- Do NOT use console.log in production code (use the monitoring/alerts system)
+- Do NOT commit .env files
+
+## File Organization
+
+- New UI components: apps/mission-control-ui/src/
+- New Convex functions: convex/
+- New packages: packages/<name>/ with package.json
+- Documentation: docs/<category>/
+- Agent persona configs (future): agents/*.yaml
+- Scripts: scripts/
+
+## Testing (Currently Missing -- Priority for Phase 2)
+
+- No test files exist yet in packages/state-machine or packages/policy-engine
+- When writing tests, use vitest
+- Test state machine transitions exhaustively
+- Test policy engine risk classification for all tool types
