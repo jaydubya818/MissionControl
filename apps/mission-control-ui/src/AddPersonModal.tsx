@@ -256,19 +256,6 @@ export function AddPersonModal({ open, onClose, projectId }: AddPersonModalProps
     }
   };
 
-  const resetForm = () => {
-    setName("");
-    setEmail("");
-    setRole("");
-    setTitle("");
-    setSystemRole("MEMBER");
-    setProjectAccessList([]);
-    setCustomPermissions([]);
-    setUseCustomPermissions(false);
-    setActiveTab("basics");
-    setError("");
-  };
-
   const effectivePermissions = useCustomPermissions
     ? customPermissions
     : ROLE_DEFAULT_PERMISSIONS[systemRole];
