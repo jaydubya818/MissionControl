@@ -9,9 +9,9 @@ interface HealthDashboardProps {
 }
 
 export function HealthDashboard({ onClose }: HealthDashboardProps) {
-  const [refreshKey, setRefreshKey] = useState(0);
-  // refreshKey is included as a dependency hint — Convex queries are reactive,
-  // but incrementing the key signals the user wants a fresh read.
+  // Convex queries are reactive, but this counter gives users a visual
+  // "click-to-refresh" action. The setter is used by the button below.
+  const [, setRefreshKey] = useState(0);
   const healthStatus = useQuery(api.health.status, {});
   const metrics = useQuery(api.health.metrics, {});
 

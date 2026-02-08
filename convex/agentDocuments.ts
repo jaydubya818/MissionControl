@@ -218,9 +218,8 @@ export const remove = mutation({
 
     await ctx.db.delete(args.documentId);
 
-    const activityProjectId = doc.projectId ?? null;
     await ctx.db.insert("activities", {
-      projectId: activityProjectId,
+      projectId: doc.projectId,
       actorType: "HUMAN",
       action: "MEMORY_DELETED",
       description: `Deleted ${doc.type} document`,
