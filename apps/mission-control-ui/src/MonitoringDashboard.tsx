@@ -1,13 +1,11 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
-
 interface MonitoringDashboardProps {
-  projectId?: string;
   onClose: () => void;
 }
 
-export function MonitoringDashboard({ projectId, onClose }: MonitoringDashboardProps) {
+export function MonitoringDashboard({ onClose }: MonitoringDashboardProps) {
   const [selectedTab, setSelectedTab] = useState<"errors" | "performance" | "audit">("errors");
   const recentErrors = useQuery(api.monitoring.listRecentErrors, { limit: 50 });
   const performanceStats = useQuery(api.monitoring.getPerformanceStats, {});

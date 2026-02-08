@@ -58,6 +58,9 @@ export function CreateTaskModal({
         priority,
         assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined,
         idempotencyKey: `ui-create:${Date.now()}`,
+        // Provenance — task came from the dashboard UI
+        source: "DASHBOARD",
+        createdBy: "HUMAN",
       });
       onCreated?.();
       onClose();
@@ -80,7 +83,7 @@ export function CreateTaskModal({
           position: "fixed",
           inset: 0,
           background: "rgba(0,0,0,0.5)",
-          zIndex: 40,
+          zIndex: 9998,
         }}
         onClick={onClose}
         aria-hidden="true"
@@ -101,7 +104,7 @@ export function CreateTaskModal({
           background: "#1e293b",
           border: "1px solid #334155",
           borderRadius: 12,
-          zIndex: 50,
+          zIndex: 9999,
           padding: 24,
         }}
       >

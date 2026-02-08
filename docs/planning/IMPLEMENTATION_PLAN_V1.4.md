@@ -14,9 +14,9 @@
 - Library: `@dnd-kit/core` + `@dnd-kit/sortable`
 - Drag tasks between columns (status changes)
 - Reorder within column (priority)
-- Optimistic updates
-- Visual feedback
-- Undo support
+- Optimistic updates: Maintain action history stack with bounded time-window (last 10 actions), capture prior state before applying optimistic change, revert locally and re-sync with server on rejection, retry with exponential backoff on failure
+- Visual feedback: Toast/error banner on failure, disabled UI during retry, visual diff highlighting
+- Undo support: Explicit undo button for last N actions, automatic rollback on server rejection, frontend service owns action history stack
 
 **Files:**
 - `apps/mission-control-ui/package.json` - Add dependencies
@@ -41,10 +41,14 @@
 **Algorithm:**
 ```
 Score = (skill_match * 0.4) + (availability * 0.3) + (workload * 0.2) + (priority * 0.1)
-- skill_match: Agent has task type in allowedTaskTypes
-- availability: Agent status is ACTIVE
-- workload: Inverse of current task count
-- priority: Agent role weight (LEAD > SPECIALIST > INTERN)
+
+Components (all normalized to 0-1):
+- skill_match = 1 if agent.allowedTaskTypes contains task.type, else 0
+- availability = 1 if agent.status == ACTIVE, else 0
+- workload = 1 / (agent.current_task_count + 1)  [avoids division by zero, range (0,1]]
+- priority = normalized role weight (LEAD=1.0, SPECIALIST=0.5, INTERN=0.25)
+
+Fallback: If all agents score 0 or no ACTIVE agents exist, assign to least-busy ACTIVE agent (max workload value) or leave unassigned.
 ```
 
 ### 3. Webhook System (Option D)
@@ -53,9 +57,11 @@ Score = (skill_match * 0.4) + (availability * 0.3) + (workload * 0.2) + (priorit
 **Technical Approach:**
 - Event subscriptions
 - HTTP POST delivery
-- Retry with exponential backoff
+- Retry with exponential backoff: 3 attempts, intervals [1s, 4s, 16s], per-attempt timeout 5s
 - Signature verification (HMAC-SHA256)
 - Event filtering
+- Circuit breaker: Open circuit on timeout, move to dead-letter queue (DLQ) after final attempt with durable logging and alerting
+- Rate limiting: 60 requests/min per subscriber with burst allowance
 
 **Files:**
 - `convex/webhooks.ts` - Webhook management
@@ -78,7 +84,7 @@ Score = (skill_match * 0.4) + (availability * 0.3) + (workload * 0.2) + (priorit
 
 **Technical Approach:**
 - CSS breakpoints (mobile: <768px, tablet: 768-1024px, desktop: >1024px)
-- Mobile-optimized Kanban (single column scroll)
+- Mobile-optimized Kanban: Single-column vertical scroll with column selector (tabs/dropdown to switch between INBOX/ASSIGNED/IN_PROGRESS/etc.)
 - Touch-friendly buttons (min 44px)
 - Collapsible sidebar
 - Bottom navigation on mobile
@@ -153,7 +159,7 @@ Score = (skill_match * 0.4) + (availability * 0.3) + (workload * 0.2) + (priorit
 - Works on mobile (< 768px)
 - Touch-friendly (44px+ buttons)
 - Sidebar collapses
-- Kanban scrolls horizontally
+- Mobile Kanban: Single-column vertical scroll with column selector (tabs/dropdown for status navigation)
 - Bottom nav on mobile
 
 ---

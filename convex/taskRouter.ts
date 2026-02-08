@@ -12,10 +12,20 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
+/** Performance data for an agent on a task type */
+interface AgentPerfData {
+  successRate: number;
+  refuteCount: number;
+  avgCostUsd: number;
+  totalTasks: number;
+}
+
 /**
  * Calculate assignment score for an agent
  * 
- * Score = (skill_match * 0.4) + (availability * 0.3) + (workload * 0.2) + (role_weight * 0.1)
+ * Score = (skill_match * 0.3) + (availability * 0.2) + (workload * 0.2) + (performance * 0.2) + (role_weight * 0.1)
+ * 
+ * Performance factor (new): success rate from agentPerformance table
  */
 function calculateScore(
   agent: {
@@ -26,7 +36,8 @@ function calculateScore(
   },
   taskType: string,
   agentWorkloads: Map<Id<"agents">, number>,
-  maxWorkload: number
+  maxWorkload: number,
+  performanceData?: AgentPerfData
 ): number {
   // Skill match (0-1)
   const skillMatch = agent.allowedTaskTypes.includes(taskType) ? 1.0 : 0.0;
@@ -48,11 +59,22 @@ function calculateScore(
   };
   const roleWeight = roleWeights[agent.role] || 0.5;
   
-  // Calculate weighted score
+  // Performance factor (0-1): based on success rate and refute count
+  let performanceScore = 0.5; // default for agents with no history
+  if (performanceData && performanceData.totalTasks > 0) {
+    // Success rate (70% weight of performance)
+    const successWeight = performanceData.successRate * 0.7;
+    // Refute penalty (30% weight of performance) — lower refutes = higher score
+    const refutePenalty = Math.max(0, 1 - performanceData.refuteCount * 0.1) * 0.3;
+    performanceScore = successWeight + refutePenalty;
+  }
+  
+  // Calculate weighted score (updated weights)
   const score = (
-    skillMatch * 0.4 +
-    availability * 0.3 +
+    skillMatch * 0.3 +
+    availability * 0.2 +
     workloadScore * 0.2 +
+    performanceScore * 0.2 +
     roleWeight * 0.1
   );
   
@@ -105,12 +127,37 @@ export const findBestAgent = query({
     
     const maxWorkload = Math.max(...Array.from(agentWorkloads.values()), 1);
     
-    // Score each agent
-    const scoredAgents = availableAgents.map((agent) => ({
-      agent,
-      score: calculateScore(agent, args.taskType, agentWorkloads, maxWorkload),
-      workload: agentWorkloads.get(agent._id) || 0,
-    }));
+    // Load performance data for all agents
+    const performanceMap = new Map<Id<"agents">, AgentPerfData>();
+    for (const agent of availableAgents) {
+      const perfRecord = await ctx.db
+        .query("agentPerformance")
+        .withIndex("by_agent_type", (q) =>
+          q.eq("agentId", agent._id).eq("taskType", args.taskType)
+        )
+        .first();
+      
+      if (perfRecord) {
+        const total = perfRecord.successCount + perfRecord.failureCount;
+        performanceMap.set(agent._id, {
+          successRate: total > 0 ? perfRecord.successCount / total : 0,
+          refuteCount: perfRecord.failureCount,
+          avgCostUsd: perfRecord.avgCostUsd,
+          totalTasks: total,
+        });
+      }
+    }
+    
+    // Score each agent (with performance data)
+    const scoredAgents = availableAgents.map((agent) => {
+      const perfData = performanceMap.get(agent._id);
+      return {
+        agent,
+        score: calculateScore(agent, args.taskType, agentWorkloads, maxWorkload, perfData),
+        workload: agentWorkloads.get(agent._id) || 0,
+        performance: perfData,
+      };
+    });
     
     // Sort by score (highest first)
     scoredAgents.sort((a, b) => b.score - a.score);
@@ -126,11 +173,14 @@ export const findBestAgent = query({
       agent: best.agent,
       score: best.score,
       workload: best.workload,
+      performance: best.performance,
       reasoning: {
         skillMatch: best.agent.allowedTaskTypes.includes(args.taskType),
         isActive: best.agent.status === "ACTIVE",
         workload: best.workload,
         role: best.agent.role,
+        successRate: best.performance?.successRate,
+        totalTasks: best.performance?.totalTasks,
       },
     };
   },
@@ -180,18 +230,45 @@ export const getRecommendations = query({
     
     const maxWorkload = Math.max(...Array.from(agentWorkloads.values()), 1);
     
-    // Score each agent
-    const scoredAgents = agents.map((agent) => ({
-      agent,
-      score: calculateScore(agent, args.taskType, agentWorkloads, maxWorkload),
-      workload: agentWorkloads.get(agent._id) || 0,
-      reasoning: {
-        skillMatch: agent.allowedTaskTypes.includes(args.taskType),
-        isActive: agent.status === "ACTIVE",
+    // Load performance data for all agents
+    const performanceMap = new Map<Id<"agents">, AgentPerfData>();
+    for (const agent of agents) {
+      const perfRecord = await ctx.db
+        .query("agentPerformance")
+        .withIndex("by_agent_type", (q) =>
+          q.eq("agentId", agent._id).eq("taskType", args.taskType)
+        )
+        .first();
+      
+      if (perfRecord) {
+        const total = perfRecord.successCount + perfRecord.failureCount;
+        performanceMap.set(agent._id, {
+          successRate: total > 0 ? perfRecord.successCount / total : 0,
+          refuteCount: perfRecord.failureCount,
+          avgCostUsd: perfRecord.avgCostUsd,
+          totalTasks: total,
+        });
+      }
+    }
+    
+    // Score each agent (with performance data)
+    const scoredAgents = agents.map((agent) => {
+      const perfData = performanceMap.get(agent._id);
+      return {
+        agent,
+        score: calculateScore(agent, args.taskType, agentWorkloads, maxWorkload, perfData),
         workload: agentWorkloads.get(agent._id) || 0,
-        role: agent.role,
-      },
-    }));
+        performance: perfData,
+        reasoning: {
+          skillMatch: agent.allowedTaskTypes.includes(args.taskType),
+          isActive: agent.status === "ACTIVE",
+          workload: agentWorkloads.get(agent._id) || 0,
+          role: agent.role,
+          successRate: perfData?.successRate,
+          totalTasks: perfData?.totalTasks,
+        },
+      };
+    });
     
     // Sort by score (highest first)
     scoredAgents.sort((a, b) => b.score - a.score);
@@ -254,9 +331,29 @@ export const autoAssign = mutation({
     
     const maxWorkload = Math.max(...Array.from(agentWorkloads.values()), 1);
     
+    // Load performance data for autoAssign
+    const perfMap = new Map<string, AgentPerfData>();
+    for (const agent of availableAgents) {
+      const perfRecord = await ctx.db
+        .query("agentPerformance")
+        .withIndex("by_agent_type", (q) =>
+          q.eq("agentId", agent._id).eq("taskType", task.type)
+        )
+        .first();
+      if (perfRecord) {
+        const total = perfRecord.successCount + perfRecord.failureCount;
+        perfMap.set(agent._id as string, {
+          successRate: total > 0 ? perfRecord.successCount / total : 0,
+          refuteCount: perfRecord.failureCount,
+          avgCostUsd: perfRecord.avgCostUsd,
+          totalTasks: total,
+        });
+      }
+    }
+    
     const scoredAgents = availableAgents.map((agent) => ({
       agent,
-      score: calculateScore(agent, task.type, agentWorkloads, maxWorkload),
+      score: calculateScore(agent, task.type, agentWorkloads, maxWorkload, perfMap.get(agent._id as string)),
       workload: agentWorkloads.get(agent._id) || 0,
     }));
     
@@ -280,15 +377,9 @@ export const autoAssign = mutation({
         isActive: best.agent.status === "ACTIVE",
         workload: best.workload,
         role: best.agent.role,
+        successRate: perfMap.get(best.agent._id as string)?.successRate,
       },
     };
-    
-    if (!result) {
-      return {
-        success: false,
-        error: "No suitable agent found",
-      };
-    }
     
     // Assign task
     await ctx.db.patch(args.taskId, {

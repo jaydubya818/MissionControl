@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 /**
+ * @deprecated This package is superseded by @mission-control/agent-runtime
+ * and apps/orchestration-server. Use `pnpm run start` or `pnpm run dev:orch`
+ * to run the new orchestration server instead.
+ *
  * Agent runner — register, heartbeat loop, claim tasks, transition.
  * Run from repo root: pnpm --filter @mission-control/agent-runner run
  * Requires: CONVEX_URL, AGENT_NAME, AGENT_ROLE, AGENT_WORKSPACE (optional), AGENT_TYPES (comma-separated)
  */
+console.warn(
+  "[DEPRECATED] @mission-control/agent-runner is deprecated. " +
+  "Use @mission-control/agent-runtime + apps/orchestration-server instead."
+);
 
 import { ConvexHttpClient } from "convex/browser";
 // @ts-ignore - ESM resolution issue with tsx

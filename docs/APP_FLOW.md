@@ -17,8 +17,11 @@ Mission Control is a single-page React app with no traditional URL routing. All 
 1. App loads at root URL
 2. Convex connection established
 3. Projects list fetched
-4. First project auto-selected (if no project previously selected)
-5. Main layout renders: Header + Sidebar + Kanban + Live Feed
+4. Project selection logic:
+   - If projects exist and no project previously selected: auto-select first project
+   - If projects exist and project previously selected: restore previous selection
+   - **Empty-state edge case:** If no projects exist, do NOT attempt auto-selection. Instead, present empty-state UI with "Create your first project" prompt and disable project-dependent behaviors (Kanban, agents, tasks). The initial load logic checks `projects.length === 0` before auto-selecting and redirects to project creation flow.
+5. Main layout renders: Header + Sidebar + Kanban + Live Feed (or empty-state UI if no projects)
 
 ---
 
@@ -45,8 +48,9 @@ Mission Control is a single-page React app with no traditional URL routing. All 
 | Approvals|                                  |                      |
 | Standup  |                                  |                      |
 | Policy   |                                  |                      |
-| Pause    |                                  |                      |
+| Pause    |                          [+ Quick Actions]              |
 +----------+----------------------------------+-----------------------+
+                                        ↑ floating button (bottom-right)
 ```
 
 ---
@@ -126,7 +130,7 @@ Mission Control is a single-page React app with no traditional URL routing. All 
 **Triggers:**
 - Sidebar: "Approvals" button (badge shows pending count)
 - Command Palette: "View Approvals"
-- Keyboard shortcut: Cmd+A
+- Keyboard shortcut: Cmd+Shift+A (changed from Cmd+A to avoid conflicting with universal "Select All" binding)
 
 **Flow:**
 1. Approvals modal opens
@@ -156,7 +160,7 @@ Mission Control is a single-page React app with no traditional URL routing. All 
 | Modal | Trigger | Content |
 |---|---|---|
 | Create Task | Header "+ New Task", Cmd+N | Task creation form |
-| Approvals | Sidebar, Cmd+A | Pending approval queue |
+| Approvals | Sidebar, Cmd+Shift+A | Pending approval queue |
 | Notifications | Sidebar | Recent notifications |
 | Standup | Sidebar | Daily standup report |
 | Policy | Sidebar | Policy configuration |
@@ -178,7 +182,7 @@ Mission Control is a single-page React app with no traditional URL routing. All 
 |---|---|
 | Cmd+K | Open Command Palette / Search |
 | Cmd+N | Create New Task |
-| Cmd+A | Open Approvals |
+| Cmd+Shift+A | Open Approvals (changed from Cmd+A to avoid conflict with Select All) |
 | Cmd+E | Open Agent Dashboard |
 | Escape | Close active modal/drawer |
 

@@ -2,6 +2,7 @@
  * Task State Transitions
  * 
  * Defines all valid transitions between task states.
+ * States are UPPERCASE to match Convex schema (source of truth).
  */
 
 import { TaskStatus, TransitionActor } from "@mission-control/shared";
@@ -22,211 +23,249 @@ export interface TransitionRule {
 export const TRANSITION_RULES: TransitionRule[] = [
   // FROM: INBOX
   {
-    from: "inbox",
-    to: "assigned",
+    from: "INBOX",
+    to: "ASSIGNED",
     allowedActors: ["agent", "human", "system"],
     requiresArtifacts: ["assigneeIds"],
     description: "Assign task to agent(s)",
   },
   {
-    from: "inbox",
-    to: "needs_approval",
+    from: "INBOX",
+    to: "NEEDS_APPROVAL",
     allowedActors: ["system"],
     description: "System requires approval before starting",
   },
   {
-    from: "inbox",
-    to: "blocked",
+    from: "INBOX",
+    to: "BLOCKED",
     allowedActors: ["system", "human"],
     description: "Block task before assignment",
   },
   {
-    from: "inbox",
-    to: "canceled",
+    from: "INBOX",
+    to: "CANCELED",
     allowedActors: ["human"],
     description: "Cancel task before assignment",
   },
 
   // FROM: ASSIGNED
   {
-    from: "assigned",
-    to: "in_progress",
+    from: "ASSIGNED",
+    to: "IN_PROGRESS",
     allowedActors: ["agent", "human"],
     requiresArtifacts: ["workPlan"],
     description: "Agent starts working on task",
   },
   {
-    from: "assigned",
-    to: "needs_approval",
+    from: "ASSIGNED",
+    to: "NEEDS_APPROVAL",
     allowedActors: ["system"],
     description: "System requires approval before starting",
   },
   {
-    from: "assigned",
-    to: "blocked",
+    from: "ASSIGNED",
+    to: "BLOCKED",
     allowedActors: ["system", "human"],
     description: "Block assigned task",
   },
   {
-    from: "assigned",
-    to: "canceled",
+    from: "ASSIGNED",
+    to: "CANCELED",
     allowedActors: ["human"],
     description: "Cancel assigned task",
   },
   {
-    from: "assigned",
-    to: "inbox",
+    from: "ASSIGNED",
+    to: "INBOX",
     allowedActors: ["human"],
     description: "Unassign task (human only)",
   },
 
   // FROM: IN_PROGRESS
   {
-    from: "in_progress",
-    to: "review",
+    from: "IN_PROGRESS",
+    to: "REVIEW",
     allowedActors: ["agent", "human"],
     requiresArtifacts: ["deliverable", "selfReview"],
     description: "Agent submits work for review",
   },
   {
-    from: "in_progress",
-    to: "needs_approval",
+    from: "IN_PROGRESS",
+    to: "NEEDS_APPROVAL",
     allowedActors: ["system"],
     description: "System requires approval during execution",
   },
   {
-    from: "in_progress",
-    to: "blocked",
+    from: "IN_PROGRESS",
+    to: "BLOCKED",
     allowedActors: ["system", "human"],
     description: "Block task during execution",
   },
   {
-    from: "in_progress",
-    to: "canceled",
+    from: "IN_PROGRESS",
+    to: "FAILED",
+    allowedActors: ["system", "agent"],
+    description: "Task failed unrecoverably during execution",
+  },
+  {
+    from: "IN_PROGRESS",
+    to: "CANCELED",
     allowedActors: ["human"],
     description: "Cancel task during execution",
   },
   {
-    from: "in_progress",
-    to: "assigned",
+    from: "IN_PROGRESS",
+    to: "ASSIGNED",
     allowedActors: ["human"],
     description: "Revert to assigned (human only)",
   },
 
   // FROM: REVIEW
   {
-    from: "review",
-    to: "in_progress",
+    from: "REVIEW",
+    to: "IN_PROGRESS",
     allowedActors: ["agent", "human"],
     description: "Request revisions",
   },
   {
-    from: "review",
-    to: "done",
+    from: "REVIEW",
+    to: "DONE",
     allowedActors: ["human"],
     requiresArtifacts: ["approvalRecord"],
     description: "Approve and complete task (human only)",
   },
   {
-    from: "review",
-    to: "needs_approval",
+    from: "REVIEW",
+    to: "NEEDS_APPROVAL",
     allowedActors: ["system", "human"],
     description: "Require additional approval",
   },
   {
-    from: "review",
-    to: "blocked",
+    from: "REVIEW",
+    to: "BLOCKED",
     allowedActors: ["system", "human"],
     description: "Block task during review",
   },
   {
-    from: "review",
-    to: "canceled",
+    from: "REVIEW",
+    to: "FAILED",
+    allowedActors: ["system"],
+    description: "Task failed during review",
+  },
+  {
+    from: "REVIEW",
+    to: "CANCELED",
     allowedActors: ["human"],
     description: "Cancel task during review",
   },
   {
-    from: "review",
-    to: "assigned",
+    from: "REVIEW",
+    to: "ASSIGNED",
     allowedActors: ["human"],
     description: "Reassign task (human only)",
   },
 
   // FROM: NEEDS_APPROVAL
   {
-    from: "needs_approval",
-    to: "blocked",
+    from: "NEEDS_APPROVAL",
+    to: "BLOCKED",
     allowedActors: ["system", "human"],
     description: "Block while awaiting approval",
   },
   {
-    from: "needs_approval",
-    to: "assigned",
+    from: "NEEDS_APPROVAL",
+    to: "ASSIGNED",
     allowedActors: ["human"],
     description: "Approve and assign (human only)",
   },
   {
-    from: "needs_approval",
-    to: "in_progress",
+    from: "NEEDS_APPROVAL",
+    to: "IN_PROGRESS",
     allowedActors: ["human"],
     description: "Approve and continue (human only)",
   },
   {
-    from: "needs_approval",
-    to: "review",
+    from: "NEEDS_APPROVAL",
+    to: "REVIEW",
     allowedActors: ["human"],
     description: "Approve and move to review (human only)",
   },
   {
-    from: "needs_approval",
-    to: "done",
+    from: "NEEDS_APPROVAL",
+    to: "DONE",
     allowedActors: ["human"],
     requiresArtifacts: ["approvalRecord"],
     description: "Approve and complete (human only)",
   },
   {
-    from: "needs_approval",
-    to: "canceled",
+    from: "NEEDS_APPROVAL",
+    to: "FAILED",
+    allowedActors: ["system", "human"],
+    description: "Denied approval leads to failure",
+  },
+  {
+    from: "NEEDS_APPROVAL",
+    to: "CANCELED",
     allowedActors: ["human"],
     description: "Deny approval and cancel",
   },
 
   // FROM: BLOCKED
   {
-    from: "blocked",
-    to: "assigned",
+    from: "BLOCKED",
+    to: "ASSIGNED",
     allowedActors: ["human"],
     description: "Unblock and assign (human only)",
   },
   {
-    from: "blocked",
-    to: "in_progress",
+    from: "BLOCKED",
+    to: "IN_PROGRESS",
     allowedActors: ["human"],
     description: "Unblock and continue (human only)",
   },
   {
-    from: "blocked",
-    to: "needs_approval",
+    from: "BLOCKED",
+    to: "NEEDS_APPROVAL",
     allowedActors: ["human", "system"],
     description: "Require approval to unblock",
   },
   {
-    from: "blocked",
-    to: "canceled",
+    from: "BLOCKED",
+    to: "FAILED",
+    allowedActors: ["human", "system"],
+    description: "Blocked task determined unrecoverable",
+  },
+  {
+    from: "BLOCKED",
+    to: "CANCELED",
     allowedActors: ["human"],
     description: "Cancel blocked task",
   },
 
-  // FROM: DONE
+  // FROM: FAILED (terminal, but reopenable by human)
   {
-    from: "done",
-    to: "review",
+    from: "FAILED",
+    to: "INBOX",
+    allowedActors: ["human"],
+    description: "Reopen failed task for retry (human only)",
+  },
+  {
+    from: "FAILED",
+    to: "CANCELED",
+    allowedActors: ["human"],
+    description: "Cancel a failed task",
+  },
+
+  // FROM: DONE (terminal, but reopenable by human)
+  {
+    from: "DONE",
+    to: "REVIEW",
     allowedActors: ["human"],
     description: "Reopen for review (human only)",
   },
   {
-    from: "done",
-    to: "canceled",
+    from: "DONE",
+    to: "CANCELED",
     allowedActors: ["human"],
     description: "Mark as canceled (incorrect close)",
   },

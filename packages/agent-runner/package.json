@@ -3,7 +3,8 @@
   "version": "0.9.1",
   "private": true,
   "type": "module",
-  "description": "Minimal agent loop: register, heartbeat, claim tasks, transition (for OpenClaw integration)",
+  "deprecated": "Use @mission-control/agent-runtime + @mission-control/orchestration-server instead. This package is retained for legacy compatibility only.",
+  "description": "[DEPRECATED] Minimal agent loop — superseded by @mission-control/agent-runtime and apps/orchestration-server",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

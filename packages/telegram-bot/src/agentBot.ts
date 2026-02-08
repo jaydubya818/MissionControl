@@ -173,25 +173,43 @@ export class AgentBot {
         }
 
         const text = ctx.message.text;
+        const msgId = ctx.message.message_id;
+        const chatId = ctx.message.chat.id;
 
         // Create a task in Mission Control
         const taskType = this.inferTaskType(text);
 
-        const taskId = await this.convex.mutation(api.tasks.create, {
+        const result = await this.convex.mutation(api.tasks.create, {
           title: text.length > 100 ? text.substring(0, 97) + "..." : text,
           description: text,
           type: taskType,
           priority: 3,
-          assigneeNames: [this.agentName],
-          source: "telegram",
+          assigneeIds: this.agentId ? [this.agentId] : undefined,
+          // Provenance
+          source: "TELEGRAM",
+          sourceRef: `telegram:${chatId}:${msgId}`,
+          createdBy: "HUMAN",
+          createdByRef: ctx.message.from?.username ?? String(ctx.message.from?.id),
+          // Deterministic idempotency key prevents duplicate tasks on retries
+          idempotencyKey: `telegram:${chatId}:${msgId}`,
         });
 
-        await ctx.reply(
-          `✅ Task created!\n\n` +
-          `I've added this to my task list. I'll get started on it soon.\n\n` +
-          `Task ID: ${taskId.slice(-6)}\n` +
-          `Type: ${taskType}`
-        );
+        const task = result.task;
+        const taskIdShort = task?._id ? String(task._id).slice(-6) : "?";
+
+        if (result.created) {
+          await ctx.reply(
+            `✅ Task created!\n\n` +
+            `I've added this to my task list. I'll get started on it soon.\n\n` +
+            `Task ID: ${taskIdShort}\n` +
+            `Type: ${taskType}`
+          );
+        } else {
+          await ctx.reply(
+            `📌 Task already exists (duplicate message).\n\n` +
+            `Task ID: ${taskIdShort}`
+          );
+        }
       } catch (error) {
         await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       }
@@ -220,29 +238,43 @@ export class AgentBot {
     return emojis[status] || "•";
   }
 
+  /**
+   * Infer task type from message text.
+   * Must return a valid TaskType from the schema:
+   * CONTENT | SOCIAL | EMAIL_MARKETING | CUSTOMER_RESEARCH | SEO_RESEARCH | ENGINEERING | DOCS | OPS
+   */
   private inferTaskType(text: string): string {
     const lower = text.toLowerCase();
 
     if (lower.includes("bug") || lower.includes("fix") || lower.includes("error")) {
       return "ENGINEERING";
     }
-    if (lower.includes("doc") || lower.includes("write") || lower.includes("explain")) {
-      return "DOCS";
+    if (lower.includes("code") || lower.includes("build") || lower.includes("implement")) {
+      return "ENGINEERING";
     }
     if (lower.includes("test") || lower.includes("qa")) {
       return "ENGINEERING";
     }
+    if (lower.includes("doc") || lower.includes("write") || lower.includes("explain")) {
+      return "DOCS";
+    }
     if (lower.includes("design") || lower.includes("ui") || lower.includes("ux")) {
       return "CONTENT";
     }
-    if (lower.includes("plan") || lower.includes("strategy") || lower.includes("organize")) {
-      return "ORCHESTRATION";
+    if (lower.includes("social") || lower.includes("post") || lower.includes("tweet")) {
+      return "SOCIAL";
     }
-    if (lower.includes("review") || lower.includes("check")) {
-      return "REVIEW";
+    if (lower.includes("email") || lower.includes("newsletter")) {
+      return "EMAIL_MARKETING";
+    }
+    if (lower.includes("research") || lower.includes("analyze") || lower.includes("compare")) {
+      return "CUSTOMER_RESEARCH";
+    }
+    if (lower.includes("seo") || lower.includes("keyword") || lower.includes("ranking")) {
+      return "SEO_RESEARCH";
     }
 
-    return "OPS"; // Default
+    return "OPS"; // Default for plan, strategy, organize, review, check, etc.
   }
 
   // Send a message to the agent's chat

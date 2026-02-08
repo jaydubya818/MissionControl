@@ -29,7 +29,7 @@ Each epic contains user stories with:
 
 **Goal:** Core infrastructure + basic task/agent management
 
-**Stories:** 15 stories, 42 story points
+**Stories:** 15 stories, 44 story points
 
 ---
 
@@ -280,7 +280,7 @@ Each epic contains user stories with:
 
 **Goal:** Approvals, budgets, thread mapping, containment
 
-**Stories:** 18 stories, 54 story points
+**Stories:** 18 stories, 47 story points
 
 ---
 
@@ -572,7 +572,7 @@ Each epic contains user stories with:
 
 **Goal:** Timeline view, cost tracking, audit logs, operational polish
 
-**Stories:** 14 stories, 42 story points
+**Stories:** 14 stories, 37 story points
 
 ---
 
@@ -794,7 +794,7 @@ Each epic contains user stories with:
 
 **Goal:** Testing, documentation, production readiness
 
-**Stories:** 12 stories, 36 story points
+**Stories:** 12 stories, 40 story points
 
 ---
 
@@ -1013,14 +1013,14 @@ Each epic contains user stories with:
 ## Summary
 
 **Total Stories:** 59  
-**Total Story Points:** 174  
+**Total Story Points:** 168  
 **Estimated Duration:** 6-8 weeks (with 1-2 developers)
 
 **Epic Breakdown:**
-- Epic 1 (Foundation): 15 stories, 42 points, 2 weeks
-- Epic 2 (Safety & Collaboration): 18 stories, 54 points, 2 weeks
-- Epic 3 (Observability): 14 stories, 42 points, 2 weeks
-- Epic 4 (Hardening): 12 stories, 36 points, 2 weeks
+- Epic 1 (Foundation): 15 stories, 44 points, 2 weeks
+- Epic 2 (Safety & Collaboration): 18 stories, 47 points, 2 weeks
+- Epic 3 (Observability): 14 stories, 37 points, 2 weeks
+- Epic 4 (Hardening): 12 stories, 40 points, 2 weeks
 
 **Critical Path:**
 1. E1-US-001 → E1-US-002/003/004/005 → E1-US-006 → E1-US-009 (state machine + tasks)

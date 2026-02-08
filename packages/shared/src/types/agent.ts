@@ -2,16 +2,17 @@
  * Agent Types
  * 
  * Agents are autonomous OpenClaw sessions that execute tasks.
+ * Values are UPPERCASE to match Convex schema (source of truth).
  */
 
-export type AutonomyLevel = "intern" | "specialist" | "lead";
+export type AutonomyLevel = "INTERN" | "SPECIALIST" | "LEAD";
 
 export type AgentStatus = 
-  | "active"      // Running normally
-  | "paused"      // Temporarily stopped
-  | "drained"     // Finishing current task, then pausing
-  | "quarantined" // Immediately stopped, tasks blocked
-  | "stopped";    // Permanently stopped
+  | "ACTIVE"       // Running normally
+  | "PAUSED"       // Temporarily stopped
+  | "DRAINED"      // Finishing current task, then pausing
+  | "QUARANTINED"  // Immediately stopped, tasks blocked
+  | "OFFLINE";     // Not running
 
 export interface ModelConfig {
   primary: string;

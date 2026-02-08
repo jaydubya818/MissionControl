@@ -78,7 +78,7 @@ export const routeTask = mutation({
       actorType: "SYSTEM",
       targetType: "TASK",
       targetId: args.taskId,
-      body: `Task routed to ${executor} (score: ${score})`,
+      description: `Task routed to ${executor} (score: ${score})`,
       metadata: { executor, score, reason },
     });
     
@@ -113,7 +113,7 @@ export const handleExecutionCallback = mutation({
         actorType: "SYSTEM",
         targetType: "TASK",
         targetId: args.taskId,
-        body: `Execution completed successfully`,
+        description: `Execution completed successfully`,
         metadata: { result: args.result, artifacts: args.artifacts },
       });
     } else if (args.status === "FAILED") {
@@ -128,7 +128,7 @@ export const handleExecutionCallback = mutation({
         actorType: "SYSTEM",
         targetType: "TASK",
         targetId: args.taskId,
-        body: `Execution failed: ${args.error}`,
+        description: `Execution failed: ${args.error}`,
         metadata: { error: args.error },
       });
     }

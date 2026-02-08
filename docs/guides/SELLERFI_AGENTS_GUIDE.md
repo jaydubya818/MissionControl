@@ -226,7 +226,7 @@ All agent activity is tracked in Mission Control:
 
 ## 📚 SellerFi Agent System
 
-The SellerFi agents are based on a comprehensive 151+ agent system organized into 13 functional categories:
+The SellerFi agents are based on a comprehensive 151+ agent system organized into 12 functional categories:
 
 1. **Orchestration & Management** (11 agents)
 2. **Development & Architecture** (24 agents)

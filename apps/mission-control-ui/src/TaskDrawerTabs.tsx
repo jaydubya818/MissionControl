@@ -5,6 +5,7 @@
  */
 
 import { useMutation, useQuery } from "convex/react";
+import { createPortal } from "react-dom";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useState } from "react";
@@ -12,7 +13,7 @@ import { PeerReviewPanel } from "./PeerReviewPanel";
 import { ExportReportButton } from "./ExportReportButton";
 import { TaskEditMode } from "./TaskEditMode";
 
-type Tab = "overview" | "timeline" | "artifacts" | "approvals" | "cost" | "reviews";
+type Tab = "overview" | "timeline" | "artifacts" | "approvals" | "cost" | "reviews" | "why";
 
 export function TaskDrawerTabs({
   taskId,
@@ -98,10 +99,32 @@ export function TaskDrawerTabs({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div style={{ flex: 1 }}>
             <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>{task.title}</h2>
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
               <StatusBadge status={task.status} />
               <span style={tagStyle}>{task.type}</span>
               <span style={tagStyle}>P{task.priority}</span>
+              {task.source && (() => {
+                const src = SOURCE_CONFIG[task.source] || SOURCE_CONFIG.UNKNOWN;
+                return (
+                  <span
+                    title={task.sourceRef ? `${src.label}: ${task.sourceRef}` : src.label}
+                    style={{
+                      padding: "4px 8px",
+                      background: src.bg,
+                      borderRadius: 4,
+                      fontSize: "0.75rem",
+                      color: src.color,
+                      fontWeight: 500,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <span style={{ fontSize: "0.7rem" }}>{src.icon}</span>
+                    {src.label}
+                  </span>
+                );
+              })()}
             </div>
           </div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -159,6 +182,9 @@ export function TaskDrawerTabs({
         <TabButton active={activeTab === "reviews"} onClick={() => setActiveTab("reviews")}>
           Reviews
         </TabButton>
+        <TabButton active={activeTab === "why"} onClick={() => setActiveTab("why")}>
+          Why?
+        </TabButton>
       </div>
 
       {/* Tab Content */}
@@ -185,13 +211,16 @@ export function TaskDrawerTabs({
           <ArtifactsTab task={task} messages={messages} />
         )}
         {activeTab === "reviews" && (
-          <PeerReviewPanel taskId={taskId} projectId={task.projectId} />
+          <PeerReviewPanel taskId={taskId} projectId={task.projectId!} />
         )}
         {activeTab === "approvals" && (
           <ApprovalsTab approvals={approvals} agentMap={agentMap} />
         )}
         {activeTab === "cost" && (
           <CostTab task={task} runs={runs} />
+        )}
+        {activeTab === "why" && (
+          <WhyTab task={task} agentMap={agentMap} transitions={transitions} />
         )}
       </div>
 
@@ -273,6 +302,10 @@ function OverviewTab({
           </div>
         </Section>
       )}
+
+      <Section title="Source">
+        <SourceBadge source={task.source} sourceRef={task.sourceRef} createdBy={task.createdBy} />
+      </Section>
 
       {task.workPlan && (
         <Section title="Work Plan">
@@ -680,16 +713,17 @@ function CostTab({
 // ============================================================================
 
 function Drawer({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
+  return createPortal(
     <>
       <div
         style={{
           position: "fixed",
           inset: 0,
           background: "rgba(0,0,0,0.5)",
-          zIndex: 40,
+          zIndex: 9990,
         }}
         onClick={onClose}
+        aria-hidden="true"
       />
       <div
         style={{
@@ -700,14 +734,15 @@ function Drawer({ children, onClose }: { children: React.ReactNode; onClose: () 
           width: "min(600px, 90vw)",
           background: "#1e293b",
           borderLeft: "1px solid #334155",
-          zIndex: 50,
+          zIndex: 9991,
           display: "flex",
           flexDirection: "column",
         }}
       >
         {children}
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
@@ -778,6 +813,74 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ============================================================================
+// SOURCE BADGE
+// ============================================================================
+
+const SOURCE_CONFIG: Record<string, { icon: string; label: string; color: string; bg: string; border: string }> = {
+  DASHBOARD: { icon: "🖥️", label: "Dashboard",  color: "#93c5fd", bg: "#1e3a5f", border: "#2563eb" },
+  TELEGRAM:  { icon: "✈️", label: "Telegram",   color: "#38bdf8", bg: "#0c4a6e", border: "#0284c7" },
+  GITHUB:    { icon: "🐙", label: "GitHub",      color: "#c4b5fd", bg: "#3b1f7e", border: "#7c3aed" },
+  AGENT:     { icon: "🤖", label: "Agent",       color: "#86efac", bg: "#14532d", border: "#16a34a" },
+  API:       { icon: "🔌", label: "API",         color: "#fcd34d", bg: "#713f12", border: "#ca8a04" },
+  TRELLO:    { icon: "📋", label: "Trello",      color: "#93c5fd", bg: "#1e3a5f", border: "#2563eb" },
+  SEED:      { icon: "🌱", label: "Seed Data",   color: "#94a3b8", bg: "#334155", border: "#475569" },
+  UNKNOWN:   { icon: "❓", label: "Unknown",     color: "#94a3b8", bg: "#334155", border: "#475569" },
+};
+
+const CREATED_BY_LABELS: Record<string, string> = {
+  HUMAN: "Human",
+  AGENT: "AI Agent",
+  SYSTEM: "System",
+};
+
+function SourceBadge({ 
+  source, 
+  sourceRef,
+  createdBy,
+}: { 
+  source?: string; 
+  sourceRef?: string;
+  createdBy?: string;
+}) {
+  const src = SOURCE_CONFIG[source ?? ""] || SOURCE_CONFIG.UNKNOWN;
+  const creatorLabel = CREATED_BY_LABELS[createdBy ?? ""] || null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 12px",
+            background: src.bg,
+            border: `1px solid ${src.border}`,
+            borderRadius: 6,
+            color: src.color,
+            fontSize: "0.85rem",
+            fontWeight: 500,
+          }}
+        >
+          <span>{src.icon}</span>
+          {src.label}
+        </span>
+        {creatorLabel && (
+          <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
+            by {creatorLabel}
+          </span>
+        )}
+      </div>
+      {sourceRef && (
+        <div style={{ fontSize: "0.8rem", color: "#64748b" }}>
+          Ref: <span style={{ color: "#94a3b8", fontFamily: "monospace" }}>{sourceRef}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ActionButton({
   onClick,
   disabled,
@@ -820,6 +923,247 @@ function Stat({
     <div style={{ padding: "8px 12px", background: "#0f172a", borderRadius: 6, border: "1px solid #334155" }}>
       <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block" }}>{label}</span>
       <span style={{ fontWeight: 600, fontSize: "1.1rem", color: color || "#e2e8f0" }}>{value}</span>
+    </div>
+  );
+}
+
+// ============================================================================
+// WHY TAB (Explainability Panel)
+// ============================================================================
+
+function WhyTab({
+  task,
+  agentMap,
+  transitions,
+}: {
+  task: Doc<"tasks">;
+  agentMap: Map<Id<"agents">, Doc<"agents">>;
+  transitions: any[];
+}) {
+  // Build explainability data from task metadata
+  const assignees = task.assigneeIds
+    .map((id: Id<"agents">) => agentMap.get(id))
+    .filter(Boolean);
+
+  const riskLevel = (task as any).riskLevel ?? "GREEN";
+  const riskColors: Record<string, string> = {
+    GREEN: "#10b981",
+    YELLOW: "#f59e0b",
+    RED: "#ef4444",
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Assignment reasoning */}
+      <section>
+        <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: 12 }}>
+          Why was this task assigned?
+        </h3>
+        <div
+          style={{
+            background: "#0f172a",
+            border: "1px solid #334155",
+            borderRadius: 8,
+            padding: 16,
+          }}
+        >
+          {assignees.length > 0 ? (
+            assignees.map((agent: any) => (
+              <div key={agent._id} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontWeight: 600, color: "#e2e8f0" }}>
+                    {agent.name}
+                  </span>
+                  <span style={tagStyle}>{agent.role}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <ExplainRow
+                    label="Skill Match"
+                    value={agent.allowedTaskTypes?.includes(task.type) ? "Yes" : "No"}
+                    detail={`Agent handles: ${(agent.allowedTaskTypes ?? []).join(", ") || "any"}`}
+                  />
+                  <ExplainRow
+                    label="Agent Status"
+                    value={agent.status}
+                    detail={`Current workload: ${agent.currentTaskCount ?? 0}/${agent.maxConcurrentTasks ?? 3}`}
+                  />
+                  <ExplainRow
+                    label="Agent Role"
+                    value={agent.role}
+                    detail={`Role weight in scoring: ${agent.role === "LEAD" ? "0.1" : agent.role === "SENIOR" ? "0.08" : "0.05"}`}
+                  />
+                </div>
+              </div>
+            ))
+          ) : (
+            <p style={{ color: "#64748b", margin: 0 }}>
+              No agent assigned yet. Task is in {task.status} state.
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* Risk Assessment */}
+      <section>
+        <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: 12 }}>
+          Risk Assessment
+        </h3>
+        <div
+          style={{
+            background: "#0f172a",
+            border: "1px solid #334155",
+            borderRadius: 8,
+            padding: 16,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <span
+              style={{
+                display: "inline-block",
+                padding: "4px 12px",
+                borderRadius: 6,
+                background: riskColors[riskLevel] ?? "#64748b",
+                color: "#fff",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+              }}
+            >
+              {riskLevel}
+            </span>
+            <span style={{ color: "#94a3b8", fontSize: "0.85rem" }}>
+              {riskLevel === "GREEN"
+                ? "Autonomous execution allowed"
+                : riskLevel === "YELLOW"
+                  ? "May require approval for certain tools"
+                  : "Requires human approval before execution"}
+            </span>
+          </div>
+          <ExplainRow
+            label="Budget"
+            value={`$${(task.actualCost ?? 0).toFixed(2)} / $${(task.estimatedCost ?? 0).toFixed(2)}`}
+            detail={
+              task.estimatedCost && task.actualCost > task.estimatedCost
+                ? "Over budget — approval may be required"
+                : "Within budget"
+            }
+          />
+        </div>
+      </section>
+
+      {/* State Transition History */}
+      <section>
+        <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: 12 }}>
+          Decision Timeline
+        </h3>
+        <div
+          style={{
+            background: "#0f172a",
+            border: "1px solid #334155",
+            borderRadius: 8,
+            padding: 16,
+          }}
+        >
+          {transitions.length > 0 ? (
+            transitions.slice(0, 10).map((t: any, i: number) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 0",
+                  borderBottom:
+                    i < transitions.length - 1
+                      ? "1px solid #1e293b"
+                      : undefined,
+                }}
+              >
+                <span style={{ color: "#64748b", fontSize: "0.75rem", width: 120, flexShrink: 0 }}>
+                  {new Date(t._creationTime).toLocaleString()}
+                </span>
+                <span style={tagStyle}>{t.fromStatus ?? "—"}</span>
+                <span style={{ color: "#64748b" }}>→</span>
+                <span style={tagStyle}>{t.toStatus}</span>
+                {t.triggeredBy && (
+                  <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>
+                    by {t.triggeredBy}
+                  </span>
+                )}
+                {t.reason && (
+                  <span style={{ color: "#64748b", fontSize: "0.75rem", fontStyle: "italic" }}>
+                    — {t.reason}
+                  </span>
+                )}
+              </div>
+            ))
+          ) : (
+            <p style={{ color: "#64748b", margin: 0 }}>
+              No transitions recorded yet.
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* Task Metadata */}
+      <section>
+        <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: 12 }}>
+          Task Properties
+        </h3>
+        <div
+          style={{
+            background: "#0f172a",
+            border: "1px solid #334155",
+            borderRadius: 8,
+            padding: 16,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          <ExplainRow label="Type" value={task.type} detail="Determines decomposition strategy and agent matching" />
+          <ExplainRow label="Priority" value={`P${task.priority}`} detail="Higher priority = higher score for agent selection" />
+          <ExplainRow 
+            label="Source" 
+            value={`${(SOURCE_CONFIG[task.source ?? ""] || SOURCE_CONFIG.UNKNOWN).icon} ${(SOURCE_CONFIG[task.source ?? ""] || SOURCE_CONFIG.UNKNOWN).label}`} 
+            detail={task.sourceRef ? `Ref: ${task.sourceRef}` : (task.createdBy ? `Created by: ${CREATED_BY_LABELS[task.createdBy] || task.createdBy}` : "How the task entered the system")}
+          />
+          <ExplainRow
+            label="Created"
+            value={new Date(task._creationTime).toLocaleDateString()}
+            detail={new Date(task._creationTime).toLocaleString()}
+          />
+          {task.parentTaskId && (
+            <ExplainRow label="Parent Task" value={String(task.parentTaskId)} detail="This is a subtask of a decomposed mission" />
+          )}
+          {task.labels && task.labels.length > 0 && (
+            <ExplainRow label="Labels" value={task.labels.join(", ")} />
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ExplainRow({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+      <span style={{ color: "#64748b", fontSize: "0.8rem", width: 100, flexShrink: 0 }}>
+        {label}
+      </span>
+      <span style={{ color: "#e2e8f0", fontSize: "0.85rem", fontWeight: 500 }}>{value}</span>
+      {detail && (
+        <span style={{ color: "#475569", fontSize: "0.75rem", fontStyle: "italic" }}>
+          — {detail}
+        </span>
+      )}
     </div>
   );
 }

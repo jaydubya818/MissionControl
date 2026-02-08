@@ -50,6 +50,8 @@ List all available projects with task and agent counts.
 ```
 📁 Projects:
 
+✓ = Currently active project
+
 ✓ OpenClaw (openclaw)
   └ 15 tasks, 8 agents active
 

@@ -33,6 +33,7 @@ const taskStatus = v.union(
   v.literal("REVIEW"),
   v.literal("NEEDS_APPROVAL"),
   v.literal("BLOCKED"),
+  v.literal("FAILED"),
   v.literal("DONE"),
   v.literal("CANCELED")
 );
@@ -104,6 +105,18 @@ export default defineSchema({
     slug: v.string(),
     description: v.optional(v.string()),
     
+    // GitHub integration
+    githubRepo: v.optional(v.string()), // e.g., "owner/repo"
+    githubBranch: v.optional(v.string()),
+    githubWebhookSecret: v.optional(v.string()),
+    
+    // Agent swarm configuration
+    swarmConfig: v.optional(v.object({
+      maxAgents: v.number(),
+      defaultModel: v.optional(v.string()),
+      autoScale: v.boolean(),
+    })),
+    
     // Per-project policy defaults (optional, merged with global policy)
     policyDefaults: v.optional(v.object({
       budgetDefaults: v.optional(v.any()),
@@ -113,7 +126,8 @@ export default defineSchema({
     // Metadata
     metadata: v.optional(v.any()),
   })
-    .index("by_slug", ["slug"]),
+    .index("by_slug", ["slug"])
+    .index("by_github_repo", ["githubRepo"]),
 
   // -------------------------------------------------------------------------
   // AGENTS
@@ -229,6 +243,19 @@ export default defineSchema({
     submittedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
     
+    // Scheduling (for calendar view)
+    scheduledFor: v.optional(v.number()),
+    recurrence: v.optional(v.object({
+      frequency: v.union(
+        v.literal("DAILY"),
+        v.literal("WEEKLY"),
+        v.literal("MONTHLY")
+      ),
+      interval: v.number(),
+      daysOfWeek: v.optional(v.array(v.number())), // 0=Sun, 6=Sat
+      endDate: v.optional(v.number()),
+    })),
+    
     // Labels
     labels: v.optional(v.array(v.string())),
     
@@ -238,6 +265,24 @@ export default defineSchema({
     // Redaction tracking
     redactedFields: v.optional(v.array(v.string())),
     
+    // Provenance — where the task came from
+    source: v.optional(v.union(
+      v.literal("DASHBOARD"),
+      v.literal("TELEGRAM"),
+      v.literal("GITHUB"),
+      v.literal("AGENT"),
+      v.literal("API"),
+      v.literal("TRELLO"),
+      v.literal("SEED")
+    )),
+    sourceRef: v.optional(v.string()),     // e.g. "jaydubya818/repo#42", telegram msg id
+    createdBy: v.optional(v.union(
+      v.literal("HUMAN"),
+      v.literal("AGENT"),
+      v.literal("SYSTEM")
+    )),
+    createdByRef: v.optional(v.string()),  // agent id or user email
+    
     // Metadata
     metadata: v.optional(v.any()),
   })
@@ -245,6 +290,7 @@ export default defineSchema({
     .index("by_type", ["type"])
     .index("by_priority", ["priority"])
     .index("by_idempotency", ["idempotencyKey"])
+    .index("by_source", ["source"])
     .index("by_project", ["projectId"])
     .index("by_project_status", ["projectId", "status"]),
 
@@ -853,4 +899,172 @@ export default defineSchema({
     .index("by_type", ["type"])
     .index("by_reviewer", ["reviewerAgentId"])
     .index("by_task_status", ["taskId", "status"]),
+
+  // -------------------------------------------------------------------------
+  // TASK DEPENDENCIES (DAG edges for coordinator decomposition)
+  // -------------------------------------------------------------------------
+  taskDependencies: defineTable({
+    parentTaskId: v.id("tasks"),
+    taskId: v.id("tasks"),        // The task that has the dependency
+    dependsOnTaskId: v.id("tasks"), // The task it depends on
+  })
+    .index("by_parent", ["parentTaskId"])
+    .index("by_task", ["taskId"])
+    .index("by_depends_on", ["dependsOnTaskId"]),
+
+  // -------------------------------------------------------------------------
+  // AGENT PERFORMANCE (Learning System — Aggregated Metrics)
+  // -------------------------------------------------------------------------
+  agentPerformance: defineTable({
+    agentId: v.id("agents"),
+    projectId: v.optional(v.id("projects")),
+    taskType: v.string(),
+    successCount: v.number(),
+    failureCount: v.number(),
+    avgCompletionTimeMs: v.number(),
+    avgCostUsd: v.number(),
+    totalTasksCompleted: v.number(),
+    lastUpdatedAt: v.number(),
+  })
+    .index("by_agent", ["agentId"])
+    .index("by_agent_type", ["agentId", "taskType"])
+    .index("by_project", ["projectId"]),
+
+  // -------------------------------------------------------------------------
+  // AGENT PATTERNS (Learning System — Discovered Strengths/Weaknesses)
+  // -------------------------------------------------------------------------
+  agentPatterns: defineTable({
+    agentId: v.id("agents"),
+    projectId: v.optional(v.id("projects")),
+    pattern: v.string(),
+    confidence: v.number(),
+    evidence: v.array(v.string()),
+    discoveredAt: v.number(),
+    lastSeenAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_agent", ["agentId"])
+    .index("by_agent_pattern", ["agentId", "pattern"])
+    .index("by_project", ["projectId"]),
+
+  // -------------------------------------------------------------------------
+  // ORG MEMBERS (Human Team Members + Org Chart + RBAC)
+  // -------------------------------------------------------------------------
+  orgMembers: defineTable({
+    projectId: v.optional(v.id("projects")),
+    
+    // Identity
+    name: v.string(),
+    email: v.optional(v.string()),
+    role: v.string(), // e.g., "CEO", "CSO", "Engineer"
+    title: v.optional(v.string()),
+    avatar: v.optional(v.string()),
+    
+    // Org hierarchy
+    parentMemberId: v.optional(v.id("orgMembers")),
+    level: v.number(), // 0 = top level (CEO), 1 = reports to CEO, etc.
+    
+    // Responsibilities
+    responsibilities: v.optional(v.array(v.string())),
+    
+    // ---- RBAC (Role-Based Access Control) ----
+    
+    // System-wide role: determines base permissions
+    systemRole: v.optional(v.union(
+      v.literal("OWNER"),       // Full access to everything
+      v.literal("ADMIN"),       // Manage users, all projects
+      v.literal("MANAGER"),     // Manage assigned projects
+      v.literal("MEMBER"),      // Edit access to assigned projects
+      v.literal("VIEWER")       // Read-only access
+    )),
+    
+    // Per-project access: overrides systemRole for specific projects
+    // Array of { projectId, accessLevel } pairs
+    projectAccess: v.optional(v.array(v.object({
+      projectId: v.id("projects"),
+      accessLevel: v.union(
+        v.literal("ADMIN"),     // Full control of this project
+        v.literal("EDIT"),      // Can create/edit tasks, manage agents
+        v.literal("VIEW")       // Read-only access to this project
+      ),
+    }))),
+    
+    // Granular permissions (override systemRole for fine-tuning)
+    permissions: v.optional(v.array(v.string())),
+    // Available permissions:
+    // "tasks.create", "tasks.edit", "tasks.delete", "tasks.assign"
+    // "agents.view", "agents.manage", "agents.configure"
+    // "approvals.view", "approvals.decide"
+    // "budget.view", "budget.manage"
+    // "people.view", "people.manage", "people.invite"
+    // "projects.create", "projects.edit", "projects.delete"
+    // "policies.view", "policies.manage"
+    // "settings.manage"
+    
+    // Status
+    active: v.boolean(),
+    
+    // Invite tracking
+    invitedAt: v.optional(v.number()),
+    invitedBy: v.optional(v.id("orgMembers")),
+    lastLoginAt: v.optional(v.number()),
+    
+    // Metadata
+    metadata: v.optional(v.any()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_parent", ["parentMemberId"])
+    .index("by_level", ["level"])
+    .index("by_email", ["email"])
+    // NOTE: systemRole is optional — queries using this index should filter
+    // for defined values (e.g., .filter(q => q.neq(q.field("systemRole"), undefined)))
+    // to exclude records where systemRole is not set.
+    .index("by_system_role", ["systemRole"]),
+
+  // -------------------------------------------------------------------------
+  // CAPTURES (Visual Artifacts Gallery)
+  // -------------------------------------------------------------------------
+  captures: defineTable({
+    projectId: v.optional(v.id("projects")),
+    
+    // Reference
+    taskId: v.optional(v.id("tasks")),
+    agentId: v.optional(v.id("agents")),
+    
+    // Artifact details
+    title: v.string(),
+    description: v.optional(v.string()),
+    type: v.union(
+      v.literal("SCREENSHOT"),
+      v.literal("DIAGRAM"),
+      v.literal("MOCKUP"),
+      v.literal("CHART"),
+      v.literal("VIDEO"),
+      v.literal("OTHER")
+    ),
+    
+    // Storage
+    url: v.optional(v.string()), // External URL or Convex file storage ID
+    fileStorageId: v.optional(v.string()),
+    thumbnailUrl: v.optional(v.string()),
+    
+    // Metadata
+    width: v.optional(v.number()),
+    height: v.optional(v.number()),
+    fileSize: v.optional(v.number()),
+    mimeType: v.optional(v.string()),
+    
+    // Tags
+    tags: v.optional(v.array(v.string())),
+    
+    // Timestamps
+    capturedAt: v.number(),
+    
+    metadata: v.optional(v.any()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_task", ["taskId"])
+    .index("by_agent", ["agentId"])
+    .index("by_type", ["type"])
+    .index("by_captured_at", ["capturedAt"]),
 });

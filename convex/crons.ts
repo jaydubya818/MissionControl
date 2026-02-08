@@ -40,12 +40,22 @@ crons.daily(
   internal.telegram.prepareDailyCEOBrief
 );
 
-// Auto-route execution requests every 5 minutes
-// Note: executorRouter.autoRoute will be available after next convex push
+// Detect stale agent heartbeats every 2 minutes
+// Recovery: quarantine agent, block tasks, create alerts
+// DISABLED: No agent runtime sending heartbeats yet (Phase 2).
+// The cron quarantines every agent within 2 minutes of seeding.
+// Re-enable once agent-runner sends real heartbeats.
 // crons.interval(
-//   "auto-route executions",
-//   { minutes: 5 },
-//   internal.executorRouter.autoRoute
+//   "detect stale heartbeats",
+//   { minutes: 2 },
+//   internal.agents.detectStaleAgents
 // );
+
+// Auto-route execution requests every 5 minutes
+crons.interval(
+  "auto-route executions",
+  { minutes: 5 },
+  internal.executorRouter.autoRoute
+);
 
 export default crons;

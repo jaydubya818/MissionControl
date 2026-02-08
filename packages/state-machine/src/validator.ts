@@ -105,9 +105,9 @@ export function canActorTransition(
   from: TaskStatus,
   actor: TransitionActor
 ): boolean {
-  const validTransitions = findTransitionRule(from, from);
-  if (!validTransitions) return false;
-  return validTransitions.allowedActors.includes(actor);
+  return TRANSITION_RULES.some(
+    (rule) => rule.from === from && rule.allowedActors.includes(actor)
+  );
 }
 
 /**

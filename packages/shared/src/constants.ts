@@ -2,6 +2,7 @@
  * Shared Constants
  * 
  * System-wide constants and configuration values.
+ * All enum values are UPPERCASE to match Convex schema (source of truth).
  */
 
 import { TaskStatus, TaskType, AutonomyLevel, ToolRisk } from "./types";
@@ -10,45 +11,46 @@ import { TaskStatus, TaskType, AutonomyLevel, ToolRisk } from "./types";
  * Task Status Constants
  */
 export const TASK_STATUSES: TaskStatus[] = [
-  "inbox",
-  "assigned",
-  "in_progress",
-  "review",
-  "needs_approval",
-  "blocked",
-  "done",
-  "canceled",
+  "INBOX",
+  "ASSIGNED",
+  "IN_PROGRESS",
+  "REVIEW",
+  "NEEDS_APPROVAL",
+  "BLOCKED",
+  "FAILED",
+  "DONE",
+  "CANCELED",
 ];
 
-export const TERMINAL_STATUSES: TaskStatus[] = ["done", "canceled"];
+export const TERMINAL_STATUSES: TaskStatus[] = ["DONE", "CANCELED", "FAILED"];
 
 export const ACTIVE_STATUSES: TaskStatus[] = [
-  "inbox",
-  "assigned",
-  "in_progress",
-  "review",
-  "needs_approval",
-  "blocked",
+  "INBOX",
+  "ASSIGNED",
+  "IN_PROGRESS",
+  "REVIEW",
+  "NEEDS_APPROVAL",
+  "BLOCKED",
 ];
 
 /**
  * Task Types
  */
 export const TASK_TYPES: TaskType[] = [
-  "content",
-  "social",
-  "email_marketing",
-  "customer_research",
-  "seo_research",
-  "engineering",
-  "docs",
-  "ops",
+  "CONTENT",
+  "SOCIAL",
+  "EMAIL_MARKETING",
+  "CUSTOMER_RESEARCH",
+  "SEO_RESEARCH",
+  "ENGINEERING",
+  "DOCS",
+  "OPS",
 ];
 
 /**
  * Autonomy Levels
  */
-export const AUTONOMY_LEVELS: AutonomyLevel[] = ["intern", "specialist", "lead"];
+export const AUTONOMY_LEVELS: AutonomyLevel[] = ["INTERN", "SPECIALIST", "LEAD"];
 
 /**
  * Tool Risk Levels
@@ -79,24 +81,24 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
  */
 export const DEFAULT_BUDGETS = {
   perAgentDaily: {
-    intern: 2,
-    specialist: 5,
-    lead: 12,
+    INTERN: 2,
+    SPECIALIST: 5,
+    LEAD: 12,
   },
   perTask: {
-    content: 6,
-    social: 2,
-    email_marketing: 4,
-    customer_research: 5,
-    seo_research: 4,
-    engineering: 8,
-    docs: 3,
-    ops: 3,
+    CONTENT: 6,
+    SOCIAL: 2,
+    EMAIL_MARKETING: 4,
+    CUSTOMER_RESEARCH: 5,
+    SEO_RESEARCH: 4,
+    ENGINEERING: 8,
+    DOCS: 3,
+    OPS: 3,
   },
   perRun: {
-    intern: 0.25,
-    specialist: 0.75,
-    lead: 1.5,
+    INTERN: 0.25,
+    SPECIALIST: 0.75,
+    LEAD: 1.5,
   },
 };
 

@@ -2,29 +2,31 @@
  * Task Types
  * 
  * Tasks are units of work assigned to agents with deterministic state machine.
+ * Status values are UPPERCASE to match Convex schema (source of truth).
  */
 
 export type TaskStatus =
-  | "inbox"           // New task, not assigned
-  | "assigned"        // Assigned to agent(s), not started
-  | "in_progress"     // Agent actively working
-  | "review"          // Agent submitted for review
-  | "needs_approval"  // Waiting for human approval
-  | "blocked"         // Cannot proceed (budget/loop/failure)
-  | "done"            // Completed and approved
-  | "canceled";       // Abandoned
+  | "INBOX"           // New task, not assigned
+  | "ASSIGNED"        // Assigned to agent(s), not started
+  | "IN_PROGRESS"     // Agent actively working
+  | "REVIEW"          // Agent submitted for review
+  | "NEEDS_APPROVAL"  // Waiting for human approval
+  | "BLOCKED"         // Cannot proceed (budget/loop/failure)
+  | "FAILED"          // Unrecoverable failure (terminal)
+  | "DONE"            // Completed and approved (terminal)
+  | "CANCELED";       // Abandoned (terminal)
 
 export type TaskType =
-  | "content"
-  | "social"
-  | "email_marketing"
-  | "customer_research"
-  | "seo_research"
-  | "engineering"
-  | "docs"
-  | "ops";
+  | "CONTENT"
+  | "SOCIAL"
+  | "EMAIL_MARKETING"
+  | "CUSTOMER_RESEARCH"
+  | "SEO_RESEARCH"
+  | "ENGINEERING"
+  | "DOCS"
+  | "OPS";
 
-export type TaskPriority = "high" | "medium" | "low";
+export type TaskPriority = 1 | 2 | 3 | 4;
 
 export interface Task {
   _id: string;

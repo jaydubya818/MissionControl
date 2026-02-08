@@ -46,6 +46,19 @@ type Task = {
   assigneeIds: Id<"agents">[];
   labels?: string[];
   blockedReason?: string;
+  source?: string;
+  sourceRef?: string;
+};
+
+const SOURCE_CONFIG: Record<string, { icon: string; label: string; color: string; bg: string }> = {
+  DASHBOARD: { icon: "🖥️", label: "Dashboard", color: "#93c5fd", bg: "#1e3a5f" },
+  TELEGRAM:  { icon: "✈️", label: "Telegram",  color: "#38bdf8", bg: "#0c4a6e" },
+  GITHUB:    { icon: "🐙", label: "GitHub",     color: "#c4b5fd", bg: "#3b1f7e" },
+  AGENT:     { icon: "🤖", label: "Agent",      color: "#86efac", bg: "#14532d" },
+  API:       { icon: "🔌", label: "API",        color: "#fcd34d", bg: "#713f12" },
+  TRELLO:    { icon: "📋", label: "Trello",     color: "#93c5fd", bg: "#1e3a5f" },
+  SEED:      { icon: "🌱", label: "Seed",       color: "#94a3b8", bg: "#334155" },
+  UNKNOWN:   { icon: "❓", label: "Unknown",    color: "#94a3b8", bg: "#334155" },
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -422,7 +435,7 @@ function Card({
       {/* Title */}
       <div style={{ fontWeight: 500, marginBottom: 8, lineHeight: 1.3 }}>{task.title}</div>
 
-      {/* Type & Priority */}
+      {/* Type, Priority & Source */}
       <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
         <span
           style={{
@@ -448,6 +461,33 @@ function Card({
         >
           {priority.label}
         </span>
+        {task.source && (() => {
+          const src = SOURCE_CONFIG[task.source] || (() => {
+            if (process.env.NODE_ENV === "development") {
+              console.warn(`[Kanban] Unmapped task.source "${task.source}" for task ${task._id}`);
+            }
+            return SOURCE_CONFIG.UNKNOWN;
+          })();
+          return (
+            <span
+              title={task.sourceRef ? `${src.label}: ${task.sourceRef}` : src.label}
+              style={{
+                fontSize: "0.7rem",
+                padding: "2px 6px",
+                background: src.bg,
+                color: src.color,
+                borderRadius: 4,
+                fontWeight: 500,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+              }}
+            >
+              <span style={{ fontSize: "0.65rem" }}>{src.icon}</span>
+              {src.label}
+            </span>
+          );
+        })()}
       </div>
 
       {/* Labels */}

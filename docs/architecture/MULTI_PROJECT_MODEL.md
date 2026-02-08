@@ -7,7 +7,7 @@
 
 ## Overview
 
-Mission Control supports **multi-project workspaces**, allowing you to manage multiple business/product contexts with isolated tasks, agents, approvals, and policies. Every entity in the system is scoped to a project.
+Mission Control supports **multi-project workspaces**, allowing you to manage multiple business/product contexts with isolated tasks, agents, approvals, and policies. Every entity in the system is scoped to a project by default. The `projectId` field is optional in the database schema for backward compatibility with legacy/migration records, but all new entities created through the API require a `projectId`. Global entities (if any) explicitly set `projectId` to null and are documented as exceptions.
 
 ---
 
@@ -65,7 +65,7 @@ agents.listAll({ projectId: "..." })
 approvals.listPending({ projectId: "..." })
 ```
 
-If `projectId` is omitted, queries return all records (for backward compatibility).
+**Security Note:** If `projectId` is omitted, queries return all records for backward compatibility. **This is a security risk for multi-tenant deployments.** For production use, queries MUST require an explicit `projectId` or an explicit `allProjects: true` flag with role-based authorization checks. Unauthorized cross-project access must be prevented at the query entrypoint level. Future versions will enforce this requirement by rejecting requests without `projectId` or without an authorized all-projects scope.
 
 ### Mutations
 
@@ -143,13 +143,13 @@ When creating tasks or registering agents, the current project is automatically 
 
 - All agents (specialists, reviewers, challengers, interns, sub-agents) report to Sofie
 - No agent may self-promote autonomy
-- No agent may execute RED actions without an approval record authorized by Sofie/policy
+- No agent may execute RED actions (external writes, destructive operations, or high-cost actions classified as RED by the policy engine — see policy-engine package for risk classification rules) without an approval record authorized by Sofie/policy
 - No agent may spawn sub-agents unless the spawn request is logged and authorized per Sofie's governance rules
 
 ### Conflict Resolution
 
 - DB is canonical; Telegram/threads are collaboration only
-- Every agent output must be posted back to Mission Control as canonical artifacts
+- Every agent output must be posted back to Mission Control as canonical artifacts. **Telegram Integration:** Telegram threads map to Mission Control task threads via the `threadRef` field on tasks. Messages posted in Telegram are synchronized to the `messages` table with `authorType: 'HUMAN'` or `authorType: 'AGENT'`. Authentication is handled via Telegram bot tokens. Thread IDs are stored as `{chatId, threadId}` objects in `tasks.threadRef`.
 - If instructions conflict, Sofie wins
 
 ---
@@ -234,6 +234,6 @@ const { projectId, setProjectId } = useProject();
 
 ## Related Documentation
 
-- [RUNBOOK.md](RUNBOOK.md) - Operational procedures including Sofie as CAO
-- [GETTING_STARTED.md](../GETTING_STARTED.md) - Project setup and development
-- [STATE_MACHINE.md](openclaw-bootstrap/operating-manual/STATE_MACHINE.md) - Task state transitions
+- [RUNBOOK.md](../runbook/RUNBOOK.md) - Operational procedures including Sofie as CAO
+- [GETTING_STARTED.md](../guides/GETTING_STARTED.md) - Project setup and development
+- [STATE_MACHINE.md](../runbook/STATE_MACHINE.md) - Task state transitions (if exists, otherwise see packages/state-machine/)

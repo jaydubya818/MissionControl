@@ -16,7 +16,10 @@ import type { Doc, Id } from "./_generated/dataModel";
 
 export type TaskStatus = 
   | "INBOX" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW" 
-  | "NEEDS_APPROVAL" | "BLOCKED" | "DONE" | "CANCELED";
+  | "NEEDS_APPROVAL" | "BLOCKED" | "FAILED" | "DONE" | "CANCELED";
+
+export type TaskSource = "DASHBOARD" | "TELEGRAM" | "GITHUB" | "AGENT" | "API" | "TRELLO" | "SEED";
+export type TaskCreator = "HUMAN" | "AGENT" | "SYSTEM";
 
 export type TaskType = 
   | "CONTENT" | "SOCIAL" | "EMAIL_MARKETING" | "CUSTOMER_RESEARCH"
@@ -74,7 +77,14 @@ const TRANSITION_RULES: TransitionRule[] = [
   { from: "BLOCKED", to: "NEEDS_APPROVAL", allowedActors: ["HUMAN", "SYSTEM"] },
   { from: "BLOCKED", to: "CANCELED", allowedActors: ["HUMAN"] },
   
-  // DONE and CANCELED are terminal - no transitions out
+  // FROM IN_PROGRESS to FAILED (agent or system detects unrecoverable failure)
+  { from: "IN_PROGRESS", to: "FAILED", allowedActors: ["AGENT", "SYSTEM"] },
+  // FROM FAILED — human can retry or cancel
+  { from: "FAILED", to: "INBOX", allowedActors: ["HUMAN"] },
+  { from: "FAILED", to: "ASSIGNED", allowedActors: ["HUMAN"] },
+  { from: "FAILED", to: "CANCELED", allowedActors: ["HUMAN"] },
+  
+  // DONE, CANCELED are terminal — no transitions out
 ];
 
 function findTransitionRule(from: TaskStatus, to: TaskStatus): TransitionRule | undefined {
@@ -89,6 +99,25 @@ export const get = query({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.taskId);
+  },
+});
+
+/** List tasks, optionally filtered by project */
+export const list = query({
+  args: {
+    projectId: v.optional(v.id("projects")),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 200;
+    if (args.projectId) {
+      return await ctx.db
+        .query("tasks")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .order("desc")
+        .take(limit);
+    }
+    return await ctx.db.query("tasks").order("desc").take(limit);
   },
 });
 
@@ -180,11 +209,12 @@ export const getAllowedTransitionsForHuman = query({
 export const updateThreadRef = mutation({
   args: {
     taskId: v.id("tasks"),
-    threadRef: v.string(),
+    chatId: v.string(),
+    threadId: v.string(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.taskId, {
-      threadRef: args.threadRef,
+      threadRef: { chatId: args.chatId, threadId: args.threadId },
     });
     return { success: true };
   },
@@ -519,10 +549,16 @@ export const create = mutation({
     labels: v.optional(v.array(v.string())),
     estimatedCost: v.optional(v.number()),
     idempotencyKey: v.optional(v.string()),
+    // Provenance — where the task came from
+    source: v.optional(v.string()),       // "DASHBOARD" | "TELEGRAM" | "GITHUB" | "AGENT" | "API"
+    sourceRef: v.optional(v.string()),    // e.g. "owner/repo#42", telegram msg id
+    createdBy: v.optional(v.string()),    // "HUMAN" | "AGENT" | "SYSTEM"
+    createdByRef: v.optional(v.string()), // agent id, user email, etc.
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    // Check idempotency
+    // ── Idempotency check ──
+    // If an idempotencyKey is provided, return existing task if found
     if (args.idempotencyKey) {
       const existing = await ctx.db
         .query("tasks")
@@ -533,12 +569,14 @@ export const create = mutation({
       }
     }
     
+    // ── INVARIANT: All tasks start as INBOX ──
+    // Status is NEVER caller-controlled. Hardcoded server-side.
     const taskId = await ctx.db.insert("tasks", {
       projectId: args.projectId,
       title: args.title,
       description: args.description,
       type: args.type as TaskType,
-      status: "INBOX",
+      status: "INBOX",  // INVARIANT: always INBOX at creation
       priority: (args.priority ?? 3) as 1 | 2 | 3 | 4,
       assigneeIds: args.assigneeIds ?? [],
       reviewCycles: 0,
@@ -546,17 +584,23 @@ export const create = mutation({
       labels: args.labels,
       estimatedCost: args.estimatedCost,
       idempotencyKey: args.idempotencyKey,
+      // Provenance
+      source: (args.source as any) ?? undefined,
+      sourceRef: args.sourceRef,
+      createdBy: (args.createdBy as any) ?? undefined,
+      createdByRef: args.createdByRef,
       metadata: args.metadata,
     });
     
     const task = await ctx.db.get(taskId);
     
-    // Log activity
+    // Log activity with provenance context
+    const sourceLabel = args.source ? ` via ${args.source}` : "";
     await ctx.db.insert("activities", {
       projectId: args.projectId,
-      actorType: "SYSTEM",
+      actorType: (args.createdBy as "AGENT" | "HUMAN" | "SYSTEM") ?? "SYSTEM",
       action: "TASK_CREATED",
-      description: `Task "${args.title}" created`,
+      description: `Task "${args.title}" created${sourceLabel}`,
       targetType: "TASK",
       targetId: taskId,
       taskId,

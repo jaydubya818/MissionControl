@@ -18,23 +18,24 @@ import {
  * Autonomy Rules
  * 
  * Defines what each autonomy level can do.
+ * Keys are UPPERCASE to match AutonomyLevel type.
  */
 export const AUTONOMY_RULES: AutonomyRules = {
-  intern: {
+  INTERN: {
     canSpawn: false,
     yellowAllowed: false,
     redAllowed: false,
     requiresApprovalForYellow: true,
     requiresApprovalForRed: true,
   },
-  specialist: {
+  SPECIALIST: {
     canSpawn: true,
     yellowAllowed: true,
     redAllowed: false,
     requiresApprovalForYellow: false,
     requiresApprovalForRed: true,
   },
-  lead: {
+  LEAD: {
     canSpawn: true,
     yellowAllowed: true,
     redAllowed: false,
@@ -169,27 +170,28 @@ export const ALLOWLISTS: Allowlists = {
  * Budget Defaults
  * 
  * Default budget caps in USD.
+ * Keys are UPPERCASE to match AutonomyLevel and TaskType.
  */
 export const BUDGET_DEFAULTS: BudgetDefaults = {
   perAgentDaily: {
-    intern: 2,
-    specialist: 5,
-    lead: 12,
+    INTERN: 2,
+    SPECIALIST: 5,
+    LEAD: 12,
   },
   perTask: {
-    content: 6,
-    social: 2,
-    email_marketing: 4,
-    customer_research: 5,
-    seo_research: 4,
-    engineering: 8,
-    docs: 3,
-    ops: 3,
+    CONTENT: 6,
+    SOCIAL: 2,
+    EMAIL_MARKETING: 4,
+    CUSTOMER_RESEARCH: 5,
+    SEO_RESEARCH: 4,
+    ENGINEERING: 8,
+    DOCS: 3,
+    OPS: 3,
   },
   perRun: {
-    intern: 0.25,
-    specialist: 0.75,
-    lead: 1.5,
+    INTERN: 0.25,
+    SPECIALIST: 0.75,
+    LEAD: 1.5,
   },
 };
 

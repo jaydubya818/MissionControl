@@ -18,8 +18,7 @@
 
 ### Step 1: Open the UI
 ```bash
-# Make sure dev server is running
-cd /Users/jaywest/MissionControl
+# Make sure dev server is running (from repo root)
 pnpm dev
 
 # Open in browser
@@ -87,7 +86,8 @@ open http://localhost:5173/
 
 #### Step 3: Deploy to Railway
 ```bash
-cd /Users/jaywest/MissionControl/packages/telegram-bot
+# Navigate to telegram-bot package (from repo root)
+cd packages/telegram-bot
 
 # Install Railway CLI (if not installed)
 npm install -g @railway/cli
@@ -126,7 +126,8 @@ railway logs
 ### Option B: Run Locally (Quick Test)
 
 ```bash
-cd /Users/jaywest/MissionControl/packages/telegram-bot
+# Navigate to telegram-bot package (from repo root)
+cd packages/telegram-bot
 
 # Create .env file
 cat > .env << 'EOF'
@@ -160,8 +161,7 @@ pnpm dev
 # Install PM2 globally
 npm install -g pm2
 
-# Create PM2 ecosystem file
-cd /Users/jaywest/MissionControl
+# Create PM2 ecosystem file (from repo root)
 cat > ecosystem.config.js << 'EOF'
 module.exports = {
   apps: [
@@ -169,7 +169,7 @@ module.exports = {
       name: "agent-sofie",
       script: "pnpm",
       args: "dev",
-      cwd: "/Users/jaywest/MissionControl/packages/agent-runner",
+      cwd: "./packages/agent-runner",
       env: {
         CONVEX_URL: "https://different-gopher-55.convex.cloud",
         PROJECT_SLUG: "mission-control",
@@ -180,7 +180,7 @@ module.exports = {
       name: "agent-backend-dev",
       script: "pnpm",
       args: "dev",
-      cwd: "/Users/jaywest/MissionControl/packages/agent-runner",
+      cwd: "./packages/agent-runner",
       env: {
         CONVEX_URL: "https://different-gopher-55.convex.cloud",
         PROJECT_SLUG: "mission-control",
@@ -191,7 +191,7 @@ module.exports = {
       name: "agent-devops",
       script: "pnpm",
       args: "dev",
-      cwd: "/Users/jaywest/MissionControl/packages/agent-runner",
+      cwd: "./packages/agent-runner",
       env: {
         CONVEX_URL: "https://different-gopher-55.convex.cloud",
         PROJECT_SLUG: "mission-control",
@@ -202,7 +202,7 @@ module.exports = {
       name: "agent-bj",
       script: "pnpm",
       args: "dev",
-      cwd: "/Users/jaywest/MissionControl/packages/agent-runner",
+      cwd: "./packages/agent-runner",
       env: {
         CONVEX_URL: "https://different-gopher-55.convex.cloud",
         PROJECT_SLUG: "sellerfi",
@@ -235,7 +235,8 @@ Open 4 separate terminals:
 
 **Terminal 1: Sofie (Mission Control)**
 ```bash
-cd /Users/jaywest/MissionControl/packages/agent-runner
+# Navigate to agent-runner package (from repo root)
+cd packages/agent-runner
 CONVEX_URL=https://different-gopher-55.convex.cloud \
 PROJECT_SLUG=mission-control \
 AGENT_NAME=Sofie \
@@ -244,7 +245,8 @@ pnpm dev
 
 **Terminal 2: Backend Developer (Mission Control)**
 ```bash
-cd /Users/jaywest/MissionControl/packages/agent-runner
+# Navigate to agent-runner package (from repo root)
+cd packages/agent-runner
 CONVEX_URL=https://different-gopher-55.convex.cloud \
 PROJECT_SLUG=mission-control \
 AGENT_NAME="Backend Developer" \
@@ -253,7 +255,8 @@ pnpm dev
 
 **Terminal 3: DevOps (Mission Control)**
 ```bash
-cd /Users/jaywest/MissionControl/packages/agent-runner
+# Navigate to agent-runner package (from repo root)
+cd packages/agent-runner
 CONVEX_URL=https://different-gopher-55.convex.cloud \
 PROJECT_SLUG=mission-control \
 AGENT_NAME=DevOps \
@@ -262,7 +265,8 @@ pnpm dev
 
 **Terminal 4: BJ (SellerFi)**
 ```bash
-cd /Users/jaywest/MissionControl/packages/agent-runner
+# Navigate to agent-runner package (from repo root)
+cd packages/agent-runner
 CONVEX_URL=https://different-gopher-55.convex.cloud \
 PROJECT_SLUG=sellerfi \
 AGENT_NAME=BJ \
@@ -374,7 +378,7 @@ pm2 logs agent-backend-dev
 
 ### UI Not Loading?
 ```bash
-cd /Users/jaywest/MissionControl
+# From repo root
 pnpm install
 pnpm dev
 ```
@@ -402,8 +406,7 @@ pm2 logs agent-backend-dev
 
 ### Tasks Not Appearing?
 ```bash
-# Re-run task creation script
-cd /Users/jaywest/MissionControl
+# Re-run task creation script (from repo root)
 npx tsx scripts/create-mission-control-tasks.ts
 ```
 

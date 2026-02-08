@@ -187,7 +187,27 @@ bj: node packages/telegram-bot/dist/bj-bot.js
 
 ### Docker
 
-Build both bots:
+**Note:** Docker only supports one CMD instruction per Dockerfile. Choose one of these approaches:
+
+**Option 1: Separate Dockerfiles**
+```dockerfile
+# Dockerfile.mission-control
+RUN pnpm --filter @mission-control/telegram-bot build
+CMD ["node", "packages/telegram-bot/dist/index.js"]
+
+# Dockerfile.bj
+RUN pnpm --filter @mission-control/telegram-bot build
+CMD ["node", "packages/telegram-bot/dist/bj-bot.js"]
+```
+
+**Option 2: Runtime selection using BOT_TYPE environment variable**
+```dockerfile
+# Dockerfile
+RUN pnpm --filter @mission-control/telegram-bot build
+CMD ["sh", "-c", "if [ \"$BOT_TYPE\" = \"bj\" ]; then node packages/telegram-bot/dist/bj-bot.js; else node packages/telegram-bot/dist/index.js; fi"]
+```
+
+**Option 3: Pick one CMD (comment out the other)**
 ```dockerfile
 # Build
 RUN pnpm --filter @mission-control/telegram-bot build
@@ -195,8 +215,8 @@ RUN pnpm --filter @mission-control/telegram-bot build
 # Run Mission Control bot
 CMD ["node", "packages/telegram-bot/dist/index.js"]
 
-# Or run BJ bot
-CMD ["node", "packages/telegram-bot/dist/bj-bot.js"]
+# Or run BJ bot (uncomment and comment above)
+# CMD ["node", "packages/telegram-bot/dist/bj-bot.js"]
 ```
 
 ## Troubleshooting

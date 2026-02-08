@@ -11,21 +11,22 @@
     "apps/*"
   ],
   "scripts": {
-    "start": "node packages/agent-runner/dist/run.js",
+    "start": "pnpm --filter @mission-control/orchestration-server dev",
     "dev": "concurrently \"npx convex dev\" \"turbo run dev --filter=mission-control-ui\"",
     "dev:ui": "pnpm --filter mission-control-ui dev",
-    "build": "pnpm --filter @mission-control/agent-runner build",
+    "dev:orch": "pnpm --filter @mission-control/orchestration-server dev",
+    "build": "turbo run build",
     "test": "turbo run test",
+    "test:integration": "npx vitest run",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean && rm -rf node_modules",
-    "setup": "npm install && npm run build",
+    "setup": "pnpm install && pnpm run build",
     "convex:dev": "npx convex dev",
     "convex:deploy": "npx convex deploy",
     "convex:seed": "npx convex run seed:seedV0",
-    "agent:run": "pnpm --filter @mission-control/agent-runner run",
-    "agent:run:scout": "AGENT_NAME=Scout AGENT_ROLE=INTERN AGENT_TYPES=CUSTOMER_RESEARCH,SEO_RESEARCH pnpm --filter @mission-control/agent-runner run",
-    "agent:run:scribe": "AGENT_NAME=Scribe AGENT_ROLE=INTERN AGENT_TYPES=DOCS,CONTENT pnpm --filter @mission-control/agent-runner run"
+    "agent:run": "pnpm --filter @mission-control/orchestration-server dev",
+    "agent:run:legacy": "pnpm --filter @mission-control/agent-runner run"
   },
   "dependencies": {
     "convex": "^1.31.7"
@@ -34,7 +35,8 @@
     "concurrently": "^8.2.2",
     "tsx": "^4.7.0",
     "turbo": "^1.11.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.0"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {

@@ -37,6 +37,7 @@ export const set = mutation({
     }
     const id = await ctx.db.insert("agentDocuments", {
       agentId: args.agentId,
+      projectId: (args as any).projectId,
       type: args.type,
       content: args.content,
       updatedAt: now,
@@ -58,6 +59,23 @@ export const get = query({
         q.eq("agentId", args.agentId).eq("type", args.type)
       )
       .first();
+  },
+});
+
+/** List all agent documents, optionally filtered by project */
+export const list = query({
+  args: {
+    projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args) => {
+    if (args.projectId) {
+      return await ctx.db
+        .query("agentDocuments")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .order("desc")
+        .collect();
+    }
+    return await ctx.db.query("agentDocuments").order("desc").collect();
   },
 });
 
@@ -97,5 +115,118 @@ export const getDailyNote = query({
       )
       .first();
     return doc?.content ?? null;
+  },
+});
+
+// ============================================================================
+// CRUD MUTATIONS
+// ============================================================================
+
+/** Create a new agent document (upserts if agent+type already exists) */
+export const create = mutation({
+  args: {
+    agentId: v.id("agents"),
+    projectId: v.optional(v.id("projects")),
+    type: documentType,
+    content: v.string(),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db.get(args.agentId);
+    if (!agent) throw new Error("Agent not found");
+
+    const projectId = args.projectId ?? agent.projectId;
+
+    // Check for existing document for this agent+type to prevent duplicates
+    const existing = await ctx.db
+      .query("agentDocuments")
+      .withIndex("by_agent_type", (q) =>
+        q.eq("agentId", args.agentId).eq("type", args.type)
+      )
+      .first();
+
+    if (existing) {
+      // Upsert: update the existing document instead of creating a duplicate
+      await ctx.db.patch(existing._id, {
+        content: args.content,
+        updatedAt: Date.now(),
+        metadata: args.metadata,
+        projectId,
+      });
+
+      await ctx.db.insert("activities", {
+        projectId,
+        actorType: "HUMAN",
+        action: "MEMORY_UPDATED",
+        description: `Updated existing ${args.type} document for agent "${agent.name}"`,
+        agentId: args.agentId,
+      });
+
+      return { documentId: existing._id, created: false };
+    }
+
+    const id = await ctx.db.insert("agentDocuments", {
+      agentId: args.agentId,
+      projectId,
+      type: args.type,
+      content: args.content,
+      updatedAt: Date.now(),
+      metadata: args.metadata,
+    });
+
+    await ctx.db.insert("activities", {
+      projectId,
+      actorType: "HUMAN",
+      action: "MEMORY_CREATED",
+      description: `Created ${args.type} document for agent "${agent.name}"`,
+      agentId: args.agentId,
+    });
+
+    return { documentId: id, created: true };
+  },
+});
+
+/** Update an existing agent document */
+export const update = mutation({
+  args: {
+    documentId: v.id("agentDocuments"),
+    content: v.string(),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.documentId);
+    if (!doc) throw new Error("Document not found");
+
+    await ctx.db.patch(args.documentId, {
+      content: args.content,
+      updatedAt: Date.now(),
+      metadata: args.metadata,
+    });
+
+    return { success: true };
+  },
+});
+
+/** Remove an agent document */
+export const remove = mutation({
+  args: {
+    documentId: v.id("agentDocuments"),
+  },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.documentId);
+    if (!doc) throw new Error("Document not found");
+
+    await ctx.db.delete(args.documentId);
+
+    const activityProjectId = doc.projectId ?? null;
+    await ctx.db.insert("activities", {
+      projectId: activityProjectId,
+      actorType: "HUMAN",
+      action: "MEMORY_DELETED",
+      description: `Deleted ${doc.type} document`,
+      agentId: doc.agentId,
+    });
+
+    return { success: true };
   },
 });

@@ -4,73 +4,163 @@
 
 ## Current Version: 0.9.0
 
-## Current Phase: Foundation COMPLETE, preparing for Phase 2 (Agent Runtime)
+## Current Phase: Phase 2 (Agent Runtime) COMPLETE → Phase 3 Ready
 
 ## Last Session: February 8, 2026
 
 ### What was done this session:
-- Created PRD v2.0 (docs/PRD_V2.md) with corrected architecture, state machine, phasing
-- Created SDD documentation stack:
-  - .cursorrules (AI operating manual for Cursor sessions)
-  - docs/TECH_STACK.md (locked dependency versions)
-  - docs/FRONTEND_GUIDELINES.md (design system extracted from codebase)
-  - docs/APP_FLOW.md (all dashboard views, navigation, modals)
-  - docs/BACKEND_STRUCTURE.md (Convex schema and API surface)
-  - progress.txt (this file)
-- Reorganized documentation: moved 20+ root-level .md files into docs/ subdirectories
-  - docs/architecture/ -- system design docs
-  - docs/guides/ -- getting started, deployment, configuration
-  - docs/planning/ -- implementation plans, epics, roadmaps
-  - docs/changelog/ -- version history, status reports
-  - docs/runbook/ -- operational runbook
-- Updated README.md to reflect actual architecture and new doc structure
+
+#### Intelligence Layer Integration (10 priorities shipped)
+1. **Hono Orchestration Server** — Created apps/orchestration-server/
+   - Entry point for coordinator loop + agent runtime
+   - Health, status, tick, agent spawn/stop endpoints
+   - Graceful shutdown with cleanup
+2. **Coordinator Integration** — Created convex/coordinator.ts
+   - decomposeTask mutation with strategy-based decomposition
+   - getDependencyGraph query for DAG visualization
+   - Added taskDependencies table to convex/schema.ts
+3. **Policy Engine Wiring** — Created convex/lib/riskClassifier.ts
+   - Centralized risk classification within Convex
+   - Refactored convex/policy.ts to use shared classifier
+4. **Model Router Package** — Created packages/model-router/
+   - ModelRouter, CostEstimator, ClaudeProvider
+   - Model selection by task type, risk, budget
+   - Fallback chains and cost tracking
+5. **Memory System Integration** — Updated packages/agent-runtime/src/lifecycle.ts
+   - MemoryManager initialization on agent start
+   - Session/daily notes persistence on task completion
+   - buildTaskContext() and startTask()/endTask() methods
+6. **Executor Router Cron** — Uncommented in convex/crons.ts
+   - Auto-routes execution requests every 5 minutes
+7. **Performance-Based Task Routing** — Updated convex/taskRouter.ts
+   - calculateScore includes 20% performance weight
+   - Success rate and refute count from agentPerformance table
+   - Both findBestAgent and autoAssign use performance data
+8. **Mission DAG Visualization** — Created MissionDAGView.tsx
+   - SVG DAG with topological layout (Kahn's algorithm)
+   - Status-colored nodes, clickable to open task
+   - Added "DAG" tab to TopNav
+9. **Explainability Panels** — Added "Why?" tab to TaskDrawerTabs.tsx
+   - Assignment reasoning (skill match, status, role weight)
+   - Risk assessment with budget check
+   - Decision timeline (state transitions)
+10. **Loop Detection UI** — Created LoopDetectionPanel.tsx
+    - Summary cards per loop type
+    - Alert cards with one-click actions (Unblock, Acknowledge, Resolve, Ignore)
+    - Integrated into tasks view
+
+#### Follow-Up Work (6 items shipped)
+11. **Context Router Package** — Created packages/context-router/
+    - Tier 1 rule-based classifier (intent, complexity, task type)
+    - ContextRouter with custom rules, capacity/budget checks
+    - Routes to COORDINATOR, SINGLE_TASK, CLARIFY, REJECT, or DEFER
+    - 38 unit tests passing
+12. **Integration Tests** — Created convex/__tests__/integration.test.ts
+    - Context Router → Coordinator decomposition flow
+    - Coordinator → Delegation pipeline
+    - Decomposition → Dependency graph validation
+    - CoordinatorLoop.tick() stuck detection and escalation
+    - 12 integration tests, 42 total tests passing at root
+13. **Deprecated agent-runner** — Marked packages/agent-runner as deprecated
+    - Updated root package.json scripts to use orchestration-server
+    - Added deprecation warning to agent-runner
+    - Retained for legacy compatibility
+14. **Updated progress.txt** — This file
+15. **Budget Burn-Down UI** — Created BudgetBurnDown.tsx
+    - Per-agent and per-project budget visualization
+    - Spend tracking with progress bars and alerts
+16. **Convex Deployment Validation** — Verified schema and function consistency
+
+#### Previous Session Work (carried forward)
+- Fixed 5 bugs (AgentDashboard Tailwind, Convex SDK, state casing, loop detection, agentLearning)
+- Added FAILED terminal state (9 states total)
+- Created 11 agent persona YAML files in agents/
+- Created packages/agent-runtime (persona loader, lifecycle, heartbeat, 19 tests)
+- Created packages/coordinator (decomposer, delegator, dep graph, loop, 26 tests)
+- Created packages/memory (session, project, global tiers, 18 tests)
+- Implemented heartbeat recovery in convex/agents.ts
+- Unit tests for state-machine, policy-engine (all passing)
 
 ### What is working:
-- Convex backend: 18 tables, 60+ queries, 50+ mutations, cron jobs
+- Convex backend: 21 tables (added taskDependencies), 60+ queries, 50+ mutations, cron jobs
 - React dashboard: Kanban, agent management, approvals, analytics, monitoring, live feed
-- State machine: 8 states with validated transitions
-- Policy engine: GREEN/YELLOW/RED risk classification
+- **NEW** Mission DAG view: dependency graph visualization
+- **NEW** Explainability panel: "Why?" tab in task drawer
+- **NEW** Loop detection UI: alerts with one-click actions
+- **NEW** Budget burn-down: per-agent/project spend visualization
+- State machine: 9 states (UPPERCASE) with validated transitions and FAILED state
+- Policy engine: GREEN/YELLOW/RED risk classification + centralized classifier in Convex
 - Budget enforcement: per-agent daily, per-task, per-run
-- Loop detection: comment storms, review ping-pong, repeated failures (cron)
+- Loop detection: comment storms, review ping-pong, repeated failures, back-and-forth (cron)
 - Emergency controls: pause squad, quarantine, drain, resume
 - Telegram bot: approvals, squad commands, daily CEO briefs
-- Agent runner: register, heartbeat, claim tasks (proto-runtime)
+- **NEW** Orchestration server: Hono-based coordinator + agent runtime host
+- Agent runtime: persona loading, lifecycle management, heartbeat monitor, memory integration
+- Heartbeat recovery: stale detection, auto-quarantine, task blocking, alerts (cron)
+- Coordinator: task decomposition, delegation, dependency graph, orchestration loop
+- **NEW** Context router: intent classification + routing (Tier 1 rule-based)
+- **NEW** Model router: Claude provider, cost estimation, fallback chains
+- Memory system: session, project, global tiers with unified manager
+- Agent learning: performance tracking, pattern discovery, project insights
+- **NEW** Performance-based task routing: success rate + refute count in scoring
+- **NEW** Executor router cron: auto-routes every 5 minutes
 - OpenClaw SDK: external agent integration
 - Multi-project workspace support
 - Docker Compose deployment
+- Unit tests: state-machine, policy-engine, agent-runtime, coordinator, memory, context-router (all passing)
+- **NEW** Integration tests: context-router -> coordinator -> agent-runtime pipeline
 
 ### What is broken / known issues:
-- AgentDashboard.tsx references Tailwind classes but Tailwind is not configured
-- Convex SDK version mismatch: root uses ^1.31.7, UI uses ^1.14.0
-- No test files exist for any package
-- packages/state-machine uses lowercase states (inbox) but schema uses uppercase (INBOX)
-- Loop detection: backAndForthLimit config is defined but the detection logic is not implemented
-- agentLearning.ts: recordTaskCompletion and discoverPattern are stubs
+- packages/agent-runner is deprecated (use orchestration-server instead)
+- No Tier 2 (LLM-based) classifier in context-router yet (Phase 3)
+- Model router only has Claude provider (add OpenAI, Gemini in Phase 3)
+- Orchestration server not yet deployed to production
+- No end-to-end tests with live Convex instance
 
-### What is next (Phase 2 priorities):
-1. Decide: server-side orchestration process (Express/Hono) vs. Convex-only
-2. Evolve packages/agent-runner into packages/agent-runtime with persona loading
-3. Create agent persona YAML files in agents/ directory
-4. Build Coordinator orchestration logic (packages/coordinator)
-5. Build memory system on existing agentDocuments/agentLearning tables
-6. Add unit tests for state-machine and policy-engine packages
-7. Implement heartbeat recovery flow (detect -> alert -> terminate -> reassign)
-8. Add FAILED terminal state to task state machine (or document decision not to)
+### What is next (Phase 3):
+1. Add Tier 2 LLM-based classifier to context-router (for ambiguous inputs)
+2. Add OpenAI/GPT provider to model-router
+3. Add Gemini provider to model-router
+4. Multi-model consensus for RED-risk tasks (Phase 5 target, but can prototype)
+5. Deploy orchestration server (Docker + health checks)
+6. End-to-end tests with Convex dev instance
+7. Agent persona hot-reload (watch YAML files, update runtime)
+8. Remove packages/agent-runner entirely (after migration validation)
 
 ### Architecture decisions made:
 - Backend is Convex-native (no Express API server)
 - Real-time via Convex reactive subscriptions (no WebSocket/SSE)
 - Background jobs via Convex crons (no standalone worker processes)
-- Phase 2 will add a server-side orchestration process for long-running agent loops
-- Model router will ship Claude-only first (Phase 3), add other providers in Phase 4+
+- Orchestration server: Hono (docs/decisions/001-orchestration-architecture.md)
+- State machine uses UPPERCASE status strings everywhere
+- FAILED is a terminal state (recoverable to INBOX by human only)
+- Model router ships Claude-only first; add other providers in Phase 3
+- Context router uses 2-tier architecture: rules first, LLM fallback
 - Consensus mode (multi-model voting) deferred to Phase 5
+- agent-runner deprecated in favor of agent-runtime + orchestration-server
 
 ### Key file locations:
 - PRD: docs/PRD_V2.md
-- Schema: convex/schema.ts
+- Schema: convex/schema.ts (21 tables)
 - State machine: packages/state-machine/src/
 - Policy engine: packages/policy-engine/src/
-- Agent runner: packages/agent-runner/src/
+- Risk classifier: convex/lib/riskClassifier.ts
+- Agent runtime: packages/agent-runtime/src/
+- Agent runner (DEPRECATED): packages/agent-runner/src/
+- Coordinator: packages/coordinator/src/
+- Context router: packages/context-router/src/
+- Model router: packages/model-router/src/
+- Memory: packages/memory/src/
+- Agent personas: agents/*.yaml (11 files)
+- Orchestration server: apps/orchestration-server/src/
 - Dashboard: apps/mission-control-ui/src/
+- DAG view: apps/mission-control-ui/src/MissionDAGView.tsx
+- Loop detection: apps/mission-control-ui/src/LoopDetectionPanel.tsx
+- Budget burn-down: apps/mission-control-ui/src/BudgetBurnDown.tsx
 - Cron jobs: convex/crons.ts
+- Coordinator integration: convex/coordinator.ts
+- Heartbeat recovery: convex/agents.ts (detectStaleAgents)
+- Agent learning: convex/agentLearning.ts
+- Integration tests: convex/__tests__/integration.test.ts
+- ADRs: docs/decisions/
 - Cursor rules: .cursorrules

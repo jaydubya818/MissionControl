@@ -183,6 +183,40 @@ crons.daily("dailyCEOBrief", { hourUTC: 9, minuteUTC: 0 },
 3. Unblock API documentation (Task #12)
 ```
 
+### Security & Authorization
+
+**Implementation Required:**
+
+1. **User Identity Mapping** (index.ts):
+   - Wire Telegram user IDs to Mission Control user identities during bot initialization
+   - Store mapping in `userSessions` table or in-memory cache
+   - Validate user exists in Mission Control before processing commands
+
+2. **RBAC Enforcement** (all command handlers):
+   - Check user permissions before calling Convex mutations
+   - Commands requiring authorization:
+     - `approve.ts`, `deny.ts`: Require `approve:actions` scope
+     - `pause_squad.ts`, `quarantine.ts`: Require `control:agents` scope
+     - All commands: Require authenticated user
+   - Reject unauthorized requests with clear error message
+
+3. **Rate Limiting** (middleware):
+   - Per-user rate limits: 10 commands/minute (normal), 5 commands/minute (emergency controls)
+   - Per-command rate limits: Approve/deny 20/min, pause/quarantine 5/min
+   - Implement middleware around command handlers
+   - Return "Rate limit exceeded" error with retry-after
+
+4. **Audit Logging** (all handlers):
+   - Record every command execution: userId, command, target IDs (taskId/agentId/approvalId), timestamp, result
+   - Log to Convex `activities` table with `action: 'TELEGRAM_COMMAND'`
+   - Include command arguments (sanitized) and outcome
+
+5. **Sensitive Notifications** (notifications.ts, threads.ts):
+   - Mark sensitive notifications (approvals, budget alerts, CEO briefs) with `sensitive: true`
+   - Only send to approved channels (configured in bot initialization)
+   - Consider end-to-end encryption for sensitive channels (configurable)
+   - Functions to update: `createTaskThread`, `sendNotification`, `internal.telegram.sendDailyCEOBrief`
+
 ### Acceptance Criteria
 
 - [ ] Bot responds to all 11 commands
@@ -191,6 +225,10 @@ crons.daily("dailyCEOBrief", { hourUTC: 9, minuteUTC: 0 },
 - [ ] Notifications sent for key events
 - [ ] Daily CEO brief sent at 9am UTC
 - [ ] Documentation in `docs/TELEGRAM_COMMANDS.md`
+- [ ] All commands enforce RBAC checks
+- [ ] Rate limiting prevents abuse
+- [ ] Audit logs capture all command executions
+- [ ] Sensitive notifications only sent to approved channels
 
 ---
 
@@ -217,12 +255,30 @@ export const evaluate = mutation({
     if (args.actionType === "TOOL_CALL") {
       const { toolName, toolArgs } = args.actionPayload;
       
-      // Check shell allowlist
+      // Check shell allowlist (enhanced with AST parsing)
       if (toolName === "shell" || toolName === "exec") {
         const command = toolArgs.command;
-        if (!isShellAllowed(command, policy.shellAllowlist, policy.shellBlocklist)) {
+        
+        // Parse command into AST/token stream
+        const tokens = parseCommandTokens(command);
+        
+        // Reject dangerous metacharacters and constructs
+        if (containsDangerousMetachars(tokens)) {
+          await logShellAttempt(ctx, { command, decision: "DENIED", reason: "Dangerous metacharacters detected" });
+          return { decision: "DENIED", reason: "Shell command contains dangerous metacharacters (; && | ` $() redirects)" };
+        }
+        
+        // Normalize command paths before matching
+        const normalizedCommand = normalizeCommandPath(tokens[0]);
+        
+        // Validate entire pipeline (not just first token)
+        if (!isShellAllowed(normalizedCommand, tokens, policy.shellAllowlist, policy.shellBlocklist)) {
+          await logShellAttempt(ctx, { command, decision: "DENIED", reason: "Command not in allowlist or in blocklist" });
           return { decision: "DENIED", reason: "Shell command not allowed" };
         }
+        
+        // Audit log all allowed shell attempts
+        await logShellAttempt(ctx, { command, decision: "ALLOWED", reason: "Passed allowlist validation" });
       }
       
       // Check network allowlist
@@ -263,11 +319,11 @@ if (fromStatus === "REVIEW" && toStatus === "DONE") {
   const policy = await getActivePolicy(ctx, task.projectId);
   
   if (policy.rules.reviewToDoneRequiresApproval) {
-    // Check for approved approval record
+    // Get all approvals for this task, sorted by timestamp (most recent first)
     const approvals = await ctx.db
       .query("approvals")
       .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
-      .filter((q) => q.eq(q.field("status"), "APPROVED"))
+      .order("desc")
       .collect();
     
     if (approvals.length === 0) {
@@ -278,6 +334,61 @@ if (fromStatus === "REVIEW" && toStatus === "DONE") {
           message: "REVIEW → DONE requires an approved approval record"
         }],
       };
+    }
+    
+    // Validate the most recent approval
+    const latestApproval = approvals[0];
+    const now = Date.now();
+    const expiryWindowMs = 24 * 60 * 60 * 1000; // 24 hours
+    
+    // Check 1: Status must be APPROVED
+    if (latestApproval.status !== "APPROVED") {
+      return {
+        success: false,
+        errors: [{
+          field: "status",
+          message: "Latest approval is not APPROVED"
+        }],
+      };
+    }
+    
+    // Check 2: Approval must not be expired
+    if (latestApproval.decidedAt && (now - latestApproval.decidedAt > expiryWindowMs)) {
+      return {
+        success: false,
+        errors: [{
+          field: "status",
+          message: "Approval has expired (older than 24 hours)"
+        }],
+      };
+    }
+    
+    // Check 3: No subsequent REVOCATION
+    const revocations = approvals.filter(a => 
+      a.status === "REVOKED" && 
+      a._creationTime > latestApproval._creationTime
+    );
+    if (revocations.length > 0) {
+      return {
+        success: false,
+        errors: [{
+          field: "status",
+          message: "Approval was revoked"
+        }],
+      };
+    }
+    
+    // Check 4: Deliverable hash matches (if available)
+    if (latestApproval.deliverableHash && task.deliverableHash) {
+      if (latestApproval.deliverableHash !== task.deliverableHash) {
+        return {
+          success: false,
+          errors: [{
+            field: "status",
+            message: "Task deliverable has changed since approval"
+          }],
+        };
+      }
     }
   }
 }
@@ -403,8 +514,11 @@ export const start = mutation({
     const agent = await ctx.db.get(args.agentId);
     const task = args.taskId ? await ctx.db.get(args.taskId) : null;
     
-    // Check agent daily budget
-    if (agent.spendToday >= agent.budgetDaily) {
+    const estimatedCost = agent.budgetPerRun;
+    
+    // Atomic agent budget check and increment
+    // Use > to allow spending up to the budget (not >=)
+    if (agent.spendToday + estimatedCost > agent.budgetDaily) {
       await ctx.runMutation(api.agents.updateStatus, {
         agentId: args.agentId,
         status: "PAUSED",
@@ -413,9 +527,15 @@ export const start = mutation({
       throw new Error("Agent daily budget exceeded");
     }
     
-    // Check task budget
+    // Atomic increment agent spend (prevents race condition)
+    await ctx.db.patch(args.agentId, {
+      spendToday: agent.spendToday + estimatedCost,
+    });
+    
+    // Atomic task budget check and increment
     if (task && task.budgetAllocated) {
-      if (task.actualCost >= task.budgetAllocated) {
+      // Use > to allow spending up to the budget
+      if (task.actualCost + estimatedCost > task.budgetAllocated) {
         await ctx.runMutation(api.tasks.transition, {
           taskId: task._id,
           toStatus: "NEEDS_APPROVAL",
@@ -424,13 +544,18 @@ export const start = mutation({
         });
         throw new Error("Task budget exceeded");
       }
+      
+      // Atomic increment task spend (prevents race condition)
+      await ctx.db.patch(task._id, {
+        actualCost: task.actualCost + estimatedCost,
+      });
     }
     
-    // Create run with budget
+    // Create run only after atomic increments succeed
     const runId = await ctx.db.insert("runs", {
       agentId: args.agentId,
       taskId: args.taskId,
-      budgetAllocated: agent.budgetPerRun,
+      budgetAllocated: estimatedCost,
       // ... other fields
     });
     
@@ -515,41 +640,59 @@ Enhanced TaskDrawer with tabs and complete timeline including runs, toolCalls, a
 
 ```typescript
 export const getWithTimeline = query({
-  args: { taskId: v.id("tasks") },
+  args: { 
+    taskId: v.id("tasks"),
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+    cursor: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
     if (!task) return null;
     
-    // Get all timeline data
+    const limit = args.limit ?? 100; // Default safe cap
+    const offset = args.offset ?? 0;
+    
+    // Get paginated timeline data
     const transitions = await ctx.db
       .query("taskTransitions")
       .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
-      .collect();
+      .order("desc")
+      .take(limit);
     
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
-      .collect();
+      .order("desc")
+      .take(limit);
     
     const runs = await ctx.db
       .query("runs")
       .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
-      .collect();
+      .order("desc")
+      .take(limit);
     
     const approvals = await ctx.db
       .query("approvals")
       .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
-      .collect();
+      .order("desc")
+      .take(limit);
     
-    // Get tool calls for all runs
-    const toolCalls = [];
-    for (const run of runs) {
-      const calls = await ctx.db
-        .query("toolCalls")
-        .withIndex("by_run", (q) => q.eq("runId", run._id))
-        .collect();
-      toolCalls.push(...calls);
-    }
+    // Get tool calls in batch (avoid unbounded loop)
+    const runIds = runs.map(r => r._id);
+    const toolCalls = await ctx.db
+      .query("toolCalls")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .order("desc")
+      .take(limit);
+    
+    // Determine if there's more data (for pagination)
+    const hasMore = 
+      transitions.length === limit ||
+      messages.length === limit ||
+      runs.length === limit ||
+      approvals.length === limit ||
+      toolCalls.length === limit;
     
     return {
       task,
@@ -558,6 +701,12 @@ export const getWithTimeline = query({
       runs,
       toolCalls,
       approvals,
+      pagination: {
+        limit,
+        offset,
+        hasMore,
+        nextOffset: offset + limit,
+      }
     };
   }
 });
@@ -624,7 +773,12 @@ export const exportIncidentReport = query({
 - [ ] Search works across tasks by title/description
 - [ ] Export incident report generates markdown
 - [ ] Timeline sorted chronologically
-- [ ] Tool I/O redacted in timeline
+- [ ] Tool I/O redacted in timeline via sanitizer function:
+  - Add `redactToolIO(toolCall)` function that detects and removes API keys/credentials/PII from `toolCall.inputs` and `toolCall.outputs`
+  - Truncate large payloads (>1000 chars) to safe length, replace with `[TRUNCATED]`
+  - Replace sensitive values with `[REDACTED]` markers
+  - Apply sanitizer centrally in `getWithTimeline` when assembling `timeline.toolCalls`
+  - Ensure schema/response shape matches clients (TaskDrawer/timeline) so UI renders redaction markers
 
 ---
 
@@ -654,31 +808,89 @@ crons.interval("detectLoops", { minutes: 15 }, internal.loops.detectLoops);
 
 **New Module:** `convex/loops.ts`
 
+**Schema Addition:** `taskLoopStats` table for incremental tracking
+```typescript
+taskLoopStats: defineTable({
+  taskId: v.id("tasks"),
+  commentCount30min: v.number(),
+  lastCommentAt: v.number(),
+  reviewCycleCount: v.number(),
+  toolFailureCount: v.number(),
+  lastBlockedAt: v.optional(v.number()),
+  cooldownMs: v.number(), // Prevents flapping
+})
+  .index("by_task", ["taskId"])
+  .index("by_lastUpdated", ["lastCommentAt"])
+```
+
+**Incremental Update:** Update stats when messages are created
+```typescript
+// In convex/messages.ts createMessage mutation
+export const createMessage = mutation({
+  handler: async (ctx, args) => {
+    // ... create message ...
+    
+    // Update loop stats incrementally
+    const stats = await ctx.db
+      .query("taskLoopStats")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .first();
+    
+    const now = Date.now();
+    const windowMs = 30 * 60 * 1000;
+    
+    if (stats) {
+      // Increment counter if within window, reset if outside
+      const withinWindow = now - stats.lastCommentAt < windowMs;
+      await ctx.db.patch(stats._id, {
+        commentCount30min: withinWindow ? stats.commentCount30min + 1 : 1,
+        lastCommentAt: now,
+      });
+    } else {
+      await ctx.db.insert("taskLoopStats", {
+        taskId: args.taskId,
+        commentCount30min: 1,
+        lastCommentAt: now,
+        reviewCycleCount: 0,
+        toolFailureCount: 0,
+        cooldownMs: 5 * 60 * 1000, // 5 min cooldown
+      });
+    }
+  }
+});
+```
+
+**Scalable Detection:** Query only candidates from taskLoopStats
 ```typescript
 export const detectLoops = internalMutation({
   handler: async (ctx) => {
     const policy = await getActivePolicy(ctx);
     const thresholds = policy.loopThresholds;
+    const now = Date.now();
     
-    // Detect comment storms
-    const tasks = await ctx.db.query("tasks")
-      .filter((q) => q.neq(q.field("status"), "DONE"))
+    // Query only tasks with recent activity (scalable)
+    const candidates = await ctx.db
+      .query("taskLoopStats")
+      .withIndex("by_lastUpdated")
+      .filter((q) => 
+        q.gte(q.field("lastCommentAt"), now - 30 * 60 * 1000)
+      )
       .collect();
     
-    for (const task of tasks) {
-      const recentMessages = await ctx.db
-        .query("messages")
-        .withIndex("by_task", (q) => q.eq("taskId", task._id))
-        .filter((q) => 
-          q.gte(q.field("_creationTime"), 
-            Date.now() - thresholds.windowMinutes * 60 * 1000)
-        )
-        .collect();
+    for (const stats of candidates) {
+      // Check cooldown to prevent flapping
+      if (stats.lastBlockedAt && (now - stats.lastBlockedAt < stats.cooldownMs)) {
+        continue;
+      }
       
-      if (recentMessages.length > thresholds.maxCommentsPerWindow) {
+      // Check comment storm threshold
+      if (stats.commentCount30min > thresholds.maxCommentsPerWindow) {
+        const task = await ctx.db.get(stats.taskId);
+        if (!task || task.status === "DONE" || task.status === "BLOCKED") continue;
+        
         // Block task and create alert
         await ctx.runMutation(api.tasks.transition, {
-          taskId: task._id,
+          taskId: stats.taskId,
           toStatus: "BLOCKED",
           actorType: "SYSTEM",
           reason: "Comment storm detected",
@@ -689,19 +901,29 @@ export const detectLoops = internalMutation({
           severity: "WARNING",
           type: "LOOP_DETECTED",
           title: "Comment storm on task",
-          description: `Task ${task.title} has ${recentMessages.length} messages in ${thresholds.windowMinutes} minutes`,
-          taskId: task._id,
+          description: `Task ${task.title} has ${stats.commentCount30min} messages in 30 minutes`,
+          taskId: stats.taskId,
           status: "OPEN",
+        });
+        
+        // Update stats with block timestamp
+        await ctx.db.patch(stats._id, {
+          lastBlockedAt: now,
         });
       }
     }
     
-    // Detect review ping-pong
-    // Detect repeated tool failures
-    // ...
+    // TODO: Implement review ping-pong detector
+    // TODO: Implement repeated tool failures detector
   }
 });
 ```
+
+**Required DB Indexes:**
+- `messages._creationTime`
+- `messages.by_task`
+- `taskLoopStats.lastUpdated`
+- `taskLoopStats.by_task`
 
 #### 7.3 Quarantine UX
 

@@ -20,7 +20,7 @@ All dependency versions are locked. Do not upgrade without testing. Do not add n
 | Dependency | Version | Purpose |
 |---|---|---|
 | Turborepo | ^1.11.2 | Monorepo build orchestration |
-| Vite | ^5.0.0 | Frontend bundler (apps/mission-control-ui) |
+| Vite | >=5.4.17 | Frontend bundler (apps/mission-control-ui) — **UPGRADE REQUIRED:** apps/mission-control-ui must upgrade from ^5.0.0 to >=5.4.17. Update package.json devDependencies, regenerate lockfile (`pnpm install`), clear CI caches. Use `--host` or `server.host` only when necessary for network access. |
 | tsx | ^4.7.0 | TypeScript execution for scripts |
 | concurrently | ^8.2.2 | Parallel dev server execution |
 

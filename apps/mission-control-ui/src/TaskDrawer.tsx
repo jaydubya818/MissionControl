@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from "convex/react";
+import { createPortal } from "react-dom";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useState } from "react";
@@ -237,7 +238,7 @@ export function TaskDrawer({
 }
 
 function Drawer({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
+  return createPortal(
     <>
       <div
         onClick={onClose}
@@ -245,7 +246,7 @@ function Drawer({ children, onClose }: { children: React.ReactNode; onClose: () 
           position: "fixed",
           inset: 0,
           background: "rgba(0,0,0,0.5)",
-          zIndex: 40,
+          zIndex: 9990,
         }}
       />
       <div
@@ -260,12 +261,13 @@ function Drawer({ children, onClose }: { children: React.ReactNode; onClose: () 
           borderLeft: "1px solid #334155",
           display: "flex",
           flexDirection: "column",
-          zIndex: 50,
+          zIndex: 9991,
         }}
       >
         {children}
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 

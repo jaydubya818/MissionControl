@@ -1,8 +1,8 @@
 # Mission Control
 
 **Version:** 0.9.0  
-**Status:** Foundation Complete, Agent Runtime Next  
-**Architecture:** pnpm monorepo + Convex serverless backend + React dashboard
+**Status:** Phase 2 Complete -- Intelligence Layer Shipped  
+**Architecture:** pnpm monorepo + Convex serverless backend + React dashboard + Hono orchestration server
 
 ---
 
@@ -95,21 +95,29 @@ For the full architectural vision including the planned orchestration server, se
 ```
 MissionControl/
 ├── apps/
-│   └── mission-control-ui/     # React dashboard (Vite + Convex)
+│   ├── mission-control-ui/      # React dashboard (Vite + Convex)
+│   └── orchestration-server/    # Hono-based coordinator + agent runtime host
+├── agents/                      # Agent persona YAML configs (11 agents)
 ├── convex/                      # Database schema & serverless functions
-│   ├── schema.ts                # Source-of-truth data model
+│   ├── schema.ts                # Source-of-truth data model (21 tables)
 │   ├── tasks.ts                 # Task CRUD & state transitions
-│   ├── agents.ts                # Agent management & heartbeat
-│   ├── runs.ts                  # Run tracking & cost accounting
-│   ├── approvals.ts             # Approval workflow
-│   ├── loops.ts                 # Loop detection logic
-│   ├── crons.ts                 # Scheduled background jobs
+│   ├── agents.ts                # Agent management & heartbeat recovery
+│   ├── coordinator.ts           # Task decomposition & dependency graph
+│   ├── taskRouter.ts            # Performance-based task routing
+│   ├── agentLearning.ts         # Agent performance & pattern tracking
+│   ├── crons.ts                 # Scheduled jobs (loops, heartbeat, executor)
+│   ├── lib/riskClassifier.ts    # Centralized risk classification
 │   └── ...
 ├── packages/
 │   ├── shared/                  # Shared types, constants, utilities
-│   ├── state-machine/           # Task state validator (8-state lifecycle)
+│   ├── state-machine/           # Task state validator (9-state lifecycle)
 │   ├── policy-engine/           # Risk classification & approval logic
-│   ├── agent-runner/            # Proto-runtime: register, heartbeat, claim
+│   ├── agent-runtime/           # Full agent lifecycle, persona loading, memory
+│   ├── coordinator/             # Task decomposition, delegation, orchestration
+│   ├── context-router/          # Intent classification & routing (Tier 1)
+│   ├── model-router/            # Multi-model abstraction (Claude, cost estimation)
+│   ├── memory/                  # 3-tier memory (session, project, global)
+│   ├── agent-runner/            # DEPRECATED — use orchestration-server
 │   ├── openclaw-sdk/            # SDK for external agent integration
 │   └── telegram-bot/            # Telegram commands & notifications
 ├── docs/
@@ -121,9 +129,9 @@ MissionControl/
 │   ├── architecture/            # System design docs
 │   ├── guides/                  # Getting started, deployment, etc.
 │   ├── planning/                # Implementation plans, epics, roadmaps
-│   ├── changelog/               # Version history, status reports
+│   ├── decisions/               # Architecture Decision Records (ADRs)
 │   ├── runbook/                 # Operational runbook
-│   └── openclaw-bootstrap/      # OpenClaw integration reference
+│   └── openclaw-bootstrap/      # OpenClaw integration & agent personas
 ├── scripts/                     # Setup and utility scripts
 ├── .cursorrules                 # AI session rules (read automatically by Cursor)
 ├── progress.txt                 # Session continuity tracker
@@ -142,6 +150,25 @@ Tasks are units of work with a deterministic state machine:
 - **8 States:** INBOX, ASSIGNED, IN_PROGRESS, REVIEW, NEEDS_APPROVAL, BLOCKED, DONE, CANCELED
 - **Artifacts:** Work plan, deliverable, self-review, evidence
 - **Budget Tracking:** Per-task spend vs. budget
+- **Source Provenance:** Every task tracks where it came from and who created it
+
+#### Task Sources
+
+Each task records its origin via the `source` field, displayed as a color-coded badge on Kanban cards and in the Task Drawer:
+
+| Source | Icon | Description |
+|---|---|---|
+| `DASHBOARD` | 🖥️ | Created manually from the Mission Control UI |
+| `TELEGRAM` | ✈️ | Created via the Telegram bot (e.g. `/newtask`) |
+| `GITHUB` | 🐙 | Created from GitHub events (issues, PRs, webhooks) |
+| `AGENT` | 🤖 | Spawned autonomously by an AI agent |
+| `API` | 🔌 | Created via external API integration |
+| `TRELLO` | 📋 | Synced from a Trello board |
+| `SEED` | 🌱 | Inserted by seed/demo scripts |
+
+Tasks also carry:
+- **`sourceRef`** — a reference ID (e.g. `owner/repo#42`, Telegram message ID, Trello card ID)
+- **`createdBy`** — who initiated it: `HUMAN`, `AGENT`, or `SYSTEM`
 
 ### Agents
 
@@ -233,13 +260,75 @@ pnpm run convex:deploy    # Deploy to Convex cloud
 
 ---
 
+## Intelligence Layer
+
+Mission Control includes a full intelligence layer that turns the control plane from a passive dashboard into an active orchestration system. This was shipped as part of Phase 2 and includes:
+
+### Orchestration Server
+A Hono-based HTTP server (`apps/orchestration-server/`) that hosts the coordinator loop and agent runtime. Endpoints for health checks, status, tick, agent spawn/stop, and graceful shutdown.
+
+### Coordinator
+Task decomposition and delegation engine (`packages/coordinator/`, `convex/coordinator.ts`):
+- **Strategy-based decomposition** -- breaks complex tasks into subtasks with dependency ordering
+- **DAG dependency graph** -- tracks inter-task dependencies for execution ordering
+- **Delegation pipeline** -- matches subtasks to the best-fit agent by skill, availability, and performance
+- **Stuck detection** -- escalates tasks that stall for too long
+
+### Context Router
+Intent classification and routing (`packages/context-router/`):
+- **Tier 1 rule-based classifier** -- routes by intent, complexity, and task type
+- Routes to `COORDINATOR`, `SINGLE_TASK`, `CLARIFY`, `REJECT`, or `DEFER`
+- Capacity and budget checks before routing
+- 38 unit tests passing
+
+### Model Router
+Multi-model abstraction (`packages/model-router/`):
+- **Claude provider** with fallback chains
+- **Cost estimation** per model and task type
+- Model selection by task type, risk level, and remaining budget
+- Designed for future OpenAI/Gemini providers
+
+### Memory System
+Three-tier persistent memory (`packages/memory/`):
+- **Session memory** -- per-task context that persists across heartbeats
+- **Project memory** -- shared knowledge within a project
+- **Global memory** -- cross-project insights and patterns
+- Unified `MemoryManager` with lifecycle hooks
+
+### Agent Runtime
+Full agent lifecycle management (`packages/agent-runtime/`):
+- Persona loading from YAML configs (`agents/*.yaml`)
+- Heartbeat monitoring with auto-quarantine for stale agents
+- Memory integration on start/stop
+- Session/daily notes persistence
+
+### Performance-Based Task Routing
+Enhanced scoring in `convex/taskRouter.ts`:
+- 20% weight for agent performance (success rate, refute count)
+- Pulled from `agentPerformance` table
+- Used in both `findBestAgent` and `autoAssign`
+
+### Centralized Risk Classifier
+`convex/lib/riskClassifier.ts` provides a shared risk classification function used by both the Convex policy layer and the policy-engine package, ensuring consistent GREEN/YELLOW/RED classification.
+
+### Intelligence Layer UI
+- **Mission DAG View** -- SVG dependency graph with topological layout (Kahn's algorithm), status-colored nodes
+- **Explainability Panel** -- "Why?" tab in task drawer showing assignment reasoning, risk assessment, decision timeline
+- **Loop Detection Panel** -- summary cards per loop type with one-click actions (Unblock, Acknowledge, Resolve)
+- **Budget Burn-Down** -- per-agent and per-project spend visualization with alerts
+
+### Executor Router
+Cron-based auto-routing (`convex/crons.ts`) that processes execution requests every 5 minutes, matching tasks to the appropriate executor (Cursor, Claude Code, OpenClaw, Manual).
+
+---
+
 ## Roadmap
 
 See [PRD v2.0](./docs/PRD_V2.md) for the full roadmap. Summary:
 
-- **Phase 1: Foundation** -- COMPLETE (current repo)
-- **Phase 2: Orchestration Server & Agent Runtime** -- Weeks 1-3
-- **Phase 3: Model Router & Context Routing** -- Weeks 4-5
+- **Phase 1: Foundation** -- COMPLETE
+- **Phase 2: Orchestration Server & Agent Runtime** -- COMPLETE
+- **Phase 3: Model Router & Context Routing** -- IN PROGRESS
 - **Phase 4: Multi-Model, Observability & Polish** -- Weeks 6-8
 - **Phase 5: Hardening & Scale** -- Weeks 9-12
 

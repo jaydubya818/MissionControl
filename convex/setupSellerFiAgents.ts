@@ -209,15 +209,20 @@ export const createSellerFiAgents = mutation({
         name: agentData.name,
         role: agentData.role,
         status: "ACTIVE",
-        description: agentData.description,
         allowedTaskTypes: agentData.allowedTaskTypes,
-        capabilities: agentData.capabilities,
-        metadata: agentData.metadata,
-        budget: {
-          daily: agentData.role === "LEAD" ? 12 : 5,
-          perRun: agentData.role === "LEAD" ? 1.5 : 0.75,
+        workspacePath: `/agents/${agentData.name.toLowerCase().replace(/\s+/g, "-")}`,
+        canSpawn: agentData.role === "LEAD",
+        maxSubAgents: agentData.role === "LEAD" ? 3 : 0,
+        budgetDaily: agentData.role === "LEAD" ? 12 : 5,
+        budgetPerRun: agentData.role === "LEAD" ? 1.5 : 0.75,
+        spendToday: 0,
+        errorStreak: 0,
+        lastHeartbeatAt: Date.now(),
+        metadata: {
+          ...agentData.metadata,
+          description: agentData.description,
+          capabilities: agentData.capabilities,
         },
-        lastHeartbeat: Date.now(),
       });
       
       // Log activity

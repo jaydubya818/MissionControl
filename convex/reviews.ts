@@ -75,7 +75,7 @@ export const getStats = query({
     } else if (args.projectId) {
       reviews = await ctx.db
         .query("reviews")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
         .collect();
     } else {
       reviews = await ctx.db.query("reviews").collect();
@@ -179,7 +179,7 @@ export const create = mutation({
       actorId: args.reviewerAgentId || args.reviewerUserId,
       targetType: "REVIEW",
       targetId: reviewId,
-      body: `${args.type} review created: ${args.summary}`,
+      description: `${args.type} review created: ${args.summary}`,
       metadata: { taskId: args.taskId, reviewType: args.type },
     });
     
@@ -219,7 +219,7 @@ export const respond = mutation({
       actorId: args.responseBy,
       targetType: "REVIEW",
       targetId: args.reviewId,
-      body: `Review ${args.accept ? "accepted" : "rejected"}: ${args.responseText}`,
+      description: `Review ${args.accept ? "accepted" : "rejected"}: ${args.responseText}`,
       metadata: { taskId: review.taskId },
     });
     
@@ -254,7 +254,7 @@ export const supersede = mutation({
       actorType: "SYSTEM",
       targetType: "REVIEW",
       targetId: args.reviewId,
-      body: `Review superseded: ${args.reason}`,
+      description: `Review superseded: ${args.reason}`,
       metadata: { taskId: review.taskId },
     });
     
@@ -279,7 +279,7 @@ export const remove = mutation({
       actorType: "SYSTEM",
       targetType: "REVIEW",
       targetId: args.reviewId,
-      body: `Review deleted: ${review.summary}`,
+      description: `Review deleted: ${review.summary}`,
       metadata: { taskId: review.taskId },
     });
     

@@ -7,6 +7,26 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 
+export const list = query({
+  args: {
+    projectId: v.optional(v.id("projects")),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    if (args.projectId) {
+      return await ctx.db
+        .query("activities")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .order("desc")
+        .take(args.limit ?? 50);
+    }
+    return await ctx.db
+      .query("activities")
+      .order("desc")
+      .take(args.limit ?? 50);
+  },
+});
+
 export const listRecent = query({
   args: { 
     projectId: v.optional(v.id("projects")),

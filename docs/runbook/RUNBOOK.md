@@ -22,7 +22,7 @@
 
 ## Mission Control (Convex) — Current
 
-Mission Control uses **Convex** as the backend (no separate REST API). The UI and agent-runner talk to Convex directly.
+Mission Control uses **Convex** as the primary backend for state management and real-time subscriptions. The system also exposes HTTP REST API endpoints (http://localhost:3000/api/*) for operator/CLI actions and external integrations. The UI talks to Convex directly for reactive data, while the REST API provides programmatic access for tools and scripts.
 
 ### Startup (local)
 
@@ -228,7 +228,7 @@ curl http://localhost:3000/api/tasks?status=in_progress
 docker-compose down
 
 # 4. Backup database (if needed)
-npm run backup
+pnpm run backup
 ```
 
 ### Emergency Shutdown
@@ -418,10 +418,10 @@ curl -X POST http://localhost:3000/api/agents/{agentId}/quarantine
 docker-compose down
 
 # 2. Restore from backup
-npm run restore -- --backup=./backups/latest.json
+pnpm run restore -- --backup=./backups/latest.json
 
 # 3. Verify data integrity
-npm run verify-db
+pnpm run verify-db
 
 # 4. Restart services
 docker-compose up -d
@@ -480,10 +480,10 @@ docker-compose down
 ls -lh ./backups/
 
 # 3. Restore specific backup
-npm run restore -- --backup=./backups/2026-02-01-09-00.json
+pnpm run restore -- --backup=./backups/2026-02-01-09-00.json
 
 # 4. Verify restoration
-npm run verify-db
+pnpm run verify-db
 
 # 5. Restart services
 docker-compose up -d
@@ -551,11 +551,11 @@ curl http://localhost:3000/api/agents?sortBy=totalSpend&order=desc
 curl http://localhost:3000/api/tasks?status=blocked,needs_approval
 
 # 3. Clean up old data (optional)
-npm run cleanup -- --older-than=30d
+pnpm run cleanup -- --older-than=30d
 
 # 4. Update dependencies
-npm outdated
-npm update
+pnpm outdated
+pnpm update
 ```
 
 ### Monthly Tasks
@@ -568,11 +568,11 @@ npm update
 # Adjust based on actual spend patterns
 
 # 3. Archive old tasks
-npm run archive -- --older-than=90d
+pnpm run archive -- --older-than=90d
 
 # 4. Security audit
-npm audit
-npm run security-check
+pnpm audit
+pnpm run security-check
 ```
 
 ---
@@ -632,10 +632,10 @@ docker-compose logs | grep WARN
 
 ## Emergency Contacts
 
-- **Primary Operator:** Jarrett West
-- **Backup Operator:** TBD
+- **Primary Operator:** Jarrett West (jarrett@example.com, +1-555-0100)
+- **Backup Operator:** [Name TBD] ([email TBD], [phone TBD])
 - **Convex Support:** https://convex.dev/support
-- **OpenClaw Support:** TBD
+- **OpenClaw Support:** [Name TBD] ([email TBD], [phone TBD])
 
 ---
 

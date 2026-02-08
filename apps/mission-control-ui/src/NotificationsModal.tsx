@@ -83,7 +83,7 @@ export function NotificationsModal({ onClose, onSelectTask }: { onClose: () => v
 function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <>
-      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 40 }} onClick={onClose} aria-hidden />
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9998 }} onClick={onClose} aria-hidden />
       <div
         role="dialog"
         aria-modal="true"
@@ -99,7 +99,7 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
           background: "#1e293b",
           border: "1px solid #334155",
           borderRadius: 12,
-          zIndex: 50,
+          zIndex: 9999,
           padding: 24,
         }}
       >

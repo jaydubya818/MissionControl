@@ -224,7 +224,7 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
           position: "fixed",
           inset: 0,
           background: "rgba(0,0,0,0.5)",
-          zIndex: 40,
+          zIndex: 9998,
         }}
         onClick={onClose}
         aria-hidden="true"
@@ -244,7 +244,7 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
           background: "#1e293b",
           border: "1px solid #334155",
           borderRadius: 12,
-          zIndex: 50,
+          zIndex: 9999,
           padding: 24,
         }}
       >

@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
+import { TopNav, type MainView } from "./TopNav";
 import { Kanban } from "./Kanban";
 import { TaskDrawerTabs } from "./TaskDrawerTabs";
 import { Sidebar } from "./Sidebar";
@@ -24,6 +25,19 @@ import { CommandPalette } from "./CommandPalette";
 import { KeyboardShortcutsHelp, useKeyboardShortcuts } from "./KeyboardShortcuts";
 import { DashboardOverview } from "./DashboardOverview";
 import { ActivityFeedModal } from "./ActivityFeed";
+import { OrgView } from "./OrgView";
+import { CalendarView } from "./CalendarView";
+import { OfficeView } from "./OfficeView";
+import { ProjectsView } from "./ProjectsView";
+import { ChatView } from "./ChatView";
+import { CouncilView } from "./CouncilView";
+import { MemoryView } from "./MemoryView";
+import { CapturesView } from "./CapturesView";
+import { DocsView } from "./DocsView";
+import { PeopleView } from "./PeopleView";
+import { MissionDAGView } from "./MissionDAGView";
+import { LoopDetectionPanel } from "./LoopDetectionPanel";
+import { BudgetBurnDown } from "./BudgetBurnDown";
 
 // ============================================================================
 // PROJECT CONTEXT
@@ -97,6 +111,7 @@ function useHeaderMetrics() {
 }
 
 export default function App() {
+  const [currentView, setCurrentView] = useState<MainView>("tasks");
   const [projectId, setProjectId] = useState<Id<"projects"> | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<Id<"tasks"> | null>(null);
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -106,6 +121,7 @@ export default function App() {
   const [showStandup, setShowStandup] = useState(false);
   const [showAgentDashboard, setShowAgentDashboard] = useState(false);
   const [showCostAnalytics, setShowCostAnalytics] = useState(false);
+  const [showBudgetBurnDown, setShowBudgetBurnDown] = useState(false);
   const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
   const [showHealthDashboard, setShowHealthDashboard] = useState(false);
   const [showMonitoringDashboard, setShowMonitoringDashboard] = useState(false);
@@ -182,6 +198,8 @@ export default function App() {
   return (
     <ProjectContext.Provider value={projectContextValue}>
     <AppContent
+      currentView={currentView}
+      setCurrentView={setCurrentView}
       projectId={projectId}
       selectedTaskId={selectedTaskId}
       setSelectedTaskId={setSelectedTaskId}
@@ -199,6 +217,8 @@ export default function App() {
       setShowAgentDashboard={setShowAgentDashboard}
       showCostAnalytics={showCostAnalytics}
       setShowCostAnalytics={setShowCostAnalytics}
+      showBudgetBurnDown={showBudgetBurnDown}
+      setShowBudgetBurnDown={setShowBudgetBurnDown}
       showAdvancedAnalytics={showAdvancedAnalytics}
       setShowAdvancedAnalytics={setShowAdvancedAnalytics}
       showHealthDashboard={showHealthDashboard}
@@ -226,6 +246,8 @@ export default function App() {
 }
 
 function AppContent({
+  currentView,
+  setCurrentView,
   projectId,
   selectedTaskId,
   setSelectedTaskId,
@@ -243,6 +265,8 @@ function AppContent({
   setShowAgentDashboard,
   showCostAnalytics,
   setShowCostAnalytics,
+  showBudgetBurnDown,
+  setShowBudgetBurnDown,
   showAdvancedAnalytics,
   setShowAdvancedAnalytics,
   showHealthDashboard,
@@ -265,6 +289,8 @@ function AppContent({
   dateStr,
   toast,
 }: {
+  currentView: MainView;
+  setCurrentView: (view: MainView) => void;
   projectId: Id<"projects"> | null;
   selectedTaskId: Id<"tasks"> | null;
   setSelectedTaskId: (id: Id<"tasks"> | null) => void;
@@ -282,6 +308,8 @@ function AppContent({
   setShowAgentDashboard: (v: boolean) => void;
   showCostAnalytics: boolean;
   setShowCostAnalytics: (v: boolean) => void;
+  showBudgetBurnDown: boolean;
+  setShowBudgetBurnDown: (v: boolean) => void;
   showAdvancedAnalytics: boolean;
   setShowAdvancedAnalytics: (v: boolean) => void;
   showHealthDashboard: boolean;
@@ -359,6 +387,23 @@ function AppContent({
             }}
           >
             💰 Costs
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowBudgetBurnDown(true)}
+            style={{
+              padding: "6px 12px",
+              background: "#6366f1",
+              border: "1px solid #4f46e5",
+              borderRadius: 6,
+              color: "#fff",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              marginRight: "8px",
+            }}
+          >
+            📉 Budget
           </button>
           <button
             type="button"
@@ -490,30 +535,70 @@ function AppContent({
           + New task
         </button>
       </header>
+      <TopNav currentView={currentView} onViewChange={setCurrentView} />
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <Sidebar
-          projectId={projectId}
-          onOpenApprovals={() => setShowApprovals(true)}
-          onOpenPolicy={() => setShowPolicy(true)}
-          onOpenNotifications={() => setShowNotifications(true)}
-          onOpenStandup={() => setShowStandup(true)}
-          onPauseSquad={handlePauseSquad}
-          onResumeSquad={handleResumeSquad}
-        />
-        <main style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
-          <h2 className="mission-queue-header">Mission Queue</h2>
-          <KanbanFilters
+        {currentView === "tasks" && (
+          <>
+            <Sidebar
+              projectId={projectId}
+              onOpenApprovals={() => setShowApprovals(true)}
+              onOpenPolicy={() => setShowPolicy(true)}
+              onOpenNotifications={() => setShowNotifications(true)}
+              onOpenStandup={() => setShowStandup(true)}
+              onPauseSquad={handlePauseSquad}
+              onResumeSquad={handleResumeSquad}
+            />
+            <main style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+              <h2 className="mission-queue-header">Mission Queue</h2>
+              <LoopDetectionPanel
+                projectId={projectId}
+                onTaskSelect={(taskId) => setSelectedTaskId(taskId)}
+              />
+              <KanbanFilters
+                projectId={projectId}
+                filters={kanbanFilters}
+                onFiltersChange={setKanbanFilters}
+              />
+              <Kanban
+                projectId={projectId}
+                onSelectTask={setSelectedTaskId}
+                filters={kanbanFilters}
+              />
+            </main>
+            <LiveFeed projectId={projectId} />
+          </>
+        )}
+        {currentView === "dag" && (
+          <MissionDAGView
             projectId={projectId}
-            filters={kanbanFilters}
-            onFiltersChange={setKanbanFilters}
+            onTaskSelect={(taskId) => {
+              setSelectedTaskId(taskId);
+              setCurrentView("tasks");
+            }}
           />
-          <Kanban
-            projectId={projectId}
-            onSelectTask={setSelectedTaskId}
-            filters={kanbanFilters}
-          />
-        </main>
-        <LiveFeed projectId={projectId} />
+        )}
+        {currentView === "org" && <OrgView projectId={projectId} />}
+        {currentView === "calendar" && <CalendarView projectId={projectId} />}
+        {currentView === "office" && <OfficeView projectId={projectId} />}
+        {currentView === "projects" && <ProjectsView projectId={projectId} />}
+        {currentView === "chat" && <ChatView projectId={projectId} />}
+        {currentView === "council" && <CouncilView projectId={projectId} />}
+        {currentView === "memory" && <MemoryView projectId={projectId} />}
+        {currentView === "captures" && <CapturesView projectId={projectId} />}
+        {currentView === "docs" && <DocsView />}
+        {currentView === "people" && <PeopleView projectId={projectId} />}
+        {currentView === "search" && (
+          <main style={{ flex: 1, overflow: "auto", padding: "24px" }}>
+            <h2 style={{ color: "#e2e8f0", marginBottom: "16px" }}>Search</h2>
+            <SearchBar
+              projectId={projectId ?? undefined}
+              onResultClick={(taskId) => {
+                setSelectedTaskId(taskId as Id<"tasks">);
+                setCurrentView("tasks");
+              }}
+            />
+          </main>
+        )}
       </div>
       <TaskDrawerTabs taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} />
 
@@ -545,6 +630,55 @@ function AppContent({
           onClose={() => setShowCostAnalytics(false)}
         />
       )}
+      {showBudgetBurnDown && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.6)",
+            zIndex: 1000,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowBudgetBurnDown(false);
+          }}
+        >
+          <div
+            style={{
+              background: "#0f172a",
+              border: "1px solid #334155",
+              borderRadius: 12,
+              width: "min(90vw, 800px)",
+              maxHeight: "85vh",
+              overflow: "auto",
+              position: "relative",
+            }}
+          >
+            <button
+              onClick={() => setShowBudgetBurnDown(false)}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                background: "none",
+                border: "none",
+                color: "#94a3b8",
+                fontSize: "1.5rem",
+                cursor: "pointer",
+                zIndex: 10,
+              }}
+            >
+              ×
+            </button>
+            <BudgetBurnDown projectId={projectId} />
+          </div>
+        </div>
+      )}
 
       {showAdvancedAnalytics && (
         <AnalyticsDashboard
@@ -560,7 +694,6 @@ function AppContent({
       )}
       {showMonitoringDashboard && (
         <MonitoringDashboard
-          projectId={projectId}
           onClose={() => setShowMonitoringDashboard(false)}
         />
       )}

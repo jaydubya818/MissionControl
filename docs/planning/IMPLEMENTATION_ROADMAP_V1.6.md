@@ -54,25 +54,48 @@ tasks: defineTable({
   })),
 })
 
-// packages/telegram-bot/src/threads.ts - Enhanced
+// packages/telegram-bot/src/threads.ts - Enhanced with error handling and idempotency
 export async function createTaskThread(bot, task) {
-  const message = await bot.telegram.sendMessage(
-    CHAT_ID,
-    `📋 Task #${task._id.slice(-6)}: ${task.title}`,
-    { 
-      reply_to_message_id: undefined, // Creates new thread
-      allow_sending_without_reply: true 
-    }
-  );
+  // Check for existing threadRef to avoid duplicates
+  const existingTask = await convex.query(api.tasks.get, { taskId: task._id });
+  if (existingTask?.threadRef) {
+    return existingTask.threadRef;
+  }
   
-  // Save threadRef to task
-  await convex.mutation(api.tasks.updateThreadRef, {
-    taskId: task._id,
-    threadRef: {
-      chatId: CHAT_ID,
-      threadId: message.message_id.toString(),
-    },
-  });
+  try {
+    const message = await bot.telegram.sendMessage(
+      CHAT_ID,
+      `📋 Task #${task._id.slice(-6)}: ${task.title}`,
+      { 
+        reply_to_message_id: undefined, // Creates new thread
+        allow_sending_without_reply: true 
+      }
+    );
+    
+    // Save threadRef to task with idempotent upsert
+    try {
+      await convex.mutation(api.tasks.upsertThreadRef, {
+        taskId: task._id,
+        threadRef: {
+          chatId: CHAT_ID,
+          threadId: message.message_id.toString(),
+        },
+      });
+    } catch (convexError) {
+      console.error(`Failed to save threadRef for task ${task._id}:`, convexError);
+      // Return existing threadRef if concurrent creation occurred
+      const retryTask = await convex.query(api.tasks.get, { taskId: task._id });
+      if (retryTask?.threadRef) {
+        return retryTask.threadRef;
+      }
+      throw convexError;
+    }
+    
+    return { chatId: CHAT_ID, threadId: message.message_id.toString() };
+  } catch (telegramError) {
+    console.error(`Failed to create Telegram thread for task ${task._id}:`, telegramError);
+    throw telegramError;
+  }
 }
 
 // All task-related messages go to this thread
@@ -142,7 +165,14 @@ executionRequests: defineTable({
     v.literal("SOCIAL"),
     v.literal("OPS")
   ),
-  context: v.any(),
+  context: v.union([
+    v.object({ type: v.literal("CODE_CHANGE"), files: v.array(v.string()), instructions: v.string() }),
+    v.object({ type: v.literal("RESEARCH"), query: v.string(), sources: v.optional(v.array(v.string())) }),
+    v.object({ type: v.literal("CONTENT"), topic: v.string(), format: v.string(), targetLength: v.optional(v.number()) }),
+    v.object({ type: v.literal("EMAIL"), recipients: v.array(v.string()), subject: v.string(), body: v.string() }),
+    v.object({ type: v.literal("SOCIAL"), platform: v.string(), content: v.string(), media: v.optional(v.array(v.string())) }),
+    v.object({ type: v.literal("OPS"), action: v.string(), params: v.record(v.string(), v.string()) }),
+  ]),
   
   // Routing rules
   routingScore: v.number(),
@@ -154,7 +184,14 @@ executionRequests: defineTable({
   completedAt: v.optional(v.number()),
   
   // Results
-  result: v.optional(v.any()),
+  result: v.optional(v.union([
+    v.object({ type: v.literal("CODE_CHANGE"), filesModified: v.array(v.string()), diff: v.string() }),
+    v.object({ type: v.literal("RESEARCH"), summary: v.string(), sources: v.array(v.string()) }),
+    v.object({ type: v.literal("CONTENT"), content: v.string(), wordCount: v.number() }),
+    v.object({ type: v.literal("EMAIL"), sent: v.boolean(), messageId: v.optional(v.string()) }),
+    v.object({ type: v.literal("SOCIAL"), posted: v.boolean(), postId: v.optional(v.string()), url: v.optional(v.string()) }),
+    v.object({ type: v.literal("OPS"), completed: v.boolean(), output: v.string() }),
+  ])),
   artifacts: v.optional(v.array(v.string())),
   error: v.optional(v.string()),
 })
@@ -209,11 +246,46 @@ export const handleExecutionCallback = mutation({
   args: {
     requestId: v.id("executionRequests"),
     status: v.string(),
-    result: v.optional(v.any()),
+    result: v.optional(v.union([
+      v.object({ type: v.literal("CODE_CHANGE"), filesModified: v.array(v.string()), diff: v.string() }),
+      v.object({ type: v.literal("RESEARCH"), summary: v.string(), sources: v.array(v.string()) }),
+      v.object({ type: v.literal("CONTENT"), content: v.string(), wordCount: v.number() }),
+      v.object({ type: v.literal("EMAIL"), sent: v.boolean(), messageId: v.optional(v.string()) }),
+      v.object({ type: v.literal("SOCIAL"), posted: v.boolean(), postId: v.optional(v.string()), url: v.optional(v.string()) }),
+      v.object({ type: v.literal("OPS"), completed: v.boolean(), output: v.string() }),
+    ])),
     artifacts: v.optional(v.array(v.string())),
     error: v.optional(v.string()),
+    callbackSecret: v.optional(v.string()), // For authentication
   },
   handler: async (ctx, args) => {
+    // Authorization check
+    const request = await ctx.db.get(args.requestId);
+    if (!request) {
+      throw new Error("Execution request not found");
+    }
+    
+    // Verify caller authorization (check secret or authenticated user)
+    const expectedSecret = process.env.EXECUTION_CALLBACK_SECRET;
+    if (expectedSecret && args.callbackSecret !== expectedSecret) {
+      // If no secret provided, check if user is authenticated and owns the request
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) {
+        throw new Error("Unauthorized: No callback secret or user identity");
+      }
+      
+      // Verify the request belongs to the authenticated user's project
+      const task = await ctx.db.get(request.taskId);
+      if (!task) {
+        throw new Error("Task not found");
+      }
+      
+      // TODO: Add proper user-to-project ownership check
+      // For now, we require the callback secret
+      throw new Error("Unauthorized: Invalid callback secret");
+    }
+    
+    // Authorized - proceed with update
     await ctx.db.patch(args.requestId, {
       status: args.status,
       result: args.result,
@@ -223,7 +295,6 @@ export const handleExecutionCallback = mutation({
     });
     
     // Update task based on result
-    const request = await ctx.db.get(args.requestId);
     if (request && args.status === "COMPLETED") {
       await ctx.db.patch(request.taskId, {
         status: "REVIEW",
@@ -256,10 +327,40 @@ export const handleExecutionCallback = mutation({
 **Implementation:**
 ```typescript
 // convex/reports.ts - NEW FILE
+// Helper function to sanitize sensitive data
+function sanitizeText(text: string): string {
+  if (!text) return text;
+  
+  // Redact API keys, tokens, passwords
+  let sanitized = text.replace(/\b[A-Za-z0-9_-]{20,}\b/g, '[REDACTED]');
+  sanitized = sanitized.replace(/api[_-]?key[:\s=]+[^\s]+/gi, 'api_key: [REDACTED]');
+  sanitized = sanitized.replace(/token[:\s=]+[^\s]+/gi, 'token: [REDACTED]');
+  sanitized = sanitized.replace(/password[:\s=]+[^\s]+/gi, 'password: [REDACTED]');
+  
+  // Redact email addresses and phone numbers (basic PII)
+  sanitized = sanitized.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL_REDACTED]');
+  sanitized = sanitized.replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[PHONE_REDACTED]');
+  
+  return sanitized;
+}
+
 export const generateIncidentReport = query({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, args) => {
+    // Access control check
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized: User must be authenticated to generate incident reports");
+    }
+    
     const task = await ctx.db.get(args.taskId);
+    if (!task) {
+      throw new Error("Task not found");
+    }
+    
+    // TODO: Verify user has permission to view this task's project
+    // For now, we allow any authenticated user
+    
     const transitions = await ctx.db
       .query("taskTransitions")
       .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
@@ -277,11 +378,29 @@ export const generateIncidentReport = query({
       .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
       .collect();
     
+    // Sanitize sensitive fields
+    const sanitizedTask = {
+      ...task,
+      title: sanitizeText(task.title),
+      description: task.description ? sanitizeText(task.description) : undefined,
+    };
+    
+    const sanitizedMessages = messages.map(m => ({
+      ...m,
+      body: sanitizeText(m.body),
+    }));
+    
+    const sanitizedApprovals = approvals.map(a => ({
+      ...a,
+      actionSummary: sanitizeText(a.actionSummary),
+      reason: a.reason ? sanitizeText(a.reason) : undefined,
+    }));
+    
     // Calculate costs
     const totalCost = runs.reduce((sum, r) => sum + (r.cost || 0), 0);
     
-    // Generate markdown
-    let report = `# Incident Report: ${task.title}\n\n`;
+    // Generate markdown with sanitized data
+    let report = `# Incident Report: ${sanitizedTask.title}\n\n`;
     report += `**Task ID:** ${task._id}\n`;
     report += `**Status:** ${task.status}\n`;
     report += `**Created:** ${new Date(task._creationTime).toISOString()}\n`;
@@ -290,17 +409,17 @@ export const generateIncidentReport = query({
     report += `## Timeline\n\n`;
     for (const t of transitions) {
       report += `- ${new Date(t._creationTime).toISOString()} - ${t.fromStatus} → ${t.toStatus}\n`;
-      if (t.reason) report += `  *${t.reason}*\n`;
+      if (t.reason) report += `  *${sanitizeText(t.reason)}*\n`;
     }
     
-    report += `\n## Messages (${messages.length})\n\n`;
-    for (const m of messages.slice(0, 10)) {
+    report += `\n## Messages (${sanitizedMessages.length})\n\n`;
+    for (const m of sanitizedMessages.slice(0, 10)) {
       report += `### ${new Date(m._creationTime).toISOString()}\n`;
       report += `${m.body}\n\n`;
     }
     
-    report += `\n## Approvals (${approvals.length})\n\n`;
-    for (const a of approvals) {
+    report += `\n## Approvals (${sanitizedApprovals.length})\n\n`;
+    for (const a of sanitizedApprovals) {
       report += `- **${a.actionSummary}** - ${a.status}\n`;
       report += `  Risk: ${a.riskLevel}, Cost: $${a.estimatedCost?.toFixed(2) || 0}\n`;
     }
@@ -310,7 +429,7 @@ export const generateIncidentReport = query({
       report += `- ${r.status} - Cost: $${r.cost?.toFixed(2) || 0}\n`;
     }
     
-    return { report, task, totalCost };
+    return { report, task: sanitizedTask, totalCost };
   },
 });
 
@@ -364,6 +483,7 @@ export async function withRetry<T>(
     delayMs?: number;
     backoff?: "linear" | "exponential";
     onRetry?: (attempt: number, error: Error) => void;
+    timeoutMs?: number; // Per-attempt timeout
   } = {}
 ): Promise<T> {
   const {
@@ -371,13 +491,27 @@ export async function withRetry<T>(
     delayMs = 1000,
     backoff = "exponential",
     onRetry,
+    timeoutMs,
   } = options;
   
-  let lastError: Error;
+  // Validate maxAttempts
+  if (maxAttempts <= 0) {
+    throw new Error("maxAttempts must be greater than 0");
+  }
+  
+  let lastError: Error | null = null;
   
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await fn();
+      // Race fn() against timeout if specified
+      if (timeoutMs) {
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs)
+        );
+        return await Promise.race([fn(), timeoutPromise]);
+      } else {
+        return await fn();
+      }
     } catch (error) {
       lastError = error as Error;
       
@@ -397,7 +531,8 @@ export async function withRetry<T>(
     }
   }
   
-  throw lastError!;
+  // Should never reach here, but TypeScript needs it
+  throw lastError || new Error("Retry failed with unknown error");
 }
 
 // Circuit breaker
@@ -522,13 +657,14 @@ export const updateAgentPerformance = internalMutation({
         .withIndex("by_reviewer", (q) => q.eq("reviewerAgentId", agent._id))
         .collect();
       
-      // Calculate metrics
+      // Calculate metrics with division-by-zero guards
       const completed = tasks.filter(t => t.status === "DONE");
-      const successRate = completed.length / tasks.length;
+      const successRate = tasks.length > 0 ? completed.length / tasks.length : 0;
       
-      const avgScore = reviews
-        .filter(r => r.type === "PRAISE" && r.score)
-        .reduce((sum, r) => sum + (r.score || 0), 0) / reviews.length;
+      const praiseReviews = reviews.filter(r => r.type === "PRAISE" && r.score);
+      const avgScore = praiseReviews.length > 0
+        ? praiseReviews.reduce((sum, r) => sum + (r.score || 0), 0) / praiseReviews.length
+        : 0;
       
       // Update or create performance record
       const existing = await ctx.db
@@ -580,40 +716,132 @@ export const updatePerformanceMetrics = internalMutation({
 ```typescript
 // packages/github-integration/ - NEW PACKAGE
 import { Octokit } from "@octokit/rest";
+import crypto from "crypto";
 
 export class GitHubIntegration {
   private octokit: Octokit;
+  private webhookSecret: string;
   
-  constructor(token: string) {
-    this.octokit = new Octokit({ auth: token });
+  constructor(private db: any) {
+    // Retrieve encrypted token from DB (or use GitHub App installation token)
+    this.initializeOctokit();
+    this.webhookSecret = process.env.GITHUB_WEBHOOK_SECRET || "";
   }
   
-  // Sync issues to tasks
-  async syncIssues(owner: string, repo: string, projectId: string) {
-    const { data: issues } = await this.octokit.issues.listForRepo({
-      owner,
-      repo,
-      state: "open",
-    });
+  private async initializeOctokit() {
+    // Retrieve encrypted token from DB
+    const tokenRecord = await this.db.query("integrationTokens")
+      .withIndex("by_provider", (q) => q.eq("provider", "github"))
+      .first();
     
-    for (const issue of issues) {
-      // Create task in Mission Control
-      await convex.mutation(api.tasks.create, {
-        projectId,
-        title: issue.title,
-        description: issue.body || "",
-        type: "ENGINEERING",
-        priority: issue.labels.includes("urgent") ? 1 : 3,
-        metadata: {
-          githubIssueId: issue.id,
-          githubIssueNumber: issue.number,
-          githubUrl: issue.html_url,
-        },
+    if (!tokenRecord) {
+      throw new Error("GitHub token not found in database");
+    }
+    
+    // Decrypt token (implement decryption logic)
+    const token = this.decryptToken(tokenRecord.encryptedToken);
+    
+    this.octokit = new Octokit({ auth: token });
+    
+    // Implement token rotation/refresh logic
+    await this.checkAndRefreshToken(tokenRecord);
+  }
+  
+  private decryptToken(encryptedToken: string): string {
+    // TODO: Implement proper decryption using a secret key
+    return encryptedToken;
+  }
+  
+  private async checkAndRefreshToken(tokenRecord: any) {
+    // Check if token is expired and refresh if needed
+    // For GitHub App tokens, refresh using installation ID
+  }
+  
+  // Sync issues to tasks with error handling and rate limiting
+  async syncIssues(owner: string, repo: string, projectId: string) {
+    try {
+      // Paginate results to avoid large single requests
+      const iterator = this.octokit.paginate.iterator(this.octokit.issues.listForRepo, {
+        owner,
+        repo,
+        state: "open",
+        per_page: 100,
       });
+      
+      for await (const { data: issues } of iterator) {
+        for (const issue of issues) {
+          try {
+            // Validate and normalize fields
+            if (!issue.title || !issue.number || !issue.id || !issue.html_url) {
+              console.warn(`Skipping invalid issue:`, issue);
+              continue;
+            }
+            
+            // Safely check labels (may be undefined or not an array)
+            const labels = Array.isArray(issue.labels) 
+              ? issue.labels.map(l => typeof l === 'string' ? l : l.name)
+              : [];
+            
+            // Create task in Mission Control with retry
+            await this.withRetry(async () => {
+              await convex.mutation(api.tasks.create, {
+                projectId,
+                title: issue.title,
+                description: issue.body || "",
+                type: "ENGINEERING",
+                priority: labels.includes("urgent") ? 1 : 3,
+                metadata: {
+                  githubIssueId: issue.id,
+                  githubIssueNumber: issue.number,
+                  githubUrl: issue.html_url,
+                },
+              });
+            });
+            
+            // Audit log
+            await this.auditLog("syncIssues", { issueNumber: issue.number, owner, repo });
+          } catch (issueError) {
+            console.error(`Failed to sync issue #${issue.number}:`, issueError);
+            // Continue with next issue
+          }
+        }
+        
+        // Check rate limit and pause if needed
+        const { data: rateLimit } = await this.octokit.rateLimit.get();
+        if (rateLimit.resources.core.remaining < 100) {
+          const resetTime = rateLimit.resources.core.reset * 1000;
+          const waitMs = resetTime - Date.now();
+          console.log(`Rate limit low, waiting ${waitMs}ms`);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to sync issues for ${owner}/${repo}:`, error);
+      throw error;
     }
   }
   
-  // Update PR status
+  private async withRetry<T>(fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        if (attempt === maxAttempts) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
+      }
+    }
+    throw new Error("Retry failed");
+  }
+  
+  private async auditLog(action: string, details: any) {
+    await convex.mutation(api.activities.create, {
+      action: `GITHUB_${action.toUpperCase()}`,
+      details: JSON.stringify(details),
+      timestamp: Date.now(),
+    });
+  }
+  
+  // Update PR status with audit logging
   async updatePRStatus(owner: string, repo: string, prNumber: number, status: string) {
     await this.octokit.issues.createComment({
       owner,
@@ -621,9 +849,10 @@ export class GitHubIntegration {
       issue_number: prNumber,
       body: `Mission Control Status: ${status}`,
     });
+    await this.auditLog("updatePRStatus", { owner, repo, prNumber, status });
   }
   
-  // Create PR from task
+  // Create PR from task with audit logging
   async createPRFromTask(task: any, branch: string) {
     const { data: pr } = await this.octokit.pulls.create({
       owner: task.metadata.owner,
@@ -633,8 +862,69 @@ export class GitHubIntegration {
       head: branch,
       base: "main",
     });
-    
+    await this.auditLog("createPR", { taskId: task._id, prNumber: pr.number });
     return pr;
+  }
+}
+
+// GitHub Webhook Handler
+export class GitHubWebhookHandler {
+  constructor(private integration: GitHubIntegration, private webhookSecret: string) {}
+  
+  // Verify webhook signature
+  verifyWebhookSignature(payload: string, signature: string): boolean {
+    const hmac = crypto.createHmac("sha256", this.webhookSecret);
+    const digest = "sha256=" + hmac.update(payload).digest("hex");
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
+  }
+  
+  // Handle issue events (opened, edited, closed)
+  async handleIssueEvent(event: any) {
+    const { action, issue, repository } = event;
+    
+    if (action === "opened") {
+      // Create task in Mission Control
+      await convex.mutation(api.tasks.create, {
+        projectId: repository.id,
+        title: issue.title,
+        description: issue.body || "",
+        type: "ENGINEERING",
+        metadata: {
+          githubIssueId: issue.id,
+          githubIssueNumber: issue.number,
+          githubUrl: issue.html_url,
+        },
+      });
+    } else if (action === "edited") {
+      // Update existing task
+      const task = await convex.query(api.tasks.getByGitHubIssue, { issueId: issue.id });
+      if (task) {
+        await convex.mutation(api.tasks.update, {
+          taskId: task._id,
+          title: issue.title,
+          description: issue.body || "",
+        });
+      }
+    } else if (action === "closed") {
+      // Mark task as done
+      const task = await convex.query(api.tasks.getByGitHubIssue, { issueId: issue.id });
+      if (task) {
+        await convex.mutation(api.tasks.transition, {
+          taskId: task._id,
+          toStatus: "DONE",
+          actorType: "SYSTEM",
+          reason: "GitHub issue closed",
+        });
+      }
+    }
+  }
+  
+  // Handle pull request events
+  async handlePullRequestEvent(event: any) {
+    const { action, pull_request, repository } = event;
+    
+    // Similar logic for PR events
+    // ...
   }
 }
 ```

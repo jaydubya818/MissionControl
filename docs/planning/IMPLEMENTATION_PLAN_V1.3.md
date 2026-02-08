@@ -41,12 +41,14 @@
 
 **Location:** `apps/mission-control-ui/src/AnalyticsDashboard.tsx`
 
-**Features:**
-- Cost forecasting (next 7 days based on trends)
-- Agent efficiency scores (tasks/hour, cost/task)
+**MVP (Phase 2):**
 - Task completion trends (7-day chart)
-- Budget utilization heatmap
 - Top performers leaderboard
+- Cost forecasting placeholder (static projection based on trailing average)
+
+**Deferred to Phase 3 / Future:**
+- Agent efficiency scores (tasks/hour, cost/task)
+- Budget utilization heatmap
 - Bottleneck detection
 
 ### 2. Task Comments & Mentions
@@ -61,7 +63,7 @@
 - Rich text support (markdown)
 - File attachments
 
-### 3. Smart Task Assignment
+### 3. Smart Assignment
 
 **Location:** `convex/taskRouter.ts`
 
@@ -89,13 +91,15 @@
 
 **Location:** `convex/exports.ts`
 
-**Features:**
-- Export tasks to CSV/JSON
-- Generate PDF reports
+**Phase 3 Features (Initial Scope):**
+- Export tasks to CSV/JSON via `exportTasksToCsv` and `exportTasksToJson`
 - Custom date ranges
 - Filter by agent/project/status
-- Scheduled exports (daily/weekly)
-- Email delivery
+
+**Follow-up Tasks (Deferred):**
+- Generate PDF reports (TODO: link to follow-up ticket)
+- Scheduled exports (daily/weekly) (TODO: link to follow-up ticket)
+- Email delivery (TODO: link to follow-up ticket)
 
 ### 6. Keyboard Shortcuts
 
@@ -145,16 +149,17 @@
 7. Write documentation
 
 ### Phase 2: Core Features (3-4 hours)
-1. Advanced Analytics Dashboard (1 hour)
+1. Analytics Dashboard MVP — trends chart, leaderboard, cost placeholder (30 min)
 2. Task Comments & Mentions (1 hour)
-3. Smart Task Assignment (1 hour)
+3. Smart Assignment (1 hour)
 4. Keyboard Shortcuts (30 min)
 5. Theme Customization (30 min)
 
-### Phase 3: Advanced Features (2-3 hours)
-1. Webhook System (1.5 hours)
-2. Export & Reporting (1 hour)
-3. Drag & Drop Kanban (30 min)
+### Phase 3: Advanced Features (1-2 hours)
+1. Analytics Dashboard v2 — efficiency scores, budget heatmap, bottleneck detection (1 hour)
+2. Webhook System (1.5 hours)
+3. Export & Reporting — CSV/JSON export with filtering (30 min, PDF/scheduled exports/email delivery moved to follow-up tasks)
+4. Drag & Drop Kanban (30 min)
 
 ### Phase 4: Testing & Documentation (1 hour)
 1. Test SDK with sample agent
@@ -175,7 +180,7 @@
 - ✅ Approval workflow
 
 ### Feature Enhancements
-- ✅ Analytics show meaningful insights
+- ✅ Analytics MVP: completion trends, leaderboard, cost placeholder render correctly
 - ✅ Comments work with @mentions
 - ✅ Auto-assignment reduces manual work
 - ✅ Webhooks deliver reliably
@@ -212,11 +217,11 @@ Starting with:
 1. OpenClaw SDK package
 2. Advanced Analytics Dashboard
 3. Task Comments
-4. Keyboard Shortcuts
-5. Theme Customization
+4. Smart Assignment
+5. Keyboard Shortcuts
+6. Theme Customization
 
 Then if time:
-6. Smart Assignment
 7. Webhooks
 8. Export/Reporting
 9. Drag & Drop

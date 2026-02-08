@@ -9,25 +9,6 @@ import { query } from "./_generated/server";
  */
 
 // ============================================================================
-// SCHEMA ADDITIONS NEEDED:
-// ============================================================================
-// New table: searchHistory
-// - userId: v.string()
-// - projectId: v.optional(v.id("projects"))
-// - query: v.string()
-// - filters: v.any()
-// - resultCount: v.number()
-// - searchedAt: v.number()
-//
-// New table: savedSearches
-// - userId: v.string()
-// - projectId: v.optional(v.id("projects"))
-// - name: v.string()
-// - query: v.string()
-// - filters: v.any()
-// - createdAt: v.number()
-
-// ============================================================================
 // SEARCH QUERIES
 // ============================================================================
 
@@ -47,22 +28,19 @@ export const searchAll = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 50;
-    const query = args.query.toLowerCase();
+    const searchQuery = args.query.toLowerCase();
     
     // Search tasks
-    let tasksQuery = ctx.db.query("tasks");
-    if (args.projectId) {
-      tasksQuery = tasksQuery.withIndex("by_project", (q) => 
-        q.eq("projectId", args.projectId)
-      );
-    }
-    
-    let tasks = await tasksQuery.collect();
+    let tasks = args.projectId
+      ? await ctx.db.query("tasks")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+          .collect()
+      : await ctx.db.query("tasks").collect();
     
     // Filter by text search
     tasks = tasks.filter(t => 
-      t.title.toLowerCase().includes(query) ||
-      t.description?.toLowerCase().includes(query)
+      t.title.toLowerCase().includes(searchQuery) ||
+      t.description?.toLowerCase().includes(searchQuery)
     );
     
     // Apply filters
@@ -89,11 +67,10 @@ export const searchAll = query({
       }
     }
     
-    // Search messages
-    let messagesQuery = ctx.db.query("messages");
-    let messages = await messagesQuery.collect();
+    // Search messages (use content field, not body)
+    let messages = await ctx.db.query("messages").collect();
     messages = messages.filter(m => 
-      m.body.toLowerCase().includes(query)
+      m.content.toLowerCase().includes(searchQuery)
     );
     
     if (args.projectId) {
@@ -105,28 +82,26 @@ export const searchAll = query({
     }
     
     // Search agents
-    let agentsQuery = ctx.db.query("agents");
-    if (args.projectId) {
-      agentsQuery = agentsQuery.withIndex("by_project", (q) => 
-        q.eq("projectId", args.projectId)
-      );
-    }
-    let agents = await agentsQuery.collect();
+    let agents = args.projectId
+      ? await ctx.db.query("agents")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+          .collect()
+      : await ctx.db.query("agents").collect();
+    
     agents = agents.filter(a => 
-      a.name.toLowerCase().includes(query) ||
-      a.role.toLowerCase().includes(query)
+      a.name.toLowerCase().includes(searchQuery) ||
+      a.role.toLowerCase().includes(searchQuery)
     );
     
-    // Search activities
-    let activitiesQuery = ctx.db.query("activities");
-    if (args.projectId) {
-      activitiesQuery = activitiesQuery.withIndex("by_project", (q) => 
-        q.eq("projectId", args.projectId)
-      );
-    }
-    let activities = await activitiesQuery.collect();
+    // Search activities (use description field, not body)
+    let activities = args.projectId
+      ? await ctx.db.query("activities")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+          .collect()
+      : await ctx.db.query("activities").collect();
+    
     activities = activities.filter(a => 
-      a.body.toLowerCase().includes(query)
+      a.description.toLowerCase().includes(searchQuery)
     );
     
     return {
@@ -155,23 +130,20 @@ export const searchTasks = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 50;
-    const query = args.query.toLowerCase();
+    const searchQuery = args.query.toLowerCase();
     
-    let tasksQuery = ctx.db.query("tasks");
-    if (args.projectId) {
-      tasksQuery = tasksQuery.withIndex("by_project", (q) => 
-        q.eq("projectId", args.projectId)
-      );
-    }
-    
-    let tasks = await tasksQuery.collect();
+    let tasks = args.projectId
+      ? await ctx.db.query("tasks")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+          .collect()
+      : await ctx.db.query("tasks").collect();
     
     // Text search
     tasks = tasks.filter(t => 
-      t.title.toLowerCase().includes(query) ||
-      t.description?.toLowerCase().includes(query) ||
-      t.type.toLowerCase().includes(query) ||
-      t.status.toLowerCase().includes(query)
+      t.title.toLowerCase().includes(searchQuery) ||
+      t.description?.toLowerCase().includes(searchQuery) ||
+      t.type.toLowerCase().includes(searchQuery) ||
+      t.status.toLowerCase().includes(searchQuery)
     );
     
     // Apply filters (same as searchAll)
@@ -200,8 +172,8 @@ export const searchTasks = query({
     
     // Sort by relevance (title matches first)
     tasks.sort((a, b) => {
-      const aTitle = a.title.toLowerCase().includes(query);
-      const bTitle = b.title.toLowerCase().includes(query);
+      const aTitle = a.title.toLowerCase().includes(searchQuery);
+      const bTitle = b.title.toLowerCase().includes(searchQuery);
       if (aTitle && !bTitle) return -1;
       if (!aTitle && bTitle) return 1;
       return b._creationTime - a._creationTime;
@@ -219,29 +191,27 @@ export const quickSearch = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 10;
-    const query = args.query.toLowerCase();
+    const searchQuery = args.query.toLowerCase();
     
     // Quick search across tasks and agents only
-    let tasksQuery = ctx.db.query("tasks");
-    if (args.projectId) {
-      tasksQuery = tasksQuery.withIndex("by_project", (q) => 
-        q.eq("projectId", args.projectId)
-      );
-    }
-    let tasks = await tasksQuery.collect();
+    let tasks = args.projectId
+      ? await ctx.db.query("tasks")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+          .collect()
+      : await ctx.db.query("tasks").collect();
+    
     tasks = tasks.filter(t => 
-      t.title.toLowerCase().includes(query)
+      t.title.toLowerCase().includes(searchQuery)
     ).slice(0, limit);
     
-    let agentsQuery = ctx.db.query("agents");
-    if (args.projectId) {
-      agentsQuery = agentsQuery.withIndex("by_project", (q) => 
-        q.eq("projectId", args.projectId)
-      );
-    }
-    let agents = await agentsQuery.collect();
+    let agents = args.projectId
+      ? await ctx.db.query("agents")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+          .collect()
+      : await ctx.db.query("agents").collect();
+    
     agents = agents.filter(a => 
-      a.name.toLowerCase().includes(query)
+      a.name.toLowerCase().includes(searchQuery)
     ).slice(0, 5);
     
     return { tasks, agents };
@@ -258,23 +228,21 @@ export const getSearchSuggestions = query({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const query = args.query.toLowerCase();
+    const searchQuery = args.query.toLowerCase();
     const suggestions: string[] = [];
     
     // Get recent tasks for suggestions
-    let tasksQuery = ctx.db.query("tasks");
-    if (args.projectId) {
-      tasksQuery = tasksQuery.withIndex("by_project", (q) => 
-        q.eq("projectId", args.projectId)
-      );
-    }
-    const tasks = await tasksQuery.collect();
+    const tasks = args.projectId
+      ? await ctx.db.query("tasks")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+          .collect()
+      : await ctx.db.query("tasks").collect();
     
     // Extract unique words from titles
     const words = new Set<string>();
     tasks.forEach(t => {
       t.title.toLowerCase().split(/\s+/).forEach(word => {
-        if (word.length > 3 && word.startsWith(query)) {
+        if (word.length > 3 && word.startsWith(searchQuery)) {
           words.add(word);
         }
       });
@@ -283,7 +251,7 @@ export const getSearchSuggestions = query({
     // Add task types
     const types = ["ENGINEERING", "CONTENT", "RESEARCH", "REVIEW", "PLANNING"];
     types.forEach(type => {
-      if (type.toLowerCase().startsWith(query)) {
+      if (type.toLowerCase().startsWith(searchQuery)) {
         suggestions.push(type);
       }
     });
@@ -291,7 +259,7 @@ export const getSearchSuggestions = query({
     // Add statuses
     const statuses = ["INBOX", "IN_PROGRESS", "REVIEW", "DONE", "BLOCKED"];
     statuses.forEach(status => {
-      if (status.toLowerCase().startsWith(query)) {
+      if (status.toLowerCase().startsWith(searchQuery)) {
         suggestions.push(status);
       }
     });
@@ -307,13 +275,11 @@ export const getSearchSuggestions = query({
 export const getAvailableFilters = query({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
-    let tasksQuery = ctx.db.query("tasks");
-    if (args.projectId) {
-      tasksQuery = tasksQuery.withIndex("by_project", (q) => 
-        q.eq("projectId", args.projectId)
-      );
-    }
-    const tasks = await tasksQuery.collect();
+    const tasks = args.projectId
+      ? await ctx.db.query("tasks")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+          .collect()
+      : await ctx.db.query("tasks").collect();
     
     // Extract unique values
     const statuses = [...new Set(tasks.map(t => t.status))];
@@ -321,13 +287,11 @@ export const getAvailableFilters = query({
     const priorities = [...new Set(tasks.map(t => t.priority))];
     
     // Get agents
-    let agentsQuery = ctx.db.query("agents");
-    if (args.projectId) {
-      agentsQuery = agentsQuery.withIndex("by_project", (q) => 
-        q.eq("projectId", args.projectId)
-      );
-    }
-    const agents = await agentsQuery.collect();
+    const agents = args.projectId
+      ? await ctx.db.query("agents")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+          .collect()
+      : await ctx.db.query("agents").collect();
     
     return {
       statuses,

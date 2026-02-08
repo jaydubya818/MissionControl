@@ -245,7 +245,7 @@ INBOX --> ASSIGNED --> IN_PROGRESS --> REVIEW --> DONE
 | `DONE` | Completed and approved | Yes |
 | `CANCELED` | Abandoned | Yes |
 
-**Note on FAILED:** The current implementation does not include a `FAILED` terminal state. Failed tasks are moved to `BLOCKED` with a `blockedReason`. A dedicated `FAILED` terminal state should be considered for Phase 2 to distinguish unrecoverable failures from recoverable blocks.
+**FAILED Terminal State:** Phase 2 will add a `FAILED` terminal state to distinguish unrecoverable failures from recoverable blocks. Failed tasks are currently moved to `BLOCKED` with a `blockedReason`. The `FAILED` state will be used for tasks that cannot be recovered (e.g., invalid requirements, impossible constraints, critical errors). Unlike `BLOCKED`, which can transition back to `IN_PROGRESS` after resolution, `FAILED` is terminal and requires task recreation. **Recommendation: Add FAILED in Phase 2.**
 
 **Transition rules:**
 
@@ -352,9 +352,25 @@ Coordinator: Monitor progress, resolve blockers, compile results
 Learner: Extract wins/errors/fixes -> update memory
 ```
 
-**Coordinator Decision Logging:** All Coordinator decisions (decomposition plans, agent delegation choices, conflict resolutions, escalations) are logged as first-class audit entries in the `activities` table with `action: 'COORDINATOR_DECISION'`. A "Coordinator Decision Log" view is available on the dashboard.
+**Coordinator Decision Logging:** All Coordinator decisions (decomposition plans, agent delegation choices, conflict resolutions, escalations) are logged as first-class audit entries in the `activities` table with `action: 'COORDINATOR_DECISION'`. A "Coordinator Decision Log" view is available on the dashboard. All decisions include an idempotency key to ensure reconcilability on failover.
 
 **Conflict resolution:** When two agents produce contradictory outputs (e.g., Coder and QA disagree), the Coordinator routes to consensus mode (multi-model vote, Phase 5) or escalates to the human operator.
+
+**High Availability & Failure Handling:**
+
+The Coordinator is a critical single point of failure for task decomposition and delegation. Phase 2 implements the following HA measures:
+
+1. **Health Checks:** The Coordinator process exposes a `/health` endpoint that reports status, uptime, and last successful operation. External monitoring (Docker healthcheck, Kubernetes liveness probe) polls this endpoint every 30 seconds.
+
+2. **Auto-Restart:** The Coordinator runs under a process manager (PM2 or systemd) configured to restart on failure. Maximum 3 restart attempts within 5 minutes before escalating to operator alert.
+
+3. **Leader Election (Phase 3):** For multi-instance deployments, a leader election mechanism (using Convex or Redis) ensures only one active Coordinator at a time. Standby instances monitor the leader's heartbeat and take over within 60 seconds of leader failure.
+
+4. **Graceful Degradation:** If the Coordinator is unavailable, agents can continue executing committed in-progress tasks. Agents respect task `dependencies` and post `ARTIFACT`/`PROGRESS` messages to the `messages` table as usual. New task decomposition and delegation are paused until the Coordinator recovers. The dashboard displays a "Coordinator Offline" banner and disables task creation.
+
+5. **State Reconciliation:** On Coordinator restart, the system reconciles in-flight operations by replaying the `activities` log (filtered by `action: 'COORDINATOR_DECISION'` and timestamp > last checkpoint). Idempotency keys prevent duplicate decompositions or delegations.
+
+6. **Failover Testing:** Chaos tests (Phase 5) include Coordinator crash scenarios to validate recovery within 60 seconds and zero task loss.
 
 ### 5.4 Inter-Agent Communication Protocol
 
@@ -413,9 +429,37 @@ interface LessonEntry {
 
 ### 6.3 Memory Retention Policy
 
-- Lessons with confidence < 0.3 are pruned after 90 days of no application.
-- Lessons with confidence < 0.5 that have never been applied after 60 days are archived (moved to cold storage, not deleted) for potential future review.
+- Lessons with confidence < 0.3 are pruned after 60 days of no application.
+- Lessons with confidence >= 0.3 and < 0.5 that have never been applied after 90 days are archived (moved to cold storage, not deleted) for potential future review.
 - All memory writes are versioned. Prompts, agent personas, and routing configs are stored with version history so any change can be audited and rolled back.
+
+### 6.4 Encryption for Project-Tier Secrets
+
+Project-tier memory stored in `agentDocuments` (types `WORKING_MD` and `DAILY_NOTE`) may contain sensitive information such as API keys, credentials, and proprietary context. These secrets are encrypted at rest using the following policy:
+
+**Encryption Standard:** AES-256-GCM (Galois/Counter Mode) for authenticated encryption.
+
+**Key Storage & Management:**
+- Encryption keys are stored as environment variables (`CONVEX_ENCRYPTION_KEY`) in the deployment environment, not in the codebase.
+- For production deployments, keys should be managed via a secrets manager (AWS Secrets Manager, Google Secret Manager, or Convex environment variables with restricted access).
+- Keys are base64-encoded 32-byte values generated using a cryptographically secure random number generator.
+
+**Key Rotation Policy:**
+- Keys are rotated every 90 days.
+- Rotation is semi-automated: a new key is generated and added as `CONVEX_ENCRYPTION_KEY_NEW`, old documents are re-encrypted in a background migration, and the old key is retired after all documents are migrated.
+- During rotation, both old and new keys are available for decryption (graceful migration period of 7 days).
+- Key rotation events are logged to the `activities` table with action `ENCRYPTION_KEY_ROTATED`.
+
+**Access Control:**
+- Only agents with `LEAD` role or higher can decrypt Project-tier secrets.
+- Decryption attempts are logged to the `activities` table with action `SECRET_DECRYPTED`, including agentId, documentId, and timestamp.
+- The principle of least privilege applies: agents request decryption only when needed for task execution, not preemptively.
+- Human operators can view encrypted fields via the dashboard only after explicit authorization (MFA or approval workflow).
+
+**Implementation Notes:**
+- Encryption/decryption is handled in `convex/agentDocuments.ts` via helper functions `encryptField()` and `decryptField()`.
+- Encrypted fields are stored as base64-encoded strings with a version prefix (e.g., `v1:base64data`) to support future algorithm upgrades.
+- The `agentDocuments` schema includes an `encrypted: boolean` flag to indicate which documents contain encrypted fields.
 
 ---
 
@@ -425,7 +469,7 @@ interface LessonEntry {
 
 - **Risk classification:** GREEN (reversible), YELLOW (potentially harmful), RED (external impact). Implemented in `packages/policy-engine`.
 - **Budget enforcement:** Daily, per-task, and per-run token/cost limits. Enforced inline in `convex/runs.ts` when runs start/complete.
-- **Loop detection:** >20 comments in 30 min, review ping-pong >3 cycles, repeated tool failures (5 in last 10 runs). Runs as Convex cron job every 15 minutes in `convex/loops.ts`.
+- **Loop detection:** >20 comments in 30 min, review ping-pong >3 cycles, repeated tool failures (5 in last 10 runs). Implemented as both event-triggered checks (on every 10th comment within a 30-minute window) and a Convex cron job every 5 minutes in `convex/loops.ts` to ensure timely detection (maximum 5-minute gap instead of 45 minutes).
 - **Emergency controls:** Pause squad, quarantine agent, drain gracefully, hard stop. Implemented in `convex/agents.ts` and `packages/telegram-bot`.
 - **Approval workflows:** RED and YELLOW actions (for Interns) require human approval before execution. Implemented in `convex/approvals.ts`.
 
@@ -626,7 +670,7 @@ Agents access external tools through a sandboxed tool registry. Each agent perso
 
 | Deliverable | Package | Priority |
 |---|---|---|
-| Orchestration server (Express/Hono) with Convex state sync | `packages/server` | P0 |
+| Orchestration server (Express/Hono) with Convex state sync | `packages/coordinator` | P0 |
 | Agent runtime with persona loading (evolve `agent-runner`) | `packages/agent-runtime` | P0 |
 | YAML persona definitions for all 11 agents | `agents/*.yaml` | P0 |
 | Persona schema versioning and validation | `packages/agent-runtime` | P1 |
@@ -725,7 +769,9 @@ Agents access external tools through a sandboxed tool registry. Each agent perso
 | Convex rate limits under load | Medium | Medium | Query batching, caching layer, fallback to read replicas |
 | Learning system captures bad patterns | Low | Medium | Confidence scoring + manual review in memory browser + retention policy |
 | Agent crashes cause duplicate side effects | Medium | High | Idempotency keys on runs and tool calls, logged-before-executed protocol |
-| Orchestration server failure | Medium | High | Health checks, auto-restart via PM2/Docker, Convex state survives restarts |
+| Orchestration server failure | Medium | High | Health checks, auto-restart via PM2/Docker, Convex state survives restarts, leader election (Phase 3), graceful degradation mode |
+| Dependency on primary model provider (Claude) | High | High | Implement adapter pattern in model-router with stable interface, monitor Anthropic changelogs, maintain fallback chains, accelerate Phase 4 multi-model support as strategic hedge against pricing changes/rate limits/outages/API breaking changes |
+| Convex schema migrations during active usage | Medium | High | **Migration Rollback Plan:** Blue-green deployment for breaking changes, canary rollout for schema updates. **Schema Versioning:** Version prefix on schema changes (v1, v2). **Backward Compatibility:** Additive migrations only (new optional fields), feature-flag gated reads/writes, dual-write/dual-read compatibility helpers during transition periods. Test migrations in staging environment before production rollout. |
 
 ---
 
@@ -750,15 +796,17 @@ Agents access external tools through a sandboxed tool registry. Each agent perso
 
 ---
 
-## 17. Open Questions
+## 17. Resolved Design Decisions
 
-1. **FAILED state:** Should we add a `FAILED` terminal state to the task state machine, or continue using `BLOCKED` with a `blockedReason` for unrecoverable errors? **Recommendation:** Add `FAILED` in Phase 2.
+The following design questions have been resolved and are incorporated into the architecture:
 
-2. **Consensus threshold:** For multi-model voting (Phase 5), is 2/3 agreement sufficient, or require unanimity for RED actions? **Recommendation:** 2/3 majority with mandatory human review of minority dissent.
+1. **FAILED Terminal State:** Phase 2 adds a `FAILED` terminal state to the task state machine (see Section 4). `FAILED` is used for unrecoverable errors (invalid requirements, impossible constraints, critical failures). Unlike `BLOCKED`, which can transition back to `IN_PROGRESS`, `FAILED` is terminal and requires task recreation. The `blockedReason` field is retained for `BLOCKED` tasks to describe recoverable issues.
 
-3. **Agent persona hot-reload:** Should persona YAML changes take effect immediately on running agents, or only on next spawn? **Recommendation:** Apply on next spawn only. Provide an API to restart agents with updated personas for urgent changes.
+2. **Consensus Threshold:** Multi-model voting (Phase 5) uses a 2/3 majority threshold for RED actions (see Section 7.3). When 3 models are queried and only 2 agree, the action proceeds with mandatory human review of the minority dissent. Dissent rationale is logged to the `activities` table for audit. Unanimous agreement is not required to avoid excessive blocking.
 
-4. **Cursor IDE integration:** Should Coder agent interact with Cursor's agent mode directly, or treat it as an external tool? **Recommendation:** Treat as external tool via the existing `executionRequests` table which already supports `CURSOR` as an executor type.
+3. **Agent Persona Hot-Reload:** Persona YAML changes apply only on next agent spawn (see Section 5.1). Running agents continue with their loaded persona until termination. For urgent persona updates, the system provides a `POST /agents/:id/restart` API endpoint that gracefully terminates the agent and spawns a new instance with the updated persona. The restart operation is logged to `activities` with `action: 'AGENT_RESTARTED'` and includes the persona version change.
+
+4. **Cursor IDE Integration:** The Coder agent treats Cursor as an external tool via the existing `executionRequests` table (see Section 10.2). When a task requires Cursor-specific execution (e.g., interactive debugging, IDE-based refactoring), the Coder agent creates an `executionRequest` with `executor: 'CURSOR'` and `payload` containing the task context. The Cursor integration polls for pending requests and executes them in the IDE environment. Results are posted back as task artifacts. This approach keeps the agent runtime decoupled from IDE-specific logic.
 
 ---
 

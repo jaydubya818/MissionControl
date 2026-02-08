@@ -2,11 +2,14 @@
  * Policy — Convex Functions
  * 
  * Policy evaluation for tool calls and transitions.
+ * Uses centralized risk classifier from convex/lib/riskClassifier.ts
+ * (mirrors @mission-control/policy-engine logic).
  */
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { classifyRisk, requiresApproval } from "./lib/riskClassifier";
 
 // ============================================================================
 // ALLOWLIST HELPERS
@@ -264,10 +267,10 @@ export const evaluate = query({
       };
     }
     
-    // TOOL_CALL evaluation
+    // TOOL_CALL evaluation — uses centralized risk classifier
     if (args.actionType === "TOOL_CALL" && args.toolName) {
-      const toolRiskMap = (policy.toolRiskMap || {}) as Record<string, string>;
-      const risk = toolRiskMap[args.toolName] || "GREEN";
+      // Classify risk using the centralized classifier
+      const risk = classifyRisk(args.toolName, args.toolArgs as Record<string, unknown> | undefined);
       
       // Check allowlists for specific tools
       if (args.toolArgs) {
@@ -286,27 +289,21 @@ export const evaluate = query({
         }
       }
       
-      if (risk === "RED") {
-        // RED tools always require approval
-        return {
-          decision: "NEEDS_APPROVAL",
-          reason: `Tool '${args.toolName}' is RED-rated and requires approval`,
-          riskLevel: "RED",
-          approval: {
-            type: "RED_TOOL",
-            toolName: args.toolName,
-          },
-        };
-      }
+      // Check approval requirement using centralized rules
+      const approvalCheck = requiresApproval(
+        risk,
+        agent.role,
+        estimatedCost,
+        budgetRemaining
+      );
       
-      if (risk === "YELLOW" && agent.role === "INTERN") {
-        // YELLOW tools require approval for INTERN
+      if (approvalCheck.required) {
         return {
           decision: "NEEDS_APPROVAL",
-          reason: `Tool '${args.toolName}' is YELLOW-rated and requires approval for INTERN role`,
-          riskLevel: "YELLOW",
+          reason: approvalCheck.reason,
+          riskLevel: risk,
           approval: {
-            type: "YELLOW_TOOL_INTERN",
+            type: risk === "RED" ? "RED_TOOL" : "YELLOW_TOOL_INTERN",
             toolName: args.toolName,
           },
         };

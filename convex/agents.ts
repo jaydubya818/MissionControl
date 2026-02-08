@@ -3,7 +3,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 
 // ============================================================================
 // QUERIES
@@ -26,6 +26,22 @@ export const getByName = query({
   },
 });
 
+export const list = query({
+  args: {
+    projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args) => {
+    if (args.projectId) {
+      return await ctx.db
+        .query("agents")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .collect();
+    }
+    return await ctx.db.query("agents").collect();
+  },
+});
+
+/** Alias for backwards compatibility */
 export const listAll = query({
   args: {
     projectId: v.optional(v.id("projects")),
@@ -401,6 +417,63 @@ export const resumeAll = mutation({
   },
 });
 
+/** Update agent fields (name, emoji, budget, metadata, etc.) */
+export const update = mutation({
+  args: {
+    agentId: v.id("agents"),
+    name: v.optional(v.string()),
+    emoji: v.optional(v.string()),
+    allowedTaskTypes: v.optional(v.array(v.string())),
+    allowedTools: v.optional(v.array(v.string())),
+    budgetDaily: v.optional(v.number()),
+    budgetPerRun: v.optional(v.number()),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const { agentId, ...updates } = args;
+    const agent = await ctx.db.get(agentId);
+    if (!agent) throw new Error("Agent not found");
+
+    // Check name uniqueness when renaming
+    if (args.name !== undefined && args.name !== agent.name) {
+      const nameConflict = await ctx.db
+        .query("agents")
+        .withIndex("by_name", (q) => q.eq("name", args.name!))
+        .first();
+      if (nameConflict && nameConflict._id !== agentId) {
+        throw new Error(`An agent with the name "${args.name}" already exists`);
+      }
+    }
+
+    const filtered: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (value !== undefined) {
+        filtered[key] = value;
+      }
+    }
+
+    if (Object.keys(filtered).length === 0) {
+      return agent;
+    }
+
+    await ctx.db.patch(agentId, filtered);
+
+    await ctx.db.insert("activities", {
+      projectId: agent.projectId,
+      actorType: "HUMAN",
+      actorId: "operator",
+      action: "AGENT_UPDATED",
+      description: `Agent "${agent.name}" updated`,
+      targetType: "AGENT",
+      targetId: agentId,
+      agentId: agentId,
+      metadata: { updatedFields: Object.keys(filtered) },
+    });
+
+    return await ctx.db.get(agentId);
+  },
+});
+
 export const recordSpend = mutation({
   args: {
     agentId: v.id("agents"),
@@ -427,5 +500,203 @@ export const recordSpend = mutation({
       budgetRemaining: agent.budgetDaily - newSpend,
       budgetExceeded,
     };
+  },
+});
+
+// ============================================================================
+// HEARTBEAT RECOVERY (Internal — called by cron)
+// ============================================================================
+
+/**
+ * Detect stale agents that haven't sent a heartbeat within the threshold.
+ * Recovery flow:
+ *   1. Detect: Check lastHeartbeatAt against staleThresholdMs (default 2 min)
+ *   2. Alert: Create a CRITICAL alert in the alerts table
+ *   3. Quarantine: Set agent status to QUARANTINED
+ *   4. Reassign: Move agent's in-progress tasks to BLOCKED
+ */
+export const detectStaleAgents = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const STALE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes without heartbeat
+    
+    // Get all agents that should be heartbeating (ACTIVE or DRAINED)
+    const activeAgents = await ctx.db
+      .query("agents")
+      .withIndex("by_status", (q) => q.eq("status", "ACTIVE"))
+      .collect();
+    
+    const drainedAgents = await ctx.db
+      .query("agents")
+      .withIndex("by_status", (q) => q.eq("status", "DRAINED"))
+      .collect();
+    
+    const monitoredAgents = [...activeAgents, ...drainedAgents];
+    const staleAgents: Array<{ id: string; name: string; staleDurationMs: number }> = [];
+    
+    for (const agent of monitoredAgents) {
+      const lastHB = agent.lastHeartbeatAt;
+      
+      // No heartbeat ever, or heartbeat too old
+      if (!lastHB || now - lastHB > STALE_THRESHOLD_MS) {
+        const staleDuration = lastHB ? now - lastHB : Infinity;
+        
+        // 1. QUARANTINE the agent
+        await ctx.db.patch(agent._id, {
+          status: "QUARANTINED",
+        });
+        
+        // 2. CREATE ALERT
+        await ctx.db.insert("alerts", {
+          projectId: agent.projectId,
+          severity: "CRITICAL",
+          type: "AGENT_STALE_HEARTBEAT",
+          title: `Agent "${agent.name}" is unresponsive`,
+          description: lastHB
+            ? `Agent "${agent.name}" last heartbeat was ${Math.round((now - lastHB) / 1000)}s ago (threshold: ${STALE_THRESHOLD_MS / 1000}s). Agent has been quarantined.`
+            : `Agent "${agent.name}" has never sent a heartbeat. Agent has been quarantined.`,
+          agentId: agent._id,
+          status: "OPEN",
+        });
+        
+        // 3. LOG ACTIVITY
+        await ctx.db.insert("activities", {
+          projectId: agent.projectId,
+          actorType: "SYSTEM",
+          action: "AGENT_QUARANTINED",
+          description: `Agent "${agent.name}" quarantined: stale heartbeat`,
+          targetType: "AGENT",
+          targetId: agent._id,
+          agentId: agent._id,
+          metadata: {
+            reason: "stale_heartbeat",
+            lastHeartbeatAt: lastHB,
+            staleDurationMs: staleDuration === Infinity ? null : staleDuration,
+          },
+        });
+        
+        // 4. BLOCK IN-PROGRESS TASKS assigned to this agent
+        if (agent.currentTaskId) {
+          const task = await ctx.db.get(agent.currentTaskId);
+          if (task && task.status === "IN_PROGRESS") {
+            await ctx.db.patch(task._id, {
+              status: "BLOCKED",
+              blockedReason: `Agent "${agent.name}" is unresponsive (stale heartbeat). Task needs reassignment.`,
+            });
+            
+            // Alert for the blocked task
+            await ctx.db.insert("alerts", {
+              projectId: task.projectId,
+              severity: "WARNING",
+              type: "TASK_BLOCKED_STALE_AGENT",
+              title: `Task "${task.title}" blocked — agent unresponsive`,
+              description: `Task was being worked on by "${agent.name}" who became unresponsive. Task has been moved to BLOCKED for reassignment.`,
+              agentId: agent._id,
+              taskId: task._id,
+              status: "OPEN",
+            });
+            
+            await ctx.db.insert("activities", {
+              projectId: task.projectId,
+              actorType: "SYSTEM",
+              action: "TASK_BLOCKED",
+              description: `Task "${task.title}" blocked: agent "${agent.name}" unresponsive`,
+              targetType: "TASK",
+              targetId: task._id,
+              agentId: agent._id,
+              metadata: { reason: "agent_stale_heartbeat" },
+            });
+          }
+        }
+        
+        // Also find any ASSIGNED tasks for this agent and block them
+        const assignedTasks = await ctx.db
+          .query("tasks")
+          .withIndex("by_status", (q) => q.eq("status", "ASSIGNED"))
+          .collect();
+        
+        const agentAssignedTasks = assignedTasks.filter((t) =>
+          t.assigneeIds.includes(agent._id)
+        );
+        
+        for (const task of agentAssignedTasks) {
+          // Only block if this is the sole assignee
+          if (task.assigneeIds.length === 1) {
+            await ctx.db.patch(task._id, {
+              status: "BLOCKED",
+              blockedReason: `Sole assignee "${agent.name}" is unresponsive. Task needs reassignment.`,
+            });
+          }
+        }
+        
+        staleAgents.push({
+          id: agent._id,
+          name: agent.name,
+          staleDurationMs: staleDuration === Infinity ? -1 : staleDuration,
+        });
+      }
+    }
+    
+    return {
+      checked: monitoredAgents.length,
+      staleCount: staleAgents.length,
+      staleAgents,
+    };
+  },
+});
+
+// ============================================================================
+// RESET ALL AGENTS (Dev convenience — reactivate quarantined/offline agents)
+// ============================================================================
+
+/**
+ * Reset all quarantined/offline agents back to ACTIVE with a fresh heartbeat.
+ * Useful during development when no agent runtime is sending heartbeats.
+ */
+export const resetAll = mutation({
+  args: {
+    projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const agents = args.projectId
+      ? await ctx.db
+          .query("agents")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+          .collect()
+      : await ctx.db.query("agents").collect();
+
+    let resetCount = 0;
+    for (const agent of agents) {
+      if (agent.status === "QUARANTINED" || agent.status === "OFFLINE") {
+        const oldStatus = agent.status;
+        await ctx.db.patch(agent._id, {
+          status: "ACTIVE",
+          lastHeartbeatAt: now,
+          errorStreak: 0,
+          lastError: undefined,
+        });
+
+        // Log activity for each reset agent (consistent with updateStatus/pauseAll/resumeAll)
+        await ctx.db.insert("activities", {
+          projectId: agent.projectId,
+          actorType: "HUMAN",
+          actorId: "operator",
+          action: "AGENT_RESET",
+          description: `Agent "${agent.name}" reset: ${oldStatus} → ACTIVE`,
+          targetType: "AGENT",
+          targetId: agent._id,
+          agentId: agent._id,
+          beforeState: { status: oldStatus },
+          afterState: { status: "ACTIVE" },
+          metadata: { reason: "manual_reset" },
+        });
+
+        resetCount++;
+      }
+    }
+
+    return { resetCount, totalAgents: agents.length };
   },
 });

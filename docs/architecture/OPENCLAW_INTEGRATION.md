@@ -244,9 +244,20 @@ const result = await convex.mutation(api.approvals.request, {
 
 const approvalId = result.approval._id;
 
-// Poll for approval decision
+// Poll for approval decision with timeout and exponential backoff
+const maxWaitMs = 15 * 60 * 1000; // 15 minutes
+const startTime = Date.now();
+let backoffMs = 5000; // Start with 5 seconds
+
+// Helper function for promise-based delay
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 while (true) {
-  await sleep(5000); // Wait 5 seconds
+  if (Date.now() - startTime > maxWaitMs) {
+    throw new Error("Approval request timeout: no decision received within 15 minutes");
+  }
+  
+  await sleep(backoffMs);
   
   const approval = await convex.query(api.approvals.get, { approvalId });
   
@@ -260,6 +271,9 @@ while (true) {
     // Request expired
     throw new Error("Approval request expired");
   }
+  
+  // Exponential backoff: 5s, 10s, 20s, 40s, max 60s
+  backoffMs = Math.min(backoffMs * 2, 60000);
 }
 ```
 
@@ -790,9 +804,20 @@ if (policyCheck.decision === "DENY") {
 ## Best Practices
 
 ### 1. Idempotency
-Always use idempotency keys to prevent duplicate operations:
+Always use idempotency keys to prevent duplicate operations. Keys must be **deterministic** (same inputs produce same key) to enable retries:
+
 ```typescript
+// ❌ WRONG: Date.now() changes on every retry, breaking idempotency
 idempotencyKey: `${operation}-${taskId}-${Date.now()}`
+
+// ✅ CORRECT: Deterministic key based on operation and entity
+idempotencyKey: `${operation}-${taskId}`
+
+// ✅ CORRECT: For operations that allow multiple distinct actions (e.g., progress updates)
+idempotencyKey: `${operation}-${taskId}-${runId}`
+
+// ✅ CORRECT: For run starts with explicit attempt counter
+idempotencyKey: `${operation}-${taskId}-${attemptNumber}`
 ```
 
 ### 2. Error Recovery

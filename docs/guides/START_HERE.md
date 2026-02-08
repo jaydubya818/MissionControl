@@ -245,7 +245,7 @@ open http://localhost:5173/
 
 ### **UI Not Loading?**
 ```bash
-cd /Users/jaywest/MissionControl
+cd <YOUR_PROJECT_DIR>  # e.g., cd /path/to/MissionControl
 pnpm install
 pnpm dev
 open http://localhost:5173/

@@ -262,3 +262,105 @@ export const remove = mutation({
     return { success: true };
   },
 });
+
+/**
+ * Update GitHub integration settings for a project.
+ */
+export const updateGitHubIntegration = mutation({
+  args: {
+    projectId: v.id("projects"),
+    githubRepo: v.optional(v.string()),
+    githubBranch: v.optional(v.string()),
+    githubWebhookSecret: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      return { success: false, error: "Project not found" };
+    }
+
+    // Authorization check: verify caller identity
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return { success: false, error: "Unauthorized: No identity found" };
+    }
+    // TODO: Add project membership/role check when user management is implemented
+    // For now, we allow any authenticated user to update their projects
+
+    const updates: any = {};
+    if (args.githubRepo !== undefined) updates.githubRepo = args.githubRepo;
+    if (args.githubBranch !== undefined) updates.githubBranch = args.githubBranch;
+    if (args.githubWebhookSecret !== undefined)
+      updates.githubWebhookSecret = args.githubWebhookSecret;
+
+    await ctx.db.patch(args.projectId, updates);
+
+    // Sanitize updates for activity log (remove webhook secret)
+    const sanitizedUpdates = { ...updates };
+    if (sanitizedUpdates.githubWebhookSecret !== undefined) {
+      sanitizedUpdates.githubWebhookSecret = "[REDACTED]";
+    }
+
+    // Log activity
+    await ctx.db.insert("activities", {
+      actorType: "HUMAN",
+      actorId: identity.subject,
+      action: "PROJECT_GITHUB_UPDATED",
+      description: `GitHub integration updated for "${project.name}"`,
+      targetType: "PROJECT",
+      targetId: args.projectId,
+      projectId: args.projectId,
+      metadata: { updates: sanitizedUpdates },
+    });
+
+    return { success: true, project: await ctx.db.get(args.projectId) };
+  },
+});
+
+/**
+ * Update agent swarm configuration for a project.
+ */
+export const updateSwarmConfig = mutation({
+  args: {
+    projectId: v.id("projects"),
+    maxAgents: v.optional(v.number()),
+    defaultModel: v.optional(v.string()),
+    autoScale: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      return { success: false, error: "Project not found" };
+    }
+
+    // Authorization check: verify caller identity
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return { success: false, error: "Unauthorized: No identity found" };
+    }
+    // TODO: Add project membership/role check when user management is implemented
+    // For now, we allow any authenticated user to update their projects
+
+    const swarmConfig = {
+      maxAgents: args.maxAgents ?? project.swarmConfig?.maxAgents ?? 5,
+      defaultModel: args.defaultModel ?? project.swarmConfig?.defaultModel,
+      autoScale: args.autoScale ?? project.swarmConfig?.autoScale ?? false,
+    };
+
+    await ctx.db.patch(args.projectId, { swarmConfig });
+
+    // Log activity
+    await ctx.db.insert("activities", {
+      actorType: "HUMAN",
+      actorId: identity.subject,
+      action: "PROJECT_SWARM_CONFIG_UPDATED",
+      description: `Swarm config updated for "${project.name}"`,
+      targetType: "PROJECT",
+      targetId: args.projectId,
+      projectId: args.projectId,
+      metadata: { swarmConfig },
+    });
+
+    return { success: true, project: await ctx.db.get(args.projectId) };
+  },
+});

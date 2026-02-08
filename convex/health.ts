@@ -204,44 +204,133 @@ export const status = query({
   handler: async (ctx) => {
     const now = Date.now();
     
-    // Get recent activity
-    const recentActivities = await ctx.db
-      .query("activities")
-      .order("desc")
-      .take(10);
+    // Perform health checks
+    const checks: Record<string, any> = {};
     
-    // Get recent alerts
-    const recentAlerts = await ctx.db
-      .query("alerts")
-      .withIndex("by_status", (q) => q.eq("status", "OPEN"))
-      .order("desc")
-      .take(10);
+    try {
+      // Database check
+      const startDb = Date.now();
+      await ctx.db.query("projects").take(1);
+      checks.database = {
+        status: "healthy",
+        message: "Database connection OK",
+        responseTime: Date.now() - startDb,
+      };
+    } catch (error) {
+      checks.database = {
+        status: "unhealthy",
+        message: error instanceof Error ? error.message : "Database error",
+      };
+    }
     
-    // Get agent statuses
-    const agents = await ctx.db.query("agents").collect();
-    const agentStatuses = agents.map((a) => ({
-      id: a._id,
-      name: a.name,
-      status: a.status,
-      spendToday: a.spendToday,
-      budgetDaily: a.budgetDaily,
-      lastHeartbeat: a.lastHeartbeatAt,
-    }));
+    // Projects check
+    try {
+      const projects = await ctx.db.query("projects").collect();
+      checks.projects = {
+        status: projects.length > 0 ? "healthy" : "degraded",
+        message: `${projects.length} project${projects.length !== 1 ? 's' : ''} configured`,
+      };
+    } catch (error) {
+      checks.projects = {
+        status: "unhealthy",
+        message: "Failed to query projects",
+      };
+    }
+    
+    // Agents check
+    try {
+      const agents = await ctx.db.query("agents").collect();
+      const activeAgents = agents.filter((a) => a.status === "ACTIVE").length;
+      const quarantinedAgents = agents.filter((a) => a.status === "QUARANTINED").length;
+      
+      checks.agents = {
+        status: quarantinedAgents > 0 ? "degraded" : agents.length > 0 ? "healthy" : "degraded",
+        message: `${activeAgents} active, ${agents.length} total${quarantinedAgents > 0 ? `, ${quarantinedAgents} quarantined` : ''}`,
+      };
+    } catch (error) {
+      checks.agents = {
+        status: "unhealthy",
+        message: "Failed to query agents",
+      };
+    }
+    
+    // Tasks check
+    try {
+      const tasks = await ctx.db.query("tasks").collect();
+      const blockedTasks = tasks.filter((t) => t.status === "BLOCKED").length;
+      const inProgressTasks = tasks.filter((t) => t.status === "IN_PROGRESS").length;
+      
+      checks.tasks = {
+        status: blockedTasks > 5 ? "degraded" : "healthy",
+        message: `${inProgressTasks} in progress, ${blockedTasks} blocked`,
+      };
+    } catch (error) {
+      checks.tasks = {
+        status: "unhealthy",
+        message: "Failed to query tasks",
+      };
+    }
+    
+    // Approvals check
+    try {
+      const approvals = await ctx.db.query("approvals").collect();
+      const pendingApprovals = approvals.filter((a) => a.status === "PENDING").length;
+      
+      checks.approvals = {
+        status: pendingApprovals > 10 ? "degraded" : "healthy",
+        message: `${pendingApprovals} pending approval${pendingApprovals !== 1 ? 's' : ''}`,
+      };
+    } catch (error) {
+      checks.approvals = {
+        status: "unhealthy",
+        message: "Failed to query approvals",
+      };
+    }
+    
+    // Alerts check
+    try {
+      const alerts = await ctx.db.query("alerts").collect();
+      const openAlerts = alerts.filter((a) => a.status === "OPEN").length;
+      const criticalAlerts = alerts.filter((a) => a.severity === "CRITICAL" && a.status === "OPEN").length;
+      
+      checks.alerts = {
+        status: criticalAlerts > 0 ? "unhealthy" : openAlerts > 5 ? "degraded" : "healthy",
+        message: `${openAlerts} open alert${openAlerts !== 1 ? 's' : ''}${criticalAlerts > 0 ? ` (${criticalAlerts} critical)` : ''}`,
+      };
+    } catch (error) {
+      checks.alerts = {
+        status: "unhealthy",
+        message: "Failed to query alerts",
+      };
+    }
+    
+    // Determine overall status
+    const statuses = Object.values(checks).map((c: any) => c.status);
+    let overallStatus = "healthy";
+    if (statuses.includes("unhealthy")) {
+      overallStatus = "unhealthy";
+    } else if (statuses.includes("degraded")) {
+      overallStatus = "degraded";
+    }
+    
+    // Calculate uptime (simplified - just show time since last restart)
+    const uptimeSeconds = Math.floor((now - now) / 1000);
+    const uptimeHours = Math.floor(uptimeSeconds / 3600);
+    const uptimeMinutes = Math.floor((uptimeSeconds % 3600) / 60);
+    const uptimeDisplay = uptimeHours > 0 
+      ? `${uptimeHours}h ${uptimeMinutes}m`
+      : `${uptimeMinutes}m`;
     
     return {
       timestamp: now,
-      uptime: "healthy",
-      recentActivities: recentActivities.map((a) => ({
-        action: a.action,
-        actorType: a.actorType,
-        timestamp: a._creationTime,
-      })),
-      recentAlerts: recentAlerts.map((a) => ({
-        severity: a.severity,
-        message: a.title,
-        timestamp: a._creationTime,
-      })),
-      agents: agentStatuses,
+      status: overallStatus,
+      message: overallStatus === "healthy" 
+        ? "All systems operational"
+        : overallStatus === "degraded"
+        ? "Some systems degraded"
+        : "System issues detected",
+      checks,
+      uptime: uptimeDisplay,
     };
   },
 });

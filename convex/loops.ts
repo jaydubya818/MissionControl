@@ -5,6 +5,7 @@
  * - Comment storms (too many messages in short time)
  * - Review ping-pong (too many review cycles)
  * - Repeated tool failures (same tool failing repeatedly)
+ * - Back-and-forth transitions (state oscillation)
  */
 
 import { internalMutation } from "./_generated/server";
@@ -33,6 +34,8 @@ export const detectLoops = internalMutation({
       windowMinutes?: number;
       maxReviewCycles?: number;
       maxPingPong?: number;
+      backAndForthLimit?: number;
+      backAndForthWindowMinutes?: number;
     };
     
     // Get all non-terminal tasks
@@ -41,7 +44,8 @@ export const detectLoops = internalMutation({
       .filter((q) => 
         q.and(
           q.neq(q.field("status"), "DONE"),
-          q.neq(q.field("status"), "CANCELED")
+          q.neq(q.field("status"), "CANCELED"),
+          q.neq(q.field("status"), "FAILED")
         )
       )
       .collect();
@@ -78,7 +82,7 @@ export const detectLoops = internalMutation({
         }
       }
       
-      // 2. Check review ping-pong
+      // 2. Check review ping-pong (reviewCycles counter)
       if (thresholds.maxReviewCycles && task.reviewCycles > thresholds.maxReviewCycles) {
         await blockTaskForLoop(ctx, task, {
           type: "REVIEW_PING_PONG",
@@ -89,7 +93,46 @@ export const detectLoops = internalMutation({
         continue;
       }
       
-      // 3. Check repeated tool failures
+      // 3. Check back-and-forth transitions (state oscillation detection)
+      const backAndForthLimit = thresholds.backAndForthLimit ?? 6;
+      const bafWindowMinutes = thresholds.backAndForthWindowMinutes ?? 60;
+      const bafCutoff = Date.now() - (bafWindowMinutes * 60 * 1000);
+      
+      const recentTransitions = await ctx.db
+        .query("taskTransitions")
+        .withIndex("by_task", (q) => q.eq("taskId", task._id))
+        .filter((q) => q.gte(q.field("_creationTime"), bafCutoff))
+        .collect();
+      
+      if (recentTransitions.length >= backAndForthLimit) {
+        // Detect oscillation: A->B->A->B pattern
+        const statePairs = recentTransitions.map(
+          (t) => `${t.fromStatus}->${t.toStatus}`
+        );
+        const pairCounts: Record<string, number> = {};
+        for (const pair of statePairs) {
+          pairCounts[pair] = (pairCounts[pair] || 0) + 1;
+        }
+        
+        // Check for any single pair that occurred more than half the transitions
+        const maxPairCount = Math.max(...Object.values(pairCounts));
+        if (maxPairCount >= Math.ceil(backAndForthLimit / 2)) {
+          const offendingPair = Object.entries(pairCounts)
+            .find(([, count]) => count === maxPairCount)?.[0] ?? "unknown";
+          
+          await blockTaskForLoop(ctx, task, {
+            type: "BACK_AND_FORTH",
+            count: recentTransitions.length,
+            threshold: backAndForthLimit,
+            window: bafWindowMinutes,
+            detail: `Oscillation detected: "${offendingPair}" occurred ${maxPairCount} times`,
+          });
+          blocked++;
+          continue;
+        }
+      }
+      
+      // 4. Check repeated tool failures
       const runs = await ctx.db
         .query("runs")
         .withIndex("by_task", (q) => q.eq("taskId", task._id))
@@ -125,12 +168,13 @@ async function blockTaskForLoop(
     count: number;
     threshold: number;
     window?: number;
+    detail?: string;
   }
 ) {
   // Move task to BLOCKED
   await ctx.db.patch(task._id, {
     status: "BLOCKED",
-    blockedReason: `Loop detected: ${loopData.type} (${loopData.count} > ${loopData.threshold})`,
+    blockedReason: `Loop detected: ${loopData.type} (${loopData.count} > ${loopData.threshold})${loopData.detail ? ` — ${loopData.detail}` : ""}`,
   });
   
   // Create transition record
@@ -150,26 +194,30 @@ async function blockTaskForLoop(
     severity: "WARNING",
     type: "LOOP_DETECTED",
     title: `Loop detected: ${loopData.type}`,
-    description: `Task "${task.title}" blocked due to ${loopData.type}: ${loopData.count} occurrences (threshold: ${loopData.threshold})`,
+    description: `Task "${task.title}" blocked due to ${loopData.type}: ${loopData.count} occurrences (threshold: ${loopData.threshold})${loopData.detail ? ` — ${loopData.detail}` : ""}`,
     taskId: task._id,
     status: "OPEN",
     metadata: { loopData },
   });
   
   // Create loop summary document
-  await ctx.db.insert("agentDocuments", {
-    projectId: task.projectId,
-    agentId: task.assigneeIds[0], // First assignee or null
-    type: "SESSION_MEMORY",
-    content: `# Loop Detected: ${task.title}\n\n` +
-      `**Type:** ${loopData.type}\n` +
-      `**Count:** ${loopData.count}\n` +
-      `**Threshold:** ${loopData.threshold}\n` +
-      (loopData.window ? `**Window:** ${loopData.window} minutes\n` : "") +
-      `\n**Action:** Task blocked. Review and resolve the loop before unblocking.`,
-    updatedAt: Date.now(),
-    metadata: { loopDetection: loopData },
-  });
+  const firstAssignee = task.assigneeIds?.[0];
+  if (firstAssignee) {
+    await ctx.db.insert("agentDocuments", {
+      projectId: task.projectId,
+      agentId: firstAssignee,
+      type: "SESSION_MEMORY",
+      content: `# Loop Detected: ${task.title}\n\n` +
+        `**Type:** ${loopData.type}\n` +
+        `**Count:** ${loopData.count}\n` +
+        `**Threshold:** ${loopData.threshold}\n` +
+        (loopData.window ? `**Window:** ${loopData.window} minutes\n` : "") +
+        (loopData.detail ? `**Detail:** ${loopData.detail}\n` : "") +
+        `\n**Action:** Task blocked. Review and resolve the loop before unblocking.`,
+      updatedAt: Date.now(),
+      metadata: { loopDetection: loopData },
+    });
+  }
   
   // Send notification via telegram (stored for polling)
   await ctx.runMutation(internal.telegram.notifyLoopDetected, {

@@ -2,6 +2,7 @@
  * Task State Definitions
  * 
  * Defines all valid task states and their properties.
+ * States are UPPERCASE to match Convex schema (source of truth).
  */
 
 import { TaskStatus, TransitionActor } from "@mission-control/shared";
@@ -14,53 +15,58 @@ export interface StateDefinition {
 }
 
 export const STATE_DEFINITIONS: Record<TaskStatus, StateDefinition> = {
-  inbox: {
-    status: "inbox",
+  INBOX: {
+    status: "INBOX",
     description: "New task, not assigned",
     terminal: false,
   },
-  assigned: {
-    status: "assigned",
+  ASSIGNED: {
+    status: "ASSIGNED",
     description: "Assigned to agent(s), not started",
     terminal: false,
   },
-  in_progress: {
-    status: "in_progress",
+  IN_PROGRESS: {
+    status: "IN_PROGRESS",
     description: "Agent actively working",
     terminal: false,
     requiresArtifacts: ["workPlan", "assigneeIds"],
   },
-  review: {
-    status: "review",
+  REVIEW: {
+    status: "REVIEW",
     description: "Agent submitted for review",
     terminal: false,
     requiresArtifacts: ["deliverable", "selfReview"],
   },
-  needs_approval: {
-    status: "needs_approval",
+  NEEDS_APPROVAL: {
+    status: "NEEDS_APPROVAL",
     description: "Waiting for human approval",
     terminal: false,
   },
-  blocked: {
-    status: "blocked",
+  BLOCKED: {
+    status: "BLOCKED",
     description: "Cannot proceed (budget/loop/failure)",
     terminal: false,
   },
-  done: {
-    status: "done",
+  FAILED: {
+    status: "FAILED",
+    description: "Unrecoverable failure",
+    terminal: true,
+  },
+  DONE: {
+    status: "DONE",
     description: "Completed and approved",
     terminal: true,
     requiresArtifacts: ["deliverable", "approvalRecord"],
   },
-  canceled: {
-    status: "canceled",
+  CANCELED: {
+    status: "CANCELED",
     description: "Abandoned",
     terminal: true,
   },
 };
 
 /**
- * Check if a status is terminal (done or canceled)
+ * Check if a status is terminal (done, canceled, or failed)
  */
 export function isTerminalStatus(status: TaskStatus): boolean {
   return STATE_DEFINITIONS[status].terminal;

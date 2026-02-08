@@ -36,7 +36,7 @@ export const generateIncidentReport = query({
       .collect();
     
     // Calculate costs
-    const totalCost = runs.reduce((sum, r) => sum + (r.cost || 0), 0);
+    const totalCost = runs.reduce((sum, r) => sum + (r.costUsd || 0), 0);
     
     // Generate markdown
     let report = `# Incident Report: ${task.title}\n\n`;
@@ -61,7 +61,7 @@ export const generateIncidentReport = query({
     for (const m of messages.slice(0, 10)) {
       report += `### ${new Date(m._creationTime).toISOString()}\n`;
       report += `**Type:** ${m.type}\n`;
-      report += `${m.body}\n\n`;
+      report += `${m.content}\n\n`;
     }
     
     if (messages.length > 10) {
@@ -79,7 +79,7 @@ export const generateIncidentReport = query({
     
     report += `\n## Execution Runs (${runs.length})\n\n`;
     for (const r of runs) {
-      report += `- ${r.status} - Cost: $${r.cost?.toFixed(2) || 0}\n`;
+      report += `- ${r.status} - Cost: $${r.costUsd?.toFixed(2) || 0}\n`;
       if (r.error) {
         report += `  Error: ${r.error}\n`;
       }

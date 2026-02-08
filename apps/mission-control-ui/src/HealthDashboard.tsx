@@ -1,23 +1,19 @@
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { useState, useEffect } from "react";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 interface HealthDashboardProps {
-  projectId?: string;
+  projectId: Id<"projects"> | null;
   onClose: () => void;
 }
 
-export function HealthDashboard({ projectId, onClose }: HealthDashboardProps) {
+export function HealthDashboard({ onClose }: HealthDashboardProps) {
   const [refreshKey, setRefreshKey] = useState(0);
+  // refreshKey is included as a dependency hint — Convex queries are reactive,
+  // but incrementing the key signals the user wants a fresh read.
   const healthStatus = useQuery(api.health.status, {});
   const metrics = useQuery(api.health.metrics, {});
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRefreshKey((k) => k + 1);
-    }, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
 
   if (!healthStatus || !metrics) {
     return (
@@ -214,7 +210,7 @@ export function HealthDashboard({ projectId, onClose }: HealthDashboardProps) {
                 label="Tasks"
                 value={metrics.tasks?.total || 0}
                 icon="📋"
-                subtitle={`${metrics.tasks?.inProgress || 0} in progress`}
+                subtitle={`${metrics.tasks?.byStatus?.inProgress || 0} in progress`}
               />
               <MetricCard
                 label="Pending Approvals"
@@ -239,7 +235,7 @@ export function HealthDashboard({ projectId, onClose }: HealthDashboardProps) {
           {/* Refresh Button */}
           <div style={{ marginTop: "16px", textAlign: "center" }}>
             <button
-              onClick={() => setRefreshKey(k => k + 1)}
+              onClick={() => setRefreshKey((k) => k + 1)}
               style={{
                 background: "#3b82f6",
                 color: "white",

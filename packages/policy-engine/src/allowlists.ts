@@ -117,10 +117,11 @@ export function isFileWriteAllowed(path: string): { allowed: boolean; reason?: s
  */
 function matchesGlob(path: string, pattern: string): boolean {
   // Convert glob pattern to regex
+  // Order matters: escape dots first, then convert glob wildcards
   const regexPattern = pattern
+    .replace(/\./g, "\\.") // Escape dots first
     .replace(/\*\*/g, ".*") // ** matches any path
-    .replace(/\*/g, "[^/]*") // * matches any filename
-    .replace(/\./g, "\\."); // Escape dots
+    .replace(/(?<!\.)(\*)/g, "[^/]*"); // * matches any filename (but not .* from **)
   
   const regex = new RegExp(`^${regexPattern}$`);
   return regex.test(path);

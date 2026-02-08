@@ -10,7 +10,7 @@
 ## Executive Summary
 
 Mission Control transforms multiple OpenClaw agent sessions into a coherent digital team with:
-- **Deterministic task state machine** (9 states, strict transitions)
+- **Deterministic task state machine** (8 states, strict transitions)
 - **Thread-per-task collaboration** with @mentions and subscriptions
 - **Safety guardrails**: budgets, approvals, risk classification, emergency controls
 - **Deep observability**: timeline view, cost attribution, audit logs
@@ -517,7 +517,10 @@ mission-control/
 - `REVIEW → CANCELED` (human)
 - `REVIEW → ASSIGNED` (human only; reassign)
 - `NEEDS_APPROVAL → BLOCKED` (system/human)
-- `NEEDS_APPROVAL → (any)` (human only; based on approval)
+- `NEEDS_APPROVAL → IN_PROGRESS` (human only; approval granted, continue work)
+- `NEEDS_APPROVAL → REVIEW` (human only; approval granted, work complete)
+- `NEEDS_APPROVAL → BLOCKED` (system/human; approval denied or escalated)
+- `NEEDS_APPROVAL → CANCELED` (human only; approval denied, abandon task)
 - `NEEDS_APPROVAL → CANCELED` (human)
 - `BLOCKED → ASSIGNED` (human; once unblocked)
 - `BLOCKED → IN_PROGRESS` (human; once unblocked)
@@ -640,35 +643,35 @@ const BUDGETS = {
 ## API Endpoints (Express)
 
 ### Agents
-- `GET /api/agents` - List all agents
-- `GET /api/agents/:id` - Get agent details
-- `POST /api/agents` - Create agent
-- `PATCH /api/agents/:id` - Update agent
-- `POST /api/agents/:id/pause` - Pause agent
-- `POST /api/agents/:id/drain` - Drain agent (finish current task, then pause)
-- `POST /api/agents/:id/quarantine` - Quarantine agent (immediate stop + block tasks)
-- `POST /api/agents/:id/restart` - Restart agent
-- `DELETE /api/agents/:id` - Delete agent
+- `GET /api/agents` - List all agents (Auth: JWT/API key, RBAC: read:agents)
+- `GET /api/agents/:id` - Get agent details (Auth: JWT/API key, RBAC: read:agents)
+- `POST /api/agents` - Create agent (Auth: JWT/API key, RBAC: write:agents)
+- `PATCH /api/agents/:id` - Update agent (Auth: JWT/API key, RBAC: write:agents)
+- `POST /api/agents/:id/pause` - Pause agent (Auth: JWT/API key, RBAC: control:agents, rate limit: 10/min)
+- `POST /api/agents/:id/drain` - Drain agent (Auth: JWT/API key, RBAC: control:agents, rate limit: 10/min)
+- `POST /api/agents/:id/quarantine` - Quarantine agent (Auth: JWT/API key, RBAC: control:agents, rate limit: 10/min)
+- `POST /api/agents/:id/restart` - Restart agent (Auth: JWT/API key, RBAC: control:agents, rate limit: 10/min)
+- `DELETE /api/agents/:id` - Delete agent (Auth: JWT/API key, RBAC: admin:agents)
 
 ### Tasks
-- `GET /api/tasks` - List tasks (filterable by status, agent, type)
-- `GET /api/tasks/:id` - Get task details
-- `POST /api/tasks` - Create task
-- `PATCH /api/tasks/:id` - Update task
-- `POST /api/tasks/:id/transition` - Transition task status
-- `GET /api/tasks/:id/timeline` - Get task timeline (transitions, runs, tool calls)
-- `GET /api/tasks/:id/cost` - Get task cost breakdown
-- `DELETE /api/tasks/:id` - Delete task
+- `GET /api/tasks` - List tasks (Auth: JWT/API key, RBAC: read:tasks, rate limit: 100/min)
+- `GET /api/tasks/:id` - Get task details (Auth: JWT/API key, RBAC: read:tasks)
+- `POST /api/tasks` - Create task (Auth: JWT/API key, RBAC: write:tasks, rate limit: 50/min)
+- `PATCH /api/tasks/:id` - Update task (Auth: JWT/API key, RBAC: write:tasks)
+- `POST /api/tasks/:id/transition` - Transition task status (Auth: JWT/API key, RBAC: write:tasks)
+- `GET /api/tasks/:id/timeline` - Get task timeline (Auth: JWT/API key, RBAC: read:tasks)
+- `GET /api/tasks/:id/cost` - Get task cost breakdown (Auth: JWT/API key, RBAC: read:costs)
+- `DELETE /api/tasks/:id` - Delete task (Auth: JWT/API key, RBAC: admin:tasks)
 
 ### Approvals
-- `GET /api/approvals` - List pending approvals
-- `GET /api/approvals/:id` - Get approval details
-- `POST /api/approvals/:id/approve` - Approve action
-- `POST /api/approvals/:id/deny` - Deny action
+- `GET /api/approvals` - List pending approvals (Auth: JWT/API key, RBAC: read:approvals)
+- `GET /api/approvals/:id` - Get approval details (Auth: JWT/API key, RBAC: read:approvals)
+- `POST /api/approvals/:id/approve` - Approve action (Auth: JWT/API key, RBAC: approve:actions, rate limit: 20/min)
+- `POST /api/approvals/:id/deny` - Deny action (Auth: JWT/API key, RBAC: approve:actions, rate limit: 20/min)
 
 ### Messages
-- `GET /api/messages` - List messages (filterable by task, agent)
-- `POST /api/messages` - Post message (comment)
+- `GET /api/messages` - List messages (Auth: JWT/API key, RBAC: read:messages, rate limit: 100/min)
+- `POST /api/messages` - Post message (Auth: JWT/API key, RBAC: write:messages, rate limit: 50/min)
 
 ### Activities
 - `GET /api/activities` - Get activity feed (filterable)
@@ -680,8 +683,15 @@ const BUDGETS = {
 - `POST /api/policies/:id/activate` - Activate policy
 
 ### Emergency
-- `POST /api/emergency/pause-squad` - Pause all agents
-- `POST /api/emergency/stop` - Emergency stop (pause all + block all tasks)
+- `POST /api/emergency/pause-squad` - Pause all agents (Auth: JWT/API key, RBAC: admin:emergency, rate limit: 5/min)
+- `POST /api/emergency/stop` - Emergency stop (Auth: JWT/API key, RBAC: admin:emergency, rate limit: 5/min)
+
+### API Security & Versioning
+**Authentication:** JWT tokens or API keys validated via middleware. All routes require authentication.  
+**Authorization:** RBAC scopes enforced per endpoint (read:*, write:*, control:*, approve:*, admin:*). Implemented in Phase 1.  
+**Rate Limiting:** Per-endpoint limits (see above). Public endpoints throttled more aggressively. Implemented in Phase 2.  
+**Versioning:** All endpoints prefixed with `/api/v1/`. Version strategy: URL-based. Implemented in Phase 1.  
+**Implementation:** Auth middleware in `packages/api/src/middleware/auth.ts`, RBAC in `packages/api/src/middleware/rbac.ts`, rate limiting in `packages/api/src/middleware/rateLimit.ts`.
 
 ---
 
@@ -797,7 +807,7 @@ SENTRY_DSN=optional
 - Secrets redaction
 - Allowlist bypass attempts
 - Approval bypass attempts
-- SQL injection (if using SQL)
+- SQL injection (only applicable if swapping Convex for a SQL database via the abstraction layer)
 
 ---
 
@@ -845,7 +855,7 @@ SENTRY_DSN=optional
 
 ### Open (Defer to v1.1)
 - Sub-agent tree visualization
-- Global search implementation details
+- Global search: Basic implementation in Phase 3 (search tasks/agents/messages by title/description), advanced features (full-text search, filters, facets) deferred to v1.1
 - Incident export format (JSON/CSV/PDF)
 - Model finetuning integration
 - Token economy for agent incentives

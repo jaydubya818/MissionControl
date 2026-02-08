@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
@@ -47,7 +48,7 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
   const types = ["ENGINEERING", "CONTENT", "RESEARCH", "REVIEW", "PLANNING", "DEPLOYMENT", "BUG_FIX", "FEATURE"];
   const priorities = [1, 2, 3, 4];
   
-  return (
+  return createPortal(
     <div
       style={{
         position: "fixed",
@@ -59,7 +60,7 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 1000,
+        zIndex: 10000,
         padding: "20px",
       }}
       onClick={onClose}
@@ -283,6 +284,7 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
