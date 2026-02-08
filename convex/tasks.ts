@@ -9,6 +9,8 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { api } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
+import { logTaskEvent } from "./lib/taskEvents";
+import { evaluateOperatorGate, getEffectiveOperatorControl } from "./lib/operatorControls";
 
 // ============================================================================
 // TYPES
@@ -541,6 +543,12 @@ export const getWithTimeline = query({
       .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
       .order("asc")
       .collect();
+
+    const taskEvents = await ctx.db
+      .query("taskEvents")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .order("asc")
+      .collect();
     
     // Get tool calls for all runs
     const toolCalls = [];
@@ -560,7 +568,19 @@ export const getWithTimeline = query({
       toolCalls,
       approvals,
       activities,
+      taskEvents,
     };
+  },
+});
+
+export const getUnifiedTimeline = query({
+  args: { taskId: v.id("tasks") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("taskEvents")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .order("asc")
+      .collect();
   },
 });
 
@@ -667,6 +687,198 @@ export const simulateTransition = query({
   },
 });
 
+/**
+ * Dry-run planner: transition validation + policy decision preview with no side effects.
+ */
+export const simulateExecutionPlan = query({
+  args: {
+    taskId: v.id("tasks"),
+    toStatus: v.optional(taskStatusValidator),
+    actorType: v.optional(v.union(v.literal("AGENT"), v.literal("HUMAN"), v.literal("SYSTEM"))),
+    plannedToolName: v.optional(v.string()),
+    plannedToolArgs: v.optional(v.any()),
+    estimatedCost: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    if (!task) {
+      return {
+        ok: false,
+        error: "Task not found",
+      };
+    }
+
+    const actorType = (args.actorType ?? "HUMAN") as "AGENT" | "HUMAN" | "SYSTEM";
+    const transitionPreview = (() => {
+      if (!args.toStatus) return null;
+
+      const fromStatus = task.status as TaskStatus;
+      const toStatus = args.toStatus as TaskStatus;
+      const rule = findTransitionRule(fromStatus, toStatus);
+      if (!rule) {
+        return {
+          valid: false,
+          fromStatus,
+          toStatus,
+          actorType,
+          errors: [{ field: "toStatus", message: `Invalid transition: ${fromStatus} -> ${toStatus}` }],
+          allowedTransitions: TRANSITION_RULES
+            .filter((r) => r.from === fromStatus)
+            .map((r) => r.to),
+        };
+      }
+
+      const errors: Array<{ field: string; message: string }> = [];
+      if (!rule.allowedActors.includes(actorType)) {
+        errors.push({
+          field: "actorType",
+          message: `Actor type '${actorType}' cannot perform ${fromStatus} -> ${toStatus}`,
+        });
+      }
+      if (rule.humanOnly && actorType !== "HUMAN") {
+        errors.push({
+          field: "actorType",
+          message: `Transition ${fromStatus} -> ${toStatus} requires human approval`,
+        });
+      }
+      if (rule.requiresWorkPlan && !task.workPlan) {
+        errors.push({ field: "workPlan", message: "Work plan required" });
+      }
+      if (rule.requiresDeliverable && !task.deliverable) {
+        errors.push({ field: "deliverable", message: "Deliverable required" });
+      }
+      if (rule.requiresChecklist && !task.reviewChecklist) {
+        errors.push({ field: "reviewChecklist", message: "Review checklist required" });
+      }
+
+      return {
+        valid: errors.length === 0,
+        fromStatus,
+        toStatus,
+        actorType,
+        requirements: {
+          requiresWorkPlan: !!rule.requiresWorkPlan,
+          requiresDeliverable: !!rule.requiresDeliverable,
+          requiresChecklist: !!rule.requiresChecklist,
+          humanOnly: !!rule.humanOnly,
+        },
+        errors,
+      };
+    })();
+
+    const activePolicy = await ctx.db
+      .query("policies")
+      .withIndex("by_active", (q) => q.eq("active", true))
+      .first();
+
+    const primaryAssigneeId = task.assigneeIds?.[0];
+    const assignee = primaryAssigneeId ? await ctx.db.get(primaryAssigneeId) : null;
+    const triggeredRules: string[] = [];
+    const remediationHints: string[] = [];
+    const requiredApprovals: Array<{ type: string; reason: string }> = [];
+    let policyDecision: "ALLOW" | "NEEDS_APPROVAL" | "DENY" = "ALLOW";
+    let policyReason = "No blocking policy rules triggered";
+    let riskLevel: "GREEN" | "YELLOW" | "RED" =
+      task.type === "SOCIAL" || task.type === "EMAIL_MARKETING"
+        ? "RED"
+        : task.type === "OPS" || task.type === "ENGINEERING"
+          ? "YELLOW"
+          : "GREEN";
+
+    if (!assignee) {
+      policyDecision = "NEEDS_APPROVAL";
+      policyReason = "Task has no assignee; operator confirmation required before execution";
+      triggeredRules.push("task_unassigned");
+      remediationHints.push("Assign an active agent and re-run simulation.");
+    } else if (assignee.status !== "ACTIVE") {
+      policyDecision = "DENY";
+      policyReason = `Assignee ${assignee.name} is ${assignee.status.toLowerCase()}`;
+      triggeredRules.push(`assignee_not_active:${assignee.status}`);
+      remediationHints.push("Activate the assignee or reassign this task.");
+    } else {
+      const estimatedCost = args.estimatedCost ?? task.estimatedCost ?? 0;
+      const budgetRemaining = assignee.budgetDaily - assignee.spendToday;
+      if (estimatedCost > budgetRemaining) {
+        policyDecision = "NEEDS_APPROVAL";
+        policyReason = `Estimated cost ($${estimatedCost.toFixed(2)}) exceeds remaining daily budget ($${budgetRemaining.toFixed(2)})`;
+        triggeredRules.push("budget_exceeded");
+        requiredApprovals.push({
+          type: "BUDGET_EXCEEDED",
+          reason: "Budget overrun requires human approval",
+        });
+        remediationHints.push("Reduce scope or increase budget authorization.");
+      }
+    }
+
+    const operatorControl = await getEffectiveOperatorControl(ctx.db, task.projectId);
+    const operatorGate = evaluateOperatorGate({
+      mode: operatorControl.mode,
+      actorType,
+      operation: "TRANSITION",
+    });
+    if (operatorGate.decision === "DENY") {
+      policyDecision = "DENY";
+      policyReason = operatorGate.reason;
+      triggeredRules.push(`operator_control:${operatorControl.mode}`);
+      remediationHints.push("Return operator mode to NORMAL or use explicit human override.");
+    }
+    if (operatorGate.decision === "NEEDS_APPROVAL" && policyDecision !== "DENY") {
+      policyDecision = "NEEDS_APPROVAL";
+      policyReason = operatorGate.reason;
+      triggeredRules.push(`operator_control:${operatorControl.mode}`);
+      requiredApprovals.push({
+        type: "OPERATOR_OVERRIDE",
+        reason: operatorGate.reason,
+      });
+    }
+
+    if (activePolicy && args.toStatus === "DONE") {
+      const rules = activePolicy.rules as Record<string, unknown> | undefined;
+      if (rules?.reviewToDoneRequiresHuman === true && policyDecision !== "DENY") {
+        policyDecision = "NEEDS_APPROVAL";
+        policyReason = "REVIEW -> DONE requires human approval by policy";
+        triggeredRules.push("review_to_done_requires_human");
+        requiredApprovals.push({
+          type: "TRANSITION_TO_DONE",
+          reason: "Policy requires human review before completion",
+        });
+      }
+    }
+
+    if (triggeredRules.length === 0) {
+      triggeredRules.push("no_policy_blockers");
+    }
+    if (remediationHints.length === 0 && policyDecision === "ALLOW") {
+      remediationHints.push("No remediation needed. Safe to proceed.");
+    }
+
+    const policyPreview = {
+      taskId: task._id,
+      taskStatus: task.status,
+      decision: policyDecision,
+      riskLevel,
+      reason: policyReason,
+      triggeredRules,
+      requiredApprovals,
+      remediationHints,
+      evaluatedAt: Date.now(),
+    };
+
+    return {
+      ok: true,
+      transitionPreview,
+      policyPreview,
+      summary: {
+        transitionValid: transitionPreview ? transitionPreview.valid : true,
+        policyDecision: policyPreview.decision,
+        riskLevel: policyPreview.riskLevel,
+        needsApproval: policyPreview.decision === "NEEDS_APPROVAL",
+      },
+      evaluatedAt: Date.now(),
+    };
+  },
+});
+
 // ============================================================================
 // MUTATIONS
 // ============================================================================
@@ -738,6 +950,25 @@ export const create = mutation({
       targetId: taskId,
       taskId,
     });
+
+    await logTaskEvent(ctx, {
+      taskId,
+      projectId: args.projectId,
+      eventType: "TASK_CREATED",
+      actorType: (args.createdBy as "AGENT" | "HUMAN" | "SYSTEM") ?? "SYSTEM",
+      actorId: args.createdByRef,
+      relatedId: taskId,
+      afterState: {
+        status: "INBOX",
+        title: args.title,
+        type: args.type,
+        priority: args.priority ?? 3,
+      },
+      metadata: {
+        source: args.source,
+        sourceRef: args.sourceRef,
+      },
+    });
     
     return { task, created: true };
   },
@@ -803,6 +1034,31 @@ export const transition = mutation({
     const fromStatus = task.status as TaskStatus;
     const toStatus = args.toStatus as TaskStatus;
     const actorType = args.actorType as "AGENT" | "HUMAN" | "SYSTEM";
+
+    const operatorControl = await getEffectiveOperatorControl(ctx.db, task.projectId);
+    const operatorGate = evaluateOperatorGate({
+      mode: operatorControl.mode,
+      actorType,
+      operation: "TRANSITION",
+    });
+    if (operatorGate.decision === "DENY") {
+      return {
+        success: false,
+        errors: [{
+          field: "operatorControl",
+          message: operatorGate.reason,
+        }],
+      };
+    }
+    if (operatorGate.decision === "NEEDS_APPROVAL" && actorType !== "HUMAN") {
+      return {
+        success: false,
+        errors: [{
+          field: "operatorControl",
+          message: operatorGate.reason,
+        }],
+      };
+    }
     
     // 3. Find transition rule
     const rule = findTransitionRule(fromStatus, toStatus);
@@ -959,9 +1215,49 @@ export const transition = mutation({
       beforeState: { status: fromStatus },
       afterState: { status: toStatus },
     });
-    
+
+    await logTaskEvent(ctx, {
+      taskId: args.taskId,
+      projectId: task.projectId,
+      eventType: "TASK_TRANSITION",
+      actorType,
+      actorId: args.actorAgentId?.toString() ?? args.actorUserId,
+      relatedId: transitionId,
+      beforeState: { status: fromStatus },
+      afterState: { status: toStatus },
+      metadata: {
+        reason: args.reason,
+        sessionKey: args.sessionKey,
+        operatorMode: operatorControl.mode,
+      },
+    });
+
     const updatedTask = await ctx.db.get(args.taskId);
     const transition = await ctx.db.get(transitionId);
+
+    const taskWatchers = await ctx.db
+      .query("watchSubscriptions")
+      .withIndex("by_entity", (q) =>
+        q.eq("entityType", "TASK").eq("entityId", args.taskId as unknown as string)
+      )
+      .collect();
+
+    if (taskWatchers.length > 0) {
+      await ctx.db.insert("activities", {
+        projectId: task.projectId,
+        actorType: "SYSTEM",
+        action: "TASK_WATCHERS_NOTIFIED",
+        description: `${taskWatchers.length} watcher(s) notified for task transition`,
+        targetType: "TASK",
+        targetId: args.taskId,
+        taskId: args.taskId,
+        metadata: {
+          fromStatus,
+          toStatus,
+          watchers: taskWatchers.map((watcher) => watcher.userId),
+        },
+      });
+    }
 
     // Notifications: when transitioning to ASSIGNED, notify each assignee
     if (toStatus === "ASSIGNED" && updatedTask && updatedTask.assigneeIds.length > 0) {

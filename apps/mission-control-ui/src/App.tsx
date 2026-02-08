@@ -10,6 +10,7 @@ import { LiveFeed } from "./LiveFeed";
 import { CreateTaskModal } from "./CreateTaskModal";
 import { ApprovalsModal } from "./ApprovalsModal";
 import { PolicyModal } from "./PolicyModal";
+import { OperatorControlsModal } from "./OperatorControlsModal";
 import { NotificationsModal } from "./NotificationsModal";
 import { StandupModal } from "./StandupModal";
 import { useToast } from "./Toast";
@@ -118,6 +119,7 @@ export default function App() {
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showApprovals, setShowApprovals] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
+  const [showOperatorControls, setShowOperatorControls] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showStandup, setShowStandup] = useState(false);
   const [showAgentDashboard, setShowAgentDashboard] = useState(false);
@@ -210,6 +212,8 @@ export default function App() {
       setShowApprovals={setShowApprovals}
       showPolicy={showPolicy}
       setShowPolicy={setShowPolicy}
+      showOperatorControls={showOperatorControls}
+      setShowOperatorControls={setShowOperatorControls}
       showNotifications={showNotifications}
       setShowNotifications={setShowNotifications}
       showStandup={showStandup}
@@ -258,6 +262,8 @@ function AppContent({
   setShowApprovals,
   showPolicy,
   setShowPolicy,
+  showOperatorControls,
+  setShowOperatorControls,
   showNotifications,
   setShowNotifications,
   showStandup,
@@ -301,6 +307,8 @@ function AppContent({
   setShowApprovals: (v: boolean) => void;
   showPolicy: boolean;
   setShowPolicy: (v: boolean) => void;
+  showOperatorControls: boolean;
+  setShowOperatorControls: (v: boolean) => void;
   showNotifications: boolean;
   setShowNotifications: (v: boolean) => void;
   showStandup: boolean;
@@ -459,6 +467,23 @@ function AppContent({
           </button>
           <button
             type="button"
+            onClick={() => setShowOperatorControls(true)}
+            style={{
+              padding: "6px 12px",
+              background: "#b91c1c",
+              border: "1px solid #991b1b",
+              borderRadius: 6,
+              color: "#fee2e2",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              marginRight: "8px",
+            }}
+          >
+            🚨 Control
+          </button>
+          <button
+            type="button"
             onClick={() => setShowDashboardOverview(true)}
             style={{
               padding: "6px 12px",
@@ -544,6 +569,7 @@ function AppContent({
               projectId={projectId}
               onOpenApprovals={() => setShowApprovals(true)}
               onOpenPolicy={() => setShowPolicy(true)}
+              onOpenOperatorControls={() => setShowOperatorControls(true)}
               onOpenNotifications={() => setShowNotifications(true)}
               onOpenStandup={() => setShowStandup(true)}
               onPauseSquad={handlePauseSquad}
@@ -557,6 +583,7 @@ function AppContent({
               />
               <KanbanFilters
                 projectId={projectId}
+                currentUserId="operator"
                 filters={kanbanFilters}
                 onFiltersChange={setKanbanFilters}
               />
@@ -613,6 +640,12 @@ function AppContent({
       )}
       {showApprovals && <ApprovalsModal projectId={projectId} onClose={() => setShowApprovals(false)} />}
       {showPolicy && <PolicyModal onClose={() => setShowPolicy(false)} />}
+      {showOperatorControls && (
+        <OperatorControlsModal
+          projectId={projectId}
+          onClose={() => setShowOperatorControls(false)}
+        />
+      )}
       {showNotifications && (
         <NotificationsModal
           onClose={() => setShowNotifications(false)}
@@ -716,6 +749,10 @@ function AppContent({
             setShowCommandPalette(false);
             setCurrentView("agents");
           }}
+          onOpenControls={() => {
+            setShowCommandPalette(false);
+            setShowOperatorControls(true);
+          }}
         />
       )}
       {showKeyboardHelp && (
@@ -740,6 +777,7 @@ function AppContent({
         onOpenSearch={() => setShowCommandPalette(true)}
         onOpenApprovals={() => setShowApprovals(true)}
         onOpenAgents={() => setCurrentView("agents")}
+        onOpenControls={() => setShowOperatorControls(true)}
       />
       
       {/* Error Boundary wraps everything */}

@@ -4,16 +4,14 @@ Last updated: 2026-02-08
 
 ## Now (0–2 weeks)
 
-- Harden operator-critical workflows:
-  - approvals center throughput and reason quality
-  - task drawer explainability and simulation UX
-  - agent registry controls + confirmation semantics
-- Enforce docs/contract consistency:
-  - keep backend response contracts aligned with UI usage
-  - close remaining stale field references in legacy views
-- Stabilize release quality gates:
-  - run `ci:typecheck` and `ci:test` on every PR
-  - keep architecture/plan docs in sync with shipped behavior
+- Land and harden newly shipped control-plane upgrades:
+  - approval escalation + dual-control operation quality
+  - operator mode controls in day-to-day incident handling
+  - canonical `taskEvents` timeline backfill coverage
+  - saved view/watch workflow adoption in core task operations
+- Add operator training/runbook snippets:
+  - when to use `PAUSED` vs `DRAINING` vs `QUARANTINED`
+  - dual-control response expectations for RED approvals
 
 ## Next (2–6 weeks)
 
@@ -24,8 +22,9 @@ Last updated: 2026-02-08
   - replace `.collect()` + in-memory filtering with index-driven queries in hot paths
   - reduce timeline/report N+1 joins with pre-joined view helpers
 - Event contract unification:
-  - standardize timeline event schema across transitions/activities/runs/tool calls
+  - move remaining producers to `taskEvents` (`messages`, policy decisions, tool calls)
   - add stable event IDs and rule IDs for policy causality
+  - migrate exports/reports to canonical event stream only
 
 ## Later (6+ weeks)
 

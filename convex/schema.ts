@@ -337,6 +337,40 @@ export default defineSchema({
     .index("by_project", ["projectId"]),
 
   // -------------------------------------------------------------------------
+  // TASK EVENTS (Canonical timeline stream)
+  // -------------------------------------------------------------------------
+  taskEvents: defineTable({
+    projectId: v.optional(v.id("projects")),
+    taskId: v.id("tasks"),
+    eventType: v.union(
+      v.literal("TASK_CREATED"),
+      v.literal("TASK_TRANSITION"),
+      v.literal("POLICY_DECISION"),
+      v.literal("APPROVAL_REQUESTED"),
+      v.literal("APPROVAL_ESCALATED"),
+      v.literal("APPROVAL_APPROVED"),
+      v.literal("APPROVAL_DENIED"),
+      v.literal("APPROVAL_EXPIRED"),
+      v.literal("RUN_STARTED"),
+      v.literal("RUN_COMPLETED"),
+      v.literal("RUN_FAILED"),
+      v.literal("TOOL_CALL"),
+      v.literal("OPERATOR_CONTROL")
+    ),
+    actorType: actorType,
+    actorId: v.optional(v.string()),
+    relatedId: v.optional(v.string()),
+    timestamp: v.number(),
+    beforeState: v.optional(v.any()),
+    afterState: v.optional(v.any()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_task", ["taskId"])
+    .index("by_project", ["projectId"])
+    .index("by_project_task", ["projectId", "taskId"])
+    .index("by_task_type", ["taskId", "eventType"]),
+
+  // -------------------------------------------------------------------------
   // MESSAGES (Task Thread)
   // -------------------------------------------------------------------------
   messages: defineTable({
@@ -515,6 +549,7 @@ export default defineSchema({
     // Status
     status: v.union(
       v.literal("PENDING"),
+      v.literal("ESCALATED"),
       v.literal("APPROVED"),
       v.literal("DENIED"),
       v.literal("EXPIRED"),
@@ -526,6 +561,15 @@ export default defineSchema({
     decidedByUserId: v.optional(v.string()),
     decidedAt: v.optional(v.number()),
     decisionReason: v.optional(v.string()),
+    firstDecisionByUserId: v.optional(v.string()),
+    firstDecisionAt: v.optional(v.number()),
+    firstDecisionReason: v.optional(v.string()),
+    escalationLevel: v.optional(v.number()),
+    escalatedAt: v.optional(v.number()),
+    escalatedBy: v.optional(v.string()),
+    escalationReason: v.optional(v.string()),
+    requiredDecisionCount: v.optional(v.number()),
+    decisionCount: v.optional(v.number()),
     
     // Expiration
     expiresAt: v.number(),
@@ -659,6 +703,71 @@ export default defineSchema({
     .index("by_task", ["taskId"])
     .index("by_agent_task", ["agentId", "taskId"])
     .index("by_project", ["projectId"]),
+
+  // -------------------------------------------------------------------------
+  // SAVED VIEWS (operator filters/presets)
+  // -------------------------------------------------------------------------
+  savedViews: defineTable({
+    projectId: v.id("projects"),
+    ownerUserId: v.string(),
+    name: v.string(),
+    description: v.optional(v.string()),
+    scope: v.union(
+      v.literal("KANBAN"),
+      v.literal("APPROVALS"),
+      v.literal("AGENTS"),
+      v.literal("SEARCH")
+    ),
+    filters: v.any(),
+    isShared: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_owner", ["ownerUserId"])
+    .index("by_project_owner", ["projectId", "ownerUserId"])
+    .index("by_project_scope", ["projectId", "scope"]),
+
+  // -------------------------------------------------------------------------
+  // WATCH SUBSCRIPTIONS (user watchlist for entities)
+  // -------------------------------------------------------------------------
+  watchSubscriptions: defineTable({
+    projectId: v.optional(v.id("projects")),
+    userId: v.string(),
+    entityType: v.union(
+      v.literal("TASK"),
+      v.literal("APPROVAL"),
+      v.literal("AGENT"),
+      v.literal("PROJECT")
+    ),
+    entityId: v.string(),
+    createdAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_entity", ["entityType", "entityId"])
+    .index("by_user_entity", ["userId", "entityType", "entityId"])
+    .index("by_project", ["projectId"]),
+
+  // -------------------------------------------------------------------------
+  // OPERATOR CONTROLS (global/project execution mode)
+  // -------------------------------------------------------------------------
+  operatorControls: defineTable({
+    projectId: v.optional(v.id("projects")),
+    mode: v.union(
+      v.literal("NORMAL"),
+      v.literal("PAUSED"),
+      v.literal("DRAINING"),
+      v.literal("QUARANTINED")
+    ),
+    reason: v.optional(v.string()),
+    updatedBy: v.string(),
+    updatedAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_mode", ["projectId", "mode"])
+    .index("by_updated_at", ["updatedAt"]),
 
   // -------------------------------------------------------------------------
   // AGENT DOCUMENTS (WORKING.md, daily notes, session memory)

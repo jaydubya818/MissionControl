@@ -2,29 +2,27 @@
 
 ## Major Changes
 
-- Added core docs and plan alignment artifacts:
-  - `docs/ARCHITECTURE.md`
-  - `docs/INTELLIGENCE_LAYER_PLAN.md`
-  - `docs/DECISIONS.md`
-  - `docs/ROADMAP.md`
-  - `docs/CHANGELOG_REPORT.md`
-- Implemented operator-critical intelligence layer features:
-  - Approvals Center tabs + decision reasons
-  - Task timeline enrichment + policy explainability panel
-  - Dry-run transition simulation
-  - Agent Registry + control actions
-  - Global search + command palette contract alignment
-- Added backend support endpoints:
-  - `tasks.simulateTransition`
-  - `tasks.update`
-  - `policy.explainTaskPolicy`
-  - `approvals.listByStatus`
-- Added CI pipeline with explicit quality gates:
-  - `.github/workflows/ci.yml`
-  - root `ci:*` scripts in `package.json`
-- Type-safety and contract cleanup across UI + Convex + Telegram + SDK packages.
+- Introduced canonical task event stream (`taskEvents`) and wired core producers:
+  - task creation + transition events
+  - run start/completion/failure events
+  - approval request/escalation/decision/expiration events
+- Upgraded approvals workflow:
+  - `ESCALATED` status and SLA escalation cron
+  - dual-control approvals for RED risk actions (two distinct approvers)
+  - approval decision-chain query for audit/debug surfaces
+- Added operator execution posture controls:
+  - modes: `NORMAL`, `PAUSED`, `DRAINING`, `QUARANTINED`
+  - mode checks now gate policy decisions and run starts
+  - new Operator Controls modal in UI
+- Added operator productivity features:
+  - saved Kanban views (create/apply/delete)
+  - task watch subscriptions + toggle in task drawer
+- Upgraded Approvals Center UI:
+  - Escalated tab
+  - expiry/SLA visibility
+  - dual-control first-approval feedback
 
-## How To Run
+## How to Run
 
 1. Install dependencies:
 ```bash
@@ -41,7 +39,7 @@ pnpm convex:dev
 echo "VITE_CONVEX_URL=<your-convex-url>" > apps/mission-control-ui/.env.local
 ```
 
-4. Start UI:
+4. Run UI:
 ```bash
 pnpm dev:ui
 ```
@@ -51,7 +49,7 @@ Optional runtime:
 pnpm dev:orch
 ```
 
-## How To Test
+## How to Test
 
 ```bash
 pnpm run ci:typecheck
@@ -60,26 +58,29 @@ pnpm run ci:test
 
 ## Breaking Changes / Migrations
 
-- No schema-breaking database migration required in this pass.
-- UI contracts changed for search and policy/timeline surfaces; custom clients should align to current Convex query payloads.
-- Keyboard shortcut for approvals is now `Shift+Cmd+A`.
+- Schema changes were introduced:
+  - new tables: `taskEvents`, `operatorControls`, `savedViews`, `watchSubscriptions`
+  - `approvals.status` now includes `ESCALATED`
+  - approvals include new escalation/dual-control fields
+- Existing code paths expecting approvals to be only `PENDING/APPROVED/DENIED/EXPIRED/CANCELED` must be updated to handle `ESCALATED`.
+- No destructive migration is required; data additions are backward-compatible.
 
 ## Screenshot Placeholders
 
-1. **Approvals Center**
-- Show tabs (Pending/Approved/Denied), risk badges, and decision reason modal.
+1. **Approvals Center (Escalated + Dual Control)**
+- Show Escalated tab, SLA expiry indicator, and first-approval message for RED approval.
 
-2. **Task Drawer – Timeline + Policy**
-- Show unified timeline events and policy explainability/remediation panel.
+2. **Operator Controls Modal**
+- Show mode options (`NORMAL`, `PAUSED`, `DRAINING`, `QUARANTINED`) with history panel.
 
-3. **Task Drawer – Dry Run**
-- Show simulation result with validation errors/requirements before transition.
+3. **Task Drawer Timeline (`taskEvents`)**
+- Show canonical event cards with actor, event type, before/after payload snippet.
 
-4. **Agent Registry**
-- Show per-agent status cards and control actions (Activate/Pause/Drain/Quarantine).
+4. **Task Drawer Watch Toggle**
+- Show watch button state changing (`Watch` -> `Watching`).
 
-5. **Command Palette + Search**
-- Show grouped results for tasks/approvals/agents/messages and quick actions.
+5. **Kanban Saved Views**
+- Show view select + save/delete actions and filter application.
 
-6. **Monitoring Dashboard**
-- Show severity cards, slow operations, and recent error stream.
+6. **Command Palette / Quick Actions**
+- Show operator controls action entry and navigation to modal.

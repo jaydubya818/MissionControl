@@ -3,11 +3,12 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 
-type ApprovalStatus = "PENDING" | "APPROVED" | "DENIED";
+type ApprovalStatus = "PENDING" | "ESCALATED" | "APPROVED" | "DENIED";
 
-const TAB_ORDER: ApprovalStatus[] = ["PENDING", "APPROVED", "DENIED"];
+const TAB_ORDER: ApprovalStatus[] = ["PENDING", "ESCALATED", "APPROVED", "DENIED"];
 const TAB_LABEL: Record<ApprovalStatus, string> = {
   PENDING: "Pending",
+  ESCALATED: "Escalated",
   APPROVED: "Approved",
   DENIED: "Denied",
 };
@@ -25,6 +26,10 @@ export function ApprovalsModal({
     api.approvals.listByStatus,
     projectId ? { projectId, status: "PENDING", limit: 100 } : { status: "PENDING", limit: 100 }
   );
+  const escalated = useQuery(
+    api.approvals.listByStatus,
+    projectId ? { projectId, status: "ESCALATED", limit: 100 } : { status: "ESCALATED", limit: 100 }
+  );
   const approved = useQuery(
     api.approvals.listByStatus,
     projectId ? { projectId, status: "APPROVED", limit: 100 } : { status: "APPROVED", limit: 100 }
@@ -38,7 +43,7 @@ export function ApprovalsModal({
   const approveMutation = useMutation(api.approvals.approve);
   const denyMutation = useMutation(api.approvals.deny);
 
-  if (!pending || !approved || !denied || !agents) {
+  if (!pending || !escalated || !approved || !denied || !agents) {
     return (
       <Modal onClose={onClose}>
         <div style={{ padding: 24 }}>Loading approvals...</div>
@@ -49,6 +54,7 @@ export function ApprovalsModal({
   const agentMap = new Map(agents.map((agent) => [agent._id, agent]));
   const byStatus: Record<ApprovalStatus, Doc<"approvals">[]> = {
     PENDING: pending,
+    ESCALATED: escalated,
     APPROVED: approved,
     DENIED: denied,
   };
@@ -56,17 +62,21 @@ export function ApprovalsModal({
 
   const counts = {
     PENDING: pending.length,
+    ESCALATED: escalated.length,
     APPROVED: approved.length,
     DENIED: denied.length,
   };
 
   return (
     <Modal onClose={onClose}>
-      <h2 style={{ margin: "0 0 16px", fontSize: "1.25rem", fontWeight: 700 }}>
+      <h2 style={{ margin: "0 0 12px", fontSize: "1.25rem", fontWeight: 700 }}>
         Approvals Center
       </h2>
+      <p style={{ color: "#94a3b8", margin: "0 0 14px", fontSize: "0.85rem" }}>
+        Escalated approvals breached SLA and should be actioned first.
+      </p>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {TAB_ORDER.map((status) => (
           <button
             key={status}
@@ -98,16 +108,16 @@ export function ApprovalsModal({
               key={approval._id}
               approval={approval}
               requestor={agentMap.get(approval.requestorAgentId)}
-              canDecide={activeTab === "PENDING"}
+              canDecide={activeTab === "PENDING" || activeTab === "ESCALATED"}
               onApprove={async (reason) => {
-                await approveMutation({
+                return await approveMutation({
                   approvalId: approval._id,
                   decidedByUserId: "operator",
                   reason,
                 });
               }}
               onDeny={async (reason) => {
-                await denyMutation({
+                return await denyMutation({
                   approvalId: approval._id,
                   decidedByUserId: "operator",
                   reason,
@@ -131,14 +141,15 @@ function ApprovalCard({
   approval: Doc<"approvals">;
   requestor: Doc<"agents"> | undefined;
   canDecide: boolean;
-  onApprove: (reason: string) => Promise<void>;
-  onDeny: (reason: string) => Promise<void>;
+  onApprove: (reason: string) => Promise<any>;
+  onDeny: (reason: string) => Promise<any>;
 }) {
   const [loading, setLoading] = useState(false);
   const [approveReason, setApproveReason] = useState("");
   const [denyReason, setDenyReason] = useState("");
   const [showDeny, setShowDeny] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   const riskColor = approval.riskLevel === "RED" ? "#ef4444" : "#f59e0b";
   const statusColor =
@@ -146,18 +157,31 @@ function ApprovalCard({
       ? "#22c55e"
       : approval.status === "DENIED"
         ? "#ef4444"
-        : "#f59e0b";
+        : approval.status === "ESCALATED"
+          ? "#f97316"
+          : "#f59e0b";
+
   const expiryText = useMemo(() => {
     return new Date(approval.expiresAt).toLocaleString();
   }, [approval.expiresAt]);
+
   const decidedText = approval.decidedAt ? new Date(approval.decidedAt).toLocaleString() : null;
+  const escalatedText = approval.escalatedAt ? new Date(approval.escalatedAt).toLocaleString() : null;
+  const minutesRemaining = Math.floor((approval.expiresAt - Date.now()) / 60000);
+  const needsDualControl = (approval.requiredDecisionCount ?? 1) > 1;
 
   async function handleApprove() {
     if (!approveReason.trim()) return;
     setLoading(true);
     setError(null);
+    setInfo(null);
     try {
-      await onApprove(approveReason.trim());
+      const result = await onApprove(approveReason.trim());
+      if (result?.pendingSecondDecision) {
+        setInfo("First approval recorded. A second distinct approver is required.");
+      } else {
+        setInfo("Approval recorded.");
+      }
       setApproveReason("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to approve. Please try again.");
@@ -170,10 +194,12 @@ function ApprovalCard({
     if (!denyReason.trim()) return;
     setLoading(true);
     setError(null);
+    setInfo(null);
     try {
       await onDeny(denyReason.trim());
       setShowDeny(false);
       setDenyReason("");
+      setInfo("Approval denied.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to deny. Please try again.");
     } finally {
@@ -186,7 +212,7 @@ function ApprovalCard({
       style={{
         padding: 14,
         background: "#0f172a",
-        border: "1px solid #334155",
+        border: approval.status === "ESCALATED" ? "1px solid #f97316" : "1px solid #334155",
         borderRadius: 8,
       }}
     >
@@ -208,6 +234,20 @@ function ApprovalCard({
           >
             {approval.riskLevel}
           </span>
+          {needsDualControl && (
+            <span
+              style={{
+                fontSize: "0.68rem",
+                fontWeight: 700,
+                color: "#fde68a",
+                background: "#78350f",
+                borderRadius: 4,
+                padding: "2px 6px",
+              }}
+            >
+              DUAL CONTROL
+            </span>
+          )}
         </div>
         <span style={{ fontSize: "0.75rem", color: statusColor, fontWeight: 700 }}>{approval.status}</span>
       </div>
@@ -218,9 +258,22 @@ function ApprovalCard({
         {approval.justification}
       </div>
 
-      <div style={{ marginTop: 8, fontSize: "0.75rem", color: "#64748b" }}>
-        Expires: {expiryText}
+      <div style={{ marginTop: 8, fontSize: "0.75rem", color: minutesRemaining < 10 ? "#fca5a5" : "#64748b" }}>
+        Expires: {expiryText} ({minutesRemaining >= 0 ? `${minutesRemaining}m left` : "expired"})
       </div>
+
+      {approval.status === "ESCALATED" && (
+        <div style={{ marginTop: 6, fontSize: "0.75rem", color: "#fb923c" }}>
+          Escalated: {escalatedText ?? "now"}
+          {approval.escalationReason ? ` · ${approval.escalationReason}` : ""}
+        </div>
+      )}
+
+      {approval.firstDecisionAt && (
+        <div style={{ marginTop: 6, fontSize: "0.75rem", color: "#fcd34d" }}>
+          First approval: {approval.firstDecisionByUserId ?? "operator"} at {new Date(approval.firstDecisionAt).toLocaleString()}
+        </div>
+      )}
 
       {!canDecide && (
         <div style={{ marginTop: 8, fontSize: "0.8rem", color: "#cbd5e1" }}>
@@ -244,6 +297,21 @@ function ApprovalCard({
               {error}
             </div>
           )}
+
+          {info && (
+            <div style={{
+              padding: "8px 10px",
+              marginBottom: 8,
+              background: "#0f172a",
+              border: "1px solid #334155",
+              borderRadius: 6,
+              color: "#93c5fd",
+              fontSize: "0.8rem",
+            }}>
+              {info}
+            </div>
+          )}
+
           {!showDeny ? (
             <>
               <input
@@ -276,7 +344,7 @@ function ApprovalCard({
                     cursor: loading || !approveReason.trim() ? "not-allowed" : "pointer",
                   }}
                 >
-                  {loading ? "Saving..." : "Approve"}
+                  {loading ? "Saving..." : needsDualControl && !approval.firstDecisionAt ? "Record 1st Approval" : "Approve"}
                 </button>
                 <button
                   type="button"
@@ -332,7 +400,10 @@ function ApprovalCard({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setShowDeny(false); setDenyReason(""); }}
+                  onClick={() => {
+                    setShowDeny(false);
+                    setDenyReason("");
+                  }}
                   disabled={loading}
                   style={{
                     padding: "7px 12px",
@@ -376,7 +447,7 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          width: "min(860px, 92vw)",
+          width: "min(900px, 94vw)",
           maxHeight: "90vh",
           overflow: "auto",
           background: "#1e293b",
@@ -408,4 +479,3 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
     </>
   );
 }
-

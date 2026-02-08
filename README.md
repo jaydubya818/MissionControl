@@ -15,9 +15,12 @@ It gives product and operations teams a way to run agent work with deterministic
 - Deterministic task lifecycle (`INBOX -> ... -> DONE/CANCELED`) with transition rules
 - Risk-aware policy engine (`ALLOW`, `NEEDS_APPROVAL`, `DENY`) with explainability
 - Approvals Center for pending/approved/denied decisions with reason capture
-- Task Timeline + audit stream (transitions, runs, tool calls, policy context, activities)
+- Approval escalation queue + dual-control decisions for RED actions
+- Task Timeline + audit stream (`taskEvents`) across transitions, approvals, runs, and operator actions
 - Dry-run simulation for transition/policy validation before execution
 - Agent Registry with operator controls (`ACTIVE`, `PAUSED`, `DRAINED`, `QUARANTINED`)
+- System operator mode controls (`NORMAL`, `PAUSED`, `DRAINING`, `QUARANTINED`)
+- Saved views + task watch subscriptions for operator workflows
 - Global search and command palette for tasks/agents/approvals
 
 ## Architecture
@@ -140,11 +143,12 @@ pnpm dev:orch
   - `NEEDS_APPROVAL`
   - `DENY`
 - Explainability surfaces include triggered rules, required approvals, and remediation hints
-- Approvals Center handles human decisions with reason capture and status tracking
+- Approvals Center handles escalation, dual-control decisions, and reason capture
 
 ### 3) Operator controls
 
 - Agent Registry provides per-agent control (`Activate`, `Pause`, `Drain`, `Quarantine`)
+- Operator Controls panel sets system mode (`NORMAL`, `PAUSED`, `DRAINING`, `QUARANTINED`)
 - Squad-level controls support rapid incident response
 - System remains auditable through activity logs and timeline artifacts
 

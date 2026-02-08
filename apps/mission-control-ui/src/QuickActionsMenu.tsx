@@ -5,6 +5,7 @@ interface QuickActionsMenuProps {
   onOpenSearch: () => void;
   onOpenApprovals: () => void;
   onOpenAgents: () => void;
+  onOpenControls?: () => void;
 }
 
 export function QuickActionsMenu({
@@ -12,6 +13,7 @@ export function QuickActionsMenu({
   onOpenSearch,
   onOpenApprovals,
   onOpenAgents,
+  onOpenControls,
 }: QuickActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   
@@ -20,6 +22,9 @@ export function QuickActionsMenu({
     { id: "search", label: "🔍 Search", action: onOpenSearch, shortcut: "⌘K" },
     { id: "approvals", label: "✅ Approvals", action: onOpenApprovals, shortcut: "⇧⌘A" },
     { id: "agents", label: "🤖 Agents", action: onOpenAgents, shortcut: "⌘2" },
+    ...(onOpenControls
+      ? [{ id: "controls", label: "🚨 Controls", action: onOpenControls, shortcut: "⇧⌘C" }]
+      : []),
   ];
 
   return (

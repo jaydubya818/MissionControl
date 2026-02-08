@@ -59,11 +59,15 @@ Storage is Convex tables (selected critical entities):
 - `projects`: workspace isolation boundary
 - `tasks`: canonical task object with state, assignment, artifacts, budget, provenance
 - `taskTransitions`: immutable transition audit log
+- `taskEvents`: canonical task event stream for timeline/audit surfaces
 - `approvals`: high-risk approval workflow
 - `runs` + `toolCalls`: execution and cost telemetry
 - `messages`: thread stream per task
 - `activities`: generic audit/event log
 - `alerts`: incident/health events
+- `operatorControls`: execution posture (`NORMAL`, `PAUSED`, `DRAINING`, `QUARANTINED`)
+- `savedViews`: operator filter presets for reusable workflows
+- `watchSubscriptions`: user watchlist subscriptions for task/entity updates
 - `executionRequests`, `webhooks`, `reviews`, `agentPerformance`, `taskDependencies`
 
 ## 5. State Machine Overview
@@ -85,6 +89,7 @@ Policy evaluation (`convex/policy.ts` + `convex/lib/riskClassifier.ts`) evaluate
 - Risk classification for tool actions (`GREEN`/`YELLOW`/`RED`)
 - Allowlists/blocklists (shell, network, file read/write)
 - Approval requirement triggers (risk/role/budget and transition rules)
+- Operator control mode gates (`PAUSED`/`DRAINING`/`QUARANTINED`)
 
 Decisions currently returned:
 - `ALLOW`
@@ -119,23 +124,26 @@ Primary operator workflows:
 - Many queries still allow cross-project reads when `projectId` is omitted.
 - Authorization and role checks are minimal/inconsistent.
 
-2. Partial orchestration integration:
+2. Audit/event path is now partially unified but still has overlap:
+- `taskEvents` is canonical for timelines, but legacy consumers still read `taskTransitions` + `activities` directly.
+- Export/report pipelines should fully standardize on `taskEvents`.
+
+3. Partial orchestration integration:
 - Orchestration server and executor routing include stub/manual behavior.
 - Some plan docs overstate "completed" end-to-end automation.
 
-3. Contract drift and duplicated logic:
+4. Contract drift and duplicated logic:
 - Multiple state machine representations (Convex uppercase vs legacy lowercase libs).
 - Duplicate report-generation paths (`tasks.exportIncidentReport` and `reports.generateIncidentReport`).
 
-4. Performance risks:
+5. Performance risks:
 - Several queries rely on broad `.collect()` + in-memory filtering.
 - Some N+1 patterns (timeline/report joins across runs/tool calls).
 
-5. UI contract and consistency issues:
+6. UI contract and consistency issues:
 - Search result shape mismatch in header search implementation.
 - Mixed interaction patterns (some polished flows, some placeholder controls).
 
-6. DX/operations:
-- No GitHub Actions CI workflow in repo.
-- Scripts/docs include hardcoded environment URLs and local paths.
-
+7. DX/operations:
+- CI exists, but local `convex codegen` can fail in restricted-network environments due telemetry-side network calls.
+- Scripts/docs include some hardcoded environment URLs and local paths.

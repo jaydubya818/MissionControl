@@ -156,7 +156,7 @@ export const metrics = query({
     const totalCost = runs.reduce((sum, r) => sum + r.costUsd, 0);
     const avgCostPerRun = runs.length > 0 ? totalCost / runs.length : 0;
     
-    const pendingApprovals = approvals.filter((a) => a.status === "PENDING").length;
+    const pendingApprovals = approvals.filter((a) => a.status === "PENDING" || a.status === "ESCALATED").length;
     const openAlerts = alerts.filter((a) => a.status === "OPEN").length;
     
     return {
@@ -274,7 +274,7 @@ export const status = query({
     // Approvals check
     try {
       const approvals = await ctx.db.query("approvals").collect();
-      const pendingApprovals = approvals.filter((a) => a.status === "PENDING").length;
+      const pendingApprovals = approvals.filter((a) => a.status === "PENDING" || a.status === "ESCALATED").length;
       
       checks.approvals = {
         status: pendingApprovals > 10 ? "degraded" : "healthy",

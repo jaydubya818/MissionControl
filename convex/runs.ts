@@ -6,6 +6,8 @@
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { logTaskEvent } from "./lib/taskEvents";
+import { evaluateOperatorGate, getEffectiveOperatorControl } from "./lib/operatorControls";
 
 // ============================================================================
 // QUERIES
@@ -77,6 +79,7 @@ export const start = mutation({
     sessionKey: v.string(),
     model: v.string(),
     idempotencyKey: v.string(),
+    estimatedCost: v.optional(v.number()),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
@@ -97,6 +100,23 @@ export const start = mutation({
     }
     
     const task = args.taskId ? await ctx.db.get(args.taskId) : null;
+
+    const operatorControl = await getEffectiveOperatorControl(ctx.db, agent.projectId);
+    const operatorGate = evaluateOperatorGate({
+      mode: operatorControl.mode,
+      actorType: "AGENT",
+      operation: "RUN_START",
+    });
+    if (operatorGate.decision !== "ALLOW") {
+      throw new Error(operatorGate.reason);
+    }
+
+    const estimatedCost = args.estimatedCost ?? 0;
+    if (estimatedCost > 0 && estimatedCost > agent.budgetPerRun) {
+      throw new Error(
+        `Estimated run cost ($${estimatedCost.toFixed(2)}) exceeds per-run budget ($${agent.budgetPerRun.toFixed(2)})`
+      );
+    }
     
     // Check agent daily budget
     if (agent.spendToday >= agent.budgetDaily) {
@@ -136,6 +156,12 @@ export const start = mutation({
         
         throw new Error("Task budget exceeded");
       }
+
+      if (estimatedCost > 0 && task.actualCost + estimatedCost > task.budgetAllocated) {
+        throw new Error(
+          `Estimated run cost would exceed task budget ($${task.actualCost.toFixed(2)} + $${estimatedCost.toFixed(2)} > $${task.budgetAllocated.toFixed(2)})`
+        );
+      }
     }
     
     const runId = await ctx.db.insert("runs", {
@@ -153,6 +179,23 @@ export const start = mutation({
       status: "RUNNING",
       metadata: args.metadata,
     });
+
+    if (args.taskId) {
+      await logTaskEvent(ctx, {
+        projectId: agent.projectId,
+        taskId: args.taskId,
+        eventType: "RUN_STARTED",
+        actorType: "AGENT",
+        actorId: args.agentId.toString(),
+        relatedId: runId,
+        metadata: {
+          model: args.model,
+          sessionKey: args.sessionKey,
+          operatorMode: operatorControl.mode,
+          estimatedCost,
+        },
+      });
+    }
     
     const run = await ctx.db.get(runId);
     return { run, created: true };
@@ -260,6 +303,27 @@ export const complete = mutation({
           });
         }
       }
+    }
+
+    if (run.taskId) {
+      await logTaskEvent(ctx, {
+        projectId: run.projectId,
+        taskId: run.taskId,
+        eventType: args.error ? "RUN_FAILED" : "RUN_COMPLETED",
+        actorType: "AGENT",
+        actorId: run.agentId.toString(),
+        relatedId: args.runId,
+        metadata: {
+          status: args.error ? "FAILED" : args.status ?? "COMPLETED",
+          costUsd: args.costUsd,
+          durationMs,
+          inputTokens: args.inputTokens,
+          outputTokens: args.outputTokens,
+        },
+        afterState: {
+          costUsd: args.costUsd,
+        },
+      });
     }
     
     return { success: true, run: await ctx.db.get(args.runId) };

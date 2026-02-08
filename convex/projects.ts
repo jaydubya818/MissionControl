@@ -61,12 +61,20 @@ export const getStats = query({
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
 
-    const pendingApprovals = await ctx.db
-      .query("approvals")
-      .withIndex("by_project_status", (q) =>
-        q.eq("projectId", args.projectId).eq("status", "PENDING")
-      )
-      .collect();
+    const [pendingApprovals, escalatedApprovals] = await Promise.all([
+      ctx.db
+        .query("approvals")
+        .withIndex("by_project_status", (q) =>
+          q.eq("projectId", args.projectId).eq("status", "PENDING")
+        )
+        .collect(),
+      ctx.db
+        .query("approvals")
+        .withIndex("by_project_status", (q) =>
+          q.eq("projectId", args.projectId).eq("status", "ESCALATED")
+        )
+        .collect(),
+    ]);
 
     const byStatus = (status: string) =>
       tasks.filter((t) => t.status === status).length;
@@ -90,7 +98,7 @@ export const getStats = query({
         paused: agents.filter((a) => a.status === "PAUSED").length,
       },
       approvals: {
-        pending: pendingApprovals.length,
+        pending: pendingApprovals.length + escalatedApprovals.length,
       },
     };
   },

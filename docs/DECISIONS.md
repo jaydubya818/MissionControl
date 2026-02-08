@@ -60,6 +60,38 @@ This document records major structural decisions made during the intelligence-la
 - **Why:** Reliable quality gates are mandatory for shipping confidence.
 - **Tradeoff:** More verbose scripts, but easier to debug and maintain.
 
+## D-008: Canonical task timeline uses `taskEvents`
+
+- **Status:** Accepted
+- **Context:** Timeline/audit data was previously stitched from multiple tables with drifted contracts.
+- **Decision:** Added `taskEvents` as canonical event stream and wired task transitions, approvals, and runs into it.
+- **Why:** Gives operators one deterministic event feed for incident review and export.
+- **Tradeoff:** Slightly higher write volume; accepted for audit clarity.
+
+## D-009: Approval safety upgrades require escalation + dual control
+
+- **Status:** Accepted
+- **Context:** High-risk approvals needed better SLA handling and stronger decision integrity.
+- **Decision:** Added `ESCALATED` approval status, cron-based overdue escalation, and 2-person approval for RED risk actions.
+- **Why:** Reduces stalled high-risk actions and prevents single-actor approval mistakes.
+- **Tradeoff:** More workflow complexity in Approvals Center; mitigated with explicit UI cues.
+
+## D-010: Operator posture control is a first-class runtime gate
+
+- **Status:** Accepted
+- **Context:** Existing controls were mostly per-agent and did not provide system-wide containment semantics.
+- **Decision:** Added `operatorControls` mode (`NORMAL`, `PAUSED`, `DRAINING`, `QUARANTINED`) enforced by policy and run start checks.
+- **Why:** Gives operators explicit incident containment with deterministic behavior.
+- **Tradeoff:** Can block automation unexpectedly if mode is not visible; mitigated with clear UI and remediation messages.
+
+## D-011: Saved views and watch subscriptions are persisted server-side
+
+- **Status:** Accepted
+- **Context:** Operators needed persistent workflow context instead of reapplying ad-hoc filters.
+- **Decision:** Added `savedViews` + `watchSubscriptions` with ownership/shared semantics and UI controls in Kanban/task drawer.
+- **Why:** Improves repeatability and reduces operator friction in daily usage.
+- **Tradeoff:** Introduces user-state data lifecycle concerns; follow-up needed for cleanup and notification fanout.
+
 ## Deferred Decisions
 
 - Full authn/authz rollout for project-scoped access checks.

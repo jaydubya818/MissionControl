@@ -10,6 +10,7 @@ export function Sidebar({
   projectId,
   onOpenApprovals,
   onOpenPolicy,
+  onOpenOperatorControls,
   onOpenNotifications,
   onOpenStandup,
   onPauseSquad,
@@ -18,6 +19,7 @@ export function Sidebar({
   projectId: Id<"projects"> | null;
   onOpenApprovals?: () => void;
   onOpenPolicy?: () => void;
+  onOpenOperatorControls?: () => void;
   onOpenNotifications?: () => void;
   onOpenStandup?: () => void;
   onPauseSquad?: () => void;
@@ -96,6 +98,9 @@ export function Sidebar({
             )}
             {onOpenStandup && <SidebarButton onClick={onOpenStandup} label="Standup" />}
             {onOpenPolicy && <SidebarButton onClick={onOpenPolicy} label="Policy" />}
+            {onOpenOperatorControls && (
+              <SidebarButton onClick={onOpenOperatorControls} label="Controls" variant="danger" />
+            )}
             {onPauseSquad && (
               <SidebarButton onClick={onPauseSquad} label="Pause squad" variant="danger" />
             )}

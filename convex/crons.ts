@@ -19,6 +19,14 @@ crons.interval(
   api.approvals.expireStale
 );
 
+// Escalate pending approvals breaching SLA every 10 minutes
+crons.interval(
+  "escalate overdue approvals",
+  { minutes: 10 },
+  api.approvals.escalateOverdue,
+  {}
+);
+
 // Detect loops (comment storms, review ping-pong, repeated failures) every 15 minutes
 crons.interval(
   "detect loops",

@@ -10,6 +10,7 @@ interface CommandPaletteProps {
   onCreateTask: () => void;
   onOpenApprovals: () => void;
   onOpenAgents: () => void;
+  onOpenControls?: () => void;
 }
 
 export function CommandPalette({
@@ -19,6 +20,7 @@ export function CommandPalette({
   onCreateTask,
   onOpenApprovals,
   onOpenAgents,
+  onOpenControls,
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -39,8 +41,11 @@ export function CommandPalette({
       { id: "new-task", label: "Create New Task", icon: "📝", shortcut: "Cmd+N", action: onCreateTask },
       { id: "open-approvals", label: "Open Approvals Center", icon: "✅", shortcut: "Cmd+Shift+A", action: onOpenApprovals },
       { id: "open-agents", label: "Open Agent Registry", icon: "🤖", shortcut: "Cmd+2", action: onOpenAgents },
+      ...(onOpenControls
+        ? [{ id: "open-controls", label: "Open Operator Controls", icon: "🚨", shortcut: "Cmd+Shift+C", action: onOpenControls }]
+        : []),
     ],
-    [onCreateTask, onOpenApprovals, onOpenAgents]
+    [onCreateTask, onOpenApprovals, onOpenAgents, onOpenControls]
   );
 
   const filteredCommands = commands.filter((command) =>
@@ -248,4 +253,3 @@ function ResultGroup({
     </div>
   );
 }
-

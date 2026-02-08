@@ -28,19 +28,35 @@ export const generate = query({
         .query("tasks")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect();
-      pendingApprovals = await ctx.db
-        .query("approvals")
-        .withIndex("by_project_status", (q) => 
-          q.eq("projectId", args.projectId).eq("status", "PENDING")
-        )
-        .collect();
+      const [pending, escalated] = await Promise.all([
+        ctx.db
+          .query("approvals")
+          .withIndex("by_project_status", (q) =>
+            q.eq("projectId", args.projectId).eq("status", "PENDING")
+          )
+          .collect(),
+        ctx.db
+          .query("approvals")
+          .withIndex("by_project_status", (q) =>
+            q.eq("projectId", args.projectId).eq("status", "ESCALATED")
+          )
+          .collect(),
+      ]);
+      pendingApprovals = [...pending, ...escalated];
     } else {
       agents = await ctx.db.query("agents").collect();
       tasks = await ctx.db.query("tasks").collect();
-      pendingApprovals = await ctx.db
-        .query("approvals")
-        .withIndex("by_status", (q) => q.eq("status", "PENDING"))
-        .collect();
+      const [pending, escalated] = await Promise.all([
+        ctx.db
+          .query("approvals")
+          .withIndex("by_status", (q) => q.eq("status", "PENDING"))
+          .collect(),
+        ctx.db
+          .query("approvals")
+          .withIndex("by_status", (q) => q.eq("status", "ESCALATED"))
+          .collect(),
+      ]);
+      pendingApprovals = [...pending, ...escalated];
     }
 
     const byStatus = (status: string) => tasks.filter((t) => t.status === status);
@@ -121,10 +137,17 @@ export const runDaily = mutation({
     const now = Date.now();
     const agents = await ctx.db.query("agents").collect();
     const tasks = await ctx.db.query("tasks").collect();
-    const pendingApprovals = await ctx.db
-      .query("approvals")
-      .withIndex("by_status", (q) => q.eq("status", "PENDING"))
-      .collect();
+    const [pendingApprovals, escalatedApprovals] = await Promise.all([
+      ctx.db
+        .query("approvals")
+        .withIndex("by_status", (q) => q.eq("status", "PENDING"))
+        .collect(),
+      ctx.db
+        .query("approvals")
+        .withIndex("by_status", (q) => q.eq("status", "ESCALATED"))
+        .collect(),
+    ]);
+    const pendingLikeApprovals = [...pendingApprovals, ...escalatedApprovals];
     const byStatus = (status: string) => tasks.filter((t) => t.status === status);
     const activeAgents = agents.filter((a) => a.status === "ACTIVE");
     const report = {
@@ -141,7 +164,7 @@ export const runDaily = mutation({
         done: byStatus("DONE").length,
         total: tasks.length,
       },
-      approvals: { pending: pendingApprovals.length },
+      approvals: { pending: pendingLikeApprovals.length },
     };
     await ctx.db.insert("activities", {
       actorType: "SYSTEM",

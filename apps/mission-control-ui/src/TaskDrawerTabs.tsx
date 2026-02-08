@@ -30,8 +30,13 @@ export function TaskDrawerTabs({
   
   const data = useQuery(api.tasks.getWithTimeline, taskId ? { taskId } : "skip");
   const agents = useQuery(api.agents.listAll, {});
+  const watchSubscriptions = useQuery(
+    api.watchSubscriptions.listByUser,
+    taskId ? { userId: "operator", entityType: "TASK" } : "skip"
+  );
   const postMessage = useMutation(api.messages.post);
   const transitionTask = useMutation(api.tasks.transition);
+  const toggleWatch = useMutation(api.watchSubscriptions.toggle);
 
   if (!taskId) return null;
 
@@ -51,8 +56,9 @@ export function TaskDrawerTabs({
     );
   }
 
-  const { task, transitions, messages, runs, toolCalls, approvals, activities } = data;
+  const { task, transitions, messages, runs, toolCalls, approvals, activities, taskEvents } = data;
   const agentMap = new Map(agents.map((a: Doc<"agents">) => [a._id, a]));
+  const isWatchingTask = !!watchSubscriptions?.some((subscription) => subscription.entityId === taskId);
 
   const handlePostComment = async () => {
     if (!comment.trim()) return;
@@ -129,6 +135,28 @@ export function TaskDrawerTabs({
             </div>
           </div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button
+              onClick={async () => {
+                await toggleWatch({
+                  userId: "operator",
+                  projectId: task.projectId ?? undefined,
+                  entityType: "TASK",
+                  entityId: taskId,
+                });
+              }}
+              style={{
+                padding: "8px 12px",
+                background: isWatchingTask ? "#14532d" : "#334155",
+                border: isWatchingTask ? "1px solid #16a34a" : "1px solid #475569",
+                borderRadius: "6px",
+                color: isWatchingTask ? "#dcfce7" : "#cbd5e1",
+                fontSize: "0.8rem",
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >
+              {isWatchingTask ? "👁 Watching" : "👁 Watch"}
+            </button>
             {!isEditMode && (
               <>
                 <button
@@ -200,6 +228,7 @@ export function TaskDrawerTabs({
         )}
         {activeTab === "timeline" && (
           <TimelineTab
+            taskEvents={taskEvents}
             transitions={transitions}
             messages={messages}
             runs={runs}
@@ -373,6 +402,7 @@ function OverviewTab({
 // ============================================================================
 
 function TimelineTab({
+  taskEvents,
   transitions,
   messages,
   runs,
@@ -381,6 +411,7 @@ function TimelineTab({
   activities,
   agentMap,
 }: {
+  taskEvents: Doc<"taskEvents">[];
   transitions: Doc<"taskTransitions">[];
   messages: Doc<"messages">[];
   runs: Doc<"runs">[];
@@ -391,57 +422,67 @@ function TimelineTab({
 }) {
   // Build unified timeline
   const items: Array<{
-    type: "transition" | "message" | "run" | "toolCall" | "approval" | "activity";
+    type: "taskEvent" | "transition" | "message" | "run" | "toolCall" | "approval" | "activity";
     ts: number;
     data: any;
   }> = [];
 
-  for (const t of transitions) {
-    items.push({
-      type: "transition",
-      ts: (t as any)._creationTime,
-      data: t,
-    });
-  }
+  if (taskEvents.length > 0) {
+    for (const event of taskEvents) {
+      items.push({
+        type: "taskEvent",
+        ts: event.timestamp,
+        data: event,
+      });
+    }
+  } else {
+    for (const t of transitions) {
+      items.push({
+        type: "transition",
+        ts: (t as any)._creationTime,
+        data: t,
+      });
+    }
 
-  for (const m of messages) {
-    items.push({
-      type: "message",
-      ts: (m as any)._creationTime,
-      data: m,
-    });
-  }
+    for (const m of messages) {
+      items.push({
+        type: "message",
+        ts: (m as any)._creationTime,
+        data: m,
+      });
+    }
 
-  for (const r of runs) {
-    items.push({
-      type: "run",
-      ts: r.startedAt,
-      data: r,
-    });
-  }
+    for (const r of runs) {
+      items.push({
+        type: "run",
+        ts: r.startedAt,
+        data: r,
+      });
+    }
 
-  for (const tc of toolCalls) {
-    items.push({
-      type: "toolCall",
-      ts: tc.startedAt,
-      data: tc,
-    });
-  }
+    for (const tc of toolCalls) {
+      items.push({
+        type: "toolCall",
+        ts: tc.startedAt,
+        data: tc,
+      });
+    }
 
-  for (const a of approvals) {
-    items.push({
-      type: "approval",
-      ts: (a as any)._creationTime,
-      data: a,
-    });
-  }
+    for (const a of approvals) {
+      items.push({
+        type: "approval",
+        ts: (a as any)._creationTime,
+        data: a,
+      });
+    }
 
-  for (const activity of activities) {
-    items.push({
-      type: "activity",
-      ts: (activity as any)._creationTime,
-      data: activity,
-    });
+    for (const activity of activities) {
+      items.push({
+        type: "activity",
+        ts: (activity as any)._creationTime,
+        data: activity,
+      });
+    }
   }
 
   // Sort by timestamp
@@ -476,6 +517,49 @@ function TimelineItem({
   };
 
   switch (item.type) {
+    case "taskEvent": {
+      const event = item.data as Doc<"taskEvents">;
+      const actor = formatActorName(event.actorType, event.actorId);
+      const eventConfig: Record<string, { icon: string; color: string }> = {
+        TASK_CREATED: { icon: "📝", color: "#93c5fd" },
+        TASK_TRANSITION: { icon: "🔁", color: "#60a5fa" },
+        APPROVAL_REQUESTED: { icon: "🛡️", color: "#f59e0b" },
+        APPROVAL_ESCALATED: { icon: "⏫", color: "#f97316" },
+        APPROVAL_APPROVED: { icon: "✅", color: "#22c55e" },
+        APPROVAL_DENIED: { icon: "⛔", color: "#ef4444" },
+        APPROVAL_EXPIRED: { icon: "⌛", color: "#f59e0b" },
+        RUN_STARTED: { icon: "▶", color: "#38bdf8" },
+        RUN_COMPLETED: { icon: "✔", color: "#22c55e" },
+        RUN_FAILED: { icon: "✖", color: "#ef4444" },
+        OPERATOR_CONTROL: { icon: "🚨", color: "#f97316" },
+        POLICY_DECISION: { icon: "⚖", color: "#a78bfa" },
+        TOOL_CALL: { icon: "🧰", color: "#38bdf8" },
+      };
+      const config = eventConfig[event.eventType] ?? { icon: "•", color: "#94a3b8" };
+      return (
+        <div style={timelineItemStyle}>
+          <div style={{ fontSize: "0.75rem", color: "#64748b" }}>{time}</div>
+          <div style={{ fontWeight: 600, color: "#e2e8f0", display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: config.color }}>{config.icon}</span>
+            <span>{event.eventType}</span>
+          </div>
+          <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: 2 }}>
+            Actor: {actor}
+          </div>
+          {event.beforeState && event.afterState && (
+            <div style={{ fontSize: "0.78rem", color: "#cbd5e1", marginTop: 4 }}>
+              {JSON.stringify(event.beforeState)} → {JSON.stringify(event.afterState)}
+            </div>
+          )}
+          {event.metadata && (
+            <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>
+              {JSON.stringify(event.metadata)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     case "transition": {
       const t = item.data as Doc<"taskTransitions">;
       const actor = formatActorName(t.actorType, t.actorUserId || (t.actorAgentId as unknown as string));

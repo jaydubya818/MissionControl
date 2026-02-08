@@ -10,6 +10,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { classifyRisk, requiresApproval } from "./lib/riskClassifier";
+import { evaluateOperatorGate, getEffectiveOperatorControl } from "./lib/operatorControls";
 
 // ============================================================================
 // ALLOWLIST HELPERS
@@ -342,6 +343,27 @@ export const explainTaskPolicy = query({
       }
     }
 
+    const operatorControl = await getEffectiveOperatorControl(ctx.db, task.projectId);
+    const operatorGate = evaluateOperatorGate({
+      mode: operatorControl.mode,
+      actorType: "AGENT",
+      operation: args.plannedToolName ? "TOOL_CALL" : "TRANSITION",
+    });
+    if (operatorGate.decision === "DENY") {
+      decision = "DENY";
+      reason = operatorGate.reason;
+      triggeredRules.push(`operator_control:${operatorControl.mode}`);
+      remediationHints.push("Set operator mode to NORMAL or explicitly override as a human operator.");
+    } else if (operatorGate.decision === "NEEDS_APPROVAL" && decision !== "DENY") {
+      decision = "NEEDS_APPROVAL";
+      reason = operatorGate.reason;
+      triggeredRules.push(`operator_control:${operatorControl.mode}`);
+      requiredApprovals.push({
+        type: "OPERATOR_OVERRIDE",
+        reason: operatorGate.reason,
+      });
+    }
+
     if (decision === "ALLOW") {
       remediationHints.push("No remediation needed. Safe to proceed.");
     } else if (decision === "NEEDS_APPROVAL" && requiredApprovals.length === 0) {
@@ -360,6 +382,7 @@ export const explainTaskPolicy = query({
       decision,
       riskLevel,
       reason,
+      operatorMode: operatorControl.mode,
       triggeredRules,
       requiredApprovals,
       remediationHints,
@@ -402,6 +425,31 @@ export const evaluate = query({
       return { 
         decision: "DENY", 
         reason: "Agent not found" 
+      };
+    }
+
+    const operatorControl = await getEffectiveOperatorControl(ctx.db, agent.projectId);
+    const operatorGate = evaluateOperatorGate({
+      mode: operatorControl.mode,
+      actorType: "AGENT",
+      operation: args.actionType === "TOOL_CALL" ? "TOOL_CALL" : "TRANSITION",
+    });
+    if (operatorGate.decision === "DENY") {
+      return {
+        decision: "DENY",
+        reason: operatorGate.reason,
+        operatorMode: operatorControl.mode,
+      };
+    }
+    if (operatorGate.decision === "NEEDS_APPROVAL") {
+      return {
+        decision: "NEEDS_APPROVAL",
+        reason: operatorGate.reason,
+        operatorMode: operatorControl.mode,
+        approval: {
+          type: "OPERATOR_OVERRIDE",
+          mode: operatorControl.mode,
+        },
       };
     }
     
