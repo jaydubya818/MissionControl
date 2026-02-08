@@ -88,7 +88,7 @@ export function ActivityFeed({ projectId, limit = 50 }: ActivityFeedProps) {
                   </span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: "13px", color: "#e2e8f0", marginBottom: "4px" }}>
-                      {activity.body}
+                      {activity.description}
                     </div>
                     <div style={{ fontSize: "11px", color: "#64748b", display: "flex", gap: "8px" }}>
                       <span>{activity.actorType}</span>

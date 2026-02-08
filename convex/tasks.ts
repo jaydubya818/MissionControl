@@ -25,6 +25,29 @@ export type TaskType =
   | "CONTENT" | "SOCIAL" | "EMAIL_MARKETING" | "CUSTOMER_RESEARCH"
   | "SEO_RESEARCH" | "ENGINEERING" | "DOCS" | "OPS";
 
+const taskStatusValidator = v.union(
+  v.literal("INBOX"),
+  v.literal("ASSIGNED"),
+  v.literal("IN_PROGRESS"),
+  v.literal("REVIEW"),
+  v.literal("NEEDS_APPROVAL"),
+  v.literal("BLOCKED"),
+  v.literal("FAILED"),
+  v.literal("DONE"),
+  v.literal("CANCELED")
+);
+
+const taskTypeValidator = v.union(
+  v.literal("CONTENT"),
+  v.literal("SOCIAL"),
+  v.literal("EMAIL_MARKETING"),
+  v.literal("CUSTOMER_RESEARCH"),
+  v.literal("SEO_RESEARCH"),
+  v.literal("ENGINEERING"),
+  v.literal("DOCS"),
+  v.literal("OPS")
+);
+
 // ============================================================================
 // TRANSITION RULES (State Machine)
 // ============================================================================
@@ -124,7 +147,7 @@ export const list = query({
 export const listByStatus = query({
   args: { 
     projectId: v.optional(v.id("projects")),
-    status: v.optional(v.string()),
+    status: v.optional(taskStatusValidator),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -512,6 +535,12 @@ export const getWithTimeline = query({
       .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
       .order("asc")
       .collect();
+
+    const activities = await ctx.db
+      .query("activities")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .order("asc")
+      .collect();
     
     // Get tool calls for all runs
     const toolCalls = [];
@@ -530,6 +559,110 @@ export const getWithTimeline = query({
       runs,
       toolCalls,
       approvals,
+      activities,
+    };
+  },
+});
+
+/**
+ * Dry-run transition simulation.
+ * Validates transition rules and requirements without mutating task state.
+ */
+export const simulateTransition = query({
+  args: {
+    taskId: v.id("tasks"),
+    toStatus: taskStatusValidator,
+    actorType: v.optional(v.union(v.literal("AGENT"), v.literal("HUMAN"), v.literal("SYSTEM"))),
+    hasWorkPlan: v.optional(v.boolean()),
+    hasDeliverable: v.optional(v.boolean()),
+    hasChecklist: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    if (!task) {
+      return {
+        valid: false,
+        fromStatus: null,
+        toStatus: args.toStatus,
+        actorType: args.actorType ?? "HUMAN",
+        errors: [{ field: "taskId", message: "Task not found" }],
+        allowedTransitions: [],
+      };
+    }
+
+    const fromStatus = task.status as TaskStatus;
+    const toStatus = args.toStatus as TaskStatus;
+    const actorType = (args.actorType ?? "HUMAN") as "AGENT" | "HUMAN" | "SYSTEM";
+    const rule = findTransitionRule(fromStatus, toStatus);
+
+    if (!rule) {
+      return {
+        valid: false,
+        fromStatus,
+        toStatus,
+        actorType,
+        errors: [{
+          field: "toStatus",
+          message: `Invalid transition: ${fromStatus} -> ${toStatus}`,
+        }],
+        allowedTransitions: TRANSITION_RULES
+          .filter((r) => r.from === fromStatus)
+          .map((r) => r.to),
+      };
+    }
+
+    const errors: Array<{ field: string; message: string }> = [];
+
+    if (!rule.allowedActors.includes(actorType)) {
+      errors.push({
+        field: "actorType",
+        message: `Actor type '${actorType}' cannot perform ${fromStatus} -> ${toStatus}`,
+      });
+    }
+
+    if (rule.humanOnly && actorType !== "HUMAN") {
+      errors.push({
+        field: "actorType",
+        message: `Transition ${fromStatus} -> ${toStatus} requires human approval`,
+      });
+    }
+
+    if (rule.requiresWorkPlan && !args.hasWorkPlan) {
+      errors.push({
+        field: "workPlan",
+        message: "Work plan required",
+      });
+    }
+
+    if (rule.requiresDeliverable && !args.hasDeliverable) {
+      errors.push({
+        field: "deliverable",
+        message: "Deliverable required",
+      });
+    }
+
+    if (rule.requiresChecklist && !args.hasChecklist) {
+      errors.push({
+        field: "reviewChecklist",
+        message: "Review checklist required",
+      });
+    }
+
+    return {
+      valid: errors.length === 0,
+      fromStatus,
+      toStatus,
+      actorType,
+      requirements: {
+        requiresWorkPlan: !!rule.requiresWorkPlan,
+        requiresDeliverable: !!rule.requiresDeliverable,
+        requiresChecklist: !!rule.requiresChecklist,
+        humanOnly: !!rule.humanOnly,
+      },
+      errors,
+      allowedTransitions: TRANSITION_RULES
+        .filter((r) => r.from === fromStatus && r.allowedActors.includes(actorType))
+        .map((r) => r.to),
     };
   },
 });
@@ -613,8 +746,8 @@ export const create = mutation({
 export const transition = mutation({
   args: {
     taskId: v.id("tasks"),
-    toStatus: v.string(),
-    actorType: v.string(),
+    toStatus: taskStatusValidator,
+    actorType: v.union(v.literal("AGENT"), v.literal("HUMAN"), v.literal("SYSTEM")),
     actorAgentId: v.optional(v.id("agents")),
     actorUserId: v.optional(v.string()),
     reason: v.optional(v.string()),
@@ -859,7 +992,7 @@ export const assign = mutation({
   args: {
     taskId: v.id("tasks"),
     agentIds: v.array(v.id("agents")),
-    actorType: v.string(),
+    actorType: v.union(v.literal("AGENT"), v.literal("HUMAN"), v.literal("SYSTEM")),
     actorUserId: v.optional(v.string()),
     idempotencyKey: v.string(),
   },
@@ -888,5 +1021,78 @@ export const assign = mutation({
     
     const updatedTask = await ctx.db.get(args.taskId);
     return { success: true, task: updatedTask };
+  },
+});
+
+/**
+ * Update editable task fields.
+ * Status changes are routed through the state-machine transition mutation.
+ */
+export const update = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    priority: v.optional(v.union(v.literal(1), v.literal(2), v.literal(3), v.literal(4))),
+    status: v.optional(taskStatusValidator),
+    type: v.optional(taskTypeValidator),
+    estimatedCost: v.optional(v.number()),
+    assigneeIds: v.optional(v.array(v.id("agents"))),
+    actorUserId: v.optional(v.string()),
+    idempotencyKey: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    if (!task) {
+      throw new Error("Task not found");
+    }
+
+    // Route status updates through transition rules.
+    if (args.status && args.status !== task.status) {
+      const transition = await ctx.runMutation(api.tasks.transition, {
+        taskId: args.taskId,
+        toStatus: args.status,
+        actorType: "HUMAN",
+        actorUserId: args.actorUserId ?? "operator",
+        idempotencyKey: args.idempotencyKey ?? `update-status:${args.taskId}:${args.status}:${args.actorUserId ?? "operator"}`,
+        reason: "Task updated from editor",
+        workPlan: task.workPlan,
+        deliverable: task.deliverable,
+        reviewChecklist: task.reviewChecklist,
+        blockedReason: task.blockedReason,
+      });
+
+      if (!transition.success) {
+        throw new Error(
+          transition.errors?.map((e: { message: string }) => e.message).join(", ") ||
+            "Status transition failed"
+        );
+      }
+    }
+
+    const patch: Record<string, unknown> = {};
+    if (args.title !== undefined) patch.title = args.title.trim();
+    if (args.description !== undefined) patch.description = args.description.trim() || undefined;
+    if (args.priority !== undefined) patch.priority = args.priority;
+    if (args.type !== undefined) patch.type = args.type as TaskType;
+    if (args.estimatedCost !== undefined) patch.estimatedCost = args.estimatedCost;
+    if (args.assigneeIds !== undefined) patch.assigneeIds = args.assigneeIds;
+
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(args.taskId, patch);
+      await ctx.db.insert("activities", {
+        projectId: task.projectId,
+        actorType: "HUMAN",
+        actorId: args.actorUserId ?? "operator",
+        action: "TASK_UPDATED",
+        description: `Task "${args.title ?? task.title}" updated`,
+        targetType: "TASK",
+        targetId: args.taskId,
+        taskId: args.taskId,
+        metadata: { updatedFields: Object.keys(patch) },
+      });
+    }
+
+    return await ctx.db.get(args.taskId);
   },
 });

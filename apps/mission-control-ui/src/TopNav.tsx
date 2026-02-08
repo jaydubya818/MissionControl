@@ -2,6 +2,7 @@ import { CSSProperties } from "react";
 
 export type MainView =
   | "tasks"
+  | "agents"
   | "dag"
   | "chat"
   | "council"
@@ -29,6 +30,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { id: "tasks", label: "Tasks", icon: "📋", shortcut: "1" },
+  { id: "agents", label: "Agents", icon: "🤖" },
   { id: "dag", label: "DAG", icon: "🔀" },
   { id: "chat", label: "Chat", icon: "💬", shortcut: "2" },
   { id: "council", label: "Council", icon: "🏛️", shortcut: "3" },

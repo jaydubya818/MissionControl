@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -22,35 +22,33 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  
-  const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
-  const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
-  
+
+  const searchResults = useQuery(
+    api.search.searchAll,
+    projectId && search.trim().length >= 2
+      ? { projectId, query: search.trim(), limit: 8 }
+      : "skip"
+  );
+
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-  
-  const commands = [
-    { id: "new-task", label: "Create New Task", icon: "📝", action: onCreateTask },
-    { id: "approvals", label: "View Approvals", icon: "✅", action: onOpenApprovals },
-    { id: "agents", label: "View Agents", icon: "🤖", action: onOpenAgents },
-  ];
-  
-  const filteredTasks = tasks?.filter(t =>
-    t.title.toLowerCase().includes(search.toLowerCase()) ||
-    t.description?.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 5) || [];
-  
-  const filteredAgents = agents?.filter(a =>
-    a.name.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 5) || [];
-  
-  const filteredCommands = commands.filter(c =>
-    c.label.toLowerCase().includes(search.toLowerCase())
+
+  const commands = useMemo(
+    () => [
+      { id: "new-task", label: "Create New Task", icon: "📝", shortcut: "Cmd+N", action: onCreateTask },
+      { id: "open-approvals", label: "Open Approvals Center", icon: "✅", shortcut: "Cmd+Shift+A", action: onOpenApprovals },
+      { id: "open-agents", label: "Open Agent Registry", icon: "🤖", shortcut: "Cmd+2", action: onOpenAgents },
+    ],
+    [onCreateTask, onOpenApprovals, onOpenAgents]
   );
-  
-  const hasResults = filteredTasks.length > 0 || filteredAgents.length > 0 || filteredCommands.length > 0;
-  
+
+  const filteredCommands = commands.filter((command) =>
+    command.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const hasSearch = search.trim().length >= 2;
+
   return (
     <div
       style={{
@@ -72,22 +70,21 @@ export function CommandPalette({
         style={{
           background: "#1e293b",
           borderRadius: "12px",
-          maxWidth: "600px",
+          maxWidth: "760px",
           width: "100%",
-          maxHeight: "600px",
+          maxHeight: "640px",
           overflow: "hidden",
           boxShadow: "0 20px 60px rgba(0, 0, 0, 0.6)",
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
-        {/* Search Input */}
         <div style={{ padding: "20px", borderBottom: "1px solid #334155" }}>
           <input
             ref={inputRef}
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search tasks, agents, or commands..."
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search tasks, approvals, agents, or run a command..."
             style={{
               width: "100%",
               padding: "12px",
@@ -98,143 +95,157 @@ export function CommandPalette({
               fontSize: "16px",
               outline: "none",
             }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
                 onClose();
               }
             }}
           />
         </div>
-        
-        {/* Results */}
-        <div style={{ maxHeight: "500px", overflow: "auto" }}>
-          {!hasResults && search && (
-            <div style={{
-              padding: "40px",
-              textAlign: "center",
-              color: "#64748b",
-            }}>
-              No results found for "{search}"
-            </div>
-          )}
-          
+
+        <div style={{ maxHeight: "540px", overflow: "auto", padding: "12px 20px" }}>
           {!search && (
-            <div style={{
-              padding: "20px",
-              color: "#64748b",
-              fontSize: "14px",
-            }}>
-              Start typing to search tasks, agents, or commands...
-            </div>
+            <SectionTitle>Quick Actions</SectionTitle>
           )}
-          
-          {/* Commands */}
-          {filteredCommands.length > 0 && (
-            <div style={{ padding: "12px 20px" }}>
-              <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "8px", fontWeight: 600 }}>
-                COMMANDS
-              </div>
-              {filteredCommands.map((cmd) => (
-                <div
-                  key={cmd.id}
-                  onClick={() => {
-                    cmd.action();
-                    onClose();
-                  }}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    transition: "background 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#334155";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <span style={{ fontSize: "20px" }}>{cmd.icon}</span>
-                  <span style={{ fontSize: "14px", color: "#e2e8f0" }}>{cmd.label}</span>
-                </div>
-              ))}
-            </div>
+
+          {(filteredCommands.length > 0 || !search) && (
+            <ResultGroup
+              title="Commands"
+              rows={(search ? filteredCommands : commands).map((command) => ({
+                key: command.id,
+                title: command.label,
+                subtitle: command.shortcut,
+                icon: command.icon,
+                onClick: () => {
+                  command.action();
+                  onClose();
+                },
+              }))}
+            />
           )}
-          
-          {/* Tasks */}
-          {filteredTasks.length > 0 && (
-            <div style={{ padding: "12px 20px" }}>
-              <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "8px", fontWeight: 600 }}>
-                TASKS
-              </div>
-              {filteredTasks.map((task) => (
-                <div
-                  key={task._id}
-                  onClick={() => {
+
+          {hasSearch && (
+            <>
+              <ResultGroup
+                title="Tasks"
+                rows={(searchResults?.tasks ?? []).map((task) => ({
+                  key: task._id,
+                  title: task.title,
+                  subtitle: `${task.status} · ${task.type} · P${task.priority}`,
+                  icon: "📋",
+                  onClick: () => {
                     onSelectTask(task._id);
                     onClose();
-                  }}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                    transition: "background 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#334155";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <div style={{ fontSize: "14px", color: "#e2e8f0", marginBottom: "4px" }}>
-                    {task.title}
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#64748b" }}>
-                    {task.status} · {task.type} · P{task.priority}
-                  </div>
+                  },
+                }))}
+              />
+
+              <ResultGroup
+                title="Approvals"
+                rows={(searchResults?.approvals ?? []).map((approval) => ({
+                  key: approval._id,
+                  title: approval.actionSummary,
+                  subtitle: `${approval.status} · ${approval.riskLevel} · ${approval.actionType}`,
+                  icon: "🛡️",
+                  onClick: approval.taskId
+                    ? () => {
+                        onSelectTask(approval.taskId as Id<"tasks">);
+                        onClose();
+                      }
+                    : undefined,
+                }))}
+              />
+
+              <ResultGroup
+                title="Agents"
+                rows={(searchResults?.agents ?? []).map((agent) => ({
+                  key: agent._id,
+                  title: agent.name,
+                  subtitle: `${agent.role} · ${agent.status}`,
+                  icon: agent.emoji || "🤖",
+                  onClick: () => {
+                    onOpenAgents();
+                    onClose();
+                  },
+                }))}
+              />
+
+              {searchResults && searchResults.totalResults === 0 && (
+                <div style={{ padding: "24px", color: "#64748b", textAlign: "center" }}>
+                  No results for "{search}".
                 </div>
-              ))}
-            </div>
-          )}
-          
-          {/* Agents */}
-          {filteredAgents.length > 0 && (
-            <div style={{ padding: "12px 20px" }}>
-              <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "8px", fontWeight: 600 }}>
-                AGENTS
-              </div>
-              {filteredAgents.map((agent) => (
-                <div
-                  key={agent._id}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                    transition: "background 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#334155";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <div style={{ fontSize: "14px", color: "#e2e8f0", marginBottom: "4px" }}>
-                    {agent.emoji || "🤖"} {agent.name}
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#64748b" }}>
-                    {agent.role} · {agent.status}
-                  </div>
-                </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
     </div>
   );
 }
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <div style={{ color: "#64748b", fontSize: "12px", marginBottom: "8px", fontWeight: 600 }}>{children}</div>;
+}
+
+function ResultGroup({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: Array<{
+    key: string;
+    title: string;
+    subtitle?: string;
+    icon?: string;
+    onClick?: () => void;
+  }>;
+}) {
+  if (!rows.length) return null;
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <SectionTitle>{title.toUpperCase()}</SectionTitle>
+      {rows.map((row) => (
+        <button
+          key={row.key}
+          type="button"
+          onClick={row.onClick}
+          disabled={!row.onClick}
+          style={{
+            width: "100%",
+            textAlign: "left",
+            padding: "10px 12px",
+            borderRadius: "6px",
+            border: "none",
+            background: "transparent",
+            color: "#e2e8f0",
+            cursor: row.onClick ? "pointer" : "default",
+            opacity: row.onClick ? 1 : 0.8,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+          onMouseEnter={(event) => {
+            if (row.onClick) {
+              event.currentTarget.style.background = "#334155";
+            }
+          }}
+          onMouseLeave={(event) => {
+            if (row.onClick) {
+              event.currentTarget.style.background = "transparent";
+            }
+          }}
+        >
+          <span style={{ minWidth: 22 }}>{row.icon || "•"}</span>
+          <span style={{ flex: 1 }}>
+            <span style={{ display: "block", fontSize: "0.88rem" }}>{row.title}</span>
+            {row.subtitle ? (
+              <span style={{ display: "block", fontSize: "0.75rem", color: "#94a3b8" }}>{row.subtitle}</span>
+            ) : null}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+

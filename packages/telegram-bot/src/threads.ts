@@ -12,6 +12,11 @@ import type { Id } from "../../../convex/_generated/dataModel";
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const FORUM_TOPIC_ID = process.env.TELEGRAM_FORUM_TOPIC_ID; // Optional: for forum groups
 
+type ThreadRef = {
+  chatId: string;
+  threadId: string;
+};
+
 // ============================================================================
 // CREATE THREAD FOR TASK
 // ============================================================================
@@ -20,7 +25,7 @@ export async function createThreadForTask(
   bot: Telegraf,
   convex: ConvexHttpClient,
   taskId: Id<"tasks">
-) {
+): Promise<ThreadRef | null> {
   if (!TELEGRAM_CHAT_ID) {
     console.warn("TELEGRAM_CHAT_ID not set - cannot create thread");
     return null;
@@ -60,10 +65,14 @@ export async function createThreadForTask(
     );
     
     // Store threadRef on task
-    const threadRef = `${TELEGRAM_CHAT_ID}:${message.message_id}`;
+    const threadRef: ThreadRef = {
+      chatId: TELEGRAM_CHAT_ID,
+      threadId: String(message.message_id),
+    };
     await convex.mutation(api.tasks.updateThreadRef, {
       taskId,
-      threadRef,
+      chatId: threadRef.chatId,
+      threadId: threadRef.threadId,
     });
     
     console.log(`Created thread for task ${taskId}: ${threadRef}`);
@@ -80,16 +89,12 @@ export async function createThreadForTask(
 
 export async function postMessageToThread(
   bot: Telegraf,
-  threadRef: string,
+  threadRef: ThreadRef,
   message: string
 ) {
-  if (!threadRef) {
-    console.warn("No threadRef provided");
-    return;
-  }
-  
   try {
-    const [chatId, messageId] = threadRef.split(":");
+    const chatId = threadRef.chatId;
+    const messageId = threadRef.threadId;
     
     const messageOptions: any = {
       parse_mode: "Markdown",
@@ -122,11 +127,18 @@ export async function handleThreadReply(
     
     const replyToMessageId = message.reply_to_message.message_id;
     const chatId = message.chat.id;
-    const threadRef = `${chatId}:${replyToMessageId}`;
+    const threadRef: ThreadRef = {
+      chatId: String(chatId),
+      threadId: String(replyToMessageId),
+    };
     
     // Find task with this threadRef
     const tasks = await convex.query(api.tasks.listAll, {});
-    const task = tasks.find((t: any) => t.threadRef === threadRef);
+    const task = tasks.find(
+      (t: any) =>
+        t.threadRef?.chatId === threadRef.chatId &&
+        t.threadRef?.threadId === threadRef.threadId
+    );
     
     if (!task) {
       console.log("No task found for thread:", threadRef);
@@ -167,7 +179,7 @@ export async function updateThreadStatus(
       return;
     }
     
-    const [chatId, messageId] = task.threadRef.split(":");
+    const { chatId, threadId } = task.threadRef;
     const priorityEmoji = task.priority === 1 ? "🔴" : task.priority === 2 ? "🟠" : "🔵";
     const statusEmoji = {
       INBOX: "📥",
@@ -176,13 +188,14 @@ export async function updateThreadStatus(
       REVIEW: "👀",
       NEEDS_APPROVAL: "⏳",
       BLOCKED: "🚫",
+      FAILED: "💥",
       DONE: "✅",
       CANCELED: "❌",
     };
     
     await bot.telegram.editMessageText(
       chatId,
-      parseInt(messageId),
+      parseInt(threadId, 10),
       undefined,
       `${priorityEmoji} **Task: ${task.title}**\n\n` +
       `Type: ${task.type}\n` +

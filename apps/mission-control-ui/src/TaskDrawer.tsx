@@ -7,6 +7,7 @@ import { useState } from "react";
 type Transition = Doc<"taskTransitions">;
 type Message = Doc<"messages">;
 type Agent = Doc<"agents">;
+type TaskStatus = Doc<"tasks">["status"];
 
 export function TaskDrawer({
   taskId,
@@ -63,7 +64,7 @@ export function TaskDrawer({
     setLoading(false);
   };
 
-  const handleTransition = async (toStatus: string) => {
+  const handleTransition = async (toStatus: TaskStatus) => {
     setLoading(true);
     try {
       const result = await transitionTask({
@@ -172,7 +173,7 @@ export function TaskDrawer({
         {/* Quick Actions */}
         <Section title="Actions">
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {getAvailableTransitions(task.status).map((toStatus) => (
+            {getAvailableTransitions(task.status).map((toStatus: TaskStatus) => (
               <button
                 key={toStatus}
                 onClick={() => handleTransition(toStatus)}
@@ -382,18 +383,19 @@ function TimelineItem({ item, isLast }: { item: TimelineEntry; isLast: boolean }
   );
 }
 
-function getAvailableTransitions(currentStatus: string): string[] {
-  const transitions: Record<string, string[]> = {
+function getAvailableTransitions(currentStatus: TaskStatus): TaskStatus[] {
+  const transitions: Record<TaskStatus, TaskStatus[]> = {
     INBOX: ["ASSIGNED", "CANCELED"],
     ASSIGNED: ["IN_PROGRESS", "INBOX", "CANCELED"],
-    IN_PROGRESS: ["REVIEW", "BLOCKED", "CANCELED"],
+    IN_PROGRESS: ["REVIEW", "BLOCKED", "FAILED", "CANCELED"],
     REVIEW: ["IN_PROGRESS", "DONE", "BLOCKED", "CANCELED"],
     NEEDS_APPROVAL: ["INBOX", "ASSIGNED", "IN_PROGRESS", "REVIEW", "BLOCKED", "DONE", "CANCELED"],
-    BLOCKED: ["ASSIGNED", "IN_PROGRESS", "CANCELED"],
+    BLOCKED: ["ASSIGNED", "IN_PROGRESS", "NEEDS_APPROVAL", "CANCELED"],
+    FAILED: ["INBOX", "ASSIGNED", "CANCELED"],
     DONE: [],
     CANCELED: [],
   };
-  return transitions[currentStatus] || [];
+  return transitions[currentStatus];
 }
 
 const tagStyle: React.CSSProperties = {

@@ -14,10 +14,17 @@
     "declarationMap": true,
     "sourceMap": true,
     "composite": true,
+    "baseUrl": ".",
     "paths": {
       "@mission-control/shared": ["./packages/shared/src"],
+      "@mission-control/memory": ["./packages/memory/src/index.ts"],
       "@mission-control/state-machine": ["./packages/state-machine/src"],
-      "@mission-control/policy-engine": ["./packages/policy-engine/src"]
+      "@mission-control/policy-engine": ["./packages/policy-engine/src"],
+      "@mission-control/coordinator": ["./packages/coordinator/src"],
+      "@mission-control/agent-runtime": ["./packages/agent-runtime/src"],
+      "@mission-control/context-router": ["./packages/context-router/src"],
+      "@mission-control/model-router": ["./packages/model-router/src"],
+      "@mission-control/openclaw-sdk": ["./packages/openclaw-sdk/src"]
     }
   },
   "exclude": ["node_modules", "dist", "build", ".next"]

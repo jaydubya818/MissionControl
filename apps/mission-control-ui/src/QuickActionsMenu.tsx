@@ -1,21 +1,25 @@
 import { useState } from "react";
-import { useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
 
 interface QuickActionsMenuProps {
-  projectId: Id<"projects"> | null;
   onCreateTask: () => void;
+  onOpenSearch: () => void;
+  onOpenApprovals: () => void;
+  onOpenAgents: () => void;
 }
 
-export function QuickActionsMenu({ projectId, onCreateTask }: QuickActionsMenuProps) {
+export function QuickActionsMenu({
+  onCreateTask,
+  onOpenSearch,
+  onOpenApprovals,
+  onOpenAgents,
+}: QuickActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   
   const actions = [
     { id: "new-task", label: "📝 New Task", action: onCreateTask, shortcut: "⌘N" },
-    { id: "search", label: "🔍 Search", action: () => {}, shortcut: "⌘K" },
-    { id: "approvals", label: "✅ Approvals", action: () => {}, shortcut: "⌘A" },
-    { id: "agents", label: "🤖 Agents", action: () => {}, shortcut: "⌘E" },
+    { id: "search", label: "🔍 Search", action: onOpenSearch, shortcut: "⌘K" },
+    { id: "approvals", label: "✅ Approvals", action: onOpenApprovals, shortcut: "⇧⌘A" },
+    { id: "agents", label: "🤖 Agents", action: onOpenAgents, shortcut: "⌘2" },
   ];
 
   return (

@@ -90,6 +90,10 @@ export class AgentBot {
         }
 
         const agent = await this.convex.query(api.agents.get, { agentId: this.agentId });
+        if (!agent) {
+          await ctx.reply("❌ Agent record not found");
+          return;
+        }
         const tasks = await this.convex.query(api.tasks.listByAgent, { agentId: this.agentId });
 
         const activeTasks = tasks.filter((t: any) =>

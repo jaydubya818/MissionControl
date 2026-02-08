@@ -313,8 +313,11 @@ export const status = query({
       overallStatus = "degraded";
     }
     
-    // Calculate uptime (simplified - just show time since last restart)
-    const uptimeSeconds = Math.floor((now - now) / 1000);
+    // Approximate uptime from earliest persisted project creation time.
+    // This is not process uptime, but gives operators a meaningful service age signal.
+    const earliestProject = await ctx.db.query("projects").order("asc").take(1);
+    const startedAt = earliestProject[0]?._creationTime ?? now;
+    const uptimeSeconds = Math.max(0, Math.floor((now - startedAt) / 1000));
     const uptimeHours = Math.floor(uptimeSeconds / 3600);
     const uptimeMinutes = Math.floor((uptimeSeconds % 3600) / 60);
     const uptimeDisplay = uptimeHours > 0 

@@ -172,7 +172,7 @@ export function DashboardOverview({ projectId, onClose }: DashboardOverviewProps
                   }}
                 >
                   <div style={{ color: "#e2e8f0", marginBottom: "4px" }}>
-                    {activity.body}
+                    {activity.description}
                   </div>
                   <div style={{ fontSize: "11px", color: "#64748b" }}>
                     {activity.actorType} · {new Date(activity._creationTime).toLocaleTimeString()}

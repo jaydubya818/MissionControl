@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import type { Id, Doc } from "../../../convex/_generated/dataModel";
+import type { Doc } from "../../../convex/_generated/dataModel";
 
 interface QuickEditModalProps {
   task: Doc<"tasks">;
@@ -20,7 +20,6 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
   const [saving, setSaving] = useState(false);
   
   const updateTask = useMutation(api.tasks.update);
-  const agents = useQuery(api.agents.listAll, { projectId: task.projectId });
   
   const handleSave = async () => {
     setSaving(true);
@@ -30,8 +29,8 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
         title,
         description,
         priority,
-        status: status as any,
-        type: type as any,
+        status,
+        type,
         estimatedCost,
       });
       onSave();
@@ -44,9 +43,28 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
     }
   };
   
-  const statuses = ["INBOX", "ASSIGNED", "IN_PROGRESS", "REVIEW", "NEEDS_APPROVAL", "BLOCKED", "DONE", "CANCELED"];
-  const types = ["ENGINEERING", "CONTENT", "RESEARCH", "REVIEW", "PLANNING", "DEPLOYMENT", "BUG_FIX", "FEATURE"];
-  const priorities = [1, 2, 3, 4];
+  const statuses: Array<Doc<"tasks">["status"]> = [
+    "INBOX",
+    "ASSIGNED",
+    "IN_PROGRESS",
+    "REVIEW",
+    "NEEDS_APPROVAL",
+    "BLOCKED",
+    "FAILED",
+    "DONE",
+    "CANCELED",
+  ];
+  const types: Array<Doc<"tasks">["type"]> = [
+    "CONTENT",
+    "SOCIAL",
+    "EMAIL_MARKETING",
+    "CUSTOMER_RESEARCH",
+    "SEO_RESEARCH",
+    "ENGINEERING",
+    "DOCS",
+    "OPS",
+  ];
+  const priorities: Array<Doc<"tasks">["priority"]> = [1, 2, 3, 4];
   
   return createPortal(
     <div
@@ -159,7 +177,7 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
                 </label>
                 <select
                   value={status}
-                  onChange={(e) => setStatus(e.target.value)}
+                  onChange={(e) => setStatus(e.target.value as Doc<"tasks">["status"])}
                   style={{
                     width: "100%",
                     padding: "10px 12px",
@@ -182,7 +200,7 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
                 </label>
                 <select
                   value={priority}
-                  onChange={(e) => setPriority(Number(e.target.value))}
+                  onChange={(e) => setPriority(Number(e.target.value) as Doc<"tasks">["priority"])}
                   style={{
                     width: "100%",
                     padding: "10px 12px",
@@ -205,7 +223,7 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
                 </label>
                 <select
                   value={type}
-                  onChange={(e) => setType(e.target.value)}
+                  onChange={(e) => setType(e.target.value as Doc<"tasks">["type"])}
                   style={{
                     width: "100%",
                     padding: "10px 12px",

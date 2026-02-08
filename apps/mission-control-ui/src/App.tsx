@@ -15,6 +15,7 @@ import { StandupModal } from "./StandupModal";
 import { useToast } from "./Toast";
 import { SearchBar } from "./SearchBar";
 import { AgentDashboard } from "./AgentDashboard";
+import { AgentRegistryView } from "./AgentRegistryView";
 import { KanbanFilters } from "./KanbanFilters";
 import { CostAnalytics } from "./CostAnalytics";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
@@ -158,7 +159,7 @@ export default function App() {
     onNewTask: () => setShowCreateTask(true),
     onSearch: () => setShowCommandPalette(true),
     onApprovals: () => setShowApprovals(true),
-    onAgents: () => setShowAgentDashboard(true),
+    onAgents: () => setCurrentView("agents"),
   });
   
   // Provide project context
@@ -356,7 +357,7 @@ function AppContent({
         <div className="app-header-right">
           <button
             type="button"
-            onClick={() => setShowAgentDashboard(true)}
+            onClick={() => setCurrentView("agents")}
             style={{
               padding: "6px 12px",
               background: "#10b981",
@@ -369,7 +370,7 @@ function AppContent({
               marginRight: "8px",
             }}
           >
-            📊 Agents
+            🤖 Registry
           </button>
           <button
             type="button"
@@ -568,6 +569,7 @@ function AppContent({
             <LiveFeed projectId={projectId} />
           </>
         )}
+        {currentView === "agents" && <AgentRegistryView projectId={projectId} />}
         {currentView === "dag" && (
           <MissionDAGView
             projectId={projectId}
@@ -712,7 +714,7 @@ function AppContent({
           }}
           onOpenAgents={() => {
             setShowCommandPalette(false);
-            setShowAgentDashboard(true);
+            setCurrentView("agents");
           }}
         />
       )}
@@ -734,8 +736,10 @@ function AppContent({
       
       {/* Quick Actions Menu */}
       <QuickActionsMenu
-        projectId={projectId}
         onCreateTask={() => setShowCreateTask(true)}
+        onOpenSearch={() => setShowCommandPalette(true)}
+        onOpenApprovals={() => setShowApprovals(true)}
+        onOpenAgents={() => setCurrentView("agents")}
       />
       
       {/* Error Boundary wraps everything */}

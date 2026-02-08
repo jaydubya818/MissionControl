@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query, action, internalMutation, internalQuery } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { mutation, query, action, internalQuery } from "./_generated/server";
+import { api } from "./_generated/api";
 
 /**
  * GitHub Integration

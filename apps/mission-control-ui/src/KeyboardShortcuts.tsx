@@ -30,6 +30,7 @@ export function useKeyboardShortcuts({
           onSearch();
           break;
         case "a":
+          if (!e.shiftKey) return;
           e.preventDefault();
           onApprovals();
           break;
@@ -49,7 +50,7 @@ export function KeyboardShortcutsHelp({ onClose }: { onClose: () => void }) {
   const shortcuts = [
     { keys: ["⌘", "N"], description: "Create new task" },
     { keys: ["⌘", "K"], description: "Search" },
-    { keys: ["⌘", "A"], description: "View approvals" },
+    { keys: ["⇧", "⌘", "A"], description: "View approvals" },
     { keys: ["⌘", "E"], description: "View agents" },
     { keys: ["ESC"], description: "Close modal/drawer" },
     { keys: ["?"], description: "Show this help" },

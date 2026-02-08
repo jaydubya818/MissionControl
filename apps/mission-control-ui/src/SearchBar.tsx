@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
@@ -7,12 +7,16 @@ interface SearchBarProps {
   onResultClick: (taskId: string) => void;
 }
 
+type SearchHit =
+  | { type: "task"; id: string; title: string; subtitle: string; taskId: string }
+  | { type: "approval"; id: string; title: string; subtitle: string; taskId?: string };
+
 export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [nonActionableFeedback, setNonActionableFeedback] = useState(false);
 
-  // Get search results
   const results = useQuery(
     api.search.searchAll,
     query.length >= 2 && projectId
@@ -20,65 +24,93 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
       : "skip"
   );
 
+  const taskResults = results?.tasks ?? [];
+  const approvalResults = results?.approvals ?? [];
+  const agentResults = results?.agents ?? [];
+  const messageResults = results?.messages ?? [];
+
+  const flatResults = useMemo<SearchHit[]>(() => {
+    const taskHits: SearchHit[] = taskResults.map((task) => ({
+      type: "task",
+      id: `task-${task._id}`,
+      title: task.title,
+      subtitle: `${task.status} · ${task.type} · P${task.priority}`,
+      taskId: task._id,
+    }));
+    const approvalHits: SearchHit[] = approvalResults.map((approval) => ({
+      type: "approval",
+      id: `approval-${approval._id}`,
+      title: approval.actionSummary,
+      subtitle: `${approval.status} · ${approval.riskLevel} · ${approval.actionType}`,
+      taskId: approval.taskId ?? undefined,
+    }));
+    return [...taskHits, ...approvalHits];
+  }, [taskResults, approvalResults]);
 
   useEffect(() => {
-    setIsOpen(query.length >= 2 && (results?.length ?? 0) > 0);
+    const hasAny =
+      taskResults.length > 0 ||
+      approvalResults.length > 0 ||
+      agentResults.length > 0 ||
+      messageResults.length > 0;
+    setIsOpen(query.length >= 2 && hasAny);
     setSelectedIndex(0);
-  }, [query, results]);
+  }, [query, taskResults.length, approvalResults.length, agentResults.length, messageResults.length]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!results || results.length === 0) return;
+  function handleKeyDown(event: React.KeyboardEvent) {
+    if (!flatResults.length) return;
 
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSelectedIndex((prev) => Math.min(prev + 1, results.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedIndex((prev) => Math.min(prev + 1, flatResults.length - 1));
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
       setSelectedIndex((prev) => Math.max(prev - 1, 0));
-    } else if (e.key === "Enter" && results[selectedIndex]) {
-      e.preventDefault();
-      onResultClick(results[selectedIndex].task._id);
-      setQuery("");
-      setIsOpen(false);
-    } else if (e.key === "Escape") {
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const selected = flatResults[selectedIndex];
+      if (!selected) return;
+      if (selected.type === "task") {
+        onResultClick(selected.taskId);
+        setQuery("");
+        setIsOpen(false);
+      } else if (selected.type === "approval") {
+        if (selected.taskId) {
+          onResultClick(selected.taskId);
+          setQuery("");
+          setIsOpen(false);
+        } else {
+          // Approval has no linked task -- flash feedback and keep menu open
+          setNonActionableFeedback(true);
+          setTimeout(() => setNonActionableFeedback(false), 1200);
+        }
+      }
+      return;
+    }
+
+    if (event.key === "Escape") {
       setIsOpen(false);
     }
-  };
+  }
 
-  const handleResultClick = (taskId: string) => {
-    onResultClick(taskId);
-    setQuery("");
-    setIsOpen(false);
-  };
-
-  const highlightMatch = (text: string, query: string) => {
-    const parts = text.split(new RegExp(`(${query})`, "gi"));
-    return (
-      <>
-        {parts.map((part, i) =>
-          part.toLowerCase() === query.toLowerCase() ? (
-            <mark key={i} className="bg-yellow-200 dark:bg-yellow-800">
-              {part}
-            </mark>
-          ) : (
-            part
-          )
-        )}
-      </>
-    );
-  };
+  const noResults = query.length >= 2 && !!results && !results.totalResults;
 
   return (
-    <div className="relative w-full" style={{ maxWidth: "400px" }}>
-      {/* Search Input */}
+    <div className="relative w-full" style={{ maxWidth: "460px" }}>
       <div className="relative">
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => query.length >= 2 && setIsOpen(true)}
-          placeholder="Search tasks..."
+          placeholder="Search tasks, approvals, agents..."
           style={{
             width: "100%",
             padding: "6px 12px 6px 32px",
@@ -103,150 +135,159 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
-        {query && (
-          <button
-            onClick={() => {
-              setQuery("");
-              setIsOpen(false);
-            }}
-            style={{
-              position: "absolute",
-              right: "8px",
-              top: "6px",
-              color: "#64748b",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "2px",
-            }}
-          >
-            <svg style={{ height: "16px", width: "16px" }} fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
-        )}
       </div>
 
-
-      {/* Search Results */}
-      {isOpen && results && results.length > 0 && (
+      {isOpen && (
         <div
           style={{
             position: "absolute",
             zIndex: 1000,
             width: "100%",
-            marginTop: "4px",
+            marginTop: 4,
             background: "#1e293b",
             border: "1px solid #334155",
-            borderRadius: "8px",
+            borderRadius: 8,
             boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
-            maxHeight: "400px",
+            maxHeight: 420,
             overflowY: "auto",
           }}
         >
-          <div
-            style={{
-              padding: "8px 12px",
-              fontSize: "0.75rem",
-              color: "#94a3b8",
-              borderBottom: "1px solid #334155",
-            }}
-          >
-            Found {results.length} result{results.length !== 1 ? "s" : ""}
+          <div style={{ padding: "8px 12px", fontSize: "0.75rem", color: "#94a3b8", borderBottom: "1px solid #334155" }}>
+            {nonActionableFeedback ? (
+              <span style={{ color: "#f59e0b" }}>This item has no linked task</span>
+            ) : (
+              <>{results?.totalResults ?? 0} result(s)</>
+            )}
           </div>
-          {results.map((result, i) => {
-            const task = result.task;
-            const isSelected = i === selectedIndex;
 
-            return (
-              <button
-                key={task._id}
-                onClick={() => handleResultClick(task._id)}
-                style={{
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "12px",
-                  background: isSelected ? "#334155" : "transparent",
-                  border: "none",
-                  borderBottom: "1px solid #334155",
-                  cursor: "pointer",
-                  transition: "background 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSelected) e.currentTarget.style.background = "#1e293b";
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) e.currentTarget.style.background = "transparent";
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500, fontSize: "0.875rem", color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {highlightMatch(task.title, query)}
-                    </div>
-                    {task.description && (
-                      <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                        {highlightMatch(task.description, query)}
-                      </div>
-                    )}
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", fontSize: "0.75rem" }}>
-                      <span
-                        style={{
-                          padding: "2px 8px",
-                          borderRadius: "12px",
-                          background: "#334155",
-                          color: "#94a3b8",
-                          fontSize: "0.7rem",
-                        }}
-                      >
-                        {task.status}
-                      </span>
-                      <span style={{ color: "#64748b" }}>
-                        {task.type}
-                      </span>
-                      <span style={{ color: "#64748b" }}>
-                        P{task.priority}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+          <SearchSection
+            title="Tasks"
+            rows={taskResults.map((task) => ({
+              key: `task-${task._id}`,
+              title: task.title,
+              subtitle: `${task.status} · ${task.type} · P${task.priority}`,
+              onClick: () => {
+                onResultClick(task._id);
+                setQuery("");
+                setIsOpen(false);
+              },
+              isSelected: flatResults[selectedIndex]?.id === `task-${task._id}`,
+            }))}
+          />
+
+          <SearchSection
+            title="Approvals"
+            rows={approvalResults.map((approval) => ({
+              key: `approval-${approval._id}`,
+              title: approval.actionSummary,
+              subtitle: `${approval.status} · ${approval.riskLevel} · ${approval.actionType}`,
+              onClick: approval.taskId
+                ? () => {
+                    onResultClick(approval.taskId as string);
+                    setQuery("");
+                    setIsOpen(false);
+                  }
+                : undefined,
+              isSelected: flatResults[selectedIndex]?.id === `approval-${approval._id}`,
+            }))}
+          />
+
+          <SearchSection
+            title="Agents"
+            rows={agentResults.map((agent) => ({
+              key: `agent-${agent._id}`,
+              title: `${agent.emoji || "🤖"} ${agent.name}`,
+              subtitle: `${agent.role} · ${agent.status}`,
+              onClick: undefined,
+              isSelected: false,
+            }))}
+          />
+
+          <SearchSection
+            title="Messages"
+            rows={messageResults.slice(0, 4).map((message) => ({
+              key: `message-${message._id}`,
+              title: message.content.slice(0, 80),
+              subtitle: message.type,
+              onClick: message.taskId
+                ? () => {
+                    onResultClick(message.taskId as string);
+                    setQuery("");
+                    setIsOpen(false);
+                  }
+                : undefined,
+              isSelected: false,
+            }))}
+          />
         </div>
       )}
 
-      {/* No Results */}
-      {isOpen && results && results.length === 0 && query.length >= 2 && (
+      {noResults && (
         <div
           style={{
             position: "absolute",
             zIndex: 1000,
             width: "100%",
-            marginTop: "4px",
+            marginTop: 4,
             background: "#1e293b",
             border: "1px solid #334155",
-            borderRadius: "8px",
-            padding: "16px",
+            borderRadius: 8,
+            padding: 16,
             textAlign: "center",
             color: "#94a3b8",
-            fontSize: "0.875rem",
+            fontSize: "0.85rem",
           }}
         >
-          No tasks found for "{query}"
+          No results for "{query}"
         </div>
       )}
     </div>
   );
 }
+
+function SearchSection({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: Array<{
+    key: string;
+    title: string;
+    subtitle: string;
+    onClick?: () => void;
+    isSelected: boolean;
+  }>;
+}) {
+  if (!rows.length) return null;
+
+  return (
+    <div style={{ padding: "8px 10px", borderBottom: "1px solid #334155" }}>
+      <div style={{ color: "#64748b", fontSize: "0.7rem", textTransform: "uppercase", marginBottom: 6 }}>{title}</div>
+      {rows.map((row) => (
+        <button
+          key={row.key}
+          type="button"
+          onClick={row.onClick}
+          disabled={!row.onClick}
+          style={{
+            width: "100%",
+            textAlign: "left",
+            padding: "8px 10px",
+            border: "none",
+            borderRadius: 6,
+            background: row.isSelected ? "#334155" : "transparent",
+            cursor: row.onClick ? "pointer" : "default",
+            color: "#e2e8f0",
+            opacity: row.onClick ? 1 : 0.8,
+          }}
+        >
+          <div style={{ fontSize: "0.84rem", fontWeight: 500 }}>{row.title}</div>
+          <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{row.subtitle}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+

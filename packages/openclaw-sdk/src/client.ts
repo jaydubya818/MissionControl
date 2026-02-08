@@ -64,8 +64,9 @@ export class MissionControlClient {
       });
 
       if (existing) {
-        this.agent = existing;
-        console.log(`[SDK] Agent "${this.agent.name}" already registered (${this.agent._id})`);
+        const existingAgent = existing as Agent;
+        this.agent = existingAgent;
+        console.log(`[SDK] Agent "${existingAgent.name}" already registered (${existingAgent._id})`);
       } else {
         const result = await this.client.mutation("agents:register" as any, {
           projectId: this.projectId,
@@ -77,13 +78,20 @@ export class MissionControlClient {
           budgetDaily: this.config.agent.budgetDaily,
           budgetPerRun: this.config.agent.budgetPerRun,
         });
-        this.agent = result.agent;
-        console.log(`[SDK] Agent "${this.agent.name}" registered (${this.agent._id})`);
+        const registeredAgent = (result as { agent?: Agent }).agent;
+        if (!registeredAgent) {
+          throw new Error("Agent registration did not return an agent");
+        }
+        this.agent = registeredAgent;
+        console.log(`[SDK] Agent "${registeredAgent.name}" registered (${registeredAgent._id})`);
       }
 
       // Start heartbeat loop
       this.startHeartbeatLoop();
 
+      if (!this.agent) {
+        throw new Error("Agent initialization failed");
+      }
       return this.agent;
     } catch (error) {
       this.config.onError(error as Error);
@@ -170,6 +178,9 @@ export class MissionControlClient {
     });
 
     const task = await this.client.query("tasks:get" as any, { taskId });
+    if (!task) {
+      throw new Error(`Task ${taskId} not found after claim`);
+    }
     this.config.onTaskClaimed(task);
 
     return task;
@@ -211,8 +222,12 @@ export class MissionControlClient {
       idempotencyKey: `run-${taskId}-${Date.now()}`,
     });
 
-    this.currentRun = runResult.run;
-    return this.currentRun;
+    const run = (runResult as { run?: Run }).run;
+    if (!run) {
+      throw new Error("Run start did not return a run");
+    }
+    this.currentRun = run;
+    return run;
   }
 
   /**
@@ -345,6 +360,9 @@ export class MissionControlClient {
 
     if (claimable.length > 0) {
       const task = claimable[0];
+      if (!task) {
+        return;
+      }
       await this.claimTask(task._id);
       await this.executeTask(task);
     }

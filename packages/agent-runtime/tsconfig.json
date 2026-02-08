@@ -11,6 +11,7 @@
   "references": [
     { "path": "../shared" },
     { "path": "../state-machine" },
-    { "path": "../policy-engine" }
+    { "path": "../policy-engine" },
+    { "path": "../memory" }
   ]
 }

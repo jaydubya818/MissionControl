@@ -141,7 +141,6 @@ export function PeopleView({ projectId }: PeopleViewProps) {
           <PersonCard
             key={member._id}
             member={member}
-            projects={projects || []}
             getProjectName={getProjectName}
             onClick={() => setEditMember(member)}
           />
@@ -195,12 +194,11 @@ export function PeopleView({ projectId }: PeopleViewProps) {
 
 interface PersonCardProps {
   member: Doc<"orgMembers">;
-  projects: Doc<"projects">[];
   getProjectName: (pid: Id<"projects">) => string;
   onClick: () => void;
 }
 
-function PersonCard({ member, projects, getProjectName, onClick }: PersonCardProps) {
+function PersonCard({ member, getProjectName, onClick }: PersonCardProps) {
   const systemRole = (member as any).systemRole || "MEMBER";
   const projectAccess = (member as any).projectAccess as
     | { projectId: Id<"projects">; accessLevel: string }[]

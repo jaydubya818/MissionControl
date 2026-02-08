@@ -44,9 +44,28 @@ export function TaskEditMode({ task, onSave, onCancel }: TaskEditModeProps) {
     }
   };
   
-  const statuses = ["INBOX", "ASSIGNED", "IN_PROGRESS", "REVIEW", "NEEDS_APPROVAL", "BLOCKED", "DONE", "CANCELED"];
-  const types = ["ENGINEERING", "CONTENT", "RESEARCH", "REVIEW", "PLANNING", "DEPLOYMENT", "BUG_FIX", "FEATURE"];
-  const priorities = [1, 2, 3, 4];
+  const statuses: Array<Doc<"tasks">["status"]> = [
+    "INBOX",
+    "ASSIGNED",
+    "IN_PROGRESS",
+    "REVIEW",
+    "NEEDS_APPROVAL",
+    "BLOCKED",
+    "FAILED",
+    "DONE",
+    "CANCELED",
+  ];
+  const types: Array<Doc<"tasks">["type"]> = [
+    "CONTENT",
+    "SOCIAL",
+    "EMAIL_MARKETING",
+    "CUSTOMER_RESEARCH",
+    "SEO_RESEARCH",
+    "ENGINEERING",
+    "DOCS",
+    "OPS",
+  ];
+  const priorities: Array<Doc<"tasks">["priority"]> = [1, 2, 3, 4];
   
   const inputStyle = {
     width: "100%",
@@ -150,7 +169,7 @@ export function TaskEditMode({ task, onSave, onCancel }: TaskEditModeProps) {
             </label>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => setStatus(e.target.value as Doc<"tasks">["status"])}
               style={inputStyle}
             >
               {statuses.map((s) => (
@@ -165,7 +184,7 @@ export function TaskEditMode({ task, onSave, onCancel }: TaskEditModeProps) {
             </label>
             <select
               value={priority}
-              onChange={(e) => setPriority(Number(e.target.value))}
+              onChange={(e) => setPriority(Number(e.target.value) as Doc<"tasks">["priority"])}
               style={inputStyle}
             >
               {priorities.map((p) => (
@@ -180,7 +199,7 @@ export function TaskEditMode({ task, onSave, onCancel }: TaskEditModeProps) {
             </label>
             <select
               value={type}
-              onChange={(e) => setType(e.target.value)}
+              onChange={(e) => setType(e.target.value as Doc<"tasks">["type"])}
               style={inputStyle}
             >
               {types.map((t) => (

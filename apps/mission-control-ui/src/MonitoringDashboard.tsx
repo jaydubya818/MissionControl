@@ -39,20 +39,20 @@ export function MonitoringDashboard({ onClose }: MonitoringDashboardProps) {
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case "critical": return "#ef4444";
-      case "error": return "#f97316";
-      case "warning": return "#f59e0b";
-      case "info": return "#3b82f6";
+      case "CRITICAL": return "#ef4444";
+      case "ERROR": return "#f97316";
+      case "WARNING": return "#f59e0b";
+      case "INFO": return "#3b82f6";
       default: return "#6b7280";
     }
   };
 
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
-      case "critical": return "🔴";
-      case "error": return "❌";
-      case "warning": return "⚠️";
-      case "info": return "ℹ️";
+      case "CRITICAL": return "🔴";
+      case "ERROR": return "❌";
+      case "WARNING": return "⚠️";
+      case "INFO": return "ℹ️";
       default: return "📝";
     }
   };
@@ -195,6 +195,48 @@ function TabButton({ label, active, onClick, count }: { label: string; active: b
   );
 }
 
+const SENSITIVE_KEYS = new Set([
+  "token", "access_token", "refresh_token", "id_token",
+  "password", "passwd", "secret", "api_key", "apikey", "apiKey",
+  "auth", "authorization", "credentials", "private_key", "privateKey",
+  "ssn", "email", "cookie", "session", "jwt", "bearer",
+  "client_secret", "clientSecret", "connection_string", "connectionString",
+]);
+
+const SENSITIVE_PATTERNS = [
+  /^sk[-_]/i, // Stripe/OpenAI secret keys
+  /^ghp_/i, // GitHub PATs
+  /^xoxb-/i, // Slack tokens
+  /bearer\s+\S+/i,
+];
+
+function isSensitiveValue(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  return SENSITIVE_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function sanitizeMetadata(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "string") {
+    return isSensitiveValue(obj) ? "[REDACTED]" : obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeMetadata);
+  }
+  if (typeof obj === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      if (SENSITIVE_KEYS.has(key.toLowerCase())) {
+        result[key] = "[REDACTED]";
+      } else {
+        result[key] = sanitizeMetadata(value);
+      }
+    }
+    return result;
+  }
+  return obj;
+}
+
 function ErrorsTab({ errors, getSeverityColor, getSeverityIcon }: any) {
   if (errors.length === 0) {
     return (
@@ -208,52 +250,67 @@ function ErrorsTab({ errors, getSeverityColor, getSeverityIcon }: any) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-      {errors.map((error: any, idx: number) => (
-        <div
-          key={idx}
-          style={{
-            background: "#0f172a",
-            borderRadius: "8px",
-            padding: "16px",
-            border: `1px solid ${getSeverityColor(error.severity)}`,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-            <span style={{ fontSize: "20px" }}>{getSeverityIcon(error.severity)}</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                <div style={{ fontSize: "14px", fontWeight: 600, textTransform: "uppercase" }}>
-                  {error.severity}
+      {errors.map((error: any, idx: number) => {
+        const errorType = error.metadata?.errorType || "ERROR";
+        const severity =
+          errorType === "CRITICAL" || errorType === "DATABASE_ERROR" || errorType === "API_ERROR"
+            ? "CRITICAL"
+            : errorType === "WARNING"
+              ? "WARNING"
+              : "ERROR";
+
+        return (
+          <div
+            key={idx}
+            style={{
+              background: "#0f172a",
+              borderRadius: "8px",
+              padding: "16px",
+              border: `1px solid ${getSeverityColor(severity)}`,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+              <span style={{ fontSize: "20px" }}>{getSeverityIcon(severity)}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 600, textTransform: "uppercase" }}>
+                    {severity}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#64748b" }}>
+                    {new Date(error._creationTime).toLocaleString()}
+                  </div>
                 </div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>
-                  {new Date(error._creationTime).toLocaleString()}
+                <div style={{ fontSize: "14px", marginBottom: "8px" }}>
+                  {error.description}
                 </div>
+                {error.metadata && (
+                  <div style={{
+                    background: "#020617",
+                    borderRadius: "4px",
+                    padding: "8px",
+                    fontSize: "12px",
+                    fontFamily: "monospace",
+                    color: "#94a3b8",
+                    overflow: "auto",
+                  }}>
+                    {JSON.stringify(sanitizeMetadata(error.metadata), null, 2)}
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: "14px", marginBottom: "8px" }}>
-                {error.message}
-              </div>
-              {error.context && (
-                <div style={{
-                  background: "#020617",
-                  borderRadius: "4px",
-                  padding: "8px",
-                  fontSize: "12px",
-                  fontFamily: "monospace",
-                  color: "#94a3b8",
-                  overflow: "auto",
-                }}>
-                  {JSON.stringify(error.context, null, 2)}
-                </div>
-              )}
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
 function PerformanceTab({ stats }: any) {
+  const logs = stats.recentLogs || [];
+  const slowest = [...logs]
+    .sort((a: any, b: any) => (b.metadata?.durationMs || 0) - (a.metadata?.durationMs || 0))
+    .slice(0, 8);
+
   return (
     <div>
       <div style={{
@@ -263,27 +320,25 @@ function PerformanceTab({ stats }: any) {
         marginBottom: "24px",
       }}>
         <MetricCard
-          label="Avg Query Time"
-          value={`${stats.avgQueryTime || 0}ms`}
+          label="Average Duration"
+          value={`${Math.round(stats.avgDurationMs || 0)}ms`}
           icon="⚡"
-          trend={stats.queryTimeTrend}
         />
         <MetricCard
-          label="Avg Mutation Time"
-          value={`${stats.avgMutationTime || 0}ms`}
-          icon="✏️"
-          trend={stats.mutationTimeTrend}
+          label="Min Duration"
+          value={`${Math.round(stats.minDurationMs || 0)}ms`}
+          icon="⬇️"
         />
         <MetricCard
-          label="Total Requests"
-          value={stats.totalRequests || 0}
+          label="Max Duration"
+          value={`${Math.round(stats.maxDurationMs || 0)}ms`}
+          icon="⬆️"
+          highlight={(stats.maxDurationMs || 0) > 5000}
+        />
+        <MetricCard
+          label="Sample Count"
+          value={stats.count || 0}
           icon="📊"
-        />
-        <MetricCard
-          label="Error Rate"
-          value={`${stats.errorRate || 0}%`}
-          icon="❌"
-          highlight={stats.errorRate > 5}
         />
       </div>
 
@@ -293,11 +348,14 @@ function PerformanceTab({ stats }: any) {
         padding: "20px",
       }}>
         <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: 600 }}>
-          Slowest Operations
+          Recent Slow Operations
         </h3>
-        {stats.slowestOperations && stats.slowestOperations.length > 0 ? (
+        {slowest.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {stats.slowestOperations.map((op: any, idx: number) => (
+            {slowest.map((log: any, idx: number) => {
+              const duration = log.metadata?.durationMs || 0;
+              const operation = log.metadata?.operation || "Unknown operation";
+              return (
               <div
                 key={idx}
                 style={{
@@ -308,12 +366,13 @@ function PerformanceTab({ stats }: any) {
                   borderRadius: "4px",
                 }}
               >
-                <span style={{ fontSize: "14px" }}>{op.operation}</span>
-                <span style={{ fontSize: "14px", color: op.time > 1000 ? "#ef4444" : "#94a3b8" }}>
-                  {op.time}ms
+                <span style={{ fontSize: "14px" }}>{operation}</span>
+                <span style={{ fontSize: "14px", color: duration > 1000 ? "#ef4444" : "#94a3b8" }}>
+                  {Math.round(duration)}ms
                 </span>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div style={{ textAlign: "center", color: "#64748b", padding: "20px" }}>
@@ -376,7 +435,7 @@ function AuditTab({ logs }: any) {
   );
 }
 
-function MetricCard({ label, value, icon, trend, highlight }: any) {
+function MetricCard({ label, value, icon, highlight }: any) {
   return (
     <div style={{
       background: highlight ? "#7c2d12" : "#0f172a",
@@ -390,11 +449,6 @@ function MetricCard({ label, value, icon, trend, highlight }: any) {
       </div>
       <div style={{ fontSize: "12px", color: "#94a3b8", display: "flex", justifyContent: "space-between" }}>
         <span>{label}</span>
-        {trend && (
-          <span style={{ color: trend > 0 ? "#ef4444" : "#10b981" }}>
-            {trend > 0 ? "↑" : "↓"} {Math.abs(trend)}%
-          </span>
-        )}
       </div>
     </div>
   );

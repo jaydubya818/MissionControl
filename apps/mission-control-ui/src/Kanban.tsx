@@ -17,13 +17,16 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 
-const COLUMNS: { status: string; label: string; color: string }[] = [
+type TaskStatus = Doc<"tasks">["status"];
+
+const COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
   { status: "INBOX", label: "Inbox", color: "#6366f1" },
   { status: "ASSIGNED", label: "Assigned", color: "#f59e0b" },
   { status: "IN_PROGRESS", label: "In Progress", color: "#3b82f6" },
   { status: "REVIEW", label: "Review", color: "#8b5cf6" },
   { status: "NEEDS_APPROVAL", label: "Needs Approval", color: "#ef4444" },
   { status: "BLOCKED", label: "Blocked", color: "#f97316" },
+  { status: "FAILED", label: "Failed", color: "#ef4444" },
   { status: "DONE", label: "Done", color: "#22c55e" },
   { status: "CANCELED", label: "Canceled", color: "#6b7280" },
 ];
@@ -39,7 +42,7 @@ type Task = {
   _id: Id<"tasks">;
   title: string;
   type: string;
-  status: string;
+  status: TaskStatus;
   priority: number;
   actualCost: number;
   estimatedCost?: number;
@@ -61,13 +64,14 @@ const SOURCE_CONFIG: Record<string, { icon: string; label: string; color: string
   UNKNOWN:   { icon: "❓", label: "Unknown",    color: "#94a3b8", bg: "#334155" },
 };
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS: Record<TaskStatus, string> = {
   INBOX: "Inbox",
   ASSIGNED: "Assigned",
   IN_PROGRESS: "In Progress",
   REVIEW: "Review",
   NEEDS_APPROVAL: "Needs Approval",
   BLOCKED: "Blocked",
+  FAILED: "Failed",
   DONE: "Done",
   CANCELED: "Canceled",
 };
@@ -88,8 +92,8 @@ export function Kanban({
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [lastMove, setLastMove] = useState<{
     taskId: Id<"tasks">;
-    fromStatus: string;
-    toStatus: string;
+    fromStatus: TaskStatus;
+    toStatus: TaskStatus;
   } | null>(null);
   
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
@@ -143,9 +147,10 @@ export function Kanban({
   });
 
   const agentMap = new Map(agents.map((a: Doc<"agents">) => [a._id, a]));
-  const byStatus = (status: string) => filteredTasks.filter((t: Doc<"tasks">) => t.status === status);
+  const byStatus = (status: TaskStatus) =>
+    filteredTasks.filter((t: Doc<"tasks">) => t.status === status);
 
-  const handleMoveTo = async (taskId: Id<"tasks">, fromStatus: string, toStatus: string) => {
+  const handleMoveTo = async (taskId: Id<"tasks">, fromStatus: TaskStatus, toStatus: TaskStatus) => {
     try {
       setLastMove({ taskId, fromStatus, toStatus });
       
@@ -201,7 +206,7 @@ export function Kanban({
     if (!over || active.id === over.id) return;
     
     const task = filteredTasks.find((t) => t._id === active.id);
-    const toStatus = over.id as string;
+    const toStatus = over.id as TaskStatus;
     
     if (!task) return;
     
@@ -306,12 +311,12 @@ function Column({
 }: {
   title: string;
   color: string;
-  status: string;
+  status: TaskStatus;
   tasks: Task[];
   agentMap: Map<Id<"agents">, { name: string; emoji?: string }>;
   allowedMap: Record<string, string[]>;
   onSelectTask: (id: Id<"tasks">) => void;
-  onMoveTo: (taskId: Id<"tasks">, fromStatus: string, toStatus: string) => void;
+  onMoveTo: (taskId: Id<"tasks">, fromStatus: TaskStatus, toStatus: TaskStatus) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
@@ -360,7 +365,7 @@ function Column({
             key={t._id}
             task={t}
             agentMap={agentMap}
-            allowedToStatuses={allowedMap[t.status] ?? []}
+            allowedToStatuses={(allowedMap[t.status] as TaskStatus[] | undefined) ?? []}
             onSelect={() => onSelectTask(t._id)}
             onMoveTo={(toStatus) => onMoveTo(t._id, t.status, toStatus)}
           />
@@ -385,9 +390,9 @@ function Card({
 }: {
   task: Task;
   agentMap: Map<Id<"agents">, { name: string; emoji?: string }>;
-  allowedToStatuses: string[];
+  allowedToStatuses: TaskStatus[];
   onSelect: () => void;
-  onMoveTo: (toStatus: string) => void;
+  onMoveTo: (toStatus: TaskStatus) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task._id,
@@ -594,7 +599,7 @@ function Card({
             onChange={(e) => {
               const v = e.target.value;
               if (v) {
-                onMoveTo(v);
+                onMoveTo(v as TaskStatus);
                 e.target.value = "";
               }
             }}
@@ -609,9 +614,9 @@ function Card({
             }}
           >
             <option value="">—</option>
-            {allowedToStatuses.map((s) => (
+            {allowedToStatuses.map((s: TaskStatus) => (
               <option key={s} value={s}>
-                {STATUS_LABELS[s] ?? s}
+                {STATUS_LABELS[s]}
               </option>
             ))}
           </select>

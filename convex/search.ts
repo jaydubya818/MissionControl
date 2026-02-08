@@ -68,18 +68,14 @@ export const searchAll = query({
     }
     
     // Search messages (use content field, not body)
-    let messages = await ctx.db.query("messages").collect();
+    let messages = args.projectId
+      ? await ctx.db.query("messages")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+          .collect()
+      : await ctx.db.query("messages").collect();
     messages = messages.filter(m => 
       m.content.toLowerCase().includes(searchQuery)
     );
-    
-    if (args.projectId) {
-      // Filter messages by project through tasks
-      const projectTaskIds = tasks.map(t => t._id);
-      messages = messages.filter(m => 
-        m.taskId && projectTaskIds.includes(m.taskId)
-      );
-    }
     
     // Search agents
     let agents = args.projectId
@@ -103,13 +99,31 @@ export const searchAll = query({
     activities = activities.filter(a => 
       a.description.toLowerCase().includes(searchQuery)
     );
+
+    // Search approvals
+    let approvals = args.projectId
+      ? await ctx.db
+          .query("approvals")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+          .collect()
+      : await ctx.db.query("approvals").collect();
+
+    approvals = approvals.filter((approval) =>
+      approval.actionSummary.toLowerCase().includes(searchQuery) ||
+      approval.actionType.toLowerCase().includes(searchQuery) ||
+      approval.status.toLowerCase().includes(searchQuery) ||
+      approval.riskLevel.toLowerCase().includes(searchQuery) ||
+      approval.justification.toLowerCase().includes(searchQuery) ||
+      (approval.decisionReason?.toLowerCase().includes(searchQuery) ?? false)
+    );
     
     return {
       tasks: tasks.slice(0, limit),
       messages: messages.slice(0, 20),
       agents: agents.slice(0, 10),
       activities: activities.slice(0, 20),
-      totalResults: tasks.length + messages.length + agents.length + activities.length,
+      approvals: approvals.slice(0, 20),
+      totalResults: tasks.length + messages.length + agents.length + activities.length + approvals.length,
     };
   },
 });

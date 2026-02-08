@@ -8,12 +8,13 @@ import { useMutation, useQuery } from "convex/react";
 import { createPortal } from "react-dom";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PeerReviewPanel } from "./PeerReviewPanel";
 import { ExportReportButton } from "./ExportReportButton";
 import { TaskEditMode } from "./TaskEditMode";
 
 type Tab = "overview" | "timeline" | "artifacts" | "approvals" | "cost" | "reviews" | "why";
+type TaskStatus = Doc<"tasks">["status"];
 
 export function TaskDrawerTabs({
   taskId,
@@ -50,7 +51,7 @@ export function TaskDrawerTabs({
     );
   }
 
-  const { task, transitions, messages, runs, toolCalls, approvals } = data;
+  const { task, transitions, messages, runs, toolCalls, approvals, activities } = data;
   const agentMap = new Map(agents.map((a: Doc<"agents">) => [a._id, a]));
 
   const handlePostComment = async () => {
@@ -72,7 +73,7 @@ export function TaskDrawerTabs({
     setLoading(false);
   };
 
-  const handleTransition = async (toStatus: string) => {
+  const handleTransition = async (toStatus: TaskStatus) => {
     setLoading(true);
     try {
       const result = await transitionTask({
@@ -204,6 +205,7 @@ export function TaskDrawerTabs({
             runs={runs}
             toolCalls={toolCalls}
             approvals={approvals}
+            activities={activities}
             agentMap={agentMap}
           />
         )}
@@ -277,7 +279,7 @@ function OverviewTab({
 }: { 
   task: Doc<"tasks">; 
   agentMap: Map<Id<"agents">, Doc<"agents">>;
-  onTransition: (status: string) => void;
+  onTransition: (status: TaskStatus) => void;
   loading: boolean;
 }) {
   return (
@@ -376,6 +378,7 @@ function TimelineTab({
   runs,
   toolCalls,
   approvals,
+  activities,
   agentMap,
 }: {
   transitions: Doc<"taskTransitions">[];
@@ -383,11 +386,12 @@ function TimelineTab({
   runs: Doc<"runs">[];
   toolCalls: Doc<"toolCalls">[];
   approvals: Doc<"approvals">[];
+  activities: Doc<"activities">[];
   agentMap: Map<Id<"agents">, Doc<"agents">>;
 }) {
   // Build unified timeline
   const items: Array<{
-    type: "transition" | "message" | "run" | "toolCall" | "approval";
+    type: "transition" | "message" | "run" | "toolCall" | "approval" | "activity";
     ts: number;
     data: any;
   }> = [];
@@ -432,6 +436,14 @@ function TimelineTab({
     });
   }
 
+  for (const activity of activities) {
+    items.push({
+      type: "activity",
+      ts: (activity as any)._creationTime,
+      data: activity,
+    });
+  }
+
   // Sort by timestamp
   items.sort((a, b) => a.ts - b.ts);
 
@@ -453,14 +465,25 @@ function TimelineItem({
 }) {
   const time = new Date(item.ts).toLocaleTimeString();
 
+  const formatActorName = (actorType?: string, actorId?: string) => {
+    if (actorType === "AGENT" && actorId) {
+      const maybeAgent = agentMap.get(actorId as Id<"agents">);
+      if (maybeAgent) return maybeAgent.name;
+    }
+    if (actorType === "HUMAN") return actorId || "Human";
+    if (actorType === "SYSTEM") return "System";
+    return actorId || "Unknown";
+  };
+
   switch (item.type) {
     case "transition": {
       const t = item.data as Doc<"taskTransitions">;
+      const actor = formatActorName(t.actorType, t.actorUserId || (t.actorAgentId as unknown as string));
       return (
         <div style={timelineItemStyle}>
           <div style={{ fontSize: "0.75rem", color: "#64748b" }}>{time}</div>
           <div style={{ fontWeight: 500 }}>
-            {t.fromStatus} → {t.toStatus}
+            {t.fromStatus} → {t.toStatus} · {actor}
           </div>
           {t.reason && <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>{t.reason}</div>}
         </div>
@@ -494,7 +517,7 @@ function TimelineItem({
             Run by {agent?.name || "Agent"} · {r.status}
           </div>
           <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
-            {r.model} · {duration} · ${r.costUsd.toFixed(3)}
+            {r.model} · {duration} · Δ ${r.costUsd.toFixed(3)}
           </div>
         </div>
       );
@@ -530,6 +553,22 @@ function TimelineItem({
           </div>
           <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
             {a.actionSummary} · {agent?.name || "Agent"}
+          </div>
+        </div>
+      );
+    }
+
+    case "activity": {
+      const activity = item.data as Doc<"activities">;
+      const actor = formatActorName(activity.actorType, activity.actorId);
+      return (
+        <div style={timelineItemStyle}>
+          <div style={{ fontSize: "0.75rem", color: "#64748b" }}>{time}</div>
+          <div style={{ fontWeight: 500 }}>
+            Audit · {activity.action} · {actor}
+          </div>
+          <div style={{ fontSize: "0.85rem", color: "#94a3b8", whiteSpace: "pre-wrap" }}>
+            {activity.description}
           </div>
         </div>
       );
@@ -940,24 +979,57 @@ function WhyTab({
   agentMap: Map<Id<"agents">, Doc<"agents">>;
   transitions: any[];
 }) {
-  // Build explainability data from task metadata
   const assignees = task.assigneeIds
     .map((id: Id<"agents">) => agentMap.get(id))
-    .filter(Boolean);
+    .filter((agent): agent is Doc<"agents"> => !!agent);
+  const allowedTransitions = useQuery(api.tasks.getAllowedTransitionsForHuman);
+  const [simulateToStatus, setSimulateToStatus] = useState<TaskStatus | "">("");
 
-  const riskLevel = (task as any).riskLevel ?? "GREEN";
+  const transitionChoices = (allowedTransitions?.[task.status] as TaskStatus[] | undefined) ?? [];
+  useEffect(() => {
+    if (!simulateToStatus && transitionChoices.length > 0) {
+      setSimulateToStatus(transitionChoices[0]);
+    }
+  }, [simulateToStatus, transitionChoices]);
+
+  const transitionSimulation = useQuery(
+    api.tasks.simulateTransition,
+    simulateToStatus
+      ? {
+          taskId: task._id,
+          toStatus: simulateToStatus,
+          actorType: "HUMAN",
+          hasWorkPlan: !!task.workPlan,
+          hasDeliverable: !!task.deliverable,
+          hasChecklist: !!task.reviewChecklist,
+        }
+      : "skip"
+  );
+
+  const policyDecision = useQuery(api.policy.explainTaskPolicy, {
+    taskId: task._id,
+    plannedTransitionTo: simulateToStatus || undefined,
+    estimatedCost: task.estimatedCost,
+  });
+
+  const riskLevel = policyDecision?.riskLevel ?? "GREEN";
   const riskColors: Record<string, string> = {
     GREEN: "#10b981",
     YELLOW: "#f59e0b",
     RED: "#ef4444",
   };
 
+  const decisionColor: Record<string, string> = {
+    ALLOW: "#22c55e",
+    NEEDS_APPROVAL: "#f59e0b",
+    DENY: "#ef4444",
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Assignment reasoning */}
       <section>
         <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: 12 }}>
-          Why was this task assigned?
+          Policy Decision Viewer
         </h3>
         <div
           style={{
@@ -967,56 +1039,7 @@ function WhyTab({
             padding: 16,
           }}
         >
-          {assignees.length > 0 ? (
-            assignees.map((agent: any) => (
-              <div key={agent._id} style={{ marginBottom: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontWeight: 600, color: "#e2e8f0" }}>
-                    {agent.name}
-                  </span>
-                  <span style={tagStyle}>{agent.role}</span>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <ExplainRow
-                    label="Skill Match"
-                    value={agent.allowedTaskTypes?.includes(task.type) ? "Yes" : "No"}
-                    detail={`Agent handles: ${(agent.allowedTaskTypes ?? []).join(", ") || "any"}`}
-                  />
-                  <ExplainRow
-                    label="Agent Status"
-                    value={agent.status}
-                    detail={`Current workload: ${agent.currentTaskCount ?? 0}/${agent.maxConcurrentTasks ?? 3}`}
-                  />
-                  <ExplainRow
-                    label="Agent Role"
-                    value={agent.role}
-                    detail={`Role weight in scoring: ${agent.role === "LEAD" ? "0.1" : agent.role === "SENIOR" ? "0.08" : "0.05"}`}
-                  />
-                </div>
-              </div>
-            ))
-          ) : (
-            <p style={{ color: "#64748b", margin: 0 }}>
-              No agent assigned yet. Task is in {task.status} state.
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* Risk Assessment */}
-      <section>
-        <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: 12 }}>
-          Risk Assessment
-        </h3>
-        <div
-          style={{
-            background: "#0f172a",
-            border: "1px solid #334155",
-            borderRadius: 8,
-            padding: 16,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span
               style={{
                 display: "inline-block",
@@ -1024,36 +1047,67 @@ function WhyTab({
                 borderRadius: 6,
                 background: riskColors[riskLevel] ?? "#64748b",
                 color: "#fff",
-                fontWeight: 600,
-                fontSize: "0.85rem",
+                fontWeight: 700,
+                fontSize: "0.8rem",
               }}
             >
               {riskLevel}
             </span>
-            <span style={{ color: "#94a3b8", fontSize: "0.85rem" }}>
-              {riskLevel === "GREEN"
-                ? "Autonomous execution allowed"
-                : riskLevel === "YELLOW"
-                  ? "May require approval for certain tools"
-                  : "Requires human approval before execution"}
+            <span
+              style={{
+                display: "inline-block",
+                padding: "4px 12px",
+                borderRadius: 6,
+                background: decisionColor[policyDecision?.decision ?? "ALLOW"] ?? "#334155",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+              }}
+            >
+              {policyDecision?.decision ?? "Analyzing..."}
             </span>
           </div>
-          <ExplainRow
-            label="Budget"
-            value={`$${(task.actualCost ?? 0).toFixed(2)} / $${(task.estimatedCost ?? 0).toFixed(2)}`}
-            detail={
-              task.estimatedCost && task.actualCost > task.estimatedCost
-                ? "Over budget — approval may be required"
-                : "Within budget"
-            }
-          />
+          <div style={{ marginTop: 10, color: "#cbd5e1", fontSize: "0.88rem" }}>
+            {policyDecision?.reason ?? "Calculating policy outcome..."}
+          </div>
+          {policyDecision?.triggeredRules && policyDecision.triggeredRules.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ color: "#94a3b8", fontSize: "0.8rem", marginBottom: 6 }}>Triggered rules</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {policyDecision.triggeredRules.map((rule: string) => (
+                  <span key={rule} style={tagStyle}>
+                    {rule}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {policyDecision?.requiredApprovals?.length ? (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ color: "#94a3b8", fontSize: "0.8rem", marginBottom: 6 }}>Required approvals</div>
+              {policyDecision.requiredApprovals.map((approval: { type: string; reason: string }, index: number) => (
+                <div key={`${approval.type}-${index}`} style={{ color: "#cbd5e1", fontSize: "0.83rem", marginBottom: 4 }}>
+                  • {approval.type}: {approval.reason}
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {policyDecision?.remediationHints?.length ? (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ color: "#94a3b8", fontSize: "0.8rem", marginBottom: 6 }}>Remediation hints</div>
+              {policyDecision.remediationHints.map((hint: string, index: number) => (
+                <div key={`${hint}-${index}`} style={{ color: "#cbd5e1", fontSize: "0.83rem", marginBottom: 4 }}>
+                  • {hint}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
 
-      {/* State Transition History */}
       <section>
         <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: 12 }}>
-          Decision Timeline
+          Dry Run Simulation
         </h3>
         <div
           style={{
@@ -1063,48 +1117,110 @@ function WhyTab({
             padding: 16,
           }}
         >
-          {transitions.length > 0 ? (
-            transitions.slice(0, 10).map((t: any, i: number) => (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "6px 0",
-                  borderBottom:
-                    i < transitions.length - 1
-                      ? "1px solid #1e293b"
-                      : undefined,
-                }}
-              >
-                <span style={{ color: "#64748b", fontSize: "0.75rem", width: 120, flexShrink: 0 }}>
-                  {new Date(t._creationTime).toLocaleString()}
-                </span>
-                <span style={tagStyle}>{t.fromStatus ?? "—"}</span>
-                <span style={{ color: "#64748b" }}>→</span>
-                <span style={tagStyle}>{t.toStatus}</span>
-                {t.triggeredBy && (
-                  <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>
-                    by {t.triggeredBy}
-                  </span>
-                )}
-                {t.reason && (
-                  <span style={{ color: "#64748b", fontSize: "0.75rem", fontStyle: "italic" }}>
-                    — {t.reason}
-                  </span>
-                )}
+          {transitionChoices.length > 0 ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <span style={{ color: "#94a3b8", fontSize: "0.82rem" }}>Simulate transition</span>
+                <select
+                  value={simulateToStatus}
+                  onChange={(event) => setSimulateToStatus(event.target.value as TaskStatus)}
+                  style={{
+                    padding: "6px 10px",
+                    background: "#1e293b",
+                    border: "1px solid #334155",
+                    borderRadius: 6,
+                    color: "#e2e8f0",
+                    fontSize: "0.82rem",
+                  }}
+                >
+                  {transitionChoices.map((choice: TaskStatus) => (
+                    <option key={choice} value={choice}>
+                      {task.status} → {choice}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {transitionSimulation ? (
+                <>
+                  <ExplainRow
+                    label="Result"
+                    value={transitionSimulation.valid ? "VALID" : "INVALID"}
+                    detail={transitionSimulation.valid ? "No blocking transition rule" : "One or more checks failed"}
+                  />
+                  <ExplainRow
+                    label="Actor"
+                    value={transitionSimulation.actorType}
+                    detail="Dry-run evaluates HUMAN actions by default"
+                  />
+                  {transitionSimulation.requirements && (
+                    <ExplainRow
+                      label="Requirements"
+                      value={[
+                        transitionSimulation.requirements.requiresWorkPlan ? "work plan" : null,
+                        transitionSimulation.requirements.requiresDeliverable ? "deliverable" : null,
+                        transitionSimulation.requirements.requiresChecklist ? "checklist" : null,
+                        transitionSimulation.requirements.humanOnly ? "human-only" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(", ") || "none"}
+                    />
+                  )}
+                  {transitionSimulation.errors?.length ? (
+                    <div style={{ marginTop: 8 }}>
+                      {transitionSimulation.errors.map((error: { field: string; message: string }) => (
+                        <div key={`${error.field}-${error.message}`} style={{ color: "#fca5a5", fontSize: "0.82rem", marginBottom: 4 }}>
+                          • {error.field}: {error.message}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div style={{ color: "#64748b", fontSize: "0.82rem" }}>Running simulation...</div>
+              )}
+            </>
+          ) : (
+            <div style={{ color: "#64748b", fontSize: "0.82rem" }}>
+              No human transitions available from {task.status}.
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: 12 }}>
+          Assignment Context
+        </h3>
+        <div
+          style={{
+            background: "#0f172a",
+            border: "1px solid #334155",
+            borderRadius: 8,
+            padding: 16,
+          }}
+        >
+          {assignees.length ? (
+            assignees.map((agent: Doc<"agents">) => (
+              <div key={agent._id} style={{ marginBottom: 10 }}>
+                <ExplainRow label="Agent" value={`${agent.emoji || "🤖"} ${agent.name}`} />
+                <ExplainRow label="Role" value={agent.role} />
+                <ExplainRow label="Status" value={agent.status} />
+                <ExplainRow
+                  label="Capabilities"
+                  value={agent.allowedTaskTypes.length ? agent.allowedTaskTypes.join(", ") : "All types"}
+                  detail={agent.allowedTaskTypes.includes(task.type) ? "Matches task type" : "No direct type match"}
+                />
               </div>
             ))
           ) : (
             <p style={{ color: "#64748b", margin: 0 }}>
-              No transitions recorded yet.
+              No assignee yet. Assigning an active agent improves policy confidence and simulation accuracy.
             </p>
           )}
         </div>
       </section>
 
-      {/* Task Metadata */}
       <section>
         <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: 12 }}>
           Task Properties
@@ -1138,6 +1254,11 @@ function WhyTab({
           {task.labels && task.labels.length > 0 && (
             <ExplainRow label="Labels" value={task.labels.join(", ")} />
           )}
+          <ExplainRow
+            label="Recent transitions"
+            value={String(transitions.length)}
+            detail={transitions.length ? "Included in task audit trail" : "No transitions yet"}
+          />
         </div>
       </section>
     </div>

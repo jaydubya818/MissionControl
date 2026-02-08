@@ -1165,7 +1165,6 @@ export const seedCouncilData = mutation({
     const alex = agentByName["Alex"];
     const jordan = agentByName["Jordan"];
     const casey = agentByName["Casey"];
-    const coach = agentByName["Coach"];
     const sellerfi = agentByName["SellerFi"];
 
     if (!sofie) {

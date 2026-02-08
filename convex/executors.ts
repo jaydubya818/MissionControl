@@ -5,23 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
-import { Doc, Id } from "./_generated/dataModel";
-
-const executorType = v.union(
-  v.literal("CURSOR"),
-  v.literal("CLAUDE_CODE"),
-  v.literal("OPENCLAW_AGENT"),
-  v.literal("MANUAL")
-);
-
-const requestStatus = v.union(
-  v.literal("PENDING"),
-  v.literal("ASSIGNED"),
-  v.literal("IN_PROGRESS"),
-  v.literal("COMPLETED"),
-  v.literal("FAILED")
-);
+import { mutation, query } from "./_generated/server";
 
 // ============================================================================
 // QUERIES
@@ -29,7 +13,7 @@ const requestStatus = v.union(
 
 export const listPending = query({
   args: { projectId: v.optional(v.id("projects")) },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, _args) => {
     // This would query executionRequests table
     // For now, return empty array as table doesn't exist yet
     return [];

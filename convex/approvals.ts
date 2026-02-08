@@ -52,6 +52,42 @@ export const listPending = query({
   },
 });
 
+/**
+ * List approvals by status for Approvals Center tabs.
+ */
+export const listByStatus = query({
+  args: {
+    status: v.union(
+      v.literal("PENDING"),
+      v.literal("APPROVED"),
+      v.literal("DENIED"),
+      v.literal("EXPIRED"),
+      v.literal("CANCELED")
+    ),
+    projectId: v.optional(v.id("projects")),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 100;
+
+    if (args.projectId) {
+      return await ctx.db
+        .query("approvals")
+        .withIndex("by_project_status", (q) =>
+          q.eq("projectId", args.projectId).eq("status", args.status)
+        )
+        .order("desc")
+        .take(limit);
+    }
+
+    return await ctx.db
+      .query("approvals")
+      .withIndex("by_status", (q) => q.eq("status", args.status))
+      .order("desc")
+      .take(limit);
+  },
+});
+
 export const listByTask = query({
   args: { 
     taskId: v.id("tasks"),
