@@ -22,7 +22,6 @@ import { CostAnalytics } from "./CostAnalytics";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { HealthDashboard } from "./HealthDashboard";
 import { MonitoringDashboard } from "./MonitoringDashboard";
-import { QuickActionsMenu } from "./QuickActionsMenu";
 import { CommandPalette } from "./CommandPalette";
 import { KeyboardShortcutsHelp, useKeyboardShortcuts } from "./KeyboardShortcuts";
 import { DashboardOverview } from "./DashboardOverview";
@@ -132,6 +131,7 @@ export default function App() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showDashboardOverview, setShowDashboardOverview] = useState(false);
   const [showActivityFeed, setShowActivityFeed] = useState(false);
+  const [liveFeedExpanded, setLiveFeedExpanded] = useState(false);
   const [kanbanFilters, setKanbanFilters] = useState<{
     agents: string[];
     priorities: number[];
@@ -238,6 +238,8 @@ export default function App() {
       setShowDashboardOverview={setShowDashboardOverview}
       showActivityFeed={showActivityFeed}
       setShowActivityFeed={setShowActivityFeed}
+      liveFeedExpanded={liveFeedExpanded}
+      setLiveFeedExpanded={setLiveFeedExpanded}
       kanbanFilters={kanbanFilters}
       setKanbanFilters={setKanbanFilters}
       handlePauseSquad={handlePauseSquad}
@@ -288,6 +290,8 @@ function AppContent({
   setShowDashboardOverview,
   showActivityFeed,
   setShowActivityFeed,
+  liveFeedExpanded,
+  setLiveFeedExpanded,
   kanbanFilters,
   setKanbanFilters,
   handlePauseSquad,
@@ -333,6 +337,8 @@ function AppContent({
   setShowDashboardOverview: (v: boolean) => void;
   showActivityFeed: boolean;
   setShowActivityFeed: (v: boolean) => void;
+  liveFeedExpanded: boolean;
+  setLiveFeedExpanded: (v: boolean) => void;
   kanbanFilters: {
     agents: string[];
     priorities: number[];
@@ -350,14 +356,16 @@ function AppContent({
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <header className="app-header">
-        <h1 className="app-header-title">Mission Control</h1>
-        <ProjectSwitcher />
-        <SearchBar
-          projectId={projectId ?? undefined}
-          onResultClick={(taskId) => {
-            setSelectedTaskId(taskId as Id<"tasks">);
-          }}
-        />
+        <div className="app-header-left">
+          <h1 className="app-header-title">Mission Control</h1>
+          <ProjectSwitcher />
+          <SearchBar
+            projectId={projectId ?? undefined}
+            onResultClick={(taskId) => {
+              setSelectedTaskId(taskId as Id<"tasks">);
+            }}
+          />
+        </div>
         <div className="app-header-metrics">
           <span>{activeCount} Agents Active</span>
           <span>{taskCount} Tasks in Queue</span>
@@ -366,175 +374,72 @@ function AppContent({
           <button
             type="button"
             onClick={() => setCurrentView("agents")}
-            style={{
-              padding: "6px 12px",
-              background: "#10b981",
-              border: "1px solid #059669",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
+            className="app-btn app-btn-secondary"
           >
-            🤖 Registry
+            Agents
           </button>
           <button
             type="button"
-            onClick={() => setShowCostAnalytics(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#8b5cf6",
-              border: "1px solid #7c3aed",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
+            onClick={() => setShowApprovals(true)}
+            className="app-btn app-btn-secondary"
           >
-            💰 Costs
+            Approvals
           </button>
           <button
             type="button"
-            onClick={() => setShowBudgetBurnDown(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#6366f1",
-              border: "1px solid #4f46e5",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
+            onClick={() => {
+              if (currentView === "tasks") {
+                setLiveFeedExpanded(!liveFeedExpanded);
+                return;
+              }
+              setShowActivityFeed(true);
             }}
+            className="app-btn app-btn-secondary"
           >
-            📉 Budget
+            {currentView === "tasks" && liveFeedExpanded ? "Hide Feed" : "Feed"}
           </button>
-          <button
-            type="button"
-            onClick={() => setShowAdvancedAnalytics(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#f59e0b",
-              border: "1px solid #d97706",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            📈 Analytics
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowHealthDashboard(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#10b981",
-              border: "1px solid #059669",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            🏥 Health
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowMonitoringDashboard(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#ef4444",
-              border: "1px solid #dc2626",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            📊 Monitor
-          </button>
+          <details className="app-header-menu">
+            <summary className="app-btn app-btn-ghost">Insights</summary>
+            <div className="app-header-menu-list">
+              <button type="button" className="app-header-menu-item" onClick={() => setShowCostAnalytics(true)}>
+                Cost Analytics
+              </button>
+              <button type="button" className="app-header-menu-item" onClick={() => setShowBudgetBurnDown(true)}>
+                Budget Burn-Down
+              </button>
+              <button type="button" className="app-header-menu-item" onClick={() => setShowAdvancedAnalytics(true)}>
+                Advanced Analytics
+              </button>
+              <button type="button" className="app-header-menu-item" onClick={() => setShowHealthDashboard(true)}>
+                Health Dashboard
+              </button>
+              <button type="button" className="app-header-menu-item" onClick={() => setShowMonitoringDashboard(true)}>
+                Monitoring Dashboard
+              </button>
+              <button type="button" className="app-header-menu-item" onClick={() => setShowDashboardOverview(true)}>
+                Overview Snapshot
+              </button>
+              <button type="button" className="app-header-menu-item" onClick={() => setShowActivityFeed(true)}>
+                Activity Timeline
+              </button>
+              <button type="button" className="app-header-menu-item" onClick={() => setShowKeyboardHelp(true)}>
+                Keyboard Shortcuts
+              </button>
+            </div>
+          </details>
           <button
             type="button"
             onClick={() => setShowOperatorControls(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#b91c1c",
-              border: "1px solid #991b1b",
-              borderRadius: 6,
-              color: "#fee2e2",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
+            className="app-btn app-btn-danger"
           >
-            🚨 Control
+            Controls
           </button>
           <button
             type="button"
-            onClick={() => setShowDashboardOverview(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#06b6d4",
-              border: "1px solid #0891b2",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
+            onClick={() => setShowCreateTask(true)}
+            className="app-btn app-btn-primary"
           >
-            📊 Overview
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowActivityFeed(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#ec4899",
-              border: "1px solid #db2777",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            📋 Activity
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowKeyboardHelp(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#64748b",
-              border: "1px solid #475569",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            ⌨️
-          </button>
-          <button type="button" className="app-header-docs">
-            Docs
+            New Task
           </button>
           <span className="app-header-time">
             {timeStr} {dateStr}
@@ -544,22 +449,6 @@ function AppContent({
             Online
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowCreateTask(true)}
-          style={{
-            padding: "6px 14px",
-            background: "#3b82f6",
-            border: "1px solid #2563eb",
-            borderRadius: 6,
-            color: "#fff",
-            fontSize: "0.85rem",
-            fontWeight: 500,
-            cursor: "pointer",
-          }}
-        >
-          + New task
-        </button>
       </header>
       <TopNav currentView={currentView} onViewChange={setCurrentView} />
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
@@ -593,7 +482,11 @@ function AppContent({
                 filters={kanbanFilters}
               />
             </main>
-            <LiveFeed projectId={projectId} />
+            <LiveFeed
+              projectId={projectId}
+              expanded={liveFeedExpanded}
+              onToggle={() => setLiveFeedExpanded(!liveFeedExpanded)}
+            />
           </>
         )}
         {currentView === "agents" && <AgentRegistryView projectId={projectId} />}
@@ -770,15 +663,6 @@ function AppContent({
           onClose={() => setShowActivityFeed(false)}
         />
       )}
-      
-      {/* Quick Actions Menu */}
-      <QuickActionsMenu
-        onCreateTask={() => setShowCreateTask(true)}
-        onOpenSearch={() => setShowCommandPalette(true)}
-        onOpenApprovals={() => setShowApprovals(true)}
-        onOpenAgents={() => setCurrentView("agents")}
-        onOpenControls={() => setShowOperatorControls(true)}
-      />
       
       {/* Error Boundary wraps everything */}
     </div>

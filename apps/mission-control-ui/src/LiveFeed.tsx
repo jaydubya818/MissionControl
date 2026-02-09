@@ -6,17 +6,41 @@ import type { Doc, Id } from "../../../convex/_generated/dataModel";
 type FeedFilter = "all" | "tasks" | "comments" | "decisions" | "docs" | "status";
 const FEED_PAGE_SIZE = 10;
 
-export function LiveFeed({ projectId }: { projectId: Id<"projects"> | null }) {
+interface LiveFeedProps {
+  projectId: Id<"projects"> | null;
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+export function LiveFeed({ projectId, expanded, onToggle }: LiveFeedProps) {
   const [filter, setFilter] = useState<FeedFilter>("all");
   const [visibleCount, setVisibleCount] = useState(FEED_PAGE_SIZE);
   const activities = useQuery(api.activities.listRecent, projectId ? { projectId, limit: 80 } : { limit: 80 });
   const messages = useQuery(api.messages.listRecent, projectId ? { projectId, limit: 50 } : { limit: 50 });
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
+  const totalCount = (activities?.length ?? 0) + (messages?.length ?? 0);
 
   useEffect(() => {
     setVisibleCount(FEED_PAGE_SIZE);
   }, [filter, projectId]);
+
+  if (!expanded) {
+    return (
+      <aside className="live-feed live-feed-collapsed">
+        <button
+          type="button"
+          className="live-feed-toggle"
+          onClick={onToggle}
+          aria-label="Expand live activity feed"
+          title="Open live feed"
+        >
+          <span className="live-feed-toggle-label">Feed</span>
+          <span className="live-feed-toggle-count">{totalCount}</span>
+        </button>
+      </aside>
+    );
+  }
 
   const agentMap = agents ? new Map(agents.map((a: Doc<"agents">) => [a._id, a])) : new Map();
   const taskMap = tasks ? new Map(tasks.map((t: Doc<"tasks">) => [t._id, t])) : new Map();
@@ -107,7 +131,18 @@ export function LiveFeed({ projectId }: { projectId: Id<"projects"> | null }) {
 
   return (
     <aside className="live-feed">
-      <div className="live-feed-header">LIVE FEED</div>
+      <div className="live-feed-header-row">
+        <div className="live-feed-header">Live Feed</div>
+        <button
+          type="button"
+          className="live-feed-collapse-btn"
+          onClick={onToggle}
+          aria-label="Collapse live activity feed"
+          title="Collapse live feed"
+        >
+          ×
+        </button>
+      </div>
       <div className="live-feed-filters">
         {filters.map((f) => (
           <button
