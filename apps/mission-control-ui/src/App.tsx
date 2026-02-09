@@ -169,6 +169,8 @@ export default function App() {
     onSearch: () => setShowCommandPalette(true),
     onApprovals: () => setShowApprovals(true),
     onAgents: () => setCurrentView("agents"),
+    onGoToBoard: () => setCurrentView("tasks"),
+    onShowHelp: () => setShowKeyboardHelp(true),
   });
   
   // Provide project context
