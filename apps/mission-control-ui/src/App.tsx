@@ -2,11 +2,15 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
-import { TopNav, type MainView } from "./TopNav";
+import { type MainView } from "./TopNav";
 import { Kanban } from "./Kanban";
 import { TaskDrawerTabs } from "./TaskDrawerTabs";
 import { Sidebar } from "./Sidebar";
 import { LiveFeed } from "./LiveFeed";
+import { AppSideNav } from "./components/AppSideNav";
+import { AppTopBar } from "./components/AppTopBar";
+import { PageHeader } from "./components/PageHeader";
+import { Button } from "@/components/ui/button";
 import { CreateTaskModal } from "./CreateTaskModal";
 import { ApprovalsModal } from "./ApprovalsModal";
 import { PolicyModal } from "./PolicyModal";
@@ -81,16 +85,7 @@ function ProjectSwitcher() {
         const value = e.target.value;
         setProjectId(value ? (value as Id<"projects">) : null);
       }}
-      style={{
-        padding: "6px 12px",
-        background: "#1e293b",
-        border: "1px solid #475569",
-        borderRadius: 6,
-        color: "#e2e8f0",
-        fontSize: "0.85rem",
-        cursor: "pointer",
-        minWidth: 140,
-      }}
+      className="h-8 rounded-md border border-input bg-secondary px-3 text-sm text-foreground cursor-pointer min-w-[140px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <option value="">All Projects</option>
       {projects.map((p) => (
@@ -364,179 +359,130 @@ function AppContent({
   toast: (msg: string, isError?: boolean) => void;
 }) {
   const { activeCount, taskCount } = useHeaderMetrics();
+  const pendingApprovals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 10 } : { limit: 10 });
   
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <header className="app-header">
-        <div className="app-header-left">
-          <h1 className="app-header-title">Mission Control</h1>
-          <ProjectSwitcher />
+    <div className="flex h-screen flex-col bg-background text-foreground">
+      {/* Top Bar */}
+      <AppTopBar
+        projectSwitcher={<ProjectSwitcher />}
+        searchBar={
           <SearchBar
             projectId={projectId ?? undefined}
             onResultClick={(taskId) => {
               setSelectedTaskId(taskId as Id<"tasks">);
             }}
           />
-        </div>
-        <div className="app-header-metrics">
-          <span>{activeCount} Agents Active</span>
-          <span>{taskCount} Tasks in Queue</span>
-        </div>
-        <div className="app-header-right">
-          <button
-            type="button"
-            onClick={() => setCurrentView("agents")}
-            className="app-btn app-btn-secondary"
-          >
-            Agents
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowApprovals(true)}
-            className="app-btn app-btn-secondary"
-          >
-            Approvals
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (currentView === "tasks") {
-                setLiveFeedExpanded(!liveFeedExpanded);
-                return;
-              }
-              setShowActivityFeed(true);
-            }}
-            className="app-btn app-btn-secondary"
-          >
-            {currentView === "tasks" && liveFeedExpanded ? "Hide Feed" : "Feed"}
-          </button>
-          <details className="app-header-menu">
-            <summary className="app-btn app-btn-ghost">Insights</summary>
-            <div className="app-header-menu-list">
-              <button type="button" className="app-header-menu-item" onClick={() => setShowCostAnalytics(true)}>
-                Cost Analytics
-              </button>
-              <button type="button" className="app-header-menu-item" onClick={() => setShowBudgetBurnDown(true)}>
-                Budget Burn-Down
-              </button>
-              <button type="button" className="app-header-menu-item" onClick={() => setShowAdvancedAnalytics(true)}>
-                Advanced Analytics
-              </button>
-              <button type="button" className="app-header-menu-item" onClick={() => setShowHealthDashboard(true)}>
-                Health Dashboard
-              </button>
-              <button type="button" className="app-header-menu-item" onClick={() => setShowMonitoringDashboard(true)}>
-                Monitoring Dashboard
-              </button>
-              <button type="button" className="app-header-menu-item" onClick={() => setShowDashboardOverview(true)}>
-                Overview Snapshot
-              </button>
-              <button type="button" className="app-header-menu-item" onClick={() => setShowActivityFeed(true)}>
-                Activity Timeline
-              </button>
-              <button type="button" className="app-header-menu-item" onClick={() => setShowKeyboardHelp(true)}>
-                Keyboard Shortcuts
-              </button>
-            </div>
-          </details>
-          <button
-            type="button"
-            onClick={() => setShowOperatorControls(true)}
-            className="app-btn app-btn-danger"
-          >
-            Controls
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowCreateTask(true)}
-            className="app-btn app-btn-primary"
-          >
-            New Task
-          </button>
-          <span className="app-header-time">
-            {timeStr} {dateStr}
-          </span>
-          <div className="app-header-status">
-            <span className="app-header-status-dot" aria-hidden />
-            Online
-          </div>
-        </div>
-      </header>
-      <TopNav currentView={currentView} onViewChange={setCurrentView} />
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        {currentView === "tasks" && (
-          <>
-            <Sidebar
+        }
+        activeCount={activeCount}
+        taskCount={taskCount}
+        timeStr={timeStr}
+        dateStr={dateStr}
+        onNewTask={() => setShowCreateTask(true)}
+        onOpenControls={() => setShowOperatorControls(true)}
+        onOpenCommandPalette={() => setShowCommandPalette(true)}
+        onOpenCostAnalytics={() => setShowCostAnalytics(true)}
+        onOpenBudgetBurnDown={() => setShowBudgetBurnDown(true)}
+        onOpenAdvancedAnalytics={() => setShowAdvancedAnalytics(true)}
+        onOpenHealthDashboard={() => setShowHealthDashboard(true)}
+        onOpenMonitoringDashboard={() => setShowMonitoringDashboard(true)}
+        onOpenDashboardOverview={() => setShowDashboardOverview(true)}
+        onOpenActivityFeed={() => setShowActivityFeed(true)}
+        onOpenKeyboardHelp={() => setShowKeyboardHelp(true)}
+      />
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Side Navigation */}
+        <AppSideNav
+          currentView={currentView}
+          onViewChange={setCurrentView}
+          onOpenApprovals={() => setShowApprovals(true)}
+          onOpenNotifications={() => setShowNotifications(true)}
+          pendingApprovals={pendingApprovals?.length ?? 0}
+        />
+
+        {/* Main Content Area */}
+        <div className="flex flex-1 overflow-hidden">
+          {currentView === "tasks" && (
+            <>
+              <main className="flex flex-1 flex-col overflow-auto">
+                <PageHeader
+                  title="Mission Queue"
+                  description={`${taskCount} tasks across all states`}
+                  actions={
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={handlePauseSquad}>
+                        Pause Squad
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setShowStandup(true)}>
+                        Standup
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setShowPolicy(true)}>
+                        Policy
+                      </Button>
+                    </div>
+                  }
+                />
+                <LoopDetectionPanel
+                  projectId={projectId}
+                  onTaskSelect={(taskId) => setSelectedTaskId(taskId)}
+                />
+                <KanbanFilters
+                  projectId={projectId}
+                  currentUserId="operator"
+                  filters={kanbanFilters}
+                  onFiltersChange={setKanbanFilters}
+                />
+                <Kanban
+                  projectId={projectId}
+                  onSelectTask={setSelectedTaskId}
+                  filters={kanbanFilters}
+                />
+              </main>
+              <LiveFeed
+                projectId={projectId}
+                expanded={liveFeedExpanded}
+                onToggle={() => setLiveFeedExpanded(!liveFeedExpanded)}
+              />
+            </>
+          )}
+          {currentView === "agents" && <AgentRegistryView projectId={projectId} />}
+          {currentView === "dag" && (
+            <MissionDAGView
               projectId={projectId}
-              onOpenApprovals={() => setShowApprovals(true)}
-              onOpenPolicy={() => setShowPolicy(true)}
-              onOpenOperatorControls={() => setShowOperatorControls(true)}
-              onOpenNotifications={() => setShowNotifications(true)}
-              onOpenStandup={() => setShowStandup(true)}
-              onPauseSquad={handlePauseSquad}
-              onResumeSquad={handleResumeSquad}
-            />
-            <main style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
-              <h2 className="mission-queue-header">Mission Queue</h2>
-              <LoopDetectionPanel
-                projectId={projectId}
-                onTaskSelect={(taskId) => setSelectedTaskId(taskId)}
-              />
-              <KanbanFilters
-                projectId={projectId}
-                currentUserId="operator"
-                filters={kanbanFilters}
-                onFiltersChange={setKanbanFilters}
-              />
-              <Kanban
-                projectId={projectId}
-                onSelectTask={setSelectedTaskId}
-                filters={kanbanFilters}
-              />
-            </main>
-            <LiveFeed
-              projectId={projectId}
-              expanded={liveFeedExpanded}
-              onToggle={() => setLiveFeedExpanded(!liveFeedExpanded)}
-            />
-          </>
-        )}
-        {currentView === "agents" && <AgentRegistryView projectId={projectId} />}
-        {currentView === "dag" && (
-          <MissionDAGView
-            projectId={projectId}
-            onTaskSelect={(taskId) => {
-              setSelectedTaskId(taskId);
-              setCurrentView("tasks");
-            }}
-          />
-        )}
-        {currentView === "org" && <OrgView projectId={projectId} />}
-        {currentView === "calendar" && <CalendarView projectId={projectId} />}
-        {currentView === "office" && <OfficeView projectId={projectId} />}
-        {currentView === "projects" && <ProjectsView projectId={projectId} />}
-        {currentView === "chat" && <ChatView projectId={projectId} />}
-        {currentView === "council" && <CouncilView projectId={projectId} />}
-        {currentView === "memory" && <MemoryView projectId={projectId} />}
-        {currentView === "captures" && <CapturesView projectId={projectId} />}
-        {currentView === "docs" && <DocsView />}
-        {currentView === "people" && <PeopleView projectId={projectId} />}
-        {currentView === "identity" && <IdentityDirectoryView projectId={projectId} />}
-        {currentView === "telegraph" && <TelegraphInbox projectId={projectId} />}
-        {currentView === "meetings" && <MeetingsView projectId={projectId} />}
-        {currentView === "voice" && <VoicePanel projectId={projectId} />}
-        {currentView === "search" && (
-          <main style={{ flex: 1, overflow: "auto", padding: "24px" }}>
-            <h2 style={{ color: "#e2e8f0", marginBottom: "16px" }}>Search</h2>
-            <SearchBar
-              projectId={projectId ?? undefined}
-              onResultClick={(taskId) => {
-                setSelectedTaskId(taskId as Id<"tasks">);
+              onTaskSelect={(taskId) => {
+                setSelectedTaskId(taskId);
                 setCurrentView("tasks");
               }}
             />
-          </main>
-        )}
+          )}
+          {currentView === "org" && <OrgView projectId={projectId} />}
+          {currentView === "calendar" && <CalendarView projectId={projectId} />}
+          {currentView === "office" && <OfficeView projectId={projectId} />}
+          {currentView === "projects" && <ProjectsView projectId={projectId} />}
+          {currentView === "chat" && <ChatView projectId={projectId} />}
+          {currentView === "council" && <CouncilView projectId={projectId} />}
+          {currentView === "memory" && <MemoryView projectId={projectId} />}
+          {currentView === "captures" && <CapturesView projectId={projectId} />}
+          {currentView === "docs" && <DocsView />}
+          {currentView === "people" && <PeopleView projectId={projectId} />}
+          {currentView === "identity" && <IdentityDirectoryView projectId={projectId} />}
+          {currentView === "telegraph" && <TelegraphInbox projectId={projectId} />}
+          {currentView === "meetings" && <MeetingsView projectId={projectId} />}
+          {currentView === "voice" && <VoicePanel projectId={projectId} />}
+          {currentView === "search" && (
+            <main className="flex-1 overflow-auto p-6">
+              <h2 className="text-foreground mb-4 text-lg font-semibold">Search</h2>
+              <SearchBar
+                projectId={projectId ?? undefined}
+                onResultClick={(taskId) => {
+                  setSelectedTaskId(taskId as Id<"tasks">);
+                  setCurrentView("tasks");
+                }}
+              />
+            </main>
+          )}
+        </div>
       </div>
       <TaskDrawerTabs taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} />
 
