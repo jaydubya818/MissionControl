@@ -3,6 +3,16 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useToast } from "./Toast";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   DndContext,
   DragOverlay,
@@ -16,26 +26,68 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import {
+  Inbox,
+  UserCheck,
+  Play,
+  Eye,
+  ShieldAlert,
+  Ban,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+  Undo2,
+  DollarSign,
+  GripVertical,
+  MoreHorizontal,
+  ExternalLink,
+  type LucideIcon,
+} from "lucide-react";
 
 type TaskStatus = Doc<"tasks">["status"];
 
-const COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
-  { status: "INBOX", label: "Inbox", color: "#6366f1" },
-  { status: "ASSIGNED", label: "Assigned", color: "#f59e0b" },
-  { status: "IN_PROGRESS", label: "In Progress", color: "#3b82f6" },
-  { status: "REVIEW", label: "Review", color: "#8b5cf6" },
-  { status: "NEEDS_APPROVAL", label: "Needs Approval", color: "#ef4444" },
-  { status: "BLOCKED", label: "Blocked", color: "#f97316" },
-  { status: "FAILED", label: "Failed", color: "#ef4444" },
-  { status: "DONE", label: "Done", color: "#22c55e" },
-  { status: "CANCELED", label: "Canceled", color: "#6b7280" },
+const COLUMNS: { status: TaskStatus; label: string; color: string; icon: LucideIcon }[] = [
+  { status: "INBOX", label: "Inbox", color: "text-indigo-400", icon: Inbox },
+  { status: "ASSIGNED", label: "Assigned", color: "text-amber-400", icon: UserCheck },
+  { status: "IN_PROGRESS", label: "In Progress", color: "text-blue-400", icon: Play },
+  { status: "REVIEW", label: "Review", color: "text-violet-400", icon: Eye },
+  { status: "NEEDS_APPROVAL", label: "Needs Approval", color: "text-red-400", icon: ShieldAlert },
+  { status: "BLOCKED", label: "Blocked", color: "text-orange-400", icon: Ban },
+  { status: "FAILED", label: "Failed", color: "text-red-400", icon: AlertTriangle },
+  { status: "DONE", label: "Done", color: "text-emerald-400", icon: CheckCircle2 },
+  { status: "CANCELED", label: "Canceled", color: "text-gray-400", icon: XCircle },
 ];
 
-const PRIORITY_LABELS: Record<number, { label: string; color: string }> = {
-  1: { label: "Critical", color: "#ef4444" },
-  2: { label: "High", color: "#f97316" },
-  3: { label: "Normal", color: "#3b82f6" },
-  4: { label: "Low", color: "#6b7280" },
+const COLUMN_BG: Record<string, string> = {
+  INBOX: "bg-indigo-500/5",
+  ASSIGNED: "bg-amber-500/5",
+  IN_PROGRESS: "bg-blue-500/5",
+  REVIEW: "bg-violet-500/5",
+  NEEDS_APPROVAL: "bg-red-500/5",
+  BLOCKED: "bg-orange-500/5",
+  FAILED: "bg-red-500/5",
+  DONE: "bg-emerald-500/5",
+  CANCELED: "bg-gray-500/5",
+};
+
+const COLUMN_DOT: Record<string, string> = {
+  INBOX: "bg-indigo-400",
+  ASSIGNED: "bg-amber-400",
+  IN_PROGRESS: "bg-blue-400",
+  REVIEW: "bg-violet-400",
+  NEEDS_APPROVAL: "bg-red-400",
+  BLOCKED: "bg-orange-400",
+  FAILED: "bg-red-400",
+  DONE: "bg-emerald-400",
+  CANCELED: "bg-gray-400",
+};
+
+const PRIORITY_LABELS: Record<number, { label: string; variant: "destructive" | "default" | "secondary" | "outline" }> = {
+  1: { label: "Critical", variant: "destructive" },
+  2: { label: "High", variant: "default" },
+  3: { label: "Normal", variant: "secondary" },
+  4: { label: "Low", variant: "outline" },
 };
 
 type Task = {
@@ -53,15 +105,15 @@ type Task = {
   sourceRef?: string;
 };
 
-const SOURCE_CONFIG: Record<string, { icon: string; label: string; color: string; bg: string }> = {
-  DASHBOARD: { icon: "🖥️", label: "Dashboard", color: "#93c5fd", bg: "#1e3a5f" },
-  TELEGRAM:  { icon: "✈️", label: "Telegram",  color: "#38bdf8", bg: "#0c4a6e" },
-  GITHUB:    { icon: "🐙", label: "GitHub",     color: "#c4b5fd", bg: "#3b1f7e" },
-  AGENT:     { icon: "🤖", label: "Agent",      color: "#86efac", bg: "#14532d" },
-  API:       { icon: "🔌", label: "API",        color: "#fcd34d", bg: "#713f12" },
-  TRELLO:    { icon: "📋", label: "Trello",     color: "#93c5fd", bg: "#1e3a5f" },
-  SEED:      { icon: "🌱", label: "Seed",       color: "#94a3b8", bg: "#334155" },
-  UNKNOWN:   { icon: "❓", label: "Unknown",    color: "#94a3b8", bg: "#334155" },
+const SOURCE_CONFIG: Record<string, { icon: string; label: string }> = {
+  DASHBOARD: { icon: "🖥️", label: "Dashboard" },
+  TELEGRAM:  { icon: "✈️", label: "Telegram" },
+  GITHUB:    { icon: "🐙", label: "GitHub" },
+  AGENT:     { icon: "🤖", label: "Agent" },
+  API:       { icon: "🔌", label: "API" },
+  TRELLO:    { icon: "📋", label: "Trello" },
+  SEED:      { icon: "🌱", label: "Seed" },
+  UNKNOWN:   { icon: "❓", label: "Unknown" },
 };
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -102,47 +154,37 @@ export function Kanban({
   const transitionTask = useMutation(api.tasks.transition);
   const { toast } = useToast();
   
-  // Configure sensors for both mouse and touch
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 8px movement required to start drag
-      },
+      activationConstraint: { distance: 8 },
     }),
     useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250, // 250ms hold required for touch
-        tolerance: 5,
-      },
+      activationConstraint: { delay: 250, tolerance: 5 },
     })
   );
 
   if (tasks === undefined || agents === undefined) {
-    return <div style={{ padding: 24 }}>Loading tasks…</div>;
+    return (
+      <div className="flex items-center justify-center p-12 text-muted-foreground">
+        Loading tasks...
+      </div>
+    );
   }
 
-  // Apply filters
   const filteredTasks = tasks.filter((task) => {
     if (!filters) return true;
-    
-    // Filter by agent
     if (filters.agents.length > 0) {
       const hasMatchingAgent = task.assigneeIds.some((id) =>
         filters.agents.includes(id)
       );
       if (!hasMatchingAgent && task.assigneeIds.length > 0) return false;
     }
-    
-    // Filter by priority
     if (filters.priorities.length > 0) {
       if (!filters.priorities.includes(task.priority)) return false;
     }
-    
-    // Filter by type
     if (filters.types.length > 0) {
       if (!filters.types.includes(task.type)) return false;
     }
-    
     return true;
   });
 
@@ -153,7 +195,6 @@ export function Kanban({
   const handleMoveTo = async (taskId: Id<"tasks">, fromStatus: TaskStatus, toStatus: TaskStatus) => {
     try {
       setLastMove({ taskId, fromStatus, toStatus });
-      
       const result = await transitionTask({
         taskId,
         toStatus,
@@ -161,7 +202,6 @@ export function Kanban({
         actorUserId: "operator",
         idempotencyKey: `ui-${taskId}-${toStatus}-${Date.now()}`,
       });
-      
       if (result && typeof result === "object" && "success" in result && !result.success) {
         const err = (result as { errors?: { message: string }[] }).errors?.[0]?.message ?? "Transition failed";
         toast(err, true);
@@ -175,7 +215,6 @@ export function Kanban({
   
   const handleUndo = async () => {
     if (!lastMove) return;
-    
     try {
       await transitionTask({
         taskId: lastMove.taskId,
@@ -193,29 +232,21 @@ export function Kanban({
   
   const handleDragStart = (event: DragStartEvent) => {
     const task = filteredTasks.find((t) => t._id === event.active.id);
-    if (task) {
-      setActiveTask(task as Task);
-    }
+    if (task) setActiveTask(task as Task);
   };
   
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveTask(null);
-    
     const { active, over } = event;
-    
     if (!over || active.id === over.id) return;
-    
     const task = filteredTasks.find((t) => t._id === active.id);
     const toStatus = over.id as TaskStatus;
-    
     if (!task) return;
-    
     const allowed = allowedMap?.[task.status] ?? [];
     if (!allowed.includes(toStatus)) {
       toast("Transition not allowed", true);
       return;
     }
-    
     handleMoveTo(task._id, task.status, toStatus);
   };
 
@@ -226,43 +257,24 @@ export function Kanban({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div style={{ position: "relative" }}>
-        {/* Undo button */}
+      <div className="relative flex-1">
+        {/* Undo toast */}
         {lastMove && (
-          <div style={{
-            position: "fixed",
-            bottom: 24,
-            right: 24,
-            zIndex: 100,
-          }}>
-            <button
-              onClick={handleUndo}
-              style={{
-                padding: "12px 20px",
-                background: "#3b82f6",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                fontSize: "0.875rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              ↶ Undo
-            </button>
+          <div className="fixed bottom-6 right-6 z-50">
+            <Button onClick={handleUndo} className="shadow-lg gap-2">
+              <Undo2 className="h-4 w-4" />
+              Undo
+            </Button>
           </div>
         )}
         
-        <div style={{ display: "flex", gap: 12, overflowX: "auto", minHeight: 500, paddingBottom: 16 }}>
+        <div className="flex gap-3 overflow-x-auto p-4 min-h-[500px]">
           {COLUMNS.map((col) => (
             <Column
               key={col.status}
-              title={col.label}
-              color={col.color}
+              label={col.label}
+              icon={col.icon}
+              colorClass={col.color}
               status={col.status}
               tasks={byStatus(col.status) as Task[]}
               agentMap={agentMap}
@@ -277,20 +289,12 @@ export function Kanban({
       {/* Drag overlay */}
       <DragOverlay>
         {activeTask ? (
-          <div style={{
-            padding: "12px",
-            background: "#0f172a",
-            border: "2px solid #3b82f6",
-            borderRadius: 6,
-            color: "#e2e8f0",
-            fontSize: "0.875rem",
-            minWidth: 240,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-            opacity: 0.95,
-          }}>
-            <div style={{ fontWeight: 500, marginBottom: 8 }}>{activeTask.title}</div>
-            <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>
-              {activeTask.type} • P{activeTask.priority}
+          <div className="min-w-[240px] rounded-lg border-2 border-primary bg-card p-3 shadow-xl opacity-95">
+            <div className="font-medium text-sm text-card-foreground mb-1 line-clamp-2">
+              {activeTask.title}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {activeTask.type} &bull; P{activeTask.priority}
             </div>
           </div>
         ) : null}
@@ -300,8 +304,9 @@ export function Kanban({
 }
 
 function Column({
-  title,
-  color,
+  label,
+  icon: Icon,
+  colorClass,
   status,
   tasks,
   agentMap,
@@ -309,8 +314,9 @@ function Column({
   onSelectTask,
   onMoveTo,
 }: {
-  title: string;
-  color: string;
+  label: string;
+  icon: LucideIcon;
+  colorClass: string;
   status: TaskStatus;
   tasks: Task[];
   agentMap: Map<Id<"agents">, { name: string; emoji?: string }>;
@@ -323,59 +329,53 @@ function Column({
   return (
     <div
       ref={setNodeRef}
-      style={{
-        minWidth: 260,
-        maxWidth: 260,
-        background: isOver ? "#25334d" : "#1e293b",
-        borderRadius: 8,
-        border: isOver ? `2px dashed ${color}` : "1px solid #334155",
-        display: "flex",
-        flexDirection: "column",
-        transition: "background 0.15s, border 0.15s",
-      }}
+      className={cn(
+        "flex min-w-[264px] max-w-[264px] flex-col rounded-lg border transition-colors",
+        COLUMN_BG[status],
+        isOver
+          ? "border-primary/50 bg-primary/10"
+          : "border-border"
+      )}
     >
-      <div
-        style={{
-          padding: "10px 12px",
-          borderBottom: "1px solid #334155",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-        <span style={{ fontWeight: 600, fontSize: "0.875rem" }}>{title}</span>
-        <span
-          style={{
-            marginLeft: "auto",
-            background: "#334155",
-            color: "#94a3b8",
-            padding: "2px 8px",
-            borderRadius: 12,
-            fontSize: "0.75rem",
-            fontWeight: 500,
-          }}
-        >
+      {/* Lane header */}
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border/50">
+        <span className={cn("h-2 w-2 rounded-full", COLUMN_DOT[status])} />
+        <Icon className={cn("h-3.5 w-3.5", colorClass)} />
+        <span className="text-sm font-semibold text-foreground">{label}</span>
+        <Badge variant="secondary" className="ml-auto h-5 text-[10px] font-medium px-1.5">
           {tasks.length}
-        </span>
+        </Badge>
       </div>
-      <div style={{ padding: 8, flex: 1, overflowY: "auto", maxHeight: "70vh" }}>
-        {tasks.map((t) => (
-          <Card
-            key={t._id}
-            task={t}
-            agentMap={agentMap}
-            allowedToStatuses={(allowedMap[t.status] as TaskStatus[] | undefined) ?? []}
-            onSelect={() => onSelectTask(t._id)}
-            onMoveTo={(toStatus) => onMoveTo(t._id, t.status, toStatus)}
-          />
-        ))}
-        {tasks.length === 0 && (
-          <div style={{ padding: 16, textAlign: "center", color: "#64748b", fontSize: "0.8rem" }}>
-            No tasks
-          </div>
-        )}
-      </div>
+      
+      {/* Cards */}
+      <ScrollArea className="flex-1 max-h-[calc(100vh-240px)]">
+        <div className="flex flex-col gap-2 p-2">
+          {tasks.map((t) => (
+            <Card
+              key={t._id}
+              task={t}
+              agentMap={agentMap}
+              allowedToStatuses={(allowedMap[t.status] as TaskStatus[] | undefined) ?? []}
+              onSelect={() => onSelectTask(t._id)}
+              onMoveTo={(toStatus) => onMoveTo(t._id, t.status, toStatus)}
+            />
+          ))}
+          {tasks.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+              <span className="text-2xl mb-2">
+                {status === "BLOCKED" ? "🎉" : status === "DONE" ? "✨" : "📭"}
+              </span>
+              <span className="text-xs">
+                {status === "BLOCKED"
+                  ? "No blocked tasks"
+                  : status === "DONE"
+                    ? "Nothing completed yet"
+                    : "Drop tasks here"}
+              </span>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   );
 }
@@ -404,6 +404,8 @@ function Card({
     .map((id) => agentMap.get(id))
     .filter(Boolean);
 
+  const src = task.source ? (SOURCE_CONFIG[task.source] || SOURCE_CONFIG.UNKNOWN) : null;
+
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined;
@@ -413,216 +415,129 @@ function Card({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      style={{
-        ...style,
-        width: "100%",
-        padding: "12px",
-        marginBottom: 8,
-        background: "#0f172a",
-        border: "1px solid #334155",
-        borderRadius: 6,
-        color: "#e2e8f0",
-        fontSize: "0.875rem",
-        transition: "border-color 0.15s, opacity 0.15s",
-        cursor: allowedToStatuses.length > 0 ? "grab" : "pointer",
-        opacity: isDragging ? 0.5 : 1,
-      }}
-      onMouseOver={(e) => !isDragging && (e.currentTarget.style.borderColor = "#475569")}
-      onMouseOut={(e) => !isDragging && (e.currentTarget.style.borderColor = "#334155")}
+      style={style}
+      className={cn(
+        "group rounded-lg border bg-card p-3 transition-all",
+        isDragging ? "opacity-50 shadow-lg border-primary" : "border-border hover:border-muted-foreground/30 hover:shadow-sm",
+        allowedToStatuses.length > 0 ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+      )}
     >
       <div
         role="button"
         tabIndex={0}
         onClick={onSelect}
         onKeyDown={(e) => e.key === "Enter" && onSelect()}
-        style={{ cursor: "pointer", outline: "none" }}
+        className="outline-none"
       >
-      {/* Title */}
-      <div style={{ fontWeight: 500, marginBottom: 8, lineHeight: 1.3 }}>{task.title}</div>
+        {/* Title */}
+        <div className="font-medium text-sm text-card-foreground leading-snug line-clamp-2 mb-2">
+          {task.title}
+        </div>
 
-      {/* Type, Priority & Source */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-        <span
-          style={{
-            fontSize: "0.7rem",
-            padding: "2px 6px",
-            background: "#1e3a5f",
-            color: "#93c5fd",
-            borderRadius: 4,
-            fontWeight: 500,
-          }}
-        >
-          {task.type}
-        </span>
-        <span
-          style={{
-            fontSize: "0.7rem",
-            padding: "2px 6px",
-            background: priority.color + "22",
-            color: priority.color,
-            borderRadius: 4,
-            fontWeight: 500,
-          }}
-        >
-          {priority.label}
-        </span>
-        {task.source && (() => {
-          const src = SOURCE_CONFIG[task.source] || (() => {
-            if (process.env.NODE_ENV === "development") {
-              console.warn(`[Kanban] Unmapped task.source "${task.source}" for task ${task._id}`);
-            }
-            return SOURCE_CONFIG.UNKNOWN;
-          })();
-          return (
-            <span
-              title={task.sourceRef ? `${src.label}: ${task.sourceRef}` : src.label}
-              style={{
-                fontSize: "0.7rem",
-                padding: "2px 6px",
-                background: src.bg,
-                color: src.color,
-                borderRadius: 4,
-                fontWeight: 500,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 3,
-              }}
-            >
-              <span style={{ fontSize: "0.65rem" }}>{src.icon}</span>
+        {/* Metadata chips */}
+        <div className="flex flex-wrap gap-1 mb-2">
+          <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal">
+            {task.type}
+          </Badge>
+          <Badge variant={priority.variant} className="text-[10px] h-5 px-1.5 font-medium">
+            {priority.label}
+          </Badge>
+          {src && (
+            <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal gap-1">
+              <span className="text-[9px]">{src.icon}</span>
               {src.label}
-            </span>
-          );
-        })()}
-      </div>
-
-      {/* Labels */}
-      {task.labels && task.labels.length > 0 && (
-        <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
-          {task.labels.slice(0, 3).map((label) => (
-            <span
-              key={label}
-              style={{
-                fontSize: "0.65rem",
-                padding: "1px 5px",
-                background: "#334155",
-                color: "#94a3b8",
-                borderRadius: 3,
-              }}
-            >
-              {label}
-            </span>
-          ))}
-          {task.labels.length > 3 && (
-            <span style={{ fontSize: "0.65rem", color: "#64748b" }}>
-              +{task.labels.length - 3}
-            </span>
+            </Badge>
           )}
         </div>
-      )}
 
-      {/* Blocked reason */}
-      {task.blockedReason && (
-        <div
-          style={{
-            fontSize: "0.75rem",
-            padding: "4px 8px",
-            background: "#7f1d1d",
-            color: "#fca5a5",
-            borderRadius: 4,
-            marginBottom: 8,
-          }}
-        >
-          ⚠️ {task.blockedReason}
-        </div>
-      )}
-
-      {/* Footer: Cost & Assignees */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          fontSize: "0.75rem",
-          color: "#94a3b8",
-        }}
-      >
-        <span>
-          ${task.actualCost.toFixed(2)}
-          {task.estimatedCost && ` / $${task.estimatedCost.toFixed(2)}`}
-        </span>
-        <div style={{ display: "flex", gap: 2 }}>
-          {assignees.slice(0, 3).map((agent, i) => (
-            <span
-              key={i}
-              title={agent!.name}
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                background: "#334155",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "0.7rem",
-                marginLeft: i > 0 ? -6 : 0,
-                border: "2px solid #0f172a",
-              }}
-            >
-              {agent!.emoji || agent!.name.charAt(0)}
-            </span>
-          ))}
-          {assignees.length > 3 && (
-            <span
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                background: "#475569",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "0.65rem",
-                marginLeft: -6,
-                border: "2px solid #0f172a",
-              }}
-            >
-              +{assignees.length - 3}
-            </span>
-          )}
-        </div>
-      </div>
-      {allowedToStatuses.length > 0 && (
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #334155" }}>
-          <label style={{ fontSize: "0.7rem", color: "#94a3b8", marginRight: 6 }}>Move to</label>
-          <select
-            value=""
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v) {
-                onMoveTo(v as TaskStatus);
-                e.target.value = "";
-              }
-            }}
-            style={{
-              fontSize: "0.75rem",
-              padding: "4px 8px",
-              background: "#1e293b",
-              color: "#e2e8f0",
-              border: "1px solid #334155",
-              borderRadius: 4,
-              cursor: "pointer",
-            }}
-          >
-            <option value="">—</option>
-            {allowedToStatuses.map((s: TaskStatus) => (
-              <option key={s} value={s}>
-                {STATUS_LABELS[s]}
-              </option>
+        {/* Labels */}
+        {task.labels && task.labels.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {task.labels.slice(0, 3).map((label) => (
+              <span
+                key={label}
+                className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded"
+              >
+                {label}
+              </span>
             ))}
-          </select>
+            {task.labels.length > 3 && (
+              <span className="text-[10px] text-muted-foreground">
+                +{task.labels.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Blocked reason */}
+        {task.blockedReason && (
+          <div className="text-xs px-2 py-1.5 bg-destructive/10 text-destructive rounded mb-2 flex items-start gap-1.5">
+            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+            <span className="line-clamp-2">{task.blockedReason}</span>
+          </div>
+        )}
+
+        {/* Footer: Cost & Assignees */}
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <DollarSign className="h-3 w-3" />
+            {task.actualCost.toFixed(2)}
+            {task.estimatedCost != null && (
+              <span className="text-muted-foreground/60"> / ${task.estimatedCost.toFixed(2)}</span>
+            )}
+          </span>
+          <div className="flex -space-x-1.5">
+            {assignees.slice(0, 3).map((agent, i) => (
+              <span
+                key={i}
+                title={agent!.name}
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] border-2 border-card"
+              >
+                {agent!.emoji || agent!.name.charAt(0)}
+              </span>
+            ))}
+            {assignees.length > 3 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[9px] border-2 border-card">
+                +{assignees.length - 3}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Hover actions */}
+      {allowedToStatuses.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-border/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-muted-foreground">
+                <ArrowRight className="h-3 w-3 mr-1" />
+                Move
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-44">
+              {allowedToStatuses.map((s: TaskStatus) => (
+                <DropdownMenuItem
+                  key={s}
+                  onClick={(e) => { e.stopPropagation(); onMoveTo(s); }}
+                >
+                  <span className={cn("h-2 w-2 rounded-full mr-2", COLUMN_DOT[s])} />
+                  {STATUS_LABELS[s]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-[10px] px-2 text-muted-foreground ml-auto"
+            onClick={onSelect}
+          >
+            <ExternalLink className="h-3 w-3 mr-1" />
+            Open
+          </Button>
         </div>
       )}
-      </div>
     </div>
   );
 }
