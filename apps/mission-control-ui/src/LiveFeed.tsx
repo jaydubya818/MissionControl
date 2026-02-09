@@ -1,16 +1,22 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 
 type FeedFilter = "all" | "tasks" | "comments" | "decisions" | "docs" | "status";
+const FEED_PAGE_SIZE = 10;
 
 export function LiveFeed({ projectId }: { projectId: Id<"projects"> | null }) {
   const [filter, setFilter] = useState<FeedFilter>("all");
+  const [visibleCount, setVisibleCount] = useState(FEED_PAGE_SIZE);
   const activities = useQuery(api.activities.listRecent, projectId ? { projectId, limit: 80 } : { limit: 80 });
   const messages = useQuery(api.messages.listRecent, projectId ? { projectId, limit: 50 } : { limit: 50 });
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
+
+  useEffect(() => {
+    setVisibleCount(FEED_PAGE_SIZE);
+  }, [filter, projectId]);
 
   const agentMap = agents ? new Map(agents.map((a: Doc<"agents">) => [a._id, a])) : new Map();
   const taskMap = tasks ? new Map(tasks.map((t: Doc<"tasks">) => [t._id, t])) : new Map();
@@ -95,7 +101,9 @@ export function LiveFeed({ projectId }: { projectId: Id<"projects"> | null }) {
     }
   }
   feedItems.sort((a, b) => b.ts - a.ts);
-  const displayed = feedItems.slice(0, 50);
+  const displayed = feedItems.slice(0, visibleCount);
+  const hiddenCount = Math.max(feedItems.length - displayed.length, 0);
+  const hasMore = hiddenCount > 0;
 
   return (
     <aside className="live-feed">
@@ -141,6 +149,27 @@ export function LiveFeed({ projectId }: { projectId: Id<"projects"> | null }) {
           ))
         )}
       </div>
+      {feedItems.length > FEED_PAGE_SIZE && (
+        <div className="live-feed-pagination">
+          {hasMore ? (
+            <button
+              type="button"
+              className="live-feed-load-more"
+              onClick={() => setVisibleCount((current) => Math.min(current + FEED_PAGE_SIZE, feedItems.length))}
+            >
+              Load {Math.min(FEED_PAGE_SIZE, hiddenCount)} more ({hiddenCount} remaining)
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="live-feed-load-more secondary"
+              onClick={() => setVisibleCount(FEED_PAGE_SIZE)}
+            >
+              Show first {FEED_PAGE_SIZE}
+            </button>
+          )}
+        </div>
+      )}
     </aside>
   );
 }
