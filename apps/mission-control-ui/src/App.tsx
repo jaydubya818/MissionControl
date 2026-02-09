@@ -39,6 +39,10 @@ import { PeopleView } from "./PeopleView";
 import { MissionDAGView } from "./MissionDAGView";
 import { LoopDetectionPanel } from "./LoopDetectionPanel";
 import { BudgetBurnDown } from "./BudgetBurnDown";
+import { IdentityDirectoryView } from "./IdentityDirectoryView";
+import { VoicePanel } from "./VoicePanel";
+import { TelegraphInbox } from "./TelegraphInbox";
+import { MeetingsView } from "./MeetingsView";
 
 // ============================================================================
 // PROJECT CONTEXT
@@ -131,7 +135,10 @@ export default function App() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showDashboardOverview, setShowDashboardOverview] = useState(false);
   const [showActivityFeed, setShowActivityFeed] = useState(false);
-  const [liveFeedExpanded, setLiveFeedExpanded] = useState(false);
+  const [liveFeedExpanded, setLiveFeedExpanded] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("mc.live_feed_expanded") === "1";
+  });
   const [kanbanFilters, setKanbanFilters] = useState<{
     agents: string[];
     priorities: number[];
@@ -151,6 +158,11 @@ export default function App() {
       setProjectId(projects[0]._id);
     }
   }, [projectId, projects]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("mc.live_feed_expanded", liveFeedExpanded ? "1" : "0");
+  }, [liveFeedExpanded]);
   
   const pauseAll = useMutation(api.agents.pauseAll);
   const resumeAll = useMutation(api.agents.resumeAll);
@@ -509,6 +521,10 @@ function AppContent({
         {currentView === "captures" && <CapturesView projectId={projectId} />}
         {currentView === "docs" && <DocsView />}
         {currentView === "people" && <PeopleView projectId={projectId} />}
+        {currentView === "identity" && <IdentityDirectoryView projectId={projectId} />}
+        {currentView === "telegraph" && <TelegraphInbox projectId={projectId} />}
+        {currentView === "meetings" && <MeetingsView projectId={projectId} />}
+        {currentView === "voice" && <VoicePanel projectId={projectId} />}
         {currentView === "search" && (
           <main style={{ flex: 1, overflow: "auto", padding: "24px" }}>
             <h2 style={{ color: "#e2e8f0", marginBottom: "16px" }}>Search</h2>

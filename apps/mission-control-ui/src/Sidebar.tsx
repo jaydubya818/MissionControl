@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
@@ -25,7 +25,10 @@ export function Sidebar({
   onPauseSquad?: () => void;
   onResumeSquad?: () => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("mc.sidebar_collapsed") === "1";
+  });
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
   const pendingApprovals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 10 } : { limit: 10 });
   const pendingCount = pendingApprovals?.length ?? 0;
@@ -33,6 +36,11 @@ export function Sidebar({
   const pausedCount = agents?.filter((a) => a.status === "PAUSED").length ?? 0;
 
   const width = collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("mc.sidebar_collapsed", collapsed ? "1" : "0");
+  }, [collapsed]);
 
   return (
     <aside
