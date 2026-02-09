@@ -78,34 +78,39 @@ export function Sidebar({
       </div>
       {!collapsed && (
         <>
-          <div style={{ flex: 1, overflowY: "auto" }}>
+          <div className="agents-sidebar-actions">
+            <div className="agents-sidebar-actions-title">Quick Actions</div>
+            <div className="agents-sidebar-actions-grid">
+              {onOpenNotifications && <SidebarButton onClick={onOpenNotifications} label="Notifications" />}
+              {onOpenApprovals && (
+                <SidebarButton
+                  onClick={onOpenApprovals}
+                  label="Approvals"
+                  badge={pendingCount > 0 ? String(pendingCount) : undefined}
+                />
+              )}
+              {onOpenStandup && <SidebarButton onClick={onOpenStandup} label="Standup" />}
+              {onOpenPolicy && <SidebarButton onClick={onOpenPolicy} label="Policy" />}
+            </div>
+            <div className="agents-sidebar-actions-critical">
+              {onOpenOperatorControls && (
+                <SidebarButton onClick={onOpenOperatorControls} label="Controls" variant="warning" fullWidth />
+              )}
+              {onPauseSquad && (
+                <SidebarButton onClick={onPauseSquad} label="Pause squad" variant="danger" fullWidth />
+              )}
+              {onResumeSquad && pausedCount > 0 && (
+                <SidebarButton onClick={onResumeSquad} label={`Resume ${pausedCount} paused`} variant="success" fullWidth />
+              )}
+            </div>
+          </div>
+          <div className="agents-sidebar-list">
             {agents === undefined ? (
               <div style={{ padding: 12, color: "#64748b", fontSize: "0.8rem" }}>Loading…</div>
             ) : agents.length === 0 ? (
               <div style={{ padding: 12, color: "#64748b", fontSize: "0.8rem" }}>No agents</div>
             ) : (
               agents.map((a: Doc<"agents">) => <AgentRow key={a._id} agent={a} />)
-            )}
-          </div>
-          <div style={{ padding: 8, borderTop: "1px solid #334155" }}>
-            {onOpenNotifications && <SidebarButton onClick={onOpenNotifications} label="Notifications" />}
-            {onOpenApprovals && (
-              <SidebarButton
-                onClick={onOpenApprovals}
-                label="Approvals"
-                badge={pendingCount > 0 ? String(pendingCount) : undefined}
-              />
-            )}
-            {onOpenStandup && <SidebarButton onClick={onOpenStandup} label="Standup" />}
-            {onOpenPolicy && <SidebarButton onClick={onOpenPolicy} label="Policy" />}
-            {onOpenOperatorControls && (
-              <SidebarButton onClick={onOpenOperatorControls} label="Controls" variant="danger" />
-            )}
-            {onPauseSquad && (
-              <SidebarButton onClick={onPauseSquad} label="Pause squad" variant="danger" />
-            )}
-            {onResumeSquad && pausedCount > 0 && (
-              <SidebarButton onClick={onResumeSquad} label="Resume squad" variant="success" />
             )}
           </div>
         </>
@@ -146,47 +151,23 @@ function SidebarButton({
   label,
   badge,
   variant = "default",
+  fullWidth = false,
 }: {
   onClick: () => void;
   label: string;
   badge?: string;
-  variant?: "default" | "danger" | "success";
+  variant?: "default" | "warning" | "danger" | "success";
+  fullWidth?: boolean;
 }) {
-  const bgColor = variant === "danger" ? "#7f1d1d" : variant === "success" ? "#14532d" : "#334155";
-  const borderColor = variant === "danger" ? "#b91c1c" : variant === "success" ? "#22c55e" : "#475569";
-  const textColor = variant === "danger" ? "#fecaca" : variant === "success" ? "#86efac" : "#e2e8f0";
-  
   return (
     <button
       type="button"
       onClick={onClick}
-      style={{
-        width: "100%",
-        padding: "8px 12px",
-        marginBottom: 6,
-        background: bgColor,
-        border: "1px solid " + borderColor,
-        borderRadius: 6,
-        color: textColor,
-        fontSize: "0.8rem",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-      }}
+      className={`sidebar-action-btn sidebar-action-btn-${variant}${fullWidth ? " full-width" : ""}`}
     >
       <span>{label}</span>
       {badge && (
-        <span
-          style={{
-            background: "#ef4444",
-            color: "#fff",
-            padding: "2px 6px",
-            borderRadius: 10,
-            fontSize: "0.7rem",
-            fontWeight: 600,
-          }}
-        >
+        <span className="sidebar-action-badge">
           {badge}
         </span>
       )}
