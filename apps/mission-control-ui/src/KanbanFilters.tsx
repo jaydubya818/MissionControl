@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -45,15 +45,12 @@ export function KanbanFilters({ projectId, currentUserId, filters, onFiltersChan
   const createSavedView = useMutation(api.savedViews.create);
   const removeSavedView = useMutation(api.savedViews.remove);
 
+  const selectedView = savedViews?.find((view) => view._id === selectedViewId);
+
   if (!agents || !tasks) return null;
 
   // Get unique task types
   const taskTypes = Array.from(new Set(tasks.map((t) => t.type))).sort();
-
-  const selectedView = useMemo(
-    () => savedViews?.find((view) => view._id === selectedViewId),
-    [savedViews, selectedViewId]
-  );
 
   const toggleAgent = (agentId: string) => {
     const newAgents = filters.agents.includes(agentId)
