@@ -5,7 +5,7 @@
  * Values are UPPERCASE to match Convex schema (source of truth).
  */
 
-export type AutonomyLevel = "INTERN" | "SPECIALIST" | "LEAD";
+export type AutonomyLevel = "INTERN" | "SPECIALIST" | "LEAD" | "CEO";
 
 export type AgentStatus = 
   | "ACTIVE"       // Running normally

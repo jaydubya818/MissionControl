@@ -35,3 +35,39 @@ jobs:
 
       - name: Test (CI lane)
         run: pnpm run ci:test
+
+      - name: Identity/Soul Compliance Check
+        run: |
+          echo "=== Identity/Soul Compliance Check ==="
+          echo ""
+          echo "Checking required templates..."
+          test -f templates/IDENTITY.md || (echo "FAIL: templates/IDENTITY.md missing" && exit 1)
+          test -f templates/SOUL.md || (echo "FAIL: templates/SOUL.md missing" && exit 1)
+          test -f templates/TOOLS.md || (echo "FAIL: templates/TOOLS.md missing" && exit 1)
+          echo "  ✓ All template files present"
+          echo ""
+          echo "Checking template required sections..."
+          grep -q "Name:" templates/IDENTITY.md || (echo "FAIL: IDENTITY.md missing Name field" && exit 1)
+          grep -q "Creature:" templates/IDENTITY.md || (echo "FAIL: IDENTITY.md missing Creature field" && exit 1)
+          grep -q "Vibe:" templates/IDENTITY.md || (echo "FAIL: IDENTITY.md missing Vibe field" && exit 1)
+          grep -q "Emoji:" templates/IDENTITY.md || (echo "FAIL: IDENTITY.md missing Emoji field" && exit 1)
+          grep -q "Core Truths" templates/SOUL.md || (echo "FAIL: SOUL.md missing Core Truths section" && exit 1)
+          grep -q "Boundaries" templates/SOUL.md || (echo "FAIL: SOUL.md missing Boundaries section" && exit 1)
+          echo "  ✓ All required sections present"
+          echo ""
+          echo "Checking safety defaults..."
+          grep -q "Mission Control Constraints" templates/SOUL.md || echo "WARNING: SOUL.md missing Mission Control Constraints section"
+          echo "  ✓ Safety defaults check complete"
+          echo ""
+          echo "Checking agent YAML files have name fields..."
+          agent_count=0
+          warn_count=0
+          for f in agents/*.yaml; do
+            if [ -f "$f" ]; then
+              agent_count=$((agent_count + 1))
+              grep -q "name:" "$f" || { echo "  WARNING: $f missing name field"; warn_count=$((warn_count + 1)); }
+            fi
+          done
+          echo "  ✓ Checked $agent_count agent files ($warn_count warnings)"
+          echo ""
+          echo "=== Identity/Soul compliance check passed ==="

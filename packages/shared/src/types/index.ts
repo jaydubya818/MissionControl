@@ -13,3 +13,8 @@ export * from "./message";
 export * from "./activity";
 export * from "./alert";
 export * from "./policy";
+export * from "./identity";
+export * from "./org";
+export * from "./telegraph";
+export * from "./voice";
+export * from "./meeting";

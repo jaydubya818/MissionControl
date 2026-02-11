@@ -14,7 +14,11 @@ export type MainView =
   | "people"
   | "org"
   | "office"
-  | "search";
+  | "search"
+  | "identity"
+  | "telegraph"
+  | "meetings"
+  | "voice";
 
 interface TopNavProps {
   currentView: MainView;
@@ -42,6 +46,10 @@ const navItems: NavItem[] = [
   { id: "people", label: "People", shortcut: "9" },
   { id: "org", label: "Org", shortcut: "0" },
   { id: "office", label: "Office" },
+  { id: "identity", label: "Identity" },
+  { id: "telegraph", label: "Telegraph" },
+  { id: "meetings", label: "Meetings" },
+  { id: "voice", label: "Voice" },
   { id: "search", label: "Search" },
 ];
 

@@ -47,6 +47,7 @@ import { IdentityDirectoryView } from "./IdentityDirectoryView";
 import { VoicePanel } from "./VoicePanel";
 import { TelegraphInbox } from "./TelegraphInbox";
 import { MeetingsView } from "./MeetingsView";
+import { AgentsFlyout } from "./AgentsFlyout";
 
 // ============================================================================
 // PROJECT CONTEXT
@@ -130,6 +131,7 @@ export default function App() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showDashboardOverview, setShowDashboardOverview] = useState(false);
   const [showActivityFeed, setShowActivityFeed] = useState(false);
+  const [showAgentsFlyout, setShowAgentsFlyout] = useState(false);
   const [liveFeedExpanded, setLiveFeedExpanded] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("mc.live_feed_expanded") === "1";
@@ -168,7 +170,7 @@ export default function App() {
     onNewTask: () => setShowCreateTask(true),
     onSearch: () => setShowCommandPalette(true),
     onApprovals: () => setShowApprovals(true),
-    onAgents: () => setCurrentView("agents"),
+    onAgents: () => setShowAgentsFlyout(true),
     onGoToBoard: () => setCurrentView("tasks"),
     onShowHelp: () => setShowKeyboardHelp(true),
   });
@@ -247,6 +249,8 @@ export default function App() {
       setShowDashboardOverview={setShowDashboardOverview}
       showActivityFeed={showActivityFeed}
       setShowActivityFeed={setShowActivityFeed}
+      showAgentsFlyout={showAgentsFlyout}
+      setShowAgentsFlyout={setShowAgentsFlyout}
       liveFeedExpanded={liveFeedExpanded}
       setLiveFeedExpanded={setLiveFeedExpanded}
       kanbanFilters={kanbanFilters}
@@ -299,6 +303,8 @@ function AppContent({
   setShowDashboardOverview,
   showActivityFeed,
   setShowActivityFeed,
+  showAgentsFlyout,
+  setShowAgentsFlyout,
   liveFeedExpanded,
   setLiveFeedExpanded,
   kanbanFilters,
@@ -346,6 +352,8 @@ function AppContent({
   setShowDashboardOverview: (v: boolean) => void;
   showActivityFeed: boolean;
   setShowActivityFeed: (v: boolean) => void;
+  showAgentsFlyout: boolean;
+  setShowAgentsFlyout: (v: boolean) => void;
   liveFeedExpanded: boolean;
   setLiveFeedExpanded: (v: boolean) => void;
   kanbanFilters: {
@@ -397,7 +405,13 @@ function AppContent({
         {/* Side Navigation */}
         <AppSideNav
           currentView={currentView}
-          onViewChange={setCurrentView}
+          onViewChange={(view) => {
+            if (view === "agents") {
+              setShowAgentsFlyout(true);
+            } else {
+              setCurrentView(view);
+            }
+          }}
           onOpenApprovals={() => setShowApprovals(true)}
           onOpenNotifications={() => setShowNotifications(true)}
           pendingApprovals={pendingApprovals?.length ?? 0}
@@ -407,6 +421,17 @@ function AppContent({
         <div className="flex flex-1 overflow-hidden">
           {currentView === "tasks" && (
             <>
+              {/* Agents sidebar panel */}
+              <Sidebar
+                projectId={projectId}
+                onOpenApprovals={() => setShowApprovals(true)}
+                onOpenPolicy={() => setShowPolicy(true)}
+                onOpenOperatorControls={() => setShowOperatorControls(true)}
+                onOpenNotifications={() => setShowNotifications(true)}
+                onOpenStandup={() => setShowStandup(true)}
+                onPauseSquad={handlePauseSquad}
+                onResumeSquad={handleResumeSquad}
+              />
               <main className="flex flex-1 flex-col overflow-auto">
                 <PageHeader
                   title="Mission Queue"
@@ -604,7 +629,7 @@ function AppContent({
           }}
           onOpenAgents={() => {
             setShowCommandPalette(false);
-            setCurrentView("agents");
+            setShowAgentsFlyout(true);
           }}
           onOpenControls={() => {
             setShowCommandPalette(false);
@@ -625,6 +650,35 @@ function AppContent({
         <ActivityFeedModal
           projectId={projectId}
           onClose={() => setShowActivityFeed(false)}
+        />
+      )}
+
+      {showAgentsFlyout && (
+        <AgentsFlyout
+          projectId={projectId}
+          onClose={() => setShowAgentsFlyout(false)}
+          onOpenApprovals={() => {
+            setShowAgentsFlyout(false);
+            setShowApprovals(true);
+          }}
+          onOpenPolicy={() => {
+            setShowAgentsFlyout(false);
+            setShowPolicy(true);
+          }}
+          onOpenOperatorControls={() => {
+            setShowAgentsFlyout(false);
+            setShowOperatorControls(true);
+          }}
+          onOpenNotifications={() => {
+            setShowAgentsFlyout(false);
+            setShowNotifications(true);
+          }}
+          onOpenStandup={() => {
+            setShowAgentsFlyout(false);
+            setShowStandup(true);
+          }}
+          onPauseSquad={handlePauseSquad}
+          onResumeSquad={handleResumeSquad}
         />
       )}
       

@@ -1,0 +1,176 @@
+# Bug Fix Workflow
+# 6-agent workflow: triage → investigate → setup → fix → verify → PR
+# 
+# Inspired by Antfarm's proven bug-fix pattern.
+# Paste a bug report, get back a fix with regression test.
+
+id: bug-fix
+name: Bug Fix
+description: "Deterministic bug fix workflow with root cause analysis"
+
+agents:
+  - id: triager
+    persona: QA
+    workspace:
+      files:
+        AGENTS.md: agents/qa/AGENTS.md
+  
+  - id: investigator
+    persona: Coder
+    workspace:
+      files:
+        AGENTS.md: agents/coder/AGENTS.md
+  
+  - id: setup
+    persona: Operations
+    workspace:
+      files:
+        AGENTS.md: agents/operations/AGENTS.md
+  
+  - id: fixer
+    persona: Coder
+    workspace:
+      files:
+        AGENTS.md: agents/coder/AGENTS.md
+  
+  - id: verifier
+    persona: QA
+    workspace:
+      files:
+        AGENTS.md: agents/qa/AGENTS.md
+  
+  - id: pr-creator
+    persona: Operations
+    workspace:
+      files:
+        AGENTS.md: agents/operations/AGENTS.md
+
+steps:
+  - id: triage
+    agent: triager
+    input: |
+      Reproduce this bug:
+      {{task}}
+      
+      Reply with STATUS: done and TRIAGE: ...
+      
+      Document:
+      - Steps to reproduce
+      - Expected behavior
+      - Actual behavior
+      - Severity: critical/high/medium/low
+      - Environment details (if relevant)
+      - Screenshots/logs (if available)
+      
+      If you cannot reproduce, state "TRIAGE: Cannot reproduce"
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 15
+
+  - id: investigate
+    agent: investigator
+    input: |
+      Find the root cause of this bug:
+      {{triageOutput}}
+      
+      Reply with STATUS: done and ROOT_CAUSE: ...
+      
+      Investigate:
+      - Read affected code paths
+      - Trace execution flow
+      - Identify root cause
+      - Propose fix approach
+      
+      Provide:
+      - Root cause explanation
+      - Affected files/functions
+      - Recommended fix strategy
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 20
+
+  - id: setup
+    agent: setup
+    input: |
+      Set up environment for bug fix:
+      {{investigateOutput}}
+      
+      Reply with STATUS: done and SETUP: ...
+      
+      Tasks:
+      - Create fix branch (fix/{{task}})
+      - Prepare test environment
+      - Verify bug reproduces in dev
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 5
+
+  - id: fix
+    agent: fixer
+    input: |
+      Implement the bug fix:
+      
+      Root cause: {{investigateOutput}}
+      Environment: {{setupOutput}}
+      
+      Reply with STATUS: done and FIX: ...
+      
+      Implementation:
+      - Apply the fix following the proposed approach
+      - Add regression test to prevent recurrence
+      - Include manual verification steps
+      - Update relevant documentation
+      - Commit with clear message
+      
+      IMPORTANT:
+      - Fix the root cause, not just the symptom
+      - Ensure fix doesn't introduce new issues
+      - Follow project conventions
+    expects: "STATUS: done"
+    retryLimit: 3
+    timeoutMinutes: 30
+
+  - id: verify
+    agent: verifier
+    input: |
+      Verify the bug fix:
+      
+      Original bug: {{triageOutput}}
+      Fix: {{fixOutput}}
+      
+      Reply with STATUS: done and VERIFICATION: ...
+      
+      Confirm:
+      - Original bug no longer reproduces
+      - Regression test passes
+      - No new issues introduced
+      - Manual verification steps completed
+      
+      Test thoroughly with edge cases.
+      If issues found, list them clearly.
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 15
+
+  - id: pr
+    agent: pr-creator
+    input: |
+      Create PR for bug fix:
+      
+      Fix: {{fixOutput}}
+      Verification: {{verifyOutput}}
+      
+      Reply with STATUS: done and PR_URL: ...
+      
+      PR should include:
+      - Title: "Fix: [bug description]"
+      - Link to original bug report
+      - Root cause explanation
+      - Fix description
+      - Test results
+      - Closes #[issue-number] (if applicable)
+      
+      Use: gh pr create --title "..." --body "..."
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 5
