@@ -1,0 +1,29 @@
+{
+  "name": "@mission-control/workflow-engine",
+  "version": "0.9.0",
+  "private": true,
+  "description": "Multi-agent workflow execution engine inspired by Antfarm",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@mission-control/shared": "workspace:*",
+    "@mission-control/state-machine": "workspace:*",
+    "@mission-control/policy-engine": "workspace:*",
+    "convex": "^1.31.7",
+    "mustache": "^4.2.0",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "@types/mustache": "^4.2.5",
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.0"
+  }
+}

@@ -5,7 +5,7 @@
  * and provides one-click actions to acknowledge, resolve, or unblock tasks.
  */
 
-import { CSSProperties, useState } from "react";
+import { CSSProperties, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -62,7 +62,7 @@ export function LoopDetectionPanel({
   projectId: _projectId,
   onTaskSelect,
 }: LoopDetectionPanelProps) {
-  const [filter, setFilter] = useState<"all" | "OPEN" | "ACKNOWLEDGED" | "RESOLVED">("all");
+  const [filter, setFilter] = useState<"all" | "OPEN" | "ACKNOWLEDGED">("all");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const openAlerts = useQuery(api.alerts.listOpen, { limit: 100 });
@@ -76,10 +76,26 @@ export function LoopDetectionPanel({
     (a) => a.type === "LOOP_DETECTED"
   );
 
-  const filteredAlerts =
-    filter === "all"
-      ? loopAlerts
-      : loopAlerts.filter((a) => a.status === filter);
+  const filteredAlerts = filter === "all" ? loopAlerts : loopAlerts.filter((a) => a.status === filter);
+  const hasLoopAlerts = loopAlerts.length > 0;
+
+  const summary = useMemo(
+    () =>
+      Object.entries(LOOP_TYPE_INFO).map(([type, info]) => ({
+        type,
+        info,
+        count: loopAlerts.filter(
+          (a) =>
+            (a.metadata as any)?.loopData?.type === type ||
+            a.title.includes(type)
+        ).length,
+      })),
+    [loopAlerts]
+  );
+
+  const activeSummary = summary.filter((item) => item.count > 0);
+  const openCount = loopAlerts.filter((a) => a.status === "OPEN").length;
+  const acknowledgedCount = loopAlerts.filter((a) => a.status === "ACKNOWLEDGED").length;
 
   const handleAcknowledge = async (alertId: Id<"alerts">) => {
     setActionLoading(alertId);
@@ -141,69 +157,69 @@ export function LoopDetectionPanel({
 
   return (
     <div style={styles.container}>
-      {/* Header */}
       <div style={styles.header}>
         <div>
-          <h3 style={styles.title}>Loop Detection</h3>
+          <h3 style={styles.title}>Loop Risk Monitor</h3>
           <p style={styles.subtitle}>
-            {loopAlerts.length} active loop alert{loopAlerts.length !== 1 ? "s" : ""}
+            {loopAlerts.length} active incident{loopAlerts.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <div style={styles.filterRow}>
-          {(["all", "OPEN", "ACKNOWLEDGED"] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              style={{
-                ...styles.filterBtn,
-                ...(filter === f ? styles.filterBtnActive : {}),
-              }}
-            >
-              {f === "all" ? "All" : f}
-            </button>
-          ))}
+        <div style={styles.statusRow}>
+          <StatusPill label="Open" count={openCount} tone="danger" />
+          <StatusPill label="Acknowledged" count={acknowledgedCount} tone="muted" />
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div style={styles.summaryRow}>
-        {Object.entries(LOOP_TYPE_INFO).map(([type, info]) => {
-          const count = loopAlerts.filter(
-            (a) =>
-              (a.metadata as any)?.loopData?.type === type ||
-              a.title.includes(type)
-          ).length;
-          return (
-            <div
-              key={type}
-              style={{
-                ...styles.summaryCard,
-                borderLeft: `3px solid ${info.color}`,
-              }}
-            >
-              <span style={{ fontSize: "1.2rem" }}>{info.icon}</span>
-              <div>
-                <div style={{ color: colors.textPrimary, fontWeight: 600, fontSize: "1.1rem" }}>
-                  {count}
-                </div>
-                <div style={{ color: colors.textMuted, fontSize: "0.75rem" }}>
-                  {info.label}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Alert List */}
-      {filteredAlerts.length === 0 ? (
-        <div style={styles.emptyState}>
-          <span style={{ fontSize: "2rem" }}>✅</span>
-          <p style={{ color: colors.textMuted, margin: "8px 0 0" }}>
-            No loop alerts detected. All systems healthy.
-          </p>
+      {!hasLoopAlerts ? (
+        <div style={styles.okState}>
+          <span style={styles.okIcon}>✅</span>
+          <div>
+            <div style={styles.okTitle}>No active loop incidents</div>
+            <div style={styles.okSubtitle}>Comment storms and state churn are currently stable.</div>
+          </div>
         </div>
       ) : (
+        <>
+          <div style={styles.summaryRow}>
+            {activeSummary.map(({ type, info, count }) => (
+              <button
+                key={type}
+                type="button"
+                style={{
+                  ...styles.summaryChip,
+                  borderColor: info.color,
+                }}
+                onClick={() => setFilter("all")}
+                title={info.description}
+              >
+                <span style={styles.summaryChipCount}>{count}</span>
+                <span>{info.icon}</span>
+                <span style={styles.summaryChipLabel}>{info.label}</span>
+              </button>
+            ))}
+          </div>
+          <div style={styles.filterRow}>
+            {(["all", "OPEN", "ACKNOWLEDGED"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                style={{
+                  ...styles.filterBtn,
+                  ...(filter === f ? styles.filterBtnActive : {}),
+                }}
+              >
+                {f === "all" ? "All Incidents" : f}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {hasLoopAlerts && filteredAlerts.length === 0 ? (
+        <div style={styles.emptyFilterState}>
+          No incidents for this filter.
+        </div>
+      ) : hasLoopAlerts ? (
         <div style={styles.alertList}>
           {filteredAlerts.map((alert) => {
             const loopData = (alert.metadata as any)?.loopData;
@@ -337,7 +353,29 @@ export function LoopDetectionPanel({
             );
           })}
         </div>
-      )}
+      ) : null}
+    </div>
+  );
+}
+
+function StatusPill({
+  label,
+  count,
+  tone,
+}: {
+  label: string;
+  count: number;
+  tone: "danger" | "muted";
+}) {
+  return (
+    <div
+      style={{
+        ...styles.statusPill,
+        borderColor: tone === "danger" ? "#7f1d1d" : "#334155",
+        color: tone === "danger" ? "#fecaca" : colors.textSecondary,
+      }}
+    >
+      <span style={{ fontWeight: 700 }}>{count}</span> {label}
     </div>
   );
 }
@@ -359,33 +397,49 @@ const styles: Record<string, CSSProperties> = {
   container: {
     display: "flex",
     flexDirection: "column",
-    gap: 16,
+    gap: 10,
+    padding: "10px 12px",
+    border: `1px solid ${colors.border}`,
+    borderRadius: 10,
+    background: "#111b2e",
   },
   header: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     flexWrap: "wrap",
     gap: 12,
   },
   title: {
     color: colors.textPrimary,
-    fontSize: "1.1rem",
+    fontSize: "1rem",
     fontWeight: 700,
     margin: 0,
   },
   subtitle: {
     color: colors.textMuted,
-    fontSize: "0.8rem",
+    fontSize: "0.75rem",
     margin: "2px 0 0",
+  },
+  statusRow: {
+    display: "flex",
+    gap: 8,
+    alignItems: "center",
+  },
+  statusPill: {
+    padding: "5px 9px",
+    borderRadius: 999,
+    border: "1px solid",
+    fontSize: "0.72rem",
+    background: "#0f172a",
   },
   filterRow: {
     display: "flex",
-    gap: 4,
+    gap: 6,
   },
   filterBtn: {
-    padding: "4px 10px",
-    background: colors.bgCard,
+    padding: "5px 10px",
+    background: "#15233d",
     border: `1px solid ${colors.border}`,
     borderRadius: 6,
     color: colors.textSecondary,
@@ -393,30 +447,63 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
   filterBtnActive: {
-    background: "#25334d",
+    background: "#203454",
     color: colors.textPrimary,
     borderColor: colors.accentBlue,
   },
   summaryRow: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-    gap: 10,
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
   },
-  summaryCard: {
+  summaryChip: {
+    display: "flex",
+    alignItems: "center",
+    gap: 7,
+    padding: "6px 10px",
+    background: "#15233d",
+    borderRadius: 8,
+    border: "1px solid",
+    color: colors.textPrimary,
+    cursor: "pointer",
+    fontSize: "0.76rem",
+  },
+  summaryChipCount: {
+    fontWeight: 700,
+    fontSize: "0.8rem",
+  },
+  summaryChipLabel: {
+    color: colors.textSecondary,
+    fontWeight: 600,
+  },
+  okState: {
     display: "flex",
     alignItems: "center",
     gap: 10,
-    padding: "12px 14px",
-    background: colors.bgCard,
-    borderRadius: 8,
-    border: `1px solid ${colors.border}`,
-  },
-  emptyState: {
-    textAlign: "center" as const,
-    padding: "40px 20px",
-    background: colors.bgCard,
+    padding: "10px 12px",
+    background: "#14263b",
     borderRadius: 10,
     border: `1px solid ${colors.border}`,
+  },
+  okIcon: {
+    fontSize: "1rem",
+  },
+  okTitle: {
+    color: colors.textPrimary,
+    fontSize: "0.82rem",
+    fontWeight: 600,
+  },
+  okSubtitle: {
+    color: colors.textMuted,
+    fontSize: "0.72rem",
+    marginTop: 2,
+  },
+  emptyFilterState: {
+    padding: "10px 12px",
+    border: `1px dashed ${colors.border}`,
+    borderRadius: 8,
+    color: colors.textMuted,
+    fontSize: "0.78rem",
   },
   alertList: {
     display: "flex",
@@ -424,10 +511,10 @@ const styles: Record<string, CSSProperties> = {
     gap: 10,
   },
   alertCard: {
-    background: colors.bgCard,
+    background: "#14263b",
     border: `1px solid ${colors.border}`,
     borderRadius: 8,
-    padding: 16,
+    padding: 12,
   },
   alertHeader: {
     display: "flex",

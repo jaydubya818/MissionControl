@@ -1,0 +1,210 @@
+# Security Audit Workflow
+# 7-agent workflow: scan → prioritize → setup → fix → verify → test → PR
+# 
+# Inspired by Antfarm's proven security-audit pattern.
+# Point it at a repo, get back a security fix PR with regression tests.
+
+id: security-audit
+name: Security Audit
+description: "Comprehensive security scan and fix workflow"
+
+agents:
+  - id: scanner
+    persona: Compliance
+    workspace:
+      files:
+        AGENTS.md: agents/compliance/AGENTS.md
+  
+  - id: prioritizer
+    persona: Compliance
+    workspace:
+      files:
+        AGENTS.md: agents/compliance/AGENTS.md
+  
+  - id: setup
+    persona: Operations
+    workspace:
+      files:
+        AGENTS.md: agents/operations/AGENTS.md
+  
+  - id: fixer
+    persona: Coder
+    workspace:
+      files:
+        AGENTS.md: agents/coder/AGENTS.md
+  
+  - id: verifier
+    persona: Compliance
+    workspace:
+      files:
+        AGENTS.md: agents/compliance/AGENTS.md
+  
+  - id: tester
+    persona: QA
+    workspace:
+      files:
+        AGENTS.md: agents/qa/AGENTS.md
+  
+  - id: pr-creator
+    persona: Operations
+    workspace:
+      files:
+        AGENTS.md: agents/operations/AGENTS.md
+
+steps:
+  - id: scan
+    agent: scanner
+    input: |
+      Scan the codebase for security vulnerabilities:
+      {{task}}
+      
+      Reply with STATUS: done and VULNERABILITIES: ...
+      
+      Check for:
+      - Dependency vulnerabilities (npm audit, pnpm audit)
+      - Code injection risks (SQL injection, XSS, command injection)
+      - Authentication/authorization issues
+      - Data exposure risks (secrets in code, logs)
+      - Insecure configurations
+      - Known CVEs in dependencies
+      
+      For each vulnerability found:
+      - Type and description
+      - Location (file:line or package)
+      - Severity assessment
+    expects: "STATUS: done"
+    retryLimit: 1
+    timeoutMinutes: 20
+
+  - id: prioritize
+    agent: prioritizer
+    input: |
+      Rank vulnerabilities by severity and fix priority:
+      {{scanOutput}}
+      
+      Reply with STATUS: done and PRIORITY_LIST: ...
+      
+      For each vulnerability:
+      - Severity: critical/high/medium/low
+      - Exploitability: easy/moderate/difficult
+      - Impact: high/medium/low
+      - Recommended fix order
+      
+      Prioritize:
+      1. Critical + easily exploitable first
+      2. High severity next
+      3. Medium/low based on impact
+      
+      List top 5-10 vulnerabilities to fix in this run.
+    expects: "STATUS: done"
+    retryLimit: 1
+    timeoutMinutes: 10
+
+  - id: setup
+    agent: setup
+    input: |
+      Set up environment for security fixes:
+      {{prioritizeOutput}}
+      
+      Reply with STATUS: done and SETUP: ...
+      
+      Tasks:
+      - Create security-fix branch
+      - Prepare test environment
+      - Backup current state
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 5
+
+  - id: fix
+    agent: fixer
+    input: |
+      Fix the highest priority vulnerabilities:
+      {{prioritizeOutput}}
+      
+      Environment: {{setupOutput}}
+      
+      Reply with STATUS: done and FIXES: ...
+      
+      For each vulnerability:
+      - Apply security patch
+      - Add regression test
+      - Document the change
+      - Verify fix doesn't break functionality
+      
+      IMPORTANT:
+      - Fix root cause, not just symptoms
+      - Follow security best practices
+      - Test thoroughly
+      - Commit each fix separately with clear messages
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 45
+
+  - id: verify
+    agent: verifier
+    input: |
+      Re-scan to verify all fixes are effective:
+      
+      Original scan: {{scanOutput}}
+      Fixes applied: {{fixOutput}}
+      
+      Reply with STATUS: done and VERIFICATION: ...
+      
+      Confirm:
+      - All targeted vulnerabilities resolved
+      - No new vulnerabilities introduced
+      - Security best practices followed
+      - No functionality broken
+      
+      Run security scans again:
+      - npm audit / pnpm audit
+      - Code analysis tools
+      - Manual review of changes
+    expects: "STATUS: done"
+    retryLimit: 1
+    timeoutMinutes: 15
+
+  - id: test
+    agent: tester
+    input: |
+      Run regression tests on security fixes:
+      {{fixOutput}}
+      
+      Reply with STATUS: done and TEST_RESULTS: ...
+      
+      Verify:
+      - All existing tests still pass
+      - New regression tests pass
+      - No functionality broken
+      - Performance not degraded
+      
+      Run full test suite and report results.
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 20
+
+  - id: pr
+    agent: pr-creator
+    input: |
+      Create PR for security fixes:
+      
+      Fixes: {{fixOutput}}
+      Verification: {{verifyOutput}}
+      Tests: {{testOutput}}
+      
+      Reply with STATUS: done and PR_URL: ...
+      
+      PR should include:
+      - Title: "Security: Fix [N] vulnerabilities"
+      - List of vulnerabilities fixed
+      - Severity levels
+      - Test results
+      - Security scan results (before/after)
+      
+      Mark as security-related for priority review.
+      
+      Use: gh pr create --title "..." --body "..."
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 5

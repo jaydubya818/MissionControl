@@ -12,6 +12,9 @@ import { useEffect, useState } from "react";
 import { PeerReviewPanel } from "./PeerReviewPanel";
 import { ExportReportButton } from "./ExportReportButton";
 import { TaskEditMode } from "./TaskEditMode";
+import { StatusChip } from "./components/StatusChip";
+import { PriorityChip } from "./components/PriorityChip";
+import { RiskChip } from "./components/RiskChip";
 
 type Tab = "overview" | "timeline" | "artifacts" | "approvals" | "cost" | "reviews" | "why";
 type TaskStatus = Doc<"tasks">["status"];
@@ -106,10 +109,10 @@ export function TaskDrawerTabs({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div style={{ flex: 1 }}>
             <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>{task.title}</h2>
-            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-              <StatusBadge status={task.status} />
+            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <StatusChip status={task.status} size="md" />
+              <PriorityChip priority={task.priority} size="md" />
               <span style={tagStyle}>{task.type}</span>
-              <span style={tagStyle}>P{task.priority}</span>
               {task.source && (() => {
                 const src = SOURCE_CONFIG[task.source] || SOURCE_CONFIG.UNKNOWN;
                 return (
@@ -909,31 +912,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    INBOX: "#6366f1",
-    ASSIGNED: "#f59e0b",
-    IN_PROGRESS: "#3b82f6",
-    REVIEW: "#8b5cf6",
-    NEEDS_APPROVAL: "#ef4444",
-    BLOCKED: "#f97316",
-    DONE: "#22c55e",
-    CANCELED: "#6b7280",
-  };
-
-  return (
-    <span
-      style={{
-        padding: "4px 10px",
-        background: colors[status] || "#6b7280",
-        borderRadius: 4,
-        fontSize: "0.75rem",
-        fontWeight: 600,
-        textTransform: "uppercase",
-      }}
-    >
-      {status}
-    </span>
-  );
+  return <StatusChip status={status} size="sm" />;
 }
 
 // ============================================================================

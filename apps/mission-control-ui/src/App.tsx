@@ -2,11 +2,15 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
-import { TopNav, type MainView } from "./TopNav";
+import { type MainView } from "./TopNav";
 import { Kanban } from "./Kanban";
 import { TaskDrawerTabs } from "./TaskDrawerTabs";
 import { Sidebar } from "./Sidebar";
 import { LiveFeed } from "./LiveFeed";
+import { AppSideNav } from "./components/AppSideNav";
+import { AppTopBar } from "./components/AppTopBar";
+import { PageHeader } from "./components/PageHeader";
+import { Button } from "@/components/ui/button";
 import { CreateTaskModal } from "./CreateTaskModal";
 import { ApprovalsModal } from "./ApprovalsModal";
 import { PolicyModal } from "./PolicyModal";
@@ -22,7 +26,6 @@ import { CostAnalytics } from "./CostAnalytics";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { HealthDashboard } from "./HealthDashboard";
 import { MonitoringDashboard } from "./MonitoringDashboard";
-import { QuickActionsMenu } from "./QuickActionsMenu";
 import { CommandPalette } from "./CommandPalette";
 import { KeyboardShortcutsHelp, useKeyboardShortcuts } from "./KeyboardShortcuts";
 import { DashboardOverview } from "./DashboardOverview";
@@ -40,6 +43,11 @@ import { PeopleView } from "./PeopleView";
 import { MissionDAGView } from "./MissionDAGView";
 import { LoopDetectionPanel } from "./LoopDetectionPanel";
 import { BudgetBurnDown } from "./BudgetBurnDown";
+import { IdentityDirectoryView } from "./IdentityDirectoryView";
+import { VoicePanel } from "./VoicePanel";
+import { TelegraphInbox } from "./TelegraphInbox";
+import { MeetingsView } from "./MeetingsView";
+import { AgentsFlyout } from "./AgentsFlyout";
 
 // ============================================================================
 // PROJECT CONTEXT
@@ -78,16 +86,7 @@ function ProjectSwitcher() {
         const value = e.target.value;
         setProjectId(value ? (value as Id<"projects">) : null);
       }}
-      style={{
-        padding: "6px 12px",
-        background: "#1e293b",
-        border: "1px solid #475569",
-        borderRadius: 6,
-        color: "#e2e8f0",
-        fontSize: "0.85rem",
-        cursor: "pointer",
-        minWidth: 140,
-      }}
+      className="h-8 rounded-md border border-input bg-secondary px-3 text-sm text-foreground cursor-pointer min-w-[140px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <option value="">All Projects</option>
       {projects.map((p) => (
@@ -132,6 +131,11 @@ export default function App() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showDashboardOverview, setShowDashboardOverview] = useState(false);
   const [showActivityFeed, setShowActivityFeed] = useState(false);
+  const [showAgentsFlyout, setShowAgentsFlyout] = useState(false);
+  const [liveFeedExpanded, setLiveFeedExpanded] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("mc.live_feed_expanded") === "1";
+  });
   const [kanbanFilters, setKanbanFilters] = useState<{
     agents: string[];
     priorities: number[];
@@ -151,6 +155,11 @@ export default function App() {
       setProjectId(projects[0]._id);
     }
   }, [projectId, projects]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("mc.live_feed_expanded", liveFeedExpanded ? "1" : "0");
+  }, [liveFeedExpanded]);
   
   const pauseAll = useMutation(api.agents.pauseAll);
   const resumeAll = useMutation(api.agents.resumeAll);
@@ -161,7 +170,9 @@ export default function App() {
     onNewTask: () => setShowCreateTask(true),
     onSearch: () => setShowCommandPalette(true),
     onApprovals: () => setShowApprovals(true),
-    onAgents: () => setCurrentView("agents"),
+    onAgents: () => setShowAgentsFlyout(true),
+    onGoToBoard: () => setCurrentView("tasks"),
+    onShowHelp: () => setShowKeyboardHelp(true),
   });
   
   // Provide project context
@@ -238,6 +249,10 @@ export default function App() {
       setShowDashboardOverview={setShowDashboardOverview}
       showActivityFeed={showActivityFeed}
       setShowActivityFeed={setShowActivityFeed}
+      showAgentsFlyout={showAgentsFlyout}
+      setShowAgentsFlyout={setShowAgentsFlyout}
+      liveFeedExpanded={liveFeedExpanded}
+      setLiveFeedExpanded={setLiveFeedExpanded}
       kanbanFilters={kanbanFilters}
       setKanbanFilters={setKanbanFilters}
       handlePauseSquad={handlePauseSquad}
@@ -288,6 +303,10 @@ function AppContent({
   setShowDashboardOverview,
   showActivityFeed,
   setShowActivityFeed,
+  showAgentsFlyout,
+  setShowAgentsFlyout,
+  liveFeedExpanded,
+  setLiveFeedExpanded,
   kanbanFilters,
   setKanbanFilters,
   handlePauseSquad,
@@ -333,6 +352,10 @@ function AppContent({
   setShowDashboardOverview: (v: boolean) => void;
   showActivityFeed: boolean;
   setShowActivityFeed: (v: boolean) => void;
+  showAgentsFlyout: boolean;
+  setShowAgentsFlyout: (v: boolean) => void;
+  liveFeedExpanded: boolean;
+  setLiveFeedExpanded: (v: boolean) => void;
   kanbanFilters: {
     agents: string[];
     priorities: number[];
@@ -346,288 +369,147 @@ function AppContent({
   toast: (msg: string, isError?: boolean) => void;
 }) {
   const { activeCount, taskCount } = useHeaderMetrics();
+  const pendingApprovals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 10 } : { limit: 10 });
   
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <header className="app-header">
-        <h1 className="app-header-title">Mission Control</h1>
-        <ProjectSwitcher />
-        <SearchBar
-          projectId={projectId ?? undefined}
-          onResultClick={(taskId) => {
-            setSelectedTaskId(taskId as Id<"tasks">);
-          }}
-        />
-        <div className="app-header-metrics">
-          <span>{activeCount} Agents Active</span>
-          <span>{taskCount} Tasks in Queue</span>
-        </div>
-        <div className="app-header-right">
-          <button
-            type="button"
-            onClick={() => setCurrentView("agents")}
-            style={{
-              padding: "6px 12px",
-              background: "#10b981",
-              border: "1px solid #059669",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            🤖 Registry
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowCostAnalytics(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#8b5cf6",
-              border: "1px solid #7c3aed",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            💰 Costs
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowBudgetBurnDown(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#6366f1",
-              border: "1px solid #4f46e5",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            📉 Budget
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowAdvancedAnalytics(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#f59e0b",
-              border: "1px solid #d97706",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            📈 Analytics
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowHealthDashboard(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#10b981",
-              border: "1px solid #059669",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            🏥 Health
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowMonitoringDashboard(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#ef4444",
-              border: "1px solid #dc2626",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            📊 Monitor
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowOperatorControls(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#b91c1c",
-              border: "1px solid #991b1b",
-              borderRadius: 6,
-              color: "#fee2e2",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            🚨 Control
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowDashboardOverview(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#06b6d4",
-              border: "1px solid #0891b2",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            📊 Overview
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowActivityFeed(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#ec4899",
-              border: "1px solid #db2777",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            📋 Activity
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowKeyboardHelp(true)}
-            style={{
-              padding: "6px 12px",
-              background: "#64748b",
-              border: "1px solid #475569",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              marginRight: "8px",
-            }}
-          >
-            ⌨️
-          </button>
-          <button type="button" className="app-header-docs">
-            Docs
-          </button>
-          <span className="app-header-time">
-            {timeStr} {dateStr}
-          </span>
-          <div className="app-header-status">
-            <span className="app-header-status-dot" aria-hidden />
-            Online
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowCreateTask(true)}
-          style={{
-            padding: "6px 14px",
-            background: "#3b82f6",
-            border: "1px solid #2563eb",
-            borderRadius: 6,
-            color: "#fff",
-            fontSize: "0.85rem",
-            fontWeight: 500,
-            cursor: "pointer",
-          }}
-        >
-          + New task
-        </button>
-      </header>
-      <TopNav currentView={currentView} onViewChange={setCurrentView} />
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        {currentView === "tasks" && (
-          <>
-            <Sidebar
-              projectId={projectId}
-              onOpenApprovals={() => setShowApprovals(true)}
-              onOpenPolicy={() => setShowPolicy(true)}
-              onOpenOperatorControls={() => setShowOperatorControls(true)}
-              onOpenNotifications={() => setShowNotifications(true)}
-              onOpenStandup={() => setShowStandup(true)}
-              onPauseSquad={handlePauseSquad}
-              onResumeSquad={handleResumeSquad}
-            />
-            <main style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
-              <h2 className="mission-queue-header">Mission Queue</h2>
-              <LoopDetectionPanel
-                projectId={projectId}
-                onTaskSelect={(taskId) => setSelectedTaskId(taskId)}
-              />
-              <KanbanFilters
-                projectId={projectId}
-                currentUserId="operator"
-                filters={kanbanFilters}
-                onFiltersChange={setKanbanFilters}
-              />
-              <Kanban
-                projectId={projectId}
-                onSelectTask={setSelectedTaskId}
-                filters={kanbanFilters}
-              />
-            </main>
-            <LiveFeed projectId={projectId} />
-          </>
-        )}
-        {currentView === "agents" && <AgentRegistryView projectId={projectId} />}
-        {currentView === "dag" && (
-          <MissionDAGView
-            projectId={projectId}
-            onTaskSelect={(taskId) => {
-              setSelectedTaskId(taskId);
-              setCurrentView("tasks");
+    <div className="flex h-screen flex-col bg-background text-foreground">
+      {/* Top Bar */}
+      <AppTopBar
+        projectSwitcher={<ProjectSwitcher />}
+        searchBar={
+          <SearchBar
+            projectId={projectId ?? undefined}
+            onResultClick={(taskId) => {
+              setSelectedTaskId(taskId as Id<"tasks">);
             }}
           />
-        )}
-        {currentView === "org" && <OrgView projectId={projectId} />}
-        {currentView === "calendar" && <CalendarView projectId={projectId} />}
-        {currentView === "office" && <OfficeView projectId={projectId} />}
-        {currentView === "projects" && <ProjectsView projectId={projectId} />}
-        {currentView === "chat" && <ChatView projectId={projectId} />}
-        {currentView === "council" && <CouncilView projectId={projectId} />}
-        {currentView === "memory" && <MemoryView projectId={projectId} />}
-        {currentView === "captures" && <CapturesView projectId={projectId} />}
-        {currentView === "docs" && <DocsView />}
-        {currentView === "people" && <PeopleView projectId={projectId} />}
-        {currentView === "search" && (
-          <main style={{ flex: 1, overflow: "auto", padding: "24px" }}>
-            <h2 style={{ color: "#e2e8f0", marginBottom: "16px" }}>Search</h2>
-            <SearchBar
-              projectId={projectId ?? undefined}
-              onResultClick={(taskId) => {
-                setSelectedTaskId(taskId as Id<"tasks">);
+        }
+        activeCount={activeCount}
+        taskCount={taskCount}
+        timeStr={timeStr}
+        dateStr={dateStr}
+        onNewTask={() => setShowCreateTask(true)}
+        onOpenControls={() => setShowOperatorControls(true)}
+        onOpenCommandPalette={() => setShowCommandPalette(true)}
+        onOpenCostAnalytics={() => setShowCostAnalytics(true)}
+        onOpenBudgetBurnDown={() => setShowBudgetBurnDown(true)}
+        onOpenAdvancedAnalytics={() => setShowAdvancedAnalytics(true)}
+        onOpenHealthDashboard={() => setShowHealthDashboard(true)}
+        onOpenMonitoringDashboard={() => setShowMonitoringDashboard(true)}
+        onOpenDashboardOverview={() => setShowDashboardOverview(true)}
+        onOpenActivityFeed={() => setShowActivityFeed(true)}
+        onOpenKeyboardHelp={() => setShowKeyboardHelp(true)}
+      />
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Side Navigation */}
+        <AppSideNav
+          currentView={currentView}
+          onViewChange={(view) => {
+            if (view === "agents") {
+              setShowAgentsFlyout(true);
+            } else {
+              setCurrentView(view);
+            }
+          }}
+          onOpenApprovals={() => setShowApprovals(true)}
+          onOpenNotifications={() => setShowNotifications(true)}
+          pendingApprovals={pendingApprovals?.length ?? 0}
+        />
+
+        {/* Main Content Area */}
+        <div className="flex flex-1 overflow-hidden">
+          {currentView === "tasks" && (
+            <>
+              {/* Agents sidebar panel */}
+              <Sidebar
+                projectId={projectId}
+                onOpenApprovals={() => setShowApprovals(true)}
+                onOpenPolicy={() => setShowPolicy(true)}
+                onOpenOperatorControls={() => setShowOperatorControls(true)}
+                onOpenNotifications={() => setShowNotifications(true)}
+                onOpenStandup={() => setShowStandup(true)}
+                onPauseSquad={handlePauseSquad}
+                onResumeSquad={handleResumeSquad}
+              />
+              <main className="flex flex-1 flex-col overflow-auto">
+                <PageHeader
+                  title="Mission Queue"
+                  description={`${taskCount} tasks across all states`}
+                  actions={
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={handlePauseSquad}>
+                        Pause Squad
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setShowStandup(true)}>
+                        Standup
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setShowPolicy(true)}>
+                        Policy
+                      </Button>
+                    </div>
+                  }
+                />
+                <LoopDetectionPanel
+                  projectId={projectId}
+                  onTaskSelect={(taskId) => setSelectedTaskId(taskId)}
+                />
+                <KanbanFilters
+                  projectId={projectId}
+                  currentUserId="operator"
+                  filters={kanbanFilters}
+                  onFiltersChange={setKanbanFilters}
+                />
+                <Kanban
+                  projectId={projectId}
+                  onSelectTask={setSelectedTaskId}
+                  filters={kanbanFilters}
+                />
+              </main>
+              <LiveFeed
+                projectId={projectId}
+                expanded={liveFeedExpanded}
+                onToggle={() => setLiveFeedExpanded(!liveFeedExpanded)}
+              />
+            </>
+          )}
+          {currentView === "agents" && <AgentRegistryView projectId={projectId} />}
+          {currentView === "dag" && (
+            <MissionDAGView
+              projectId={projectId}
+              onTaskSelect={(taskId) => {
+                setSelectedTaskId(taskId);
                 setCurrentView("tasks");
               }}
             />
-          </main>
-        )}
+          )}
+          {currentView === "org" && <OrgView projectId={projectId} />}
+          {currentView === "calendar" && <CalendarView projectId={projectId} />}
+          {currentView === "office" && <OfficeView projectId={projectId} />}
+          {currentView === "projects" && <ProjectsView projectId={projectId} />}
+          {currentView === "chat" && <ChatView projectId={projectId} />}
+          {currentView === "council" && <CouncilView projectId={projectId} />}
+          {currentView === "memory" && <MemoryView projectId={projectId} />}
+          {currentView === "captures" && <CapturesView projectId={projectId} />}
+          {currentView === "docs" && <DocsView />}
+          {currentView === "people" && <PeopleView projectId={projectId} />}
+          {currentView === "identity" && <IdentityDirectoryView projectId={projectId} />}
+          {currentView === "telegraph" && <TelegraphInbox projectId={projectId} />}
+          {currentView === "meetings" && <MeetingsView projectId={projectId} />}
+          {currentView === "voice" && <VoicePanel projectId={projectId} />}
+          {currentView === "search" && (
+            <main className="flex-1 overflow-auto p-6">
+              <h2 className="text-foreground mb-4 text-lg font-semibold">Search</h2>
+              <SearchBar
+                projectId={projectId ?? undefined}
+                onResultClick={(taskId) => {
+                  setSelectedTaskId(taskId as Id<"tasks">);
+                  setCurrentView("tasks");
+                }}
+              />
+            </main>
+          )}
+        </div>
       </div>
       <TaskDrawerTabs taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} />
 
@@ -747,7 +629,7 @@ function AppContent({
           }}
           onOpenAgents={() => {
             setShowCommandPalette(false);
-            setCurrentView("agents");
+            setShowAgentsFlyout(true);
           }}
           onOpenControls={() => {
             setShowCommandPalette(false);
@@ -770,15 +652,35 @@ function AppContent({
           onClose={() => setShowActivityFeed(false)}
         />
       )}
-      
-      {/* Quick Actions Menu */}
-      <QuickActionsMenu
-        onCreateTask={() => setShowCreateTask(true)}
-        onOpenSearch={() => setShowCommandPalette(true)}
-        onOpenApprovals={() => setShowApprovals(true)}
-        onOpenAgents={() => setCurrentView("agents")}
-        onOpenControls={() => setShowOperatorControls(true)}
-      />
+
+      {showAgentsFlyout && (
+        <AgentsFlyout
+          projectId={projectId}
+          onClose={() => setShowAgentsFlyout(false)}
+          onOpenApprovals={() => {
+            setShowAgentsFlyout(false);
+            setShowApprovals(true);
+          }}
+          onOpenPolicy={() => {
+            setShowAgentsFlyout(false);
+            setShowPolicy(true);
+          }}
+          onOpenOperatorControls={() => {
+            setShowAgentsFlyout(false);
+            setShowOperatorControls(true);
+          }}
+          onOpenNotifications={() => {
+            setShowAgentsFlyout(false);
+            setShowNotifications(true);
+          }}
+          onOpenStandup={() => {
+            setShowAgentsFlyout(false);
+            setShowStandup(true);
+          }}
+          onPauseSquad={handlePauseSquad}
+          onResumeSquad={handleResumeSquad}
+        />
+      )}
       
       {/* Error Boundary wraps everything */}
     </div>

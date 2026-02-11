@@ -15,7 +15,8 @@ import { v } from "convex/values";
 const agentRole = v.union(
   v.literal("INTERN"),
   v.literal("SPECIALIST"),
-  v.literal("LEAD")
+  v.literal("LEAD"),
+  v.literal("CEO")
 );
 
 const agentStatus = v.union(
@@ -1176,4 +1177,338 @@ export default defineSchema({
     .index("by_agent", ["agentId"])
     .index("by_type", ["type"])
     .index("by_captured_at", ["capturedAt"]),
+
+  // -------------------------------------------------------------------------
+  // ORG ASSIGNMENTS (Per-Project Role Hierarchy)
+  // -------------------------------------------------------------------------
+  orgAssignments: defineTable({
+    agentId: v.id("agents"),
+    projectId: v.id("projects"),
+    
+    // Org-level position (separate from capability role)
+    orgPosition: v.union(
+      v.literal("CEO"),
+      v.literal("LEAD"),
+      v.literal("SPECIALIST"),
+      v.literal("INTERN")
+    ),
+    
+    // Scope of assignment
+    scope: v.union(
+      v.literal("PROJECT"),
+      v.literal("SQUAD"),
+      v.literal("REPO")
+    ),
+    scopeRef: v.optional(v.string()), // squad name or repo path
+    
+    // Metadata
+    assignedBy: v.optional(v.string()),
+    assignedAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_agent", ["agentId"])
+    .index("by_project", ["projectId"])
+    .index("by_position", ["orgPosition"])
+    .index("by_project_position", ["projectId", "orgPosition"]),
+
+  // -------------------------------------------------------------------------
+  // AGENT IDENTITIES (OpenClaw IDENTITY/SOUL/TOOLS Governance)
+  // -------------------------------------------------------------------------
+  agentIdentities: defineTable({
+    agentId: v.id("agents"),
+    
+    // IDENTITY.md fields
+    name: v.string(),
+    creature: v.optional(v.string()),
+    vibe: v.optional(v.string()),
+    emoji: v.optional(v.string()),
+    avatarPath: v.optional(v.string()),
+    
+    // SOUL.md content
+    soulContent: v.optional(v.string()),
+    soulHash: v.optional(v.string()),
+    
+    // TOOLS.md content
+    toolsNotes: v.optional(v.string()),
+    
+    // Validation
+    validationStatus: v.union(
+      v.literal("VALID"),
+      v.literal("INVALID"),
+      v.literal("MISSING"),
+      v.literal("PARTIAL")
+    ),
+    validationErrors: v.optional(v.array(v.string())),
+    lastScannedAt: v.optional(v.number()),
+    
+    metadata: v.optional(v.any()),
+  })
+    .index("by_agent", ["agentId"])
+    .index("by_validation_status", ["validationStatus"]),
+
+  // -------------------------------------------------------------------------
+  // TELEGRAPH THREADS (Async Agent Communications)
+  // -------------------------------------------------------------------------
+  telegraphThreads: defineTable({
+    projectId: v.optional(v.id("projects")),
+    
+    title: v.string(),
+    participants: v.array(v.string()), // agent IDs or human refs
+    
+    // Channel
+    channel: v.union(
+      v.literal("INTERNAL"),
+      v.literal("TELEGRAM")
+    ),
+    externalThreadRef: v.optional(v.string()),
+    
+    // Linked entities
+    linkedTaskId: v.optional(v.id("tasks")),
+    linkedApprovalId: v.optional(v.id("approvals")),
+    linkedIncidentId: v.optional(v.string()),
+    
+    // State
+    lastMessageAt: v.optional(v.number()),
+    messageCount: v.number(),
+    
+    metadata: v.optional(v.any()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_linked_task", ["linkedTaskId"])
+    .index("by_last_message", ["lastMessageAt"])
+    .index("by_channel", ["channel"]),
+
+  // -------------------------------------------------------------------------
+  // TELEGRAPH MESSAGES (Internal + External Messaging)
+  // -------------------------------------------------------------------------
+  telegraphMessages: defineTable({
+    projectId: v.optional(v.id("projects")),
+    threadId: v.id("telegraphThreads"),
+    
+    // Sender
+    senderId: v.string(),
+    senderType: v.union(
+      v.literal("AGENT"),
+      v.literal("HUMAN"),
+      v.literal("SYSTEM")
+    ),
+    
+    // Content
+    content: v.string(),
+    replyToId: v.optional(v.id("telegraphMessages")),
+    
+    // Channel + status
+    channel: v.union(
+      v.literal("INTERNAL"),
+      v.literal("TELEGRAM")
+    ),
+    externalRef: v.optional(v.string()),
+    status: v.union(
+      v.literal("DRAFT"),
+      v.literal("SENT"),
+      v.literal("DELIVERED"),
+      v.literal("READ"),
+      v.literal("FAILED")
+    ),
+    
+    metadata: v.optional(v.any()),
+  })
+    .index("by_thread", ["threadId"])
+    .index("by_project", ["projectId"])
+    .index("by_sender", ["senderId"])
+    .index("by_status", ["status"]),
+
+  // -------------------------------------------------------------------------
+  // MEETINGS (Zoom-Ready Meeting Orchestration)
+  // -------------------------------------------------------------------------
+  meetings: defineTable({
+    projectId: v.optional(v.id("projects")),
+    
+    title: v.string(),
+    agenda: v.optional(v.string()),
+    
+    // Scheduling
+    scheduledAt: v.number(),
+    duration: v.number(), // minutes
+    
+    // Status
+    status: v.union(
+      v.literal("SCHEDULED"),
+      v.literal("IN_PROGRESS"),
+      v.literal("COMPLETED"),
+      v.literal("CANCELLED")
+    ),
+    
+    // Participants
+    hostAgentId: v.optional(v.string()),
+    participants: v.array(v.object({
+      agentId: v.string(),
+      orgPosition: v.optional(v.string()),
+      role: v.optional(v.string()), // host, presenter, attendee
+    })),
+    
+    // Provider
+    provider: v.union(
+      v.literal("MANUAL"),
+      v.literal("ZOOM")
+    ),
+    externalMeetingRef: v.optional(v.string()),
+    
+    // Artifacts
+    notesDocPath: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    actionItems: v.optional(v.array(v.object({
+      description: v.string(),
+      assigneeAgentId: v.optional(v.string()),
+      taskId: v.optional(v.id("tasks")),
+      dueAt: v.optional(v.number()),
+      completed: v.boolean(),
+    }))),
+    
+    // Calendar
+    calendarPayload: v.optional(v.string()), // JSON iCal-compatible payload
+    
+    metadata: v.optional(v.any()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_status", ["status"])
+    .index("by_host", ["hostAgentId"])
+    .index("by_scheduled", ["scheduledAt"]),
+
+  // -------------------------------------------------------------------------
+  // VOICE ARTIFACTS (TTS Audio + Transcripts)
+  // -------------------------------------------------------------------------
+  voiceArtifacts: defineTable({
+    agentId: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
+    
+    // Content
+    text: v.string(),
+    transcript: v.optional(v.string()),
+    
+    // Audio
+    audioUrl: v.optional(v.string()),
+    audioStorageId: v.optional(v.string()),
+    
+    // Provider
+    provider: v.union(
+      v.literal("ELEVENLABS"),
+      v.literal("OTHER")
+    ),
+    voiceId: v.optional(v.string()),
+    durationMs: v.optional(v.number()),
+    
+    // Links
+    linkedMessageId: v.optional(v.id("telegraphMessages")),
+    linkedMeetingId: v.optional(v.id("meetings")),
+    
+    metadata: v.optional(v.any()),
+  })
+    .index("by_agent", ["agentId"])
+    .index("by_project", ["projectId"])
+    .index("by_linked_message", ["linkedMessageId"]),
+
+  // -------------------------------------------------------------------------
+  // WORKFLOWS (Multi-Agent Workflow Definitions)
+  // -------------------------------------------------------------------------
+  workflows: defineTable({
+    // Identity
+    workflowId: v.string(), // e.g., "feature-dev", "bug-fix", "security-audit"
+    name: v.string(),
+    description: v.string(),
+    
+    // Agent definitions
+    agents: v.array(v.object({
+      id: v.string(),
+      persona: v.string(), // References agents/*.yaml
+      workspace: v.optional(v.object({
+        files: v.optional(v.any()),
+      })),
+    })),
+    
+    // Step definitions
+    steps: v.array(v.object({
+      id: v.string(),
+      agent: v.string(), // References agents[].id
+      input: v.string(), // Template with {{variables}}
+      expects: v.string(), // Success criteria (e.g., "STATUS: done")
+      retryLimit: v.number(),
+      timeoutMinutes: v.number(),
+    })),
+    
+    // Status
+    active: v.boolean(),
+    version: v.number(),
+    
+    // Metadata
+    createdBy: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_workflow_id", ["workflowId"])
+    .index("by_active", ["active"]),
+
+  // -------------------------------------------------------------------------
+  // WORKFLOW RUNS (Execution State for Multi-Agent Workflows)
+  // -------------------------------------------------------------------------
+  workflowRuns: defineTable({
+    // Identity
+    runId: v.string(), // Short ID for CLI/UI display
+    workflowId: v.string(),
+    projectId: v.optional(v.id("projects")),
+    
+    // Parent task
+    parentTaskId: v.optional(v.id("tasks")),
+    
+    // Status
+    status: v.union(
+      v.literal("PENDING"),
+      v.literal("RUNNING"),
+      v.literal("COMPLETED"),
+      v.literal("FAILED"),
+      v.literal("PAUSED")
+    ),
+    
+    // Progress
+    currentStepIndex: v.number(),
+    totalSteps: v.number(),
+    
+    // Step execution state
+    steps: v.array(v.object({
+      stepId: v.string(),
+      status: v.union(
+        v.literal("PENDING"),
+        v.literal("RUNNING"),
+        v.literal("DONE"),
+        v.literal("FAILED")
+      ),
+      taskId: v.optional(v.id("tasks")),
+      agentId: v.optional(v.id("agents")),
+      startedAt: v.optional(v.number()),
+      completedAt: v.optional(v.number()),
+      retryCount: v.number(),
+      error: v.optional(v.string()),
+      output: v.optional(v.string()), // Extracted from task deliverable
+    })),
+    
+    // Context variables passed between steps
+    context: v.any(),
+    
+    // Initial input
+    initialInput: v.string(),
+    
+    // Timing
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    
+    // Metadata
+    metadata: v.optional(v.any()),
+  })
+    .index("by_run_id", ["runId"])
+    .index("by_workflow_id", ["workflowId"])
+    .index("by_project", ["projectId"])
+    .index("by_status", ["status"])
+    .index("by_parent_task", ["parentTaskId"])
+    .index("by_project_status", ["projectId", "status"]),
 });

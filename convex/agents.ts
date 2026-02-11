@@ -41,19 +41,35 @@ export const list = query({
   },
 });
 
-/** Alias for backwards compatibility */
+/** Alias for backwards compatibility -- enriched with org position info */
 export const listAll = query({
   args: {
     projectId: v.optional(v.id("projects")),
+    includeOrgPositions: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    let agents;
     if (args.projectId) {
-      return await ctx.db
+      agents = await ctx.db
         .query("agents")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect();
+    } else {
+      agents = await ctx.db.query("agents").collect();
     }
-    return await ctx.db.query("agents").collect();
+
+    if (!args.includeOrgPositions) return agents;
+
+    // Enrich with org positions
+    return await Promise.all(
+      agents.map(async (agent) => {
+        const positions = await ctx.db
+          .query("orgAssignments")
+          .withIndex("by_agent", (q) => q.eq("agentId", agent._id))
+          .collect();
+        return { ...agent, orgPositions: positions };
+      })
+    );
   },
 });
 

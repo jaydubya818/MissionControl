@@ -14,7 +14,11 @@ export type MainView =
   | "people"
   | "org"
   | "office"
-  | "search";
+  | "search"
+  | "identity"
+  | "telegraph"
+  | "meetings"
+  | "voice";
 
 interface TopNavProps {
   currentView: MainView;
@@ -24,25 +28,29 @@ interface TopNavProps {
 interface NavItem {
   id: MainView;
   label: string;
-  icon: string;
+  icon?: string;
   shortcut?: string;
 }
 
 const navItems: NavItem[] = [
-  { id: "tasks", label: "Tasks", icon: "📋", shortcut: "1" },
-  { id: "agents", label: "Agents", icon: "🤖" },
-  { id: "dag", label: "DAG", icon: "🔀" },
-  { id: "chat", label: "Chat", icon: "💬", shortcut: "2" },
-  { id: "council", label: "Council", icon: "🏛️", shortcut: "3" },
-  { id: "calendar", label: "Calendar", icon: "📅", shortcut: "4" },
-  { id: "projects", label: "Projects", icon: "📁", shortcut: "5" },
-  { id: "memory", label: "Memory", icon: "🧠", shortcut: "6" },
-  { id: "captures", label: "Captures", icon: "📸", shortcut: "7" },
-  { id: "docs", label: "Docs", icon: "📚", shortcut: "8" },
-  { id: "people", label: "People", icon: "👥", shortcut: "9" },
-  { id: "org", label: "Org", icon: "🏢", shortcut: "0" },
-  { id: "office", label: "Office", icon: "🏠" },
-  { id: "search", label: "Search", icon: "🔍" },
+  { id: "tasks", label: "Tasks", shortcut: "1" },
+  { id: "agents", label: "Agents" },
+  { id: "dag", label: "DAG" },
+  { id: "chat", label: "Chat", shortcut: "2" },
+  { id: "council", label: "Council", shortcut: "3" },
+  { id: "calendar", label: "Calendar", shortcut: "4" },
+  { id: "projects", label: "Projects", shortcut: "5" },
+  { id: "memory", label: "Memory", shortcut: "6" },
+  { id: "captures", label: "Captures", shortcut: "7" },
+  { id: "docs", label: "Docs", shortcut: "8" },
+  { id: "people", label: "People", shortcut: "9" },
+  { id: "org", label: "Org", shortcut: "0" },
+  { id: "office", label: "Office" },
+  { id: "identity", label: "Identity" },
+  { id: "telegraph", label: "Telegraph" },
+  { id: "meetings", label: "Meetings" },
+  { id: "voice", label: "Voice" },
+  { id: "search", label: "Search" },
 ];
 
 const colors = {
@@ -73,7 +81,7 @@ export function TopNav({ currentView, onViewChange }: TopNavProps) {
               aria-current={isActive ? "page" : undefined}
               title={item.shortcut ? `${item.label} (Cmd+${item.shortcut})` : item.label}
             >
-              <span style={styles.icon}>{item.icon}</span>
+              {item.icon && <span style={styles.icon}>{item.icon}</span>}
               <span style={styles.label}>{item.label}</span>
               {isActive && <div style={styles.activeIndicator} />}
             </button>

@@ -1,0 +1,211 @@
+# Feature Development Workflow
+# 7-agent workflow: plan → setup → implement → verify → test → PR → review
+# 
+# Inspired by Antfarm's proven feature-dev pattern.
+# Drop in a feature request, get back a tested PR.
+
+id: feature-dev
+name: Feature Development
+description: "Deterministic feature development workflow with verification gates"
+
+agents:
+  - id: planner
+    persona: Strategist
+    workspace:
+      files:
+        AGENTS.md: agents/strategist/AGENTS.md
+  
+  - id: setup
+    persona: Operations
+    workspace:
+      files:
+        AGENTS.md: agents/operations/AGENTS.md
+  
+  - id: developer
+    persona: Coder
+    workspace:
+      files:
+        AGENTS.md: agents/coder/AGENTS.md
+  
+  - id: verifier
+    persona: QA
+    workspace:
+      files:
+        AGENTS.md: agents/qa/AGENTS.md
+  
+  - id: tester
+    persona: QA
+    workspace:
+      files:
+        AGENTS.md: agents/qa/AGENTS.md
+  
+  - id: pr-creator
+    persona: Operations
+    workspace:
+      files:
+        AGENTS.md: agents/operations/AGENTS.md
+  
+  - id: reviewer
+    persona: Coordinator
+    workspace:
+      files:
+        AGENTS.md: agents/coordinator/AGENTS.md
+
+steps:
+  - id: plan
+    agent: planner
+    input: |
+      Break down this feature request into implementation stories:
+      {{task}}
+      
+      Reply with STATUS: done and STORIES: ...
+      
+      Include:
+      - User stories (3-7 stories)
+      - Acceptance criteria per story
+      - Dependencies between stories
+      - Estimated effort per story
+      
+      Format each story clearly with:
+      Story N: [title]
+      - Acceptance: [criteria]
+      - Depends on: [story numbers or "none"]
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 10
+
+  - id: setup
+    agent: setup
+    input: |
+      Set up the development environment for:
+      {{planOutput}}
+      
+      Reply with STATUS: done and SETUP: ...
+      
+      Tasks:
+      - Create feature branch (feature/{{task}})
+      - Install any new dependencies needed
+      - Verify build passes
+      - Prepare test environment
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 5
+
+  - id: implement
+    agent: developer
+    input: |
+      Implement the following stories:
+      {{planOutput}}
+      
+      Environment: {{setupOutput}}
+      
+      Reply with STATUS: done and IMPLEMENTATION: ...
+      
+      For each story:
+      - Write implementation following .cursorrules conventions
+      - Add inline tests for core logic
+      - Use TypeScript strict mode (no any types)
+      - Follow existing patterns in the codebase
+      - Commit changes with clear messages
+      
+      IMPORTANT:
+      - Read relevant existing code before making changes
+      - Use Convex for backend (no Express)
+      - Follow Mission Control's architecture patterns
+    expects: "STATUS: done"
+    retryLimit: 3
+    timeoutMinutes: 45
+
+  - id: verify
+    agent: verifier
+    input: |
+      Verify the implementation against acceptance criteria.
+      
+      Stories: {{planOutput}}
+      Implementation: {{implementOutput}}
+      
+      Reply with STATUS: done and VERIFICATION: ...
+      
+      Check each story:
+      - All acceptance criteria met
+      - Code follows project conventions
+      - No obvious bugs or edge cases missed
+      - TypeScript types are correct
+      - Error handling is present
+      
+      If issues found, list them clearly.
+      If all criteria met, state "All acceptance criteria verified."
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 15
+
+  - id: test
+    agent: tester
+    input: |
+      Run comprehensive tests on the implementation.
+      
+      Implementation: {{implementOutput}}
+      Verification: {{verifyOutput}}
+      
+      Reply with STATUS: done and TEST_RESULTS: ...
+      
+      Run:
+      - Unit tests (npm test or pnpm test)
+      - Type checking (tsc --noEmit)
+      - Linter (if configured)
+      - Manual smoke tests in dev environment
+      
+      Report:
+      - All tests passing: yes/no
+      - Coverage: [percentage if available]
+      - Issues found: [list or "none"]
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 20
+
+  - id: pr
+    agent: pr-creator
+    input: |
+      Create a pull request for the completed feature.
+      
+      Implementation: {{implementOutput}}
+      Verification: {{verifyOutput}}
+      Tests: {{testOutput}}
+      
+      Reply with STATUS: done and PR_URL: ...
+      
+      PR should include:
+      - Clear title and description
+      - Link to original task/issue
+      - Summary of changes
+      - Test results
+      - Screenshots (if UI changes)
+      
+      Use: gh pr create --title "..." --body "..."
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 5
+
+  - id: review
+    agent: reviewer
+    input: |
+      Review the completed work and approve for merge.
+      
+      PR: {{prOutput}}
+      Stories: {{planOutput}}
+      Verification: {{verifyOutput}}
+      Tests: {{testOutput}}
+      
+      Reply with STATUS: done and DECISION: approved/changes-requested
+      
+      Final checks:
+      - All stories completed
+      - Tests passing
+      - Code quality acceptable
+      - Ready to merge
+      
+      If changes needed, list them clearly.
+      If approved, state "DECISION: approved"
+    expects: "STATUS: done"
+    retryLimit: 1
+    timeoutMinutes: 10

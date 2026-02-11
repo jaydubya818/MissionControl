@@ -14,7 +14,7 @@ Mission Control is a self-hosted orchestration and observability control plane f
 - **Database:** Convex (source of truth: convex/schema.ts, 18 tables)
 - **Real-time:** Convex reactive subscriptions via useQuery/useMutation hooks. No WebSocket/SSE code.
 - **Background jobs:** Convex cron jobs (convex/crons.ts). No standalone worker processes.
-- **Styling:** Inline React styles + global CSS (apps/mission-control-ui/src/index.css). No Tailwind. No CSS-in-JS.
+- **Styling:** Tailwind CSS v4 + shadcn/ui components + global CSS (apps/mission-control-ui/src/index.css). Legacy inline styles exist during migration.
 - **Package manager:** pnpm 9+
 - **Node version:** 18+
 
@@ -68,16 +68,19 @@ Planned (not yet created):
 ## Frontend Conventions
 
 - All components in apps/mission-control-ui/src/
-- No component library (no MUI, no Chakra). Custom components only.
-- Dark theme: backgrounds #0f172a (page), #1e293b (cards), #334155 (borders)
-- Text: #e2e8f0 (primary), #94a3b8 (secondary), #64748b (muted)
-- Accents: blue #3b82f6, green #10b981, orange #f59e0b, purple #8b5cf6, red #ef4444
-- Font: system-ui, -apple-system, sans-serif
-- Border radius: 6px default, 8px for cards, 10-12px for modals
-- Use inline styles (not className for custom styles). Global styles in index.css only for layout/responsive.
+- **Component library:** shadcn/ui (copied into src/components/ui/). Built on Radix UI primitives + Tailwind.
+- **Styling:** Tailwind CSS utility classes. Use `cn()` from `@/lib/utils` for conditional classes.
+- **Icons:** Lucide React (tree-shakeable, consistent with shadcn).
+- **Theming:** CSS variables in index.css for dark/light modes. Tailwind theme reads from CSS vars.
+- **Path alias:** `@/` maps to `src/` (configured in tsconfig.json + vite.config.ts).
+- Dark theme (default): Enterprise Dark palette via CSS variables.
+- Light theme: Available via `[data-theme="light"]` class on root.
+- Font: Inter, IBM Plex Sans, system-ui, sans-serif
+- Border radius: 0.5rem default (via `--radius` CSS var)
 - Animations via framer-motion
 - Drag-and-drop via @dnd-kit
 - Convex data via useQuery/useMutation hooks
+- Legacy inline styles exist in older components; migrate to Tailwind incrementally.
 
 ## Coding Standards
 
@@ -91,8 +94,8 @@ Planned (not yet created):
 ## What NOT to Do
 
 - Do NOT create an Express server or REST API (the backend is Convex)
-- Do NOT add Tailwind (the project uses inline styles)
-- Do NOT add a CSS-in-JS library
+- Do NOT add CSS-in-JS libraries (styled-components, emotion, etc.)
+- Do NOT add MUI, Chakra, or other full component libraries (shadcn/ui is the standard)
 - Do NOT add new npm dependencies without discussing first
 - Do NOT modify convex/schema.ts without updating docs/BACKEND_STRUCTURE.md
 - Do NOT hardcode colors -- reference docs/FRONTEND_GUIDELINES.md
@@ -102,7 +105,9 @@ Planned (not yet created):
 
 ## File Organization
 
-- New UI components: apps/mission-control-ui/src/
+- New UI primitives (shadcn): apps/mission-control-ui/src/components/ui/
+- New feature components: apps/mission-control-ui/src/
+- Utility functions: apps/mission-control-ui/src/lib/
 - New Convex functions: convex/
 - New packages: packages/<name>/ with package.json
 - Documentation: docs/<category>/

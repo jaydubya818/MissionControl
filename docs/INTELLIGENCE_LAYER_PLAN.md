@@ -166,3 +166,111 @@ v1 is done when:
 - Simulation surfaces may expose policy complexity to users. UX should prioritize actionable remediation hints over raw internals.
 - all queries enforce mandatory project scoping with zero cross-tenant leaks (validate via security/authorization tests in Section 6 and penetration test per Phase 1 gating)
 - all SLO targets are met and monitored in production (validate via performance/load tests in Section 6; ref: Section 5 SLO targets)
+
+---
+
+## 12. Identity/Soul Governance (Platform Upgrade)
+
+### Purpose
+Every agent in the OpenClaw ecosystem must have a verifiable identity (IDENTITY.md), behavioral soul (SOUL.md), and environment-specific tool notes (TOOLS.md). Mission Control governs the creation, validation, indexing, and auditing of these files.
+
+### Components
+- **Templates**: `templates/IDENTITY.md`, `templates/SOUL.md`, `templates/TOOLS.md` derived from OpenClaw reference templates.
+- **Validator**: `convex/identity.ts` validates required fields (name, creature, vibe, emoji for identity; core truths + boundaries for soul).
+- **Scanner/Indexer**: `identity.scan` action discovers agents, checks for missing/invalid files, indexes fields into `agentIdentities` table.
+- **Compliance Dashboard**: UI showing agents with missing or invalid identity/soul/tools, with one-click fix-it workflows.
+- **Change Audit**: Any SOUL.md modification triggers a notification to the operator and an audit log entry (per OpenClaw rule: "If you change SOUL.md, tell the user").
+- **CI Enforcement**: GitHub Actions check that templates exist and agent YAMLs have required identity fields.
+
+### Data Model
+- `agentIdentities` table: `agentId`, `name`, `creature`, `vibe`, `emoji`, `avatarPath`, `soulContent`, `soulHash`, `toolsNotes`, `validationStatus`, `validationErrors`, `lastScannedAt`
+
+### Acceptance Criteria
+- All registered agents have an `agentIdentities` record.
+- Validator catches 100% of missing required fields.
+- Soul changes produce audit events visible in timeline.
+- CI blocks PRs with missing templates or invalid agent identity fields.
+
+## 13. Voice + Avatar Pipeline (Platform Upgrade)
+
+### Purpose
+Agents can speak via TTS (text-to-speech) and present as animated avatars in the UI. Enables richer operator interaction and meeting/briefing scenarios.
+
+### Components
+- **TTSProvider interface**: `synthesize(text, options) -> TTSResult` with voice selection, model params.
+- **ElevenLabs provider**: First concrete implementation using `api.elevenlabs.io/v1/text-to-speech`.
+- **AvatarProvider interface**: `getAvatarUrl(agentId)`, `getAnimationState(speaking)`.
+- **Default avatar**: Agent emoji with CSS speaking animation via framer-motion.
+- **Convex actions**: `voice.synthesize` calls ElevenLabs, stores audio in Convex file storage, creates `voiceArtifacts` record.
+- **Voice Panel UI**: Select agent, enter text, synthesize, playback with avatar animation, transcript logged.
+
+### Data Model
+- `voiceArtifacts` table: `agentId`, `projectId`, `text`, `audioUrl`, `audioStorageId`, `provider`, `voiceId`, `durationMs`, `transcript`, `linkedMessageId`, `linkedMeetingId`
+
+### Acceptance Criteria
+- Operator can select an agent, type a message, hear it spoken, and see the transcript logged.
+- Audio files persist in Convex file storage with metadata.
+- Provider interface allows swapping ElevenLabs for another TTS vendor.
+
+## 14. Telegraph Communications (Platform Upgrade)
+
+### Purpose
+Fast, async messaging channel for agent-org communications. Internal messages stored in Convex; external messages routed via Telegram with safety checks.
+
+### Components
+- **TelegraphProvider interface**: `sendMessage`, `getMessages`, `createThread`, `mapExternalThread`.
+- **Internal provider**: Pure Convex mutations/queries on `telegraphMessages` + `telegraphThreads`.
+- **Telegram provider**: Bridges to existing `packages/telegram-bot`; enforces final-reply-only rule.
+- **Safety enforcement**: Messages to TELEGRAM channel validated as complete (no streaming/partial).
+- **Thread linking**: Threads can be linked to tasks, approvals, or incidents.
+- **Telegraph Inbox UI**: Threads grouped by project, expandable to full message view.
+
+### Data Model
+- `telegraphMessages`: `projectId`, `threadId`, `senderId`, `senderType`, `content`, `channel`, `status`
+- `telegraphThreads`: `projectId`, `title`, `participants`, `linkedTaskId`, `linkedApprovalId`, `channel`, `lastMessageAt`
+
+### Acceptance Criteria
+- Agents and operators can send messages in threads.
+- Threads link to tasks and appear in task drawer.
+- External (Telegram) messages rejected if streaming/partial.
+- Inbox groups threads by project with unread indicators.
+
+## 15. Meeting Orchestration (Platform Upgrade)
+
+### Purpose
+Schedule and run meetings with CEO agents, project leads, and specialists. Generate agendas, capture notes, and convert action items into tasks.
+
+### Components
+- **MeetingProvider interface**: `scheduleMeeting`, `generateAgenda`, `generateNotes`, `extractActionItems`, `getCalendarPayload`.
+- **Manual provider**: Generates markdown meeting docs, structured agendas, iCal-compatible payloads, action item extraction.
+- **Convex functions**: `meetings.schedule`, `meetings.generateAgenda`, `meetings.complete`, `meetings.convertActionItems`.
+- **Meetings UI**: Schedule form (project, participants from org chart, topic), list of meetings, detail view with notes/action items.
+
+### Data Model
+- `meetings`: `projectId`, `title`, `agenda`, `scheduledAt`, `duration`, `status`, `hostAgentId`, `participants`, `provider`, `notesDocPath`, `actionItems`, `calendarPayload`
+
+### Acceptance Criteria
+- Operator can schedule a meeting, selecting from the project org chart.
+- Agenda is auto-generated based on participants and topic.
+- Action items convert to tasks with owners and due dates.
+- Calendar payload is iCal-compatible.
+
+## 16. Org Model + Role Hierarchy (Platform Upgrade)
+
+### Purpose
+Support hierarchical organization: Organization -> Projects -> Squads -> Agents, with positional roles per project.
+
+### Components
+- **Extended agent roles**: `CEO`, `LEAD`, `SPECIALIST`, `INTERN` (CEO added to enum).
+- **orgAssignments table**: Maps agents to projects with org-level positions, separate from capability role.
+- **Convex functions**: `org.assign`, `org.getProjectOrg`, `org.getCEO`, `org.getLeads`.
+- **OrgView enhancement**: Display org positions per project, assign roles, show comms links.
+
+### Data Model
+- `orgAssignments`: `agentId`, `projectId`, `orgPosition`, `scope`, `scopeRef`, `assignedBy`, `assignedAt`
+
+### Acceptance Criteria
+- Each project can have exactly one CEO agent.
+- Leads and specialists can be assigned per project/squad.
+- Org chart UI shows positional hierarchy.
+- Meeting scheduling draws from org chart participants.
