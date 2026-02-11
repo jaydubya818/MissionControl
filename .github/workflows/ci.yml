@@ -36,6 +36,12 @@ jobs:
       - name: Test (CI lane)
         run: pnpm run ci:test
 
+      - name: Dependency audit
+        run: |
+          echo "=== Dependency audit ==="
+          pnpm audit --audit-level=high || true
+          echo "=== Audit complete (non-blocking) ==="
+
       - name: Identity/Soul Compliance Check
         run: |
           echo "=== Identity/Soul Compliance Check ==="

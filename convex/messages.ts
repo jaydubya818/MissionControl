@@ -8,6 +8,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { sanitizeMessageContent } from "./lib/sanitize";
 
 // ============================================================================
 // QUERIES
@@ -99,6 +100,9 @@ async function postMessageInternal(
     throw new Error("Task not found");
   }
 
+  // Sanitize content (OpenClaw: untrusted DM/webhook input)
+  const content = sanitizeMessageContent(args.content);
+
   // Create message
   const messageId = await ctx.db.insert("messages", {
     projectId: task.projectId,
@@ -107,7 +111,7 @@ async function postMessageInternal(
     authorAgentId: args.authorAgentId,
     authorUserId: args.authorUserId,
     type: args.type as any,
-    content: args.content,
+    content,
     artifacts: args.artifacts,
     mentions: args.mentions,
     replyToId: args.replyToId,

@@ -9,8 +9,8 @@ Aligned with [OpenClaw Security Audit Guidance](https://docs.openclaw.ai/gateway
 | Check | Status | Notes |
 |---|---|---|
 | DM messages treated as untrusted input | Implemented | Policy engine flags `inputTrustLevel: UNTRUSTED` for DM sources |
-| Input sanitization before processing | Partial | Convex validators handle type safety; no content sanitization yet |
-| Rate limiting on external inputs | Not implemented | Future: add rate limiting to webhook/bot endpoints |
+| Input sanitization before processing | Implemented | `convex/lib/sanitize.ts` + applied in `tasks.create` (TELEGRAM/GITHUB/API) and `messages.post` |
+| Rate limiting on external inputs | Implemented | `rateLimitEntries` table; 30 task creates per Telegram chat per minute in `tasks.create` |
 | Bot command authentication | Implemented | Telegram bot validates chat context |
 | API key rotation schedule | Not implemented | Manual process; needs automation |
 
@@ -98,14 +98,14 @@ Aligned with [OpenClaw Security Audit Guidance](https://docs.openclaw.ai/gateway
 | Type checking in CI | Implemented | `pnpm run ci:typecheck` |
 | Tests in CI | Implemented | `pnpm run ci:test` |
 | Identity/soul compliance in CI | Implemented | Template existence + required sections check |
-| Dependency audit | Not implemented | Add `pnpm audit` to CI pipeline |
+| Dependency audit | Implemented | CI step: `pnpm audit --audit-level=high` (non-blocking) |
 | No `.env` files in commits | Manual | Add pre-commit hook or CI check |
 
 ## Remediation Priority
 
-1. **High**: Add input content sanitization for DM/webhook inputs
-2. **High**: Add `pnpm audit` to CI for dependency vulnerability scanning
-3. **Medium**: Add rate limiting to external-facing endpoints
+1. ~~**High**: Add input content sanitization for DM/webhook inputs~~ ✅ Done
+2. ~~**High**: Add `pnpm audit` to CI for dependency vulnerability scanning~~ ✅ Done
+3. ~~**Medium**: Add rate limiting to external-facing endpoints~~ ✅ Done (Telegram task creation)
 4. **Medium**: Implement API key rotation automation
 5. **Medium**: Add pre-commit hook to block `.env` files
 6. **Low**: Improve external API call auditing in tool call logs

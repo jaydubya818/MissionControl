@@ -1409,6 +1409,16 @@ export default defineSchema({
     .index("by_linked_message", ["linkedMessageId"]),
 
   // -------------------------------------------------------------------------
+  // RATE LIMIT (External input throttling)
+  // -------------------------------------------------------------------------
+  rateLimitEntries: defineTable({
+    key: v.string(),       // e.g. "telegram:chatId" or "webhook:projectId"
+    windowStart: v.number(), // start of 1-minute window (ms)
+    count: v.number(),
+  })
+    .index("by_key", ["key"]),
+
+  // -------------------------------------------------------------------------
   // WORKFLOWS (Multi-Agent Workflow Definitions)
   // -------------------------------------------------------------------------
   workflows: defineTable({

@@ -11,6 +11,7 @@ import { api } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
 import { evaluateOperatorGate, getEffectiveOperatorControl } from "./lib/operatorControls";
+import { sanitizeTaskTitle, sanitizeTaskDescription } from "./lib/sanitize";
 
 // ============================================================================
 // TYPES
@@ -913,13 +914,43 @@ export const create = mutation({
         return { task: existing, created: false };
       }
     }
-    
+
+    // ── Rate limit external sources (30 per key per minute)
+    const RATE_LIMIT_PER_MINUTE = 30;
+    const WINDOW_MS = 60 * 1000;
+    if (args.source === "TELEGRAM" && args.sourceRef) {
+      const key = `telegram:${args.sourceRef.split(":")[1] ?? "unknown"}`;
+      const now = Date.now();
+      const windowStart = Math.floor(now / WINDOW_MS) * WINDOW_MS;
+      const entry = await ctx.db
+        .query("rateLimitEntries")
+        .withIndex("by_key", (q) => q.eq("key", key))
+        .first();
+      if (!entry || entry.windowStart < windowStart) {
+        if (entry) await ctx.db.delete(entry._id);
+        await ctx.db.insert("rateLimitEntries", { key, windowStart, count: 1 });
+      } else {
+        if (entry.count >= RATE_LIMIT_PER_MINUTE) {
+          throw new Error("Rate limit exceeded. Please try again in a minute.");
+        }
+        await ctx.db.patch(entry._id, { count: entry.count + 1 });
+      }
+    }
+
+    // ── Sanitize untrusted input from external sources (OpenClaw safety) ──
+    const externalSources = ["TELEGRAM", "GITHUB", "API"];
+    const isUntrusted = args.source && externalSources.includes(args.source);
+    const title = isUntrusted ? sanitizeTaskTitle(args.title) : args.title;
+    const description = isUntrusted
+      ? sanitizeTaskDescription(args.description)
+      : args.description;
+
     // ── INVARIANT: All tasks start as INBOX ──
     // Status is NEVER caller-controlled. Hardcoded server-side.
     const taskId = await ctx.db.insert("tasks", {
       projectId: args.projectId,
-      title: args.title,
-      description: args.description,
+      title,
+      description,
       type: args.type as TaskType,
       status: "INBOX",  // INVARIANT: always INBOX at creation
       priority: (args.priority ?? 3) as 1 | 2 | 3 | 4,
@@ -945,7 +976,7 @@ export const create = mutation({
       projectId: args.projectId,
       actorType: (args.createdBy as "AGENT" | "HUMAN" | "SYSTEM") ?? "SYSTEM",
       action: "TASK_CREATED",
-      description: `Task "${args.title}" created${sourceLabel}`,
+      description: `Task "${title}" created${sourceLabel}`,
       targetType: "TASK",
       targetId: taskId,
       taskId,
@@ -960,7 +991,7 @@ export const create = mutation({
       relatedId: taskId,
       afterState: {
         status: "INBOX",
-        title: args.title,
+        title,
         type: args.type,
         priority: args.priority ?? 3,
       },
