@@ -343,6 +343,8 @@ export default defineSchema({
   taskEvents: defineTable({
     projectId: v.optional(v.id("projects")),
     taskId: v.id("tasks"),
+    // Stable event identity for idempotency/reconciliation
+    eventId: v.optional(v.string()),
     eventType: v.union(
       v.literal("TASK_CREATED"),
       v.literal("TASK_TRANSITION"),
@@ -360,6 +362,8 @@ export default defineSchema({
     ),
     actorType: actorType,
     actorId: v.optional(v.string()),
+    // Optional policy/guardrail rule identifier for causality tracing
+    ruleId: v.optional(v.string()),
     relatedId: v.optional(v.string()),
     timestamp: v.number(),
     beforeState: v.optional(v.any()),
@@ -367,6 +371,7 @@ export default defineSchema({
     metadata: v.optional(v.any()),
   })
     .index("by_task", ["taskId"])
+    .index("by_event_id", ["eventId"])
     .index("by_project", ["projectId"])
     .index("by_project_task", ["projectId", "taskId"])
     .index("by_task_type", ["taskId", "eventType"]),
