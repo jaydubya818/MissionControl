@@ -32,25 +32,45 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    let query = ctx.db.query("workflowRuns");
+    // Build query based on filters
+    if (args.projectId && args.status) {
+      return await ctx.db
+        .query("workflowRuns")
+        .withIndex("by_project_status", (q) => 
+          q.eq("projectId", args.projectId).eq("status", args.status as any)
+        )
+        .order("desc")
+        .take(args.limit ?? 100);
+    }
     
     if (args.projectId) {
-      query = query.withIndex("by_project", (q) => q.eq("projectId", args.projectId));
+      return await ctx.db
+        .query("workflowRuns")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .order("desc")
+        .take(args.limit ?? 100);
     }
     
     if (args.workflowId) {
-      query = query.withIndex("by_workflow_id", (q) => q.eq("workflowId", args.workflowId));
+      return await ctx.db
+        .query("workflowRuns")
+        .withIndex("by_workflow_id", (q) => q.eq("workflowId", args.workflowId!))
+        .order("desc")
+        .take(args.limit ?? 100);
     }
     
     if (args.status) {
-      query = query.filter((q) => q.eq(q.field("status"), args.status));
+      return await ctx.db
+        .query("workflowRuns")
+        .withIndex("by_status", (q) => q.eq("status", args.status as any))
+        .order("desc")
+        .take(args.limit ?? 100);
     }
     
-    let runs = await query
+    return await ctx.db
+      .query("workflowRuns")
       .order("desc")
       .take(args.limit ?? 100);
-    
-    return runs;
   },
 });
 

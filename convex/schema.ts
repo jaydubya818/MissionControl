@@ -99,9 +99,133 @@ const reviewStatus = v.union(
 
 export default defineSchema({
   // -------------------------------------------------------------------------
+  // ARM: TENANTS (Multi-Tenancy Foundation)
+  // -------------------------------------------------------------------------
+  tenants: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    
+    // Status
+    active: v.boolean(),
+    
+    // Metadata
+    metadata: v.optional(v.any()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_active", ["active"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: ENVIRONMENTS (Release Channels)
+  // -------------------------------------------------------------------------
+  environments: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    type: v.union(
+      v.literal("dev"),
+      v.literal("staging"),
+      v.literal("prod")
+    ),
+    description: v.optional(v.string()),
+    
+    // Metadata
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_type", ["type"])
+    .index("by_tenant_type", ["tenantId", "type"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: OPERATORS (Human Identity)
+  // -------------------------------------------------------------------------
+  operators: defineTable({
+    tenantId: v.id("tenants"),
+    
+    // Identity
+    email: v.string(),
+    name: v.string(),
+    authId: v.optional(v.string()), // External auth provider ID
+    
+    // Status
+    active: v.boolean(),
+    
+    // GDPR fields
+    lastLoginAt: v.optional(v.number()),
+    createdAt: v.number(),
+    
+    // Metadata
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_email", ["email"])
+    .index("by_auth_id", ["authId"])
+    .index("by_tenant_email", ["tenantId", "email"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: ROLES (RBAC Role Definitions)
+  // -------------------------------------------------------------------------
+  roles: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    
+    // Permissions array (references permissions table)
+    permissions: v.array(v.string()),
+    
+    // Metadata
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_name", ["name"])
+    .index("by_tenant_name", ["tenantId", "name"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: PERMISSIONS (Permission Registry)
+  // -------------------------------------------------------------------------
+  permissions: defineTable({
+    resource: v.string(), // e.g., "tasks", "agents", "approvals"
+    action: v.string(),   // e.g., "create", "read", "update", "delete"
+    description: v.optional(v.string()),
+    
+    // Metadata
+    metadata: v.optional(v.any()),
+  })
+    .index("by_resource", ["resource"])
+    .index("by_resource_action", ["resource", "action"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: ROLE ASSIGNMENTS (Operator-to-Role Mappings)
+  // -------------------------------------------------------------------------
+  roleAssignments: defineTable({
+    operatorId: v.id("operators"),
+    roleId: v.id("roles"),
+    
+    // Scope (optional: tenant-wide if not specified)
+    scope: v.optional(v.object({
+      type: v.union(
+        v.literal("tenant"),
+        v.literal("project"),
+        v.literal("environment")
+      ),
+      id: v.string(),
+    })),
+    
+    // Metadata
+    assignedBy: v.optional(v.id("operators")),
+    assignedAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_operator", ["operatorId"])
+    .index("by_role", ["roleId"])
+    .index("by_operator_role", ["operatorId", "roleId"]),
+
+  // -------------------------------------------------------------------------
   // PROJECTS (Multi-Project Workspaces)
   // -------------------------------------------------------------------------
   projects: defineTable({
+    // ARM: Tenant scope (optional for migration; will be required after backfill)
+    tenantId: v.optional(v.id("tenants")),
+    
     name: v.string(),
     slug: v.string(),
     description: v.optional(v.string()),
@@ -127,13 +251,17 @@ export default defineSchema({
     // Metadata
     metadata: v.optional(v.any()),
   })
+    .index("by_tenant", ["tenantId"])
     .index("by_slug", ["slug"])
-    .index("by_github_repo", ["githubRepo"]),
+    .index("by_github_repo", ["githubRepo"])
+    .index("by_tenant_slug", ["tenantId", "slug"]),
 
   // -------------------------------------------------------------------------
   // AGENTS
   // -------------------------------------------------------------------------
   agents: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope
     projectId: v.optional(v.id("projects")),
     // Identity
@@ -180,6 +308,8 @@ export default defineSchema({
   // TASKS
   // -------------------------------------------------------------------------
   tasks: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope
     projectId: v.optional(v.id("projects")),
     
@@ -299,6 +429,8 @@ export default defineSchema({
   // TASK TRANSITIONS (Immutable Audit Log)
   // -------------------------------------------------------------------------
   taskTransitions: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope (denormalized for efficient queries)
     projectId: v.optional(v.id("projects")),
     
@@ -341,6 +473,7 @@ export default defineSchema({
   // TASK EVENTS (Canonical timeline stream)
   // -------------------------------------------------------------------------
   taskEvents: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     taskId: v.id("tasks"),
     eventType: v.union(
@@ -375,6 +508,8 @@ export default defineSchema({
   // MESSAGES (Task Thread)
   // -------------------------------------------------------------------------
   messages: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope (denormalized for efficient queries)
     projectId: v.optional(v.id("projects")),
     
@@ -426,6 +561,8 @@ export default defineSchema({
   // RUNS (Agent Execution Turns)
   // -------------------------------------------------------------------------
   runs: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope (denormalized for efficient queries)
     projectId: v.optional(v.id("projects")),
     
@@ -475,6 +612,8 @@ export default defineSchema({
   // TOOL CALLS
   // -------------------------------------------------------------------------
   toolCalls: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope (denormalized for efficient queries)
     projectId: v.optional(v.id("projects")),
     
@@ -527,6 +666,8 @@ export default defineSchema({
   // APPROVALS
   // -------------------------------------------------------------------------
   approvals: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope
     projectId: v.optional(v.id("projects")),
     
@@ -585,6 +726,8 @@ export default defineSchema({
   // ACTIVITIES (Audit Log)
   // -------------------------------------------------------------------------
   activities: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope
     projectId: v.optional(v.id("projects")),
     
@@ -618,6 +761,8 @@ export default defineSchema({
   // ALERTS
   // -------------------------------------------------------------------------
   alerts: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope
     projectId: v.optional(v.id("projects")),
     
@@ -662,6 +807,8 @@ export default defineSchema({
   // NOTIFICATIONS (@mentions, assignments — delivered to agents via heartbeat)
   // -------------------------------------------------------------------------
   notifications: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope
     projectId: v.optional(v.id("projects")),
     
@@ -692,6 +839,8 @@ export default defineSchema({
   // THREAD SUBSCRIPTIONS (agents subscribed to task threads)
   // -------------------------------------------------------------------------
   threadSubscriptions: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope
     projectId: v.optional(v.id("projects")),
     
@@ -733,6 +882,7 @@ export default defineSchema({
   // WATCH SUBSCRIPTIONS (user watchlist for entities)
   // -------------------------------------------------------------------------
   watchSubscriptions: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     userId: v.string(),
     entityType: v.union(
@@ -754,6 +904,7 @@ export default defineSchema({
   // OPERATOR CONTROLS (global/project execution mode)
   // -------------------------------------------------------------------------
   operatorControls: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     mode: v.union(
       v.literal("NORMAL"),
@@ -774,6 +925,8 @@ export default defineSchema({
   // AGENT DOCUMENTS (WORKING.md, daily notes, session memory)
   // -------------------------------------------------------------------------
   agentDocuments: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope
     projectId: v.optional(v.id("projects")),
     
@@ -795,6 +948,8 @@ export default defineSchema({
   // EXECUTION REQUESTS (Multi-Executor Routing)
   // -------------------------------------------------------------------------
   executionRequests: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope
     projectId: v.optional(v.id("projects")),
     
@@ -849,6 +1004,8 @@ export default defineSchema({
   // POLICIES
   // -------------------------------------------------------------------------
   policies: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Project scope (optional: null = global policy)
     projectId: v.optional(v.id("projects")),
     
@@ -888,6 +1045,7 @@ export default defineSchema({
   // ============================================================================
   
   webhooks: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     
     name: v.string(),
@@ -921,6 +1079,7 @@ export default defineSchema({
   
   webhookDeliveries: defineTable({
     webhookId: v.id("webhooks"),
+    tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     
     event: v.string(),
@@ -955,6 +1114,7 @@ export default defineSchema({
   // ============================================================================
   
   reviews: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),
     taskId: v.id("tasks"),
     
@@ -1026,6 +1186,7 @@ export default defineSchema({
   // AGENT PERFORMANCE (Learning System — Aggregated Metrics)
   // -------------------------------------------------------------------------
   agentPerformance: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     agentId: v.id("agents"),
     projectId: v.optional(v.id("projects")),
     taskType: v.string(),
@@ -1044,6 +1205,7 @@ export default defineSchema({
   // AGENT PATTERNS (Learning System — Discovered Strengths/Weaknesses)
   // -------------------------------------------------------------------------
   agentPatterns: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     agentId: v.id("agents"),
     projectId: v.optional(v.id("projects")),
     pattern: v.string(),
@@ -1061,6 +1223,7 @@ export default defineSchema({
   // ORG MEMBERS (Human Team Members + Org Chart + RBAC)
   // -------------------------------------------------------------------------
   orgMembers: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     
     // Identity
@@ -1135,6 +1298,7 @@ export default defineSchema({
   // CAPTURES (Visual Artifacts Gallery)
   // -------------------------------------------------------------------------
   captures: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     
     // Reference
@@ -1250,6 +1414,7 @@ export default defineSchema({
   // TELEGRAPH THREADS (Async Agent Communications)
   // -------------------------------------------------------------------------
   telegraphThreads: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     
     title: v.string(),
@@ -1282,6 +1447,7 @@ export default defineSchema({
   // TELEGRAPH MESSAGES (Internal + External Messaging)
   // -------------------------------------------------------------------------
   telegraphMessages: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     threadId: v.id("telegraphThreads"),
     
@@ -1322,6 +1488,7 @@ export default defineSchema({
   // MEETINGS (Zoom-Ready Meeting Orchestration)
   // -------------------------------------------------------------------------
   meetings: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     
     title: v.string(),
@@ -1379,6 +1546,7 @@ export default defineSchema({
   // VOICE ARTIFACTS (TTS Audio + Transcripts)
   // -------------------------------------------------------------------------
   voiceArtifacts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     agentId: v.optional(v.string()),
     projectId: v.optional(v.id("projects")),
     
@@ -1463,6 +1631,8 @@ export default defineSchema({
   // WORKFLOW RUNS (Execution State for Multi-Agent Workflows)
   // -------------------------------------------------------------------------
   workflowRuns: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
     // Identity
     runId: v.string(), // Short ID for CLI/UI display
     workflowId: v.string(),
@@ -1521,4 +1691,51 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_parent_task", ["parentTaskId"])
     .index("by_project_status", ["projectId", "status"]),
+
+  // -------------------------------------------------------------------------
+  // WORKFLOW METRICS (Aggregated Workflow Performance Stats)
+  // -------------------------------------------------------------------------
+  workflowMetrics: defineTable({
+    // ARM: Tenant scope (optional, backfill later)
+    tenantId: v.optional(v.id("tenants")),
+    // Identity
+    workflowId: v.string(),
+    projectId: v.optional(v.id("projects")),
+    
+    // Time period
+    periodStart: v.number(),
+    periodEnd: v.number(),
+    
+    // Execution stats
+    totalRuns: v.number(),
+    successfulRuns: v.number(),
+    failedRuns: v.number(),
+    pausedRuns: v.number(),
+    
+    // Success rate
+    successRate: v.number(), // 0-1
+    
+    // Timing stats
+    avgDurationMs: v.number(),
+    minDurationMs: v.number(),
+    maxDurationMs: v.number(),
+    
+    // Step stats
+    avgStepsCompleted: v.number(),
+    totalRetries: v.number(),
+    totalEscalations: v.number(),
+    
+    // Bottlenecks (step IDs with highest failure/retry rates)
+    bottlenecks: v.array(v.object({
+      stepId: v.string(),
+      failureRate: v.number(),
+      avgRetries: v.number(),
+    })),
+    
+    // Metadata
+    lastUpdated: v.number(),
+  })
+    .index("by_workflow", ["workflowId"])
+    .index("by_project", ["projectId"])
+    .index("by_period", ["periodStart", "periodEnd"]),
 });

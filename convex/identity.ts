@@ -7,7 +7,7 @@
 
 import { v } from "convex/values";
 import { query, mutation, action } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api } from "./_generated/api";
 
 // ============================================================================
 // VALIDATION HELPERS
@@ -263,10 +263,13 @@ export const upsert = mutation({
       if (soulChanged) {
         await ctx.db.insert("activities", {
           projectId: undefined,
-          type: "SOUL_CHANGED",
-          actor: "SYSTEM",
-          actorRef: args.agentId,
-          summary: `SOUL.md changed for agent ${args.name}. Previous hash: ${existing.soulHash}, new hash: ${soulHash}. Per OpenClaw rules, the user has been notified.`,
+          actorType: "SYSTEM",
+          actorId: args.agentId,
+          action: "SOUL_CHANGED",
+          description: `SOUL.md changed for agent ${args.name}. Previous hash: ${existing.soulHash}, new hash: ${soulHash}. Per OpenClaw rules, the user has been notified.`,
+          targetType: "AGENT",
+          targetId: args.agentId,
+          agentId: args.agentId,
           metadata: {
             agentId: args.agentId,
             previousSoulHash: existing.soulHash,
@@ -309,7 +312,7 @@ export const scan = action({
   args: {},
   handler: async (ctx) => {
     // Get all agents
-    const agents: any[] = await ctx.runQuery(internal.identity.listAgentsForScan);
+    const agents: any[] = await ctx.runQuery(api.identity.listAgentsForScan);
 
     const results = {
       scanned: 0,
@@ -323,13 +326,13 @@ export const scan = action({
       results.scanned++;
 
       // Check if identity already exists
-      const existing: any = await ctx.runQuery(internal.identity.getByAgentInternal, {
+      const existing: any = await ctx.runQuery(api.identity.getByAgentInternal, {
         agentId: agent._id,
       });
 
       if (!existing) {
         // Create a MISSING identity record from agent data
-        await ctx.runMutation(internal.identity.upsertInternal, {
+        await ctx.runMutation(api.identity.upsertInternal, {
           agentId: agent._id,
           name: agent.name || "Unknown",
           creature: undefined,
@@ -355,7 +358,7 @@ export const scan = action({
           status = (hasName || hasSoul) ? "PARTIAL" : "INVALID";
         }
 
-        await ctx.runMutation(internal.identity.updateValidationStatus, {
+        await ctx.runMutation(api.identity.updateValidationStatus, {
           identityId: existing._id,
           validationStatus: status,
           validationErrors: allErrors.length > 0 ? allErrors : undefined,

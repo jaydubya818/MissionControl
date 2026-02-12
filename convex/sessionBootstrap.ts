@@ -12,7 +12,7 @@
 
 import { v } from "convex/values";
 import { action, query } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api } from "./_generated/api";
 
 // ============================================================================
 // QUERIES
@@ -88,15 +88,15 @@ export const getBootstrapContext = query({
  * Called at the start of every agent session.
  * Returns assembled context per OpenClaw AGENTS template requirements.
  */
-export const bootstrap = action({
+export const bootstrap: any = action({
   args: {
     agentId: v.id("agents"),
     projectId: v.optional(v.id("projects")),
     includeMemory: v.optional(v.boolean()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     // 1. Get agent + identity context
-    const context = await ctx.runQuery(internal.sessionBootstrap.getBootstrapContext, {
+    const context: any = await ctx.runQuery(api.sessionBootstrap.getBootstrapContext, {
       agentId: args.agentId,
       projectId: args.projectId,
     });
@@ -116,7 +116,7 @@ export const bootstrap = action({
     }
 
     // 4. Build the bootstrap payload
-    const payload = {
+    const payload: any = {
       // SOUL.md content
       soul: context.identity?.soulContent ?? null,
 

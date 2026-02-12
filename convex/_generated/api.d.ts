@@ -24,8 +24,10 @@ import type * as executors from "../executors.js";
 import type * as github from "../github.js";
 import type * as health from "../health.js";
 import type * as identity from "../identity.js";
+import type * as lib_getActiveTenant from "../lib/getActiveTenant.js";
 import type * as lib_operatorControls from "../lib/operatorControls.js";
 import type * as lib_riskClassifier from "../lib/riskClassifier.js";
+import type * as lib_sanitize from "../lib/sanitize.js";
 import type * as lib_stateMachine from "../lib/stateMachine.js";
 import type * as lib_taskEvents from "../lib/taskEvents.js";
 import type * as loops from "../loops.js";
@@ -61,6 +63,9 @@ import type * as transitions from "../transitions.js";
 import type * as voice from "../voice.js";
 import type * as watchSubscriptions from "../watchSubscriptions.js";
 import type * as webhooks from "../webhooks.js";
+import type * as workflowMetrics from "../workflowMetrics.js";
+import type * as workflowRuns from "../workflowRuns.js";
+import type * as workflows from "../workflows.js";
 
 import type {
   ApiFromModules,
@@ -85,8 +90,10 @@ declare const fullApi: ApiFromModules<{
   github: typeof github;
   health: typeof health;
   identity: typeof identity;
+  "lib/getActiveTenant": typeof lib_getActiveTenant;
   "lib/operatorControls": typeof lib_operatorControls;
   "lib/riskClassifier": typeof lib_riskClassifier;
+  "lib/sanitize": typeof lib_sanitize;
   "lib/stateMachine": typeof lib_stateMachine;
   "lib/taskEvents": typeof lib_taskEvents;
   loops: typeof loops;
@@ -122,6 +129,9 @@ declare const fullApi: ApiFromModules<{
   voice: typeof voice;
   watchSubscriptions: typeof watchSubscriptions;
   webhooks: typeof webhooks;
+  workflowMetrics: typeof workflowMetrics;
+  workflowRuns: typeof workflowRuns;
+  workflows: typeof workflows;
 }>;
 
 /**

@@ -21,13 +21,14 @@ export const list = query({
     activeOnly: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    let query = ctx.db.query("workflows");
-    
     if (args.activeOnly) {
-      query = query.withIndex("by_active", (q) => q.eq("active", true));
+      return await ctx.db
+        .query("workflows")
+        .withIndex("by_active", (q) => q.eq("active", true))
+        .collect();
     }
     
-    return await query.collect();
+    return await ctx.db.query("workflows").collect();
   },
 });
 

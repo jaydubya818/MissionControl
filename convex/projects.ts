@@ -116,6 +116,7 @@ export const create = mutation({
     name: v.string(),
     slug: v.string(),
     description: v.optional(v.string()),
+    tenantId: v.optional(v.id("tenants")), // ARM: Required for new projects
     policyDefaults: v.optional(
       v.object({
         budgetDefaults: v.optional(v.any()),
@@ -125,6 +126,29 @@ export const create = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    // ARM Phase 1: Require tenantId for new projects
+    // TODO: Remove this check after migration completes
+    if (!args.tenantId) {
+      // For now, get or create default tenant
+      let defaultTenant = await ctx.db
+        .query("tenants")
+        .withIndex("by_slug", (q) => q.eq("slug", "default"))
+        .first();
+      
+      if (!defaultTenant) {
+        // Create default tenant if it doesn't exist
+        const tenantId = await ctx.db.insert("tenants", {
+          name: "Default Organization",
+          slug: "default",
+          description: "Default tenant for migration",
+          active: true,
+        });
+        defaultTenant = await ctx.db.get(tenantId);
+      }
+      
+      args.tenantId = defaultTenant!._id;
+    }
+
     // Check for duplicate slug
     const existing = await ctx.db
       .query("projects")
@@ -139,6 +163,7 @@ export const create = mutation({
     }
 
     const projectId = await ctx.db.insert("projects", {
+      tenantId: args.tenantId,
       name: args.name,
       slug: args.slug,
       description: args.description,
