@@ -9,6 +9,7 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { sanitizeMessageContent } from "./lib/sanitize";
+import { logTaskEvent } from "./lib/taskEvents";
 
 // ============================================================================
 // QUERIES
@@ -118,6 +119,19 @@ async function postMessageInternal(
     redactedFields: args.redactedFields,
     idempotencyKey: args.idempotencyKey,
     metadata: args.metadata,
+  });
+
+  await logTaskEvent(ctx, {
+    taskId: args.taskId,
+    projectId: task.projectId,
+    eventType: "MESSAGE_POSTED",
+    actorType: args.authorType as "AGENT" | "HUMAN" | "SYSTEM",
+    actorId: args.authorAgentId ? String(args.authorAgentId) : args.authorUserId,
+    relatedId: String(messageId),
+    metadata: {
+      messageType: args.type,
+      replyToId: args.replyToId ? String(args.replyToId) : undefined,
+    },
   });
 
   // Log activity

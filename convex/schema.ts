@@ -348,6 +348,7 @@ export default defineSchema({
     eventType: v.union(
       v.literal("TASK_CREATED"),
       v.literal("TASK_TRANSITION"),
+      v.literal("MESSAGE_POSTED"),
       v.literal("POLICY_DECISION"),
       v.literal("APPROVAL_REQUESTED"),
       v.literal("APPROVAL_ESCALATED"),

@@ -11,6 +11,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { classifyRisk, requiresApproval } from "./lib/riskClassifier";
 import { evaluateOperatorGate, getEffectiveOperatorControl } from "./lib/operatorControls";
+import { logTaskEvent } from "./lib/taskEvents";
 
 // ============================================================================
 // ALLOWLIST HELPERS
@@ -602,6 +603,64 @@ export const evaluate = query({
 // ============================================================================
 // MUTATIONS
 // ============================================================================
+
+export const recordDecision = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    actorType: v.optional(v.union(v.literal("AGENT"), v.literal("HUMAN"), v.literal("SYSTEM"))),
+    actorId: v.optional(v.string()),
+    decision: v.union(v.literal("ALLOW"), v.literal("NEEDS_APPROVAL"), v.literal("DENY")),
+    reason: v.string(),
+    riskLevel: v.optional(v.union(v.literal("GREEN"), v.literal("YELLOW"), v.literal("RED"))),
+    ruleId: v.optional(v.string()),
+    triggeredRules: v.optional(v.array(v.string())),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    if (!task) {
+      throw new Error("Task not found");
+    }
+
+    const eventId = await logTaskEvent(ctx, {
+      taskId: args.taskId,
+      projectId: task.projectId,
+      eventType: "POLICY_DECISION",
+      actorType: (args.actorType ?? "SYSTEM") as "AGENT" | "HUMAN" | "SYSTEM",
+      actorId: args.actorId,
+      ruleId: args.ruleId ?? args.triggeredRules?.[0],
+      afterState: { status: task.status },
+      metadata: {
+        decision: args.decision,
+        reason: args.reason,
+        riskLevel: args.riskLevel,
+        triggeredRules: args.triggeredRules ?? [],
+        ...(args.metadata ?? {}),
+      },
+    });
+
+    await ctx.db.insert("activities", {
+      projectId: task.projectId,
+      actorType: (args.actorType ?? "SYSTEM") as "AGENT" | "HUMAN" | "SYSTEM",
+      actorId: args.actorId,
+      action: "POLICY_DECISION",
+      description: `${args.decision}: ${args.reason}`,
+      targetType: "TASK",
+      targetId: args.taskId,
+      taskId: args.taskId,
+      metadata: {
+        riskLevel: args.riskLevel,
+        triggeredRules: args.triggeredRules ?? [],
+        timelineEventId: eventId,
+      },
+    });
+
+    return {
+      success: true,
+      eventId,
+    };
+  },
+});
 
 export const create = mutation({
   args: {
