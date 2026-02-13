@@ -14,7 +14,6 @@ import { ExportReportButton } from "./ExportReportButton";
 import { TaskEditMode } from "./TaskEditMode";
 import { StatusChip } from "./components/StatusChip";
 import { PriorityChip } from "./components/PriorityChip";
-import { RiskChip } from "./components/RiskChip";
 
 type Tab = "overview" | "timeline" | "artifacts" | "approvals" | "cost" | "reviews" | "why";
 type TaskStatus = Doc<"tasks">["status"];
@@ -26,10 +25,23 @@ export function TaskDrawerTabs({
   taskId: Id<"tasks"> | null;
   onClose: () => void;
 }) {
+  type BackfillResult = {
+    taskId: Id<"tasks">;
+    existingPatched: number;
+    transitionsInserted: number;
+    messagesInserted: number;
+    runsInserted: number;
+    approvalsInserted: number;
+    toolCallsInserted: number;
+  };
+
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [isEditMode, setIsEditMode] = useState(false);
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
+  const [backfillLoading, setBackfillLoading] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<BackfillResult | null>(null);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
   
   const data = useQuery(api.tasks.getWithTimeline, taskId ? { taskId } : "skip");
   const agents = useQuery(api.agents.listAll, {});
@@ -40,6 +52,7 @@ export function TaskDrawerTabs({
   const postMessage = useMutation(api.messages.post);
   const transitionTask = useMutation(api.tasks.transition);
   const toggleWatch = useMutation(api.watchSubscriptions.toggle);
+  const backfillTaskTimeline = useMutation((api as any).taskEvents.backfillTask);
 
   if (!taskId) return null;
 
@@ -62,6 +75,11 @@ export function TaskDrawerTabs({
   const { task, transitions, messages, runs, toolCalls, approvals, activities, taskEvents } = data;
   const agentMap = new Map(agents.map((a: Doc<"agents">) => [a._id, a]));
   const isWatchingTask = !!watchSubscriptions?.some((subscription) => subscription.entityId === taskId);
+
+  useEffect(() => {
+    setBackfillResult(null);
+    setBackfillError(null);
+  }, [taskId]);
 
   const handlePostComment = async () => {
     if (!comment.trim()) return;
@@ -100,6 +118,19 @@ export function TaskDrawerTabs({
       console.error(e);
     }
     setLoading(false);
+  };
+
+  const handleBackfillTimeline = async () => {
+    setBackfillLoading(true);
+    setBackfillError(null);
+    try {
+      const result = await backfillTaskTimeline({ taskId });
+      setBackfillResult(result as BackfillResult);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Backfill failed";
+      setBackfillError(message);
+    }
+    setBackfillLoading(false);
   };
 
   return (
@@ -231,6 +262,7 @@ export function TaskDrawerTabs({
         )}
         {activeTab === "timeline" && (
           <TimelineTab
+            taskId={taskId}
             taskEvents={taskEvents}
             transitions={transitions}
             messages={messages}
@@ -239,6 +271,10 @@ export function TaskDrawerTabs({
             approvals={approvals}
             activities={activities}
             agentMap={agentMap}
+            onBackfill={handleBackfillTimeline}
+            backfillLoading={backfillLoading}
+            backfillError={backfillError}
+            backfillResult={backfillResult}
           />
         )}
         {activeTab === "artifacts" && (
@@ -405,6 +441,7 @@ function OverviewTab({
 // ============================================================================
 
 function TimelineTab({
+  taskId,
   taskEvents,
   transitions,
   messages,
@@ -413,7 +450,12 @@ function TimelineTab({
   approvals,
   activities,
   agentMap,
+  onBackfill,
+  backfillLoading,
+  backfillError,
+  backfillResult,
 }: {
+  taskId: Id<"tasks">;
   taskEvents: Doc<"taskEvents">[];
   transitions: Doc<"taskTransitions">[];
   messages: Doc<"messages">[];
@@ -422,7 +464,31 @@ function TimelineTab({
   approvals: Doc<"approvals">[];
   activities: Doc<"activities">[];
   agentMap: Map<Id<"agents">, Doc<"agents">>;
+  onBackfill: () => Promise<void>;
+  backfillLoading: boolean;
+  backfillError: string | null;
+  backfillResult: {
+    taskId: Id<"tasks">;
+    existingPatched: number;
+    transitionsInserted: number;
+    messagesInserted: number;
+    runsInserted: number;
+    approvalsInserted: number;
+    toolCallsInserted: number;
+  } | null;
 }) {
+  const legacySignals =
+    transitions.length + messages.length + runs.length + toolCalls.length + approvals.length;
+  const shouldSuggestBackfill =
+    taskEvents.length === 0 || (legacySignals > 0 && taskEvents.length < legacySignals);
+
+  const backfillInsertedCount =
+    (backfillResult?.transitionsInserted ?? 0) +
+    (backfillResult?.messagesInserted ?? 0) +
+    (backfillResult?.runsInserted ?? 0) +
+    (backfillResult?.approvalsInserted ?? 0) +
+    (backfillResult?.toolCallsInserted ?? 0);
+
   // Build unified timeline
   const items: Array<{
     type: "taskEvent" | "transition" | "message" | "run" | "toolCall" | "approval" | "activity";
@@ -493,6 +559,46 @@ function TimelineTab({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {shouldSuggestBackfill && (
+        <div
+          style={{
+            padding: 12,
+            border: "1px solid #1d4ed8",
+            borderRadius: 8,
+            background: "rgba(30, 58, 138, 0.25)",
+          }}
+        >
+          <div style={{ fontSize: "0.85rem", color: "#bfdbfe", marginBottom: 8 }}>
+            Canonical timeline appears incomplete for task `{taskId}`.
+          </div>
+          <button
+            onClick={() => void onBackfill()}
+            disabled={backfillLoading}
+            style={{
+              padding: "8px 12px",
+              background: backfillLoading ? "#1e293b" : "#2563eb",
+              border: "1px solid #1d4ed8",
+              borderRadius: 6,
+              color: "#e2e8f0",
+              fontSize: "0.8rem",
+              cursor: backfillLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {backfillLoading ? "Backfilling..." : "Backfill canonical timeline"}
+          </button>
+          {backfillResult && (
+            <div style={{ fontSize: "0.75rem", color: "#93c5fd", marginTop: 8 }}>
+              Backfill complete: inserted {backfillInsertedCount} events, patched{" "}
+              {backfillResult.existingPatched} existing entries.
+            </div>
+          )}
+          {backfillError && (
+            <div style={{ fontSize: "0.75rem", color: "#fca5a5", marginTop: 8 }}>
+              Backfill error: {backfillError}
+            </div>
+          )}
+        </div>
+      )}
       {items.map((item, i) => (
         <TimelineItem key={i} item={item} agentMap={agentMap} />
       ))}
@@ -526,6 +632,7 @@ function TimelineItem({
       const eventConfig: Record<string, { icon: string; color: string }> = {
         TASK_CREATED: { icon: "📝", color: "#93c5fd" },
         TASK_TRANSITION: { icon: "🔁", color: "#60a5fa" },
+        MESSAGE_POSTED: { icon: "💬", color: "#38bdf8" },
         APPROVAL_REQUESTED: { icon: "🛡️", color: "#f59e0b" },
         APPROVAL_ESCALATED: { icon: "⏫", color: "#f97316" },
         APPROVAL_APPROVED: { icon: "✅", color: "#22c55e" },
@@ -549,6 +656,20 @@ function TimelineItem({
           <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: 2 }}>
             Actor: {actor}
           </div>
+          {((event as any).eventId || (event as any).ruleId) && (
+            <div style={{ fontSize: "0.74rem", color: "#94a3b8", marginTop: 3 }}>
+              {(event as any).eventId && (
+                <span style={{ marginRight: 10 }}>
+                  Event: <code style={{ color: "#cbd5e1" }}>{(event as any).eventId}</code>
+                </span>
+              )}
+              {(event as any).ruleId && (
+                <span>
+                  Rule: <code style={{ color: "#cbd5e1" }}>{(event as any).ruleId}</code>
+                </span>
+              )}
+            </div>
+          )}
           {event.beforeState && event.afterState && (
             <div style={{ fontSize: "0.78rem", color: "#cbd5e1", marginTop: 4 }}>
               {JSON.stringify(event.beforeState)} → {JSON.stringify(event.afterState)}
@@ -909,10 +1030,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       {children}
     </div>
   );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  return <StatusChip status={status} size="sm" />;
 }
 
 // ============================================================================
