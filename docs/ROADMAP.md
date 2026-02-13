@@ -24,6 +24,7 @@ Last updated: 2026-02-09
 - Produce ARCHITECTURE.md, OPENCLAW_INTEGRATION_MAP.md, PLAN_VS_REALITY.md
 - Update INTELLIGENCE_LAYER_PLAN.md with new subsystems
 - Security audit checklist (aligned with OpenClaw security guidance)
+- Maintain prioritized enhancement backlog in `docs/ENHANCEMENTS.md` (kept separate from active milestone scope)
 
 ## Next (2-6 weeks)
 
