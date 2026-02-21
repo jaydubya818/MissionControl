@@ -112,10 +112,10 @@ export const metrics = query({
     const projectsQuery = ctx.db.query("projects");
     const projects = await projectsQuery.collect();
     
-    const agentsQuery = args.projectId
-      ? ctx.db.query("agents").filter((q) => q.eq(q.field("projectId"), args.projectId))
-      : ctx.db.query("agents");
-    const agents = await agentsQuery.collect();
+    // Use by_project index when projectId is available; cap total scan otherwise
+    const agents = args.projectId
+      ? await ctx.db.query("agents").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).collect()
+      : await ctx.db.query("agents").take(1000);
     
     const tasksQuery = args.projectId
       ? ctx.db.query("tasks").withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -127,10 +127,10 @@ export const metrics = query({
       : ctx.db.query("runs");
     const runs = await runsQuery.take(1000); // Last 1000 runs
     
-    const approvalsQuery = args.projectId
-      ? ctx.db.query("approvals").filter((q) => q.eq(q.field("projectId"), args.projectId))
-      : ctx.db.query("approvals");
-    const approvals = await approvalsQuery.collect();
+    // Use by_project index when projectId available; cap total scan otherwise
+    const approvals = args.projectId
+      ? await ctx.db.query("approvals").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).collect()
+      : await ctx.db.query("approvals").take(500);
     
     const alertsQuery = args.projectId
       ? ctx.db.query("alerts").withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -237,15 +237,19 @@ export const status = query({
       };
     }
     
-    // Agents check
+    // Agents check — use by_status index instead of full-table scan
     try {
-      const agents = await ctx.db.query("agents").collect();
-      const activeAgents = agents.filter((a) => a.status === "ACTIVE").length;
-      const quarantinedAgents = agents.filter((a) => a.status === "QUARANTINED").length;
-      
+      const [activeAgents, quarantinedAgents, allAgents] = await Promise.all([
+        ctx.db.query("agents").withIndex("by_status", (q) => q.eq("status", "ACTIVE" as any)).collect(),
+        ctx.db.query("agents").withIndex("by_status", (q) => q.eq("status", "QUARANTINED" as any)).collect(),
+        ctx.db.query("agents").take(1000), // cap for total count; not a full scan
+      ]);
+      const activeCount = activeAgents.length;
+      const quarantinedCount = quarantinedAgents.length;
+      const totalCount = allAgents.length;
       checks.agents = {
-        status: quarantinedAgents > 0 ? "degraded" : agents.length > 0 ? "healthy" : "degraded",
-        message: `${activeAgents} active, ${agents.length} total${quarantinedAgents > 0 ? `, ${quarantinedAgents} quarantined` : ''}`,
+        status: quarantinedCount > 0 ? "degraded" : totalCount > 0 ? "healthy" : "degraded",
+        message: `${activeCount} active, ${totalCount} total${quarantinedCount > 0 ? `, ${quarantinedCount} quarantined` : ''}`,
       };
     } catch (error) {
       checks.agents = {
@@ -253,16 +257,18 @@ export const status = query({
         message: "Failed to query agents",
       };
     }
-    
-    // Tasks check
+
+    // Tasks check — use by_status index for each count instead of full-table scan
     try {
-      const tasks = await ctx.db.query("tasks").collect();
-      const blockedTasks = tasks.filter((t) => t.status === "BLOCKED").length;
-      const inProgressTasks = tasks.filter((t) => t.status === "IN_PROGRESS").length;
-      
+      const [blockedTasks, inProgressTasks] = await Promise.all([
+        ctx.db.query("tasks").withIndex("by_status", (q) => q.eq("status", "BLOCKED" as any)).take(100),
+        ctx.db.query("tasks").withIndex("by_status", (q) => q.eq("status", "IN_PROGRESS" as any)).take(100),
+      ]);
+      const blockedCount = blockedTasks.length;
+      const inProgressCount = inProgressTasks.length;
       checks.tasks = {
-        status: blockedTasks > 5 ? "degraded" : "healthy",
-        message: `${inProgressTasks} in progress, ${blockedTasks} blocked`,
+        status: blockedCount > 5 ? "degraded" : "healthy",
+        message: `${inProgressCount} in progress, ${blockedCount} blocked`,
       };
     } catch (error) {
       checks.tasks = {
@@ -270,15 +276,17 @@ export const status = query({
         message: "Failed to query tasks",
       };
     }
-    
-    // Approvals check
+
+    // Approvals check — use by_status index instead of full-table scan
     try {
-      const approvals = await ctx.db.query("approvals").collect();
-      const pendingApprovals = approvals.filter((a) => a.status === "PENDING" || a.status === "ESCALATED").length;
-      
+      const [pendingApprovals, escalatedApprovals] = await Promise.all([
+        ctx.db.query("approvals").withIndex("by_status", (q) => q.eq("status", "PENDING" as any)).take(50),
+        ctx.db.query("approvals").withIndex("by_status", (q) => q.eq("status", "ESCALATED" as any)).take(50),
+      ]);
+      const pendingCount = pendingApprovals.length + escalatedApprovals.length;
       checks.approvals = {
-        status: pendingApprovals > 10 ? "degraded" : "healthy",
-        message: `${pendingApprovals} pending approval${pendingApprovals !== 1 ? 's' : ''}`,
+        status: pendingCount > 10 ? "degraded" : "healthy",
+        message: `${pendingCount} pending approval${pendingCount !== 1 ? 's' : ''}`,
       };
     } catch (error) {
       checks.approvals = {
@@ -286,10 +294,10 @@ export const status = query({
         message: "Failed to query approvals",
       };
     }
-    
-    // Alerts check
+
+    // Alerts check — cap with take() since no by_status index on alerts
     try {
-      const alerts = await ctx.db.query("alerts").collect();
+      const alerts = await ctx.db.query("alerts").take(500);
       const openAlerts = alerts.filter((a) => a.status === "OPEN").length;
       const criticalAlerts = alerts.filter((a) => a.severity === "CRITICAL" && a.status === "OPEN").length;
       

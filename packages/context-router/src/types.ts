@@ -105,6 +105,12 @@ export interface ContextRouterConfig {
   singleTaskBudgetCap: number;
   /** Custom rules (tier 1) evaluated before LLM */
   customRules: RoutingRule[];
+  /**
+   * Confidence below which Tier 2 LLM classification is triggered.
+   * Only relevant when an LLMClient is provided to ContextRouter.
+   * Defaults to 0.5 — inputs above this threshold skip the LLM call.
+   */
+  llmFallbackThreshold?: number;
 }
 
 export interface RoutingRule {

@@ -314,12 +314,13 @@ export function OrgView({ projectId }: OrgViewProps) {
           icon={Users}
           title="No Org Chart Yet"
           description="Add team members and agents to build your organizational hierarchy."
-        >
-          <Button onClick={() => handleOpenCreate()} className="mt-4">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Your First Agent
-          </Button>
-        </EmptyState>
+          action={
+            <Button onClick={() => handleOpenCreate()} className="mt-4">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Your First Agent
+            </Button>
+          }
+        />
         <CreateAgentModal
           open={showCreateModal}
           parentAgentId={createParentId}

@@ -230,7 +230,9 @@ export const listByAgent = query({
     agentId: v.id("agents"),
   },
   handler: async (ctx, args) => {
-    const tasks = await ctx.db.query("tasks").collect();
+    // assigneeIds is an array field — no direct Convex index possible.
+    // Safety cap prevents unbounded full-table scan; proper fix = taskAssignments junction table.
+    const tasks = await ctx.db.query("tasks").take(500);
     if (preferInstanceRefs()) {
       const resolved = await resolveAgentRef(
         { db: ctx.db as any },

@@ -14,6 +14,7 @@
  */
 
 import { classify } from "./classifier";
+import { classifyWithLLM, type LLMClient } from "./llm-classifier";
 import type {
   ContextRouterConfig,
   ComplexityTier,
@@ -86,11 +87,20 @@ const BUILT_IN_RULES: RoutingRule[] = [
 export class ContextRouter {
   private config: ContextRouterConfig;
   private allRules: RoutingRule[];
+  private llmClient: LLMClient | null = null;
 
-  constructor(config?: Partial<ContextRouterConfig>) {
+  constructor(config?: Partial<ContextRouterConfig>, llmClient?: LLMClient) {
     this.config = { ...DEFAULT_ROUTER_CONFIG, ...config };
     // Built-in rules first, then custom rules (custom take priority via order)
     this.allRules = [...BUILT_IN_RULES, ...this.config.customRules];
+    this.llmClient = llmClient ?? null;
+  }
+
+  /**
+   * Attach (or replace) the Tier 2 LLM client at runtime.
+   */
+  setLLMClient(client: LLMClient): void {
+    this.llmClient = client;
   }
 
   /**
@@ -145,6 +155,41 @@ export class ContextRouter {
 
     // 7. Build the result
     return this.buildResult(decision, classification, context);
+  }
+
+  /**
+   * Async version of route() that invokes the Tier 2 LLM classifier when:
+   *   1. An LLMClient has been provided, AND
+   *   2. Tier 1 confidence < config.llmFallbackThreshold (default 0.5)
+   *
+   * Falls back gracefully to the Tier 1 result if the LLM call fails.
+   */
+  async routeAsync(context: RoutingContext): Promise<RouteResult> {
+    // First run the fast synchronous Tier 1 path
+    const tier1Result = this.route(context);
+
+    const threshold = this.config.llmFallbackThreshold ?? 0.5;
+
+    // Only invoke Tier 2 if we have a client AND confidence is below threshold
+    if (!this.llmClient || tier1Result.classification.confidence >= threshold) {
+      return tier1Result;
+    }
+
+    // Tier 2: LLM-enhanced classification
+    const enhanced = await classifyWithLLM(
+      context.input,
+      this.llmClient,
+      tier1Result.classification
+    );
+
+    // If LLM didn't improve confidence enough, stick with Tier 1 result
+    if (enhanced.confidence <= tier1Result.classification.confidence) {
+      return tier1Result;
+    }
+
+    // Rebuild the route decision with the improved classification
+    const decision = this.decideRoute(enhanced.complexity, context);
+    return this.buildResult(decision, enhanced, context);
   }
 
   /**

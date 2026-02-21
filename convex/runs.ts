@@ -757,7 +757,8 @@ export const getStats = query({
         .withIndex("by_task", (q) => q.eq("taskId", taskId))
         .collect();
     } else {
-      runs = await ctx.db.query("runs").collect();
+      // No filter specified — cap at 1000 to prevent unbounded full-table scan
+      runs = await ctx.db.query("runs").take(1000);
     }
     
     // Filter by time if specified

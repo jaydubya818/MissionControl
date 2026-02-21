@@ -39,7 +39,7 @@ export const list = query({
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect();
     }
-    return await ctx.db.query("agents").collect();
+    return await ctx.db.query("agents").take(1000);
   },
 });
 
@@ -57,7 +57,7 @@ export const listAll = query({
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect();
     } else {
-      agents = await ctx.db.query("agents").collect();
+      agents = await ctx.db.query("agents").take(1000);
     }
 
     if (!args.includeOrgPositions) return agents;
@@ -310,7 +310,7 @@ export const heartbeat = mutation({
     const pendingTasks = await ctx.db
       .query("tasks")
       .withIndex("by_status", (q) => q.eq("status", "ASSIGNED"))
-      .collect();
+      .take(200);
     
     const myPendingTasks = pendingTasks.filter(t => 
       t.assigneeIds.includes(args.agentId)
@@ -320,7 +320,7 @@ export const heartbeat = mutation({
     const inboxTasks = await ctx.db
       .query("tasks")
       .withIndex("by_status", (q) => q.eq("status", "INBOX"))
-      .collect();
+      .take(200);
     
     const claimableTasks = inboxTasks.filter(t =>
       agent.allowedTaskTypes.length === 0 || 

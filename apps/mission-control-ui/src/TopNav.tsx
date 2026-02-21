@@ -40,8 +40,7 @@ export type MainView =
   | "gherkin"
   | "metrics"
   | "qc-dashboard"
-  | "qc-runs"
-  | "qc-config";
+  | "qc-runs";
 
 /** Top-level command center sections */
 export type CommandSection =

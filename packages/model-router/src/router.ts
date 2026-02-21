@@ -17,6 +17,7 @@ import type {
   FallbackConfig,
 } from "./types";
 import { ClaudeProvider, CLAUDE_MODELS } from "./providers/claude";
+import { OpenAIProvider, OPENAI_MODELS } from "./providers/openai";
 import { CostEstimator } from "./cost-estimator";
 
 // ============================================================================
@@ -67,6 +68,7 @@ const TASK_TYPE_TIERS: Record<string, ModelTier> = {
 
 export class ModelRouter {
   private claude: ClaudeProvider | null = null;
+  private openai: OpenAIProvider | null = null;
   private config: RouterConfig;
   private costEstimator: CostEstimator;
   private totalCostUsd = 0;
@@ -79,10 +81,15 @@ export class ModelRouter {
 
   /**
    * Initialize providers with API keys.
+   * Both anthropicApiKey and openaiApiKey are optional — only initialise
+   * providers whose keys are supplied.
    */
-  initialize(keys: { anthropicApiKey?: string }): void {
+  initialize(keys: { anthropicApiKey?: string; openaiApiKey?: string }): void {
     if (keys.anthropicApiKey) {
       this.claude = new ClaudeProvider(keys.anthropicApiKey);
+    }
+    if (keys.openaiApiKey) {
+      this.openai = new OpenAIProvider(keys.openaiApiKey);
     }
   }
 
@@ -185,12 +192,12 @@ export class ModelRouter {
 
   /**
    * Call the appropriate provider for a model.
+   * Routes Claude model IDs to ClaudeProvider, OpenAI IDs to OpenAIProvider.
    */
   private async callProvider(
     modelId: string,
     request: ModelRequest
   ): Promise<ModelResponse> {
-    // Currently Claude-only; add other providers here
     if (modelId in CLAUDE_MODELS) {
       if (!this.claude) {
         throw new Error("Anthropic API key not configured");
@@ -198,29 +205,50 @@ export class ModelRouter {
       return this.claude.complete(modelId, request);
     }
 
+    if (modelId in OPENAI_MODELS) {
+      if (!this.openai) {
+        throw new Error("OpenAI API key not configured");
+      }
+      return this.openai.complete(modelId, request);
+    }
+
     throw new Error(`No provider available for model: ${modelId}`);
   }
 
   /**
    * Get the best available model for a tier.
+   * Searches Claude models first, then OpenAI if a key is configured.
    */
   private getBestModelForTier(tier: ModelTier): string | null {
-    const models = Object.values(CLAUDE_MODELS).filter((m) => m.tier === tier);
-    return models.length > 0 ? models[0].id : null;
+    // Prefer Claude
+    const claudeModels = Object.values(CLAUDE_MODELS).filter((m) => m.tier === tier);
+    if (claudeModels.length > 0) return claudeModels[0].id;
+
+    // Fall back to OpenAI if initialized
+    if (this.openai) {
+      const openaiModels = Object.values(OPENAI_MODELS).filter((m) => m.tier === tier);
+      if (openaiModels.length > 0) return openaiModels[0].id;
+    }
+
+    return null;
   }
 
   /**
-   * Get model config by ID.
+   * Get model config by ID (searches all providers).
    */
   getModelConfig(modelId: string): ModelConfig | null {
-    return CLAUDE_MODELS[modelId] ?? null;
+    return CLAUDE_MODELS[modelId] ?? OPENAI_MODELS[modelId] ?? null;
   }
 
   /**
-   * Get all available models.
+   * Get all available models across initialized providers.
    */
   getAvailableModels(): ModelConfig[] {
-    return Object.values(CLAUDE_MODELS);
+    const models: ModelConfig[] = [...Object.values(CLAUDE_MODELS)];
+    if (this.openai) {
+      models.push(...Object.values(OPENAI_MODELS));
+    }
+    return models;
   }
 
   /**
