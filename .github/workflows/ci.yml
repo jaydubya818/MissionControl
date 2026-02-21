@@ -1,79 +1,114 @@
-name: CI
+name: CI — Mission Control
 
 on:
-  pull_request:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master, 'feat/*', 'bugfix/*']
+  pull_request:
+    branches: [main, master]
 
 jobs:
-  quality:
+  smoke:
+    name: Smoke Test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup Node
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: pnpm
+          node-version: '20'
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      
+      - name: Install Python dependencies
+        run: |
+          pip install pyyaml
+      
+      - name: Run smoke test
+        run: |
+          ./scripts/mc-smoke.sh
+        env:
+          DRY_RUN: "true"
 
+  typecheck:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck (CI lane)
-        run: pnpm run ci:typecheck
-
-      - name: Test (CI lane)
-        run: pnpm run ci:test
-
-      - name: Dependency audit
         run: |
-          echo "=== Dependency audit ==="
-          pnpm audit --audit-level=high || true
-          echo "=== Audit complete (non-blocking) ==="
-
-      - name: Identity/Soul Compliance Check
+          pnpm install
+      
+      - name: Build shared packages
         run: |
-          echo "=== Identity/Soul Compliance Check ==="
-          echo ""
-          echo "Checking required templates..."
-          test -f templates/IDENTITY.md || (echo "FAIL: templates/IDENTITY.md missing" && exit 1)
-          test -f templates/SOUL.md || (echo "FAIL: templates/SOUL.md missing" && exit 1)
-          test -f templates/TOOLS.md || (echo "FAIL: templates/TOOLS.md missing" && exit 1)
-          echo "  ✓ All template files present"
-          echo ""
-          echo "Checking template required sections..."
-          grep -q "Name:" templates/IDENTITY.md || (echo "FAIL: IDENTITY.md missing Name field" && exit 1)
-          grep -q "Creature:" templates/IDENTITY.md || (echo "FAIL: IDENTITY.md missing Creature field" && exit 1)
-          grep -q "Vibe:" templates/IDENTITY.md || (echo "FAIL: IDENTITY.md missing Vibe field" && exit 1)
-          grep -q "Emoji:" templates/IDENTITY.md || (echo "FAIL: IDENTITY.md missing Emoji field" && exit 1)
-          grep -q "Core Truths" templates/SOUL.md || (echo "FAIL: SOUL.md missing Core Truths section" && exit 1)
-          grep -q "Boundaries" templates/SOUL.md || (echo "FAIL: SOUL.md missing Boundaries section" && exit 1)
-          echo "  ✓ All required sections present"
-          echo ""
-          echo "Checking safety defaults..."
-          grep -q "Mission Control Constraints" templates/SOUL.md || echo "WARNING: SOUL.md missing Mission Control Constraints section"
-          echo "  ✓ Safety defaults check complete"
-          echo ""
-          echo "Checking agent YAML files have name fields..."
-          agent_count=0
-          warn_count=0
-          for f in agents/*.yaml; do
-            if [ -f "$f" ]; then
-              agent_count=$((agent_count + 1))
-              grep -q "name:" "$f" || { echo "  WARNING: $f missing name field"; warn_count=$((warn_count + 1)); }
-            fi
-          done
-          echo "  ✓ Checked $agent_count agent files ($warn_count warnings)"
-          echo ""
-          echo "=== Identity/Soul compliance check passed ==="
+          pnpm run ci:prepare
+      
+      - name: Run typecheck
+        run: |
+          pnpm run ci:typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      
+      - name: Install dependencies
+        run: |
+          pnpm install
+      
+      - name: Run lint
+        run: |
+          pnpm run lint
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      
+      - name: Install dependencies
+        run: |
+          pnpm install
+      
+      - name: Build shared packages
+        run: |
+          pnpm run ci:prepare
+      
+      - name: Run unit tests
+        run: |
+          pnpm run ci:test
