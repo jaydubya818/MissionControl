@@ -1,27 +1,28 @@
-import { CSSProperties, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Camera } from "lucide-react";
 
 interface CapturesViewProps {
   projectId: Id<"projects"> | null;
 }
 
-const colors = {
-  bgPage: "#0f172a",
-  bgCard: "#1e293b",
-  bgHover: "#25334d",
-  border: "#334155",
-  textPrimary: "#e2e8f0",
-  textSecondary: "#94a3b8",
-  textMuted: "#64748b",
-  accentBlue: "#3b82f6",
-  accentGreen: "#10b981",
-  accentOrange: "#f59e0b",
-  accentPurple: "#8b5cf6",
-};
-
 type CaptureType = "all" | "SCREENSHOT" | "DIAGRAM" | "MOCKUP" | "CHART" | "VIDEO" | "OTHER";
+
+const FILTER_OPTIONS: { value: CaptureType; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "SCREENSHOT", label: "Screenshots" },
+  { value: "DIAGRAM", label: "Diagrams" },
+  { value: "MOCKUP", label: "Mockups" },
+  { value: "CHART", label: "Charts" },
+  { value: "VIDEO", label: "Videos" },
+  { value: "OTHER", label: "Other" },
+];
 
 export function CapturesView({ projectId }: CapturesViewProps) {
   const [filterType, setFilterType] = useState<CaptureType>("all");
@@ -30,175 +31,100 @@ export function CapturesView({ projectId }: CapturesViewProps) {
     type: filterType === "all" ? undefined : filterType,
   });
 
-  // Handle loading state
   if (captures === undefined) {
     return (
-      <main style={styles.container}>
-        <div style={styles.header}>
-          <h1 style={styles.title}>Captures</h1>
-          <p style={styles.subtitle}>Loading...</p>
+      <main className="flex-1 overflow-auto p-6">
+        <div className="mb-6">
+          <h1 className="text-lg font-semibold text-foreground">Captures</h1>
+          <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </main>
     );
   }
 
-  const typeColors: Record<string, string> = {
-    SCREENSHOT: colors.accentBlue,
-    DIAGRAM: colors.accentPurple,
-    MOCKUP: colors.accentGreen,
-    CHART: colors.accentOrange,
-    VIDEO: colors.accentPurple,
-    OTHER: colors.textMuted,
-  };
-
   return (
-    <main style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>Captures</h1>
-        <p style={styles.subtitle}>Visual artifacts and deliverables gallery</p>
+    <main className="flex-1 overflow-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-lg font-semibold text-foreground">Captures</h1>
+        <p className="text-sm text-muted-foreground">Visual artifacts and deliverables gallery</p>
       </div>
 
-      <div style={styles.filters}>
-        <button
-          onClick={() => setFilterType("all")}
-          style={{
-            ...styles.filterButton,
-            ...(filterType === "all" && styles.filterButtonActive),
-          }}
-        >
-          All
-        </button>
-        <button
-          onClick={() => setFilterType("SCREENSHOT")}
-          style={{
-            ...styles.filterButton,
-            ...(filterType === "SCREENSHOT" && styles.filterButtonActive),
-          }}
-        >
-          Screenshots
-        </button>
-        <button
-          onClick={() => setFilterType("DIAGRAM")}
-          style={{
-            ...styles.filterButton,
-            ...(filterType === "DIAGRAM" && styles.filterButtonActive),
-          }}
-        >
-          Diagrams
-        </button>
-        <button
-          onClick={() => setFilterType("MOCKUP")}
-          style={{
-            ...styles.filterButton,
-            ...(filterType === "MOCKUP" && styles.filterButtonActive),
-          }}
-        >
-          Mockups
-        </button>
-        <button
-          onClick={() => setFilterType("CHART")}
-          style={{
-            ...styles.filterButton,
-            ...(filterType === "CHART" && styles.filterButtonActive),
-          }}
-        >
-          Charts
-        </button>
-        <button
-          onClick={() => setFilterType("VIDEO")}
-          style={{
-            ...styles.filterButton,
-            ...(filterType === "VIDEO" && styles.filterButtonActive),
-          }}
-        >
-          Videos
-        </button>
-        <button
-          onClick={() => setFilterType("OTHER")}
-          style={{
-            ...styles.filterButton,
-            ...(filterType === "OTHER" && styles.filterButtonActive),
-          }}
-        >
-          Other
-        </button>
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {FILTER_OPTIONS.map((opt) => (
+          <Button
+            key={opt.value}
+            variant={filterType === opt.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilterType(opt.value)}
+          >
+            {opt.label}
+          </Button>
+        ))}
       </div>
 
-      <div style={styles.gallery}>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
         {captures?.map((capture) => (
-          <CaptureCard
-            key={capture._id}
-            capture={capture}
-            typeColor={typeColors[capture.type]}
-          />
+          <CaptureCard key={capture._id} capture={capture} />
         ))}
       </div>
 
       {captures?.length === 0 && (
-        <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>📸</div>
-          <div style={styles.emptyTitle}>No captures yet</div>
-          <div style={styles.emptyText}>
-            Visual artifacts will appear here as agents complete tasks
-          </div>
-        </div>
+        <EmptyState
+          icon={Camera}
+          title="No captures yet"
+          description="Visual artifacts will appear here as agents complete tasks"
+        />
       )}
     </main>
   );
 }
 
-interface CaptureCardProps {
-  capture: Doc<"captures">;
-  typeColor: string;
-}
+function CaptureCard({ capture }: { capture: Doc<"captures"> }) {
+  const thumbnailUrl = getRenderableThumbnailUrl(capture.thumbnailUrl);
 
-function CaptureCard({ capture, typeColor }: CaptureCardProps) {
+  const typeEmoji: Record<string, string> = {
+    SCREENSHOT: "📷",
+    DIAGRAM: "📊",
+    MOCKUP: "🎨",
+    CHART: "📈",
+    VIDEO: "🎥",
+    OTHER: "📄",
+  };
+
   return (
-    <div style={styles.captureCard}>
+    <div className="rounded-lg border border-border bg-card overflow-hidden hover:border-muted-foreground/30 transition-colors cursor-pointer">
       <div
-        style={{
-          ...styles.captureThumbnail,
-          background: capture.thumbnailUrl
-            ? `url(${capture.thumbnailUrl}) center/cover`
-            : colors.bgHover,
-        }}
+        className="w-full h-[180px] flex items-center justify-center bg-muted"
+        style={thumbnailUrl ? { background: `url(${thumbnailUrl}) center/cover` } : undefined}
       >
-        {!capture.thumbnailUrl && (
-          <div style={styles.capturePlaceholder}>
-            {capture.type === "SCREENSHOT" && "📷"}
-            {capture.type === "DIAGRAM" && "📊"}
-            {capture.type === "MOCKUP" && "🎨"}
-            {capture.type === "CHART" && "📈"}
-            {capture.type === "VIDEO" && "🎥"}
-            {capture.type === "OTHER" && "📄"}
-          </div>
+        {!thumbnailUrl && (
+          <span className="text-5xl">{typeEmoji[capture.type] || "📄"}</span>
         )}
       </div>
 
-      <div style={styles.captureInfo}>
-        <div style={styles.captureTitle}>{capture.title}</div>
+      <div className="p-4">
+        <h3 className="text-sm font-semibold text-foreground mb-1.5 truncate">
+          {capture.title}
+        </h3>
         {capture.description && (
-          <div style={styles.captureDesc}>{capture.description}</div>
+          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-2">
+            {capture.description}
+          </p>
         )}
-        <div style={styles.captureMeta}>
-          <span
-            style={{
-              ...styles.captureType,
-              background: typeColor,
-            }}
-          >
+        <div className="flex items-center gap-2 mb-2">
+          <Badge variant="default" className="text-xs">
             {capture.type}
-          </span>
-          <span style={styles.captureTime}>
+          </Badge>
+          <span className="text-xs text-muted-foreground">
             {new Date(capture.capturedAt).toLocaleDateString()}
           </span>
         </div>
         {capture.tags && capture.tags.length > 0 && (
-          <div style={styles.captureTags}>
+          <div className="flex flex-wrap gap-1.5">
             {capture.tags.map((tag, i) => (
-              <span key={i} style={styles.tag}>
+              <Badge key={i} variant="outline" className="text-xs">
                 {tag}
-              </span>
+              </Badge>
             ))}
           </div>
         )}
@@ -207,145 +133,13 @@ function CaptureCard({ capture, typeColor }: CaptureCardProps) {
   );
 }
 
-const styles: Record<string, CSSProperties> = {
-  container: {
-    flex: 1,
-    overflow: "auto",
-    background: colors.bgPage,
-    padding: "24px",
-  },
-  header: {
-    marginBottom: "24px",
-  },
-  title: {
-    fontSize: "1.75rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginTop: 0,
-    marginBottom: "4px",
-  },
-  subtitle: {
-    fontSize: "1rem",
-    color: colors.textSecondary,
-    marginTop: 0,
-  },
-  filters: {
-    display: "flex",
-    gap: "8px",
-    marginBottom: "24px",
-    flexWrap: "wrap",
-  },
-  filterButton: {
-    padding: "8px 16px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    color: colors.textSecondary,
-    fontSize: "0.875rem",
-    fontWeight: 500,
-    cursor: "pointer",
-    transition: "all 0.2s",
-  },
-  filterButtonActive: {
-    background: colors.accentBlue,
-    borderColor: colors.accentBlue,
-    color: "#fff",
-  },
-  gallery: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-    gap: "16px",
-  },
-  captureCard: {
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 10,
-    overflow: "hidden",
-    cursor: "pointer",
-    transition: "all 0.2s",
-  },
-  captureThumbnail: {
-    width: "100%",
-    height: 180,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  capturePlaceholder: {
-    fontSize: "3rem",
-  },
-  captureInfo: {
-    padding: "16px",
-  },
-  captureTitle: {
-    fontSize: "1rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginBottom: "6px",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  },
-  captureDesc: {
-    fontSize: "0.875rem",
-    color: colors.textSecondary,
-    lineHeight: 1.4,
-    marginBottom: "8px",
-    display: "-webkit-box",
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: "vertical",
-    overflow: "hidden",
-  },
-  captureMeta: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    marginBottom: "8px",
-  },
-  captureType: {
-    padding: "4px 8px",
-    borderRadius: 4,
-    fontSize: "0.75rem",
-    fontWeight: 600,
-    color: "#fff",
-  },
-  captureTime: {
-    fontSize: "0.75rem",
-    color: colors.textMuted,
-  },
-  captureTags: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "6px",
-  },
-  tag: {
-    padding: "4px 8px",
-    background: colors.bgHover,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 4,
-    fontSize: "0.75rem",
-    color: colors.textSecondary,
-  },
-  emptyState: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "64px 24px",
-    textAlign: "center",
-  },
-  emptyIcon: {
-    fontSize: "4rem",
-    marginBottom: "16px",
-  },
-  emptyTitle: {
-    fontSize: "1.5rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginBottom: "8px",
-  },
-  emptyText: {
-    fontSize: "1rem",
-    color: colors.textSecondary,
-  },
-};
+function getRenderableThumbnailUrl(thumbnailUrl: string | undefined) {
+  if (!thumbnailUrl) return null;
+  try {
+    const parsed = new URL(thumbnailUrl, window.location.origin);
+    if (parsed.hostname === "example.com") return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}

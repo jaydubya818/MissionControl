@@ -25,6 +25,53 @@
 
 ---
 
+## Implementation Notes (2026-02-12)
+
+This migration pass aligned the codebase to Phases 1-7 with a pragmatic, ship-first scope:
+
+- Added ARM schema primitives and execution bridge fields in `convex/schema.ts`:
+  - `agentTemplates`, `agentVersions`, `agentInstances`, `policyEnvelopes`, `approvalRecords`, `changeRecords`, `deployments`, `opEvents`
+  - Added dual-write fields on MC execution tables (`tasks.assigneeInstanceIds`, `runs.instanceId/versionId/templateId`, `toolCalls.instanceId/versionId`, `messages.authorInstanceId/operatorId`)
+- Added compatibility layer in `convex/lib/agentResolver.ts`:
+  - `resolveAgentRef`, `ensureInstanceForLegacyAgent`, `getAgentByLegacyId`
+  - Legacy agent registration path now auto-creates ARM template/version/instance mappings
+- Added ARM audit + telemetry helpers in `convex/lib/armAudit.ts` and compat flag helpers in `convex/lib/armCompat.ts`
+- Added genome hashing utility in `convex/lib/genomeHash.ts`
+- Wired dual-write and ARM refs into MC paths:
+  - `convex/agents.ts`, `convex/tasks.ts`, `convex/runs.ts`, `convex/messages.ts`, `convex/approvals.ts`, `convex/identity.ts`, `convex/workflowRuns.ts`
+- Added migration backfill action in `convex/migrations/backfillInstanceRefs.ts`
+  - Added migration health query (`getMigrationHealth`) and tenant backfill action (`runTenantBackfill`)
+- Added ARM registry/governance module surface:
+  - `convex/registry/*` and `convex/governance/*` (templates/versions/instances/identities, policy envelopes, approval records, change records, deployments, RBAC helpers)
+- Added ARM policy bridge mutation in `convex/policy.ts`:
+  - `evaluateWithARM` with inheritance preference (`version > project > tenant`) and parallel governance/telemetry writes
+  - Added legacy policy fallback when no ARM envelope matches (ARM-first, legacy as fallback)
+- Added Phase 8 ARM UI views and navigation wiring in `apps/mission-control-ui/src/`:
+  - `DirectoryView.tsx`, `PoliciesView.tsx`, `DeploymentsView.tsx`, `AuditView.tsx`, `TelemetryView.tsx`
+  - Sidebar/MainView/App routing now includes `directory`, `policies`, `deployments`, `audit`, `telemetry`
+- Added ARM telemetry query surface in `convex/operations/opEvents.ts`:
+  - `listOpEvents`, `getOpEventStats`
+- Local UI validation path now supports creating and exercising ARM flows directly:
+  - Bootstrap tenant/environment/operator
+  - Create template/version/instance stack
+  - Run instance ref backfill + tenant backfill from Directory Migration Ops
+  - Create/activate policy envelopes
+  - Create/activate deployments
+  - View governance audit and emit telemetry probes through `policy.evaluateWithARM`
+- Fixed Convex runtime compatibility issue in `convex/lib/genomeHash.ts` by removing `node:crypto` dependency and using a runtime-safe SHA-256 implementation.
+
+Validation snapshot:
+
+- `pnpm run ci:typecheck` ✅
+- `pnpm run ci:test` ✅
+- `pnpm exec tsc -p convex/tsconfig.json` ✅
+
+Environment caveat:
+
+- Convex codegen could not be refreshed in this sandbox due outbound network restrictions (`fetch failed`). Existing generated files were preserved.
+
+---
+
 ## Phase 0 — Documentation ✅
 
 **Goal**: Document fork boundary and migration plan.
@@ -423,5 +470,5 @@ After this migration is stable:
 
 ---
 
-**Status**: Ready for Phase 1 implementation  
-**Next**: See [FORK_BOUNDARY.md](FORK_BOUNDARY.md) for component mapping details
+**Status**: Phases 1-8 implemented in branch (incremental hardening in progress)  
+**Next**: Run UI validation + data seed + backfill (`seedMissionControlDemo.run`, `migrations/backfillInstanceRefs.runBackfill`, `migrations/backfillInstanceRefs.runTenantBackfill`)

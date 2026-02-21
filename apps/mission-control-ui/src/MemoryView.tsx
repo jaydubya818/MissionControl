@@ -1,27 +1,12 @@
-import { CSSProperties, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
 
 interface MemoryViewProps {
   projectId: Id<"projects"> | null;
 }
-
-const colors = {
-  bgPage: "#0f172a",
-  bgCard: "#1e293b",
-  bgHover: "#25334d",
-  bgInput: "#0f172a",
-  border: "#334155",
-  textPrimary: "#e2e8f0",
-  textSecondary: "#94a3b8",
-  textMuted: "#64748b",
-  accentBlue: "#3b82f6",
-  accentGreen: "#10b981",
-  accentOrange: "#f59e0b",
-  accentPurple: "#8b5cf6",
-  accentRed: "#ef4444",
-};
 
 type MemoryTier = "session" | "project" | "global" | "agent";
 type DocType = "WORKING_MD" | "DAILY_NOTE" | "SESSION_MEMORY";
@@ -87,25 +72,25 @@ function MemoryModal({
   };
 
   return (
-    <div style={modalStyles.overlay} onClick={onClose}>
-      <div style={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
-        <div style={modalStyles.header}>
-          <h2 style={modalStyles.title}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[1000]" onClick={onClose}>
+      <div className="bg-card border border-border rounded-[10px] w-full max-w-[520px] max-h-[85vh] overflow-auto shadow-[0_20px_60px_rgba(0,0,0,0.4)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground m-0">
             {mode === "create" ? "Add Memory" : "Edit Memory"}
           </h2>
-          <button style={modalStyles.closeBtn} onClick={onClose}>
+          <button className="bg-transparent border-none text-muted-foreground text-2xl cursor-pointer px-1 leading-none" onClick={onClose}>
             &times;
           </button>
         </div>
 
-        <div style={modalStyles.body}>
+        <div className="p-5 flex flex-col gap-1">
           {mode === "create" && (
             <>
-              <label style={modalStyles.label}>Agent</label>
+              <label className="text-xs font-semibold text-muted-foreground mt-2 mb-1">Agent</label>
               <select
                 value={agentId}
                 onChange={(e) => setAgentId(e.target.value)}
-                style={modalStyles.select}
+                className="px-3 py-2 bg-background border border-border rounded-md text-foreground text-sm w-full mb-1"
               >
                 <option value="">Select agent...</option>
                 {agents.map((a) => (
@@ -115,11 +100,11 @@ function MemoryModal({
                 ))}
               </select>
 
-              <label style={modalStyles.label}>Type</label>
+              <label className="text-xs font-semibold text-muted-foreground mt-2 mb-1">Type</label>
               <select
                 value={docType}
                 onChange={(e) => setDocType(e.target.value as DocType)}
-                style={modalStyles.select}
+                className="px-3 py-2 bg-background border border-border rounded-md text-foreground text-sm w-full mb-1"
               >
                 <option value="SESSION_MEMORY">Session Memory</option>
                 <option value="WORKING_MD">Working Doc</option>
@@ -128,26 +113,26 @@ function MemoryModal({
             </>
           )}
 
-          <label style={modalStyles.label}>Content</label>
+          <label className="text-xs font-semibold text-muted-foreground mt-2 mb-1">Content</label>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            style={modalStyles.textarea}
+            className="px-3 py-2.5 bg-background border border-border rounded-md text-foreground text-sm w-full resize-y font-[system-ui,-apple-system,sans-serif] leading-relaxed box-border"
             rows={8}
             placeholder="Enter memory content..."
             autoFocus
           />
         </div>
 
-        <div style={modalStyles.footer}>
-          <button style={modalStyles.cancelBtn} onClick={onClose}>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
+          <button className="px-4 py-2 bg-transparent border border-border rounded-md text-muted-foreground text-sm cursor-pointer" onClick={onClose}>
             Cancel
           </button>
           <button
-            style={{
-              ...modalStyles.saveBtn,
-              opacity: saving || !content.trim() || (mode === "create" && !agentId) ? 0.5 : 1,
-            }}
+            className={cn(
+              "px-5 py-2 bg-primary border-none rounded-md text-white text-sm font-semibold cursor-pointer",
+              (saving || !content.trim() || (mode === "create" && !agentId)) && "opacity-50 cursor-not-allowed"
+            )}
             onClick={handleSave}
             disabled={saving || !content.trim() || (mode === "create" && !agentId)}
           >
@@ -231,25 +216,25 @@ function PatternModal({
   };
 
   return (
-    <div style={modalStyles.overlay} onClick={onClose}>
-      <div style={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
-        <div style={modalStyles.header}>
-          <h2 style={modalStyles.title}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[1000]" onClick={onClose}>
+      <div className="bg-card border border-border rounded-[10px] w-full max-w-[520px] max-h-[85vh] overflow-auto shadow-[0_20px_60px_rgba(0,0,0,0.4)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground m-0">
             {mode === "create" ? "Add Pattern" : "Edit Pattern"}
           </h2>
-          <button style={modalStyles.closeBtn} onClick={onClose}>
+          <button className="bg-transparent border-none text-muted-foreground text-2xl cursor-pointer px-1 leading-none" onClick={onClose}>
             &times;
           </button>
         </div>
 
-        <div style={modalStyles.body}>
+        <div className="p-5 flex flex-col gap-1">
           {mode === "create" && (
             <>
-              <label style={modalStyles.label}>Agent</label>
+              <label className="text-xs font-semibold text-muted-foreground mt-2 mb-1">Agent</label>
               <select
                 value={agentId}
                 onChange={(e) => setAgentId(e.target.value)}
-                style={modalStyles.select}
+                className="px-3 py-2 bg-background border border-border rounded-md text-foreground text-sm w-full mb-1"
               >
                 <option value="">Select agent...</option>
                 {agents.map((a) => (
@@ -261,15 +246,15 @@ function PatternModal({
             </>
           )}
 
-          <label style={modalStyles.label}>Pattern</label>
+          <label className="text-xs font-semibold text-muted-foreground mt-2 mb-1">Pattern</label>
           <input
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
-            style={modalStyles.input}
+            className="px-3 py-2 bg-background border border-border rounded-md text-foreground text-sm w-full box-border mb-1"
             placeholder="e.g., strength:content-writing"
           />
 
-          <label style={modalStyles.label}>
+          <label className="text-xs font-semibold text-muted-foreground mt-2 mb-1">
             Confidence: {(confidence * 100).toFixed(0)}%
           </label>
           <input
@@ -279,28 +264,28 @@ function PatternModal({
             step={0.05}
             value={confidence}
             onChange={(e) => setConfidence(parseFloat(e.target.value))}
-            style={{ width: "100%", marginBottom: 16 }}
+            className="w-full mb-4"
           />
 
-          <label style={modalStyles.label}>Evidence (one per line)</label>
+          <label className="text-xs font-semibold text-muted-foreground mt-2 mb-1">Evidence (one per line)</label>
           <textarea
             value={evidenceText}
             onChange={(e) => setEvidenceText(e.target.value)}
-            style={modalStyles.textarea}
+            className="px-3 py-2.5 bg-background border border-border rounded-md text-foreground text-sm w-full resize-y font-[system-ui,-apple-system,sans-serif] leading-relaxed box-border"
             rows={4}
             placeholder="Task completed successfully&#10;High quality output"
           />
         </div>
 
-        <div style={modalStyles.footer}>
-          <button style={modalStyles.cancelBtn} onClick={onClose}>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
+          <button className="px-4 py-2 bg-transparent border border-border rounded-md text-muted-foreground text-sm cursor-pointer" onClick={onClose}>
             Cancel
           </button>
           <button
-            style={{
-              ...modalStyles.saveBtn,
-              opacity: saving || !pattern.trim() || (mode === "create" && !agentId) ? 0.5 : 1,
-            }}
+            className={cn(
+              "px-5 py-2 bg-primary border-none rounded-md text-white text-sm font-semibold cursor-pointer",
+              (saving || !pattern.trim() || (mode === "create" && !agentId)) && "opacity-50 cursor-not-allowed"
+            )}
             onClick={handleSave}
             disabled={saving || !pattern.trim() || (mode === "create" && !agentId)}
           >
@@ -326,27 +311,27 @@ function DeleteConfirm({
   onCancel: () => void;
 }) {
   return (
-    <div style={modalStyles.overlay} onClick={onCancel}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[1000]" onClick={onCancel}>
       <div
-        style={{ ...modalStyles.modal, maxWidth: 420 }}
+        className="bg-card border border-border rounded-[10px] w-full max-w-[420px] max-h-[85vh] overflow-auto shadow-[0_20px_60px_rgba(0,0,0,0.4)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={modalStyles.header}>
-          <h2 style={{ ...modalStyles.title, color: colors.accentRed }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-red-400 m-0">
             Confirm Delete
           </h2>
         </div>
-        <div style={modalStyles.body}>
-          <p style={{ color: colors.textSecondary, margin: 0, lineHeight: 1.5 }}>
+        <div className="p-5 flex flex-col gap-1">
+          <p className="text-muted-foreground m-0 leading-relaxed">
             {message}
           </p>
         </div>
-        <div style={modalStyles.footer}>
-          <button style={modalStyles.cancelBtn} onClick={onCancel}>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
+          <button className="px-4 py-2 bg-transparent border border-border rounded-md text-muted-foreground text-sm cursor-pointer" onClick={onCancel}>
             Cancel
           </button>
           <button
-            style={{ ...modalStyles.saveBtn, background: colors.accentRed }}
+            className="px-5 py-2 bg-red-500 border-none rounded-md text-white text-sm font-semibold cursor-pointer"
             onClick={onConfirm}
           >
             Delete
@@ -392,7 +377,6 @@ export function MemoryView({ projectId }: MemoryViewProps) {
   } | null>(null);
   const [agentFilter, setAgentFilter] = useState<string>("all");
 
-  // Queries
   const agentDocs = useQuery(api.agentDocuments.list, {
     projectId: projectId ?? undefined,
   });
@@ -403,7 +387,6 @@ export function MemoryView({ projectId }: MemoryViewProps) {
     projectId: projectId ?? undefined,
   });
 
-  // Mutations
   const removeDoc = useMutation(api.agentDocuments.remove);
   const removePattern = useMutation(api.agentLearning.removePattern);
 
@@ -415,7 +398,6 @@ export function MemoryView({ projectId }: MemoryViewProps) {
     return a ? `${a.emoji ?? ""} ${a.name}`.trim() : String(agentId).slice(0, 8);
   };
 
-  // Filter docs by type
   const sessionDocs = (agentDocs ?? []).filter(
     (d) => d.type === "SESSION_MEMORY"
   );
@@ -423,20 +405,11 @@ export function MemoryView({ projectId }: MemoryViewProps) {
     (d) => d.type === "WORKING_MD"
   );
 
-  // Agent memories: group all docs by agent
-  const agentDocsByAgent = new Map<string, typeof agentDocs>();
-  for (const doc of agentDocs ?? []) {
-    const key = doc.agentId;
-    if (!agentDocsByAgent.has(key)) agentDocsByAgent.set(key, []);
-    agentDocsByAgent.get(key)!.push(doc);
-  }
-
   const filteredAgentDocs =
     agentFilter === "all"
       ? agentDocs ?? []
       : (agentDocs ?? []).filter((d) => d.agentId === agentFilter);
 
-  // Delete handlers
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
     try {
@@ -463,18 +436,18 @@ export function MemoryView({ projectId }: MemoryViewProps) {
   ];
 
   return (
-    <main style={styles.container}>
-      <div style={styles.headerRow}>
+    <main className="flex-1 overflow-auto bg-background p-6">
+      <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 style={styles.title}>Memory</h1>
-          <p style={styles.subtitle}>Agent learning and document browser</p>
+          <h1 className="text-2xl font-semibold text-foreground mt-0 mb-1">Memory</h1>
+          <p className="text-base text-muted-foreground mt-0">Agent learning and document browser</p>
         </div>
-        <div style={styles.headerActions}>
+        <div className="flex gap-2 pt-1">
           {(activeTier === "session" ||
             activeTier === "agent" ||
             activeTier === "global") && (
             <button
-              style={styles.addBtn}
+              className="px-4 py-2 bg-primary border-none rounded-md text-white text-sm font-semibold cursor-pointer transition-opacity"
               onClick={() =>
                 setMemoryModal({ open: true, mode: "create" })
               }
@@ -484,7 +457,7 @@ export function MemoryView({ projectId }: MemoryViewProps) {
           )}
           {activeTier === "project" && (
             <button
-              style={styles.addBtn}
+              className="px-4 py-2 bg-primary border-none rounded-md text-white text-sm font-semibold cursor-pointer transition-opacity"
               onClick={() =>
                 setPatternModal({ open: true, mode: "create" })
               }
@@ -496,15 +469,17 @@ export function MemoryView({ projectId }: MemoryViewProps) {
       </div>
 
       {/* Tier Navigation */}
-      <div style={styles.tierNav}>
+      <div className="flex gap-2 mb-6 flex-wrap">
         {tiers.map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTier(t.key)}
-            style={{
-              ...styles.tierButton,
-              ...(activeTier === t.key && styles.tierButtonActive),
-            }}
+            className={cn(
+              "px-5 py-2.5 rounded-md text-sm font-medium cursor-pointer transition-all border",
+              activeTier === t.key
+                ? "bg-primary border-primary text-white"
+                : "bg-card border-border text-muted-foreground"
+            )}
           >
             {t.label}
           </button>
@@ -513,15 +488,15 @@ export function MemoryView({ projectId }: MemoryViewProps) {
 
       {/* ============ SESSION MEMORY ============ */}
       {activeTier === "session" && (
-        <div style={styles.content}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.contentTitle}>Session Documents</h2>
-            <span style={styles.countBadge}>{sessionDocs.length}</span>
+        <div className="mt-2">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-xl font-semibold text-foreground m-0">Session Documents</h2>
+            <span className="px-2.5 py-0.5 bg-card border border-border rounded-xl text-xs font-semibold text-muted-foreground">{sessionDocs.length}</span>
           </div>
           {sessionDocs.length === 0 && (
             <EmptyState icon="clock" text="No session memories yet" />
           )}
-          <div style={styles.docList}>
+          <div className="flex flex-col gap-3">
             {sessionDocs.map((doc) => (
               <MemoryCard
                 key={doc._id}
@@ -557,43 +532,42 @@ export function MemoryView({ projectId }: MemoryViewProps) {
 
       {/* ============ PATTERNS (PROJECT) ============ */}
       {activeTier === "project" && (
-        <div style={styles.content}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.contentTitle}>Learned Patterns</h2>
-            <span style={styles.countBadge}>
+        <div className="mt-2">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-xl font-semibold text-foreground m-0">Learned Patterns</h2>
+            <span className="px-2.5 py-0.5 bg-card border border-border rounded-xl text-xs font-semibold text-muted-foreground">
               {(agentPatterns ?? []).length}
             </span>
           </div>
           {(agentPatterns ?? []).length === 0 && (
             <EmptyState icon="brain" text="No patterns discovered yet" />
           )}
-          <div style={styles.docList}>
+          <div className="flex flex-col gap-3">
             {(agentPatterns ?? []).map((p) => (
-              <div key={p._id} style={styles.docCard}>
-                <div style={styles.cardHeader}>
+              <div key={p._id} className="p-4 bg-card border border-border rounded-lg transition-colors">
+                <div className="flex items-start gap-3">
                   <div>
-                    <div style={styles.patternTitle}>{p.pattern}</div>
-                    <div style={styles.cardMeta}>
+                    <div className="text-base font-semibold text-foreground mb-1">{p.pattern}</div>
+                    <div className="text-sm text-muted-foreground mb-1">
                       Agent: {getAgentLabel(p.agentId)}
                     </div>
                   </div>
-                  <div style={styles.cardRight}>
+                  <div className="flex flex-col items-end gap-2 ml-auto">
                     <div
-                      style={{
-                        ...styles.confidenceBadge,
-                        background:
-                          p.confidence > 0.7
-                            ? colors.accentGreen
-                            : p.confidence > 0.4
-                              ? colors.accentOrange
-                              : colors.textMuted,
-                      }}
+                      className={cn(
+                        "px-2.5 py-[3px] rounded-xl text-xs font-semibold text-white",
+                        p.confidence > 0.7
+                          ? "bg-emerald-500"
+                          : p.confidence > 0.4
+                            ? "bg-amber-500"
+                            : "bg-muted-foreground"
+                      )}
                     >
                       {(p.confidence * 100).toFixed(0)}%
                     </div>
-                    <div style={styles.cardActions}>
+                    <div className="flex gap-1">
                       <button
-                        style={styles.iconBtn}
+                        className="px-2 py-1 bg-transparent border border-border rounded text-muted-foreground text-sm cursor-pointer transition-all"
                         title="Edit"
                         onClick={() =>
                           setPatternModal({
@@ -612,7 +586,7 @@ export function MemoryView({ projectId }: MemoryViewProps) {
                         &#9998;
                       </button>
                       <button
-                        style={{ ...styles.iconBtn, color: colors.accentRed }}
+                        className="px-2 py-1 bg-transparent border border-border rounded text-red-400 text-sm cursor-pointer transition-all"
                         title="Delete"
                         onClick={() =>
                           setDeleteConfirm({
@@ -628,10 +602,10 @@ export function MemoryView({ projectId }: MemoryViewProps) {
                     </div>
                   </div>
                 </div>
-                <div style={styles.evidenceRow}>
+                <div className="text-sm text-muted-foreground mt-2 mb-1">
                   Evidence: {p.evidence?.length ?? 0} instances
                 </div>
-                <div style={styles.docTime}>
+                <div className="text-xs text-muted-foreground">
                   Discovered:{" "}
                   {new Date(p.discoveredAt).toLocaleDateString()}
                 </div>
@@ -643,13 +617,13 @@ export function MemoryView({ projectId }: MemoryViewProps) {
 
       {/* ============ AGENT MEMORIES ============ */}
       {activeTier === "agent" && (
-        <div style={styles.content}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.contentTitle}>Agent Memories</h2>
+        <div className="mt-2">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-xl font-semibold text-foreground m-0">Agent Memories</h2>
             <select
               value={agentFilter}
               onChange={(e) => setAgentFilter(e.target.value)}
-              style={styles.filterSelect}
+              className="px-3 py-1.5 bg-card border border-border rounded-md text-foreground text-sm ml-auto cursor-pointer"
             >
               <option value="all">All Agents</option>
               {agentsList.map((a) => (
@@ -662,7 +636,7 @@ export function MemoryView({ projectId }: MemoryViewProps) {
           {filteredAgentDocs.length === 0 && (
             <EmptyState icon="robot" text="No agent memories found" />
           )}
-          <div style={styles.docList}>
+          <div className="flex flex-col gap-3">
             {filteredAgentDocs.map((doc) => (
               <MemoryCard
                 key={doc._id}
@@ -698,10 +672,10 @@ export function MemoryView({ projectId }: MemoryViewProps) {
 
       {/* ============ GLOBAL / KNOWLEDGE BASE ============ */}
       {activeTier === "global" && (
-        <div style={styles.content}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.contentTitle}>Global Knowledge Base</h2>
-            <span style={styles.countBadge}>{globalDocs.length}</span>
+        <div className="mt-2">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-xl font-semibold text-foreground m-0">Global Knowledge Base</h2>
+            <span className="px-2.5 py-0.5 bg-card border border-border rounded-xl text-xs font-semibold text-muted-foreground">{globalDocs.length}</span>
           </div>
           {globalDocs.length === 0 && (
             <EmptyState
@@ -709,7 +683,7 @@ export function MemoryView({ projectId }: MemoryViewProps) {
               text="Global memory aggregates knowledge across all projects. Add Working Docs to populate."
             />
           )}
-          <div style={styles.docList}>
+          <div className="flex flex-col gap-3">
             {globalDocs.map((doc) => (
               <MemoryCard
                 key={doc._id}
@@ -794,38 +768,36 @@ function MemoryCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const typeLabels: Record<string, { label: string; color: string }> = {
-    SESSION_MEMORY: { label: "Session", color: colors.accentBlue },
-    WORKING_MD: { label: "Working Doc", color: colors.accentPurple },
-    DAILY_NOTE: { label: "Daily Note", color: colors.accentOrange },
+  const typeLabels: Record<string, { label: string; twBg: string }> = {
+    SESSION_MEMORY: { label: "Session", twBg: "bg-blue-500" },
+    WORKING_MD: { label: "Working Doc", twBg: "bg-blue-500" },
+    DAILY_NOTE: { label: "Daily Note", twBg: "bg-amber-500" },
   };
-  const tl = typeLabels[type] ?? { label: type, color: colors.textMuted };
+  const tl = typeLabels[type] ?? { label: type, twBg: "bg-muted-foreground" };
 
   return (
-    <div style={styles.docCard}>
-      <div style={styles.cardHeader}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={styles.cardTopRow}>
-            <span style={styles.agentName}>{agent}</span>
-            <span
-              style={{ ...styles.typeBadge, background: tl.color }}
-            >
+    <div className="p-4 bg-card border border-border rounded-lg transition-colors">
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm font-semibold text-foreground">{agent}</span>
+            <span className={cn("px-2 py-0.5 rounded-lg text-[0.7rem] font-semibold text-white", tl.twBg)}>
               {tl.label}
             </span>
           </div>
-          <div style={styles.docContent}>
+          <div className="text-sm text-muted-foreground leading-relaxed mb-2 whitespace-pre-wrap break-words">
             {content.length > 280 ? content.slice(0, 280) + "..." : content}
           </div>
-          <div style={styles.docTime}>
+          <div className="text-xs text-muted-foreground">
             Updated: {new Date(updatedAt).toLocaleString()}
           </div>
         </div>
-        <div style={styles.cardActions}>
-          <button style={styles.iconBtn} title="Edit" onClick={onEdit}>
+        <div className="flex gap-1">
+          <button className="px-2 py-1 bg-transparent border border-border rounded text-muted-foreground text-sm cursor-pointer transition-all" title="Edit" onClick={onEdit}>
             &#9998;
           </button>
           <button
-            style={{ ...styles.iconBtn, color: colors.accentRed }}
+            className="px-2 py-1 bg-transparent border border-border rounded text-red-400 text-sm cursor-pointer transition-all"
             title="Delete"
             onClick={onDelete}
           >
@@ -845,341 +817,9 @@ function EmptyState({ icon, text }: { icon: string; text: string }) {
     globe: "\uD83C\uDF10",
   };
   return (
-    <div style={styles.emptyState}>
-      <div style={styles.emptyIcon}>{emojiMap[icon] ?? "\uD83D\uDCE6"}</div>
-      <div style={styles.emptyText}>{text}</div>
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <div className="text-4xl mb-4">{emojiMap[icon] ?? "\uD83D\uDCE6"}</div>
+      <div className="text-base text-muted-foreground max-w-xs leading-relaxed">{text}</div>
     </div>
   );
 }
-
-// ============================================================================
-// STYLES
-// ============================================================================
-
-const styles: Record<string, CSSProperties> = {
-  container: {
-    flex: 1,
-    overflow: "auto",
-    background: colors.bgPage,
-    padding: "24px",
-  },
-  headerRow: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: "24px",
-  },
-  title: {
-    fontSize: "1.75rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginTop: 0,
-    marginBottom: "4px",
-  },
-  subtitle: {
-    fontSize: "1rem",
-    color: colors.textSecondary,
-    marginTop: 0,
-  },
-  headerActions: {
-    display: "flex",
-    gap: "8px",
-    paddingTop: "4px",
-  },
-  addBtn: {
-    padding: "8px 18px",
-    background: colors.accentBlue,
-    border: "none",
-    borderRadius: 6,
-    color: "#fff",
-    fontSize: "0.875rem",
-    fontWeight: 600,
-    cursor: "pointer",
-    transition: "opacity 0.15s",
-  },
-  tierNav: {
-    display: "flex",
-    gap: "8px",
-    marginBottom: "24px",
-    flexWrap: "wrap" as const,
-  },
-  tierButton: {
-    padding: "10px 20px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    color: colors.textSecondary,
-    fontSize: "0.875rem",
-    fontWeight: 500,
-    cursor: "pointer",
-    transition: "all 0.2s",
-  },
-  tierButtonActive: {
-    background: colors.accentBlue,
-    borderColor: colors.accentBlue,
-    color: "#fff",
-  },
-  content: {
-    marginTop: "8px",
-  },
-  sectionHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    marginBottom: "16px",
-  },
-  contentTitle: {
-    fontSize: "1.25rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    margin: 0,
-  },
-  countBadge: {
-    padding: "2px 10px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 12,
-    fontSize: "0.8rem",
-    fontWeight: 600,
-    color: colors.textSecondary,
-  },
-  filterSelect: {
-    padding: "6px 12px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    color: colors.textPrimary,
-    fontSize: "0.85rem",
-    marginLeft: "auto",
-    cursor: "pointer",
-  },
-  docList: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "12px",
-  },
-  docCard: {
-    padding: "16px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 8,
-    transition: "border-color 0.15s",
-  },
-  cardHeader: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "12px",
-  },
-  cardTopRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    marginBottom: "8px",
-  },
-  agentName: {
-    fontSize: "0.875rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-  },
-  typeBadge: {
-    padding: "2px 8px",
-    borderRadius: 10,
-    fontSize: "0.7rem",
-    fontWeight: 600,
-    color: "#fff",
-  },
-  docContent: {
-    fontSize: "0.875rem",
-    color: colors.textSecondary,
-    lineHeight: 1.5,
-    marginBottom: "8px",
-    whiteSpace: "pre-wrap" as const,
-    wordBreak: "break-word" as const,
-  },
-  docTime: {
-    fontSize: "0.75rem",
-    color: colors.textMuted,
-  },
-  cardRight: {
-    display: "flex",
-    flexDirection: "column" as const,
-    alignItems: "flex-end",
-    gap: "8px",
-  },
-  cardActions: {
-    display: "flex",
-    gap: "4px",
-  },
-  iconBtn: {
-    padding: "4px 8px",
-    background: "transparent",
-    border: `1px solid ${colors.border}`,
-    borderRadius: 4,
-    color: colors.textSecondary,
-    fontSize: "0.85rem",
-    cursor: "pointer",
-    transition: "all 0.15s",
-  },
-  cardMeta: {
-    fontSize: "0.8rem",
-    color: colors.textMuted,
-    marginBottom: "4px",
-  },
-  patternTitle: {
-    fontSize: "1rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginBottom: "4px",
-  },
-  confidenceBadge: {
-    padding: "3px 10px",
-    borderRadius: 12,
-    fontSize: "0.75rem",
-    fontWeight: 600,
-    color: "#fff",
-  },
-  evidenceRow: {
-    fontSize: "0.85rem",
-    color: colors.textSecondary,
-    marginTop: "8px",
-    marginBottom: "4px",
-  },
-  emptyState: {
-    display: "flex",
-    flexDirection: "column" as const,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "48px",
-    textAlign: "center" as const,
-  },
-  emptyIcon: {
-    fontSize: "3.5rem",
-    marginBottom: "16px",
-  },
-  emptyText: {
-    fontSize: "1rem",
-    color: colors.textSecondary,
-    maxWidth: 320,
-    lineHeight: 1.5,
-  },
-};
-
-const modalStyles: Record<string, CSSProperties> = {
-  overlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: "rgba(0,0,0,0.6)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000,
-  },
-  modal: {
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 10,
-    width: "100%",
-    maxWidth: 520,
-    maxHeight: "85vh",
-    overflow: "auto",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "16px 20px",
-    borderBottom: `1px solid ${colors.border}`,
-  },
-  title: {
-    fontSize: "1.15rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    margin: 0,
-  },
-  closeBtn: {
-    background: "transparent",
-    border: "none",
-    color: colors.textMuted,
-    fontSize: "1.5rem",
-    cursor: "pointer",
-    padding: "0 4px",
-    lineHeight: 1,
-  },
-  body: {
-    padding: "20px",
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "4px",
-  },
-  label: {
-    fontSize: "0.8rem",
-    fontWeight: 600,
-    color: colors.textSecondary,
-    marginTop: "8px",
-    marginBottom: "4px",
-  },
-  select: {
-    padding: "8px 12px",
-    background: colors.bgInput,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    color: colors.textPrimary,
-    fontSize: "0.875rem",
-    width: "100%",
-    marginBottom: "4px",
-  },
-  input: {
-    padding: "8px 12px",
-    background: colors.bgInput,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    color: colors.textPrimary,
-    fontSize: "0.875rem",
-    width: "100%",
-    boxSizing: "border-box" as const,
-    marginBottom: "4px",
-  },
-  textarea: {
-    padding: "10px 12px",
-    background: colors.bgInput,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    color: colors.textPrimary,
-    fontSize: "0.875rem",
-    width: "100%",
-    resize: "vertical" as const,
-    fontFamily: "system-ui, -apple-system, sans-serif",
-    lineHeight: 1.5,
-    boxSizing: "border-box" as const,
-  },
-  footer: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "8px",
-    padding: "16px 20px",
-    borderTop: `1px solid ${colors.border}`,
-  },
-  cancelBtn: {
-    padding: "8px 16px",
-    background: "transparent",
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    color: colors.textSecondary,
-    fontSize: "0.875rem",
-    cursor: "pointer",
-  },
-  saveBtn: {
-    padding: "8px 20px",
-    background: colors.accentBlue,
-    border: "none",
-    borderRadius: 6,
-    color: "#fff",
-    fontSize: "0.875rem",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-};

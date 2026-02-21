@@ -93,6 +93,32 @@ const reviewStatus = v.union(
   v.literal("SUPERSEDED")
 );
 
+const agentVersionStatus = v.union(
+  v.literal("DRAFT"),
+  v.literal("TESTING"),
+  v.literal("CANDIDATE"),
+  v.literal("APPROVED"),
+  v.literal("DEPRECATED"),
+  v.literal("RETIRED")
+);
+
+const agentInstanceStatus = v.union(
+  v.literal("PROVISIONING"),
+  v.literal("ACTIVE"),
+  v.literal("PAUSED"),
+  v.literal("READONLY"),
+  v.literal("DRAINING"),
+  v.literal("QUARANTINED"),
+  v.literal("RETIRED")
+);
+
+const deploymentStatus = v.union(
+  v.literal("PENDING"),
+  v.literal("ACTIVE"),
+  v.literal("ROLLING_BACK"),
+  v.literal("RETIRED")
+);
+
 // ============================================================================
 // SCHEMA
 // ============================================================================
@@ -105,6 +131,7 @@ export default defineSchema({
     name: v.string(),
     slug: v.string(),
     description: v.optional(v.string()),
+    missionStatement: v.optional(v.string()),
     
     // Status
     active: v.boolean(),
@@ -220,6 +247,257 @@ export default defineSchema({
     .index("by_operator_role", ["operatorId", "roleId"]),
 
   // -------------------------------------------------------------------------
+  // ARM: AGENT TEMPLATES (Registry)
+  // -------------------------------------------------------------------------
+  agentTemplates: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    name: v.string(),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    active: v.boolean(),
+    createdBy: v.optional(v.id("operators")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_project", ["projectId"])
+    .index("by_slug", ["slug"])
+    .index("by_tenant_slug", ["tenantId", "slug"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: AGENT VERSIONS (Registry)
+  // -------------------------------------------------------------------------
+  agentVersions: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    templateId: v.id("agentTemplates"),
+    version: v.number(),
+    genomeHash: v.string(),
+    genome: v.object({
+      modelConfig: v.object({
+        provider: v.string(),
+        modelId: v.string(),
+        temperature: v.optional(v.number()),
+        maxTokens: v.optional(v.number()),
+      }),
+      promptBundleHash: v.string(),
+      toolManifestHash: v.string(),
+      provenance: v.object({
+        createdBy: v.string(),
+        source: v.string(),
+        createdAt: v.number(),
+      }),
+    }),
+    status: agentVersionStatus,
+    notes: v.optional(v.string()),
+    createdBy: v.optional(v.id("operators")),
+    approvedBy: v.optional(v.id("operators")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_project", ["projectId"])
+    .index("by_template", ["templateId"])
+    .index("by_template_status", ["templateId", "status"])
+    .index("by_genome_hash", ["genomeHash"])
+    .index("by_status", ["status"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: AGENT INSTANCES (Registry)
+  // -------------------------------------------------------------------------
+  agentInstances: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    templateId: v.id("agentTemplates"),
+    versionId: v.id("agentVersions"),
+    environmentId: v.optional(v.id("environments")),
+    name: v.string(),
+    status: agentInstanceStatus,
+    legacyAgentId: v.optional(v.id("agents")),
+    assignedOperatorId: v.optional(v.id("operators")),
+    activatedAt: v.optional(v.number()),
+    retiredAt: v.optional(v.number()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_project", ["projectId"])
+    .index("by_template", ["templateId"])
+    .index("by_version", ["versionId"])
+    .index("by_environment", ["environmentId"])
+    .index("by_status", ["status"])
+    .index("by_legacy_agent", ["legacyAgentId"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: POLICY ENVELOPES (Governance)
+  // -------------------------------------------------------------------------
+  policyEnvelopes: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    templateId: v.optional(v.id("agentTemplates")),
+    versionId: v.optional(v.id("agentVersions")),
+    name: v.string(),
+    active: v.boolean(),
+    priority: v.number(),
+    rules: v.any(),
+    createdBy: v.optional(v.id("operators")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_project", ["projectId"])
+    .index("by_template", ["templateId"])
+    .index("by_version", ["versionId"])
+    .index("by_active", ["active"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: APPROVAL RECORDS (Governance)
+  // -------------------------------------------------------------------------
+  approvalRecords: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    instanceId: v.optional(v.id("agentInstances")),
+    versionId: v.optional(v.id("agentVersions")),
+    legacyApprovalId: v.optional(v.id("approvals")),
+    actionType: v.string(),
+    riskLevel: riskLevel,
+    rollbackPlan: v.optional(v.string()),
+    justification: v.string(),
+    escalationLevel: v.optional(v.number()),
+    status: v.union(
+      v.literal("PENDING"),
+      v.literal("APPROVED"),
+      v.literal("DENIED"),
+      v.literal("EXPIRED"),
+      v.literal("CANCELED")
+    ),
+    requestedBy: v.optional(v.id("operators")),
+    requestedAt: v.number(),
+    decidedBy: v.optional(v.id("operators")),
+    decidedAt: v.optional(v.number()),
+    decisionReason: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_project", ["projectId"])
+    .index("by_status", ["status"])
+    .index("by_instance", ["instanceId"])
+    .index("by_legacy_approval", ["legacyApprovalId"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: CHANGE RECORDS (Governance + Audit)
+  // -------------------------------------------------------------------------
+  changeRecords: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    templateId: v.optional(v.id("agentTemplates")),
+    versionId: v.optional(v.id("agentVersions")),
+    instanceId: v.optional(v.id("agentInstances")),
+    operatorId: v.optional(v.id("operators")),
+    legacyAgentId: v.optional(v.id("agents")),
+    type: v.union(
+      v.literal("TEMPLATE_CREATED"),
+      v.literal("VERSION_CREATED"),
+      v.literal("VERSION_TRANSITIONED"),
+      v.literal("INSTANCE_CREATED"),
+      v.literal("INSTANCE_TRANSITIONED"),
+      v.literal("IDENTITY_UPDATED"),
+      v.literal("POLICY_ATTACHED"),
+      v.literal("TASK_TRANSITIONED"),
+      v.literal("APPROVAL_REQUESTED"),
+      v.literal("APPROVAL_DECIDED"),
+      v.literal("DEPLOYMENT_CREATED"),
+      v.literal("DEPLOYMENT_ACTIVATED"),
+      v.literal("DEPLOYMENT_ROLLED_BACK"),
+      v.literal("EMERGENCY_PAUSE"),
+      v.literal("POLICY_DENIED"),
+      v.literal("QC_RUN_CREATED"),
+      v.literal("QC_FINDINGS_RECORDED")
+    ),
+    summary: v.string(),
+    payload: v.optional(v.any()),
+    relatedTable: v.optional(v.string()),
+    relatedId: v.optional(v.string()),
+    timestamp: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_project", ["projectId"])
+    .index("by_type", ["type"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_instance", ["instanceId"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: DEPLOYMENTS (Governance)
+  // -------------------------------------------------------------------------
+  deployments: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    templateId: v.id("agentTemplates"),
+    environmentId: v.id("environments"),
+    targetVersionId: v.id("agentVersions"),
+    previousVersionId: v.optional(v.id("agentVersions")),
+    rolloutPolicy: v.optional(v.any()),
+    status: deploymentStatus,
+    createdBy: v.optional(v.id("operators")),
+    approvedBy: v.optional(v.id("operators")),
+    activatedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_template", ["templateId"])
+    .index("by_environment", ["environmentId"])
+    .index("by_status", ["status"])
+    .index("by_target_version", ["targetVersionId"]),
+
+  // -------------------------------------------------------------------------
+  // ARM: OP EVENTS (Operational Telemetry)
+  // -------------------------------------------------------------------------
+  opEvents: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    type: v.union(
+      v.literal("RUN_STARTED"),
+      v.literal("RUN_STEP"),
+      v.literal("RUN_COMPLETED"),
+      v.literal("RUN_FAILED"),
+      v.literal("TOOL_CALL_STARTED"),
+      v.literal("TOOL_CALL_COMPLETED"),
+      v.literal("TOOL_CALL_BLOCKED"),
+      v.literal("WORKFLOW_STEP_STARTED"),
+      v.literal("WORKFLOW_STEP_COMPLETED"),
+      v.literal("WORKFLOW_STEP_FAILED"),
+      v.literal("HEARTBEAT"),
+      v.literal("COST_TICK"),
+      v.literal("MESSAGE_SENT"),
+      v.literal("DECISION_MADE"),
+      v.literal("QC_RUN_STARTED"),
+      v.literal("QC_RUN_COMPLETED"),
+      v.literal("QC_RUN_FAILED")
+    ),
+    timestamp: v.number(),
+    instanceId: v.optional(v.id("agentInstances")),
+    versionId: v.optional(v.id("agentVersions")),
+    taskId: v.optional(v.id("tasks")),
+    runId: v.optional(v.id("runs")),
+    toolCallId: v.optional(v.id("toolCalls")),
+    workflowRunId: v.optional(v.id("workflowRuns")),
+    qcRunId: v.optional(v.id("qcRuns")),
+    changeRecordId: v.optional(v.id("changeRecords")),
+    payload: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_project", ["projectId"])
+    .index("by_type", ["type"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_instance", ["instanceId"])
+    .index("by_run", ["runId"])
+    .index("by_qc_run", ["qcRunId"]),
+
+  // -------------------------------------------------------------------------
   // PROJECTS (Multi-Project Workspaces)
   // -------------------------------------------------------------------------
   projects: defineTable({
@@ -332,6 +610,7 @@ export default defineSchema({
     // Assignment
     creatorAgentId: v.optional(v.id("agents")),
     assigneeIds: v.array(v.id("agents")),
+    assigneeInstanceIds: v.optional(v.array(v.id("agentInstances"))),
     reviewerId: v.optional(v.id("agents")),
     
     // Hierarchy
@@ -404,7 +683,8 @@ export default defineSchema({
       v.literal("AGENT"),
       v.literal("API"),
       v.literal("TRELLO"),
-      v.literal("SEED")
+      v.literal("SEED"),
+      v.literal("MISSION_PROMPT")
     )),
     sourceRef: v.optional(v.string()),     // e.g. "jaydubya818/repo#42", telegram msg id
     createdBy: v.optional(v.union(
@@ -522,6 +802,8 @@ export default defineSchema({
     // Author
     authorType: actorType,
     authorAgentId: v.optional(v.id("agents")),
+    authorInstanceId: v.optional(v.id("agentInstances")),
+    operatorId: v.optional(v.id("operators")),
     authorUserId: v.optional(v.string()),
     
     // Content
@@ -554,6 +836,7 @@ export default defineSchema({
   })
     .index("by_task", ["taskId"])
     .index("by_author_agent", ["authorAgentId"])
+    .index("by_author_instance", ["authorInstanceId"])
     .index("by_idempotency", ["idempotencyKey"])
     .index("by_project", ["projectId"]),
 
@@ -571,6 +854,9 @@ export default defineSchema({
     
     // References
     agentId: v.id("agents"),
+    instanceId: v.optional(v.id("agentInstances")),
+    versionId: v.optional(v.id("agentVersions")),
+    templateId: v.optional(v.id("agentTemplates")),
     taskId: v.optional(v.id("tasks")),
     sessionKey: v.string(),
     
@@ -603,6 +889,8 @@ export default defineSchema({
     metadata: v.optional(v.any()),
   })
     .index("by_agent", ["agentId"])
+    .index("by_instance", ["instanceId"])
+    .index("by_version", ["versionId"])
     .index("by_task", ["taskId"])
     .index("by_session", ["sessionKey"])
     .index("by_idempotency", ["idempotencyKey"])
@@ -620,6 +908,8 @@ export default defineSchema({
     // References
     runId: v.id("runs"),
     agentId: v.id("agents"),
+    instanceId: v.optional(v.id("agentInstances")),
+    versionId: v.optional(v.id("agentVersions")),
     taskId: v.optional(v.id("tasks")),
     
     // Tool info
@@ -658,6 +948,7 @@ export default defineSchema({
   })
     .index("by_run", ["runId"])
     .index("by_agent", ["agentId"])
+    .index("by_instance", ["instanceId"])
     .index("by_task", ["taskId"])
     .index("by_risk", ["riskLevel"])
     .index("by_project", ["projectId"]),
@@ -781,6 +1072,7 @@ export default defineSchema({
     agentId: v.optional(v.id("agents")),
     taskId: v.optional(v.id("tasks")),
     runId: v.optional(v.id("runs")),
+    qcRunId: v.optional(v.id("qcRuns")),
     
     // Status
     status: v.union(
@@ -1379,7 +1671,12 @@ export default defineSchema({
   // AGENT IDENTITIES (OpenClaw IDENTITY/SOUL/TOOLS Governance)
   // -------------------------------------------------------------------------
   agentIdentities: defineTable({
+    tenantId: v.optional(v.id("tenants")),
     agentId: v.id("agents"),
+    templateId: v.optional(v.id("agentTemplates")),
+    versionId: v.optional(v.id("agentVersions")),
+    instanceId: v.optional(v.id("agentInstances")),
+    legacyAgentId: v.optional(v.id("agents")),
     
     // IDENTITY.md fields
     name: v.string(),
@@ -1407,7 +1704,11 @@ export default defineSchema({
     
     metadata: v.optional(v.any()),
   })
+    .index("by_tenant", ["tenantId"])
     .index("by_agent", ["agentId"])
+    .index("by_template", ["templateId"])
+    .index("by_instance", ["instanceId"])
+    .index("by_legacy_agent", ["legacyAgentId"])
     .index("by_validation_status", ["validationStatus"]),
 
   // -------------------------------------------------------------------------
@@ -1692,6 +1993,456 @@ export default defineSchema({
     .index("by_parent_task", ["parentTaskId"])
     .index("by_project_status", ["projectId", "status"]),
 
+  // =========================================================================
+  // QUALITY CONTROL
+  // =========================================================================
+
+  // -------------------------------------------------------------------------
+  // QC RUNS (Quality Control Run Metadata + Lifecycle)
+  // -------------------------------------------------------------------------
+  qcRuns: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+
+    // Display ID and ordering
+    runId: v.string(),
+    runSequence: v.number(),
+
+    // Lifecycle
+    status: v.union(
+      v.literal("PENDING"),
+      v.literal("RUNNING"),
+      v.literal("COMPLETED"),
+      v.literal("FAILED"),
+      v.literal("CANCELED")
+    ),
+
+    // Governance (riskGrade is deterministic from gates; qualityScore is informational)
+    riskGrade: v.optional(v.union(
+      v.literal("GREEN"),
+      v.literal("YELLOW"),
+      v.literal("RED")
+    )),
+    qualityScore: v.optional(v.number()),
+
+    // Target
+    repoUrl: v.string(),
+    commitSha: v.optional(v.string()),
+    branch: v.optional(v.string()),
+    scopeType: v.union(
+      v.literal("FULL_REPO"),
+      v.literal("FILE_LIST"),
+      v.literal("DIRECTORY"),
+      v.literal("BRANCH_DIFF")
+    ),
+    scopeSpec: v.optional(v.any()),
+
+    // Ruleset
+    rulesetId: v.optional(v.id("qcRulesets")),
+
+    // Initiator
+    initiatorType: v.union(
+      v.literal("HUMAN"),
+      v.literal("AGENT"),
+      v.literal("SYSTEM"),
+      v.literal("WORKFLOW")
+    ),
+    initiatorId: v.optional(v.string()),
+
+    // Results summary
+    findingCounts: v.optional(v.object({
+      red: v.number(),
+      yellow: v.number(),
+      green: v.number(),
+      info: v.number(),
+    })),
+    gatePassed: v.optional(v.boolean()),
+    evidenceHash: v.optional(v.string()),
+
+    // Timing
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+
+    // Idempotency
+    idempotencyKey: v.optional(v.string()),
+
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_project", ["projectId"])
+    .index("by_status", ["status"])
+    .index("by_project_sequence", ["projectId", "runSequence"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  // -------------------------------------------------------------------------
+  // QC FINDINGS (Individual Check Results)
+  // -------------------------------------------------------------------------
+  qcFindings: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    qcRunId: v.id("qcRuns"),
+
+    severity: v.union(
+      v.literal("RED"),
+      v.literal("YELLOW"),
+      v.literal("GREEN"),
+      v.literal("INFO")
+    ),
+    category: v.union(
+      v.literal("REQUIREMENT_GAP"),
+      v.literal("DOCS_DRIFT"),
+      v.literal("COVERAGE_GAP"),
+      v.literal("SECURITY_GAP"),
+      v.literal("CONFIG_MISSING"),
+      v.literal("DELIVERY_GATE")
+    ),
+
+    title: v.string(),
+    description: v.string(),
+    filePaths: v.optional(v.array(v.string())),
+    lineRanges: v.optional(v.array(v.object({
+      file: v.string(),
+      start: v.number(),
+      end: v.number(),
+    }))),
+    prdRefs: v.optional(v.array(v.string())),
+    suggestedFix: v.optional(v.string()),
+    confidence: v.optional(v.number()),
+
+    linkedTaskId: v.optional(v.id("tasks")),
+
+    metadata: v.optional(v.any()),
+  })
+    .index("by_run", ["qcRunId"])
+    .index("by_severity", ["severity"])
+    .index("by_category", ["category"])
+    .index("by_project", ["projectId"]),
+
+  // -------------------------------------------------------------------------
+  // QC ARTIFACTS (Evidence Packs, Reports, Trace Logs)
+  // -------------------------------------------------------------------------
+  qcArtifacts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    qcRunId: v.id("qcRuns"),
+
+    type: v.union(
+      v.literal("EVIDENCE_PACK_JSON"),
+      v.literal("SUMMARY_MD"),
+      v.literal("TRACE_MATRIX"),
+      v.literal("COVERAGE_REPORT"),
+      v.literal("CUSTOM")
+    ),
+    name: v.string(),
+
+    storageId: v.optional(v.id("_storage")),
+    content: v.optional(v.string()),
+    mimeType: v.string(),
+    sizeBytes: v.optional(v.number()),
+
+    metadata: v.optional(v.any()),
+  })
+    .index("by_run", ["qcRunId"])
+    .index("by_type", ["type"]),
+
+  // -------------------------------------------------------------------------
+  // QC RULESETS (Configurable Check Definitions + Built-in Presets)
+  // -------------------------------------------------------------------------
+  qcRulesets: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+
+    name: v.string(),
+    description: v.optional(v.string()),
+    preset: v.optional(v.union(
+      v.literal("PRE_RELEASE"),
+      v.literal("POST_MERGE"),
+      v.literal("WEEKLY_HEALTH"),
+      v.literal("SECURITY_FOCUS"),
+      v.literal("CUSTOM")
+    )),
+
+    requiredDocs: v.array(v.string()),
+    coverageThresholds: v.object({
+      unit: v.number(),
+      integration: v.number(),
+      e2e: v.number(),
+    }),
+    securityPaths: v.array(v.string()),
+    gateDefinitions: v.array(v.object({
+      name: v.string(),
+      condition: v.string(),
+      severity: v.string(),
+    })),
+    severityOverrides: v.optional(v.any()),
+
+    active: v.boolean(),
+    isBuiltIn: v.boolean(),
+
+    metadata: v.optional(v.any()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_project", ["projectId"])
+    .index("by_preset", ["preset"])
+    .index("by_active", ["active"]),
+
+  // -------------------------------------------------------------------------
+  // TEST RECORDINGS (Browser interaction capture sessions)
+  // -------------------------------------------------------------------------
+  testRecordings: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    sessionId: v.string(),
+    userId: v.string(),
+    url: v.optional(v.string()),
+    status: v.union(
+      v.literal("RECORDING"),
+      v.literal("COMPLETED"),
+      v.literal("FAILED"),
+      v.literal("CANCELED")
+    ),
+    events: v.array(v.any()),
+    playwrightCode: v.optional(v.array(v.string())),
+    gherkinScenario: v.optional(v.string()),
+    screenshotUrls: v.optional(v.array(v.string())),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_project", ["projectId"])
+    .index("by_status", ["status"])
+    .index("by_user", ["userId"]),
+
+  // -------------------------------------------------------------------------
+  // TEST SUITES (API/UI/Hybrid suite definitions)
+  // -------------------------------------------------------------------------
+  testSuites: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    suiteId: v.string(),
+    name: v.string(),
+    description: v.optional(v.string()),
+    testType: v.union(
+      v.literal("api_functional"),
+      v.literal("api_integration"),
+      v.literal("ui_functional"),
+      v.literal("ui_e2e"),
+      v.literal("hybrid_workflow"),
+      v.literal("performance"),
+      v.literal("security")
+    ),
+    apiTests: v.optional(v.array(v.any())),
+    uiTests: v.optional(v.array(v.string())),
+    gherkinFeature: v.optional(v.string()),
+    executionMode: v.union(
+      v.literal("api_only"),
+      v.literal("ui_only"),
+      v.literal("hybrid"),
+      v.literal("auto_detect")
+    ),
+    retryEnabled: v.boolean(),
+    timeoutSeconds: v.number(),
+    tags: v.optional(v.array(v.string())),
+    createdBy: v.optional(v.string()),
+    status: v.union(
+      v.literal("DRAFT"),
+      v.literal("READY"),
+      v.literal("RUNNING"),
+      v.literal("PASSED"),
+      v.literal("FAILED")
+    ),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_suite", ["suiteId"])
+    .index("by_project", ["projectId"])
+    .index("by_type", ["testType"])
+    .index("by_status", ["status"]),
+
+  // -------------------------------------------------------------------------
+  // API COLLECTIONS (Postman/Bruno/SoapUI/OpenAPI imports)
+  // -------------------------------------------------------------------------
+  apiCollections: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    collectionId: v.string(),
+    name: v.string(),
+    collectionType: v.union(
+      v.literal("postman"),
+      v.literal("bruno"),
+      v.literal("soapui"),
+      v.literal("openapi")
+    ),
+    steps: v.array(v.any()),
+    importedBy: v.string(),
+    importedAt: v.number(),
+    totalSteps: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_collection", ["collectionId"])
+    .index("by_project", ["projectId"])
+    .index("by_type", ["collectionType"]),
+
+  // -------------------------------------------------------------------------
+  // EXECUTION RESULTS (API/UI/Hybrid execution outcomes)
+  // -------------------------------------------------------------------------
+  executionResults: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    resultId: v.string(),
+    executionType: v.union(
+      v.literal("api"),
+      v.literal("ui"),
+      v.literal("hybrid")
+    ),
+    suiteId: v.optional(v.id("testSuites")),
+    workflowId: v.optional(v.id("hybridWorkflows")),
+    jobId: v.optional(v.id("scheduledJobs")),
+    steps: v.array(v.any()),
+    totalTime: v.number(),
+    passed: v.number(),
+    failed: v.number(),
+    success: v.boolean(),
+    context: v.optional(v.any()),
+    executedAt: v.number(),
+    executedBy: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_result", ["resultId"])
+    .index("by_project", ["projectId"])
+    .index("by_type", ["executionType"])
+    .index("by_executed_at", ["executedAt"]),
+
+  // -------------------------------------------------------------------------
+  // FLAKY STEPS (Retry and reliability tracking)
+  // -------------------------------------------------------------------------
+  flakySteps: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    stepName: v.string(),
+    failureRatio: v.number(),
+    totalRuns: v.number(),
+    failedRuns: v.number(),
+    lastSeen: v.number(),
+    firstDetected: v.number(),
+    githubIssueNumber: v.optional(v.number()),
+    isActive: v.boolean(),
+    retryCount: v.number(),
+    avgResponseTimeMs: v.optional(v.number()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_step", ["stepName"])
+    .index("by_project", ["projectId"])
+    .index("by_active", ["isActive"]),
+
+  // -------------------------------------------------------------------------
+  // HYBRID WORKFLOWS (API + UI combined workflows)
+  // -------------------------------------------------------------------------
+  hybridWorkflows: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    workflowId: v.string(),
+    name: v.string(),
+    description: v.optional(v.string()),
+    apiSetupSteps: v.array(v.any()),
+    uiValidationSteps: v.array(v.string()),
+    executionMode: v.union(
+      v.literal("api_only"),
+      v.literal("ui_only"),
+      v.literal("hybrid"),
+      v.literal("auto_detect")
+    ),
+    stopOnFailure: v.boolean(),
+    timeoutSeconds: v.number(),
+    retryEnabled: v.boolean(),
+    createdBy: v.optional(v.string()),
+    active: v.boolean(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_workflow", ["workflowId"])
+    .index("by_project", ["projectId"])
+    .index("by_active", ["active"]),
+
+  // -------------------------------------------------------------------------
+  // CODEGEN REQUESTS (Prompt-driven code generation and PR metadata)
+  // -------------------------------------------------------------------------
+  codegenRequests: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    requestId: v.string(),
+    filePath: v.string(),
+    prompt: v.string(),
+    status: v.union(
+      v.literal("PENDING"),
+      v.literal("GENERATING"),
+      v.literal("COMPLETED"),
+      v.literal("FAILED")
+    ),
+    diff: v.optional(v.string()),
+    branchName: v.optional(v.string()),
+    commitHash: v.optional(v.string()),
+    prUrl: v.optional(v.string()),
+    requestedBy: v.string(),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+    error: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_request", ["requestId"])
+    .index("by_project", ["projectId"])
+    .index("by_status", ["status"]),
+
+  // -------------------------------------------------------------------------
+  // SCHEDULED JOBS (Cron-like recurring operations)
+  // -------------------------------------------------------------------------
+  scheduledJobs: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    jobId: v.string(),
+    name: v.string(),
+    jobType: v.union(
+      v.literal("test_suite"),
+      v.literal("qc_run"),
+      v.literal("workflow"),
+      v.literal("hybrid"),
+      v.literal("mission_prompt")
+    ),
+    cronExpression: v.string(),
+    nextRun: v.number(),
+    lastRun: v.optional(v.number()),
+    targetId: v.string(),
+    autoRerunFlaky: v.boolean(),
+    enabled: v.boolean(),
+    createdBy: v.string(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_job", ["jobId"])
+    .index("by_project", ["projectId"])
+    .index("by_enabled", ["enabled"])
+    .index("by_next_run", ["nextRun"]),
+
+  // -------------------------------------------------------------------------
+  // METRICS (Time-series operational metrics)
+  // -------------------------------------------------------------------------
+  metrics: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    metricName: v.string(),
+    metricType: v.union(
+      v.literal("counter"),
+      v.literal("gauge"),
+      v.literal("histogram")
+    ),
+    value: v.number(),
+    timestamp: v.number(),
+    labels: v.optional(v.any()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_name", ["metricName"])
+    .index("by_project", ["projectId"])
+    .index("by_timestamp", ["timestamp"]),
+
   // -------------------------------------------------------------------------
   // WORKFLOW METRICS (Aggregated Workflow Performance Stats)
   // -------------------------------------------------------------------------
@@ -1738,4 +2489,90 @@ export default defineSchema({
     .index("by_workflow", ["workflowId"])
     .index("by_project", ["projectId"])
     .index("by_period", ["periodStart", "periodEnd"]),
+
+  // -------------------------------------------------------------------------
+  // CONTENT DROPS (Agent-Submitted Deliverables)
+  // -------------------------------------------------------------------------
+  contentDrops: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+
+    agentId: v.optional(v.id("agents")),
+    taskId: v.optional(v.id("tasks")),
+
+    title: v.string(),
+    contentType: v.union(
+      v.literal("BLOG_POST"),
+      v.literal("SOCIAL_POST"),
+      v.literal("EMAIL_DRAFT"),
+      v.literal("SCRIPT"),
+      v.literal("REPORT"),
+      v.literal("CODE_SNIPPET"),
+      v.literal("DESIGN"),
+      v.literal("OTHER")
+    ),
+
+    content: v.string(),
+    summary: v.optional(v.string()),
+    fileUrl: v.optional(v.string()),
+
+    status: v.union(
+      v.literal("DRAFT"),
+      v.literal("SUBMITTED"),
+      v.literal("APPROVED"),
+      v.literal("REJECTED"),
+      v.literal("PUBLISHED")
+    ),
+
+    reviewedBy: v.optional(v.string()),
+    reviewedAt: v.optional(v.number()),
+    reviewNote: v.optional(v.string()),
+
+    tags: v.optional(v.array(v.string())),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_agent", ["agentId"])
+    .index("by_status", ["status"])
+    .index("by_task", ["taskId"])
+    .index("by_content_type", ["contentType"]),
+
+  // -------------------------------------------------------------------------
+  // REVENUE EVENTS (Stripe / External Revenue Tracking)
+  // -------------------------------------------------------------------------
+  revenueEvents: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+
+    source: v.union(
+      v.literal("STRIPE"),
+      v.literal("MANUAL"),
+      v.literal("OTHER")
+    ),
+    eventType: v.union(
+      v.literal("CHARGE"),
+      v.literal("SUBSCRIPTION"),
+      v.literal("REFUND"),
+      v.literal("PAYOUT"),
+      v.literal("OTHER")
+    ),
+
+    amount: v.number(),
+    currency: v.string(),
+    description: v.optional(v.string()),
+
+    customerId: v.optional(v.string()),
+    customerEmail: v.optional(v.string()),
+
+    externalId: v.optional(v.string()),
+    externalRef: v.optional(v.string()),
+
+    timestamp: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_source", ["source"])
+    .index("by_event_type", ["eventType"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_external_id", ["externalId"]),
 });

@@ -2,9 +2,13 @@ import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
-const SIDEBAR_WIDTH = 260;
-const SIDEBAR_COLLAPSED = 48;
+export const SIDEBAR_WIDTH = 260;
+export const SIDEBAR_COLLAPSED = 48;
 
 export function Sidebar({
   projectId,
@@ -15,6 +19,8 @@ export function Sidebar({
   onOpenStandup,
   onPauseSquad,
   onResumeSquad,
+  onAgentSelect,
+  onWidthChange,
 }: {
   projectId: Id<"projects"> | null;
   onOpenApprovals?: () => void;
@@ -24,6 +30,8 @@ export function Sidebar({
   onOpenStandup?: () => void;
   onPauseSquad?: () => void;
   onResumeSquad?: () => void;
+  onAgentSelect?: (agentId: Id<"agents">) => void;
+  onWidthChange?: (width: number) => void;
 }) {
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -42,53 +50,46 @@ export function Sidebar({
     window.localStorage.setItem("mc.sidebar_collapsed", collapsed ? "1" : "0");
   }, [collapsed]);
 
+  useEffect(() => {
+    onWidthChange?.(width);
+  }, [onWidthChange, width]);
+
   return (
     <aside
-      className="agents-sidebar"
-      style={{
-        width,
-        minWidth: width,
-        transition: "width 0.2s ease",
-      }}
+      className="flex flex-col border-r border-border bg-card shrink-0 overflow-hidden transition-[width] duration-200"
+      style={{ width, minWidth: width }}
     >
-      <div
-        style={{
-          padding: "12px 14px",
-          borderBottom: "1px solid #334155",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: collapsed ? "center" : "space-between",
-        }}
-      >
+      {/* Header */}
+      <div className={cn("px-3 py-3 border-b border-border flex items-center shrink-0", collapsed ? "justify-center" : "justify-between")}>
         {!collapsed && (
           <>
-            <span style={{ fontWeight: 700, fontSize: "0.8rem", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            <span className="font-semibold text-xs uppercase tracking-wider text-foreground">
               Agents
             </span>
-            <span className="agents-sidebar-count">{agentCount}</span>
+            <Badge variant="outline" className="text-xs px-1.5 py-0">
+              {agentCount}
+            </Badge>
           </>
         )}
         <button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#94a3b8",
-            cursor: "pointer",
-            padding: 4,
-            fontSize: "1rem",
-          }}
+          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {collapsed ? "→" : "←"}
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </button>
       </div>
+
       {!collapsed && (
         <>
-          <div className="agents-sidebar-actions">
-            <div className="agents-sidebar-actions-title">Quick Actions</div>
-            <div className="agents-sidebar-actions-grid">
+          {/* Quick Actions */}
+          <div className="px-3 py-3 shrink-0 border-b border-border">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+              Quick Actions
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 mb-2">
               {onOpenNotifications && <SidebarButton onClick={onOpenNotifications} label="Notifications" />}
               {onOpenApprovals && (
                 <SidebarButton
@@ -100,7 +101,7 @@ export function Sidebar({
               {onOpenStandup && <SidebarButton onClick={onOpenStandup} label="Standup" />}
               {onOpenPolicy && <SidebarButton onClick={onOpenPolicy} label="Policy" />}
             </div>
-            <div className="agents-sidebar-actions-critical">
+            <div className="flex flex-col gap-1.5">
               {onOpenOperatorControls && (
                 <SidebarButton onClick={onOpenOperatorControls} label="Controls" variant="warning" fullWidth />
               )}
@@ -112,23 +113,34 @@ export function Sidebar({
               )}
             </div>
           </div>
-          <div className="agents-sidebar-list">
-            {agents === undefined ? (
-              <div style={{ padding: 12, color: "#64748b", fontSize: "0.8rem" }}>Loading…</div>
-            ) : agents.length === 0 ? (
-              <div style={{ padding: 12, color: "#64748b", fontSize: "0.8rem" }}>No agents</div>
-            ) : (
-              agents.map((a: Doc<"agents">) => <AgentRow key={a._id} agent={a} />)
-            )}
-          </div>
+
+          {/* Agent List */}
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="py-1">
+              {agents === undefined ? (
+                <div className="p-3 text-muted-foreground text-sm">Loading...</div>
+              ) : agents.length === 0 ? (
+                <div className="p-3 text-muted-foreground text-sm">No agents</div>
+              ) : (
+                agents.map((a: Doc<"agents">) => (
+                  <AgentRow
+                    key={a._id}
+                    agent={a}
+                    onClick={onAgentSelect ? () => onAgentSelect(a._id) : undefined}
+                  />
+                ))
+              )}
+            </div>
+          </ScrollArea>
         </>
       )}
     </aside>
   );
 }
 
-function AgentRow({ agent }: { agent: Doc<"agents"> }) {
+function AgentRow({ agent, onClick }: { agent: Doc<"agents">; onClick?: () => void }) {
   const isActive = agent.status === "ACTIVE";
+  const statusLabel = isActive ? "Active" : "Not active";
   const roleShort =
     agent.role === "LEAD"
       ? "Lead"
@@ -139,18 +151,33 @@ function AgentRow({ agent }: { agent: Doc<"agents"> }) {
           : agent.role;
 
   return (
-    <div className="agent-row">
-      <span className="agent-row-avatar">{agent.emoji || agent.name.charAt(0)}</span>
-      <div className="agent-row-info">
-        <div className="agent-row-name">{agent.name}</div>
-        <div className="agent-row-role">{roleShort}</div>
+    <button
+      type="button"
+      className={cn(
+        "w-full flex items-center gap-3 px-3 py-2 text-left border-0 bg-transparent transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+        onClick ? "cursor-pointer hover:bg-muted/50" : "cursor-default"
+      )}
+      onClick={onClick}
+      aria-label={`${agent.name}, ${roleShort}, ${statusLabel}`}
+      disabled={!onClick}
+    >
+      <span className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm shrink-0">
+        {agent.emoji || agent.name.charAt(0)}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-foreground truncate">{agent.name}</div>
+        <div className="text-xs text-muted-foreground">{roleShort}</div>
       </div>
       <span
-        className={"agent-row-status " + (isActive ? "active" : "paused")}
+        className={cn(
+          "w-2 h-2 rounded-full shrink-0",
+          isActive ? "bg-emerald-500" : "bg-muted-foreground/40"
+        )}
         title={agent.status}
         aria-hidden
       />
-    </div>
+    </button>
   );
 }
 
@@ -167,18 +194,31 @@ function SidebarButton({
   variant?: "default" | "warning" | "danger" | "success";
   fullWidth?: boolean;
 }) {
+  const variantClasses: Record<string, string> = {
+    default: "bg-muted hover:bg-muted/80 text-foreground",
+    warning: "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20",
+    danger: "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20",
+    success: "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20",
+  };
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`sidebar-action-btn sidebar-action-btn-${variant}${fullWidth ? " full-width" : ""}`}
-    >
-      <span>{label}</span>
-      {badge && (
-        <span className="sidebar-action-badge">
-          {badge}
-        </span>
+      className={cn(
+        "px-3 py-2 rounded-md text-xs font-medium border border-border transition-colors cursor-pointer",
+        variantClasses[variant],
+        fullWidth ? "w-full" : "flex-1 min-w-0"
       )}
+    >
+      <span className="flex items-center justify-center gap-1.5">
+        {label}
+        {badge && (
+          <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 min-w-[18px] justify-center">
+            {badge}
+          </Badge>
+        )}
+      </span>
     </button>
   );
 }

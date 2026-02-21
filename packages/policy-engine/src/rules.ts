@@ -67,6 +67,7 @@ export const TOOL_RISK_MAP: ToolRiskMap = {
   web_search: "green",
   generate_draft: "green",
   analyze_data: "green",
+  qc_report: "green",
   
   // YELLOW: Potentially harmful, requires guardrails
   shell_exec: "yellow",
@@ -79,6 +80,7 @@ export const TOOL_RISK_MAP: ToolRiskMap = {
   install_deps: "yellow",
   modify_cron: "yellow",
   create_branch: "yellow",
+  qc_scan: "yellow",
   
   // RED: External impact, irreversible, secrets
   send_email: "red",

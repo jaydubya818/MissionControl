@@ -1,8 +1,14 @@
 import { CSSProperties } from "react";
 
 export type MainView =
+  | "home"
   | "tasks"
   | "agents"
+  | "directory"
+  | "policies"
+  | "deployments"
+  | "audit"
+  | "telemetry"
   | "dag"
   | "chat"
   | "council"
@@ -18,7 +24,36 @@ export type MainView =
   | "identity"
   | "telegraph"
   | "meetings"
-  | "voice";
+  | "voice"
+  | "content-pipeline"
+  | "crm"
+  | "command"
+  | "code"
+  | "recorder"
+  | "test-generation"
+  | "api-import"
+  | "execution"
+  | "flaky-steps"
+  | "hybrid-workflows"
+  | "schedule"
+  | "codegen"
+  | "gherkin"
+  | "metrics"
+  | "qc-dashboard"
+  | "qc-runs"
+  | "qc-config";
+
+/** Top-level command center sections */
+export type CommandSection =
+  | "home"
+  | "ops"
+  | "agents"
+  | "chat"
+  | "content"
+  | "comms"
+  | "knowledge"
+  | "code"
+  | "quality";
 
 interface TopNavProps {
   currentView: MainView;
@@ -35,6 +70,11 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: "tasks", label: "Tasks", shortcut: "1" },
   { id: "agents", label: "Agents" },
+  { id: "directory", label: "Directory" },
+  { id: "policies", label: "Policies" },
+  { id: "deployments", label: "Deployments" },
+  { id: "audit", label: "Audit" },
+  { id: "telemetry", label: "Telemetry" },
   { id: "dag", label: "DAG" },
   { id: "chat", label: "Chat", shortcut: "2" },
   { id: "council", label: "Council", shortcut: "3" },

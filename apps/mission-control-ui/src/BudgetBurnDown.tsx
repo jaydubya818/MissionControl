@@ -7,34 +7,21 @@
  *   - Alerts when agents approach or exceed budget
  */
 
-import { CSSProperties, useMemo } from "react";
+import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
 
 interface BudgetBurnDownProps {
   projectId: Id<"projects"> | null;
 }
 
-const colors = {
-  bgPage: "#0f172a",
-  bgCard: "#1e293b",
-  border: "#334155",
-  textPrimary: "#e2e8f0",
-  textSecondary: "#94a3b8",
-  textMuted: "#64748b",
-  accentBlue: "#3b82f6",
-  accentGreen: "#10b981",
-  accentOrange: "#f59e0b",
-  accentRed: "#ef4444",
-  accentPurple: "#8b5cf6",
-};
-
-function getSpendColor(ratio: number): string {
-  if (ratio >= 1) return colors.accentRed;
-  if (ratio >= 0.8) return colors.accentOrange;
-  if (ratio >= 0.5) return colors.accentBlue;
-  return colors.accentGreen;
+function getSpendClasses(ratio: number): { text: string; bg: string } {
+  if (ratio >= 1) return { text: "text-red-500", bg: "bg-red-500" };
+  if (ratio >= 0.8) return { text: "text-amber-500", bg: "bg-amber-500" };
+  if (ratio >= 0.5) return { text: "text-blue-500", bg: "bg-blue-500" };
+  return { text: "text-emerald-500", bg: "bg-emerald-500" };
 }
 
 function getStatusLabel(ratio: number): string {
@@ -64,12 +51,11 @@ export function BudgetBurnDown({ projectId }: BudgetBurnDownProps) {
         spendToday: spent,
         ratio,
         remaining: Math.max(0, daily - spent),
-        color: getSpendColor(ratio),
+        classes: getSpendClasses(ratio),
         statusLabel: getStatusLabel(ratio),
       };
     });
 
-    // Aggregate stats
     const totalBudget = agentBudgets.reduce((sum, a) => sum + a.budgetDaily, 0);
     const totalSpent = agentBudgets.reduce((sum, a) => sum + a.spendToday, 0);
     const activeCount = agentBudgets.filter((a) => a.status === "ACTIVE").length;
@@ -89,131 +75,92 @@ export function BudgetBurnDown({ projectId }: BudgetBurnDownProps) {
 
   if (!budgetData) {
     return (
-      <div style={styles.container}>
-        <div style={{ color: colors.textMuted, padding: 24 }}>Loading budget data...</div>
+      <div className="flex-1 overflow-auto p-6">
+        <div className="text-muted-foreground p-6">Loading budget data...</div>
       </div>
     );
   }
 
+  const totalClasses = getSpendClasses(budgetData.totalRatio);
+
   return (
-    <div style={styles.container}>
+    <div className="flex-1 overflow-auto p-6">
       {/* Header */}
-      <div style={styles.header}>
-        <h2 style={styles.title}>Budget Burn-Down</h2>
-        <p style={styles.subtitle}>Daily budget consumption across all agents</p>
+      <div className="mb-5">
+        <h2 className="text-foreground text-2xl font-bold">Budget Burn-Down</h2>
+        <p className="text-muted-foreground text-sm mt-1">Daily budget consumption across all agents</p>
       </div>
 
       {/* Aggregate Summary */}
-      <div style={styles.summaryRow}>
-        <SummaryCard
-          label="Total Budget"
-          value={`$${budgetData.totalBudget.toFixed(2)}`}
-          color={colors.textPrimary}
-        />
-        <SummaryCard
-          label="Total Spent"
-          value={`$${budgetData.totalSpent.toFixed(2)}`}
-          color={getSpendColor(budgetData.totalRatio)}
-        />
-        <SummaryCard
-          label="Remaining"
-          value={`$${Math.max(0, budgetData.totalBudget - budgetData.totalSpent).toFixed(2)}`}
-          color={colors.accentGreen}
-        />
-        <SummaryCard
-          label="Active Agents"
-          value={String(budgetData.activeCount)}
-          color={colors.accentBlue}
-        />
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2.5 mb-5">
+        <SummaryCard label="Total Budget" value={`$${budgetData.totalBudget.toFixed(2)}`} colorClass="text-foreground" />
+        <SummaryCard label="Total Spent" value={`$${budgetData.totalSpent.toFixed(2)}`} colorClass={totalClasses.text} />
+        <SummaryCard label="Remaining" value={`$${Math.max(0, budgetData.totalBudget - budgetData.totalSpent).toFixed(2)}`} colorClass="text-emerald-500" />
+        <SummaryCard label="Active Agents" value={String(budgetData.activeCount)} colorClass="text-blue-500" />
         {budgetData.overBudgetCount > 0 && (
-          <SummaryCard
-            label="Over Budget"
-            value={String(budgetData.overBudgetCount)}
-            color={colors.accentRed}
-          />
+          <SummaryCard label="Over Budget" value={String(budgetData.overBudgetCount)} colorClass="text-red-500" />
         )}
         {budgetData.warningCount > 0 && (
-          <SummaryCard
-            label="Warning"
-            value={String(budgetData.warningCount)}
-            color={colors.accentOrange}
-          />
+          <SummaryCard label="Warning" value={String(budgetData.warningCount)} colorClass="text-amber-500" />
         )}
       </div>
 
       {/* Aggregate Progress Bar */}
-      <div style={styles.aggregateBar}>
-        <div style={styles.aggregateLabel}>
-          <span style={{ color: colors.textPrimary, fontWeight: 600 }}>
+      <div className="bg-card border border-border rounded-xl p-4 mb-5">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-foreground font-semibold">
             Overall: {(budgetData.totalRatio * 100).toFixed(0)}% consumed
           </span>
-          <span style={{ color: colors.textMuted, fontSize: "0.8rem" }}>
+          <span className="text-muted-foreground text-sm">
             ${budgetData.totalSpent.toFixed(2)} / ${budgetData.totalBudget.toFixed(2)}
           </span>
         </div>
-        <div style={styles.progressTrack}>
+        <div className="relative h-3 bg-background rounded-md overflow-hidden">
           <div
-            style={{
-              ...styles.progressFill,
-              width: `${Math.min(budgetData.totalRatio * 100, 100)}%`,
-              background: getSpendColor(budgetData.totalRatio),
-            }}
+            className={cn("absolute top-0 left-0 h-full rounded-md transition-all duration-300", totalClasses.bg)}
+            style={{ width: `${Math.min(budgetData.totalRatio * 100, 100)}%` }}
           />
-          {/* Warning threshold line at 80% */}
-          <div style={styles.thresholdLine80} />
+          <div className="absolute top-0 bottom-0 w-0.5 bg-amber-500/50" style={{ left: "80%" }} />
         </div>
       </div>
 
       {/* Per-Agent Breakdown */}
-      <div style={styles.agentList}>
+      <div className="flex flex-col gap-2.5">
         {budgetData.agents.map((agent) => (
-          <div key={agent.id} style={styles.agentCard}>
-            <div style={styles.agentHeader}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontWeight: 600, color: colors.textPrimary }}>
-                  {agent.name}
+          <div key={agent.id} className="bg-card border border-border rounded-lg px-4 py-3">
+            <div className="flex justify-between items-center mb-2 flex-wrap gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-foreground">{agent.name}</span>
+                <span className="px-1.5 py-0.5 bg-background border border-border rounded text-[0.7rem] text-muted-foreground">
+                  {agent.role}
                 </span>
-                <span style={styles.roleBadge}>{agent.role}</span>
-                <span
-                  style={{
-                    ...styles.statusDot,
-                    background:
-                      agent.status === "ACTIVE"
-                        ? colors.accentGreen
-                        : agent.status === "PAUSED"
-                          ? colors.accentOrange
-                          : colors.textMuted,
-                  }}
-                />
+                <span className={cn(
+                  "w-2 h-2 rounded-full inline-block",
+                  agent.status === "ACTIVE" ? "bg-emerald-500"
+                    : agent.status === "PAUSED" ? "bg-amber-500"
+                    : "bg-slate-500"
+                )} />
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
-                  style={{
-                    ...styles.budgetLabel,
-                    color: agent.color,
-                  }}
-                >
+              <div className="flex items-center gap-2">
+                <span className={cn("text-xs font-semibold", agent.classes.text)}>
                   {agent.statusLabel}
                 </span>
-                <span style={{ color: colors.textSecondary, fontSize: "0.85rem" }}>
+                <span className="text-muted-foreground text-sm">
                   ${agent.spendToday.toFixed(2)} / ${agent.budgetDaily.toFixed(2)}
                 </span>
               </div>
             </div>
-            <div style={styles.progressTrackSmall}>
+            <div className="relative h-1.5 bg-background rounded-sm overflow-hidden">
               <div
-                style={{
-                  ...styles.progressFillSmall,
-                  width: `${Math.min(agent.ratio * 100, 100)}%`,
-                  background: agent.color,
-                }}
+                className={cn("absolute top-0 left-0 h-full rounded-sm transition-all duration-300", agent.classes.bg)}
+                style={{ width: `${Math.min(agent.ratio * 100, 100)}%` }}
               />
             </div>
-            <div style={styles.agentFooter}>
-              <span style={{ color: colors.textMuted, fontSize: "0.75rem" }}>
+            <div className="flex justify-between mt-1.5">
+              <span className="text-muted-foreground text-xs">
                 Remaining: ${agent.remaining.toFixed(2)}
               </span>
-              <span style={{ color: colors.textMuted, fontSize: "0.75rem" }}>
+              <span className="text-muted-foreground text-xs">
                 {(agent.ratio * 100).toFixed(0)}% used
               </span>
             </div>
@@ -222,8 +169,8 @@ export function BudgetBurnDown({ projectId }: BudgetBurnDownProps) {
       </div>
 
       {budgetData.agents.length === 0 && (
-        <div style={styles.emptyState}>
-          <p style={{ color: colors.textMuted }}>No agents found. Budget tracking will appear once agents are registered.</p>
+        <div className="text-center py-10 px-5 bg-card rounded-xl border border-border">
+          <p className="text-muted-foreground">No agents found. Budget tracking will appear once agents are registered.</p>
         </div>
       )}
     </div>
@@ -233,155 +180,16 @@ export function BudgetBurnDown({ projectId }: BudgetBurnDownProps) {
 function SummaryCard({
   label,
   value,
-  color,
+  colorClass,
 }: {
   label: string;
   value: string;
-  color: string;
+  colorClass: string;
 }) {
   return (
-    <div style={styles.summaryCard}>
-      <span style={{ fontSize: "0.7rem", color: colors.textMuted, display: "block" }}>
-        {label}
-      </span>
-      <span style={{ fontSize: "1.2rem", fontWeight: 700, color }}>
-        {value}
-      </span>
+    <div className="px-3.5 py-3 bg-card border border-border rounded-lg">
+      <span className="text-[0.7rem] text-muted-foreground block">{label}</span>
+      <span className={cn("text-xl font-bold", colorClass)}>{value}</span>
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  container: {
-    flex: 1,
-    overflow: "auto",
-    padding: "24px",
-  },
-  header: {
-    marginBottom: 20,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: "1.5rem",
-    fontWeight: 700,
-    margin: 0,
-  },
-  subtitle: {
-    color: colors.textMuted,
-    fontSize: "0.875rem",
-    margin: "4px 0 0",
-  },
-  summaryRow: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-    gap: 10,
-    marginBottom: 20,
-  },
-  summaryCard: {
-    padding: "12px 14px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 8,
-  },
-  aggregateBar: {
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 20,
-  },
-  aggregateLabel: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  progressTrack: {
-    position: "relative",
-    height: 12,
-    background: colors.bgPage,
-    borderRadius: 6,
-    overflow: "hidden",
-  },
-  progressFill: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    height: "100%",
-    borderRadius: 6,
-    transition: "width 0.3s ease",
-  },
-  thresholdLine80: {
-    position: "absolute",
-    left: "80%",
-    top: 0,
-    bottom: 0,
-    width: 2,
-    background: colors.accentOrange,
-    opacity: 0.5,
-  },
-  agentList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  },
-  agentCard: {
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 8,
-    padding: "12px 16px",
-  },
-  agentHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  roleBadge: {
-    padding: "2px 6px",
-    background: colors.bgPage,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 4,
-    fontSize: "0.7rem",
-    color: colors.textMuted,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: "50%",
-    display: "inline-block",
-  },
-  budgetLabel: {
-    fontSize: "0.75rem",
-    fontWeight: 600,
-  },
-  progressTrackSmall: {
-    position: "relative",
-    height: 6,
-    background: colors.bgPage,
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  progressFillSmall: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    height: "100%",
-    borderRadius: 3,
-    transition: "width 0.3s ease",
-  },
-  agentFooter: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginTop: 6,
-  },
-  emptyState: {
-    textAlign: "center" as const,
-    padding: "40px 20px",
-    background: colors.bgCard,
-    borderRadius: 10,
-    border: `1px solid ${colors.border}`,
-  },
-};

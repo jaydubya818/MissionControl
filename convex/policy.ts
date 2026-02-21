@@ -11,6 +11,10 @@ import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { classifyRisk, requiresApproval } from "./lib/riskClassifier";
 import { evaluateOperatorGate, getEffectiveOperatorControl } from "./lib/operatorControls";
+import { appendChangeRecord, appendOpEvent } from "./lib/armAudit";
+import { resolveAgentRef } from "./lib/agentResolver";
+import { evaluatePolicyEnvelopes, type ArmDecision } from "./lib/armPolicy";
+import { evaluateLegacyToolPolicy } from "./lib/legacyToolPolicy";
 
 // ============================================================================
 // ALLOWLIST HELPERS
@@ -427,6 +431,29 @@ export const evaluate = query({
         reason: "Agent not found" 
       };
     }
+    const riskForArm = args.toolName
+      ? classifyRisk(args.toolName, args.toolArgs as Record<string, unknown> | undefined)
+      : "GREEN";
+    const armDecision = await evaluatePolicyEnvelopes(ctx.db as any, {
+      tenantId: agent.tenantId,
+      projectId: agent.projectId,
+      versionId: (
+        await resolveAgentRef(
+          { db: ctx.db as any },
+          { agentId: args.agentId, createIfMissing: true }
+        )
+      )?.versionId,
+      toolName: args.toolName,
+      riskLevel: riskForArm,
+    });
+    if (armDecision) {
+      return {
+        decision: armDecision.decision,
+        reason: armDecision.reason,
+        riskLevel: riskForArm,
+        source: "ARM_POLICY_ENVELOPE",
+      };
+    }
 
     const operatorControl = await getEffectiveOperatorControl(ctx.db, agent.projectId);
     const operatorGate = evaluateOperatorGate({
@@ -595,6 +622,141 @@ export const evaluate = query({
     return {
       decision: "ALLOW",
       reason: "No policy rules triggered",
+    };
+  },
+});
+
+export const evaluateWithARM = mutation({
+  args: {
+    agentId: v.optional(v.id("agents")),
+    instanceId: v.optional(v.id("agentInstances")),
+    actionType: v.string(),
+    toolName: v.optional(v.string()),
+    toolArgs: v.optional(v.any()),
+    transitionTo: v.optional(v.string()),
+    estimatedCost: v.optional(v.number()),
+    context: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const resolved = args.instanceId
+      ? await resolveAgentRef(
+          { db: ctx.db as any },
+          { instanceId: args.instanceId, createIfMissing: false }
+        )
+      : args.agentId
+      ? await resolveAgentRef(
+          { db: ctx.db as any },
+          { agentId: args.agentId, createIfMissing: true }
+        )
+      : null;
+
+    const legacyAgentId = args.agentId ?? resolved?.legacyAgentId;
+    const legacyAgent = legacyAgentId ? await ctx.db.get(legacyAgentId) : null;
+    const resolvedInstance = resolved?.instanceId ? await ctx.db.get(resolved.instanceId) : null;
+    const effectiveTenantId = legacyAgent?.tenantId ?? resolvedInstance?.tenantId;
+    const risk = args.toolName
+      ? classifyRisk(args.toolName, args.toolArgs as Record<string, unknown> | undefined)
+      : "GREEN";
+
+    const envelopeDecision = await evaluatePolicyEnvelopes(ctx.db as any, {
+      tenantId: effectiveTenantId,
+      projectId: legacyAgent?.projectId,
+      versionId: resolved?.versionId,
+      toolName: args.toolName,
+      riskLevel: risk,
+    });
+    const activeLegacyPolicy =
+      !envelopeDecision && args.actionType === "TOOL_CALL" && args.toolName && legacyAgent
+        ? await ctx.db
+            .query("policies")
+            .withIndex("by_active", (q) => q.eq("active", true))
+            .first()
+        : null;
+    const legacyDecision =
+      !envelopeDecision && args.actionType === "TOOL_CALL" && args.toolName && legacyAgent
+        ? evaluateLegacyToolPolicy({
+            policy: activeLegacyPolicy,
+            agentRole: legacyAgent.role as "INTERN" | "SPECIALIST" | "LEAD" | "CEO",
+            budgetRemaining: Math.max(legacyAgent.budgetDaily - legacyAgent.spendToday, 0),
+            estimatedCost: args.estimatedCost ?? 0,
+            toolName: args.toolName,
+            toolArgs: args.toolArgs,
+          })
+        : null;
+
+    const fallback: { decision: ArmDecision; reason: string } = {
+      decision: "ALLOW",
+      reason: "No matching ARM envelope; caller may run legacy policy evaluate()",
+    };
+
+    const decision: ArmDecision =
+      envelopeDecision?.decision ?? legacyDecision?.decision ?? fallback.decision;
+    const reason: string =
+      envelopeDecision?.reason ?? legacyDecision?.reason ?? fallback.reason;
+
+    if (decision === "NEEDS_APPROVAL") {
+      await ctx.db.insert("approvalRecords", {
+        tenantId: effectiveTenantId,
+        projectId: legacyAgent?.projectId,
+        instanceId: resolved?.instanceId,
+        versionId: resolved?.versionId,
+        actionType: args.actionType,
+        riskLevel: risk,
+        justification: reason,
+        status: "PENDING",
+        requestedAt: Date.now(),
+      });
+    }
+
+    let changeRecordId: any = undefined;
+    if (decision === "DENY") {
+      changeRecordId = await appendChangeRecord(ctx.db as any, {
+        tenantId: effectiveTenantId,
+        projectId: legacyAgent?.projectId,
+        instanceId: resolved?.instanceId,
+        versionId: resolved?.versionId,
+        legacyAgentId,
+        type: "POLICY_DENIED",
+        summary: `Policy denied ${args.actionType}${args.toolName ? ` (${args.toolName})` : ""}`,
+        payload: {
+          reason,
+          actionType: args.actionType,
+          toolName: args.toolName,
+          risk,
+        },
+      });
+    }
+
+    await appendOpEvent(ctx.db as any, {
+      tenantId: effectiveTenantId,
+      projectId: legacyAgent?.projectId,
+      instanceId: resolved?.instanceId,
+      versionId: resolved?.versionId,
+      type:
+        decision === "DENY"
+          ? "TOOL_CALL_BLOCKED"
+          : decision === "ALLOW"
+          ? "TOOL_CALL_STARTED"
+          : "DECISION_MADE",
+      changeRecordId,
+      payload: {
+        decision,
+        reason,
+        actionType: args.actionType,
+        toolName: args.toolName,
+        risk,
+      },
+    });
+
+    return {
+      decision,
+      reason,
+      riskLevel: risk,
+      source: envelopeDecision
+        ? "ARM_POLICY_ENVELOPE"
+        : legacyDecision
+        ? "LEGACY_POLICY_FALLBACK"
+        : "LEGACY_POLICY",
     };
   },
 });

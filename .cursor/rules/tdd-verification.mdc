@@ -1,0 +1,36 @@
+---
+description: TDD, systematic debugging, and verification. Use when writing tests, debugging, or before marking work done.
+alwaysApply: false
+globs: "**/*.{test,spec}.{ts,tsx}", "**/__tests__/**", "packages/state-machine/**", "packages/policy-engine/**"
+---
+
+# TDD & Verification
+
+When writing tests or debugging, follow these practices.
+
+## Before Marking Work Done
+
+1. **Run the code** – Execute tests, build, or the dev server. Don't claim it works without verification.
+2. **Report results** – If something fails, say so. Don't hide breakage.
+3. **Fix before shipping** – Address failures before considering the task complete.
+
+## TDD Flow (New Code)
+
+1. **Red** – Write a failing test for the desired behavior.
+2. **Green** – Implement the minimum code to pass.
+3. **Refactor** – Clean up while keeping tests green.
+
+Use **Vitest** for this project. Co-locate tests with code or use `__tests__/` directories.
+
+## Systematic Debugging
+
+1. **Reproduce** – Identify exact steps or inputs that trigger the bug.
+2. **Isolate** – Narrow to the smallest unit (function, component) that reproduces it.
+3. **Hypothesize** – Form a specific hypothesis, then validate with a focused change or log.
+4. **Verify** – Confirm the fix and add a regression test when appropriate.
+
+## Test Coverage Priorities
+
+- **State machine** – Exhaustive transition tests for all 8 states.
+- **Policy engine** – Risk classification (GREEN/YELLOW/RED) for all tool types.
+- **Convex functions** – Validate inputs and error paths.

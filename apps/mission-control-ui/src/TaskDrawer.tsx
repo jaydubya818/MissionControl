@@ -1,8 +1,17 @@
 import { useMutation, useQuery } from "convex/react";
-import { createPortal } from "react-dom";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useState } from "react";
+import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 type Transition = Doc<"taskTransitions">;
 type Message = Doc<"messages">;
@@ -20,30 +29,72 @@ export function TaskDrawer({
   const agents = useQuery(api.agents.listAll, {});
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   const postMessage = useMutation(api.messages.post);
   const transitionTask = useMutation(api.tasks.transition);
 
   if (!taskId) return null;
 
-  if (data === undefined || agents === undefined) {
-    return (
-      <Drawer onClose={onClose}>
-        <div style={{ padding: 24 }}>Loading...</div>
-      </Drawer>
-    );
-  }
+  const isLoading = data === undefined || agents === undefined;
 
-  if (!data) {
-    return (
-      <Drawer onClose={onClose}>
-        <div style={{ padding: 24 }}>Task not found</div>
-      </Drawer>
-    );
-  }
+  return (
+    <Sheet open={!!taskId} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent side="right" className="w-[480px] max-w-[90vw] p-0 flex flex-col">
+        {isLoading ? (
+          <div className="p-6 text-sm text-muted-foreground">Loading...</div>
+        ) : !data ? (
+          <div className="p-6 text-sm text-muted-foreground">Task not found</div>
+        ) : (
+          <TaskDrawerContent
+            task={data.task}
+            transitions={data.transitions}
+            messages={data.messages}
+            agents={agents as Agent[]}
+            comment={comment}
+            setComment={setComment}
+            loading={loading}
+            setLoading={setLoading}
+            postMessage={postMessage}
+            transitionTask={transitionTask}
+            taskId={taskId}
+            onClose={onClose}
+          />
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
 
-  const { task, transitions, messages } = data;
-  const agentMap = new Map(agents.map((a: Agent) => [a._id, a]));
+function TaskDrawerContent({
+  task,
+  transitions,
+  messages,
+  agents,
+  comment,
+  setComment,
+  loading,
+  setLoading,
+  postMessage,
+  transitionTask,
+  taskId,
+  onClose,
+}: {
+  task: Doc<"tasks">;
+  transitions: Transition[];
+  messages: Message[];
+  agents: Agent[];
+  comment: string;
+  setComment: (v: string) => void;
+  loading: boolean;
+  setLoading: (v: boolean) => void;
+  postMessage: any;
+  transitionTask: any;
+  taskId: Id<"tasks">;
+  onClose: () => void;
+}) {
+  const agentMap = new Map<Id<"agents">, Agent>(
+    agents.map((a) => [a._id, a])
+  );
 
   const handlePostComment = async () => {
     if (!comment.trim()) return;
@@ -84,39 +135,35 @@ export function TaskDrawer({
     setLoading(false);
   };
 
-  // Build timeline from transitions and messages
   const timeline = buildTimeline(transitions, messages, agentMap);
 
   return (
-    <Drawer onClose={onClose}>
+    <>
       {/* Header */}
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid #334155" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>{task.title}</h2>
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <StatusBadge status={task.status} />
-              <span style={tagStyle}>{task.type}</span>
-              <span style={tagStyle}>P{task.priority}</span>
-            </div>
-          </div>
-          <button onClick={onClose} style={closeButtonStyle}>×</button>
+      <div className="px-5 py-4 border-b border-border">
+        <SheetHeader className="space-y-0">
+          <SheetTitle className="text-base font-semibold leading-snug">
+            {task.title}
+          </SheetTitle>
+        </SheetHeader>
+        <div className="flex gap-2 mt-2 flex-wrap">
+          <StatusBadge status={task.status} />
+          <Badge variant="outline" className="text-xs">{task.type}</Badge>
+          <Badge variant="outline" className="text-xs">P{task.priority}</Badge>
         </div>
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: "auto", padding: 20 }}>
-        {/* Description */}
+      <div className="flex-1 overflow-auto p-5 space-y-6">
         {task.description && (
           <Section title="Description">
-            <p style={{ margin: 0, color: "#cbd5e1", lineHeight: 1.5 }}>{task.description}</p>
+            <p className="text-sm text-foreground/80 leading-relaxed">{task.description}</p>
           </Section>
         )}
 
-        {/* Assignees */}
         {task.assigneeIds.length > 0 && (
           <Section title="Assignees">
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className="flex gap-2 flex-wrap">
               {task.assigneeIds.map((id: Id<"agents">) => {
                 const agent = agentMap.get(id) || ({} as Agent);
                 return agent._id ? (
@@ -127,155 +174,107 @@ export function TaskDrawer({
           </Section>
         )}
 
-        {/* Work Plan */}
         {task.workPlan && (
           <Section title="Work Plan">
-            <ul style={{ margin: 0, paddingLeft: 20, color: "#cbd5e1" }}>
+            <ul className="list-disc pl-5 text-sm text-foreground/80 space-y-1">
               {task.workPlan.bullets.map((b: string, i: number) => (
-                <li key={i} style={{ marginBottom: 4 }}>{b}</li>
+                <li key={i}>{b}</li>
               ))}
             </ul>
             {task.workPlan.estimatedCost && (
-              <div style={{ marginTop: 8, fontSize: "0.85rem", color: "#94a3b8" }}>
+              <p className="mt-2 text-xs text-muted-foreground">
                 Est. cost: ${task.workPlan.estimatedCost.toFixed(2)}
-              </div>
+              </p>
             )}
           </Section>
         )}
 
-        {/* Deliverable */}
         {task.deliverable && (
           <Section title="Deliverable">
             {task.deliverable.summary && (
-              <p style={{ margin: 0, color: "#cbd5e1" }}>{task.deliverable.summary}</p>
+              <p className="text-sm text-foreground/80">{task.deliverable.summary}</p>
             )}
             {task.deliverable.artifactIds && task.deliverable.artifactIds.length > 0 && (
-              <div style={{ marginTop: 8, display: "flex", gap: 4, flexWrap: "wrap" }}>
+              <div className="flex gap-1.5 flex-wrap mt-2">
                 {task.deliverable.artifactIds.map((id: string, i: number) => (
-                  <span key={i} style={{ ...tagStyle, background: "#1e3a5f", color: "#93c5fd" }}>
+                  <Badge key={i} variant="secondary" className="text-xs gap-1">
                     📎 {id}
-                  </span>
+                  </Badge>
                 ))}
               </div>
             )}
           </Section>
         )}
 
-        {/* Blocked reason */}
         {task.blockedReason && (
           <Section title="Blocked">
-            <div style={{ padding: 12, background: "#7f1d1d", borderRadius: 6, color: "#fca5a5" }}>
+            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
               ⚠️ {task.blockedReason}
             </div>
           </Section>
         )}
 
-        {/* Quick Actions */}
         <Section title="Actions">
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div className="flex gap-2 flex-wrap">
             {getAvailableTransitions(task.status).map((toStatus: TaskStatus) => (
-              <button
+              <Button
                 key={toStatus}
+                variant="outline"
+                size="sm"
                 onClick={() => handleTransition(toStatus)}
                 disabled={loading}
-                style={actionButtonStyle}
               >
                 → {toStatus.replace("_", " ")}
-              </button>
+              </Button>
             ))}
           </div>
         </Section>
 
-        {/* Timeline */}
         <Section title="Timeline">
-          <div style={{ position: "relative" }}>
+          <div className="relative">
             {timeline.map((item, i) => (
               <TimelineItem key={i} item={item} isLast={i === timeline.length - 1} />
             ))}
             {timeline.length === 0 && (
-              <div style={{ color: "#64748b", fontSize: "0.85rem" }}>No activity yet</div>
+              <p className="text-xs text-muted-foreground">No activity yet</p>
             )}
           </div>
         </Section>
 
-        {/* Add Comment */}
         <Section title="Add Comment">
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Write a comment..."
-            style={{
-              width: "100%",
-              minHeight: 80,
-              padding: 12,
-              background: "#0f172a",
-              border: "1px solid #334155",
-              borderRadius: 6,
-              color: "#e2e8f0",
-              fontSize: "0.875rem",
-              resize: "vertical",
-            }}
+            className="w-full min-h-[80px] p-3 bg-background border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-ring"
           />
-          <button
+          <Button
+            size="sm"
             onClick={handlePostComment}
             disabled={loading || !comment.trim()}
-            style={{ ...actionButtonStyle, marginTop: 8, opacity: loading || !comment.trim() ? 0.5 : 1 }}
+            className="mt-2"
           >
             {loading ? "Posting..." : "Post Comment"}
-          </button>
+          </Button>
         </Section>
       </div>
 
       {/* Footer */}
-      <div style={{ padding: "12px 20px", borderTop: "1px solid #334155", fontSize: "0.75rem", color: "#64748b" }}>
+      <div className="px-5 py-3 border-t border-border text-xs text-muted-foreground">
         Cost: ${task.actualCost.toFixed(2)}
         {task.estimatedCost && ` / $${task.estimatedCost.toFixed(2)}`}
         {" · "}
         Review cycles: {task.reviewCycles}
         {task.completedAt && ` · Completed: ${new Date(task.completedAt).toLocaleDateString()}`}
       </div>
-    </Drawer>
-  );
-}
-
-function Drawer({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return createPortal(
-    <>
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.5)",
-          zIndex: 9990,
-        }}
-      />
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: 480,
-          maxWidth: "90vw",
-          background: "#1e293b",
-          borderLeft: "1px solid #334155",
-          display: "flex",
-          flexDirection: "column",
-          zIndex: 9991,
-        }}
-      >
-        {children}
-      </div>
-    </>,
-    document.body
+    </>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 24 }}>
-      <h3 style={{ margin: "0 0 12px", fontSize: "0.85rem", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+    <div>
+      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
         {title}
       </h3>
       {children}
@@ -283,31 +282,31 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  INBOX: "secondary",
+  ASSIGNED: "outline",
+  IN_PROGRESS: "default",
+  REVIEW: "outline",
+  NEEDS_APPROVAL: "destructive",
+  BLOCKED: "destructive",
+  DONE: "default",
+  CANCELED: "secondary",
+};
+
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, { bg: string; color: string }> = {
-    INBOX: { bg: "#312e81", color: "#a5b4fc" },
-    ASSIGNED: { bg: "#78350f", color: "#fcd34d" },
-    IN_PROGRESS: { bg: "#1e3a8a", color: "#93c5fd" },
-    REVIEW: { bg: "#4c1d95", color: "#c4b5fd" },
-    NEEDS_APPROVAL: { bg: "#7f1d1d", color: "#fca5a5" },
-    BLOCKED: { bg: "#7c2d12", color: "#fed7aa" },
-    DONE: { bg: "#14532d", color: "#86efac" },
-    CANCELED: { bg: "#27272a", color: "#a1a1aa" },
-  };
-  const style = colors[status] || colors.INBOX;
   return (
-    <span style={{ ...tagStyle, background: style.bg, color: style.color, fontWeight: 600 }}>
+    <Badge variant={STATUS_VARIANTS[status] || "secondary"} className="text-xs">
       {status.replace("_", " ")}
-    </span>
+    </Badge>
   );
 }
 
 function AgentChip({ agent }: { agent: Agent }) {
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "#334155", borderRadius: 16, fontSize: "0.8rem" }}>
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-muted rounded-full text-xs text-foreground">
       <span>{agent.emoji || "🤖"}</span>
       <span>{agent.name}</span>
-      <span style={{ fontSize: "0.7rem", color: "#94a3b8" }}>{agent.role}</span>
+      <span className="text-muted-foreground">{agent.role}</span>
     </span>
   );
 }
@@ -355,27 +354,24 @@ function buildTimeline(
 function TimelineItem({ item, isLast }: { item: TimelineEntry; isLast: boolean }) {
   const isTransition = item.type === "transition";
   return (
-    <div style={{ display: "flex", gap: 12, marginBottom: isLast ? 0 : 16 }}>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+    <div className={cn("flex gap-3", !isLast && "mb-4")}>
+      <div className="flex flex-col items-center">
         <div
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: isTransition ? "#3b82f6" : "#22c55e",
-            flexShrink: 0,
-          }}
+          className={cn(
+            "w-2.5 h-2.5 rounded-full shrink-0",
+            isTransition ? "bg-primary" : "bg-emerald-500"
+          )}
         />
-        {!isLast && <div style={{ width: 2, flex: 1, background: "#334155", marginTop: 4 }} />}
+        {!isLast && <div className="w-0.5 flex-1 bg-border mt-1" />}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginBottom: 2 }}>
-          <strong>{item.actor}</strong>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-muted-foreground mb-0.5">
+          <strong className="text-foreground">{item.actor}</strong>
           {" · "}
           {new Date(item.timestamp).toLocaleString()}
-          {item.details && <span style={{ marginLeft: 8, color: "#64748b" }}>{item.details}</span>}
+          {item.details && <span className="ml-2 text-muted-foreground/60">{item.details}</span>}
         </div>
-        <div style={{ fontSize: "0.85rem", color: "#e2e8f0", whiteSpace: "pre-wrap" }}>
+        <div className="text-sm text-foreground/80 whitespace-pre-wrap">
           {isTransition ? `Status changed: ${item.content}` : item.content}
         </div>
       </div>
@@ -397,31 +393,3 @@ function getAvailableTransitions(currentStatus: TaskStatus): TaskStatus[] {
   };
   return transitions[currentStatus];
 }
-
-const tagStyle: React.CSSProperties = {
-  fontSize: "0.7rem",
-  padding: "2px 8px",
-  background: "#334155",
-  color: "#94a3b8",
-  borderRadius: 4,
-};
-
-const closeButtonStyle: React.CSSProperties = {
-  background: "none",
-  border: "none",
-  color: "#94a3b8",
-  fontSize: "1.5rem",
-  cursor: "pointer",
-  padding: 4,
-  lineHeight: 1,
-};
-
-const actionButtonStyle: React.CSSProperties = {
-  padding: "6px 12px",
-  background: "#334155",
-  border: "1px solid #475569",
-  borderRadius: 6,
-  color: "#e2e8f0",
-  fontSize: "0.8rem",
-  cursor: "pointer",
-};

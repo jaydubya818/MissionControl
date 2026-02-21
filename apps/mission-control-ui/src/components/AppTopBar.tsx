@@ -22,8 +22,16 @@ import {
   User,
   Moon,
   Sun,
+  Bell,
+  Shield,
+  Bot,
+  Sparkles,
+  Target,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import type { Id } from "../../../../convex/_generated/dataModel";
 
 interface AppTopBarProps {
   projectSwitcher: React.ReactNode;
@@ -32,6 +40,8 @@ interface AppTopBarProps {
   taskCount: number;
   timeStr: string;
   dateStr: string;
+  pendingApprovals?: number;
+  projectId?: Id<"projects"> | null;
   onNewTask: () => void;
   onOpenControls: () => void;
   onOpenCommandPalette: () => void;
@@ -43,6 +53,11 @@ interface AppTopBarProps {
   onOpenDashboardOverview: () => void;
   onOpenActivityFeed: () => void;
   onOpenKeyboardHelp: () => void;
+  onOpenApprovals?: () => void;
+  onOpenNotifications?: () => void;
+  onOpenAgentsFlyout?: () => void;
+  onOpenMissionModal?: () => void;
+  onOpenSuggestionsDrawer?: () => void;
 }
 
 export function AppTopBar({
@@ -52,6 +67,8 @@ export function AppTopBar({
   taskCount,
   timeStr,
   dateStr,
+  pendingApprovals = 0,
+  projectId,
   onNewTask,
   onOpenControls,
   onOpenCommandPalette,
@@ -63,11 +80,18 @@ export function AppTopBar({
   onOpenDashboardOverview,
   onOpenActivityFeed,
   onOpenKeyboardHelp,
+  onOpenApprovals,
+  onOpenNotifications,
+  onOpenAgentsFlyout,
+  onOpenMissionModal,
+  onOpenSuggestionsDrawer,
 }: AppTopBarProps) {
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     return window.localStorage.getItem("mc.theme") || "dark";
   });
+
+  const missionData = useQuery(api.mission.getMission, projectId ? { projectId } : {});
 
   useEffect(() => {
     const root = document.documentElement;
@@ -100,17 +124,86 @@ export function AppTopBar({
         </Button>
       </div>
 
-      {/* Center: metrics */}
-      <div className="hidden md:flex items-center gap-4 text-xs font-medium text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          {activeCount} Active
-        </span>
-        <span>{taskCount} Tasks</span>
+      {/* Center: mission + metrics */}
+      <div className="hidden lg:flex items-center gap-4">
+        {missionData?.missionStatement && (
+          <>
+            <div className="flex items-center gap-2 max-w-[400px] px-3 py-1.5 bg-muted border border-border rounded-md">
+              <Target className="h-3 w-3 text-muted-foreground shrink-0" strokeWidth={1.5} />
+              <span className="text-xs text-foreground/80 truncate">
+                {missionData.missionStatement}
+              </span>
+            </div>
+            {onOpenSuggestionsDrawer && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                onClick={onOpenSuggestionsDrawer}
+                title="Generate mission-aligned tasks"
+              >
+                <Sparkles className="h-3 w-3" strokeWidth={1.5} />
+              </Button>
+            )}
+          </>
+        )}
+        <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            {activeCount} Active
+          </span>
+          <span>{taskCount} Tasks</span>
+        </div>
       </div>
 
       {/* Right: actions */}
       <div className="flex items-center gap-1.5">
+        {/* Agents flyout toggle */}
+        {onOpenAgentsFlyout && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-muted-foreground"
+            onClick={onOpenAgentsFlyout}
+            aria-label="Open agents panel"
+          >
+            <Bot className="h-3.5 w-3.5 mr-1" />
+            <span className="hidden lg:inline">Agents</span>
+          </Button>
+        )}
+
+        {/* Approvals */}
+        {onOpenApprovals && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-muted-foreground relative"
+            onClick={onOpenApprovals}
+            aria-label={`Approvals${pendingApprovals > 0 ? ` (${pendingApprovals} pending)` : ""}`}
+          >
+            <Shield className="h-3.5 w-3.5 mr-1" />
+            <span className="hidden lg:inline">Approvals</span>
+            {pendingApprovals > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold">
+                {pendingApprovals}
+              </span>
+            )}
+          </Button>
+        )}
+
+        {/* Notifications / Alerts */}
+        {onOpenNotifications && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground"
+            onClick={onOpenNotifications}
+            aria-label="Notifications"
+          >
+            <Bell className="h-3.5 w-3.5" />
+          </Button>
+        )}
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground">

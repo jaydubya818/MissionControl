@@ -6,7 +6,8 @@
 
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
-import { Doc, Id } from "./_generated/dataModel";
+import { appendOpEvent } from "./lib/armAudit";
+import { resolveAgentRef } from "./lib/agentResolver";
 
 // ============================================================================
 // HELPERS
@@ -183,6 +184,17 @@ export const start = mutation({
       initialInput: args.initialInput,
       startedAt: now,
     });
+    await appendOpEvent(ctx.db as any, {
+      tenantId: undefined,
+      projectId: args.projectId,
+      workflowRunId: id,
+      type: "WORKFLOW_STEP_STARTED",
+      payload: {
+        runId,
+        workflowId: args.workflowId,
+        stepIndex: 0,
+      },
+    });
     
     // Log activity
     await ctx.db.insert("activities", {
@@ -248,7 +260,57 @@ export const updateStep = internalMutation({
     };
     
     await ctx.db.patch(run._id, { steps });
-    
+    const instanceRef = args.agentId
+      ? await resolveAgentRef({ db: ctx.db as any }, { agentId: args.agentId, createIfMissing: true })
+      : null;
+    if (args.status === "RUNNING") {
+      await appendOpEvent(ctx.db as any, {
+        tenantId: run.tenantId,
+        projectId: run.projectId,
+        workflowRunId: run._id,
+        taskId: args.taskId,
+        instanceId: instanceRef?.instanceId,
+        versionId: instanceRef?.versionId,
+        type: "WORKFLOW_STEP_STARTED",
+        payload: {
+          runId: args.runId,
+          stepIndex: args.stepIndex,
+          stepId: step.stepId,
+        },
+      });
+    } else if (args.status === "DONE") {
+      await appendOpEvent(ctx.db as any, {
+        tenantId: run.tenantId,
+        projectId: run.projectId,
+        workflowRunId: run._id,
+        taskId: args.taskId,
+        instanceId: instanceRef?.instanceId,
+        versionId: instanceRef?.versionId,
+        type: "WORKFLOW_STEP_COMPLETED",
+        payload: {
+          runId: args.runId,
+          stepIndex: args.stepIndex,
+          stepId: step.stepId,
+        },
+      });
+    } else if (args.status === "FAILED") {
+      await appendOpEvent(ctx.db as any, {
+        tenantId: run.tenantId,
+        projectId: run.projectId,
+        workflowRunId: run._id,
+        taskId: args.taskId,
+        instanceId: instanceRef?.instanceId,
+        versionId: instanceRef?.versionId,
+        type: "WORKFLOW_STEP_FAILED",
+        payload: {
+          runId: args.runId,
+          stepIndex: args.stepIndex,
+          stepId: step.stepId,
+          error: args.error,
+        },
+      });
+    }
+
     return { success: true };
   },
 });

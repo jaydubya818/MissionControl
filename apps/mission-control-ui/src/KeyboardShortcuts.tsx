@@ -10,6 +10,7 @@ interface KeyboardShortcutsProps {
   onAgents: () => void;
   onGoToBoard?: () => void;
   onShowHelp?: () => void;
+  onMission?: () => void;
 }
 
 export function useKeyboardShortcuts({
@@ -19,6 +20,7 @@ export function useKeyboardShortcuts({
   onAgents,
   onGoToBoard,
   onShowHelp,
+  onMission,
 }: KeyboardShortcutsProps) {
   const pendingGRef = useRef(false);
   const gTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,6 +60,10 @@ export function useKeyboardShortcuts({
             e.preventDefault();
             onAgents();
             return;
+          case "m":
+            e.preventDefault();
+            onMission?.();
+            return;
         }
         return;
       }
@@ -96,7 +102,7 @@ export function useKeyboardShortcuts({
       window.removeEventListener("keydown", handleKeyDown);
       if (gTimerRef.current) clearTimeout(gTimerRef.current);
     };
-  }, [onNewTask, onSearch, onApprovals, onAgents, onGoToBoard, onShowHelp]);
+  }, [onNewTask, onSearch, onApprovals, onAgents, onGoToBoard, onShowHelp, onMission]);
 }
 
 const shortcutGroups = [
@@ -115,6 +121,7 @@ const shortcutGroups = [
       { keys: ["⌘", "K"], description: "Open command palette" },
       { keys: ["⇧", "⌘", "A"], description: "View approvals" },
       { keys: ["⌘", "E"], description: "View agents" },
+      { keys: ["⌘", "M"], description: "Edit mission statement" },
     ],
   },
   {

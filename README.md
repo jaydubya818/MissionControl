@@ -31,10 +31,11 @@ flowchart LR
 
 Deterministic, multi-agent workflows with automatic retries and human escalation:
 
-- **3 Built-in Workflows**:
+- **4 Built-in Workflows**:
   - `feature-dev` (7 agents): plan → setup → implement → verify → test → PR → review
   - `bug-fix` (6 agents): triage → investigate → setup → fix → verify → PR
   - `security-audit` (7 agents): scan → prioritize → setup → fix → verify → test → PR
+  - `code-review` (4 agents): analyze → security → style → approve
 
 - **Core Principles**:
   - Deterministic execution (same steps, same order, every time)
@@ -43,10 +44,18 @@ Deterministic, multi-agent workflows with automatic retries and human escalation
   - Automatic retry with exponential backoff
   - Escalation to human approval when retries exhausted
 
-- **YAML-based Definitions**: Define custom workflows in `workflows/*.yaml`
-- **Real-time Dashboard**: Monitor workflow progress with step-by-step status
-- **Context Passing**: Mustache-style `{{variables}}` for inter-step communication
-- **Status Markers**: Explicit "STATUS: done" completion signals
+- **Complete System**:
+  - YAML-based workflow definitions (`workflows/*.yaml`)
+  - Real-time dashboard with step-by-step progress
+  - Standalone executor with PM2 support
+  - CLI for workflow management (`mc workflow`)
+  - Performance metrics and analytics
+  - Bottleneck detection
+  - Context passing via `{{variables}}`
+  - Status markers ("STATUS: done")
+
+- **Testing**: Comprehensive test suite for renderer, parser, and loader
+- **Monitoring**: Metrics dashboard tracking success rates, durations, retries, escalations
 
 See [docs/WORKFLOWS.md](docs/WORKFLOWS.md) for full documentation.
 
@@ -142,11 +151,27 @@ npx convex dev
 pnpm --filter mission-control-ui dev
 ```
 
+### ARM Migration Validation (UI)
+
+Once both servers are running, open `http://127.0.0.1:5173`.
+
+1. Open `ARM -> Directory`.
+2. Click `Seed Mission Control Demo` to load dense cross-section demo data.
+3. Click `Run Instance Ref Backfill` to populate legacy `agentId` mappings to ARM `instanceId`/`versionId`.
+4. Click `Run Tenant Backfill` to populate missing `tenantId` values on legacy records.
+5. Confirm migration counters in the `Migration Ops` panel move toward zero for missing refs and tenant gaps.
+6. Validate ARM views:
+   - `ARM -> Policies`
+   - `ARM -> Deployments`
+   - `ARM -> Audit`
+   - `ARM -> Telemetry`
+
 ### Environment Variables
 
 | Variable | Required | Description |
 |---|---|---|
 | `CONVEX_DEPLOYMENT` | Yes | Convex deployment URL |
+| `ARM_COMPAT_MODE` | Recommended | `true` keeps legacy-pref read compatibility; set `false` only after ARM cutover soak |
 | `ELEVENLABS_API_KEY` | For voice | ElevenLabs API key for TTS synthesis |
 | `TELEGRAM_BOT_TOKEN` | For Telegram | Telegram bot token for Telegraph Telegram bridge |
 | `TELEGRAM_CHAT_ID` | For Telegram | Default Telegram chat ID for notifications |
@@ -155,6 +180,7 @@ Create a `.env` file in the project root:
 
 ```env
 CONVEX_DEPLOYMENT=your-deployment-url
+ARM_COMPAT_MODE=true
 ELEVENLABS_API_KEY=your-elevenlabs-key
 TELEGRAM_BOT_TOKEN=your-bot-token
 TELEGRAM_CHAT_ID=your-chat-id
@@ -184,13 +210,15 @@ Enforcement layers:
 MissionControl/
 ├── apps/
 │   ├── mission-control-ui/    # React 18 + Vite frontend
-│   └── orchestration-server/  # Hono coordinator + agent runtime
+│   ├── orchestration-server/  # Hono coordinator + agent runtime
+│   └── workflow-executor/     # Standalone workflow executor (NEW)
 ├── convex/                    # Convex functions + schema (backend)
-│   ├── schema.ts              # 29+ tables (source of truth)
+│   ├── schema.ts              # 30+ tables (source of truth)
 │   ├── tasks.ts               # Task CRUD + state machine
 │   ├── agents.ts              # Agent registration + lifecycle
 │   ├── workflows.ts           # Workflow definitions (NEW)
 │   ├── workflowRuns.ts        # Workflow execution state (NEW)
+│   ├── workflowMetrics.ts     # Performance analytics (NEW)
 │   ├── identity.ts            # Identity/Soul governance
 │   ├── telegraph.ts           # Async messaging
 │   ├── voice.ts               # TTS synthesis
@@ -202,6 +230,7 @@ MissionControl/
 │   ├── state-machine/         # Transition validation
 │   ├── policy-engine/         # Risk classification + safety
 │   ├── workflow-engine/       # Multi-agent workflow execution (NEW)
+│   ├── cli/                   # mc workflow commands (NEW)
 │   ├── voice/                 # TTSProvider + ElevenLabs
 │   ├── telegraph/             # TelegraphProvider + internal/Telegram
 │   ├── meetings/              # MeetingProvider + Manual
@@ -215,13 +244,17 @@ MissionControl/
 ├── workflows/                 # Multi-agent workflow definitions (NEW)
 │   ├── feature-dev.yaml       # Feature development (7 agents)
 │   ├── bug-fix.yaml           # Bug fix (6 agents)
-│   └── security-audit.yaml    # Security audit (7 agents)
+│   ├── security-audit.yaml    # Security audit (7 agents)
+│   └── code-review.yaml       # Code review (4 agents) (NEW)
 ├── templates/                 # OpenClaw-derived templates
 │   ├── IDENTITY.md
 │   ├── SOUL.md
 │   └── TOOLS.md
 ├── agents/                    # Agent persona YAML files
 ├── docs/                      # Architecture, roadmap, plans
+├── scripts/                   # Setup and utility scripts
+│   ├── seed-workflows.ts      # Load workflows into Convex
+│   └── setup-workflows.sh     # Complete workflow setup (NEW)
 └── .github/workflows/         # CI pipeline
 ```
 
@@ -231,6 +264,10 @@ MissionControl/
 - **[Workflows](docs/WORKFLOWS.md) -- Multi-agent workflow orchestration (NEW)**
 - **[Workflows Quick Start](docs/WORKFLOWS_QUICKSTART.md) -- Get started in 5 minutes (NEW)**
 - **[Creating Workflows](docs/CREATING_WORKFLOWS.md) -- Custom workflow guide (NEW)**
+- **[Workflow Examples](docs/WORKFLOW_EXAMPLES.md) -- Practical workflow patterns (NEW)**
+- **[Workflow Executor](docs/WORKFLOW_EXECUTOR.md) -- Deployment guide (NEW)**
+- **[Workflow CLI](docs/WORKFLOW_CLI.md) -- Command-line interface (NEW)**
+- **[Workflow Metrics](docs/WORKFLOW_METRICS.md) -- Performance analytics (NEW)**
 - [OpenClaw Integration Map](docs/OPENCLAW_INTEGRATION_MAP.md) -- How MC connects to OpenClaw
 - [Plan vs Reality](docs/PLAN_VS_REALITY.md) -- Gap analysis
 - [Intelligence Layer Plan](docs/INTELLIGENCE_LAYER_PLAN.md) -- Control plane design

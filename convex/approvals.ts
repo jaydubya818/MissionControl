@@ -5,6 +5,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { logTaskEvent } from "./lib/taskEvents";
+import { appendChangeRecord, appendOpEvent } from "./lib/armAudit";
+import { resolveAgentRef } from "./lib/agentResolver";
 
 const approvalStatusValidator = v.union(
   v.literal("PENDING"),
@@ -259,9 +261,19 @@ export const request = mutation({
 
     const dualControlRequired = args.riskLevel.toUpperCase() === "RED";
     const expiresAt = Date.now() + (args.expiresInMinutes ?? 60) * 60 * 1000;
+    const requestor = await ctx.db.get(args.requestorAgentId);
+    const requestorRef = await resolveAgentRef(
+      { db: ctx.db as any },
+      { agentId: args.requestorAgentId, createIfMissing: true }
+    );
+    const requestorInstance = requestorRef?.instanceId
+      ? await ctx.db.get(requestorRef.instanceId)
+      : null;
+    const effectiveTenantId = requestor?.tenantId ?? requestorInstance?.tenantId;
 
     const approvalId = await ctx.db.insert("approvals", {
       projectId,
+      tenantId: effectiveTenantId,
       idempotencyKey: args.idempotencyKey,
       taskId: args.taskId,
       toolCallId: args.toolCallId,
@@ -279,9 +291,53 @@ export const request = mutation({
       decisionCount: 0,
       escalationLevel: 0,
     });
+    await ctx.db.insert("approvalRecords", {
+      tenantId: effectiveTenantId,
+      projectId,
+      instanceId: requestorRef?.instanceId,
+      versionId: requestorRef?.versionId,
+      legacyApprovalId: approvalId,
+      actionType: args.actionType,
+      riskLevel: args.riskLevel as any,
+      rollbackPlan: args.rollbackPlan,
+      justification: args.justification,
+      escalationLevel: 0,
+      status: "PENDING",
+      requestedAt: Date.now(),
+    });
+    const changeRecordId = await appendChangeRecord(ctx.db as any, {
+      tenantId: effectiveTenantId,
+      projectId,
+      instanceId: requestorRef?.instanceId,
+      versionId: requestorRef?.versionId,
+      legacyAgentId: args.requestorAgentId,
+      type: "APPROVAL_REQUESTED",
+      summary: `Approval requested: ${args.actionSummary}`,
+      payload: {
+        approvalId,
+        actionType: args.actionType,
+        riskLevel: args.riskLevel,
+      },
+      relatedTable: "approvals",
+      relatedId: approvalId,
+    });
+    await appendOpEvent(ctx.db as any, {
+      tenantId: effectiveTenantId,
+      projectId,
+      instanceId: requestorRef?.instanceId,
+      versionId: requestorRef?.versionId,
+      taskId: args.taskId,
+      type: "DECISION_MADE",
+      changeRecordId,
+      payload: {
+        stage: "REQUESTED",
+        approvalId,
+        actionType: args.actionType,
+      },
+    });
 
     // Log activity
-    const agent = await ctx.db.get(args.requestorAgentId);
+    const agent = requestor;
     await ctx.db.insert("activities", {
       projectId,
       actorType: "AGENT",
@@ -423,6 +479,17 @@ export const approve = mutation({
       decisionReason: args.reason,
       decisionCount: requiredDecisionCount > 1 ? 2 : 1,
     });
+    const approvalRecord = await ctx.db
+      .query("approvalRecords")
+      .withIndex("by_legacy_approval", (q) => q.eq("legacyApprovalId", args.approvalId))
+      .first();
+    if (approvalRecord) {
+      await ctx.db.patch(approvalRecord._id, {
+        status: "APPROVED",
+        decidedAt: now,
+        decisionReason: args.reason,
+      });
+    }
 
     // Log activity
     await ctx.db.insert("activities", {
@@ -454,6 +521,44 @@ export const approve = mutation({
         },
       });
     }
+    const requestorRef = await resolveAgentRef(
+      { db: ctx.db as any },
+      { agentId: approval.requestorAgentId, createIfMissing: true }
+    );
+    const requestorInstance = requestorRef?.instanceId
+      ? await ctx.db.get(requestorRef.instanceId)
+      : null;
+    const effectiveTenantId = approval.tenantId ?? requestorInstance?.tenantId;
+    const changeRecordId = await appendChangeRecord(ctx.db as any, {
+      tenantId: effectiveTenantId,
+      projectId: approval.projectId,
+      instanceId: requestorRef?.instanceId,
+      versionId: requestorRef?.versionId,
+      legacyAgentId: approval.requestorAgentId,
+      type: "APPROVAL_DECIDED",
+      summary: `Approval approved: ${approval.actionSummary}`,
+      payload: {
+        approvalId: args.approvalId,
+        decision: "APPROVED",
+        decidedByUserId: args.decidedByUserId,
+        decidedByAgentId: args.decidedByAgentId,
+      },
+      relatedTable: "approvals",
+      relatedId: args.approvalId,
+    });
+    await appendOpEvent(ctx.db as any, {
+      tenantId: effectiveTenantId,
+      projectId: approval.projectId,
+      instanceId: requestorRef?.instanceId,
+      versionId: requestorRef?.versionId,
+      taskId: approval.taskId ?? undefined,
+      type: "DECISION_MADE",
+      changeRecordId,
+      payload: {
+        stage: "APPROVED",
+        approvalId: args.approvalId,
+      },
+    });
 
     return { success: true, approval: await ctx.db.get(args.approvalId) };
   },
@@ -484,6 +589,17 @@ export const deny = mutation({
       decisionReason: args.reason,
       decisionCount: (approval.decisionCount ?? 0) + 1,
     });
+    const approvalRecord = await ctx.db
+      .query("approvalRecords")
+      .withIndex("by_legacy_approval", (q) => q.eq("legacyApprovalId", args.approvalId))
+      .first();
+    if (approvalRecord) {
+      await ctx.db.patch(approvalRecord._id, {
+        status: "DENIED",
+        decidedAt: Date.now(),
+        decisionReason: args.reason,
+      });
+    }
 
     // Log activity
     await ctx.db.insert("activities", {
@@ -511,6 +627,43 @@ export const deny = mutation({
         },
       });
     }
+    const requestorRef = await resolveAgentRef(
+      { db: ctx.db as any },
+      { agentId: approval.requestorAgentId, createIfMissing: true }
+    );
+    const requestorInstance = requestorRef?.instanceId
+      ? await ctx.db.get(requestorRef.instanceId)
+      : null;
+    const effectiveTenantId = approval.tenantId ?? requestorInstance?.tenantId;
+    const changeRecordId = await appendChangeRecord(ctx.db as any, {
+      tenantId: effectiveTenantId,
+      projectId: approval.projectId,
+      instanceId: requestorRef?.instanceId,
+      versionId: requestorRef?.versionId,
+      legacyAgentId: approval.requestorAgentId,
+      type: "APPROVAL_DECIDED",
+      summary: `Approval denied: ${approval.actionSummary}`,
+      payload: {
+        approvalId: args.approvalId,
+        decision: "DENIED",
+        reason: args.reason,
+      },
+      relatedTable: "approvals",
+      relatedId: args.approvalId,
+    });
+    await appendOpEvent(ctx.db as any, {
+      tenantId: effectiveTenantId,
+      projectId: approval.projectId,
+      instanceId: requestorRef?.instanceId,
+      versionId: requestorRef?.versionId,
+      taskId: approval.taskId ?? undefined,
+      type: "DECISION_MADE",
+      changeRecordId,
+      payload: {
+        stage: "DENIED",
+        approvalId: args.approvalId,
+      },
+    });
 
     return { success: true, approval: await ctx.db.get(args.approvalId) };
   },

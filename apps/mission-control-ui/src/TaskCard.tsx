@@ -2,6 +2,7 @@ import type { Doc } from "../../../convex/_generated/dataModel";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { QuickEditModal } from "./QuickEditModal";
+import { cn } from "@/lib/utils";
 
 interface TaskCardProps {
   task: Doc<"tasks">;
@@ -11,29 +12,29 @@ interface TaskCardProps {
   onUpdate?: () => void;
 }
 
+const PRIORITY_CLASSES: Record<number, { card: string }> = {
+  1: { card: "bg-orange-900 border-orange-600" },
+  2: { card: "bg-orange-900 border-orange-500" },
+  3: { card: "bg-slate-800 border-slate-600" },
+  4: { card: "bg-slate-900 border-slate-700" },
+};
+
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  INBOX: "bg-gray-500",
+  ASSIGNED: "bg-blue-500",
+  IN_PROGRESS: "bg-amber-500",
+  REVIEW: "bg-blue-500",
+  NEEDS_APPROVAL: "bg-red-500",
+  BLOCKED: "bg-red-600",
+  DONE: "bg-emerald-500",
+  CANCELED: "bg-slate-500",
+};
+
 export function TaskCard({ task, agents, onClick, isDragging, onUpdate }: TaskCardProps) {
   const [showQuickEdit, setShowQuickEdit] = useState(false);
   const assignedAgent = agents?.find(a => task.assigneeIds?.includes(a._id));
   
-  const priorityColors = {
-    1: { bg: "#7c2d12", border: "#ea580c", text: "#fbbf24" },
-    2: { bg: "#7c2d12", border: "#f97316", text: "#fb923c" },
-    3: { bg: "#1e293b", border: "#475569", text: "#94a3b8" },
-    4: { bg: "#0f172a", border: "#334155", text: "#64748b" },
-  };
-  
-  const statusColors = {
-    INBOX: "#6b7280",
-    ASSIGNED: "#3b82f6",
-    IN_PROGRESS: "#f59e0b",
-    REVIEW: "#8b5cf6",
-    NEEDS_APPROVAL: "#ef4444",
-    BLOCKED: "#dc2626",
-    DONE: "#10b981",
-    CANCELED: "#64748b",
-  };
-  
-  const colors = priorityColors[task.priority as keyof typeof priorityColors] || priorityColors[3];
+  const priorityClass = PRIORITY_CLASSES[task.priority as number] || PRIORITY_CLASSES[3];
   
   return (
     <>
@@ -49,111 +50,64 @@ export function TaskCard({ task, agents, onClick, isDragging, onUpdate }: TaskCa
           e.stopPropagation();
           setShowQuickEdit(true);
         }}
-        style={{
-        background: colors.bg,
-        border: `1px solid ${colors.border}`,
-        borderRadius: "8px",
-        padding: "12px",
-        marginBottom: "8px",
-        cursor: "pointer",
-        opacity: isDragging ? 0.5 : 1,
-        transition: "all 0.2s",
-      }}
+        className={cn(
+          "border rounded-lg p-3 mb-2 cursor-pointer transition-all",
+          priorityClass.card,
+          isDragging && "opacity-50"
+        )}
     >
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-          <span style={{
-            fontSize: "10px",
-            padding: "2px 6px",
-            borderRadius: "4px",
-            background: statusColors[task.status as keyof typeof statusColors],
-            color: "white",
-            fontWeight: 600,
-          }}>
+      <div className="flex justify-between mb-2">
+        <div className="flex gap-1.5 items-center">
+          <span className={cn(
+            "text-[10px] px-1.5 py-0.5 rounded text-white font-semibold",
+            STATUS_BADGE_CLASSES[task.status] || "bg-slate-500"
+          )}>
             {task.status}
           </span>
-          <span style={{
-            fontSize: "10px",
-            padding: "2px 6px",
-            borderRadius: "4px",
-            background: "#334155",
-            color: "#94a3b8",
-          }}>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-muted-foreground">
             P{task.priority}
           </span>
         </div>
-        <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+        <div className="flex gap-1 items-center">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setShowQuickEdit(true);
             }}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#64748b",
-              fontSize: "14px",
-              cursor: "pointer",
-              padding: "2px 4px",
-            }}
+            className="bg-transparent border-none text-muted-foreground text-sm cursor-pointer px-1 py-0.5 hover:text-foreground transition-colors"
             title="Edit task (or double-click card)"
           >
             ✏️
           </button>
-          <span style={{ fontSize: "10px", color: "#64748b" }}>
+          <span className="text-[10px] text-muted-foreground">
             {task._id.slice(-6)}
           </span>
         </div>
       </div>
 
-      {/* Title */}
-      <div style={{
-        fontSize: "14px",
-        fontWeight: 500,
-        color: "#e2e8f0",
-        marginBottom: "8px",
-        lineHeight: "1.4",
-      }}>
+      <div className="text-sm font-medium text-foreground mb-2 leading-snug">
         {task.title}
       </div>
 
-      {/* Description */}
       {task.description && (
-        <div style={{
-          fontSize: "12px",
-          color: "#94a3b8",
-          marginBottom: "8px",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          display: "-webkit-box",
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: "vertical",
-        }}>
+        <div className="text-xs text-muted-foreground mb-2 overflow-hidden line-clamp-2">
           {task.description}
         </div>
       )}
 
-      {/* Footer */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-          <span style={{ fontSize: "11px", color: "#64748b" }}>
+      <div className="flex justify-between items-center">
+        <div className="flex gap-1.5 items-center">
+          <span className="text-[11px] text-muted-foreground">
             {task.type}
           </span>
           {task.actualCost > 0 && (
-            <span style={{ fontSize: "11px", color: "#10b981" }}>
+            <span className="text-[11px] text-emerald-500">
               ${task.actualCost.toFixed(2)}
             </span>
           )}
         </div>
         {assignedAgent && (
-          <div style={{
-            fontSize: "11px",
-            padding: "3px 8px",
-            borderRadius: "12px",
-            background: "#334155",
-            color: "#e2e8f0",
-          }}>
+          <div className="text-[11px] px-2 py-0.5 rounded-full bg-slate-700 text-foreground">
             {assignedAgent.emoji || "🤖"} {assignedAgent.name}
           </div>
         )}

@@ -1,0 +1,33 @@
+---
+description: Clean up code without breaking behavior. Use when asked to simplify, refactor, or tidy recently modified code.
+alwaysApply: false
+globs: "**/*.{ts,tsx}"
+---
+
+# Code Simplifier
+
+When asked to **simplify**, **clean up**, **refactor**, or **tidy** code:
+
+## Rules
+
+1. **Preserve behavior** – No functional changes. Same inputs → same outputs.
+2. **Focus scope** – Prefer recently modified or in-context files. Don't spread changes unnecessarily.
+3. **Run first** – If tests or build exist, run them before and after. Report any breakage.
+4. **One concern per change** – Extract helpers, remove duplication, improve names. Avoid mixed cleanups.
+5. **Avoid over-engineering** – Simple and readable beats clever. Don't add abstractions unless they reduce complexity.
+
+## What to Do
+
+- Remove dead code and unused imports
+- Simplify conditionals (early returns, guard clauses)
+- Extract repeated logic into small helpers
+- Improve variable/function names for clarity
+- Reduce nesting (max 2–3 levels)
+- Drop redundant comments; keep docs that explain *why*
+
+## What NOT to Do
+
+- Change APIs, types, or function signatures without explicit request
+- Introduce new dependencies
+- Rewrite working code from scratch
+- Add premature optimizations

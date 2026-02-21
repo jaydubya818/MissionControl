@@ -12,6 +12,9 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
 import { evaluateOperatorGate, getEffectiveOperatorControl } from "./lib/operatorControls";
 import { sanitizeTaskTitle, sanitizeTaskDescription } from "./lib/sanitize";
+import { resolveAgentRef } from "./lib/agentResolver";
+import { appendChangeRecord } from "./lib/armAudit";
+import { preferInstanceRefs } from "./lib/armCompat";
 
 // ============================================================================
 // TYPES
@@ -21,7 +24,7 @@ export type TaskStatus =
   | "INBOX" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW" 
   | "NEEDS_APPROVAL" | "BLOCKED" | "FAILED" | "DONE" | "CANCELED";
 
-export type TaskSource = "DASHBOARD" | "TELEGRAM" | "GITHUB" | "AGENT" | "API" | "TRELLO" | "SEED";
+export type TaskSource = "DASHBOARD" | "TELEGRAM" | "GITHUB" | "AGENT" | "API" | "TRELLO" | "SEED" | "MISSION_PROMPT";
 export type TaskCreator = "HUMAN" | "AGENT" | "SYSTEM";
 
 export type TaskType = 
@@ -117,6 +120,24 @@ function findTransitionRule(from: TaskStatus, to: TaskStatus): TransitionRule | 
   return TRANSITION_RULES.find(r => r.from === from && r.to === to);
 }
 
+async function resolveAssigneeInstanceIds(
+  ctx: any,
+  assigneeIds: Id<"agents">[]
+): Promise<Id<"agentInstances">[]> {
+  const resolved = await Promise.all(
+    assigneeIds.map((agentId) =>
+      resolveAgentRef(
+        { db: ctx.db as any },
+        { agentId, createIfMissing: true }
+      )
+    )
+  );
+
+  return resolved
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+    .map((entry) => entry.instanceId);
+}
+
 // ============================================================================
 // QUERIES
 // ============================================================================
@@ -210,9 +231,18 @@ export const listByAgent = query({
   },
   handler: async (ctx, args) => {
     const tasks = await ctx.db.query("tasks").collect();
-    return tasks.filter(task =>
-      task.assigneeIds && task.assigneeIds.includes(args.agentId)
-    );
+    if (preferInstanceRefs()) {
+      const resolved = await resolveAgentRef(
+        { db: ctx.db as any },
+        { agentId: args.agentId, createIfMissing: false }
+      );
+      if (resolved) {
+        return tasks.filter((task) =>
+          (task.assigneeInstanceIds ?? []).includes(resolved.instanceId)
+        );
+      }
+    }
+    return tasks.filter((task) => task.assigneeIds && task.assigneeIds.includes(args.agentId));
   },
 });
 
@@ -944,17 +974,25 @@ export const create = mutation({
     const description = isUntrusted
       ? sanitizeTaskDescription(args.description)
       : args.description;
+    const project = args.projectId ? await ctx.db.get(args.projectId) : null;
+    const assigneeIds = args.assigneeIds ?? [];
+    const assigneeInstanceIds =
+      assigneeIds.length > 0
+        ? await resolveAssigneeInstanceIds(ctx, assigneeIds)
+        : undefined;
 
     // ── INVARIANT: All tasks start as INBOX ──
     // Status is NEVER caller-controlled. Hardcoded server-side.
     const taskId = await ctx.db.insert("tasks", {
+      tenantId: project?.tenantId,
       projectId: args.projectId,
       title,
       description,
       type: args.type as TaskType,
       status: "INBOX",  // INVARIANT: always INBOX at creation
       priority: (args.priority ?? 3) as 1 | 2 | 3 | 4,
-      assigneeIds: args.assigneeIds ?? [],
+      assigneeIds,
+      assigneeInstanceIds,
       reviewCycles: 0,
       actualCost: 0,
       labels: args.labels,
@@ -1231,6 +1269,24 @@ export const transition = mutation({
         reviewChecklist: args.reviewChecklist,
       },
     });
+
+    await appendChangeRecord(ctx.db as any, {
+      tenantId: task.tenantId,
+      projectId: task.projectId,
+      legacyAgentId: args.actorAgentId,
+      type: "TASK_TRANSITIONED",
+      summary: `Task ${args.taskId} transitioned ${fromStatus} -> ${toStatus}`,
+      payload: {
+        taskId: args.taskId,
+        fromStatus,
+        toStatus,
+        actorType,
+        actorAgentId: args.actorAgentId,
+        actorUserId: args.actorUserId,
+      },
+      relatedTable: "tasks",
+      relatedId: args.taskId,
+    });
     
     // 10. Log activity
     await ctx.db.insert("activities", {
@@ -1330,8 +1386,10 @@ export const assign = mutation({
     }
     
     // Update assignees
+    const assigneeInstanceIds = await resolveAssigneeInstanceIds(ctx, args.agentIds);
     await ctx.db.patch(args.taskId, {
       assigneeIds: args.agentIds,
+      assigneeInstanceIds,
     });
     
     // If task is in INBOX, transition to ASSIGNED
@@ -1403,7 +1461,10 @@ export const update = mutation({
     if (args.priority !== undefined) patch.priority = args.priority;
     if (args.type !== undefined) patch.type = args.type as TaskType;
     if (args.estimatedCost !== undefined) patch.estimatedCost = args.estimatedCost;
-    if (args.assigneeIds !== undefined) patch.assigneeIds = args.assigneeIds;
+    if (args.assigneeIds !== undefined) {
+      patch.assigneeIds = args.assigneeIds;
+      patch.assigneeInstanceIds = await resolveAssigneeInstanceIds(ctx, args.assigneeIds);
+    }
 
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(args.taskId, patch);

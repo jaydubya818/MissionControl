@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { AgentDetailFlyout } from "./AgentDetailFlyout";
 
 const FLYOUT_WIDTH = 320;
@@ -21,18 +25,31 @@ function SidebarButton({
   variant?: "default" | "warning" | "danger" | "success";
   fullWidth?: boolean;
 }) {
+  const variantClasses: Record<string, string> = {
+    default: "bg-muted hover:bg-muted/80 text-foreground",
+    warning: "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20",
+    danger: "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20",
+    success: "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20",
+  };
+
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "sidebar-action-btn",
-        `sidebar-action-btn-${variant}`,
-        fullWidth && "full-width"
+        "px-3 py-2 rounded-md text-xs font-medium border border-border transition-colors cursor-pointer",
+        variantClasses[variant],
+        fullWidth ? "w-full" : "flex-1 min-w-0"
       )}
     >
-      <span>{label}</span>
-      {badge && <span className="sidebar-action-badge">{badge}</span>}
+      <span className="flex items-center justify-center gap-1.5">
+        {label}
+        {badge && (
+          <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 min-w-[18px] justify-center">
+            {badge}
+          </Badge>
+        )}
+      </span>
     </button>
   );
 }
@@ -45,6 +62,7 @@ function AgentRow({
   onClick: () => void;
 }) {
   const isActive = agent.status === "ACTIVE";
+  const statusLabel = isActive ? "Active" : "Not active";
   const roleShort =
     agent.role === "LEAD"
       ? "Lead"
@@ -58,15 +76,21 @@ function AgentRow({
     <button
       type="button"
       onClick={onClick}
-      className="agent-row w-full text-left cursor-pointer border-0"
+      className="w-full flex items-center gap-3 px-3 py-2 text-left cursor-pointer border-0 bg-transparent hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+      aria-label={`${agent.name}, ${roleShort}, ${statusLabel}`}
     >
-      <span className="agent-row-avatar">{agent.emoji || agent.name.charAt(0)}</span>
-      <div className="agent-row-info">
-        <div className="agent-row-name">{agent.name}</div>
-        <div className="agent-row-role">{roleShort}</div>
+      <span className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm shrink-0">
+        {agent.emoji || agent.name.charAt(0)}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-foreground truncate">{agent.name}</div>
+        <div className="text-xs text-muted-foreground">{roleShort}</div>
       </div>
       <span
-        className={cn("agent-row-status", isActive ? "active" : "paused")}
+        className={cn(
+          "w-2 h-2 rounded-full shrink-0",
+          isActive ? "bg-emerald-500" : "bg-muted-foreground/40"
+        )}
         title={agent.status}
         aria-hidden
       />
@@ -84,6 +108,7 @@ export function AgentsFlyout({
   onOpenStandup,
   onPauseSquad,
   onResumeSquad,
+  onOpenOrg,
 }: {
   projectId: Id<"projects"> | null;
   onClose: () => void;
@@ -94,13 +119,35 @@ export function AgentsFlyout({
   onOpenStandup?: () => void;
   onPauseSquad?: () => void;
   onResumeSquad?: () => void;
+  onOpenOrg?: (agentId: Id<"agents">) => void;
 }) {
   const [selectedAgentId, setSelectedAgentId] = useState<Id<"agents"> | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
   const pendingApprovals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 10 } : { limit: 10 });
   const pendingCount = pendingApprovals?.length ?? 0;
   const agentCount = agents?.length ?? 0;
   const pausedCount = agents?.filter((a) => a.status === "PAUSED").length ?? 0;
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (selectedAgentId) {
+        setSelectedAgentId(null);
+      } else {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, selectedAgentId]);
+
+  useEffect(() => {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    panelRef.current?.focus({ preventScroll: true });
+    return () => returnFocusRef.current?.focus({ preventScroll: true });
+  }, []);
 
   return (
     <>
@@ -113,29 +160,38 @@ export function AgentsFlyout({
 
       {/* Fly-out panel */}
       <aside
-        className="fixed top-0 right-0 bottom-0 z-50 flex flex-col border-l border-border bg-[#1e293b] shadow-xl animate-in slide-in-from-right duration-200"
+        ref={panelRef}
+        className="fixed top-0 left-0 bottom-0 z-50 flex flex-col border-r border-border bg-card shadow-xl animate-in slide-in-from-left duration-200"
         style={{ width: FLYOUT_WIDTH }}
         role="dialog"
+        aria-modal="true"
         aria-label="Agents panel"
+        tabIndex={-1}
       >
-        <div className="agents-sidebar-header flex items-center gap-2 shrink-0">
-          <span className="font-bold text-sm uppercase tracking-wider text-[#e2e8f0]">
+        {/* Header */}
+        <div className="flex items-center gap-2 px-4 py-3 shrink-0 border-b border-border">
+          <span className="font-semibold text-sm uppercase tracking-wider text-foreground">
             Agents
           </span>
-          <span className="agents-sidebar-count">{agentCount}</span>
+          <Badge variant="outline" className="text-xs px-1.5 py-0">
+            {agentCount}
+          </Badge>
           <button
             type="button"
             onClick={onClose}
-            className="ml-auto p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+            className="ml-auto p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             aria-label="Close agents panel"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="agents-sidebar-actions shrink-0">
-          <div className="agents-sidebar-actions-title">Quick Actions</div>
-          <div className="agents-sidebar-actions-grid">
+        {/* Quick Actions */}
+        <div className="px-3 py-3 shrink-0 border-b border-border">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            Quick Actions
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 mb-2">
             {onOpenNotifications && (
               <SidebarButton onClick={onOpenNotifications} label="Notifications" />
             )}
@@ -149,7 +205,7 @@ export function AgentsFlyout({
             {onOpenStandup && <SidebarButton onClick={onOpenStandup} label="Standup" />}
             {onOpenPolicy && <SidebarButton onClick={onOpenPolicy} label="Policy" />}
           </div>
-          <div className="agents-sidebar-actions-critical">
+          <div className="flex flex-col gap-1.5">
             {onOpenOperatorControls && (
               <SidebarButton
                 onClick={onOpenOperatorControls}
@@ -172,27 +228,31 @@ export function AgentsFlyout({
           </div>
         </div>
 
-        <div className="agents-sidebar-list flex-1 min-h-0 overflow-y-auto">
-          {agents === undefined ? (
-            <div className="p-3 text-muted-foreground text-sm">Loading…</div>
-          ) : agents.length === 0 ? (
-            <div className="p-3 text-muted-foreground text-sm">No agents</div>
-          ) : (
-            agents.map((a: Doc<"agents">) => (
-              <AgentRow
-                key={a._id}
-                agent={a}
-                onClick={() => setSelectedAgentId(a._id)}
-              />
-            ))
-          )}
-        </div>
+        {/* Agent List */}
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="py-1">
+            {agents === undefined ? (
+              <div className="p-3 text-muted-foreground text-sm">Loading...</div>
+            ) : agents.length === 0 ? (
+              <div className="p-3 text-muted-foreground text-sm">No agents</div>
+            ) : (
+              agents.map((a: Doc<"agents">) => (
+                <AgentRow
+                  key={a._id}
+                  agent={a}
+                  onClick={() => setSelectedAgentId(a._id)}
+                />
+              ))
+            )}
+          </div>
+        </ScrollArea>
       </aside>
 
       {selectedAgentId && (
         <AgentDetailFlyout
           agentId={selectedAgentId}
           onClose={() => setSelectedAgentId(null)}
+          onEdit={onOpenOrg}
         />
       )}
     </>

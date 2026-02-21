@@ -130,9 +130,9 @@ export function CostAnalytics({ projectId, onClose }: CostAnalyticsProps) {
                 ${todayCost.toFixed(2)}
               </div>
             </div>
-            <div className="bg-purple-50 dark:bg-purple-900 dark:bg-opacity-20 rounded-lg p-4">
-              <div className="text-sm text-purple-600 dark:text-purple-400 font-medium">Last 7 Days</div>
-              <div className="text-2xl font-bold text-purple-900 dark:text-purple-100 mt-1">
+            <div className="bg-blue-50 dark:bg-blue-900 dark:bg-opacity-20 rounded-lg p-4">
+              <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">Last 7 Days</div>
+              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-1">
                 ${last7DaysCost.toFixed(2)}
               </div>
             </div>

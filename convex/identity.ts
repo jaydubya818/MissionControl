@@ -8,6 +8,8 @@
 import { v } from "convex/values";
 import { query, mutation, action } from "./_generated/server";
 import { api } from "./_generated/api";
+import { resolveAgentRef } from "./lib/agentResolver";
+import { appendChangeRecord } from "./lib/armAudit";
 
 // ============================================================================
 // VALIDATION HELPERS
@@ -235,6 +237,12 @@ export const upsert = mutation({
 
     const soulHash = args.soulContent ? computeSoulHash(args.soulContent) : undefined;
 
+    const agent = await ctx.db.get(args.agentId);
+    const resolved = await resolveAgentRef(
+      { db: ctx.db as any },
+      { agentId: args.agentId, createIfMissing: true }
+    );
+
     // Check for existing identity
     const existing = await ctx.db
       .query("agentIdentities")
@@ -246,7 +254,12 @@ export const upsert = mutation({
 
     if (existing) {
       await ctx.db.patch(existing._id, {
+        tenantId: agent?.tenantId,
         name: args.name,
+        templateId: resolved?.templateId,
+        versionId: resolved?.versionId,
+        instanceId: resolved?.instanceId,
+        legacyAgentId: args.agentId,
         creature: args.creature,
         vibe: args.vibe,
         emoji: args.emoji,
@@ -277,11 +290,28 @@ export const upsert = mutation({
           },
         });
       }
+      await appendChangeRecord(ctx.db as any, {
+        tenantId: agent?.tenantId,
+        projectId: agent?.projectId,
+        templateId: resolved?.templateId,
+        versionId: resolved?.versionId,
+        instanceId: resolved?.instanceId,
+        legacyAgentId: args.agentId,
+        type: "IDENTITY_UPDATED",
+        summary: `Identity updated for ${args.name}`,
+        relatedTable: "agentIdentities",
+        relatedId: existing._id,
+      });
 
       return { id: existing._id, validationStatus, errors: allErrors, soulChanged };
     } else {
       const id = await ctx.db.insert("agentIdentities", {
+        tenantId: agent?.tenantId,
         agentId: args.agentId,
+        templateId: resolved?.templateId,
+        versionId: resolved?.versionId,
+        instanceId: resolved?.instanceId,
+        legacyAgentId: args.agentId,
         name: args.name,
         creature: args.creature,
         vibe: args.vibe,
@@ -293,6 +323,18 @@ export const upsert = mutation({
         validationStatus,
         validationErrors: allErrors.length > 0 ? allErrors : undefined,
         lastScannedAt: Date.now(),
+      });
+      await appendChangeRecord(ctx.db as any, {
+        tenantId: agent?.tenantId,
+        projectId: agent?.projectId,
+        templateId: resolved?.templateId,
+        versionId: resolved?.versionId,
+        instanceId: resolved?.instanceId,
+        legacyAgentId: args.agentId,
+        type: "IDENTITY_UPDATED",
+        summary: `Identity created for ${args.name}`,
+        relatedTable: "agentIdentities",
+        relatedId: id,
       });
 
       return { id, validationStatus, errors: allErrors, soulChanged: false };

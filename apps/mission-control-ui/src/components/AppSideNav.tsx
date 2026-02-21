@@ -52,6 +52,16 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: "ARM",
+    items: [
+      { id: "directory", label: "Directory", icon: LayoutDashboard },
+      { id: "policies", label: "Policies", icon: Shield },
+      { id: "deployments", label: "Deployments", icon: GitBranch },
+      { id: "audit", label: "Audit", icon: FileText },
+      { id: "telemetry", label: "Telemetry", icon: Radio },
+    ],
+  },
+  {
     label: "Agents",
     items: [
       { id: "agents", label: "Registry", icon: Bot },

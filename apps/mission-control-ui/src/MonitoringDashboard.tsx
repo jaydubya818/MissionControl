@@ -1,6 +1,14 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 interface MonitoringDashboardProps {
   onClose: () => void;
 }
@@ -403,34 +411,34 @@ function AuditTab({ logs }: any) {
       maxHeight: "600px",
       overflow: "auto",
     }}>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ borderBottom: "1px solid #334155" }}>
-            <th style={{ padding: "8px", textAlign: "left", fontSize: "12px", color: "#94a3b8" }}>Time</th>
-            <th style={{ padding: "8px", textAlign: "left", fontSize: "12px", color: "#94a3b8" }}>Actor</th>
-            <th style={{ padding: "8px", textAlign: "left", fontSize: "12px", color: "#94a3b8" }}>Action</th>
-            <th style={{ padding: "8px", textAlign: "left", fontSize: "12px", color: "#94a3b8" }}>Target</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table>
+        <TableHeader>
+          <TableRow className="border-b border-slate-700">
+            <TableHead className="text-xs text-slate-400">Time</TableHead>
+            <TableHead className="text-xs text-slate-400">Actor</TableHead>
+            <TableHead className="text-xs text-slate-400">Action</TableHead>
+            <TableHead className="text-xs text-slate-400">Target</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {logs.map((log: any, idx: number) => (
-            <tr key={idx} style={{ borderBottom: "1px solid #1e293b" }}>
-              <td style={{ padding: "8px", fontSize: "12px", color: "#64748b" }}>
+            <TableRow key={idx} className="border-b border-slate-800 hover:bg-transparent">
+              <TableCell className="py-2 text-xs text-slate-500">
                 {new Date(log._creationTime).toLocaleTimeString()}
-              </td>
-              <td style={{ padding: "8px", fontSize: "12px" }}>
+              </TableCell>
+              <TableCell className="py-2 text-xs">
                 {log.actorType}: {log.actorId || "System"}
-              </td>
-              <td style={{ padding: "8px", fontSize: "12px", fontWeight: 500 }}>
+              </TableCell>
+              <TableCell className="py-2 text-xs font-medium">
                 {log.action}
-              </td>
-              <td style={{ padding: "8px", fontSize: "12px", color: "#94a3b8" }}>
+              </TableCell>
+              <TableCell className="py-2 text-xs text-slate-400">
                 {log.targetType}: {log.targetId}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

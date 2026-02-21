@@ -1,26 +1,12 @@
-import { CSSProperties, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
 
 interface CouncilViewProps {
   projectId: Id<"projects"> | null;
 }
-
-const colors = {
-  bgPage: "#0f172a",
-  bgCard: "#1e293b",
-  bgHover: "#25334d",
-  border: "#334155",
-  textPrimary: "#e2e8f0",
-  textSecondary: "#94a3b8",
-  textMuted: "#64748b",
-  accentBlue: "#3b82f6",
-  accentGreen: "#10b981",
-  accentOrange: "#f59e0b",
-  accentPurple: "#8b5cf6",
-  accentRed: "#ef4444",
-};
 
 type Tab = "decisions" | "pending" | "coordinator";
 
@@ -41,25 +27,22 @@ export function CouncilView({ projectId }: CouncilViewProps) {
     projectId: projectId ?? undefined,
   });
 
-  // Handle loading state
   if (approvals === undefined || activities === undefined || agents === undefined) {
     return (
-      <main style={styles.container}>
-        <div style={styles.header}>
-          <h1 style={styles.title}>Council</h1>
-          <p style={styles.subtitle}>Loading...</p>
+      <main className="flex-1 overflow-auto bg-background p-6">
+        <div className="mb-6">
+          <h1 className="mb-1 text-3xl font-semibold text-foreground">Council</h1>
+          <p className="mt-0 text-base text-muted-foreground">Loading...</p>
         </div>
       </main>
     );
   }
 
-  // Build agent name lookup
   const agentMap = new Map<string, Doc<"agents">>();
   for (const a of agents ?? []) {
     agentMap.set(a._id, a);
   }
 
-  // Filter coordinator decisions (approvals and system actions)
   const decisions = approvals.filter(
     (a) => a.status === "APPROVED" || a.status === "DENIED"
   );
@@ -71,45 +54,44 @@ export function CouncilView({ projectId }: CouncilViewProps) {
   const pending = pendingApprovals ?? [];
 
   return (
-    <main style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>Council</h1>
-        <p style={styles.subtitle}>
+    <main className="flex-1 overflow-auto bg-background p-6">
+      <div className="mb-6">
+        <h1 className="mb-1 text-3xl font-semibold text-foreground">Council</h1>
+        <p className="mt-0 text-base text-muted-foreground">
           Multi-agent decision-making and consensus visualization
         </p>
       </div>
 
-      <div style={styles.metricsRow}>
+      <div className="mb-6 flex flex-wrap gap-4">
         <MetricCard
           value={decisions.length}
           label="Decisions Made"
-          color={colors.accentBlue}
+          colorClass="text-primary"
         />
         <MetricCard
           value={decisions.filter((d) => d.status === "APPROVED").length}
           label="Approved"
-          color={colors.accentGreen}
+          colorClass="text-emerald-500"
         />
         <MetricCard
           value={decisions.filter((d) => d.status === "DENIED").length}
           label="Denied"
-          color={colors.accentRed}
+          colorClass="text-red-500"
         />
         <MetricCard
           value={pending.length}
           label="Awaiting Decision"
-          color={pending.length > 0 ? colors.accentOrange : colors.textMuted}
+          colorClass={pending.length > 0 ? "text-amber-500" : "text-muted-foreground"}
           pulse={pending.length > 0}
         />
         <MetricCard
           value={coordinatorActivities.length}
           label="Coordinator Actions"
-          color={colors.accentPurple}
+          colorClass="text-blue-400"
         />
       </div>
 
-      {/* Tab Bar */}
-      <div style={styles.tabBar}>
+      <div className="mb-5 flex gap-1 border-b border-border">
         <TabButton
           active={activeTab === "decisions"}
           label={`Decisions (${decisions.length})`}
@@ -128,9 +110,8 @@ export function CouncilView({ projectId }: CouncilViewProps) {
         />
       </div>
 
-      {/* Tab Content */}
       {activeTab === "decisions" && (
-        <div style={styles.section}>
+        <div className="mb-8">
           {decisions.length === 0 ? (
             <EmptyState
               icon="🏛️"
@@ -138,7 +119,7 @@ export function CouncilView({ projectId }: CouncilViewProps) {
               description="When agents request approval for risky actions (YELLOW/RED risk level), decisions will appear here after they are approved or denied."
             />
           ) : (
-            <div style={styles.timeline}>
+            <div className="flex flex-col gap-3">
               {decisions.map((decision) => (
                 <DecisionCard
                   key={decision._id}
@@ -152,7 +133,7 @@ export function CouncilView({ projectId }: CouncilViewProps) {
       )}
 
       {activeTab === "pending" && (
-        <div style={styles.section}>
+        <div className="mb-8">
           {pending.length === 0 ? (
             <EmptyState
               icon="✅"
@@ -160,7 +141,7 @@ export function CouncilView({ projectId }: CouncilViewProps) {
               description="All clear! No agents are currently waiting for approval to proceed."
             />
           ) : (
-            <div style={styles.timeline}>
+            <div className="flex flex-col gap-3">
               {pending.map((approval) => (
                 <PendingApprovalCard
                   key={approval._id}
@@ -174,7 +155,7 @@ export function CouncilView({ projectId }: CouncilViewProps) {
       )}
 
       {activeTab === "coordinator" && (
-        <div style={styles.section}>
+        <div className="mb-8">
           {coordinatorActivities.length === 0 ? (
             <EmptyState
               icon="🤖"
@@ -182,7 +163,7 @@ export function CouncilView({ projectId }: CouncilViewProps) {
               description="The coordinator handles task decomposition, agent delegation, conflict resolution, and loop detection. Activity will appear here as the system orchestrates work."
             />
           ) : (
-            <div style={styles.activityList}>
+            <div className="flex flex-col gap-2">
               {coordinatorActivities.map((activity) => (
                 <ActivityCard
                   key={activity._id}
@@ -198,33 +179,33 @@ export function CouncilView({ projectId }: CouncilViewProps) {
   );
 }
 
-// ============================================================================
-// Sub-components
-// ============================================================================
-
 function MetricCard({
   value,
   label,
-  color,
+  colorClass,
   pulse,
 }: {
   value: number;
   label: string;
-  color: string;
+  colorClass: string;
   pulse?: boolean;
 }) {
   return (
-    <div style={styles.metric}>
+    <div className="min-w-[130px] flex-1 rounded-lg border border-border bg-card p-4 text-center">
       <div
-        style={{
-          ...styles.metricValue,
-          color: value > 0 ? color : colors.textMuted,
-        }}
+        className={cn(
+          "relative mb-1 inline-flex items-center gap-1.5 text-3xl font-semibold",
+          value > 0 ? colorClass : "text-muted-foreground"
+        )}
       >
         {value}
-        {pulse && <span style={styles.pulseDot} />}
+        {pulse && (
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+        )}
       </div>
-      <div style={styles.metricLabel}>{label}</div>
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
     </div>
   );
 }
@@ -243,14 +224,16 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      style={{
-        ...styles.tabButton,
-        ...(active ? styles.tabButtonActive : {}),
-      }}
+      className={cn(
+        "flex items-center gap-2 border-b-2 border-transparent bg-transparent px-4 py-2.5 font-[inherit] text-sm font-medium text-muted-foreground transition-colors",
+        active && "border-b-primary text-foreground"
+      )}
     >
       {label}
       {badge !== undefined && badge > 0 && (
-        <span style={styles.badge}>{badge}</span>
+        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[0.7rem] font-bold text-white">
+          {badge}
+        </span>
       )}
     </button>
   );
@@ -266,10 +249,12 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div style={styles.emptyState}>
-      <div style={styles.emptyIcon}>{icon}</div>
-      <div style={styles.emptyTitle}>{title}</div>
-      <div style={styles.emptyDescription}>{description}</div>
+    <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card px-6 py-12 text-center">
+      <div className="mb-3 text-5xl">{icon}</div>
+      <div className="mb-2 text-lg font-semibold text-foreground">{title}</div>
+      <div className="max-w-[420px] text-sm leading-relaxed text-muted-foreground">
+        {description}
+      </div>
     </div>
   );
 }
@@ -288,58 +273,63 @@ function DecisionCard({ decision, agentMap }: DecisionCardProps) {
 
   return (
     <div
-      style={{
-        ...styles.decisionCard,
-        borderLeftColor: isApproved ? colors.accentGreen : colors.accentRed,
-      }}
+      className={cn(
+        "rounded-lg border border-border bg-card px-5 py-4 border-l-4",
+        isApproved ? "border-l-emerald-500" : "border-l-red-500"
+      )}
     >
-      <div style={styles.decisionHeader}>
+      <div className="mb-2.5 flex items-center justify-between">
         <div
-          style={{
-            ...styles.decisionStatus,
-            color: isApproved ? colors.accentGreen : colors.accentRed,
-          }}
+          className={cn(
+            "text-xs font-bold tracking-wide",
+            isApproved ? "text-emerald-500" : "text-red-500"
+          )}
         >
           {isApproved ? "✓ APPROVED" : "✗ DENIED"}
         </div>
-        <div style={styles.decisionTime}>
+        <div className="text-xs text-muted-foreground/70">
           {decision.decidedAt
             ? formatTimeAgo(decision.decidedAt)
             : "Pending"}
         </div>
       </div>
 
-      <div style={styles.decisionTitle}>{decision.actionSummary}</div>
+      <div className="mb-2.5 text-base font-semibold leading-snug text-foreground">
+        {decision.actionSummary}
+      </div>
 
-      <div style={styles.decisionMeta}>
-        <span style={styles.metaChip}>
+      <div className="mb-2.5 flex flex-wrap gap-2">
+        <span className="whitespace-nowrap rounded-xl bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
           {requestor ? `${requestor.emoji || "🤖"} ${requestor.name}` : "Unknown agent"}
         </span>
         <span
-          style={{
-            ...styles.metaChip,
-            background: decision.riskLevel === "RED" ? "#ef444420" : "#f59e0b20",
-            color: decision.riskLevel === "RED" ? colors.accentRed : colors.accentOrange,
-          }}
+          className={cn(
+            "whitespace-nowrap rounded-xl px-2.5 py-0.5 text-xs",
+            decision.riskLevel === "RED"
+              ? "bg-red-500/10 text-red-500"
+              : "bg-amber-500/10 text-amber-500"
+          )}
         >
           {decision.riskLevel === "RED" ? "🔴" : "🟡"} {decision.riskLevel}
         </span>
-        <span style={styles.metaChip}>{decision.actionType}</span>
+        <span className="whitespace-nowrap rounded-xl bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+          {decision.actionType}
+        </span>
         {decision.estimatedCost !== undefined && (
-          <span style={styles.metaChip}>
+          <span className="whitespace-nowrap rounded-xl bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
             ${decision.estimatedCost.toFixed(2)}
           </span>
         )}
       </div>
 
       {decision.justification && (
-        <div style={styles.decisionJustification}>
+        <div className="mb-2 text-sm leading-relaxed text-muted-foreground">
           <strong>Justification:</strong> {decision.justification}
         </div>
       )}
 
       {decision.decisionReason && (
-        <div style={styles.decisionReason}>
+        <div className="rounded-md bg-muted px-3.5 py-2.5 text-sm leading-relaxed text-foreground">
           <strong>
             {decider
               ? `${decider.emoji || "🤖"} ${decider.name}`
@@ -369,7 +359,7 @@ function PendingApprovalCard({ approval, agentMap }: PendingApprovalCardProps) {
 
   const requestor = agentMap.get(approval.requestorAgentId);
   const timeLeft = approval.expiresAt - Date.now();
-  const isExpiringSoon = timeLeft < 30 * 60 * 1000; // 30 minutes
+  const isExpiringSoon = timeLeft < 30 * 60 * 1000;
 
   const handleApprove = async () => {
     setIsActing(true);
@@ -401,91 +391,91 @@ function PendingApprovalCard({ approval, agentMap }: PendingApprovalCardProps) {
   };
 
   return (
-    <div
-      style={{
-        ...styles.decisionCard,
-        borderLeftColor: colors.accentOrange,
-      }}
-    >
-      <div style={styles.decisionHeader}>
-        <div style={{ ...styles.decisionStatus, color: colors.accentOrange }}>
+    <div className="rounded-lg border border-border border-l-4 border-l-amber-500 bg-card px-5 py-4">
+      <div className="mb-2.5 flex items-center justify-between">
+        <div className="text-xs font-bold tracking-wide text-amber-500">
           ⏳ AWAITING DECISION
         </div>
         <div
-          style={{
-            ...styles.decisionTime,
-            color: isExpiringSoon ? colors.accentRed : colors.textMuted,
-          }}
+          className={cn(
+            "text-xs",
+            isExpiringSoon ? "text-red-500" : "text-muted-foreground/70"
+          )}
         >
           {isExpiringSoon ? "⚠️ " : ""}
           Expires {formatTimeAgo(approval.expiresAt, true)}
         </div>
       </div>
 
-      <div style={styles.decisionTitle}>{approval.actionSummary}</div>
+      <div className="mb-2.5 text-base font-semibold leading-snug text-foreground">
+        {approval.actionSummary}
+      </div>
 
-      <div style={styles.decisionMeta}>
-        <span style={styles.metaChip}>
+      <div className="mb-2.5 flex flex-wrap gap-2">
+        <span className="whitespace-nowrap rounded-xl bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
           {requestor ? `${requestor.emoji || "🤖"} ${requestor.name}` : "Unknown agent"}
         </span>
         <span
-          style={{
-            ...styles.metaChip,
-            background: approval.riskLevel === "RED" ? "#ef444420" : "#f59e0b20",
-            color: approval.riskLevel === "RED" ? colors.accentRed : colors.accentOrange,
-          }}
+          className={cn(
+            "whitespace-nowrap rounded-xl px-2.5 py-0.5 text-xs",
+            approval.riskLevel === "RED"
+              ? "bg-red-500/10 text-red-500"
+              : "bg-amber-500/10 text-amber-500"
+          )}
         >
           {approval.riskLevel === "RED" ? "🔴" : "🟡"} {approval.riskLevel}
         </span>
-        <span style={styles.metaChip}>{approval.actionType}</span>
+        <span className="whitespace-nowrap rounded-xl bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+          {approval.actionType}
+        </span>
         {approval.estimatedCost !== undefined && (
-          <span style={styles.metaChip}>
+          <span className="whitespace-nowrap rounded-xl bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
             ${approval.estimatedCost.toFixed(2)}
           </span>
         )}
       </div>
 
-      <div style={styles.decisionJustification}>
+      <div className="mb-2 text-sm leading-relaxed text-muted-foreground">
         <strong>Justification:</strong> {approval.justification}
       </div>
 
       {!showActions ? (
         <button
           onClick={() => setShowActions(true)}
-          style={styles.reviewButton}
+          className="mt-2 rounded-md bg-primary px-5 py-2 font-[inherit] text-sm font-semibold text-white"
         >
-          Review & Decide
+          Review &amp; Decide
         </button>
       ) : (
-        <div style={styles.actionPanel}>
+        <div className="mt-3 flex flex-col gap-2.5">
           <input
             type="text"
             placeholder="Reason (required for deny, optional for approve)"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            style={styles.reasonInput}
+            className="rounded-md border border-border bg-background px-3 py-2 font-[inherit] text-sm text-foreground outline-none"
           />
-          <div style={styles.actionButtons}>
+          <div className="flex gap-2">
             <button
               onClick={handleApprove}
               disabled={isActing}
-              style={styles.approveButton}
+              className="rounded-md bg-emerald-500 px-4.5 py-2 font-[inherit] text-sm font-semibold text-white"
             >
               {isActing ? "..." : "✓ Approve"}
             </button>
             <button
               onClick={handleDeny}
               disabled={isActing || !reason.trim()}
-              style={{
-                ...styles.denyButton,
-                opacity: !reason.trim() ? 0.5 : 1,
-              }}
+              className={cn(
+                "rounded-md bg-red-500 px-4.5 py-2 font-[inherit] text-sm font-semibold text-white",
+                !reason.trim() && "opacity-50"
+              )}
             >
               {isActing ? "..." : "✗ Deny"}
             </button>
             <button
               onClick={() => setShowActions(false)}
-              style={styles.cancelButton}
+              className="rounded-md border border-border bg-transparent px-3.5 py-2 font-[inherit] text-sm text-muted-foreground"
             >
               Cancel
             </button>
@@ -502,7 +492,6 @@ interface ActivityCardProps {
 }
 
 function ActivityCard({ activity, agentMap }: ActivityCardProps) {
-  // Determine icon based on action type
   const actionIcons: Record<string, string> = {
     COORDINATOR_TASK_DECOMPOSED: "🧩",
     COORDINATOR_DELEGATED: "📋",
@@ -525,29 +514,27 @@ function ActivityCard({ activity, agentMap }: ActivityCardProps) {
     : undefined;
 
   return (
-    <div style={styles.activityCard}>
-      <div style={styles.activityHeader}>
-        <div style={styles.activityAction}>
-          <span style={{ marginRight: 6 }}>{icon}</span>
+    <div className="rounded-lg border border-border bg-card px-4.5 py-3.5">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-1 text-sm font-semibold capitalize text-foreground">
+          <span className="mr-1.5">{icon}</span>
           {actionLabel}
           {relatedAgent && (
-            <span style={styles.activityAgentTag}>
+            <span className="ml-2 rounded-xl bg-primary/10 px-2 py-0.5 text-xs text-primary">
               {relatedAgent.emoji || "🤖"} {relatedAgent.name}
             </span>
           )}
         </div>
-        <div style={styles.activityTime}>
+        <div className="text-xs text-muted-foreground/70">
           {formatTimeAgo(activity._creationTime)}
         </div>
       </div>
-      <div style={styles.activityDesc}>{activity.description}</div>
+      <div className="text-sm leading-relaxed text-muted-foreground">
+        {activity.description}
+      </div>
     </div>
   );
 }
-
-// ============================================================================
-// Helpers
-// ============================================================================
 
 function formatTimeAgo(timestamp: number, future = false): string {
   const diff = future ? timestamp - Date.now() : Date.now() - timestamp;
@@ -567,329 +554,3 @@ function formatTimeAgo(timestamp: number, future = false): string {
   const d = Math.floor(abs / (24 * 60 * 60 * 1000));
   return `${prefix}${d}d${suffix}`;
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
-
-const styles: Record<string, CSSProperties> = {
-  container: {
-    flex: 1,
-    overflow: "auto",
-    background: colors.bgPage,
-    padding: "24px",
-  },
-  header: {
-    marginBottom: "24px",
-  },
-  title: {
-    fontSize: "1.75rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginTop: 0,
-    marginBottom: "4px",
-  },
-  subtitle: {
-    fontSize: "1rem",
-    color: colors.textSecondary,
-    marginTop: 0,
-  },
-  metricsRow: {
-    display: "flex",
-    gap: "16px",
-    marginBottom: "24px",
-    flexWrap: "wrap" as const,
-  },
-  metric: {
-    flex: 1,
-    minWidth: 130,
-    padding: "16px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 8,
-    textAlign: "center" as const,
-  },
-  metricValue: {
-    fontSize: "2rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginBottom: "4px",
-    position: "relative" as const,
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-  },
-  metricLabel: {
-    fontSize: "0.8rem",
-    color: colors.textSecondary,
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.5px",
-  },
-  pulseDot: {
-    display: "inline-block",
-    width: 8,
-    height: 8,
-    borderRadius: "50%",
-    background: colors.accentOrange,
-    animation: "pulse 2s infinite",
-  },
-
-  // Tabs
-  tabBar: {
-    display: "flex",
-    gap: "4px",
-    marginBottom: "20px",
-    borderBottom: `1px solid ${colors.border}`,
-    paddingBottom: 0,
-  },
-  tabButton: {
-    background: "none",
-    border: "none",
-    borderBottom: "2px solid transparent",
-    color: colors.textSecondary,
-    fontSize: "0.9rem",
-    fontWeight: 500,
-    padding: "10px 16px",
-    cursor: "pointer",
-    transition: "color 0.2s, border-color 0.2s",
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    fontFamily: "inherit",
-  },
-  tabButtonActive: {
-    color: colors.textPrimary,
-    borderBottomColor: colors.accentBlue,
-  },
-  badge: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    background: colors.accentOrange,
-    color: "#fff",
-    fontSize: "0.7rem",
-    fontWeight: 700,
-    padding: "0 6px",
-  },
-
-  // Sections
-  section: {
-    marginBottom: "32px",
-  },
-  sectionTitle: {
-    fontSize: "1.25rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginTop: 0,
-    marginBottom: "16px",
-  },
-
-  // Empty state
-  emptyState: {
-    display: "flex",
-    flexDirection: "column" as const,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "48px 24px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 8,
-    textAlign: "center" as const,
-  },
-  emptyIcon: {
-    fontSize: "3rem",
-    marginBottom: "12px",
-  },
-  emptyTitle: {
-    fontSize: "1.1rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginBottom: "8px",
-  },
-  emptyDescription: {
-    fontSize: "0.9rem",
-    color: colors.textSecondary,
-    maxWidth: 420,
-    lineHeight: 1.5,
-  },
-
-  // Timeline
-  timeline: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "12px",
-  },
-
-  // Decision cards
-  decisionCard: {
-    padding: "16px 20px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderLeft: "4px solid",
-    borderRadius: 8,
-  },
-  decisionHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: "10px",
-  },
-  decisionStatus: {
-    fontSize: "0.8rem",
-    fontWeight: 700,
-    letterSpacing: "0.5px",
-  },
-  decisionTime: {
-    fontSize: "0.75rem",
-    color: colors.textMuted,
-  },
-  decisionTitle: {
-    fontSize: "1rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginBottom: "10px",
-    lineHeight: 1.4,
-  },
-  decisionMeta: {
-    display: "flex",
-    gap: "8px",
-    marginBottom: "10px",
-    flexWrap: "wrap" as const,
-  },
-  metaChip: {
-    fontSize: "0.75rem",
-    color: colors.textSecondary,
-    background: colors.bgHover,
-    padding: "3px 10px",
-    borderRadius: 12,
-    whiteSpace: "nowrap" as const,
-  },
-  decisionJustification: {
-    fontSize: "0.85rem",
-    color: colors.textSecondary,
-    lineHeight: 1.5,
-    marginBottom: "8px",
-  },
-  decisionReason: {
-    fontSize: "0.85rem",
-    color: colors.textPrimary,
-    lineHeight: 1.5,
-    padding: "10px 14px",
-    background: colors.bgHover,
-    borderRadius: 6,
-  },
-
-  // Pending approval actions
-  reviewButton: {
-    background: colors.accentBlue,
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    padding: "8px 20px",
-    fontSize: "0.85rem",
-    fontWeight: 600,
-    cursor: "pointer",
-    marginTop: 8,
-    fontFamily: "inherit",
-  },
-  actionPanel: {
-    marginTop: 12,
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: 10,
-  },
-  reasonInput: {
-    background: colors.bgPage,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    padding: "8px 12px",
-    color: colors.textPrimary,
-    fontSize: "0.85rem",
-    outline: "none",
-    fontFamily: "inherit",
-  },
-  actionButtons: {
-    display: "flex",
-    gap: 8,
-  },
-  approveButton: {
-    background: colors.accentGreen,
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    padding: "8px 18px",
-    fontSize: "0.85rem",
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "inherit",
-  },
-  denyButton: {
-    background: colors.accentRed,
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    padding: "8px 18px",
-    fontSize: "0.85rem",
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "inherit",
-  },
-  cancelButton: {
-    background: "none",
-    color: colors.textSecondary,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    padding: "8px 14px",
-    fontSize: "0.85rem",
-    cursor: "pointer",
-    fontFamily: "inherit",
-  },
-
-  // Activity list
-  activityList: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "8px",
-  },
-  activityCard: {
-    padding: "14px 18px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 8,
-  },
-  activityHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: "8px",
-  },
-  activityAction: {
-    fontSize: "0.85rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    display: "flex",
-    alignItems: "center",
-    gap: 4,
-    textTransform: "capitalize" as const,
-  },
-  activityAgentTag: {
-    fontSize: "0.75rem",
-    color: colors.accentBlue,
-    background: `${colors.accentBlue}15`,
-    padding: "2px 8px",
-    borderRadius: 10,
-    marginLeft: 8,
-  },
-  activityTime: {
-    fontSize: "0.75rem",
-    color: colors.textMuted,
-  },
-  activityDesc: {
-    fontSize: "0.85rem",
-    color: colors.textSecondary,
-    lineHeight: 1.5,
-  },
-};

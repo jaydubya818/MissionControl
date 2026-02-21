@@ -249,6 +249,7 @@ export const convertActionItems = mutation({
 
       // Create task from action item
       const taskId = await ctx.db.insert("tasks", {
+        tenantId: meeting.tenantId,
         projectId: meeting.projectId,
         title: item.description,
         description: `Action item from meeting: ${meeting.title}`,
@@ -256,6 +257,7 @@ export const convertActionItems = mutation({
         status: "INBOX",
         priority: 3,
         assigneeIds: [],
+        assigneeInstanceIds: [],
         reviewCycles: 0,
         actualCost: 0,
         dueAt: item.dueAt,

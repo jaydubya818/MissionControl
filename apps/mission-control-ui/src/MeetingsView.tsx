@@ -9,20 +9,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-
-const colors = {
-  bgPage: "#0f172a",
-  bgCard: "#1e293b",
-  bgInput: "#0f172a",
-  border: "#334155",
-  textPrimary: "#e2e8f0",
-  textSecondary: "#94a3b8",
-  textMuted: "#64748b",
-  accentBlue: "#3b82f6",
-  accentGreen: "#10b981",
-  accentOrange: "#f59e0b",
-  accentPurple: "#8b5cf6",
-};
+import { cn } from "@/lib/utils";
 
 type Tab = "upcoming" | "all" | "schedule";
 
@@ -51,7 +38,7 @@ export function MeetingsView({ projectId }: { projectId: Id<"projects"> | null }
     await scheduleMeeting({
       projectId: projectId ?? undefined,
       title: title.trim(),
-      scheduledAt: Date.now() + 86400000, // tomorrow
+      scheduledAt: Date.now() + 86400000,
       duration,
       participants: (agents ?? []).slice(0, 5).map((a: any) => ({
         agentId: a._id,
@@ -72,67 +59,59 @@ export function MeetingsView({ projectId }: { projectId: Id<"projects"> | null }
 
   if (selectedMeeting) {
     return (
-      <main style={{ flex: 1, overflow: "auto", padding: "24px" }}>
+      <main className="flex-1 overflow-auto p-6">
         <button
           onClick={() => setSelectedMeetingId(null)}
-          style={{ background: "none", border: "none", color: colors.accentBlue, cursor: "pointer", marginBottom: 16, fontSize: "0.85rem" }}
+          className="mb-4 border-none bg-transparent text-sm text-primary"
         >
           ← Back to Meetings
         </button>
 
-        <div style={{ background: colors.bgCard, border: "1px solid " + colors.border, borderRadius: 8, padding: 20, maxWidth: 700 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <h3 style={{ color: colors.textPrimary, margin: 0 }}>{selectedMeeting.title}</h3>
-            <span style={{
-              padding: "3px 10px",
-              borderRadius: 4,
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              background:
-                selectedMeeting.status === "COMPLETED" ? colors.accentGreen + "22" :
-                selectedMeeting.status === "SCHEDULED" ? colors.accentBlue + "22" :
-                selectedMeeting.status === "CANCELLED" ? colors.textMuted + "22" :
-                colors.accentOrange + "22",
-              color:
-                selectedMeeting.status === "COMPLETED" ? colors.accentGreen :
-                selectedMeeting.status === "SCHEDULED" ? colors.accentBlue :
-                selectedMeeting.status === "CANCELLED" ? colors.textMuted :
-                colors.accentOrange,
-            }}>
+        <div className="max-w-[700px] rounded-lg border border-border bg-card p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="m-0 text-foreground">{selectedMeeting.title}</h3>
+            <span
+              className={cn(
+                "rounded px-2.5 py-0.5 text-xs font-semibold",
+                selectedMeeting.status === "COMPLETED" && "bg-emerald-500/15 text-emerald-500",
+                selectedMeeting.status === "SCHEDULED" && "bg-primary/15 text-primary",
+                selectedMeeting.status === "CANCELLED" && "bg-muted text-muted-foreground",
+                selectedMeeting.status !== "COMPLETED" &&
+                  selectedMeeting.status !== "SCHEDULED" &&
+                  selectedMeeting.status !== "CANCELLED" &&
+                  "bg-amber-500/15 text-amber-500"
+              )}
+            >
               {selectedMeeting.status}
             </span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <div className="mb-4 grid grid-cols-2 gap-3">
             <div>
-              <div style={{ color: colors.textMuted, fontSize: "0.8rem" }}>Date</div>
-              <div style={{ color: colors.textPrimary }}>{new Date(selectedMeeting.scheduledAt).toLocaleDateString()}</div>
+              <div className="text-xs text-muted-foreground/70">Date</div>
+              <div className="text-foreground">{new Date(selectedMeeting.scheduledAt).toLocaleDateString()}</div>
             </div>
             <div>
-              <div style={{ color: colors.textMuted, fontSize: "0.8rem" }}>Duration</div>
-              <div style={{ color: colors.textPrimary }}>{selectedMeeting.duration} min</div>
+              <div className="text-xs text-muted-foreground/70">Duration</div>
+              <div className="text-foreground">{selectedMeeting.duration} min</div>
             </div>
             <div>
-              <div style={{ color: colors.textMuted, fontSize: "0.8rem" }}>Host</div>
-              <div style={{ color: colors.textPrimary }}>{selectedMeeting.hostAgentId ?? "TBD"}</div>
+              <div className="text-xs text-muted-foreground/70">Host</div>
+              <div className="text-foreground">{selectedMeeting.hostAgentId ?? "TBD"}</div>
             </div>
             <div>
-              <div style={{ color: colors.textMuted, fontSize: "0.8rem" }}>Provider</div>
-              <div style={{ color: colors.textPrimary }}>{selectedMeeting.provider}</div>
+              <div className="text-xs text-muted-foreground/70">Provider</div>
+              <div className="text-foreground">{selectedMeeting.provider}</div>
             </div>
           </div>
 
-          <h4 style={{ color: colors.textSecondary, marginBottom: 8 }}>Participants</h4>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+          <h4 className="mb-2 text-muted-foreground">Participants</h4>
+          <div className="mb-4 flex flex-wrap gap-1.5">
             {selectedMeeting.participants.map((p: any, i: number) => (
-              <span key={i} style={{
-                padding: "3px 10px",
-                borderRadius: 4,
-                background: colors.bgInput,
-                border: "1px solid " + colors.border,
-                color: colors.textSecondary,
-                fontSize: "0.8rem",
-              }}>
+              <span
+                key={i}
+                className="rounded border border-border bg-background px-2.5 py-0.5 text-xs text-muted-foreground"
+              >
                 {p.agentId} {p.orgPosition ? `(${p.orgPosition})` : ""}
               </span>
             ))}
@@ -140,17 +119,8 @@ export function MeetingsView({ projectId }: { projectId: Id<"projects"> | null }
 
           {selectedMeeting.agenda && (
             <>
-              <h4 style={{ color: colors.textSecondary, marginBottom: 8 }}>Agenda</h4>
-              <pre style={{
-                color: colors.textSecondary,
-                fontSize: "0.85rem",
-                whiteSpace: "pre-wrap",
-                background: colors.bgInput,
-                padding: 12,
-                borderRadius: 6,
-                border: "1px solid " + colors.border,
-                marginBottom: 16,
-              }}>
+              <h4 className="mb-2 text-muted-foreground">Agenda</h4>
+              <pre className="mb-4 whitespace-pre-wrap rounded-md border border-border bg-background p-3 text-sm text-muted-foreground">
                 {selectedMeeting.agenda}
               </pre>
             </>
@@ -158,42 +128,31 @@ export function MeetingsView({ projectId }: { projectId: Id<"projects"> | null }
 
           {selectedMeeting.actionItems && selectedMeeting.actionItems.length > 0 && (
             <>
-              <h4 style={{ color: colors.textSecondary, marginBottom: 8 }}>Action Items</h4>
+              <h4 className="mb-2 text-muted-foreground">Action Items</h4>
               {selectedMeeting.actionItems.map((item: any, i: number) => (
-                <div key={i} style={{
-                  background: colors.bgInput,
-                  border: "1px solid " + colors.border,
-                  borderRadius: 6,
-                  padding: 10,
-                  marginBottom: 6,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                }}>
-                  <span style={{ color: item.completed ? colors.accentGreen : colors.textPrimary, fontSize: "0.85rem", flex: 1 }}>
+                <div
+                  key={i}
+                  className="mb-1.5 flex items-center gap-2.5 rounded-md border border-border bg-background p-2.5"
+                >
+                  <span
+                    className={cn(
+                      "flex-1 text-sm",
+                      item.completed ? "text-emerald-500" : "text-foreground"
+                    )}
+                  >
                     {item.description}
                   </span>
                   {item.assigneeAgentId && (
-                    <span style={{ color: colors.textMuted, fontSize: "0.75rem" }}>→ {item.assigneeAgentId}</span>
+                    <span className="text-xs text-muted-foreground/70">→ {item.assigneeAgentId}</span>
                   )}
                   {item.taskId && (
-                    <span style={{ color: colors.accentGreen, fontSize: "0.75rem", fontWeight: 600 }}>Task Created</span>
+                    <span className="text-xs font-semibold text-emerald-500">Task Created</span>
                   )}
                 </div>
               ))}
               <button
                 onClick={handleConvert}
-                style={{
-                  marginTop: 10,
-                  padding: "8px 16px",
-                  borderRadius: 6,
-                  border: "none",
-                  background: colors.accentGreen,
-                  color: "#fff",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: "0.85rem",
-                }}
+                className="mt-2.5 rounded-md border-none bg-emerald-500 px-4 py-2 text-sm font-semibold text-white"
               >
                 Convert Action Items to Tasks
               </button>
@@ -205,25 +164,20 @@ export function MeetingsView({ projectId }: { projectId: Id<"projects"> | null }
   }
 
   return (
-    <main style={{ flex: 1, overflow: "auto", padding: "24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h2 style={{ color: colors.textPrimary, margin: 0 }}>Meetings</h2>
-        <div style={{ display: "flex", gap: 8 }}>
+    <main className="flex-1 overflow-auto p-6">
+      <div className="mb-5 flex items-center justify-between">
+        <h2 className="m-0 text-foreground">Meetings</h2>
+        <div className="flex gap-2">
           {(["upcoming", "all", "schedule"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              style={{
-                padding: "6px 14px",
-                borderRadius: 6,
-                border: "1px solid " + (tab === t ? colors.accentBlue : colors.border),
-                background: tab === t ? colors.accentBlue + "22" : "transparent",
-                color: tab === t ? colors.accentBlue : colors.textSecondary,
-                cursor: "pointer",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                textTransform: "capitalize",
-              }}
+              className={cn(
+                "rounded-md border px-3.5 py-1.5 text-sm font-semibold capitalize",
+                tab === t
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border bg-transparent text-muted-foreground"
+              )}
             >
               {t}
             </button>
@@ -232,62 +186,68 @@ export function MeetingsView({ projectId }: { projectId: Id<"projects"> | null }
       </div>
 
       {tab === "schedule" && (
-        <div style={{ background: colors.bgCard, border: "1px solid " + colors.border, borderRadius: 8, padding: 20, maxWidth: 500 }}>
-          <h3 style={{ color: colors.textPrimary, margin: "0 0 16px" }}>Schedule Meeting</h3>
-          <label style={{ color: colors.textSecondary, fontSize: "0.85rem", display: "block", marginBottom: 6 }}>Title</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Meeting title..." style={{
-            width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid " + colors.border, background: colors.bgInput, color: colors.textPrimary, fontSize: "0.9rem", marginBottom: 14, outline: "none",
-          }} />
-          <label style={{ color: colors.textSecondary, fontSize: "0.85rem", display: "block", marginBottom: 6 }}>Duration (min)</label>
-          <input type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} style={{
-            width: 100, padding: "8px 12px", borderRadius: 6, border: "1px solid " + colors.border, background: colors.bgInput, color: colors.textPrimary, fontSize: "0.9rem", marginBottom: 14, outline: "none",
-          }} />
-          <label style={{ color: colors.textSecondary, fontSize: "0.85rem", display: "block", marginBottom: 6 }}>Agenda Topics (one per line)</label>
-          <textarea value={topics} onChange={(e) => setTopics(e.target.value)} rows={4} placeholder="Topic 1\nTopic 2\n..." style={{
-            width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid " + colors.border, background: colors.bgInput, color: colors.textPrimary, fontSize: "0.9rem", marginBottom: 14, resize: "vertical",
-          }} />
-          <button onClick={handleSchedule} disabled={!title.trim()} style={{
-            padding: "10px 20px", borderRadius: 6, border: "none", background: colors.accentGreen, color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "0.9rem",
-          }}>
+        <div className="max-w-[500px] rounded-lg border border-border bg-card p-5">
+          <h3 className="mb-4 text-foreground">Schedule Meeting</h3>
+          <label className="mb-1.5 block text-sm text-muted-foreground">Title</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Meeting title..."
+            className="mb-3.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none"
+          />
+          <label className="mb-1.5 block text-sm text-muted-foreground">Duration (min)</label>
+          <input
+            type="number"
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
+            className="mb-3.5 w-[100px] rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none"
+          />
+          <label className="mb-1.5 block text-sm text-muted-foreground">Agenda Topics (one per line)</label>
+          <textarea
+            value={topics}
+            onChange={(e) => setTopics(e.target.value)}
+            rows={4}
+            placeholder="Topic 1\nTopic 2\n..."
+            className="mb-3.5 w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+          />
+          <button
+            onClick={handleSchedule}
+            disabled={!title.trim()}
+            className="rounded-md border-none bg-emerald-500 px-5 py-2.5 text-sm font-bold text-white"
+          >
             Schedule
           </button>
         </div>
       )}
 
       {(tab === "upcoming" || tab === "all") && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           {(tab === "upcoming" ? upcomingMeetings : allMeetings)?.map((m: any) => (
             <div
               key={m._id}
               onClick={() => setSelectedMeetingId(m._id)}
-              style={{
-                background: colors.bgCard,
-                border: "1px solid " + colors.border,
-                borderRadius: 8,
-                padding: 14,
-                cursor: "pointer",
-              }}
+              className="cursor-pointer rounded-lg border border-border bg-card p-3.5"
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ color: colors.textPrimary, fontWeight: 600 }}>{m.title}</span>
-                <span style={{
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                  fontSize: "0.7rem",
-                  fontWeight: 600,
-                  background: m.status === "COMPLETED" ? colors.accentGreen + "22" : colors.accentBlue + "22",
-                  color: m.status === "COMPLETED" ? colors.accentGreen : colors.accentBlue,
-                }}>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-foreground">{m.title}</span>
+                <span
+                  className={cn(
+                    "rounded px-2 py-0.5 text-[0.7rem] font-semibold",
+                    m.status === "COMPLETED"
+                      ? "bg-emerald-500/15 text-emerald-500"
+                      : "bg-primary/15 text-primary"
+                  )}
+                >
                   {m.status}
                 </span>
               </div>
-              <div style={{ color: colors.textMuted, fontSize: "0.8rem", marginTop: 4 }}>
+              <div className="mt-1 text-xs text-muted-foreground/70">
                 {new Date(m.scheduledAt).toLocaleDateString()} · {m.duration} min · {m.participants.length} participants · {m.provider}
               </div>
             </div>
           ))}
           {(tab === "upcoming" ? upcomingMeetings : allMeetings)?.length === 0 && (
-            <div style={{ color: colors.textMuted, textAlign: "center", padding: 40, background: colors.bgCard, borderRadius: 8, border: "1px solid " + colors.border }}>
+            <div className="rounded-lg border border-border bg-card p-10 text-center text-muted-foreground/70">
               {tab === "upcoming" ? "No upcoming meetings." : "No meetings found."}
             </div>
           )}

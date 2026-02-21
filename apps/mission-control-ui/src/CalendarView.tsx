@@ -1,26 +1,20 @@
-import { CSSProperties, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
 
 interface CalendarViewProps {
   projectId: Id<"projects"> | null;
 }
 
-const colors = {
-  bgPage: "#0f172a",
-  bgCard: "#1e293b",
-  bgHover: "#25334d",
-  border: "#334155",
-  textPrimary: "#e2e8f0",
-  textSecondary: "#94a3b8",
-  textMuted: "#64748b",
-  accentBlue: "#3b82f6",
-  accentGreen: "#10b981",
-  accentOrange: "#f59e0b",
-  accentPurple: "#8b5cf6",
-  accentRed: "#ef4444",
-  accentYellow: "#eab308",
+const taskTypeBorderClass: Record<string, string> = {
+  CONTENT: "border-l-blue-500",
+  SOCIAL: "border-l-amber-500",
+  EMAIL_MARKETING: "border-l-emerald-500",
+  CUSTOMER_RESEARCH: "border-l-yellow-500",
+  SEO_RESEARCH: "border-l-blue-500",
+  ENGINEERING: "border-l-red-500",
 };
 
 type ViewMode = "week" | "today";
@@ -50,33 +44,37 @@ export function CalendarView({ projectId }: CalendarViewProps) {
   const tasksByDay = groupTasksByDay(scheduledTasks, weekDays);
 
   return (
-    <main style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>Scheduled Tasks</h1>
-        <p style={styles.subtitle}>Henry's automated routines</p>
-        <div style={styles.controls}>
+    <main className="flex-1 overflow-auto bg-background p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-foreground mt-0 mb-1">Scheduled Tasks</h1>
+        <p className="text-base text-muted-foreground mt-0 mb-4">Henry&apos;s automated routines</p>
+        <div className="flex gap-2">
           <button
             onClick={() => setViewMode("week")}
-            style={{
-              ...styles.viewButton,
-              ...(viewMode === "week" && styles.viewButtonActive),
-            }}
+            className={cn(
+              "px-4 py-2 border rounded-md text-sm font-medium cursor-pointer transition-all duration-200",
+              viewMode === "week"
+                ? "bg-primary border-primary text-white"
+                : "bg-card border-border text-muted-foreground"
+            )}
             aria-pressed={viewMode === "week"}
           >
             Week
           </button>
           <button
             onClick={() => setViewMode("today")}
-            style={{
-              ...styles.viewButton,
-              ...(viewMode === "today" && styles.viewButtonActive),
-            }}
+            className={cn(
+              "px-4 py-2 border rounded-md text-sm font-medium cursor-pointer transition-all duration-200",
+              viewMode === "today"
+                ? "bg-primary border-primary text-white"
+                : "bg-card border-border text-muted-foreground"
+            )}
             aria-pressed={viewMode === "today"}
           >
             Today
           </button>
-          <button 
-            style={styles.refreshButton} 
+          <button
+            className="px-3 py-2 bg-card border border-border rounded-md text-base cursor-pointer transition-all duration-200"
             aria-label="Refresh"
             onClick={() => window.location.reload()}
           >
@@ -86,13 +84,13 @@ export function CalendarView({ projectId }: CalendarViewProps) {
       </div>
 
       {recurringTasks.length > 0 && (
-        <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>⚡ Always Running</h2>
-          <div style={styles.recurringList}>
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-foreground mt-0 mb-3">⚡ Always Running</h2>
+          <div className="flex gap-3 flex-wrap">
             {recurringTasks.map((task) => (
-              <div key={task._id} style={styles.recurringTask}>
-                <div style={styles.recurringTaskTitle}>{task.title}</div>
-                <div style={styles.recurringTaskFreq}>
+              <div key={task._id} className="py-3 px-4 bg-card border border-border rounded-lg">
+                <div className="text-sm font-medium text-foreground mb-1">{task.title}</div>
+                <div className="text-xs text-muted-foreground">
                   Every {formatRecurrence(task.recurrence)}
                 </div>
               </div>
@@ -102,27 +100,27 @@ export function CalendarView({ projectId }: CalendarViewProps) {
       )}
 
       {viewMode === "week" && (
-        <div style={styles.weekView}>
+        <div className="grid grid-cols-7 gap-3">
           {weekDays.map((day, i) => {
             const dayTasks = tasksByDay[i] || [];
             const isToday = isSameDay(day, today);
             return (
               <div
                 key={day.toISOString()}
-                style={{
-                  ...styles.dayColumn,
-                  ...(isToday && styles.dayColumnToday),
-                }}
+                className={cn(
+                  "bg-card border border-border rounded-lg overflow-hidden",
+                  isToday && "border-primary ring-2 ring-primary/25"
+                )}
               >
-                <div style={styles.dayHeader}>
-                  <div style={styles.dayName}>
+                <div className="p-3 border-b border-border text-center">
+                  <div className="text-sm font-semibold text-foreground mb-0.5">
                     {day.toLocaleDateString("en-US", { weekday: "short" })}
                   </div>
-                  <div style={styles.dayDate}>
+                  <div className="text-xs text-muted-foreground">
                     {day.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </div>
                 </div>
-                <div style={styles.dayTasks}>
+                <div className="p-2 flex flex-col gap-2">
                   {dayTasks.map((task) => (
                     <TaskCard key={task._id} task={task} />
                   ))}
@@ -134,11 +132,11 @@ export function CalendarView({ projectId }: CalendarViewProps) {
       )}
 
       {viewMode === "today" && (
-        <div style={styles.todayView}>
-          <h2 style={styles.todayTitle}>
+        <div className="max-w-[800px] mx-auto">
+          <h2 className="text-2xl font-semibold text-foreground mt-0 mb-6">
             {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </h2>
-          <div style={styles.todayTasks}>
+          <div className="flex flex-col gap-3">
             {(tasksByDay[today.getDay()] || []).map((task) => (
               <TaskCard key={task._id} task={task} large />
             ))}
@@ -162,27 +160,18 @@ function TaskCard({ task, large }: TaskCardProps) {
       })
     : "All day";
 
-  // Color based on task type
-  let color = colors.accentBlue;
-  if (task.type === "CONTENT") color = colors.accentPurple;
-  else if (task.type === "SOCIAL") color = colors.accentOrange;
-  else if (task.type === "EMAIL_MARKETING") color = colors.accentGreen;
-  else if (task.type === "CUSTOMER_RESEARCH") color = colors.accentYellow;
-  else if (task.type === "SEO_RESEARCH") color = colors.accentBlue;
-  else if (task.type === "ENGINEERING") color = colors.accentRed;
-
   return (
     <div
-      style={{
-        ...styles.taskCard,
-        borderLeftColor: color,
-        ...(large && styles.taskCardLarge),
-      }}
+      className={cn(
+        "py-2 px-3 bg-muted border border-border border-l-[3px] rounded-md cursor-pointer transition-all duration-200",
+        large && "py-3 px-4",
+        taskTypeBorderClass[task.type] ?? "border-l-blue-500"
+      )}
     >
-      <div style={styles.taskTime}>{time}</div>
-      <div style={styles.taskTitle}>{task.title}</div>
+      <div className="text-xs text-muted-foreground mb-1">{time}</div>
+      <div className="text-sm font-medium text-foreground leading-snug">{task.title}</div>
       {task.description && large && (
-        <div style={styles.taskDesc}>{task.description}</div>
+        <div className="text-xs text-muted-foreground mt-1.5 leading-snug">{task.description}</div>
       )}
     </div>
   );
@@ -214,14 +203,12 @@ function groupTasksByDay(tasks: Doc<"tasks">[], weekDays: Date[]): Doc<"tasks">[
         grouped[dayIndex].push(task);
       }
     } else if (task.recurrence) {
-      // Add recurring tasks to all days
       for (let i = 0; i < 7; i++) {
         grouped[i].push(task);
       }
     }
   }
 
-  // Sort tasks by time within each day
   for (const dayTasks of grouped) {
     dayTasks.sort((a, b) => {
       const timeA = a.scheduledFor ?? 0;
@@ -242,170 +229,3 @@ function formatRecurrence(recurrence: Doc<"tasks">["recurrence"]): string {
   }
   return `${interval} ${frequency.toLowerCase()}`;
 }
-
-const styles: Record<string, CSSProperties> = {
-  container: {
-    flex: 1,
-    overflow: "auto",
-    background: colors.bgPage,
-    padding: "24px",
-  },
-  header: {
-    marginBottom: "24px",
-  },
-  title: {
-    fontSize: "1.75rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginTop: 0,
-    marginBottom: "4px",
-  },
-  subtitle: {
-    fontSize: "1rem",
-    color: colors.textSecondary,
-    marginTop: 0,
-    marginBottom: "16px",
-  },
-  controls: {
-    display: "flex",
-    gap: "8px",
-  },
-  viewButton: {
-    padding: "8px 16px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    color: colors.textSecondary,
-    fontSize: "0.875rem",
-    fontWeight: 500,
-    cursor: "pointer",
-    transition: "all 0.2s",
-  },
-  viewButtonActive: {
-    background: colors.accentBlue,
-    borderColor: colors.accentBlue,
-    color: "#fff",
-  },
-  refreshButton: {
-    padding: "8px 12px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    fontSize: "1rem",
-    cursor: "pointer",
-    transition: "all 0.2s",
-  },
-  section: {
-    marginBottom: "32px",
-  },
-  sectionTitle: {
-    fontSize: "1.25rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginTop: 0,
-    marginBottom: "12px",
-  },
-  recurringList: {
-    display: "flex",
-    gap: "12px",
-    flexWrap: "wrap",
-  },
-  recurringTask: {
-    padding: "12px 16px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 8,
-  },
-  recurringTaskTitle: {
-    fontSize: "0.875rem",
-    fontWeight: 500,
-    color: colors.textPrimary,
-    marginBottom: "4px",
-  },
-  recurringTaskFreq: {
-    fontSize: "0.75rem",
-    color: colors.textSecondary,
-  },
-  weekView: {
-    display: "grid",
-    gridTemplateColumns: "repeat(7, 1fr)",
-    gap: "12px",
-  },
-  dayColumn: {
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  dayColumnToday: {
-    borderColor: colors.accentBlue,
-    boxShadow: `0 0 0 2px ${colors.accentBlue}40`,
-  },
-  dayHeader: {
-    padding: "12px",
-    borderBottom: `1px solid ${colors.border}`,
-    textAlign: "center",
-  },
-  dayName: {
-    fontSize: "0.875rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginBottom: "2px",
-  },
-  dayDate: {
-    fontSize: "0.75rem",
-    color: colors.textSecondary,
-  },
-  dayTasks: {
-    padding: "8px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  taskCard: {
-    padding: "8px 12px",
-    background: colors.bgHover,
-    border: `1px solid ${colors.border}`,
-    borderLeft: "3px solid",
-    borderRadius: 6,
-    cursor: "pointer",
-    transition: "all 0.2s",
-  },
-  taskCardLarge: {
-    padding: "12px 16px",
-  },
-  taskTime: {
-    fontSize: "0.75rem",
-    color: colors.textSecondary,
-    marginBottom: "4px",
-  },
-  taskTitle: {
-    fontSize: "0.875rem",
-    fontWeight: 500,
-    color: colors.textPrimary,
-    lineHeight: 1.4,
-  },
-  taskDesc: {
-    fontSize: "0.75rem",
-    color: colors.textSecondary,
-    marginTop: "6px",
-    lineHeight: 1.4,
-  },
-  todayView: {
-    maxWidth: 800,
-    marginLeft: "auto",
-    marginRight: "auto",
-  },
-  todayTitle: {
-    fontSize: "1.5rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginTop: 0,
-    marginBottom: "24px",
-  },
-  todayTasks: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-  },
-};

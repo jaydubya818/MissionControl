@@ -1,26 +1,16 @@
+import { useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import type { Doc, Id } from "../../../convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const FLYOUT_WIDTH = 360;
 
-const colors = {
-  textPrimary: "#e2e8f0",
-  textSecondary: "#94a3b8",
-  textMuted: "#64748b",
-  accentBlue: "#3b82f6",
-  accentGreen: "#10b981",
-  accentOrange: "#f59e0b",
-  accentRed: "#ef4444",
-  accentPurple: "#8b5cf6",
-};
-
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="border-b border-[#334155] py-3 last:border-b-0">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[#94a3b8] mb-2">
+    <div className="border-b border-border py-3 last:border-b-0">
+      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
         {title}
       </h3>
       <div className="space-y-1.5">{children}</div>
@@ -32,22 +22,22 @@ function DetailRow({
   label,
   value,
   mono,
-  valueColor,
+  valueClassName,
 }: {
   label: string;
   value: string;
   mono?: boolean;
-  valueColor?: string;
+  valueClassName?: string;
 }) {
   return (
     <div className="flex justify-between items-start gap-2 text-sm">
-      <span className="text-[#94a3b8] shrink-0">{label}</span>
+      <span className="text-muted-foreground shrink-0">{label}</span>
       <span
         className={cn(
-          "text-right break-all min-w-0",
-          mono && "font-mono text-xs"
+          "text-right break-all min-w-0 text-foreground",
+          mono && "font-mono text-xs",
+          valueClassName
         )}
-        style={valueColor ? { color: valueColor } : { color: colors.textPrimary }}
       >
         {value}
       </span>
@@ -58,21 +48,47 @@ function DetailRow({
 export function AgentDetailFlyout({
   agentId,
   onClose,
+  leftOffset = 320,
+  onEdit,
 }: {
   agentId: Id<"agents">;
   onClose: () => void;
+  /** Distance from the left edge of the viewport in px (default 320 for AgentsFlyout width) */
+  leftOffset?: number;
+  /** Called when the user clicks Edit -- host can navigate to Org view */
+  onEdit?: (agentId: Id<"agents">) => void;
 }) {
+  const panelRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    panelRef.current?.focus({ preventScroll: true });
+    return () => returnFocusRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   const agent = useQuery(api.agents.get, { agentId });
   if (!agent) {
     return (
       <aside
-        className="fixed top-0 bottom-0 z-[60] flex flex-col w-[360px] bg-[#1e293b] border-l border-[#334155] shadow-xl"
-        style={{ right: 320 }}
+        ref={panelRef}
+        className="fixed top-0 bottom-0 z-[60] flex flex-col bg-sidebar border-r border-border shadow-xl animate-in slide-in-from-left duration-200"
+        style={{ left: leftOffset, width: FLYOUT_WIDTH }}
         role="dialog"
+        aria-modal="true"
         aria-label="Agent detail"
+        tabIndex={-1}
       >
-        <div className="p-4 flex items-center justify-between border-b border-[#334155]">
-          <span className="text-[#94a3b8] text-sm">Loading…</span>
+        <div className="p-4 flex items-center justify-between border-b border-border">
+          <span className="text-muted-foreground text-sm">Loading…</span>
           <button
             type="button"
             onClick={onClose}
@@ -101,42 +117,40 @@ export function AgentDetailFlyout({
   const spent = agent.spendToday ?? 0;
   const remaining = Math.max(0, daily - spent);
   const ratio = daily > 0 ? spent / daily : 0;
-  const ratioColor =
-    ratio > 0.9 ? colors.accentRed : ratio > 0.7 ? colors.accentOrange : colors.accentGreen;
+  const ratioClass =
+    ratio > 0.9 ? "text-red-500" : ratio > 0.7 ? "text-amber-500" : "text-emerald-500";
 
   return (
     <aside
-      className="fixed top-0 bottom-0 z-[60] flex flex-col bg-[#1e293b] border-l border-[#334155] shadow-xl animate-in slide-in-from-right duration-200"
-      style={{ right: 320, width: FLYOUT_WIDTH }}
+      ref={panelRef}
+      className="fixed top-0 bottom-0 z-[60] flex flex-col bg-sidebar border-r border-border shadow-xl animate-in slide-in-from-left duration-200"
+      style={{ left: leftOffset, width: FLYOUT_WIDTH }}
       role="dialog"
+      aria-modal="true"
       aria-label={`${agent.name} details`}
+      tabIndex={-1}
     >
-      <div className="shrink-0 p-4 border-b border-[#334155] flex items-start justify-between gap-2">
+      <div className="shrink-0 p-4 border-b border-border flex items-start justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
           <div
-            className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold shrink-0"
-            style={{
-              background: isActive ? "rgba(16, 185, 129, 0.2)" : "rgba(148, 163, 184, 0.2)",
-              color: isActive ? colors.accentGreen : colors.textSecondary,
-            }}
+            className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold shrink-0",
+              isActive ? "bg-emerald-500/20 text-emerald-500" : "bg-slate-400/20 text-muted-foreground"
+            )}
           >
             {agent.emoji || agent.name.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-[#e2e8f0] truncate">{agent.name}</h2>
+            <h2 className="text-lg font-bold text-foreground truncate">{agent.name}</h2>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <span
-                className="px-2 py-0.5 rounded text-xs font-semibold"
-                style={{ background: "rgba(59, 130, 246, 0.2)", color: colors.accentBlue }}
-              >
+              <span className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-500/20 text-blue-500">
                 {roleLabel}
               </span>
               <span
-                className="px-2 py-0.5 rounded text-xs font-semibold"
-                style={{
-                  background: isActive ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)",
-                  color: isActive ? colors.accentGreen : colors.accentOrange,
-                }}
+                className={cn(
+                  "px-2 py-0.5 rounded text-xs font-semibold",
+                  isActive ? "bg-emerald-500/20 text-emerald-500" : "bg-amber-500/20 text-amber-500"
+                )}
               >
                 {agent.status}
               </span>
@@ -173,12 +187,12 @@ export function AgentDetailFlyout({
         <DetailSection title="Configuration">
           {agent.allowedTaskTypes && agent.allowedTaskTypes.length > 0 && (
             <div className="mb-2">
-              <div className="text-[#94a3b8] text-xs mb-1">Allowed Task Types</div>
+              <div className="text-muted-foreground text-xs mb-1">Allowed Task Types</div>
               <div className="flex flex-wrap gap-1.5">
                 {agent.allowedTaskTypes.map((t: string) => (
                   <span
                     key={t}
-                    className="px-2 py-0.5 rounded border border-[#3b82f6] text-xs text-[#e2e8f0]"
+                    className="px-2 py-0.5 rounded border border-primary text-xs text-foreground"
                   >
                     {t}
                   </span>
@@ -202,10 +216,23 @@ export function AgentDetailFlyout({
           <DetailRow
             label="Remaining"
             value={`$${remaining.toFixed(2)}`}
-            valueColor={ratioColor}
+            valueClassName={ratioClass}
           />
         </DetailSection>
       </div>
+
+      {/* Footer with Edit action */}
+      {onEdit && (
+        <div className="shrink-0 p-4 border-t border-border flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onEdit(agentId)}
+            className="px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Edit
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

@@ -10,23 +10,15 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-
-const colors = {
-  bgPage: "#0f172a",
-  bgCard: "#1e293b",
-  bgInput: "#0f172a",
-  border: "#334155",
-  textPrimary: "#e2e8f0",
-  textSecondary: "#94a3b8",
-  textMuted: "#64748b",
-  accentBlue: "#3b82f6",
-  accentGreen: "#10b981",
-  accentOrange: "#f59e0b",
-  accentRed: "#ef4444",
-  accentPurple: "#8b5cf6",
-};
+import { cn } from "@/lib/utils";
 
 type Tab = "directory" | "compliance" | "soul";
+
+const VALIDATION_BADGE: Record<string, { bg: string; text: string }> = {
+  VALID: { bg: "bg-emerald-500/15", text: "text-emerald-500" },
+  PARTIAL: { bg: "bg-amber-500/15", text: "text-amber-500" },
+  INVALID: { bg: "bg-red-500/15", text: "text-red-500" },
+};
 
 export function IdentityDirectoryView({ projectId }: { projectId: Id<"projects"> | null }) {
   const [tab, setTab] = useState<Tab>("directory");
@@ -55,25 +47,20 @@ export function IdentityDirectoryView({ projectId }: { projectId: Id<"projects">
   });
 
   return (
-    <main style={{ flex: 1, overflow: "auto", padding: "24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h2 style={{ color: colors.textPrimary, margin: 0 }}>Identity Directory</h2>
-        <div style={{ display: "flex", gap: 8 }}>
+    <main className="flex-1 overflow-auto p-6">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-foreground font-semibold text-xl">Identity Directory</h2>
+        <div className="flex gap-2">
           {(["directory", "compliance"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              style={{
-                padding: "6px 14px",
-                borderRadius: 6,
-                border: "1px solid " + (tab === t ? colors.accentBlue : colors.border),
-                background: tab === t ? colors.accentBlue + "22" : "transparent",
-                color: tab === t ? colors.accentBlue : colors.textSecondary,
-                cursor: "pointer",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                textTransform: "capitalize",
-              }}
+              className={cn(
+                "px-3.5 py-1.5 rounded-md border text-sm font-semibold capitalize cursor-pointer transition-colors",
+                tab === t
+                  ? "border-blue-500 bg-blue-500/15 text-blue-500"
+                  : "border-border bg-transparent text-muted-foreground hover:text-foreground"
+              )}
             >
               {t}
             </button>
@@ -87,78 +74,46 @@ export function IdentityDirectoryView({ projectId }: { projectId: Id<"projects">
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search agents by name, creature, or vibe..."
-            style={{
-              width: "100%",
-              maxWidth: 400,
-              padding: "8px 12px",
-              borderRadius: 6,
-              border: "1px solid " + colors.border,
-              background: colors.bgInput,
-              color: colors.textPrimary,
-              fontSize: "0.9rem",
-              marginBottom: 20,
-              outline: "none",
-            }}
+            className="w-full max-w-[400px] px-3 py-2 rounded-md border border-border bg-background text-foreground text-sm mb-5 outline-none focus:border-blue-500 transition-colors"
           />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-            {filtered.map((identity: any) => (
-              <div
-                key={identity._id}
-                onClick={() => {
-                  setSelectedAgentId(identity.agentId);
-                  setSoulContent(identity.soulContent ?? "");
-                  setTab("soul");
-                }}
-                style={{
-                  background: colors.bgCard,
-                  border: "1px solid " + colors.border,
-                  borderRadius: 8,
-                  padding: 16,
-                  cursor: "pointer",
-                  transition: "border-color 0.15s",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                  <span style={{ fontSize: "2rem" }}>{identity.emoji ?? "🤖"}</span>
-                  <div>
-                    <div style={{ color: colors.textPrimary, fontWeight: 700, fontSize: "1rem" }}>
-                      {identity.name}
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+            {filtered.map((identity: any) => {
+              const badge = VALIDATION_BADGE[identity.validationStatus] || VALIDATION_BADGE.INVALID;
+              return (
+                <div
+                  key={identity._id}
+                  onClick={() => {
+                    setSelectedAgentId(identity.agentId);
+                    setSoulContent(identity.soulContent ?? "");
+                    setTab("soul");
+                  }}
+                  className="bg-card border border-border rounded-lg p-4 cursor-pointer hover:border-blue-500/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3 mb-2.5">
+                    <span className="text-3xl">{identity.emoji ?? "🤖"}</span>
+                    <div>
+                      <div className="text-foreground font-bold text-base">
+                        {identity.name}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        {identity.creature ?? "—"}
+                      </div>
                     </div>
-                    <div style={{ color: colors.textMuted, fontSize: "0.8rem" }}>
-                      {identity.creature ?? "—"}
-                    </div>
+                    <span className={cn(
+                      "ml-auto px-2 py-0.5 rounded text-[0.7rem] font-semibold",
+                      badge.bg, badge.text
+                    )}>
+                      {identity.validationStatus}
+                    </span>
                   </div>
-                  <span
-                    style={{
-                      marginLeft: "auto",
-                      padding: "2px 8px",
-                      borderRadius: 4,
-                      fontSize: "0.7rem",
-                      fontWeight: 600,
-                      background:
-                        identity.validationStatus === "VALID"
-                          ? colors.accentGreen + "22"
-                          : identity.validationStatus === "PARTIAL"
-                            ? colors.accentOrange + "22"
-                            : colors.accentRed + "22",
-                      color:
-                        identity.validationStatus === "VALID"
-                          ? colors.accentGreen
-                          : identity.validationStatus === "PARTIAL"
-                            ? colors.accentOrange
-                            : colors.accentRed,
-                    }}
-                  >
-                    {identity.validationStatus}
-                  </span>
+                  <div className="text-muted-foreground text-sm">
+                    {identity.vibe ?? "No vibe set"}
+                  </div>
                 </div>
-                <div style={{ color: colors.textSecondary, fontSize: "0.85rem" }}>
-                  {identity.vibe ?? "No vibe set"}
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {filtered.length === 0 && (
-              <div style={{ color: colors.textMuted, gridColumn: "1 / -1", textAlign: "center", padding: 40 }}>
+              <div className="text-muted-foreground col-span-full text-center py-10">
                 {search ? "No agents match your search." : "No agent identities found. Run the identity scanner to populate."}
               </div>
             )}
@@ -168,62 +123,43 @@ export function IdentityDirectoryView({ projectId }: { projectId: Id<"projects">
 
       {tab === "compliance" && complianceReport && (
         <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+          <div className="grid grid-cols-4 gap-4 mb-6">
             {([
-              { label: "Valid", count: complianceReport.valid, color: colors.accentGreen },
-              { label: "Partial", count: complianceReport.partial, color: colors.accentOrange },
-              { label: "Invalid", count: complianceReport.invalid, color: colors.accentRed },
-              { label: "Missing", count: complianceReport.missing, color: colors.textMuted },
+              { label: "Valid", count: complianceReport.valid, classes: "text-emerald-500" },
+              { label: "Partial", count: complianceReport.partial, classes: "text-amber-500" },
+              { label: "Invalid", count: complianceReport.invalid, classes: "text-red-500" },
+              { label: "Missing", count: complianceReport.missing, classes: "text-muted-foreground" },
             ] as const).map((stat) => (
               <div
                 key={stat.label}
-                style={{
-                  background: colors.bgCard,
-                  border: "1px solid " + colors.border,
-                  borderRadius: 8,
-                  padding: 16,
-                  textAlign: "center",
-                }}
+                className="bg-card border border-border rounded-lg p-4 text-center"
               >
-                <div style={{ fontSize: "2rem", fontWeight: 700, color: stat.color }}>{stat.count}</div>
-                <div style={{ color: colors.textSecondary, fontSize: "0.85rem" }}>{stat.label}</div>
+                <div className={cn("text-3xl font-bold", stat.classes)}>{stat.count}</div>
+                <div className="text-muted-foreground text-sm">{stat.label}</div>
               </div>
             ))}
           </div>
 
-          <h3 style={{ color: colors.textPrimary, marginBottom: 12 }}>Agents Needing Attention</h3>
+          <h3 className="text-foreground font-semibold mb-3">Agents Needing Attention</h3>
           {[...complianceReport.details.missing, ...complianceReport.details.invalid, ...complianceReport.details.partial].map((item: any) => (
             <div
               key={item.agent?._id ?? Math.random()}
-              style={{
-                background: colors.bgCard,
-                border: "1px solid " + colors.border,
-                borderRadius: 8,
-                padding: 14,
-                marginBottom: 10,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
+              className="bg-card border border-border rounded-lg px-3.5 py-3 mb-2.5 flex items-center justify-between"
             >
               <div>
-                <span style={{ color: colors.textPrimary, fontWeight: 600 }}>
+                <span className="text-foreground font-semibold">
                   {item.agent?.emoji ?? "🤖"} {item.agent?.name ?? "Unknown"}
                 </span>
-                <span
-                  style={{
-                    marginLeft: 8,
-                    fontSize: "0.75rem",
-                    color:
-                      item.status === "MISSING" ? colors.textMuted
-                        : item.status === "INVALID" ? colors.accentRed
-                          : colors.accentOrange,
-                  }}
-                >
+                <span className={cn(
+                  "ml-2 text-xs",
+                  item.status === "MISSING" ? "text-muted-foreground"
+                    : item.status === "INVALID" ? "text-red-500"
+                    : "text-amber-500"
+                )}>
                   {item.status}
                 </span>
                 {item.identity?.validationErrors?.map((err: string, i: number) => (
-                  <div key={i} style={{ color: colors.accentRed, fontSize: "0.8rem", marginTop: 4 }}>{err}</div>
+                  <div key={i} className="text-red-500 text-xs mt-1">{err}</div>
                 ))}
               </div>
               <button
@@ -235,16 +171,7 @@ export function IdentityDirectoryView({ projectId }: { projectId: Id<"projects">
                     setTab("soul");
                   }
                 }}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  border: "1px solid " + colors.accentBlue,
-                  background: "transparent",
-                  color: colors.accentBlue,
-                  cursor: "pointer",
-                  fontSize: "0.8rem",
-                  fontWeight: 600,
-                }}
+                className="px-3 py-1.5 rounded-md border border-blue-500 bg-transparent text-blue-500 cursor-pointer text-xs font-semibold hover:bg-blue-500/10 transition-colors"
               >
                 Fix It
               </button>
@@ -254,52 +181,34 @@ export function IdentityDirectoryView({ projectId }: { projectId: Id<"projects">
       )}
 
       {tab === "soul" && selectedAgentId && (
-        <div style={{ maxWidth: 700 }}>
+        <div className="max-w-[700px]">
           <button
             onClick={() => { setTab("directory"); setSelectedAgentId(null); setEditingSoul(false); }}
-            style={{
-              background: "none",
-              border: "none",
-              color: colors.accentBlue,
-              cursor: "pointer",
-              marginBottom: 16,
-              fontSize: "0.85rem",
-            }}
+            className="bg-transparent border-none text-blue-500 cursor-pointer mb-4 text-sm hover:text-blue-400 transition-colors"
           >
             ← Back to Directory
           </button>
 
-          <div style={{ background: colors.bgCard, border: "1px solid " + colors.border, borderRadius: 8, padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-              <span style={{ fontSize: "2.5rem" }}>{selectedIdentity?.emoji ?? "🤖"}</span>
+          <div className="bg-card border border-border rounded-lg p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-4xl">{selectedIdentity?.emoji ?? "🤖"}</span>
               <div>
-                <h3 style={{ color: colors.textPrimary, margin: 0 }}>{selectedIdentity?.name ?? "Unknown"}</h3>
-                <div style={{ color: colors.textMuted, fontSize: "0.85rem" }}>
+                <h3 className="text-foreground font-semibold text-lg">{selectedIdentity?.name ?? "Unknown"}</h3>
+                <div className="text-muted-foreground text-sm">
                   {selectedIdentity?.creature ?? "—"} · {selectedIdentity?.vibe ?? "—"}
                 </div>
               </div>
             </div>
 
-            <h4 style={{ color: colors.textSecondary, marginTop: 20, marginBottom: 8 }}>SOUL.md Content</h4>
+            <h4 className="text-muted-foreground mt-5 mb-2 text-sm font-semibold uppercase tracking-wider">SOUL.md Content</h4>
             {editingSoul ? (
               <>
                 <textarea
                   value={soulContent}
                   onChange={(e) => setSoulContent(e.target.value)}
-                  style={{
-                    width: "100%",
-                    minHeight: 300,
-                    padding: 12,
-                    borderRadius: 6,
-                    border: "1px solid " + colors.border,
-                    background: colors.bgInput,
-                    color: colors.textPrimary,
-                    fontFamily: "monospace",
-                    fontSize: "0.85rem",
-                    resize: "vertical",
-                  }}
+                  className="w-full min-h-[300px] p-3 rounded-md border border-border bg-background text-foreground font-mono text-sm resize-y"
                 />
-                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <div className="flex gap-2 mt-3">
                   <button
                     onClick={async () => {
                       if (!selectedAgentId) return;
@@ -315,15 +224,7 @@ export function IdentityDirectoryView({ projectId }: { projectId: Id<"projects">
                       });
                       setEditingSoul(false);
                     }}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: 6,
-                      border: "none",
-                      background: colors.accentBlue,
-                      color: "#fff",
-                      cursor: "pointer",
-                      fontWeight: 600,
-                    }}
+                    className="px-4 py-2 rounded-md border-none bg-blue-500 hover:bg-blue-600 text-white cursor-pointer font-semibold text-sm transition-colors"
                   >
                     Save Soul
                   </button>
@@ -332,14 +233,7 @@ export function IdentityDirectoryView({ projectId }: { projectId: Id<"projects">
                       setEditingSoul(false);
                       setSoulContent(selectedIdentity?.soulContent ?? "");
                     }}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: 6,
-                      border: "1px solid " + colors.border,
-                      background: "transparent",
-                      color: colors.textSecondary,
-                      cursor: "pointer",
-                    }}
+                    className="px-4 py-2 rounded-md border border-border bg-transparent text-muted-foreground cursor-pointer text-sm hover:bg-muted transition-colors"
                   >
                     Cancel
                   </button>
@@ -347,31 +241,12 @@ export function IdentityDirectoryView({ projectId }: { projectId: Id<"projects">
               </>
             ) : (
               <>
-                <pre style={{
-                  color: colors.textSecondary,
-                  fontSize: "0.85rem",
-                  whiteSpace: "pre-wrap",
-                  background: colors.bgInput,
-                  padding: 12,
-                  borderRadius: 6,
-                  border: "1px solid " + colors.border,
-                  maxHeight: 400,
-                  overflow: "auto",
-                }}>
+                <pre className="text-muted-foreground text-sm whitespace-pre-wrap bg-background p-3 rounded-md border border-border max-h-[400px] overflow-auto">
                   {selectedIdentity?.soulContent ?? "No soul content. Click Edit to add."}
                 </pre>
                 <button
                   onClick={() => setEditingSoul(true)}
-                  style={{
-                    marginTop: 12,
-                    padding: "8px 16px",
-                    borderRadius: 6,
-                    border: "1px solid " + colors.accentBlue,
-                    background: "transparent",
-                    color: colors.accentBlue,
-                    cursor: "pointer",
-                    fontWeight: 600,
-                  }}
+                  className="mt-3 px-4 py-2 rounded-md border border-blue-500 bg-transparent text-blue-500 cursor-pointer font-semibold text-sm hover:bg-blue-500/10 transition-colors"
                 >
                   Edit Soul
                 </button>
@@ -380,16 +255,8 @@ export function IdentityDirectoryView({ projectId }: { projectId: Id<"projects">
 
             {selectedIdentity?.toolsNotes && (
               <>
-                <h4 style={{ color: colors.textSecondary, marginTop: 20, marginBottom: 8 }}>TOOLS.md Notes</h4>
-                <pre style={{
-                  color: colors.textMuted,
-                  fontSize: "0.85rem",
-                  whiteSpace: "pre-wrap",
-                  background: colors.bgInput,
-                  padding: 12,
-                  borderRadius: 6,
-                  border: "1px solid " + colors.border,
-                }}>
+                <h4 className="text-muted-foreground mt-5 mb-2 text-sm font-semibold uppercase tracking-wider">TOOLS.md Notes</h4>
+                <pre className="text-muted-foreground text-sm whitespace-pre-wrap bg-background p-3 rounded-md border border-border">
                   {selectedIdentity.toolsNotes}
                 </pre>
               </>

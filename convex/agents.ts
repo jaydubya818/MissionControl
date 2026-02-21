@@ -4,6 +4,8 @@
 
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
+import { ensureInstanceForLegacyAgent, resolveAgentRef } from "./lib/agentResolver";
+import { appendChangeRecord } from "./lib/armAudit";
 
 // ============================================================================
 // QUERIES
@@ -143,6 +145,29 @@ export const register = mutation({
       .first();
     
     if (existing) {
+      const existingRef = await resolveAgentRef(
+        { db: ctx.db as any },
+        { agentId: existing._id, createIfMissing: false }
+      );
+      if (!existingRef) {
+        const resolved = await ensureInstanceForLegacyAgent(
+          { db: ctx.db as any },
+          existing._id
+        );
+        await appendChangeRecord(ctx.db as any, {
+          tenantId: existing.tenantId,
+          projectId: existing.projectId,
+          templateId: resolved.templateId,
+          versionId: resolved.versionId,
+          instanceId: resolved.instanceId,
+          legacyAgentId: existing._id,
+          type: "INSTANCE_CREATED",
+          summary: `Created ARM instance for legacy agent ${existing.name}`,
+          relatedTable: "agents",
+          relatedId: existing._id,
+        });
+      }
+
       // Update existing agent
       await ctx.db.patch(existing._id, {
         emoji: args.emoji ?? existing.emoji,
@@ -163,9 +188,11 @@ export const register = mutation({
       LEAD: { daily: 12.00, perRun: 1.50 },
     };
     const roleDefaults = budgetDefaults[args.role as keyof typeof budgetDefaults] ?? budgetDefaults.INTERN;
+    const project = args.projectId ? await ctx.db.get(args.projectId) : null;
     
     // Create new agent
     const agentId = await ctx.db.insert("agents", {
+      tenantId: project?.tenantId,
       projectId: args.projectId,
       name: args.name,
       emoji: args.emoji,
@@ -195,6 +222,23 @@ export const register = mutation({
       targetType: "AGENT",
       targetId: agentId,
       agentId,
+    });
+
+    const resolved = await ensureInstanceForLegacyAgent(
+      { db: ctx.db as any },
+      agentId
+    );
+    await appendChangeRecord(ctx.db as any, {
+      tenantId: (await ctx.db.get(agentId))?.tenantId,
+      projectId: args.projectId,
+      templateId: resolved.templateId,
+      versionId: resolved.versionId,
+      instanceId: resolved.instanceId,
+      legacyAgentId: agentId,
+      type: "INSTANCE_CREATED",
+      summary: `Created ARM instance for agent ${args.name}`,
+      relatedTable: "agents",
+      relatedId: agentId,
     });
     
     return { agent: await ctx.db.get(agentId), created: true };

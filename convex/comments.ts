@@ -5,6 +5,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { resolveAgentRef } from "./lib/agentResolver";
 
 // ============================================================================
 // QUERIES
@@ -83,13 +84,21 @@ export const post = mutation({
     }
 
     // Create comment
+    const authorRef = args.authorAgentId
+      ? await resolveAgentRef(
+          { db: ctx.db as any },
+          { agentId: args.authorAgentId, createIfMissing: true }
+        )
+      : null;
     const commentId = await ctx.db.insert("messages", {
+      tenantId: task.tenantId,
       projectId: task.projectId,
       idempotencyKey: args.idempotencyKey || `comment-${args.taskId}-${Date.now()}`,
       taskId: args.taskId,
       type: "COMMENT",
       authorType: args.authorType,
       authorAgentId: args.authorAgentId,
+      authorInstanceId: authorRef?.instanceId,
       authorUserId: args.authorUserId,
       content: args.content,
     });

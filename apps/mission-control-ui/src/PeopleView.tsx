@@ -1,44 +1,27 @@
-import { CSSProperties, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { AddPersonModal } from "./AddPersonModal";
 import { EditPersonModal } from "./EditPersonModal";
+import { cn } from "@/lib/utils";
 
 interface PeopleViewProps {
   projectId: Id<"projects"> | null;
 }
 
-// ============================================================================
-// ROLE BADGE CONFIG
-// ============================================================================
-
-const ROLE_BADGE_CONFIG: Record<string, { color: string; bg: string }> = {
-  OWNER: { color: "#fbbf24", bg: "rgba(251, 191, 36, 0.12)" },
-  ADMIN: { color: "#ef4444", bg: "rgba(239, 68, 68, 0.12)" },
-  MANAGER: { color: "#f59e0b", bg: "rgba(245, 158, 11, 0.12)" },
-  MEMBER: { color: "#3b82f6", bg: "rgba(59, 130, 246, 0.12)" },
-  VIEWER: { color: "#64748b", bg: "rgba(100, 116, 139, 0.12)" },
+const ROLE_BADGE_CLASSES: Record<string, string> = {
+  OWNER: "text-amber-400 bg-amber-500/10 border-amber-400/20",
+  ADMIN: "text-red-500 bg-red-500/10 border-red-500/20",
+  MANAGER: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+  MEMBER: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+  VIEWER: "text-slate-500 bg-slate-500/10 border-slate-500/20",
 };
 
-const colors = {
-  bgPage: "#0f172a",
-  bgCard: "#1e293b",
-  bgHover: "#25334d",
-  border: "#334155",
-  textPrimary: "#e2e8f0",
-  textSecondary: "#94a3b8",
-  textMuted: "#64748b",
-  accentBlue: "#3b82f6",
-  accentGreen: "#10b981",
-  accentPurple: "#8b5cf6",
-  accentOrange: "#f59e0b",
-  accentRed: "#ef4444",
+const ACCESS_LEVEL_CLASSES: Record<string, string> = {
+  ADMIN: "text-red-500",
+  EDIT: "text-amber-500",
 };
-
-// ============================================================================
-// MAIN VIEW
-// ============================================================================
 
 export function PeopleView({ projectId }: PeopleViewProps) {
   const orgMembers = useQuery(api.orgMembers.list, {
@@ -53,13 +36,14 @@ export function PeopleView({ projectId }: PeopleViewProps) {
 
   if (!orgMembers) {
     return (
-      <main style={styles.container}>
-        <div style={styles.loading}>Loading team...</div>
+      <main className="flex-1 overflow-auto bg-background p-6">
+        <div className="flex items-center justify-center h-full text-muted-foreground">
+          Loading team...
+        </div>
       </main>
     );
   }
 
-  // Filter members
   const filtered = orgMembers.filter((m) => {
     const matchesSearch =
       !searchQuery ||
@@ -73,7 +57,6 @@ export function PeopleView({ projectId }: PeopleViewProps) {
     return matchesSearch && matchesRole;
   });
 
-  // Count by role
   const roleCounts: Record<string, number> = {};
   orgMembers.forEach((m) => {
     const sr = (m as any).systemRole || "MEMBER";
@@ -85,35 +68,40 @@ export function PeopleView({ projectId }: PeopleViewProps) {
   };
 
   return (
-    <main style={styles.container}>
+    <main className="flex-1 overflow-auto bg-background p-6">
       {/* Header */}
-      <div style={styles.header}>
+      <div className="flex justify-between items-start mb-5">
         <div>
-          <h1 style={styles.title}>People</h1>
-          <p style={styles.subtitle}>
+          <h1 className="text-3xl font-semibold text-foreground mt-0 mb-1">People</h1>
+          <p className="text-base text-muted-foreground mt-0">
             {orgMembers.length} team member{orgMembers.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <button style={styles.addButton} onClick={() => setShowAddModal(true)}>
+        <button
+          className="px-5 py-2.5 text-sm font-semibold bg-blue-500 hover:bg-blue-600 border-none rounded-lg text-white cursor-pointer transition-opacity whitespace-nowrap"
+          onClick={() => setShowAddModal(true)}
+        >
           + Add Member
         </button>
       </div>
 
       {/* Filters */}
-      <div style={styles.filterBar}>
+      <div className="flex flex-col gap-3 mb-6">
         <input
-          style={styles.searchInput}
+          className="px-3.5 py-2.5 bg-card border border-border rounded-lg text-foreground text-sm outline-none max-w-[420px] focus:border-blue-500 transition-colors"
           placeholder="Search by name, email, or role..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           aria-label="Search team members by name, email, or role"
         />
-        <div style={styles.roleFilters}>
+        <div className="flex gap-2 flex-wrap">
           <button
-            style={{
-              ...styles.filterChip,
-              ...(roleFilter === null ? styles.filterChipActive : {}),
-            }}
+            className={cn(
+              "px-3.5 py-1 text-[0.8125rem] font-medium rounded-full border cursor-pointer transition-all",
+              roleFilter === null
+                ? "border-blue-500 text-blue-500 bg-blue-500/10"
+                : "border-border text-muted-foreground bg-transparent hover:text-foreground"
+            )}
             onClick={() => setRoleFilter(null)}
           >
             All ({orgMembers.length})
@@ -122,10 +110,12 @@ export function PeopleView({ projectId }: PeopleViewProps) {
             roleCounts[r] ? (
               <button
                 key={r}
-                style={{
-                  ...styles.filterChip,
-                  ...(roleFilter === r ? styles.filterChipActive : {}),
-                }}
+                className={cn(
+                  "px-3.5 py-1 text-[0.8125rem] font-medium rounded-full border cursor-pointer transition-all",
+                  roleFilter === r
+                    ? "border-blue-500 text-blue-500 bg-blue-500/10"
+                    : "border-border text-muted-foreground bg-transparent hover:text-foreground"
+                )}
                 onClick={() => setRoleFilter(roleFilter === r ? null : r)}
               >
                 {r.charAt(0) + r.slice(1).toLowerCase()} ({roleCounts[r]})
@@ -136,7 +126,7 @@ export function PeopleView({ projectId }: PeopleViewProps) {
       </div>
 
       {/* People Grid */}
-      <div style={styles.peopleGrid}>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4">
         {filtered.map((member) => (
           <PersonCard
             key={member._id}
@@ -148,24 +138,24 @@ export function PeopleView({ projectId }: PeopleViewProps) {
       </div>
 
       {filtered.length === 0 && orgMembers.length > 0 && (
-        <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>🔍</div>
-          <div style={styles.emptyTitle}>No matching members</div>
-          <div style={styles.emptyText}>
+        <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+          <div className="text-6xl mb-4">🔍</div>
+          <div className="text-2xl font-semibold text-foreground mb-2">No matching members</div>
+          <div className="text-base text-muted-foreground">
             Try adjusting your search or filters
           </div>
         </div>
       )}
 
       {orgMembers.length === 0 && (
-        <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>👥</div>
-          <div style={styles.emptyTitle}>No team members yet</div>
-          <div style={styles.emptyText}>
+        <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+          <div className="text-6xl mb-4">👥</div>
+          <div className="text-2xl font-semibold text-foreground mb-2">No team members yet</div>
+          <div className="text-base text-muted-foreground">
             Add team members to build your directory and assign roles
           </div>
           <button
-            style={{ ...styles.addButton, marginTop: "16px" }}
+            className="mt-4 px-5 py-2.5 text-sm font-semibold bg-blue-500 hover:bg-blue-600 border-none rounded-lg text-white cursor-pointer transition-opacity whitespace-nowrap"
             onClick={() => setShowAddModal(true)}
           >
             + Add First Member
@@ -188,10 +178,6 @@ export function PeopleView({ projectId }: PeopleViewProps) {
   );
 }
 
-// ============================================================================
-// PERSON CARD
-// ============================================================================
-
 interface PersonCardProps {
   member: Doc<"orgMembers">;
   getProjectName: (pid: Id<"projects">) => string;
@@ -204,11 +190,11 @@ function PersonCard({ member, getProjectName, onClick }: PersonCardProps) {
     | { projectId: Id<"projects">; accessLevel: string }[]
     | undefined;
   const permissions = (member as any).permissions as string[] | undefined;
-  const badge = ROLE_BADGE_CONFIG[systemRole] || ROLE_BADGE_CONFIG.MEMBER;
+  const badgeClasses = ROLE_BADGE_CLASSES[systemRole] || ROLE_BADGE_CLASSES.MEMBER;
 
   return (
     <div
-      style={styles.personCard}
+      className="p-5 bg-card border border-border rounded-xl cursor-pointer transition-all hover:border-blue-500/50 flex flex-col gap-3 relative"
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
       tabIndex={0}
@@ -216,44 +202,36 @@ function PersonCard({ member, getProjectName, onClick }: PersonCardProps) {
       aria-label={`View details for ${member.name}`}
     >
       {/* Top row: avatar + info */}
-      <div style={styles.cardTopRow}>
-        <div
-          style={{
-            ...styles.avatar,
-            background: member.active ? colors.accentBlue : colors.textMuted,
-          }}
-        >
+      <div className="flex gap-4 items-start">
+        <div className={cn(
+          "w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-semibold shrink-0",
+          member.active ? "bg-blue-500" : "bg-slate-500"
+        )}>
           {member.avatar || member.name.charAt(0).toUpperCase()}
         </div>
-        <div style={styles.cardTopInfo}>
-          <div style={styles.personName}>{member.name}</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-lg font-semibold text-foreground mb-0.5">{member.name}</div>
           {member.title && (
-            <div style={styles.personTitle}>{member.title}</div>
+            <div className="text-[0.8125rem] text-muted-foreground mb-0.5">{member.title}</div>
           )}
-          <div style={styles.personRole}>{member.role}</div>
+          <div className="text-[0.8125rem] font-medium text-blue-500">{member.role}</div>
         </div>
       </div>
 
       {/* System role badge */}
-      <div style={styles.badgeRow}>
-        <span
-          style={{
-            ...styles.roleBadge,
-            color: badge.color,
-            background: badge.bg,
-            border: `1px solid ${badge.color}33`,
-          }}
-        >
+      <div className="flex items-center gap-2.5">
+        <span className={cn(
+          "px-2.5 py-0.5 text-[0.6875rem] font-bold rounded-full tracking-wide uppercase border",
+          badgeClasses
+        )}>
           {systemRole}
         </span>
-        <div style={styles.personStatusInline}>
-          <div
-            style={{
-              ...styles.statusDot,
-              background: member.active ? colors.accentGreen : colors.textMuted,
-            }}
-          />
-          <span style={styles.statusText}>
+        <div className="flex items-center gap-1.5">
+          <div className={cn(
+            "w-2 h-2 rounded-full",
+            member.active ? "bg-emerald-500" : "bg-slate-500"
+          )} />
+          <span className="text-xs text-muted-foreground">
             {member.active ? "Active" : "Inactive"}
           </span>
         </div>
@@ -263,7 +241,7 @@ function PersonCard({ member, getProjectName, onClick }: PersonCardProps) {
       {member.email && (
         <a
           href={`mailto:${member.email}`}
-          style={styles.personEmail}
+          className="text-[0.8125rem] text-blue-500 no-underline hover:underline"
           onClick={(e) => e.stopPropagation()}
         >
           {member.email}
@@ -272,29 +250,26 @@ function PersonCard({ member, getProjectName, onClick }: PersonCardProps) {
 
       {/* Project access */}
       {projectAccess && projectAccess.length > 0 && (
-        <div style={styles.projectAccessSection}>
-          <div style={styles.sectionLabel}>Project Access</div>
-          <div style={styles.projectChips}>
-            {projectAccess.slice(0, 3).map((pa) => {
-              const alColor =
-                pa.accessLevel === "ADMIN"
-                  ? colors.accentRed
-                  : pa.accessLevel === "EDIT"
-                  ? colors.accentOrange
-                  : colors.accentBlue;
-              return (
-                <span key={pa.projectId} style={styles.projectChip}>
-                  <span style={styles.projectChipName}>
-                    {getProjectName(pa.projectId)}
-                  </span>
-                  <span style={{ ...styles.projectChipLevel, color: alColor }}>
-                    {pa.accessLevel}
-                  </span>
+        <div className="flex flex-col gap-1.5 pt-2 border-t border-border">
+          <div className="text-[0.6875rem] font-bold text-muted-foreground uppercase tracking-wide">
+            Project Access
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {projectAccess.slice(0, 3).map((pa) => (
+              <span key={pa.projectId} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-background border border-border rounded-md text-xs">
+                <span className="text-muted-foreground">
+                  {getProjectName(pa.projectId)}
                 </span>
-              );
-            })}
+                <span className={cn(
+                  "font-semibold text-[0.6875rem]",
+                  ACCESS_LEVEL_CLASSES[pa.accessLevel] || "text-blue-500"
+                )}>
+                  {pa.accessLevel}
+                </span>
+              </span>
+            ))}
             {projectAccess.length > 3 && (
-              <span style={styles.moreChip}>
+              <span className="px-2.5 py-0.5 text-xs text-muted-foreground bg-background rounded-md border border-border">
                 +{projectAccess.length - 3} more
               </span>
             )}
@@ -304,7 +279,7 @@ function PersonCard({ member, getProjectName, onClick }: PersonCardProps) {
 
       {/* Permissions count */}
       {permissions && permissions.length > 0 && (
-        <div style={styles.permissionCount}>
+        <div className="text-xs text-muted-foreground">
           {permissions.length} permission{permissions.length !== 1 ? "s" : ""}{" "}
           granted
         </div>
@@ -312,16 +287,18 @@ function PersonCard({ member, getProjectName, onClick }: PersonCardProps) {
 
       {/* Responsibilities */}
       {member.responsibilities && member.responsibilities.length > 0 && (
-        <div style={styles.responsibilities}>
-          <div style={styles.sectionLabel}>Responsibilities</div>
-          <ul style={styles.responsibilitiesList}>
+        <div className="flex flex-col gap-1.5 pt-2 border-t border-border">
+          <div className="text-[0.6875rem] font-bold text-muted-foreground uppercase tracking-wide">
+            Responsibilities
+          </div>
+          <ul className="mt-0 mb-0 pl-4.5">
             {member.responsibilities.slice(0, 3).map((resp, i) => (
-              <li key={i} style={styles.responsibilityItem}>
+              <li key={i} className="text-[0.8125rem] text-muted-foreground leading-relaxed">
                 {resp}
               </li>
             ))}
             {member.responsibilities.length > 3 && (
-              <li style={styles.responsibilityItem}>
+              <li className="text-[0.8125rem] text-muted-foreground leading-relaxed">
                 +{member.responsibilities.length - 3} more...
               </li>
             )}
@@ -330,281 +307,9 @@ function PersonCard({ member, getProjectName, onClick }: PersonCardProps) {
       )}
 
       {/* Edit hint */}
-      <div style={styles.editHint}>Click to edit</div>
+      <div className="absolute bottom-2 right-3 text-[0.6875rem] text-muted-foreground opacity-50">
+        Click to edit
+      </div>
     </div>
   );
 }
-
-// ============================================================================
-// STYLES
-// ============================================================================
-
-const styles: Record<string, CSSProperties> = {
-  container: {
-    flex: 1,
-    overflow: "auto",
-    background: colors.bgPage,
-    padding: "24px",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: "20px",
-  },
-  title: {
-    fontSize: "1.75rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginTop: 0,
-    marginBottom: "4px",
-  },
-  subtitle: {
-    fontSize: "1rem",
-    color: colors.textSecondary,
-    marginTop: 0,
-  },
-  addButton: {
-    padding: "10px 20px",
-    fontSize: "0.875rem",
-    fontWeight: 600,
-    background: colors.accentBlue,
-    border: "none",
-    borderRadius: 8,
-    color: "#fff",
-    cursor: "pointer",
-    transition: "opacity 0.15s",
-    whiteSpace: "nowrap",
-  },
-  // Filters
-  filterBar: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-    marginBottom: "24px",
-  },
-  searchInput: {
-    padding: "10px 14px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 8,
-    color: colors.textPrimary,
-    fontSize: "0.875rem",
-    outline: "none",
-    maxWidth: 420,
-  },
-  roleFilters: {
-    display: "flex",
-    gap: "8px",
-    flexWrap: "wrap",
-  },
-  filterChip: {
-    padding: "5px 14px",
-    fontSize: "0.8125rem",
-    fontWeight: 500,
-    background: "transparent",
-    border: `1px solid ${colors.border}`,
-    borderRadius: 20,
-    color: colors.textSecondary,
-    cursor: "pointer",
-    transition: "all 0.15s",
-  },
-  filterChipActive: {
-    borderColor: colors.accentBlue,
-    color: colors.accentBlue,
-    background: "rgba(59, 130, 246, 0.08)",
-  },
-  // Grid
-  peopleGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
-    gap: "16px",
-  },
-  personCard: {
-    padding: "20px",
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 10,
-    cursor: "pointer",
-    transition: "border-color 0.15s, box-shadow 0.15s",
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-    position: "relative",
-  },
-  cardTopRow: {
-    display: "flex",
-    gap: "16px",
-    alignItems: "flex-start",
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#fff",
-    fontSize: "1.5rem",
-    fontWeight: 600,
-    flexShrink: 0,
-  },
-  cardTopInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  personName: {
-    fontSize: "1.1rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginBottom: "2px",
-  },
-  personTitle: {
-    fontSize: "0.8125rem",
-    color: colors.textSecondary,
-    marginBottom: "2px",
-  },
-  personRole: {
-    fontSize: "0.8125rem",
-    fontWeight: 500,
-    color: colors.accentPurple,
-  },
-  badgeRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-  },
-  roleBadge: {
-    padding: "3px 10px",
-    fontSize: "0.6875rem",
-    fontWeight: 700,
-    borderRadius: 12,
-    letterSpacing: "0.5px",
-    textTransform: "uppercase",
-  },
-  personStatusInline: {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: "50%",
-  },
-  statusText: {
-    fontSize: "0.75rem",
-    color: colors.textMuted,
-  },
-  personEmail: {
-    fontSize: "0.8125rem",
-    color: colors.accentBlue,
-    textDecoration: "none",
-  },
-  // Project access chips
-  projectAccessSection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-    paddingTop: "8px",
-    borderTop: `1px solid ${colors.border}`,
-  },
-  sectionLabel: {
-    fontSize: "0.6875rem",
-    fontWeight: 700,
-    color: colors.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: "0.5px",
-  },
-  projectChips: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "6px",
-  },
-  projectChip: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "6px",
-    padding: "3px 10px",
-    background: colors.bgPage,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    fontSize: "0.75rem",
-  },
-  projectChipName: {
-    color: colors.textSecondary,
-  },
-  projectChipLevel: {
-    fontWeight: 600,
-    fontSize: "0.6875rem",
-  },
-  moreChip: {
-    padding: "3px 10px",
-    fontSize: "0.75rem",
-    color: colors.textMuted,
-    background: colors.bgPage,
-    borderRadius: 6,
-    border: `1px solid ${colors.border}`,
-  },
-  permissionCount: {
-    fontSize: "0.75rem",
-    color: colors.textMuted,
-  },
-  // Responsibilities
-  responsibilities: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-    paddingTop: "8px",
-    borderTop: `1px solid ${colors.border}`,
-  },
-  responsibilitiesList: {
-    marginTop: 0,
-    marginBottom: 0,
-    paddingLeft: "18px",
-  },
-  responsibilityItem: {
-    fontSize: "0.8125rem",
-    color: colors.textSecondary,
-    lineHeight: 1.5,
-  },
-  editHint: {
-    position: "absolute",
-    bottom: 8,
-    right: 12,
-    fontSize: "0.6875rem",
-    color: colors.textMuted,
-    opacity: 0.5,
-  },
-  // Empty states
-  emptyState: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "64px 24px",
-    textAlign: "center",
-  },
-  emptyIcon: {
-    fontSize: "4rem",
-    marginBottom: "16px",
-  },
-  emptyTitle: {
-    fontSize: "1.5rem",
-    fontWeight: 600,
-    color: colors.textPrimary,
-    marginBottom: "8px",
-  },
-  emptyText: {
-    fontSize: "1rem",
-    color: colors.textSecondary,
-  },
-  loading: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    height: "100%",
-    color: colors.textSecondary,
-    fontSize: "1rem",
-  },
-};

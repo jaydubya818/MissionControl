@@ -9,6 +9,8 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { sanitizeMessageContent } from "./lib/sanitize";
+import { resolveAgentRef } from "./lib/agentResolver";
+import { appendOpEvent } from "./lib/armAudit";
 
 // ============================================================================
 // QUERIES
@@ -102,13 +104,21 @@ async function postMessageInternal(
 
   // Sanitize content (OpenClaw: untrusted DM/webhook input)
   const content = sanitizeMessageContent(args.content);
+  const authorRef = args.authorAgentId
+    ? await resolveAgentRef(
+        { db: ctx.db as any },
+        { agentId: args.authorAgentId, createIfMissing: true }
+      )
+    : null;
 
   // Create message
   const messageId = await ctx.db.insert("messages", {
+    tenantId: task.tenantId,
     projectId: task.projectId,
     taskId: args.taskId,
     authorType: args.authorType as any,
     authorAgentId: args.authorAgentId,
+    authorInstanceId: authorRef?.instanceId,
     authorUserId: args.authorUserId,
     type: args.type as any,
     content,
@@ -158,6 +168,19 @@ async function postMessageInternal(
   }
 
   const message = await ctx.db.get(messageId);
+  if (message) {
+    await appendOpEvent(ctx.db as any, {
+      tenantId: message.tenantId,
+      projectId: message.projectId,
+      instanceId: message.authorInstanceId,
+      taskId: message.taskId,
+      type: "MESSAGE_SENT",
+      payload: {
+        messageId,
+        messageType: message.type,
+      },
+    });
+  }
   return { message, created: true };
 }
 
@@ -354,6 +377,7 @@ export const postReview = mutation({
     } else if (args.reviewType === "APPROVE" && args.authorAgentId) {
       // Create approval record for REVIEW → DONE
       await ctx.db.insert("approvals", {
+        tenantId: task.tenantId,
         projectId: task.projectId,
         taskId: args.taskId,
         requestorAgentId: args.authorAgentId,

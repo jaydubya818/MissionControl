@@ -1,30 +1,13 @@
-import { CSSProperties, useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
 
 interface OfficeViewProps {
   projectId: Id<"projects"> | null;
 }
-
-const colors = {
-  bgPage: "#0f172a",
-  bgCard: "#1e293b",
-  bgCardHover: "#253347",
-  bgHover: "#25334d",
-  border: "#334155",
-  borderSubtle: "#1e293b",
-  textPrimary: "#e2e8f0",
-  textSecondary: "#94a3b8",
-  textMuted: "#64748b",
-  accentBlue: "#3b82f6",
-  accentGreen: "#10b981",
-  accentOrange: "#f59e0b",
-  accentPurple: "#8b5cf6",
-  accentRed: "#ef4444",
-  accentCyan: "#06b6d4",
-};
 
 type AgentStatusType = "ACTIVE" | "PAUSED" | "DRAINED" | "QUARANTINED" | "OFFLINE";
 
@@ -32,18 +15,18 @@ function getStatusConfig(status: AgentStatusType, hasTask: boolean) {
   switch (status) {
     case "ACTIVE":
       return hasTask
-        ? { color: colors.accentGreen, label: "Working", glow: true, pulse: true }
-        : { color: colors.accentBlue, label: "Idle", glow: false, pulse: false };
+        ? { twText: "text-emerald-400", twBg: "bg-emerald-500", twBorder: "border-emerald-500", twBgFaint: "bg-emerald-500/20", label: "Working", glow: true, pulse: true }
+        : { twText: "text-blue-400", twBg: "bg-blue-500", twBorder: "border-blue-500", twBgFaint: "bg-blue-500/20", label: "Idle", glow: false, pulse: false };
     case "PAUSED":
-      return { color: colors.accentOrange, label: "Paused", glow: false, pulse: false };
+      return { twText: "text-amber-400", twBg: "bg-amber-500", twBorder: "border-amber-500", twBgFaint: "bg-amber-500/20", label: "Paused", glow: false, pulse: false };
     case "DRAINED":
-      return { color: colors.accentOrange, label: "Draining", glow: false, pulse: false };
+      return { twText: "text-amber-400", twBg: "bg-amber-500", twBorder: "border-amber-500", twBgFaint: "bg-amber-500/20", label: "Draining", glow: false, pulse: false };
     case "QUARANTINED":
-      return { color: colors.accentRed, label: "Quarantined", glow: true, pulse: true };
+      return { twText: "text-red-400", twBg: "bg-red-500", twBorder: "border-red-500", twBgFaint: "bg-red-500/20", label: "Quarantined", glow: true, pulse: true };
     case "OFFLINE":
-      return { color: colors.textMuted, label: "Offline", glow: false, pulse: false };
+      return { twText: "text-muted-foreground", twBg: "bg-muted-foreground", twBorder: "border-muted-foreground", twBgFaint: "bg-muted-foreground/20", label: "Offline", glow: false, pulse: false };
     default:
-      return { color: colors.textMuted, label: status, glow: false, pulse: false };
+      return { twText: "text-muted-foreground", twBg: "bg-muted-foreground", twBorder: "border-muted-foreground", twBgFaint: "bg-muted-foreground/20", label: status, glow: false, pulse: false };
   }
 }
 
@@ -71,13 +54,13 @@ function formatElapsed(startedAt: number): string {
 function getRoleBadge(role: string) {
   switch (role) {
     case "LEAD":
-      return { bg: `${colors.accentPurple}25`, color: colors.accentPurple, label: "Lead" };
+      return { twBg: "bg-blue-500/15", twText: "text-blue-400", label: "Lead" };
     case "SPECIALIST":
-      return { bg: `${colors.accentBlue}25`, color: colors.accentBlue, label: "Specialist" };
+      return { twBg: "bg-blue-500/15", twText: "text-blue-400", label: "Specialist" };
     case "INTERN":
-      return { bg: `${colors.accentCyan}25`, color: colors.accentCyan, label: "Intern" };
+      return { twBg: "bg-cyan-500/15", twText: "text-cyan-400", label: "Intern" };
     default:
-      return { bg: `${colors.textMuted}25`, color: colors.textMuted, label: role };
+      return { twBg: "bg-muted", twText: "text-muted-foreground", label: role };
   }
 }
 
@@ -90,7 +73,6 @@ export function OfficeView({ projectId }: OfficeViewProps) {
   const [resetting, setResetting] = useState(false);
   const [, setTick] = useState(0);
 
-  // Tick every 10s for heartbeat age updates
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 10_000);
     return () => clearInterval(interval);
@@ -108,7 +90,6 @@ export function OfficeView({ projectId }: OfficeViewProps) {
 
   const filteredAgents = useMemo(() => {
     const base = filterStatus === "ALL" ? agentsWithTasks : agentsWithTasks.filter((a) => a.agent.status === filterStatus);
-    // Sort: working first, then idle/active, then paused, then quarantined, then offline
     const statusOrder: Record<string, number> = {
       ACTIVE: 0,
       PAUSED: 2,
@@ -126,7 +107,6 @@ export function OfficeView({ projectId }: OfficeViewProps) {
     });
   }, [agentsWithTasks, filterStatus]);
 
-  // Stats
   const stats = useMemo(() => {
     if (!agents) return { total: 0, active: 0, working: 0, idle: 0, paused: 0, offline: 0, quarantined: 0 };
     const active = agents.filter((a) => a.status === "ACTIVE");
@@ -144,27 +124,27 @@ export function OfficeView({ projectId }: OfficeViewProps) {
 
   if (!agents) {
     return (
-      <main style={styles.container}>
-        <div style={styles.loadingContainer}>
+      <main className="flex-1 overflow-auto bg-background p-6">
+        <div className="flex flex-col items-center justify-center h-full">
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-            style={styles.spinner}
+            className="w-7 h-7 border-3 border-border border-t-primary rounded-full"
           />
-          <div style={{ color: colors.textSecondary, marginTop: 12 }}>Loading office...</div>
+          <div className="text-muted-foreground mt-3">Loading office...</div>
         </div>
       </main>
     );
   }
 
   return (
-    <main style={styles.container}>
+    <main className="flex-1 overflow-auto bg-background p-6">
       {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.headerTop}>
+      <div className="mb-6">
+        <div className="flex items-start justify-between mb-4">
           <div>
-            <h1 style={styles.title}>Agent Office</h1>
-            <p style={styles.subtitle}>Real-time agent workstation view</p>
+            <h1 className="text-2xl font-bold text-foreground m-0">Agent Office</h1>
+            <p className="text-sm text-muted-foreground mt-0.5 mb-0">Real-time agent workstation view</p>
           </div>
           {stats.quarantined > 0 && (
             <button
@@ -180,19 +160,10 @@ export function OfficeView({ projectId }: OfficeViewProps) {
                 }
               }}
               disabled={resetting}
-              style={{
-                padding: "8px 18px",
-                fontSize: "0.8rem",
-                fontWeight: 600,
-                background: resetting ? colors.textMuted : colors.accentGreen,
-                border: "none",
-                borderRadius: 8,
-                color: "#fff",
-                cursor: resetting ? "not-allowed" : "pointer",
-                transition: "opacity 0.15s",
-                whiteSpace: "nowrap",
-                alignSelf: "flex-start",
-              }}
+              className={cn(
+                "px-4 py-2 text-xs font-semibold border-none rounded-lg text-white cursor-pointer transition-opacity whitespace-nowrap self-start",
+                resetting ? "bg-muted-foreground cursor-not-allowed" : "bg-emerald-500"
+              )}
             >
               {resetting ? "Resetting..." : `Reset ${stats.quarantined} Quarantined`}
             </button>
@@ -200,40 +171,55 @@ export function OfficeView({ projectId }: OfficeViewProps) {
         </div>
 
         {/* Stats Row */}
-        <div style={styles.statsRow}>
+        <div className="flex gap-2 flex-wrap">
           <StatChip
             label={`All (${stats.total})`}
             value={stats.total}
-            color={colors.textSecondary}
+            colorClass="text-muted-foreground"
+            dotClass="bg-muted-foreground"
+            activeBorderClass="border-muted-foreground"
+            activeBgClass="bg-muted-foreground/15"
             active={filterStatus === "ALL"}
             onClick={() => setFilterStatus("ALL")}
             hideValue
           />
-          <span style={{ width: 1, height: 20, background: colors.border, flexShrink: 0 }} />
+          <span className="w-px h-5 bg-border shrink-0" />
           <StatChip
             label="Working"
             value={stats.working}
-            color={colors.accentGreen}
+            colorClass="text-emerald-400"
+            dotClass="bg-emerald-500"
+            activeBorderClass="border-emerald-500"
+            activeBgClass="bg-emerald-500/15"
             active={filterStatus === "ACTIVE"}
             onClick={() => setFilterStatus(filterStatus === "ACTIVE" ? "ALL" : "ACTIVE")}
           />
           <StatChip
             label="Idle"
             value={stats.idle}
-            color={colors.accentBlue}
+            colorClass="text-blue-400"
+            dotClass="bg-blue-500"
+            activeBorderClass="border-blue-500"
+            activeBgClass="bg-blue-500/15"
             active={false}
           />
           <StatChip
             label="Paused"
             value={stats.paused}
-            color={colors.accentOrange}
+            colorClass="text-amber-400"
+            dotClass="bg-amber-500"
+            activeBorderClass="border-amber-500"
+            activeBgClass="bg-amber-500/15"
             active={filterStatus === "PAUSED"}
             onClick={() => setFilterStatus(filterStatus === "PAUSED" ? "ALL" : "PAUSED")}
           />
           <StatChip
             label="Offline"
             value={stats.offline}
-            color={colors.textMuted}
+            colorClass="text-muted-foreground"
+            dotClass="bg-muted-foreground"
+            activeBorderClass="border-muted-foreground"
+            activeBgClass="bg-muted-foreground/15"
             active={filterStatus === "OFFLINE"}
             onClick={() => setFilterStatus(filterStatus === "OFFLINE" ? "ALL" : "OFFLINE")}
           />
@@ -241,7 +227,10 @@ export function OfficeView({ projectId }: OfficeViewProps) {
             <StatChip
               label="Quarantined"
               value={stats.quarantined}
-              color={colors.accentRed}
+              colorClass="text-red-400"
+              dotClass="bg-red-500"
+              activeBorderClass="border-red-500"
+              activeBgClass="bg-red-500/15"
               active={filterStatus === "QUARANTINED"}
               onClick={() =>
                 setFilterStatus(filterStatus === "QUARANTINED" ? "ALL" : "QUARANTINED")
@@ -252,7 +241,7 @@ export function OfficeView({ projectId }: OfficeViewProps) {
       </div>
 
       {/* Agent Grid */}
-      <div style={styles.grid}>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
         <AnimatePresence mode="popLayout">
           {filteredAgents.map(({ agent, currentTask }) => (
             <motion.div
@@ -276,9 +265,9 @@ export function OfficeView({ projectId }: OfficeViewProps) {
         </AnimatePresence>
 
         {filteredAgents.length === 0 && (
-          <div style={styles.emptyState}>
-            <span style={{ fontSize: "2rem" }}>&#128373;</span>
-            <p style={{ color: colors.textSecondary, margin: "8px 0 0" }}>
+          <div className="col-span-full flex flex-col items-center justify-center py-16 px-5">
+            <span className="text-2xl">&#128373;</span>
+            <p className="text-muted-foreground mt-2 mb-0">
               No agents match the current filter
             </p>
           </div>
@@ -306,14 +295,20 @@ export function OfficeView({ projectId }: OfficeViewProps) {
 function StatChip({
   label,
   value,
-  color,
+  colorClass,
+  dotClass,
+  activeBorderClass,
+  activeBgClass,
   active,
   onClick,
   hideValue,
 }: {
   label: string;
   value: number;
-  color: string;
+  colorClass: string;
+  dotClass: string;
+  activeBorderClass: string;
+  activeBgClass: string;
   active: boolean;
   onClick?: () => void;
   hideValue?: boolean;
@@ -321,34 +316,19 @@ function StatChip({
   return (
     <button
       onClick={onClick}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "6px 14px",
-        borderRadius: 20,
-        border: active ? `1.5px solid ${color}` : `1px solid ${colors.border}`,
-        background: active ? `${color}15` : colors.bgCard,
-        color: colors.textPrimary,
-        cursor: onClick ? "pointer" : "default",
-        fontSize: "0.8rem",
-        fontFamily: "inherit",
-        transition: "all 0.2s",
-      }}
+      className={cn(
+        "flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-inherit transition-all text-foreground",
+        active
+          ? cn("border-[1.5px]", activeBorderClass, activeBgClass)
+          : "border border-border bg-card",
+        onClick ? "cursor-pointer" : "cursor-default"
+      )}
     >
       {!hideValue && (
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: color,
-            flexShrink: 0,
-          }}
-        />
+        <span className={cn("w-2 h-2 rounded-full shrink-0", dotClass)} />
       )}
-      {!hideValue && <span style={{ fontWeight: 600 }}>{value}</span>}
-      <span style={{ color: active ? colors.textPrimary : colors.textSecondary }}>{label}</span>
+      {!hideValue && <span className="font-semibold">{value}</span>}
+      <span className={active ? "text-foreground" : "text-muted-foreground"}>{label}</span>
     </button>
   );
 }
@@ -376,98 +356,59 @@ function AgentCard({ agent, currentTask, isSelected, onSelect }: AgentCardProps)
       onClick={onSelect}
       whileHover={{ y: -3, transition: { duration: 0.15 } }}
       whileTap={{ scale: 0.98 }}
-      style={{
-        ...styles.card,
-        borderColor: isSelected
-          ? colors.accentBlue
+      className={cn(
+        "w-full text-left bg-card border rounded-xl p-4 cursor-pointer font-inherit flex flex-col gap-3 transition-[border-color,box-shadow]",
+        isSelected
+          ? "border-primary shadow-[0_0_0_1px_hsl(var(--primary)),0_4px_20px_hsl(var(--primary)/0.12)]"
           : isWorking
-            ? `${colors.accentGreen}50`
-            : colors.border,
-        boxShadow: isSelected
-          ? `0 0 0 1px ${colors.accentBlue}, 0 4px 20px ${colors.accentBlue}20`
-          : isWorking
-            ? `0 0 20px ${colors.accentGreen}12, 0 2px 8px rgba(0,0,0,0.25)`
-            : "0 2px 8px rgba(0,0,0,0.2)",
-        borderLeftWidth: isWorking ? 3 : 1,
-        borderLeftColor: isWorking ? colors.accentGreen : undefined,
-      }}
+            ? "border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.07),0_2px_8px_rgba(0,0,0,0.25)] border-l-[3px] border-l-emerald-500"
+            : "border-border shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
+      )}
     >
       {/* Top Row: Avatar + Name + Status */}
-      <div style={styles.cardTop}>
+      <div className="flex items-center gap-3">
         {/* Avatar with status ring */}
-        <div style={{ position: "relative" }}>
-          {/* Pulse ring for working/quarantined */}
+        <div className="relative">
           {statusConfig.pulse && (
             <motion.div
               animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
               transition={{ repeat: Infinity, duration: 1.8, ease: "easeOut" }}
-              style={{
-                position: "absolute",
-                inset: -3,
-                borderRadius: "50%",
-                border: `2px solid ${statusConfig.color}`,
-              }}
+              className={cn("absolute -inset-[3px] rounded-full border-2", statusConfig.twBorder)}
             />
           )}
           <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: "50%",
-              background: `${statusConfig.color}20`,
-              border: `2px solid ${statusConfig.color}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: agent.emoji ? "1.3rem" : "1.1rem",
-              fontWeight: 700,
-              color: statusConfig.color,
-              position: "relative",
-              zIndex: 1,
-            }}
+            className={cn(
+              "w-11 h-11 rounded-full border-2 flex items-center justify-center font-bold relative z-[1]",
+              statusConfig.twBgFaint,
+              statusConfig.twBorder,
+              statusConfig.twText,
+              agent.emoji ? "text-xl" : "text-lg"
+            )}
           >
             {agent.emoji || agent.name.charAt(0).toUpperCase()}
           </div>
-          {/* Status dot */}
           <div
-            style={{
-              position: "absolute",
-              bottom: 0,
-              right: 0,
-              width: 12,
-              height: 12,
-              borderRadius: "50%",
-              background: statusConfig.color,
-              border: `2px solid ${colors.bgCard}`,
-              zIndex: 2,
-            }}
+            className={cn(
+              "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-card z-[2]",
+              statusConfig.twBg
+            )}
           />
         </div>
 
         {/* Name + Role */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={styles.agentName}>{agent.name}</div>
-          <div style={styles.roleRow}>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold text-foreground leading-tight">{agent.name}</div>
+          <div className="flex items-center gap-1.5 mt-0.5">
             <span
-              style={{
-                padding: "1px 7px",
-                borderRadius: 10,
-                fontSize: "0.65rem",
-                fontWeight: 600,
-                background: roleBadge.bg,
-                color: roleBadge.color,
-                letterSpacing: "0.02em",
-              }}
+              className={cn(
+                "px-1.5 py-px rounded-lg text-[0.65rem] font-semibold tracking-wide",
+                roleBadge.twBg,
+                roleBadge.twText
+              )}
             >
               {roleBadge.label}
             </span>
-            <span
-              style={{
-                fontSize: "0.7rem",
-                color: statusConfig.color,
-                fontWeight: 600,
-              }}
-            >
+            <span className={cn("text-[0.7rem] font-semibold", statusConfig.twText)}>
               {statusConfig.label}
             </span>
           </div>
@@ -475,75 +416,73 @@ function AgentCard({ agent, currentTask, isSelected, onSelect }: AgentCardProps)
       </div>
 
       {/* Current Task / Activity */}
-      <div style={styles.taskSection}>
+      <div className="min-h-[36px]">
         {isWorking && currentTask ? (
-          <div style={styles.taskActive}>
-            {/* Animated typing dots */}
-            <div style={styles.activityIndicator}>
+          <div className="flex items-start gap-2 p-2 px-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+            <div className="flex gap-[3px] pt-1 shrink-0">
               <motion.span
                 animate={{ opacity: [0.3, 1, 0.3] }}
                 transition={{ repeat: Infinity, duration: 1.2, delay: 0 }}
-                style={styles.typingDot}
+                className="w-1 h-1 rounded-full bg-emerald-500"
               />
               <motion.span
                 animate={{ opacity: [0.3, 1, 0.3] }}
                 transition={{ repeat: Infinity, duration: 1.2, delay: 0.2 }}
-                style={styles.typingDot}
+                className="w-1 h-1 rounded-full bg-emerald-500"
               />
               <motion.span
                 animate={{ opacity: [0.3, 1, 0.3] }}
                 transition={{ repeat: Infinity, duration: 1.2, delay: 0.4 }}
-                style={styles.typingDot}
+                className="w-1 h-1 rounded-full bg-emerald-500"
               />
             </div>
-            <div style={styles.taskInfo}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={styles.taskLabel}>Working on</div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <div className="text-[0.6rem] text-emerald-400 font-semibold uppercase tracking-wider mb-0.5">Working on</div>
                 {currentTask.startedAt && (
-                  <div style={{ fontSize: "0.6rem", color: colors.textMuted }}>
+                  <div className="text-[0.6rem] text-muted-foreground">
                     {formatElapsed(currentTask.startedAt)}
                   </div>
                 )}
               </div>
-              <div style={styles.taskTitle}>{currentTask.title}</div>
-              {/* Animated progress shimmer */}
-              <div style={{ marginTop: 4, borderRadius: 2, height: 2, background: `${colors.accentGreen}15`, overflow: "hidden" }}>
+              <div className="text-[0.78rem] text-foreground font-medium overflow-hidden text-ellipsis whitespace-nowrap">{currentTask.title}</div>
+              <div className="mt-1 rounded-sm h-0.5 bg-emerald-500/10 overflow-hidden">
                 <motion.div
                   animate={{ x: ["-100%", "200%"] }}
                   transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                  style={{ width: "40%", height: "100%", background: `${colors.accentGreen}50`, borderRadius: 2 }}
+                  className="w-2/5 h-full bg-emerald-500/30 rounded-sm"
                 />
               </div>
             </div>
           </div>
         ) : agent.status === "ACTIVE" ? (
-          <div style={styles.taskIdle}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2">
+          <div className="flex items-center gap-1.5 p-2 px-2.5 rounded-lg bg-muted-foreground/5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 6v6l4 2" />
             </svg>
-            <span style={{ color: colors.textMuted, fontSize: "0.75rem" }}>
+            <span className="text-muted-foreground text-xs">
               Waiting for assignment
             </span>
           </div>
         ) : agent.status === "QUARANTINED" ? (
-          <div style={{ ...styles.taskIdle, background: `${colors.accentRed}10` }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accentRed} strokeWidth="2">
+          <div className="flex items-center gap-1.5 p-2 px-2.5 rounded-lg bg-red-500/5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400">
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
               <line x1="12" y1="9" x2="12" y2="13" />
               <line x1="12" y1="17" x2="12.01" y2="17" />
             </svg>
-            <span style={{ color: colors.accentRed, fontSize: "0.75rem" }}>
+            <span className="text-red-400 text-xs">
               {agent.lastError || "Unresponsive"}
             </span>
           </div>
         ) : (
-          <div style={styles.taskIdle}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2">
+          <div className="flex items-center gap-1.5 p-2 px-2.5 rounded-lg bg-muted-foreground/5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground">
               <rect x="6" y="4" width="4" height="16" rx="1" />
               <rect x="14" y="4" width="4" height="16" rx="1" />
             </svg>
-            <span style={{ color: colors.textMuted, fontSize: "0.75rem" }}>
+            <span className="text-muted-foreground text-xs">
               {agent.status === "PAUSED" ? "Paused" : "Offline"}
             </span>
           </div>
@@ -551,50 +490,50 @@ function AgentCard({ agent, currentTask, isSelected, onSelect }: AgentCardProps)
       </div>
 
       {/* Bottom: Budget Bar + Heartbeat */}
-      <div style={styles.cardBottom}>
+      <div className="flex flex-col gap-1.5">
         {/* Budget bar */}
-        <div style={styles.budgetSection}>
-          <div style={styles.budgetLabels}>
-            <span style={{ color: colors.textMuted, fontSize: "0.65rem" }}>Budget</span>
-            <span style={{ color: colors.textSecondary, fontSize: "0.65rem", fontWeight: 500 }}>
+        <div>
+          <div className="flex justify-between mb-0.5">
+            <span className="text-muted-foreground text-[0.65rem]">Budget</span>
+            <span className="text-muted-foreground text-[0.65rem] font-medium">
               ${agent.spendToday.toFixed(2)} / ${agent.budgetDaily.toFixed(2)}
             </span>
           </div>
-          <div style={styles.budgetBarTrack}>
+          <div className="w-full h-1 rounded-sm bg-muted-foreground/20 overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${Math.min(budgetPct, 100)}%` }}
               transition={{ duration: 0.6, ease: "easeOut" }}
-              style={{
-                ...styles.budgetBarFill,
-                background:
-                  budgetPct > 90
-                    ? colors.accentRed
-                    : budgetPct > 70
-                      ? colors.accentOrange
-                      : colors.accentGreen,
-              }}
+              className={cn(
+                "h-1 rounded-sm transition-[width] duration-600 ease-out",
+                budgetPct > 90
+                  ? "bg-red-500"
+                  : budgetPct > 70
+                    ? "bg-amber-500"
+                    : "bg-emerald-500"
+              )}
             />
           </div>
         </div>
 
         {/* Heartbeat */}
-        <div style={styles.heartbeatRow}>
+        <div className="flex items-center gap-1.5">
           <svg
             width="12"
             height="12"
             viewBox="0 0 24 24"
             fill="none"
-            stroke={heartbeat.healthy ? colors.accentGreen : colors.accentRed}
+            stroke="currentColor"
             strokeWidth="2"
+            className={heartbeat.healthy ? "text-emerald-400" : "text-red-400"}
           >
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
           </svg>
           <span
-            style={{
-              fontSize: "0.65rem",
-              color: heartbeat.healthy ? colors.textMuted : colors.accentRed,
-            }}
+            className={cn(
+              "text-[0.65rem]",
+              heartbeat.healthy ? "text-muted-foreground" : "text-red-400"
+            )}
           >
             {heartbeat.text}
           </span>
@@ -644,7 +583,7 @@ function AgentDetailPanel({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        style={styles.backdrop}
+        className="fixed inset-0 bg-black/45 z-[999]"
       />
       {/* Panel */}
       <motion.div
@@ -652,76 +591,47 @@ function AgentDetailPanel({
         animate={{ x: 0 }}
         exit={{ x: 420 }}
         transition={{ type: "spring", damping: 28, stiffness: 300 }}
-        style={styles.detailPanel}
+        className="fixed top-0 right-0 bottom-0 w-[400px] max-w-[90vw] bg-background border-l border-border z-[1000] flex flex-col overflow-hidden"
       >
         {/* Panel header */}
-        <div style={styles.panelHeader}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border shrink-0">
+          <div className="flex items-center gap-3">
             <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: "50%",
-                background: `${statusConfig.color}20`,
-                border: `2px solid ${statusConfig.color}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "1.4rem",
-                fontWeight: 700,
-                color: statusConfig.color,
-              }}
+              className={cn(
+                "w-12 h-12 rounded-full border-2 flex items-center justify-center text-xl font-bold",
+                statusConfig.twBgFaint,
+                statusConfig.twBorder,
+                statusConfig.twText
+              )}
             >
               {agent.emoji || agent.name.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: "1.25rem",
-                  fontWeight: 700,
-                  color: colors.textPrimary,
-                }}
-              >
+              <h2 className="m-0 text-xl font-bold text-foreground">
                 {agent.name}
               </h2>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+              <div className="flex items-center gap-2 mt-0.5">
                 <span
-                  style={{
-                    padding: "1px 8px",
-                    borderRadius: 10,
-                    fontSize: "0.7rem",
-                    fontWeight: 600,
-                    background: roleBadge.bg,
-                    color: roleBadge.color,
-                  }}
+                  className={cn(
+                    "px-2 py-px rounded-lg text-[0.7rem] font-semibold",
+                    roleBadge.twBg,
+                    roleBadge.twText
+                  )}
                 >
                   {roleBadge.label}
                 </span>
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: "0.75rem",
-                    color: statusConfig.color,
-                    fontWeight: 600,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: "50%",
-                      background: statusConfig.color,
-                    }}
-                  />
+                <span className={cn("flex items-center gap-1 text-xs font-semibold", statusConfig.twText)}>
+                  <span className={cn("w-[7px] h-[7px] rounded-full", statusConfig.twBg)} />
                   {statusConfig.label}
                 </span>
               </div>
             </div>
           </div>
-          <button onClick={onClose} style={styles.closeBtn} aria-label="Close">
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg border-none bg-transparent text-muted-foreground cursor-pointer flex items-center justify-center transition-colors hover:bg-muted"
+            aria-label="Close"
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
@@ -730,41 +640,17 @@ function AgentDetailPanel({
         </div>
 
         {/* Panel body */}
-        <div style={styles.panelBody}>
+        <div className="flex-1 overflow-auto p-5 flex flex-col gap-5">
           {/* Current Task */}
           {currentTask && (
-            <div style={styles.panelSection}>
-              <div style={styles.panelSectionTitle}>Current Task</div>
-              <div style={styles.currentTaskCard}>
-                <div
-                  style={{
-                    fontSize: "0.85rem",
-                    fontWeight: 600,
-                    color: colors.textPrimary,
-                    marginBottom: 4,
-                  }}
-                >
+            <div>
+              <div className="text-[0.7rem] font-bold text-muted-foreground uppercase tracking-wider mb-2">Current Task</div>
+              <div className="p-2.5 px-3 rounded-lg bg-card border border-border">
+                <div className="text-sm font-semibold text-foreground mb-1">
                   {currentTask.title}
                 </div>
-                <div
-                  style={{
-                    fontSize: "0.75rem",
-                    color: colors.textSecondary,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <span
-                    style={{
-                      padding: "1px 6px",
-                      borderRadius: 4,
-                      background: `${colors.accentGreen}20`,
-                      color: colors.accentGreen,
-                      fontSize: "0.65rem",
-                      fontWeight: 600,
-                    }}
-                  >
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  <span className="px-1.5 py-px rounded bg-emerald-500/20 text-emerald-400 text-[0.65rem] font-semibold">
                     {currentTask.status}
                   </span>
                   <span>{currentTask.type}</span>
@@ -777,18 +663,18 @@ function AgentDetailPanel({
           )}
 
           {/* Details Grid */}
-          <div style={styles.panelSection}>
-            <div style={styles.panelSectionTitle}>Details</div>
-            <div style={styles.detailGrid}>
+          <div>
+            <div className="text-[0.7rem] font-bold text-muted-foreground uppercase tracking-wider mb-2">Details</div>
+            <div className="flex flex-col">
               <DetailRow label="Workspace" value={agent.workspacePath} />
               <DetailRow
                 label="Heartbeat"
                 value={heartbeat.text}
-                valueColor={heartbeat.healthy ? colors.accentGreen : colors.accentRed}
+                valueClass={heartbeat.healthy ? "text-emerald-400" : "text-red-400"}
               />
               <DetailRow label="Error Streak" value={String(agent.errorStreak)} />
               {agent.lastError && (
-                <DetailRow label="Last Error" value={agent.lastError} valueColor={colors.accentRed} />
+                <DetailRow label="Last Error" value={agent.lastError} valueClass="text-red-400" />
               )}
               <DetailRow
                 label="Can Spawn"
@@ -804,41 +690,31 @@ function AgentDetailPanel({
           </div>
 
           {/* Budget */}
-          <div style={styles.panelSection}>
-            <div style={styles.panelSectionTitle}>Budget</div>
-            <div style={styles.budgetPanel}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: "0.8rem", color: colors.textSecondary }}>
+          <div>
+            <div className="text-[0.7rem] font-bold text-muted-foreground uppercase tracking-wider mb-2">Budget</div>
+            <div className="p-2.5 px-3 rounded-lg bg-card border border-border">
+              <div className="flex justify-between mb-1.5">
+                <span className="text-sm text-muted-foreground">
                   Daily Spend
                 </span>
-                <span style={{ fontSize: "0.8rem", fontWeight: 600, color: colors.textPrimary }}>
+                <span className="text-sm font-semibold text-foreground">
                   ${agent.spendToday.toFixed(2)} / ${agent.budgetDaily.toFixed(2)}
                 </span>
               </div>
-              <div style={{ ...styles.budgetBarTrack, height: 6 }}>
+              <div className="w-full h-1.5 rounded-sm bg-muted-foreground/20 overflow-hidden">
                 <div
-                  style={{
-                    ...styles.budgetBarFill,
-                    height: 6,
-                    width: `${Math.min(budgetPct, 100)}%`,
-                    background:
-                      budgetPct > 90
-                        ? colors.accentRed
-                        : budgetPct > 70
-                          ? colors.accentOrange
-                          : colors.accentGreen,
-                  }}
+                  className={cn(
+                    "h-1.5 rounded-sm transition-[width] duration-600 ease-out",
+                    budgetPct > 90
+                      ? "bg-red-500"
+                      : budgetPct > 70
+                        ? "bg-amber-500"
+                        : "bg-emerald-500"
+                  )}
+                  style={{ width: `${Math.min(budgetPct, 100)}%` }}
                 />
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginTop: 8,
-                  fontSize: "0.7rem",
-                  color: colors.textMuted,
-                }}
-              >
+              <div className="flex justify-between mt-2 text-[0.7rem] text-muted-foreground">
                 <span>Per-run limit: ${agent.budgetPerRun.toFixed(2)}</span>
                 <span>{budgetPct.toFixed(0)}% used</span>
               </div>
@@ -847,46 +723,27 @@ function AgentDetailPanel({
 
           {/* Assigned Tasks */}
           {assignedTasks && assignedTasks.length > 0 && (
-            <div style={styles.panelSection}>
-              <div style={styles.panelSectionTitle}>
+            <div>
+              <div className="text-[0.7rem] font-bold text-muted-foreground uppercase tracking-wider mb-2">
                 Assigned Tasks ({assignedTasks.length})
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="flex flex-col gap-1.5">
                 {assignedTasks.slice(0, 8).map((t) => (
-                  <div key={t._id} style={styles.assignedTaskRow}>
+                  <div key={t._id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-card border border-border">
                     <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        background:
-                          t.status === "IN_PROGRESS"
-                            ? colors.accentGreen
-                            : t.status === "BLOCKED"
-                              ? colors.accentRed
-                              : colors.accentBlue,
-                        flexShrink: 0,
-                      }}
+                      className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        t.status === "IN_PROGRESS"
+                          ? "bg-emerald-500"
+                          : t.status === "BLOCKED"
+                            ? "bg-red-500"
+                            : "bg-blue-500"
+                      )}
                     />
-                    <span
-                      style={{
-                        flex: 1,
-                        fontSize: "0.75rem",
-                        color: colors.textPrimary,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <span className="flex-1 text-xs text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
                       {t.title}
                     </span>
-                    <span
-                      style={{
-                        fontSize: "0.6rem",
-                        color: colors.textMuted,
-                        flexShrink: 0,
-                      }}
-                    >
+                    <span className="text-[0.6rem] text-muted-foreground shrink-0">
                       {t.status}
                     </span>
                   </div>
@@ -907,298 +764,23 @@ function AgentDetailPanel({
 function DetailRow({
   label,
   value,
-  valueColor,
+  valueClass,
 }: {
   label: string;
   value: string;
-  valueColor?: string;
+  valueClass?: string;
 }) {
   return (
-    <div style={styles.detailRowItem}>
-      <span style={{ fontSize: "0.75rem", color: colors.textMuted }}>{label}</span>
+    <div className="flex justify-between items-center py-[7px] border-b border-border">
+      <span className="text-xs text-muted-foreground">{label}</span>
       <span
-        style={{
-          fontSize: "0.75rem",
-          color: valueColor ?? colors.textPrimary,
-          fontWeight: 500,
-          textAlign: "right",
-          maxWidth: "60%",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
+        className={cn(
+          "text-xs font-medium text-right max-w-[60%] overflow-hidden text-ellipsis whitespace-nowrap",
+          valueClass ?? "text-foreground"
+        )}
       >
         {value}
       </span>
     </div>
   );
 }
-
-/* ============================================================================
-   Styles
-   ============================================================================ */
-
-const styles: Record<string, CSSProperties> = {
-  container: {
-    flex: 1,
-    overflow: "auto",
-    background: colors.bgPage,
-    padding: "24px 28px",
-  },
-  loadingContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    height: "100%",
-  },
-  spinner: {
-    width: 28,
-    height: 28,
-    border: `3px solid ${colors.border}`,
-    borderTopColor: colors.accentBlue,
-    borderRadius: "50%",
-  },
-  header: {
-    marginBottom: 24,
-  },
-  headerTop: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: "1.5rem",
-    fontWeight: 700,
-    color: colors.textPrimary,
-    margin: 0,
-  },
-  subtitle: {
-    fontSize: "0.85rem",
-    color: colors.textSecondary,
-    margin: "2px 0 0",
-  },
-  statsRow: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap" as const,
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-    gap: 16,
-  },
-  card: {
-    width: "100%",
-    textAlign: "left" as const,
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 12,
-    padding: 16,
-    cursor: "pointer",
-    fontFamily: "inherit",
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: 12,
-    transition: "border-color 0.2s, box-shadow 0.2s",
-  },
-  cardTop: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-  },
-  agentName: {
-    fontSize: "0.9rem",
-    fontWeight: 700,
-    color: colors.textPrimary,
-    lineHeight: 1.2,
-  },
-  roleRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 3,
-  },
-  taskSection: {
-    minHeight: 36,
-  },
-  taskActive: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: 8,
-    padding: "8px 10px",
-    borderRadius: 8,
-    background: `${colors.accentGreen}08`,
-    border: `1px solid ${colors.accentGreen}20`,
-  },
-  activityIndicator: {
-    display: "flex",
-    gap: 3,
-    paddingTop: 4,
-    flexShrink: 0,
-  },
-  typingDot: {
-    width: 4,
-    height: 4,
-    borderRadius: "50%",
-    background: colors.accentGreen,
-  },
-  taskInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  taskLabel: {
-    fontSize: "0.6rem",
-    color: colors.accentGreen,
-    fontWeight: 600,
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.05em",
-    marginBottom: 2,
-  },
-  taskTitle: {
-    fontSize: "0.78rem",
-    color: colors.textPrimary,
-    fontWeight: 500,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap" as const,
-  },
-  taskIdle: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "8px 10px",
-    borderRadius: 8,
-    background: `${colors.textMuted}08`,
-  },
-  cardBottom: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: 6,
-  },
-  budgetSection: {},
-  budgetLabels: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: 3,
-  },
-  budgetBarTrack: {
-    width: "100%",
-    height: 4,
-    borderRadius: 2,
-    background: `${colors.textMuted}20`,
-    overflow: "hidden",
-  },
-  budgetBarFill: {
-    height: 4,
-    borderRadius: 2,
-    transition: "width 0.6s ease-out",
-  },
-  heartbeatRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 5,
-  },
-  emptyState: {
-    gridColumn: "1 / -1",
-    display: "flex",
-    flexDirection: "column" as const,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "60px 20px",
-  },
-
-  // Detail Panel
-  backdrop: {
-    position: "fixed" as const,
-    inset: 0,
-    background: "rgba(0,0,0,0.45)",
-    zIndex: 999,
-  },
-  detailPanel: {
-    position: "fixed" as const,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: 400,
-    maxWidth: "90vw",
-    background: colors.bgPage,
-    borderLeft: `1px solid ${colors.border}`,
-    zIndex: 1000,
-    display: "flex",
-    flexDirection: "column" as const,
-    overflow: "hidden",
-  },
-  panelHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "20px 20px 16px",
-    borderBottom: `1px solid ${colors.border}`,
-    flexShrink: 0,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    border: "none",
-    background: "transparent",
-    color: colors.textMuted,
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "background 0.15s",
-  },
-  panelBody: {
-    flex: 1,
-    overflow: "auto",
-    padding: 20,
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: 20,
-  },
-  panelSection: {},
-  panelSectionTitle: {
-    fontSize: "0.7rem",
-    fontWeight: 700,
-    color: colors.textMuted,
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.06em",
-    marginBottom: 8,
-  },
-  currentTaskCard: {
-    padding: "10px 12px",
-    borderRadius: 8,
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-  },
-  detailGrid: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: 0,
-  },
-  detailRowItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "7px 0",
-    borderBottom: `1px solid ${colors.border}`,
-  },
-  budgetPanel: {
-    padding: "10px 12px",
-    borderRadius: 8,
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-  },
-  assignedTaskRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "6px 10px",
-    borderRadius: 6,
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-  },
-};

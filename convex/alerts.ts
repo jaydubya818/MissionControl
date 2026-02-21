@@ -54,6 +54,7 @@ export const listByAgent = query({
 
 export const create = mutation({
   args: {
+    projectId: v.optional(v.id("projects")),
     severity: v.string(),
     type: v.string(),
     title: v.string(),
@@ -65,6 +66,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const alertId = await ctx.db.insert("alerts", {
+      projectId: args.projectId,
       severity: args.severity as any,
       type: args.type,
       title: args.title,

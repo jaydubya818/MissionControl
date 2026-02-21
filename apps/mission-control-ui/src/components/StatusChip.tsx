@@ -32,7 +32,7 @@ const STATUS_CONFIG: Record<TaskStatus, {
   INBOX: {
     label: "Inbox",
     icon: Inbox,
-    classes: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+    classes: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   },
   ASSIGNED: {
     label: "Assigned",
@@ -47,7 +47,7 @@ const STATUS_CONFIG: Record<TaskStatus, {
   REVIEW: {
     label: "Review",
     icon: Eye,
-    classes: "bg-violet-500/10 text-violet-400 border-violet-500/20",
+    classes: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   },
   NEEDS_APPROVAL: {
     label: "Needs Approval",

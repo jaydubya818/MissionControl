@@ -1,0 +1,256 @@
+# Quality Audit Workflow
+# Multi-agent quality control workflow for comprehensive code quality checks
+# 
+# Automated quality audit with requirement traceability, coverage analysis,
+# docs drift detection, and delivery gate validation.
+
+id: quality-audit
+name: Quality Audit
+description: "Comprehensive quality control with multi-agent verification and delivery gates"
+
+agents:
+  - id: requirements-tracer
+    persona: QA
+    workspace:
+      files:
+        AGENTS.md: agents/qa/AGENTS.md
+  
+  - id: coverage-analyzer
+    persona: QA
+    workspace:
+      files:
+        AGENTS.md: agents/qa/AGENTS.md
+  
+  - id: docs-validator
+    persona: QA
+    workspace:
+      files:
+        AGENTS.md: agents/qa/AGENTS.md
+  
+  - id: gate-validator
+    persona: Coordinator
+    workspace:
+      files:
+        AGENTS.md: agents/coordinator/AGENTS.md
+
+steps:
+  - id: trace-requirements
+    agent: requirements-tracer
+    input: |
+      Trace requirements to implementation and tests.
+      
+      Repository: {{repoUrl}}
+      Branch: {{branch}}
+      Commit: {{commitSha}}
+      
+      Required docs: {{requiredDocs}}
+      
+      Reply with STATUS: done and TRACEABILITY: ...
+      
+      For each requirement in PRD/docs:
+      1. Identify requirement ID and text
+      2. Find implementation files (with line ranges)
+      3. Find test files covering it
+      4. Assess coverage: COVERED/PARTIAL/MISSING/UNTESTABLE
+      5. Provide evidence snippet
+      
+      Output format:
+      ```json
+      {
+        "requirements": [
+          {
+            "id": "REQ-001",
+            "text": "System must support X",
+            "sourceDoc": "docs/PRD_V2.md",
+            "implementationFiles": [{"path": "src/x.ts", "lineRange": [10, 50]}],
+            "testFiles": [{"path": "tests/x.test.ts"}],
+            "status": "COVERED",
+            "evidence": "Implementation found in x.ts with unit tests"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "REQ-002",
+            "issue": "No implementation found",
+            "severity": "RED"
+          }
+        ]
+      }
+      ```
+    expects: "STATUS: done"
+    retryLimit: 1
+    timeoutMinutes: 20
+
+  - id: analyze-coverage
+    agent: coverage-analyzer
+    input: |
+      Analyze test coverage and identify gaps.
+      
+      Repository: {{repoUrl}}
+      Branch: {{branch}}
+      Commit: {{commitSha}}
+      
+      Coverage thresholds:
+      - Unit: {{coverageThresholds.unit}}%
+      - Integration: {{coverageThresholds.integration}}%
+      - E2E: {{coverageThresholds.e2e}}%
+      
+      Security paths: {{securityPaths}}
+      
+      Reply with STATUS: done and COVERAGE: ...
+      
+      Analyze:
+      1. Unit test coverage (% of functions/lines)
+      2. Integration test coverage
+      3. E2E test coverage
+      4. Security-critical paths coverage
+      5. Missing test areas
+      
+      Output format:
+      ```json
+      {
+        "summary": {
+          "unit": {"covered": 150, "total": 200, "percentage": 75},
+          "integration": {"covered": 30, "total": 50, "percentage": 60},
+          "e2e": {"covered": 10, "total": 20, "percentage": 50}
+        },
+        "securityCoverage": {
+          "auth/": 95,
+          "api/": 80
+        },
+        "missingAreas": [
+          "Error handling in workflow executor",
+          "Edge cases in payment processing"
+        ],
+        "findings": [
+          {
+            "severity": "YELLOW",
+            "category": "COVERAGE_GAP",
+            "title": "Low integration coverage",
+            "description": "Integration tests below threshold (60% < 70%)",
+            "suggestedFix": "Add integration tests for API endpoints"
+          }
+        ]
+      }
+      ```
+    expects: "STATUS: done"
+    retryLimit: 1
+    timeoutMinutes: 20
+
+  - id: validate-docs
+    agent: docs-validator
+    input: |
+      Validate documentation completeness and freshness.
+      
+      Repository: {{repoUrl}}
+      Branch: {{branch}}
+      Commit: {{commitSha}}
+      
+      Required docs: {{requiredDocs}}
+      
+      Traceability context: {{traceRequirementsOutput}}
+      
+      Reply with STATUS: done and DOCS: ...
+      
+      Check:
+      1. Required docs exist (README, PRD, CHANGELOG, etc.)
+      2. Docs are up-to-date (compare last modified vs code changes)
+      3. Code changes reflected in docs
+      4. API docs match implementation
+      5. Examples still work
+      
+      Output format:
+      ```json
+      {
+        "docsIndex": [
+          {"path": "README.md", "type": "README", "lastModified": "2026-02-15T10:00:00Z"},
+          {"path": "docs/PRD_V2.md", "type": "PRD", "lastModified": "2026-02-10T14:30:00Z"}
+        ],
+        "findings": [
+          {
+            "severity": "YELLOW",
+            "category": "DOCS_DRIFT",
+            "title": "README outdated",
+            "description": "README last updated 5 days before recent code changes",
+            "filePaths": ["README.md"],
+            "suggestedFix": "Update README to reflect new features"
+          }
+        ],
+        "missingDocs": ["CHANGELOG.md"]
+      }
+      ```
+    expects: "STATUS: done"
+    retryLimit: 1
+    timeoutMinutes: 15
+
+  - id: validate-gates
+    agent: gate-validator
+    input: |
+      Validate delivery gates and determine risk grade.
+      
+      Gate definitions: {{gateDefinitions}}
+      
+      Traceability: {{traceRequirementsOutput}}
+      Coverage: {{analyzeCoverageOutput}}
+      Docs: {{validateDocsOutput}}
+      
+      Reply with STATUS: done and GATES: ...
+      
+      For each gate:
+      1. Evaluate condition (passed/failed)
+      2. Provide rationale
+      3. Determine severity (RED/YELLOW/GREEN)
+      
+      Compute overall risk grade:
+      - Any RED gate fail -> RED
+      - Any YELLOW gate fail -> YELLOW
+      - All gates pass -> GREEN
+      
+      Compute quality score (0-100):
+      - Requirement coverage: 40%
+      - Test coverage: 30%
+      - Docs completeness: 20%
+      - Gate compliance: 10%
+      
+      Output format:
+      ```json
+      {
+        "gates": [
+          {
+            "name": "PRD exists",
+            "passed": true,
+            "rationale": "Found docs/PRD_V2.md",
+            "severity": "YELLOW"
+          },
+          {
+            "name": "Coverage meets threshold",
+            "passed": false,
+            "rationale": "Integration coverage 60% < 70%",
+            "severity": "RED"
+          }
+        ],
+        "riskGrade": "RED",
+        "qualityScore": 72,
+        "policyNotes": [
+          "RED gate failed: Coverage below threshold",
+          "Recommend blocking deployment until fixed"
+        ],
+        "summary": "Quality audit completed with RED risk grade. Critical gate failures detected."
+      }
+      ```
+      
+      If riskGrade is RED:
+        - Alert must be created
+        - Deployment should be blocked
+        - Immediate remediation required
+      
+      If riskGrade is YELLOW:
+        - Warning issued
+        - Review recommended before deployment
+      
+      If riskGrade is GREEN:
+        - All gates passed
+        - Safe to proceed
+    expects: "STATUS: done"
+    retryLimit: 1
+    timeoutMinutes: 15

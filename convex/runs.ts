@@ -6,8 +6,25 @@
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
 import { evaluateOperatorGate, getEffectiveOperatorControl } from "./lib/operatorControls";
+import { ensureInstanceForLegacyAgent } from "./lib/agentResolver";
+import { appendChangeRecord, appendOpEvent } from "./lib/armAudit";
+import { preferInstanceRefs } from "./lib/armCompat";
+import { classifyRisk } from "./lib/riskClassifier";
+import { evaluatePolicyEnvelopes } from "./lib/armPolicy";
+import { evaluateLegacyToolPolicy } from "./lib/legacyToolPolicy";
+
+function toPreview(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  try {
+    const raw = typeof value === "string" ? value : JSON.stringify(value);
+    return raw.length > 600 ? `${raw.slice(0, 597)}...` : raw;
+  } catch {
+    return "[unserializable]";
+  }
+}
 
 // ============================================================================
 // QUERIES
@@ -26,6 +43,18 @@ export const listByAgent = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    if (preferInstanceRefs()) {
+      const resolved = await ensureInstanceForLegacyAgent(
+        { db: ctx.db as any },
+        args.agentId
+      );
+      return await ctx.db
+        .query("runs")
+        .withIndex("by_instance", (q) => q.eq("instanceId", resolved.instanceId))
+        .order("desc")
+        .take(args.limit ?? 50);
+    }
+
     return await ctx.db
       .query("runs")
       .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
@@ -80,6 +109,8 @@ export const start = mutation({
     model: v.string(),
     idempotencyKey: v.string(),
     estimatedCost: v.optional(v.number()),
+    toolName: v.optional(v.string()),
+    toolArgs: v.optional(v.any()),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
@@ -164,10 +195,267 @@ export const start = mutation({
       }
     }
     
+    const resolved = await ensureInstanceForLegacyAgent(
+      { db: ctx.db as any },
+      args.agentId
+    );
+    const instance = await ctx.db.get(resolved.instanceId);
+    const effectiveTenantId = agent.tenantId ?? instance?.tenantId;
+    const riskLevel = args.toolName
+      ? classifyRisk(args.toolName, args.toolArgs as Record<string, unknown> | undefined)
+      : "GREEN";
+    const armDecision = await evaluatePolicyEnvelopes(ctx.db as any, {
+      tenantId: effectiveTenantId,
+      projectId: agent.projectId,
+      versionId: resolved.versionId,
+      toolName: args.toolName,
+      riskLevel,
+    });
+    const budgetRemaining = Math.max(agent.budgetDaily - agent.spendToday, 0);
+    const activeLegacyPolicy = !armDecision && args.toolName
+      ? await ctx.db
+          .query("policies")
+          .withIndex("by_active", (q) => q.eq("active", true))
+          .first()
+      : null;
+    const legacyDecision =
+      !armDecision && args.toolName
+        ? evaluateLegacyToolPolicy({
+            policy: activeLegacyPolicy,
+            agentRole: agent.role as "INTERN" | "SPECIALIST" | "LEAD" | "CEO",
+            budgetRemaining,
+            estimatedCost,
+            toolName: args.toolName,
+            toolArgs: args.toolArgs,
+          })
+        : null;
+
+    if (armDecision?.decision === "DENY") {
+      const changeRecordId = await appendChangeRecord(ctx.db as any, {
+        tenantId: effectiveTenantId,
+        projectId: agent.projectId,
+        templateId: resolved.templateId,
+        versionId: resolved.versionId,
+        instanceId: resolved.instanceId,
+        legacyAgentId: args.agentId,
+        type: "POLICY_DENIED",
+        summary: armDecision.reason,
+        payload: {
+          toolName: args.toolName,
+          riskLevel,
+          actionType: args.toolName ? "TOOL_CALL" : "RUN_START",
+        },
+      });
+
+      await appendOpEvent(ctx.db as any, {
+        tenantId: effectiveTenantId,
+        projectId: agent.projectId,
+        instanceId: resolved.instanceId,
+        versionId: resolved.versionId,
+        taskId: args.taskId,
+        type: "TOOL_CALL_BLOCKED",
+        changeRecordId,
+        payload: {
+          decision: "DENY",
+          reason: armDecision.reason,
+          toolName: args.toolName,
+          riskLevel,
+        },
+      });
+
+      throw new Error(armDecision.reason);
+    }
+    if (!armDecision && legacyDecision?.decision === "DENY") {
+      const changeRecordId = await appendChangeRecord(ctx.db as any, {
+        tenantId: effectiveTenantId,
+        projectId: agent.projectId,
+        templateId: resolved.templateId,
+        versionId: resolved.versionId,
+        instanceId: resolved.instanceId,
+        legacyAgentId: args.agentId,
+        type: "POLICY_DENIED",
+        summary: legacyDecision.reason,
+        payload: {
+          toolName: args.toolName,
+          riskLevel,
+          actionType: "TOOL_CALL",
+          source: "LEGACY_POLICY_FALLBACK",
+        },
+      });
+
+      await appendOpEvent(ctx.db as any, {
+        tenantId: effectiveTenantId,
+        projectId: agent.projectId,
+        instanceId: resolved.instanceId,
+        versionId: resolved.versionId,
+        taskId: args.taskId,
+        type: "TOOL_CALL_BLOCKED",
+        changeRecordId,
+        payload: {
+          decision: "DENY",
+          reason: legacyDecision.reason,
+          toolName: args.toolName,
+          riskLevel,
+          source: "LEGACY_POLICY_FALLBACK",
+        },
+      });
+
+      throw new Error(legacyDecision.reason);
+    }
+
+    if (armDecision?.decision === "NEEDS_APPROVAL") {
+      const actionType = args.toolName ? "TOOL_CALL" : "RUN_START";
+      const pending = await ctx.db
+        .query("approvalRecords")
+        .withIndex("by_instance", (q) => q.eq("instanceId", resolved.instanceId))
+        .collect();
+      const existing = pending.find(
+        (row) =>
+          row.status === "PENDING" &&
+          row.actionType === actionType &&
+          (row.metadata as any)?.idempotencyKey === args.idempotencyKey
+      );
+
+      if (!existing) {
+        await ctx.db.insert("approvalRecords", {
+          tenantId: effectiveTenantId,
+          projectId: agent.projectId,
+          instanceId: resolved.instanceId,
+          versionId: resolved.versionId,
+          actionType,
+          riskLevel,
+          justification: armDecision.reason,
+          escalationLevel: riskLevel === "RED" ? 2 : riskLevel === "YELLOW" ? 1 : 0,
+          status: "PENDING",
+          requestedAt: Date.now(),
+          metadata: {
+            source: "runs.start",
+            idempotencyKey: args.idempotencyKey,
+            toolName: args.toolName,
+          },
+        });
+      }
+
+      await appendChangeRecord(ctx.db as any, {
+        tenantId: effectiveTenantId,
+        projectId: agent.projectId,
+        templateId: resolved.templateId,
+        versionId: resolved.versionId,
+        instanceId: resolved.instanceId,
+        legacyAgentId: args.agentId,
+        type: "APPROVAL_REQUESTED",
+        summary: `ARM policy requires approval: ${actionType}`,
+        payload: {
+          reason: armDecision.reason,
+          toolName: args.toolName,
+          riskLevel,
+        },
+      });
+
+      await appendOpEvent(ctx.db as any, {
+        tenantId: effectiveTenantId,
+        projectId: agent.projectId,
+        instanceId: resolved.instanceId,
+        versionId: resolved.versionId,
+        taskId: args.taskId,
+        type: "DECISION_MADE",
+        payload: {
+          decision: "NEEDS_APPROVAL",
+          reason: armDecision.reason,
+          toolName: args.toolName,
+          riskLevel,
+        },
+      });
+
+      throw new Error(`ARM policy requires approval: ${armDecision.reason}`);
+    }
+    if (!armDecision && legacyDecision?.decision === "NEEDS_APPROVAL") {
+      const actionType = "TOOL_CALL";
+      const pending = await ctx.db
+        .query("approvalRecords")
+        .withIndex("by_instance", (q) => q.eq("instanceId", resolved.instanceId))
+        .collect();
+      const existing = pending.find(
+        (row) =>
+          row.status === "PENDING" &&
+          row.actionType === actionType &&
+          (row.metadata as any)?.idempotencyKey === args.idempotencyKey
+      );
+
+      if (!existing) {
+        await ctx.db.insert("approvalRecords", {
+          tenantId: effectiveTenantId,
+          projectId: agent.projectId,
+          instanceId: resolved.instanceId,
+          versionId: resolved.versionId,
+          actionType,
+          riskLevel,
+          justification: legacyDecision.reason,
+          escalationLevel: riskLevel === "RED" ? 2 : riskLevel === "YELLOW" ? 1 : 0,
+          status: "PENDING",
+          requestedAt: Date.now(),
+          metadata: {
+            source: "runs.start.legacyFallback",
+            idempotencyKey: args.idempotencyKey,
+            toolName: args.toolName,
+          },
+        });
+      }
+
+      await appendChangeRecord(ctx.db as any, {
+        tenantId: effectiveTenantId,
+        projectId: agent.projectId,
+        templateId: resolved.templateId,
+        versionId: resolved.versionId,
+        instanceId: resolved.instanceId,
+        legacyAgentId: args.agentId,
+        type: "APPROVAL_REQUESTED",
+        summary: `Legacy policy requires approval: ${actionType}`,
+        payload: {
+          reason: legacyDecision.reason,
+          toolName: args.toolName,
+          riskLevel,
+          source: "LEGACY_POLICY_FALLBACK",
+        },
+      });
+
+      await appendOpEvent(ctx.db as any, {
+        tenantId: effectiveTenantId,
+        projectId: agent.projectId,
+        instanceId: resolved.instanceId,
+        versionId: resolved.versionId,
+        taskId: args.taskId,
+        type: "DECISION_MADE",
+        payload: {
+          decision: "NEEDS_APPROVAL",
+          reason: legacyDecision.reason,
+          toolName: args.toolName,
+          riskLevel,
+          source: "LEGACY_POLICY_FALLBACK",
+        },
+      });
+
+      throw new Error(`Legacy policy requires approval: ${legacyDecision.reason}`);
+    }
+
+    const policySource = armDecision ? "ARM_POLICY_ENVELOPE" : legacyDecision ? "LEGACY_POLICY_FALLBACK" : "NONE";
+    const policyReason = armDecision?.reason ?? legacyDecision?.reason ?? "No policy gate applied";
+
+    // Fetch mission statement to inject into run context
+    let missionStatement: string | null = null;
+    if (effectiveTenantId) {
+      const tenant = await ctx.db.get(effectiveTenantId);
+      missionStatement = (tenant as any)?.missionStatement ?? null;
+    }
+
     const runId = await ctx.db.insert("runs", {
+      tenantId: effectiveTenantId,
       projectId: agent.projectId,
       idempotencyKey: args.idempotencyKey,
       agentId: args.agentId,
+      instanceId: resolved.instanceId,
+      versionId: resolved.versionId,
+      templateId: resolved.templateId,
       taskId: args.taskId,
       sessionKey: args.sessionKey,
       startedAt: Date.now(),
@@ -177,8 +465,75 @@ export const start = mutation({
       costUsd: 0,
       budgetAllocated: agent.budgetPerRun,
       status: "RUNNING",
-      metadata: args.metadata,
+      metadata: {
+        ...args.metadata,
+        missionStatement,
+      },
     });
+    const run = await ctx.db.get(runId);
+    if (!run) {
+      throw new Error("Failed to create run");
+    }
+
+    await appendOpEvent(ctx.db as any, {
+      tenantId: run.tenantId,
+      projectId: run.projectId,
+      instanceId: run.instanceId,
+      versionId: run.versionId,
+      taskId: run.taskId,
+      runId: run._id,
+      type: "RUN_STARTED",
+      payload: {
+        model: run.model,
+        sessionKey: run.sessionKey,
+      },
+    });
+
+    if (args.toolName) {
+      const toolCallId = await ctx.db.insert("toolCalls", {
+        tenantId: effectiveTenantId,
+        projectId: agent.projectId,
+        runId,
+        agentId: args.agentId,
+        instanceId: resolved.instanceId,
+        versionId: resolved.versionId,
+        taskId: args.taskId,
+        toolName: args.toolName,
+        riskLevel,
+        policyResult: {
+          decision: "ALLOW",
+          reason: policyReason,
+        },
+        inputPreview: toPreview(args.toolArgs),
+        startedAt: Date.now(),
+        status: "RUNNING",
+        retryCount: 0,
+      });
+
+      await ctx.db.patch(runId, {
+        metadata: {
+          ...(run.metadata ?? {}),
+          toolCallId,
+          toolName: args.toolName,
+        },
+      });
+
+      await appendOpEvent(ctx.db as any, {
+        tenantId: effectiveTenantId,
+        projectId: agent.projectId,
+        instanceId: resolved.instanceId,
+        versionId: resolved.versionId,
+        taskId: args.taskId,
+        runId,
+        toolCallId,
+        type: "TOOL_CALL_STARTED",
+        payload: {
+          toolName: args.toolName,
+          riskLevel,
+          source: policySource,
+        },
+      });
+    }
 
     if (args.taskId) {
       await logTaskEvent(ctx, {
@@ -197,7 +552,6 @@ export const start = mutation({
       });
     }
     
-    const run = await ctx.db.get(runId);
     return { run, created: true };
   },
 });
@@ -221,6 +575,8 @@ export const complete = mutation({
     
     const now = Date.now();
     const durationMs = now - run.startedAt;
+    const metadata = (run.metadata ?? {}) as Record<string, unknown>;
+    const toolCallId = metadata.toolCallId as Id<"toolCalls"> | undefined;
     
     // Check if run budget exceeded
     if (run.budgetAllocated && args.costUsd > run.budgetAllocated) {
@@ -249,6 +605,55 @@ export const complete = mutation({
       status: (args.error ? "FAILED" : args.status ?? "COMPLETED") as any,
       error: args.error,
     });
+    const updatedRun = await ctx.db.get(args.runId);
+    if (updatedRun) {
+      await appendOpEvent(ctx.db as any, {
+        tenantId: updatedRun.tenantId,
+        projectId: updatedRun.projectId,
+        instanceId: updatedRun.instanceId,
+        versionId: updatedRun.versionId,
+        taskId: updatedRun.taskId,
+        runId: updatedRun._id,
+        type: args.error ? "RUN_FAILED" : "RUN_COMPLETED",
+        payload: {
+          costUsd: args.costUsd,
+          durationMs,
+          inputTokens: args.inputTokens,
+          outputTokens: args.outputTokens,
+          status: args.error ? "FAILED" : args.status ?? "COMPLETED",
+        },
+      });
+
+      if (toolCallId) {
+        const toolCall = await ctx.db.get(toolCallId);
+        if (toolCall) {
+          await ctx.db.patch(toolCallId, {
+            endedAt: now,
+            durationMs,
+            outputPreview: toPreview(args.error ? { error: args.error } : { status: args.status ?? "COMPLETED" }),
+            status: args.error ? "FAILED" : "SUCCESS",
+            error: args.error,
+          });
+
+          await appendOpEvent(ctx.db as any, {
+            tenantId: updatedRun.tenantId,
+            projectId: updatedRun.projectId,
+            instanceId: updatedRun.instanceId,
+            versionId: updatedRun.versionId,
+            taskId: updatedRun.taskId,
+            runId: updatedRun._id,
+            toolCallId,
+            type: "TOOL_CALL_COMPLETED",
+            payload: {
+              toolName: toolCall.toolName,
+              status: args.error ? "FAILED" : "SUCCESS",
+              error: args.error,
+              durationMs,
+            },
+          });
+        }
+      }
+    }
     
     // Update agent's spend
     if (args.costUsd > 0) {

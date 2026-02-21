@@ -135,6 +135,7 @@ export const decomposeTask = mutation({
     for (let i = 0; i < phases.length; i++) {
       const phase = phases[i];
       const subtaskId = await ctx.db.insert("tasks", {
+        tenantId: task.tenantId,
         projectId: task.projectId,
         title: `${phase.verb} — ${task.title}`,
         description: `${phase.description} for: ${task.description ?? task.title}`,
@@ -142,6 +143,7 @@ export const decomposeTask = mutation({
         status: "INBOX",
         priority: task.priority,
         assigneeIds: [],
+        assigneeInstanceIds: [],
         reviewCycles: 0,
         actualCost: 0,
         parentTaskId: args.taskId,

@@ -66,4 +66,18 @@ crons.interval(
   internal.executorRouter.autoRoute
 );
 
+// Guard against migration drift (missing instance refs or tenant IDs) every 30 minutes
+crons.interval(
+  "guard ARM migration health",
+  { minutes: 30 },
+  internal.migrations.backfillInstanceRefs.guardMigrationHealth
+);
+
+// Execute due scheduled jobs every minute
+crons.interval(
+  "execute scheduled jobs",
+  { minutes: 1 },
+  internal.scheduledJobs.executeDue
+);
+
 export default crons;

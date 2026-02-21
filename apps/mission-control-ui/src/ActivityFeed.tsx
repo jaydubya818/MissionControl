@@ -2,6 +2,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface ActivityFeedProps {
   projectId: Id<"projects"> | null;
@@ -16,7 +17,7 @@ export function ActivityFeed({ projectId, limit = 50 }: ActivityFeedProps) {
   
   if (!activities) {
     return (
-      <div style={{ padding: "20px", color: "#94a3b8" }}>
+      <div className="p-5 text-muted-foreground">
         Loading activities...
       </div>
     );
@@ -36,38 +37,32 @@ export function ActivityFeed({ projectId, limit = 50 }: ActivityFeedProps) {
     return "📝";
   };
   
-  const getActivityColor = (action: string) => {
-    if (action.includes("CREATED")) return "#10b981";
-    if (action.includes("COMPLETED")) return "#10b981";
-    if (action.includes("APPROVED")) return "#10b981";
-    if (action.includes("DENIED")) return "#ef4444";
-    if (action.includes("BLOCKED")) return "#ef4444";
-    if (action.includes("DELETED")) return "#ef4444";
-    if (action.includes("REVIEW")) return "#8b5cf6";
-    if (action.includes("ASSIGNED")) return "#3b82f6";
-    return "#94a3b8";
+  const getActivityBorderClass = (action: string) => {
+    if (action.includes("CREATED")) return "border-l-emerald-500";
+    if (action.includes("COMPLETED")) return "border-l-emerald-500";
+    if (action.includes("APPROVED")) return "border-l-emerald-500";
+    if (action.includes("DENIED")) return "border-l-red-500";
+    if (action.includes("BLOCKED")) return "border-l-red-500";
+    if (action.includes("DELETED")) return "border-l-red-500";
+    if (action.includes("REVIEW")) return "border-l-blue-500";
+    if (action.includes("ASSIGNED")) return "border-l-blue-500";
+    return "border-l-slate-400";
   };
   
   return (
-    <div style={{
-      background: "#0f172a",
-      borderRadius: "8px",
-      padding: "16px",
-      maxHeight: "600px",
-      overflow: "auto",
-    }}>
-      <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: 600 }}>
+    <div className="bg-background rounded-lg p-4 max-h-[600px] overflow-auto">
+      <h3 className="mb-4 text-base font-semibold">
         📊 Recent Activity
       </h3>
       
       <AnimatePresence>
         {activities.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
-            <div style={{ fontSize: "48px", marginBottom: "12px" }}>📭</div>
-            <div style={{ fontSize: "16px" }}>No activity yet</div>
+          <div className="text-center py-10 text-muted-foreground">
+            <div className="text-5xl mb-3">📭</div>
+            <div className="text-base">No activity yet</div>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div className="flex flex-col gap-2">
             {activities.map((activity, idx) => (
               <motion.div
                 key={activity._id}
@@ -75,22 +70,20 @@ export function ActivityFeed({ projectId, limit = 50 }: ActivityFeedProps) {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ delay: idx * 0.05 }}
-                style={{
-                  padding: "12px",
-                  background: "#1e293b",
-                  borderRadius: "6px",
-                  borderLeft: `3px solid ${getActivityColor(activity.action)}`,
-                }}
+                className={cn(
+                  "p-3 bg-card rounded-md border-l-[3px]",
+                  getActivityBorderClass(activity.action)
+                )}
               >
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-                  <span style={{ fontSize: "18px", flexShrink: 0 }}>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-lg shrink-0">
                     {getActivityIcon(activity.action)}
                   </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "13px", color: "#e2e8f0", marginBottom: "4px" }}>
+                  <div className="flex-1">
+                    <div className="text-[13px] text-foreground mb-1">
                       {activity.description}
                     </div>
-                    <div style={{ fontSize: "11px", color: "#64748b", display: "flex", gap: "8px" }}>
+                    <div className="text-[11px] text-muted-foreground flex gap-2">
                       <span>{activity.actorType}</span>
                       <span>·</span>
                       <span>{new Date(activity._creationTime).toLocaleTimeString()}</span>
@@ -109,61 +102,26 @@ export function ActivityFeed({ projectId, limit = 50 }: ActivityFeedProps) {
 export function ActivityFeedModal({ projectId, onClose }: { projectId: Id<"projects"> | null; onClose: () => void }) {
   return (
     <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0,0,0,0.8)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        padding: "20px",
-      }}
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[1000] p-5"
       onClick={onClose}
     >
       <div
-        style={{
-          background: "#1e293b",
-          borderRadius: "12px",
-          maxWidth: "800px",
-          width: "100%",
-          maxHeight: "80vh",
-          overflow: "hidden",
-          color: "#e2e8f0",
-        }}
+        className="bg-card rounded-xl max-w-[800px] w-full max-h-[80vh] overflow-hidden text-card-foreground"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div style={{
-          padding: "24px",
-          borderBottom: "1px solid #334155",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}>
-          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 600 }}>
+        <div className="p-6 border-b border-border flex justify-between items-center">
+          <h2 className="text-xl font-semibold">
             📊 Activity Feed
           </h2>
           <button
             onClick={onClose}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#94a3b8",
-              fontSize: "24px",
-              cursor: "pointer",
-              padding: "0 8px",
-            }}
+            className="bg-transparent border-none text-muted-foreground text-2xl cursor-pointer px-2 hover:text-foreground transition-colors"
           >
             ×
           </button>
         </div>
         
-        {/* Content */}
-        <div style={{ padding: "24px", overflow: "auto", maxHeight: "calc(80vh - 80px)" }}>
+        <div className="p-6 overflow-auto max-h-[calc(80vh-80px)]">
           <ActivityFeed projectId={projectId} limit={100} />
         </div>
       </div>
