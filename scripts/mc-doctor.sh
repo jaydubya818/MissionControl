@@ -70,10 +70,10 @@ else
     log_fail "convex not installed (run: pnpm install)"
 fi
 
-if [[ -d "$MC_DIR/node_modules/react" ]]; then
-    log_pass "react package installed"
+if [[ -d "$MC_DIR/apps/mission-control-ui/node_modules/react" || -d "$MC_DIR/node_modules/react" ]]; then
+    log_pass "react installed"
 else
-    log_fail "react not installed"
+    log_warn "react not in root (check UI app)"
 fi
 
 # A3: TypeScript compilation

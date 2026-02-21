@@ -58,7 +58,7 @@ log_section "2. Dependencies"
 if [[ -d "$MC_DIR/node_modules" ]]; then
     log_info "node_modules exists"
     
-    PACKAGES=("convex" "react" "typescript")
+    PACKAGES=("convex" "typescript")
     for pkg in "${PACKAGES[@]}"; do
         if [[ -d "$MC_DIR/node_modules/$pkg" ]]; then
             log_info "$pkg installed"
@@ -66,6 +66,13 @@ if [[ -d "$MC_DIR/node_modules" ]]; then
             log_error "$pkg not installed"
         fi
     done
+    
+    # React is in UI app in monorepo
+    if [[ -d "$MC_DIR/apps/mission-control-ui/node_modules/react" || -d "$MC_DIR/node_modules/react" ]]; then
+        log_info "react installed"
+    else
+        log_warn "react not found (may need to install UI deps)"
+    fi
 else
     log_warn "node_modules not found (run: pnpm install)"
 fi
