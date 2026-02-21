@@ -331,6 +331,101 @@ for test in "${TEST_FILES[@]}"; do
 done
 
 # ============================================
+# K) E2E VALIDATION (if --e2e flag provided)
+# ============================================
+
+E2E_RUN_ID="${1:-}"
+if [[ "$E2E_RUN_ID" == --e2e* ]]; then
+    E2E_RUN_ID="${E2E_RUN_ID#--e2e}"
+    E2E_RUN_ID="${E2E_RUN_ID#=}"
+    E2E_RUN_ID="${E2E_RUN_ID# }"
+fi
+
+if [[ -n "$E2E_RUN_ID" ]]; then
+    log_section "K) E2E Validation (RUN_ID: $E2E_RUN_ID)"
+    
+    # Check if seed data exists
+    log_info "Checking E2E seed data..."
+    
+    VALIDATION_OUTPUT=$(cd "$MC_DIR" && npx convex run api.e2e.validate --arg "{\"runId\": \"$E2E_RUN_ID\"}" 2>&1)
+    
+    if [[ $? -ne 0 ]]; then
+        log_fail "E2E validation query failed"
+        log_info "Attempting to seed data..."
+        
+        # Try to seed
+        SEED_OUTPUT=$(cd "$MC_DIR" && npx convex run api.e2e.seed --arg "{\"runId\": \"$E2E_RUN_ID\"}" 2>&1)
+        if [[ $? -ne 0 ]]; then
+            log_fail "E2E seed failed: $SEED_OUTPUT"
+        else
+            log_pass "E2E seed completed"
+            # Re-run validation
+            VALIDATION_OUTPUT=$(cd "$MC_DIR" && npx convex run api.e2e.validate --arg "{\"runId\": \"$E2E_RUN_ID\"}" 2>&1)
+        fi
+    fi
+    
+    # Parse validation results
+    if echo "$VALIDATION_OUTPUT" | jq -e '.allValid' > /dev/null 2>&1; then
+        log_pass "E2E validation query succeeded"
+        
+        # Check agents
+        AGENTS_FOUND=$(echo "$VALIDATION_OUTPUT" | jq -r '.agents.found')
+        AGENTS_EXPECTED=$(echo "$VALIDATION_OUTPUT" | jq -r '.agents.expected')
+        if [[ "$AGENTS_FOUND" -ge "$AGENTS_EXPECTED" ]]; then
+            log_pass "E2E agents: $AGENTS_FOUND/$AGENTS_EXPECTED"
+        else
+            log_fail "E2E agents: $AGENTS_FOUND/$AGENTS_EXPECTED"
+        fi
+        
+        # Check tasks
+        TASKS_FOUND=$(echo "$VALIDATION_OUTPUT" | jq -r '.tasks.found')
+        TASKS_EXPECTED=$(echo "$VALIDATION_OUTPUT" | jq -r '.tasks.expected')
+        if [[ "$TASKS_FOUND" -ge "$TASKS_EXPECTED" ]]; then
+            log_pass "E2E tasks: $TASKS_FOUND/$TASKS_EXPECTED"
+        else
+            log_fail "E2E tasks: $TASKS_FOUND/$TASKS_EXPECTED"
+        fi
+        
+        # Check content drops
+        DROPS_FOUND=$(echo "$VALIDATION_OUTPUT" | jq -r '.contentDrops.found')
+        DROPS_EXPECTED=$(echo "$VALIDATION_OUTPUT" | jq -r '.contentDrops.expected')
+        if [[ "$DROPS_FOUND" -ge "$DROPS_EXPECTED" ]]; then
+            log_pass "E2E content drops: $DROPS_FOUND/$DROPS_EXPECTED"
+        else
+            log_fail "E2E content drops: $DROPS_FOUND/$DROPS_EXPECTED"
+        fi
+        
+        # Check budget
+        BUDGET_TOTAL=$(echo "$VALIDATION_OUTPUT" | jq -r '.budget.total')
+        BUDGET_EXPECTED=$(echo "$VALIDATION_OUTPUT" | jq -r '.budget.expected')
+        if echo "$VALIDATION_OUTPUT" | jq -e '.budget.valid' > /dev/null 2>&1; then
+            log_pass "E2E budget: $BUDGET_TOTAL/$BUDGET_EXPECTED"
+        else
+            log_fail "E2E budget: $BUDGET_TOTAL (expected $BUDGET_EXPECTED)"
+        fi
+        
+        # Check workflow runs
+        WORKFLOWS_FOUND=$(echo "$VALIDATION_OUTPUT" | jq -r '.workflowRuns.found')
+        WORKFLOWS_EXPECTED=$(echo "$VALIDATION_OUTPUT" | jq -r '.workflowRuns.expected')
+        if [[ "$WORKFLOWS_FOUND" -ge "$WORKFLOWS_EXPECTED" ]]; then
+            log_pass "E2E workflow runs: $WORKFLOWS_FOUND/$WORKFLOWS_EXPECTED"
+        else
+            log_fail "E2E workflow runs: $WORKFLOWS_FOUND/$WORKFLOWS_EXPECTED"
+        fi
+        
+        # Overall
+        if echo "$VALIDATION_OUTPUT" | jq -e '.allValid' > /dev/null 2>&1; then
+            log_pass "E2E validation PASSED"
+        else
+            log_fail "E2E validation FAILED"
+        fi
+    else
+        log_fail "E2E validation failed or returned invalid data"
+        log_info "Output: $VALIDATION_OUTPUT"
+    fi
+fi
+
+# ============================================
 # SUMMARY
 # ============================================
 log_section "SUMMARY"
