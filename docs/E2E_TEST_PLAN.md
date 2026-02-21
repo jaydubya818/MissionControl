@@ -1,349 +1,355 @@
-# E2E Test Plan — Mission Control
+# E2E Test Plan — Mission Control (Deterministic Seed)
 
-**Version:** 1.0  
+**Version:** 2.0  
 **Date:** 2026-02-21  
-**Purpose:** Validate full system end-to-end
+**Purpose:** Validate full system end-to-end with deterministic seed data
 
 ---
 
-## Test Suite Overview
+## Overview
 
-| Test ID | Name | Type | Duration | Priority |
-|---------|------|------|----------|----------|
-| A1 | Boot Validation | Smoke | <30s | Critical |
-| A2 | Convex Connectivity | Smoke | <10s | Critical |
-| B1 | Schema Sanity | Doctor | <10s | High |
-| B2 | Agent Registry | Doctor | <30s | High |
-| C1 | Inbox Lifecycle | Doctor | <60s | High |
-| D1 | Content Drop | Doctor | <30s | Medium |
-| E1 | Budget Ledger | Doctor | <30s | Medium |
-| F1 | Workflow Execution | Doctor | <120s | High |
+This test plan uses a **deterministic seed dataset** that is created, validated, and cleaned up automatically. All objects are prefixed with `E2E_<timestamp>_<shortid>` for isolation and cleanup.
+
+**Lifecycle:**
+1. **Seed** — Create test data via `./scripts/mc-seed-e2e.sh`
+2. **Validate** — Run assertions against seeded data
+3. **Cleanup** — Remove all E2E objects via `./scripts/mc-cleanup-e2e.sh`
 
 ---
 
-## A) Boot Validation
+## Seed Dataset
 
-### A1: UI Starts Without Errors
+### A) Agents (2)
 
-**Command:**
+| Name | Role | Capabilities |
+|------|------|--------------|
+| `e2e_scout_<runId>` | SPECIALIST | repo_scan, workflow_boot, reporting |
+| `e2e_executor_<runId>` | SPECIALIST | task_claim, state_advance, content_drop, budget_write |
+
+### B) Inbox Tasks (3)
+
+| Title | Type | Expected States |
+|-------|------|-----------------|
+| E2E: Verify inbox claim/complete | e2e_inbox_roundtrip | INBOX → ASSIGNED → IN_PROGRESS → DONE |
+| E2E: Submit content drop | e2e_content_drop | drop exists + retrievable |
+| E2E: Budget ledger write/read | e2e_budget_roundtrip | ledger entry exists + totals match |
+
+### C) Content Drops (2)
+
+| Title | Kind | Metadata |
+|-------|------|----------|
+| e2e-drop: hello | note | source: doctor, run_id |
+| e2e-drop: structured | json | source: doctor, run_id, payload: {a:1,b:2} |
+
+### D) Budget Ledger (2 entries)
+
+| Entry | Amount | Expected Total |
+|-------|--------|----------------|
+| Credit | +1.00 | +0.75 |
+| Debit | -0.25 | |
+
+### E) Workflow Run (1)
+
+- **Workflow:** feature-dev (or minimal e2e workflow)
+- **Goal:** "Add a README line in /work/mc-e2e/toy-repo"
+- **Must:** Not require external credentials
+
+---
+
+## Test Execution
+
+### Quick Run
+
 ```bash
-timeout 10 pnpm run dev:ui &
-sleep 5
-curl -s http://localhost:5173 | head -20
+# 1. Seed data
+./scripts/mc-seed-e2e.sh
+# Output: RUN_ID=E2E_...
+
+# 2. Run validation (uses seed data)
+./scripts/mc-doctor.sh --e2e $RUN_ID
+
+# 3. Cleanup
+./scripts/mc-cleanup-e2e.sh $RUN_ID
+```
+
+### Full Validation (mc-doctor.sh)
+
+**With E2E flag, doctor will:**
+1. Skip placeholder warnings for CONVEX_URL
+2. Seed data if not already present
+3. Run all validations against seeded data
+4. Report PASS/FAIL per subsystem
+5. Cleanup on success (optional)
+
+---
+
+## Test Suite
+
+| ID | Name | Command | Expected |
+|----|------|---------|----------|
+| S1 | Seed Creation | `mc-seed-e2e.sh` | 2 agents, 3 tasks, 2 drops, budget entries |
+| V1 | Convex Ping | `convex run api.health.ping` | HTTP 200 |
+| V2 | Agents Retrievable | `convex run api.agents.get` | Both agents exist with metadata |
+| V3 | Inbox Roundtrip | Task lifecycle transitions | INBOX→ASSIGNED→IN_PROGRESS→DONE |
+| V4 | Content Drops | `convex run api.e2e.validate` | 2 drops retrievable, metadata preserved |
+| V5 | Budget Total | Calculate from activities | +0.75 units for run_id |
+| V6 | Workflow Run | Check workflowRuns table | Run exists, reaches terminal state |
+| C1 | Cleanup | `mc-cleanup-e2e.sh $RUN_ID` | All E2E objects deleted |
+
+---
+
+## Detailed Validation Steps
+
+### V1: Convex Ping
+
+```bash
+npx convex run api.health.ping
 ```
 
 **Expected:**
-- Exit code 0
-- Response contains HTML
-- No runtime errors in console
-
-**Logs:** Console output
+```json
+{"status": "healthy", "timestamp": 1708544400000}
+```
 
 ---
 
-### A2: Convex Dev Starts
+### V2: Agents Retrievable
 
-**Command:**
 ```bash
-timeout 15 npx convex dev &
-sleep 10
-curl -s $CONVEX_URL/health
+npx convex run api.agents.get --arg '{"agentId": "<scout_id>"}'
+npx convex run api.agents.get --arg '{"agentId": "<executor_id>"}'
 ```
 
 **Expected:**
-- HTTP 200
-- Response: `{"status": "healthy"}`
-
-**Logs:** `.env.local` (generated with deployment URL)
-
----
-
-### A3: Orchestration Server Starts
-
-**Command:**
-```bash
-timeout 10 pnpm run dev:orch &
-sleep 5
-curl -s http://localhost:3000/health
-```
-
-**Expected:**
-- HTTP 200
-- Response contains `status` field
-
-**Logs:** Server stdout
+- Both agents exist
+- metadata.e2eRunId matches RUN_ID
+- Role is SPECIALIST
+- Status is ACTIVE
 
 ---
 
-## B) Convex + Data Layer
+### V3: Inbox Roundtrip
 
-### B1: Schema Sanity Check
-
-**Command:**
 ```bash
-npx convex run api.health.schemaCheck
-```
+# Get inbox task
+TASK_ID=$(npx convex run api.tasks.list --arg '{"status": "INBOX"}' | \
+  jq -r '.[] | select(.metadata.e2eRunId == "'$RUN_ID'") | ._id')
 
-**Expected:**
-- All required tables exist:
-  - `agents` — Agent registry
-  - `tasks` — Task lifecycle
-  - `workflows` — Workflow definitions
-  - `workflowRuns` — Workflow executions
-  - `runs` — Agent execution runs
-  - `approvals` — Approval requests
+# Claim
+npx convex run api.tasks.assign --arg \
+  '{"taskId": "'$TASK_ID'", "assigneeIds": ["<executor_id>"]}'
 
-**Validation:**
-```typescript
-// Expected schema structure
-agents: { agentId, name, emoji, role, status, lastHeartbeatAt }
-tasks: { taskId, title, status, assigneeIds, createdAt }
-workflows: { workflowId, name, steps, active }
-```
+# Advance to IN_PROGRESS
+npx convex run api.tasks.transition --arg \
+  '{"taskId": "'$TASK_ID'", "toStatus": "IN_PROGRESS", "actorType": "AGENT"}'
 
----
-
-### B2: Agent Registry Round Trip
-
-**Steps:**
-1. Create agent
-2. List agents
-3. Read back agent
-4. Verify required fields
-
-**Commands:**
-```bash
-# Create
-npx convex run api.agents.register --arg '{
-  "name": "TestAgent",
-  "emoji": "🧪",
-  "role": "INTERN",
-  "allowedTaskTypes": ["ENGINEERING"]
-}'
-
-# List
-npx convex run api.agents.list
-
-# Verify fields present
-```
-
-**Expected:**
-- Agent created with ID
-- List contains new agent
-- Required fields: name, emoji, role, status, createdAt
-
----
-
-## C) Inbox Lifecycle
-
-### C1: Full Task Lifecycle
-
-**Steps:**
-1. Create task in INBOX
-2. Claim task (ASSIGNED)
-3. Start work (IN_PROGRESS)
-4. Complete task (DONE)
-
-**Commands:**
-```bash
-# 1. Create
-TASK_ID=$(npx convex run api.tasks.create --arg '{
-  "title": "E2E Test Task",
-  "type": "ENGINEERING",
-  "priority": 2,
-  "description": "Test task for E2E validation"
-}' | jq -r '.taskId')
-
-# 2. Claim
-npx convex run api.tasks.assign --arg "{\"taskId\": \"$TASK_ID\", \"assigneeIds\": [\"test-agent-id\"]}"
-
-# 3. Start
-npx convex run api.tasks.transition --arg "{\"taskId\": \"$TASK_ID\", \"toStatus\": \"IN_PROGRESS\"}"
-
-# 4. Complete
-npx convex run api.tasks.transition --arg "{\"taskId\": \"$TASK_ID\", \"toStatus\": \"DONE\"}"
+# Complete
+npx convex run api.tasks.transition --arg \
+  '{"taskId": "'$TASK_ID'", "toStatus": "DONE", "actorType": "AGENT"}'
 
 # Verify
-npx convex run api.tasks.get --arg "{\"taskId\": \"$TASK_ID\"}"
+npx convex run api.tasks.get --arg '{"taskId": "'$TASK_ID'"}'
 ```
 
 **Expected:**
-- Task status: DONE
-- Assignee: test-agent-id
+- Final status: DONE
+- Assignee: e2e_executor
 - State transitions logged
 
-**Logs:** Task document in Convex dashboard
-
 ---
 
-## D) Content Drop
+### V4: Content Drops Retrievable
 
-### D1: Submit and Retrieve
-
-**Command:**
 ```bash
-# Submit
-DROP_ID=$(npx convex run api.contentDrops.submit --arg '{
-  "title": "E2E Test Drop",
-  "contentType": "CODE_SNIPPET",
-  "content": "console.log('Hello E2E')",
-  "agentId": "test-agent"
-}' | jq -r '.dropId')
-
-# Retrieve
-npx convex run api.contentDrops.get --arg "{\"dropId\": \"$DROP_ID\"}"
+npx convex run api.e2e.validate --arg '{"runId": "'$RUN_ID'"}'
 ```
 
 **Expected:**
-- Drop created with ID
-- Content matches submission
-- Metadata: agentId, timestamp, contentType
+```json
+{
+  "contentDrops": {"found": 2, "expected": 2, "valid": true},
+  "drops": [
+    {"title": "e2e-drop: hello", "kind": "note"},
+    {"title": "e2e-drop: structured", "kind": "json", "payload": {a:1,b:2}}
+  ]
+}
+```
 
 ---
 
-## E) Budget Ledger
+### V5: Budget Total
 
-### E1: Write and Verify
-
-**Command:**
 ```bash
-# Write
-npx convex run api.agents.recordSpend --arg '{
-  "agentId": "test-agent",
-  "amount": 0.05,
-  "description": "E2E test spend"
-}'
-
-# Verify
-npx convex run api.agents.get --arg '{"agentId": "test-agent"}'
-# Check: totalSpend increased by 0.05
+npx convex run api.e2e.validate --arg '{"runId": "'$RUN_ID'"}'
 ```
 
 **Expected:**
-- Spend recorded
-- Budget remaining updated
+```json
+{
+  "budget": {"total": 0.75, "expected": 0.75, "valid": true}
+}
+```
+
+**Calculation:**
+- Entry 1: +1.00 (credit)
+- Entry 2: -0.25 (debit)
+- Total: +0.75 ✓
 
 ---
 
-## F) Workflow Execution
+### V6: Workflow Run State
 
-### F1: Feature Dev Workflow
-
-**Command:**
 ```bash
-npx convex run api.workflows.run --arg '{
-  "workflowId": "feature-dev",
-  "input": "Add a console.log statement to index.ts",
-  "projectId": "test-project"
-}'
+# Get workflow run
+npx convex run api.workflowRuns.get --arg '{"runId": "<workflow_run_id>"}'
 ```
 
 **Expected:**
-- Workflow run created
-- Status progresses through steps
-- Final status: COMPLETED or FAILED (with error)
-
-**Timeout:** 120 seconds
+- Workflow ID: feature-dev
+- Status: PENDING, RUNNING, or COMPLETED
+- metadata.e2eRunId matches RUN_ID
 
 ---
 
-### F2: Bug Fix Workflow
+### C1: Cleanup
 
-**Command:**
 ```bash
-npx convex run api.workflows.run --arg '{
-  "workflowId": "bug-fix",
-  "input": "Fix typo in console.log",
-  "projectId": "test-project"
-}'
+./scripts/mc-cleanup-e2e.sh $RUN_ID
 ```
 
 **Expected:**
-- Workflow run created
-- 6 steps execute
-- Final status: COMPLETED
-
----
-
-### F3: Security Audit Workflow
-
-**Command:**
-```bash
-npx convex run api.workflows.run --arg '{
-  "workflowId": "security-audit",
-  "input": "Audit src/auth.ts for vulnerabilities",
-  "projectId": "test-project"
-}'
+```
+Agents deleted: 2
+Tasks deleted: 3
+Content drops deleted: 2
+Activities deleted: N
+Workflow runs deleted: 1
 ```
 
-**Expected:**
-- Audit-only mode (no changes)
-- Report generated
-- Status: COMPLETED
-
----
-
-### F4: Code Review Workflow (if exists)
-
-**Command:**
+**Verify:**
 ```bash
-npx convex run api.workflows.run --arg '{
-  "workflowId": "code-review",
-  "input": "Review PR: Add logging",
-  "projectId": "test-project"
-}'
+npx convex run api.e2e.validate --arg '{"runId": "'$RUN_ID'"}'
+# Should return all counts as 0
 ```
 
-**Expected:**
-- 4 steps: intake → review → verify → approve
-- Decision: APPROVE or CHANGES_REQUESTED
-
 ---
 
-## Success Criteria
+## Scripts
 
-### Smoke Tests (mc-smoke.sh)
-- [ ] All env vars present
-- [ ] Dependencies installed
-- [ ] Workflows valid YAML
-- [ ] Schema has required tables
-- [ ] Packages exist
+### mc-seed-e2e.sh
 
-### Doctor Tests (mc-doctor.sh)
-- [ ] Convex ping succeeds
-- [ ] Agent registry works
-- [ ] Inbox lifecycle completes
-- [ ] Content drop round trip
-- [ ] Budget ledger updates
-- [ ] At least 2 workflows execute
+Creates deterministic seed data with unique RUN_ID.
 
-### Full System
-- [ ] UI loads
-- [ ] Convex responds
-- [ ] Orchestration starts
-- [ ] End-to-end task flow works
-- [ ] Workflows execute
+**Output:**
+- RUN_ID
+- Agent IDs
+- Task IDs
+- Content Drop IDs
+- Budget total
+- Workflow Run ID
 
----
+**Artifacts:**
+- Saves to `/tmp/mc-e2e-seed-${RUN_ID}.json`
 
-## Failure Response
+### mc-doctor.sh --e2e $RUN_ID
 
-For each failure:
-1. Log error with context
-2. Identify root cause
-3. Fix in smallest possible commit
-4. Add regression test
-5. Re-run full suite
+Validates system using seeded data.
+
+**Checks:**
+- Convex reachable
+- All seed objects exist
+- State transitions work
+- Budget totals match
+- Workflow runs exist
+
+**Output:**
+- PASS/FAIL per subsystem
+- Detailed error messages
+- Summary statistics
+
+### mc-cleanup-e2e.sh $RUN_ID
+
+Deletes all E2E objects for given RUN_ID.
+
+**Safety:**
+- Only deletes objects with matching e2eRunId
+- Logs all deletions
+- Cannot delete non-E2E data
 
 ---
 
 ## CI Integration
 
-**GitHub Action should:**
-1. Install deps: `pnpm install`
-2. Run smoke: `./scripts/mc-smoke.sh`
-3. Run typecheck: `pnpm run typecheck`
-4. Run lint: `pnpm run lint`
-5. Run unit tests: `pnpm run test`
+### GitHub Action
 
-**Note:** Full doctor tests require Convex deployment (skip in CI or use mock)
+```yaml
+- name: E2E Test
+  run: |
+    # Seed
+    RUN_ID=$(./scripts/mc-seed-e2e.sh | grep "RUN_ID=" | cut -d= -f2)
+    
+    # Validate
+    ./scripts/mc-doctor.sh --e2e $RUN_ID
+    
+    # Cleanup
+    ./scripts/mc-cleanup-e2e.sh $RUN_ID
+  env:
+    CONVEX_URL: ${{ secrets.CONVEX_URL }}
+```
+
+### Local Development
+
+```bash
+# Full cycle
+./scripts/mc-seed-e2e.sh
+# Copy RUN_ID from output
+./scripts/mc-doctor.sh --e2e $RUN_ID
+./scripts/mc-cleanup-e2e.sh $RUN_ID
+```
+
+---
+
+## Success Criteria
+
+### Seed Phase
+- [ ] 2 agents created with E2E prefix
+- [ ] 3 tasks created in INBOX
+- [ ] 2 content drops created
+- [ ] 2 budget entries (+1.00, -0.25)
+- [ ] 1 workflow run created
+
+### Validation Phase
+- [ ] Convex ping returns 200
+- [ ] Both agents retrievable with correct metadata
+- [ ] Inbox task completes full lifecycle
+- [ ] Content drops retrievable with metadata
+- [ ] Budget total is +0.75
+- [ ] Workflow run exists
+
+### Cleanup Phase
+- [ ] All E2E agents deleted
+- [ ] All E2E tasks deleted
+- [ ] All E2E drops deleted
+- [ ] All E2E activities deleted
+- [ ] E2E workflow runs deleted
+
+---
+
+## Failure Response
+
+1. **Log** the RUN_ID and error context
+2. **Diagnose** which validation failed
+3. **Fix** root cause in source code
+4. **Re-seed** and re-run validation
+5. **Commit** fix with regression test
+6. **Cleanup** after success
+
+---
+
+## Files
+
+- `convex/e2e.ts` — Seed, cleanup, validate mutations
+- `scripts/mc-seed-e2e.sh` — Seed script
+- `scripts/mc-cleanup-e2e.sh` — Cleanup script
+- `scripts/mc-doctor.sh` — Validation script (with --e2e flag)
+- `docs/E2E_TEST_PLAN.md` — This document
