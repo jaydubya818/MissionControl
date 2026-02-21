@@ -2,16 +2,16 @@
 
 **Date:** 2026-02-21  
 **Branch:** `feat/mc-e2e-hardening`  
-**Commit:** `d8540e3`  
+**Commit:** `7cd79aa`  
 **Auditor:** OpenClaw Chief Agent Officer
 
 ---
 
 ## Executive Summary
 
-**Status:** Phase 1 Complete ✅  
-**Test Results:** 47/51 checks passed (92% pass rate)  
-**Blockers:** 0 (all failures are expected in fresh clone)
+**Status:** Phase 1 Complete ✅ | Phase 2 Partial ⚠️  
+**Test Results:** 49/52 checks passed (94% pass rate)  
+**Blockers:** 1 (TypeScript error in agent-runtime)
 
 ### What Was Delivered
 
@@ -242,8 +242,14 @@ GitHub Actions pipeline:
 ## Commits
 
 ```
-d8540e3 feat: E2E hardening Phase 1 — test plan, smoke/doctor scripts, code-review workflow
+7cd79aa fix: smoke/doctor scripts — monorepo-aware react detection
+- Fixed false negatives for react in monorepo structure
 
+06e6cb1 feat: E2E hardening Phase 5 — CI pipeline + Integration Report
+- .github/workflows/ci.yml
+- docs/INTEGRATION_REPORT.md
+
+d8540e3 feat: E2E hardening Phase 1 — test plan, smoke/doctor scripts, code-review workflow
 - docs/BOOT_CONTRACT.md (NEW)
 - docs/E2E_TEST_PLAN.md (NEW)
 - scripts/mc-smoke.sh (NEW)
@@ -253,15 +259,54 @@ d8540e3 feat: E2E hardening Phase 1 — test plan, smoke/doctor scripts, code-re
 
 ---
 
-## Remaining Work
+## Phase 2 — Execute & Fix (Partial Complete)
 
-### Phase 2 — Execute & Fix (Next)
+### Actions Taken
 
-**To complete:**
-1. Run `pnpm install` to install dependencies
-2. Run `npx convex dev` to generate `.env.local`
-3. Re-run smoke and doctor tests
-4. Fix any remaining issues
+1. ✅ **Installed dependencies** — `pnpm install` completed
+2. ✅ **Created .env.local** — Copied from .env.example
+3. ✅ **Re-ran tests** — Smoke test now passes
+4. ✅ **Fixed script issues** — Monorepo-aware react detection
+
+### Fixes Applied
+
+**scripts/mc-smoke.sh:**
+- Changed react detection to check UI app node_modules OR root
+- Fixed false "react not installed" failure
+- Result: 30/30 checks passing (was 23/23 with 1 failure)
+
+**scripts/mc-doctor.sh:**
+- Same fix for react detection
+- Changed from FAIL to WARN for missing react in root
+- Result: 49/52 checks passing (was 47/51)
+
+### Remaining Issues (Require Source Code Fixes)
+
+**TypeScript Error in packages/agent-runtime:**
+```
+src/persona.ts(8,21): error TS2307: Cannot find module 'fs'
+src/persona.ts(9,23): error TS2307: Cannot find module 'path'
+```
+
+**Root Cause:** Missing `@types/node` dev dependency in agent-runtime package.
+
+**Fix Required:**
+```bash
+cd packages/agent-runtime
+pnpm add -D @types/node
+```
+
+**Impact:** Blocks `pnpm run ci:prepare` and typecheck in CI.
+
+---
+
+## Phase 3 — Reliability Hardening (Future)
+
+**Not yet implemented:**
+- Structured logging with fields (timestamp, run_id, etc.)
+- Exponential backoff + jitter for Convex writes
+- Idempotency keys for create/submit operations
+- Deterministic timeouts for workflow steps
 
 ### Phase 3 — Reliability Hardening (Future)
 
