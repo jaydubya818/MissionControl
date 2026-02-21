@@ -1,0 +1,151 @@
+# Code Review Workflow
+# 4-agent workflow: intake → review → verify-suggestions → approval/changes-requested
+#
+# Purpose: Thorough code review with security, style, and logic verification
+
+id: code-review
+name: Code Review
+description: "Thorough code review with security, style, and logic verification"
+
+agents:
+  - id: intake
+    persona: Coordinator
+    workspace:
+      files:
+        AGENTS.md: agents/coordinator/AGENTS.md
+  
+  - id: reviewer
+    persona: Coder
+    workspace:
+      files:
+        AGENTS.md: agents/coder/AGENTS.md
+        CODING_STANDARDS.md: CODING_STANDARDS.md
+  
+  - id: verifier
+    persona: QA
+    workspace:
+      files:
+        AGENTS.md: agents/qa/AGENTS.md
+  
+  - id: approver
+    persona: Lead
+    workspace:
+      files:
+        AGENTS.md: agents/lead/AGENTS.md
+
+steps:
+  - id: intake
+    agent: intake
+    input: |
+      Review this pull request/code change:
+      {{prDescription}}
+      
+      Code to review:
+      {{diff}}
+      
+      Reply with STATUS: done and INTAKE_SUMMARY: ...
+      
+      Tasks:
+      - Summarize what the code change does
+      - Identify files changed and scope
+      - Note any obvious red flags
+      - Check if PR description matches the actual changes
+    expects: "STATUS: done"
+    retryLimit: 1
+    timeoutMinutes: 5
+
+  - id: review
+    agent: reviewer
+    input: |
+      Perform a thorough code review of:
+      {{intakeOutput}}
+      
+      Code:
+      {{diff}}
+      
+      Reply with STATUS: done and REVIEW: ...
+      
+      Check for:
+      1. Security issues (injection, auth, secrets)
+      2. Logic errors (edge cases, null handling, race conditions)
+      3. Style violations (naming, formatting, consistency)
+      4. Performance issues (N+1 queries, inefficient loops)
+      5. Test coverage (are tests present? do they cover edge cases?)
+      6. Documentation (comments, README updates)
+      
+      For each issue found:
+      - File:line: specific location
+      - Severity: CRITICAL / HIGH / MEDIUM / LOW
+      - Issue: clear description
+      - Suggestion: how to fix
+      
+      Also note:
+      - What this code does well
+      - Any architectural concerns
+    expects: "STATUS: done"
+    retryLimit: 2
+    timeoutMinutes: 15
+
+  - id: verify
+    agent: verifier
+    input: |
+      Verify the review suggestions for this code:
+      {{reviewOutput}}
+      
+      Code:
+      {{diff}}
+      
+      Reply with STATUS: done and VERIFICATION: ...
+      
+      Tasks:
+      - Check that each suggestion is actionable and specific
+      - Verify suggestions don't conflict with each other
+      - Ensure no false positives in the review
+      - Validate that CRITICAL/HIGH issues are real problems
+      - Confirm test coverage feedback is accurate
+      
+      Output:
+      - Valid suggestions (list by severity)
+      - Any suggestions to disregard (with reason)
+      - Overall assessment: thorough/superficial/missed issues
+    expects: "STATUS: done"
+    retryLimit: 1
+    timeoutMinutes: 10
+
+  - id: approve
+    agent: approver
+    input: |
+      Make final approval decision based on:
+      {{verifyOutput}}
+      
+      Original code:
+      {{diff}}
+      
+      Reply with STATUS: done and DECISION: ...
+      
+      Decision options:
+      - APPROVE: Code is good to merge
+      - APPROVE_WITH_NITS: Minor suggestions, not blocking
+      - CHANGES_REQUESTED: Issues must be addressed
+      
+      Include:
+      - Decision (APPROVE / APPROVE_WITH_NITS / CHANGES_REQUESTED)
+      - Summary of findings
+      - Required changes (if any)
+      - Optional improvements (if any)
+      - Security verdict (CLEAR / NEEDS_FIX)
+      
+      If CHANGES_REQUESTED:
+      - List must-fix issues by severity
+      - Suggest re-review after fixes
+    expects: "STATUS: done"
+    retryLimit: 1
+    timeoutMinutes: 5
+
+onSuccess:
+  action: notify
+  message: "Code review complete: {{decision}}"
+  
+onFailure:
+  action: escalate
+  message: "Code review workflow failed, requires manual review"
