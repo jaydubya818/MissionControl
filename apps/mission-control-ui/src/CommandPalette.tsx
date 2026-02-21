@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
 import {
-  Plus,
-  Shield,
-  Bot,
-  AlertTriangle,
-  Search,
-} from "lucide-react";
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from "@/components/ui/command";
+import { Bot, Plus, Shield, AlertTriangle } from "lucide-react";
 
 interface CommandPaletteProps {
   projectId: Id<"projects"> | null;
@@ -33,7 +34,6 @@ export function CommandPalette({
   onOpenControls,
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const searchResults = useQuery(
     api.search.searchAll,
@@ -41,10 +41,6 @@ export function CommandPalette({
       ? { projectId, query: search.trim(), limit: 8 }
       : "skip"
   );
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
 
   const commands = useMemo(
     () => [
@@ -63,151 +59,112 @@ export function CommandPalette({
   );
 
   const hasSearch = search.trim().length >= 2;
+  const hasNoResults = hasSearch && !!searchResults && searchResults.totalResults === 0 && filteredCommands.length === 0;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 flex items-start justify-center pt-[100px] z-[1000]"
-      onClick={onClose}
-    >
-      <div
-        className="bg-popover border border-border rounded-xl w-full max-w-[720px] max-h-[600px] overflow-hidden shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        {/* Search input */}
-        <div className="p-4 border-b border-border">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              ref={inputRef}
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search tasks, approvals, agents, or run a command..."
-              className="pl-10 h-10 text-base bg-background"
-              onKeyDown={(event) => {
-                if (event.key === "Escape") onClose();
+    <CommandDialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <CommandInput
+        value={search}
+        onValueChange={setSearch}
+        placeholder="Search tasks, approvals, agents, or run a command..."
+      />
+      <CommandList>
+        <CommandEmpty>No results found.</CommandEmpty>
+
+        <CommandGroup heading="Commands">
+          {(search ? filteredCommands : commands).map((command) => (
+            <CommandItem
+              key={command.id}
+              value={`${command.label}-${command.id}`}
+              onSelect={() => {
+                command.action();
+                onClose();
               }}
-            />
+            >
+              {command.icon}
+              <span className="flex-1">{command.label}</span>
+              <CommandShortcut>{command.shortcut}</CommandShortcut>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+
+        {hasSearch && <CommandSeparator />}
+
+        {hasSearch && (
+          <>
+            <CommandGroup heading="Tasks">
+              {(searchResults?.tasks ?? []).map((task) => (
+                <CommandItem
+                  key={task._id}
+                  value={`${task.title}-${task._id}`}
+                  onSelect={() => {
+                    onSelectTask(task._id);
+                    onClose();
+                  }}
+                >
+                  <span className="text-base leading-none">📋</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block truncate text-sm">{task.title}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {task.status} · {task.type} · P{task.priority}
+                    </span>
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+
+            <CommandGroup heading="Approvals">
+              {(searchResults?.approvals ?? []).map((approval) => (
+                <CommandItem
+                  key={approval._id}
+                  value={`${approval.actionSummary}-${approval._id}`}
+                  onSelect={() => {
+                    if (!approval.taskId) return;
+                    onSelectTask(approval.taskId as Id<"tasks">);
+                    onClose();
+                  }}
+                  disabled={!approval.taskId}
+                >
+                  <span className="text-base leading-none">🛡️</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block truncate text-sm">{approval.actionSummary}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {approval.status} · {approval.riskLevel} · {approval.actionType}
+                    </span>
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+
+            <CommandGroup heading="Agents">
+              {(searchResults?.agents ?? []).map((agent) => (
+                <CommandItem
+                  key={agent._id}
+                  value={`${agent.name}-${agent._id}`}
+                  onSelect={() => {
+                    onOpenAgents();
+                    onClose();
+                  }}
+                >
+                  <span className="text-base leading-none">{agent.emoji || "🤖"}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block truncate text-sm">{agent.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {agent.role} · {agent.status}
+                    </span>
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
+
+        {hasNoResults && (
+          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+            No results for &ldquo;{search}&rdquo;.
           </div>
-        </div>
-
-        {/* Results */}
-        <ScrollArea className="max-h-[480px]">
-          <div className="p-3">
-            {!search && (
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
-                Quick Actions
-              </p>
-            )}
-
-            {(filteredCommands.length > 0 || !search) && (
-              <ResultGroup
-                title="Commands"
-                rows={(search ? filteredCommands : commands).map((command) => ({
-                  key: command.id,
-                  title: command.label,
-                  subtitle: command.shortcut,
-                  icon: command.icon,
-                  onClick: () => { command.action(); onClose(); },
-                }))}
-              />
-            )}
-
-            {hasSearch && (
-              <>
-                <ResultGroup
-                  title="Tasks"
-                  rows={(searchResults?.tasks ?? []).map((task) => ({
-                    key: task._id,
-                    title: task.title,
-                    subtitle: `${task.status} · ${task.type} · P${task.priority}`,
-                    icon: <span className="text-sm">📋</span>,
-                    onClick: () => { onSelectTask(task._id); onClose(); },
-                  }))}
-                />
-
-                <ResultGroup
-                  title="Approvals"
-                  rows={(searchResults?.approvals ?? []).map((approval) => ({
-                    key: approval._id,
-                    title: approval.actionSummary,
-                    subtitle: `${approval.status} · ${approval.riskLevel} · ${approval.actionType}`,
-                    icon: <span className="text-sm">🛡️</span>,
-                    onClick: approval.taskId
-                      ? () => { onSelectTask(approval.taskId as Id<"tasks">); onClose(); }
-                      : undefined,
-                  }))}
-                />
-
-                <ResultGroup
-                  title="Agents"
-                  rows={(searchResults?.agents ?? []).map((agent) => ({
-                    key: agent._id,
-                    title: agent.name,
-                    subtitle: `${agent.role} · ${agent.status}`,
-                    icon: <span className="text-sm">{agent.emoji || "🤖"}</span>,
-                    onClick: () => { onOpenAgents(); onClose(); },
-                  }))}
-                />
-
-                {searchResults && searchResults.totalResults === 0 && (
-                  <div className="py-8 text-center text-muted-foreground text-sm">
-                    No results for &ldquo;{search}&rdquo;.
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
-    </div>
-  );
-}
-
-function ResultGroup({
-  title,
-  rows,
-}: {
-  title: string;
-  rows: Array<{
-    key: string;
-    title: string;
-    subtitle?: string;
-    icon?: React.ReactNode;
-    onClick?: () => void;
-  }>;
-}) {
-  if (!rows.length) return null;
-
-  return (
-    <div className="mb-3">
-      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1">
-        {title}
-      </p>
-      {rows.map((row) => (
-        <button
-          key={row.key}
-          type="button"
-          onClick={row.onClick}
-          disabled={!row.onClick}
-          className={cn(
-            "w-full text-left px-2 py-2 rounded-md flex items-center gap-3 transition-colors",
-            row.onClick
-              ? "cursor-pointer hover:bg-accent text-foreground"
-              : "cursor-default opacity-70 text-muted-foreground"
-          )}
-        >
-          <span className="flex items-center justify-center w-6 h-6 rounded bg-muted text-muted-foreground shrink-0">
-            {row.icon || "•"}
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-sm truncate">{row.title}</span>
-            {row.subtitle && (
-              <span className="block text-xs text-muted-foreground truncate">{row.subtitle}</span>
-            )}
-          </span>
-        </button>
-      ))}
-    </div>
+        )}
+      </CommandList>
+    </CommandDialog>
   );
 }

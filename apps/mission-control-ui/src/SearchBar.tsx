@@ -1,6 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface SearchBarProps {
   projectId: string | undefined;
@@ -57,7 +61,7 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
     setSelectedIndex(0);
   }, [query, taskResults.length, approvalResults.length, agentResults.length, messageResults.length]);
 
-  function handleKeyDown(event: React.KeyboardEvent) {
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (!flatResults.length) return;
 
     if (event.key === "ArrowDown") {
@@ -76,6 +80,7 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
       event.preventDefault();
       const selected = flatResults[selectedIndex];
       if (!selected) return;
+
       if (selected.type === "task") {
         onResultClick(selected.taskId);
         setQuery("");
@@ -86,7 +91,6 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
           setQuery("");
           setIsOpen(false);
         } else {
-          // Approval has no linked task -- flash feedback and keep menu open
           setNonActionableFeedback(true);
           setTimeout(() => setNonActionableFeedback(false), 1200);
         }
@@ -102,144 +106,96 @@ export function SearchBar({ projectId, onResultClick }: SearchBarProps) {
   const noResults = query.length >= 2 && !!results && !results.totalResults;
 
   return (
-    <div className="relative w-full" style={{ maxWidth: "460px" }}>
+    <div className="relative w-full max-w-[460px]">
       <div className="relative">
-        <input
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => query.length >= 2 && setIsOpen(true)}
           placeholder="Search tasks, approvals, agents..."
-          style={{
-            width: "100%",
-            padding: "6px 12px 6px 32px",
-            background: "#0f172a",
-            border: "1px solid #334155",
-            borderRadius: "6px",
-            color: "#e2e8f0",
-            fontSize: "0.85rem",
-            outline: "none",
-          }}
+          className="h-8 pl-8 text-sm"
+          aria-label="Search tasks, approvals, and agents"
         />
-        <svg
-          style={{
-            position: "absolute",
-            left: "10px",
-            top: "8px",
-            height: "16px",
-            width: "16px",
-            color: "#64748b",
-          }}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
       </div>
 
       {isOpen && (
-        <div
-          style={{
-            position: "absolute",
-            zIndex: 1000,
-            width: "100%",
-            marginTop: 4,
-            background: "#1e293b",
-            border: "1px solid #334155",
-            borderRadius: 8,
-            boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
-            maxHeight: 420,
-            overflowY: "auto",
-          }}
-        >
-          <div style={{ padding: "8px 12px", fontSize: "0.75rem", color: "#94a3b8", borderBottom: "1px solid #334155" }}>
+        <div className="absolute z-[1000] mt-1.5 w-full overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
+          <div className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
             {nonActionableFeedback ? (
-              <span style={{ color: "#f59e0b" }}>This item has no linked task</span>
+              <span className="text-amber-500">This item has no linked task</span>
             ) : (
               <>{results?.totalResults ?? 0} result(s)</>
             )}
           </div>
+          <ScrollArea className="max-h-[420px]">
+            <SearchSection
+              title="Tasks"
+              rows={taskResults.map((task) => ({
+                key: `task-${task._id}`,
+                title: task.title,
+                subtitle: `${task.status} · ${task.type} · P${task.priority}`,
+                onClick: () => {
+                  onResultClick(task._id);
+                  setQuery("");
+                  setIsOpen(false);
+                },
+                isSelected: flatResults[selectedIndex]?.id === `task-${task._id}`,
+              }))}
+            />
 
-          <SearchSection
-            title="Tasks"
-            rows={taskResults.map((task) => ({
-              key: `task-${task._id}`,
-              title: task.title,
-              subtitle: `${task.status} · ${task.type} · P${task.priority}`,
-              onClick: () => {
-                onResultClick(task._id);
-                setQuery("");
-                setIsOpen(false);
-              },
-              isSelected: flatResults[selectedIndex]?.id === `task-${task._id}`,
-            }))}
-          />
+            <SearchSection
+              title="Approvals"
+              rows={approvalResults.map((approval) => ({
+                key: `approval-${approval._id}`,
+                title: approval.actionSummary,
+                subtitle: `${approval.status} · ${approval.riskLevel} · ${approval.actionType}`,
+                onClick: approval.taskId
+                  ? () => {
+                      onResultClick(approval.taskId as string);
+                      setQuery("");
+                      setIsOpen(false);
+                    }
+                  : undefined,
+                isSelected: flatResults[selectedIndex]?.id === `approval-${approval._id}`,
+              }))}
+            />
 
-          <SearchSection
-            title="Approvals"
-            rows={approvalResults.map((approval) => ({
-              key: `approval-${approval._id}`,
-              title: approval.actionSummary,
-              subtitle: `${approval.status} · ${approval.riskLevel} · ${approval.actionType}`,
-              onClick: approval.taskId
-                ? () => {
-                    onResultClick(approval.taskId as string);
-                    setQuery("");
-                    setIsOpen(false);
-                  }
-                : undefined,
-              isSelected: flatResults[selectedIndex]?.id === `approval-${approval._id}`,
-            }))}
-          />
+            <SearchSection
+              title="Agents"
+              rows={agentResults.map((agent) => ({
+                key: `agent-${agent._id}`,
+                title: `${agent.emoji || "🤖"} ${agent.name}`,
+                subtitle: `${agent.role} · ${agent.status}`,
+                onClick: undefined,
+                isSelected: false,
+              }))}
+            />
 
-          <SearchSection
-            title="Agents"
-            rows={agentResults.map((agent) => ({
-              key: `agent-${agent._id}`,
-              title: `${agent.emoji || "🤖"} ${agent.name}`,
-              subtitle: `${agent.role} · ${agent.status}`,
-              onClick: undefined,
-              isSelected: false,
-            }))}
-          />
-
-          <SearchSection
-            title="Messages"
-            rows={messageResults.slice(0, 4).map((message) => ({
-              key: `message-${message._id}`,
-              title: message.content.slice(0, 80),
-              subtitle: message.type,
-              onClick: message.taskId
-                ? () => {
-                    onResultClick(message.taskId as string);
-                    setQuery("");
-                    setIsOpen(false);
-                  }
-                : undefined,
-              isSelected: false,
-            }))}
-          />
+            <SearchSection
+              title="Messages"
+              rows={messageResults.slice(0, 4).map((message) => ({
+                key: `message-${message._id}`,
+                title: message.content.slice(0, 80),
+                subtitle: message.type,
+                onClick: message.taskId
+                  ? () => {
+                      onResultClick(message.taskId as string);
+                      setQuery("");
+                      setIsOpen(false);
+                    }
+                  : undefined,
+                isSelected: false,
+              }))}
+            />
+          </ScrollArea>
         </div>
       )}
 
       {noResults && (
-        <div
-          style={{
-            position: "absolute",
-            zIndex: 1000,
-            width: "100%",
-            marginTop: 4,
-            background: "#1e293b",
-            border: "1px solid #334155",
-            borderRadius: 8,
-            padding: 16,
-            textAlign: "center",
-            color: "#94a3b8",
-            fontSize: "0.85rem",
-          }}
-        >
+        <div className="absolute z-[1000] mt-1.5 w-full rounded-lg border border-border bg-popover px-4 py-3 text-center text-sm text-muted-foreground shadow-lg">
           No results for "{query}"
         </div>
       )}
@@ -263,31 +219,28 @@ function SearchSection({
   if (!rows.length) return null;
 
   return (
-    <div style={{ padding: "8px 10px", borderBottom: "1px solid #334155" }}>
-      <div style={{ color: "#64748b", fontSize: "0.7rem", textTransform: "uppercase", marginBottom: 6 }}>{title}</div>
+    <div className="border-b border-border/70 p-2 last:border-b-0">
+      <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </p>
       {rows.map((row) => (
         <button
           key={row.key}
           type="button"
           onClick={row.onClick}
           disabled={!row.onClick}
-          style={{
-            width: "100%",
-            textAlign: "left",
-            padding: "8px 10px",
-            border: "none",
-            borderRadius: 6,
-            background: row.isSelected ? "#334155" : "transparent",
-            cursor: row.onClick ? "pointer" : "default",
-            color: "#e2e8f0",
-            opacity: row.onClick ? 1 : 0.8,
-          }}
+          className={cn(
+            "w-full rounded-md px-2 py-2 text-left transition-colors",
+            row.isSelected && "bg-accent",
+            row.onClick
+              ? "cursor-pointer text-foreground hover:bg-accent"
+              : "cursor-default text-muted-foreground/90"
+          )}
         >
-          <div style={{ fontSize: "0.84rem", fontWeight: 500 }}>{row.title}</div>
-          <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{row.subtitle}</div>
+          <span className="block truncate text-sm font-medium">{row.title}</span>
+          <span className="block truncate text-xs text-muted-foreground">{row.subtitle}</span>
         </button>
       ))}
     </div>
   );
 }
-
