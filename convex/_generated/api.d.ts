@@ -21,6 +21,7 @@ import type * as comments from "../comments.js";
 import type * as contentDrops from "../contentDrops.js";
 import type * as coordinator from "../coordinator.js";
 import type * as crons from "../crons.js";
+import type * as e2e from "../e2e.js";
 import type * as execution from "../execution.js";
 import type * as executionRequests from "../executionRequests.js";
 import type * as executorRouter from "../executorRouter.js";
@@ -129,6 +130,7 @@ declare const fullApi: ApiFromModules<{
   contentDrops: typeof contentDrops;
   coordinator: typeof coordinator;
   crons: typeof crons;
+  e2e: typeof e2e;
   execution: typeof execution;
   executionRequests: typeof executionRequests;
   executorRouter: typeof executorRouter;
