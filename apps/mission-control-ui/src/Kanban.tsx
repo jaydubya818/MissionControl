@@ -42,16 +42,17 @@ import {
   GripVertical,
   MoreHorizontal,
   ExternalLink,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
 type TaskStatus = Doc<"tasks">["status"];
 
 const COLUMNS: { status: TaskStatus; label: string; color: string; icon: LucideIcon }[] = [
-  { status: "INBOX", label: "Inbox", color: "text-indigo-400", icon: Inbox },
+  { status: "INBOX", label: "Inbox", color: "text-blue-400", icon: Inbox },
   { status: "ASSIGNED", label: "Assigned", color: "text-amber-400", icon: UserCheck },
   { status: "IN_PROGRESS", label: "In Progress", color: "text-blue-400", icon: Play },
-  { status: "REVIEW", label: "Review", color: "text-violet-400", icon: Eye },
+  { status: "REVIEW", label: "Review", color: "text-blue-400", icon: Eye },
   { status: "NEEDS_APPROVAL", label: "Needs Approval", color: "text-red-400", icon: ShieldAlert },
   { status: "BLOCKED", label: "Blocked", color: "text-orange-400", icon: Ban },
   { status: "FAILED", label: "Failed", color: "text-red-400", icon: AlertTriangle },
@@ -60,10 +61,10 @@ const COLUMNS: { status: TaskStatus; label: string; color: string; icon: LucideI
 ];
 
 const COLUMN_BG: Record<string, string> = {
-  INBOX: "bg-indigo-500/5",
+  INBOX: "bg-blue-500/5",
   ASSIGNED: "bg-amber-500/5",
   IN_PROGRESS: "bg-blue-500/5",
-  REVIEW: "bg-violet-500/5",
+  REVIEW: "bg-blue-500/5",
   NEEDS_APPROVAL: "bg-red-500/5",
   BLOCKED: "bg-orange-500/5",
   FAILED: "bg-red-500/5",
@@ -72,10 +73,10 @@ const COLUMN_BG: Record<string, string> = {
 };
 
 const COLUMN_DOT: Record<string, string> = {
-  INBOX: "bg-indigo-400",
+  INBOX: "bg-blue-400",
   ASSIGNED: "bg-amber-400",
   IN_PROGRESS: "bg-blue-400",
-  REVIEW: "bg-violet-400",
+  REVIEW: "bg-blue-400",
   NEEDS_APPROVAL: "bg-red-400",
   BLOCKED: "bg-orange-400",
   FAILED: "bg-red-400",
@@ -105,7 +106,7 @@ type Task = {
   sourceRef?: string;
 };
 
-const SOURCE_CONFIG: Record<string, { icon: string; label: string }> = {
+const SOURCE_CONFIG: Record<string, { icon: string; label: string; isSpecial?: boolean }> = {
   DASHBOARD: { icon: "🖥️", label: "Dashboard" },
   TELEGRAM:  { icon: "✈️", label: "Telegram" },
   GITHUB:    { icon: "🐙", label: "GitHub" },
@@ -113,6 +114,7 @@ const SOURCE_CONFIG: Record<string, { icon: string; label: string }> = {
   API:       { icon: "🔌", label: "API" },
   TRELLO:    { icon: "📋", label: "Trello" },
   SEED:      { icon: "🌱", label: "Seed" },
+  MISSION_PROMPT: { icon: "✨", label: "Mission", isSpecial: true },
   UNKNOWN:   { icon: "❓", label: "Unknown" },
 };
 
@@ -188,7 +190,9 @@ export function Kanban({
     return true;
   });
 
-  const agentMap = new Map(agents.map((a: Doc<"agents">) => [a._id, a]));
+  const agentMap = new Map<Id<"agents">, Doc<"agents">>(
+    (agents as Doc<"agents">[]).map((a: Doc<"agents">) => [a._id, a])
+  );
   const byStatus = (status: TaskStatus) =>
     filteredTasks.filter((t: Doc<"tasks">) => t.status === status);
 
@@ -443,8 +447,18 @@ function Card({
             {priority.label}
           </Badge>
           {src && (
-            <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal gap-1">
-              <span className="text-[9px]">{src.icon}</span>
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-[10px] h-5 px-1.5 font-normal gap-1",
+                src.isSpecial && "bg-primary/10 border-primary/20 text-primary"
+              )}
+            >
+              {src.isSpecial ? (
+                <Sparkles className="h-2.5 w-2.5" strokeWidth={2} />
+              ) : (
+                <span className="text-[9px]">{src.icon}</span>
+              )}
               {src.label}
             </Badge>
           )}
