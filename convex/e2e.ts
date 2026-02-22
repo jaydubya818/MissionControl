@@ -37,7 +37,7 @@ export const seed = mutation({
       role: "SPECIALIST",
       status: "ACTIVE",
       workspacePath: "/work/mc-e2e",
-      allowedTaskTypes: ["E2E_TEST", "repo_scan", "workflow_boot", "reporting"],
+      allowedTaskTypes: ["ENGINEERING", "DOCS", "OPS"],
       allowedTools: ["convex", "git", "github"],
       budgetDaily: 10.00,
       budgetPerRun: 2.00,
@@ -61,7 +61,7 @@ export const seed = mutation({
       role: "SPECIALIST",
       status: "ACTIVE",
       workspacePath: "/work/mc-e2e",
-      allowedTaskTypes: ["E2E_TEST", "task_claim", "state_advance", "content_drop", "budget_write"],
+      allowedTaskTypes: ["ENGINEERING", "DOCS", "OPS"],
       allowedTools: ["convex", "tasks", "content"],
       budgetDaily: 10.00,
       budgetPerRun: 2.00,
@@ -94,13 +94,15 @@ export const seed = mutation({
     // Task 1: Inbox roundtrip
     const inboxTaskId = await ctx.db.insert("tasks", {
       title: "E2E: Verify inbox claim/complete",
-      type: "E2E_TEST",
+      type: "ENGINEERING",
       status: "INBOX",
       priority: 2,
       description: `Test task for E2E inbox roundtrip validation. Run: ${runId}`,
       assigneeIds: [],
       createdBy: "SYSTEM",
-      source: "E2E_SEED",
+      source: "SEED",
+      reviewCycles: 0,
+      actualCost: 0,
       metadata: {
         e2eRunId: runId,
         testType: "inbox_roundtrip",
@@ -118,13 +120,15 @@ export const seed = mutation({
     // Task 2: Content drop test
     const contentTaskId = await ctx.db.insert("tasks", {
       title: "E2E: Submit content drop",
-      type: "E2E_TEST",
+      type: "ENGINEERING",
       status: "INBOX",
       priority: 2,
       description: `Test task for E2E content drop validation. Run: ${runId}`,
       assigneeIds: [],
       createdBy: "SYSTEM",
-      source: "E2E_SEED",
+      source: "SEED",
+      reviewCycles: 0,
+      actualCost: 0,
       metadata: {
         e2eRunId: runId,
         testType: "content_drop",
@@ -142,13 +146,15 @@ export const seed = mutation({
     // Task 3: Budget ledger test
     const budgetTaskId = await ctx.db.insert("tasks", {
       title: "E2E: Budget ledger write/read",
-      type: "E2E_TEST",
+      type: "ENGINEERING",
       status: "INBOX",
       priority: 2,
       description: `Test task for E2E budget validation. Run: ${runId}`,
       assigneeIds: [],
       createdBy: "SYSTEM",
-      source: "E2E_SEED",
+      source: "SEED",
+      reviewCycles: 0,
+      actualCost: 0,
       metadata: {
         e2eRunId: runId,
         testType: "budget_roundtrip",
@@ -168,49 +174,33 @@ export const seed = mutation({
     // ============================================================================
     
     // Drop 1: Simple note
-    const drop1Id = await ctx.db.insert("runs", {
+    const drop1Id = await ctx.db.insert("contentDrops", {
       agentId: executorAgentId,
-      sessionKey: `e2e_session_${runId}`,
-      model: "test-model",
-      status: "COMPLETED",
-      content: {
-        type: "content_drop",
-        title: "e2e-drop: hello",
-        body: "Hello from E2E test",
-        metadata: {
-          source: "doctor",
-          kind: "note",
-          runId,
-        },
-      },
+      title: "e2e-drop: hello",
+      contentType: "OTHER",
+      status: "DRAFT",
+      content: "Hello from E2E test",
       metadata: {
         e2eRunId: runId,
-        dropType: "simple_note",
+        source: "doctor",
+        kind: "note",
       },
     });
     
     results.contentDrops.push({ id: drop1Id.toString(), title: "e2e-drop: hello" });
     
     // Drop 2: Structured JSON
-    const drop2Id = await ctx.db.insert("runs", {
+    const drop2Id = await ctx.db.insert("contentDrops", {
       agentId: executorAgentId,
-      sessionKey: `e2e_session_${runId}`,
-      model: "test-model",
-      status: "COMPLETED",
-      content: {
-        type: "content_drop",
-        title: "e2e-drop: structured",
-        body: JSON.stringify({ a: 1, b: 2 }),
-        metadata: {
-          source: "doctor",
-          kind: "json",
-          runId,
-          payload: { a: 1, b: 2 },
-        },
-      },
+      title: "e2e-drop: structured",
+      contentType: "OTHER",
+      status: "DRAFT",
+      content: JSON.stringify({ a: 1, b: 2 }),
       metadata: {
         e2eRunId: runId,
-        dropType: "structured_json",
+        source: "doctor",
+        kind: "json",
+        payload: { a: 1, b: 2 },
       },
     });
     
@@ -269,9 +259,12 @@ export const seed = mutation({
     // ============================================================================
     
     const workflowRunId = await ctx.db.insert("workflowRuns", {
+      runId: `e2e-${runId}`,
       workflowId: "feature-dev",
       status: "PENDING",
       initialInput: `E2E test workflow run. Goal: Add a README line in toy repo. Run: ${runId}`,
+      startedAt: Date.now(),
+      totalSteps: 3,
       currentStepIndex: 0,
       steps: [],
       context: {
@@ -328,27 +321,13 @@ export const cleanup = mutation({
       workflowRunsDeleted: 0,
     };
 
-    // Delete agents
-    const agents = await ctx.db
+    // Delete agents by name prefix
+    const allAgents = await ctx.db
       .query("agents")
-      .withIndex("by_name", (q) => q.gte(`e2e_scout_${runId}`).lt(`e2e_scout_${runId}~`))
       .collect();
     
-    for (const agent of agents) {
-      if (agent.metadata?.e2eRunId === runId) {
-        await ctx.db.delete(agent._id);
-        results.agentsDeleted++;
-      }
-    }
-
-    // Also check executor agents
-    const executors = await ctx.db
-      .query("agents")
-      .withIndex("by_name", (q) => q.gte(`e2e_executor_${runId}`).lt(`e2e_executor_${runId}~`))
-      .collect();
-    
-    for (const agent of executors) {
-      if (agent.metadata?.e2eRunId === runId) {
+    for (const agent of allAgents) {
+      if (agent.name?.startsWith(`e2e_scout_${runId}`) || agent.name?.startsWith(`e2e_executor_${runId}`)) {
         await ctx.db.delete(agent._id);
         results.agentsDeleted++;
       }
@@ -357,7 +336,7 @@ export const cleanup = mutation({
     // Delete tasks
     const tasks = await ctx.db
       .query("tasks")
-      .filter((q) => q.eq(q.field("metadata", "e2eRunId"), runId))
+      .filter((q) => q.eq("metadata.e2eRunId", runId))
       .collect();
     
     for (const task of tasks) {
@@ -365,21 +344,21 @@ export const cleanup = mutation({
       results.tasksDeleted++;
     }
 
-    // Delete runs (content drops)
-    const runs = await ctx.db
-      .query("runs")
-      .filter((q) => q.eq(q.field("metadata", "e2eRunId"), runId))
+    // Delete content drops
+    const drops = await ctx.db
+      .query("contentDrops")
+      .filter((q) => q.eq("metadata.e2eRunId", runId))
       .collect();
     
-    for (const run of runs) {
-      await ctx.db.delete(run._id);
+    for (const drop of drops) {
+      await ctx.db.delete(drop._id);
       results.dropsDeleted++;
     }
 
     // Delete workflow runs
     const workflowRuns = await ctx.db
       .query("workflowRuns")
-      .filter((q) => q.eq(q.field("metadata", "e2eRunId"), runId))
+      .filter((q) => q.eq("metadata.e2eRunId", runId))
       .collect();
     
     for (const wr of workflowRuns) {
@@ -390,7 +369,7 @@ export const cleanup = mutation({
     // Delete activities
     const activities = await ctx.db
       .query("activities")
-      .filter((q) => q.eq(q.field("metadata", "e2eRunId"), runId))
+      .filter((q) => q.eq("metadata.e2eRunId", runId))
       .collect();
     
     for (const activity of activities) {
@@ -440,7 +419,7 @@ export const validate = query({
     // Check agents
     const agents = await ctx.db
       .query("agents")
-      .filter((q) => q.eq(q.field("metadata", "e2eRunId"), runId))
+      .filter((q) => q.eq("metadata.e2eRunId", runId))
       .collect();
     results.agents.found = agents.length;
     results.agents.valid = agents.length >= 2;
@@ -448,28 +427,28 @@ export const validate = query({
     // Check tasks
     const tasks = await ctx.db
       .query("tasks")
-      .filter((q) => q.eq(q.field("metadata", "e2eRunId"), runId))
+      .filter((q) => q.eq("metadata.e2eRunId", runId))
       .collect();
     results.tasks.found = tasks.length;
     results.tasks.valid = tasks.length >= 3;
 
-    // Check content drops (runs)
-    const runs = await ctx.db
-      .query("runs")
-      .filter((q) => q.eq(q.field("metadata", "e2eRunId"), runId))
+    // Check content drops
+    const drops = await ctx.db
+      .query("contentDrops")
+      .filter((q) => q.eq("metadata.e2eRunId", runId))
       .collect();
-    results.contentDrops.found = runs.length;
-    results.contentDrops.valid = runs.length >= 2;
+    results.contentDrops.found = drops.length;
+    results.contentDrops.valid = drops.length >= 2;
 
     // Check budget
     const budgetActivities = await ctx.db
       .query("activities")
       .filter((q) => 
         q.and(
-          q.eq(q.field("metadata", "e2eRunId"), runId),
+          q.eq("metadata.e2eRunId", runId),
           q.or(
-            q.eq(q.field("action"), "E2E_BUDGET_CREDIT"),
-            q.eq(q.field("action"), "E2E_BUDGET_DEBIT")
+            q.eq("action", "E2E_BUDGET_CREDIT"),
+            q.eq("action", "E2E_BUDGET_DEBIT")
           )
         )
       )
@@ -485,7 +464,7 @@ export const validate = query({
     // Check workflow runs
     const workflowRuns = await ctx.db
       .query("workflowRuns")
-      .filter((q) => q.eq(q.field("metadata", "e2eRunId"), runId))
+      .filter((q) => q.eq("metadata.e2eRunId", runId))
       .collect();
     results.workflowRuns.found = workflowRuns.length;
     results.workflowRuns.valid = workflowRuns.length >= 1;
