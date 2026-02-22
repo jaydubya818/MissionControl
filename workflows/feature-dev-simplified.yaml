@@ -1,0 +1,77 @@
+# Simplified Workflow Format (v2)
+# 
+# This is a proposed simplified format for Mission Control workflows.
+# Goals: Reduce verbosity, improve readability, faster to write.
+#
+# CHANGES from v1:
+# - Agents: Inline persona reference (no workspace files)
+# - Steps: Condensed input using templates
+# - Expects: Default to "STATUS: done" (can omit)
+# - Retry: Default to 3 (can omit)
+# - Timeout: Default to 10m (can omit)
+
+id: feature-dev-v2
+name: Feature Development (Simplified)
+description: "Concise feature dev workflow"
+
+agents:
+  planner: Strategist
+  setup: Operations
+  developer: Coder
+  verifier: QA
+  tester: QA
+  pr-creator: Operations
+  reviewer: Coordinator
+
+steps:
+  - id: plan
+    agent: planner
+    prompt: |
+      Break down feature request into stories:
+      {{task}}
+      
+      Output: STORIES with acceptance criteria
+    
+  - id: setup
+    agent: setup
+    prompt: |
+      Setup workspace for: {{planOutput}}
+      Branch: feature/{{task}}
+      
+  - id: implement
+    agent: developer
+    prompt: |
+      Implement stories: {{planOutput}}
+      Environment: {{setupOutput}}
+      timeout: 45m
+      
+  - id: verify
+    agent: verifier
+    prompt: |
+      Verify implementation against criteria.
+      Stories: {{planOutput}}
+      Implementation: {{implementOutput}}
+      
+  - id: test
+    agent: tester
+    prompt: |
+      Run tests and report results.
+      Branch: feature/{{task}}
+      
+  - id: create-pr
+    agent: pr-creator
+    prompt: |
+      Create PR from branch feature/{{task}}
+      Include: Summary of changes, test results
+      
+  - id: final-review
+    agent: reviewer
+    prompt: |
+      Final review of PR {{prUrl}}
+      Approve or request changes.
+      
+# Config (optional, uses defaults if omitted)
+config:
+  defaultRetry: 3
+  defaultTimeout: 10m
+  autoApprove: LOW
