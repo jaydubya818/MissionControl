@@ -29,14 +29,14 @@ dotenv.config();
 // CONFIG
 // ============================================================================
 
-const PORT = parseInt(process.env.ORCH_PORT ?? "4100", 10);
+const PORT = parseInt(process.env.ORCHESTRATION_PORT ?? "4100", 10);
 const CONVEX_URL = process.env.CONVEX_URL ?? "";
 const PROJECT_SLUG = process.env.PROJECT_SLUG ?? "openclaw";
 const TICK_INTERVAL_MS = parseInt(process.env.TICK_INTERVAL_MS ?? "30000", 10);
 const AGENTS_DIR = process.env.AGENTS_DIR ?? path.resolve(process.cwd(), "../../agents");
 
 if (!CONVEX_URL) {
-  console.error("[orch] CONVEX_URL is required. Set it in .env or environment.");
+  console.error("[orchestration] CONVEX_URL is required. Set it in .env or environment.");
   process.exit(1);
 }
 
@@ -131,7 +131,7 @@ async function runTick(): Promise<any> {
             idempotencyKey: `decompose-${decomp.parentTaskId}-${i}-${Date.now()}`,
           });
         } catch (err) {
-          console.error(`[orch] Failed to create subtask: ${sub.title}`, err);
+          console.error(`[orchestration] Failed to create subtask: ${sub.title}`, err);
         }
       }
     }
@@ -145,7 +145,7 @@ async function runTick(): Promise<any> {
           idempotencyKey: `delegate-${delegation.taskId}-${Date.now()}`,
         });
       } catch (err) {
-        console.error(`[orch] Failed to delegate task ${delegation.taskId}`, err);
+        console.error(`[orchestration] Failed to delegate task ${delegation.taskId}`, err);
       }
     }
 
@@ -162,13 +162,13 @@ async function runTick(): Promise<any> {
         });
       } catch (err) {
         // Alert creation may not exist; log and continue
-        console.warn(`[orch] Could not create stuck alert for ${stuck.taskId}`);
+        console.warn(`[orchestration] Could not create stuck alert for ${stuck.taskId}`);
       }
     }
 
     // 7. Log escalations
     for (const esc of actions.escalations) {
-      console.warn(`[orch] Escalation: ${esc.taskTitle} — ${esc.reason}`);
+      console.warn(`[orchestration] Escalation: ${esc.taskTitle} — ${esc.reason}`);
     }
 
     lastTickAt = Date.now();
@@ -182,7 +182,7 @@ async function runTick(): Promise<any> {
 
     return lastTickResult;
   } catch (err) {
-    console.error("[orch] Tick error:", err);
+    console.error("[orchestration] Tick error:", err);
     lastTickResult = { error: String(err) };
     return lastTickResult;
   }
@@ -216,7 +216,7 @@ async function spawnAgent(personaName: string): Promise<string> {
   // Note: lifecycle.start() requires the Convex API reference.
   // In a full integration, we'd pass the generated API object.
   // For now, we store the lifecycle for status tracking.
-  console.log(`[orch] Agent ${personaName} spawned (persona loaded)`);
+  console.log(`[orchestration] Agent ${personaName} spawned (persona loaded)`);
 
   return personaName;
 }
@@ -229,7 +229,7 @@ async function stopAgent(personaName: string): Promise<void> {
 
   activeAgents.delete(personaName);
   memoryManagers.delete(personaName);
-  console.log(`[orch] Agent ${personaName} stopped`);
+  console.log(`[orchestration] Agent ${personaName} stopped`);
 }
 
 // ============================================================================
@@ -327,29 +327,29 @@ app.get("/agents/personas", (c) => {
 // START
 // ============================================================================
 
-console.log(`[orch] Mission Control Orchestration Server`);
-console.log(`[orch] Convex URL: ${CONVEX_URL ? "configured" : "MISSING"}`);
-console.log(`[orch] Project: ${PROJECT_SLUG}`);
-console.log(`[orch] Tick interval: ${TICK_INTERVAL_MS}ms`);
-console.log(`[orch] Agents dir: ${AGENTS_DIR}`);
+console.log(`[orchestration] Mission Control Orchestration Server`);
+console.log(`[orchestration] Convex URL: ${CONVEX_URL ? "configured" : "MISSING"}`);
+console.log(`[orchestration] Project: ${PROJECT_SLUG}`);
+console.log(`[orchestration] Tick interval: ${TICK_INTERVAL_MS}ms`);
+console.log(`[orchestration] Agents dir: ${AGENTS_DIR}`);
 
 startedAt = Date.now();
 
 // Start coordinator tick loop
 tickTimer = setInterval(() => {
   runTick().catch((err) => {
-    console.error("[orch] Tick loop error:", err);
+    console.error("[orchestration] Tick loop error:", err);
   });
 }, TICK_INTERVAL_MS);
 
 // Run first tick immediately
 runTick().then((result) => {
-  console.log(`[orch] Initial tick complete:`, result);
+  console.log(`[orchestration] Initial tick complete:`, result);
 });
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
-  console.log("\n[orch] Shutting down...");
+  console.log("\n[orchestration] Shutting down...");
   if (tickTimer) clearInterval(tickTimer);
   for (const [name] of activeAgents) {
     try {
@@ -362,12 +362,12 @@ process.on("SIGINT", async () => {
 });
 
 process.on("SIGTERM", async () => {
-  console.log("\n[orch] SIGTERM received, shutting down...");
+  console.log("\n[orchestration] SIGTERM received, shutting down...");
   if (tickTimer) clearInterval(tickTimer);
   process.exit(0);
 });
 
 serve({ fetch: app.fetch, port: PORT }, () => {
-  console.log(`[orch] Server listening on http://localhost:${PORT}`);
-  console.log(`[orch] Health: http://localhost:${PORT}/health`);
+  console.log(`[orchestration] Server listening on http://localhost:${PORT}`);
+  console.log(`[orchestration] Health: http://localhost:${PORT}/health`);
 });
