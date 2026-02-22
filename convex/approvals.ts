@@ -271,6 +271,10 @@ export const request = mutation({
       : null;
     const effectiveTenantId = requestor?.tenantId ?? requestorInstance?.tenantId;
 
+    // Auto-approve LOW risk tasks (no human approval needed)
+    const isLowRisk = args.riskLevel.toUpperCase() === "LOW" || args.riskLevel.toUpperCase() === "GREEN";
+    const shouldAutoApprove = isLowRisk && !dualControlRequired;
+
     const approvalId = await ctx.db.insert("approvals", {
       projectId,
       tenantId: effectiveTenantId,
@@ -285,10 +289,13 @@ export const request = mutation({
       estimatedCost: args.estimatedCost,
       rollbackPlan: args.rollbackPlan,
       justification: args.justification,
-      status: "PENDING",
+      status: shouldAutoApprove ? "APPROVED" : "PENDING",
+      decidedAt: shouldAutoApprove ? Date.now() : undefined,
+      decidedByAgentId: shouldAutoApprove ? args.requestorAgentId : undefined,
+      decisionReason: shouldAutoApprove ? "Auto-approved (LOW risk)" : undefined,
       expiresAt,
       requiredDecisionCount: dualControlRequired ? 2 : 1,
-      decisionCount: 0,
+      decisionCount: shouldAutoApprove ? 1 : 0,
       escalationLevel: 0,
     });
     await ctx.db.insert("approvalRecords", {
