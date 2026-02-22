@@ -18,7 +18,7 @@ The backend is entirely Convex. There is no Express server, no REST API, and no 
 
 ---
 
-## Database Tables (18 total)
+## Database Tables (19 total)
 
 ### Core Data
 
@@ -26,8 +26,9 @@ The backend is entirely Convex. There is no Express server, no REST API, and no 
 |---|---|---|
 | `projects` | Multi-project workspaces | name, slug, policyDefaults |
 | `agents` | Agent registry | name, role, status, budgetDaily, budgetPerRun, spendToday, currentTaskId |
-| `tasks` | Task management | title, type, status, priority, assigneeIds, actualCost, workPlan, deliverable |
+| `tasks` | Task management | title, type, status, priority, assigneeIds, actualCost, workPlan, deliverable, source (DASHBOARD/TELEGRAM/GITHUB/AGENT/API/TRELLO/SEED/MISSION_PROMPT/PRD_IMPORT) |
 | `taskTransitions` | Immutable audit log of status changes | taskId, fromStatus, toStatus, actorType, reason, idempotencyKey |
+| `prdDocuments` | Stored PRDs for import pipeline | projectId, title, content, taskCount, parsedAt, createdBy |
 | `messages` | Task thread messages | taskId, authorType, type (COMMENT/WORK_PLAN/PROGRESS/ARTIFACT/REVIEW/SYSTEM), content |
 
 ### Execution & Cost
@@ -185,6 +186,15 @@ All tables use indexes for efficient querying. Common patterns:
 | `getProjectLearningInsights` | query | Project learning insights |
 | `recordTaskCompletion` | mutation | Record completion for learning (stub) |
 | `discoverPattern` | mutation | Discover agent patterns (stub) |
+
+### PRD (convex/prd.ts)
+
+| Function | Type | Purpose |
+|---|---|---|
+| `parsePrd` | action | Call LLM to extract structured tasks from PRD markdown; returns task previews |
+| `bulkCreateFromPrd` | mutation | Batch create tasks from parsed list with source PRD_IMPORT and shared sourceRef |
+| `storePrdDocument` | mutation | Store raw PRD markdown in prdDocuments table |
+| `getPrdDocument` | query | Retrieve stored PRD by ID |
 
 ### Other
 

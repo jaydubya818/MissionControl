@@ -31,16 +31,18 @@
     "migration:backfill:tenant": "npx convex run migrations/backfillInstanceRefs:runTenantBackfill",
     "workflows:seed": "npx tsx scripts/seed-workflows.ts",
     "agent:run": "pnpm --filter @mission-control/orchestration-server dev",
-
     "ci:prepare": "pnpm --filter @mission-control/shared build && pnpm --filter @mission-control/state-machine build && pnpm --filter @mission-control/policy-engine build && pnpm --filter @mission-control/coordinator build && pnpm --filter @mission-control/memory build && pnpm --filter @mission-control/agent-runtime build && pnpm --filter @mission-control/telegraph build && pnpm --filter @mission-control/meetings build",
     "ci:typecheck": "pnpm run ci:prepare && pnpm --filter mission-control-ui typecheck && pnpm --filter @mission-control/telegram-bot typecheck && pnpm --filter @mission-control/orchestration-server typecheck",
     "ci:test": "pnpm --filter @mission-control/shared test && pnpm --filter @mission-control/state-machine test && pnpm --filter @mission-control/policy-engine test && pnpm --filter @mission-control/coordinator test && pnpm --filter @mission-control/context-router test && pnpm --filter @mission-control/memory test && pnpm --filter @mission-control/agent-runtime test && pnpm --filter @mission-control/telegraph test && pnpm --filter @mission-control/meetings test && pnpm exec vitest run convex/__tests__/tasks.test.ts convex/__tests__/integration.test.ts convex/__tests__/operatorControls.test.ts convex/__tests__/armPolicy.test.ts && pnpm run test:e2e:arm",
-    "ci:lint": "pnpm run ci:typecheck"
+    "ci:lint": "pnpm run ci:typecheck",
+    "taskmaster:plan": "taskmaster plan docs/PRD_V2.md",
+    "taskmaster": "taskmaster"
   },
   "dependencies": {
     "convex": "^1.31.7"
   },
   "devDependencies": {
+    "@taskmasterai/cli": "^1.0.55",
     "concurrently": "^8.2.2",
     "tsx": "^4.7.0",
     "turbo": "^1.11.2",

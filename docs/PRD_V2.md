@@ -570,13 +570,21 @@ React-based dashboard in `apps/mission-control-ui` with real-time updates via Co
 - **CLI:** Command-line interface for developer workflows (via `scripts/mc`).
 - **Webhooks:** Inbound webhooks for external system triggers (requires orchestration server, Phase 2).
 
-### 10.2 Existing Integrations
+### 10.2 PRD Import Pipeline
+
+- Users can upload or paste a PRD (markdown) via the Dashboard.
+- AI parses the PRD into structured tasks with: title, description, type, priority, dependencies.
+- Tasks are created in INBOX via `api.tasks.create` with `source: "PRD_IMPORT"`.
+- Parent PRD is stored as a reference document linked to the generated tasks.
+- Coordinator can further decompose PRD-generated tasks into subtasks.
+
+### 10.3 Existing Integrations
 
 - **Telegram:** Full-featured bot with commands for approvals, squad management, and daily CEO briefs. Implemented in `packages/telegram-bot`.
 - **OpenClaw:** SDK for external agent integration with registration, heartbeat, and task claiming. Implemented in `packages/openclaw-sdk`.
 - **Execution routing:** The `executionRequests` table supports routing work to different executors: `CURSOR`, `CLAUDE_CODE`, or `OPENCLAW_AGENT`.
 
-### 10.3 Tool Access (Per-Agent)
+### 10.4 Tool Access (Per-Agent)
 
 Agents access external tools through a sandboxed tool registry. Each agent persona defines which tools it can use:
 
@@ -590,7 +598,7 @@ Agents access external tools through a sandboxed tool registry. Each agent perso
 | `database` | All (read), Operations (write) | Convex queries and mutations |
 | `notification` | Coordinator, Operations | Send alerts to operator |
 
-### 10.4 External Integrations (Post-MVP)
+### 10.5 External Integrations (Post-MVP)
 
 - **GitHub:** PR reviews, issue triage, CI/CD monitoring.
 - **Slack/Discord:** Task intake from messages, status updates to channels.

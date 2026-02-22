@@ -65,6 +65,7 @@ import type * as operatorControls from "../operatorControls.js";
 import type * as orgAssignments from "../orgAssignments.js";
 import type * as orgMembers from "../orgMembers.js";
 import type * as policy from "../policy.js";
+import type * as prd from "../prd.js";
 import type * as projects from "../projects.js";
 import type * as qcArtifacts from "../qcArtifacts.js";
 import type * as qcFindings from "../qcFindings.js";
@@ -174,6 +175,7 @@ declare const fullApi: ApiFromModules<{
   orgAssignments: typeof orgAssignments;
   orgMembers: typeof orgMembers;
   policy: typeof policy;
+  prd: typeof prd;
   projects: typeof projects;
   qcArtifacts: typeof qcArtifacts;
   qcFindings: typeof qcFindings;

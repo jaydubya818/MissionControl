@@ -31,6 +31,7 @@ export interface OpsSectionProps {
   onOpenStandup: () => void;
   onPauseSquad: () => void;
   onResumeSquad: () => void;
+  onOpenImportPrd: () => void;
   onNavigate: (view: MainView) => void;
 }
 
@@ -53,6 +54,7 @@ export function OpsSection({
   onOpenStandup,
   onPauseSquad,
   onResumeSquad,
+  onOpenImportPrd,
   onNavigate,
 }: OpsSectionProps) {
   if (currentView === "tasks") {
@@ -76,6 +78,9 @@ export function OpsSection({
             description={`${taskCount} tasks across all states`}
             actions={
               <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={onOpenImportPrd}>
+                  Import PRD
+                </Button>
                 <Button variant="outline" size="sm" onClick={onPauseSquad}>
                   Pause Squad
                 </Button>

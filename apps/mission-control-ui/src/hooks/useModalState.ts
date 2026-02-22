@@ -27,6 +27,7 @@ const INITIAL: {
   agentsFlyout: boolean;
   missionModal: boolean;
   suggestionsDrawer: boolean;
+  importPrd: boolean;
   pauseConfirm: boolean;
 } = {
   createTask: false,
@@ -47,6 +48,7 @@ const INITIAL: {
   agentsFlyout: false,
   missionModal: false,
   suggestionsDrawer: false,
+  importPrd: false,
   pauseConfirm: false,
 };
 

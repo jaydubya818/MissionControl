@@ -1,0 +1,29 @@
+# Project Requirements Document (PRD)
+
+## Project Overview
+[Describe your project here - what it does, who it's for, and the main goals]
+
+## Core Features
+1. [Feature 1] - [Brief description]
+2. [Feature 2] - [Brief description]
+3. [Feature 3] - [Brief description]
+
+## Technical Requirements
+- [Requirement 1]
+- [Requirement 2]
+- [Requirement 3]
+
+## User Stories
+- As a [user type], I want to [action] so that [benefit]
+- As a [user type], I want to [action] so that [benefit]
+
+## Success Criteria
+- [Criterion 1]
+- [Criterion 2]
+
+## Out of Scope
+- [What's not included in this version]
+
+## Timeline
+- Phase 1: [Description]
+- Phase 2: [Description]

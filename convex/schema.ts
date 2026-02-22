@@ -684,7 +684,8 @@ export default defineSchema({
       v.literal("API"),
       v.literal("TRELLO"),
       v.literal("SEED"),
-      v.literal("MISSION_PROMPT")
+      v.literal("MISSION_PROMPT"),
+      v.literal("PRD_IMPORT")
     )),
     sourceRef: v.optional(v.string()),     // e.g. "jaydubya818/repo#42", telegram msg id
     createdBy: v.optional(v.union(
@@ -704,6 +705,22 @@ export default defineSchema({
     .index("by_source", ["source"])
     .index("by_project", ["projectId"])
     .index("by_project_status", ["projectId", "status"]),
+
+  // -------------------------------------------------------------------------
+  // PRD DOCUMENTS (PRD Import Pipeline)
+  // -------------------------------------------------------------------------
+  prdDocuments: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    title: v.string(),
+    content: v.string(),
+    taskCount: v.number(),
+    parsedAt: v.number(),
+    createdBy: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_tenant", ["tenantId"]),
 
   // -------------------------------------------------------------------------
   // TASK TRANSITIONS (Immutable Audit Log)

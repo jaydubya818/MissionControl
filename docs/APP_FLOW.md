@@ -153,6 +153,16 @@ Mission Control is a single-page React app with no traditional URL routing. All 
 1. Sidebar: "Resume Squad" button (appears when agents are paused)
 2. All PAUSED agents set to ACTIVE
 
+### 3.8 PRD Import Flow
+
+1. User clicks "Import PRD" from Operations > Tasks.
+2. Modal opens with: paste markdown textarea OR file upload (.md).
+3. User clicks "Parse" → loading state while AI processes.
+4. Preview screen shows generated tasks (title, type, priority, deps).
+5. User can edit/remove/reorder before confirming.
+6. "Create All" inserts tasks into INBOX.
+7. Coordinator picks them up on next tick for decomposition.
+
 ---
 
 ## 4. Modal Inventory
@@ -160,6 +170,7 @@ Mission Control is a single-page React app with no traditional URL routing. All 
 | Modal | Trigger | Content |
 |---|---|---|
 | Create Task | Header "+ New Task", Cmd+N | Task creation form |
+| Import PRD | Operations > Tasks toolbar "Import PRD" | Paste/upload PRD, parse, preview, create tasks |
 | Approvals | Sidebar, Cmd+Shift+A | Pending approval queue |
 | Notifications | Sidebar | Recent notifications |
 | Standup | Sidebar | Daily standup report |

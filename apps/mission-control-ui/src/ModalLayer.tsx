@@ -21,6 +21,7 @@ import { AgentsFlyout } from "./AgentsFlyout";
 import { AgentDetailFlyout } from "./AgentDetailFlyout";
 import { MissionModal } from "./MissionModal";
 import { MissionSuggestionsDrawer } from "./MissionSuggestionsDrawer";
+import { ImportPrdModal } from "./ImportPrdModal";
 
 // ============================================================================
 // MODAL LAYER
@@ -97,6 +98,14 @@ export function ModalLayer({
           projectId={projectId}
           onClose={() => close("createTask")}
           onCreated={() => onToast("Task created")}
+        />
+      )}
+
+      {modals.importPrd && (
+        <ImportPrdModal
+          projectId={projectId}
+          onClose={() => close("importPrd")}
+          onCreated={(count) => onToast(`${count} tasks created from PRD`)}
         />
       )}
 

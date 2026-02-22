@@ -372,6 +372,7 @@ export default function App() {
             onOpenStandup={() => open("standup")}
             onPauseSquad={() => open("pauseConfirm")}
             onResumeSquad={handleResumeSquad}
+            onOpenImportPrd={() => open("importPrd")}
             onNavigate={setCurrentView}
           />
         );

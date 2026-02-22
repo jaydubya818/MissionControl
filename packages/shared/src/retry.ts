@@ -5,6 +5,8 @@
  * database writes, and external API calls.
  */
 
+import { sleep } from "./utils";
+
 export interface RetryConfig {
   maxAttempts: number;
   baseDelayMs: number;
@@ -42,13 +44,6 @@ export function calculateDelay(
   const jitter = Math.random() * (cappedDelay * jitterFactor);
   
   return Math.floor(cappedDelay + jitter);
-}
-
-/**
- * Sleep for specified milliseconds
- */
-export function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
