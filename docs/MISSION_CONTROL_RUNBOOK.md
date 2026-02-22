@@ -42,9 +42,18 @@ cp .env.example .env.local
 - **Dashboard:** `npx convex dashboard`
 
 ### Orchestration Server (Hono)
-- **Port:** 3000
-- **Start:** `pnpm run dev:orch`
-- **Health:** `curl http://localhost:3000/health`
+- **Port:** 4100 (ORCHESTRATION_PORT)
+- **Start:** `pnpm run dev:orchestration`
+- **Health:** `curl http://localhost:4100/health`
+
+### CLI (`mc`)
+- **Location:** `scripts/mc`
+- **Commands:**
+  - `mc doctor` — Health check
+  - `mc status` — System status
+  - `mc run <workflow>` — Start workflow
+  - `mc tasks [status]` — List tasks
+  - `mc claim` — Claim next task
 
 ---
 
@@ -257,6 +266,34 @@ npx convex run api.workflows.run --arg '{
 | `scripts/mc-seed-e2e.sh` | E2E seed creation |
 | `scripts/mc-cleanup-e2e.sh` | E2E cleanup |
 | `convex/e2e.ts` | E2E Convex mutations |
+
+---
+
+## Troubleshooting
+
+### Typecheck Errors
+```bash
+# Regenerate Convex types
+npx convex dev
+
+# Check specific package
+cd packages/shared && pnpm run build
+```
+
+### UI Not Loading
+- Check Vite is running: `pnpm run dev:ui`
+- Verify CONVEX_URL in .env.local
+- Check browser console for errors
+
+### Agent Not Claiming Tasks
+- Check agent status is ACTIVE
+- Verify heartbeat is running
+- Check logs: `mc status`
+
+### Workflow Stuck
+- Check workflow run status in UI
+- Review logs for errors
+- Manually advance if needed via Convex dashboard
 
 ---
 
