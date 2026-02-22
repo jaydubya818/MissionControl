@@ -40,8 +40,8 @@ echo ""
 echo "Press Ctrl+C to stop"
 echo ""
 
-# Track processed tasks to avoid duplicates
-declare -A PROCESSED_TASKS
+# Track processed tasks to avoid duplicates (macOS compatible)
+PROCESSED_TASKS=""
 
 process_task() {
     local task_id="$1"
@@ -130,7 +130,7 @@ process_task() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
     # Mark as processed
-    PROCESSED_TASKS["$task_id"]=1
+    PROCESSED_TASKS="$PROCESSED_TASKS $task_id"
 }
 
 # Main loop
@@ -139,7 +139,7 @@ while true; do
     echo "🔍 Polling for INBOX tasks... ($(date -Iseconds))"
     
     # Get INBOX tasks
-    tasks_json=$(npx convex run api.tasks.listAll '{"limit": 10}' 2>&1) || {
+    tasks_json=$(npx convex run api.tasks.listAll '{}' 2>&1) || {
         echo "❌ Failed to fetch tasks: $tasks_json"
         sleep "$POLL_INTERVAL"
         continue
@@ -159,7 +159,7 @@ while true; do
                 task_count=$((task_count + 1))
                 
                 # Skip if already processed
-                if [[ -n "${PROCESSED_TASKS[$task_id]:-}" ]]; then
+                if [[ "$PROCESSED_TASKS" == *"$task_id"* ]]; then
                     echo "  ⏭️  Skipping already processed: $task_title"
                     continue
                 fi
