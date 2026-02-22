@@ -3,6 +3,28 @@
 # 
 # Inspired by Antfarm's proven feature-dev pattern.
 # Drop in a feature request, get back a tested PR.
+#
+# AGENT CONTRACT:
+#   Inputs:  {{goal}} - The feature request string
+#   Outputs: PR URL - The created pull request
+#   Steps:   7 sequential steps with verification gates
+#
+# STEP REFERENCE:
+#   1. planner:    Create implementation plan → outputs plan.md
+#   2. setup:      Prepare workspace, clone repo → outputs ready signal
+#   3. developer:  Implement feature → outputs code changes
+#   4. verifier:   Verify implementation matches plan → outputs verification report
+#   5. tester:     Run tests → outputs test results
+#   6. pr-creator: Create PR → outputs PR URL
+#   7. reviewer:   Final review → outputs approval
+#
+# ERROR HANDLING:
+#   - Step failure triggers retry (max 3)
+#   - After max retries, escalates to human
+#
+# APPROVAL:
+#   - Auto-approve: LOW risk
+#   - Human required: HIGH risk
 
 id: feature-dev
 name: Feature Development

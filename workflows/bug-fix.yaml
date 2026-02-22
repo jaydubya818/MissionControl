@@ -3,6 +3,23 @@
 # 
 # Inspired by Antfarm's proven bug-fix pattern.
 # Paste a bug report, get back a fix with regression test.
+#
+# AGENT CONTRACT:
+#   Inputs:  {{bug_report}} - Bug description with reproduction steps
+#   Outputs: PR URL with fix + regression test
+#   Steps:   6 sequential steps with root cause analysis
+#
+# STEP REFERENCE:
+#   1. triager:      Classify bug severity → outputs triage report
+#   2. investigator: Find root cause → outputs analysis.md
+#   3. setup:        Prepare workspace → outputs ready signal
+#   4. fixer:        Implement fix → outputs code changes
+#   5. tester:       Add regression test → outputs test results
+#   6. pr-creator:   Create PR → outputs PR URL
+#
+# ERROR HANDLING:
+#   - Step failure triggers retry (max 3)
+#   - After max retries, escalates to human
 
 id: bug-fix
 name: Bug Fix

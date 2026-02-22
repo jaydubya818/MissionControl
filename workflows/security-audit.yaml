@@ -3,6 +3,27 @@
 # 
 # Inspired by Antfarm's proven security-audit pattern.
 # Point it at a repo, get back a security fix PR with regression tests.
+#
+# AGENT CONTRACT:
+#   Inputs:  {{repo_url}} or {{workspace}} - Repository to audit
+#   Outputs: PR URL with security fixes + regression tests
+#   Steps:   7 sequential steps with severity prioritization
+#
+# STEP REFERENCE:
+#   1. scanner:      Run security scan → outputs findings report
+#   2. prioritizer:  Rank by severity → outputs prioritized list
+#   3. setup:        Prepare workspace → outputs ready signal
+#   4. fixer:        Implement fixes → outputs code changes
+#   5. verifier:     Verify fixes → outputs verification report
+#   6. tester:       Add regression tests → outputs test results
+#   7. pr-creator:   Create PR → outputs PR URL
+#
+# ERROR HANDLING:
+#   - Step failure triggers retry (max 3)
+#   - After max retries, escalates to security team
+#
+# APPROVAL:
+#   - HIGH risk fixes require security team approval
 
 id: security-audit
 name: Security Audit

@@ -2,6 +2,21 @@
 # 4-agent workflow: intake → review → verify-suggestions → approval/changes-requested
 #
 # Purpose: Thorough code review with security, style, and logic verification
+#
+# AGENT CONTRACT:
+#   Inputs:  {{pr_url}} or {{diff}} - Code to review
+#   Outputs: Review approval or changes requested with comments
+#   Steps:   4 sequential steps
+#
+# STEP REFERENCE:
+#   1. intake:    Parse PR/diff → outputs structured review request
+#   2. reviewer:  Analyze code → outputs review comments
+#   3. verifier:  Check suggestions → outputs verification report
+#   4. approver:  Final decision → outputs APPROVED or CHANGES_REQUESTED
+#
+# ERROR HANDLING:
+#   - Step failure triggers retry (max 3)
+#   - After max retries, assigns to human reviewer
 
 id: code-review
 name: Code Review
