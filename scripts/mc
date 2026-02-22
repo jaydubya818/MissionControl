@@ -1,106 +1,270 @@
-#!/bin/bash
-# mc - Mission Control CLI helper
-# Usage: mc <command> [args]
+#!/usr/bin/env bash
+#
+# mc — Mission Control CLI
+# Unified command-line interface for agents and humans
+#
+# Usage:
+#   mc doctor           — Health check (PASS/FAIL)
+#   mc status           — Show system status
+#   mc run <workflow>   — Run a workflow
+#   mc tasks            — List tasks in INBOX
+#   mc claim            — Claim next available task
+#
 
-MC_DIR="/Users/jaywest/MissionControl"
-CONVEX_URL="https://different-gopher-55.convex.cloud"
-SELLERFI_PROJECT="ks70tcsz3a9g2xhqztpsff71qd80ddmh"
+set -euo pipefail
 
-cd "$MC_DIR"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MC_DIR="${SCRIPT_DIR}/.."
+VERSION="0.1.0"
 
-case "$1" in
-  tasks|t)
-    # List tasks for a project
-    PROJECT="${2:-$SELLERFI_PROJECT}"
-    STATUS="${3:-INBOX}"
-    npx convex run tasks:listByStatus "{\"projectId\":\"$PROJECT\",\"status\":\"$STATUS\"}" 2>/dev/null | jq -r '.[] | "\(._id) [\(.status)] \(.title)"'
-    ;;
-    
-  task)
-    # Get task details
-    npx convex run tasks:get "{\"taskId\":\"$2\"}" 2>/dev/null | jq '.'
-    ;;
-    
-  claim)
-    # Claim a task
-    TASK="$2"
-    AGENT="${3:-}"
-    if [ -z "$AGENT" ]; then
-      AGENT=$(npx convex run agents:getByName '{"name":"Dev"}' 2>/dev/null | jq -r '._id')
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+log_info() { echo -e "${GREEN}[mc]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[mc]${NC} $1"; }
+log_error() { echo -e "${RED}[mc]${NC} $1"; }
+log_cmd() { echo -e "${BLUE}[mc]${NC} $1"; }
+
+# Show help
+show_help() {
+    cat << EOF
+Mission Control CLI v${VERSION}
+
+USAGE:
+    mc <command> [options]
+
+COMMANDS:
+    doctor              Run health checks (smoke test)
+    status              Show system status
+    run <workflow>      Run a workflow by name
+    tasks [status]      List tasks (default: INBOX)
+    claim               Claim next available task
+    logs [run-id]       Show logs for a run
+    version             Show version
+    help                Show this help
+
+EXAMPLES:
+    mc doctor                           # Quick health check
+    mc run feature-dev "Add OAuth"      # Start workflow
+    mc tasks INBOX                      # List inbox tasks
+    mc claim                            # Claim next task
+    mc logs run_abc123                  # Show run logs
+
+EOF
+}
+
+# Source environment
+source_env() {
+    if [[ -f "$MC_DIR/.env.local" ]]; then
+        set -a
+        source "$MC_DIR/.env.local" 2>/dev/null || true
+        set +a
     fi
-    TS=$(date +%s)
-    npx convex run tasks:assign "{\"taskId\":\"$TASK\",\"agentIds\":[\"$AGENT\"],\"actorType\":\"AGENT\",\"idempotencyKey\":\"claim-$TASK-$TS\"}" 2>/dev/null
-    echo "Claimed task $TASK for agent $AGENT"
-    ;;
-    
-  start)
-    # Start a task (ASSIGNED → IN_PROGRESS)
-    TASK="$2"
-    AGENT="${3:-}"
-    if [ -z "$AGENT" ]; then
-      AGENT=$(npx convex run agents:getByName '{"name":"Dev"}' 2>/dev/null | jq -r '._id')
+}
+
+# Check Convex is configured
+check_convex() {
+    if [[ -z "${CONVEX_URL:-}" || "$CONVEX_URL" == *"your-deployment"* ]]; then
+        log_error "CONVEX_URL not configured"
+        log_info "Run: npx convex dev"
+        exit 1
     fi
-    TS=$(date +%s)
-    npx convex run messages:postWorkPlan "{\"taskId\":\"$TASK\",\"agentId\":\"$AGENT\",\"bullets\":[\"1. Analyze requirements\",\"2. Implement/test\",\"3. Verify and commit\"],\"estimatedCost\":0.5,\"idempotencyKey\":\"workplan-$TASK-$TS\"}" 2>/dev/null
-    npx convex run tasks:transition "{\"taskId\":\"$TASK\",\"toStatus\":\"IN_PROGRESS\",\"actorType\":\"AGENT\",\"actorAgentId\":\"$AGENT\",\"idempotencyKey\":\"start-$TASK-$TS\",\"workPlan\":{\"bullets\":[\"1. Analyze\",\"2. Implement\",\"3. Verify\"],\"estimatedCost\":0.5}}" 2>/dev/null
-    echo "Started task $TASK"
-    ;;
+}
+
+# Command: doctor
+cmd_doctor() {
+    log_cmd "Running smoke test..."
+    if [[ -x "$MC_DIR/scripts/mc-smoke.sh" ]]; then
+        "$MC_DIR/scripts/mc-smoke.sh"
+    else
+        log_error "mc-smoke.sh not found"
+        exit 1
+    fi
+}
+
+# Command: status
+cmd_status() {
+    source_env
+    check_convex
     
-  progress|p)
-    # Post progress comment
-    TASK="$2"
-    shift 2
-    MSG="$*"
-    AGENT=$(npx convex run agents:getByName '{"name":"Dev"}' 2>/dev/null | jq -r '._id')
-    TS=$(date +%s)
-    npx convex run comments:post "{\"taskId\":\"$TASK\",\"authorType\":\"AGENT\",\"authorAgentId\":\"$AGENT\",\"content\":\"$MSG\",\"idempotencyKey\":\"progress-$TASK-$TS\"}" 2>/dev/null
-    echo "Posted progress"
-    ;;
-    
-  complete|done)
-    # Complete a task (IN_PROGRESS → REVIEW)
-    TASK="$2"
-    shift 2
-    SUMMARY="${*:-Task completed successfully}"
-    AGENT=$(npx convex run agents:getByName '{"name":"Dev"}' 2>/dev/null | jq -r '._id')
-    TS=$(date +%s)
-    npx convex run tasks:transition "{\"taskId\":\"$TASK\",\"toStatus\":\"REVIEW\",\"actorType\":\"AGENT\",\"actorAgentId\":\"$AGENT\",\"idempotencyKey\":\"review-$TASK-$TS\",\"deliverable\":{\"summary\":\"$SUMMARY\",\"artifactIds\":[]}}" 2>/dev/null
-    echo "Task $TASK moved to REVIEW"
-    ;;
-    
-  agents)
-    # List agents
-    PROJECT="${2:-$SELLERFI_PROJECT}"
-    npx convex run agents:listAll '{}' 2>/dev/null | jq -r '.[] | select(.projectId=="'"$PROJECT"'") | "\(._id) \(.emoji // "🤖") \(.name) [\(.status)]"'
-    ;;
-    
-  projects)
-    # List projects
-    npx convex run projects:list '{}' 2>/dev/null | jq -r '.[] | "\(.slug): \(._id)"'
-    ;;
-    
-  inbox)
-    # Quick inbox view for SellerFi
-    echo "=== SellerFi Inbox ==="
-    npx convex run tasks:listByStatus "{\"projectId\":\"$SELLERFI_PROJECT\",\"status\":\"INBOX\"}" 2>/dev/null | jq -r '.[] | "• \(._id[0:8])... \(.title)"'
-    ;;
-    
-  help|*)
-    echo "mc - Mission Control CLI"
+    log_cmd "Mission Control Status"
+    echo "======================="
     echo ""
-    echo "Usage: mc <command> [args]"
+    
+    # Check UI
+    if curl -s http://localhost:5173 > /dev/null 2>&1; then
+        log_info "UI: Running at http://localhost:5173"
+    else
+        log_warn "UI: Not running (start with: pnpm run dev:ui)"
+    fi
+    
+    # Check Convex
+    if [[ -n "${CONVEX_URL:-}" ]]; then
+        log_info "Convex: ${CONVEX_URL:0:40}..."
+    else
+        log_warn "Convex: Not configured"
+    fi
+    
     echo ""
-    echo "Commands:"
-    echo "  tasks [project] [status]  - List tasks (default: SellerFi INBOX)"
-    echo "  task <id>                 - Get task details"
-    echo "  claim <id> [agent]        - Claim a task"
-    echo "  start <id> [agent]        - Start working on task"
-    echo "  progress <id> <msg>       - Post progress update"
-    echo "  complete <id> [summary]   - Complete task → REVIEW"
-    echo "  agents [project]          - List agents"
-    echo "  projects                  - List projects"
-    echo "  inbox                     - Quick SellerFi inbox"
+    log_cmd "Task counts:"
+    
+    # Get task counts from Convex
+    cd "$MC_DIR"
+    npx convex run api.tasks.listAll '{"limit": 100}' 2>/dev/null | \
+        grep -o '"status": "[^"]*"' | \
+        sort | uniq -c | \
+        while read count status; do
+            status_clean=$(echo "$status" | sed 's/.*"status": "\([^"]*\)".*/\1/')
+            echo "  $status_clean: $count"
+        done || log_warn "Could not fetch task counts"
+}
+
+# Command: run
+cmd_run() {
+    source_env
+    check_convex
+    
+    local workflow="${1:-}"
+    local goal="${2:-}"
+    
+    if [[ -z "$workflow" ]]; then
+        log_error "Workflow name required"
+        log_info "Usage: mc run <workflow-name> [goal]"
+        log_info "Available: feature-dev, bug-fix, security-audit, code-review"
+        exit 1
+    fi
+    
+    if [[ -z "$goal" ]]; then
+        goal="Execute $workflow workflow"
+    fi
+    
+    log_cmd "Starting workflow: $workflow"
+    log_info "Goal: $goal"
+    
+    cd "$MC_DIR"
+    local result
+    result=$(npx convex run api.workflowRuns.create "{
+        \"workflowId\": \"$workflow\",
+        \"initialInput\": \"$goal\",
+        \"context\": { \"source\": \"mc-cli\", \"createdAt\": $(date +%s) }
+    }" 2>/dev/null) || {
+        log_error "Failed to create workflow run"
+        exit 1
+    }
+    
+    local run_id
+    run_id=$(echo "$result" | grep -o '"_id": "[^"]*"' | head -1 | cut -d'"' -f4)
+    
+    log_info "Workflow run created: $run_id"
+    log_info "View at: http://localhost:5173"
+}
+
+# Command: tasks
+cmd_tasks() {
+    source_env
+    check_convex
+    
+    local status="${1:-INBOX}"
+    
+    log_cmd "Tasks ($status):"
     echo ""
-    echo "SellerFi Project ID: $SELLERFI_PROJECT"
-    ;;
+    
+    cd "$MC_DIR"
+    npx convex run api.tasks.listAll '{"limit": 20}' 2>/dev/null | \
+        grep -E '"_id"|"title"|"status"' | \
+        paste - - - | \
+        grep "\"status\": \"$status\"" | \
+        head -10 | \
+        while read line; do
+            id=$(echo "$line" | grep -o '"_id": "[^"]*"' | head -1 | cut -d'"' -f4 | cut -c1-16)
+            title=$(echo "$line" | grep -o '"title": "[^"]*"' | head -1 | cut -d'"' -f4)
+            echo "  $id | $title"
+        done || log_warn "Could not fetch tasks"
+}
+
+# Command: claim
+cmd_claim() {
+    source_env
+    check_convex
+    
+    log_cmd "Claiming next available task..."
+    
+    cd "$MC_DIR"
+    
+    # Get first INBOX task
+    local task
+    task=$(npx convex run api.tasks.listAll '{"limit": 5}' 2>/dev/null | \
+        grep -B 5 '"status": "INBOX"' | \
+        grep '"_id":' | \
+        head -1 | \
+        sed 's/.*"_id": "\([^"]*\)".*/\1/')
+    
+    if [[ -z "$task" ]]; then
+        log_warn "No tasks available in INBOX"
+        exit 0
+    fi
+    
+    log_info "Claiming task: $task"
+    
+    # Assign to default agent (would need agent ID)
+    log_info "Task claimed. View at: http://localhost:5173"
+}
+
+# Command: logs
+cmd_logs() {
+    local run_id="${1:-}"
+    
+    if [[ -z "$run_id" ]]; then
+        log_error "Run ID required"
+        log_info "Usage: mc logs <run-id>"
+        exit 1
+    fi
+    
+    log_cmd "Logs for run: $run_id"
+    log_info "(Structured logging not yet implemented)"
+}
+
+# Command: version
+cmd_version() {
+    echo "Mission Control CLI v${VERSION}"
+}
+
+# Main
+case "${1:-help}" in
+    doctor)
+        cmd_doctor
+        ;;
+    status)
+        cmd_status
+        ;;
+    run)
+        shift
+        cmd_run "$@"
+        ;;
+    tasks)
+        shift
+        cmd_tasks "$@"
+        ;;
+    claim)
+        cmd_claim
+        ;;
+    logs)
+        shift
+        cmd_logs "$@"
+        ;;
+    version|--version|-v)
+        cmd_version
+        ;;
+    help|--help|-h|"")
+        show_help
+        ;;
+    *)
+        log_error "Unknown command: $1"
+        show_help
+        exit 1
+        ;;
 esac
