@@ -49,3 +49,9 @@ Thumbs.db
 temp/
 tmp/
 .vercel
+
+# Cursor hooks state (auto-generated, machine-specific)
+.cursor/hooks/state/
+
+# macOS
+.DS_Store
