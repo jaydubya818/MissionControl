@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { parseDateInputValue } from "@/lib/dateInput";
 
 const TASK_TYPES = [
   "CONTENT",
@@ -78,7 +79,7 @@ export function CreateTaskModal({
         description: description.trim() || undefined,
         type,
         priority,
-        dueAt: dueAt ? new Date(dueAt).getTime() : undefined,
+        dueAt: parseDateInputValue(dueAt) ?? undefined,
         assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined,
         idempotencyKey: `ui-create:${Date.now()}`,
         source: "DASHBOARD",

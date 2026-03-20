@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc } from "../../../convex/_generated/dataModel";
+import { formatDateInputValue, parseDateInputValue } from "@/lib/dateInput";
 
 interface QuickEditModalProps {
   task: Doc<"tasks">;
@@ -18,7 +19,7 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
   const [type, setType] = useState(task.type);
   const [estimatedCost, setEstimatedCost] = useState(task.estimatedCost || 0);
   const [dueAt, setDueAt] = useState<string>(
-    task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 10) : ""
+    formatDateInputValue(task.dueAt)
   );
   const [saving, setSaving] = useState(false);
   
@@ -35,7 +36,7 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
         status,
         type,
         estimatedCost,
-        dueAt: dueAt ? new Date(dueAt).getTime() : null,
+        dueAt: parseDateInputValue(dueAt),
       });
       onSave();
       onClose();

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
+import { formatDateInputValue, parseDateInputValue } from "@/lib/dateInput";
 
 interface TaskEditModeProps {
   task: Doc<"tasks">;
@@ -16,7 +17,7 @@ export function TaskEditMode({ task, onSave, onCancel }: TaskEditModeProps) {
   const [status, setStatus] = useState(task.status);
   const [type, setType] = useState(task.type);
   const [estimatedCost, setEstimatedCost] = useState(task.estimatedCost || 0);
-  const [dueAt, setDueAt] = useState(task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 10) : "");
+  const [dueAt, setDueAt] = useState(formatDateInputValue(task.dueAt));
   const [assigneeIds, setAssigneeIds] = useState<Id<"agents">[]>(task.assigneeIds || []);
   const [saving, setSaving] = useState(false);
   
@@ -34,7 +35,7 @@ export function TaskEditMode({ task, onSave, onCancel }: TaskEditModeProps) {
         status: status as any,
         type: type as any,
         estimatedCost,
-        dueAt: dueAt ? new Date(dueAt).getTime() : null,
+        dueAt: parseDateInputValue(dueAt),
         assigneeIds,
       });
       onSave();
