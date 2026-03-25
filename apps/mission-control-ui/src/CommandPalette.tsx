@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import type { MainView } from "./TopNav";
 import {
   CommandDialog,
   CommandEmpty,
@@ -12,7 +13,24 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
-import { Bot, Plus, Shield, AlertTriangle, DollarSign, Radio } from "lucide-react";
+import {
+  Bot,
+  Plus,
+  Shield,
+  AlertTriangle,
+  DollarSign,
+  Radio,
+  LayoutDashboard,
+  ListTodo,
+  Calendar,
+  Activity,
+  Radar,
+  Factory,
+  GitBranch,
+  MessageSquare,
+  Brain,
+  Users,
+} from "lucide-react";
 
 interface CommandPaletteProps {
   projectId: Id<"projects"> | null;
@@ -25,6 +43,8 @@ interface CommandPaletteProps {
   onOpenCostAnalytics?: () => void;
   onOpenCreateAgent?: () => void;
   onNavigateToGateway?: () => void;
+  /** Jump to a main view and close the palette */
+  onNavigateView?: (view: MainView) => void;
 }
 
 export function CommandPalette({
@@ -38,6 +58,7 @@ export function CommandPalette({
   onOpenCostAnalytics,
   onOpenCreateAgent,
   onNavigateToGateway,
+  onNavigateView,
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
 
@@ -67,8 +88,99 @@ export function CommandPalette({
     command.label.toLowerCase().includes(search.toLowerCase())
   );
 
+  const navigateCommands = useMemo(() => {
+    if (!onNavigateView) return [];
+    const q = search.trim().toLowerCase();
+    const all: {
+      id: string;
+      label: string;
+      view: MainView;
+      icon: ReactNode;
+      /** Matched by cmdk via value string */
+      value: string;
+    }[] = [
+      {
+        id: "nav-home",
+        label: "Go to Home",
+        view: "home",
+        icon: <LayoutDashboard className="h-4 w-4" />,
+        value: "Go to Home dashboard home start",
+      },
+      {
+        id: "nav-tasks",
+        label: "Go to Tasks",
+        view: "tasks",
+        icon: <ListTodo className="h-4 w-4" />,
+        value: "Go to Tasks board kanban inbox",
+      },
+      {
+        id: "nav-agents",
+        label: "Go to Agents",
+        view: "agents",
+        icon: <Users className="h-4 w-4" />,
+        value: "Go to Agents registry squad",
+      },
+      {
+        id: "nav-schedule",
+        label: "Go to Schedule",
+        view: "ops-schedule",
+        icon: <Calendar className="h-4 w-4" />,
+        value: "Go to Schedule ops calendar timeline operations",
+      },
+      {
+        id: "nav-system",
+        label: "Go to System",
+        view: "system",
+        icon: <Activity className="h-4 w-4" />,
+        value: "Go to System platform health status",
+      },
+      {
+        id: "nav-radar",
+        label: "Go to Radar",
+        view: "radar",
+        icon: <Radar className="h-4 w-4" />,
+        value: "Go to Radar alerts monitoring",
+      },
+      {
+        id: "nav-factory",
+        label: "Go to Factory",
+        view: "factory",
+        icon: <Factory className="h-4 w-4" />,
+        value: "Go to Factory jobs batch scheduled",
+      },
+      {
+        id: "nav-pipeline",
+        label: "Go to Pipeline",
+        view: "pipeline",
+        icon: <GitBranch className="h-4 w-4" />,
+        value: "Go to Pipeline content code crm",
+      },
+      {
+        id: "nav-feedback",
+        label: "Go to Feedback",
+        view: "feedback",
+        icon: <MessageSquare className="h-4 w-4" />,
+        value: "Go to Feedback qc approvals findings",
+      },
+      {
+        id: "nav-memory",
+        label: "Go to Memory",
+        view: "memory",
+        icon: <Brain className="h-4 w-4" />,
+        value: "Go to Memory journal knowledge",
+      },
+    ];
+    if (!q) return all;
+    return all.filter((item) => item.value.toLowerCase().includes(q));
+  }, [onNavigateView, search]);
+
   const hasSearch = search.trim().length >= 2;
-  const hasNoResults = hasSearch && !!searchResults && searchResults.totalResults === 0 && filteredCommands.length === 0;
+  const hasNoResults =
+    hasSearch &&
+    !!searchResults &&
+    searchResults.totalResults === 0 &&
+    filteredCommands.length === 0 &&
+    navigateCommands.length === 0;
 
   return (
     <CommandDialog open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -96,6 +208,27 @@ export function CommandPalette({
             </CommandItem>
           ))}
         </CommandGroup>
+
+        {onNavigateView && navigateCommands.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Navigate">
+              {navigateCommands.map((item) => (
+                <CommandItem
+                  key={item.id}
+                  value={item.value}
+                  onSelect={() => {
+                    onNavigateView(item.view);
+                    onClose();
+                  }}
+                >
+                  {item.icon}
+                  <span className="flex-1">{item.label}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
 
         {hasSearch && <CommandSeparator />}
 

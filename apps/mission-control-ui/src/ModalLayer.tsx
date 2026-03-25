@@ -268,6 +268,10 @@ export function ModalLayer({
             open("createAgent");
           }}
           onNavigateToGateway={onNavigateToGateway}
+          onNavigateView={(view) => {
+            close("commandPalette");
+            onNavigate(view);
+          }}
         />
       )}
 

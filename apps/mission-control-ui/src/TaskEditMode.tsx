@@ -3,14 +3,30 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { formatDateInputValue, parseDateInputValue } from "@/lib/dateInput";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { Pencil, Save, Loader2 } from "lucide-react";
 
 interface TaskEditModeProps {
   task: Doc<"tasks">;
   onSave: () => void;
   onCancel: () => void;
+  /** Shown when save fails (e.g. invalid status transition). Falls back to alert if omitted. */
+  onSaveError?: (message: string) => void;
 }
 
-export function TaskEditMode({ task, onSave, onCancel }: TaskEditModeProps) {
+export function TaskEditMode({ task, onSave, onCancel, onSaveError }: TaskEditModeProps) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
   const [priority, setPriority] = useState(task.priority);
@@ -20,10 +36,10 @@ export function TaskEditMode({ task, onSave, onCancel }: TaskEditModeProps) {
   const [dueAt, setDueAt] = useState(formatDateInputValue(task.dueAt));
   const [assigneeIds, setAssigneeIds] = useState<Id<"agents">[]>(task.assigneeIds || []);
   const [saving, setSaving] = useState(false);
-  
+
   const updateTask = useMutation(api.tasks.update);
   const agents = useQuery(api.agents.listAll, { projectId: task.projectId });
-  
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -32,21 +48,26 @@ export function TaskEditMode({ task, onSave, onCancel }: TaskEditModeProps) {
         title,
         description,
         priority,
-        status: status as any,
-        type: type as any,
+        status,
+        type,
         estimatedCost,
         dueAt: parseDateInputValue(dueAt),
         assigneeIds,
       });
       onSave();
     } catch (error) {
-      console.error("Failed to update task:", error);
-      alert("Failed to update task");
+      const message =
+        error instanceof Error ? error.message : "Failed to update task";
+      if (onSaveError) {
+        onSaveError(message);
+      } else {
+        window.alert(message);
+      }
     } finally {
       setSaving(false);
     }
   };
-  
+
   const statuses: Array<Doc<"tasks">["status"]> = [
     "INBOX",
     "ASSIGNED",
@@ -69,237 +90,193 @@ export function TaskEditMode({ task, onSave, onCancel }: TaskEditModeProps) {
     "OPS",
   ];
   const priorities: Array<Doc<"tasks">["priority"]> = [1, 2, 3, 4];
-  
-  const inputStyle = {
-    width: "100%",
-    padding: "10px 12px",
-    background: "#0f172a",
-    border: "1px solid #334155",
-    borderRadius: "6px",
-    color: "#e2e8f0",
-    fontSize: "14px",
-  };
-  
+
   return (
-    <div style={{ padding: "20px" }}>
-      {/* Header */}
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "24px",
-        paddingBottom: "16px",
-        borderBottom: "1px solid #334155",
-      }}>
-        <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>
-          ✏️ Edit Task
+    <div className="p-5 flex flex-col gap-5 max-h-[calc(100vh-8rem)] overflow-y-auto">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-border">
+        <h3 className="m-0 text-base font-semibold text-foreground flex items-center gap-2">
+          <Pencil className="h-4 w-4 text-muted-foreground" />
+          Edit task
         </h3>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button
+        <div className="flex gap-2">
+          <Button
             onClick={handleSave}
             disabled={saving || !title.trim()}
-            style={{
-              padding: "8px 16px",
-              background: saving || !title.trim() ? "#334155" : "#10b981",
-              border: "none",
-              borderRadius: "6px",
-              color: "white",
-              fontSize: "14px",
-              fontWeight: 600,
-              cursor: saving || !title.trim() ? "not-allowed" : "pointer",
-            }}
+            size="sm"
+            className="gap-1.5"
           >
-            {saving ? "Saving..." : "💾 Save"}
-          </button>
-          <button
-            onClick={onCancel}
-            style={{
-              padding: "8px 16px",
-              background: "transparent",
-              border: "1px solid #334155",
-              borderRadius: "6px",
-              color: "#94a3b8",
-              fontSize: "14px",
-              fontWeight: 500,
-              cursor: "pointer",
-            }}
-          >
+            {saving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            {saving ? "Saving…" : "Save"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={onCancel} disabled={saving}>
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
-      
-      {/* Form */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-        {/* Title */}
-        <div>
-          <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: 500, color: "#e2e8f0" }}>
-            Title *
-          </label>
-          <input
-            type="text"
+
+      <div className="flex flex-col gap-5">
+        <div className="space-y-2">
+          <Label htmlFor="task-edit-title">Title *</Label>
+          <Input
+            id="task-edit-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            style={inputStyle}
             placeholder="Task title"
             autoFocus
           />
         </div>
-        
-        {/* Description */}
-        <div>
-          <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: 500, color: "#e2e8f0" }}>
-            Description
-          </label>
-          <textarea
+
+        <div className="space-y-2">
+          <Label htmlFor="task-edit-description">Description</Label>
+          <Textarea
+            id="task-edit-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={6}
-            style={{
-              ...inputStyle,
-              resize: "vertical",
-              fontFamily: "inherit",
-            }}
-            placeholder="Detailed task description..."
-          />
-        </div>
-        
-        {/* Grid: Status, Priority, Type */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
-          <div>
-            <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: 500, color: "#e2e8f0" }}>
-              Status
-            </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as Doc<"tasks">["status"])}
-              style={inputStyle}
-            >
-              {statuses.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: 500, color: "#e2e8f0" }}>
-              Priority
-            </label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(Number(e.target.value) as Doc<"tasks">["priority"])}
-              style={inputStyle}
-            >
-              {priorities.map((p) => (
-                <option key={p} value={p}>P{p} - {p === 1 ? "Critical" : p === 2 ? "High" : p === 3 ? "Normal" : "Low"}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: 500, color: "#e2e8f0" }}>
-              Type
-            </label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as Doc<"tasks">["type"])}
-              style={inputStyle}
-            >
-              {types.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        
-        {/* Due date */}
-        <div>
-          <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: 500, color: "#e2e8f0" }}>
-            Due Date
-          </label>
-          <input
-            type="date"
-            value={dueAt}
-            onChange={(e) => setDueAt(e.target.value)}
-            style={inputStyle}
+            placeholder="Detailed task description…"
+            className="resize-y min-h-[120px]"
           />
         </div>
 
-        {/* Assignees */}
-        <div>
-          <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: 500, color: "#e2e8f0" }}>
-            Assigned Agents
-          </label>
-          <div style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "8px",
-            padding: "12px",
-            background: "#0f172a",
-            border: "1px solid #334155",
-            borderRadius: "6px",
-            minHeight: "48px",
-          }}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as Doc<"tasks">["status"])}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statuses.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Priority</Label>
+            <Select
+              value={String(priority)}
+              onValueChange={(v) => setPriority(Number(v) as Doc<"tasks">["priority"])}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {priorities.map((p) => (
+                  <SelectItem key={p} value={String(p)}>
+                    P{p} —{" "}
+                    {p === 1 ? "Critical" : p === 2 ? "High" : p === 3 ? "Normal" : "Low"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <Select value={type} onValueChange={(v) => setType(v as Doc<"tasks">["type"])}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {types.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="task-edit-due">Due date</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="task-edit-due"
+              type="date"
+              value={dueAt}
+              onChange={(e) => setDueAt(e.target.value)}
+            />
+            {dueAt && (
+              <Button type="button" variant="ghost" size="sm" className="h-9 px-2.5 text-xs" onClick={() => setDueAt("")}>
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Assigned agents ({assigneeIds.length})</Label>
+          <div className="flex flex-wrap gap-2 p-3 rounded-md border border-border bg-muted/20 min-h-[3rem]">
             {agents?.map((agent) => {
               const isSelected = assigneeIds.includes(agent._id);
               return (
-                <button
+                <Button
                   key={agent._id}
+                  type="button"
+                  variant={isSelected ? "default" : "outline"}
+                  size="sm"
+                  className={cn(
+                    "h-8 text-xs",
+                    isSelected && "ring-2 ring-primary/30"
+                  )}
                   onClick={() => {
                     if (isSelected) {
-                      setAssigneeIds(assigneeIds.filter(id => id !== agent._id));
+                      setAssigneeIds(assigneeIds.filter((id) => id !== agent._id));
                     } else {
                       setAssigneeIds([...assigneeIds, agent._id]);
                     }
                   }}
-                  style={{
-                    padding: "6px 12px",
-                    background: isSelected ? "#3b82f6" : "#1e293b",
-                    border: `1px solid ${isSelected ? "#3b82f6" : "#334155"}`,
-                    borderRadius: "6px",
-                    color: "#e2e8f0",
-                    fontSize: "13px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
                 >
-                  {agent.emoji || "🤖"} {agent.name}
-                </button>
+                  <span className="mr-1">{agent.emoji || "🤖"}</span>
+                  {agent.name}
+                </Button>
               );
             })}
+            {agents?.length === 0 && (
+              <p className="text-xs text-muted-foreground py-1">No agents in project.</p>
+            )}
           </div>
         </div>
-        
-        {/* Estimated Cost */}
-        <div>
-          <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: 500, color: "#e2e8f0" }}>
-            Estimated Cost ($)
-          </label>
-          <input
+
+        <div className="space-y-2">
+          <Label htmlFor="task-edit-cost">Estimated cost ($)</Label>
+          <Input
+            id="task-edit-cost"
             type="number"
             value={estimatedCost}
             onChange={(e) => setEstimatedCost(Number(e.target.value))}
             step="0.01"
-            min="0"
-            style={inputStyle}
+            min={0}
           />
         </div>
-        
-        {/* Info */}
-        <div style={{
-          padding: "12px",
-          background: "#0f172a",
-          border: "1px solid #334155",
-          borderRadius: "6px",
-          fontSize: "12px",
-          color: "#94a3b8",
-        }}>
-          <div><strong>Task ID:</strong> {task._id}</div>
-          <div><strong>Created:</strong> {new Date(task._creationTime).toLocaleString()}</div>
-          {task.actualCost > 0 && <div><strong>Actual Cost:</strong> ${task.actualCost.toFixed(2)}</div>}
-        </div>
+
+        <Card className="p-3 bg-muted/30 border-border/80">
+          <p className="text-[0.7rem] text-muted-foreground space-y-1">
+            <span className="block">
+              <span className="font-medium text-foreground/90">Task ID:</span>{" "}
+              <code className="text-[0.65rem]">{task._id}</code>
+            </span>
+            <span className="block">
+              <span className="font-medium text-foreground/90">Created:</span>{" "}
+              {new Date(task._creationTime).toLocaleString()}
+            </span>
+            {task.actualCost > 0 && (
+              <span className="block">
+                <span className="font-medium text-foreground/90">Actual cost:</span> $
+                {task.actualCost.toFixed(2)}
+              </span>
+            )}
+          </p>
+        </Card>
       </div>
     </div>
   );

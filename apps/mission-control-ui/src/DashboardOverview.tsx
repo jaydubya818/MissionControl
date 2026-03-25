@@ -57,6 +57,7 @@ import { StatusDot, type StatusDotVariant } from "@/components/ui/status-dot";
 import { AutoRefreshBadge } from "@/components/ui/auto-refresh-badge";
 import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { MissionBanner } from "@/components/MissionBanner";
+import { OperatorTipsCard } from "@/components/OperatorTipsCard";
 import { NeonChartContainer, NeonChartTheme } from "@/components/NeonChartTheme";
 import { QuotaFuelGauge } from "@/components/QuotaFuelGauge";
 import { cn } from "@/lib/utils";
@@ -1847,6 +1848,8 @@ export function DashboardOverview({
           className="mb-6"
         />
 
+
+        <OperatorTipsCard onNavigate={onNavigate} />
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.7fr)_360px] mb-8">
           <Card className="overflow-hidden">
             <div className="grid gap-0 xl:grid-cols-[minmax(0,1.2fr)_380px]">
