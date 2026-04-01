@@ -90,25 +90,57 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 9
-      
+
       - name: Install dependencies
         run: |
           pnpm install
-      
+
       - name: Build shared packages
         run: |
           pnpm run ci:prepare
-      
+
       - name: Run unit tests
         run: |
           pnpm run ci:test
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    # E2E requires a live Convex backend — run but don't block merges if infra unavailable
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build shared packages
+        run: pnpm run ci:prepare
+
+      - name: Run E2E tests
+        run: pnpm run ci:test:e2e
+        env:
+          CI: true
