@@ -14,6 +14,7 @@
     "start": "pnpm --filter @mission-control/orchestration-server dev",
     "dev": "concurrently \"npx convex dev\" \"turbo run dev --filter=mission-control-ui\"",
     "dev:ui": "pnpm --filter mission-control-ui dev",
+    "ui:shadcn": "pnpm --filter mission-control-ui shadcn",
     "dev:orchestration": "pnpm --filter @mission-control/orchestration-server dev",
     "build": "turbo run build",
     "build:workspaces": "pnpm -r --filter './packages/*' build",
@@ -53,6 +54,16 @@
     "turbo": "^1.11.2",
     "typescript": "^5.3.3",
     "vitest": "^1.1.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "rollup": ">=4.59.0",
+      "esbuild": ">=0.25.0",
+      "yaml": ">=2.8.3",
+      "undici": ">=7.24.7",
+      "path-to-regexp": ">=8.4.1",
+      "@modelcontextprotocol/sdk": ">=1.29.0"
+    }
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
