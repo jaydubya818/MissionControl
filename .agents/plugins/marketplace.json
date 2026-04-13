@@ -1,0 +1,20 @@
+{
+  "name": "sellerfi-local",
+  "interface": {
+    "displayName": "SellerFi Local Plugins"
+  },
+  "plugins": [
+    {
+      "name": "mission-control-shadcn",
+      "source": {
+        "source": "local",
+        "path": "./plugins/mission-control-shadcn"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

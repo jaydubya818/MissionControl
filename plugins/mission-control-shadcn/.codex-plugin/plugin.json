@@ -1,0 +1,40 @@
+{
+  "name": "mission-control-shadcn",
+  "version": "0.1.0",
+  "description": "Intentional shadcn/ui workflow for SellerFi Mission Control.",
+  "author": {
+    "name": "Jarrett West",
+    "url": "https://github.com/jaydubya818"
+  },
+  "homepage": "https://github.com/jaydubya818/MissionControl/blob/main/docs/SHADCN_UI_WORKFLOW.md",
+  "repository": "https://github.com/jaydubya818/MissionControl",
+  "license": "MIT",
+  "keywords": [
+    "shadcn",
+    "tailwind",
+    "vite",
+    "mission-control",
+    "sellerfi"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Mission Control shadcn",
+    "shortDescription": "Use shadcn/ui in this repo without design drift.",
+    "longDescription": "Provides a focused workflow for adding and adapting shadcn/ui components inside the Vite-based Mission Control UI while preserving SellerFi's visual system and avoiding ad hoc component sprawl.",
+    "developerName": "SellerFi",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/jaydubya818/MissionControl",
+    "privacyPolicyURL": "https://github.com/jaydubya818/MissionControl/blob/main/README.md",
+    "termsOfServiceURL": "https://github.com/jaydubya818/MissionControl/blob/main/LICENSE",
+    "defaultPrompt": [
+      "Use shadcn to add a polished table to Mission Control UI.",
+      "Refactor this modal onto shadcn primitives for Mission Control.",
+      "Add a new shadcn component without breaking our shell theme."
+    ],
+    "brandColor": "#67E8F9"
+  }
+}

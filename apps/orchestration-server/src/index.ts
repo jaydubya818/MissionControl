@@ -27,21 +27,27 @@ import { ConvexQueries, ConvexMutations } from "./convexCalls.js";
 import { CoordinatorLoop } from "@mission-control/coordinator";
 import { AgentLifecycle } from "@mission-control/agent-runtime";
 import { MemoryManager } from "@mission-control/memory";
+import { discoverSkills, listSkillFiles, readSkillFile, resolveSkill, writeSkillFile } from "./skills.js";
 import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ============================================================================
 // CONFIG
 // ============================================================================
 
+const REPO_ROOT = path.resolve(__dirname, "../../..");
 const PORT = parseInt(process.env.ORCHESTRATION_PORT ?? "4100", 10);
 const CONVEX_URL = process.env.CONVEX_URL ?? "";
 const PROJECT_SLUG = process.env.PROJECT_SLUG ?? "openclaw";
 const TICK_INTERVAL_MS = parseInt(process.env.TICK_INTERVAL_MS ?? "30000", 10);
-const AGENTS_DIR = process.env.AGENTS_DIR ?? path.resolve(process.cwd(), "../../agents");
+const AGENTS_DIR = process.env.AGENTS_DIR ?? path.join(REPO_ROOT, "agents");
 
 if (!CONVEX_URL) {
   console.error("[orchestration] CONVEX_URL is required. Set it in .env or environment.");
@@ -361,6 +367,83 @@ app.get("/gateway/status", async (c) => {
         typeof process.env.GATEWAY_TOKEN === "string" && process.env.GATEWAY_TOKEN.trim().length > 0
       ),
     });
+  }
+});
+
+app.get("/gateway/skills", (c) => {
+  try {
+    const skills = discoverSkills().map((skill) => ({
+      id: skill.id,
+      name: skill.name,
+      source: skill.source,
+      sourceLabel: skill.sourceLabel,
+      relativePath: skill.relativePath,
+      updatedAt: skill.updatedAt,
+      fileCount: skill.fileCount,
+      description: skill.description,
+    }));
+    return c.json({ skills });
+  } catch (err: any) {
+    return c.json({ error: err?.message ?? "Unable to list skills" }, 500);
+  }
+});
+
+app.get("/gateway/skills/files", (c) => {
+  try {
+    const skillId = c.req.query("skillId");
+    if (!skillId) {
+      return c.json({ error: "Missing skillId" }, 400);
+    }
+
+    const skill = resolveSkill(skillId);
+    return c.json({
+      skill: {
+        id: skill.id,
+        name: skill.name,
+        source: skill.source,
+        sourceLabel: skill.sourceLabel,
+        relativePath: skill.relativePath,
+        updatedAt: skill.updatedAt,
+        fileCount: skill.fileCount,
+        description: skill.description,
+      },
+      files: listSkillFiles(skill.id),
+    });
+  } catch (err: any) {
+    return c.json({ error: err?.message ?? "Unable to read skill files" }, 400);
+  }
+});
+
+app.get("/gateway/skills/file", (c) => {
+  try {
+    const skillId = c.req.query("skillId");
+    const relativeFilePath = c.req.query("path");
+    if (!skillId || !relativeFilePath) {
+      return c.json({ error: "Missing skillId or path" }, 400);
+    }
+
+    return c.json(readSkillFile(skillId, relativeFilePath));
+  } catch (err: any) {
+    return c.json({ error: err?.message ?? "Unable to read skill file" }, 400);
+  }
+});
+
+app.put("/gateway/skills/file", async (c) => {
+  try {
+    const skillId = c.req.query("skillId");
+    const relativeFilePath = c.req.query("path");
+    if (!skillId || !relativeFilePath) {
+      return c.json({ error: "Missing skillId or path" }, 400);
+    }
+
+    const body = await c.req.json().catch(() => ({}));
+    if (typeof body.content !== "string") {
+      return c.json({ error: "Missing string content" }, 400);
+    }
+
+    return c.json(writeSkillFile(skillId, relativeFilePath, body.content));
+  } catch (err: any) {
+    return c.json({ error: err?.message ?? "Unable to write skill file" }, 400);
   }
 });
 

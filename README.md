@@ -64,6 +64,8 @@ mc claim               # Claim next task
 - [Runbook](docs/MISSION_CONTROL_RUNBOOK.md) — Operations, E2E, CI
 - [Troubleshooting](docs/guides/TROUBLESHOOTING.md) — Diagnostics and common fixes
 - [Setup Guide](docs/BOOT_CONTRACT.md)
+- [shadcn Workflow](docs/SHADCN_UI_WORKFLOW.md) — Intentional UI component workflow for Mission Control
+- [Enhancement Plan](docs/MISSION_CONTROL_ENHANCEMENT_PLAN.md) — What to adopt next and what to ignore
 - [Workflows](docs/WORKFLOWS.md)
 
 ## License
