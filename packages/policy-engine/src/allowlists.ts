@@ -199,6 +199,7 @@ export function validateToolAction(
       break;
       
     case "read_file":
+    case "skills_read":
       if (params.path) {
         const readCheck = isFileReadAllowed(params.path);
         if (!readCheck.allowed) {
@@ -210,6 +211,7 @@ export function validateToolAction(
       
     case "write_file":
     case "delete_file":
+    case "skills_write":
       if (params.path) {
         const writeCheck = isFileWriteAllowed(params.path);
         if (!writeCheck.allowed) {
