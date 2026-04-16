@@ -92,8 +92,12 @@ export const create = mutation({
     active: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    // Resolve tenantId from project
+    const project = await ctx.db.get(args.projectId);
+    const tenantId = project?.tenantId;
+
     const id = await ctx.db.insert("qcRulesets", {
-      tenantId: undefined, // TODO: resolve from project
+      tenantId,
       projectId: args.projectId,
       name: args.name,
       description: args.description,
