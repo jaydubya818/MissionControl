@@ -131,6 +131,11 @@ export interface Deliverable {
   summary: string;
   artifactIds?: string[];
   evidence?: string;
+  /** Actual LLM token usage for this task run (used for cost tracking) */
+  tokenUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
 }
 
 export interface HeartbeatResult {

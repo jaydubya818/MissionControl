@@ -21,7 +21,7 @@ export class MissionControlClient {
   private config: Required<SDKConfig>;
   private agent?: Agent;
   private projectId?: Id<"projects">;
-  private heartbeatTimer?: NodeJS.Timeout;
+  private heartbeatTimer?: ReturnType<typeof setInterval>;
   private taskHandlers: Map<string, TaskHandler> = new Map();
   private currentRun?: Run;
 
@@ -252,8 +252,8 @@ export class MissionControlClient {
     if (this.currentRun) {
       await this.client.mutation("runs:complete" as any, {
         runId: this.currentRun._id,
-        inputTokens: 1000, // TODO: Track actual tokens
-        outputTokens: 500,
+        inputTokens: deliverable.tokenUsage?.inputTokens ?? 0,
+        outputTokens: deliverable.tokenUsage?.outputTokens ?? 0,
         costUsd,
       });
     }

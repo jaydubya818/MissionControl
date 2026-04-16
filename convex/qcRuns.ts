@@ -451,9 +451,13 @@ export const start = mutation({
     const now = Date.now();
     const runId = generateRunId();
     
+    // Resolve tenantId from project
+    const project = args.projectId ? await ctx.db.get(args.projectId) : null;
+    const tenantId = project?.tenantId;
+
     // Create run
     const id = await ctx.db.insert("qcRuns", {
-      tenantId: undefined, // TODO: resolve from project
+      tenantId,
       projectId: args.projectId,
       runId,
       runSequence,
