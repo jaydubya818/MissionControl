@@ -92,8 +92,12 @@ export const create = mutation({
     active: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    // Resolve tenantId from project
-    const project = await ctx.db.get(args.projectId);
+    // Resolve tenantId from project (projectId is optional, cast needed because
+    // ctx.db.get returns the full doc-union type rather than narrowing to projects)
+    // Query projects table directly so the result is properly typed as Doc<"projects">
+    const project = args.projectId != null
+      ? await ctx.db.query("projects").filter((q) => q.eq(q.field("_id"), args.projectId)).first()
+      : null;
     const tenantId = project?.tenantId;
 
     const id = await ctx.db.insert("qcRulesets", {
