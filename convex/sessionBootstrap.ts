@@ -19,6 +19,74 @@ import { api } from "./_generated/api";
 // ============================================================================
 
 /**
+ * Fetch memory context for a session bootstrap.
+ * Reads today/yesterday daily notes and long-term performance + patterns.
+ * Dates are passed as arguments (YYYY-MM-DD) so the query remains deterministic.
+ */
+export const getMemoryContext = query({
+  args: {
+    agentId: v.id("agents"),
+    todayDate: v.string(),
+    yesterdayDate: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Daily notes — filter by date stored in metadata
+    const dailyNotes = await ctx.db
+      .query("agentDocuments")
+      .withIndex("by_agent_type", (q) =>
+        q.eq("agentId", args.agentId).eq("type", "DAILY_NOTE")
+      )
+      .collect();
+
+    const todayNote = dailyNotes.find((d) => d.metadata?.date === args.todayDate) ?? null;
+    const yesterdayNote = dailyNotes.find((d) => d.metadata?.date === args.yesterdayDate) ?? null;
+
+    // Performance records (one row per task type)
+    const performance = await ctx.db
+      .query("agentPerformance")
+      .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+      .collect();
+
+    // Discovered patterns — top 10 by confidence
+    const allPatterns = await ctx.db
+      .query("agentPatterns")
+      .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+      .collect();
+    const topPatterns = allPatterns
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 10);
+
+    return {
+      today: todayNote
+        ? { content: todayNote.content, date: args.todayDate }
+        : null,
+      yesterday: yesterdayNote
+        ? { content: yesterdayNote.content, date: args.yesterdayDate }
+        : null,
+      longTerm:
+        performance.length > 0 || topPatterns.length > 0
+          ? {
+              performance: performance.map((p) => ({
+                taskType: p.taskType,
+                successCount: p.successCount,
+                failureCount: p.failureCount,
+                avgCompletionTimeMs: p.avgCompletionTimeMs,
+                avgCostUsd: p.avgCostUsd,
+                totalTasksCompleted: p.totalTasksCompleted,
+              })),
+              patterns: topPatterns.map((p) => ({
+                pattern: p.pattern,
+                confidence: p.confidence,
+                // Cap evidence to 3 entries to keep context lean
+                evidence: p.evidence.slice(0, 3),
+              })),
+            }
+          : null,
+    };
+  },
+});
+
+/**
  * Get bootstrap context for an agent session (sync version for UI).
  */
 export const getBootstrapContext = query({
@@ -115,7 +183,22 @@ export const bootstrap: any = action({
       console.warn(`Agent ${context.agent.name} identity is ${context.identity?.validationStatus ?? "MISSING"}. Some features may be limited.`);
     }
 
-    // 4. Build the bootstrap payload
+    // 4. Fetch memory context if requested
+    let memory = null;
+    if (args.includeMemory) {
+      const now = new Date();
+      const todayDate = now.toISOString().split("T")[0]; // YYYY-MM-DD
+      const yesterdayMs = now.getTime() - 86_400_000;
+      const yesterdayDate = new Date(yesterdayMs).toISOString().split("T")[0];
+
+      memory = await ctx.runQuery(api.sessionBootstrap.getMemoryContext, {
+        agentId: args.agentId,
+        todayDate,
+        yesterdayDate,
+      });
+    }
+
+    // 5. Build the bootstrap payload
     const payload: any = {
       // SOUL.md content
       soul: context.identity?.soulContent ?? null,
@@ -140,14 +223,10 @@ export const bootstrap: any = action({
       // Tools notes
       toolsNotes: context.identity?.toolsNotes ?? null,
 
-      // Memory placeholder (memory package integration point)
-      memory: args.includeMemory ? {
-        today: null,     // TODO: Integrate with packages/memory daily notes
-        yesterday: null, // TODO: Integrate with packages/memory previous day
-        longTerm: null,  // TODO: Integrate with packages/memory global tier
-      } : null,
+      // Memory: today/yesterday daily notes + long-term performance/patterns
+      memory,
 
-      // Safety reminders (from OpenClaw AGENTS template)
+      // 6. Safety reminders (from OpenClaw AGENTS template)
       safetyReminders: [
         "Read SOUL.md before acting.",
         "Do not dump directories or secrets into chat.",
