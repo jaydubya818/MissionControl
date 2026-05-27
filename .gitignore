@@ -39,6 +39,10 @@ Thumbs.db
 # Convex
 .convex/
 # convex/_generated/ - included for Railway deployment
+# Top-level + nested convex/*.js are TypeScript compile artifacts (matching .ts source exists).
+# Only convex/_generated/*.js stays tracked (above).
+convex/**/*.js
+!convex/_generated/**/*.js
 
 # Turbo
 .turbo/
