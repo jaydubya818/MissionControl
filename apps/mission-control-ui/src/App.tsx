@@ -1,6 +1,5 @@
 import { useState, useEffect, createContext, useContext, useMemo, useCallback, lazy, Suspense } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { AnimatePresence, motion } from "framer-motion";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { type MainView, type CommandSection } from "./TopNav";
@@ -49,6 +48,9 @@ const QualitySection = lazy(() =>
 );
 const PlatformSection = lazy(() =>
   import("./sections/PlatformSection").then((module) => ({ default: module.PlatformSection }))
+);
+const ControlSection = lazy(() =>
+  import("./sections/ControlSection").then((module) => ({ default: module.ControlSection }))
 );
 
 // ============================================================================
@@ -132,6 +134,7 @@ const VALID_MAIN_VIEWS: MainView[] = [
   "hybrid-workflows", "schedule", "codegen", "gherkin", "metrics", "qc-dashboard", "qc-runs",
   "qc-environments", "qc-findings", "qc-metrics", "qc-rulesets", "gateway", "live-chat", "schedules",
   "hiring", "team", "system", "radar", "factory", "pipeline", "feedback", "ops-schedule", "goals",
+  "control-portfolio", "control-fleet", "control-approvals",
 ];
 
 function readPersistedView(): MainView | null {
@@ -161,6 +164,7 @@ const SECTION_DEFAULT_VIEW: Record<CommandSection, MainView> = {
   code: "code",
   quality: "qc-dashboard",
   platform: "system",
+  control: "control-portfolio",
 };
 
 const SECTION_TABS: Record<CommandSection, TabItem[] | null> = {
@@ -242,10 +246,16 @@ const SECTION_TABS: Record<CommandSection, TabItem[] | null> = {
     { id: "pipeline", label: "Build Pipeline" },
     { id: "feedback", label: "Feedback" },
   ],
+  control: [
+    { id: "control-portfolio", label: "Portfolio" },
+    { id: "control-fleet", label: "Fleet" },
+    { id: "control-approvals", label: "Approvals" },
+  ],
 };
 
 function viewToSection(view: MainView): CommandSection {
   if (view === "home") return "home";
+  if (["control-portfolio", "control-fleet", "control-approvals"].includes(view)) return "control";
   if (["tasks", "goals", "dag", "calendar", "ops-schedule", "audit", "telemetry"].includes(view)) return "ops";
   if (["atc", "agents", "directory", "identity", "policies", "deployments", "gateway", "schedules"].includes(view)) return "agents";
   if (["chat", "live-chat", "council", "command"].includes(view)) return "chat";
@@ -402,20 +412,13 @@ function useHeaderMetrics() {
 // PAGE TRANSITION
 // ============================================================================
 
+// CSS animation (not framer-motion) so a lazy section suspending mid-transition
+// can never freeze the wrapper at opacity 0 and leave the page invisible.
 function PageTransition({ children, viewKey }: { children: React.ReactNode; viewKey: string }) {
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={viewKey}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
-        className="flex flex-1 overflow-hidden"
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <div key={viewKey} className="page-enter flex flex-1 overflow-hidden">
+      {children}
+    </div>
   );
 }
 
@@ -708,6 +711,13 @@ export default function App() {
               setSelectedTaskId(taskId);
               setCurrentView("tasks");
             }}
+          />
+        );
+      case "control":
+        return (
+          <ControlSection
+            currentView={currentView}
+            onNavigate={setCurrentView}
           />
         );
       default:

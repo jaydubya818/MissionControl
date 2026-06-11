@@ -61,7 +61,10 @@ export type MainView =
   | "pipeline"
   | "feedback"
   | "ops-schedule"
-  | "goals";
+  | "goals"
+  | "control-portfolio"
+  | "control-fleet"
+  | "control-approvals";
 
 /** Top-level command center sections */
 export type CommandSection =
@@ -74,7 +77,8 @@ export type CommandSection =
   | "knowledge"
   | "code"
   | "quality"
-  | "platform";
+  | "platform"
+  | "control";
 
 interface TopNavProps {
   currentView: MainView;

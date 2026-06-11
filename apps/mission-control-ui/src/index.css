@@ -610,6 +610,23 @@ main {
   to { transform: rotate(360deg); }
 }
 
+/* Page-level view transition. CSS animation (not JS-driven) so it always
+   completes to the final visible state, even if React suspends mid-render. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-enter {
+  animation: page-enter 0.2s ease-out;
+}
+
 .animate-spin-slow {
   animation: spin-slow 1.2s linear infinite;
 }

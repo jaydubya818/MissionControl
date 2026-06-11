@@ -57,6 +57,9 @@ import { StatusDot, type StatusDotVariant } from "@/components/ui/status-dot";
 import { AutoRefreshBadge } from "@/components/ui/auto-refresh-badge";
 import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { MissionBanner } from "@/components/MissionBanner";
+import { MissionSnapshot } from "@/components/MissionSnapshot";
+import { ExecutionReadiness } from "@/components/ExecutionReadiness";
+import { FleetPreview } from "@/components/FleetPreview";
 import { OperatorTipsCard } from "@/components/OperatorTipsCard";
 import { NeonChartContainer, NeonChartTheme } from "@/components/NeonChartTheme";
 import { QuotaFuelGauge } from "@/components/QuotaFuelGauge";
@@ -478,6 +481,15 @@ function QuickActionsBar({
 // SYSTEM STATUS BAR
 // ─────────────────────────────────────────────────────────────────────────────
 
+function formatCycleTime(ms: number | null): string {
+  if (ms === null) return "—";
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = ms / 3_600_000;
+  if (hours < 48) return `${hours.toFixed(1)}h`;
+  return `${(hours / 24).toFixed(1)}d`;
+}
+
 function SystemStatusBar({
   agents,
   tasks,
@@ -488,60 +500,90 @@ function SystemStatusBar({
   approvals: Doc<"approvals">[];
 }) {
   const quarantinedCount = agents.filter((a) => a.status === "QUARANTINED").length;
+  const activeAgentCount = agents.filter((a) => a.status === "ACTIVE").length;
+  const runningCount = tasks.filter((t) => t.status === "IN_PROGRESS").length;
   const failedCount = tasks.filter((t) => t.status === "FAILED").length;
   const blockedCount = tasks.filter((t) => t.status === "BLOCKED").length;
   const pendingApprovals = approvals.length;
 
-  const issues = [
-    quarantinedCount > 0 && { label: `${quarantinedCount} quarantined`, variant: "error" as const },
-    failedCount > 0 && { label: `${failedCount} failed`, variant: "error" as const },
-    blockedCount > 0 && { label: `${blockedCount} blocked`, variant: "warning" as const },
-    pendingApprovals > 0 && { label: `${pendingApprovals} pending approvals`, variant: "warning" as const },
-  ].filter(Boolean) as { label: string; variant: "error" | "warning" }[];
+  const cycleSamples = tasks.filter(
+    (t) => t.status === "DONE" && typeof t.startedAt === "number" && typeof t.completedAt === "number"
+  );
+  const avgCycleMs =
+    cycleSamples.length > 0
+      ? cycleSamples.reduce((sum, t) => sum + ((t.completedAt as number) - (t.startedAt as number)), 0) /
+        cycleSamples.length
+      : null;
 
-  const isHealthy = issues.length === 0;
+  const hasError = quarantinedCount > 0 || failedCount > 0;
+  const hasWarning = blockedCount > 0 || pendingApprovals > 0;
+  const isHealthy = !hasError && !hasWarning;
+
+  // Tone classes: cyan = active/running, amber = warning, red = blocked/failing
+  const metrics: Array<{ label: string; value: string; tone: "cyan" | "amber" | "red" | "neutral" | "green" }> = [
+    { label: "Active Agents", value: String(activeAgentCount), tone: activeAgentCount > 0 ? "cyan" : "neutral" },
+    { label: "Running Tasks", value: String(runningCount), tone: runningCount > 0 ? "cyan" : "neutral" },
+    { label: "Blocked", value: String(blockedCount), tone: blockedCount > 0 ? "amber" : "green" },
+    { label: "Approvals", value: String(pendingApprovals), tone: pendingApprovals > 0 ? "amber" : "green" },
+    { label: "Failed Runs", value: String(failedCount), tone: failedCount > 0 ? "red" : "green" },
+    { label: "Avg Cycle", value: formatCycleTime(avgCycleMs), tone: "neutral" },
+  ];
+
+  const toneClass: Record<string, string> = {
+    cyan: "text-cyan-200",
+    amber: "text-amber-300",
+    red: "text-red-400",
+    green: "text-emerald-300",
+    neutral: "text-foreground/70",
+  };
 
   return (
-    <div className={cn(
-      "flex items-center gap-3 px-4 py-2.5 rounded-lg border mb-6 text-xs",
-      isHealthy
-        ? "bg-primary/5 border-primary/20"
-        : issues.some((i) => i.variant === "error")
-          ? "bg-red-500/5 border-red-500/20"
-          : "bg-amber-500/5 border-amber-500/20"
-    )}>
-      <StatusDot
-        variant={isHealthy ? "active" : issues.some((i) => i.variant === "error") ? "error" : "warning"}
-        pulse
-        size="sm"
-      />
-      <span className={cn(
-        "font-semibold",
-        isHealthy ? "text-primary" : issues.some((i) => i.variant === "error") ? "text-red-400" : "text-amber-500"
-      )}>
-        {isHealthy ? "All Systems Operational" : "Attention Required"}
-      </span>
-      {issues.length > 0 && (
-        <span className="text-muted-foreground">·</span>
+    <div
+      className={cn(
+        "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border px-4 py-2.5 text-xs",
+        "bg-[linear-gradient(180deg,color-mix(in_srgb,var(--shell-panel)_96%,transparent),color-mix(in_srgb,var(--background)_92%,transparent))]",
+        isHealthy ? "border-[var(--panel-line)]" : hasError ? "border-red-500/25" : "border-amber-500/25"
       )}
-      <div className="flex items-center gap-2 flex-wrap">
-        {issues.map((issue, i) => (
-          <span
-            key={i}
-            className={cn(
-              "px-2 py-0.5 rounded-full border text-[0.65rem] font-medium uppercase tracking-wider",
-              issue.variant === "error"
-                ? "bg-red-500/10 border-red-500/20 text-red-400"
-                : "bg-amber-500/10 border-amber-500/20 text-amber-500"
-            )}
-          >
-            {issue.label}
+    >
+      <div className="flex items-center gap-2">
+        <StatusDot
+          variant={isHealthy ? "active" : hasError ? "error" : "warning"}
+          pulse
+          size="sm"
+        />
+        <span
+          className={cn(
+            "font-semibold uppercase tracking-[0.14em]",
+            isHealthy ? "text-emerald-300" : hasError ? "text-red-400" : "text-amber-300"
+          )}
+        >
+          {isHealthy ? "All systems operational" : hasError ? "Faults detected" : "Attention required"}
+        </span>
+        {quarantinedCount > 0 && (
+          <span className="rounded-full border border-red-500/25 bg-red-500/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wider text-red-400">
+            {quarantinedCount} quarantined
           </span>
+        )}
+      </div>
+
+      <div className="hidden h-4 w-px bg-[var(--panel-line-strong)] sm:block" />
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="flex items-baseline gap-1.5">
+            <span className={cn("font-[family:var(--font-display)] text-sm font-semibold tabular-nums", toneClass[metric.tone])}>
+              {metric.value}
+            </span>
+            <span className="text-[0.6rem] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
+              {metric.label}
+            </span>
+          </div>
         ))}
       </div>
+
       <div className="ml-auto flex items-center gap-1.5 text-muted-foreground/60">
         <Clock className="h-3 w-3" />
-        <span className="text-[0.65rem]">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+        <span className="text-[0.65rem] tabular-nums">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
       </div>
     </div>
   );
@@ -1830,10 +1872,23 @@ export function DashboardOverview({
       <div className="max-w-[1720px] mx-auto px-6 py-5">
         <SystemStatusBar agents={agents} tasks={tasks} approvals={approvals} />
 
+        <MissionSnapshot
+          hasMission={!!missionData?.missionStatement}
+          agents={agents}
+          tasks={tasks}
+          approvals={approvals}
+          onOpenMission={() => onOpenMissionModal?.()}
+          onOpenFleet={() => onNavigate?.("control-fleet")}
+          onOpenApprovals={onOpenApprovals}
+          onOpenTasks={() => onNavigate?.("tasks")}
+        />
+
         <MissionBanner
           projectId={projectId}
           onEditClick={() => onOpenMissionModal?.()}
           onReversePromptClick={() => onOpenSuggestionsDrawer?.()}
+          onImportFromJira={onNavigateToGateway}
+          onConnectFleet={() => onNavigate?.("agents")}
           brief={{
             stageLabel: currentBuildStage.label,
             stageEyebrow: currentBuildStage.eyebrow,
@@ -1849,7 +1904,37 @@ export function DashboardOverview({
         />
 
 
-        <OperatorTipsCard onNavigate={onNavigate} />
+        <FleetPreview
+          agents={agents}
+          tasks={tasks}
+          onSelectAgent={onSelectAgent}
+          onRegisterAgent={() => onNavigate?.("agents")}
+          onResumeFleet={() => onNavigate?.("agents")}
+          onLaunchTask={() => onOpenCreateTask?.()}
+          onInspectFleet={() => onNavigate?.("control-fleet")}
+        />
+
+        <ExecutionReadiness
+          readiness={{
+            missionDefined: !!missionData?.missionStatement,
+            actorsSelected: agents.length > 0,
+            toolsConnected: gatewayConfigured === true,
+            observabilityEnabled: (activities?.length ?? 0) > 0,
+          }}
+          onOpenMission={() => onOpenMissionModal?.()}
+          onOpenFleet={() => onNavigate?.("agents")}
+          onOpenGateway={onNavigateToGateway}
+          onOpenApprovals={onOpenApprovals}
+        />
+
+        <OperatorTipsCard
+          onNavigate={onNavigate}
+          hasMission={!!missionData?.missionStatement}
+          hasAgents={agents.length > 0}
+          gatewayConfigured={gatewayConfigured}
+          onOpenMission={() => onOpenMissionModal?.()}
+          onOpenGateway={onNavigateToGateway}
+        />
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.7fr)_360px] mb-8">
           <Card className="overflow-hidden">
             <div className="grid gap-0 xl:grid-cols-[minmax(0,1.2fr)_380px]">

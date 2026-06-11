@@ -54,6 +54,7 @@ import type * as lib_genomeHash from "../lib/genomeHash.js";
 import type * as lib_getActiveTenant from "../lib/getActiveTenant.js";
 import type * as lib_legacyToolPolicy from "../lib/legacyToolPolicy.js";
 import type * as lib_operatorControls from "../lib/operatorControls.js";
+import type * as lib_outputValidation from "../lib/outputValidation.js";
 import type * as lib_riskClassifier from "../lib/riskClassifier.js";
 import type * as lib_sanitize from "../lib/sanitize.js";
 import type * as lib_stateMachine from "../lib/stateMachine.js";
@@ -176,6 +177,7 @@ declare const fullApi: ApiFromModules<{
   "lib/getActiveTenant": typeof lib_getActiveTenant;
   "lib/legacyToolPolicy": typeof lib_legacyToolPolicy;
   "lib/operatorControls": typeof lib_operatorControls;
+  "lib/outputValidation": typeof lib_outputValidation;
   "lib/riskClassifier": typeof lib_riskClassifier;
   "lib/sanitize": typeof lib_sanitize;
   "lib/stateMachine": typeof lib_stateMachine;
