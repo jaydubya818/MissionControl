@@ -613,6 +613,14 @@ export default function App() {
             }}
           />
         );
+      case "control":
+        return (
+          <ControlSection
+            currentView={currentView}
+            projectId={projectId}
+            onNavigate={setCurrentView}
+          />
+        );
       case "ops":
         return (
           <OpsSection
@@ -720,14 +728,6 @@ export default function App() {
               setSelectedTaskId(taskId);
               setCurrentView("tasks");
             }}
-          />
-        );
-      case "control":
-        return (
-          <ControlSection
-            currentView={currentView}
-            projectId={projectId}
-            onNavigate={setCurrentView}
           />
         );
       default:
