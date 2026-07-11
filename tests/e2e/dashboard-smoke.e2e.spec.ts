@@ -1,32 +1,32 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function expectShellLoaded(page: Page) {
+  await page.goto("/");
+  await expect(page.getByRole("navigation", { name: "Command center navigation" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Home" })).toBeVisible();
+}
 
 /**
  * Smoke E2E: Dashboard and home load with Convex (dev or deployed).
  * webServer in playwright.config.ts runs UI with VITE_CONVEX_URL so Convex dev can back the test.
  */
 test("home dashboard loads and shows main sections", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByText("Mission Control").first()).toBeVisible({ timeout: 15000 });
+  await expectShellLoaded(page);
 
   // Home section: quick navigation or status
-  await expect(
-    page.getByText(/Quick|System status|All Systems|INBOX|Agents/i).first()
-  ).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("Quick Navigation", { exact: true })).toBeVisible({ timeout: 10000 });
 });
 
 test("navigate to Tasks and back to Home", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByText("Mission Control").first()).toBeVisible({ timeout: 15000 });
+  await expectShellLoaded(page);
 
-  const opsNav = page.getByRole("button", { name: "Ops" });
+  const commandNav = page.getByRole("navigation", { name: "Command center navigation" });
+  const opsNav = commandNav.getByRole("button", { name: "Operations", exact: true });
   await opsNav.click();
-  await expect(
-    page.getByText(/Tasks|Kanban|INBOX|Board/i).first()
-  ).toBeVisible({ timeout: 8000 });
+  await page.getByRole("tab", { name: "Tasks", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible({ timeout: 8000 });
 
-  const homeNav = page.getByRole("button", { name: "Home" });
+  const homeNav = commandNav.getByRole("button", { name: "Home", exact: true });
   await homeNav.click();
-  await expect(
-    page.getByText(/Quick|System status|INBOX/i).first()
-  ).toBeVisible({ timeout: 8000 });
+  await expect(page.getByText("Quick Navigation", { exact: true })).toBeVisible({ timeout: 8000 });
 });
