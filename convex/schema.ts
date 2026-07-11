@@ -1414,6 +1414,11 @@ export default defineSchema({
     
     // Metadata
     metadata: v.optional(v.any()),
+
+    // Context Bill of Materials captured at run start (Software Factory
+    // Epic 4). Set once by context/snapshots.ts:createSnapshot; never
+    // patched afterwards.
+    contextSnapshotId: v.optional(v.id("contextSnapshots")),
   })
     .index("by_agent", ["agentId"])
     .index("by_instance", ["instanceId"])
@@ -3634,4 +3639,74 @@ export default defineSchema({
     .index("by_repo", ["repoSlug"])
     .index("by_repo_package", ["repoSlug", "packageSlug"])
     .index("by_package", ["packageSlug"]),
+
+  // -------------------------------------------------------------------------
+  // CONTEXT BILL OF MATERIALS: SNAPSHOTS (Software Factory Epic 4)
+  // -------------------------------------------------------------------------
+  // Immutable record of everything that shaped an agent run: model, agent
+  // version, context packages (with content hashes), tools, feature flags,
+  // repo state, and policy/workflow versions. One snapshot per run (by_run
+  // is unique in practice); rows are inserted once by
+  // context/snapshots.ts:createSnapshot and NEVER patched — no update
+  // mutation may exist for this table. Writes are gated behind the
+  // `context.cbom` feature flag and audited via `activities`
+  // (CONTEXT_SNAPSHOT_CREATED). Diff/export logic lives in
+  // lib/contextSnapshots.ts. See docs/software-factory/CBOM.md.
+  contextSnapshots: defineTable({
+    // Evidence attachment points
+    runId: v.optional(v.id("runs")),
+    taskId: v.optional(v.id("tasks")),
+    workOrderId: v.optional(v.string()),
+    // Repository state
+    repoSlug: v.optional(v.string()),
+    repositorySha: v.optional(v.string()),
+    branch: v.optional(v.string()),
+    worktreePath: v.optional(v.string()),
+    // Model
+    model: v.string(),
+    modelVersion: v.optional(v.string()),
+    // Agent identity
+    agentId: v.optional(v.id("agents")),
+    agentVersion: v.optional(v.string()),
+    soulVersionHash: v.optional(v.string()),
+    // Orchestration versions
+    workflowVersion: v.optional(v.string()),
+    policyVersion: v.optional(v.string()),
+    // Context packages in effect (contentHash: sha256:<64 hex>)
+    packages: v.array(
+      v.object({
+        packageId: v.optional(v.id("contextPackages")),
+        slug: v.string(),
+        version: v.string(),
+        contentHash: v.string(),
+        sourceCommitSha: v.optional(v.string()),
+      })
+    ),
+    // Tools available to the run
+    tools: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          version: v.optional(v.string()),
+          server: v.optional(v.string()),
+          permissions: v.optional(v.array(v.string())),
+        })
+      )
+    ),
+    // Environment and policy state
+    environmentHash: v.optional(v.string()),
+    runtimeConfigHash: v.optional(v.string()),
+    // Resolved at creation time by createSnapshot (auto-captured)
+    featureFlags: v.optional(
+      v.array(v.object({ key: v.string(), enabled: v.boolean() }))
+    ),
+    approvalPolicy: v.optional(v.string()),
+    riskClassification: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_run", ["runId"])
+    .index("by_task", ["taskId"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_agent", ["agentId"])
+    .index("by_repo", ["repoSlug"]),
 });
