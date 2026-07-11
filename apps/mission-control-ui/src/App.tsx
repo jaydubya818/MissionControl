@@ -135,7 +135,7 @@ const VALID_MAIN_VIEWS: MainView[] = [
   "hybrid-workflows", "schedule", "codegen", "gherkin", "metrics", "qc-dashboard", "qc-runs",
   "qc-environments", "qc-findings", "qc-metrics", "qc-rulesets", "gateway", "live-chat", "schedules",
   "hiring", "team", "system", "radar", "factory", "pipeline", "feedback", "ops-schedule", "goals",
-  "control-portfolio", "control-fleet", "control-approvals",
+  "control-portfolio", "control-work-orders", "control-fleet", "control-approvals",
 ];
 
 function readPersistedView(): MainView | null {
@@ -172,6 +172,7 @@ const SECTION_TABS: Record<CommandSection, TabItem[] | null> = {
   home: null,
   control: [
     { id: "control-portfolio", label: "Portfolio" },
+    { id: "control-work-orders", label: "Work Orders" },
     { id: "control-fleet", label: "Fleet" },
     { id: "control-approvals", label: "Approvals" },
   ],
@@ -256,7 +257,7 @@ const SECTION_TABS: Record<CommandSection, TabItem[] | null> = {
 
 function viewToSection(view: MainView): CommandSection {
   if (view === "home") return "home";
-  if (["control-portfolio", "control-fleet", "control-approvals"].includes(view)) return "control";
+  if (["control-portfolio", "control-work-orders", "control-fleet", "control-approvals"].includes(view)) return "control";
   if (["tasks", "goals", "dag", "calendar", "ops-schedule", "audit", "telemetry"].includes(view)) return "ops";
   if (["atc", "agents", "directory", "identity", "policies", "deployments", "gateway", "schedules"].includes(view)) return "agents";
   if (["chat", "live-chat", "council", "command"].includes(view)) return "chat";
@@ -612,13 +613,6 @@ export default function App() {
             }}
           />
         );
-      case "control":
-        return (
-          <ControlSection
-            currentView={currentView}
-            onNavigate={setCurrentView}
-          />
-        );
       case "ops":
         return (
           <OpsSection
@@ -726,6 +720,14 @@ export default function App() {
               setSelectedTaskId(taskId);
               setCurrentView("tasks");
             }}
+          />
+        );
+      case "control":
+        return (
+          <ControlSection
+            currentView={currentView}
+            projectId={projectId}
+            onNavigate={setCurrentView}
           />
         );
       default:

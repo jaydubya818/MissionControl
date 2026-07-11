@@ -1,21 +1,30 @@
-import { Orbit, ShieldCheck, Waypoints } from "lucide-react";
+import { ClipboardList, Orbit, ShieldCheck, Waypoints } from "lucide-react";
+import type { Id } from "../../../../convex/_generated/dataModel";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { MainView } from "../TopNav";
+import { WorkOrdersView } from "../controlPlane/WorkOrdersView";
 
 interface ControlSectionProps {
   currentView: MainView;
+  projectId: Id<"projects"> | null;
   onNavigate: (view: MainView) => void;
 }
 
-const VIEW_COPY: Record<Extract<MainView, "control-portfolio" | "control-fleet" | "control-approvals">, {
-  title: string;
-  description: string;
-}> = {
+type ControlView = Extract<
+  MainView,
+  "control-portfolio" | "control-work-orders" | "control-fleet" | "control-approvals"
+>;
+
+const VIEW_COPY: Record<ControlView, { title: string; description: string }> = {
   "control-portfolio": {
     title: "Portfolio",
     description: "Track operator-facing software factory work at the request and outcome layer.",
+  },
+  "control-work-orders": {
+    title: "Work Orders",
+    description: "Create and inspect first-class software-factory requests, acceptance criteria, and linked execution runs.",
   },
   "control-fleet": {
     title: "Fleet",
@@ -27,19 +36,22 @@ const VIEW_COPY: Record<Extract<MainView, "control-portfolio" | "control-fleet" 
   },
 };
 
-const CONTROL_VIEWS: Array<{
-  id: Extract<MainView, "control-portfolio" | "control-fleet" | "control-approvals">;
-  icon: typeof Orbit;
-}> = [
+const CONTROL_VIEWS: Array<{ id: ControlView; icon: typeof Orbit }> = [
   { id: "control-portfolio", icon: Orbit },
+  { id: "control-work-orders", icon: ClipboardList },
   { id: "control-fleet", icon: Waypoints },
   { id: "control-approvals", icon: ShieldCheck },
 ];
 
-export function ControlSection({ currentView, onNavigate }: ControlSectionProps) {
+export function ControlSection({ currentView, projectId, onNavigate }: ControlSectionProps) {
   const activeView = CONTROL_VIEWS.some((view) => view.id === currentView)
-    ? currentView as keyof typeof VIEW_COPY
+    ? (currentView as ControlView)
     : "control-portfolio";
+
+  if (activeView === "control-work-orders") {
+    return <WorkOrdersView projectId={projectId} />;
+  }
+
   const activeCopy = VIEW_COPY[activeView];
 
   return (
@@ -47,7 +59,7 @@ export function ControlSection({ currentView, onNavigate }: ControlSectionProps)
       <PageHeader
         eyebrow="Control plane"
         title="Control"
-        description="Minimal application-shell foundation for portfolio, fleet, approvals, and upcoming WorkOrder control surfaces."
+        description="Minimal control-plane shell plus the Work Orders slice for governed software-factory execution."
         icon={<Orbit className="h-5 w-5" />}
       />
 
@@ -57,7 +69,7 @@ export function ControlSection({ currentView, onNavigate }: ControlSectionProps)
             <CardHeader>
               <CardTitle>Surface navigation</CardTitle>
               <CardDescription>
-                Stable shell entrypoints for the Control section. Each view is intentionally lightweight until live control-plane features are wired.
+                Stable shell entrypoints for the Control section. Work Orders is live; the other views remain intentionally lightweight until follow-on control-plane slices are wired.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -86,22 +98,22 @@ export function ControlSection({ currentView, onNavigate }: ControlSectionProps)
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-muted-foreground">
               <p>
-                This landing state intentionally avoids demo-backed execution logic. It exists to provide a durable section,
-                navigation model, and rendering boundary for follow-on control-plane work.
+                This landing state keeps the application shell stable while follow-on control-plane work arrives incrementally.
+                It preserves the section boundary introduced by the shell PR without pulling demo-heavy execution logic back into the WorkOrder slice.
               </p>
 
               <div className="grid gap-3 md:grid-cols-3">
                 <ControlNote
                   title="Section boundary"
-                  body="The Control section now routes independently from Home, Ops, and Platform while preserving all existing shell views."
+                  body="Control routes independently from Home, Ops, and Platform while preserving all existing shell views."
                 />
                 <ControlNote
-                  title="Integration point"
-                  body="Future WorkOrder, approval, and fleet features can mount inside this section without rewiring the global app shell."
+                  title="Live slice"
+                  body="Work Orders now uses real Convex-backed data and governed dispatch behavior within this section."
                 />
                 <ControlNote
-                  title="Safe placeholder"
-                  body="No seeded control-plane records or orchestration side effects are required for this shell to compile, render, and navigate."
+                  title="Follow-on space"
+                  body="Portfolio, Fleet, and Approvals remain stable placeholders until those slices are implemented on their own merits."
                 />
               </div>
             </CardContent>

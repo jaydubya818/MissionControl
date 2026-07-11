@@ -63,6 +63,7 @@ export type MainView =
   | "ops-schedule"
   | "goals"
   | "control-portfolio"
+  | "control-work-orders"
   | "control-fleet"
   | "control-approvals";
 
