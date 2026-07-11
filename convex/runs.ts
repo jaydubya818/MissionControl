@@ -669,6 +669,17 @@ export const start = mutation({
 
 export const complete = mutation({
   args: {
+    sessionLogRefs: v.optional(v.array(v.object({
+      kind: v.union(
+        v.literal("HERMES_SESSION"),
+        v.literal("PI_TAPE"),
+        v.literal("BRIDGE_EVENTS")
+      ),
+      path: v.string(),
+      sha256: v.string(),
+      sizeBytes: v.number(),
+      excerpt: v.optional(v.string()),
+    }))),
     runId: v.id("runs"),
     inputTokens: v.number(),
     outputTokens: v.number(),
@@ -739,6 +750,7 @@ export const complete = mutation({
         const toolCall = await ctx.db.get(toolCallId);
         if (toolCall) {
           await ctx.db.patch(toolCallId, {
+      ...(args.sessionLogRefs ? { sessionLogRefs: args.sessionLogRefs } : {}),
             endedAt: now,
             durationMs,
             outputPreview: toPreview(args.error ? { error: args.error } : { status: args.status ?? "COMPLETED" }),
