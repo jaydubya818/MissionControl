@@ -2168,6 +2168,23 @@ export default defineSchema({
     
     // Metadata
     metadata: v.optional(v.any()),
+    // Compat: fields written by the local workorder-revision dev session
+    // (worktree removed 2026-07-11); declared optional so existing local
+    // data validates. Superseded when the revision concept lands properly.
+    runtime: v.optional(v.string()),
+    workOrderId: v.optional(v.string()),
+    workOrderRevisionId: v.optional(v.string()),
+    workOrderRevisionNumber: v.optional(v.number()),
+    model: v.optional(v.string()),
+    worktree: v.optional(v.string()),
+    humanInterventions: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
+    turns: v.optional(v.number()),
+    toolFailures: v.optional(v.number()),
+    policyViolations: v.optional(v.number()),
+    failureReason: v.optional(v.string()),
+    approvalId: v.optional(v.string()),
+    dispatchedBy: v.optional(v.string()),
   })
     .index("by_run_id", ["runId"])
     .index("by_workflow_id", ["workflowId"])
