@@ -751,6 +751,15 @@ export default defineSchema({
     supersedesWorkOrderId: v.optional(v.id("workOrders")),
     governancePolicyId: v.optional(v.id("governancePolicies")),
 
+    // External executor claims (Epic 18 — Pi bridge). Additive; unused by
+    // the internal workflow path.
+    claimedByAgentId: v.optional(v.id("agents")),
+    claimLeaseExpiresAt: v.optional(v.number()),
+    claimAttempt: v.optional(v.number()),
+    // Universal correlation chain (missionId/taskId/executionId/runId/
+    // bridgeRunId/hermesSessionId/pullRequestId) — merged, never erased
+    correlation: v.optional(v.any()),
+
     createdAt: v.number(),
     updatedAt: v.number(),
     metadata: v.optional(v.any()),
@@ -794,7 +803,10 @@ export default defineSchema({
       v.literal("VERIFICATION_WAIVED"),
       v.literal("VERIFICATION_STALE"),
       v.literal("GOVERNANCE_RECORDS_EXPIRED"),
-      v.literal("WORK_ORDER_ACCEPTED")
+      v.literal("WORK_ORDER_ACCEPTED"),
+      v.literal("CLAIMED"),
+      v.literal("EXECUTION_STATE"),
+      v.literal("ARTIFACT_RECORDED")
     ),
     fromState: v.optional(workOrderState),
     toState: v.optional(workOrderState),
@@ -1386,6 +1398,19 @@ export default defineSchema({
     templateId: v.optional(v.id("agentTemplates")),
     taskId: v.optional(v.id("tasks")),
     sessionKey: v.string(),
+    // Session-log references (never full logs): local path + sha256 + size,
+    // optional redacted failure excerpt (Epic 18)
+    sessionLogRefs: v.optional(v.array(v.object({
+      kind: v.union(
+        v.literal("HERMES_SESSION"),
+        v.literal("PI_TAPE"),
+        v.literal("BRIDGE_EVENTS")
+      ),
+      path: v.string(),
+      sha256: v.string(),
+      sizeBytes: v.number(),
+      excerpt: v.optional(v.string()),
+    }))),
     
     // Timing
     startedAt: v.number(),
@@ -1786,11 +1811,7 @@ export default defineSchema({
       v.literal("SOCIAL"),
       v.literal("OPS")
     ),
-    executor: v.union(
-      v.literal("CURSOR"),
-      v.literal("CLAUDE_CODE"),
-      v.literal("OPENCLAW_AGENT")
-    ),
+    executor: v.union(v.literal("CURSOR"), v.literal("CLAUDE_CODE"), v.literal("OPENCLAW_AGENT"), v.literal("PI_BRIDGE")),
     
     // Status
     status: v.union(
@@ -3262,8 +3283,11 @@ export default defineSchema({
 
     tags: v.optional(v.array(v.string())),
     metadata: v.optional(v.any()),
+    // Executor artifact dedup (Epic 18)
+    idempotencyKey: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
+    .index("by_idempotency", ["idempotencyKey"])
     .index("by_agent", ["agentId"])
     .index("by_status", ["status"])
     .index("by_task", ["taskId"])

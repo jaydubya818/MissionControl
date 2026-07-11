@@ -485,6 +485,23 @@ cmd_logs() {
     log_info "(Structured logging not yet implemented)"
 }
 
+# Command: executor
+cmd_executor() {
+    source_env
+    check_convex
+    cd "$MC_DIR"
+    case "${1:-}" in
+        smoke)
+            log_cmd "Running fake-executor contract walk..."
+            node scripts/fake-executor.mjs
+            ;;
+        *)
+            log_error "Usage: mc executor smoke"
+            exit 1
+            ;;
+    esac
+}
+
 # Command: version
 # Command: flags
 cmd_flags() {
@@ -632,6 +649,10 @@ case "${1:-help}" in
     flags)
         shift
         cmd_flags "$@"
+        ;;
+    executor)
+        shift
+        cmd_executor "$@"
         ;;
     skill)
         shift

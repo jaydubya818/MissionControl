@@ -28,7 +28,7 @@ function generateRunId(): string {
   return Math.random().toString(36).substring(2, 10);
 }
 
-async function logWorkOrderEvent(
+export async function logWorkOrderEvent(
   ctx: any,
   args: {
     workOrderId: any;
@@ -63,7 +63,10 @@ async function logWorkOrderEvent(
       | "VERIFICATION_WAIVED"
       | "VERIFICATION_STALE"
       | "GOVERNANCE_RECORDS_EXPIRED"
-      | "WORK_ORDER_ACCEPTED";
+      | "WORK_ORDER_ACCEPTED"
+      | "CLAIMED"
+      | "EXECUTION_STATE"
+      | "ARTIFACT_RECORDED";
     fromState?: string;
     toState?: string;
     actorType: "AGENT" | "HUMAN" | "SYSTEM";
