@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { deriveVerificationStatus, currentWorkflowStepLabel, totalWorkflowRetries } from "./lib/workOrders";
 import { ACTIVE_RUN_STATUSES, nextStateForRunStatus, validateDispatchable } from "./lib/workOrderDispatch";
+import { resolveFlag } from "./lib/flags";
 
 function generateRunId(): string {
   return Math.random().toString(36).substring(2, 10);
@@ -345,6 +346,18 @@ export const dispatch = mutation({
     worktree: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Feature-gated: work-order dispatch stays off until the delivery
+    // control plane is complete (docs/FEATURE_FLAGS.md)
+    const flagRows = await ctx.db
+      .query("featureFlags")
+      .withIndex("by_key", (q) => q.eq("key", "delivery.workorders"))
+      .collect();
+    if (!resolveFlag(flagRows, "delivery.workorders").enabled) {
+      throw new Error(
+        'Work-order dispatch is disabled — enable the "delivery.workorders" feature flag'
+      );
+    }
+
     const existingEvent = await ctx.db
       .query("workOrderEvents")
       .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", `${args.idempotencyKey}:dispatched`))
