@@ -6,10 +6,13 @@ import { PortfolioDashboard } from "../controlPlane/PortfolioDashboard";
 import { FleetCommander } from "../controlPlane/FleetCommander";
 import { ApprovalQueue } from "../controlPlane/ApprovalQueue";
 import { EpicCommandCenter } from "../controlPlane/EpicCommandCenter";
+import { WorkOrdersView } from "../controlPlane/WorkOrdersView";
 import type { ControlPlaneMode } from "../controlPlane/types";
+import type { Id } from "../../../../convex/_generated/dataModel";
 
 interface ControlSectionProps {
   currentView: MainView;
+  projectId: Id<"projects"> | null;
   onNavigate: (view: MainView) => void;
 }
 
@@ -26,7 +29,7 @@ function readPersistedMode(): ControlPlaneMode {
  * Currently fed by deterministic demo data (see controlPlane/demoData.ts);
  * each view renders a "Demo data" badge until runtime adapters are wired.
  */
-export function ControlSection({ currentView, onNavigate }: ControlSectionProps) {
+export function ControlSection({ currentView, projectId, onNavigate }: ControlSectionProps) {
   const [mode, setModeState] = useState<ControlPlaneMode>(readPersistedMode);
   const [selectedEpicKey, setSelectedEpicKey] = useState<string | null>(null);
 
@@ -73,6 +76,8 @@ export function ControlSection({ currentView, onNavigate }: ControlSectionProps)
   }
 
   switch (currentView) {
+    case "control-work-orders":
+      return <WorkOrdersView projectId={projectId} />;
     case "control-fleet":
       return <FleetCommander fleet={DEMO_FLEET} modeToggle={modeToggle} onSelectEpic={setSelectedEpicKey} />;
     case "control-approvals":
