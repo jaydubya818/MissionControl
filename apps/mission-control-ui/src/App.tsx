@@ -50,6 +50,9 @@ const QualitySection = lazy(() =>
 const PlatformSection = lazy(() =>
   import("./sections/PlatformSection").then((module) => ({ default: module.PlatformSection }))
 );
+const ControlSection = lazy(() =>
+  import("./sections/ControlSection").then((module) => ({ default: module.ControlSection }))
+);
 
 // ============================================================================
 // PROJECT CONTEXT
@@ -132,6 +135,7 @@ const VALID_MAIN_VIEWS: MainView[] = [
   "hybrid-workflows", "schedule", "codegen", "gherkin", "metrics", "qc-dashboard", "qc-runs",
   "qc-environments", "qc-findings", "qc-metrics", "qc-rulesets", "gateway", "live-chat", "schedules",
   "hiring", "team", "system", "radar", "factory", "pipeline", "feedback", "ops-schedule", "goals",
+  "control-portfolio", "control-fleet", "control-approvals",
 ];
 
 function readPersistedView(): MainView | null {
@@ -152,6 +156,7 @@ function readPersistedView(): MainView | null {
 
 const SECTION_DEFAULT_VIEW: Record<CommandSection, MainView> = {
   home: "home",
+  control: "control-portfolio",
   ops: "tasks",
   agents: "agents",
   chat: "chat",
@@ -165,6 +170,11 @@ const SECTION_DEFAULT_VIEW: Record<CommandSection, MainView> = {
 
 const SECTION_TABS: Record<CommandSection, TabItem[] | null> = {
   home: null,
+  control: [
+    { id: "control-portfolio", label: "Portfolio" },
+    { id: "control-fleet", label: "Fleet" },
+    { id: "control-approvals", label: "Approvals" },
+  ],
   ops: [
     { id: "tasks", label: "Tasks" },
     { id: "goals", label: "Goals" },
@@ -246,6 +256,7 @@ const SECTION_TABS: Record<CommandSection, TabItem[] | null> = {
 
 function viewToSection(view: MainView): CommandSection {
   if (view === "home") return "home";
+  if (["control-portfolio", "control-fleet", "control-approvals"].includes(view)) return "control";
   if (["tasks", "goals", "dag", "calendar", "ops-schedule", "audit", "telemetry"].includes(view)) return "ops";
   if (["atc", "agents", "directory", "identity", "policies", "deployments", "gateway", "schedules"].includes(view)) return "agents";
   if (["chat", "live-chat", "council", "command"].includes(view)) return "chat";
@@ -599,6 +610,13 @@ export default function App() {
               setSidebarSelectedAgentId(id);
               open("agentsFlyout");
             }}
+          />
+        );
+      case "control":
+        return (
+          <ControlSection
+            currentView={currentView}
+            onNavigate={setCurrentView}
           />
         );
       case "ops":

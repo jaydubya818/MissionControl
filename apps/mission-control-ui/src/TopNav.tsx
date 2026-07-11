@@ -61,11 +61,15 @@ export type MainView =
   | "pipeline"
   | "feedback"
   | "ops-schedule"
-  | "goals";
+  | "goals"
+  | "control-portfolio"
+  | "control-fleet"
+  | "control-approvals";
 
 /** Top-level command center sections */
 export type CommandSection =
   | "home"
+  | "control"
   | "ops"
   | "agents"
   | "chat"
@@ -89,6 +93,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { id: "control-portfolio", label: "Control" },
   { id: "tasks", label: "Tasks", shortcut: "1" },
   { id: "agents", label: "Agents" },
   { id: "directory", label: "Directory" },

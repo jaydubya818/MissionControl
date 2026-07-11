@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   Home,
+  Orbit,
   Crosshair,
   Bot,
   MessageSquare,
@@ -24,6 +25,7 @@ interface CommandNavItem {
 
 const navItems: CommandNavItem[] = [
   { id: "home", label: "Home", shortLabel: "Home", icon: Home },
+  { id: "control", label: "Control", shortLabel: "Ctrl", icon: Orbit },
   { id: "ops", label: "Operations", shortLabel: "Ops", icon: Crosshair },
   { id: "agents", label: "Agents", shortLabel: "Agents", icon: Bot },
   { id: "chat", label: "Chat", shortLabel: "Chat", icon: MessageSquare },
