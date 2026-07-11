@@ -30,7 +30,7 @@ interface AcceptanceCriterion {
   title: string;
   description?: string;
   verificationMethod?: "MANUAL" | "COMMAND" | "TEST" | "CHECKLIST";
-  status: "PENDING" | "PASS" | "FAIL" | "WAIVED";
+  status: "PENDING" | "PASS" | "FAIL" | "WAIVED" | "STALE";
 }
 
 interface SourceOfTruthRef {
@@ -212,12 +212,94 @@ The following entrypoints must all use this same command instead of creating run
 | `PAUSED` | `AWAITING_APPROVAL` |
 | `FAILED` | `BLOCKED` |
 | `CANCELED` | `CANCELED` |
-| `COMPLETED` + verification pass/waived | `DONE` |
-| `COMPLETED` + verification pending/fail | `AWAITING_VERIFICATION` |
+| `COMPLETED` + approval pending/revision/reject | `AWAITING_APPROVAL` |
+| `COMPLETED` + execution complete | `AWAITING_VERIFICATION` |
+
+`COMPLETED` no longer means accepted. Explicit acceptance is a separate governed command.
 
 ### Auditable lifecycle log
 
 Use `workOrderEvents` for canonical lifecycle auditing:
+
+## 7. Third-slice governance and evidence contracts
+
+### ApprovalDecision
+
+```ts
+type WorkOrderApprovalStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "CONDITIONAL"
+  | "REJECTED"
+  | "REVISION_REQUESTED"
+  | "EXPIRED"
+  | "SUPERSEDED";
+
+type WorkOrderApprovalDecision = "APPROVE" | "APPROVE_WITH_CONDITIONS" | "REJECT" | "REQUEST_REVISION";
+
+interface ApprovalDecision {
+  _id: Id<"approvalDecisions">;
+  workOrderId: Id<"workOrders">;
+  workflowRunId?: Id<"workflowRuns">;
+  approvalType: string;
+  requestedAction: string;
+  riskLevel: WorkOrderRisk;
+  requestedBy?: string;
+  approver?: string;
+  status: WorkOrderApprovalStatus;
+  decision?: WorkOrderApprovalDecision;
+  conditions?: string[];
+  reason?: string;
+  supersededByApprovalDecisionId?: Id<"approvalDecisions">;
+  createdAt: number;
+  decidedAt?: number;
+  metadata?: any;
+}
+```
+
+### VerificationReceipt
+
+```ts
+type VerificationReceiptStatus = "PENDING" | "PASSED" | "FAILED" | "WAIVED" | "STALE";
+
+interface VerificationReceipt {
+  _id: Id<"verificationReceipts">;
+  workOrderId: Id<"workOrders">;
+  acceptanceCriterionId: string;
+  workflowRunId: Id<"workflowRuns">;
+  verificationMethod?: "MANUAL" | "COMMAND" | "TEST" | "CHECKLIST";
+  commandOrCheck?: string;
+  result?: string;
+  evidenceLocation?: string;
+  artifactReference?: string;
+  verifier?: string;
+  status: VerificationReceiptStatus;
+  exceptionOrWaiver?: string;
+  waiverApprovalDecisionId?: Id<"approvalDecisions">;
+  recordedAt: number;
+  metadata?: any;
+}
+```
+
+### Explicit acceptance boundary
+
+```ts
+type AcceptWorkOrderCommand = {
+  workOrderId: Id<"workOrders">;
+  actorType: "HUMAN" | "SYSTEM" | "AGENT";
+  actorId?: string;
+  idempotencyKey: string;
+};
+```
+
+The command must reject acceptance unless:
+
+1. no active run exists
+2. the latest run is `COMPLETED`
+3. required approvals are satisfied
+4. every acceptance criterion has a non-stale receipt
+5. no receipt is failed
+6. waived criteria carry an approved waiver decision
 
 - `WORK_ORDER_CREATED`
 - `DISPATCH_REQUESTED`

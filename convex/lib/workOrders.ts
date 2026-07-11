@@ -1,16 +1,8 @@
-export type WorkOrderCriterionStatus = "PENDING" | "PASS" | "FAIL" | "WAIVED";
-
-export type WorkOrderVerificationStatus = "PENDING" | "PASS" | "FAIL" | "WAIVED";
-
-export function deriveVerificationStatus(
-  criteria: Array<{ status: WorkOrderCriterionStatus }>
-): WorkOrderVerificationStatus {
-  if (criteria.length === 0) return "PENDING";
-  if (criteria.some((criterion) => criterion.status === "FAIL")) return "FAIL";
-  if (criteria.every((criterion) => criterion.status === "WAIVED")) return "WAIVED";
-  if (criteria.every((criterion) => criterion.status === "PASS" || criterion.status === "WAIVED")) return "PASS";
-  return "PENDING";
-}
+export {
+  deriveVerificationStatus,
+  type WorkOrderCriterionStatus,
+  type WorkOrderVerificationStatus,
+} from "./workOrderGovernance";
 
 export function totalWorkflowRetries(
   steps: Array<{ retryCount: number }>

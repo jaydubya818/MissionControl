@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import type { MainView } from "../TopNav";
 import { WorkOrdersView } from "../controlPlane/WorkOrdersView";
+import { WorkOrderApprovalsView } from "../controlPlane/WorkOrderApprovalsView";
 
 interface ControlSectionProps {
   currentView: MainView;
@@ -50,6 +51,10 @@ export function ControlSection({ currentView, projectId, onNavigate }: ControlSe
 
   if (activeView === "control-work-orders") {
     return <WorkOrdersView projectId={projectId} />;
+  }
+
+  if (activeView === "control-approvals") {
+    return <WorkOrderApprovalsView projectId={projectId} />;
   }
 
   const activeCopy = VIEW_COPY[activeView];

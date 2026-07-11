@@ -9,10 +9,10 @@ export type DispatchableState =
   | "DONE"
   | "CANCELED";
 
-export type DispatchApprovalStatus = "NOT_REQUIRED" | "PENDING" | "APPROVED" | "REJECTED" | "CONDITIONAL";
+export type DispatchApprovalStatus = "NOT_REQUIRED" | "PENDING" | "APPROVED" | "REJECTED" | "CONDITIONAL" | "REVISION_REQUESTED";
 export type DispatchRiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type DispatchRunStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "PAUSED" | "CANCELED";
-export type DispatchVerificationStatus = "PENDING" | "PASS" | "FAIL" | "WAIVED";
+export type DispatchVerificationStatus = "PENDING" | "PASS" | "FAIL" | "WAIVED" | "STALE";
 
 export const ACTIVE_RUN_STATUSES: DispatchRunStatus[] = ["PENDING", "RUNNING", "PAUSED"];
 
@@ -39,7 +39,7 @@ export function validateDispatchable(args: {
   activeRunStatuses: DispatchRunStatus[];
 }): { ok: true } | { ok: false; reason: string } {
   if (!args.hasWorkflowId) return { ok: false, reason: "missing-workflow" };
-  if (!["READY", "BLOCKED", "DISPATCHED", "IN_PROGRESS"].includes(args.state)) {
+  if (!["READY", "BLOCKED", "DISPATCHED", "IN_PROGRESS", "AWAITING_APPROVAL", "AWAITING_VERIFICATION"].includes(args.state)) {
     return { ok: false, reason: `invalid-state:${args.state}` };
   }
   if (!dispatchApprovalAllowed(args)) {
@@ -55,6 +55,7 @@ export function nextStateForRunStatus(args: {
   currentState: DispatchableState;
   runStatus: DispatchRunStatus;
   verificationStatus: DispatchVerificationStatus;
+  approvalStatus: DispatchApprovalStatus | "REVISION_REQUESTED";
 }): DispatchableState {
   if (args.runStatus === "PENDING") return "DISPATCHED";
   if (args.runStatus === "RUNNING") return "IN_PROGRESS";
@@ -62,9 +63,9 @@ export function nextStateForRunStatus(args: {
   if (args.runStatus === "FAILED") return "BLOCKED";
   if (args.runStatus === "CANCELED") return "CANCELED";
   if (args.runStatus === "COMPLETED") {
-    return args.verificationStatus === "PASS" || args.verificationStatus === "WAIVED"
-      ? "DONE"
-      : "AWAITING_VERIFICATION";
+    return args.approvalStatus === "APPROVED" || args.approvalStatus === "CONDITIONAL" || args.approvalStatus === "NOT_REQUIRED"
+      ? "AWAITING_VERIFICATION"
+      : "AWAITING_APPROVAL";
   }
   return args.currentState;
 }

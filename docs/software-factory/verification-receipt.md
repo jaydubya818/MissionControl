@@ -148,7 +148,48 @@ pnpm exec tsc --noEmit -p convex/tsconfig.json
 ## Known limitations
 
 1. WorkOrder detail currently embeds run summaries rather than a dedicated Run Inspector view.
-2. Verification is represented through criterion status, not yet through a full VerificationReceipt entity/table.
-3. Approval center is not yet WorkOrder-aware.
-4. Existing portfolio/fleet control-plane surfaces remain demo-backed.
-5. `scripts/seed-workflows.ts` remains a pre-existing verification issue and was intentionally excluded from this slice; direct `workflows:upsert` was used as the workaround.
+2. Existing portfolio/fleet control-plane surfaces remain placeholder-backed.
+3. `scripts/seed-workflows.ts` remains a pre-existing verification issue and was intentionally excluded from this slice; direct `workflows:upsert` was used as the workaround.
+
+## Third slice — ApprovalDecision and VerificationReceipt traceability
+
+| Criterion | Result | Evidence |
+| --- | --- | --- |
+| Approval decisions are first-class and auditable | PASS | `convex/schema.ts`, `convex/workOrders.ts`, `apps/mission-control-ui/src/controlPlane/WorkOrderApprovalsView.tsx` |
+| Verification receipts are first-class and criterion-linked | PASS | `convex/schema.ts`, `convex/workOrders.ts`, `apps/mission-control-ui/src/controlPlane/WorkOrdersView.tsx` |
+| Run completion no longer auto-accepts WorkOrders | PASS | `convex/lib/workOrderDispatch.ts`, `convex/workOrders.ts#accept` |
+| Missing, failed, or stale receipts block acceptance | PASS | `convex/lib/workOrderGovernance.ts`, `convex/__tests__/workOrderGovernance.test.ts`, local end-to-end verification |
+| Waived criteria require auditable approval | PASS | `convex/workOrders.ts#recordVerificationReceipt`, local end-to-end verification |
+| Duplicate receipt creation is idempotent | PASS | `convex/workOrders.ts#recordVerificationReceipt`, local end-to-end verification |
+| Newer runs can make prior evidence stale | PASS | `convex/workOrders.ts#dispatch`, `convex/workOrders.ts#markReceiptsStaleForWorkOrder`, local end-to-end verification |
+| Approval Center and traceability matrix render governance state | PASS | `apps/mission-control-ui/src/controlPlane/WorkOrderApprovalsView.tsx`, `apps/mission-control-ui/src/controlPlane/WorkOrdersView.tsx` |
+
+### Additional checks executed
+
+```bash
+pnpm exec convex codegen --typecheck disable
+pnpm exec vitest run convex/__tests__/workOrderDispatch.test.ts convex/__tests__/workOrderGovernance.test.ts apps/mission-control-ui/src/controlPlane/workOrdersModel.test.ts
+pnpm run ci:typecheck
+pnpm run ci:test
+pnpm run ci:test:e2e
+pnpm exec playwright test -c playwright.config.ts --workers=1 tests/e2e/arm-ui.e2e.spec.ts tests/e2e/dashboard-smoke.e2e.spec.ts
+pnpm --filter mission-control-ui build
+pnpm exec tsc --noEmit -p convex/tsconfig.json
+pnpm --filter @mission-control/orchestration-server build
+```
+
+### Local governed acceptance evidence
+
+- approval gate error: `WorkOrder is not dispatchable (approval-required)`
+- acceptance gate error before receipts: `WorkOrder cannot be accepted (Missing receipts: ac-1)`
+- verified acceptance WorkOrder: `wd7abx34yqyq1nh5hcfn6n49vx8aaeeb` → final state `DONE`
+- waiver acceptance WorkOrder: `wd78ecnsw61p05f5yhjqx5ab0n8aa4qg` → final verification status `WAIVED`, final state `DONE`
+- stale-evidence WorkOrder: `wd76w0305pcrsr4jdchhq6vg0s8aawnc` → criterion status `STALE`, verification status `STALE`
+- idempotent receipt replay confirmed: first create `true`, second create `false`
+- lifecycle events observed include:
+  - `APPROVAL_REQUESTED`
+  - `APPROVAL_APPROVED`
+  - `VERIFICATION_FAILED`
+  - `VERIFICATION_STALE`
+  - `VERIFICATION_RECORDED`
+  - `WORK_ORDER_ACCEPTED`

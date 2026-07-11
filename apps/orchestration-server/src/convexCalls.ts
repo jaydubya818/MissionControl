@@ -22,6 +22,10 @@ export const ConvexMutations = {
   },
   workOrders: {
     dispatch: "workOrders:dispatch",
+    requestApprovalDecision: "workOrders:requestApprovalDecision",
+    decideApprovalDecision: "workOrders:decideApprovalDecision",
+    recordVerificationReceipt: "workOrders:recordVerificationReceipt",
+    accept: "workOrders:accept",
   },
   taskRouter: {
     autoAssign: "taskRouter:autoAssign",

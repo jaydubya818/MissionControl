@@ -61,6 +61,7 @@ import type * as lib_stateMachine from "../lib/stateMachine.js";
 import type * as lib_taskEvents from "../lib/taskEvents.js";
 import type * as lib_workOrderCompat from "../lib/workOrderCompat.js";
 import type * as lib_workOrderDispatch from "../lib/workOrderDispatch.js";
+import type * as lib_workOrderGovernance from "../lib/workOrderGovernance.js";
 import type * as lib_workOrders from "../lib/workOrders.js";
 import type * as loops from "../loops.js";
 import type * as meetings from "../meetings.js";
@@ -188,6 +189,7 @@ declare const fullApi: ApiFromModules<{
   "lib/taskEvents": typeof lib_taskEvents;
   "lib/workOrderCompat": typeof lib_workOrderCompat;
   "lib/workOrderDispatch": typeof lib_workOrderDispatch;
+  "lib/workOrderGovernance": typeof lib_workOrderGovernance;
   "lib/workOrders": typeof lib_workOrders;
   loops: typeof loops;
   meetings: typeof meetings;

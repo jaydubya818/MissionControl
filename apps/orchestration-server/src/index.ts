@@ -349,6 +349,86 @@ app.post("/workorders/:workOrderId/dispatch", async (c) => {
   }
 });
 
+app.post("/workorders/:workOrderId/approvals", async (c) => {
+  try {
+    const workOrderId = c.req.param("workOrderId");
+    const body = await c.req.json().catch(() => ({}));
+    const result = await client.mutation(ConvexMutations.workOrders.requestApprovalDecision as any, {
+      workOrderId,
+      workflowRunId: body.workflowRunId,
+      idempotencyKey: body.idempotencyKey ?? `orch-approval:${workOrderId}:${body.approvalType ?? "RISK_REVIEW"}`,
+      approvalType: body.approvalType ?? "RISK_REVIEW",
+      requestedAction: body.requestedAction ?? "Approve protected work-order action",
+      riskLevel: body.riskLevel,
+      requestedBy: body.requestedBy ?? "orchestration-server",
+      metadata: body.metadata,
+    });
+    return c.json({ success: true, result });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+app.post("/approval-decisions/:approvalDecisionId/decide", async (c) => {
+  try {
+    const approvalDecisionId = c.req.param("approvalDecisionId");
+    const body = await c.req.json().catch(() => ({}));
+    const result = await client.mutation(ConvexMutations.workOrders.decideApprovalDecision as any, {
+      approvalDecisionId,
+      decision: body.decision,
+      approver: body.approver ?? "orchestration-server",
+      reason: body.reason,
+      conditions: body.conditions,
+      metadata: body.metadata,
+    });
+    return c.json({ success: true, result });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+app.post("/workorders/:workOrderId/verification-receipts", async (c) => {
+  try {
+    const workOrderId = c.req.param("workOrderId");
+    const body = await c.req.json().catch(() => ({}));
+    const result = await client.mutation(ConvexMutations.workOrders.recordVerificationReceipt as any, {
+      workOrderId,
+      workflowRunId: body.workflowRunId,
+      acceptanceCriterionId: body.acceptanceCriterionId,
+      idempotencyKey: body.idempotencyKey,
+      verificationMethod: body.verificationMethod,
+      commandOrCheck: body.commandOrCheck,
+      result: body.result,
+      evidenceLocation: body.evidenceLocation,
+      artifactReference: body.artifactReference,
+      verifier: body.verifier ?? "orchestration-server",
+      status: body.status,
+      exceptionOrWaiver: body.exceptionOrWaiver,
+      waiverApprovalDecisionId: body.waiverApprovalDecisionId,
+      metadata: body.metadata,
+    });
+    return c.json({ success: true, result });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+app.post("/workorders/:workOrderId/accept", async (c) => {
+  try {
+    const workOrderId = c.req.param("workOrderId");
+    const body = await c.req.json().catch(() => ({}));
+    const result = await client.mutation(ConvexMutations.workOrders.accept as any, {
+      workOrderId,
+      actorType: body.actorType ?? "SYSTEM",
+      actorId: body.actorId ?? "orchestration-server",
+      idempotencyKey: body.idempotencyKey ?? `orch-accept:${workOrderId}`,
+    });
+    return c.json({ success: true, result });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
 // List available personas
 app.get("/agents/personas", (c) => {
   try {

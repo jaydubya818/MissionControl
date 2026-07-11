@@ -45,6 +45,24 @@ Implement:
 7. UI, CLI, and orchestration adoption of the same dispatch boundary
 8. concurrency/lifecycle tests
 
+## Third thin vertical slice
+
+Implement:
+
+**WorkOrder-aware ApprovalDecision and VerificationReceipt traceability**
+
+### Scope
+
+1. first-class `approvalDecisions`
+2. first-class `verificationReceipts`
+3. explicit `workOrders.accept` command
+4. acceptance gating from approvals plus verification coverage
+5. stale-evidence supersession on new runs
+6. control-plane Approval Center
+7. WorkOrder verification traceability matrix
+8. CLI and orchestration entrypoints for acceptance/governance flows
+9. lifecycle and governance tests
+
 ## Why this slice first
 
 Because it establishes the correct domain boundary without requiring a platform rewrite:
@@ -53,6 +71,15 @@ Because it establishes the correct domain boundary without requiring a platform 
 - execution stays governed by existing workflow/run infrastructure
 - operator can inspect value request and execution together
 - future approvals, verification, and analytics have a stable anchor
+
+## Why this slice next
+
+Because run completion alone is not enough to prove delivery:
+
+- business acceptance must remain explicit
+- approvals need a WorkOrder-native audit trail
+- verification evidence must map criterion-by-criterion
+- operators need one place to see what still blocks acceptance
 
 ## Scope for slice one
 

@@ -102,7 +102,8 @@ const verificationStatus = v.union(
   v.literal("PENDING"),
   v.literal("PASS"),
   v.literal("FAIL"),
-  v.literal("WAIVED")
+  v.literal("WAIVED"),
+  v.literal("STALE")
 );
 
 const approvalDecisionStatus = v.union(
@@ -110,7 +111,33 @@ const approvalDecisionStatus = v.union(
   v.literal("PENDING"),
   v.literal("APPROVED"),
   v.literal("REJECTED"),
-  v.literal("CONDITIONAL")
+  v.literal("CONDITIONAL"),
+  v.literal("REVISION_REQUESTED")
+);
+
+const workOrderApprovalDecisionStatus = v.union(
+  v.literal("PENDING"),
+  v.literal("APPROVED"),
+  v.literal("CONDITIONAL"),
+  v.literal("REJECTED"),
+  v.literal("REVISION_REQUESTED"),
+  v.literal("EXPIRED"),
+  v.literal("SUPERSEDED")
+);
+
+const workOrderApprovalDecisionAction = v.union(
+  v.literal("APPROVE"),
+  v.literal("APPROVE_WITH_CONDITIONS"),
+  v.literal("REJECT"),
+  v.literal("REQUEST_REVISION")
+);
+
+const verificationReceiptStatus = v.union(
+  v.literal("PENDING"),
+  v.literal("PASSED"),
+  v.literal("FAILED"),
+  v.literal("WAIVED"),
+  v.literal("STALE")
 );
 
 const reviewType = v.union(
@@ -651,7 +678,19 @@ export default defineSchema({
       v.literal("RUN_FAILED"),
       v.literal("RUN_CANCELED"),
       v.literal("RUN_RETRIED"),
-      v.literal("STATE_SYNCED")
+      v.literal("STATE_SYNCED"),
+      v.literal("APPROVAL_REQUESTED"),
+      v.literal("APPROVAL_APPROVED"),
+      v.literal("APPROVAL_CONDITIONAL"),
+      v.literal("APPROVAL_REJECTED"),
+      v.literal("APPROVAL_REVISION_REQUESTED"),
+      v.literal("APPROVAL_EXPIRED"),
+      v.literal("APPROVAL_SUPERSEDED"),
+      v.literal("VERIFICATION_RECORDED"),
+      v.literal("VERIFICATION_FAILED"),
+      v.literal("VERIFICATION_WAIVED"),
+      v.literal("VERIFICATION_STALE"),
+      v.literal("WORK_ORDER_ACCEPTED")
     ),
     fromState: v.optional(workOrderState),
     toState: v.optional(workOrderState),
@@ -663,6 +702,61 @@ export default defineSchema({
   })
     .index("by_work_order", ["workOrderId"])
     .index("by_project", ["projectId"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  approvalDecisions: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.optional(v.id("workflowRuns")),
+    idempotencyKey: v.optional(v.string()),
+    approvalType: v.string(),
+    requestedAction: v.string(),
+    riskLevel: workOrderRiskLevel,
+    requestedBy: v.optional(v.string()),
+    approver: v.optional(v.string()),
+    status: workOrderApprovalDecisionStatus,
+    decision: v.optional(workOrderApprovalDecisionAction),
+    conditions: v.optional(v.array(v.string())),
+    reason: v.optional(v.string()),
+    supersededByApprovalDecisionId: v.optional(v.id("approvalDecisions")),
+    createdAt: v.number(),
+    decidedAt: v.optional(v.number()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_work_order", ["workOrderId"])
+    .index("by_work_order_status", ["workOrderId", "status"])
+    .index("by_project_status", ["projectId", "status"])
+    .index("by_run", ["workflowRunId"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  verificationReceipts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    workOrderId: v.id("workOrders"),
+    acceptanceCriterionId: v.string(),
+    workflowRunId: v.id("workflowRuns"),
+    idempotencyKey: v.optional(v.string()),
+    verificationMethod: v.optional(v.union(
+      v.literal("MANUAL"),
+      v.literal("COMMAND"),
+      v.literal("TEST"),
+      v.literal("CHECKLIST")
+    )),
+    commandOrCheck: v.optional(v.string()),
+    result: v.optional(v.string()),
+    evidenceLocation: v.optional(v.string()),
+    artifactReference: v.optional(v.string()),
+    verifier: v.optional(v.string()),
+    status: verificationReceiptStatus,
+    exceptionOrWaiver: v.optional(v.string()),
+    waiverApprovalDecisionId: v.optional(v.id("approvalDecisions")),
+    recordedAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_work_order", ["workOrderId"])
+    .index("by_work_order_criterion", ["workOrderId", "acceptanceCriterionId"])
+    .index("by_run", ["workflowRunId"])
     .index("by_idempotency", ["idempotencyKey"]),
 
   // -------------------------------------------------------------------------

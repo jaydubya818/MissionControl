@@ -54,6 +54,18 @@ describe("work order dispatch policy", () => {
 
     expect(result).toEqual({ ok: false, reason: "missing-workflow" });
   });
+
+  it("allows redispatch from awaiting verification when no active run exists", () => {
+    const result = validateDispatchable({
+      state: "AWAITING_VERIFICATION",
+      riskLevel: "LOW",
+      approvalStatus: "NOT_REQUIRED",
+      hasWorkflowId: true,
+      activeRunStatuses: [],
+    });
+
+    expect(result).toEqual({ ok: true });
+  });
 });
 
 describe("work order lifecycle synchronization", () => {
@@ -63,8 +75,9 @@ describe("work order lifecycle synchronization", () => {
         currentState: "IN_PROGRESS",
         runStatus: "COMPLETED",
         verificationStatus: "PASS",
+        approvalStatus: "APPROVED",
       })
-    ).toBe("DONE");
+    ).toBe("AWAITING_VERIFICATION");
   });
 
   it("moves completed but unverified work to AWAITING_VERIFICATION", () => {
@@ -73,8 +86,20 @@ describe("work order lifecycle synchronization", () => {
         currentState: "IN_PROGRESS",
         runStatus: "COMPLETED",
         verificationStatus: "PENDING",
+        approvalStatus: "APPROVED",
       })
     ).toBe("AWAITING_VERIFICATION");
+  });
+
+  it("moves completed but unapproved work to AWAITING_APPROVAL", () => {
+    expect(
+      nextStateForRunStatus({
+        currentState: "IN_PROGRESS",
+        runStatus: "COMPLETED",
+        verificationStatus: "PASS",
+        approvalStatus: "PENDING",
+      })
+    ).toBe("AWAITING_APPROVAL");
   });
 
   it("moves failed work to BLOCKED", () => {
@@ -83,6 +108,7 @@ describe("work order lifecycle synchronization", () => {
         currentState: "IN_PROGRESS",
         runStatus: "FAILED",
         verificationStatus: "PENDING",
+        approvalStatus: "PENDING",
       })
     ).toBe("BLOCKED");
   });
@@ -93,6 +119,7 @@ describe("work order lifecycle synchronization", () => {
         currentState: "DISPATCHED",
         runStatus: "CANCELED",
         verificationStatus: "PENDING",
+        approvalStatus: "PENDING",
       })
     ).toBe("CANCELED");
   });
@@ -103,6 +130,7 @@ describe("work order lifecycle synchronization", () => {
         currentState: "IN_PROGRESS",
         runStatus: "PAUSED",
         verificationStatus: "PENDING",
+        approvalStatus: "PENDING",
       })
     ).toBe("AWAITING_APPROVAL");
   });

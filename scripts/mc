@@ -43,6 +43,8 @@ COMMANDS:
     run <workflow>      Run a workflow by name
     dispatch <workOrderId> [workflowId]
                         Dispatch a WorkOrder through the governed server-side boundary
+    accept <workOrderId>
+                        Accept a WorkOrder once approvals and verification are satisfied
     tasks [status]      List tasks (default: INBOX)
     claim               Claim next available task
     logs [run-id]       Show logs for a run
@@ -54,6 +56,7 @@ EXAMPLES:
     mc doctor                           # Quick health check
     mc run feature-dev "Add OAuth"      # Start workflow
     mc dispatch wd711... feature-dev    # Dispatch a WorkOrder
+    mc accept wd711...                  # Accept a WorkOrder
     mc tasks INBOX                      # List inbox tasks
     mc claim                            # Claim next task
     mc logs run_abc123                  # Show run logs
@@ -210,6 +213,42 @@ EOF
     echo "$result"
 }
 
+# Command: accept
+cmd_accept() {
+    source_env
+    check_convex
+
+    local work_order_id="${1:-}"
+
+    if [[ -z "$work_order_id" ]]; then
+        log_error "WorkOrder ID required"
+        log_info "Usage: mc accept <workOrderId>"
+        exit 1
+    fi
+
+    log_cmd "Accepting WorkOrder: $work_order_id"
+
+    cd "$MC_DIR"
+    local payload
+    payload=$(cat <<EOF
+{
+  "workOrderId": "$work_order_id",
+  "actorType": "HUMAN",
+  "actorId": "mc-cli",
+  "idempotencyKey": "mc-accept-${work_order_id}-$(date +%s)"
+}
+EOF
+)
+
+    local result
+    result=$(npx convex run api.workOrders.accept "$payload" 2>/dev/null) || {
+        log_error "Failed to accept WorkOrder"
+        exit 1
+    }
+
+    echo "$result"
+}
+
 # Command: tasks
 cmd_tasks() {
     source_env
@@ -295,6 +334,10 @@ case "${1:-help}" in
     dispatch)
         shift
         cmd_dispatch "$@"
+        ;;
+    accept)
+        shift
+        cmd_accept "$@"
         ;;
     tasks)
         shift
