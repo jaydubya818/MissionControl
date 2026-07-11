@@ -20,6 +20,9 @@ export const ConvexMutations = {
   tasks: {
     create: "tasks:create",
   },
+  workOrders: {
+    dispatch: "workOrders:dispatch",
+  },
   taskRouter: {
     autoAssign: "taskRouter:autoAssign",
   },

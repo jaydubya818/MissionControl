@@ -6,6 +6,7 @@
 
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { appendOpEvent } from "./lib/armAudit";
 import { resolveAgentRef } from "./lib/agentResolver";
 
@@ -136,8 +137,12 @@ export const start = mutation({
   args: {
     workflowId: v.string(),
     projectId: v.optional(v.id("projects")),
+    workOrderId: v.optional(v.id("workOrders")),
     parentTaskId: v.optional(v.id("tasks")),
     initialInput: v.string(),
+    runtime: v.optional(v.string()),
+    model: v.optional(v.string()),
+    worktree: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Get workflow definition
@@ -175,6 +180,7 @@ export const start = mutation({
       runId,
       workflowId: args.workflowId,
       projectId: args.projectId,
+      workOrderId: args.workOrderId,
       parentTaskId: args.parentTaskId,
       status: "PENDING",
       currentStepIndex: 0,
@@ -182,6 +188,9 @@ export const start = mutation({
       steps,
       context: { task: args.initialInput },
       initialInput: args.initialInput,
+      runtime: args.runtime,
+      model: args.model,
+      worktree: args.worktree,
       startedAt: now,
     });
     await appendOpEvent(ctx.db as any, {
@@ -227,6 +236,7 @@ export const updateStep = internalMutation({
     agentId: v.optional(v.id("agents")),
     error: v.optional(v.string()),
     output: v.optional(v.string()),
+    failureReason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const run = await ctx.db
@@ -259,11 +269,22 @@ export const updateStep = internalMutation({
       output: args.output ?? step.output,
     };
     
-    await ctx.db.patch(run._id, { steps });
+    await ctx.db.patch(run._id, {
+      steps,
+      failureReason: args.failureReason ?? (args.status === "FAILED" ? args.error : run.failureReason),
+    });
     const instanceRef = args.agentId
       ? await resolveAgentRef({ db: ctx.db as any }, { agentId: args.agentId, createIfMissing: true })
       : null;
     if (args.status === "RUNNING") {
+      await ctx.db.patch(run._id, { status: "RUNNING" });
+      if (run.workOrderId) {
+        await ctx.runMutation(internal.workOrders.syncExecutionOutcome, {
+          workflowRunId: run._id,
+          eventType: "STATE_SYNCED",
+          summary: `Workflow run ${run.runId} is running`,
+        });
+      }
       await appendOpEvent(ctx.db as any, {
         tenantId: run.tenantId,
         projectId: run.projectId,
@@ -294,6 +315,14 @@ export const updateStep = internalMutation({
         },
       });
     } else if (args.status === "FAILED") {
+      await ctx.db.patch(run._id, { status: "FAILED", completedAt: now, failureReason: args.failureReason ?? args.error ?? run.failureReason });
+      if (run.workOrderId) {
+        await ctx.runMutation(internal.workOrders.syncExecutionOutcome, {
+          workflowRunId: run._id,
+          eventType: "RUN_FAILED",
+          summary: args.error ?? `Workflow run ${run.runId} failed`,
+        });
+      }
       await appendOpEvent(ctx.db as any, {
         tenantId: run.tenantId,
         projectId: run.projectId,
@@ -340,6 +369,14 @@ export const advance = internalMutation({
         status: "COMPLETED",
         completedAt: Date.now(),
       });
+
+      if (run.workOrderId) {
+        await ctx.runMutation(internal.workOrders.syncExecutionOutcome, {
+          workflowRunId: run._id,
+          eventType: "RUN_COMPLETED",
+          summary: `Workflow run ${run.runId} completed`,
+        });
+      }
       
       return { complete: true };
     }
@@ -360,6 +397,7 @@ export const updateStatus = mutation({
   args: {
     runId: v.string(),
     status: v.string(),
+    failureReason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const run = await ctx.db
@@ -374,12 +412,35 @@ export const updateStatus = mutation({
     const updates: any = {
       status: args.status,
     };
+
+    if (args.failureReason !== undefined) {
+      updates.failureReason = args.failureReason;
+    }
     
     if (args.status === "COMPLETED" || args.status === "FAILED") {
       updates.completedAt = Date.now();
     }
+
+    if (args.status === "CANCELED") {
+      updates.completedAt = Date.now();
+    }
     
     await ctx.db.patch(run._id, updates);
+
+    if (run.workOrderId) {
+      await ctx.runMutation(internal.workOrders.syncExecutionOutcome, {
+        workflowRunId: run._id,
+        eventType:
+          args.status === "COMPLETED"
+            ? "RUN_COMPLETED"
+            : args.status === "FAILED"
+              ? "RUN_FAILED"
+              : args.status === "CANCELED"
+                ? "RUN_CANCELED"
+                : "STATE_SYNCED",
+        summary: `Workflow run ${run.runId} status changed to ${args.status}`,
+      });
+    }
     
     return { success: true };
   },
@@ -442,6 +503,12 @@ export const incrementRetry = internalMutation({
     };
     
     await ctx.db.patch(run._id, { steps });
+
+    if (run.workOrderId) {
+      await ctx.runMutation(internal.workOrders.recordRetry, {
+        workflowRunId: run._id,
+      });
+    }
     
     return { retryCount: steps[args.stepIndex].retryCount };
   },

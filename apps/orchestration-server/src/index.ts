@@ -266,6 +266,7 @@ app.get("/health", (c) => {
 app.use("/status", requireAuth());
 app.use("/tick", requireAuth());
 app.use("/agents/*", requireAuth());
+app.use("/workorders/*", requireAuth());
 
 // Detailed status
 app.get("/status", (c) => {
@@ -322,6 +323,27 @@ app.post("/agents/stop", async (c) => {
     }
     await stopAgent(personaName);
     return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+// Authoritative work-order dispatch path for orchestration consumers
+app.post("/workorders/:workOrderId/dispatch", async (c) => {
+  try {
+    const workOrderId = c.req.param("workOrderId");
+    const body = await c.req.json().catch(() => ({}));
+    const result = await client.mutation(ConvexMutations.workOrders.dispatch as any, {
+      workOrderId,
+      workflowId: body.workflowId,
+      actorType: body.actorType ?? "SYSTEM",
+      actorId: body.actorId ?? "orchestration-server",
+      idempotencyKey: body.idempotencyKey ?? `orch-dispatch:${workOrderId}`,
+      runtime: body.runtime ?? "Hono Orchestration Server",
+      model: body.model,
+      worktree: body.worktree,
+    });
+    return c.json({ success: true, result });
   } catch (err: any) {
     return c.json({ error: err.message }, 400);
   }
