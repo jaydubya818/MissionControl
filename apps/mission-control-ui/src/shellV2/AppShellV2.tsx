@@ -7,6 +7,7 @@ import { groupForView, itemForView, allNavViews } from "./navConfig";
 import { EOS_NAV_GROUPS } from "./eosNavConfig";
 import { useFlag } from "../hooks/useFlag";
 import { registerEosNavigate } from "../eos/skillSelection";
+import { EOS_VIEWS } from "../eos/EosSection";
 import { Breadcrumbs } from "../components/factory/Breadcrumbs";
 import { cn } from "../lib/utils";
 
@@ -61,6 +62,7 @@ export function AppShellV2({
         ...new Set([
           ...activeGroups.flatMap((g) => g.items.map((i) => i.view as string)),
           ...allNavViews(),
+          ...EOS_VIEWS,
         ]),
       ]
     : (allNavViews() as string[]);
