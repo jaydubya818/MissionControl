@@ -79,6 +79,40 @@ const riskLevel = v.union(
   v.literal("RED")
 );
 
+const workOrderRiskLevel = v.union(
+  v.literal("LOW"),
+  v.literal("MEDIUM"),
+  v.literal("HIGH"),
+  v.literal("CRITICAL")
+);
+
+const workOrderState = v.union(
+  v.literal("DRAFT"),
+  v.literal("READY"),
+  v.literal("DISPATCHED"),
+  v.literal("IN_PROGRESS"),
+  v.literal("BLOCKED"),
+  v.literal("AWAITING_APPROVAL"),
+  v.literal("AWAITING_VERIFICATION"),
+  v.literal("DONE"),
+  v.literal("CANCELED")
+);
+
+const verificationStatus = v.union(
+  v.literal("PENDING"),
+  v.literal("PASS"),
+  v.literal("FAIL"),
+  v.literal("WAIVED")
+);
+
+const approvalDecisionStatus = v.union(
+  v.literal("NOT_REQUIRED"),
+  v.literal("PENDING"),
+  v.literal("APPROVED"),
+  v.literal("REJECTED"),
+  v.literal("CONDITIONAL")
+);
+
 const reviewType = v.union(
   v.literal("PRAISE"),
   v.literal("REFUTE"),
@@ -571,6 +605,112 @@ export default defineSchema({
     .index("by_tenant_slug", ["tenantId", "slug"]),
 
   // -------------------------------------------------------------------------
+  // SOFTWARE FACTORY: WORK ORDERS
+  // -------------------------------------------------------------------------
+  workOrders: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    legacyTaskId: v.optional(v.id("tasks")),
+    idempotencyKey: v.optional(v.string()),
+
+    title: v.string(),
+    desiredOutcome: v.string(),
+    context: v.optional(v.string()),
+    workflowId: v.optional(v.string()),
+    repository: v.optional(v.string()),
+    branchStrategy: v.optional(v.string()),
+    priority: taskPriority,
+    riskLevel: workOrderRiskLevel,
+    requestedBy: v.optional(v.string()),
+    assignedAgent: v.optional(v.string()),
+    assignedSquad: v.optional(v.string()),
+
+    acceptanceCriteria: v.array(v.object({
+      id: v.string(),
+      title: v.string(),
+      description: v.optional(v.string()),
+      verificationMethod: v.optional(v.union(
+        v.literal("MANUAL"),
+        v.literal("COMMAND"),
+        v.literal("TEST"),
+        v.literal("CHECKLIST")
+      )),
+      status: verificationStatus,
+    })),
+
+    constraints: v.optional(v.array(v.string())),
+    dependencies: v.optional(v.array(v.string())),
+    sourceOfTruthRefs: v.optional(v.array(v.object({
+      kind: v.union(
+        v.literal("REPO"),
+        v.literal("DOC"),
+        v.literal("PRD"),
+        v.literal("ISSUE"),
+        v.literal("URL")
+      ),
+      label: v.string(),
+      location: v.string(),
+    }))),
+    requiredApprovals: v.optional(v.array(v.string())),
+
+    state: workOrderState,
+    verificationStatus,
+    approvalStatus: approvalDecisionStatus,
+    blockingIssue: v.optional(v.string()),
+    requiredHumanAction: v.optional(v.string()),
+    currentExecutionRunId: v.optional(v.id("workflowRuns")),
+
+    // External executor claims (Epic 18 — Pi bridge). Additive; unused by
+    // the internal workflow path.
+    claimedByAgentId: v.optional(v.id("agents")),
+    claimLeaseExpiresAt: v.optional(v.number()),
+    claimAttempt: v.optional(v.number()),
+    // Universal correlation chain (missionId/taskId/executionId/runId/
+    // bridgeRunId/hermesSessionId/pullRequestId) — merged, never erased
+    correlation: v.optional(v.any()),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_state", ["projectId", "state"])
+    .index("by_project_risk", ["projectId", "riskLevel"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  workOrderEvents: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.optional(v.id("workflowRuns")),
+    idempotencyKey: v.optional(v.string()),
+    eventType: v.union(
+      v.literal("WORK_ORDER_CREATED"),
+      v.literal("DISPATCH_REQUESTED"),
+      v.literal("DISPATCHED"),
+      v.literal("RUN_COMPLETED"),
+      v.literal("RUN_FAILED"),
+      v.literal("RUN_CANCELED"),
+      v.literal("RUN_RETRIED"),
+      v.literal("STATE_SYNCED"),
+      v.literal("CLAIMED"),
+      v.literal("EXECUTION_STATE"),
+      v.literal("ARTIFACT_RECORDED"),
+      v.literal("VERIFICATION_RECORDED")
+    ),
+    fromState: v.optional(workOrderState),
+    toState: v.optional(workOrderState),
+    actorType: actorType,
+    actorId: v.optional(v.string()),
+    summary: v.string(),
+    timestamp: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_work_order", ["workOrderId"])
+    .index("by_project", ["projectId"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  // -------------------------------------------------------------------------
   // AGENTS
   // -------------------------------------------------------------------------
   agents: defineTable({
@@ -925,6 +1065,19 @@ export default defineSchema({
     templateId: v.optional(v.id("agentTemplates")),
     taskId: v.optional(v.id("tasks")),
     sessionKey: v.string(),
+    // Session-log references (never full logs): local path + sha256 + size,
+    // optional redacted failure excerpt (Epic 18)
+    sessionLogRefs: v.optional(v.array(v.object({
+      kind: v.union(
+        v.literal("HERMES_SESSION"),
+        v.literal("PI_TAPE"),
+        v.literal("BRIDGE_EVENTS")
+      ),
+      path: v.string(),
+      sha256: v.string(),
+      sizeBytes: v.number(),
+      excerpt: v.optional(v.string()),
+    }))),
     
     // Timing
     startedAt: v.number(),
@@ -1325,11 +1478,7 @@ export default defineSchema({
       v.literal("SOCIAL"),
       v.literal("OPS")
     ),
-    executor: v.union(
-      v.literal("CURSOR"),
-      v.literal("CLAUDE_CODE"),
-      v.literal("OPENCLAW_AGENT")
-    ),
+    executor: v.union(v.literal("CURSOR"), v.literal("CLAUDE_CODE"), v.literal("OPENCLAW_AGENT"), v.literal("PI_BRIDGE")),
     
     // Status
     status: v.union(
@@ -2121,6 +2270,7 @@ export default defineSchema({
     runId: v.string(), // Short ID for CLI/UI display
     workflowId: v.string(),
     projectId: v.optional(v.id("projects")),
+    workOrderId: v.optional(v.id("workOrders")),
     
     // Parent task
     parentTaskId: v.optional(v.id("tasks")),
@@ -2131,7 +2281,8 @@ export default defineSchema({
       v.literal("RUNNING"),
       v.literal("COMPLETED"),
       v.literal("FAILED"),
-      v.literal("PAUSED")
+      v.literal("PAUSED"),
+      v.literal("CANCELED")
     ),
     
     // Progress
@@ -2161,6 +2312,13 @@ export default defineSchema({
     
     // Initial input
     initialInput: v.string(),
+
+    // Execution environment
+    runtime: v.optional(v.string()),
+    model: v.optional(v.string()),
+    worktree: v.optional(v.string()),
+    failureReason: v.optional(v.string()),
+    humanInterventions: v.optional(v.number()),
     
     // Timing
     startedAt: v.number(),
@@ -2172,6 +2330,7 @@ export default defineSchema({
     .index("by_run_id", ["runId"])
     .index("by_workflow_id", ["workflowId"])
     .index("by_project", ["projectId"])
+    .index("by_work_order", ["workOrderId"])
     .index("by_status", ["status"])
     .index("by_parent_task", ["parentTaskId"])
     .index("by_project_status", ["projectId", "status"]),
@@ -2789,8 +2948,11 @@ export default defineSchema({
 
     tags: v.optional(v.array(v.string())),
     metadata: v.optional(v.any()),
+    // Executor artifact dedup (Epic 18)
+    idempotencyKey: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
+    .index("by_idempotency", ["idempotencyKey"])
     .index("by_agent", ["agentId"])
     .index("by_status", ["status"])
     .index("by_task", ["taskId"])

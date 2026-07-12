@@ -41,6 +41,8 @@ COMMANDS:
     doctor              Run health checks (smoke test)
     status              Show system status
     run <workflow>      Run a workflow by name
+    dispatch <workOrderId> [workflowId]
+                        Dispatch a WorkOrder through the governed server-side boundary
     tasks [status]      List tasks (default: INBOX)
     claim               Claim next available task
     logs [run-id]       Show logs for a run
@@ -55,6 +57,7 @@ COMMANDS:
 EXAMPLES:
     mc doctor                           # Quick health check
     mc run feature-dev "Add OAuth"      # Start workflow
+    mc dispatch wd711... feature-dev    # Dispatch a WorkOrder
     mc tasks INBOX                      # List inbox tasks
     mc claim                            # Claim next task
     mc logs run_abc123                  # Show run logs
@@ -152,20 +155,63 @@ cmd_run() {
     
     cd "$MC_DIR"
     local result
-    result=$(npx convex run api.workflowRuns.create "{
+    result=$(npx convex run api.workflowRuns.start "{
         \"workflowId\": \"$workflow\",
-        \"initialInput\": \"$goal\",
-        \"context\": { \"source\": \"mc-cli\", \"createdAt\": $(date +%s) }
+        \"initialInput\": \"$goal\"
     }" 2>/dev/null) || {
         log_error "Failed to create workflow run"
         exit 1
     }
     
     local run_id
-    run_id=$(echo "$result" | grep -o '"_id": "[^"]*"' | head -1 | cut -d'"' -f4)
+    run_id=$(echo "$result" | grep -o '"runId": "[^"]*"' | head -1 | cut -d'"' -f4)
     
     log_info "Workflow run created: $run_id"
     log_info "View at: http://localhost:5173"
+}
+
+# Command: dispatch
+cmd_dispatch() {
+    source_env
+    check_convex
+
+    local work_order_id="${1:-}"
+    local workflow_id="${2:-}"
+
+    if [[ -z "$work_order_id" ]]; then
+        log_error "WorkOrder ID required"
+        log_info "Usage: mc dispatch <workOrderId> [workflowId]"
+        exit 1
+    fi
+
+    local dispatch_key="mc-dispatch-${work_order_id}-$(date +%s)"
+    local workflow_json="null"
+    if [[ -n "$workflow_id" ]]; then
+        workflow_json="\"$workflow_id\""
+    fi
+    log_cmd "Dispatching WorkOrder: $work_order_id"
+
+    cd "$MC_DIR"
+    local payload
+    payload=$(cat <<EOF
+{
+  "workOrderId": "$work_order_id",
+  "workflowId": $workflow_json,
+  "actorType": "HUMAN",
+  "actorId": "mc-cli",
+  "idempotencyKey": "$dispatch_key",
+  "runtime": "mc CLI"
+}
+EOF
+)
+
+    local result
+    result=$(npx convex run api.workOrders.dispatch "$payload" 2>/dev/null) || {
+        log_error "Failed to dispatch WorkOrder"
+        exit 1
+    }
+
+    echo "$result"
 }
 
 # Command: tasks
@@ -287,6 +333,23 @@ cmd_skill() {
     esac
 }
 
+# Command: executor
+cmd_executor() {
+    source_env
+    check_convex
+    cd "$MC_DIR"
+    case "${1:-}" in
+        smoke)
+            log_cmd "Running fake-executor contract walk..."
+            node scripts/fake-executor.mjs
+            ;;
+        *)
+            log_error "Usage: mc executor smoke"
+            exit 1
+            ;;
+    esac
+}
+
 # Command: context
 cmd_context() {
     # Dist auto-build and all subcommand logic live in mc-context.mjs
@@ -308,6 +371,10 @@ case "${1:-help}" in
     run)
         shift
         cmd_run "$@"
+        ;;
+    dispatch)
+        shift
+        cmd_dispatch "$@"
         ;;
     tasks)
         shift
@@ -340,6 +407,10 @@ case "${1:-help}" in
     context)
         shift
         cmd_context "$@"
+        ;;
+    executor)
+        shift
+        cmd_executor "$@"
         ;;
     version|--version|-v)
         cmd_version
