@@ -134,6 +134,7 @@ const VALID_MAIN_VIEWS: MainView[] = [
   "hybrid-workflows", "schedule", "codegen", "gherkin", "metrics", "qc-dashboard", "qc-runs",
   "qc-environments", "qc-findings", "qc-metrics", "qc-rulesets", "gateway", "live-chat", "schedules",
   "hiring", "team", "system", "radar", "factory", "pipeline", "feedback", "ops-schedule", "goals",
+  "analytics",
 ];
 
 function readPersistedView(): MainView | null {
@@ -243,6 +244,7 @@ const SECTION_TABS: Record<CommandSection, TabItem[] | null> = {
     { id: "factory", label: "Factory" },
     { id: "pipeline", label: "Build Pipeline" },
     { id: "feedback", label: "Feedback" },
+    { id: "analytics", label: "Analytics" },
   ],
 };
 
@@ -255,7 +257,7 @@ function viewToSection(view: MainView): CommandSection {
   if (["qc-dashboard", "qc-runs", "qc-environments", "qc-findings", "qc-metrics", "qc-rulesets"].includes(view)) return "quality";
   if (["telegraph", "meetings", "voice", "people", "org", "office", "live-office", "crm", "hiring", "team"].includes(view)) return "comms";
   if (["docs", "design-system", "skills", "search", "memory"].includes(view)) return "knowledge";
-  if (["system", "radar", "factory", "pipeline", "feedback"].includes(view)) return "platform";
+  if (["system", "radar", "factory", "pipeline", "feedback", "analytics"].includes(view)) return "platform";
   if ([
     "code", "recorder", "test-generation", "api-import", "execution",
     "flaky-steps", "hybrid-workflows", "schedule", "codegen", "gherkin", "metrics",

@@ -61,7 +61,8 @@ export type MainView =
   | "pipeline"
   | "feedback"
   | "ops-schedule"
-  | "goals";
+  | "goals"
+  | "analytics";
 
 /** Top-level command center sections */
 export type CommandSection =

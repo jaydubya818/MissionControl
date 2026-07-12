@@ -104,6 +104,7 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: Gauge,
     items: [
       { view: "telemetry", label: "Telemetry", icon: Activity },
+      { view: "analytics", label: "Analytics", icon: BarChart3 },
       { view: "metrics", label: "Metrics", icon: BarChart3 },
       { view: "qc-dashboard", label: "QC Dashboard", icon: Gauge },
       { view: "qc-runs", label: "QC Runs", icon: FlaskConical },

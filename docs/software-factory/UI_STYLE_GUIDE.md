@@ -24,6 +24,7 @@ glass. If a element can't justify its decoration, it loses it.
 - Colors: `text-ink` (primary), `text-ink-secondary`, `text-ink-muted` only.
 - Scale: 26 page title · 19 section title · 15 card title (semibold) · 13.5 body · 12.5 meta · 11.5 micro-labels.
 - Uppercase + tracking only for: table headers, rail section labels (11–11.5px, `text-ink-muted`). Nowhere else.
+- Exception: overview/landing surfaces may use a mono green category eyebrow (`font-mono text-[11px] uppercase tracking-[0.14em] text-ok`) above a section title when it adds information (e.g. FLEET, GOVERNANCE) — never restating the heading.
 - `font-mono` only for: code, hashes, ids, keys, scores, terminal output.
 - No kickers, no emoji in UI chrome/copy, no full-sentence display headlines.
 
