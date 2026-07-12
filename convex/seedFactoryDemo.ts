@@ -25,7 +25,9 @@ const FLAG_ACTOR = "sf-demo-seed";
 const QUOTA_TIER_PREFIX = "sf-demo/";
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
-const NOW = Date.now();
+// Set at the start of every handler — module-scope Date.now() is frozen
+// by Convex at module init and produced month-old timestamps.
+let NOW = 0;
 
 const DEMO_FLAGS = [
   "ui.shell.v2",
@@ -1021,6 +1023,7 @@ async function doClear(ctx: MutationCtx): Promise<Record<string, number>> {
 export const run = mutation({
   args: { force: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
+    NOW = Date.now();
     const existing = await findDemoProject(ctx);
     if (existing && !args.force) {
       return {
@@ -1038,6 +1041,7 @@ export const run = mutation({
 export const clear = mutation({
   args: {},
   handler: async (ctx) => {
+    NOW = Date.now();
     const removed = await doClear(ctx);
     const total = Object.values(removed).reduce((a, b) => a + b, 0);
     return { status: "cleared", seedTag: SEED_TAG, totalRemoved: total, removed };
@@ -1047,6 +1051,7 @@ export const clear = mutation({
 export const status = query({
   args: {},
   handler: async (ctx) => {
+    NOW = Date.now();
     const project = await ctx.db
       .query("projects")
       .withIndex("by_slug", (q) => q.eq("slug", PROJECT_SLUG))
