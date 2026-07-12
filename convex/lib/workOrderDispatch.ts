@@ -7,12 +7,18 @@ export type DispatchableState =
   | "AWAITING_APPROVAL"
   | "AWAITING_VERIFICATION"
   | "DONE"
-  | "CANCELED";
+  | "CANCELED"
+  // Compat: revisions-stack states (never dispatchable; rejected by whitelist)
+  | "REOPENED"
+  | "SUPERSEDED";
 
-export type DispatchApprovalStatus = "NOT_REQUIRED" | "PENDING" | "APPROVED" | "REJECTED" | "CONDITIONAL";
+export type DispatchApprovalStatus =
+  | "NOT_REQUIRED" | "PENDING" | "APPROVED" | "REJECTED" | "CONDITIONAL"
+  // Compat: revisions-stack statuses (treated as not-approved)
+  | "REVISION_REQUESTED" | "EXPIRED" | "REVOKED";
 export type DispatchRiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type DispatchRunStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "PAUSED" | "CANCELED";
-export type DispatchVerificationStatus = "PENDING" | "PASS" | "FAIL" | "WAIVED";
+export type DispatchVerificationStatus = "PENDING" | "PASS" | "FAIL" | "WAIVED" | "STALE";
 
 export const ACTIVE_RUN_STATUSES: DispatchRunStatus[] = ["PENDING", "RUNNING", "PAUSED"];
 

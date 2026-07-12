@@ -356,6 +356,31 @@ cmd_context() {
     node "$MC_DIR/scripts/mc-context.mjs" "$@"
 }
 
+# Command: demo (Software Factory demo seed — sf/90-demo-seed branch)
+cmd_demo() {
+    source_env
+    check_convex
+    cd "$MC_DIR"
+    case "${1:-}" in
+        seed)
+            log_cmd "Seeding Software Factory demo data (seedTag=sf-demo)..."
+            npx convex run seedFactoryDemo:run '{"force":true}'
+            ;;
+        clear)
+            log_cmd "Clearing Software Factory demo data..."
+            npx convex run seedFactoryDemo:clear '{}'
+            ;;
+        status)
+            log_cmd "Software Factory demo seed status:"
+            npx convex run seedFactoryDemo:status '{}'
+            ;;
+        *)
+            log_error "Usage: mc demo <seed|clear|status>"
+            exit 1
+            ;;
+    esac
+}
+
 cmd_version() {
     echo "Mission Control CLI v${VERSION}"
 }
@@ -411,6 +436,10 @@ case "${1:-help}" in
     executor)
         shift
         cmd_executor "$@"
+        ;;
+    demo)
+        shift
+        cmd_demo "$@"
         ;;
     version|--version|-v)
         cmd_version

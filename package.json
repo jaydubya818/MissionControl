@@ -31,6 +31,8 @@
     "convex:seed:demo": "npx convex run seedMissionControlDemo:run",
     "convex:seed:demo:force": "npx convex run seedMissionControlDemo:run --force",
     "convex:seed:hiring": "npx convex run seedAgentHiring:run",
+    "demo:seed": "npx convex run seedFactoryDemo:run '{\"force\":true}'",
+    "demo:clear": "npx convex run seedFactoryDemo:clear '{}'",
     "migration:health": "npx convex run migrations/backfillInstanceRefs:getMigrationHealth",
     "migration:backfill:refs": "npx convex run migrations/backfillInstanceRefs:runBackfill",
     "migration:backfill:tenant": "npx convex run migrations/backfillInstanceRefs:runTenantBackfill",

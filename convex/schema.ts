@@ -95,14 +95,19 @@ const workOrderState = v.union(
   v.literal("AWAITING_APPROVAL"),
   v.literal("AWAITING_VERIFICATION"),
   v.literal("DONE"),
-  v.literal("CANCELED")
+  v.literal("CANCELED"),
+  // Compat: present in existing local data from the revisions stack
+  v.literal("REOPENED"),
+  v.literal("SUPERSEDED")
 );
 
 const verificationStatus = v.union(
   v.literal("PENDING"),
   v.literal("PASS"),
   v.literal("FAIL"),
-  v.literal("WAIVED")
+  v.literal("WAIVED"),
+  // Compat: present in existing local data from the revisions stack
+  v.literal("STALE")
 );
 
 const approvalDecisionStatus = v.union(
@@ -110,7 +115,11 @@ const approvalDecisionStatus = v.union(
   v.literal("PENDING"),
   v.literal("APPROVED"),
   v.literal("REJECTED"),
-  v.literal("CONDITIONAL")
+  v.literal("CONDITIONAL"),
+  // Compat: present in existing local data from the revisions stack
+  v.literal("REVISION_REQUESTED"),
+  v.literal("EXPIRED"),
+  v.literal("REVOKED")
 );
 
 const reviewType = v.union(
@@ -669,6 +678,15 @@ export default defineSchema({
     // bridgeRunId/hermesSessionId/pullRequestId) — merged, never erased
     correlation: v.optional(v.any()),
 
+    // Compat: fields written by the revisions stack, present in existing
+    // local data. currentRevisionId is a string because workOrderRevisions
+    // is not defined in this branch's schema.
+    currentRevisionId: v.optional(v.string()),
+    currentRevisionNumber: v.optional(v.number()),
+    acceptedRevisionNumber: v.optional(v.number()),
+    supersededByWorkOrderId: v.optional(v.id("workOrders")),
+    supersedesWorkOrderId: v.optional(v.id("workOrders")),
+
     createdAt: v.number(),
     updatedAt: v.number(),
     metadata: v.optional(v.any()),
@@ -696,7 +714,25 @@ export default defineSchema({
       v.literal("CLAIMED"),
       v.literal("EXECUTION_STATE"),
       v.literal("ARTIFACT_RECORDED"),
-      v.literal("VERIFICATION_RECORDED")
+      v.literal("VERIFICATION_RECORDED"),
+      // Compat: present in existing local data from the revisions stack
+      v.literal("REVISION_APPLIED"),
+      v.literal("REVISION_REQUESTED"),
+      v.literal("REVISION_APPROVED"),
+      v.literal("APPROVAL_REQUESTED"),
+      v.literal("APPROVAL_APPROVED"),
+      v.literal("APPROVAL_EXPIRED"),
+      v.literal("VERIFICATION_FAILED"),
+      v.literal("VERIFICATION_STALE"),
+      v.literal("VERIFICATION_WAIVED"),
+      v.literal("WORK_ORDER_ACCEPTED"),
+      v.literal("WORK_ORDER_REOPENED"),
+      v.literal("WORK_ORDER_SUPERSEDED"),
+      v.literal("RUN_STARTED"),
+      v.literal("COMMAND_EXECUTED"),
+      v.literal("FILE_CHANGED"),
+      v.literal("ARTIFACT_CREATED"),
+      v.literal("GOVERNANCE_RECORDS_EXPIRED")
     ),
     fromState: v.optional(workOrderState),
     toState: v.optional(workOrderState),
@@ -705,6 +741,17 @@ export default defineSchema({
     summary: v.string(),
     timestamp: v.number(),
     metadata: v.optional(v.any()),
+    // Compat: fields written by the revisions/executor stack, present in
+    // existing local data.
+    actor: v.optional(v.string()),
+    status: v.optional(v.string()),
+    workflowStep: v.optional(v.string()),
+    sequenceNumber: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
+    endedAt: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+    commandSummary: v.optional(v.string()),
+    evidenceArtifactIds: v.optional(v.array(v.string())),
   })
     .index("by_work_order", ["workOrderId"])
     .index("by_project", ["projectId"])
@@ -2319,6 +2366,11 @@ export default defineSchema({
     worktree: v.optional(v.string()),
     failureReason: v.optional(v.string()),
     humanInterventions: v.optional(v.number()),
+
+    // Compat: fields written by the revisions stack, present in existing
+    // local data. String ref because workOrderRevisions is not defined here.
+    workOrderRevisionId: v.optional(v.string()),
+    workOrderRevisionNumber: v.optional(v.number()),
     
     // Timing
     startedAt: v.number(),
