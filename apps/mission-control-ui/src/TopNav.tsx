@@ -62,7 +62,18 @@ export type MainView =
   | "feedback"
   | "ops-schedule"
   | "goals"
-  | "analytics";
+  | "analytics"
+  | "command-center"
+  | "missions"
+  | "mission-detail"
+  | "trace-inspector"
+  | "effectiveness"
+  | "factory-health"
+  | "readiness"
+  | "friction"
+  | "agent-catalog"
+  | "dossier"
+  | "recommendations";
 
 /** Top-level command center sections */
 export type CommandSection =

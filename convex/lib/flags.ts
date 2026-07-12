@@ -49,6 +49,7 @@ export const KNOWN_FLAGS: FlagDefinition[] = [
   { key: "rollout.rings", description: "Context rollout rings 0–4 (PR 17)", defaultEnabled: false },
   { key: "delivery.workorders", description: "Work order delivery control plane (PR 2a, 21)", defaultEnabled: false },
   { key: "executor.pi-bridge", description: "External executor contract for the Pi bridge (PR 21a/b/c)", defaultEnabled: false },
+  { key: "eos.command-center-preview", description: "Engineering OS demo experience — Command Center, missions, lineage, intelligence views", defaultEnabled: false },
 ];
 
 const KNOWN_FLAG_MAP: Map<string, FlagDefinition> = new Map(

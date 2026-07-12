@@ -4,6 +4,8 @@ import { BellRing } from "lucide-react";
 import type { MainView } from "../TopNav";
 import { Sidebar } from "./Sidebar";
 import { groupForView, itemForView, allNavViews } from "./navConfig";
+import { EOS_NAV_GROUPS } from "./eosNavConfig";
+import { useFlag } from "../hooks/useFlag";
 import { Breadcrumbs } from "../components/factory/Breadcrumbs";
 import { cn } from "../lib/utils";
 
@@ -72,6 +74,7 @@ export function AppShellV2({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView]);
 
+  const eosPreview = useFlag("eos.command-center-preview");
   const group = groupForView(activeView);
   const item = itemForView(activeView);
   const crumbs = [
@@ -82,6 +85,7 @@ export function AppShellV2({
   return (
     <div className="shell-v2 flex h-screen overflow-hidden">
       <Sidebar
+        groups={eosPreview ? EOS_NAV_GROUPS : undefined}
         activeView={activeView}
         onNavigate={onNavigate}
         onOpenSearch={onOpenSearch}

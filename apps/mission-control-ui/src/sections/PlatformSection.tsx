@@ -1,3 +1,4 @@
+import { EosViewRenderer, isEosView } from "../eos/EosSection";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { MainView } from "../TopNav";
 import { SystemView } from "../SystemView";
@@ -24,6 +25,7 @@ export function PlatformSection({
   onOpenMonitoringDashboard,
   onTaskSelect,
 }: PlatformSectionProps) {
+  if (isEosView(currentView)) return <EosViewRenderer view={currentView} onNavigate={onNavigate as (v: string) => void} />;
   if (currentView === "system") {
     return (
       <SystemView
