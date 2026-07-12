@@ -564,10 +564,6 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
         />
 
         <PageProvenanceNote />
-            onOpenTasks={() => onNavigate("tasks")}
-            onOpenAlerts={() => onNavigate("telemetry")}
-          />
-        )}
 
         <MissionAnchorCard onNavigate={onNavigate} />
 
