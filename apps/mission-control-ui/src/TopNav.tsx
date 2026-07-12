@@ -64,6 +64,7 @@ export type MainView =
   | "goals"
   | "analytics"
   | "command-center"
+  | "skill-detail"
   | "missions"
   | "mission-detail"
   | "trace-inspector"

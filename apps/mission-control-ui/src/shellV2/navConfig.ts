@@ -19,6 +19,7 @@ import {
   LayoutDashboard,
   ListChecks,
   MessageSquare,
+  Orbit,
   Radar,
   ScrollText,
   Shield,
@@ -64,6 +65,17 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    id: "control",
+    label: "Control",
+    icon: Orbit,
+    items: [
+      { view: "control-portfolio", label: "Portfolio", icon: Target },
+      { view: "control-work-orders", label: "Work Orders", icon: ClipboardList },
+      { view: "control-fleet", label: "Fleet", icon: Bot },
+      { view: "control-approvals", label: "Approvals", icon: CheckCircle2 },
+    ],
+  },
+  {
     id: "factory",
     label: "Factory",
     icon: Wrench,
@@ -91,7 +103,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { view: "atc", label: "ATC Board", icon: Radar },
       { view: "directory", label: "Templates", icon: BookOpen },
       { view: "identity", label: "Identities", icon: Users },
-      { view: "skills", label: "Skills", icon: Sparkles },
+      { view: "skills", label: "Registry", icon: Sparkles },
       { view: "memory", label: "Memory", icon: Brain },
       { view: "docs", label: "Knowledge", icon: BookOpen },
       { view: "search", label: "Search", icon: FileSearch },
@@ -104,7 +116,6 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: Gauge,
     items: [
       { view: "telemetry", label: "Telemetry", icon: Activity },
-      { view: "analytics", label: "Analytics", icon: BarChart3 },
       { view: "metrics", label: "Metrics", icon: BarChart3 },
       { view: "qc-dashboard", label: "QC Dashboard", icon: Gauge },
       { view: "qc-runs", label: "QC Runs", icon: FlaskConical },

@@ -22,7 +22,8 @@ export const EOS_NAV_GROUPS: NavGroup[] = [
     { view: "goals" as MainView, label: "Objectives", icon: TrendingUp },
   ]},
   { id: "delivery", label: "Delivery", icon: Wrench, items: [
-    { view: "tasks" as MainView, label: "Work Orders", icon: ListChecks },
+    { view: "control-work-orders" as MainView, label: "Work Orders", icon: ClipboardList },
+    { view: "tasks" as MainView, label: "Tasks", icon: ListChecks },
     { view: "factory" as MainView, label: "Factory Board", icon: Wrench },
     { view: "trace-inspector" as MainView, label: "Execution", icon: GitBranch },
     { view: "code" as MainView, label: "Pipelines", icon: Cog },
@@ -44,7 +45,7 @@ export const EOS_NAV_GROUPS: NavGroup[] = [
     { view: "dossier" as MainView, label: "Evidence Dossiers", icon: Scale },
   ]},
   { id: "knowledge", label: "Knowledge", icon: BookOpen, items: [
-    { view: "skills" as MainView, label: "Context Registry", icon: Sparkles },
+    { view: "skills" as MainView, label: "Skills Marketplace", icon: Sparkles },
     { view: "memory" as MainView, label: "Memory", icon: Brain },
     { view: "docs" as MainView, label: "Docs", icon: BookOpen },
   ]},

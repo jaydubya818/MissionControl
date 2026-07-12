@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown, Command, Search } from "lucide-react";
 import type { MainView } from "../TopNav";
-import { NAV_GROUPS, groupForView, type NavGroup, type NavItem } from "./navConfig";
+import { NAV_GROUPS, type NavGroup, type NavItem } from "./navConfig";
 import { cn } from "../lib/utils";
 
 export const SIDEBAR_V2_WIDTH = 256;

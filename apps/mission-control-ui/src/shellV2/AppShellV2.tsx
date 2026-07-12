@@ -6,6 +6,7 @@ import { Sidebar } from "./Sidebar";
 import { groupForView, itemForView, allNavViews } from "./navConfig";
 import { EOS_NAV_GROUPS } from "./eosNavConfig";
 import { useFlag } from "../hooks/useFlag";
+import { registerEosNavigate } from "../eos/skillSelection";
 import { Breadcrumbs } from "../components/factory/Breadcrumbs";
 import { cn } from "../lib/utils";
 
@@ -47,9 +48,34 @@ export function AppShellV2({
 }: AppShellV2Props): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
-  // Guards the URL↔view sync against echo loops: when the URL drives a view
-  // change, the follow-up view→URL effect must not navigate back.
   const syncingFromUrl = useRef(false);
+
+  const eosPreview = useFlag("eos.command-center-preview");
+  useEffect(() => {
+    registerEosNavigate(onNavigate as (v: string) => void);
+  }, [onNavigate]);
+  const navGroups = eosPreview ? EOS_NAV_GROUPS : undefined;
+  const activeGroups = navGroups ?? null;
+  const validViews = activeGroups
+    ? [
+        ...new Set([
+          ...activeGroups.flatMap((g) => g.items.map((i) => i.view as string)),
+          ...allNavViews(),
+        ]),
+      ]
+    : (allNavViews() as string[]);
+  const group = activeGroups
+    ? (activeGroups.find((g) => g.items.some((i) => i.view === activeView)) ??
+      groupForView(activeView))
+    : groupForView(activeView);
+  const item = activeGroups
+    ? (activeGroups.flatMap((g) => g.items).find((i) => i.view === activeView) ??
+      itemForView(activeView))
+    : itemForView(activeView);
+  const crumbs = [
+    ...(group ? [{ label: group.label }] : []),
+    ...(item ? [{ label: item.label, current: true }] : []),
+  ];
 
   // URL → view (deep links, back/forward)
   useEffect(() => {
@@ -59,7 +85,7 @@ export function AppShellV2({
       onNavigate(pathView);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+  }, [location.pathname, validViews.join(",")]);
 
   // view → URL (sidebar clicks, legacy in-app navigation)
   useEffect(() => {
@@ -71,23 +97,6 @@ export function AppShellV2({
     if (location.pathname !== expected) navigate(expected);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView]);
-
-  const eosPreview = useFlag("eos.command-center-preview");
-  const navGroups = eosPreview ? EOS_NAV_GROUPS : undefined;
-  const activeGroups = navGroups ?? null;
-  const validViews = activeGroups
-    ? [...new Set([...activeGroups.flatMap((g) => g.items.map((i) => i.view as string)), ...allNavViews()])]
-    : (allNavViews() as string[]);
-  const group = activeGroups
-    ? activeGroups.find((g) => g.items.some((i) => i.view === activeView)) ?? groupForView(activeView)
-    : groupForView(activeView);
-  const item = activeGroups
-    ? activeGroups.flatMap((g) => g.items).find((i) => i.view === activeView) ?? itemForView(activeView)
-    : itemForView(activeView);
-  const crumbs = [
-    ...(group ? [{ label: group.label }] : []),
-    ...(item ? [{ label: item.label, current: true }] : []),
-  ];
 
   return (
     <div className="shell-v2 flex h-screen overflow-hidden">
@@ -121,7 +130,9 @@ export function AppShellV2({
             </button>
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-auto bg-app">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+        </main>
       </div>
     </div>
   );

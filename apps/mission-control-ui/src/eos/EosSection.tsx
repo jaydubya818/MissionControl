@@ -10,11 +10,12 @@ import { AgentCatalogView } from "./views/AgentCatalogView";
 import { DossierView } from "./views/DossierView";
 import { RecommendationsView } from "./views/RecommendationsView";
 import { DemoTourBar } from "./components";
+import { SkillDetailView } from "./views/SkillDetailView";
 
 export const EOS_VIEWS = [
   "command-center", "missions", "mission-detail", "trace-inspector",
   "effectiveness", "factory-health", "readiness", "friction",
-  "agent-catalog", "dossier", "recommendations",
+  "agent-catalog", "dossier", "recommendations", "skill-detail",
 ] as const;
 
 export type EosView = (typeof EOS_VIEWS)[number];
@@ -45,5 +46,6 @@ function EosViewBody({ view, onNavigate }: { view: EosView; onNavigate: (v: stri
     case "agent-catalog": return <AgentCatalogView onNavigate={onNavigate} />;
     case "dossier": return <DossierView onNavigate={onNavigate} />;
     case "recommendations": return <RecommendationsView onNavigate={onNavigate} />;
+    case "skill-detail": return <SkillDetailView onNavigate={onNavigate} />;
   }
 }
