@@ -7,8 +7,8 @@ import { DataTable, type Column } from "../../components/factory/DataTable";
 import { MetricBlock, MetricRow } from "../../components/factory/MetricBlock";
 import { RiskBadge, StatusBadge, type StatusBadgeProps } from "../../components/factory/badges";
 import { cn } from "../../lib/utils";
-import { EosSection, EvidenceLink, InsightCard, ProvenanceBadge } from "../components";
-import { ATLAS, demoInsights, demoLineage, demoMission } from "../demoData";
+import { EosSection, EvidenceLink, InsightCard, PageProvenanceNote, ProvenanceBadge } from "../components";
+import { AGENT_ROLES, ATLAS, demoInsights, demoLineage, demoMission } from "../demoData";
 import type { EvidenceReference } from "../types";
 
 export interface MissionDetailViewProps {
@@ -66,12 +66,12 @@ interface TimelineBeat {
 /** Phase-12 story beats condensed to the delivery milestones that matter. */
 const TIMELINE: TimelineBeat[] = [
   { id: "created", label: "Mission created with PCI compliance constraints", when: "5d ago", tone: "neutral" },
-  { id: "planned", label: "Planning decomposed the mission into 3 work orders", detail: `${ATLAS.agents.supervisor} → Apple Pay · PCI evidence pack · fraud screening`, when: "5d ago", tone: "ok" },
+  { id: "planned", label: "Planning decomposed the mission into 3 work orders", detail: `${AGENT_ROLES[ATLAS.agents.supervisor]} (${ATLAS.agents.supervisor}) → Apple Pay · PCI evidence pack · fraud screening`, when: "5d ago", tone: "ok" },
   { id: "implemented", label: "Apple Pay live-config change implemented", when: "3d ago", tone: "ok", link: { label: "view trace", view: "trace-inspector" } },
   { id: "approval", label: "Security policy approval — RED, dual control 2/2", when: "2d ago", tone: "ok", link: { label: "audit record", view: "audit" } },
   { id: "env-failure", label: "Environment setup failed; human-assisted retry recovered the run", detail: "undocumented pnpm config — recurring friction in this repo", when: "2d ago", tone: "warn", link: { label: "readiness assessment", view: "readiness" } },
   { id: "pr", label: `PR #${ATLAS.pr.number} opened — checks passing`, when: "1d ago", tone: "ok", link: { label: "view trace", view: "trace-inspector" } },
-  { id: "verification", label: "Verification: 3 of 4 criteria PASSED, 1 awaiting waiver", detail: "sandbox-only PCI scan pending human waiver decision", when: "8h ago", tone: "warn", link: { label: "criteria", count: 4, view: "trace-inspector" } },
+  { id: "verification", label: "Verification: 3 of 4 · 1 awaiting waiver", detail: "sandbox-only PCI scan pending human waiver decision", when: "8h ago", tone: "warn", link: { label: "criteria", count: 4, view: "trace-inspector" } },
   { id: "bootstrap", label: "Bootstrap skill improvement proposed from recurring setup friction", when: "2h ago", tone: "neutral", link: { label: "recommendation", view: "readiness" } },
 ];
 
@@ -201,7 +201,7 @@ function EvidenceTab({ onNavigate }: { onNavigate: (view: string) => void }): JS
                   </div>
                 )}
               </div>
-              <ProvenanceBadge provenance={node.provenance} className="shrink-0" />
+              <ProvenanceBadge provenance={node.provenance} variant="dot" className="mt-0.5 shrink-0" />
             </li>
           ))}
         </ul>
@@ -326,6 +326,7 @@ export function MissionDetailView({ onNavigate }: MissionDetailViewProps): JSX.E
         aside={aside}
       >
         <div className="flex flex-col gap-6">
+          <PageProvenanceNote />
           {tab === "overview" && <DeliveryTimeline onNavigate={onNavigate} />}
           {tab === "work-orders" && <WorkOrdersTab onNavigate={onNavigate} />}
           {tab === "evidence" && <EvidenceTab onNavigate={onNavigate} />}

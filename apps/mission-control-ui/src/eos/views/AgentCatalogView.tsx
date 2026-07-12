@@ -13,7 +13,7 @@ import { PageHeader } from "../../components/factory/DetailLayout";
 import { DataTable, type Column } from "../../components/factory/DataTable";
 import { ScoreBadge, StatusBadge, type StatusBadgeProps } from "../../components/factory/badges";
 import { EosSection, ProvenanceBadge } from "../components";
-import { demoCapabilities } from "../demoData";
+import { AGENT_ROLES, demoCapabilities } from "../demoData";
 import type { AgentCapabilityProfile } from "../types";
 import { cn } from "../../lib/utils";
 
@@ -70,9 +70,11 @@ function CapabilityCard({ profile }: { profile: AgentCapabilityProfile }): JSX.E
               <span className="font-mono">v{profile.version}</span>
             </StatusBadge>
           </div>
-          <div className="mt-0.5 text-[12.5px] text-ink-secondary">{profile.role}</div>
+          <div className="mt-0.5 text-[12.5px] text-ink-secondary">
+            {AGENT_ROLES[profile.agentName] ?? profile.role}
+          </div>
         </div>
-        <ProvenanceBadge provenance={profile.provenance} />
+        <ProvenanceBadge provenance={profile.provenance} variant="dot" className="mt-1" />
       </div>
 
       <div className="flex flex-wrap gap-1.5">
@@ -95,7 +97,12 @@ function CapabilityCard({ profile }: { profile: AgentCapabilityProfile }): JSX.E
               {spec.verifiedCompletionPct !== null ? (
                 <ScoreBadge score={spec.verifiedCompletionPct} />
               ) : (
-                <ProvenanceBadge provenance="insufficient" />
+                <span
+                  className="text-right text-[11px] leading-snug text-warn"
+                  title="Below minimum sample size — value withheld rather than invented"
+                >
+                  Insufficient evidence — n={spec.sampleSize}; 5 required.
+                </span>
               )}
             </span>
             <span className="text-right font-mono text-[12.5px] text-ink-secondary">
@@ -158,7 +165,7 @@ export function AgentCatalogView({ onNavigate }: AgentCatalogViewProps): JSX.Ele
         </span>
       ),
     },
-    { id: "role", header: "Role", cell: (row) => row.role },
+    { id: "role", header: "Role", cell: (row) => AGENT_ROLES[row.name] ?? row.role },
     {
       id: "status",
       header: "Status",
@@ -192,7 +199,7 @@ export function AgentCatalogView({ onNavigate }: AgentCatalogViewProps): JSX.Ele
 
   return (
     <div className="relative flex-1 overflow-auto bg-app">
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
         <PageHeader title="Agents" description="Capability-evidenced digital workforce." />
 
         <EosSection eyebrow="FLEET" title="Fleet">

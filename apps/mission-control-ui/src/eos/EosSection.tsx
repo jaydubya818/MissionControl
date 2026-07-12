@@ -9,6 +9,7 @@ import { FrictionView } from "./views/FrictionView";
 import { AgentCatalogView } from "./views/AgentCatalogView";
 import { DossierView } from "./views/DossierView";
 import { RecommendationsView } from "./views/RecommendationsView";
+import { DemoTourBar } from "./components";
 
 export const EOS_VIEWS = [
   "command-center", "missions", "mission-detail", "trace-inspector",
@@ -23,6 +24,15 @@ export function isEosView(view: string): view is EosView {
 }
 
 export function EosViewRenderer({ view, onNavigate }: { view: EosView; onNavigate: (v: string) => void }): JSX.Element {
+  return (
+    <>
+      <EosViewBody view={view} onNavigate={onNavigate} />
+      <DemoTourBar currentView={view} onNavigate={onNavigate} />
+    </>
+  );
+}
+
+function EosViewBody({ view, onNavigate }: { view: EosView; onNavigate: (v: string) => void }): JSX.Element {
   switch (view) {
     case "command-center": return <CommandCenterView onNavigate={onNavigate} />;
     case "missions": return <MissionPortfolioView onNavigate={onNavigate} />;

@@ -3,7 +3,7 @@ import { DataTable, type Column } from "../../components/factory/DataTable";
 import { PageHeader } from "../../components/factory/DetailLayout";
 import { MetricBlock } from "../../components/factory/MetricBlock";
 import { StatusBadge, type StatusBadgeProps } from "../../components/factory/badges";
-import { EvidenceLink, InsightCard, ProvenanceBadge, TrendIcon } from "../components";
+import { EvidenceLink, InsightCard, PageProvenanceNote, ProvenanceBadge, TrendIcon } from "../components";
 import { demoFriction, demoInsights } from "../demoData";
 import type { FrictionSummary } from "../types";
 
@@ -159,26 +159,27 @@ export function FrictionView({ onNavigate }: FrictionViewProps): JSX.Element {
 
   return (
     <div className="relative flex-1 overflow-auto bg-app">
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
         <PageHeader
           title="Friction & Waste"
           description="Detectable categories only — every incident drills to a trace."
         />
+        <PageProvenanceNote />
         <div className="flex flex-col gap-6 rounded-xl border border-line bg-surface-1 p-4 sm:flex-row sm:[&>*]:flex-1">
           <MetricBlock
             label="Total incidents"
             value={totalIncidents}
-            adornment={<ProvenanceBadge provenance="demo" />}
+            adornment={<ProvenanceBadge provenance="demo" variant="dot" />}
           />
           <MetricBlock
             label="Estimated wasted cost"
             value={<span className="font-mono">{formatUsd(totalCostUsd)}</span>}
-            adornment={<ProvenanceBadge provenance="demo" />}
+            adornment={<ProvenanceBadge provenance="demo" variant="dot" />}
           />
           <MetricBlock
             label="Wasted time"
             value={formatMinutes(totalWastedMinutes)}
-            adornment={<ProvenanceBadge provenance="demo" />}
+            adornment={<ProvenanceBadge provenance="demo" variant="dot" />}
           />
         </div>
         <DataTable

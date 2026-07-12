@@ -225,3 +225,66 @@ export const demoReadiness: ReadinessAssessment[] = [
     provenance: "projected",
   },
 ];
+
+/** Functional role titles (assignment §7): never "specialist". */
+export const AGENT_ROLES: Record<string, string> = {
+  "pi-supervisor-demo": "Factory Supervisor",
+  "hermes-executor-demo": "Implementation Engineer",
+  "demo-coder": "Implementation Engineer",
+  "demo-qa": "Verification Engineer",
+  "demo-security": "Security Engineer",
+  "demo-docs": "Documentation Engineer",
+  "demo-research": "Research Engineer",
+  "demo-ops": "Platform Engineer",
+};
+
+/** Mission anchor — operational status brief for the Command Center top. */
+export const demoMissionAnchor = {
+  blocking: "PCI evidence pack blocked: dual-control approval pending second decision",
+  milestone: `PR #${ATLAS.pr.number} open · checks passing · 3 of 4 criteria verified`,
+  verification: "1 criterion awaiting waiver decision (sandbox-only PCI scan)",
+  nextAction: "Decide the PCI waiver, then accept the Apple Pay work order",
+} as const;
+
+/**
+ * Specific operational language for needs-attention rows (assignment §4).
+ * Keyed by substring match against seeded record titles/summaries; rows
+ * without a match fall back to their raw text. Demo narrative only.
+ */
+export const demoAttentionNarratives: Array<{
+  match: string;
+  decision: string;
+  why: string;
+  priority: number; // 1 irreversible · 2 security/prod · 3 mission blockage · 4 time · 5 cost
+}> = [
+  { match: "PCI", decision: "Decide whether to waive the remaining PCI verification criterion", why: "Blocks Apple Pay acceptance; waiver is an irreversible compliance decision", priority: 1 },
+  { match: "Fraud-screening", decision: "Authorize sandbox credentials for the fraud-screening vendor", why: "Security agent quarantined until credentials rotate", priority: 2 },
+  { match: "Apple Pay", decision: "Approve production configuration change for Apple Pay", why: "RED-tier change: second dual-control decision required", priority: 2 },
+  { match: "budget", decision: "Raise or confirm the run budget for the implementation agent", why: "Auto-pause will halt execution at the daily cap", priority: 5 },
+];
+
+/** Curated Command Center timeline (assignment §6) — the story, not a log. */
+export const demoTimeline: Array<{
+  rel: string; actor: string; event: string; object: string;
+  state: "ok" | "warn" | "err" | "info"; drillView: string;
+}> = [
+  { rel: "2d", actor: "Jay West", event: "Mission created with reliability + PCI constraints", object: ATLAS.mission, state: "info", drillView: "mission-detail" },
+  { rel: "2d", actor: AGENT_ROLES["pi-supervisor-demo"], event: "Planning decomposed 3 work orders", object: ATLAS.mission, state: "ok", drillView: "missions" },
+  { rel: "1d", actor: AGENT_ROLES["hermes-executor-demo"], event: "Environment setup failed — undocumented bootstrap step", object: ATLAS.repo, state: "err", drillView: "trace-inspector" },
+  { rel: "1d", actor: "Operator + agent", event: "Human-assisted retry succeeded", object: ATLAS.workOrders.applePay, state: "warn", drillView: "trace-inspector" },
+  { rel: "22h", actor: AGENT_ROLES["demo-security"], event: "Security approval requested (RED, dual control)", object: ATLAS.workOrders.applePay, state: "warn", drillView: "audit" },
+  { rel: "20h", actor: AGENT_ROLES["hermes-executor-demo"], event: `Pull request #${ATLAS.pr.number} opened`, object: ATLAS.repo, state: "ok", drillView: "trace-inspector" },
+  { rel: "18h", actor: AGENT_ROLES["demo-qa"], event: "3 of 4 verification criteria passed", object: ATLAS.workOrders.applePay, state: "ok", drillView: "trace-inspector" },
+  { rel: "18h", actor: "Mission Control", event: "Waiver required on sandbox-only PCI scan", object: ATLAS.workOrders.applePay, state: "warn", drillView: "dossier" },
+  { rel: "6h", actor: "Friction detector", event: "Repeated setup friction detected (11 runs)", object: ATLAS.repo, state: "warn", drillView: "friction" },
+  { rel: "5h", actor: "Mission Control", event: "Factory Improvement proposed: repository bootstrap skill", object: ATLAS.repo, state: "info", drillView: "recommendations" },
+];
+
+/** Guided demo path (assignment §14). */
+export const DEMO_TOUR: Array<{ view: string; label: string }> = [
+  { view: "command-center", label: "Command Center" },
+  { view: "mission-detail", label: "Atlas Checkout mission" },
+  { view: "trace-inspector", label: "Execution trace" },
+  { view: "recommendations", label: "Factory improvement" },
+  { view: "dossier", label: "Evidence dossier" },
+];

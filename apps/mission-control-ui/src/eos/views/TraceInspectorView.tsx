@@ -12,6 +12,8 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Cog,
   DollarSign,
   ExternalLink,
@@ -34,7 +36,7 @@ import { api } from "../../../../../convex/_generated/api";
 import { cn } from "../../lib/utils";
 import { PageHeader, MetadataPanel, type MetadataEntry } from "../../components/factory/DetailLayout";
 import { StatusBadge, type StatusBadgeProps } from "../../components/factory/badges";
-import { EvidenceLink, ProvenanceBadge } from "../components";
+import { EvidenceLink, PageProvenanceNote, ProvenanceBadge } from "../components";
 import { ATLAS, demoCapabilities, demoFriction, demoLineage, demoTraceSpans } from "../demoData";
 import type { LineageNode, TraceSpanView } from "../types";
 
@@ -90,11 +92,14 @@ function formatUsd(value: number): string {
 function LineageRail({ onNavigate }: { onNavigate: (view: string) => void }): JSX.Element {
   return (
     <section className="rounded-xl border border-line bg-surface-1 p-4">
-      <h2 className="text-[15px] font-semibold text-ink">Lineage</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[19px] font-semibold tracking-tight text-ink">Lineage</h2>
+        <ProvenanceBadge provenance="demo" />
+      </div>
       <p className="mt-0.5 text-[12.5px] text-ink-muted">
         Mission to learning — one connected chain of records for this work order.
       </p>
-      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2.5">
+      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-3">
         {demoLineage.map((node, i) => {
           const Icon = LINEAGE_ICON[node.kind];
           const isFocus = node.kind === "RUN";
@@ -115,11 +120,11 @@ function LineageRail({ onNavigate }: { onNavigate: (view: string) => void }): JS
                   </span>
                 )}
               </span>
-              <ProvenanceBadge provenance={node.provenance} />
+              <ProvenanceBadge provenance={node.provenance} variant="dot" />
             </>
           );
           return (
-            <span key={node.id} className="flex items-center gap-2">
+            <span key={node.id} className="flex min-w-0 items-center gap-2">
               {i > 0 && (
                 <span aria-hidden className="text-[13px] text-ink-muted">
                   →
@@ -152,6 +157,9 @@ function SpanRow({
   const Icon = SPAN_ICON[span.kind];
   // A real failure signal: the failed step and its retry share a warn rule.
   const warnRule = span.status === "FAILED" || span.kind === "RETRY";
+  // FAILED and RETRY details are the story — visible by default; the rest collapse.
+  const [detailsOpen, setDetailsOpen] = useState(warnRule);
+  const DisclosureIcon = detailsOpen ? ChevronDown : ChevronRight;
   return (
     <div
       className={cn(
@@ -165,8 +173,21 @@ function SpanRow({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-medium text-ink">{span.label}</span>
           <StatusBadge tone={SPAN_STATUS_TONE[span.status]}>{span.status}</StatusBadge>
+          {span.detail && (
+            <button
+              type="button"
+              aria-expanded={detailsOpen}
+              onClick={() => setDetailsOpen((open) => !open)}
+              className="inline-flex items-center gap-0.5 text-[11.5px] text-ink-muted transition-colors duration-150 hover:text-ink-secondary"
+            >
+              <DisclosureIcon size={12} strokeWidth={1.7} aria-hidden />
+              Details
+            </button>
+          )}
         </div>
-        {span.detail && <div className="mt-0.5 text-[12px] text-ink-muted">{span.detail}</div>}
+        {span.detail && detailsOpen && (
+          <div className="mt-0.5 text-[12px] text-ink-muted">{span.detail}</div>
+        )}
         {span.kind === "APPROVAL" && (
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <span className="text-[12px] text-ink-secondary">human gate · dual control 2/2</span>
@@ -175,7 +196,7 @@ function SpanRow({
         )}
         {span.kind === "VERIFY" && (
           <div className="mt-1.5 flex flex-wrap items-center gap-3">
-            <span className="text-[12px] text-ink-secondary">3 PASSED · 1 awaiting waiver</span>
+            <span className="text-[12px] text-ink-secondary">3 of 4 · 1 awaiting waiver</span>
             <button
               type="button"
               onClick={() => onNavigate("dossier")}
@@ -203,6 +224,10 @@ function ExecutionTree({ onNavigate }: { onNavigate: (view: string) => void }): 
         <p className="mt-0.5 text-[12.5px] text-ink-muted">
           Every span of run-12, recorded at write time.{" "}
           <ProvenanceBadge provenance="demo" className="align-middle" />
+        </p>
+        <p className="mt-1.5 text-[12.5px] text-ink-secondary">
+          Planned → failed setup → human-assisted recovery → gated by dual-control approval → PR #
+          {ATLAS.pr.number} → 3/4 verified · 1 waiver pending
         </p>
       </div>
       <div className="rounded-xl border border-line bg-surface-1">
@@ -292,9 +317,9 @@ export function TraceInspectorView({ onNavigate }: TraceInspectorViewProps): JSX
     {
       label: "Work order",
       value: (
-        <span className="flex flex-col gap-1">
-          {ATLAS.workOrders.applePay}
-          <ProvenanceBadge provenance="demo" className="self-start" />
+        <span className="flex items-start gap-2">
+          <span className="min-w-0">{ATLAS.workOrders.applePay}</span>
+          <ProvenanceBadge provenance="demo" variant="dot" className="mt-0.5 shrink-0" />
         </span>
       ),
     },
@@ -303,7 +328,7 @@ export function TraceInspectorView({ onNavigate }: TraceInspectorViewProps): JSX
       value: (
         <span className="flex items-center gap-2">
           <span className="font-mono text-[12.5px]">{ATLAS.repo}</span>
-          <ProvenanceBadge provenance="demo" />
+          <ProvenanceBadge provenance="demo" variant="dot" />
         </span>
       ),
     },
@@ -315,7 +340,7 @@ export function TraceInspectorView({ onNavigate }: TraceInspectorViewProps): JSX
             {ATLAS.agents.executor}
             {executor ? ` · v${executor.version}` : ""}
           </span>
-          <ProvenanceBadge provenance="demo" />
+          <ProvenanceBadge provenance="demo" variant="dot" />
         </span>
       ),
     },
@@ -394,18 +419,19 @@ export function TraceInspectorView({ onNavigate }: TraceInspectorViewProps): JSX
 
   return (
     <div className="relative flex-1 overflow-auto bg-app">
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
         <PageHeader
           title="Trace Inspector"
           description="Intent to outcome — every step recorded at write time."
         />
+        <PageProvenanceNote />
         <LineageRail onNavigate={onNavigate} />
-        <div className="flex gap-8">
-          <div className="flex min-w-0 flex-1 flex-col gap-6">
+        <div className="grid grid-cols-1 gap-8 xl:grid-cols-12">
+          <div className="flex min-w-0 flex-col gap-6 xl:col-span-8">
             <ExecutionTree onNavigate={onNavigate} />
             <InterventionsStrip onNavigate={onNavigate} />
           </div>
-          <MetadataPanel entries={metadataEntries} />
+          <MetadataPanel entries={metadataEntries} className="w-full xl:col-span-4" />
         </div>
       </div>
     </div>

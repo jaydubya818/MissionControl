@@ -5,7 +5,7 @@
  */
 
 import { PageHeader } from "../../components/factory/DetailLayout";
-import { InsightCard, ProvenanceBadge } from "../components";
+import { InsightCard, PageProvenanceNote, ProvenanceBadge } from "../components";
 import { demoInsights } from "../demoData";
 
 export interface RecommendationsViewProps {
@@ -15,11 +15,12 @@ export interface RecommendationsViewProps {
 export function RecommendationsView({ onNavigate }: RecommendationsViewProps): JSX.Element {
   return (
     <div className="relative flex-1 overflow-auto bg-app">
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
         <PageHeader
           title="Recommendations"
           description="Every recommendation carries evidence, confidence, and a drill-down."
         />
+        <PageProvenanceNote />
 
         <div className="grid gap-4 md:grid-cols-2">
           {demoInsights.map((insight) => (

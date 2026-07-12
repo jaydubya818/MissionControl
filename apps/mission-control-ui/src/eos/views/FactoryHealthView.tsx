@@ -3,6 +3,7 @@ import {
   EosSection,
   EvidenceLink,
   HealthSignalCard,
+  PageProvenanceNote,
   ProvenanceBadge,
   TrendIcon,
 } from "../components";
@@ -58,12 +59,12 @@ function TraitRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[13.5px] font-medium text-ink">{trait.label}</span>
+            <span className="text-[15px] font-semibold text-ink">{trait.label}</span>
             <TrendIcon trend={trait.trend} />
           </div>
           <div className="text-[12.5px] text-ink-muted">{trait.definition}</div>
         </div>
-        <ProvenanceBadge provenance={trait.provenance} />
+        <ProvenanceBadge provenance={trait.provenance} variant="dot" className="mt-1" />
       </div>
       <div className="relative h-3" aria-hidden>
         <div className="absolute inset-x-0 top-0.5 h-2 rounded-full bg-surface-2" />
@@ -92,13 +93,18 @@ export function FactoryHealthView({ onNavigate }: FactoryHealthViewProps): JSX.E
   return (
     <div className="relative flex-1 overflow-auto bg-app">
       <PageHeader title="Factory Health" />
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
+        <PageProvenanceNote />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {healthFamilies.map((signal) => (
             <HealthSignalCard key={signal.id} signal={signal} onNavigate={onNavigate} />
           ))}
         </div>
-        <EosSection eyebrow="Traits" title="Operating characteristics">
+        <EosSection
+          eyebrow="Traits"
+          title="Operating characteristics"
+          action={<ProvenanceBadge provenance="demo" />}
+        >
           <div className="text-[12.5px] text-ink-secondary">
             Quarterly distributions, not scores. p25–p75 ranges with median.
           </div>

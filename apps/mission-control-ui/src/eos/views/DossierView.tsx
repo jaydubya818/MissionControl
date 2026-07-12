@@ -5,7 +5,7 @@
  */
 
 import { PageHeader } from "../../components/factory/DetailLayout";
-import { ConfidenceLabel, EvidenceLink, ProvenanceBadge } from "../components";
+import { ConfidenceLabel, EvidenceLink, PageProvenanceNote, ProvenanceBadge } from "../components";
 import { demoDossier } from "../demoData";
 import { cn } from "../../lib/utils";
 
@@ -21,8 +21,9 @@ function isRingScoped(alternative: string): boolean {
 export function DossierView({ onNavigate }: DossierViewProps): JSX.Element {
   return (
     <div className="relative flex-1 overflow-auto bg-app">
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
         <PageHeader title="Evidence Dossier" description={demoDossier.question} />
+        <PageProvenanceNote />
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <span className="text-[12.5px] text-ink-secondary">

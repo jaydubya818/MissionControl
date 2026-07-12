@@ -3,7 +3,7 @@ import { PageHeader } from "../../components/factory/DetailLayout";
 import { StatusBadge, type StatusBadgeProps } from "../../components/factory/badges";
 import { EmptyState } from "../../components/ui/empty-state";
 import { cn } from "../../lib/utils";
-import { ProvenanceBadge } from "../components";
+import { PageProvenanceNote, ProvenanceBadge } from "../components";
 import { demoMission } from "../demoData";
 import type { HealthStatus, MissionSummary } from "../types";
 
@@ -98,7 +98,7 @@ function MissionCard({
         <div className="min-w-0 truncate text-[12px] text-ink-muted">
           Next milestone: <span className="text-ink-secondary">{mission.nextMilestone}</span>
         </div>
-        <ProvenanceBadge provenance={mission.provenance} className="shrink-0" />
+        <ProvenanceBadge provenance={mission.provenance} variant="dot" className="shrink-0" />
       </div>
     </button>
   );
@@ -111,7 +111,8 @@ export function MissionPortfolioView({ onNavigate }: MissionPortfolioViewProps):
         title="Missions"
         description="Business outcomes the factory is delivering, with cost, risk, and evidence per mission."
       />
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
+        <PageProvenanceNote />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <MissionCard mission={demoMission} onNavigate={onNavigate} />
           <EmptyState

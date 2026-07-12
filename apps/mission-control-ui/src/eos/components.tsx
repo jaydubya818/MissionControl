@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { ArrowRight, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { ArrowRight, ArrowUpRight, ArrowDownRight, Database, Minus } from "lucide-react";
+import { DEMO_TOUR } from "./demoData";
 import { cn } from "../lib/utils";
 import type {
   Confidence,
@@ -11,25 +12,113 @@ import type {
   Trend,
 } from "./types";
 
-/** Honest-labeling chip. Rendered on EVERY non-authoritative datum. */
-export function ProvenanceBadge({ provenance, className }: { provenance: Provenance; className?: string }): JSX.Element | null {
+const PROVENANCE_LABEL: Record<Exclude<Provenance, "convex">, string> = {
+  demo: "Demo data",
+  preview: "Preview",
+  projected: "Projected",
+  insufficient: "Insufficient evidence",
+  disconnected: "Not yet connected",
+};
+
+const PROVENANCE_EXPLANATION: Record<Exclude<Provenance, "convex">, string> = {
+  demo: "Seeded demo narrative (Atlas Checkout) — not measured production data",
+  preview: "Real interface over a pipeline that ships with the Lineage v1 roadmap",
+  projected: "Derived client-side from seeded lineage events",
+  insufficient: "Below minimum sample size — value withheld rather than invented",
+  disconnected: "Integration not configured in this environment",
+};
+
+/**
+ * Honest-labeling indicator. Rendered on EVERY non-authoritative datum.
+ * variant "badge": explicit chip (default for standalone/heading placement).
+ * variant "dot": compact icon with tooltip, for dense grids where repeated
+ * chips become noise — provenance stays explicit and discoverable.
+ */
+export function ProvenanceBadge({
+  provenance,
+  className,
+  variant = "badge",
+}: {
+  provenance: Provenance;
+  className?: string;
+  variant?: "badge" | "dot";
+}): JSX.Element | null {
   if (provenance === "convex") return null;
-  const label: Record<Exclude<Provenance, "convex">, string> = {
-    demo: "Demo data",
-    preview: "Preview",
-    projected: "Projected",
-    insufficient: "Insufficient evidence",
-    disconnected: "Not yet connected",
-  };
+  const label = PROVENANCE_LABEL[provenance];
+  const explanation = PROVENANCE_EXPLANATION[provenance];
+  if (variant === "dot") {
+    return (
+      <span
+        role="img"
+        tabIndex={0}
+        aria-label={`${label} — ${explanation}`}
+        title={`${label} — ${explanation}`}
+        className={cn("inline-flex items-center rounded text-ink-muted focus-visible:outline-none", className)}
+      >
+        <Database size={11} strokeWidth={1.7} aria-hidden />
+      </span>
+    );
+  }
   return (
     <span
+      title={explanation}
       className={cn(
-        "inline-flex items-center rounded border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-ink-muted",
+        "inline-flex items-center rounded border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-ink-muted",
+        provenance === "insufficient" && "text-warn border-warn/40",
         className
       )}
     >
-      {label[provenance]}
+      {label}
     </span>
+  );
+}
+
+/** Page-level disclosure when most of a page is seeded (assignment §11). */
+export function PageProvenanceNote({ text }: { text?: string }): JSX.Element {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] text-ink-muted">
+      <Database size={12} strokeWidth={1.7} aria-hidden />
+      {text ??
+        "This page presents the seeded Atlas Checkout demo narrative. Cards marked with the data icon are demo projections; unmarked values are live records."}
+    </div>
+  );
+}
+
+/** Inline guided demo bar (assignment §14) — no modals. */
+export function DemoTourBar({
+  currentView,
+  onNavigate,
+}: {
+  currentView: string;
+  onNavigate: (view: string) => void;
+}): JSX.Element | null {
+  const idx = DEMO_TOUR.findIndex((s) => s.view === currentView);
+  if (idx === -1) return null;
+  const next = DEMO_TOUR[idx + 1];
+  return (
+    <div className="pointer-events-auto fixed bottom-4 right-4 z-40 flex items-center gap-3 rounded-xl border border-line bg-surface-3 px-3 py-2 shadow-[var(--shadow-elevation-2)]">
+      <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-ink-muted">
+        EOS preview · demo {idx + 1}/{DEMO_TOUR.length}
+      </span>
+      {next ? (
+        <button
+          type="button"
+          onClick={() => onNavigate(next.view)}
+          className="inline-flex items-center gap-1 rounded-lg bg-act px-2.5 py-1 text-[12.5px] font-medium text-act-ink hover:opacity-90"
+        >
+          Next: {next.label}
+          <ArrowRight size={12} aria-hidden />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onNavigate(DEMO_TOUR[0].view)}
+          className="rounded-lg border border-line px-2.5 py-1 text-[12.5px] text-ink-secondary hover:text-ink"
+        >
+          Restart demo
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -97,7 +186,7 @@ export function HealthSignalCard({
         <span className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-muted">
           {signal.label}
         </span>
-        <ProvenanceBadge provenance={signal.provenance} />
+        <ProvenanceBadge provenance={signal.provenance} variant="dot" />
       </div>
       <div className="flex items-center gap-2">
         <span className={cn("h-2 w-2 rounded-full", style.dot)} aria-hidden />

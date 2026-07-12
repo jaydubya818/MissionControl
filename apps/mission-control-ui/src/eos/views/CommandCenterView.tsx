@@ -1,27 +1,17 @@
 /**
  * EOS Command Center — causal system of record and operating control plane.
  *
- * Composition: demo-provenance projections (health band, insights, mission
- * portfolio from demoData) beside live Convex data (attention queue, factory
- * activity, workforce, capacity). Every demo-sourced element renders its
- * ProvenanceBadge; Convex data renders none (see src/eos/types.ts).
+ * Composition: demo-provenance projections (mission anchor, health band,
+ * insights, curated timeline from demoData) beside live Convex data
+ * (attention queue, workforce, capacity). Every demo-sourced element renders
+ * its ProvenanceBadge; Convex data renders none (see src/eos/types.ts).
  */
 
 import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import type { Doc } from "../../../../../convex/_generated/dataModel";
-import {
-  Activity,
-  AlertTriangle,
-  ArrowRight,
-  Bot,
-  ListTodo,
-  Play,
-  Plus,
-  ShieldCheck,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ArrowRight, Bot, ChevronRight, Plus } from "lucide-react";
 import { PageHeader } from "../../components/factory/DetailLayout";
 import { StatusBadge, RiskBadge } from "../../components/factory/badges";
 import { EmptyState } from "../../components/ui/empty-state";
@@ -32,10 +22,19 @@ import {
   EosSection,
   HealthSignalCard,
   InsightCard,
+  PageProvenanceNote,
   ProvenanceBadge,
 } from "../components";
-import { demoHealthSignals, demoInsights, demoMission } from "../demoData";
-import type { HealthStatus, MissionSummary } from "../types";
+import {
+  AGENT_ROLES,
+  demoAttentionNarratives,
+  demoHealthSignals,
+  demoInsights,
+  demoMission,
+  demoMissionAnchor,
+  demoTimeline,
+} from "../demoData";
+import type { HealthStatus } from "../types";
 
 export interface CommandCenterViewProps {
   onNavigate: (view: string) => void;
@@ -46,14 +45,6 @@ export interface CommandCenterViewProps {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CARD_CLASS = "rounded-xl border border-line bg-surface-1";
-
-function formatRelativeTime(ts: number): string {
-  const diff = Date.now() - ts;
-  if (diff < 60_000) return "just now";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-  return `${Math.floor(diff / 86_400_000)}d ago`;
-}
 
 function ViewAllLink({
   onClick,
@@ -123,29 +114,134 @@ const HEALTH_DOT: Record<HealthStatus, string> = {
   INSUFFICIENT_EVIDENCE: "bg-ink-muted",
 };
 
-const MISSION_STATE_TONE: Record<
-  MissionSummary["state"],
-  "success" | "warning" | "info" | "neutral"
-> = {
-  ACTIVE: "info",
-  AT_RISK: "warning",
-  BLOCKED: "warning",
-  VALIDATED: "success",
+const HEALTH_LABEL: Record<HealthStatus, string> = {
+  HEALTHY: "Healthy",
+  WATCH: "Watch",
+  AT_RISK: "At risk",
+  CRITICAL: "Critical",
+  INSUFFICIENT_EVIDENCE: "Insufficient evidence",
 };
 
-function activityIcon(action: string): LucideIcon {
-  const a = action.toLowerCase();
-  if (a.includes("approv")) return ShieldCheck;
-  if (a.includes("alert")) return AlertTriangle;
-  if (a.includes("run") || a.includes("execut")) return Play;
-  if (a.includes("agent")) return Bot;
-  if (a.includes("task")) return ListTodo;
-  return Activity;
+// ─────────────────────────────────────────────────────────────────────────────
+// Mission anchor (demo projection) — operational status brief at page top
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MissionAnchorCard({
+  onNavigate,
+}: {
+  onNavigate: (view: string) => void;
+}): JSX.Element {
+  const facts: { label: string; value: React.ReactNode }[] = [
+    {
+      label: "State",
+      value: (
+        <span className="flex items-center gap-2">
+          <StatusBadge tone="info">Active</StatusBadge>
+          <span className="flex items-center gap-1.5">
+            <span
+              className={cn("h-1.5 w-1.5 shrink-0 rounded-full", HEALTH_DOT[demoMission.health])}
+              aria-hidden
+            />
+            <span className="text-[13px] text-ink">{HEALTH_LABEL[demoMission.health]}</span>
+          </span>
+        </span>
+      ),
+    },
+    {
+      label: "Work orders",
+      value: (
+        <span className="flex flex-col gap-1">
+          <span className="text-[13px] text-ink">
+            {demoMission.progressPct}% · {demoMission.workOrderTitles.length} active
+          </span>
+          <ThinBar fraction={demoMission.progressPct / 100} />
+        </span>
+      ),
+    },
+    {
+      label: "Blocking",
+      value: <span className="text-[13px] text-warn">{demoMissionAnchor.blocking}</span>,
+    },
+    {
+      label: "Delivery",
+      value: <span className="text-[13px] text-ink">{demoMissionAnchor.milestone}</span>,
+    },
+    {
+      label: "Verification",
+      value: <span className="text-[13px] text-warn">{demoMissionAnchor.verification}</span>,
+    },
+    {
+      label: "Cost",
+      value: (
+        <span className="font-mono text-[13px] text-ink">
+          ${demoMission.actualCostUsd.toFixed(2)} of ${demoMission.plannedBudgetUsd.toFixed(2)}{" "}
+          planned
+        </span>
+      ),
+    },
+  ];
+  return (
+    <section className={cn(CARD_CLASS, "p-5")} aria-label="Active mission">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 max-w-[72ch] flex-1">
+          <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-ok">
+            Active mission
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate("mission-detail")}
+            className="mt-1 block text-left text-[19px] font-semibold tracking-tight text-ink transition-opacity duration-150 hover:opacity-80"
+          >
+            {demoMission.name}
+          </button>
+          <p className="mt-1 text-[13.5px] leading-relaxed text-ink-secondary">
+            {demoMission.objective}
+          </p>
+          <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+            {facts.map((fact) => (
+              <div key={fact.label} className="min-w-0">
+                <dt className="text-[11.5px] text-ink-muted">{fact.label}</dt>
+                <dd className="mt-0.5">{fact.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
+          <ProvenanceBadge provenance={demoMission.provenance} />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onNavigate("mission-detail")}
+              className="inline-flex h-9 items-center rounded-lg bg-act px-3 text-[13px] font-medium text-act-ink transition-opacity duration-150 hover:opacity-90"
+            >
+              Open mission
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate("dossier")}
+              className="inline-flex h-9 items-center rounded-lg border border-line px-3 text-[13px] font-medium text-ink-secondary transition-colors duration-150 hover:border-line-strong hover:text-ink"
+            >
+              Decide waiver
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
+        <span className="text-[12.5px] text-ink-muted">
+          Next action: {demoMissionAnchor.nextAction}
+        </span>
+        <ViewAllLink label="View all missions" onClick={() => onNavigate("missions")} />
+      </div>
+    </section>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Needs attention (real Convex: pending approvals + blocked tasks + alerts)
+// Needs attention (real Convex: pending approvals + blocked tasks + alerts,
+// with matched rows narrated via demoAttentionNarratives — never invented)
 // ─────────────────────────────────────────────────────────────────────────────
+
+type AttentionNarrative = (typeof demoAttentionNarratives)[number];
 
 interface AttentionRow {
   id: string;
@@ -153,6 +249,26 @@ interface AttentionRow {
   detail?: string;
   badge: JSX.Element;
   onOpen: () => void;
+  narrative?: AttentionNarrative;
+}
+
+/**
+ * Match real rows against demo narratives by title/summary substring; sort
+ * matched rows by narrative priority, unmatched rows after in original order.
+ */
+function narrateAttentionRows(rows: AttentionRow[]): AttentionRow[] {
+  const annotated = rows.map((row) => {
+    const haystack = `${row.title} ${row.detail ?? ""}`.toLowerCase();
+    const narrative = demoAttentionNarratives.find((n) =>
+      haystack.includes(n.match.toLowerCase())
+    );
+    return narrative ? { ...row, narrative } : row;
+  });
+  const matched = annotated
+    .filter((r) => r.narrative)
+    .sort((a, b) => (a.narrative?.priority ?? 99) - (b.narrative?.priority ?? 99));
+  const unmatched = annotated.filter((r) => !r.narrative);
+  return [...matched, ...unmatched];
 }
 
 function AttentionList({ rows }: { rows: AttentionRow[] }): JSX.Element {
@@ -168,13 +284,31 @@ function AttentionList({ rows }: { rows: AttentionRow[] }): JSX.Element {
             onClick={row.onOpen}
             className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors duration-150 hover:bg-surface-2"
           >
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-medium text-ink">{row.title}</div>
-              {row.detail && (
-                <div className="mt-0.5 truncate text-[12.5px] text-ink-muted">{row.detail}</div>
-              )}
-            </div>
+            {row.narrative ? (
+              <div className="min-w-0 max-w-[72ch] flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-[13.5px] font-medium text-ink">
+                    {row.narrative.decision}
+                  </span>
+                  <ProvenanceBadge provenance="demo" variant="dot" />
+                </div>
+                <div className="mt-0.5 truncate text-[12.5px] text-ink-muted">
+                  {row.narrative.why}
+                </div>
+                <div className="mt-0.5 truncate font-mono text-[11.5px] text-ink-muted">
+                  {row.title}
+                </div>
+              </div>
+            ) : (
+              <div className="min-w-0 max-w-[72ch] flex-1">
+                <div className="truncate text-[13px] font-medium text-ink">{row.title}</div>
+                {row.detail && (
+                  <div className="mt-0.5 truncate text-[12.5px] text-ink-muted">{row.detail}</div>
+                )}
+              </div>
+            )}
             {row.badge}
+            <ChevronRight size={14} strokeWidth={1.75} className="shrink-0 text-ink-muted" aria-hidden />
           </button>
         </li>
       ))}
@@ -183,106 +317,52 @@ function AttentionList({ rows }: { rows: AttentionRow[] }): JSX.Element {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mission portfolio (demo projection)
+// Live factory activity (curated demo timeline — the story, not a log)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function MissionPortfolioCard({
-  mission,
-  onNavigate,
-}: {
-  mission: MissionSummary;
-  onNavigate: (view: string) => void;
-}): JSX.Element {
-  return (
-    <button
-      type="button"
-      onClick={() => onNavigate("mission-detail")}
-      className={cn(
-        CARD_CLASS,
-        "flex w-full flex-col gap-3 p-4 text-left transition-colors duration-150 hover:border-line-strong"
-      )}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span
-            className={cn("h-2 w-2 shrink-0 rounded-full", HEALTH_DOT[mission.health])}
-            aria-hidden
-          />
-          <span className="truncate text-[15px] font-semibold text-ink">{mission.name}</span>
-          <StatusBadge tone={MISSION_STATE_TONE[mission.state]}>
-            {mission.state.charAt(0) + mission.state.slice(1).toLowerCase().replace("_", " ")}
-          </StatusBadge>
-        </div>
-        <ProvenanceBadge provenance={mission.provenance} />
-      </div>
-      <p className="text-[13.5px] leading-relaxed text-ink-secondary">{mission.objective}</p>
-      <ThinBar fraction={mission.progressPct / 100} label={`${mission.progressPct}%`} />
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
-        <span className="text-[12.5px] text-ink-muted">
-          Cost{" "}
-          <span className="font-mono text-ink">
-            ${mission.actualCostUsd.toFixed(2)} / ${mission.plannedBudgetUsd.toFixed(2)}
-          </span>
-        </span>
-        <span className="text-[12.5px] text-ink-muted">
-          Work orders{" "}
-          <span className="font-mono text-ink">{mission.workOrderTitles.length}</span>
-        </span>
-        <span className="text-[12.5px] text-ink-muted">
-          Next milestone <span className="text-ink">{mission.nextMilestone}</span>
-        </span>
-      </div>
-      <div className="border-t border-line pt-2 text-[12.5px] text-warn">
-        {mission.deliveryRisk}
-      </div>
-    </button>
-  );
-}
+const TIMELINE_DOT: Record<(typeof demoTimeline)[number]["state"], string> = {
+  ok: "bg-ok",
+  warn: "bg-warn",
+  err: "bg-err",
+  info: "bg-info-accent",
+};
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Live factory activity (real Convex)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ActivityList({ activities }: { activities: Doc<"activities">[] }): JSX.Element {
-  if (activities.length === 0) {
-    return (
-      <EmptyState
-        icon={Activity}
-        title="No factory activity yet"
-        description="Agent and operator actions will stream here as they happen."
-      />
-    );
-  }
+function TimelineList({ onNavigate }: { onNavigate: (view: string) => void }): JSX.Element {
   return (
     <ul className={CARD_CLASS}>
-      {activities.slice(0, 8).map((activity) => {
-        const Icon = activityIcon(activity.action);
-        return (
-          <li
-            key={activity._id}
-            className="flex items-start gap-3 border-b border-line px-4 py-3 last:border-b-0"
+      {demoTimeline.map((event, i) => (
+        <li key={`${event.rel}-${i}`} className="border-b border-line last:border-b-0">
+          <button
+            type="button"
+            onClick={() => onNavigate(event.drillView)}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-surface-2"
           >
-            <Icon
-              size={14}
-              strokeWidth={1.75}
-              className="mt-0.5 shrink-0 text-ink-muted"
+            <span className="w-10 shrink-0 font-mono text-[11.5px] text-ink-muted">
+              {event.rel}
+            </span>
+            <span
+              className={cn("h-1.5 w-1.5 shrink-0 rounded-full", TIMELINE_DOT[event.state])}
               aria-hidden
             />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] text-ink-secondary">{activity.description}</p>
-              <p className="mt-0.5 text-[11.5px] text-ink-muted">
-                {activity.actorType} · {formatRelativeTime(activity._creationTime)}
-              </p>
-            </div>
-          </li>
-        );
-      })}
+            <span className="min-w-0 max-w-[72ch] flex-1">
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="shrink-0 text-[12.5px] text-ink-secondary">{event.actor}</span>
+                <span className="text-[13px] text-ink">{event.event}</span>
+              </span>
+              <span className="mt-0.5 block truncate font-mono text-[11.5px] text-ink-muted">
+                {event.object}
+              </span>
+            </span>
+            <ChevronRight size={14} strokeWidth={1.75} className="shrink-0 text-ink-muted" aria-hidden />
+          </button>
+        </li>
+      ))}
     </ul>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AI workforce (real Convex agents + task join)
+// AI workforce (real Convex agents + task join; functional role titles)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function WorkforceList({
@@ -312,6 +392,11 @@ function WorkforceList({
         const currentTask = agent.currentTaskId
           ? tasks.find((t) => t._id === agent.currentTaskId) ?? null
           : null;
+        const recentResult = currentTask
+          ? `Working: ${currentTask.title}`
+          : agent.status === "ACTIVE"
+            ? "Idle"
+            : agent.status.toLowerCase();
         return (
           <li key={agent._id} className="border-b border-line last:border-b-0">
             <button
@@ -330,16 +415,18 @@ function WorkforceList({
                 <span className="flex items-baseline gap-2">
                   <span className="truncate text-[13px] font-medium text-ink">{agent.name}</span>
                   <span className="shrink-0 text-[11.5px] text-ink-muted">
-                    {agent.role.toLowerCase()}
+                    {AGENT_ROLES[agent.name] ?? agent.role.toLowerCase()}
                   </span>
                 </span>
                 <span className="mt-0.5 block truncate text-[12px] text-ink-muted">
-                  {currentTask
-                    ? currentTask.title
-                    : agent.status === "ACTIVE"
-                      ? "Idle"
-                      : agent.status.toLowerCase()}
+                  {recentResult}
                 </span>
+                {agent.status === "QUARANTINED" && (
+                  <span className="mt-0.5 flex items-center gap-1.5 text-[12px] text-err">
+                    <span className="truncate">Escalation: credential rotation required</span>
+                    <ProvenanceBadge provenance="demo" variant="dot" />
+                  </span>
+                )}
               </span>
               <span className="hidden w-32 shrink-0 sm:block">
                 <ThinBar
@@ -359,8 +446,22 @@ function WorkforceList({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Factory readiness (system + integration status)
+// Factory capacity (quota gauge + scheduler posture) and readiness
 // ─────────────────────────────────────────────────────────────────────────────
+
+function CapacityPostureCard({ usagePct }: { usagePct: number | null }): JSX.Element {
+  const schedulerDot =
+    usagePct == null ? "bg-ink-muted" : usagePct < 80 ? "bg-ok" : "bg-warn";
+  return (
+    <div className={cn(CARD_CLASS, "flex flex-col gap-2 p-4")}>
+      <div className="flex items-center gap-2 text-[12.5px] text-ink-secondary">
+        <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", schedulerDot)} aria-hidden />
+        Scheduler: safe to start background work
+      </div>
+      <div className="text-[12.5px] text-ink-muted">Constraint: provider quota</div>
+    </div>
+  );
+}
 
 function FactoryReadinessCard({
   gatewayConfigured,
@@ -394,17 +495,16 @@ function FactoryReadinessCard({
     { label: "CI", value: <ProvenanceBadge provenance="disconnected" /> },
   ];
   return (
-    <section className={cn(CARD_CLASS, "p-4")}>
-      <h3 className="text-[15px] font-semibold text-ink">Factory readiness</h3>
-      <dl className="mt-3 flex flex-col divide-y divide-line">
+    <div className={cn(CARD_CLASS, "p-4")}>
+      <dl className="flex flex-col divide-y divide-line">
         {rows.map((row) => (
-          <div key={row.label} className="flex items-center justify-between gap-3 py-2.5">
+          <div key={row.label} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
             <dt className="text-[12.5px] text-ink-muted">{row.label}</dt>
             <dd className="text-[13px] text-ink">{row.value}</dd>
           </div>
         ))}
       </dl>
-    </section>
+    </div>
   );
 }
 
@@ -438,14 +538,14 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
   const approvals = useQuery(api.approvals.listPending, { limit: 25 });
   const tasks = useQuery(api.tasks.listAll, {});
   const openAlerts = useQuery(api.alerts.listOpen, { limit: 10 });
-  const activities = useQuery(api.activities.listRecent, { limit: 8 });
   const agents = useQuery(api.agents.listAll, {});
   const scheduledJobs = useQuery(api.scheduledJobs.list, {});
+  const quotaSnapshot = useQuery(api.quotaTracking.getLatestSnapshot, {});
 
   const attentionLoading = !approvals || !tasks || !openAlerts;
   const attentionRows: AttentionRow[] = attentionLoading
     ? []
-    : [
+    : narrateAttentionRows([
         ...approvals.map((approval) => ({
           id: `approval-${approval._id}`,
           title: approval.title || "Approval requested",
@@ -476,7 +576,7 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
           badge: <StatusBadge tone="error">Alert</StatusBadge>,
           onOpen: () => onNavigate("audit"),
         })),
-      ].slice(0, 8);
+      ]).slice(0, 5);
 
   const now = Date.now();
   const nextJob = (scheduledJobs ?? [])
@@ -494,7 +594,7 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="relative flex-1 overflow-auto bg-app">
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
         <PageHeader
           title="Command Center"
           description="The causal system of record and operating control plane for AI-native engineering."
@@ -510,8 +610,12 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
           }
         />
 
+        <PageProvenanceNote />
+
+        <MissionAnchorCard onNavigate={onNavigate} />
+
         <div
-          className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6"
+          className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6"
           aria-label="Factory health signals"
         >
           {demoHealthSignals.map((signal) => (
@@ -519,60 +623,73 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
           ))}
         </div>
 
-        <EosSection eyebrow="OPERATE" title="Needs attention">
-          {attentionLoading ? <LoadingRows /> : <AttentionList rows={attentionRows} />}
-        </EosSection>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          {/* Main column */}
+          <div className="flex min-w-0 flex-col gap-6 xl:col-span-8">
+            <EosSection
+              eyebrow="INTELLIGENCE"
+              title="Recommended actions"
+              action={<ViewAllLink onClick={() => onNavigate("recommendations")} />}
+            >
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {demoInsights.map((insight) => (
+                  <InsightCard key={insight.id} insight={insight} onNavigate={onNavigate} />
+                ))}
+              </div>
+            </EosSection>
 
-        <EosSection
-          eyebrow="INTELLIGENCE"
-          title="Recommended actions"
-          action={<ViewAllLink onClick={() => onNavigate("recommendations")} />}
-        >
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {demoInsights.map((insight) => (
-              <InsightCard key={insight.id} insight={insight} onNavigate={onNavigate} />
-            ))}
+            <EosSection
+              eyebrow="OPERATE"
+              title="Needs attention"
+              action={<ViewAllLink onClick={() => onNavigate("tasks")} />}
+            >
+              {attentionLoading ? <LoadingRows /> : <AttentionList rows={attentionRows} />}
+            </EosSection>
+
+            <EosSection
+              eyebrow="EXECUTION"
+              title="Live factory activity"
+              action={
+                <div className="flex items-center gap-3">
+                  <ProvenanceBadge provenance="demo" />
+                  <ViewAllLink onClick={() => onNavigate("audit")} />
+                </div>
+              }
+            >
+              <TimelineList onNavigate={onNavigate} />
+            </EosSection>
           </div>
-        </EosSection>
 
-        <EosSection
-          eyebrow="STRATEGY"
-          title="Mission portfolio"
-          action={<ViewAllLink onClick={() => onNavigate("missions")} />}
-        >
-          <MissionPortfolioCard mission={demoMission} onNavigate={onNavigate} />
-        </EosSection>
+          {/* Right rail */}
+          <div className="flex min-w-0 flex-col gap-6 xl:col-span-4">
+            <EosSection
+              eyebrow="WORKFORCE"
+              title="AI workforce"
+              action={<ViewAllLink onClick={() => onNavigate("agent-catalog")} />}
+            >
+              {!agents || !tasks ? (
+                <LoadingRows count={4} />
+              ) : (
+                <WorkforceList agents={agents} tasks={tasks} onNavigate={onNavigate} />
+              )}
+            </EosSection>
 
-        <EosSection
-          eyebrow="EXECUTION"
-          title="Live factory activity"
-          action={<ViewAllLink onClick={() => onNavigate("audit")} />}
-        >
-          {!activities ? <LoadingRows count={4} /> : <ActivityList activities={activities} />}
-        </EosSection>
+            <EosSection eyebrow="RESOURCES" title="Factory capacity">
+              <div className="flex flex-col gap-3">
+                <QuotaFuelGauge />
+                <CapacityPostureCard usagePct={quotaSnapshot?.usagePct ?? null} />
+              </div>
+            </EosSection>
 
-        <EosSection
-          eyebrow="WORKFORCE"
-          title="AI workforce"
-          action={<ViewAllLink onClick={() => onNavigate("agent-catalog")} />}
-        >
-          {!agents || !tasks ? (
-            <LoadingRows count={4} />
-          ) : (
-            <WorkforceList agents={agents} tasks={tasks} onNavigate={onNavigate} />
-          )}
-        </EosSection>
-
-        <EosSection eyebrow="FACTORY CAPACITY" title="AI capacity">
-          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-            <QuotaFuelGauge />
-            <FactoryReadinessCard
-              gatewayConfigured={gatewayConfigured}
-              agents={agents ?? []}
-              nextJobLabel={nextJobLabel}
-            />
+            <EosSection eyebrow="SYSTEM" title="Factory readiness">
+              <FactoryReadinessCard
+                gatewayConfigured={gatewayConfigured}
+                agents={agents ?? []}
+                nextJobLabel={nextJobLabel}
+              />
+            </EosSection>
           </div>
-        </EosSection>
+        </div>
       </div>
     </div>
   );

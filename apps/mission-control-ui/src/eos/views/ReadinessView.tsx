@@ -3,7 +3,7 @@ import { PageHeader } from "../../components/factory/DetailLayout";
 import { StatusBadge } from "../../components/factory/badges";
 import { EmptyState } from "../../components/ui/empty-state";
 import { cn } from "../../lib/utils";
-import { InsightCard, ProvenanceBadge } from "../components";
+import { InsightCard, PageProvenanceNote, ProvenanceBadge } from "../components";
 import { demoReadiness } from "../demoData";
 import type { HealthStatus, ReadinessAssessment } from "../types";
 
@@ -99,11 +99,12 @@ export function ReadinessView({ onNavigate }: ReadinessViewProps): JSX.Element {
 
   return (
     <div className="relative flex-1 overflow-auto bg-app">
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
         <PageHeader
           title="Environment Readiness"
           description="Learned from execution friction, not questionnaires."
         />
+        <PageProvenanceNote />
         <div className="flex gap-6">
           <div className="flex w-[300px] shrink-0 flex-col gap-3">
             {demoReadiness.map((assessment) => (
@@ -123,9 +124,14 @@ export function ReadinessView({ onNavigate }: ReadinessViewProps): JSX.Element {
                 ))}
               </div>
               <section className="flex flex-col gap-3">
-                <h2 className="text-[15px] font-semibold text-ink">Recommendations</h2>
+                <h2 className="text-[19px] font-semibold tracking-tight text-ink">
+                  Recommendations
+                </h2>
                 {selected.recommendations.length === 0 ? (
-                  <EmptyState title="No open recommendations" />
+                  <EmptyState
+                    title="No open recommendations"
+                    description="Friction detectors report nothing recurring for this repository."
+                  />
                 ) : (
                   selected.recommendations.map((insight) => (
                     <InsightCard key={insight.id} insight={insight} onNavigate={onNavigate} />
