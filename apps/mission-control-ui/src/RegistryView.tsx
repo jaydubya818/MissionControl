@@ -46,22 +46,23 @@ interface Category {
   id: string;
   label: string;
   icon: LucideIcon;
+  description: string;
 }
 
 const CATEGORIES: Category[] = [
-  { id: "all", label: "All", icon: Boxes },
-  { id: "testing-quality", label: "Testing & Quality", icon: FlaskConical },
-  { id: "security-compliance", label: "Security & Compliance", icon: Shield },
-  { id: "documentation", label: "Documentation", icon: BookOpen },
-  { id: "debugging", label: "Debugging & Errors", icon: Bug },
-  { id: "api-development", label: "API Development", icon: Layers },
-  { id: "web-development", label: "Web Development", icon: Globe },
-  { id: "database", label: "Database", icon: Database },
-  { id: "infrastructure", label: "Infrastructure", icon: Cloud },
-  { id: "git-delivery", label: "Git & Delivery", icon: GitBranch },
-  { id: "observability", label: "Observability", icon: Radio },
-  { id: "release-engineering", label: "Release Engineering", icon: Rocket },
-  { id: "agent-operations", label: "Agent Operations", icon: Bot },
+  { id: "all", label: "All", icon: Boxes , description: "Everything in the governed registry, ranked by quality." },
+  { id: "testing-quality", label: "Testing & Quality", icon: FlaskConical , description: "Skills for writing, running, and debugging tests across unit, integration, and E2E." },
+  { id: "security-compliance", label: "Security & Compliance", icon: Shield , description: "Harden agents and code, enforce policy, and keep approvals audit-ready." },
+  { id: "documentation", label: "Documentation", icon: BookOpen , description: "Generate and maintain READMEs, API docs, runbooks, and inline guidance." },
+  { id: "debugging", label: "Debugging & Errors", icon: Bug , description: "Diagnose failures, trace errors, and encode resilient recovery patterns." },
+  { id: "api-development", label: "API Development", icon: Layers , description: "Design, build, and document APIs with consistent contracts." },
+  { id: "web-development", label: "Web Development", icon: Globe , description: "UI components, layout systems, and design-to-code workflows." },
+  { id: "database", label: "Database", icon: Database , description: "Schema design, query optimization, and migration patterns." },
+  { id: "infrastructure", label: "Infrastructure", icon: Cloud , description: "Provisioning, environments, and deployment pipeline skills." },
+  { id: "git-delivery", label: "Git & Delivery", icon: GitBranch , description: "Worktrees, branches, PR discipline, and safe delivery flows." },
+  { id: "observability", label: "Observability", icon: Radio , description: "Telemetry, run inspection, and evidence-first diagnostics." },
+  { id: "release-engineering", label: "Release Engineering", icon: Rocket , description: "Release readiness, verification gates, and rollback safety." },
+  { id: "agent-operations", label: "Agent Operations", icon: Bot , description: "Registration, heartbeats, budgets, memory, and the factory contract." },
 ];
 
 const TYPE_TABS = [
@@ -94,14 +95,19 @@ function CategoryChip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "flex h-[92px] w-[118px] shrink-0 flex-col items-center justify-center gap-2 rounded-xl border px-2 text-center transition-colors duration-150",
+        "flex min-h-[132px] w-full flex-col items-start gap-2.5 rounded-xl border p-4 text-left transition-colors duration-150",
         active
           ? "border-info-accent bg-surface-1 text-ink"
           : "border-line bg-surface-1/60 text-ink-secondary hover:border-line-strong hover:text-ink"
       )}
     >
-      <Icon size={18} strokeWidth={1.6} aria-hidden />
-      <span className="text-[11.5px] leading-tight">{category.label}</span>
+      <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface-2">
+        <Icon size={16} strokeWidth={1.6} aria-hidden />
+      </span>
+      <span className="text-[13.5px] font-semibold text-ink">{category.label}</span>
+      <span className="line-clamp-2 text-[12px] leading-relaxed text-ink-muted">
+        {category.description}
+      </span>
     </button>
   );
 }
@@ -249,17 +255,22 @@ export function RegistryViewContent({ entries }: RegistryViewContentProps): JSX.
           className="h-10 w-full rounded-lg border border-line bg-surface-1 pl-9 pr-3 text-[13.5px] text-ink placeholder:text-ink-muted focus-visible:border-line-strong"
         />
       </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {CATEGORIES.map((c) => (
-          <CategoryChip
-            key={c.id}
-            category={c}
-            active={category === c.id}
-            onClick={() => setCategory(c.id)}
-          />
-        ))}
-      </div>
+      <section className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-[19px] font-semibold tracking-tight text-ink">Browse by category</h2>
+          <p className="mt-0.5 text-[12.5px] text-ink-muted">Find exactly what you need, organized by use case.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          {CATEGORIES.map((c) => (
+            <CategoryChip
+              key={c.id}
+              category={c}
+              active={category === c.id}
+              onClick={() => setCategory(c.id)}
+            />
+          ))}
+        </div>
+      </section>
 
       <div className="flex items-end justify-between gap-4">
         <div>
@@ -314,6 +325,40 @@ export function RegistryViewContent({ entries }: RegistryViewContentProps): JSX.
           </span>
         }
       />
+
+      <section className="rounded-xl border border-line bg-surface-1 p-6">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="flex flex-col gap-3">
+            <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-ok">Publish a skill</div>
+            <h2 className="text-[19px] font-semibold tracking-tight text-ink">
+              Make your skill work correctly — provably.
+            </h2>
+            <p className="max-w-[60ch] text-[13.5px] leading-relaxed text-ink-secondary">
+              Register a skill and the factory lints it, versions it by content
+              hash, and lists it here. Scenario evaluations attach scores and
+              lift once the evaluation pipeline runs.
+            </p>
+            <code className="w-fit rounded-lg border border-line bg-surface-2 px-3 py-2 font-mono text-[12.5px] text-ink">
+              node scripts/import-repo-skills.mjs
+            </code>
+          </div>
+          <ol className="flex flex-col gap-2">
+            {[
+              ["Submit your skill", "Point the importer at a SKILL.md — frontmatter is validated and the content hash recorded."],
+              ["Get your score", "mc skill lint runs the structural review; scenario evals add impact once PRs 8\u20139 land."],
+              ["Improve and republish", "Act on lint findings, re-import, and every version stays tracked and comparable."],
+            ].map(([title, body], i) => (
+              <li key={title} className="flex gap-3 rounded-lg border border-line bg-surface-2 p-3">
+                <span className="font-mono text-[12.5px] text-ok">{String(i + 1).padStart(2, "0")}</span>
+                <span>
+                  <span className="block text-[13.5px] font-medium text-ink">{title}</span>
+                  <span className="block text-[12.5px] text-ink-muted">{body}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
 
       <div className="flex items-center gap-1.5 pb-4 text-[12px] text-ink-muted">
         <Sparkles size={12} aria-hidden />
