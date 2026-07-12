@@ -11,12 +11,10 @@ import { cn } from "../lib/utils";
 
 const ROUTE_PREFIX = "/v2";
 
-function viewFromPath(pathname: string): MainView | null {
+function viewFromPath(pathname: string, validViews: string[]): MainView | null {
   if (!pathname.startsWith(`${ROUTE_PREFIX}/`)) return null;
   const candidate = pathname.slice(ROUTE_PREFIX.length + 1).split("/")[0];
-  return (allNavViews() as string[]).includes(candidate)
-    ? (candidate as MainView)
-    : null;
+  return validViews.includes(candidate) ? (candidate as MainView) : null;
 }
 
 interface AppShellV2Props {
@@ -55,7 +53,7 @@ export function AppShellV2({
 
   // URL → view (deep links, back/forward)
   useEffect(() => {
-    const pathView = viewFromPath(location.pathname);
+    const pathView = viewFromPath(location.pathname, validViews);
     if (pathView && pathView !== activeView) {
       syncingFromUrl.current = true;
       onNavigate(pathView);
@@ -75,8 +73,17 @@ export function AppShellV2({
   }, [activeView]);
 
   const eosPreview = useFlag("eos.command-center-preview");
-  const group = groupForView(activeView);
-  const item = itemForView(activeView);
+  const navGroups = eosPreview ? EOS_NAV_GROUPS : undefined;
+  const activeGroups = navGroups ?? null;
+  const validViews = activeGroups
+    ? [...new Set([...activeGroups.flatMap((g) => g.items.map((i) => i.view as string)), ...allNavViews()])]
+    : (allNavViews() as string[]);
+  const group = activeGroups
+    ? activeGroups.find((g) => g.items.some((i) => i.view === activeView)) ?? groupForView(activeView)
+    : groupForView(activeView);
+  const item = activeGroups
+    ? activeGroups.flatMap((g) => g.items).find((i) => i.view === activeView) ?? itemForView(activeView)
+    : itemForView(activeView);
   const crumbs = [
     ...(group ? [{ label: group.label }] : []),
     ...(item ? [{ label: item.label, current: true }] : []),
@@ -85,7 +92,7 @@ export function AppShellV2({
   return (
     <div className="shell-v2 flex h-screen overflow-hidden">
       <Sidebar
-        groups={eosPreview ? EOS_NAV_GROUPS : undefined}
+        groups={navGroups}
         activeView={activeView}
         onNavigate={onNavigate}
         onOpenSearch={onOpenSearch}
