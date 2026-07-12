@@ -29,6 +29,7 @@ import {
 } from "../components";
 import {
   AGENT_ROLES,
+  demoAttentionNarratives,
   demoHealthSignals,
   demoInsights,
   demoMission,
@@ -477,6 +478,7 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
   };
 
   const attentionItems = buildAttentionItems({
+    limit: 5,
     approvals: approvals ?? [],
     blockedTasks: blockedTasksList,
     needsApprovalTasks,
@@ -504,6 +506,21 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
       });
     },
   });
+
+  // Narrate matched rows with decision-specific demo copy (semantic
+  // substring match, priority-sorted; unmatched rows keep real text).
+  const narratedItems = attentionItems
+    .map((item) => {
+      const haystack = `${item.title} ${item.detail ?? ""}`.toLowerCase();
+      const narrative = demoAttentionNarratives.find((n) =>
+        haystack.includes(n.match.toLowerCase())
+      );
+      return narrative
+        ? { ...item, title: narrative.decision, detail: narrative.why, _priority: narrative.priority }
+        : { ...item, _priority: 99 };
+    })
+    .sort((a, b) => a._priority - b._priority)
+    .slice(0, 5);
 
   const exceptions = exceptionCounts({
     approvals: approvals ?? [],
@@ -547,15 +564,6 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
         />
 
         <PageProvenanceNote />
-
-        {attentionLoading ? (
-          <LoadingRows count={4} />
-        ) : (
-          <AttentionQueuePanel
-            items={attentionItems}
-            scannedAt={scannedAt}
-            counts={exceptions}
-            onOpenApprovals={() => onNavigate("audit")}
             onOpenTasks={() => onNavigate("tasks")}
             onOpenAlerts={() => onNavigate("telemetry")}
           />
@@ -585,6 +593,30 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
                   <InsightCard key={insight.id} insight={insight} onNavigate={onNavigate} />
                 ))}
               </div>
+            </EosSection>
+
+            <EosSection
+              eyebrow="OPERATE"
+              title="Needs attention"
+              action={
+                <span className="flex items-center gap-3">
+                  <ProvenanceBadge provenance="demo" variant="dot" />
+                  <ViewAllLink onClick={() => onNavigate("tasks")} />
+                </span>
+              }
+            >
+              {attentionLoading ? (
+                <LoadingRows count={4} />
+              ) : (
+                <AttentionQueuePanel
+                  items={narratedItems}
+                  scannedAt={scannedAt}
+                  counts={exceptions}
+                  onOpenApprovals={() => onNavigate("audit")}
+                  onOpenTasks={() => onNavigate("tasks")}
+                  onOpenAlerts={() => onNavigate("telemetry")}
+                />
+              )}
             </EosSection>
 
             <EosSection
