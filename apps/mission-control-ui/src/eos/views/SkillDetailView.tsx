@@ -161,6 +161,29 @@ function splitFrontmatter(content: string): { frontmatter: string | null; body: 
   return { frontmatter: null, body: content };
 }
 
+function renderInline(text: string): JSX.Element[] {
+  // Minimal inline markdown: **bold** and `code`. No HTML injection —
+  // output is plain React elements.
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).filter(Boolean);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={i} className="font-semibold text-ink">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code key={i} className="rounded bg-surface-2 px-1 font-mono text-[12px]">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 function parseMarkdownBlocks(body: string): JSX.Element[] {
   const lines = body.split("\n");
   const out: JSX.Element[] = [];
@@ -182,6 +205,42 @@ function parseMarkdownBlocks(body: string): JSX.Element[] {
         >
           {buf.join("\n")}
         </pre>
+      );
+      continue;
+    }
+    if (line.trim().startsWith("|") && lines[i + 1]?.trim().match(/^\|[\s:-|]+\|?$/)) {
+      const header = line.trim().split("|").map((c) => c.trim()).filter(Boolean);
+      i += 2; // skip header + separator
+      const rows: string[][] = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        rows.push(lines[i].trim().split("|").map((c) => c.trim()).filter(Boolean));
+        i++;
+      }
+      out.push(
+        <div key={out.length} className="overflow-x-auto rounded-xl border border-line">
+          <table className="w-full border-collapse text-[12.5px]">
+            <thead>
+              <tr className="border-b border-line">
+                {header.map((h, j) => (
+                  <th key={j} className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
+                    {renderInline(h)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((cells, r) => (
+                <tr key={r} className="border-b border-line last:border-b-0">
+                  {cells.map((cell, c) => (
+                    <td key={c} className="px-3 py-2 align-top text-ink-secondary">
+                      {renderInline(cell)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       );
       continue;
     }
@@ -221,7 +280,7 @@ function parseMarkdownBlocks(body: string): JSX.Element[] {
       out.push(
         <ul key={out.length} className="flex list-disc flex-col gap-1 pl-5 text-[13.5px] leading-relaxed text-ink-secondary">
           {items.map((item, j) => (
-            <li key={j}>{item}</li>
+            <li key={j}>{renderInline(item)}</li>
           ))}
         </ul>
       );
@@ -245,7 +304,7 @@ function parseMarkdownBlocks(body: string): JSX.Element[] {
     }
     out.push(
       <p key={out.length} className="text-[13.5px] leading-relaxed text-ink-secondary">
-        {para.join(" ")}
+        {renderInline(para.join(" "))}
       </p>
     );
   }
