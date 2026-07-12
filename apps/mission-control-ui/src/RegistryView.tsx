@@ -21,6 +21,7 @@ import type { LucideIcon } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { ScoreBadge, StatusBadge } from "./components/factory/badges";
 import { DataTable, type Column } from "./components/factory/DataTable";
+import { eosNavigate, setSelectedSkillSlug } from "./eos/skillSelection";
 import { cn } from "./lib/utils";
 
 export interface RegistryEntry {
@@ -105,9 +106,19 @@ function CategoryChip({
   );
 }
 
+/** Set cross-view selection, then route to the detail page. */
+function openSkillDetail(slug: string): void {
+  setSelectedSkillSlug(slug);
+  eosNavigate("skill-detail");
+}
+
 function TopPackageCard({ entry }: { entry: RegistryEntry }): JSX.Element {
   return (
-    <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-line bg-surface-1 p-4 transition-colors duration-150 hover:border-line-strong">
+    <button
+      type="button"
+      onClick={() => openSkillDetail(entry.slug)}
+      className="flex min-w-0 cursor-pointer flex-col gap-3 rounded-xl border border-line bg-surface-1 p-4 text-left transition-colors duration-150 hover:border-line-strong hover:bg-surface-2"
+    >
       <div className="flex items-center gap-2">
         {entry.qualityScore !== null && <ScoreBadge score={entry.qualityScore} />}
         {entry.version && (
@@ -125,7 +136,7 @@ function TopPackageCard({ entry }: { entry: RegistryEntry }): JSX.Element {
       <p className="line-clamp-3 text-[12.5px] leading-relaxed text-ink-secondary">
         {entry.description}
       </p>
-    </div>
+    </button>
   );
 }
 
@@ -216,11 +227,10 @@ export function RegistryViewContent({ entries }: RegistryViewContentProps): JSX.
     <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-6">
       <div>
         <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">
-          Registry
+          Skills Marketplace
         </h1>
         <p className="mt-1.5 text-[14px] text-ink-secondary">
-          Governed context packages — skills, rules, and documentation your
-          agents run with.
+          Governed skills and context packages — evaluated, secured, versioned.
         </p>
       </div>
 
@@ -293,6 +303,7 @@ export function RegistryViewContent({ entries }: RegistryViewContentProps): JSX.
         columns={columns}
         rows={filtered ?? []}
         rowKey={(e) => e._id}
+        onRowClick={(e) => openSkillDetail(e.slug)}
         loading={filtered === undefined}
         emptyState={
           <span>
