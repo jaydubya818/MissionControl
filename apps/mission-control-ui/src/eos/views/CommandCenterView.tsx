@@ -8,15 +8,17 @@
  */
 
 import { useEffect, useState } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
-import type { Doc } from "../../../../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../../../../convex/_generated/dataModel";
 import { ArrowRight, Bot, ChevronRight, Plus } from "lucide-react";
 import { PageHeader } from "../../components/factory/DetailLayout";
-import { StatusBadge, RiskBadge } from "../../components/factory/badges";
+import { StatusBadge } from "../../components/factory/badges";
+import { AttentionQueuePanel } from "../../components/AttentionQueuePanel";
 import { EmptyState } from "../../components/ui/empty-state";
 import { QuotaFuelGauge } from "../../components/QuotaFuelGauge";
 import { cn } from "../../lib/utils";
+import { buildAttentionItems, exceptionCounts } from "../../lib/attentionQueue";
 import { getOrchestrationBaseUrl } from "../../lib/orchestrationUrl";
 import {
   EosSection,
@@ -27,7 +29,6 @@ import {
 } from "../components";
 import {
   AGENT_ROLES,
-  demoAttentionNarratives,
   demoHealthSignals,
   demoInsights,
   demoMission,
@@ -237,86 +238,6 @@ function MissionAnchorCard({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Needs attention (real Convex: pending approvals + blocked tasks + alerts,
-// with matched rows narrated via demoAttentionNarratives — never invented)
-// ─────────────────────────────────────────────────────────────────────────────
-
-type AttentionNarrative = (typeof demoAttentionNarratives)[number];
-
-interface AttentionRow {
-  id: string;
-  title: string;
-  detail?: string;
-  badge: JSX.Element;
-  onOpen: () => void;
-  narrative?: AttentionNarrative;
-}
-
-/**
- * Match real rows against demo narratives by title/summary substring; sort
- * matched rows by narrative priority, unmatched rows after in original order.
- */
-function narrateAttentionRows(rows: AttentionRow[]): AttentionRow[] {
-  const annotated = rows.map((row) => {
-    const haystack = `${row.title} ${row.detail ?? ""}`.toLowerCase();
-    const narrative = demoAttentionNarratives.find((n) =>
-      haystack.includes(n.match.toLowerCase())
-    );
-    return narrative ? { ...row, narrative } : row;
-  });
-  const matched = annotated
-    .filter((r) => r.narrative)
-    .sort((a, b) => (a.narrative?.priority ?? 99) - (b.narrative?.priority ?? 99));
-  const unmatched = annotated.filter((r) => !r.narrative);
-  return [...matched, ...unmatched];
-}
-
-function AttentionList({ rows }: { rows: AttentionRow[] }): JSX.Element {
-  if (rows.length === 0) {
-    return <EmptyState title="Nothing needs attention" description="Approvals, blockers, and alerts are all clear." />;
-  }
-  return (
-    <ul className={CARD_CLASS}>
-      {rows.map((row) => (
-        <li key={row.id} className="border-b border-line last:border-b-0">
-          <button
-            type="button"
-            onClick={row.onOpen}
-            className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors duration-150 hover:bg-surface-2"
-          >
-            {row.narrative ? (
-              <div className="min-w-0 max-w-[72ch] flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="truncate text-[13.5px] font-medium text-ink">
-                    {row.narrative.decision}
-                  </span>
-                  <ProvenanceBadge provenance="demo" variant="dot" />
-                </div>
-                <div className="mt-0.5 truncate text-[12.5px] text-ink-muted">
-                  {row.narrative.why}
-                </div>
-                <div className="mt-0.5 truncate font-mono text-[11.5px] text-ink-muted">
-                  {row.title}
-                </div>
-              </div>
-            ) : (
-              <div className="min-w-0 max-w-[72ch] flex-1">
-                <div className="truncate text-[13px] font-medium text-ink">{row.title}</div>
-                {row.detail && (
-                  <div className="mt-0.5 truncate text-[12.5px] text-ink-muted">{row.detail}</div>
-                )}
-              </div>
-            )}
-            {row.badge}
-            <ChevronRight size={14} strokeWidth={1.75} className="shrink-0 text-ink-muted" aria-hidden />
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Live factory activity (curated demo timeline — the story, not a log)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -514,6 +435,8 @@ function FactoryReadinessCard({
 
 export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.Element {
   const [gatewayConfigured, setGatewayConfigured] = useState<boolean | null>(null);
+  const approveApproval = useMutation(api.approvals.approve);
+  const transitionTask = useMutation(api.tasks.transition);
 
   useEffect(() => {
     let cancelled = false;
@@ -542,41 +465,54 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
   const scheduledJobs = useQuery(api.scheduledJobs.list, {});
   const quotaSnapshot = useQuery(api.quotaTracking.getLatestSnapshot, {});
 
+  const alertsList = openAlerts ?? [];
+  const blockedTasksList = (tasks ?? []).filter((t) => t.status === "BLOCKED");
+  const failedTasksList = (tasks ?? []).filter((t) => t.status === "FAILED");
+  const needsApprovalTasks = (tasks ?? []).filter((t) => t.status === "NEEDS_APPROVAL");
+  const scannedAt = Date.now();
+
+  const openTask = (taskId: Id<"tasks">) => {
+    onNavigate("tasks");
+    void taskId;
+  };
+
+  const attentionItems = buildAttentionItems({
+    approvals: approvals ?? [],
+    blockedTasks: blockedTasksList,
+    needsApprovalTasks,
+    failedTasks: failedTasksList,
+    alerts: alertsList,
+    openApproval: () => onNavigate("audit"),
+    openTask,
+    openApprovalsModal: () => onNavigate("audit"),
+    openAlertRules: () => onNavigate("telemetry"),
+    approveApproval: async (approvalId) => {
+      await approveApproval({
+        approvalId,
+        decidedByUserId: "operator",
+        reason: "Approved from Command Center",
+      });
+    },
+    unblockTask: async (taskId) => {
+      await transitionTask({
+        taskId,
+        toStatus: "ASSIGNED",
+        actorType: "HUMAN",
+        actorUserId: "operator",
+        reason: "Unblocked from Command Center",
+        idempotencyKey: `command-center-unblock-${taskId}-${Date.now()}`,
+      });
+    },
+  });
+
+  const exceptions = exceptionCounts({
+    approvals: approvals ?? [],
+    blockedTasks: blockedTasksList,
+    failedTasks: failedTasksList,
+    alerts: alertsList,
+  });
+
   const attentionLoading = !approvals || !tasks || !openAlerts;
-  const attentionRows: AttentionRow[] = attentionLoading
-    ? []
-    : narrateAttentionRows([
-        ...approvals.map((approval) => ({
-          id: `approval-${approval._id}`,
-          title: approval.title || "Approval requested",
-          detail: approval.description || "Operator approval required before execution continues.",
-          badge: <RiskBadge level={approval.riskLevel} />,
-          onOpen: () => onNavigate("audit"),
-        })),
-        ...tasks
-          .filter((t) => t.status === "BLOCKED" || t.status === "NEEDS_APPROVAL")
-          .map((task) => ({
-            id: `task-${task._id}`,
-            title: task.title,
-            detail:
-              task.status === "BLOCKED"
-                ? task.blockedReason || "Execution is stalled until a dependency is removed."
-                : task.description || "Task is waiting on a human decision.",
-            badge: (
-              <StatusBadge tone="warning">
-                {task.status === "BLOCKED" ? "Blocked" : "Needs approval"}
-              </StatusBadge>
-            ),
-            onOpen: () => onNavigate("tasks"),
-          })),
-        ...openAlerts.map((alert) => ({
-          id: `alert-${alert._id}`,
-          title: alert.title,
-          detail: alert.description || undefined,
-          badge: <StatusBadge tone="error">Alert</StatusBadge>,
-          onOpen: () => onNavigate("audit"),
-        })),
-      ]).slice(0, 5);
 
   const now = Date.now();
   const nextJob = (scheduledJobs ?? [])
@@ -612,6 +548,19 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
 
         <PageProvenanceNote />
 
+        {attentionLoading ? (
+          <LoadingRows count={4} />
+        ) : (
+          <AttentionQueuePanel
+            items={attentionItems}
+            scannedAt={scannedAt}
+            counts={exceptions}
+            onOpenApprovals={() => onNavigate("audit")}
+            onOpenTasks={() => onNavigate("tasks")}
+            onOpenAlerts={() => onNavigate("telemetry")}
+          />
+        )}
+
         <MissionAnchorCard onNavigate={onNavigate} />
 
         <div
@@ -636,14 +585,6 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
                   <InsightCard key={insight.id} insight={insight} onNavigate={onNavigate} />
                 ))}
               </div>
-            </EosSection>
-
-            <EosSection
-              eyebrow="OPERATE"
-              title="Needs attention"
-              action={<ViewAllLink onClick={() => onNavigate("tasks")} />}
-            >
-              {attentionLoading ? <LoadingRows /> : <AttentionList rows={attentionRows} />}
             </EosSection>
 
             <EosSection
