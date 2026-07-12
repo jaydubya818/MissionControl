@@ -15,6 +15,7 @@ import type * as agentLearning from "../agentLearning.js";
 import type * as agents from "../agents.js";
 import type * as alertRules from "../alertRules.js";
 import type * as alerts from "../alerts.js";
+import type * as analytics from "../analytics.js";
 import type * as apiCollections from "../apiCollections.js";
 import type * as approvals from "../approvals.js";
 import type * as captures from "../captures.js";
@@ -146,6 +147,7 @@ declare const fullApi: ApiFromModules<{
   agents: typeof agents;
   alertRules: typeof alertRules;
   alerts: typeof alerts;
+  analytics: typeof analytics;
   apiCollections: typeof apiCollections;
   approvals: typeof approvals;
   captures: typeof captures;

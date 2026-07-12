@@ -28,6 +28,7 @@ describe("navConfig", () => {
       "flaky-steps", "hybrid-workflows", "schedule", "codegen", "gherkin", "metrics", "qc-dashboard", "qc-runs",
       "qc-environments", "qc-findings", "qc-metrics", "qc-rulesets", "gateway", "live-chat", "schedules",
       "hiring", "team", "system", "radar", "factory", "pipeline", "feedback", "ops-schedule", "goals",
+      "analytics",
     ];
     const reachable = new Set(allNavViews());
     const missing = required.filter((v) => !reachable.has(v as never));

@@ -5,6 +5,7 @@ import { RadarView } from "../RadarView";
 import { FactoryView } from "../FactoryView";
 import { PipelineView } from "../PipelineView";
 import { FeedbackView } from "../FeedbackView";
+import { AnalyticsView } from "../AnalyticsView";
 
 export interface PlatformSectionProps {
   currentView: MainView;
@@ -60,6 +61,9 @@ export function PlatformSection({
   }
   if (currentView === "feedback") {
     return <FeedbackView projectId={projectId} onNavigate={onNavigate} />;
+  }
+  if (currentView === "analytics") {
+    return <AnalyticsView />;
   }
   return null;
 }
