@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { compareSemver } from "../lib/contextPackages";
 import {
   UNKNOWN_COMMIT_SHA,
   dependenciesToRecord,
   diffInstallations,
+  enrichInstallation,
+  indexLatestVersions,
   isValidManifestHash,
+  summarizeRepoInstallations,
   toAvailablePackage,
   type ExistingInstallation,
   type InstallationEntry,
@@ -281,6 +285,99 @@ describe("diffInstallations", () => {
       updates: [],
       deletes: [],
       unchanged: [],
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Outdated detection
+// ---------------------------------------------------------------------------
+
+describe("indexLatestVersions", () => {
+  it("picks the highest semver per slug", () => {
+    const index = indexLatestVersions(
+      [
+        { slug: "scope/a", version: "1.0.0" },
+        { slug: "scope/a", version: "1.2.0" },
+        { slug: "scope/b", version: "0.5.1" },
+      ],
+      compareSemver
+    );
+    expect(index).toEqual({ "scope/a": "1.2.0", "scope/b": "0.5.1" });
+  });
+});
+
+describe("enrichInstallation", () => {
+  it("marks rows outdated when registry has a newer version", () => {
+    const latest = indexLatestVersions(
+      [{ slug: "scope/pkg", version: "2.0.0" }],
+      compareSemver
+    );
+    const row = enrichInstallation(
+      {
+        repoSlug: "acme/app",
+        packageSlug: "scope/pkg",
+        version: "1.0.0",
+        contentHash: "sha256:abc",
+        state: "INSTALLED",
+      },
+      latest,
+      compareSemver
+    );
+    expect(row.isOutdated).toBe(true);
+    expect(row.latestVersion).toBe("2.0.0");
+  });
+
+  it("does not mark current installs outdated", () => {
+    const latest = indexLatestVersions(
+      [{ slug: "scope/pkg", version: "1.0.0" }],
+      compareSemver
+    );
+    const row = enrichInstallation(
+      {
+        repoSlug: "acme/app",
+        packageSlug: "scope/pkg",
+        version: "1.0.0",
+        contentHash: "sha256:abc",
+        state: "INSTALLED",
+      },
+      latest,
+      compareSemver
+    );
+    expect(row.isOutdated).toBe(false);
+  });
+});
+
+describe("summarizeRepoInstallations", () => {
+  it("aggregates state and outdated counts", () => {
+    const summary = summarizeRepoInstallations([
+      {
+        repoSlug: "acme/app",
+        packageSlug: "a",
+        version: "1.0.0",
+        contentHash: "h1",
+        state: "INSTALLED",
+        latestVersion: "2.0.0",
+        isOutdated: true,
+      },
+      {
+        repoSlug: "acme/app",
+        packageSlug: "b",
+        version: "1.0.0",
+        contentHash: "h2",
+        state: "STALE",
+        latestVersion: "1.0.0",
+        isOutdated: false,
+      },
+    ]);
+    expect(summary).toEqual({
+      repoSlug: "acme/app",
+      total: 2,
+      installed: 1,
+      stale: 1,
+      missing: 0,
+      incompatible: 0,
+      outdated: 1,
     });
   });
 });

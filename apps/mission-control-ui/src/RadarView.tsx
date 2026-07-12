@@ -41,7 +41,7 @@ export function RadarView({ projectId, onNavigate, onTaskSelect }: RadarViewProp
     .slice(0, 10);
 
   return (
-    <main className="relative flex-1 overflow-auto bg-app">
+    <main className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="Radar"
         description="What's on the horizon. Upcoming deadlines, scheduled runs, and recent alerts."

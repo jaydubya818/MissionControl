@@ -41,7 +41,7 @@ export function CalendarView({ projectId }: CalendarViewProps) {
   const tasksByDay = groupTasksByDay(scheduledTasks, weekDays);
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="Calendar"
         description={

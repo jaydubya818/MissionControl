@@ -49,7 +49,7 @@ export function VoicePanel({ projectId }: { projectId: Id<"projects"> | null }) 
   };
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="Voice"
         description="Generate operator-reviewed voice output, inspect transcripts, and keep spoken interactions attached to a real agent context."

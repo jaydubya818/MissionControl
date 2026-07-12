@@ -11,31 +11,23 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import type { MainView } from "./TopNav";
-import { Activity, ChevronRight, Plus, X } from "lucide-react";
+import { Activity, Plus, X } from "lucide-react";
 import { PageHeader } from "./components/factory/DetailLayout";
 import { MetricBlock, MetricRow } from "./components/factory/MetricBlock";
 import { StatusBadge } from "./components/factory/badges";
+import { AttentionQueuePanel } from "@/components/AttentionQueuePanel";
+import { TopSessionsCard } from "@/components/dashboard/TopSessionsCard";
 import {
-  CHART_GRID_COLOR,
-  CHART_SERIES,
-  CHART_STROKE_WIDTH,
-  CHART_TICK_STYLE,
-  CHART_TOOLTIP_CONTENT_STYLE,
-  CHART_CONTAINER_CLASS,
-} from "./components/factory/chartTheme";
+  UsageTrendCharts,
+  type ChartWindow,
+} from "@/components/dashboard/UsageTrendCharts";
 import { QuotaFuelGauge } from "@/components/QuotaFuelGauge";
 import { cn } from "@/lib/utils";
-import { getOrchestrationBaseUrl } from "@/lib/orchestrationUrl";
 import {
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-} from "recharts";
+  buildAttentionItems,
+  exceptionCounts,
+} from "@/lib/attentionQueue";
+import { getOrchestrationBaseUrl } from "@/lib/orchestrationUrl";
 
 interface DashboardOverviewProps {
   projectId: Id<"projects"> | null;
@@ -79,73 +71,6 @@ const CARD_CLASS = "rounded-xl border border-line bg-surface-1";
 
 function SectionTitle({ children }: { children: React.ReactNode }): JSX.Element {
   return <h2 className="text-[15px] font-semibold text-ink">{children}</h2>;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Needs attention (blocked tasks + pending approvals + alerts)
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface AttentionItem {
-  id: string;
-  title: string;
-  detail?: string;
-  badgeLabel: string;
-  badgeTone: "warning" | "error" | "neutral";
-  onOpen?: () => void;
-}
-
-function NeedsAttentionCard({ items }: { items: AttentionItem[] }): JSX.Element {
-  return (
-    <section className={cn(CARD_CLASS, "flex flex-col")}>
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-        <SectionTitle>Needs attention</SectionTitle>
-        {items.length > 0 && (
-          <span className="text-[12.5px] text-ink-muted">
-            {items.length} item{items.length === 1 ? "" : "s"}
-          </span>
-        )}
-      </div>
-      {items.length === 0 ? (
-        <p className="px-4 py-10 text-center text-[13px] text-ink-muted">
-          Nothing needs attention right now.
-        </p>
-      ) : (
-        <ul>
-          {items.map((item) => (
-            <li key={item.id} className="border-b border-line last:border-b-0">
-              <button
-                type="button"
-                onClick={item.onOpen}
-                disabled={!item.onOpen}
-                className={cn(
-                  "group flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors duration-150",
-                  item.onOpen ? "hover:bg-surface-2" : "cursor-default"
-                )}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-medium text-ink">{item.title}</div>
-                  {item.detail && (
-                    <div className="mt-0.5 truncate text-[12.5px] text-ink-muted">
-                      {item.detail}
-                    </div>
-                  )}
-                </div>
-                <StatusBadge tone={item.badgeTone}>{item.badgeLabel}</StatusBadge>
-                {item.onOpen && (
-                  <ChevronRight
-                    size={14}
-                    strokeWidth={1.75}
-                    className="shrink-0 text-ink-muted transition-colors duration-150 group-hover:text-ink-secondary"
-                    aria-hidden
-                  />
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -374,154 +299,6 @@ function SetupChecklist({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Usage charts (token usage + cost trend)
-// ─────────────────────────────────────────────────────────────────────────────
-
-type ChartWindow = 24 | 168 | 720;
-
-interface UsagePoint {
-  period: string;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number;
-}
-
-function formatPeriodTick(value: string, windowHours: ChartWindow): string {
-  if (windowHours === 24) return value.slice(11, 13);
-  if (windowHours === 168) return value.slice(5, 10);
-  return value.slice(0, 10);
-}
-
-function UsageCharts({
-  series,
-  windowHours,
-  onWindowChange,
-  onOpenCostAnalytics,
-}: {
-  series: UsagePoint[];
-  windowHours: ChartWindow;
-  onWindowChange: (w: ChartWindow) => void;
-  onOpenCostAnalytics?: () => void;
-}): JSX.Element {
-  const data = series.map((d) => ({ ...d, totalTokens: d.inputTokens + d.outputTokens }));
-  const windows: { value: ChartWindow; label: string }[] = [
-    { value: 24, label: "24h" },
-    { value: 168, label: "7d" },
-    { value: 720, label: "30d" },
-  ];
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <SectionTitle>Usage</SectionTitle>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-line p-0.5">
-            {windows.map((w) => (
-              <button
-                key={w.value}
-                type="button"
-                onClick={() => onWindowChange(w.value)}
-                className={cn(
-                  "rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors duration-150",
-                  windowHours === w.value
-                    ? "bg-surface-2 text-ink"
-                    : "text-ink-muted hover:text-ink-secondary"
-                )}
-              >
-                {w.label}
-              </button>
-            ))}
-          </div>
-          {onOpenCostAnalytics && (
-            <button type="button" className={SECONDARY_BUTTON} onClick={onOpenCostAnalytics}>
-              Cost analytics
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className={CHART_CONTAINER_CLASS}>
-          <div className="mb-3 text-[12.5px] font-medium text-ink-secondary">Token usage</div>
-          <div className="h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <XAxis
-                  dataKey="period"
-                  tick={CHART_TICK_STYLE}
-                  tickLine={{ stroke: CHART_GRID_COLOR }}
-                  axisLine={{ stroke: CHART_GRID_COLOR }}
-                  tickFormatter={(v: string) => formatPeriodTick(v, windowHours)}
-                />
-                <YAxis
-                  tick={CHART_TICK_STYLE}
-                  tickLine={{ stroke: CHART_GRID_COLOR }}
-                  axisLine={{ stroke: CHART_GRID_COLOR }}
-                  tickFormatter={(v: number) =>
-                    v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
-                  }
-                />
-                <RechartsTooltip
-                  contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                  formatter={(value: number) => [
-                    value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value,
-                    "Tokens",
-                  ]}
-                  labelFormatter={(l) => (typeof l === "string" ? l : "")}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="totalTokens"
-                  stroke={CHART_SERIES[1]}
-                  fill={CHART_SERIES[1]}
-                  fillOpacity={0.12}
-                  strokeWidth={CHART_STROKE_WIDTH}
-                  dot={false}
-                  activeDot={{ r: 3 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        <div className={CHART_CONTAINER_CLASS}>
-          <div className="mb-3 text-[12.5px] font-medium text-ink-secondary">Cost trend</div>
-          <div className="h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <XAxis
-                  dataKey="period"
-                  tick={CHART_TICK_STYLE}
-                  tickLine={{ stroke: CHART_GRID_COLOR }}
-                  axisLine={{ stroke: CHART_GRID_COLOR }}
-                  tickFormatter={(v: string) => formatPeriodTick(v, windowHours)}
-                />
-                <YAxis
-                  tick={CHART_TICK_STYLE}
-                  tickLine={{ stroke: CHART_GRID_COLOR }}
-                  axisLine={{ stroke: CHART_GRID_COLOR }}
-                  tickFormatter={(v: number) => `$${Number(v).toFixed(2)}`}
-                />
-                <RechartsTooltip
-                  contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                  formatter={(value: number) => [`$${Number(value).toFixed(2)}`, "Cost"]}
-                  labelFormatter={(l) => (typeof l === "string" ? l : "")}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="costUsd"
-                  stroke={CHART_SERIES[0]}
-                  strokeWidth={CHART_STROKE_WIDTH}
-                  dot={false}
-                  activeDot={{ r: 3 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Recent activity strip
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -624,23 +401,32 @@ export function DashboardOverview({
           bucketHours: chartWindowHours === 24 ? 1 : chartWindowHours === 168 ? 24 : 24,
         }
   );
+  const topRuns = useQuery(
+    api.runs.getTopRunsByTokens,
+    projectId
+      ? { projectId, limit: 5, windowHours: chartWindowHours }
+      : { limit: 5, windowHours: chartWindowHours },
+  );
   // Retained mutation (squad deploy flows re-attach here); intentionally unused in v2 render.
   const deploySquad = useMutation(api.squad.deploySquad);
+  const approveApproval = useMutation(api.approvals.approve);
+  const transitionTask = useMutation(api.tasks.transition);
   void deploySquad;
 
   const isLoading = !agents || !tasks || !approvals || !activities;
 
   if (isLoading) {
     return (
-      <main className="flex-1 overflow-auto bg-app">
-        <PageHeader title="Overview" description="Fleet, queue, approvals, and spend at a glance." />
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
+        <PageHeader
+          title="Overview"
+          description="Exceptions, approvals, and proof of completion — then fleet context."
+        />
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-6 py-6">
-          <div className="grid grid-cols-1 gap-6 border-b border-line pb-5 sm:grid-cols-3 xl:grid-cols-6">
-            {Array.from({ length: 6 }, (_, i) => (
-              <div key={i} className="flex flex-col gap-2">
-                <div className="h-3 w-20 animate-pulse rounded bg-surface-2" />
-                <div className="h-5 w-12 animate-pulse rounded bg-surface-2" />
-              </div>
+          <div className="h-48 animate-pulse rounded-xl border border-line bg-surface-2" />
+          <div className="flex gap-2">
+            {Array.from({ length: 4 }, (_, i) => (
+              <div key={i} className="h-12 w-28 animate-pulse rounded-lg bg-surface-2" />
             ))}
           </div>
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
@@ -670,51 +456,61 @@ export function DashboardOverview({
 
   const alertsList = openAlerts ?? [];
   const blockedTasksList = tasks.filter((t) => t.status === "BLOCKED");
+  const failedTasksList = tasks.filter((t) => t.status === "FAILED");
+  const scannedAt = Date.now();
 
-  const attentionItems: AttentionItem[] = [
-    ...approvals.map((approval) => ({
-      id: `approval-${approval._id}`,
-      title: approval.title,
-      detail: approval.description || "Operator approval required before execution continues.",
-      badgeLabel: "Approval",
-      badgeTone: "warning" as const,
-      onOpen: onOpenApprovals,
-    })),
-    ...blockedTasksList.map((task) => ({
-      id: `blocked-${task._id}`,
-      title: task.title,
-      detail: task.blockedReason || "Execution is stalled until a dependency is removed.",
-      badgeLabel: "Blocked",
-      badgeTone: "warning" as const,
-      onOpen: onTaskSelect
-        ? () => {
-            onTaskSelect(task._id);
-            onNavigate?.("tasks");
-          }
-        : undefined,
-    })),
-    ...needsApprovalTasks.map((task) => ({
-      id: `needs-approval-${task._id}`,
-      title: task.title,
-      detail: task.description || "Task is waiting on a human decision.",
-      badgeLabel: "Needs approval",
-      badgeTone: "warning" as const,
-      onOpen: onTaskSelect
-        ? () => {
-            onTaskSelect(task._id);
-            onNavigate?.("tasks");
-          }
-        : undefined,
-    })),
-    ...alertsList.map((alert) => ({
-      id: `alert-${alert._id}`,
-      title: alert.title,
-      detail: alert.description || undefined,
-      badgeLabel: "Alert",
-      badgeTone: "error" as const,
-      onOpen: onOpenAlertRules,
-    })),
-  ].slice(0, 8);
+  const openTask = (taskId: Id<"tasks">) => {
+    onTaskSelect?.(taskId);
+    onNavigate?.("tasks");
+  };
+
+  const openRun = (run: Doc<"runs">) => {
+    if (run.taskId) {
+      openTask(run.taskId);
+      return;
+    }
+    onSelectAgent?.(run.agentId);
+    onNavigate?.("live-chat");
+  };
+
+  const chartWindowLabel =
+    chartWindowHours === 24 ? "24h" : chartWindowHours === 168 ? "7d" : "30d";
+
+  const attentionItems = buildAttentionItems({
+    approvals,
+    blockedTasks: blockedTasksList,
+    needsApprovalTasks,
+    failedTasks: failedTasksList,
+    alerts: alertsList,
+    openApproval: () => onOpenApprovals?.(),
+    openTask,
+    openApprovalsModal: onOpenApprovals,
+    openAlertRules: onOpenAlertRules,
+    approveApproval: async (approvalId) => {
+      await approveApproval({
+        approvalId,
+        decidedByUserId: "operator",
+        reason: "Approved from Overview",
+      });
+    },
+    unblockTask: async (taskId) => {
+      await transitionTask({
+        taskId,
+        toStatus: "ASSIGNED",
+        actorType: "HUMAN",
+        actorUserId: "operator",
+        reason: "Unblocked from Overview",
+        idempotencyKey: `overview-unblock-${taskId}-${Date.now()}`,
+      });
+    },
+  });
+
+  const exceptions = exceptionCounts({
+    approvals,
+    blockedTasks: blockedTasksList,
+    failedTasks: failedTasksList,
+    alerts: alertsList,
+  });
 
   const healthy =
     quarantinedAgents === 0 && failedTasks === 0 && blockedTasks === 0 && approvals.length === 0;
@@ -802,10 +598,10 @@ export function DashboardOverview({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="Overview"
-        description="Fleet, queue, approvals, and spend at a glance."
+        description="Exceptions, approvals, and proof of completion — then fleet context."
         actions={
           onOpenCreateTask && (
             <button
@@ -820,47 +616,37 @@ export function DashboardOverview({
         }
       />
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-6 py-6">
-        <MetricRow className="xl:grid-cols-6">
-          <MetricBlock
-            label="Agents working"
-            value={activeAgents}
-            detail={`${agents.length} total${pausedAgents > 0 ? ` · ${pausedAgents} paused` : ""}${quarantinedAgents > 0 ? ` · ${quarantinedAgents} quarantined` : ""}`}
-          />
-          <MetricBlock
-            label="In progress"
-            value={inProgressTasks}
-            detail={`${tasks.length} tasks · ${inboxTasks} in inbox`}
-          />
-          <MetricBlock
-            label="Pending approvals"
-            value={approvals.length}
-            adornment={
-              approvals.length > 0 ? <StatusBadge tone="warning">Action</StatusBadge> : undefined
-            }
-            detail={approvals.length > 0 ? "Human review required" : "All clear"}
-          />
-          <MetricBlock
-            label="Blocked"
-            value={blockedTasks}
-            adornment={
-              blockedTasks > 0 ? <StatusBadge tone="warning">Stalled</StatusBadge> : undefined
-            }
-            detail={blockedTasks > 0 ? "Needs operator action" : "No blockers"}
-          />
-          <MetricBlock
-            label="Spend (24h)"
-            value={spend24h != null ? `$${spend24h.toFixed(2)}` : "—"}
-            detail="Across all models"
-          />
-          <MetricBlock
-            label="Completed"
-            value={doneTasks}
-            detail={`${completionRate}% completion rate`}
-          />
-        </MetricRow>
+        <AttentionQueuePanel
+          items={attentionItems}
+          scannedAt={scannedAt}
+          counts={exceptions}
+          onOpenApprovals={onOpenApprovals}
+          onOpenTasks={onNavigate ? () => onNavigate("tasks") : undefined}
+          onOpenAlerts={onOpenAlertRules}
+        />
 
         <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-          <NeedsAttentionCard items={attentionItems} />
+          <div className="flex flex-col gap-6">
+            {usageTimeSeries && (
+              <UsageTrendCharts
+                series={usageTimeSeries}
+                windowHours={chartWindowHours}
+                onWindowChange={setChartWindowHours}
+                onOpenCostAnalytics={onOpenCostAnalytics}
+                secondaryButtonClass={SECONDARY_BUTTON}
+              />
+            )}
+            {topRuns && topRuns.length > 0 && (
+              <TopSessionsCard
+                runs={topRuns}
+                agents={agents}
+                windowLabel={chartWindowLabel}
+                onOpenRun={openRun}
+                onViewAll={onOpenCostAnalytics ?? (onNavigate ? () => onNavigate("telemetry") : undefined)}
+              />
+            )}
+            <RecentActivityCard activities={activities} />
+          </div>
           <div className="flex flex-col gap-4">
             <MissionCard
               missionStatement={missionData?.missionStatement}
@@ -882,6 +668,50 @@ export function DashboardOverview({
           </div>
         </div>
 
+        <div>
+          <h2 className="mb-3 text-[13px] font-medium uppercase tracking-[0.06em] text-ink-muted">
+            Fleet snapshot
+          </h2>
+          <MetricRow className="xl:grid-cols-6">
+            <MetricBlock
+              label="Agents working"
+              value={activeAgents}
+              detail={`${agents.length} total${pausedAgents > 0 ? ` · ${pausedAgents} paused` : ""}${quarantinedAgents > 0 ? ` · ${quarantinedAgents} quarantined` : ""}`}
+            />
+            <MetricBlock
+              label="In progress"
+              value={inProgressTasks}
+              detail={`${tasks.length} tasks · ${inboxTasks} in inbox`}
+            />
+            <MetricBlock
+              label="Pending approvals"
+              value={approvals.length}
+              adornment={
+                approvals.length > 0 ? <StatusBadge tone="warning">Action</StatusBadge> : undefined
+              }
+              detail={approvals.length > 0 ? "Human review required" : "All clear"}
+            />
+            <MetricBlock
+              label="Blocked"
+              value={blockedTasks}
+              adornment={
+                blockedTasks > 0 ? <StatusBadge tone="warning">Stalled</StatusBadge> : undefined
+              }
+              detail={blockedTasks > 0 ? "Needs operator action" : "No blockers"}
+            />
+            <MetricBlock
+              label="Spend (24h)"
+              value={spend24h != null ? `$${spend24h.toFixed(2)}` : "—"}
+              detail="Across all models"
+            />
+            <MetricBlock
+              label="Completed"
+              value={doneTasks}
+              detail={`${completionRate}% completion rate`}
+            />
+          </MetricRow>
+        </div>
+
         {showQuickStart && (
           <SetupChecklist
             items={checklistItems}
@@ -896,16 +726,6 @@ export function DashboardOverview({
           />
         )}
 
-        {usageTimeSeries && usageTimeSeries.length > 0 && (
-          <UsageCharts
-            series={usageTimeSeries}
-            windowHours={chartWindowHours}
-            onWindowChange={setChartWindowHours}
-            onOpenCostAnalytics={onOpenCostAnalytics}
-          />
-        )}
-
-        <RecentActivityCard activities={activities} />
       </div>
     </main>
   );

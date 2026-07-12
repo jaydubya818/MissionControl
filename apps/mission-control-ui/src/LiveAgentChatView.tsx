@@ -176,7 +176,7 @@ export function LiveAgentChatView({ projectId }: { projectId: Id<"projects"> | n
 
   if (status === null && !statusError) {
     return (
-      <main className="flex-1 overflow-auto bg-app">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
         <PageHeader
           title="Live Agent Chat"
           description="Connect to the OpenClaw Gateway for streaming chat with agents."
@@ -274,7 +274,7 @@ export function LiveAgentChatView({ projectId }: { projectId: Id<"projects"> | n
 
   if (!status?.configured) {
     return (
-      <main className="flex-1 overflow-auto bg-app">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
         <PageHeader
           title="Live Agent Chat"
           description="Connect to the OpenClaw Gateway for streaming chat with agents."

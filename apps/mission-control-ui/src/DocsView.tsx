@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ExternalLink, FileText, ChevronRight, Search, MessageSquare, BookOpen, Loader2, Zap, RotateCcw, Send, X, FolderGit2, Bot, NotebookPen, Boxes, type LucideIcon } from "lucide-react";
+import { ExternalLink, FileText, ChevronRight, Search, MessageSquare, BookOpen, Loader2, Zap, RotateCcw, Send, X, FolderGit2, Bot, NotebookPen, Boxes, Package, type LucideIcon } from "lucide-react";
 import { useAction, useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Card } from "@/components/ui/card";
@@ -24,6 +24,9 @@ const DOC_LINKS = [
   { title: "Implementation Plan",  path: "docs/planning/IMPLEMENTATION_PLAN.md", description: "Implementation roadmap" },
   { title: "Architecture",         path: "docs/ARCHITECTURE.md", description: "System architecture" },
   { title: "Agent Guide",          path: "docs/AGENT_GUIDE.md", description: "Working with agents" },
+  { title: "Creating Plugins",     path: "docs/CREATING_PLUGINS.md", description: "Skills, rules, and registry packages" },
+  { title: "Context Manifests",    path: "docs/CONTEXT_MANIFESTS.md", description: "Lock and install context packages" },
+  { title: "Creating Workflows",   path: "docs/CREATING_WORKFLOWS.md", description: "Custom multi-agent workflows" },
   { title: "Security Audit",       path: "docs/SECURITY_AUDIT.md", description: "Security review" },
   { title: "Decisions",            path: "docs/DECISIONS.md", description: "Architecture decisions" },
 ];
@@ -37,6 +40,7 @@ interface QuickLinkItem {
 const QUICK_LINK_CATEGORY_ICONS: Record<string, LucideIcon> = {
   Project: FolderGit2,
   "AI Tools": Bot,
+  Tessl: Package,
   Workspace: NotebookPen,
   Infra: Boxes,
 };
@@ -57,6 +61,14 @@ const QUICK_LINKS: QuickLinkItem[] = [
   { label: "OpenAI API Docs",           href: "https://platform.openai.com/docs/api-reference", category: "AI Tools" },
   { label: "Cursor IDE",                href: "cursor://", category: "AI Tools" },
   { label: "Cursor Docs",               href: "https://docs.cursor.com", category: "AI Tools" },
+
+  // Tessl (context package lifecycle reference)
+  { label: "Tessl Docs",                href: "https://docs.tessl.io/", category: "Tessl" },
+  { label: "Creating Plugins",          href: "https://docs.tessl.io/create/creating-plugins", category: "Tessl" },
+  { label: "Creating Skills",           href: "https://docs.tessl.io/create/creating-skills", category: "Tessl" },
+  { label: "Developing Plugins Locally", href: "https://docs.tessl.io/create/developing-plugins-locally", category: "Tessl" },
+  { label: "Distributing via Registry", href: "https://docs.tessl.io/distribute/distributing-via-registry", category: "Tessl" },
+  { label: "Tessl Glossary",            href: "https://docs.tessl.io/reference/glossary", category: "Tessl" },
 
   // Workspace
   { label: "Notion Workspace",          href: "https://notion.so", category: "Workspace" },
@@ -556,7 +568,7 @@ export function DocsView() {
   const [activeTab, setActiveTab] = useState("knowledge");
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="Documentation"
         description="Project guides, runbooks, search, and repo-aware chat in one knowledge surface."

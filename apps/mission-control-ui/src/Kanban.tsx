@@ -243,13 +243,14 @@ export function Kanban({
   };
 
   return (
+    <div className="flex min-h-0 flex-1 flex-col">
     <DndContext
       sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="relative flex-1">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         {/* Undo toast */}
         {lastMove && (
           <div className="fixed bottom-6 right-6 z-50">
@@ -260,7 +261,7 @@ export function Kanban({
           </div>
         )}
         
-        <div className="flex gap-3 overflow-x-auto p-4 min-h-[500px]">
+        <div className="flex min-h-0 flex-1 items-stretch gap-3 overflow-x-auto p-4">
           {COLUMNS.map((col) => (
             <Column
               key={col.status}
@@ -298,6 +299,7 @@ export function Kanban({
         onSuccess={() => setPlanningTaskId(null)}
       />
     </DndContext>
+    </div>
   );
 }
 
@@ -330,7 +332,7 @@ function Column({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex min-w-[264px] max-w-[264px] flex-col rounded-xl border bg-surface-1 transition-colors duration-150 overflow-hidden",
+        "flex h-full min-h-0 min-w-[264px] max-w-[264px] flex-col rounded-xl border bg-surface-1 transition-colors duration-150 overflow-hidden",
         isOver ? "border-line-strong bg-surface-2" : "border-line"
       )}
     >
@@ -344,7 +346,7 @@ function Column({
       </div>
       
       {/* Cards */}
-      <ScrollArea className="flex-1 max-h-[calc(100vh-240px)]">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-2 p-2">
           {tasks.map((t) => (
             <Card

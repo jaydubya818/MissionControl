@@ -39,7 +39,7 @@ export interface ResolvedFlag {
  */
 export const KNOWN_FLAGS: FlagDefinition[] = [
   { key: "ui.shell.v2", description: "Left-sidebar AppShell + router navigation (PR 1)", defaultEnabled: false },
-  { key: "context.registry", description: "Context package registry backend + UI (PR 2, 18)", defaultEnabled: false },
+  { key: "context.registry", description: "Context package registry backend + UI (PR 2, 18)", defaultEnabled: true },
   { key: "context.cbom", description: "Context Bill of Materials snapshot at run start (PR 6)", defaultEnabled: false },
   { key: "context.gates", description: "Context quality gates blocking publication (PR 10)", defaultEnabled: false },
   { key: "eval.framework", description: "Baseline/candidate evaluation execution (PR 7–9)", defaultEnabled: false },
@@ -48,6 +48,7 @@ export const KNOWN_FLAGS: FlagDefinition[] = [
   { key: "trust.scoring", description: "Agent trust scores and constraints (PR 15)", defaultEnabled: false },
   { key: "rollout.rings", description: "Context rollout rings 0–4 (PR 17)", defaultEnabled: false },
   { key: "delivery.workorders", description: "Work order delivery control plane (PR 2a, 21)", defaultEnabled: false },
+  { key: "eos.command-center-preview", description: "Engineering OS demo experience — Command Center, missions, lineage, intelligence views", defaultEnabled: false },
 ];
 
 const KNOWN_FLAG_MAP: Map<string, FlagDefinition> = new Map(

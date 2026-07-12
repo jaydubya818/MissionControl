@@ -70,7 +70,7 @@ export function GatewaySettingsView() {
   };
 
   return (
-    <main className="flex-1 overflow-auto">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <PageHeader
         title="OpenClaw Gateway"
         description="Connect Mission Control to an OpenClaw Gateway for live agent chat and streaming. URL is stored here; token is set on the server (GATEWAY_TOKEN)."

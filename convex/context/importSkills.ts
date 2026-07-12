@@ -57,6 +57,15 @@ export const importSkillMarkdown = mutation({
     // Structural review score from the skill linter (0-100) and tags for
     // registry categorization — both optional, set at import time
     qualityScore: v.optional(v.number()),
+    // Per-axis review breakdown from the skill linter (validation /
+    // implementation / activation, 0-100 each)
+    reviewAxes: v.optional(
+      v.object({
+        validation: v.number(),
+        implementation: v.number(),
+        activation: v.number(),
+      })
+    ),
     tags: v.optional(v.array(v.string())),
     projectId: v.optional(v.id("projects")),
     tenantId: v.optional(v.id("tenants")),
@@ -137,6 +146,7 @@ export const importSkillMarkdown = mutation({
       sourceCommitSha: args.sourceCommitSha,
       createdAt: now,
       qualityScore: args.qualityScore,
+      reviewAxes: args.reviewAxes,
     });
 
     await ctx.db.insert("activities", {

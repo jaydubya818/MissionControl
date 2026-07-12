@@ -69,10 +69,10 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Control",
     icon: Orbit,
     items: [
-      { view: "control-portfolio", label: "Portfolio", icon: Orbit },
+      { view: "control-portfolio", label: "Portfolio", icon: Target },
       { view: "control-work-orders", label: "Work Orders", icon: ClipboardList },
+      { view: "control-fleet", label: "Fleet", icon: Bot },
       { view: "control-approvals", label: "Approvals", icon: CheckCircle2 },
-      { view: "control-fleet", label: "Fleet", icon: Users },
     ],
   },
   {
@@ -103,7 +103,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { view: "atc", label: "ATC Board", icon: Radar },
       { view: "directory", label: "Templates", icon: BookOpen },
       { view: "identity", label: "Identities", icon: Users },
-      { view: "skills", label: "Skills", icon: Sparkles },
+      { view: "skills", label: "Registry", icon: Sparkles },
       { view: "memory", label: "Memory", icon: Brain },
       { view: "docs", label: "Knowledge", icon: BookOpen },
       { view: "search", label: "Search", icon: FileSearch },

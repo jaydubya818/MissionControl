@@ -524,7 +524,7 @@ export function ContentPipelineView({ projectId }: ContentPipelineViewProps) {
 
   if (isLoading) {
     return (
-      <main className="flex-1 overflow-auto bg-app">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
         <div className="mx-auto grid max-w-[1200px] grid-cols-4 gap-4 px-6 py-6">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-line bg-surface-1 p-5">
@@ -655,9 +655,9 @@ export function ContentPipelineView({ projectId }: ContentPipelineViewProps) {
 
       {/* Filters (Drops tab only) */}
       {tab === "drops" && contentDrops.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface-1 px-4 py-2.5">
+        <div className="flex shrink-0 items-center gap-2 overflow-x-auto flex-nowrap rounded-xl border border-line bg-surface-1 px-4 py-2.5">
           <Filter size={14} strokeWidth={1.7} className="shrink-0 text-ink-muted" aria-hidden />
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex shrink-0 gap-1.5 flex-nowrap">
             {["ALL", ...STATUSES].map((s) => (
               <button
                 key={s}
@@ -676,8 +676,8 @@ export function ContentPipelineView({ projectId }: ContentPipelineViewProps) {
               </button>
             ))}
           </div>
-          <div className="mx-1 h-4 w-px bg-line" />
-          <div className="flex flex-wrap gap-1.5">
+          <div className="mx-1 h-4 w-px shrink-0 bg-line" />
+          <div className="flex shrink-0 gap-1.5 flex-nowrap">
             {["ALL", ...CONTENT_TYPES].map((t) => (
               <button
                 key={t}

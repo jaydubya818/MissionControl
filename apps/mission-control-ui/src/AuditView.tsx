@@ -107,7 +107,7 @@ export function AuditView({ projectId: _projectId }: { projectId: Id<"projects">
   };
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
       <PageHeader
         title="ARM Audit"
         description="Governance trail for approvals, lifecycle transitions, deployments, and policy decisions."
@@ -121,22 +121,22 @@ export function AuditView({ projectId: _projectId }: { projectId: Id<"projects">
       />
 
       {/* Stats */}
-      <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-4 overflow-hidden px-6 pb-6 pt-4">
+      <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard icon={FileText}   label="Change Records"   value={(changes ?? []).length} />
         <StatCard icon={ShieldCheck} label="Approval Records" value={(approvals ?? []).length} />
         <StatCard icon={Clock}      label="Pending Approvals" value={pendingCount} accent={pendingCount > 0 ? "text-warn" : undefined} />
         <StatCard icon={XCircle}    label="Denied Decisions"  value={deniedCount}  accent={deniedCount  > 0 ? "text-err"  : undefined} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="flex flex-col gap-4">
+      <div className="grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
         {/* Change records */}
         <TableSection
           title="Change Records"
           empty={(changes ?? []).length === 0}
           controls={
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex shrink-0 items-center gap-3 overflow-x-auto flex-nowrap">
               <div className="flex items-center gap-2">
                 <Filter className="h-3 w-3 text-ink-muted" strokeWidth={1.6} />
                 <input

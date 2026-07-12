@@ -35,8 +35,21 @@ export interface SkillLintFinding {
   readonly line?: number;
 }
 
+/**
+ * Per-axis review scores (0-100), mirroring Tessl-style skill reviews:
+ *   validation     — is the skill well-formed? (frontmatter, required fields, naming)
+ *   implementation — is the body sound? (length, structure, dangerous instructions)
+ *   activation     — will agents know when to use it? (activation language, description quality)
+ */
+export interface SkillReviewAxes {
+  readonly validation: number;
+  readonly implementation: number;
+  readonly activation: number;
+}
+
 export interface SkillLintResult {
   readonly score: number;
+  readonly axes: SkillReviewAxes;
   readonly findings: SkillLintFinding[];
 }
 
@@ -69,6 +82,40 @@ const DEDUCTIONS: Readonly<Record<string, number>> = {
   "no-headings": 2,
   "dangerous-instruction": 30,
 };
+
+type ReviewAxis = keyof SkillReviewAxes;
+
+const RULE_AXIS: Readonly<Record<string, ReviewAxis>> = {
+  "frontmatter-missing": "validation",
+  "frontmatter-invalid": "validation",
+  "required-field-missing": "validation",
+  "name-mismatch": "validation",
+  "activation-language-missing": "activation",
+  "description-too-short": "activation",
+  "description-too-long": "activation",
+  "body-too-long": "implementation",
+  "no-headings": "implementation",
+  "dangerous-instruction": "implementation",
+};
+
+function computeAxes(findings: SkillLintFinding[]): SkillReviewAxes {
+  const axes: Record<ReviewAxis, number> = {
+    validation: findings.some((f) => SCORE_CAP_RULES.includes(f.rule)) ? 40 : 100,
+    implementation: 100,
+    activation: 100,
+  };
+  for (const finding of findings) {
+    const axis = RULE_AXIS[finding.rule];
+    if (axis !== undefined) {
+      axes[axis] -= DEDUCTIONS[finding.rule] ?? 0;
+    }
+  }
+  return {
+    validation: Math.max(0, axes.validation),
+    implementation: Math.max(0, axes.implementation),
+    activation: Math.max(0, axes.activation),
+  };
+}
 
 /** Directory name from a path like "skills/foo/SKILL.md" -> "foo". */
 function directoryName(path: string): string | null {
@@ -228,5 +275,5 @@ export function lintSkill(markdown: string, opts: SkillLintOptions = {}): SkillL
   }
   score = Math.max(0, score);
 
-  return { score, findings };
+  return { score, axes: computeAxes(findings), findings };
 }

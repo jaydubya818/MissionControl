@@ -44,7 +44,7 @@ export function PeopleView({ projectId }: PeopleViewProps) {
 
   if (!orgMembers) {
     return (
-      <main className="flex-1 overflow-auto bg-app">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
         <div className="mx-auto max-w-[1200px] px-6 py-6">
           <div className="h-[620px] animate-pulse rounded-xl border border-line bg-surface-2" />
         </div>
@@ -77,7 +77,7 @@ export function PeopleView({ projectId }: PeopleViewProps) {
   };
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="People"
         description="Directory, role posture, and project access across the operating team."

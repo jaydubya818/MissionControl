@@ -270,6 +270,14 @@ const contextSecurityStatus = v.union(
   v.literal("QUARANTINED")
 );
 
+const contextEvalRunStatus = v.union(
+  v.literal("PENDING"),
+  v.literal("RUNNING"),
+  v.literal("COMPLETED"),
+  v.literal("FAILED"),
+  v.literal("CANCELED")
+);
+
 // ============================================================================
 // SCHEMA
 // ============================================================================
@@ -3555,6 +3563,14 @@ export default defineSchema({
     ),
     // Scores (populated by eval/security PRs)
     qualityScore: v.optional(v.number()),
+    // Per-axis review breakdown (0-100 each) from the skill review linter
+    reviewAxes: v.optional(
+      v.object({
+        validation: v.number(),
+        implementation: v.number(),
+        activation: v.number(),
+      })
+    ),
     impactScore: v.optional(v.number()),
     securityStatus: v.optional(contextSecurityStatus),
     // Lifecycle timestamps
@@ -3634,4 +3650,129 @@ export default defineSchema({
     .index("by_repo", ["repoSlug"])
     .index("by_repo_package", ["repoSlug", "packageSlug"])
     .index("by_package", ["packageSlug"]),
+
+  // -------------------------------------------------------------------------
+  // CONTEXT REGISTRY: EVAL SCENARIOS (Software Factory Epic 4)
+  // -------------------------------------------------------------------------
+  contextEvalScenarios: defineTable({
+    packageId: v.id("contextPackages"),
+    name: v.string(),
+    description: v.string(),
+    taskPrompt: v.string(),
+    criteria: v.array(
+      v.object({
+        id: v.string(),
+        label: v.string(),
+        weight: v.number(),
+      })
+    ),
+    active: v.boolean(),
+    projectId: v.optional(v.id("projects")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_package", ["packageId"])
+    .index("by_package_active", ["packageId", "active"]),
+
+  // -------------------------------------------------------------------------
+  // CONTEXT REGISTRY: EVAL RUNS (Software Factory Epic 4)
+  // -------------------------------------------------------------------------
+  contextEvalRuns: defineTable({
+    packageId: v.id("contextPackages"),
+    versionId: v.id("contextPackageVersions"),
+    status: contextEvalRunStatus,
+    scenarioCount: v.number(),
+    completedScenarios: v.number(),
+    baselineScore: v.optional(v.number()),
+    candidateScore: v.optional(v.number()),
+    impactScore: v.optional(v.number()),
+    impactDelta: v.optional(v.number()),
+    results: v.optional(
+      v.array(
+        v.object({
+          scenarioId: v.id("contextEvalScenarios"),
+          scenarioName: v.string(),
+          baselineScore: v.number(),
+          candidateScore: v.number(),
+          criteriaPassed: v.number(),
+          criteriaTotal: v.number(),
+        })
+      )
+    ),
+    idempotencyKey: v.optional(v.string()),
+    actorId: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
+    errorMessage: v.optional(v.string()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_package", ["packageId"])
+    .index("by_version", ["versionId"])
+    .index("by_status", ["status"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  // -------------------------------------------------------------------------
+  // KNOWLEDGE GRAPH (Agentic-KB Graphify overlay + future Obsidian sync)
+  // -------------------------------------------------------------------------
+  knowledgeGraphNodes: defineTable({
+    projectId: v.optional(v.id("projects")),
+    source: v.union(
+      v.literal("agentic-kb"),
+      v.literal("obsidian"),
+      v.literal("mission-control")
+    ),
+    externalId: v.string(),
+    label: v.string(),
+    fileType: v.optional(v.string()),
+    sourceFile: v.optional(v.string()),
+    community: v.optional(v.number()),
+    metadata: v.optional(v.any()),
+    importedAt: v.number(),
+  })
+    .index("by_project_source", ["projectId", "source"])
+    .index("by_source", ["source"])
+    .index("by_external", ["source", "externalId"]),
+
+  knowledgeGraphEdges: defineTable({
+    projectId: v.optional(v.id("projects")),
+    source: v.union(
+      v.literal("agentic-kb"),
+      v.literal("obsidian"),
+      v.literal("mission-control")
+    ),
+    externalId: v.string(),
+    fromExternalId: v.string(),
+    toExternalId: v.string(),
+    relation: v.string(),
+    confidence: v.optional(v.string()),
+    confidenceScore: v.optional(v.number()),
+    weight: v.optional(v.number()),
+    sourceFile: v.optional(v.string()),
+    importedAt: v.number(),
+  })
+    .index("by_project_source", ["projectId", "source"])
+    .index("by_source", ["source"])
+    .index("by_from", ["source", "fromExternalId"])
+    .index("by_to", ["source", "toExternalId"]),
+
+  knowledgeGraphHyperedges: defineTable({
+    projectId: v.optional(v.id("projects")),
+    source: v.union(
+      v.literal("agentic-kb"),
+      v.literal("obsidian"),
+      v.literal("mission-control")
+    ),
+    externalId: v.string(),
+    label: v.string(),
+    nodeExternalIds: v.array(v.string()),
+    relation: v.string(),
+    confidence: v.optional(v.string()),
+    confidenceScore: v.optional(v.number()),
+    sourceFile: v.optional(v.string()),
+    importedAt: v.number(),
+  })
+    .index("by_project_source", ["projectId", "source"])
+    .index("by_source", ["source"])
+    .index("by_external", ["source", "externalId"]),
 });

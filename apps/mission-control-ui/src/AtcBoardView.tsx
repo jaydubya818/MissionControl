@@ -67,7 +67,7 @@ export function AtcBoardView({
 
   if (agents === undefined || tasks === undefined || runs === undefined) {
     return (
-      <main className="flex-1 overflow-auto">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <PageHeader title="Air Traffic Control" />
         <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-3">
           <div className="h-3.5 w-48 animate-pulse rounded bg-surface-2" />
@@ -110,15 +110,15 @@ export function AtcBoardView({
   const busyCount = agents.length - idleCount;
 
   return (
-    <main className="flex-1 overflow-auto">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
       <PageHeader
         title="Air Traffic Control"
         description="Real-time agent status. Idle agents are highlighted — assign work from Tasks."
       />
 
-      <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-4 overflow-hidden px-6 pb-6 pt-4">
         {/* Command bar */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex shrink-0 items-center justify-between gap-4 overflow-x-auto flex-nowrap">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-2 text-[13.5px] text-ink-secondary">
               <Radio size={15} strokeWidth={1.7} aria-hidden />
@@ -138,7 +138,7 @@ export function AtcBoardView({
         </div>
 
         {/* Agent grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {agentRows.map(({ agent, currentTask, sessionCost, sessionTokens, isIdle }) => (
             <Card
               key={agent._id}

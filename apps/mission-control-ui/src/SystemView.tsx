@@ -63,7 +63,7 @@ export function SystemView({
   const isHealthy = issues.length === 0;
 
   return (
-    <main className="relative flex-1 overflow-auto bg-app">
+    <main className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="System"
         description="System health, gateway status, and scheduled crons. One place for platform status."

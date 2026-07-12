@@ -76,7 +76,7 @@ export function TelemetryView({ projectId }: { projectId: Id<"projects"> | null 
   const inWindow    = stats?.inWindow ?? 0;
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
       <PageHeader
         title="ARM Telemetry"
         description={
@@ -94,8 +94,8 @@ export function TelemetryView({ projectId }: { projectId: Id<"projects"> | null 
       />
 
       {/* Summary stats */}
-      <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-4 overflow-hidden px-6 pb-6 pt-4">
+      <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { icon: Activity,     label: "Total Events",     value: totalEvents },
           { icon: Radio,        label: `Last ${windowMinutes}m`, value: inWindow },
@@ -112,13 +112,13 @@ export function TelemetryView({ projectId }: { projectId: Id<"projects"> | null 
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="flex flex-col gap-4">
+      <div className="grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
         {/* Filters + Event type breakdown */}
         <Card className="overflow-hidden">
-          <div className="px-5 py-3 border-b border-line flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-[15px] font-semibold text-ink">Event Type Breakdown</p>
-            <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex shrink-0 items-center justify-between gap-3 overflow-x-auto flex-nowrap border-b border-line px-5 py-3">
+            <p className="shrink-0 text-[15px] font-semibold text-ink">Event Type Breakdown</p>
+            <div className="flex shrink-0 items-center gap-3 overflow-x-auto flex-nowrap">
               <div className="flex items-center gap-2">
                 <Filter className="h-3 w-3 text-ink-muted" strokeWidth={1.6} />
                 <input

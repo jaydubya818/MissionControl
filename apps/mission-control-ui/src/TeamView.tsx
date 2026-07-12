@@ -170,7 +170,7 @@ export function TeamView({ projectId: _projectId, onNavigate }: TeamViewProps) {
   const totalAgents = TEAM_SECTIONS.reduce((sum, section) => sum + section.members.length, 1);
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="Team"
         description="A readable map of who does what inside Mission Control so operators can understand ownership before they delegate work."

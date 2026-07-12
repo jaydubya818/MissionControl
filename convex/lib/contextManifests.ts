@@ -187,3 +187,115 @@ export function diffInstallations<Id>(
 
   return { creates, updates, deletes, unchanged };
 }
+
+// ---------------------------------------------------------------------------
+// Outdated detection (registry snapshot vs locked installations)
+// ---------------------------------------------------------------------------
+
+/** Highest published semver per package slug. */
+export type LatestVersionIndex = Readonly<Record<string, string>>;
+
+export interface VersionedSlug {
+  readonly slug: string;
+  readonly version: string;
+}
+
+/**
+ * Build a slug → highest-version index from a registry snapshot.
+ * `compare` must return -1 | 0 | 1 (see contextPackages.compareSemver).
+ */
+export function indexLatestVersions(
+  packages: readonly VersionedSlug[],
+  compare: (a: string, b: string) => -1 | 0 | 1
+): LatestVersionIndex {
+  const index: Record<string, string> = {};
+  for (const pkg of packages) {
+    const current = index[pkg.slug];
+    if (current === undefined || compare(pkg.version, current) > 0) {
+      index[pkg.slug] = pkg.version;
+    }
+  }
+  return index;
+}
+
+export interface EnrichedInstallation {
+  readonly repoSlug: string;
+  readonly packageSlug: string;
+  readonly version: string;
+  readonly contentHash: string;
+  readonly state: InstallationState;
+  readonly latestVersion: string | null;
+  readonly isOutdated: boolean;
+}
+
+/** Compare one installation row against the latest published registry version. */
+export function enrichInstallation(
+  row: InstallationEntry & { repoSlug: string },
+  latestBySlug: LatestVersionIndex,
+  compare: (a: string, b: string) => -1 | 0 | 1
+): EnrichedInstallation {
+  const latestVersion = latestBySlug[row.packageSlug] ?? null;
+  const isOutdated =
+    latestVersion !== null && compare(latestVersion, row.version) > 0;
+  return {
+    repoSlug: row.repoSlug,
+    packageSlug: row.packageSlug,
+    version: row.version,
+    contentHash: row.contentHash,
+    state: row.state,
+    latestVersion,
+    isOutdated,
+  };
+}
+
+export interface RepoInstallationSummary {
+  readonly repoSlug: string;
+  readonly total: number;
+  readonly installed: number;
+  readonly stale: number;
+  readonly missing: number;
+  readonly incompatible: number;
+  readonly outdated: number;
+}
+
+/** Aggregate installation rows for one repository. */
+export function summarizeRepoInstallations(
+  rows: readonly EnrichedInstallation[]
+): RepoInstallationSummary {
+  const repoSlug = rows[0]?.repoSlug ?? "";
+  let installed = 0;
+  let stale = 0;
+  let missing = 0;
+  let incompatible = 0;
+  let outdated = 0;
+  for (const row of rows) {
+    switch (row.state) {
+      case "INSTALLED":
+        installed++;
+        break;
+      case "STALE":
+        stale++;
+        break;
+      case "MISSING":
+        missing++;
+        break;
+      case "INCOMPATIBLE":
+        incompatible++;
+        break;
+      default: {
+        const _exhaustive: never = row.state;
+        void _exhaustive;
+      }
+    }
+    if (row.isOutdated) outdated++;
+  }
+  return {
+    repoSlug,
+    total: rows.length,
+    installed,
+    stale,
+    missing,
+    incompatible,
+    outdated,
+  };
+}

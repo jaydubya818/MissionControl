@@ -2,6 +2,11 @@
 
 Exact commands to run Mission Control locally.
 
+> **Software Factory demo (v2 shell + EOS Command Center + registry):** see the root
+> [README § Software Factory Demo](../README.md#software-factory-demo-local-end-to-end).
+> Run `pnpm run dev:demo` from the main repo (UI on **http://localhost:5199**).
+> Legacy worktree flow (`sf-19-ui-migration` + `sf-90-demo`) still works but is optional.
+
 ## Prerequisites
 
 - Node 18+
@@ -150,6 +155,20 @@ pnpm run convex:seed:demo:force
 ```
 
 To fully reset, clear tables in the Convex dashboard and run the seed again. For the minimal seed: `pnpm run convex:seed`.
+
+## Knowledge graph (Memory → Graph tab)
+
+Import the Agentic-KB Graphify graph into Convex for the Memory knowledge graph overlay:
+
+```bash
+# Requires local Agentic-KB clone at ~/Agentic-KB (or set AGENTIC_KB_PATH)
+pnpm run import:knowledge-graph
+
+# Demo project scope (Memory → Graph tab on sf-demo)
+pnpm run import:knowledge-graph:demo
+```
+
+Then open **Memory → Graph** in the v2 shell (`http://localhost:5199/v2/memory`).
 
 ## Docker
 

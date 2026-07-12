@@ -196,7 +196,7 @@ export function AgentRegistryView({
   };
 
   return (
-    <main className="flex-1 overflow-auto">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
       <PageHeader
         title="Agent Registry"
         description={`${agents.length} agents · ${activeCount} active`}
@@ -228,8 +228,8 @@ export function AgentRegistryView({
         onImported={() => toast("Agent imported")}
       />
 
-      <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-6">
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-4 overflow-hidden px-6 pb-6 pt-4">
+      <div className="grid shrink-0 gap-4 md:grid-cols-4">
         <Card className="p-4">
           <MetricBlock
             label="Active"
@@ -261,7 +261,7 @@ export function AgentRegistryView({
       </div>
 
       {/* Fleet health bar */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2 overflow-x-auto flex-nowrap">
         <button
           type="button"
           onClick={() => setStatusFilter("ALL")}
@@ -320,7 +320,7 @@ export function AgentRegistryView({
       </div>
 
       {/* Compact operator controls */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2 overflow-x-auto flex-nowrap">
         <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={handlePauseAll}>
           <Pause className="h-3 w-3 mr-1" />
           Pause Squad
@@ -374,7 +374,7 @@ export function AgentRegistryView({
       </div>
 
       {/* 2-column agent grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto md:grid-cols-2">
         {filteredAgents.map((agent) => {
           const lastHB = agent.lastHeartbeatAt ? formatRelativeTime(agent.lastHeartbeatAt) : "Never";
           const aCount = taskCountByAgent.get(agent._id) ?? 0;

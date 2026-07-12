@@ -15,6 +15,7 @@ function entry(overrides: Partial<RegistryEntry>): RegistryEntry {
     tags: ["agent-operations"],
     version: "0.1.0",
     qualityScore: 100,
+    reviewAxes: { validation: 100, implementation: 100, activation: 100 },
     impactScore: null,
     securityStatus: "UNSCANNED",
     sourceRepo: "jaydubya818/MissionControl",
@@ -79,9 +80,8 @@ describe("RegistryViewContent", () => {
     expect(container.querySelector(".animate-pulse")).toBeTruthy();
   });
 
-  it("never invents impact numbers — shows the evals note instead", () => {
+  it("points operators to the Evals tab for impact scores", () => {
     render(<RegistryViewContent entries={ENTRIES} />);
-    expect(screen.getByText(/Impact scores appear once the evaluation/)).toBeInTheDocument();
-    expect(screen.queryByText(/x$/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Run evals from the Evals tab/)).toBeInTheDocument();
   });
 });

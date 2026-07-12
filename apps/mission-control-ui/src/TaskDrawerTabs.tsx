@@ -29,6 +29,8 @@ import { PeerReviewPanel } from "./PeerReviewPanel";
 import { ExportReportButton } from "./ExportReportButton";
 import { TaskEditMode } from "./TaskEditMode";
 import { RiskBadge, StatusBadge, type StatusBadgeProps } from "./components/factory/badges";
+import { VerificationTracePanel } from "./components/tasks/VerificationTracePanel";
+import { buildVerificationTrace } from "@/lib/verificationTrace";
 
 type Tab = "overview" | "timeline" | "artifacts" | "approvals" | "cost" | "reviews" | "why";
 type TaskStatus = Doc<"tasks">["status"];
@@ -241,6 +243,8 @@ export function TaskDrawerTabs({
                       <OverviewTab
                         taskId={taskId}
                         task={task}
+                        runs={runs}
+                        approvals={approvals}
                         agents={agents as Doc<"agents">[]}
                         agentMap={agentMap}
                         onTransition={handleTransition}
@@ -314,6 +318,8 @@ export function TaskDrawerTabs({
 function OverviewTab({
   taskId,
   task,
+  runs,
+  approvals,
   agents,
   agentMap,
   onTransition,
@@ -324,6 +330,8 @@ function OverviewTab({
 }: {
   taskId: Id<"tasks">;
   task: Doc<"tasks">;
+  runs: Doc<"runs">[];
+  approvals: Doc<"approvals">[];
   agents: Doc<"agents">[];
   agentMap: Map<Id<"agents">, Doc<"agents">>;
   onTransition: (status: TaskStatus) => void;
@@ -339,8 +347,12 @@ function OverviewTab({
   updateTask: (args: { taskId: Id<"tasks">; assigneeIds: Id<"agents">[] }) => Promise<unknown>;
   setLoading: (value: boolean) => void;
 }) {
+  const verificationTrace = buildVerificationTrace(task, runs, approvals);
+
   return (
     <div className="space-y-6">
+      <VerificationTracePanel trace={verificationTrace} />
+
       {task.description && (
         <Section title="Description">
           <p className="text-sm text-ink-secondary leading-relaxed">{task.description}</p>

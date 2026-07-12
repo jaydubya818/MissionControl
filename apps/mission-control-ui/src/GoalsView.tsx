@@ -351,7 +351,7 @@ export function GoalsView({ projectId, onTaskSelect }: GoalsViewProps) {
 
   if (!projectId) {
     return (
-      <main className="flex-1 overflow-auto bg-app">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
         <PageHeader
           title="Goals"
           description="Track the hierarchy between company goals, team goals, and task execution."
@@ -379,7 +379,7 @@ export function GoalsView({ projectId, onTaskSelect }: GoalsViewProps) {
   const plannedGoals = topLevelGoals.filter((goal) => goal.status === "PLANNED").length;
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
       <PageHeader
         title="Goals"
         description="Every task should trace back to a real goal. If you cannot explain why it matters, it should not be in the system."
@@ -395,8 +395,8 @@ export function GoalsView({ projectId, onTaskSelect }: GoalsViewProps) {
           </Button>
         }
       />
-      <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-6">
-        <div className="grid gap-4 md:grid-cols-4">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-4 overflow-hidden px-6 pb-6 pt-4">
+        <div className="grid shrink-0 gap-4 md:grid-cols-4">
           <Card className="p-4">
             <MetricBlock
               label="Top level"
@@ -427,8 +427,8 @@ export function GoalsView({ projectId, onTaskSelect }: GoalsViewProps) {
           </Card>
         </div>
 
-        <Card className="p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <Card className="shrink-0 p-4">
+          <div className="flex items-center justify-between gap-3 overflow-x-auto flex-nowrap">
             <div>
               <div className="text-[15px] font-semibold text-ink">Goal filters</div>
               <div className="mt-1 text-[12.5px] text-ink-muted">Focus the goal tree by lifecycle state</div>
@@ -476,7 +476,7 @@ export function GoalsView({ projectId, onTaskSelect }: GoalsViewProps) {
             }
           />
         ) : (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_320px]">
             <Card className="p-4">
               <div className="mb-4">
                 <div className="text-[15px] font-semibold text-ink">Goal tree</div>

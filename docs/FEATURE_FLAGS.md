@@ -14,7 +14,7 @@ Runtime toggles gating incomplete or risky Software Factory subsystems. Introduc
 1. `VITE_FLAG_<KEY>` env override (UI only — CI and local dev; dots/dashes → underscores, uppercased)
 2. Project-scoped row (`projectId` set)
 3. Global row (no `projectId`)
-4. Registered default from `KNOWN_FLAGS` (always `false` for new subsystems)
+4. Registered default from `KNOWN_FLAGS` (`false` for new subsystems; `context.registry` now defaults to `true` — the registry is the primary skills surface)
 5. Unknown keys resolve to `false` — never throw
 
 ## Registered flags
@@ -22,7 +22,7 @@ Runtime toggles gating incomplete or risky Software Factory subsystems. Introduc
 | Key | Gates | Introduced |
 |-----|-------|-----------|
 | `ui.shell.v2` | Left-sidebar AppShell + router navigation | PR 1 |
-| `context.registry` | Context package registry backend + UI | PR 2, 18 |
+| `context.registry` | Context package registry backend + UI (defaults **on**; RegistryView is the only skills surface) | PR 2, 18 |
 | `context.cbom` | Context Bill of Materials snapshot at run start | PR 6 |
 | `context.gates` | Context quality gates blocking publication | PR 10 |
 | `eval.framework` | Baseline/candidate evaluation execution | PR 7–9 |
@@ -31,6 +31,7 @@ Runtime toggles gating incomplete or risky Software Factory subsystems. Introduc
 | `trust.scoring` | Agent trust scores and constraints | PR 15 |
 | `rollout.rings` | Context rollout rings 0–4 | PR 17 |
 | `delivery.workorders` | Work order delivery control plane | PR 2a, 21 |
+| `eos.command-center-preview` | Engineering OS Command Center, missions, intelligence views | EOS demo |
 
 ## Usage
 

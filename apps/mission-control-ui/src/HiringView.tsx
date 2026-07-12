@@ -89,7 +89,7 @@ export function HiringView({ projectId }: HiringViewProps) {
 
   if (!projectId) {
     return (
-      <main className="flex-1 overflow-auto">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <PageHeader
           title="Hiring"
           description="Define role specs, compare candidates, and record an explicit hire or no-hire decision."
@@ -108,7 +108,7 @@ export function HiringView({ projectId }: HiringViewProps) {
   }
 
   return (
-    <main className="flex-1 overflow-auto">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <PageHeader
         title="Hiring"
         description="Role specs, candidates, and decision records for building a reliable operator-grade agent bench."

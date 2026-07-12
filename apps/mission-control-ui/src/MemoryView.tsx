@@ -4,12 +4,13 @@ import { Bot, Brain, Clock, Globe, Package, Pencil, Trash2, type LucideIcon } fr
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
+import { KnowledgeGraphPanel } from "./KnowledgeGraphPanel";
 
 interface MemoryViewProps {
   projectId: Id<"projects"> | null;
 }
 
-type MemoryTier = "session" | "project" | "global" | "agent" | "journal";
+type MemoryTier = "session" | "project" | "global" | "agent" | "journal" | "graph";
 type DocType = "WORKING_MD" | "DAILY_NOTE" | "SESSION_MEMORY";
 
 function wordCount(text: string): number {
@@ -637,6 +638,7 @@ export function MemoryView({ projectId }: MemoryViewProps) {
     { key: "session", label: "Session", icon: "clock" },
     { key: "journal", label: "Daily Journal", icon: "calendar" },
     { key: "project", label: "Patterns", icon: "brain" },
+    { key: "graph", label: "Graph", icon: "network" },
     { key: "agent", label: "Agent Memories", icon: "robot" },
     { key: "global", label: "Knowledge Base", icon: "globe" },
   ];
@@ -834,6 +836,11 @@ export function MemoryView({ projectId }: MemoryViewProps) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* ============ KNOWLEDGE GRAPH ============ */}
+      {activeTier === "graph" && (
+        <KnowledgeGraphPanel projectId={projectId} />
       )}
 
       {/* ============ AGENT MEMORIES ============ */}

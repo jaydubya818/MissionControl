@@ -78,7 +78,7 @@ export function LoopDetectionPanel({
   onTaskSelect,
 }: LoopDetectionPanelProps) {
   const [filter, setFilter] = useState<"all" | "OPEN" | "ACKNOWLEDGED">("all");
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const openAlerts = useQuery(api.alerts.listOpen, { limit: 100 });
@@ -151,7 +151,7 @@ export function LoopDetectionPanel({
   };
 
   return (
-    <div className="mx-4 my-3 rounded-xl border border-line bg-surface-1">
+    <div className="mx-4 my-3 shrink-0 rounded-xl border border-line bg-surface-1">
       {/* Header */}
       <button
         type="button"

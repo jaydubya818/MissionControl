@@ -85,6 +85,7 @@ for (const target of targets) {
     type: "SKILL",
     contentHash,
     qualityScore: lint.score,
+    reviewAxes: lint.axes,
     tags: ["agent-operations", ...(fm.capabilities ?? []).slice(0, 4)],
     sourceRepo: "jaydubya818/MissionControl",
     sourcePath: target.sourcePath,

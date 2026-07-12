@@ -78,7 +78,7 @@ export function OpsSection({
           onAgentSelect={onAgentSelect}
           onWidthChange={onSidebarWidthChange}
         />
-        <main className="flex flex-1 flex-col overflow-auto">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <PageHeader
             title="Tasks"
             description="Track what your agents are doing and what they've accomplished"
@@ -134,18 +134,20 @@ export function OpsSection({
             }
           />
           <TaskboardStats projectId={projectId} />
-          <LoopDetectionPanel projectId={projectId} onTaskSelect={onTaskSelect} />
           <KanbanFilters
             projectId={projectId}
             currentUserId="operator"
             filters={kanbanFilters}
             onFiltersChange={onFiltersChange}
           />
-          <Kanban
-            projectId={projectId}
-            onSelectTask={onTaskSelect}
-            filters={kanbanFilters}
-          />
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <Kanban
+              projectId={projectId}
+              onSelectTask={onTaskSelect}
+              filters={kanbanFilters}
+            />
+            <LoopDetectionPanel projectId={projectId} onTaskSelect={onTaskSelect} />
+          </div>
         </main>
         <LiveFeed
           projectId={projectId}

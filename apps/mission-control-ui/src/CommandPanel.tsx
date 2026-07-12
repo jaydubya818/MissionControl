@@ -4,12 +4,13 @@ import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import {
-  Play, Pause, Plus, Shield, RefreshCw, Terminal, AlertTriangle,
+  Play, Pause, Plus, Shield, Terminal, AlertTriangle,
   CheckCircle2, Sparkles, XCircle, Zap, Activity, Users, ClipboardList,
   Radio, ChevronRight, Send, Clock, TrendingUp, BarChart3, Loader2, Bot,
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { ProgressBar } from "@/components/factory/ProgressBar";
 import { PageHeader } from "./components/PageHeader";
 import { RiskBadge, type RiskLevel } from "./components/factory/badges";
 import { useToast } from "./Toast";
@@ -36,10 +37,8 @@ const QUICK_ACTIONS: QuickAction[] = [
   { id: "reverse-prompt",  label: "Reverse Prompt",     description: "AI suggests tasks to advance your mission",  icon: Sparkles,      accent: "text-ink-secondary", variant: "default"  },
   { id: "pause-all",       label: "Pause All Agents",   description: "Immediately halt all active agents",         icon: Pause,         accent: "text-warn",          variant: "warning"  },
   { id: "resume-all",      label: "Resume All Agents",  description: "Resume all paused agents",                   icon: Play,          accent: "text-ok",            variant: "success"  },
-  { id: "run-standup",     label: "Run Standup",        description: "Generate squad standup report",              icon: RefreshCw,     accent: "text-ink-secondary", variant: "default"  },
   { id: "approve-all",     label: "Bulk Approve",       description: "Approve all pending low-risk items",         icon: CheckCircle2,  accent: "text-ok",            variant: "success"  },
   { id: "broadcast",       label: "Broadcast",          description: "Send directive to all active agents",        icon: Radio,         accent: "text-ink-secondary", variant: "info"     },
-  { id: "health-check",    label: "Health Check",       description: "Run system diagnostics across all services", icon: Activity,      accent: "text-ink-secondary", variant: "info"     },
   { id: "emergency-stop",  label: "Emergency Stop",     description: "Kill switch — quarantine all agents",        icon: AlertTriangle, accent: "text-err",           variant: "danger"   },
 ];
 
@@ -417,12 +416,11 @@ function TaskPipeline({ projectId }: { projectId: Id<"projects"> | null }) {
     <div className="space-y-2">
       {pipeline.map(({ label, color }) => {
         const n = counts[label] ?? 0;
-        const pct = Math.round((n / total) * 100);
         return (
           <div key={label} className="flex items-center gap-3">
             <span className="text-[11.5px] text-ink-muted w-24 shrink-0">{label.replace("_", " ")}</span>
-            <div className="flex-1 h-1.5 rounded-full bg-surface-2 overflow-hidden">
-              <div className={cn("h-full rounded-full transition-all duration-150", color)} style={{ width: `${pct}%` }} />
+            <div className="flex-1">
+              <ProgressBar fraction={n / total} barClassName={color} />
             </div>
             <span className="text-[11.5px] font-medium text-ink w-6 text-right">{n}</span>
           </div>
@@ -483,12 +481,6 @@ export function CommandPanel({ projectId, onOpenSuggestionsDrawer }: CommandPane
           toast(`Approved ${low.length} low-risk item(s)`);
           break;
         }
-        case "run-standup":
-          toast("Standup report queued (check Comms)");
-          break;
-        case "health-check":
-          toast("Health check: all systems operational");
-          break;
         case "broadcast":
           toast("Use the Broadcast bar below");
           break;
@@ -507,7 +499,7 @@ export function CommandPanel({ projectId, onOpenSuggestionsDrawer }: CommandPane
   };
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="Command Panel"
         description="Orchestrate agents, tasks, and approvals in real-time"

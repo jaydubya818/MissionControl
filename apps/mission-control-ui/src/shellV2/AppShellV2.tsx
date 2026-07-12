@@ -4,17 +4,17 @@ import { BellRing } from "lucide-react";
 import type { MainView } from "../TopNav";
 import { Sidebar } from "./Sidebar";
 import { groupForView, itemForView, allNavViews } from "./navConfig";
+import { EOS_NAV_GROUPS } from "./eosNavConfig";
+import { useFlag } from "../hooks/useFlag";
 import { Breadcrumbs } from "../components/factory/Breadcrumbs";
 import { cn } from "../lib/utils";
 
 const ROUTE_PREFIX = "/v2";
 
-function viewFromPath(pathname: string): MainView | null {
+function viewFromPath(pathname: string, validViews: string[]): MainView | null {
   if (!pathname.startsWith(`${ROUTE_PREFIX}/`)) return null;
   const candidate = pathname.slice(ROUTE_PREFIX.length + 1).split("/")[0];
-  return (allNavViews() as string[]).includes(candidate)
-    ? (candidate as MainView)
-    : null;
+  return validViews.includes(candidate) ? (candidate as MainView) : null;
 }
 
 interface AppShellV2Props {
@@ -47,19 +47,41 @@ export function AppShellV2({
 }: AppShellV2Props): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
-  // Guards the URL↔view sync against echo loops: when the URL drives a view
-  // change, the follow-up view→URL effect must not navigate back.
   const syncingFromUrl = useRef(false);
+
+  const eosPreview = useFlag("eos.command-center-preview");
+  const navGroups = eosPreview ? EOS_NAV_GROUPS : undefined;
+  const activeGroups = navGroups ?? null;
+  const validViews = activeGroups
+    ? [
+        ...new Set([
+          ...activeGroups.flatMap((g) => g.items.map((i) => i.view as string)),
+          ...allNavViews(),
+        ]),
+      ]
+    : (allNavViews() as string[]);
+  const group = activeGroups
+    ? (activeGroups.find((g) => g.items.some((i) => i.view === activeView)) ??
+      groupForView(activeView))
+    : groupForView(activeView);
+  const item = activeGroups
+    ? (activeGroups.flatMap((g) => g.items).find((i) => i.view === activeView) ??
+      itemForView(activeView))
+    : itemForView(activeView);
+  const crumbs = [
+    ...(group ? [{ label: group.label }] : []),
+    ...(item ? [{ label: item.label, current: true }] : []),
+  ];
 
   // URL → view (deep links, back/forward)
   useEffect(() => {
-    const pathView = viewFromPath(location.pathname);
+    const pathView = viewFromPath(location.pathname, validViews);
     if (pathView && pathView !== activeView) {
       syncingFromUrl.current = true;
       onNavigate(pathView);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+  }, [location.pathname, validViews.join(",")]);
 
   // view → URL (sidebar clicks, legacy in-app navigation)
   useEffect(() => {
@@ -72,16 +94,10 @@ export function AppShellV2({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView]);
 
-  const group = groupForView(activeView);
-  const item = itemForView(activeView);
-  const crumbs = [
-    ...(group ? [{ label: group.label }] : []),
-    ...(item ? [{ label: item.label, current: true }] : []),
-  ];
-
   return (
     <div className="shell-v2 flex h-screen overflow-hidden">
       <Sidebar
+        groups={navGroups}
         activeView={activeView}
         onNavigate={onNavigate}
         onOpenSearch={onOpenSearch}
@@ -110,7 +126,9 @@ export function AppShellV2({
             </button>
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-auto bg-app">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+        </main>
       </div>
     </div>
   );

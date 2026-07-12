@@ -123,7 +123,7 @@ export function PoliciesView({ projectId }: { projectId: Id<"projects"> | null }
   const activeCount = list.filter((e) => e.active).length;
 
   return (
-    <main className="flex-1 overflow-auto">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <PageHeader
         title="Policies"
         description="Version-aware guardrails (version → project → tenant precedence)"

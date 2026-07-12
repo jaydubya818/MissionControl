@@ -4,9 +4,7 @@ import { DocsView } from "../DocsView";
 import { DesignSystemView } from "../DesignSystemView";
 import { MemoryView } from "../MemoryView";
 import { SearchBar } from "../SearchBar";
-import { SkillsView } from "../SkillsView";
 import { RegistryView } from "../RegistryView";
-import { useFlag } from "../hooks/useFlag";
 import { PageHeader } from "../components/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,11 +19,11 @@ interface KnowledgeSectionProps {
 export function KnowledgeSection({ currentView, projectId, onTaskSelect }: KnowledgeSectionProps) {
   if (currentView === "docs") return <DocsView />;
   if (currentView === "design-system") return <DesignSystemView />;
-  if (currentView === "skills") return <SkillsRoute />;
+  if (currentView === "skills") return <RegistryView />;
   if (currentView === "memory") return <MemoryView projectId={projectId} />;
   if (currentView === "search") {
     return (
-      <main className="relative flex-1 overflow-auto bg-app">
+      <main className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
         <PageHeader
           title="Search"
           description="Find tasks, agents, and context across Mission Control. Results open in the Mission Queue."
@@ -63,9 +61,4 @@ export function KnowledgeSection({ currentView, projectId, onTaskSelect }: Knowl
     );
   }
   return null;
-}
-
-function SkillsRoute() {
-  const registryEnabled = useFlag("context.registry");
-  return registryEnabled ? <RegistryView /> : <SkillsView />;
 }

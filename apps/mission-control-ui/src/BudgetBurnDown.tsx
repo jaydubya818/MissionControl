@@ -84,7 +84,7 @@ export function BudgetBurnDown({ projectId }: BudgetBurnDownProps) {
 
   if (!budgetData) {
     return (
-      <div className="flex-1 overflow-auto bg-app">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
         <PageHeader title="Budget burn-down" description="Daily budget consumption across all agents" />
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-6 py-6">
           <div className="h-4 w-48 animate-pulse rounded bg-surface-2" />
@@ -97,7 +97,7 @@ export function BudgetBurnDown({ projectId }: BudgetBurnDownProps) {
   const totalClasses = getSpendClasses(budgetData.totalRatio);
 
   return (
-    <div className="flex-1 overflow-auto bg-app">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader title="Budget burn-down" description="Daily budget consumption across all agents" />
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-6 py-6">
         {/* Aggregate Summary */}

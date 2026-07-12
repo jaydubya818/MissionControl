@@ -26,7 +26,13 @@ export type {
 } from "./skillFrontmatter.js";
 
 export { lintSkill } from "./skillLint.js";
-export type { SkillLintResult, SkillLintFinding, SkillLintSeverity, SkillLintOptions } from "./skillLint.js";
+export type {
+  SkillLintResult,
+  SkillLintFinding,
+  SkillLintSeverity,
+  SkillLintOptions,
+  SkillReviewAxes,
+} from "./skillLint.js";
 
 export { resolve, diffLock, checkOutdated } from "./resolver.js";
 export type {

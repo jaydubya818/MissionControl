@@ -6,9 +6,18 @@
 
 ## Current Phase: Phase 2 (Agent Runtime) COMPLETE → Phase 3 Ready
 
-## Last Session: March 2, 2026
+## Last Session: July 11, 2026
 
 ### What was done this session:
+
+#### Memory Knowledge Graph v1 + EOS merge + demo ergonomics
+1. **Knowledge graph** — Convex schema/API, Graphify import (`pnpm run import:knowledge-graph:demo`), Memory → Graph tab with pan/zoom/detail, hyperedge dedupe, tests.
+2. **Sprint 1 exception-first Overview** — shared `AttentionQueuePanel` (Approve/Unblock/Open), wired into `DashboardOverview` and EOS `CommandCenterView`.
+3. **EOS in main repo** — full `src/eos/`, `eosNavConfig`, `AppShellV2` flag swap (`eos.command-center-preview`), `convex/analytics.ts`, flag registered.
+4. **Demo from main** — `pnpm run dev:demo` / `dev:demo:ui`; README + RUN.md + AGENTS.md updated (worktrees optional).
+5. **EOS nav** — Delivery sidebar label `Tasks` → `Work Orders` (Sprint 1.2 breadcrumb alignment).
+
+## Last Session (archived): March 2, 2026
 
 #### Dashboard Phase 1 + UI polish (2026-02-28 plan + UI-GAPS)
 1. **Savings baseline** — Verified Est. monthly savings tooltip already present (?) with "Savings vs. paying full window price without cache/optimizations."

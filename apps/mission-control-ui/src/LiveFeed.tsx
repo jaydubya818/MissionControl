@@ -159,7 +159,7 @@ export function LiveFeed({ projectId, expanded, onToggle }: LiveFeedProps) {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-border">
+      <div className="flex shrink-0 gap-1 overflow-x-auto flex-nowrap px-3 py-2 border-b border-border">
         {filters.map((f) => (
           <button
             key={f.key}
@@ -178,7 +178,7 @@ export function LiveFeed({ projectId, expanded, onToggle }: LiveFeedProps) {
       </div>
 
       {/* Agent chips */}
-      <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-border">
+      <div className="flex shrink-0 gap-1 overflow-x-auto flex-nowrap px-3 py-2 border-b border-border">
         <Badge variant="default" className="text-xs cursor-pointer">All Agents</Badge>
         {agents && (agents as Doc<"agents">[]).slice(0, 8).map((a) => (
           <Badge key={a._id} variant="outline" className="text-xs">

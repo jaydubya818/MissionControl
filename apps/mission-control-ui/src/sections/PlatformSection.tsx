@@ -1,3 +1,4 @@
+import { EosViewRenderer, isEosView } from "../eos/EosSection";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { MainView } from "../TopNav";
 import { SystemView } from "../SystemView";
@@ -5,6 +6,7 @@ import { RadarView } from "../RadarView";
 import { FactoryView } from "../FactoryView";
 import { PipelineView } from "../PipelineView";
 import { FeedbackView } from "../FeedbackView";
+import { AnalyticsView } from "../AnalyticsView";
 
 export interface PlatformSectionProps {
   currentView: MainView;
@@ -23,6 +25,11 @@ export function PlatformSection({
   onOpenMonitoringDashboard,
   onTaskSelect,
 }: PlatformSectionProps) {
+  if (isEosView(currentView)) {
+    return (
+      <EosViewRenderer view={currentView} onNavigate={onNavigate as (v: string) => void} />
+    );
+  }
   if (currentView === "system") {
     return (
       <SystemView
@@ -60,6 +67,9 @@ export function PlatformSection({
   }
   if (currentView === "feedback") {
     return <FeedbackView projectId={projectId} onNavigate={onNavigate} />;
+  }
+  if (currentView === "analytics") {
+    return <AnalyticsView />;
   }
   return null;
 }

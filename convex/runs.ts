@@ -191,7 +191,7 @@ export const getUsageTimeSeries = query({
       const bucketStart = Math.floor(r.startedAt / bucketMs) * bucketMs;
       if (!buckets[bucketStart]) {
         buckets[bucketStart] = {
-          period: new Date(bucketStart).toISOString().slice(0, 13),
+          period: new Date(bucketStart).toISOString(),
           inputTokens: 0,
           outputTokens: 0,
           costUsd: 0,
@@ -201,10 +201,20 @@ export const getUsageTimeSeries = query({
       buckets[bucketStart].outputTokens += r.outputTokens ?? 0;
       buckets[bucketStart].costUsd += r.costUsd ?? 0;
     }
-    return Object.entries(buckets)
-      .map(([t, v]) => ({ ...v, _t: Number(t) }))
-      .sort((a, b) => a._t - b._t)
-      .map(({ _t, ...v }) => v);
+    const bucketStart = Math.floor(since / bucketMs) * bucketMs;
+    const bucketEnd = Math.floor(Date.now() / bucketMs) * bucketMs;
+    const filled: { period: string; inputTokens: number; outputTokens: number; costUsd: number }[] = [];
+    for (let t = bucketStart; t <= bucketEnd; t += bucketMs) {
+      filled.push(
+        buckets[t] ?? {
+          period: new Date(t).toISOString(),
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: 0,
+        },
+      );
+    }
+    return filled;
   },
 });
 

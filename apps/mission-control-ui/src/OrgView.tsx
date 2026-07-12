@@ -306,7 +306,7 @@ export function OrgView({ projectId }: OrgViewProps) {
 
   if (!hierarchy) {
     return (
-      <main className="flex-1 overflow-auto bg-app">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
         <div className="mx-auto max-w-[1440px] px-6 py-6">
           <div className="h-[640px] animate-pulse rounded-xl border border-line bg-surface-2" />
         </div>
@@ -316,7 +316,7 @@ export function OrgView({ projectId }: OrgViewProps) {
 
   if (hierarchy.length === 0) {
     return (
-      <main className="flex-1 overflow-auto bg-app">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
         <PageHeader
           title="Org Chart"
           description="Human and agent structure for the current project, including ownership, role posture, and organizational relationships."
@@ -369,7 +369,7 @@ export function OrgView({ projectId }: OrgViewProps) {
   const drawerOpen = selectedNode !== null;
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
       <PageHeader
         title="Org Chart"
         description="Human and agent reporting structure for the operating system behind this project."
@@ -388,8 +388,8 @@ export function OrgView({ projectId }: OrgViewProps) {
         }
       />
 
-      <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-6 py-6">
-        <div className="grid gap-4 md:grid-cols-4">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-4 overflow-hidden px-6 pb-6 pt-4">
+        <div className="grid shrink-0 gap-4 md:grid-cols-4">
           <Card className="p-4">
             <div className="text-[12.5px] font-medium text-ink-secondary">Humans</div>
             <div className="mt-1.5 text-[20px] font-semibold leading-none text-ink">{totalHumans}</div>
@@ -433,7 +433,7 @@ export function OrgView({ projectId }: OrgViewProps) {
         ) : null}
 
       {/* Chart + Drawer */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <div
           className="flex-1 overflow-auto flex flex-col items-center gap-8 pb-12 transition-[margin-left] duration-200"
           style={{ marginLeft: drawerOpen ? 480 : 0 }}

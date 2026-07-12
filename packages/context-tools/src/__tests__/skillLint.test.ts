@@ -36,6 +36,40 @@ describe("lintSkill — clean skill", () => {
     const result = lintSkill(CLEAN, { path: "skills/mission-control-heartbeat/SKILL.md" });
     expect(result.findings).toEqual([]);
     expect(result.score).toBe(100);
+    expect(result.axes).toEqual({ validation: 100, implementation: 100, activation: 100 });
+  });
+});
+
+describe("review axes", () => {
+  it("caps the validation axis at 40 when frontmatter is missing", () => {
+    const result = lintSkill("## Just a body\n\nNo frontmatter here.\n");
+    expect(result.axes.validation).toBe(40);
+    expect(result.axes.implementation).toBe(100);
+    expect(result.axes.activation).toBe(100);
+  });
+
+  it("charges activation findings to the activation axis only", () => {
+    const md = `---\nname: a-skill\ndescription: short\nversion: 1.0.0\nowner: team\n---\n## Body\n`;
+    const result = lintSkill(md);
+    // -20 activation-language-missing, -10 description-too-short
+    expect(result.axes).toEqual({ validation: 100, implementation: 100, activation: 70 });
+  });
+
+  it("charges dangerous instructions to the implementation axis", () => {
+    const md = `---\nname: a-skill\ndescription: ${OK_DESCRIPTION}\nversion: 1.0.0\nowner: team\n---\n## Steps\n\nsudo rm -rf /x\n`;
+    const result = lintSkill(md);
+    expect(result.axes.implementation).toBe(70);
+    expect(result.axes.validation).toBe(100);
+    expect(result.axes.activation).toBe(100);
+  });
+
+  it("floors each axis at 0 independently", () => {
+    const body = ["## Steps", "rm -rf /a", "rm -rf /b", "rm -rf /c", "sudo reboot"].join("\n");
+    const md = `---\nname: a-skill\ndescription: short\nversion: 1.0.0\nowner: team\n---\n${body}`;
+    const result = lintSkill(md);
+    expect(result.axes.implementation).toBe(0); // 4 x -30 floored
+    expect(result.axes.activation).toBe(70); // -20 -10
+    expect(result.axes.validation).toBe(100);
   });
 });
 

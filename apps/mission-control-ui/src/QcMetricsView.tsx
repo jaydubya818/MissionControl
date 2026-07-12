@@ -8,11 +8,12 @@ import { useState, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RiskBadge, StatusBadge } from "@/components/factory/badges";
+import { MiniBarChart } from "@/components/factory/MiniBarChart";
 import { CheckCircle, XCircle, Bot } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const ENVIRONMENTS = ["local", "dev", "staging", "pilot", "production"] as const;
 const TIME_RANGES = [
@@ -155,23 +156,17 @@ export function QcMetricsView({ projectId }: QcMetricsViewProps) {
           Quality score trend — {envTab}
         </h3>
         {qualityScoresForChart.length > 0 ? (
-          <div className="flex h-40 items-end gap-1">
-            {qualityScoresForChart.map((m, i) => {
-              const height = Math.max(4, (m.value / 100) * 100);
-              return (
-                <div
-                  key={`${m.recordedAt}-${i}`}
-                  className="flex min-w-0 flex-1 flex-col items-center gap-0.5"
-                  title={`${new Date(m.recordedAt).toLocaleDateString()}: ${m.value}`}
-                >
-                  <div
-                    className="w-full rounded-t bg-ok"
-                    style={{ height: `${height}%` }}
-                  />
-                </div>
-              );
-            })}
-          </div>
+          <MiniBarChart
+            points={qualityScoresForChart.map((m, i) => ({
+              key: `${m.recordedAt}-${i}`,
+              value: m.value,
+              max: 100,
+              title: `${new Date(m.recordedAt).toLocaleDateString()}: ${m.value}`,
+              colorClass: "bg-ok",
+            }))}
+            maxValue={100}
+            heightClass="h-40"
+          />
         ) : (
           <div className="flex h-32 items-center justify-center text-[13px] text-ink-muted">
             No quality score data for this environment and range

@@ -88,7 +88,7 @@ export function TelegraphInbox({ projectId }: { projectId: Id<"projects"> | null
   if (selectedThreadId && selectedThread) {
     const messages = selectedThread.messages ?? [];
     return (
-      <main className="flex-1 overflow-auto bg-app">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
         <PageHeader
           title={selectedThread.title}
           description="Message history, operator notes, and linked work for this thread."
@@ -182,7 +182,7 @@ export function TelegraphInbox({ projectId }: { projectId: Id<"projects"> | null
   }
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="Telegraph"
         description={

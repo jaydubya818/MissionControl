@@ -4,8 +4,8 @@ import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useState, useEffect } from "react";
 import { Paperclip, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusBadge, type StatusBadgeProps } from "@/components/factory/badges";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,11 +49,11 @@ export function TaskDrawer({
 
   return (
     <Sheet open={!!taskId} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <SheetContent side="right" className="w-[480px] max-w-[90vw] p-0 flex flex-col">
+      <SheetContent side="right" className="flex w-[480px] max-w-[90vw] flex-col border-l border-line bg-surface-1 p-0">
         {isLoading ? (
-          <div className="p-6 text-sm text-muted-foreground">Loading...</div>
+          <div className="p-6 text-sm text-ink-muted">Loading...</div>
         ) : !data ? (
-          <div className="p-6 text-sm text-muted-foreground">Task not found</div>
+          <div className="p-6 text-sm text-ink-muted">Task not found</div>
         ) : (
           <TaskDrawerContent
             task={data.task}
@@ -99,9 +99,23 @@ function TaskDrawerContent({
   setComment: (v: string) => void;
   loading: boolean;
   setLoading: (v: boolean) => void;
-  postMessage: any;
-  transitionTask: any;
-  updateTask: any;
+  postMessage: (args: {
+    taskId: Id<"tasks">;
+    authorType: "HUMAN";
+    authorUserId: string;
+    type: string;
+    content: string;
+    idempotencyKey: string;
+  }) => Promise<unknown>;
+  transitionTask: (args: {
+    taskId: Id<"tasks">;
+    toStatus: TaskStatus;
+    actorType: "HUMAN";
+    actorUserId: string;
+    idempotencyKey: string;
+    reason?: string;
+  }) => Promise<{ success: boolean; errors?: Array<{ message: string }> }>;
+  updateTask: (args: { taskId: Id<"tasks">; assigneeIds: Id<"agents">[] }) => Promise<unknown>;
   taskId: Id<"tasks">;
   onClose: () => void;
 }) {
@@ -116,7 +130,7 @@ function TaskDrawerContent({
       await postMessage({
         taskId,
         authorType: "HUMAN",
-        authorUserId: "jay",
+        authorUserId: "operator",
         type: "COMMENT",
         content: comment,
         idempotencyKey: `comment:${taskId}:${Date.now()}`,
@@ -135,7 +149,7 @@ function TaskDrawerContent({
         taskId,
         toStatus,
         actorType: "HUMAN",
-        actorUserId: "jay",
+        actorUserId: "operator",
         idempotencyKey: `transition:${taskId}:${toStatus}:${Date.now()}`,
         reason: "Manual transition from UI",
       });
@@ -153,31 +167,31 @@ function TaskDrawerContent({
   return (
     <>
       {/* Header */}
-      <div className="px-5 py-4 border-b border-border">
+      <div className="border-b border-line px-5 py-4">
         <SheetHeader className="space-y-0">
-          <SheetTitle className="text-base font-semibold leading-snug">
+          <SheetTitle className="text-base font-semibold leading-snug text-ink">
             {task.title}
           </SheetTitle>
         </SheetHeader>
-        <div className="flex gap-2 mt-2 flex-wrap">
-          <StatusBadge status={task.status} />
-          <Badge variant="outline" className="text-xs">{task.type}</Badge>
-          <Badge variant="outline" className="text-xs">P{task.priority}</Badge>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <StatusBadge tone={taskStatusTone(task.status)}>
+            {task.status.replace(/_/g, " ")}
+          </StatusBadge>
+          <StatusBadge tone="neutral">{task.type}</StatusBadge>
+          <StatusBadge tone="neutral">P{task.priority}</StatusBadge>
           {task.dueAt != null && (
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-xs",
+            <StatusBadge
+              tone={
                 task.dueAt < Date.now()
-                  ? "border-destructive text-destructive"
+                  ? "error"
                   : task.dueAt < Date.now() + 86400000 * 2
-                    ? "border-warn text-warn"
-                    : ""
-              )}
+                    ? "warning"
+                    : "neutral"
+              }
             >
               Due {new Date(task.dueAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-              {task.dueAt < Date.now() && " (overdue)"}
-            </Badge>
+              {task.dueAt < Date.now() ? " (overdue)" : ""}
+            </StatusBadge>
           )}
         </div>
       </div>
@@ -186,7 +200,7 @@ function TaskDrawerContent({
       <div className="flex-1 overflow-auto p-5 space-y-6">
         {task.description && (
           <Section title="Description">
-            <p className="text-sm text-foreground/80 leading-relaxed">{task.description}</p>
+            <p className="text-sm leading-relaxed text-ink-secondary">{task.description}</p>
           </Section>
         )}
 
@@ -200,7 +214,7 @@ function TaskDrawerContent({
                 ) : null;
               })
             ) : (
-              <span className="text-sm text-muted-foreground">Unassigned</span>
+              <span className="text-sm text-ink-muted">Unassigned</span>
             )}
             <ReassignDropdown
               taskId={taskId}
@@ -223,13 +237,13 @@ function TaskDrawerContent({
 
         {task.workPlan && (
           <Section title="Work Plan">
-            <ul className="list-disc pl-5 text-sm text-foreground/80 space-y-1">
+            <ul className="list-disc space-y-1 pl-5 text-sm text-ink-secondary">
               {task.workPlan.bullets.map((b: string, i: number) => (
                 <li key={i}>{b}</li>
               ))}
             </ul>
             {task.workPlan.estimatedCost && (
-              <p className="mt-2 text-xs text-muted-foreground">
+              <p className="mt-2 text-xs text-ink-muted">
                 Est. cost: ${task.workPlan.estimatedCost.toFixed(2)}
               </p>
             )}
@@ -239,15 +253,15 @@ function TaskDrawerContent({
         {task.deliverable && (
           <Section title="Deliverable">
             {task.deliverable.summary && (
-              <p className="text-sm text-foreground/80">{task.deliverable.summary}</p>
+              <p className="text-sm text-ink-secondary">{task.deliverable.summary}</p>
             )}
             {task.deliverable.artifactIds && task.deliverable.artifactIds.length > 0 && (
               <div className="flex gap-1.5 flex-wrap mt-2">
-                {task.deliverable.artifactIds.map((id: string, i: number) => (
-                  <Badge key={i} variant="secondary" className="text-xs gap-1">
-                    <Paperclip className="h-3 w-3" strokeWidth={1.75} />
+                {task.deliverable.artifactIds.map((id: string) => (
+                  <StatusBadge key={id} tone="neutral" className="font-mono">
+                    <Paperclip className="mr-1 inline h-3 w-3" strokeWidth={1.75} />
                     {id}
-                  </Badge>
+                  </StatusBadge>
                 ))}
               </div>
             )}
@@ -256,7 +270,7 @@ function TaskDrawerContent({
 
         {task.blockedReason && (
           <Section title="Blocked">
-            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
+            <div className="rounded-md border border-line bg-err-soft p-3 text-sm text-err">
               {task.blockedReason}
             </div>
           </Section>
@@ -284,7 +298,7 @@ function TaskDrawerContent({
               <TimelineItem key={i} item={item} isLast={i === timeline.length - 1} />
             ))}
             {timeline.length === 0 && (
-              <p className="text-xs text-muted-foreground">No activity yet</p>
+              <p className="text-xs text-ink-muted">No activity yet</p>
             )}
           </div>
         </Section>
@@ -294,7 +308,7 @@ function TaskDrawerContent({
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Write a comment..."
-            className="w-full min-h-[80px] p-3 bg-background border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full min-h-[80px] resize-y rounded-md border border-line bg-surface-1 p-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <Button
             size="sm"
@@ -308,7 +322,7 @@ function TaskDrawerContent({
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-3 border-t border-border text-xs text-muted-foreground">
+      <div className="border-t border-line px-5 py-3 text-xs text-ink-muted">
         Cost: ${task.actualCost.toFixed(2)}
         {task.estimatedCost && ` / $${task.estimatedCost.toFixed(2)}`}
         {" · "}
@@ -436,7 +450,7 @@ function RedirectForm({
         value={redirectText}
         onChange={(e) => setRedirectText(e.target.value)}
         placeholder="Instruction for the agent..."
-        className="flex-1 min-w-0 px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        className="min-w-0 flex-1 rounded-md border border-line bg-surface-1 px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-ring"
       />
       <Button size="sm" onClick={handleRedirect} disabled={loading || !redirectText.trim()}>
         Send redirect
@@ -448,7 +462,7 @@ function RedirectForm({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+      <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
         {title}
       </h3>
       {children}
@@ -456,32 +470,29 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  INBOX: "secondary",
-  ASSIGNED: "outline",
-  IN_PROGRESS: "default",
-  REVIEW: "outline",
-  NEEDS_APPROVAL: "destructive",
-  BLOCKED: "destructive",
-  FAILED: "destructive",
-  DONE: "default",
-  CANCELED: "secondary",
-};
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <Badge variant={STATUS_VARIANTS[status] || "secondary"} className="text-xs">
-      {status.replace("_", " ")}
-    </Badge>
-  );
+function taskStatusTone(status: TaskStatus): StatusBadgeProps["tone"] {
+  switch (status) {
+    case "DONE":
+      return "success";
+    case "IN_PROGRESS":
+    case "REVIEW":
+      return "info";
+    case "NEEDS_APPROVAL":
+    case "BLOCKED":
+      return "warning";
+    case "FAILED":
+      return "error";
+    default:
+      return "neutral";
+  }
 }
 
 function AgentChip({ agent }: { agent: Agent }) {
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-muted rounded-full text-xs text-foreground">
-      {agent.emoji ? <span>{agent.emoji}</span> : null}
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-2.5 py-1 text-xs text-ink">
+      {agent.emoji ? <span aria-hidden>{agent.emoji}</span> : null}
       <span>{agent.name}</span>
-      <span className="text-muted-foreground">{agent.role}</span>
+      <span className="text-ink-muted">{agent.role}</span>
     </span>
   );
 }
@@ -533,20 +544,20 @@ function TimelineItem({ item, isLast }: { item: TimelineEntry; isLast: boolean }
       <div className="flex flex-col items-center">
         <div
           className={cn(
-            "w-2.5 h-2.5 rounded-full shrink-0",
-            isTransition ? "bg-primary" : "bg-primary"
+            "h-2.5 w-2.5 shrink-0 rounded-full",
+            isTransition ? "bg-info-accent" : "bg-ink-muted",
           )}
         />
-        {!isLast && <div className="w-0.5 flex-1 bg-border mt-1" />}
+        {!isLast && <div className="mt-1 w-0.5 flex-1 bg-surface-2" />}
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-xs text-muted-foreground mb-0.5">
-          <strong className="text-foreground">{item.actor}</strong>
+      <div className="min-w-0 flex-1">
+        <div className="mb-0.5 text-xs text-ink-muted">
+          <strong className="text-ink">{item.actor}</strong>
           {" · "}
           {new Date(item.timestamp).toLocaleString()}
-          {item.details && <span className="ml-2 text-muted-foreground/60">{item.details}</span>}
+          {item.details && <span className="ml-2 text-ink-muted/80">{item.details}</span>}
         </div>
-        <div className="text-sm text-foreground/80 whitespace-pre-wrap">
+        <div className="whitespace-pre-wrap text-sm text-ink-secondary">
           {isTransition ? `Status changed: ${item.content}` : item.content}
         </div>
       </div>

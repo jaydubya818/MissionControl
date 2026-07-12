@@ -67,7 +67,7 @@ export function LiveOfficeView({ projectId }: LiveOfficeViewProps) {
 
   if (agents === undefined) {
     return (
-      <main className="relative flex-1 overflow-auto bg-app" role="region" aria-label="Live Office">
+      <main className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-app" role="region" aria-label="Live Office">
         <div className="mx-auto w-full max-w-[1200px] px-6 py-6">
           <div className="h-[620px] animate-pulse rounded-xl border border-line bg-surface-2" />
         </div>
@@ -77,7 +77,7 @@ export function LiveOfficeView({ projectId }: LiveOfficeViewProps) {
 
   return (
     <main
-      className="relative flex-1 overflow-auto bg-app"
+      className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-app"
       role="region"
       aria-label="Live Office"
       data-testid="live-office-view"

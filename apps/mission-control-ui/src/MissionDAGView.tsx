@@ -186,7 +186,7 @@ export function MissionDAGView({ projectId, onTaskSelect }: MissionDAGViewProps)
   const doneCount = statusCounts.DONE ?? 0;
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
       <PageHeader
         title="Mission DAG"
         description="Visualize dependency structure, sequencing, and blockers across the mission graph."
@@ -198,8 +198,8 @@ export function MissionDAGView({ projectId, onTaskSelect }: MissionDAGViewProps)
           </StatusBadge>
         }
       />
-      <div className="px-6 py-6 flex flex-col gap-6">
-        <div className="grid gap-4 md:grid-cols-4">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 pb-6 pt-4 gap-4">
+        <div className="grid shrink-0 gap-4 md:grid-cols-4">
           <Card className="p-4">
             <MetricBlock
               label="Graph size"
@@ -230,13 +230,13 @@ export function MissionDAGView({ projectId, onTaskSelect }: MissionDAGViewProps)
           </Card>
         </div>
 
-        <Card className="p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
+        <Card className="shrink-0 p-4">
+          <div className="flex items-center justify-between gap-3 overflow-x-auto flex-nowrap">
+            <div className="shrink-0">
               <div className="text-[15px] font-semibold text-ink">Graph filters</div>
               <div className="mt-1 text-[12.5px] text-ink-muted">Focus the dependency map by task state</div>
             </div>
-            <div className="flex flex-wrap gap-1 rounded-lg border border-line p-0.5">
+            <div className="flex shrink-0 gap-1 rounded-lg border border-line p-0.5">
               <button
                 className={cn(
                   "rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150",
@@ -266,13 +266,13 @@ export function MissionDAGView({ projectId, onTaskSelect }: MissionDAGViewProps)
           </div>
         </Card>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card className="overflow-hidden p-0">
-          <div className="border-b border-line px-5 py-4">
+        <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+          <div className="shrink-0 border-b border-line px-5 py-4">
             <div className="text-[15px] font-semibold text-ink">Dependency canvas</div>
             <div className="mt-1 text-[12.5px] text-ink-muted">Read downstream relationships before changing task sequencing</div>
           </div>
-          <div className="overflow-auto max-h-[calc(100vh-320px)] bg-app">
+          <div className="min-h-0 flex-1 overflow-auto bg-app">
         <svg
           width={canvasWidth}
           height={canvasHeight}

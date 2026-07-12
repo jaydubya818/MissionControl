@@ -53,6 +53,15 @@ const riskLevelArg = v.union(
   v.literal("RED")
 );
 
+/** Minimum structural review score required to publish SKILL packages. */
+export const MIN_PUBLISH_QUALITY_SCORE = 50;
+
+const reviewAxesArg = v.object({
+  validation: v.number(),
+  implementation: v.number(),
+  activation: v.number(),
+});
+
 async function insertAudit(
   ctx: { db: any },
   entry: {
@@ -200,6 +209,7 @@ export const listWithCurrentVersions = query({
         version: version?.version ?? null,
         versionStatus: version?.status ?? null,
         qualityScore: version?.qualityScore ?? null,
+        reviewAxes: version?.reviewAxes ?? null,
         impactScore: version?.impactScore ?? null,
         securityStatus: version?.securityStatus ?? null,
         sourceRepo: version?.sourceRepo ?? null,
@@ -424,12 +434,80 @@ export const createVersion = mutation({
   },
 });
 
+export const setVersionReview = mutation({
+  args: {
+    versionId: v.id("contextPackageVersions"),
+    qualityScore: v.number(),
+    reviewAxes: reviewAxesArg,
+    actorId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const version = await ctx.db.get(args.versionId);
+    if (!version) {
+      throw new Error("Version not found");
+    }
+    const pkg = await ctx.db.get(version.packageId);
+    if (!pkg) {
+      throw new Error("Package not found for version");
+    }
+    await requireContextRegistryEnabled(ctx, pkg.projectId);
+
+    if (version.status !== "DRAFT") {
+      throw new Error(
+        `Cannot update review on version in status ${version.status} — only DRAFT versions are reviewable`
+      );
+    }
+    if (
+      args.qualityScore < 0 ||
+      args.qualityScore > 100 ||
+      args.reviewAxes.validation < 0 ||
+      args.reviewAxes.validation > 100 ||
+      args.reviewAxes.implementation < 0 ||
+      args.reviewAxes.implementation > 100 ||
+      args.reviewAxes.activation < 0 ||
+      args.reviewAxes.activation > 100
+    ) {
+      throw new Error("qualityScore and reviewAxes must be integers in 0–100");
+    }
+
+    await ctx.db.patch(args.versionId, {
+      qualityScore: Math.round(args.qualityScore),
+      reviewAxes: {
+        validation: Math.round(args.reviewAxes.validation),
+        implementation: Math.round(args.reviewAxes.implementation),
+        activation: Math.round(args.reviewAxes.activation),
+      },
+    });
+
+    await insertAudit(ctx, {
+      projectId: pkg.projectId,
+      actorId: args.actorId,
+      action: "CONTEXT_VERSION_REVIEWED",
+      description: `Version ${version.version} of "${pkg.slug}" reviewed (score ${Math.round(args.qualityScore)})`,
+      targetType: "contextPackageVersion",
+      targetId: args.versionId,
+      afterState: {
+        qualityScore: Math.round(args.qualityScore),
+        reviewAxes: args.reviewAxes,
+      },
+    });
+
+    return await ctx.db.get(args.versionId);
+  },
+});
+
 export const publishVersion = mutation({
   args: {
     versionId: v.id("contextPackageVersions"),
     // Caller-computed sha256 for rows created without one (see lib docstring)
     contentHash: v.optional(v.string()),
     approvedBy: v.optional(v.string()),
+    // Structural review from the skill linter — required for SKILL packages
+    // unless already stored on the DRAFT version row.
+    qualityScore: v.optional(v.number()),
+    reviewAxes: v.optional(reviewAxesArg),
+    /** Override the default minimum score (50) for this publish. */
+    minQualityScore: v.optional(v.number()),
     actorId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -462,6 +540,28 @@ export const publishVersion = mutation({
       );
     }
 
+    const qualityScore = args.qualityScore ?? version.qualityScore;
+    const reviewAxes = args.reviewAxes ?? version.reviewAxes;
+    const minScore = args.minQualityScore ?? MIN_PUBLISH_QUALITY_SCORE;
+
+    if (pkg.type === "SKILL") {
+      if (qualityScore === undefined || qualityScore === null) {
+        throw new Error(
+          `SKILL packages require a structural review score before publish — run the skill linter and pass qualityScore/reviewAxes, or call setVersionReview first`
+        );
+      }
+      if (qualityScore < minScore) {
+        throw new Error(
+          `Cannot publish SKILL "${pkg.slug}" — quality score ${qualityScore} is below minimum ${minScore}`
+        );
+      }
+      if (reviewAxes === undefined || reviewAxes.validation < 40) {
+        throw new Error(
+          `Cannot publish SKILL "${pkg.slug}" — validation axis must be at least 40 (well-formed frontmatter and required fields)`
+        );
+      }
+    }
+
     const now = Date.now();
     await ctx.db.patch(args.versionId, {
       status: "PUBLISHED",
@@ -469,6 +569,10 @@ export const publishVersion = mutation({
       approvedBy: args.approvedBy,
       approvedAt: args.approvedBy ? now : undefined,
       publishedAt: now,
+      ...(qualityScore !== undefined && qualityScore !== null
+        ? { qualityScore: Math.round(qualityScore) }
+        : {}),
+      ...(reviewAxes !== undefined ? { reviewAxes } : {}),
     });
     await ctx.db.patch(version.packageId, {
       currentVersionId: args.versionId,

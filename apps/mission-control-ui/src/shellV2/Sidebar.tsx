@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown, Command, Search } from "lucide-react";
 import type { MainView } from "../TopNav";
-import { NAV_GROUPS, groupForView, type NavGroup, type NavItem } from "./navConfig";
+import { NAV_GROUPS, type NavGroup, type NavItem } from "./navConfig";
 import { cn } from "../lib/utils";
 
 export const SIDEBAR_V2_WIDTH = 256;
@@ -101,6 +101,7 @@ export function WorkspaceSwitcher({ children }: WorkspaceSwitcherProps): JSX.Ele
 }
 
 interface SidebarProps {
+  groups?: NavGroup[];
   activeView: MainView;
   onNavigate: (view: MainView) => void;
   onOpenSearch: () => void;
@@ -109,15 +110,17 @@ interface SidebarProps {
 }
 
 export function Sidebar({
+  groups,
   activeView,
   onNavigate,
   onOpenSearch,
   workspaceSwitcher,
   footer,
 }: SidebarProps): JSX.Element {
-  const activeGroupId = groupForView(activeView)?.id ?? "operate";
+  const navGroups = groups ?? NAV_GROUPS;
+  const activeGroupId = (navGroups.find((g) => g.items.some((i) => i.view === activeView)) ?? navGroups[0]).id;
   const [expandedIds, setExpandedIds] = useState<string[]>(() => [
-    "operate",
+    navGroups[0].id,
     activeGroupId,
   ]);
 
@@ -158,7 +161,7 @@ export function Sidebar({
       <WorkspaceSwitcher>{workspaceSwitcher}</WorkspaceSwitcher>
 
       <div className="flex-1 overflow-y-auto px-3 py-1">
-        {NAV_GROUPS.map((group) => (
+        {navGroups.map((group) => (
           <SidebarSection
             key={group.id}
             group={group}

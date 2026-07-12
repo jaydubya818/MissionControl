@@ -18,12 +18,18 @@
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { requireContextRegistryEnabled } from "../lib/contextRegistryGate";
+import { compareSemver } from "../lib/contextPackages";
 import {
   diffInstallations,
+  enrichInstallation,
+  indexLatestVersions,
   isValidManifestHash,
+  summarizeRepoInstallations,
   toAvailablePackage,
   type AvailablePackageShape,
+  type EnrichedInstallation,
   type InstallationEntry,
+  type RepoInstallationSummary,
 } from "../lib/contextManifests";
 
 const installationStateArg = v.union(
@@ -100,6 +106,106 @@ export const listInstallationsByPackage = query({
       .withIndex("by_package", (q) => q.eq("packageSlug", args.packageSlug))
       .collect();
     return rows.sort((a, b) => a.repoSlug.localeCompare(b.repoSlug));
+  },
+});
+
+async function latestPublishedBySlug(
+  ctx: { db: any }
+): Promise<Record<string, string>> {
+  const packages = await ctx.db.query("contextPackages").collect();
+  const versioned: { slug: string; version: string }[] = [];
+  for (const pkg of packages) {
+    const versions = await ctx.db
+      .query("contextPackageVersions")
+      .withIndex("by_package", (q: any) => q.eq("packageId", pkg._id))
+      .collect();
+    for (const row of versions) {
+      if (row.status === "PUBLISHED" && row.contentHash) {
+        versioned.push({ slug: pkg.slug, version: row.version });
+      }
+    }
+  }
+  return indexLatestVersions(versioned, compareSemver);
+}
+
+async function buildInstallationOverview(
+  ctx: { db: any },
+  filter?: { repoSlug?: string; outdatedOnly?: boolean }
+): Promise<EnrichedInstallation[]> {
+  const latestBySlug = await latestPublishedBySlug(ctx);
+  let rows = await ctx.db.query("contextInstallations").collect();
+  if (filter?.repoSlug !== undefined) {
+    rows = rows.filter((r: { repoSlug: string }) => r.repoSlug === filter.repoSlug);
+  }
+
+  const enriched = rows
+    .map((row: {
+      repoSlug: string;
+      packageSlug: string;
+      version: string;
+      contentHash: string;
+      state: InstallationEntry["state"];
+    }) =>
+      enrichInstallation(
+        {
+          repoSlug: row.repoSlug,
+          packageSlug: row.packageSlug,
+          version: row.version,
+          contentHash: row.contentHash,
+          state: row.state,
+        },
+        latestBySlug,
+        compareSemver
+      )
+    )
+    .sort(
+      (a: EnrichedInstallation, b: EnrichedInstallation) =>
+        a.repoSlug.localeCompare(b.repoSlug) ||
+        a.packageSlug.localeCompare(b.packageSlug)
+    );
+
+  if (filter?.outdatedOnly) {
+    return enriched.filter(
+      (row: EnrichedInstallation) => row.isOutdated || row.state !== "INSTALLED"
+    );
+  }
+  return enriched;
+}
+
+/**
+ * All installation rows enriched with latest registry version and an
+ * outdated flag. Powers the Installations tab in the Registry UI.
+ */
+export const listInstallationOverview = query({
+  args: {
+    repoSlug: v.optional(v.string()),
+    outdatedOnly: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<EnrichedInstallation[]> => {
+    return await buildInstallationOverview(ctx, {
+      repoSlug: args.repoSlug,
+      outdatedOnly: args.outdatedOnly,
+    });
+  },
+});
+
+/** Per-repository rollups for the Installations dashboard. */
+export const listRepoSummaries = query({
+  args: {},
+  handler: async (ctx): Promise<RepoInstallationSummary[]> => {
+    const overview = await buildInstallationOverview(ctx);
+    const byRepo = new Map<string, EnrichedInstallation[]>();
+    for (const row of overview) {
+      const list = byRepo.get(row.repoSlug);
+      if (list === undefined) {
+        byRepo.set(row.repoSlug, [row]);
+      } else {
+        list.push(row);
+      }
+    }
+    return [...byRepo.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, rows]) => summarizeRepoInstallations(rows));
   },
 });
 

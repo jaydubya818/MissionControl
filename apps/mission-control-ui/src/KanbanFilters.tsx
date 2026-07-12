@@ -143,8 +143,8 @@ export function KanbanFilters({ projectId, currentUserId, filters, onFiltersChan
   };
 
   return (
-    <div className="border-b border-line bg-app px-4 py-3">
-      <div className="flex items-center gap-3 flex-wrap">
+    <div className="shrink-0 border-b border-line bg-app px-4 py-2">
+      <div className="flex items-center gap-3 overflow-x-auto flex-nowrap">
         {/* Filter icon + active count */}
         <div className="flex items-center gap-2 shrink-0">
           <Filter size={14} strokeWidth={1.6} className="text-ink-muted" />
@@ -221,7 +221,7 @@ export function KanbanFilters({ projectId, currentUserId, filters, onFiltersChan
         {/* Agents */}
         <div className="flex items-center gap-2">
           <span className="text-[11.5px] font-medium text-ink-muted shrink-0">Agent</span>
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className="flex items-center gap-1 flex-nowrap">
             {agents.slice(0, 5).map((agent) => {
               const isActive = filters.agents.includes(agent._id);
               return (
@@ -250,7 +250,7 @@ export function KanbanFilters({ projectId, currentUserId, filters, onFiltersChan
             <div className="w-px h-5 bg-line shrink-0" />
             <div className="flex items-center gap-2">
               <span className="text-[11.5px] font-medium text-ink-muted shrink-0">Type</span>
-              <div className="flex items-center gap-1 flex-wrap">
+              <div className="flex items-center gap-1 flex-nowrap">
                 {taskTypes.slice(0, 4).map((type) => {
                   const isActive = filters.types.includes(type);
                   return (

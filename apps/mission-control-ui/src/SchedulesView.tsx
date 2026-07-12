@@ -213,7 +213,7 @@ export function SchedulesView({ projectId }: { projectId: Id<"projects"> | null 
 
   if (!jobs) {
     return (
-      <main className="flex-1 overflow-auto bg-app">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
         <PageHeader title="Schedules" />
         <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-3" aria-label="Loading schedules">
           <div className="h-3.5 w-2/3 animate-pulse rounded bg-surface-2" />
@@ -225,7 +225,7 @@ export function SchedulesView({ projectId }: { projectId: Id<"projects"> | null 
   }
 
   return (
-    <main className="flex-1 overflow-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="Schedules"
         description="Convex scheduled jobs. For per-agent cron (OpenClaw Gateway), use OpenClaw Studio."

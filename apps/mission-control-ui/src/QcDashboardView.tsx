@@ -20,6 +20,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Clock, Play } from "lucide-react";
+import { MiniBarChart } from "@/components/factory/MiniBarChart";
 import { cn } from "@/lib/utils";
 
 const ENV_OPTIONS = [
@@ -264,27 +265,23 @@ export function QcDashboardView({ projectId, onRunSelect, onOpenStartQcRun }: Qc
       {scoresForTrend.length > 0 && (
         <Card className="p-6">
           <h3 className="mb-4 text-[15px] font-semibold text-ink">Quality Score Trend</h3>
-          <div className="flex h-32 items-end gap-2">
-            <TooltipProvider>
-              {scoresForTrend.map((s) => {
-                const height = (s.qualityScore / 100) * 100;
-                const color = s.riskGrade === "RED" ? "bg-err" : s.riskGrade === "YELLOW" ? "bg-warn" : "bg-ok";
-                return (
-                  <Tooltip key={s.runId}>
-                    <TooltipTrigger asChild>
-                      <div className="flex flex-1 cursor-default flex-col items-center gap-1">
-                        <div className={cn("w-full rounded-t", color)} style={{ height: `${height}%` }} />
-                        <div className="font-mono text-[11px] text-ink-muted">#{s.runSequence}</div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Run {s.runId}: {s.qualityScore} {s.riskGrade ?? ""}
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </TooltipProvider>
-          </div>
+          <MiniBarChart
+            points={scoresForTrend.map((s) => ({
+              key: s.runId,
+              value: s.qualityScore,
+              max: 100,
+              label: `#${s.runSequence}`,
+              title: `Run ${s.runId}: ${s.qualityScore} ${s.riskGrade ?? ""}`,
+              colorClass:
+                s.riskGrade === "RED"
+                  ? "bg-err"
+                  : s.riskGrade === "YELLOW"
+                    ? "bg-warn"
+                    : "bg-ok",
+            }))}
+            maxValue={100}
+            heightClass="h-32"
+          />
         </Card>
       )}
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -6,6 +7,10 @@ import { X } from "lucide-react";
 import { MetricBlock, MetricRow } from "./components/factory/MetricBlock";
 import { StatusBadge } from "./components/factory/badges";
 import { CHART_SERIES } from "./components/factory/chartTheme";
+import {
+  UsageTrendCharts,
+  type ChartWindow,
+} from "@/components/dashboard/UsageTrendCharts";
 
 interface AnalyticsDashboardProps {
   projectId: Id<"projects"> | null;
@@ -13,6 +18,8 @@ interface AnalyticsDashboardProps {
 }
 
 export function AnalyticsDashboard({ projectId, onClose }: AnalyticsDashboardProps) {
+  const [chartWindowHours, setChartWindowHours] = useState<ChartWindow>(168);
+
   const agents = useQuery(
     api.agents.listAll,
     projectId ? { projectId } : {}
@@ -26,6 +33,20 @@ export function AnalyticsDashboard({ projectId, onClose }: AnalyticsDashboardPro
   const runs = useQuery(
     api.runs.listRecent,
     { limit: 1000 }
+  );
+
+  const usageTimeSeries = useQuery(
+    api.runs.getUsageTimeSeries,
+    projectId
+      ? {
+          projectId,
+          windowHours: chartWindowHours,
+          bucketHours: chartWindowHours === 24 ? 1 : 24,
+        }
+      : {
+          windowHours: chartWindowHours,
+          bucketHours: chartWindowHours === 24 ? 1 : 24,
+        },
   );
 
   if (!agents || !tasks || !runs) {
@@ -144,34 +165,13 @@ export function AnalyticsDashboard({ projectId, onClose }: AnalyticsDashboardPro
             <MetricBlock label="7-day forecast" value={`$${forecast7Days.toFixed(2)}`} detail="At current burn rate" />
           </MetricRow>
 
-          {/* Daily cost chart */}
-          <div className="rounded-xl border border-line bg-surface-1 p-4">
-            <div className="mb-3 text-[12.5px] font-medium text-ink-secondary">
-              Daily cost trend (last 7 days)
-            </div>
-            <div className="flex h-[100px] items-end gap-1">
-              {dailyCosts.map((cost, i) => {
-                const maxCost = Math.max(...dailyCosts, 1);
-                const height = (cost / maxCost) * 100;
-                return (
-                  <div key={i} className="flex flex-1 flex-col items-center">
-                    <div
-                      className="w-full rounded-t-sm"
-                      style={{
-                        height: `${height}%`,
-                        minHeight: cost > 0 ? "4px" : "0",
-                        backgroundColor: CHART_SERIES[1],
-                      }}
-                      title={`$${cost.toFixed(2)}`}
-                    />
-                    <div className="mt-1 text-[11px] text-ink-muted">
-                      {i === 6 ? "Today" : `${6 - i}d`}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          {usageTimeSeries && (
+            <UsageTrendCharts
+              series={usageTimeSeries}
+              windowHours={chartWindowHours}
+              onWindowChange={setChartWindowHours}
+            />
+          )}
         </div>
 
         {/* Agent Efficiency Leaderboard */}
