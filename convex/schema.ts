@@ -3236,4 +3236,189 @@ export default defineSchema({
     .index("by_work_order", ["workOrderId"])
     .index("by_agent", ["agentId"])
     .index("by_repo", ["repoSlug"]),
+
+  // -------------------------------------------------------------------------
+  // EVALUATION: SCENARIOS (Software Factory Epic 5)
+  // -------------------------------------------------------------------------
+  // A reusable evaluation task definition: what to ask an agent to do, in
+  // which repo, with what fixtures, budgets, and required outputs. Criteria
+  // (how the result is scored) live in `evaluationCriteria` and may only be
+  // edited while the scenario is DRAFT. Writes are gated behind the
+  // `eval.framework` feature flag (convex/evaluation/scenarios.ts) and
+  // audited via `activities` (EVAL_SCENARIO_*). Execution arrives in PR 8.
+  // See docs/software-factory/EVALUATION.md.
+  evaluationScenarios: defineTable({
+    name: v.string(),
+    description: v.string(),
+    // Capability under test, e.g. "code-review", "refactor", "test-gen"
+    capability: v.string(),
+    // Repository the scenario runs against, format "owner/repo"
+    repoSlug: v.optional(v.string()),
+    // The prompt handed to the agent under evaluation
+    taskPrompt: v.string(),
+    setupInstructions: v.optional(v.string()),
+    // Fixture pinning: REPO_SHA (value = commit sha), SCRIPT (value =
+    // setup script ref), or NONE (no fixture)
+    fixtureRef: v.optional(
+      v.object({
+        kind: v.union(
+          v.literal("REPO_SHA"),
+          v.literal("SCRIPT"),
+          v.literal("NONE")
+        ),
+        value: v.optional(v.string()),
+      })
+    ),
+    // Context/agent configuration for each arm (opaque until PR 8 executes)
+    baselineConfig: v.optional(v.any()),
+    candidateConfig: v.optional(v.any()),
+    // Artifacts a run must produce to be scoreable (paths/names)
+    requiredArtifacts: v.optional(v.array(v.string())),
+    // Budgets
+    timeoutMs: v.optional(v.number()),
+    maxCostUsd: v.optional(v.number()),
+    // Trials per arm; default 1 applied in code (scenarios.ts:create)
+    trials: v.number(),
+    tags: v.optional(v.array(v.string())),
+    owner: v.string(),
+    riskLevel: riskLevel,
+    status: v.union(
+      v.literal("DRAFT"),
+      v.literal("ACTIVE"),
+      v.literal("ARCHIVED")
+    ),
+    // Provenance: where the scenario came from
+    source: v.optional(
+      v.union(
+        v.literal("MANUAL"),
+        v.literal("FROM_PR"),
+        v.literal("FROM_COMMIT"),
+        v.literal("FROM_RUN"),
+        v.literal("FROM_INCIDENT")
+      )
+    ),
+    sourceRef: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_capability", ["capability"])
+    .index("by_status", ["status"])
+    .index("by_owner", ["owner"])
+    .index("by_repo", ["repoSlug"]),
+
+  // -------------------------------------------------------------------------
+  // EVALUATION: CRITERIA (Software Factory Epic 5)
+  // -------------------------------------------------------------------------
+  // How a scenario run is scored. Weights are normalized at scoring time
+  // (lib/evaluation.ts:computeWeightedScore) so they need not sum to 1.
+  // `required: true` criteria cap the overall score when failed. Mutable
+  // only while the parent scenario is DRAFT.
+  evaluationCriteria: defineTable({
+    scenarioId: v.id("evaluationScenarios"),
+    name: v.string(),
+    description: v.string(),
+    // Relative weight, normalized across the scenario's criteria
+    weight: v.number(),
+    scoringMethod: v.union(
+      v.literal("BINARY"),
+      v.literal("SCALE"),
+      v.literal("LLM_RUBRIC"),
+      v.literal("COMMAND")
+    ),
+    // Method-specific config (rubric text, command line, scale bounds…)
+    scoringConfig: v.optional(v.any()),
+    // Failing a required criterion caps the run score (lib/evaluation.ts)
+    required: v.boolean(),
+    // Display/scoring order within the scenario
+    ordinal: v.number(),
+    createdAt: v.number(),
+  }).index("by_scenario", ["scenarioId"]),
+
+  // -------------------------------------------------------------------------
+  // EVALUATION: RUNS (Software Factory Epic 5)
+  // -------------------------------------------------------------------------
+  // One trial of a scenario in one arm (BASELINE or CANDIDATE). Rows are
+  // created/updated by the execution pipeline (PR 8); this PR ships the
+  // contract only. criterionResults holds per-criterion scores; `score` is
+  // the weighted aggregate (lib/evaluation.ts:computeWeightedScore).
+  evaluationRuns: defineTable({
+    scenarioId: v.id("evaluationScenarios"),
+    mode: v.union(v.literal("BASELINE"), v.literal("CANDIDATE")),
+    // Context package version under test (candidate arm)
+    contextPackageVersionId: v.optional(v.id("contextPackageVersions")),
+    model: v.string(),
+    agentId: v.optional(v.id("agents")),
+    // Live run that executed the trial, when applicable
+    runId: v.optional(v.id("runs")),
+    // CBOM captured at trial start (Epic 4)
+    contextSnapshotId: v.optional(v.id("contextSnapshots")),
+    status: v.union(
+      v.literal("PENDING"),
+      v.literal("RUNNING"),
+      v.literal("SCORED"),
+      v.literal("FAILED"),
+      v.literal("CANCELED")
+    ),
+    // Weighted aggregate score, 0–100
+    score: v.optional(v.number()),
+    criterionResults: v.optional(
+      v.array(
+        v.object({
+          criterionId: v.string(),
+          score: v.number(),
+          passed: v.boolean(),
+          evidence: v.optional(v.string()),
+        })
+      )
+    ),
+    // Cost/effort telemetry
+    costUsd: v.optional(v.number()),
+    turns: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+    toolFailures: v.optional(v.number()),
+    humanInterventions: v.optional(v.number()),
+    policyViolations: v.optional(v.number()),
+    // Produced artifacts (paths/refs)
+    artifacts: v.optional(v.array(v.string())),
+    // 0-based trial number within the arm
+    trialIndex: v.number(),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_scenario", ["scenarioId"])
+    .index("by_scenario_mode", ["scenarioId", "mode"])
+    .index("by_status", ["status"]),
+
+  // -------------------------------------------------------------------------
+  // EVALUATION: COMPARISONS (Software Factory Epic 5)
+  // -------------------------------------------------------------------------
+  // Baseline-vs-candidate verdict over a set of scored evaluationRuns.
+  // Recorded by the comparison pipeline (PR 9) via
+  // evaluation/comparisons.ts:recordComparison; pure lift/regression math
+  // lives in lib/evaluation.ts. Audited via `activities`
+  // (EVAL_COMPARISON_RECORDED).
+  evaluationComparisons: defineTable({
+    scenarioId: v.id("evaluationScenarios"),
+    baselineRunIds: v.array(v.id("evaluationRuns")),
+    candidateRunIds: v.array(v.id("evaluationRuns")),
+    // Mean scores per arm
+    baselineScore: v.number(),
+    candidateScore: v.number(),
+    // candidateScore - baselineScore (points, may be negative)
+    contextLift: v.number(),
+    costDelta: v.optional(v.number()),
+    durationMsDelta: v.optional(v.number()),
+    turnDelta: v.optional(v.number()),
+    // Regression flags from lib/evaluation.ts:detectRegressions
+    regressionFlags: v.optional(v.array(v.string())),
+    recommendation: v.union(
+      v.literal("APPROVE"),
+      v.literal("BLOCK"),
+      v.literal("NEUTRAL"),
+      v.literal("NEEDS_REVIEW")
+    ),
+    summary: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_scenario", ["scenarioId"]),
 });
