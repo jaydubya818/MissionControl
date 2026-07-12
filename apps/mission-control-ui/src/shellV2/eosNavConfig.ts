@@ -62,6 +62,8 @@ export const EOS_NAV_GROUPS: NavGroup[] = [
     { view: "recorder" as MainView, label: "Recorder", icon: Activity },
     { view: "test-generation" as MainView, label: "Test Generation", icon: FlaskConical },
     { view: "api-import" as MainView, label: "API Import", icon: FileSearch },
+  ]},
+  { id: "labs", label: "Labs", icon: FlaskConical, items: [
     { view: "flaky-steps" as MainView, label: "Flaky Steps", icon: Activity },
     { view: "gherkin" as MainView, label: "Gherkin Studio", icon: ScrollText },
     { view: "hybrid-workflows" as MainView, label: "Hybrid Workflows", icon: GitBranch },

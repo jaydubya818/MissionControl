@@ -81,7 +81,7 @@ export function OpsSection({
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <PageHeader
             title="Tasks"
-            description="Track what your agents are doing and what they've accomplished"
+            description="Execution queue for active work orders"
             actions={
               <div className="flex items-center gap-2">
                 {onNewTask && (

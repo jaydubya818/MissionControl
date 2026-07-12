@@ -3,8 +3,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { BellRing } from "lucide-react";
 import type { MainView } from "../TopNav";
 import { Sidebar } from "./Sidebar";
-import { groupForView, itemForView, allNavViews } from "./navConfig";
+import { groupForView, itemForView, allNavViews, NAV_GROUPS } from "./navConfig";
 import { EOS_NAV_GROUPS } from "./eosNavConfig";
+import { filterNavGroups } from "./navFilter";
 import { useFlag } from "../hooks/useFlag";
 import { Breadcrumbs } from "../components/factory/Breadcrumbs";
 import { cn } from "../lib/utils";
@@ -50,24 +51,21 @@ export function AppShellV2({
   const syncingFromUrl = useRef(false);
 
   const eosPreview = useFlag("eos.command-center-preview");
-  const navGroups = eosPreview ? EOS_NAV_GROUPS : undefined;
-  const activeGroups = navGroups ?? null;
-  const validViews = activeGroups
-    ? [
-        ...new Set([
-          ...activeGroups.flatMap((g) => g.items.map((i) => i.view as string)),
-          ...allNavViews(),
-        ]),
-      ]
-    : (allNavViews() as string[]);
-  const group = activeGroups
-    ? (activeGroups.find((g) => g.items.some((i) => i.view === activeView)) ??
-      groupForView(activeView))
-    : groupForView(activeView);
-  const item = activeGroups
-    ? (activeGroups.flatMap((g) => g.items).find((i) => i.view === activeView) ??
-      itemForView(activeView))
-    : itemForView(activeView);
+  const showControlStubs = useFlag("ui.control.stubs");
+  const baseNavGroups = eosPreview ? EOS_NAV_GROUPS : NAV_GROUPS;
+  const navGroups = filterNavGroups(baseNavGroups, { showControlStubs });
+  const validViews = [
+    ...new Set([
+      ...baseNavGroups.flatMap((g) => g.items.map((i) => i.view as string)),
+      ...allNavViews(),
+    ]),
+  ];
+  const group =
+    navGroups.find((g) => g.items.some((i) => i.view === activeView)) ??
+    groupForView(activeView);
+  const item =
+    navGroups.flatMap((g) => g.items).find((i) => i.view === activeView) ??
+    itemForView(activeView);
   const crumbs = [
     ...(group ? [{ label: group.label }] : []),
     ...(item ? [{ label: item.label, current: true }] : []),

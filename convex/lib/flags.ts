@@ -49,6 +49,7 @@ export const KNOWN_FLAGS: FlagDefinition[] = [
   { key: "rollout.rings", description: "Context rollout rings 0–4 (PR 17)", defaultEnabled: false },
   { key: "delivery.workorders", description: "Work order delivery control plane (PR 2a, 21)", defaultEnabled: false },
   { key: "eos.command-center-preview", description: "Engineering OS demo experience — Command Center, missions, lineage, intelligence views", defaultEnabled: false },
+  { key: "ui.control.stubs", description: "Show preview-only Control plane stubs (Portfolio, Fleet) in navigation", defaultEnabled: false },
 ];
 
 const KNOWN_FLAG_MAP: Map<string, FlagDefinition> = new Map(

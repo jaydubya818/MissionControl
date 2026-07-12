@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { NAV_GROUPS, allNavViews, groupForView, itemForView } from "./navConfig";
 
 describe("navConfig", () => {
-  it("has the five Software Factory domains plus workspace", () => {
+  it("has the five Software Factory domains plus workspace and labs", () => {
     expect(NAV_GROUPS.map((g) => g.id)).toEqual([
       "operate",
       "control",
@@ -11,6 +11,7 @@ describe("navConfig", () => {
       "observe",
       "govern",
       "workspace",
+      "labs",
     ]);
   });
 
@@ -45,6 +46,14 @@ describe("navConfig", () => {
     ];
     const missing = required.filter((v) => !eosViews.includes(v as never));
     expect(missing).toEqual([]);
+  });
+
+  it("keeps EOS administration and labs groups within six visible items each", async () => {
+    const { EOS_NAV_GROUPS } = await import("./eosNavConfig");
+    const administration = EOS_NAV_GROUPS.find((g) => g.id === "administration");
+    const labs = EOS_NAV_GROUPS.find((g) => g.id === "labs");
+    expect(administration?.items.length).toBeLessThanOrEqual(6);
+    expect(labs?.items.length).toBeLessThanOrEqual(6);
   });
 
   it("resolves group and item lookups", () => {

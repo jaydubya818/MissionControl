@@ -146,8 +146,15 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { view: "chat", label: "Chat", icon: MessageSquare },
       { view: "live-chat", label: "Live Chat", icon: MessageSquare },
-      { view: "council", label: "Council", icon: Users },
       { view: "command", label: "Command", icon: Cog },
+    ],
+  },
+  {
+    id: "labs",
+    label: "Labs",
+    icon: FlaskConical,
+    items: [
+      { view: "council", label: "Council", icon: Users },
       { view: "content-pipeline", label: "Content", icon: ScrollText },
       { view: "captures", label: "Captures", icon: FileSearch },
       { view: "projects", label: "Projects", icon: Building2 },
