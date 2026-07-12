@@ -11,10 +11,11 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import type { MainView } from "./TopNav";
-import { Activity, ChevronRight, Plus, X } from "lucide-react";
+import { Activity, ArrowRight, ChevronRight, Plus, X } from "lucide-react";
 import { PageHeader } from "./components/factory/DetailLayout";
 import { MetricBlock, MetricRow } from "./components/factory/MetricBlock";
-import { StatusBadge } from "./components/factory/badges";
+import { StatusBadge, RiskBadge, ScoreBadge } from "./components/factory/badges";
+import { DataTable, type Column } from "./components/factory/DataTable";
 import {
   CHART_GRID_COLOR,
   CHART_SERIES,
@@ -72,6 +73,21 @@ const AGENT_DOT_COLOR: Record<string, string> = {
   OFFLINE: "bg-ink-muted",
 };
 
+const AGENT_BADGE_TONE: Record<string, "success" | "warning" | "error" | "neutral"> = {
+  ACTIVE: "success",
+  PAUSED: "warning",
+  DRAINED: "warning",
+  QUARANTINED: "error",
+  OFFLINE: "neutral",
+};
+
+const RUN_BADGE_TONE: Record<string, "success" | "warning" | "error" | "info"> = {
+  RUNNING: "info",
+  COMPLETED: "success",
+  FAILED: "error",
+  TIMEOUT: "warning",
+};
+
 const SECONDARY_BUTTON =
   "inline-flex h-8 items-center gap-1.5 rounded-lg border border-line px-3 text-[12.5px] font-medium text-ink-secondary transition-colors duration-150 hover:border-line-strong hover:text-ink";
 
@@ -79,6 +95,83 @@ const CARD_CLASS = "rounded-xl border border-line bg-surface-1";
 
 function SectionTitle({ children }: { children: React.ReactNode }): JSX.Element {
   return <h2 className="text-[15px] font-semibold text-ink">{children}</h2>;
+}
+
+/** Mono green category eyebrow (overview surfaces only — see UI_STYLE_GUIDE Typography). */
+function Eyebrow({ children }: { children: React.ReactNode }): JSX.Element {
+  return (
+    <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-ok">{children}</div>
+  );
+}
+
+function ViewAllLink({
+  onClick,
+  label = "View all",
+}: {
+  onClick: () => void;
+  label?: string;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex shrink-0 items-center gap-1 text-[12.5px] font-medium text-ok transition-opacity duration-150 hover:opacity-80"
+    >
+      {label}
+      <ArrowRight size={12} strokeWidth={1.75} aria-hidden />
+    </button>
+  );
+}
+
+/** Card header with eyebrow category label, section title, and optional view-all link. */
+function SectionHeader({
+  eyebrow,
+  title,
+  onViewAll,
+  viewAllLabel,
+}: {
+  eyebrow: string;
+  title: string;
+  onViewAll?: () => void;
+  viewAllLabel?: string;
+}): JSX.Element {
+  return (
+    <div className="flex items-end justify-between gap-3 border-b border-line px-4 py-3">
+      <div className="min-w-0">
+        <Eyebrow>{eyebrow}</Eyebrow>
+        <div className="mt-1">
+          <SectionTitle>{title}</SectionTitle>
+        </div>
+      </div>
+      {onViewAll && <ViewAllLink onClick={onViewAll} label={viewAllLabel} />}
+    </div>
+  );
+}
+
+/** Thin 4px green progress bar with a right-aligned mono value label. */
+function ThinBar({ fraction, label }: { fraction: number; label?: string }): JSX.Element {
+  const pct = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0)) * 100;
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-2">
+        <div className="h-full rounded-full bg-ok" style={{ width: `${pct}%` }} />
+      </div>
+      {label && (
+        <span className="shrink-0 text-right font-mono text-[11px] text-ink-muted">{label}</span>
+      )}
+    </div>
+  );
+}
+
+/** 28px stat-band value (MetricBlock renders 20px by default; override locally). */
+function BigValue({ children }: { children: React.ReactNode }): JSX.Element {
+  return <span className="text-[28px] font-semibold leading-none text-ink">{children}</span>;
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -238,10 +331,10 @@ function SystemStatusCard({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Agents card (compact working list)
+// Fleet card (agents with current task + daily budget bars)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function AgentsCard({
+function FleetCard({
   agents,
   tasks,
   onSelectAgent,
@@ -258,14 +351,7 @@ function AgentsCard({
   );
   return (
     <section className={CARD_CLASS}>
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-        <SectionTitle>Agents</SectionTitle>
-        {onViewAll && (
-          <button type="button" className={SECONDARY_BUTTON} onClick={onViewAll}>
-            View all
-          </button>
-        )}
-      </div>
+      <SectionHeader eyebrow="Fleet" title="Agents" onViewAll={onViewAll} />
       <ul>
         {sorted.slice(0, 6).map((agent) => {
           const currentTask = agent.currentTaskId
@@ -277,7 +363,7 @@ function AgentsCard({
                 type="button"
                 onClick={onSelectAgent ? () => onSelectAgent(agent._id) : undefined}
                 className={cn(
-                  "flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150",
+                  "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-150",
                   onSelectAgent ? "hover:bg-surface-2" : "cursor-default"
                 )}
               >
@@ -289,10 +375,13 @@ function AgentsCard({
                   aria-hidden
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium text-ink">
-                    {agent.name}
+                  <span className="flex items-baseline gap-2">
+                    <span className="truncate text-[13px] font-medium text-ink">{agent.name}</span>
+                    <span className="shrink-0 text-[11.5px] text-ink-muted">
+                      {agent.role.toLowerCase()}
+                    </span>
                   </span>
-                  <span className="block truncate text-[12px] text-ink-muted">
+                  <span className="mt-0.5 block truncate text-[12px] text-ink-muted">
                     {currentTask
                       ? currentTask.title
                       : agent.status === "ACTIVE"
@@ -300,15 +389,269 @@ function AgentsCard({
                         : agent.status.toLowerCase()}
                   </span>
                 </span>
-                {agent.lastHeartbeatAt && (
-                  <span className="shrink-0 text-[11.5px] text-ink-muted">
-                    {formatRelativeTime(agent.lastHeartbeatAt)}
-                  </span>
-                )}
+                <span className="hidden w-32 shrink-0 sm:block">
+                  <ThinBar
+                    fraction={agent.budgetDaily > 0 ? agent.spendToday / agent.budgetDaily : 0}
+                    label={`$${agent.spendToday.toFixed(2)}/$${agent.budgetDaily.toFixed(0)}`}
+                  />
+                </span>
+                <StatusBadge tone={AGENT_BADGE_TONE[agent.status] ?? "neutral"}>
+                  {agent.status.charAt(0) + agent.status.slice(1).toLowerCase()}
+                </StatusBadge>
               </button>
             </li>
           );
         })}
+      </ul>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Work queue (segmented task-state distribution bar)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TASK_STATE_SEGMENTS: { status: string; label: string; color: string }[] = [
+  { status: "INBOX", label: "Inbox", color: "bg-ink-muted" },
+  { status: "ASSIGNED", label: "Assigned", color: "bg-ink-muted" },
+  { status: "IN_PROGRESS", label: "In progress", color: "bg-info-accent" },
+  { status: "REVIEW", label: "Review", color: "bg-info-accent" },
+  { status: "NEEDS_APPROVAL", label: "Needs approval", color: "bg-warn" },
+  { status: "BLOCKED", label: "Blocked", color: "bg-warn" },
+  { status: "DONE", label: "Done", color: "bg-ok" },
+  { status: "FAILED", label: "Failed", color: "bg-err" },
+  { status: "CANCELED", label: "Canceled", color: "bg-ink-muted" },
+];
+
+function WorkQueueCard({
+  tasks,
+  onViewAll,
+}: {
+  tasks: Doc<"tasks">[];
+  onViewAll?: () => void;
+}): JSX.Element | null {
+  if (tasks.length === 0) return null;
+  const segments = TASK_STATE_SEGMENTS.map((s) => ({
+    ...s,
+    count: tasks.filter((t) => t.status === s.status).length,
+  })).filter((s) => s.count > 0);
+  const total = tasks.length;
+  return (
+    <section className={CARD_CLASS}>
+      <SectionHeader eyebrow="Work queue" title="Tasks by state" onViewAll={onViewAll} />
+      <div className="flex flex-col gap-3 px-4 py-4">
+        <div className="flex h-2 w-full gap-px overflow-hidden rounded-full bg-surface-2">
+          {segments.map((s) => (
+            <div
+              key={s.status}
+              className={s.color}
+              style={{ width: `${(s.count / total) * 100}%` }}
+              title={`${s.label}: ${s.count}`}
+            />
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          {segments.map((s) => (
+            <span key={s.status} className="inline-flex items-center gap-1.5">
+              <span className={cn("h-1.5 w-1.5 rounded-full", s.color)} aria-hidden />
+              <span className="text-[12px] text-ink-secondary">{s.label}</span>
+              <span className="font-mono text-[12px] text-ink-muted">{s.count}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recent runs (execution table)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function RecentRunsCard({
+  runs,
+  agents,
+}: {
+  runs: Doc<"runs">[];
+  agents: Doc<"agents">[];
+}): JSX.Element | null {
+  if (runs.length === 0) return null;
+  const agentName = new Map(agents.map((a) => [a._id, a.name]));
+  const columns: Column<Doc<"runs">>[] = [
+    {
+      id: "agent",
+      header: "Agent",
+      cell: (run) => (
+        <span className="text-[13px] font-medium text-ink">
+          {agentName.get(run.agentId) ?? "Unknown"}
+        </span>
+      ),
+    },
+    {
+      id: "model",
+      header: "Model",
+      cell: (run) => <span className="font-mono text-[12px] text-ink-secondary">{run.model}</span>,
+    },
+    {
+      id: "tokens",
+      header: "Tokens",
+      align: "right",
+      cell: (run) => (
+        <span className="font-mono text-[12px]">
+          {formatTokens((run.inputTokens ?? 0) + (run.outputTokens ?? 0))}
+        </span>
+      ),
+    },
+    {
+      id: "cost",
+      header: "Cost",
+      align: "right",
+      cell: (run) => <span className="font-mono text-[12px]">${run.costUsd.toFixed(2)}</span>,
+    },
+    {
+      id: "status",
+      header: "Status",
+      align: "right",
+      cell: (run) => (
+        <StatusBadge tone={RUN_BADGE_TONE[run.status] ?? "neutral"}>
+          {run.status.charAt(0) + run.status.slice(1).toLowerCase()}
+        </StatusBadge>
+      ),
+    },
+  ];
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <Eyebrow>Execution</Eyebrow>
+          <div className="mt-1">
+            <SectionTitle>Recent runs</SectionTitle>
+          </div>
+        </div>
+      </div>
+      <DataTable columns={columns} rows={runs.slice(0, 5)} rowKey={(run) => run._id} />
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Context registry health
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ContextPackageSummary {
+  _id: string;
+  name: string;
+  displayName?: string | null;
+  qualityScore: number | null;
+  securityStatus: string | null;
+}
+
+function ContextHealthCard({
+  packages,
+  onViewAll,
+}: {
+  packages: ContextPackageSummary[];
+  onViewAll?: () => void;
+}): JSX.Element | null {
+  if (packages.length === 0) return null;
+  const scored = packages.filter((p) => p.qualityScore != null);
+  const avgQuality =
+    scored.length > 0
+      ? scored.reduce((sum, p) => sum + (p.qualityScore ?? 0), 0) / scored.length
+      : null;
+  const passed = packages.filter((p) => p.securityStatus === "PASSED").length;
+  const quarantined = packages.filter((p) => p.securityStatus === "QUARANTINED").length;
+  const failed = packages.filter((p) => p.securityStatus === "FAILED").length;
+  const unscanned = packages.length - passed - quarantined - failed;
+  const top = scored.slice(0, 3);
+  return (
+    <section className={CARD_CLASS}>
+      <SectionHeader eyebrow="Governance" title="Context registry" onViewAll={onViewAll} />
+      <div className="flex flex-col gap-3 px-4 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[12.5px] text-ink-muted">Packages</span>
+          <span className="font-mono text-[13px] text-ink">{packages.length}</span>
+        </div>
+        {avgQuality != null && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12.5px] text-ink-muted">Average quality</span>
+            <ThinBar fraction={avgQuality / 100} label={String(Math.round(avgQuality))} />
+          </div>
+        )}
+        <p className="text-[12.5px] text-ink-muted">
+          {passed} passed · {unscanned} unscanned · {quarantined} quarantined
+          {failed > 0 ? ` · ${failed} failed` : ""}
+        </p>
+        {top.length > 0 && (
+          <ul className="flex flex-col divide-y divide-line border-t border-line">
+            {top.map((pkg) => (
+              <li key={pkg._id} className="flex items-center justify-between gap-3 py-2">
+                <span className="truncate text-[13px] text-ink">
+                  {pkg.displayName || pkg.name}
+                </span>
+                {pkg.qualityScore != null && <ScoreBadge score={pkg.qualityScore} />}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Awaiting approval (inline, only when pending)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface PendingApprovalRow {
+  _id: string;
+  _creationTime: number;
+  title?: string;
+  actionSummary?: string;
+  actionType?: string;
+  riskLevel: "YELLOW" | "RED";
+  requestorAgentId: Id<"agents">;
+}
+
+function ApprovalsInlineCard({
+  approvals,
+  agents,
+  onOpenApprovals,
+}: {
+  approvals: PendingApprovalRow[];
+  agents: Doc<"agents">[];
+  onOpenApprovals?: () => void;
+}): JSX.Element | null {
+  if (approvals.length === 0) return null;
+  const agentName = new Map(agents.map((a) => [a._id, a.name]));
+  return (
+    <section className={CARD_CLASS}>
+      <SectionHeader eyebrow="Governance" title="Awaiting approval" onViewAll={onOpenApprovals} />
+      <ul>
+        {approvals.slice(0, 3).map((approval) => (
+          <li key={approval._id} className="border-b border-line last:border-b-0">
+            <button
+              type="button"
+              onClick={onOpenApprovals}
+              disabled={!onOpenApprovals}
+              className={cn(
+                "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-150",
+                onOpenApprovals ? "hover:bg-surface-2" : "cursor-default"
+              )}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium text-ink">
+                  {approval.title || approval.actionSummary || approval.actionType || "Approval"}
+                </span>
+                <span className="mt-0.5 block truncate text-[12px] text-ink-muted">
+                  {agentName.get(approval.requestorAgentId) ?? "Unknown agent"} ·{" "}
+                  {formatRelativeTime(approval._creationTime)}
+                </span>
+              </span>
+              <RiskBadge level={approval.riskLevel} />
+            </button>
+          </li>
+        ))}
       </ul>
     </section>
   );
@@ -624,6 +967,11 @@ export function DashboardOverview({
           bucketHours: chartWindowHours === 24 ? 1 : chartWindowHours === 168 ? 24 : 24,
         }
   );
+  const recentRuns = useQuery(
+    api.runs.listRecent,
+    projectId ? { projectId, limit: 50 } : { limit: 50 }
+  );
+  const contextPackages = useQuery(api.context.packages.listWithCurrentVersions, {});
   // Retained mutation (squad deploy flows re-attach here); intentionally unused in v2 render.
   const deploySquad = useMutation(api.squad.deploySquad);
   void deploySquad;
@@ -660,6 +1008,7 @@ export function DashboardOverview({
   const pausedAgents = agents.filter((a) => a.status === "PAUSED").length;
   const quarantinedAgents = agents.filter((a) => a.status === "QUARANTINED").length;
   const inProgressTasks = tasks.filter((t) => t.status === "IN_PROGRESS").length;
+  const reviewTasks = tasks.filter((t) => t.status === "REVIEW").length;
   const doneTasks = tasks.filter((t) => t.status === "DONE").length;
   const blockedTasks = tasks.filter((t) => t.status === "BLOCKED").length;
   const failedTasks = tasks.filter((t) => t.status === "FAILED").length;
@@ -667,6 +1016,16 @@ export function DashboardOverview({
   const needsApprovalTasks = tasks.filter((t) => t.status === "NEEDS_APPROVAL");
   const completionRate = ((doneTasks / Math.max(tasks.length, 1)) * 100).toFixed(0);
   const spend24h = usageByModel?.reduce((sum, m) => sum + (m.costUsd ?? 0), 0);
+  const topModel =
+    usageByModel && usageByModel.length > 0
+      ? [...usageByModel].sort((a, b) => (b.costUsd ?? 0) - (a.costUsd ?? 0))[0].model
+      : null;
+  const redApprovals = approvals.filter((a) => a.riskLevel === "RED").length;
+  const yellowApprovals = approvals.filter((a) => a.riskLevel === "YELLOW").length;
+  const weekAgo = Date.now() - 7 * 86_400_000;
+  const completedThisWeek = tasks.filter(
+    (t) => t.status === "DONE" && t.completedAt != null && t.completedAt >= weekAgo
+  ).length;
 
   const alertsList = openAlerts ?? [];
   const blockedTasksList = tasks.filter((t) => t.status === "BLOCKED");
@@ -823,25 +1182,27 @@ export function DashboardOverview({
         <MetricRow className="xl:grid-cols-6">
           <MetricBlock
             label="Agents working"
-            value={activeAgents}
-            detail={`${agents.length} total${pausedAgents > 0 ? ` · ${pausedAgents} paused` : ""}${quarantinedAgents > 0 ? ` · ${quarantinedAgents} quarantined` : ""}`}
+            value={<BigValue>{activeAgents}</BigValue>}
+            detail={`${activeAgents} active · ${quarantinedAgents} quarantined${pausedAgents > 0 ? ` · ${pausedAgents} paused` : ""}`}
           />
           <MetricBlock
             label="In progress"
-            value={inProgressTasks}
-            detail={`${tasks.length} tasks · ${inboxTasks} in inbox`}
+            value={<BigValue>{inProgressTasks}</BigValue>}
+            detail={`${reviewTasks} review · ${blockedTasks} blocked`}
           />
           <MetricBlock
             label="Pending approvals"
-            value={approvals.length}
+            value={<BigValue>{approvals.length}</BigValue>}
             adornment={
               approvals.length > 0 ? <StatusBadge tone="warning">Action</StatusBadge> : undefined
             }
-            detail={approvals.length > 0 ? "Human review required" : "All clear"}
+            detail={
+              approvals.length > 0 ? `${redApprovals} red · ${yellowApprovals} yellow` : "All clear"
+            }
           />
           <MetricBlock
             label="Blocked"
-            value={blockedTasks}
+            value={<BigValue>{blockedTasks}</BigValue>}
             adornment={
               blockedTasks > 0 ? <StatusBadge tone="warning">Stalled</StatusBadge> : undefined
             }
@@ -849,19 +1210,32 @@ export function DashboardOverview({
           />
           <MetricBlock
             label="Spend (24h)"
-            value={spend24h != null ? `$${spend24h.toFixed(2)}` : "—"}
-            detail="Across all models"
+            value={<BigValue>{spend24h != null ? `$${spend24h.toFixed(2)}` : "—"}</BigValue>}
+            detail={topModel ? `top model ${topModel}` : "Across all models"}
           />
           <MetricBlock
             label="Completed"
-            value={doneTasks}
-            detail={`${completionRate}% completion rate`}
+            value={<BigValue>{doneTasks}</BigValue>}
+            detail={`${completedThisWeek} this week · ${completionRate}% rate`}
           />
         </MetricRow>
 
         <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-          <NeedsAttentionCard items={attentionItems} />
-          <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-6">
+            <NeedsAttentionCard items={attentionItems} />
+            <FleetCard
+              agents={agents}
+              tasks={tasks}
+              onSelectAgent={onSelectAgent}
+              onViewAll={onNavigate ? () => onNavigate("agents") : undefined}
+            />
+            <WorkQueueCard
+              tasks={tasks}
+              onViewAll={onNavigate ? () => onNavigate("tasks") : undefined}
+            />
+            <RecentRunsCard runs={recentRuns ?? []} agents={agents} />
+          </div>
+          <div className="flex min-w-0 flex-col gap-4">
             <MissionCard
               missionStatement={missionData?.missionStatement}
               onEdit={onOpenMissionModal}
@@ -873,11 +1247,14 @@ export function DashboardOverview({
               onOpenSystem={onNavigate ? () => onNavigate("system") : undefined}
             />
             <QuotaFuelGauge />
-            <AgentsCard
+            <ContextHealthCard
+              packages={(contextPackages ?? []) as ContextPackageSummary[]}
+              onViewAll={onNavigate ? () => onNavigate("skills") : undefined}
+            />
+            <ApprovalsInlineCard
+              approvals={approvals as PendingApprovalRow[]}
               agents={agents}
-              tasks={tasks}
-              onSelectAgent={onSelectAgent}
-              onViewAll={onNavigate ? () => onNavigate("agents") : undefined}
+              onOpenApprovals={onOpenApprovals}
             />
           </div>
         </div>
