@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../../../convex/_generated/api";
 import { PageHeader } from "../../components/factory/DetailLayout";
 import { StatusBadge } from "../../components/factory/badges";
 import { EmptyState } from "../../components/ui/empty-state";
 import { cn } from "../../lib/utils";
 import { InsightCard, PageProvenanceNote, ProvenanceBadge } from "../components";
 import { demoReadiness } from "../demoData";
+import { adaptReadinessAssessments } from "../liveAdapters";
 import type { HealthStatus, ReadinessAssessment } from "../types";
 
 export interface ReadinessViewProps {
@@ -94,8 +97,13 @@ function DimensionRow({
 }
 
 export function ReadinessView({ onNavigate }: ReadinessViewProps): JSX.Element {
-  const [selectedSlug, setSelectedSlug] = useState<string>(demoReadiness[0]?.repoSlug ?? "");
-  const selected = demoReadiness.find((a) => a.repoSlug === selectedSlug) ?? demoReadiness[0];
+  const liveReadiness = useQuery(api.eos.projections.getReadinessAssessments, {});
+  const assessments: ReadinessAssessment[] =
+    liveReadiness && liveReadiness.length > 0
+      ? adaptReadinessAssessments(liveReadiness)
+      : demoReadiness;
+  const [selectedSlug, setSelectedSlug] = useState<string>(assessments[0]?.repoSlug ?? "");
+  const selected = assessments.find((a) => a.repoSlug === selectedSlug) ?? assessments[0];
 
   return (
     <div className="relative flex-1 overflow-auto bg-app">
@@ -107,7 +115,7 @@ export function ReadinessView({ onNavigate }: ReadinessViewProps): JSX.Element {
         <PageProvenanceNote />
         <div className="flex gap-6">
           <div className="flex w-[300px] shrink-0 flex-col gap-3">
-            {demoReadiness.map((assessment) => (
+            {assessments.map((assessment) => (
               <RepoCard
                 key={assessment.repoSlug}
                 assessment={assessment}

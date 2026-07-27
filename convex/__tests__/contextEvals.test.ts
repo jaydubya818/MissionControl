@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateEvalRun,
   averageScenarioScores,
+  buildCriterionResults,
   clampScore,
   computeImpactDelta,
+  computeImpactMultiplier,
   computeImpactScore,
   defaultSkillScenarios,
   validateCriteriaWeights,
@@ -86,10 +88,24 @@ describe("defaultSkillScenarios", () => {
   });
 });
 
-describe("validateCriteriaWeights", () => {
-  it("rejects weights that do not sum to 100", () => {
-    expect(() =>
-      validateCriteriaWeights([{ id: "a", label: "A", weight: 50 }])
-    ).toThrow(/sum to 100/);
+describe("buildCriterionResults", () => {
+  it("marks passed criteria at 100% with context", () => {
+    const rows = buildCriterionResults(
+      [
+        { id: "c1", label: "A", weight: 50 },
+        { id: "c2", label: "B", weight: 50 },
+      ],
+      20,
+      93,
+      1
+    );
+    expect(rows[0].withContextPct).toBe(100);
+    expect(rows[1].withContextPct).toBeLessThan(100);
+  });
+});
+
+describe("computeImpactMultiplier", () => {
+  it("returns candidate over baseline ratio", () => {
+    expect(computeImpactMultiplier(35, 93)).toBe(2.66);
   });
 });

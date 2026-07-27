@@ -258,6 +258,8 @@ All tables use indexes for efficient querying. Common patterns:
 | `webhooks` | list, create, update, remove, deliverPending (action) |
 | `standup` | generate (query), save, runDaily (mutations) |
 | `loops` | detectLoops (internal mutation, called by cron) |
+| `eos/projections` | getHealthSignals, getFactoryTraits, getEffectivenessMetrics, getFrictionSummary, getReadinessAssessments, getMissionSummaries, getRecommendations (queries — live EOS intelligence) |
+| `factory/piBridge` | ingestReceiptPacket (mutation — Pi runtime receipt packet ingestion, gated on `executor.pi-bridge`) |
 
 ---
 

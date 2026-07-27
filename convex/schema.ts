@@ -3696,6 +3696,16 @@ export default defineSchema({
           candidateScore: v.number(),
           criteriaPassed: v.number(),
           criteriaTotal: v.number(),
+          criterionResults: v.optional(
+            v.array(
+              v.object({
+                criterionId: v.string(),
+                label: v.string(),
+                baselinePct: v.number(),
+                withContextPct: v.number(),
+              })
+            )
+          ),
         })
       )
     ),
@@ -3711,6 +3721,165 @@ export default defineSchema({
     .index("by_version", ["versionId"])
     .index("by_status", ["status"])
     .index("by_idempotency", ["idempotencyKey"]),
+
+  // -------------------------------------------------------------------------
+  // HARNESS ENGINEERING: VERIFIERS (outer loop — skill adherence)
+  // -------------------------------------------------------------------------
+  contextVerifiers: defineTable({
+    packageId: v.optional(v.id("contextPackages")),
+    projectId: v.optional(v.id("projects")),
+    label: v.string(),
+    invariant: v.string(),
+    globPatterns: v.array(v.string()),
+    active: v.boolean(),
+    passRate: v.optional(v.number()),
+    lastRunAt: v.optional(v.number()),
+    validatedModel: v.optional(v.string()),
+    sourceSkillId: v.optional(v.id("contextPackages")),
+    idempotencyKey: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_package", ["packageId"])
+    .index("by_active", ["active"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  // -------------------------------------------------------------------------
+  // HARNESS ENGINEERING: CHANGE RISK POLICIES (human gate)
+  // -------------------------------------------------------------------------
+  changeRiskPolicies: defineTable({
+    projectId: v.optional(v.id("projects")),
+    name: v.string(),
+    strictness: v.number(),
+    rules: v.array(
+      v.object({
+        id: v.string(),
+        label: v.string(),
+        requireHuman: v.boolean(),
+        globPatterns: v.optional(v.array(v.string())),
+      })
+    ),
+    active: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_active", ["active"]),
+
+  // -------------------------------------------------------------------------
+  // HARNESS ENGINEERING: WORKFLOW RUNS (Launch analog)
+  // -------------------------------------------------------------------------
+  contextWorkflowRuns: defineTable({
+    projectId: v.optional(v.id("projects")),
+    packageId: v.optional(v.id("contextPackages")),
+    skillName: v.string(),
+    agentModel: v.optional(v.string()),
+    intelligenceTier: v.optional(v.string()),
+    schedule: v.optional(v.string()),
+    status: v.union(
+      v.literal("PENDING"),
+      v.literal("RUNNING"),
+      v.literal("COMPLETED"),
+      v.literal("FAILED"),
+      v.literal("CANCELLED")
+    ),
+    logUrl: v.optional(v.string()),
+    tokenCost: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+    idempotencyKey: v.optional(v.string()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_status", ["status"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  // -------------------------------------------------------------------------
+  // HARNESS ENGINEERING: PR CHECKS (change review + mutation testing)
+  // -------------------------------------------------------------------------
+  harnessPrChecks: defineTable({
+    projectId: v.optional(v.id("projects")),
+    prUrl: v.string(),
+    prNumber: v.optional(v.number()),
+    repoFullName: v.string(),
+    branch: v.optional(v.string()),
+    title: v.optional(v.string()),
+    ciStatus: v.optional(
+      v.union(
+        v.literal("PASS"),
+        v.literal("FAIL"),
+        v.literal("PENDING"),
+        v.literal("UNKNOWN")
+      )
+    ),
+    ciRunUrl: v.optional(v.string()),
+    ciProvider: v.optional(v.string()),
+    source: v.union(
+      v.literal("CODEGEN"),
+      v.literal("WORKFLOW"),
+      v.literal("GITHUB"),
+      v.literal("MANUAL")
+    ),
+    sourceRef: v.optional(v.string()),
+    changeReviewLenses: v.array(
+      v.object({
+        id: v.string(),
+        label: v.string(),
+        enabled: v.boolean(),
+        score: v.optional(v.number()),
+      })
+    ),
+    mutationTesting: v.optional(
+      v.object({
+        diffCoveragePct: v.number(),
+        findings: v.array(
+          v.object({
+            id: v.string(),
+            mutation: v.string(),
+            caught: v.boolean(),
+            file: v.optional(v.string()),
+          })
+        ),
+      })
+    ),
+    syncedAt: v.number(),
+    createdAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_pr_url", ["prUrl"])
+    .index("by_repo", ["repoFullName"]),
+
+  // -------------------------------------------------------------------------
+  // HARNESS ENGINEERING: META LOOP SUGGESTIONS
+  // -------------------------------------------------------------------------
+  metaLoopSuggestions: defineTable({
+    projectId: v.optional(v.id("projects")),
+    kind: v.union(
+      v.literal("VERIFIER"),
+      v.literal("SKILL_UPDATE"),
+      v.literal("EVAL_SCENARIO"),
+      v.literal("MAINTENANCE"),
+      v.literal("RULE_RETIRE"),
+      v.literal("DELEGATION")
+    ),
+    title: v.string(),
+    summary: v.string(),
+    status: v.union(
+      v.literal("OPEN"),
+      v.literal("ACCEPTED"),
+      v.literal("DISMISSED")
+    ),
+    sourceRef: v.optional(v.string()),
+    packageId: v.optional(v.id("contextPackages")),
+    payload: v.optional(v.any()),
+    createdAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_project_status", ["projectId", "status"])
+    .index("by_status", ["status"]),
 
   // -------------------------------------------------------------------------
   // KNOWLEDGE GRAPH (Agentic-KB Graphify overlay + future Obsidian sync)

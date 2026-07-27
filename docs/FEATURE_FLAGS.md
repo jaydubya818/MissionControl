@@ -32,6 +32,7 @@ Runtime toggles gating incomplete or risky Software Factory subsystems. Introduc
 | `rollout.rings` | Context rollout rings 0–4 | PR 17 |
 | `delivery.workorders` | Work order delivery control plane | PR 2a, 21 |
 | `eos.command-center-preview` | Engineering OS Command Center, missions, intelligence views | EOS demo |
+| `executor.pi-bridge` | Pi runtime receipt packet ingestion and orchestration dispatch envelope | Factory runtime |
 | `ui.control.stubs` | Preview-only Control nav items (Portfolio, Fleet) | Factory UI S5 |
 
 ## Usage

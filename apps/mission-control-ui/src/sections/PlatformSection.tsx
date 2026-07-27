@@ -7,6 +7,8 @@ import { FactoryView } from "../FactoryView";
 import { PipelineView } from "../PipelineView";
 import { FeedbackView } from "../FeedbackView";
 import { AnalyticsView } from "../AnalyticsView";
+import { DataExplorerView } from "../eos/views/DataExplorerView";
+import { useFlag } from "../hooks/useFlag";
 
 export interface PlatformSectionProps {
   currentView: MainView;
@@ -25,12 +27,16 @@ export function PlatformSection({
   onOpenMonitoringDashboard,
   onTaskSelect,
 }: PlatformSectionProps) {
+  const eosPreview = useFlag("eos.command-center-preview");
   if (isEosView(currentView)) {
     return (
       <EosViewRenderer view={currentView} onNavigate={onNavigate as (v: string) => void} />
     );
   }
   if (currentView === "system") {
+    if (eosPreview) {
+      return <DataExplorerView projectId={projectId} />;
+    }
     return (
       <SystemView
         projectId={projectId}

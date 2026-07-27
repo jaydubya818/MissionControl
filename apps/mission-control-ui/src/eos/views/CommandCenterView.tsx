@@ -15,6 +15,7 @@ import { ArrowRight, Bot, ChevronRight, Plus } from "lucide-react";
 import { PageHeader } from "../../components/factory/DetailLayout";
 import { StatusBadge } from "../../components/factory/badges";
 import { AttentionQueuePanel } from "../../components/AttentionQueuePanel";
+import { FactorySchematicOverview } from "../../components/schematic";
 import { EmptyState } from "../../components/ui/empty-state";
 import { QuotaFuelGauge } from "../../components/QuotaFuelGauge";
 import { cn } from "../../lib/utils";
@@ -35,7 +36,8 @@ import {
   demoMissionAnchor,
   demoTimeline,
 } from "../demoData";
-import type { HealthStatus } from "../types";
+import { adaptHealthSignals, adaptRecommendations } from "../liveAdapters";
+import type { HealthStatus, HealthSignal, Insight } from "../types";
 
 export interface CommandCenterViewProps {
   onNavigate: (view: string) => void;
@@ -464,6 +466,15 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
   const agents = useQuery(api.agents.listAll, {});
   const scheduledJobs = useQuery(api.scheduledJobs.list, {});
   const quotaSnapshot = useQuery(api.quotaTracking.getLatestSnapshot, {});
+  const liveSignals = useQuery(api.eos.projections.getHealthSignals, {});
+  const liveRecs = useQuery(api.eos.projections.getRecommendations, {});
+
+  const healthSignals: HealthSignal[] =
+    liveSignals && liveSignals.length > 0
+      ? adaptHealthSignals(liveSignals as HealthSignal[])
+      : demoHealthSignals;
+  const insights: Insight[] =
+    liveRecs && liveRecs.length > 0 ? adaptRecommendations(liveRecs as Insight[]) : demoInsights;
 
   const alertsList = openAlerts ?? [];
   const blockedTasksList = (tasks ?? []).filter((t) => t.status === "BLOCKED");
@@ -548,6 +559,29 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
 
         <PageProvenanceNote />
 
+        <FactorySchematicOverview
+          onNavigate={onNavigate}
+          scannedAt={scannedAt}
+          evalPass={null}
+          title="Command Center"
+        />
+
+        <section className={cn(CARD_CLASS, "flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between")}>
+          <div>
+            <div className="text-[15px] font-semibold text-ink">Run the demo</div>
+            <p className="mt-1 max-w-xl text-[13px] text-ink-secondary">
+              Seed mc-demo-v2 data and walk through WorkOrders, registry evals, and harness loops from the docs site.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate("docs")}
+            className="inline-flex h-9 shrink-0 items-center rounded-lg border border-line px-3 text-[13px] font-medium text-ink-secondary transition-colors duration-150 hover:border-line-strong hover:text-ink"
+          >
+            Open docs → Run the demo
+          </button>
+        </section>
+
         {attentionLoading ? (
           <LoadingRows count={4} />
         ) : (
@@ -567,7 +601,7 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
           className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6"
           aria-label="Factory health signals"
         >
-          {demoHealthSignals.map((signal) => (
+          {healthSignals.map((signal) => (
             <HealthSignalCard key={signal.id} signal={signal} onNavigate={onNavigate} />
           ))}
         </div>
@@ -581,7 +615,7 @@ export function CommandCenterView({ onNavigate }: CommandCenterViewProps): JSX.E
               action={<ViewAllLink onClick={() => onNavigate("recommendations")} />}
             >
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {demoInsights.map((insight) => (
+                {insights.map((insight) => (
                   <InsightCard key={insight.id} insight={insight} onNavigate={onNavigate} />
                 ))}
               </div>

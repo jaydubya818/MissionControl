@@ -57,7 +57,7 @@ export function WorkOrderApprovalsView({ projectId }: { projectId: Id<"projects"
         <div className="grid grid-cols-3 gap-3">
           <Card className="p-4"><div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Shown</div><div className="mt-2 text-2xl font-semibold">{counts.total}</div></Card>
           <Card className="p-4"><div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Pending</div><div className="mt-2 text-2xl font-semibold text-amber-300">{counts.waiting}</div></Card>
-          <Card className="p-4"><div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Conditional</div><div className="mt-2 text-2xl font-semibold text-cyan-200">{counts.conditional}</div></Card>
+          <Card className="p-4"><div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Conditional</div><div className="mt-2 text-2xl font-semibold text-registry-accent">{counts.conditional}</div></Card>
         </div>
 
         <div className="mt-4 max-w-[220px] space-y-1.5">

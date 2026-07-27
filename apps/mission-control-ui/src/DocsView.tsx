@@ -1,197 +1,24 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ExternalLink, FileText, ChevronRight, Search, MessageSquare, BookOpen, Loader2, Zap, RotateCcw, Send, X, FolderGit2, Bot, NotebookPen, Boxes, Package, type LucideIcon } from "lucide-react";
+import { BookOpen, FileText, Loader2, MessageSquare, RotateCcw, Search, Send, Zap } from "lucide-react";
 import { useAction, useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Card } from "@/components/ui/card";
-import { StatusBadge } from "./components/factory/badges";
+import { StatusBadge } from "@/components/factory/badges";
+import { DocsSiteBrowser } from "@/components/docs/DocsSiteBrowser";
 import { PageHeader } from "./components/PageHeader";
 import { TabBar } from "./components/TabBar";
 import { cn } from "@/lib/utils";
-
-// ---------------------------------------------------------------------------
-// DATA
-// ---------------------------------------------------------------------------
-
-const DOC_LINKS = [
-  { title: "Design DNA",           path: "design.md", description: "Shared design contract" },
-  { title: "PRD V2",               path: "docs/PRD_V2.md", description: "Product requirements" },
-  { title: "App Flow",             path: "docs/APP_FLOW.md", description: "Application architecture" },
-  { title: "Backend Structure",    path: "docs/BACKEND_STRUCTURE.md", description: "Backend overview" },
-  { title: "Frontend Guidelines",  path: "docs/FRONTEND_GUIDELINES.md", description: "UI/UX standards" },
-  { title: "Tech Stack",           path: "docs/TECH_STACK.md", description: "Technologies used" },
-  { title: "Quick Start",          path: "docs/guides/QUICK_START_NOW.md", description: "Get up and running" },
-  { title: "Runbook",              path: "docs/runbook/RUNBOOK.md", description: "Operations runbook" },
-  { title: "Implementation Plan",  path: "docs/planning/IMPLEMENTATION_PLAN.md", description: "Implementation roadmap" },
-  { title: "Architecture",         path: "docs/ARCHITECTURE.md", description: "System architecture" },
-  { title: "Agent Guide",          path: "docs/AGENT_GUIDE.md", description: "Working with agents" },
-  { title: "Creating Plugins",     path: "docs/CREATING_PLUGINS.md", description: "Skills, rules, and registry packages" },
-  { title: "Context Manifests",    path: "docs/CONTEXT_MANIFESTS.md", description: "Lock and install context packages" },
-  { title: "Creating Workflows",   path: "docs/CREATING_WORKFLOWS.md", description: "Custom multi-agent workflows" },
-  { title: "Security Audit",       path: "docs/SECURITY_AUDIT.md", description: "Security review" },
-  { title: "Decisions",            path: "docs/DECISIONS.md", description: "Architecture decisions" },
-];
-
-interface QuickLinkItem {
-  label: string;
-  href: string;
-  category: string;
-}
-
-const QUICK_LINK_CATEGORY_ICONS: Record<string, LucideIcon> = {
-  Project: FolderGit2,
-  "AI Tools": Bot,
-  Tessl: Package,
-  Workspace: NotebookPen,
-  Infra: Boxes,
-};
-
-const QUICK_LINKS: QuickLinkItem[] = [
-  // Project
-  { label: "GitHub Repository",         href: "https://github.com/jaydubya818/MissionControl", category: "Project" },
-  { label: "Vercel Dashboard",          href: "https://vercel.com/jaydubya818/mission-control-mission-control-ui",  category: "Project" },
-  { label: "Convex Dashboard",          href: "https://dashboard.convex.dev", category: "Project" },
-  { label: "Taskmaster Tasks",          href: "https://github.com/jaydubya818/MissionControl/blob/main/.taskmaster/tasks/tasks.json", category: "Project" },
-
-  // AI Tools
-  { label: "Claude (claude.ai)",        href: "https://claude.ai", category: "AI Tools" },
-  { label: "Claude API Docs",           href: "https://docs.anthropic.com/en/api/getting-started", category: "AI Tools" },
-  { label: "Claude Model Reference",    href: "https://docs.anthropic.com/en/docs/about-claude/models/overview", category: "AI Tools" },
-  { label: "Codex (OpenAI)",            href: "https://platform.openai.com/docs/guides/code", category: "AI Tools" },
-  { label: "OpenAI Platform",           href: "https://platform.openai.com", category: "AI Tools" },
-  { label: "OpenAI API Docs",           href: "https://platform.openai.com/docs/api-reference", category: "AI Tools" },
-  { label: "Cursor IDE",                href: "cursor://", category: "AI Tools" },
-  { label: "Cursor Docs",               href: "https://docs.cursor.com", category: "AI Tools" },
-
-  // Tessl (context package lifecycle reference)
-  { label: "Tessl Docs",                href: "https://docs.tessl.io/", category: "Tessl" },
-  { label: "Creating Plugins",          href: "https://docs.tessl.io/create/creating-plugins", category: "Tessl" },
-  { label: "Creating Skills",           href: "https://docs.tessl.io/create/creating-skills", category: "Tessl" },
-  { label: "Developing Plugins Locally", href: "https://docs.tessl.io/create/developing-plugins-locally", category: "Tessl" },
-  { label: "Distributing via Registry", href: "https://docs.tessl.io/distribute/distributing-via-registry", category: "Tessl" },
-  { label: "Tessl Glossary",            href: "https://docs.tessl.io/reference/glossary", category: "Tessl" },
-
-  // Workspace
-  { label: "Notion Workspace",          href: "https://notion.so", category: "Workspace" },
-  { label: "Obsidian Vault",            href: "obsidian://open", category: "Workspace" },
-
-  // Infra & Services
-  { label: "Convex Docs",               href: "https://docs.convex.dev", category: "Infra" },
-  { label: "Convex Vector Search",      href: "https://docs.convex.dev/search/vector-search", category: "Infra" },
-  { label: "Tailwind CSS Docs",         href: "https://tailwindcss.com/docs", category: "Infra" },
-  { label: "shadcn/ui Components",      href: "https://ui.shadcn.com/docs/components", category: "Infra" },
-  { label: "Lucide Icons",              href: "https://lucide.dev/icons", category: "Infra" },
-  { label: "Telegram Bot API",          href: "https://core.telegram.org/bots/api", category: "Infra" },
-];
+import { DOCS_SITE_PAGES } from "@/lib/docsSiteConfig";
 
 // ---------------------------------------------------------------------------
 // TABS
 // ---------------------------------------------------------------------------
 
 const TABS = [
-  { id: "knowledge", label: "Knowledge" },
-  { id: "search",    label: "Search" },
-  { id: "chat",      label: "Chat with Repo" },
+  { id: "documentation", label: "Documentation" },
+  { id: "search", label: "Search" },
+  { id: "chat", label: "Chat with Repo" },
 ];
-
-// ---------------------------------------------------------------------------
-// KNOWLEDGE TAB
-// ---------------------------------------------------------------------------
-
-function KnowledgeTab() {
-  const categories = Array.from(new Set(QUICK_LINKS.map((l) => l.category)));
-
-  return (
-    <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-6">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
-        <Card className="p-5">
-          <div className="text-[15px] font-semibold text-ink">The operating handbook for Mission Control</div>
-          <div className="mt-2 max-w-3xl text-[13.5px] leading-relaxed text-ink-secondary">
-            Keep the mission, architecture, and runbooks close to the operator surface so every decision is grounded in the same source of truth.
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <StatusBadge tone="neutral">{DOC_LINKS.length} curated docs</StatusBadge>
-            <StatusBadge tone="neutral">{QUICK_LINKS.length} linked tools</StatusBadge>
-          </div>
-        </Card>
-
-        <Card className="p-5">
-          <div className="text-[15px] font-semibold text-ink">Use this surface for stable context, not transient chatter.</div>
-          <div className="mt-3 space-y-2 text-[12.5px] leading-relaxed text-ink-secondary">
-            <div className="rounded-lg border border-line bg-surface-2 px-3 py-3">
-              Open docs first when you need trusted project context or process guidance.
-            </div>
-            <div className="rounded-lg border border-line bg-surface-2 px-3 py-3">
-              Use search when you know the question but not the source document, then use repo chat for follow-up.
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Project docs grid */}
-      <div>
-        <h2 className="mb-3 text-[19px] font-semibold tracking-tight text-ink">Project Docs</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {DOC_LINKS.map((doc) => (
-            <a
-              key={doc.path}
-              href={`/${doc.path}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block group"
-            >
-              <Card className="p-4 h-full flex items-center gap-3 cursor-pointer group-hover:bg-surface-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-ink-secondary">
-                  <FileText size={16} strokeWidth={1.7} aria-hidden />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13.5px] font-semibold text-ink truncate">{doc.title}</p>
-                  <p className="text-[12.5px] text-ink-muted truncate">{doc.description}</p>
-                </div>
-                <ChevronRight size={14} strokeWidth={1.7} aria-hidden className="text-ink-muted group-hover:text-ink-secondary transition-colors duration-150 shrink-0" />
-              </Card>
-            </a>
-          ))}
-        </div>
-      </div>
-
-      {/* Quick links grouped by category */}
-      <div>
-        <h2 className="mb-3 text-[19px] font-semibold tracking-tight text-ink">Quick Links</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {categories.map((cat) => (
-            <div key={cat}>
-              <p className="mb-2 px-1 text-[12.5px] font-medium text-ink-muted">{cat}</p>
-              <Card className="divide-y divide-line">
-                {QUICK_LINKS.filter((l) => l.category === cat).map((link) => (
-                  (() => {
-                    const LinkIcon = QUICK_LINK_CATEGORY_ICONS[link.category] ?? FileText;
-                    return (
-                      <a
-                        key={link.href}
-                        href={link.href}
-                        target={link.href.startsWith("obsidian://") || link.href.startsWith("cursor://") ? "_self" : "_blank"}
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between px-4 py-2.5 hover:bg-surface-2 transition-colors duration-150 group"
-                      >
-                        <span className="flex items-center gap-3 text-[13.5px] font-medium text-ink">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface-2 text-ink-secondary">
-                            <LinkIcon size={15} strokeWidth={1.7} aria-hidden />
-                          </span>
-                          {link.label}
-                        </span>
-                        <ExternalLink size={14} strokeWidth={1.7} aria-hidden className="text-ink-muted group-hover:text-ink-secondary transition-colors duration-150 shrink-0" />
-                      </a>
-                    );
-                  })()
-                ))}
-              </Card>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // SEARCH TAB
@@ -565,21 +392,33 @@ function ChatTab() {
 // ---------------------------------------------------------------------------
 
 export function DocsView() {
-  const [activeTab, setActiveTab] = useState("knowledge");
+  const [activeTab, setActiveTab] = useState("documentation");
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
       <PageHeader
         title="Documentation"
-        description="Project guides, runbooks, search, and repo-aware chat in one knowledge surface."
+        description="Agentic software factory guides — Tessl-style docs for Mission Control, plus semantic search and repo chat."
         icon={<BookOpen size={16} strokeWidth={1.7} aria-hidden />}
-        status={<StatusBadge tone="neutral">{DOC_LINKS.length} docs</StatusBadge>}
+        status={<StatusBadge tone="neutral">{DOCS_SITE_PAGES.length} guides</StatusBadge>}
       />
-      <TabBar tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} className="px-6" />
+      <TabBar tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} className="px-6 shrink-0" />
 
-      {activeTab === "knowledge" && <KnowledgeTab />}
-      {activeTab === "search"    && <SearchTab />}
-      {activeTab === "chat"      && <ChatTab />}
+      {activeTab === "documentation" && (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-2">
+          <DocsSiteBrowser />
+        </div>
+      )}
+      {activeTab === "search" && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <SearchTab />
+        </div>
+      )}
+      {activeTab === "chat" && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <ChatTab />
+        </div>
+      )}
     </main>
   );
 }

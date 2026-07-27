@@ -16,6 +16,7 @@ import { PageHeader } from "./components/factory/DetailLayout";
 import { MetricBlock, MetricRow } from "./components/factory/MetricBlock";
 import { StatusBadge } from "./components/factory/badges";
 import { AttentionQueuePanel } from "@/components/AttentionQueuePanel";
+import { FactorySchematicOverview } from "@/components/schematic";
 import { TopSessionsCard } from "@/components/dashboard/TopSessionsCard";
 import {
   UsageTrendCharts,
@@ -599,11 +600,9 @@ export function DashboardOverview({
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
-      <PageHeader
-        title="Overview"
-        description="Exceptions, approvals, and proof of completion — then fleet context."
-        actions={
-          onOpenCreateTask && (
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-6 xl:px-8">
+        {onOpenCreateTask && (
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={onOpenCreateTask}
@@ -612,10 +611,17 @@ export function DashboardOverview({
               <Plus size={14} strokeWidth={1.75} aria-hidden />
               New task
             </button>
-          )
-        }
-      />
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-6 py-6">
+          </div>
+        )}
+
+        {onNavigate && (
+          <FactorySchematicOverview
+            onNavigate={(view) => onNavigate(view as MainView)}
+            projectId={projectId}
+            scannedAt={scannedAt}
+          />
+        )}
+
         <AttentionQueuePanel
           items={attentionItems}
           scannedAt={scannedAt}

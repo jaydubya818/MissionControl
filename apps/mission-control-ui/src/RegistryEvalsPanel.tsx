@@ -6,6 +6,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { DataTable, type Column } from "./components/factory/DataTable";
 import { ScoreBadge, StatusBadge } from "./components/factory/badges";
 import { cn } from "./lib/utils";
+import { useFlag } from "./hooks/useFlag";
 
 export interface EvalRunRow {
   _id: string;
@@ -136,9 +137,8 @@ export function RegistryEvalsContent({
           Run evaluation
         </h2>
         <p className="mt-0.5 text-[12.5px] text-ink-muted">
-          Baseline vs candidate comparison — evidence that context improves agent
-          output. Proxy mode uses the structural review score until an external
-          agent runner is connected.
+          Baseline (without skill) vs candidate (with skill) — scenario pressure tests prove context
+          works. Proxy mode uses structural review until an external agent runner is connected.
         </p>
         <div className="mt-3 flex flex-col gap-2">
           {(packages ?? []).slice(0, 8).map((pkg) => (
@@ -226,6 +226,7 @@ function MetricCard({
 
 /** Data container for the Evals tab. */
 export function RegistryEvalsPanel(): JSX.Element {
+  const evalEnabled = useFlag("eval.framework");
   const [runningPackageId, setRunningPackageId] = useState<string | null>(null);
   const runs = useQuery(api.context.evals.listRecentRuns, { limit: 25 });
   const packages = useQuery(api.context.packages.listWithCurrentVersions, {});
@@ -245,11 +246,19 @@ export function RegistryEvalsPanel(): JSX.Element {
   };
 
   return (
-    <RegistryEvalsContent
+    <>
+      {!evalEnabled ? (
+        <div className="mb-4 rounded-xl border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-ink-secondary">
+          <strong className="text-ink">eval.framework</strong> is off — enable via{" "}
+          <code className="text-xs">mc flags set eval.framework on</code> to run baseline/candidate evals.
+        </div>
+      ) : null}
+      <RegistryEvalsContent
       runs={runs ?? undefined}
       packages={packages ?? undefined}
       onRunEval={handleRunEval}
       runningPackageId={runningPackageId}
     />
+    </>
   );
 }

@@ -22,6 +22,7 @@ describe("flag registry", () => {
     expect(keys).toContain("trust.scoring");
     expect(keys).toContain("rollout.rings");
     expect(keys).toContain("delivery.workorders");
+    expect(keys).toContain("executor.pi-bridge");
   });
 
   it("ships every flag default-off", () => {

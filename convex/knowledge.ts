@@ -212,6 +212,16 @@ export const indexAllDocs = action({
       "https://raw.githubusercontent.com/jaydubya818/MissionControl/main/";
 
     const docs: { path: string; title: string }[] = [
+      { path: "docs/site/overview/readme.md", title: "What is Mission Control?" },
+      { path: "docs/site/overview/platform-components.md", title: "Platform components" },
+      { path: "docs/site/get-started/set-up-mission-control.md", title: "Set up Mission Control" },
+      { path: "docs/site/get-started/run-the-demo.md", title: "Run the demo" },
+      { path: "docs/site/get-started/improve-your-first-skill.md", title: "Improve your first skill" },
+      { path: "docs/site/tutorials/governing-work-orders.md", title: "Governing WorkOrders" },
+      { path: "docs/site/tutorials/setting-up-agentic-code-review.md", title: "Agentic code review" },
+      { path: "docs/site/harness/software-factory.md", title: "Software factory" },
+      { path: "docs/site/registry/discover-and-install.md", title: "Registry discover" },
+      { path: "docs/site/reference/glossary.md", title: "Glossary" },
       { path: "docs/PRD_V2.md", title: "PRD V2" },
       { path: "docs/APP_FLOW.md", title: "App Flow" },
       { path: "docs/BACKEND_STRUCTURE.md", title: "Backend Structure" },

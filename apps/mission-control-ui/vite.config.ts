@@ -27,11 +27,12 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    strictPort: false, // if 5173 is in use, Vite will use the next available port
+    strictPort: false,
     host: true,
+    fs: {
+      allow: [path.resolve(__dirname, "../..")],
+    },
     proxy: {
-      // Forward orchestration server in dev so UI can reach it same-origin (no CORS).
-      // If nothing is running on 4100, /gateway/* requests will fail; the UI handles that.
       "/gateway": {
         target: "http://localhost:4100",
         changeOrigin: true,

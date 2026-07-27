@@ -165,6 +165,46 @@ export const getVersion = query({
   },
 });
 
+/** Package + current version detail for the Registry detail view. */
+export const getDetail = query({
+  args: { packageId: v.id("contextPackages") },
+  handler: async (ctx, args) => {
+    const pkg = await ctx.db.get(args.packageId);
+    if (!pkg) return null;
+
+    let version = pkg.currentVersionId
+      ? await ctx.db.get(pkg.currentVersionId)
+      : null;
+    if (!version) {
+      const versions = await ctx.db
+        .query("contextPackageVersions")
+        .withIndex("by_package", (q) => q.eq("packageId", pkg._id))
+        .collect();
+      version =
+        versions.sort((a, b) => compareSemver(b.version, a.version))[0] ?? null;
+    }
+
+    const runs = await ctx.db
+      .query("contextEvalRuns")
+      .withIndex("by_package", (q) => q.eq("packageId", pkg._id))
+      .collect();
+    runs.sort((a, b) => b.createdAt - a.createdAt);
+    const latestRun = runs.find((r) => r.status === "COMPLETED") ?? runs[0] ?? null;
+
+    const scenarios = await ctx.db
+      .query("contextEvalScenarios")
+      .withIndex("by_package", (q) => q.eq("packageId", pkg._id))
+      .collect();
+
+    return {
+      package: pkg,
+      version,
+      latestRun,
+      scenarioCount: scenarios.filter((s) => s.active).length,
+    };
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
@@ -195,6 +235,22 @@ export const listWithCurrentVersions = query({
           .collect();
         version = versions.sort((a: any, b: any) => b.createdAt - a.createdAt)[0] ?? null;
       }
+
+      const runs = await ctx.db
+        .query("contextEvalRuns")
+        .withIndex("by_package", (q: any) => q.eq("packageId", pkg._id))
+        .collect();
+      const latestRun =
+        runs
+          .filter((r: any) => r.status === "COMPLETED")
+          .sort((a: any, b: any) => b.createdAt - a.createdAt)[0] ?? null;
+
+      const scenarios = await ctx.db
+        .query("contextEvalScenarios")
+        .withIndex("by_package", (q: any) => q.eq("packageId", pkg._id))
+        .collect();
+      const activeScenarioCount = scenarios.filter((s: any) => s.active).length;
+
       result.push({
         _id: pkg._id,
         slug: pkg.slug,
@@ -210,10 +266,17 @@ export const listWithCurrentVersions = query({
         versionStatus: version?.status ?? null,
         qualityScore: version?.qualityScore ?? null,
         reviewAxes: version?.reviewAxes ?? null,
-        impactScore: version?.impactScore ?? null,
+        impactScore: latestRun?.impactScore ?? version?.impactScore ?? null,
         securityStatus: version?.securityStatus ?? null,
         sourceRepo: version?.sourceRepo ?? null,
         updatedAt: pkg.updatedAt,
+        scenarioCount: activeScenarioCount,
+        evalRunStatus: latestRun?.status ?? null,
+        baselineScore: latestRun?.baselineScore ?? null,
+        candidateScore: latestRun?.candidateScore ?? null,
+        impactDelta: latestRun?.impactDelta ?? null,
+        evalCompletedAt: latestRun?.completedAt ?? null,
+        hasEvalData: latestRun?.status === "COMPLETED",
       });
     }
     return result.sort(

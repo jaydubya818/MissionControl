@@ -1,10 +1,13 @@
 import { Target } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../../../convex/_generated/api";
 import { PageHeader } from "../../components/factory/DetailLayout";
 import { StatusBadge, type StatusBadgeProps } from "../../components/factory/badges";
 import { EmptyState } from "../../components/ui/empty-state";
 import { cn } from "../../lib/utils";
 import { PageProvenanceNote, ProvenanceBadge } from "../components";
 import { demoMission } from "../demoData";
+import { adaptMissionSummaries } from "../liveAdapters";
 import type { HealthStatus, MissionSummary } from "../types";
 
 export interface MissionPortfolioViewProps {
@@ -105,6 +108,12 @@ function MissionCard({
 }
 
 export function MissionPortfolioView({ onNavigate }: MissionPortfolioViewProps): JSX.Element {
+  const liveMissions = useQuery(api.eos.projections.getMissionSummaries, {});
+  const missions: MissionSummary[] =
+    liveMissions && liveMissions.length > 0
+      ? adaptMissionSummaries(liveMissions as MissionSummary[])
+      : [demoMission];
+
   return (
     <div className="relative flex-1 overflow-auto bg-app">
       <PageHeader
@@ -114,21 +123,25 @@ export function MissionPortfolioView({ onNavigate }: MissionPortfolioViewProps):
       <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
         <PageProvenanceNote />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <MissionCard mission={demoMission} onNavigate={onNavigate} />
-          <EmptyState
-            icon={Target}
-            title="Define your next mission"
-            description="Missions turn objectives into governed work orders with budgets and acceptance criteria."
-            action={
-              <button
-                type="button"
-                onClick={() => onNavigate("goals")}
-                className="h-9 rounded-lg border border-line px-3 text-[13px] text-ink-secondary transition-colors duration-150 hover:border-line-strong hover:text-ink"
-              >
-                Start from an objective
-              </button>
-            }
-          />
+          {missions.map((mission) => (
+            <MissionCard key={mission.id} mission={mission} onNavigate={onNavigate} />
+          ))}
+          {missions.length < 2 ? (
+            <EmptyState
+              icon={Target}
+              title="Define your next mission"
+              description="Missions turn objectives into governed work orders with budgets and acceptance criteria."
+              action={
+                <button
+                  type="button"
+                  onClick={() => onNavigate("goals")}
+                  className="h-9 rounded-lg border border-line px-3 text-[13px] text-ink-secondary transition-colors duration-150 hover:border-line-strong hover:text-ink"
+                >
+                  Start from an objective
+                </button>
+              }
+            />
+          ) : null}
         </div>
       </div>
     </div>

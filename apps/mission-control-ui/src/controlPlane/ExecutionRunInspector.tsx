@@ -85,7 +85,7 @@ export function ExecutionRunInspector({
                         const highlighted = (verificationReceiptId && event.verificationReceiptId === verificationReceiptId)
                           || (acceptanceCriterionId && event.metadata?.acceptanceCriterionId === acceptanceCriterionId);
                         return (
-                          <div key={event._id ?? `${event.sequenceNumber}-${event.eventType}`} className={`rounded-lg border px-3 py-3 ${highlighted ? "border-cyan-400/40 bg-cyan-500/5" : "border-[var(--panel-line)] bg-background/30"}`}>
+                          <div key={event._id ?? `${event.sequenceNumber}-${event.eventType}`} className={`rounded-lg border px-3 py-3 ${highlighted ? "border-registry-accent/40 bg-registry-accent-soft" : "border-[var(--panel-line)] bg-background/30"}`}>
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 <Badge variant="outline">#{event.sequenceNumber}</Badge>
@@ -125,7 +125,7 @@ export function ExecutionRunInspector({
                             <Badge variant="outline">{change.changeType}</Badge>
                           </div>
                           <div className="mt-2 text-xs text-muted-foreground">Event #{change.sequenceNumber} · {change.workflowStep ?? "—"}</div>
-                          <div className="mt-1 flex flex-wrap gap-3 text-xs text-cyan-100">
+                          <div className="mt-1 flex flex-wrap gap-3 text-xs text-registry-accent">
                             {change.diffLocation ? <span>Diff: {change.diffLocation}</span> : null}
                             {change.pullRequestUrl ? <span>PR: {change.pullRequestUrl}</span> : null}
                           </div>
@@ -142,7 +142,7 @@ export function ExecutionRunInspector({
                       {(inspector.artifacts ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No artifacts recorded yet.</p> : inspector.artifacts.map((artifact: any) => {
                         const highlighted = evidenceArtifacts.some((item: any) => item._id === artifact._id);
                         return (
-                          <div key={artifact._id} className={`rounded-lg border px-3 py-3 ${highlighted ? "border-cyan-400/40 bg-cyan-500/5" : "border-[var(--panel-line)] bg-background/30"}`}>
+                          <div key={artifact._id} className={`rounded-lg border px-3 py-3 ${highlighted ? "border-registry-accent/40 bg-registry-accent-soft" : "border-[var(--panel-line)] bg-background/30"}`}>
                             <div className="flex items-start justify-between gap-3">
                               <div>
                                 <div className="text-sm font-medium text-foreground">{artifact.name}</div>

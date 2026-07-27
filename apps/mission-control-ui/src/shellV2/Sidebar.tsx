@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown, Command, Search } from "lucide-react";
+import { ChevronDown, ChevronLeft, Command, Search } from "lucide-react";
 import type { MainView } from "../TopNav";
 import { NAV_GROUPS, type NavGroup, type NavItem } from "./navConfig";
 import { cn } from "../lib/utils";
@@ -22,12 +22,17 @@ export function SidebarItem({ item, active, onNavigate }: SidebarItemProps): JSX
       className={cn(
         "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] transition-colors duration-150",
         active
-          ? "bg-surface-2 text-ink ring-1 ring-line"
+          ? "bg-registry-accent-soft text-ink ring-1 ring-registry-accent/30"
           : "text-ink-secondary hover:bg-surface-1 hover:text-ink"
       )}
     >
       <Icon size={15} strokeWidth={1.75} className="shrink-0" aria-hidden />
-      <span className="truncate">{item.label}</span>
+      <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+      {item.count != null && item.count > 0 ? (
+        <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-muted">
+          {item.count}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -101,21 +106,25 @@ export function WorkspaceSwitcher({ children }: WorkspaceSwitcherProps): JSX.Ele
 }
 
 interface SidebarProps {
+  width?: number;
   groups?: NavGroup[];
   activeView: MainView;
   onNavigate: (view: MainView) => void;
   onOpenSearch: () => void;
   workspaceSwitcher: ReactNode;
   footer?: ReactNode;
+  onHide?: () => void;
 }
 
 export function Sidebar({
+  width = SIDEBAR_V2_WIDTH,
   groups,
   activeView,
   onNavigate,
   onOpenSearch,
   workspaceSwitcher,
   footer,
+  onHide,
 }: SidebarProps): JSX.Element {
   const navGroups = groups ?? NAV_GROUPS;
   const activeGroupId = (navGroups.find((g) => g.items.some((i) => i.view === activeView)) ?? navGroups[0]).id;
@@ -132,16 +141,26 @@ export function Sidebar({
   return (
     <nav
       aria-label="Primary"
-      style={{ width: SIDEBAR_V2_WIDTH }}
+      style={{ width }}
       className="flex h-full shrink-0 flex-col border-r border-line bg-rail"
     >
       <div className="flex items-center gap-2 px-4 pb-3 pt-4">
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-surface-3 text-[13px] font-bold text-ink">
           MC
         </div>
-        <span className="text-[13px] font-semibold tracking-tight text-ink">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-tight text-ink">
           Mission Control
         </span>
+        {onHide ? (
+          <button
+            type="button"
+            onClick={onHide}
+            className="rounded p-1 text-ink-muted hover:text-ink"
+            title="Hide sidebar"
+          >
+            <ChevronLeft size={14} aria-hidden />
+          </button>
+        ) : null}
       </div>
 
       <div className="px-3 pb-3">

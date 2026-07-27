@@ -52,6 +52,9 @@ const QualitySection = lazy(() =>
 const PlatformSection = lazy(() =>
   import("./sections/PlatformSection").then((module) => ({ default: module.PlatformSection }))
 );
+const HarnessSection = lazy(() =>
+  import("./harness/HarnessSection").then((module) => ({ default: module.HarnessSection }))
+);
 const ControlSection = lazy(() =>
   import("./sections/ControlSection").then((module) => ({ default: module.ControlSection }))
 );
@@ -140,6 +143,11 @@ const VALID_MAIN_VIEWS: MainView[] = [
   "analytics", "command-center", "missions", "mission-detail", "trace-inspector", "effectiveness",
   "factory-health", "readiness", "friction", "agent-catalog", "dossier", "recommendations",
   "control-portfolio", "control-work-orders", "control-fleet", "control-approvals",
+  "harness-health", "harness-loops", "harness-control-plane", "harness-work-ledger",
+  "harness-verifiers", "harness-change-review", "harness-change-risk", "harness-launch",
+  "harness-meta-loop", "harness-team-pulse", "harness-builder", "harness-maintenance", "harness-code-review-wizard",
+  "harness-workshop", "harness-automations", "harness-agent-fleet", "harness-software-factory", "harness-architect", "harness-patterns",
+  "registry-lifecycle", "registry-evaluate", "registry-inventory", "registry-installations", "registry-runs",
 ];
 
 function readPersistedView(): MainView | null {
@@ -160,7 +168,7 @@ function readPersistedView(): MainView | null {
 
 const SECTION_DEFAULT_VIEW: Record<CommandSection, MainView> = {
   home: "home",
-  control: "control-portfolio",
+  control: "harness-health",
   ops: "tasks",
   agents: "agents",
   chat: "chat",
@@ -262,14 +270,62 @@ const SECTION_TABS: Record<CommandSection, TabItem[] | null> = {
 
 function viewToSection(view: MainView): CommandSection {
   if (view === "home") return "home";
-  if (["control-portfolio", "control-work-orders", "control-fleet", "control-approvals"].includes(view)) return "control";
+  if (
+    [
+      "control-portfolio",
+      "control-work-orders",
+      "control-fleet",
+      "control-approvals",
+    ].includes(view)
+  ) {
+    return "control";
+  }
+  if (
+    [
+      "harness-health",
+      "harness-loops",
+      "harness-control-plane",
+      "harness-work-ledger",
+      "harness-team-pulse",
+      "harness-meta-loop",
+      "harness-builder",
+      "harness-verifiers",
+      "harness-change-review",
+      "harness-change-risk",
+      "harness-launch",
+      "harness-maintenance",
+      "harness-code-review-wizard",
+      "harness-workshop",
+      "harness-automations",
+      "harness-agent-fleet",
+      "harness-software-factory",
+      "harness-architect",
+      "harness-patterns",
+    ].includes(view)
+  ) {
+    return "control";
+  }
   if (["tasks", "goals", "dag", "calendar", "ops-schedule", "audit", "telemetry"].includes(view)) return "ops";
   if (["atc", "agents", "directory", "identity", "policies", "deployments", "gateway", "schedules"].includes(view)) return "agents";
   if (["chat", "live-chat", "council", "command"].includes(view)) return "chat";
   if (["captures", "projects", "content-pipeline"].includes(view)) return "content";
   if (["qc-dashboard", "qc-runs", "qc-environments", "qc-findings", "qc-metrics", "qc-rulesets"].includes(view)) return "quality";
   if (["telegraph", "meetings", "voice", "people", "org", "office", "live-office", "crm", "hiring", "team"].includes(view)) return "comms";
-  if (["docs", "design-system", "skills", "search", "memory"].includes(view)) return "knowledge";
+  if (
+    [
+      "docs",
+      "design-system",
+      "skills",
+      "registry-lifecycle",
+      "registry-evaluate",
+      "registry-inventory",
+      "registry-installations",
+      "registry-runs",
+      "search",
+      "memory",
+    ].includes(view)
+  )
+    return "knowledge";
   if (["system", "radar", "factory", "pipeline", "feedback", "analytics", "command-center", "missions", "mission-detail", "trace-inspector", "effectiveness", "factory-health", "readiness", "friction", "agent-catalog", "dossier", "recommendations"].includes(view)) return "platform";
   if ([
     "code", "recorder", "test-generation", "api-import", "execution",
@@ -594,6 +650,38 @@ export default function App() {
 
   // ── Section renderer ─────────────────────────────────────────────────────
   function renderSection() {
+    if (
+      [
+        "harness-health",
+        "harness-loops",
+        "harness-control-plane",
+        "harness-work-ledger",
+        "harness-verifiers",
+        "harness-change-review",
+        "harness-change-risk",
+        "harness-launch",
+        "harness-meta-loop",
+        "harness-team-pulse",
+        "harness-builder",
+        "harness-maintenance",
+        "harness-code-review-wizard",
+        "harness-workshop",
+        "harness-automations",
+        "harness-agent-fleet",
+        "harness-software-factory",
+        "harness-architect",
+      "harness-patterns",
+      ].includes(currentView)
+    ) {
+      return (
+        <HarnessSection
+          currentView={currentView}
+          projectId={projectId}
+          onNavigate={setCurrentView}
+        />
+      );
+    }
+
     switch (activeSection) {
       case "home":
         return (
@@ -693,6 +781,7 @@ export default function App() {
           <KnowledgeSection
             currentView={currentView}
             projectId={projectId}
+            onNavigate={setCurrentView}
             onTaskSelect={(taskId) => {
               setSelectedTaskId(taskId as Id<"tasks">);
               setCurrentView("tasks");
@@ -756,6 +845,7 @@ export default function App() {
             onOpenSearch={() => open("commandPalette")}
             pendingApprovals={pendingApprovals?.length ?? 0}
             onOpenApprovals={() => open("approvals")}
+            projectId={projectId}
           >
             <Suspense fallback={<SectionLoadingState />}>{renderSection()}</Suspense>
           </AppShellV2>

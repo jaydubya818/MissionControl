@@ -7,6 +7,8 @@ import { IdentityDirectoryView } from "../IdentityDirectoryView";
 import { PoliciesView } from "../PoliciesView";
 import { DeploymentsView } from "../DeploymentsView";
 import { GatewaySettingsView } from "../GatewaySettingsView";
+import { GatewayInboxView } from "../eos/views/GatewayInboxView";
+import { useFlag } from "../hooks/useFlag";
 import { SchedulesView } from "../SchedulesView";
 
 interface AgentsSectionProps {
@@ -28,6 +30,7 @@ export function AgentsSection({
   onNavigateToAgent,
   onOpenCreateAgent,
 }: AgentsSectionProps) {
+  const eosPreview = useFlag("eos.command-center-preview");
   if (currentView === "atc")
     return (
       <AtcBoardView
@@ -42,7 +45,9 @@ export function AgentsSection({
   if (currentView === "identity") return <IdentityDirectoryView projectId={projectId} />;
   if (currentView === "policies") return <PoliciesView projectId={projectId} />;
   if (currentView === "deployments") return <DeploymentsView projectId={projectId} />;
-  if (currentView === "gateway") return <GatewaySettingsView />;
+  if (currentView === "gateway") {
+    return eosPreview ? <GatewayInboxView /> : <GatewaySettingsView />;
+  }
   if (currentView === "schedules") return <SchedulesView projectId={projectId} />;
   return null;
 }

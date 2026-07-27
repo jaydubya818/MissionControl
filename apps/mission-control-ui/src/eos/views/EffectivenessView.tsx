@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { useQuery } from "convex/react";
 import { Info } from "lucide-react";
+import { api } from "../../../../../convex/_generated/api";
 import { PageHeader } from "../../components/factory/DetailLayout";
 import { cn } from "../../lib/utils";
 import { EvidenceLink, PageProvenanceNote, ProvenanceBadge, TrendIcon } from "../components";
 import { demoEffectiveness } from "../demoData";
+import { adaptEffectivenessMetrics } from "../liveAdapters";
 import type { EffectivenessMetric } from "../types";
 
 export interface EffectivenessViewProps {
@@ -172,6 +175,12 @@ function MetricCard({
 
 export function EffectivenessView({ onNavigate }: EffectivenessViewProps): JSX.Element {
   const [grouping, setGrouping] = useState<Grouping>("all");
+  const liveMetrics = useQuery(api.eos.projections.getEffectivenessMetrics, {});
+  const metrics: EffectivenessMetric[] =
+    liveMetrics && liveMetrics.length > 0
+      ? adaptEffectivenessMetrics(liveMetrics)
+      : demoEffectiveness;
+
   return (
     <div className="relative flex-1 overflow-auto bg-app">
       <PageHeader
@@ -186,7 +195,7 @@ export function EffectivenessView({ onNavigate }: EffectivenessViewProps): JSX.E
         </div>
         <GroupingControl grouping={grouping} onChange={setGrouping} />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {demoEffectiveness.map((metric) => (
+          {metrics.map((metric) => (
             <MetricCard
               key={metric.id}
               metric={metric}

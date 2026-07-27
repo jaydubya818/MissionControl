@@ -16,6 +16,9 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     env: {
       VITE_CONVEX_URL: "http://127.0.0.1:3210",
+      VITE_FLAG_UI_SHELL_V2: "true",
+      VITE_FLAG_CONTEXT_REGISTRY: "true",
+      VITE_FLAG_EOS_COMMAND_CENTER_PREVIEW: "true",
     },
   },
   projects: [

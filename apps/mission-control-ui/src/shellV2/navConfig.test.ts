@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import { NAV_GROUPS, allNavViews, groupForView, itemForView } from "./navConfig";
 
 describe("navConfig", () => {
-  it("has the five Software Factory domains plus workspace and labs", () => {
+  it("has the Software Factory domains plus harness, workspace and labs", () => {
     expect(NAV_GROUPS.map((g) => g.id)).toEqual([
       "operate",
       "control",
+      "harness",
       "factory",
       "intelligence",
       "observe",
+      "platform",
       "govern",
       "workspace",
       "labs",
@@ -31,6 +33,13 @@ describe("navConfig", () => {
       "qc-environments", "qc-findings", "qc-metrics", "qc-rulesets", "gateway", "live-chat", "schedules",
       "hiring", "team", "system", "radar", "factory", "pipeline", "feedback", "ops-schedule", "goals",
       "control-portfolio", "control-work-orders", "control-fleet", "control-approvals",
+      "harness-health", "harness-loops", "harness-control-plane", "harness-work-ledger",
+      "harness-verifiers", "harness-change-review", "harness-change-risk", "harness-launch",
+      "harness-meta-loop", "harness-team-pulse", "harness-builder", "harness-maintenance", "harness-code-review-wizard",
+      "harness-workshop", "harness-automations", "harness-agent-fleet", "harness-software-factory", "harness-architect", "harness-patterns",
+      "registry-lifecycle", "registry-evaluate", "registry-inventory", "registry-installations", "registry-runs",
+      "analytics", "command-center", "missions", "trace-inspector", "effectiveness", "factory-health",
+      "readiness", "friction", "agent-catalog", "dossier", "recommendations",
     ];
     const reachable = new Set(allNavViews());
     const missing = required.filter((v) => !reachable.has(v as never));
@@ -59,7 +68,7 @@ describe("navConfig", () => {
   it("resolves group and item lookups", () => {
     expect(groupForView("tasks")?.id).toBe("operate");
     expect(groupForView("policies")?.id).toBe("govern");
-    expect(itemForView("skills")?.label).toBe("Registry");
+    expect(itemForView("skills")?.label).toBe("Registry Discover");
     expect(itemForView("nonexistent" as never)).toBeUndefined();
   });
 });

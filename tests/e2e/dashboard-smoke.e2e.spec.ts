@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function expectShellLoaded(page: Page) {
-  await page.goto("/");
-  await expect(page.getByRole("navigation", { name: "Command center navigation" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Home" })).toBeVisible();
+  await page.goto("/v2/home");
+  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Overview" })).toBeVisible();
 }
 
 /**
@@ -14,19 +14,16 @@ test("home dashboard loads and shows main sections", async ({ page }) => {
   await expectShellLoaded(page);
 
   // Home section: quick navigation or status
-  await expect(page.getByText("Quick Navigation", { exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("Needs attention", { exact: true })).toBeVisible({ timeout: 10000 });
 });
 
 test("navigate to Tasks and back to Home", async ({ page }) => {
   await expectShellLoaded(page);
 
-  const commandNav = page.getByRole("navigation", { name: "Command center navigation" });
-  const opsNav = commandNav.getByRole("button", { name: "Operations", exact: true });
-  await opsNav.click();
-  await page.getByRole("tab", { name: "Tasks", exact: true }).click();
+  await page.goto("/v2/tasks");
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible({ timeout: 8000 });
 
-  const homeNav = commandNav.getByRole("button", { name: "Home", exact: true });
-  await homeNav.click();
-  await expect(page.getByText("Quick Navigation", { exact: true })).toBeVisible({ timeout: 8000 });
+  await page.goto("/v2/home");
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible({ timeout: 8000 });
 });

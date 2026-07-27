@@ -45,7 +45,12 @@ export const EOS_NAV_GROUPS: NavGroup[] = [
     { view: "dossier" as MainView, label: "Evidence Dossiers", icon: Scale },
   ]},
   { id: "knowledge", label: "Knowledge", icon: BookOpen, items: [
-    { view: "skills" as MainView, label: "Context Registry", icon: Sparkles },
+    { view: "skills" as MainView, label: "Registry Discover", icon: Sparkles },
+    { view: "registry-lifecycle" as MainView, label: "Context CDL", icon: BookOpen },
+    { view: "registry-evaluate" as MainView, label: "Evaluate Skill", icon: FlaskConical },
+    { view: "registry-inventory" as MainView, label: "Skill Inventory", icon: ClipboardList },
+    { view: "registry-installations" as MainView, label: "Installations", icon: ClipboardList },
+    { view: "registry-runs" as MainView, label: "Eval Runs", icon: FlaskConical },
     { view: "memory" as MainView, label: "Memory", icon: Brain },
     { view: "docs" as MainView, label: "Docs", icon: BookOpen },
   ]},

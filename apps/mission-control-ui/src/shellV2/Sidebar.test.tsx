@@ -18,7 +18,7 @@ describe("Sidebar", () => {
   it("renders primary navigation with group labels", () => {
     renderSidebar();
     expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
-    for (const label of ["Operate", "Factory", "Intelligence", "Observe", "Govern"]) {
+    for (const label of ["Operate", "Control", "Harness", "Factory", "Intelligence", "Observe", "Platform", "Govern"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
   });

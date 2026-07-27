@@ -13,9 +13,10 @@
 import { mutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { computeGenomeHash } from "./lib/genomeHash";
+import { seedDemoExtensions } from "./lib/demoSeedExtensions";
 import { v } from "convex/values";
 
-const SEED_VERSION = "mc-demo-v1";
+const SEED_VERSION = "mc-demo-v2";
 const SEED_TAG = "mc-demo";
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -345,6 +346,23 @@ async function collectCounts(ctx: any, projectId: Id<"projects">, tenantId: Id<"
   const opEvents = await ctx.db.query("opEvents").withIndex("by_project", (q: any) => q.eq("projectId", projectId)).collect();
   const templates = await ctx.db.query("agentTemplates").withIndex("by_project", (q: any) => q.eq("projectId", projectId)).collect();
   const deployments = await ctx.db.query("deployments").withIndex("by_tenant", (q: any) => q.eq("tenantId", tenantId)).collect();
+  const contextPackages = await ctx.db.query("contextPackages").collect();
+  const knowledgeGraphNodes = await ctx.db
+    .query("knowledgeGraphNodes")
+    .withIndex("by_project_source", (q: any) => q.eq("projectId", projectId).eq("source", "mission-control"))
+    .collect();
+  const workOrders = await ctx.db
+    .query("workOrders")
+    .withIndex("by_project", (q: any) => q.eq("projectId", projectId))
+    .collect();
+  const goals = await ctx.db
+    .query("goals")
+    .withIndex("by_project", (q: any) => q.eq("projectId", projectId))
+    .collect();
+  const alerts = await ctx.db
+    .query("alerts")
+    .withIndex("by_project", (q: any) => q.eq("projectId", projectId))
+    .collect();
 
   return {
     agents: agents.length,
@@ -355,6 +373,11 @@ async function collectCounts(ctx: any, projectId: Id<"projects">, tenantId: Id<"
     opEvents: opEvents.length,
     armTemplates: templates.length,
     armDeployments: deployments.length,
+    contextPackages: contextPackages.filter((p: any) => p.projectId === projectId).length,
+    knowledgeGraphNodes: knowledgeGraphNodes.length,
+    workOrders: workOrders.length,
+    goals: goals.length,
+    alerts: alerts.length,
   };
 }
 
@@ -2318,11 +2341,21 @@ export const run = mutation({
       }
     }
 
+    const extensionCounts = await seedDemoExtensions(ctx, {
+      tenantId: tenant._id,
+      projectId: project._id,
+      now,
+      seedTag: SEED_TAG,
+      seedVersion: SEED_VERSION,
+      withSeedMeta,
+    });
+
     const seedMeta = {
       ...(projectMeta ?? {}),
       missionControlDemoSeedVersion: SEED_VERSION,
       missionControlDemoSeededAt: now,
       missionControlDemoSeedTag: SEED_TAG,
+      missionControlDemoExtensionCounts: extensionCounts,
     };
     await ctx.db.patch(project._id, { metadata: seedMeta });
 
@@ -2332,6 +2365,7 @@ export const run = mutation({
       tenantId: tenant._id,
       projectId: project._id,
       counts: await collectCounts(ctx, project._id, tenant._id),
+      extensionCounts,
     };
   },
 });

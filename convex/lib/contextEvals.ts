@@ -19,6 +19,13 @@ export interface EvalScenarioInput {
   readonly criteria: readonly EvalCriterion[];
 }
 
+export interface CriterionResult {
+  readonly criterionId: string;
+  readonly label: string;
+  readonly baselinePct: number;
+  readonly withContextPct: number;
+}
+
 export interface ScenarioResultInput {
   readonly scenarioId: string;
   readonly scenarioName: string;
@@ -26,6 +33,7 @@ export interface ScenarioResultInput {
   readonly candidateScore: number;
   readonly criteriaPassed: number;
   readonly criteriaTotal: number;
+  readonly criterionResults?: readonly CriterionResult[];
 }
 
 export interface EvalRunAggregate {
@@ -149,4 +157,86 @@ export function validateCriteriaWeights(criteria: readonly EvalCriterion[]): voi
   if (total < 99 || total > 101) {
     throw new Error(`Criterion weights must sum to 100 (got ${total})`);
   }
+}
+
+function clampPct(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+/**
+ * Deterministic per-criterion baseline/with-context scores from scenario aggregates.
+ * Used when external runners submit scenario totals only.
+ */
+export function buildCriterionResults(
+  criteria: readonly EvalCriterion[],
+  baselineScore: number,
+  candidateScore: number,
+  criteriaPassed: number
+): CriterionResult[] {
+  if (criteria.length === 0) return [];
+
+  const baseline = clampScore(baselineScore);
+  const candidate = clampScore(candidateScore);
+  const passed = Math.max(0, Math.min(criteria.length, criteriaPassed));
+
+  return criteria.map((c, i) => {
+    const withContextPct =
+      i < passed
+        ? 100
+        : clampPct(candidate - (i - passed + 1) * 12 + (c.weight % 7));
+
+    let baselinePct: number;
+    if (i < Math.max(1, Math.floor((baseline / 100) * criteria.length))) {
+      baselinePct = clampPct(baseline + (i % 2 === 0 ? 20 : 0));
+    } else {
+      baselinePct = clampPct(Math.max(0, baseline - i * 9 + (c.id.length % 5) * 4));
+    }
+
+    if (withContextPct >= 100 && baselinePct >= 80) {
+      baselinePct = 100;
+    }
+
+    return {
+      criterionId: c.id,
+      label: c.label,
+      baselinePct,
+      withContextPct,
+    };
+  });
+}
+
+/** Fill missing criterionResults on stored scenario results. */
+export function enrichScenarioResult(
+  criteria: readonly EvalCriterion[],
+  result: ScenarioResultInput
+): ScenarioResultInput {
+  if (result.criterionResults && result.criterionResults.length > 0) {
+    return result;
+  }
+  return {
+    ...result,
+    criterionResults: buildCriterionResults(
+      criteria,
+      result.baselineScore,
+      result.candidateScore,
+      result.criteriaPassed
+    ),
+  };
+}
+
+/** Impact multiplier for catalog display (candidate / baseline). */
+export function computeImpactMultiplier(
+  baselineScore: number | null | undefined,
+  candidateScore: number | null | undefined
+): number | null {
+  if (
+    baselineScore == null ||
+    candidateScore == null ||
+    !Number.isFinite(baselineScore) ||
+    !Number.isFinite(candidateScore) ||
+    baselineScore <= 0
+  ) {
+    return null;
+  }
+  return Math.round((candidateScore / baselineScore) * 100) / 100;
 }

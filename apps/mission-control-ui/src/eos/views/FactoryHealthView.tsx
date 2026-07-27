@@ -1,3 +1,5 @@
+import { useQuery } from "convex/react";
+import { api } from "../../../../../convex/_generated/api";
 import { PageHeader } from "../../components/factory/DetailLayout";
 import {
   EosSection,
@@ -8,38 +10,12 @@ import {
   TrendIcon,
 } from "../components";
 import { demoHealthSignals, demoTraits } from "../demoData";
+import { adaptFactoryTraits, adaptHealthSignals } from "../liveAdapters";
 import type { FactoryTrait, HealthSignal } from "../types";
 
 export interface FactoryHealthViewProps {
   onNavigate: (view: string) => void;
 }
-
-/** Extra demo family cards local to this view — never merged into demoData fixtures. */
-const reliabilitySignal: HealthSignal = {
-  id: "reliability",
-  label: "Reliability",
-  status: "HEALTHY",
-  trend: "flat",
-  summary: "0 quarantine events this week except demo-security",
-  confidence: "high",
-  provenance: "demo",
-  evidence: [{ label: "agents", count: 8, view: "agent-catalog" }],
-  drillView: "agent-catalog",
-};
-
-const knowledgeSignal: HealthSignal = {
-  id: "knowledge",
-  label: "Knowledge",
-  status: "WATCH",
-  trend: "flat",
-  summary: "9 skills governed · promotion pipeline pending",
-  confidence: "moderate",
-  provenance: "demo",
-  evidence: [{ label: "skills", count: 9, view: "skills" }],
-  drillView: "skills",
-};
-
-const healthFamilies: HealthSignal[] = [...demoHealthSignals, reliabilitySignal, knowledgeSignal];
 
 function TraitRow({
   trait,
@@ -48,7 +24,6 @@ function TraitRow({
   trait: FactoryTrait;
   onNavigate: (view: string) => void;
 }): JSX.Element {
-  /** Each trait scales to its own domain: 0 .. p75 × 1.3. */
   const domain = trait.p75 * 1.3;
   const pct = (value: number): number => Math.min(100, Math.max(0, (value / domain) * 100));
   const rangeLeft = pct(trait.p25);
@@ -90,6 +65,18 @@ function TraitRow({
 }
 
 export function FactoryHealthView({ onNavigate }: FactoryHealthViewProps): JSX.Element {
+  const liveSignals = useQuery(api.eos.projections.getHealthSignals, {});
+  const liveTraits = useQuery(api.eos.projections.getFactoryTraits, {});
+
+  const healthFamilies: HealthSignal[] =
+    liveSignals && liveSignals.length > 0
+      ? adaptHealthSignals(liveSignals as HealthSignal[])
+      : [...demoHealthSignals];
+  const traits: FactoryTrait[] =
+    liveTraits && liveTraits.length > 0
+      ? adaptFactoryTraits(liveTraits)
+      : demoTraits;
+
   return (
     <div className="relative flex-1 overflow-auto bg-app">
       <PageHeader title="Factory Health" />
@@ -103,13 +90,13 @@ export function FactoryHealthView({ onNavigate }: FactoryHealthViewProps): JSX.E
         <EosSection
           eyebrow="Traits"
           title="Operating characteristics"
-          action={<ProvenanceBadge provenance="demo" />}
+          action={<ProvenanceBadge provenance={traits[0]?.provenance ?? "demo"} />}
         >
           <div className="text-[12.5px] text-ink-secondary">
             Quarterly distributions, not scores. p25–p75 ranges with median.
           </div>
           <div className="flex flex-col gap-3">
-            {demoTraits.map((trait) => (
+            {traits.map((trait) => (
               <TraitRow key={trait.id} trait={trait} onNavigate={onNavigate} />
             ))}
           </div>

@@ -36,15 +36,15 @@ import { splitCurrentAndHistoricalRevisions, summarizeRevisionEffects } from "./
 
 const RISK_STYLES: Record<string, string> = {
   LOW: "border-emerald-500/30 text-emerald-300",
-  MEDIUM: "border-cyan-500/30 text-cyan-200",
+  MEDIUM: "border-registry-accent/30 text-registry-accent",
   HIGH: "border-amber-500/30 text-amber-300",
   CRITICAL: "border-red-500/30 text-red-300",
 };
 
 const STATE_STYLES: Record<string, string> = {
   DRAFT: "border-border text-muted-foreground",
-  READY: "border-cyan-500/30 text-cyan-200",
-  DISPATCHED: "border-cyan-500/30 text-cyan-200",
+  READY: "border-registry-accent/30 text-registry-accent",
+  DISPATCHED: "border-registry-accent/30 text-registry-accent",
   IN_PROGRESS: "border-primary/30 text-primary",
   BLOCKED: "border-red-500/30 text-red-300",
   AWAITING_APPROVAL: "border-amber-500/30 text-amber-300",
@@ -251,7 +251,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                     key={item._id}
                     type="button"
                     onClick={() => setSelectedId(item._id)}
-                    className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedRow ? "border-cyan-400/40 bg-cyan-500/5" : "border-[var(--panel-line)] bg-card/40 hover:border-cyan-500/20"}`}
+                    className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedRow ? "border-registry-accent/40 bg-registry-accent-soft" : "border-[var(--panel-line)] bg-card/40 hover:border-registry-accent/20"}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -440,7 +440,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                           <div>Decided: <span className="text-foreground/85">{approval.decidedAt ? new Date(approval.decidedAt).toLocaleString() : "—"}</span></div>
                         </div>
                         {approval.reason ? <div className="mt-2 text-xs text-muted-foreground">Reason: {approval.reason}</div> : null}
-                        {approval.conditions?.length ? <div className="mt-2 text-xs text-cyan-100">Conditions: {approval.conditions.join("; ")}</div> : null}
+                        {approval.conditions?.length ? <div className="mt-2 text-xs text-registry-accent">Conditions: {approval.conditions.join("; ")}</div> : null}
                       </div>
                     )) : (
                       <p className="text-sm text-muted-foreground">No approval decisions recorded yet.</p>
@@ -478,7 +478,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                 <Section title="Revision history">
                   <div className="space-y-2">
                     {revisionSplit.current ? (
-                      <div className="rounded-lg border border-cyan-400/30 bg-cyan-500/5 px-3 py-3">
+                      <div className="rounded-lg border border-registry-accent/30 bg-registry-accent-soft px-3 py-3">
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="text-sm font-medium text-foreground">Current revision r{revisionSplit.current.revisionNumber}</div>
@@ -675,7 +675,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                         <div key={run._id} className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
-                              <PlayCircle className="h-4 w-4 text-cyan-200" />
+                              <PlayCircle className="h-4 w-4 text-registry-accent" />
                               <span className="text-sm font-medium text-foreground">{run.workflowId}</span>
                               <Badge variant="outline">{run.status}</Badge>
                             </div>

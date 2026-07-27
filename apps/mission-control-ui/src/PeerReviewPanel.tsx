@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/factory/badges";
+import { HarnessFirstReviewModal } from "./harness/components/HarnessFirstReviewModal";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -258,8 +259,9 @@ function CreateReviewModal({ taskId, projectId, onClose }: any) {
   const [details, setDetails] = useState("");
   const [score, setScore] = useState(8);
   const [severity, setSeverity] = useState<"MINOR" | "MAJOR" | "CRITICAL">("MINOR");
+  const [showHarnessGate, setShowHarnessGate] = useState(false);
 
-  const handleSubmit = async () => {
+  const submitReview = async () => {
     if (!summary.trim()) return;
 
     try {
@@ -278,6 +280,15 @@ function CreateReviewModal({ taskId, projectId, onClose }: any) {
     } catch (error) {
       console.error("Error creating review:", error);
     }
+  };
+
+  const handleSubmit = () => {
+    if (!summary.trim()) return;
+    if (type === "REFUTE" || type === "CHANGESET") {
+      setShowHarnessGate(true);
+      return;
+    }
+    void submitReview();
   };
 
   const inputClasses = "w-full h-9 px-3 bg-surface-1 border border-line rounded-lg text-ink text-[13.5px] placeholder:text-ink-muted";
@@ -375,6 +386,14 @@ function CreateReviewModal({ taskId, projectId, onClose }: any) {
           </button>
         </div>
       </div>
+      <HarnessFirstReviewModal
+        open={showHarnessGate}
+        onClose={() => setShowHarnessGate(false)}
+        onProceedComment={() => {
+          setShowHarnessGate(false);
+          void submitReview();
+        }}
+      />
     </div>
   );
 }

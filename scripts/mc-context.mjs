@@ -15,6 +15,7 @@
  *   verify               Re-resolve and compare with the lock; exit 1 on drift
  *   diff                 Show what a fresh resolution would change vs the lock
  *   outdated             List locked packages with newer registry versions
+ *   scan                 Discover local SKILL.md files and sync installations to Convex
  *
  * Files are read/written in CWD unless --dir <path> is given. Registry
  * commands (add's default range, lock, verify, diff, outdated) call the
@@ -26,7 +27,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -505,6 +506,80 @@ function cmdOutdated() {
   }
 }
 
+function discoverLocalSkills() {
+  const roots = [
+    join(workDir, ".agents", "skills"),
+    join(workDir, ".cursor", "skills"),
+    join(workDir, "skills"),
+  ];
+  const discovered = [];
+  const seen = new Set();
+
+  for (const root of roots) {
+    if (!existsSync(root)) continue;
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const skillPath = join(root, entry.name, "SKILL.md");
+      if (!existsSync(skillPath) || seen.has(skillPath)) continue;
+      seen.add(skillPath);
+      const content = readFileSync(skillPath, "utf8");
+      const nameMatch = content.match(/^name:\s*(.+)$/m);
+      const name = nameMatch?.[1]?.trim() ?? entry.name;
+      const slug = name.includes("/") ? name : `local/${name}`;
+      discovered.push({
+        slug,
+        name,
+        path: skillPath.replace(workDir + "/", ""),
+        contentHash: sha256(content),
+      });
+    }
+  }
+  return discovered;
+}
+
+function cmdScan() {
+  const repoSlug = existsSync(manifestPath())
+    ? readManifest().repository
+    : detectRepositorySlug();
+  const snapshot = fetchRegistrySnapshot();
+  const discovered = discoverLocalSkills();
+
+  const entries = discovered.map((skill) => {
+    const registryPkg = snapshot.find((pkg) => pkg.slug === skill.slug);
+    const version = registryPkg?.version ?? "0.0.0-local";
+    const contentHash = registryPkg?.contentHash ?? skill.contentHash;
+    const state = registryPkg ? "INSTALLED" : "MISSING";
+    return {
+      packageSlug: skill.slug,
+      version,
+      contentHash,
+      state,
+    };
+  });
+
+  if (entries.length === 0) {
+    emit({ discovered: [], synced: null }, "No local SKILL.md files found under .agents/skills, .cursor/skills, or skills/");
+    return;
+  }
+
+  const syncResult = convexRun("context/manifests:syncInstallations", {
+    repoSlug,
+    entries,
+    actorId: "mc-cli-scan",
+  });
+
+  if (jsonOutput) {
+    emit({ discovered, synced: syncResult }, "");
+    return;
+  }
+
+  console.log(`Discovered ${discovered.length} local skill(s) for ${repoSlug}:`);
+  for (const skill of discovered) {
+    console.log(`  ${skill.slug} (${skill.path})`);
+  }
+  console.log("Synced installations to Convex.");
+}
+
 // ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
@@ -534,6 +609,9 @@ switch (command) {
   case "outdated":
     cmdOutdated();
     break;
+  case "scan":
+    cmdScan();
+    break;
   case undefined:
   case "help":
   case "--help":
@@ -550,6 +628,7 @@ switch (command) {
         "  verify               re-resolve and compare with the lock (exit 1 on drift)",
         "  diff                 show fresh resolution vs the lock",
         "  outdated             list locked packages with newer versions",
+        "  scan                 discover local skills and sync installations to Convex",
       ].join("\n")
     );
     break;

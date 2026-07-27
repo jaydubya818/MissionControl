@@ -7,6 +7,10 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { api } from "./_generated/api";
+import {
+  extractPrFromWebhookEvent,
+  verifyGithubWebhookSignature,
+} from "./lib/githubCiIngest";
 
 const http = httpRouter();
 
@@ -110,6 +114,53 @@ http.route({
       customerEmail: obj.receipt_email ?? obj.customer_email ?? undefined,
       externalId: event.id,
       externalRef: obj.id,
+    });
+
+    return new Response("OK", { status: 200 });
+  }),
+});
+
+http.route({
+  path: "/github/webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.text();
+    const secret = process.env.GITHUB_WEBHOOK_SECRET;
+    const signature = request.headers.get("x-hub-signature-256");
+
+    if (secret) {
+      const valid = await verifyGithubWebhookSignature(body, signature, secret);
+      if (!valid) {
+        return new Response("GitHub webhook signature verification failed", { status: 401 });
+      }
+    }
+
+    const event = request.headers.get("x-github-event") ?? "";
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(body);
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+
+    const prRef = extractPrFromWebhookEvent(event, payload);
+    if (!prRef) {
+      return new Response("OK (ignored)", { status: 200 });
+    }
+
+    if (
+      event === "pull_request" &&
+      !["opened", "synchronize", "reopened"].includes(String(payload.action ?? ""))
+    ) {
+      return new Response("OK (ignored action)", { status: 200 });
+    }
+
+    if (event === "check_run" && payload.action !== "completed") {
+      return new Response("OK (ignored action)", { status: 200 });
+    }
+
+    await ctx.runAction(api.factory.prChecks.ingestPullRequest, {
+      prUrl: prRef.prUrl,
     });
 
     return new Response("OK", { status: 200 });

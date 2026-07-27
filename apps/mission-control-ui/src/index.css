@@ -73,6 +73,8 @@
   --color-info-soft: var(--status-info-subtle);
   --color-act: var(--action-primary);
   --color-act-ink: var(--action-primary-text);
+  --color-schematic-accent: var(--schematic-accent);
+  --color-schematic-gate-retrieve: var(--schematic-gate-retrieve);
   --color-risk-low: var(--status-success);
   --color-risk-medium: var(--status-warning);
   --color-risk-high: var(--status-error);
@@ -758,6 +760,10 @@ main {
   --action-primary: #f4f5f7;
   --action-primary-text: #0b0c0e;
   --risk-critical: #ff7a7a;
+  /* Tessl registry green — unified accent across factory + harness surfaces */
+  --schematic-accent: #4ade80;
+  --schematic-accent-soft: rgba(74, 222, 128, 0.12);
+  --schematic-gate-retrieve: #c8951f;
   --focus-ring: 0 0 0 2px var(--background-app), 0 0 0 4px var(--status-info);
   --shadow-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-elevation-2: 0 4px 16px rgba(0, 0, 0, 0.45);
@@ -822,6 +828,7 @@ main {
   --panel-line: var(--border-subtle);
   --neon-green: var(--status-success);
   --neon-cyan: var(--status-info);
+  --neon-cyan-dim: var(--registry-accent-soft);
   --neon-magenta: var(--text-muted);
   --glass-bg: var(--surface-primary);
   --glass-border: var(--border-subtle);
@@ -833,3 +840,913 @@ main {
 .shell-v2 [class*="backdrop-blur"] {
   backdrop-filter: none !important;
 }
+
+/* ── Waku-inspired schematic architecture diagram ─────────────────────── */
+.schematic-arch {
+  width: 100%;
+  min-width: 760px;
+  height: auto;
+  font-family: var(--font-sans-v2);
+}
+.schematic-arch .schematic-container {
+  fill: none;
+  stroke: var(--border-emphasized);
+  stroke-dasharray: 5 4;
+}
+.schematic-arch .schematic-container-ops {
+  fill: var(--schematic-accent-soft);
+  opacity: 0.5;
+  stroke: var(--schematic-accent);
+  stroke-width: 1.6;
+  stroke-dasharray: none;
+}
+.schematic-arch .schematic-bx {
+  fill: var(--surface-primary);
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+  transition: stroke 0.15s ease, fill 0.15s ease, stroke-width 0.15s ease;
+}
+.schematic-arch .schematic-node:hover .schematic-bx {
+  stroke: var(--schematic-accent);
+  stroke-width: 1.5;
+}
+.schematic-arch .schematic-loopbox {
+  fill: none;
+  stroke: var(--schematic-accent);
+  stroke-width: 1.5;
+}
+.schematic-arch .schematic-memgroup {
+  fill: var(--schematic-accent-soft);
+  opacity: 0.4;
+  stroke: var(--border-emphasized);
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+}
+.schematic-arch .schematic-gate {
+  fill: var(--schematic-accent-soft);
+  stroke: var(--schematic-accent);
+  stroke-width: 1.2;
+  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+}
+.schematic-arch .schematic-gate:hover {
+  stroke-width: 2;
+}
+.schematic-arch .schematic-nt {
+  fill: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+.schematic-arch .schematic-ns {
+  fill: var(--text-secondary);
+  font-size: 11.5px;
+}
+.schematic-arch .schematic-grp {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.schematic-arch .schematic-fl {
+  fill: var(--text-muted);
+  font-size: 10.5px;
+}
+.schematic-arch .schematic-flow {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.3;
+}
+.schematic-arch .schematic-flow-dash {
+  stroke-dasharray: 4 3;
+  opacity: 0.75;
+}
+.schematic-arch .schematic-head {
+  fill: var(--text-muted);
+}
+.bg-schematic-accent {
+  background-color: var(--schematic-accent);
+}
+.bg-schematic-gate-retrieve {
+  background-color: var(--schematic-gate-retrieve);
+}
+.text-schematic-accent {
+  color: var(--schematic-accent);
+}
+
+/* ── Waku schematic UI primitives ─────────────────────────────────────── */
+.shell-main {
+  scroll-behavior: smooth;
+}
+body.shell-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+.schematic-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0 0 18px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.schematic-subtab {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.schematic-subtab:hover {
+  color: var(--text-primary);
+}
+.schematic-subtab-active {
+  color: var(--schematic-accent);
+  border-bottom-color: var(--schematic-accent);
+  font-weight: 550;
+}
+.schematic-subtab-count {
+  margin-left: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.schematic-card {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.schematic-meta {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.schematic-reply {
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.schematic-badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--border-emphasized);
+  color: var(--text-secondary);
+}
+.schematic-badge-retrieve {
+  border-color: var(--schematic-accent);
+  color: var(--schematic-accent);
+}
+.schematic-tool {
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  background: var(--surface-secondary);
+}
+.schematic-tool-error {
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+}
+.schematic-tool-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.schematic-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  flex-shrink: 0;
+  background: var(--color-success);
+}
+.schematic-dot-error {
+  background: var(--color-danger);
+}
+.schematic-dot-warn {
+  background: #c8951f;
+}
+.schematic-tool-summary {
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+.schematic-tool-pre {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-top: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+.schematic-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.schematic-stage {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+.schematic-stage-on {
+  border-color: var(--schematic-accent);
+  color: var(--schematic-accent);
+  background: var(--schematic-accent-soft);
+}
+.schematic-stage-done {
+  color: var(--text-secondary);
+}
+.schematic-caret {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--schematic-accent);
+  border-radius: 1px;
+  animation: schematic-blink 1s step-start infinite;
+}
+@keyframes schematic-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.schematic-bubble {
+  align-self: flex-end;
+  max-width: 88%;
+  margin-left: auto;
+  margin-bottom: 8px;
+  padding: 10px 13px;
+  border-radius: 9px;
+  background: var(--schematic-accent-soft);
+  font-size: 13.5px;
+  color: var(--text-primary);
+}
+.schematic-chatlog {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.schematic-sessbtn {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-emphasized);
+  border-radius: 7px;
+  color: var(--text-secondary);
+  padding: 5px 11px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.schematic-sessbtn:hover {
+  border-color: var(--schematic-accent);
+  color: var(--schematic-accent);
+}
+.schematic-sessbtn-on {
+  border-color: var(--schematic-accent);
+  color: var(--schematic-accent);
+  background: var(--schematic-accent-soft);
+}
+.schematic-sessmenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--surface-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 6px;
+}
+.schematic-sessitem {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+.schematic-sessitem:hover {
+  background: var(--surface-secondary);
+}
+.schematic-sessitem-active {
+  background: var(--schematic-accent-soft);
+  color: var(--schematic-accent);
+}
+.schematic-gwtag {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
+  color: var(--color-success);
+  text-transform: lowercase;
+}
+.schematic-modelchip {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  max-width: 120px;
+}
+.schematic-arch-status {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--schematic-accent);
+}
+.schematic-live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--schematic-accent);
+  margin-right: 5px;
+  vertical-align: middle;
+  animation: schematic-pulse 1s ease-in-out infinite;
+}
+@keyframes schematic-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.schematic-arch .schematic-node.schematic-hot .schematic-bx {
+  stroke: var(--schematic-accent) !important;
+  stroke-width: 2.6;
+  fill: var(--schematic-accent-soft) !important;
+}
+.schematic-arch .schematic-gate.schematic-hot {
+  stroke: var(--schematic-accent) !important;
+  stroke-width: 4;
+}
+.schematic-arch .schematic-flow.schematic-flow-live {
+  stroke: var(--schematic-accent) !important;
+  stroke-width: 2.6;
+  opacity: 1;
+  stroke-dasharray: 6 5;
+  animation: schematic-flowdash 0.5s linear infinite;
+}
+@keyframes schematic-flowdash {
+  to {
+    stroke-dashoffset: -22;
+  }
+}
+.schematic-scrolly {
+  max-height: 62vh;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-primary);
+}
+.schematic-scrolly th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--schematic-accent-soft);
+  color: var(--schematic-accent);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.schematic-dbcell {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.schematic-toolcard {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px 13px;
+  margin-bottom: 8px;
+  background: var(--surface-primary);
+}
+.schematic-srcpill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--schematic-accent-soft);
+  color: var(--schematic-accent);
+  margin-left: 8px;
+}
+.schematic-section-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin: 28px 0 10px;
+}
+body.schematic-no-tele .schematic-tele {
+  display: none;
+}
+
+/* ── Context Registry (Tessl-inspired) ─────────────────────────────────── */
+:root {
+  --registry-accent: #4ade80;
+  --registry-accent-soft: rgba(74, 222, 128, 0.12);
+  --registry-accent-glow: rgba(74, 222, 128, 0.35);
+}
+.text-registry-accent {
+  color: var(--registry-accent);
+}
+.bg-registry-accent {
+  background-color: var(--registry-accent);
+}
+.registry-page {
+  --registry-accent: #4ade80;
+}
+
+/* Unified factory page scope (registry + harness + operator surfaces) */
+.factory-page {
+  --registry-accent: #4ade80;
+  --registry-accent-soft: rgba(74, 222, 128, 0.12);
+  --registry-accent-glow: rgba(74, 222, 128, 0.35);
+  --schematic-accent: var(--registry-accent);
+  --schematic-accent-soft: var(--registry-accent-soft);
+}
+.bg-registry-accent-soft {
+  background-color: var(--registry-accent-soft);
+}
+.border-registry-accent\/20 {
+  border-color: color-mix(in srgb, var(--registry-accent) 20%, transparent);
+}
+.border-registry-accent\/25 {
+  border-color: color-mix(in srgb, var(--registry-accent) 25%, transparent);
+}
+.border-registry-accent\/40 {
+  border-color: color-mix(in srgb, var(--registry-accent) 40%, transparent);
+}
+.border-registry-accent\/30 {
+  border-color: color-mix(in srgb, var(--registry-accent) 30%, transparent);
+}
+.ring-registry-accent\/30 {
+  --tw-ring-color: color-mix(in srgb, var(--registry-accent) 30%, transparent);
+}
+.factory-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 1.5rem 1.5rem;
+}
+.factory-tab-bar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-secondary);
+}
+.factory-tab {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.factory-tab:hover {
+  color: var(--text-secondary);
+}
+.factory-tab-active {
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  font-weight: 550;
+}
+.registry-hex-fill {
+  fill: var(--registry-accent-soft);
+}
+.registry-hex-stroke {
+  stroke: var(--registry-accent);
+  stroke-width: 2;
+}
+.registry-score-hex-glow {
+  filter: drop-shadow(0 0 12px var(--registry-accent-glow));
+}
+.registry-delta {
+  color: var(--registry-accent);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--registry-accent-soft);
+}
+.registry-cli-box {
+  background: #0b0b0d;
+  color: #d6d7de;
+  border: 1px solid var(--border-emphasized);
+}
+.registry-detail-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.registry-detail-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.registry-detail-tab:hover {
+  color: var(--text-primary);
+}
+.registry-detail-tab-active {
+  color: var(--text-primary);
+  border-bottom-color: var(--registry-accent);
+  font-weight: 550;
+}
+.registry-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--registry-accent-soft);
+  color: var(--registry-accent);
+}
+.registry-sev-critical,
+.registry-sev-dot-critical {
+  color: #f87171;
+}
+.registry-sev-high,
+.registry-sev-dot-high {
+  color: #fb923c;
+}
+.registry-sev-medium,
+.registry-sev-dot-medium {
+  color: #facc15;
+}
+.registry-sev-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  margin-top: 5px;
+  flex-shrink: 0;
+  background: currentColor;
+}
+.registry-sev-dot-critical {
+  background: #f87171;
+}
+.registry-sev-dot-high {
+  background: #fb923c;
+}
+.registry-sev-dot-medium {
+  background: #facc15;
+}
+.registry-sev-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 99px;
+}
+.registry-sev-pill-critical {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+}
+.registry-sev-pill-high {
+  background: rgba(251, 146, 60, 0.15);
+  color: #fb923c;
+}
+.registry-sev-pill-medium {
+  background: rgba(250, 204, 21, 0.15);
+  color: #facc15;
+}
+.registry-triage-item {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.registry-triage-item:hover {
+  background: var(--surface-secondary);
+}
+.registry-triage-item-active {
+  background: var(--registry-accent-soft);
+}
+.registry-top-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-primary);
+  padding: 16px;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.registry-top-card:hover {
+  border-color: var(--registry-accent);
+}
+.registry-top-card-active {
+  border-color: var(--registry-accent);
+  box-shadow: 0 0 0 1px var(--registry-accent-soft);
+}
+.registry-top-card-glow {
+  background: linear-gradient(145deg, rgba(74, 222, 128, 0.06) 0%, var(--surface-primary) 45%);
+}
+.registry-category-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (min-width: 768px) {
+  .registry-category-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1100px) {
+  .registry-category-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.registry-category-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 118px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.registry-category-card:hover {
+  border-color: var(--border-emphasized);
+}
+.registry-category-card-active {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.registry-category-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
+}
+.registry-category-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+.registry-category-desc {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+.registry-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--registry-accent);
+}
+.registry-optimize-block {
+  display: grid;
+  gap: 24px;
+  padding: 28px;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-primary);
+}
+@media (min-width: 900px) {
+  .registry-optimize-block {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+.registry-optimize-title {
+  margin-top: 8px;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+.registry-optimize-body {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 46ch;
+}
+.registry-optimize-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 10px 18px;
+  border-radius: 99px;
+  border: none;
+  background: var(--text-primary);
+  color: var(--surface-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.registry-optimize-btn:hover {
+  opacity: 0.92;
+}
+.registry-optimize-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.registry-optimize-step {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-secondary);
+}
+.registry-optimize-step-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.registry-step-num {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: var(--registry-accent);
+}
+.registry-optimize-step-body {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.registry-eval-card {
+  padding: 24px;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-primary);
+}
+.registry-eval-footnote {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.registry-contains-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.registry-version-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-secondary);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.registry-preview-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-secondary);
+}
+.registry-preview-toggle button {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.registry-preview-toggle-active {
+  background: var(--surface-primary) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.registry-file-browser {
+  max-height: 280px;
+  overflow-y: auto;
+}
+.registry-file-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+.registry-file-row:hover {
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+}
+.registry-file-row-active {
+  background: var(--registry-accent-soft);
+  color: var(--registry-accent);
+}
+.registry-related-card {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-secondary);
+  transition: border-color 0.15s ease;
+}
+.registry-related-card:hover {
+  border-color: var(--registry-accent);
+}
+.registry-scrolly {
+  overflow-x: auto;
+}
+
+/* Harness engineering UI */
+.harness-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-secondary);
+  color: var(--foreground);
+  cursor: pointer;
+}
+.harness-btn-primary {
+  border-color: color-mix(in srgb, var(--registry-accent) 35%, transparent);
+  background: var(--registry-accent-soft);
+  color: var(--registry-accent);
+}
+.harness-btn-primary:hover {
+  border-color: var(--registry-accent);
+  background: color-mix(in srgb, var(--registry-accent) 18%, transparent);
+}
+.adw-factory-scrolly {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-subtle) transparent;
+}
+.adw-factory-scrolly::-webkit-scrollbar {
+  height: 8px;
+}
+.adw-factory-scrolly::-webkit-scrollbar-thumb {
+  background: var(--border-emphasized);
+  border-radius: 99px;
+}
+

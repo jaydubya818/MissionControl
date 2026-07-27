@@ -1,0 +1,23 @@
+# Mission Control Software Factory — documentation index for AI agents
+# Base URL (in-app): Knowledge → Docs → Documentation tab
+
+overview/readme.md — What is Mission Control? Platform overview and six core components.
+overview/platform-components.md — Registry, Governance, Evals, Factory, Observability, Harness.
+get-started/set-up-mission-control.md — Install, seed demo data, run EOS Command Center preview.
+get-started/run-the-demo.md — pnpm dev:demo, convex:seed:demo:force, page walkthrough.
+get-started/improve-your-first-skill.md — Import, lint, eval, and publish a registry skill.
+tutorials/tutorials.md — Tutorial index mapped to common agentic development problems.
+tutorials/governing-work-orders.md — WorkOrders, acceptance criteria, verification receipts.
+tutorials/setting-up-agentic-code-review.md — Harness change review, merge gates, mutation testing.
+tutorials/improving-a-skill.md — Eval scenarios, baseline vs candidate, meta-loop feedback.
+tutorials/protecting-against-insecure-skills.md — Skill lint, security status, install policies.
+tutorials/automating-repetitive-tasks.md — Workflows, scheduled jobs, software factory loop.
+harness/software-factory.md — IndyDevDan / Eric workshop patterns in Mission Control.
+harness/architect-mode.md — Architect don't code — merge gates and adoption metrics.
+harness/code-review-wizard.md — Seven-step PR review wizard end-to-end.
+registry/discover-and-install.md — Registry Discover, installs, mc-context.lock.
+registry/context-cdl.md — Context CDL lifecycle: draft → publish → deprecate.
+registry/eval-runs.md — Eval runs, scenarios, framework gate.
+reference/glossary.md — WorkOrder, ExecutionRun, VerificationReceipt, and related terms.
+reference/eos-navigation.md — Engineering OS sidebar information architecture.
+reference/feature-flags.md — Feature flags for registry, EOS, harness surfaces.

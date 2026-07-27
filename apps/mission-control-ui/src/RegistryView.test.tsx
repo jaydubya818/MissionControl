@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { RegistryViewContent, type RegistryEntry } from "./RegistryView";
 
@@ -37,18 +37,27 @@ const ENTRIES: RegistryEntry[] = [
 ];
 
 describe("RegistryViewContent", () => {
-  it("renders header, categories, and all rows", () => {
-    render(<RegistryViewContent entries={ENTRIES} />);
-    expect(screen.getByRole("heading", { name: "Registry" })).toBeInTheDocument();
-    expect(screen.getByText("Testing & Quality")).toBeInTheDocument();
+  it("renders discover header, categories, and all rows", () => {
+    const { container } = render(<RegistryViewContent entries={ENTRIES} />);
+    expect(screen.getByRole("heading", { name: "Discover skills" })).toBeInTheDocument();
+    expect(screen.getByText("Testing & QA")).toBeInTheDocument();
     expect(screen.getAllByText("mission-control-heartbeat").length).toBeGreaterThan(0);
     expect(screen.getByText("unscored-draft")).toBeInTheDocument();
+    expect(container.querySelector(".registry-category-grid")).toBeTruthy();
+  });
+
+  it("calls onOpenDetail when a package row is clicked", () => {
+    const onOpenDetail = vi.fn();
+    render(<RegistryViewContent entries={ENTRIES} onOpenDetail={onOpenDetail} />);
+    fireEvent.click(screen.getAllByText("mission-control-heartbeat")[0]);
+    expect(onOpenDetail).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "mission-control-heartbeat" })
+    );
   });
 
   it("shows top cards only for scored packages", () => {
     render(<RegistryViewContent entries={ENTRIES} />);
-    // top cards + table rows both render the name; unscored only in table
-    expect(screen.getAllByText("mission-control-heartbeat").length).toBe(2);
+    expect(screen.getAllByText("mission-control-heartbeat").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("unscored-draft").length).toBe(1);
   });
 
@@ -61,18 +70,29 @@ describe("RegistryViewContent", () => {
 
   it("filters by search text", () => {
     render(<RegistryViewContent entries={ENTRIES} />);
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search packages" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search skills" }), {
       target: { value: "task-lifecycle" },
     });
     expect(screen.getAllByText("mission-control-task-lifecycle").length).toBeGreaterThan(0);
     expect(screen.queryByText("unscored-draft")).not.toBeInTheDocument();
   });
 
-  it("filters by category chip", () => {
+  it("filters by category card", () => {
     render(<RegistryViewContent entries={ENTRIES} />);
-    fireEvent.click(screen.getByRole("button", { name: /Documentation/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Documentation Generation/ }));
     expect(screen.getAllByText("architecture-notes").length).toBeGreaterThan(0);
     expect(screen.queryByText("mission-control-heartbeat")).not.toBeInTheDocument();
+  });
+
+  it("opens detail callback when a top card is selected", () => {
+    const onOpenDetail = vi.fn();
+    render(<RegistryViewContent entries={ENTRIES} onOpenDetail={onOpenDetail} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /View details for mission-control-task-lifecycle/i })
+    );
+    expect(onOpenDetail).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "mission-control-task-lifecycle" })
+    );
   });
 
   it("shows loading skeleton when entries are undefined", () => {
@@ -80,8 +100,17 @@ describe("RegistryViewContent", () => {
     expect(container.querySelector(".animate-pulse")).toBeTruthy();
   });
 
-  it("points operators to the Evals tab for impact scores", () => {
-    render(<RegistryViewContent entries={ENTRIES} />);
-    expect(screen.getByText(/Run evals from the Evals tab/)).toBeInTheDocument();
+  it("shows optimize CTA and switches to evaluate tab", () => {
+    const onTabChange = vi.fn();
+    render(<RegistryViewContent entries={ENTRIES} onTabChange={onTabChange} />);
+    expect(screen.getByText(/Make your skill work correctly, provably/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Optimize with Mission Control/i }));
+    expect(onTabChange).toHaveBeenCalledWith("evaluate");
+  });
+
+  it("renders Context CDL tab content", () => {
+    render(<RegistryViewContent entries={ENTRIES} activeTab="lifecycle" />);
+    expect(screen.getByText(/Context Development Lifecycle/)).toBeInTheDocument();
+    expect(screen.getByText(/Four problems engineers face in 2026/)).toBeInTheDocument();
   });
 });

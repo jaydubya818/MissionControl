@@ -1,9 +1,10 @@
 import { CommandCenterView } from "./views/CommandCenterView";
 import { MissionPortfolioView } from "./views/MissionPortfolioView";
 import { MissionDetailView } from "./views/MissionDetailView";
-import { TraceInspectorView } from "./views/TraceInspectorView";
+import { ExecutionInspectorView } from "./views/ExecutionInspectorView";
 import { EffectivenessView } from "./views/EffectivenessView";
 import { FactoryHealthView } from "./views/FactoryHealthView";
+import { FactoryOpsView } from "./views/FactoryOpsView";
 import { ReadinessView } from "./views/ReadinessView";
 import { FrictionView } from "./views/FrictionView";
 import { AgentCatalogView } from "./views/AgentCatalogView";
@@ -37,9 +38,15 @@ function EosViewBody({ view, onNavigate }: { view: EosView; onNavigate: (v: stri
     case "command-center": return <CommandCenterView onNavigate={onNavigate} />;
     case "missions": return <MissionPortfolioView onNavigate={onNavigate} />;
     case "mission-detail": return <MissionDetailView onNavigate={onNavigate} />;
-    case "trace-inspector": return <TraceInspectorView onNavigate={onNavigate} />;
+    case "trace-inspector": return <ExecutionInspectorView onNavigate={onNavigate} />;
     case "effectiveness": return <EffectivenessView onNavigate={onNavigate} />;
-    case "factory-health": return <FactoryHealthView onNavigate={onNavigate} />;
+    case "factory-health":
+      return (
+        <>
+          <FactoryOpsView onNavigate={onNavigate} />
+          <FactoryHealthView onNavigate={onNavigate} />
+        </>
+      );
     case "readiness": return <ReadinessView onNavigate={onNavigate} />;
     case "friction": return <FrictionView onNavigate={onNavigate} />;
     case "agent-catalog": return <AgentCatalogView onNavigate={onNavigate} />;

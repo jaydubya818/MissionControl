@@ -21,11 +21,16 @@ import {
   MessageSquare,
   Orbit,
   Radar,
+  Radio,
+  Rocket,
   ScrollText,
   Shield,
   Sparkles,
   Target,
   Users,
+  Waypoints,
+  Workflow,
+  Compass,
   Wrench,
 } from "lucide-react";
 import type { MainView } from "../TopNav";
@@ -34,6 +39,8 @@ export interface NavItem {
   view: MainView;
   label: string;
   icon: LucideIcon;
+  /** Optional count badge (waku-agent nav pattern) */
+  count?: number;
 }
 
 export interface NavGroup {
@@ -76,6 +83,32 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    id: "harness",
+    label: "Harness",
+    icon: GitBranch,
+    items: [
+      { view: "harness-patterns", label: "AI Patterns", icon: Brain },
+      { view: "harness-architect", label: "Architect Mode", icon: Compass },
+      { view: "harness-software-factory", label: "Software Factory", icon: Workflow },
+      { view: "harness-workshop", label: "Workshop", icon: BookOpen },
+      { view: "harness-health", label: "Factory Health", icon: Gauge },
+      { view: "harness-agent-fleet", label: "Agent Fleet", icon: Bot },
+      { view: "harness-automations", label: "Automations", icon: Sparkles },
+      { view: "harness-loops", label: "Harness Loops", icon: GitBranch },
+      { view: "harness-control-plane", label: "Control Plane", icon: Waypoints },
+      { view: "harness-work-ledger", label: "Work Ledger", icon: ClipboardList },
+      { view: "harness-team-pulse", label: "Team Pulse", icon: Radio },
+      { view: "harness-code-review-wizard", label: "Code Review Setup", icon: CheckCircle2 },
+      { view: "harness-change-review", label: "Change Review", icon: FileSearch },
+      { view: "harness-verifiers", label: "Verifiers", icon: Shield },
+      { view: "harness-change-risk", label: "Change Risk", icon: Shield },
+      { view: "harness-launch", label: "Launch", icon: Rocket },
+      { view: "harness-meta-loop", label: "Meta Loop", icon: Sparkles },
+      { view: "harness-maintenance", label: "Maintenance", icon: CalendarDays },
+      { view: "harness-builder", label: "Factory Builder", icon: Wrench },
+    ],
+  },
+  {
     id: "factory",
     label: "Factory",
     icon: Wrench,
@@ -103,7 +136,12 @@ export const NAV_GROUPS: NavGroup[] = [
       { view: "atc", label: "ATC Board", icon: Radar },
       { view: "directory", label: "Templates", icon: BookOpen },
       { view: "identity", label: "Identities", icon: Users },
-      { view: "skills", label: "Registry", icon: Sparkles },
+      { view: "skills", label: "Registry Discover", icon: Sparkles },
+      { view: "registry-lifecycle", label: "Context CDL", icon: BookOpen },
+      { view: "registry-evaluate", label: "Evaluate Skill", icon: FlaskConical },
+      { view: "registry-inventory", label: "Skill Inventory", icon: ListChecks },
+      { view: "registry-installations", label: "Installations", icon: ClipboardList },
+      { view: "registry-runs", label: "Eval Runs", icon: FlaskConical },
       { view: "memory", label: "Memory", icon: Brain },
       { view: "docs", label: "Knowledge", icon: BookOpen },
       { view: "search", label: "Search", icon: FileSearch },
@@ -117,6 +155,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { view: "telemetry", label: "Telemetry", icon: Activity },
       { view: "metrics", label: "Metrics", icon: BarChart3 },
+      { view: "analytics", label: "Analytics", icon: BarChart3 },
       { view: "qc-dashboard", label: "QC Dashboard", icon: Gauge },
       { view: "qc-runs", label: "QC Runs", icon: FlaskConical },
       { view: "qc-findings", label: "QC Findings", icon: FileSearch },
@@ -124,6 +163,23 @@ export const NAV_GROUPS: NavGroup[] = [
       { view: "qc-environments", label: "QC Environments", icon: Landmark },
       { view: "radar", label: "Radar", icon: Radar },
       { view: "system", label: "System", icon: Cog },
+    ],
+  },
+  {
+    id: "platform",
+    label: "Platform",
+    icon: Target,
+    items: [
+      { view: "command-center", label: "Command Center", icon: LayoutDashboard },
+      { view: "missions", label: "Missions", icon: Target },
+      { view: "trace-inspector", label: "Trace Inspector", icon: GitBranch },
+      { view: "effectiveness", label: "AI Effectiveness", icon: Gauge },
+      { view: "factory-health", label: "Legacy Factory Health", icon: CheckCircle2 },
+      { view: "readiness", label: "Readiness", icon: Landmark },
+      { view: "friction", label: "Friction", icon: Activity },
+      { view: "agent-catalog", label: "Agent Catalog", icon: Bot },
+      { view: "dossier", label: "Dossiers", icon: ScrollText },
+      { view: "recommendations", label: "Recommendations", icon: Sparkles },
     ],
   },
   {

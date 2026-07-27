@@ -1,5 +1,6 @@
-import { ClipboardList, Loader2, ShieldAlert, Waypoints } from "lucide-react";
-import { useQuery } from "convex/react";
+import { useState } from "react";
+import { ClipboardList, Loader2, ShieldAlert, Sparkles, Waypoints } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { api } from "../../../../convex/_generated/api";
 import { PageHeader } from "@/components/PageHeader";
@@ -11,6 +12,32 @@ import type { MainView } from "../TopNav";
 
 export function FactoryOverviewView({ projectId, onNavigate }: { projectId: Id<"projects"> | null; onNavigate: (view: MainView) => void }) {
   const overview = useQuery(api.workOrders.factoryOverview, { projectId: projectId ?? undefined, limit: 5 });
+  const createSoftwareFactoryProject = useMutation(api.projects.createSoftwareFactoryProject);
+  const [createState, setCreateState] = useState<"idle" | "submitting" | "created" | "replayed" | "error">("idle");
+  const [createMessage, setCreateMessage] = useState<string | null>(null);
+
+  const handleCreateSoftwareFactoryProject = async () => {
+    setCreateState("submitting");
+    setCreateMessage(null);
+    try {
+      const result = await createSoftwareFactoryProject({
+        name: "Apple Notes Software Factory",
+        slug: "apple-notes-software-factory",
+        repository: "jaydubya818/MissionControl",
+        githubBranch: "main",
+        requestedBy: "Hermes",
+      });
+      setCreateState(result.created ? "created" : "replayed");
+      setCreateMessage(
+        result.created
+          ? `Created ${result.createdWorkOrders} factory WorkOrders for ${result.project?.name ?? "the project"}.`
+          : `${result.project?.name ?? "Software factory project"} already exists; refreshed the read model.`
+      );
+    } catch (error) {
+      setCreateState("error");
+      setCreateMessage(error instanceof Error ? error.message : "Failed to create software factory project.");
+    }
+  };
 
   if (!overview) {
     return (
@@ -50,11 +77,29 @@ export function FactoryOverviewView({ projectId, onNavigate }: { projectId: Id<"
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
           <Card>
             <CardHeader>
+              <CardTitle>Project creation</CardTitle>
+              <CardDescription>Create the Apple Notes software-factory project and hydrate the project-scoped read model with WorkOrders, runs, approvals, artifacts, and receipts.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button variant="neon-cyan" onClick={handleCreateSoftwareFactoryProject} disabled={createState === "submitting"}>
+                {createState === "submitting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Create factory project
+              </Button>
+              {createMessage && (
+                <div className={`rounded-2xl border p-3 text-sm ${createState === "error" ? "border-red-500/30 text-red-200" : "border-emerald-500/30 text-emerald-200"}`}>
+                  {createMessage}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Operator attention</CardTitle>
               <CardDescription>{attentionLoad} live exceptions currently need a decision, rerun, or evidence refresh.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
-              <Button variant="neon-cyan" onClick={() => onNavigate("control-work-orders")}><ClipboardList className="h-4 w-4" /> Open Work Orders</Button>
+              <Button variant="outline" onClick={() => onNavigate("control-work-orders")}><ClipboardList className="h-4 w-4" /> Open Work Orders</Button>
               <Button variant="outline" onClick={() => onNavigate("control-approvals")}><ShieldAlert className="h-4 w-4" /> Open Approval Center</Button>
             </CardContent>
           </Card>
@@ -177,6 +222,6 @@ function toneClass(tone: "neutral" | "warning" | "danger" | "success") {
     case "success":
       return "text-emerald-200 border-emerald-500/30";
     default:
-      return "text-cyan-100 border-cyan-500/30";
+      return "text-registry-accent border-registry-accent/30";
   }
 }

@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../../../convex/_generated/api";
 import { DataTable, type Column } from "../../components/factory/DataTable";
 import { PageHeader } from "../../components/factory/DetailLayout";
 import { MetricBlock } from "../../components/factory/MetricBlock";
 import { StatusBadge, type StatusBadgeProps } from "../../components/factory/badges";
 import { EvidenceLink, InsightCard, PageProvenanceNote, ProvenanceBadge, TrendIcon } from "../components";
 import { demoFriction, demoInsights } from "../demoData";
+import { adaptFrictionSummary } from "../liveAdapters";
 import type { FrictionSummary } from "../types";
 
 export interface FrictionViewProps {
@@ -85,10 +88,16 @@ function FrictionDetailPanel({
 
 export function FrictionView({ onNavigate }: FrictionViewProps): JSX.Element {
   const [expandedCategory, setExpandedCategory] = useState<FrictionSummary["category"] | null>(null);
+  const liveFriction = useQuery(api.eos.projections.getFrictionSummary, { periodDays: 30 });
+  const frictionRows: FrictionSummary[] =
+    liveFriction && liveFriction.length > 0
+      ? adaptFrictionSummary(liveFriction)
+      : demoFriction;
+  const provenance = frictionRows[0]?.provenance ?? "demo";
 
-  const totalIncidents = demoFriction.reduce((sum, row) => sum + row.incidents, 0);
-  const totalCostUsd = demoFriction.reduce((sum, row) => sum + row.estCostUsd, 0);
-  const totalWastedMinutes = demoFriction.reduce((sum, row) => sum + row.wastedMinutes, 0);
+  const totalIncidents = frictionRows.reduce((sum, row) => sum + row.incidents, 0);
+  const totalCostUsd = frictionRows.reduce((sum, row) => sum + row.estCostUsd, 0);
+  const totalWastedMinutes = frictionRows.reduce((sum, row) => sum + row.wastedMinutes, 0);
 
   const columns: Column<FrictionSummary>[] = [
     {
@@ -155,7 +164,7 @@ export function FrictionView({ onNavigate }: FrictionViewProps): JSX.Element {
     },
   ];
 
-  const expandedRow = demoFriction.find((row) => row.category === expandedCategory);
+  const expandedRow = frictionRows.find((row) => row.category === expandedCategory);
 
   return (
     <div className="relative flex-1 overflow-auto bg-app">
@@ -169,22 +178,22 @@ export function FrictionView({ onNavigate }: FrictionViewProps): JSX.Element {
           <MetricBlock
             label="Total incidents"
             value={totalIncidents}
-            adornment={<ProvenanceBadge provenance="demo" variant="dot" />}
+            adornment={<ProvenanceBadge provenance={provenance} variant="dot" />}
           />
           <MetricBlock
             label="Estimated wasted cost"
             value={<span className="font-mono">{formatUsd(totalCostUsd)}</span>}
-            adornment={<ProvenanceBadge provenance="demo" variant="dot" />}
+            adornment={<ProvenanceBadge provenance={provenance} variant="dot" />}
           />
           <MetricBlock
             label="Wasted time"
             value={formatMinutes(totalWastedMinutes)}
-            adornment={<ProvenanceBadge provenance="demo" variant="dot" />}
+            adornment={<ProvenanceBadge provenance={provenance} variant="dot" />}
           />
         </div>
         <DataTable
           columns={columns}
-          rows={demoFriction}
+          rows={frictionRows}
           rowKey={(row) => row.category}
           onRowClick={(row) =>
             setExpandedCategory((current) => (current === row.category ? null : row.category))

@@ -73,7 +73,7 @@ export function ControlSection({ currentView, projectId, onNavigate }: ControlSe
         icon={<Orbit className="h-5 w-5" />}
       />
 
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="factory-content">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
           <Card>
             <CardHeader>

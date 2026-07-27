@@ -63,7 +63,7 @@ export function DetailTabs({
             className={cn(
               "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] transition-colors duration-150",
               active
-                ? "border-ink text-ink"
+                ? "border-registry-accent text-ink font-medium"
                 : "border-transparent text-ink-muted hover:text-ink-secondary"
             )}
           >
@@ -140,22 +140,25 @@ export function PageHeader({
   title,
   description,
   actions,
+  eyebrow,
 }: {
   title: string;
   description?: string;
   actions?: ReactNode;
+  eyebrow?: string;
 }): JSX.Element {
   return (
     <div className="flex items-start justify-between gap-6 px-6 pb-4 pt-5">
       <div className="min-w-0">
+        {eyebrow ? <div className="registry-kicker">{eyebrow}</div> : null}
         <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">
           {title}
         </h1>
-        {description && (
-          <p className="mt-1.5 text-[14px] text-ink-secondary">{description}</p>
-        )}
+        {description ? (
+          <p className="mt-1.5 text-[14px] leading-relaxed text-ink-secondary">{description}</p>
+        ) : null}
       </div>
-      {actions && <div className="shrink-0">{actions}</div>}
+      {actions ? <div className="shrink-0">{actions}</div> : null}
     </div>
   );
 }

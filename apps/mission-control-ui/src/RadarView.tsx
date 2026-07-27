@@ -8,6 +8,14 @@ import { EmptyState } from "./components/ui/empty-state";
 import { StatusBadge } from "./components/factory/badges";
 import { MetricBlock } from "./components/factory/MetricBlock";
 import { Radar, Calendar, AlertTriangle, ListTodo, Settings } from "lucide-react";
+import {
+  blockedDueSoonTasks,
+  buildRadarSummary,
+  criticalAlerts,
+  dueSoonTasks,
+  overdueTasks,
+  relativeDueLabel,
+} from "./radarModel";
 
 interface RadarViewProps {
   projectId: Id<"projects"> | null;
@@ -15,28 +23,23 @@ interface RadarViewProps {
   onTaskSelect?: (taskId: Id<"tasks">) => void;
 }
 
-const NOW = Date.now();
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
 export function RadarView({ projectId, onNavigate, onTaskSelect }: RadarViewProps) {
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
   const jobs = useQuery(api.scheduledJobs.list, projectId ? { projectId } : {});
   const alerts = useQuery(api.alerts.listOpen, { limit: 20 });
+  const now = Date.now();
 
   const tasksList = tasks ?? [];
   const jobsList = jobs ?? [];
   const alertsList = alerts ?? [];
-
-  const tasksWithDue = tasksList.filter((t) => {
-    const due = (t as { dueAt?: number }).dueAt;
-    return due != null && due >= NOW && due <= NOW + SEVEN_DAYS_MS;
-  });
-  const sortedByDue = [...tasksWithDue].sort(
-    (a, b) => ((a as { dueAt?: number }).dueAt ?? 0) - ((b as { dueAt?: number }).dueAt ?? 0)
-  );
+  const sortedByDue = dueSoonTasks(tasksList, now);
+  const overdue = overdueTasks(tasksList, now);
+  const blockedDueSoon = blockedDueSoonTasks(tasksList, now);
+  const critical = criticalAlerts(alertsList);
+  const summary = buildRadarSummary(tasksList, alertsList, now);
 
   const nextJobs = [...jobsList]
-    .filter((j) => j.nextRun != null && j.nextRun >= NOW)
+    .filter((j) => j.nextRun != null && j.nextRun >= now)
     .sort((a, b) => (a.nextRun ?? 0) - (b.nextRun ?? 0))
     .slice(0, 10);
 
@@ -60,30 +63,34 @@ export function RadarView({ projectId, onNavigate, onTaskSelect }: RadarViewProp
         <div className="grid gap-4 md:grid-cols-4">
           <Card className="p-4">
             <MetricBlock
-              label="Due soon"
-              value={sortedByDue.length}
-              detail="Tasks with due dates in the next seven days"
+              label="Overdue"
+              value={summary.overdue}
+              detail="Open tasks already past due"
+              adornment={summary.overdue > 0 ? <StatusBadge tone="error">act now</StatusBadge> : undefined}
             />
           </Card>
           <Card className="p-4">
             <MetricBlock
-              label="Next runs"
-              value={nextJobs.length}
-              detail="Scheduled jobs visible on the near horizon"
+              label="Due in 24h"
+              value={summary.dueNext24Hours}
+              detail="Open tasks landing within the next day"
+              adornment={summary.dueNext24Hours > 0 ? <StatusBadge tone="warning">soon</StatusBadge> : undefined}
             />
           </Card>
           <Card className="p-4">
             <MetricBlock
-              label="Alerts"
-              value={alertsList.length}
-              detail="Open alert conditions that may need operator review"
+              label="Blocked due soon"
+              value={summary.blockedDueSoon}
+              detail="Near-term work blocked by status or approval"
+              adornment={summary.blockedDueSoon > 0 ? <StatusBadge tone="error">blocked</StatusBadge> : undefined}
             />
           </Card>
           <Card className="p-4">
             <MetricBlock
-              label="Posture"
-              value={alertsList.length > 0 ? "Watch" : "Calm"}
-              detail="Quick horizon read based on deadlines and alerts"
+              label="Critical alerts"
+              value={summary.criticalAlerts}
+              detail="Error or critical signals on the horizon"
+              adornment={summary.criticalAlerts > 0 ? <StatusBadge tone="error">investigate</StatusBadge> : <StatusBadge tone="success">clear</StatusBadge>}
             />
           </Card>
         </div>
@@ -92,6 +99,7 @@ export function RadarView({ projectId, onNavigate, onTaskSelect }: RadarViewProp
           <Card className="p-5">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-[15px] font-semibold text-ink">Due in next 7 days</h3>
+              <StatusBadge tone={sortedByDue.length > 0 ? "warning" : "neutral"}>{sortedByDue.length} queued</StatusBadge>
               {onNavigate && (
                 <Button variant="outline" size="sm" onClick={() => onNavigate("calendar")}>
                   View calendar
@@ -113,16 +121,25 @@ export function RadarView({ projectId, onNavigate, onTaskSelect }: RadarViewProp
                   const dueStr = dueAt
                     ? new Date(dueAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
                     : "—";
+                  const urgencyLabel = dueAt ? relativeDueLabel(dueAt, now) : "No due date";
                   return (
                     <button
                       key={task._id}
                       type="button"
                       className="w-full rounded-lg border border-line bg-surface-2 px-4 py-3 text-left transition-colors duration-150 hover:border-line-strong"
-                      onClick={() => onTaskSelect?.(task._id)}
+                      onClick={() => onTaskSelect?.(task._id as Id<"tasks">)}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-[13.5px] font-medium text-ink">{task.title}</span>
-                        <span className="text-[12.5px] text-ink-muted">{dueStr}</span>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-[13.5px] font-medium text-ink">{task.title}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-ink-muted">
+                            <StatusBadge tone={task.status === "BLOCKED" || task.status === "FAILED" ? "error" : task.status === "NEEDS_APPROVAL" ? "warning" : "neutral"}>
+                              {task.status.replace(/_/g, " ")}
+                            </StatusBadge>
+                            <span>{urgencyLabel}</span>
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-[12.5px] text-ink-muted">{dueStr}</span>
                       </div>
                     </button>
                   );
@@ -135,6 +152,7 @@ export function RadarView({ projectId, onNavigate, onTaskSelect }: RadarViewProp
             <Card className="p-5">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-[15px] font-semibold text-ink">Next scheduled runs</h3>
+                <StatusBadge tone={nextJobs.length > 0 ? "neutral" : "success"}>{nextJobs.length} upcoming</StatusBadge>
                 {onNavigate && (
                   <Button variant="outline" size="sm" onClick={() => onNavigate("schedules")}>
                     View schedules
@@ -160,7 +178,12 @@ export function RadarView({ projectId, onNavigate, onTaskSelect }: RadarViewProp
             </Card>
 
             <Card className="p-5">
-              <h3 className="text-[15px] font-semibold text-ink">Recent alerts</h3>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-[15px] font-semibold text-ink">Recent alerts</h3>
+                <StatusBadge tone={critical.length > 0 ? "error" : alertsList.length > 0 ? "warning" : "success"}>
+                  {critical.length > 0 ? `${critical.length} critical` : alertsList.length > 0 ? `${alertsList.length} open` : "clear"}
+                </StatusBadge>
+              </div>
               {alertsList.length === 0 ? (
                 <div className="mt-4 text-[13.5px] text-ink-muted">No recent alerts.</div>
               ) : (
@@ -181,13 +204,27 @@ export function RadarView({ projectId, onNavigate, onTaskSelect }: RadarViewProp
           </div>
 
           <Card className="p-5">
-            <h3 className="text-[15px] font-semibold text-ink">Operator guidance</h3>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-[15px] font-semibold text-ink">Operator guidance</h3>
+              <StatusBadge tone={summary.overdue > 0 || summary.criticalAlerts > 0 ? "error" : summary.blockedDueSoon > 0 ? "warning" : "success"}>
+                {summary.overdue > 0 || summary.criticalAlerts > 0 ? "attention first" : summary.blockedDueSoon > 0 ? "watch list" : "steady"}
+              </StatusBadge>
+            </div>
             <div className="mt-3 space-y-3 text-[13.5px] leading-relaxed text-ink-secondary">
               <div className="rounded-lg border border-line bg-surface-2 px-4 py-4">
-                Use Radar to decide what needs attention next, not to inspect every detail of execution.
+                {summary.overdue > 0
+                  ? `${summary.overdue} open task${summary.overdue === 1 ? " is" : "s are"} already overdue. Clear those before pulling in future work.`
+                  : "No open overdue tasks right now. Use Radar to decide what needs attention next, not to inspect every detail of execution."}
               </div>
               <div className="rounded-lg border border-line bg-surface-2 px-4 py-4">
-                When a date or alert looks risky here, drill into Tasks, Schedules, or System immediately.
+                {summary.criticalAlerts > 0 || summary.blockedDueSoon > 0
+                  ? `${summary.criticalAlerts} critical alert${summary.criticalAlerts === 1 ? "" : "s"} and ${summary.blockedDueSoon} blocked due-soon task${summary.blockedDueSoon === 1 ? "" : "s"} need triage before the horizon gets noisier.`
+                  : "When a date or alert looks risky here, drill into Tasks, Schedules, or System immediately."}
+              </div>
+              <div className="rounded-lg border border-line bg-surface-2 px-4 py-4">
+                {nextJobs.length > 0
+                  ? `${nextJobs.length} scheduled run${nextJobs.length === 1 ? " is" : "s are"} already queued. Check that automation is reducing, not adding to, the next 24 hours of risk.`
+                  : "No scheduled runs are queued. If the horizon feels too quiet, verify your automation cadence in Schedules or Factory."}
               </div>
             </div>
           </Card>

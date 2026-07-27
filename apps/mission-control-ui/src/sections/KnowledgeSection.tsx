@@ -3,8 +3,11 @@ import type { MainView } from "../TopNav";
 import { DocsView } from "../DocsView";
 import { DesignSystemView } from "../DesignSystemView";
 import { MemoryView } from "../MemoryView";
+import { MemoryPillarsView } from "../eos/views/MemoryPillarsView";
+import { useFlag } from "../hooks/useFlag";
 import { SearchBar } from "../SearchBar";
 import { RegistryView } from "../RegistryView";
+import { registryTabFromView, isRegistryView } from "../lib/registryViews";
 import { PageHeader } from "../components/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,13 +17,29 @@ interface KnowledgeSectionProps {
   currentView: MainView;
   projectId: Id<"projects"> | null;
   onTaskSelect: (taskId: string) => void;
+  onNavigate?: (view: MainView) => void;
 }
 
-export function KnowledgeSection({ currentView, projectId, onTaskSelect }: KnowledgeSectionProps) {
+export function KnowledgeSection({ currentView, projectId, onTaskSelect, onNavigate }: KnowledgeSectionProps) {
+  const eosPreview = useFlag("eos.command-center-preview");
   if (currentView === "docs") return <DocsView />;
   if (currentView === "design-system") return <DesignSystemView />;
-  if (currentView === "skills") return <RegistryView />;
-  if (currentView === "memory") return <MemoryView projectId={projectId} />;
+  if (isRegistryView(currentView)) {
+    const tab = registryTabFromView(currentView) ?? "catalog";
+    return (
+      <RegistryView
+        initialTab={tab}
+        onNavigate={(view) => onNavigate?.(view)}
+      />
+    );
+  }
+  if (currentView === "memory") {
+    return eosPreview ? (
+      <MemoryPillarsView projectId={projectId} onNavigate={(v) => onNavigate?.(v as MainView)} />
+    ) : (
+      <MemoryView projectId={projectId} />
+    );
+  }
   if (currentView === "search") {
     return (
       <main className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
@@ -29,7 +48,7 @@ export function KnowledgeSection({ currentView, projectId, onTaskSelect }: Knowl
           description="Find tasks, agents, and context across Mission Control. Results open in the Mission Queue."
           icon={<Search className="h-4.5 w-4.5" strokeWidth={1.7} />}
           status={
-            <Badge variant="outline" className="border-cyan-300/20 text-cyan-100">
+            <Badge variant="outline" className="border-registry-accent/20 text-registry-accent">
               Cross-surface lookup
             </Badge>
           }
@@ -45,7 +64,7 @@ export function KnowledgeSection({ currentView, projectId, onTaskSelect }: Knowl
                 </div>
               </div>
               <div className="flex items-center gap-2 rounded-lg border border-[var(--panel-line)] bg-[color:var(--shell-panel)] px-3 py-2 text-xs text-muted-foreground">
-                <BookOpen className="h-3.5 w-3.5 text-cyan-100" />
+                <BookOpen className="h-3.5 w-3.5 text-registry-accent" />
                 Results stay within Mission Control
               </div>
             </div>

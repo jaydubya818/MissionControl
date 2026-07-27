@@ -4,15 +4,24 @@
  * (friction detectors + effectiveness projections) is Lineage v1 roadmap.
  */
 
+import { useQuery } from "convex/react";
+import { api } from "../../../../../convex/_generated/api";
 import { PageHeader } from "../../components/factory/DetailLayout";
 import { InsightCard, PageProvenanceNote, ProvenanceBadge } from "../components";
 import { demoInsights } from "../demoData";
+import { adaptRecommendations } from "../liveAdapters";
+import type { Insight } from "../types";
 
 export interface RecommendationsViewProps {
   onNavigate: (view: string) => void;
 }
 
 export function RecommendationsView({ onNavigate }: RecommendationsViewProps): JSX.Element {
+  const liveRecs = useQuery(api.eos.projections.getRecommendations, {});
+  const insights: Insight[] =
+    liveRecs && liveRecs.length > 0 ? adaptRecommendations(liveRecs as Insight[]) : demoInsights;
+  const provenance = insights[0]?.provenance ?? "demo";
+
   return (
     <div className="relative flex-1 overflow-auto bg-app">
       <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
@@ -23,7 +32,7 @@ export function RecommendationsView({ onNavigate }: RecommendationsViewProps): J
         <PageProvenanceNote />
 
         <div className="grid gap-4 md:grid-cols-2">
-          {demoInsights.map((insight) => (
+          {insights.map((insight) => (
             <InsightCard key={insight.id} insight={insight} onNavigate={onNavigate} />
           ))}
         </div>
@@ -33,7 +42,7 @@ export function RecommendationsView({ onNavigate }: RecommendationsViewProps): J
             Recommendations are generated from friction detectors and effectiveness projections
             (Lineage v1 roadmap).
           </p>
-          <ProvenanceBadge provenance="preview" />
+          <ProvenanceBadge provenance={insights.length > 0 ? provenance : "preview"} />
         </div>
       </div>
     </div>

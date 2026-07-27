@@ -10,8 +10,10 @@ import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import {
   aggregateEvalRun,
+  buildCriterionResults,
   clampScore,
   defaultSkillScenarios,
+  enrichScenarioResult,
   validateCriteriaWeights,
   type ScenarioResultInput,
 } from "../lib/contextEvals";
@@ -31,6 +33,13 @@ const criterionArg = v.object({
   weight: v.number(),
 });
 
+const criterionResultArg = v.object({
+  criterionId: v.string(),
+  label: v.string(),
+  baselinePct: v.number(),
+  withContextPct: v.number(),
+});
+
 const scenarioResultArg = v.object({
   scenarioId: v.id("contextEvalScenarios"),
   scenarioName: v.string(),
@@ -38,6 +47,7 @@ const scenarioResultArg = v.object({
   candidateScore: v.number(),
   criteriaPassed: v.number(),
   criteriaTotal: v.number(),
+  criterionResults: v.optional(v.array(criterionResultArg)),
 });
 
 async function insertAudit(
@@ -122,6 +132,68 @@ export const getRun = query({
   args: { runId: v.id("contextEvalRuns") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.runId);
+  },
+});
+
+/** Full eval profile for a package — scenarios + enriched latest run. */
+export const getEvalProfile = query({
+  args: { packageId: v.id("contextPackages") },
+  handler: async (ctx, args) => {
+    const pkg = await ctx.db.get(args.packageId);
+    if (!pkg) return null;
+
+    const scenarios = await ctx.db
+      .query("contextEvalScenarios")
+      .withIndex("by_package", (q) => q.eq("packageId", args.packageId))
+      .collect();
+    const activeScenarios = scenarios
+      .filter((s) => s.active)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const runs = await ctx.db
+      .query("contextEvalRuns")
+      .withIndex("by_package", (q) => q.eq("packageId", args.packageId))
+      .collect();
+    runs.sort((a, b) => b.createdAt - a.createdAt);
+    const latestRun = runs.find((r) => r.status === "COMPLETED") ?? runs[0] ?? null;
+
+    const scenarioById = new Map(activeScenarios.map((s) => [s._id, s]));
+    const enrichedResults = (latestRun?.results ?? []).map((result) => {
+      const scenario = scenarioById.get(result.scenarioId);
+      const criteria = scenario?.criteria ?? [];
+      return enrichScenarioResult(criteria, {
+        scenarioId: result.scenarioId,
+        scenarioName: result.scenarioName,
+        baselineScore: result.baselineScore,
+        candidateScore: result.candidateScore,
+        criteriaPassed: result.criteriaPassed,
+        criteriaTotal: result.criteriaTotal,
+        criterionResults: result.criterionResults,
+      });
+    });
+
+    return {
+      packageId: args.packageId,
+      scenarios: activeScenarios,
+      latestRun: latestRun
+        ? { ...latestRun, results: enrichedResults }
+        : null,
+      scenarioCount: activeScenarios.length,
+      summary: latestRun
+        ? {
+            runId: latestRun._id,
+            status: latestRun.status,
+            baselineScore: latestRun.baselineScore ?? null,
+            candidateScore: latestRun.candidateScore ?? null,
+            impactScore: latestRun.impactScore ?? null,
+            impactDelta: latestRun.impactDelta ?? null,
+            completedScenarios: latestRun.completedScenarios,
+            scenarioCount: latestRun.scenarioCount,
+            completedAt: latestRun.completedAt ?? null,
+            startedAt: latestRun.startedAt ?? null,
+          }
+        : null,
+    };
   },
 });
 
@@ -292,7 +364,7 @@ function buildProxyResults(
   scenarios: Array<{
     _id: any;
     name: string;
-    criteria: Array<{ weight: number }>;
+    criteria: Array<{ id: string; label: string; weight: number }>;
   }>,
   candidateScore: number
 ) {
@@ -302,6 +374,12 @@ function buildProxyResults(
     const candidate = clampScore(candidateScore + jitter);
     const criteriaTotal = scenario.criteria.length;
     const criteriaPassed = Math.round((candidate / 100) * criteriaTotal);
+    const criterionResults = buildCriterionResults(
+      scenario.criteria,
+      baseline,
+      candidate,
+      criteriaPassed
+    );
     return {
       scenarioId: scenario._id,
       scenarioName: scenario.name,
@@ -309,6 +387,7 @@ function buildProxyResults(
       candidateScore: candidate,
       criteriaPassed,
       criteriaTotal,
+      criterionResults,
     };
   });
 }
@@ -383,6 +462,7 @@ export const runProxyEval = mutation({
       candidateScore: r.candidateScore,
       criteriaPassed: r.criteriaPassed,
       criteriaTotal: r.criteriaTotal,
+      criterionResults: r.criterionResults,
     }));
     const aggregate = aggregateEvalRun(normalized);
 
@@ -527,27 +607,42 @@ export const submitRunResults = mutation({
       }
     }
 
-    const normalized: ScenarioResultInput[] = args.results.map((r) => ({
-      scenarioId: r.scenarioId,
-      scenarioName: r.scenarioName,
-      baselineScore: clampScore(r.baselineScore),
-      candidateScore: clampScore(r.candidateScore),
-      criteriaPassed: r.criteriaPassed,
-      criteriaTotal: r.criteriaTotal,
-    }));
-
-    const aggregate = aggregateEvalRun(normalized);
-    const now = Date.now();
-
-    await ctx.db.patch(args.runId, {
-      status: "COMPLETED",
-      results: args.results.map((r) => ({
+    const normalized: ScenarioResultInput[] = [];
+    for (const r of args.results) {
+      const scenario = await ctx.db.get(r.scenarioId);
+      const criteria = scenario?.criteria ?? [];
+      const criterionResults =
+        r.criterionResults ??
+        buildCriterionResults(
+          criteria,
+          r.baselineScore,
+          r.candidateScore,
+          r.criteriaPassed
+        );
+      normalized.push({
         scenarioId: r.scenarioId,
         scenarioName: r.scenarioName,
         baselineScore: clampScore(r.baselineScore),
         candidateScore: clampScore(r.candidateScore),
         criteriaPassed: r.criteriaPassed,
         criteriaTotal: r.criteriaTotal,
+        criterionResults,
+      });
+    }
+
+    const aggregate = aggregateEvalRun(normalized);
+    const now = Date.now();
+
+    await ctx.db.patch(args.runId, {
+      status: "COMPLETED",
+      results: normalized.map((r) => ({
+        scenarioId: r.scenarioId as any,
+        scenarioName: r.scenarioName,
+        baselineScore: r.baselineScore,
+        candidateScore: r.candidateScore,
+        criteriaPassed: r.criteriaPassed,
+        criteriaTotal: r.criteriaTotal,
+        criterionResults: r.criterionResults ? [...r.criterionResults] : undefined,
       })),
       completedScenarios: aggregate.completedScenarios,
       baselineScore: aggregate.baselineScore,
@@ -577,6 +672,84 @@ export const submitRunResults = mutation({
     });
 
     return await ctx.db.get(args.runId);
+  },
+});
+
+/** Seed scenarios (if needed) and run proxy eval when a package has no completed run. */
+export const ensurePackageEval = mutation({
+  args: {
+    packageId: v.id("contextPackages"),
+    actorId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const pkg = await ctx.db.get(args.packageId);
+    if (!pkg) throw new Error("Package not found");
+    await requireEvalFrameworkEnabled(ctx, pkg.projectId);
+
+    await loadActiveScenarios(ctx, args.packageId, pkg);
+
+    const runs = await ctx.db
+      .query("contextEvalRuns")
+      .withIndex("by_package", (q) => q.eq("packageId", args.packageId))
+      .collect();
+    const completed = runs
+      .filter((r) => r.status === "COMPLETED")
+      .sort((a, b) => b.createdAt - a.createdAt);
+    if (completed.length > 0) {
+      return { created: false, runId: completed[0]._id };
+    }
+
+    let version = pkg.currentVersionId ? await ctx.db.get(pkg.currentVersionId) : null;
+    if (!version) {
+      const versions = await ctx.db
+        .query("contextPackageVersions")
+        .withIndex("by_package", (q) => q.eq("packageId", args.packageId))
+        .collect();
+      version = versions.sort((a, b) => b.createdAt - a.createdAt)[0] ?? null;
+    }
+    if (!version) throw new Error("No evaluable version found for package");
+
+    const candidateScore = version.qualityScore ?? 60;
+    const scenarios = await loadActiveScenarios(ctx, args.packageId, pkg);
+    const now = Date.now();
+    const runId = await ctx.db.insert("contextEvalRuns", {
+      packageId: args.packageId,
+      versionId: version._id,
+      status: "RUNNING",
+      scenarioCount: scenarios.length,
+      completedScenarios: 0,
+      idempotencyKey: `ensure-eval:${args.packageId}:${now}`,
+      actorId: args.actorId ?? "ensure-package-eval",
+      projectId: pkg.projectId,
+      startedAt: now,
+      createdAt: now,
+    });
+
+    const proxyResults = buildProxyResults(scenarios, candidateScore);
+    const normalized: ScenarioResultInput[] = proxyResults.map((r) => ({
+      scenarioId: r.scenarioId,
+      scenarioName: r.scenarioName,
+      baselineScore: r.baselineScore,
+      candidateScore: r.candidateScore,
+      criteriaPassed: r.criteriaPassed,
+      criteriaTotal: r.criteriaTotal,
+      criterionResults: r.criterionResults,
+    }));
+    const aggregate = aggregateEvalRun(normalized);
+
+    await ctx.db.patch(runId, {
+      status: "COMPLETED",
+      results: proxyResults,
+      completedScenarios: aggregate.completedScenarios,
+      baselineScore: aggregate.baselineScore,
+      candidateScore: aggregate.candidateScore,
+      impactDelta: aggregate.impactDelta,
+      impactScore: aggregate.impactScore,
+      completedAt: Date.now(),
+    });
+    await ctx.db.patch(version._id, { impactScore: aggregate.impactScore });
+
+    return { created: true, runId };
   },
 });
 

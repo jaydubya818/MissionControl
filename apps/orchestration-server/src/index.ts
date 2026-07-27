@@ -390,6 +390,25 @@ app.post("/approval-decisions/:approvalDecisionId/decide", async (c) => {
   }
 });
 
+app.post("/workorders/:workOrderId/receipt-packets", async (c) => {
+  try {
+    const workOrderId = c.req.param("workOrderId");
+    const body = await c.req.json().catch(() => ({}));
+    const result = await client.mutation(ConvexMutations.factory.ingestReceiptPacket as any, {
+      workOrderId,
+      workflowRunId: body.workflowRunId,
+      piSessionId: body.piSessionId,
+      piExecutionId: body.piExecutionId,
+      markRunCompleted: body.markRunCompleted,
+      receipts: body.receipts ?? [],
+      idempotencyKey: body.idempotencyKey,
+    });
+    return c.json({ success: true, result });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
 app.post("/workorders/:workOrderId/verification-receipts", async (c) => {
   try {
     const workOrderId = c.req.param("workOrderId");

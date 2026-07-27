@@ -44,6 +44,9 @@ export const ConvexMutations = {
     supersedeWorkOrder: "workOrders:supersedeWorkOrder",
     expireGovernanceRecords: "workOrders:expireGovernanceRecords",
   },
+  factory: {
+    ingestReceiptPacket: "factory/piBridge:ingestReceiptPacket",
+  },
   workflowRuns: {
     recordEvent: "workflowRuns:recordEvent",
     createArtifact: "workflowRuns:createArtifact",
