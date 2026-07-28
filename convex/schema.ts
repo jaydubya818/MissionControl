@@ -4050,6 +4050,46 @@ export default defineSchema({
     .index("by_repo_package", ["repoSlug", "packageSlug"])
     .index("by_package", ["packageSlug"]),
 
+  // Immutable evidence that an executor received the exact packages pinned by
+  // a repository lock. Package content is returned by activation, not stored.
+  contextActivationReceipts: defineTable({
+    repoSlug: v.string(),
+    workflowRunId: v.id("contextWorkflowRuns"),
+    lockManifestHash: v.string(),
+    packages: v.array(v.object({
+      packageSlug: v.string(),
+      packageId: v.id("contextPackages"),
+      versionId: v.id("contextPackageVersions"),
+      version: v.string(),
+      contentHash: v.string(),
+    })),
+    idempotencyKey: v.string(),
+    actorId: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_workflow_run", ["workflowRunId"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  // Equivalent immutable activation evidence for the Work Order execution
+  // runtime used by Pi.
+  workflowContextActivationReceipts: defineTable({
+    repoSlug: v.string(),
+    workflowRunId: v.id("workflowRuns"),
+    lockManifestHash: v.string(),
+    packages: v.array(v.object({
+      packageSlug: v.string(),
+      packageId: v.id("contextPackages"),
+      versionId: v.id("contextPackageVersions"),
+      version: v.string(),
+      contentHash: v.string(),
+    })),
+    idempotencyKey: v.string(),
+    actorId: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_workflow_run", ["workflowRunId"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
   // -------------------------------------------------------------------------
   // CONTEXT REGISTRY: EVAL SCENARIOS (Software Factory Epic 4)
   // -------------------------------------------------------------------------

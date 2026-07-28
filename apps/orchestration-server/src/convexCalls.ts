@@ -32,6 +32,9 @@ export const ConvexQueries = {
 } as const;
 
 export const ConvexMutations = {
+  context: {
+    activateForWorkflowRun: "context/activation:activateForWorkflowRun",
+  },
   coordinator: {
     decomposeTask: "coordinator:decomposeTask",
   },

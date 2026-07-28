@@ -50,6 +50,7 @@ export const ingestReceiptPacket = mutation({
       nextOwner: v.optional(v.string()),
     })),
     idempotencyKey: v.optional(v.string()),
+    contextActivationReceiptId: v.optional(v.id("workflowContextActivationReceipts")),
   },
   handler: async (ctx, args) => {
     const workOrder = await ctx.db.get(args.workOrderId);
@@ -68,6 +69,16 @@ export const ingestReceiptPacket = mutation({
     const run = await ctx.db.get(args.workflowRunId);
     if (!run || run.workOrderId !== workOrder._id) {
       throw new Error("Workflow run does not belong to this WorkOrder");
+    }
+    const expectedActivationReceiptId = (run.metadata as { contextActivationReceiptId?: string } | undefined)?.contextActivationReceiptId;
+    if (expectedActivationReceiptId) {
+      if (args.contextActivationReceiptId !== expectedActivationReceiptId) {
+        throw new Error("Pi receipt packet must include the workflow context activation receipt");
+      }
+      const activation = await ctx.db.get(args.contextActivationReceiptId);
+      if (!activation || activation.workflowRunId !== run._id) {
+        throw new Error("Context activation receipt does not belong to this workflow run");
+      }
     }
 
     validateReceiptPacket({
@@ -97,6 +108,7 @@ export const ingestReceiptPacket = mutation({
           piSessionId: args.piSessionId,
           piExecutionId: args.piExecutionId,
           receiptPacketKey: args.idempotencyKey,
+          contextActivationReceiptId: args.contextActivationReceiptId,
         },
       });
     }
@@ -115,7 +127,11 @@ export const ingestReceiptPacket = mutation({
         artifactReference: receipt.artifactReference,
         verifier: receipt.verifier ?? "pi-runtime",
         status: receipt.status,
-        metadata: { source: "piBridge.ingestReceiptPacket", piSessionId: args.piSessionId },
+        metadata: {
+          source: "piBridge.ingestReceiptPacket",
+          piSessionId: args.piSessionId,
+          contextActivationReceiptId: args.contextActivationReceiptId,
+        },
       });
       created += 1;
     }

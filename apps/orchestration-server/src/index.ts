@@ -30,6 +30,7 @@ import { MemoryManager } from "@mission-control/memory";
 import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
+import { pathToFileURL } from "url";
 
 const envSearchPaths = [
   path.resolve(process.cwd(), ".env.local"),
@@ -269,7 +270,7 @@ async function stopAgent(personaName: string): Promise<void> {
 // HONO APP
 // ============================================================================
 
-const app = new Hono();
+export const app = new Hono();
 
 // CORS so UI (different origin/port) can call gateway/status and other endpoints
 app.use("*", cors());
@@ -380,6 +381,16 @@ app.post("/workorders/:workOrderId/dispatch", async (c) => {
         409
       );
     }
+    const run = (result as any)?.run;
+    if (body.contextRepoSlug && run?._id) {
+      const activation = await client.mutation(ConvexMutations.context.activateForWorkflowRun as any, {
+        repoSlug: body.contextRepoSlug,
+        workflowRunId: run._id,
+        idempotencyKey: `${body.idempotencyKey ?? `orch-dispatch:${workOrderId}`}:context-activation`,
+        actorId: body.actorId ?? "orchestration-server",
+      });
+      return c.json({ success: true, result, contextActivation: activation });
+    }
     return c.json({ success: true, result });
   } catch (err: any) {
     return c.json({ error: err.message }, 400);
@@ -438,6 +449,7 @@ app.post("/workorders/:workOrderId/receipt-packets", async (c) => {
       receipts: body.receipts ?? [],
       handoff: body.handoff,
       idempotencyKey: body.idempotencyKey,
+      contextActivationReceiptId: body.contextActivationReceiptId,
     });
     return c.json({ success: true, result });
   } catch (err: any) {
@@ -883,52 +895,58 @@ const gatewayProxy = createGatewayProxy({
 // START
 // ============================================================================
 
-console.log(`[orchestration] Mission Control Orchestration Server`);
-console.log(`[orchestration] Convex URL: ${CONVEX_URL ? "configured" : "MISSING"}`);
-console.log(`[orchestration] Project: ${PROJECT_SLUG}`);
-console.log(`[orchestration] Tick interval: ${TICK_INTERVAL_MS}ms`);
-console.log(`[orchestration] Agents dir: ${AGENTS_DIR}`);
+export function startServer() {
+  console.log(`[orchestration] Mission Control Orchestration Server`);
+  console.log(`[orchestration] Convex URL: ${CONVEX_URL ? "configured" : "MISSING"}`);
+  console.log(`[orchestration] Project: ${PROJECT_SLUG}`);
+  console.log(`[orchestration] Tick interval: ${TICK_INTERVAL_MS}ms`);
+  console.log(`[orchestration] Agents dir: ${AGENTS_DIR}`);
 
-startedAt = Date.now();
+  startedAt = Date.now();
 
-// Start coordinator tick loop
-tickTimer = setInterval(() => {
-  runTick().catch((err) => {
-    console.error("[orchestration] Tick loop error:", err);
+  tickTimer = setInterval(() => {
+    runTick().catch((err) => {
+      console.error("[orchestration] Tick loop error:", err);
+    });
+  }, TICK_INTERVAL_MS);
+
+  runTick().then((result) => {
+    console.log(`[orchestration] Initial tick complete:`, result);
   });
-}, TICK_INTERVAL_MS);
 
-// Run first tick immediately
-runTick().then((result) => {
-  console.log(`[orchestration] Initial tick complete:`, result);
-});
-
-// Graceful shutdown
-process.on("SIGINT", async () => {
-  console.log("\n[orchestration] Shutting down...");
-  if (tickTimer) clearInterval(tickTimer);
-  for (const [name] of activeAgents) {
-    try {
-      await stopAgent(name);
-    } catch {
-      // ignore
+  process.on("SIGINT", async () => {
+    console.log("\n[orchestration] Shutting down...");
+    if (tickTimer) clearInterval(tickTimer);
+    for (const [name] of activeAgents) {
+      try {
+        await stopAgent(name);
+      } catch {
+        // ignore
+      }
     }
-  }
-  process.exit(0);
-});
+    process.exit(0);
+  });
 
-process.on("SIGTERM", async () => {
-  console.log("\n[orchestration] SIGTERM received, shutting down...");
-  if (tickTimer) clearInterval(tickTimer);
-  process.exit(0);
-});
+  process.on("SIGTERM", async () => {
+    console.log("\n[orchestration] SIGTERM received, shutting down...");
+    if (tickTimer) clearInterval(tickTimer);
+    process.exit(0);
+  });
 
-const server = serve({ fetch: app.fetch, port: PORT }, () => {
-  console.log(`[orchestration] Server listening on http://localhost:${PORT}`);
-  console.log(`[orchestration] Health: http://localhost:${PORT}/health`);
-  console.log(`[orchestration] Gateway WS: ws://localhost:${PORT}/gateway/ws`);
-});
+  const server = serve({ fetch: app.fetch, port: PORT }, () => {
+    console.log(`[orchestration] Server listening on http://localhost:${PORT}`);
+    console.log(`[orchestration] Health: http://localhost:${PORT}/health`);
+    console.log(`[orchestration] Gateway WS: ws://localhost:${PORT}/gateway/ws`);
+  });
 
-server.on("upgrade", (req, socket, head) => {
-  gatewayProxy.handleUpgrade(req, socket, head);
-});
+  server.on("upgrade", (req, socket, head) => {
+    gatewayProxy.handleUpgrade(req, socket, head);
+  });
+
+  return server;
+}
+
+const entryUrl = process.argv[1] ? pathToFileURL(process.argv[1]).href : null;
+if (process.env.ORCHESTRATION_DISABLE_STARTUP !== "1" && entryUrl === import.meta.url) {
+  startServer();
+}
