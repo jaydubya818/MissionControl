@@ -11,7 +11,7 @@
 | Repository | `jaydubya818/MissionControl` |
 | Related Mission | WorkOrders and Tasks Operator Experience (`gs7g4215qyeka9njttxdcsd48n8bc9yn`) |
 | Created / updated | 2026-07-28 |
-| Source commit | `61d479b` plus current Docs remediation |
+| Source commit | Discovery `61d479b`; Docs remediation `5ea8703` |
 | Document version | 1.0 |
 
 ## Summary

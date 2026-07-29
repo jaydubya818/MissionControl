@@ -11,7 +11,7 @@
 | Related Mission | WorkOrders and Tasks Operator Experience (`gs7g4215qyeka9njttxdcsd48n8bc9yn`) |
 | Related Work Orders / Tasks | Not selected; migration has not started |
 | Created / updated | 2026-07-28 |
-| Source commit | `61d479b` |
+| Source commit | Discovery `61d479b`; operator mirror `5ea8703` |
 | Document version | 1.0 |
 
 ## Summary

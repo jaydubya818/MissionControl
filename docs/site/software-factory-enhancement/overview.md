@@ -13,7 +13,7 @@
 | Related Tasks | Research Lab execution board; 84 Tasks observed, not yet canonically linked |
 | Created | 2026-07-28 |
 | Last updated | 2026-07-28 |
-| Source commit | `61d479b` discovery package |
+| Source commit | Discovery `61d479b`; operator mirror `5ea8703` |
 | Document version | 1.0 |
 
 ## Summary

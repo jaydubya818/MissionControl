@@ -10,7 +10,7 @@
 | Repository | `jaydubya818/MissionControl` |
 | Related Mission | Continuous Software-Factory Research and Improvement (`gs7jkmzhhhfhp2gj4pc1gggych8bd0x9`) |
 | Created / updated | 2026-07-28 |
-| Source commit | Current documentation-governance change |
+| Source commit | Operator policy and mirror `5ea8703` |
 | Document version | 1.0 |
 
 ## Summary
