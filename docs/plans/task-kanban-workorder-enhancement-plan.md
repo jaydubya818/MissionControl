@@ -3,6 +3,11 @@ title: Task Kanban and Work Order Enhancement Plan
 date: 2026-07-28
 status: proposed-for-approval
 branch: codex/task-kanban-workorder-hierarchy
+mission_control_docs_id: SFE-DOC-004
+mission_control_docs_title: Master Enhancement Plan
+related_mission_id: gs7g4215qyeka9njttxdcsd48n8bc9yn
+related_work_order_ids: []
+last_synchronized_date: 2026-07-28
 ---
 
 # Task Kanban and Work Order Enhancement Plan

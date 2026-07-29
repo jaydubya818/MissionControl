@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveDocsPageByHref } from "./docsSiteConfig";
+import {
+  DEFAULT_DOCS_PAGE_ID,
+  resolveDocsPageByHref,
+  resolveDocsPageId,
+} from "./docsSiteConfig";
 
 describe("resolveDocsPageByHref", () => {
   it("resolves sibling relative links", () => {
@@ -16,5 +20,16 @@ describe("resolveDocsPageByHref", () => {
 
   it("returns null for external links", () => {
     expect(resolveDocsPageByHref("https://docs.tessl.io/", "overview/readme")).toBeNull();
+  });
+});
+
+describe("resolveDocsPageId", () => {
+  it("keeps a registered operator document ID", () => {
+    expect(resolveDocsPageId("sfe-overview")).toBe("sfe-overview");
+  });
+
+  it("falls back for missing or unknown document IDs", () => {
+    expect(resolveDocsPageId(null)).toBe(DEFAULT_DOCS_PAGE_ID);
+    expect(resolveDocsPageId("unknown-document")).toBe(DEFAULT_DOCS_PAGE_ID);
   });
 });

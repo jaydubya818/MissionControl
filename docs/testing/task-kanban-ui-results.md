@@ -5,6 +5,11 @@ result: partial-pass-with-product-gaps
 commit_tested: 3252aa0
 workspace: Software Factory Research Lab
 workspace_id: sn71gskbdemgf4z1trt9zdmm5h8bde69
+mission_control_docs_id: SFE-DOC-006
+mission_control_docs_title: Browser Test Results
+related_mission_id: gs7g4215qyeka9njttxdcsd48n8bc9yn
+related_work_order_ids: []
+last_synchronized_date: 2026-07-28
 ---
 
 # Task Kanban and Work Order UI Discovery Results

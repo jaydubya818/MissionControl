@@ -5,6 +5,11 @@ workspace: Software Factory Research Lab
 workspace_id: sn71gskbdemgf4z1trt9zdmm5h8bde69
 tested_commit: 3252aa0
 status: discovery-complete
+mission_control_docs_id: SFE-DOC-003
+mission_control_docs_title: Work Orders and Tasks Experience
+related_mission_id: gs7g4215qyeka9njttxdcsd48n8bc9yn
+related_work_order_ids: []
+last_synchronized_date: 2026-07-28
 ---
 
 # Task and Work Order Current-State Assessment

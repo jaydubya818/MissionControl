@@ -26,6 +26,67 @@ export type DocsSiteSection = {
 /** Tessl-style information architecture for Mission Control docs. */
 export const DOCS_SITE_SECTIONS: DocsSiteSection[] = [
   {
+    id: "software-factory-enhancement",
+    label: "Software Factory Enhancement",
+    icon: Layers,
+    pages: [
+      {
+        id: "sfe-overview",
+        title: "Software Factory Enhancement Overview",
+        description: "Status, findings, decisions, and next actions",
+        path: "software-factory-enhancement/overview",
+      },
+      {
+        id: "sfe-canonical-hierarchy",
+        title: "Canonical Delivery Hierarchy",
+        description: "Goal, Mission, Work Order, Task, and Attempt ownership",
+        path: "software-factory-enhancement/canonical-delivery-hierarchy",
+      },
+      {
+        id: "sfe-task-workorder-experience",
+        title: "Work Orders and Tasks Experience",
+        description: "Current state and target operator experience",
+        path: "software-factory-enhancement/task-workorder-experience",
+      },
+      {
+        id: "sfe-implementation-plan",
+        title: "Master Enhancement Plan",
+        description: "Reviewable PR sequence and approval boundaries",
+        path: "software-factory-enhancement/implementation-plan",
+      },
+      {
+        id: "sfe-migration-plan",
+        title: "Task and Work Order Migration Plan",
+        description: "Compatibility, validation, rollback, and migration gates",
+        path: "software-factory-enhancement/migration-plan",
+      },
+      {
+        id: "sfe-browser-results",
+        title: "Browser Test Results",
+        description: "Task Kanban, Work Orders, Docs, console, and network evidence",
+        path: "software-factory-enhancement/browser-test-results",
+      },
+      {
+        id: "sfe-decision-log",
+        title: "Decision Log",
+        description: "Material product and architecture decisions",
+        path: "software-factory-enhancement/decision-log",
+      },
+      {
+        id: "sfe-docs-assessment",
+        title: "Mission Control Docs Product Assessment",
+        description: "Docs capabilities, defects, and remediation recommendations",
+        path: "software-factory-enhancement/docs-product-assessment",
+      },
+      {
+        id: "sfe-documentation-governance",
+        title: "Documentation Governance",
+        description: "Operator Docs and repository synchronization policy",
+        path: "software-factory-enhancement/documentation-governance",
+      },
+    ],
+  },
+  {
     id: "overview",
     label: "Overview",
     icon: BookOpen,
@@ -117,6 +178,10 @@ export const DEFAULT_DOCS_PAGE_ID = "overview-readme";
 
 export function findDocsPage(id: string): DocsSitePage | undefined {
   return DOCS_SITE_PAGES.find((p) => p.id === id);
+}
+
+export function resolveDocsPageId(id: string | null | undefined): string {
+  return id && findDocsPage(id) ? id : DEFAULT_DOCS_PAGE_ID;
 }
 
 /** Resolve relative markdown links (e.g. ../get-started/run-the-demo.md) to a docs page id. */

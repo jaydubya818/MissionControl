@@ -1,4 +1,5 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ChevronRight, ExternalLink, FileText, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/factory/badges";
@@ -10,15 +11,35 @@ import {
   LEGACY_REPO_DOCS,
   docsMarkdownForPath,
   findDocsPage,
+  resolveDocsPageId,
   resolveDocsPageByHref,
 } from "@/lib/docsSiteConfig";
 
 export function DocsSiteBrowser(): JSX.Element {
-  const [activePageId, setActivePageId] = useState(DEFAULT_DOCS_PAGE_ID);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedPageId = resolveDocsPageId(searchParams.get("doc"));
+  const [activePageId, setActivePageId] = useState(requestedPageId);
   const [filter, setFilter] = useState("");
 
   const activePage = findDocsPage(activePageId) ?? findDocsPage(DEFAULT_DOCS_PAGE_ID)!;
   const markdown = useMemo(() => docsMarkdownForPath(activePage.path), [activePage.path]);
+
+  useEffect(() => {
+    setActivePageId(requestedPageId);
+  }, [requestedPageId]);
+
+  const selectPage = useCallback(
+    (pageId: string) => {
+      const resolvedPageId = resolveDocsPageId(pageId);
+      setActivePageId(resolvedPageId);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("doc", resolvedPageId);
+        return next;
+      });
+    },
+    [setSearchParams]
+  );
 
   const resolveInternalLink = useCallback(
     (href: string) => resolveDocsPageByHref(href, activePage.path),
@@ -31,9 +52,9 @@ export function DocsSiteBrowser(): JSX.Element {
       if (!target) return;
       event.preventDefault();
       const pageId = target.getAttribute("data-docs-page");
-      if (pageId) setActivePageId(pageId);
+      if (pageId) selectPage(pageId);
     },
-    []
+    [selectPage]
   );
 
   const filteredSections = useMemo(() => {
@@ -80,7 +101,7 @@ export function DocsSiteBrowser(): JSX.Element {
                     <li key={page.id}>
                       <button
                         type="button"
-                        onClick={() => setActivePageId(page.id)}
+                        onClick={() => selectPage(page.id)}
                         className={cn(
                           "flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors duration-150",
                           page.id === activePageId
@@ -135,7 +156,7 @@ export function DocsSiteBrowser(): JSX.Element {
           <select
             id="docs-page-select"
             value={activePageId}
-            onChange={(e) => setActivePageId(e.target.value)}
+            onChange={(e) => selectPage(e.target.value)}
             className="h-9 w-full rounded-lg border border-line bg-surface-1 px-3 text-[13px] text-ink"
           >
             {DOCS_SITE_SECTIONS.flatMap((s) =>

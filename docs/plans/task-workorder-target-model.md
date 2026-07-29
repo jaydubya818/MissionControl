@@ -2,6 +2,11 @@
 title: Task and Work Order Target Model
 date: 2026-07-28
 status: proposed-for-approval
+mission_control_docs_id: SFE-DOC-002
+mission_control_docs_title: Canonical Delivery Hierarchy
+related_mission_id: gs7g4215qyeka9njttxdcsd48n8bc9yn
+related_work_order_ids: []
+last_synchronized_date: 2026-07-28
 ---
 
 # Task and Work Order Target Model
