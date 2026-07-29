@@ -15,19 +15,19 @@ last_synchronized_date: 2026-07-28
 
 ## DEC-001 — Canonical delivery hierarchy
 
-- Status: Proposed
+- Status: Approved
 - Context: Task and Work Order records exist but lack a canonical child link.
 - Options: merge objects; hide Tasks; keep distinct hierarchy.
 - Selected: Goal → Mission → Work Order → Task → Attempt.
 - Reason: separates strategy, governance, execution, and retry ownership.
 - Tradeoff: compatibility and data migration.
-- Evidence: schema/UI assessment at commit `61d479b`.
+- Evidence: schema/UI assessment at rebased commit `bc8340d`.
 - Risk: wrong legacy linkage.
 - Revisit trigger: PR 1 cannot classify required legacy records safely.
 
 ## DEC-002 — Continue Tasks Kanban
 
-- Status: Proposed
+- Status: Approved
 - Options: remove Kanban; make Work Orders cards; keep Task cards.
 - Selected: keep Task Kanban central.
 - Reason: operators need visible operational ownership and progress.
@@ -36,7 +36,7 @@ last_synchronized_date: 2026-07-28
 
 ## DEC-003 — Task versus Work Order responsibility
 
-- Status: Proposed
+- Status: Approved
 - Selected: Task owns operational work; Work Order owns delivery contract and
   acceptance.
 - Reason: avoids duplicate top-level state and silent acceptance.
@@ -52,15 +52,15 @@ last_synchronized_date: 2026-07-28
 
 ## DEC-005 — Orphan Task handling
 
-- Status: Approval required
-- Recommended: visible Ungoverned Inbox and explicit conversion.
+- Status: Approved
+- Selected: visible Ungoverned Inbox and explicit conversion.
 - Alternative: visible Quick Work Order flow.
 - Rejected: silent hidden Quick Work Order.
 - Reason: governance must remain visible.
 
 ## DEC-006 — Progress rollups
 
-- Status: Proposed
+- Status: Approved
 - Selected: Work Order execution progress and acceptance readiness are separate.
 - Reason: completed Tasks do not prove criteria.
 - Tradeoff: more than one metric.
@@ -74,7 +74,7 @@ last_synchronized_date: 2026-07-28
 
 ## DEC-008 — Initial implementation sequence
 
-- Status: Proposed
+- Status: Approved
 - Selected: relationship → Kanban context/query → state cleanup → generation →
   detail → scale → enforcement.
 - Reason: smallest reversible path.

@@ -11,12 +11,12 @@
 | Related Mission | WorkOrders and Tasks Operator Experience (`gs7g4215qyeka9njttxdcsd48n8bc9yn`) |
 | Related Work Orders / Tasks | None yet |
 | Created / updated | 2026-07-28 |
-| Source commit | Discovery `61d479b`; decisions mirrored `5ea8703` |
+| Source commit | Discovery `bc8340d`; decisions mirrored `78d7219` |
 | Document version | 1.0 |
 
 ## DEC-001 — Canonical delivery hierarchy
 
-- Status: Proposed
+- Status: Approved
 - Selected option: Goal → Mission → Work Order → Task → Attempt.
 - Reason: assigns strategy, governance, execution, and retry ownership once.
 - Tradeoff: requires compatibility and a relationship migration.
@@ -25,7 +25,7 @@
 
 ## DEC-002 — Keep Tasks Kanban
 
-- Status: Proposed
+- Status: Approved
 - Selected option: retain Kanban as the central execution surface.
 - Reason: operators need visible work ownership, progress, review, and blockers.
 - Tradeoff: requires responsive/table alternatives at high volume.
@@ -33,7 +33,7 @@
 
 ## DEC-003 — Separate Task and Work Order responsibility
 
-- Status: Proposed
+- Status: Approved
 - Selected option: Task manages execution; Work Order manages contract and
   acceptance.
 - Reason: prevents duplicate top-level status and silent acceptance.
@@ -50,14 +50,14 @@
 
 ## DEC-005 — Orphan Tasks
 
-- Status: Approval required
-- Recommended option: visible Ungoverned Inbox plus explicit conversion.
+- Status: Approved
+- Selected option: visible Ungoverned Inbox plus explicit conversion.
 - Rejected option: silent hidden Quick Work Order.
 - Reason: keeps governance visible and avoids invented contracts.
 
 ## DEC-006 — Progress calculation
 
-- Status: Proposed
+- Status: Approved
 - Selected option: show execution and acceptance separately.
 - Reason: completed Tasks do not prove criteria.
 - Tradeoff: more than one metric must be understood.
@@ -71,7 +71,7 @@
 
 ## DEC-008 — Initial implementation sequence
 
-- Status: Proposed
+- Status: Approved
 - Selected option: relationship → board/query → READY/review/blocker →
   generation → detail → scale → enforcement.
 - Reason: smallest reversible path.
@@ -105,7 +105,6 @@
 
 ## Open questions
 
-- Product Owner approval for DEC-001 through DEC-008;
 - authoring/status/versioning scope for dynamic Docs;
 - whether the supplied Docs workspace should be repaired or replaced.
 

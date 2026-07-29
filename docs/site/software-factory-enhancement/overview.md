@@ -13,7 +13,7 @@
 | Related Tasks | Research Lab execution board; 84 Tasks observed, not yet canonically linked |
 | Created | 2026-07-28 |
 | Last updated | 2026-07-28 |
-| Source commit | Discovery `61d479b`; operator mirror `5ea8703` |
+| Source commit | Discovery `bc8340d`; operator mirror `78d7219` |
 | Document version | 1.0 |
 
 ## Summary
@@ -136,7 +136,7 @@ have intentionally not been created.
 - Migration plan: `docs/plans/task-workorder-migration.md`
 - UI results: `docs/testing/task-kanban-ui-results.md`
 - Docs UI results: `docs/testing/mission-control-docs-ui-results.md`
-- Source commit: `61d479bb82e00da2aac2c12738bf39fb0f914215`
+- Rebased discovery commit: `bc8340dbd8e3159e6870c18add8477e18d308186`
 
 ## Collection map
 

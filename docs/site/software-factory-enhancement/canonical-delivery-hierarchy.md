@@ -12,7 +12,7 @@
 | Related Work Orders | None |
 | Related Tasks | None canonically linked yet |
 | Created / updated | 2026-07-28 |
-| Source commit | Discovery `61d479b`; operator mirror `5ea8703` |
+| Source commit | Discovery `bc8340d`; operator mirror `78d7219` |
 | Document version | 1.0 |
 
 ## Summary

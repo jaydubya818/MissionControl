@@ -11,7 +11,7 @@
 | Related Mission | WorkOrders and Tasks Operator Experience (`gs7g4215qyeka9njttxdcsd48n8bc9yn`) |
 | Related Work Orders / Tasks | Research Lab queues; no records mutated |
 | Created / updated | 2026-07-28 |
-| Source commit | Discovery `61d479b`; Docs evidence `5ea8703` |
+| Source commit | Discovery `bc8340d`; Docs evidence `78d7219` |
 | Document version | 1.0 |
 
 ## Summary
@@ -53,6 +53,15 @@ The bounded Docs change also passed:
 - Axe WCAG 2 A/AA, 2.1 A/AA, and 2.2 AA scan: zero critical violations;
 - valid journey page errors: zero;
 - valid journey failed requests, excluding the optional gateway probe: zero.
+
+The planning-only branch was rebased onto `origin/main` and revalidated on
+2026-07-28:
+
+- `pnpm run ci:prepare`: PASS;
+- `pnpm test`: PASS;
+- `pnpm typecheck`: PASS;
+- `pnpm build`: PASS;
+- existing production chunk-size warning remains non-blocking.
 
 ## Console and network
 
