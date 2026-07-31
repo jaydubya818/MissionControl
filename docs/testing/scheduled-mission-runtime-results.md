@@ -103,7 +103,9 @@ evidence.
 
 ## Publication evidence
 
-- Implementation commit: pending
-- Pull request: pending
-- CI run: pending
-- Merge commit: pending
+- Implementation commit: `6d391b1` (`fix(runtime): guard scheduled mission prompts`)
+- Pull request: [#52](https://github.com/jaydubya818/MissionControl/pull/52)
+- Substantive CI run: [30659997922](https://github.com/jaydubya818/MissionControl/actions/runs/30659997922)
+- CI result: PASS for build, TypeScript, unit, E2E, lint, smoke, and both
+  Vercel preview deployments.
+- Merge target: canonical `main` branch; no active `master` branch is used.

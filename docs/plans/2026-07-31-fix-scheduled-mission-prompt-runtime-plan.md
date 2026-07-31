@@ -1,6 +1,6 @@
 ---
 title: Fix scheduled mission-prompt runtime failures
-status: active
+status: completed
 date: 2026-07-31
 owner: Codex
 scope: bounded-runtime-correctness
@@ -39,7 +39,7 @@ Keep direct operator invocation of `mission:reversePrompt` strict so the UI cont
 - [x] Add focused regression tests; do not run the complete test suite.
 - [x] Verify the affected UI journey after a clean reload and inspect browser/server errors.
 - [x] Publish the implementation and test result in repository docs and Mission Control Docs.
-- [ ] Commit, open a pull request, monitor CI, and squash-merge to `main`.
+- [x] Commit, open a pull request, monitor CI, and squash-merge to `main`.
 
 ## Bounded validation
 

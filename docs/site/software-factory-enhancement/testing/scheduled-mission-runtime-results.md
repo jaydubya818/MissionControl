@@ -20,6 +20,13 @@ its `nextRun` advanced. Eighteen focused tests, the workspace TypeScript gate,
 the UI production build, and a clean Software Factory Research Lab Task/Why
 browser journey passed. The fresh browser session had zero page errors.
 
+The implementation is commit `6d391b1` in
+[pull request #52](https://github.com/jaydubya818/MissionControl/pull/52). The
+[substantive CI run](https://github.com/jaydubya818/MissionControl/actions/runs/30659997922)
+passed build, TypeScript, unit, E2E, lint, smoke, and both preview deployments.
+The canonical merge target is `main`; this repository does not use an active
+`master` branch.
+
 Screenshots are retained under
 `docs/testing/evidence/runtime-correctness/`. The full evidence record, including
 timestamps, IDs, reproduction classification, and bounded-test rationale, is in
