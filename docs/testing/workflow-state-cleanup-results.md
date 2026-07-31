@@ -103,4 +103,10 @@ to look unavailable. Restarting the demo with a single explicit
 configuration mismatch, not a workspace-recovery defect; the server currently
 runs at `http://localhost:5199` against `http://127.0.0.1:3210`.
 
-Git commit and CI run references are added after publication.
+## Publication evidence
+
+- Implementation commit: `82b1167` (`feat(tasks): add truthful workflow states`)
+- Pull request: [#50](https://github.com/jaydubya818/MissionControl/pull/50)
+- Substantive CI run: [30656367162](https://github.com/jaydubya818/MissionControl/actions/runs/30656367162)
+- CI result: PASS for build, TypeScript, unit tests, E2E, lint, smoke, and both
+  Vercel preview deployments.

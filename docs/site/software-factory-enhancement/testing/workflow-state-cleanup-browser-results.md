@@ -22,3 +22,7 @@ and 20 raw legacy Assigned. The report was read-only and authorized no migration
 Screenshots are stored in
 `docs/testing/evidence/workflow-state-cleanup/`. Full record:
 `docs/testing/workflow-state-cleanup-results.md`.
+
+Publication: implementation commit `82b1167`,
+[PR #50](https://github.com/jaydubya818/MissionControl/pull/50), and green
+[CI run 30656367162](https://github.com/jaydubya818/MissionControl/actions/runs/30656367162).
