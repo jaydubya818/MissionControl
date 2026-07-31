@@ -202,6 +202,12 @@ export const DOCS_SITE_SECTIONS: DocsSiteSection[] = [
         description: "Client/backend handshake, guarded startup, and reload recovery",
         path: "software-factory-enhancement/testing/runtime-contract-recovery-results",
       },
+      {
+        id: "runtime-contract-ci-guard-pr7-results",
+        title: "Runtime Contract CI Guard PR 7",
+        description: "Git-base public Convex validator comparison and version enforcement",
+        path: "software-factory-enhancement/testing/runtime-contract-ci-guard-results",
+      },
     ],
   },
   {
