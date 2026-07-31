@@ -1,4 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { RuntimeCompatibilityNotice } from "./RuntimeCompatibilityGate";
+import { isRuntimeContractError } from "./lib/runtimeCompatibility";
 
 interface Props {
   children: ReactNode;
@@ -21,6 +23,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (!this.state.error) return this.props.children;
+
+    if (isRuntimeContractError(this.state.error)) {
+      return <RuntimeCompatibilityNotice technicalDetails={this.state.error.message} />;
+    }
 
     return (
       <main className="flex min-h-screen items-center justify-center bg-app p-6 text-ink">

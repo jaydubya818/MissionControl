@@ -114,6 +114,7 @@ import type * as lib_repetitiveTaskCandidates from "../lib/repetitiveTaskCandida
 import type * as lib_repetitiveTasks from "../lib/repetitiveTasks.js";
 import type * as lib_riskClassifier from "../lib/riskClassifier.js";
 import type * as lib_runInspector from "../lib/runInspector.js";
+import type * as lib_runtimeContract from "../lib/runtimeContract.js";
 import type * as lib_sanitize from "../lib/sanitize.js";
 import type * as lib_skillAutomation from "../lib/skillAutomation.js";
 import type * as lib_stateMachine from "../lib/stateMachine.js";
@@ -175,6 +176,7 @@ import type * as reports from "../reports.js";
 import type * as revenue from "../revenue.js";
 import type * as reviews from "../reviews.js";
 import type * as runs from "../runs.js";
+import type * as runtimeCompatibility from "../runtimeCompatibility.js";
 import type * as savedViews from "../savedViews.js";
 import type * as scheduledJobs from "../scheduledJobs.js";
 import type * as search from "../search.js";
@@ -322,6 +324,7 @@ declare const fullApi: ApiFromModules<{
   "lib/repetitiveTasks": typeof lib_repetitiveTasks;
   "lib/riskClassifier": typeof lib_riskClassifier;
   "lib/runInspector": typeof lib_runInspector;
+  "lib/runtimeContract": typeof lib_runtimeContract;
   "lib/sanitize": typeof lib_sanitize;
   "lib/skillAutomation": typeof lib_skillAutomation;
   "lib/stateMachine": typeof lib_stateMachine;
@@ -383,6 +386,7 @@ declare const fullApi: ApiFromModules<{
   revenue: typeof revenue;
   reviews: typeof reviews;
   runs: typeof runs;
+  runtimeCompatibility: typeof runtimeCompatibility;
   savedViews: typeof savedViews;
   scheduledJobs: typeof scheduledJobs;
   search: typeof search;

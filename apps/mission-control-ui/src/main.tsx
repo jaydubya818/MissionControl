@@ -5,10 +5,19 @@ import { BrowserRouter } from "react-router-dom";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { SetupMessage } from "./SetupMessage";
 import { ToastProvider } from "./Toast";
+import { RuntimeCompatibilityGate } from "./RuntimeCompatibilityGate";
 import App from "./App";
 import "./index.css";
 
 const convexUrl = (import.meta.env.VITE_CONVEX_URL as string)?.trim() || "";
+
+try {
+  const initialTheme = window.localStorage.getItem("mc.theme") === "light" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", initialTheme);
+  document.documentElement.classList.toggle("light", initialTheme === "light");
+} catch {
+  document.documentElement.setAttribute("data-theme", "dark");
+}
 
 const rootEl = document.getElementById("root");
 if (!rootEl) {
@@ -22,16 +31,18 @@ if (!rootEl) {
           <SetupMessage />
         ) : (
           <ConvexProvider client={new ConvexReactClient(convexUrl)}>
-            <ToastProvider>
-              <BrowserRouter
-                future={{
-                  v7_startTransition: true,
-                  v7_relativeSplatPath: true,
-                }}
-              >
-                <App />
-              </BrowserRouter>
-            </ToastProvider>
+            <RuntimeCompatibilityGate>
+              <ToastProvider>
+                <BrowserRouter
+                  future={{
+                    v7_startTransition: true,
+                    v7_relativeSplatPath: true,
+                  }}
+                >
+                  <App />
+                </BrowserRouter>
+              </ToastProvider>
+            </RuntimeCompatibilityGate>
           </ConvexProvider>
         )}
       </ErrorBoundary>
