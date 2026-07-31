@@ -138,6 +138,12 @@ export const DOCS_SITE_SECTIONS: DocsSiteSection[] = [
         description: "Dark/light contrast, target size, and deterministic Axe evidence",
         path: "software-factory-enhancement/testing/task-drawer-accessibility-results",
       },
+      {
+        id: "scheduled-mission-runtime-pr5-results",
+        title: "Scheduled Mission Runtime PR 5",
+        description: "Mission preflight, skip audit evidence, and stale-client findings",
+        path: "software-factory-enhancement/testing/scheduled-mission-runtime-results",
+      },
     ],
   },
   {

@@ -5,6 +5,8 @@ import type { GenericMutationCtx } from "convex/server";
 import type { DataModel } from "./_generated/dataModel";
 import type { GenericDatabaseReader } from "convex/server";
 import { api } from "./_generated/api";
+import { resolveActiveTenantId } from "./lib/getActiveTenant";
+import { evaluateMissionPromptReadiness } from "./lib/missionPromptScheduling";
 
 function buildJobId(): string {
   return `job_${Math.random().toString(36).slice(2, 10)}`;
@@ -119,6 +121,25 @@ async function evaluateRunPolicy(
   }
 
   return { allowed: true, reason: "Unknown policy, allow" };
+}
+
+async function evaluateJobReadiness(
+  ctx: { db: GenericDatabaseReader<DataModel> },
+  job: Doc<"scheduledJobs">
+): Promise<{ allowed: boolean; reason: string }> {
+  if (job.jobType !== "mission_prompt") {
+    return { allowed: true, reason: "No additional job preconditions" };
+  }
+
+  const tenantId = await resolveActiveTenantId(ctx as any, {
+    tenantId: job.tenantId,
+    projectId: job.projectId,
+    createDefaultIfMissing: false,
+  });
+  if (!tenantId) return evaluateMissionPromptReadiness(undefined);
+
+  const tenant = await ctx.db.get(tenantId);
+  return evaluateMissionPromptReadiness(tenant?.missionStatement);
 }
 
 export const list = query({
@@ -268,8 +289,12 @@ export const runNow = mutation({
       }
       throw new Error(`Run policy blocked: ${evaluation.reason}`);
     }
+    const readiness = await evaluateJobReadiness(ctx, job);
+    if (!readiness.allowed) {
+      return { success: false, skipped: true, reason: readiness.reason };
+    }
     if (args.dryRun) {
-      return { success: true, wouldRun: true, reason: evaluation.reason };
+      return { success: true, wouldRun: true, reason: readiness.reason };
     }
     const now = Date.now();
     await ctx.db.patch(args.id, {
@@ -309,9 +334,31 @@ export const executeDue = internalMutation({
       .filter((j) => j.nextRun <= now)
       .sort((a, b) => (a.priority ?? 3) - (b.priority ?? 3) || a.nextRun - b.nextRun);
     let executed = 0;
+    let skipped = 0;
     for (const job of due) {
       const evaluation = await evaluateRunPolicy(ctx, job);
       if (!evaluation.allowed) continue;
+      const readiness = await evaluateJobReadiness(ctx, job);
+      if (!readiness.allowed) {
+        skipped += 1;
+        await ctx.db.patch(job._id, {
+          nextRun: parseNextRun(job.cronExpression, now),
+        });
+        await ctx.db.insert("activities", {
+          projectId: job.projectId,
+          actorType: "SYSTEM",
+          action: "SCHEDULED_JOB_SKIPPED",
+          description: `Skipped scheduled job ${job.name}: ${readiness.reason}`,
+          targetType: "SCHEDULED_JOB",
+          targetId: job._id,
+          metadata: {
+            jobType: job.jobType,
+            targetId: job.targetId,
+            reason: readiness.reason,
+          },
+        });
+        continue;
+      }
       executed += 1;
       await ctx.db.patch(job._id, {
         lastRun: now,
@@ -344,6 +391,6 @@ export const executeDue = internalMutation({
         },
       });
     }
-    return { executed };
+    return { executed, skipped };
   },
 });
