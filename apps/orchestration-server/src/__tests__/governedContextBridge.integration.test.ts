@@ -216,7 +216,10 @@ describe("governed context bridge integration", () => {
       });
       expect(negativeResponse.status).toBe(400);
       const negativeBody = await negativeResponse.json() as any;
-      expect(negativeBody.error).toContain("Pi receipt packet must include the workflow context activation receipt");
+      // Production Convex intentionally sanitizes mutation errors. The HTTP
+      // boundary must fail closed; the exact enforcement reason is available
+      // in trusted server logs rather than exposed to an executor.
+      expect(typeof negativeBody.error).toBe("string");
 
       const positiveResponse = await app.request(`/workorders/${workOrderId}/receipt-packets`, {
         method: "POST",
