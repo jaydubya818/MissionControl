@@ -248,6 +248,7 @@ export const run = mutation({
         description: task.description,
         type: task.type as "CONTENT" | "SOCIAL" | "EMAIL_MARKETING" | "CUSTOMER_RESEARCH" | "SEO_RESEARCH" | "ENGINEERING" | "DOCS" | "OPS",
         status: "INBOX",
+        stateEnteredAt: Date.now(),
         priority: task.priority as 1 | 2 | 3 | 4,
         assigneeIds: [],
         createdBy: "SYSTEM",

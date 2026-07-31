@@ -11,7 +11,7 @@ const task = {
   _id: "task-a",
   projectId: "project-a",
   workOrderId: "work-order-a",
-  status: "ASSIGNED",
+  status: "READY",
 };
 
 function attempt(
@@ -57,6 +57,17 @@ describe("Task Attempt selection", () => {
         projectId: task.projectId,
         hasCanonicalChildTasks: true,
         task,
+      }),
+    ).toEqual({ ok: true, taskId: task._id });
+  });
+
+  it("keeps legacy ASSIGNED Child Tasks schedulable during compatibility", () => {
+    expect(
+      validateTaskAttemptSelection({
+        workOrderId: task.workOrderId,
+        projectId: task.projectId,
+        hasCanonicalChildTasks: true,
+        task: { ...task, status: "ASSIGNED" },
       }),
     ).toEqual({ ok: true, taskId: task._id });
   });

@@ -318,7 +318,18 @@ export const start = mutation({
     if (task && task.budgetAllocated) {
       if (task.actualCost >= task.budgetAllocated) {
         // Move task to NEEDS_APPROVAL
-        await ctx.db.patch(task._id, { status: "NEEDS_APPROVAL" });
+        const now = Date.now();
+        await ctx.db.patch(task._id, { status: "NEEDS_APPROVAL", stateEnteredAt: now });
+        await ctx.db.insert("taskTransitions", {
+          projectId: task.projectId,
+          idempotencyKey: `budget-gate:${task._id}:${now}`,
+          taskId: task._id,
+          fromStatus: task.status,
+          toStatus: "NEEDS_APPROVAL",
+          actorType: "SYSTEM",
+          reason: "Task budget was exhausted before execution could start.",
+          validationResult: { valid: true },
+        });
         
         // Create alert
         await ctx.db.insert("alerts", {
@@ -854,7 +865,18 @@ export const complete = mutation({
         
         // Check if task budget exceeded
         if (task.budgetAllocated && newCost >= task.budgetAllocated) {
-          await ctx.db.patch(run.taskId, { status: "NEEDS_APPROVAL" });
+          const now = Date.now();
+          await ctx.db.patch(run.taskId, { status: "NEEDS_APPROVAL", stateEnteredAt: now });
+          await ctx.db.insert("taskTransitions", {
+            projectId: task.projectId,
+            idempotencyKey: `budget-gate:${run.taskId}:${args.runId}`,
+            taskId: run.taskId,
+            fromStatus: task.status,
+            toStatus: "NEEDS_APPROVAL",
+            actorType: "SYSTEM",
+            reason: "Recorded execution cost exhausted the Task budget.",
+            validationResult: { valid: true },
+          });
           
           await ctx.db.insert("alerts", {
             projectId: task.projectId,

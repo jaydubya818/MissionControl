@@ -20,9 +20,14 @@ export const STATE_DEFINITIONS: Record<TaskStatus, StateDefinition> = {
     description: "New task, not assigned",
     terminal: false,
   },
+  READY: {
+    status: "READY",
+    description: "Assigned and ready to start",
+    terminal: false,
+  },
   ASSIGNED: {
     status: "ASSIGNED",
-    description: "Assigned to agent(s), not started",
+    description: "Legacy assigned state, presented as ready",
     terminal: false,
   },
   IN_PROGRESS: {

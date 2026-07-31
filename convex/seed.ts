@@ -320,12 +320,12 @@ export const seedV0 = mutation({
         labels: ["research", "competitive-analysis"],
       },
       
-      // ASSIGNED
+      // READY
       {
         title: "Write blog post about AI automation",
         description: "1500-word blog post on how AI agents are transforming business operations.",
         type: "CONTENT",
-        status: "ASSIGNED",
+        status: "READY",
         priority: 2,
         assigneeNames: ["Jordan"],
         labels: ["content", "blog"],
@@ -423,6 +423,7 @@ export const seedV0 = mutation({
     const taskIds: any[] = [];
     
     for (const config of taskConfigs) {
+      const stateEnteredAt = Date.now();
       const assigneeIds = (config.assigneeNames || [])
         .map((name: string) => agentIds[name])
         .filter(Boolean);
@@ -435,12 +436,26 @@ export const seedV0 = mutation({
         description: config.description,
         type: config.type as any,
         status: config.status as any,
+        stateEnteredAt,
         priority: config.priority as any,
         assigneeIds,
         reviewerId,
         workPlan: config.workPlan,
         deliverable: config.deliverable,
         blockedReason: config.blockedReason,
+        blocker: config.status === "BLOCKED" ? {
+          type: "EXTERNAL" as const,
+          reason: config.blockedReason ?? "Seeded external blocker",
+          ownerRef: "finance",
+          requiredAction: "Provide the required API credentials through the approved secret channel.",
+          blockedSince: stateEnteredAt,
+        } : undefined,
+        review: config.status === "REVIEW" ? {
+          ownerId: reviewerId,
+          enteredAt: stateEnteredAt,
+          resubmissionCount: 0,
+          history: [],
+        } : undefined,
         reviewCycles: config.status === "REVIEW" ? 1 : 0,
         actualCost: 0,
         completedAt: config.completedAt,
@@ -1096,6 +1111,7 @@ export const activateAgentsForDemo = mutation({
         description: `Seed demo task for ${cfg.name}: ${cfg.taskTitle}`,
         type: cfg.taskType,
         status: "IN_PROGRESS",
+        stateEnteredAt: now - 15 * 60 * 1000,
         priority: 2,
         assigneeIds: [agent._id],
         reviewCycles: 0,

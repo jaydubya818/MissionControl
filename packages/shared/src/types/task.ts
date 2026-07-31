@@ -7,7 +7,8 @@
 
 export type TaskStatus =
   | "INBOX"           // New task, not assigned
-  | "ASSIGNED"        // Assigned to agent(s), not started
+  | "READY"           // Assigned, planned, and ready to start
+  | "ASSIGNED"        // Legacy compatibility state; presented as Ready
   | "IN_PROGRESS"     // Agent actively working
   | "REVIEW"          // Agent submitted for review
   | "NEEDS_APPROVAL"  // Waiting for human approval
@@ -49,6 +50,7 @@ export interface Task {
   selfReview?: string;
   evidence?: string[];
   blockedReason?: string;
+  stateEnteredAt?: number;
   metadata: Record<string, any>;
 }
 
@@ -84,6 +86,7 @@ export interface UpdateTaskInput {
   selfReview?: string;
   evidence?: string[];
   blockedReason?: string;
+  stateEnteredAt?: number;
   metadata?: Record<string, any>;
 }
 

@@ -111,7 +111,7 @@ export const findBestAgent = query({
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .filter((q) =>
         q.or(
-          q.eq(q.field("status"), "ASSIGNED"),
+          q.or(q.eq(q.field("status"), "READY"), q.eq(q.field("status"), "ASSIGNED")),
           q.eq(q.field("status"), "IN_PROGRESS")
         )
       )
@@ -214,7 +214,7 @@ export const getRecommendations = query({
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .filter((q) =>
         q.or(
-          q.eq(q.field("status"), "ASSIGNED"),
+          q.or(q.eq(q.field("status"), "READY"), q.eq(q.field("status"), "ASSIGNED")),
           q.eq(q.field("status"), "IN_PROGRESS")
         )
       )
@@ -316,7 +316,7 @@ export const autoAssign = mutation({
       .withIndex("by_project", (q) => q.eq("projectId", task.projectId))
       .filter((q) =>
         q.or(
-          q.eq(q.field("status"), "ASSIGNED"),
+          q.or(q.eq(q.field("status"), "READY"), q.eq(q.field("status"), "ASSIGNED")),
           q.eq(q.field("status"), "IN_PROGRESS")
         )
       )
@@ -384,7 +384,8 @@ export const autoAssign = mutation({
     // Assign task
     await ctx.db.patch(args.taskId, {
       assigneeIds: [...task.assigneeIds, result.agent._id],
-      status: "ASSIGNED",
+      status: "READY",
+      stateEnteredAt: Date.now(),
     });
     
     // Create activity

@@ -266,7 +266,7 @@ export class WorkflowExecutor {
 
     const assignment = await this.client.mutation(api.tasks.transition, {
       taskId,
-      toStatus: "ASSIGNED",
+      toStatus: "READY",
       actorType: "SYSTEM",
       actorUserId: "workflow-executor",
       idempotencyKey: `workflow:${run.runId}:${stepDefinition.id}:assign:${run.steps[stepIndex].retryCount}`,

@@ -260,7 +260,7 @@ describe("CommandCenterView", () => {
         expect.objectContaining({
           taskId: "task-blocked",
           projectId: "project-1",
-          toStatus: "ASSIGNED",
+          toStatus: "READY",
           actorType: "HUMAN",
           actorUserId: "operator",
           reason: "Unblocked from Command Center",

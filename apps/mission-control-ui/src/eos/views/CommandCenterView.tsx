@@ -568,10 +568,14 @@ export function CommandCenterView({
       await transitionTask({
         taskId,
         projectId,
-        toStatus: "ASSIGNED",
+        toStatus: "READY",
         actorType: "HUMAN",
         actorUserId: "operator",
         reason: "Unblocked from Command Center",
+        blockerResolution: {
+          resolution: "RESOLVED",
+          reason: "Operator resolved the blocker from Command Center",
+        },
         idempotencyKey: `command-center-unblock-${taskId}-${Date.now()}`,
       });
     },

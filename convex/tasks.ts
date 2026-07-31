@@ -30,13 +30,17 @@ import {
   loadTaskProjections,
   taskWorkOrderLinkError,
 } from "./lib/taskProjection";
+import {
+  buildWorkflowStateCompatibilityReport,
+  validateWorkflowTransitionContext,
+} from "./lib/taskWorkflowState";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type TaskStatus = 
-  | "INBOX" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW" 
+export type TaskStatus =
+  | "INBOX" | "READY" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW"
   | "NEEDS_APPROVAL" | "BLOCKED" | "FAILED" | "DONE" | "CANCELED";
 
 export type TaskSource = "DASHBOARD" | "TELEGRAM" | "GITHUB" | "AGENT" | "API" | "TRELLO" | "SEED" | "MISSION_PROMPT";
@@ -58,6 +62,7 @@ export type TaskType =
 
 const taskStatusValidator = v.union(
   v.literal("INBOX"),
+  v.literal("READY"),
   v.literal("ASSIGNED"),
   v.literal("IN_PROGRESS"),
   v.literal("REVIEW"),
@@ -90,18 +95,28 @@ interface TransitionRule {
   requiresWorkPlan?: boolean;
   requiresDeliverable?: boolean;
   requiresChecklist?: boolean;
+  requiresAssignee?: boolean;
   humanOnly?: boolean;
 }
 
 const TRANSITION_RULES: TransitionRule[] = [
   // FROM INBOX
+  { from: "INBOX", to: "READY", allowedActors: ["AGENT", "HUMAN", "SYSTEM"], requiresAssignee: true },
   { from: "INBOX", to: "ASSIGNED", allowedActors: ["AGENT", "HUMAN", "SYSTEM"] },
   { from: "INBOX", to: "CANCELED", allowedActors: ["HUMAN"] },
   
   // FROM ASSIGNED
+  { from: "ASSIGNED", to: "READY", allowedActors: ["HUMAN", "SYSTEM"] },
   { from: "ASSIGNED", to: "IN_PROGRESS", allowedActors: ["AGENT", "HUMAN"], requiresWorkPlan: true },
   { from: "ASSIGNED", to: "INBOX", allowedActors: ["HUMAN"] },
   { from: "ASSIGNED", to: "CANCELED", allowedActors: ["HUMAN"] },
+
+  // FROM READY
+  { from: "READY", to: "IN_PROGRESS", allowedActors: ["AGENT", "HUMAN"], requiresWorkPlan: true },
+  { from: "READY", to: "INBOX", allowedActors: ["HUMAN"] },
+  { from: "READY", to: "BLOCKED", allowedActors: ["HUMAN", "SYSTEM"] },
+  { from: "READY", to: "NEEDS_APPROVAL", allowedActors: ["SYSTEM"] },
+  { from: "READY", to: "CANCELED", allowedActors: ["HUMAN"] },
   
   // FROM IN_PROGRESS
   { from: "IN_PROGRESS", to: "REVIEW", allowedActors: ["AGENT", "HUMAN"], requiresDeliverable: true, requiresChecklist: true },
@@ -110,7 +125,7 @@ const TRANSITION_RULES: TransitionRule[] = [
   { from: "IN_PROGRESS", to: "CANCELED", allowedActors: ["HUMAN"] },
   
   // FROM REVIEW
-  { from: "REVIEW", to: "IN_PROGRESS", allowedActors: ["AGENT", "HUMAN"] }, // Revisions
+  { from: "REVIEW", to: "IN_PROGRESS", allowedActors: ["HUMAN"] }, // Reasoned revision request
   { from: "REVIEW", to: "DONE", allowedActors: ["HUMAN"], humanOnly: true },
   { from: "REVIEW", to: "BLOCKED", allowedActors: ["HUMAN", "SYSTEM"] },
   { from: "REVIEW", to: "NEEDS_APPROVAL", allowedActors: ["HUMAN", "SYSTEM"] },
@@ -126,6 +141,7 @@ const TRANSITION_RULES: TransitionRule[] = [
   { from: "NEEDS_APPROVAL", to: "CANCELED", allowedActors: ["HUMAN"] },
   
   // FROM BLOCKED
+  { from: "BLOCKED", to: "READY", allowedActors: ["HUMAN"] },
   { from: "BLOCKED", to: "ASSIGNED", allowedActors: ["HUMAN"] },
   { from: "BLOCKED", to: "IN_PROGRESS", allowedActors: ["HUMAN"] },
   { from: "BLOCKED", to: "NEEDS_APPROVAL", allowedActors: ["HUMAN", "SYSTEM"] },
@@ -715,6 +731,26 @@ export const getUnifiedTimeline = query({
 });
 
 /**
+ * Read-only, workspace-scoped evidence for a future ASSIGNED -> READY migration.
+ * This query never patches Tasks and deliberately reports exclusions.
+ */
+export const getWorkflowStateCompatibilityReport = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    return {
+      projectId: args.projectId,
+      generatedAt: Date.now(),
+      mutatesData: false as const,
+      ...buildWorkflowStateCompatibilityReport(tasks as any),
+    };
+  },
+});
+
+/**
  * Dry-run transition simulation.
  * Validates transition rules and requirements without mutating task state.
  */
@@ -810,6 +846,15 @@ export const simulateTransition = query({
       });
     }
 
+    if (rule.requiresAssignee && task.assigneeIds.length === 0) {
+      errors.push({ field: "assigneeIds", message: "At least one assignee is required" });
+    }
+
+    errors.push(...validateWorkflowTransitionContext({
+      fromStatus,
+      toStatus,
+    }));
+
     return {
       valid: errors.length === 0,
       fromStatus,
@@ -819,6 +864,7 @@ export const simulateTransition = query({
         requiresWorkPlan: !!rule.requiresWorkPlan,
         requiresDeliverable: !!rule.requiresDeliverable,
         requiresChecklist: !!rule.requiresChecklist,
+        requiresAssignee: !!rule.requiresAssignee,
         humanOnly: !!rule.humanOnly,
       },
       errors,
@@ -892,6 +938,10 @@ export const simulateExecutionPlan = query({
       if (rule.requiresChecklist && !task.reviewChecklist) {
         errors.push({ field: "reviewChecklist", message: "Review checklist required" });
       }
+      if (rule.requiresAssignee && task.assigneeIds.length === 0) {
+        errors.push({ field: "assigneeIds", message: "At least one assignee is required" });
+      }
+      errors.push(...validateWorkflowTransitionContext({ fromStatus, toStatus }));
 
       return {
         valid: errors.length === 0,
@@ -902,6 +952,7 @@ export const simulateExecutionPlan = query({
           requiresWorkPlan: !!rule.requiresWorkPlan,
           requiresDeliverable: !!rule.requiresDeliverable,
           requiresChecklist: !!rule.requiresChecklist,
+          requiresAssignee: !!rule.requiresAssignee,
           humanOnly: !!rule.humanOnly,
         },
         errors,
@@ -1132,6 +1183,7 @@ export const create = mutation({
       description,
       type: args.type as TaskType,
       status: "INBOX",  // INVARIANT: always INBOX at creation
+      stateEnteredAt: Date.now(),
       priority: (args.priority ?? 3) as 1 | 2 | 3 | 4,
       assigneeIds,
       assigneeInstanceIds,
@@ -1327,6 +1379,31 @@ export const transition = mutation({
       })),
     })),
     blockedReason: v.optional(v.string()),
+    reviewOwnerId: v.optional(v.id("agents")),
+    reviewFindings: v.optional(v.array(v.string())),
+    blocker: v.optional(v.object({
+      type: v.union(
+        v.literal("TASK"),
+        v.literal("EXTERNAL"),
+        v.literal("POLICY"),
+        v.literal("APPROVAL"),
+        v.literal("CAPACITY"),
+        v.literal("UNKNOWN")
+      ),
+      reason: v.string(),
+      blockingTaskId: v.optional(v.id("tasks")),
+      ownerRef: v.optional(v.string()),
+      requiredAction: v.optional(v.string()),
+      escalationAt: v.optional(v.number()),
+    })),
+    blockerResolution: v.optional(v.object({
+      resolution: v.union(
+        v.literal("RESOLVED"),
+        v.literal("WAIVED"),
+        v.literal("REPLACED")
+      ),
+      reason: v.string(),
+    })),
   },
   handler: async (ctx, args) => {
     // 1. Check idempotency - return existing if same key
@@ -1477,6 +1554,36 @@ export const transition = mutation({
     if (rule.requiresChecklist && !effectiveReviewChecklist) {
       errors.push({ field: "reviewChecklist", message: "Review checklist required for REVIEW" });
     }
+    if (rule.requiresAssignee && task.assigneeIds.length === 0) {
+      errors.push({ field: "assigneeIds", message: "Task must have at least one assignee" });
+    }
+
+    errors.push(...validateWorkflowTransitionContext({
+      fromStatus,
+      toStatus,
+      reason: args.reason,
+      blocker: args.blocker,
+      blockerResolution: args.blockerResolution,
+    }));
+
+    if (args.reviewOwnerId) {
+      const reviewOwner = await ctx.db.get(args.reviewOwnerId);
+      if (!reviewOwner || reviewOwner.projectId !== task.projectId) {
+        errors.push({
+          field: "reviewOwnerId",
+          message: "Review owner must belong to the selected workspace",
+        });
+      }
+    }
+    if (args.blocker?.blockingTaskId) {
+      const blockingTask = await ctx.db.get(args.blocker.blockingTaskId);
+      if (!blockingTask || blockingTask.projectId !== task.projectId) {
+        errors.push({
+          field: "blocker.blockingTaskId",
+          message: "Blocking Task must belong to the selected workspace",
+        });
+      }
+    }
     
     // Output validation when transitioning to REVIEW (format, length, checklist)
     if (toStatus === "REVIEW") {
@@ -1526,14 +1633,80 @@ export const transition = mutation({
     
     // 7. Build task update
     const now = Date.now();
+    const actorRef =
+      args.actorUserId ?? args.actorAgentId?.toString() ?? args.actorType;
     const taskUpdate: any = {
       status: toStatus,
+      stateEnteredAt: now,
     };
     
     if (args.workPlan) taskUpdate.workPlan = args.workPlan;
     if (args.deliverable) taskUpdate.deliverable = args.deliverable;
     if (args.reviewChecklist) taskUpdate.reviewChecklist = args.reviewChecklist;
     if (args.blockedReason) taskUpdate.blockedReason = args.blockedReason;
+
+    if (toStatus === "REVIEW") {
+      const priorReview = task.review;
+      const priorHistory = priorReview?.history ?? [];
+      taskUpdate.review = {
+        ownerId: args.reviewOwnerId ?? task.reviewerId ?? priorReview?.ownerId,
+        enteredAt: now,
+        resubmissionCount:
+          (priorReview?.resubmissionCount ?? task.reviewCycles) +
+          (priorReview?.result === "CHANGES_REQUESTED" ? 1 : 0),
+        history: priorHistory,
+      };
+      if (args.reviewOwnerId) taskUpdate.reviewerId = args.reviewOwnerId;
+    }
+
+    if (fromStatus === "REVIEW" && ["IN_PROGRESS", "DONE", "NEEDS_APPROVAL"].includes(toStatus)) {
+      const result =
+        toStatus === "IN_PROGRESS"
+          ? "CHANGES_REQUESTED"
+          : toStatus === "DONE"
+            ? "APPROVED"
+            : "ESCALATED";
+      const decision = {
+        result,
+        reason: args.reason?.trim() || undefined,
+        findings: args.reviewFindings,
+        completedAt: now,
+        decidedBy: actorRef,
+      };
+      taskUpdate.review = {
+        ...(task.review ?? { resubmissionCount: task.reviewCycles }),
+        completedAt: now,
+        result,
+        reason: decision.reason,
+        findings: args.reviewFindings,
+        findingsCount: args.reviewFindings?.length ?? 0,
+        decidedBy: actorRef,
+        history: [...(task.review?.history ?? []), decision],
+      };
+    }
+
+    if (toStatus === "BLOCKED" && args.blocker) {
+      taskUpdate.blockedReason = args.blocker.reason.trim();
+      taskUpdate.blocker = {
+        ...args.blocker,
+        reason: args.blocker.reason.trim(),
+        blockedSince: now,
+      };
+    }
+
+    if (fromStatus === "BLOCKED" && args.blockerResolution) {
+      taskUpdate.blocker = {
+        ...(task.blocker ?? {
+          type: "UNKNOWN",
+          reason: task.blockedReason ?? "Legacy blocker without structured context",
+          blockedSince: task.stateEnteredAt ?? task._creationTime,
+        }),
+        resolvedAt: now,
+        resolution: args.blockerResolution.resolution,
+        resolutionReason: args.blockerResolution.reason.trim(),
+        resolvedBy: actorRef,
+      };
+    }
     
     // Set timestamps
     if (toStatus === "IN_PROGRESS" && !task.startedAt) {
@@ -1571,6 +1744,9 @@ export const transition = mutation({
         workPlan: effectiveWorkPlan,
         deliverable: effectiveDeliverable,
         reviewChecklist: effectiveReviewChecklist,
+        review: taskUpdate.review,
+        blocker: taskUpdate.blocker,
+        blockerResolution: args.blockerResolution,
       },
     });
 
@@ -1603,8 +1779,8 @@ export const transition = mutation({
       targetId: args.taskId,
       taskId: args.taskId,
       agentId: args.actorAgentId,
-      beforeState: { status: fromStatus },
-      afterState: { status: toStatus },
+      beforeState: { status: fromStatus, review: task.review, blocker: task.blocker },
+      afterState: { status: toStatus, review: taskUpdate.review, blocker: taskUpdate.blocker },
     });
 
     await logTaskEvent(ctx, {
@@ -1614,8 +1790,8 @@ export const transition = mutation({
       actorType,
       actorId: args.actorAgentId?.toString() ?? args.actorUserId,
       relatedId: transitionId,
-      beforeState: { status: fromStatus },
-      afterState: { status: toStatus },
+      beforeState: { status: fromStatus, review: task.review, blocker: task.blocker },
+      afterState: { status: toStatus, review: taskUpdate.review, blocker: taskUpdate.blocker },
       metadata: {
         reason: args.reason,
         sessionKey: args.sessionKey,
@@ -1651,7 +1827,7 @@ export const transition = mutation({
     }
 
     // Notifications: when transitioning to ASSIGNED, notify each assignee
-    if (toStatus === "ASSIGNED" && updatedTask && updatedTask.assigneeIds.length > 0) {
+    if (["READY", "ASSIGNED"].includes(toStatus) && updatedTask && updatedTask.assigneeIds.length > 0) {
       for (const agentId of updatedTask.assigneeIds) {
         await ctx.db.insert("notifications", {
           projectId: updatedTask.projectId,
@@ -1735,6 +1911,7 @@ export const supersedeWorkflowAttempt = mutation({
     const fromStatus = task.status as TaskStatus;
     await ctx.db.patch(args.taskId, {
       status: "CANCELED",
+      stateEnteredAt: now,
       completedAt: now,
       metadata: {
         ...metadata,
@@ -1920,6 +2097,7 @@ export const resolveApprovedWorkflowGate = mutation({
     };
     await ctx.db.patch(args.taskId, {
       status: "DONE",
+      stateEnteredAt: now,
       completedAt: now,
       deliverable,
       reviewChecklist,
@@ -2037,11 +2215,11 @@ export const assign = mutation({
       assigneeInstanceIds,
     });
     
-    // If task is in INBOX, transition to ASSIGNED
+    // If task is in INBOX, enter the canonical execution-ready state.
     if (task.status === "INBOX") {
       return await ctx.runMutation(api.tasks.transition, {
         taskId: args.taskId,
-        toStatus: "ASSIGNED",
+        toStatus: "READY",
         actorType: args.actorType,
         actorUserId: args.actorUserId,
         idempotencyKey: args.idempotencyKey,

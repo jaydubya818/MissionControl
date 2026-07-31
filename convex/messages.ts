@@ -355,24 +355,59 @@ export const postReview = mutation({
     });
     
     // Handle review type actions
-    if (args.reviewType === "CHANGESET" || args.reviewType === "REQUEST_CHANGES") {
+    if (["CHANGESET", "REQUEST_CHANGES", "REJECT"].includes(args.reviewType)) {
+      const reason = args.comments.trim();
+      if (task.status !== "REVIEW") {
+        throw new Error("Changes can only be requested while the task is in Review.");
+      }
+      if (args.authorType !== "HUMAN") {
+        throw new Error("Only a human reviewer can request changes.");
+      }
+      if (reason.length < 10) {
+        throw new Error("A review rejection reason of at least 10 characters is required.");
+      }
+      const now = Date.now();
+      const findings = args.changeset?.map((change) =>
+        `${change.file}${change.lineNumber ? `:${change.lineNumber}` : ""} — ${change.change}`
+      );
+      const decision = {
+        result: "CHANGES_REQUESTED" as const,
+        reason,
+        findings,
+        completedAt: now,
+        decidedBy: args.authorUserId ?? args.authorAgentId?.toString() ?? "HUMAN",
+      };
+      const review = {
+        ...(task.review ?? { resubmissionCount: task.reviewCycles }),
+        completedAt: now,
+        result: decision.result,
+        reason,
+        findings,
+        findingsCount: findings?.length ?? 0,
+        decidedBy: decision.decidedBy,
+        history: [...(task.review?.history ?? []), decision],
+      };
       // Move task back to IN_PROGRESS for revisions
       await ctx.db.patch(args.taskId, {
         status: "IN_PROGRESS",
+        stateEnteredAt: now,
         reviewCycles: task.reviewCycles + 1,
+        review,
       });
       
       // Create transition record
       await ctx.db.insert("taskTransitions", {
         projectId: task.projectId,
-        idempotencyKey: args.idempotencyKey || `review-changeset-${args.taskId}-${Date.now()}`,
+        idempotencyKey: args.idempotencyKey || `review-changeset-${args.taskId}-${now}`,
         taskId: args.taskId,
         fromStatus: task.status,
         toStatus: "IN_PROGRESS",
         actorType: args.authorType as any,
         actorAgentId: args.authorAgentId,
         actorUserId: args.authorUserId,
-        reason: "Changes requested in review",
+        reason,
+        validationResult: { valid: true },
+        artifactsSnapshot: { review },
       });
     } else if (args.reviewType === "APPROVE" && args.authorAgentId) {
       // Create approval record for REVIEW → DONE

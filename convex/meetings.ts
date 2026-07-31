@@ -255,6 +255,7 @@ export const convertActionItems = mutation({
         description: `Action item from meeting: ${meeting.title}`,
         type: "OPS",
         status: "INBOX",
+        stateEnteredAt: Date.now(),
         priority: 3,
         assigneeIds: [],
         assigneeInstanceIds: [],

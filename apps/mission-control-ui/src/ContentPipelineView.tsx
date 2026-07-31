@@ -556,7 +556,7 @@ export function ContentPipelineView({ projectId }: ContentPipelineViewProps) {
 
   const columnItems: Record<string, typeof captures> = {
     idea:      captures.filter((t) => t.status === "INBOX"),
-    drafting:  captures.filter((t) => ["ASSIGNED", "IN_PROGRESS"].includes(t.status)),
+    drafting:  captures.filter((t) => ["READY", "ASSIGNED", "IN_PROGRESS"].includes(t.status)),
     review:    captures.filter((t) => ["REVIEW", "NEEDS_APPROVAL"].includes(t.status)),
     published: captures.filter((t) => t.status === "DONE"),
   };

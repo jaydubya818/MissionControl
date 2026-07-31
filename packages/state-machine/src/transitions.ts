@@ -24,6 +24,13 @@ export const TRANSITION_RULES: TransitionRule[] = [
   // FROM: INBOX
   {
     from: "INBOX",
+    to: "READY",
+    allowedActors: ["agent", "human", "system"],
+    requiresArtifacts: ["assigneeIds"],
+    description: "Assign and prepare task for execution",
+  },
+  {
+    from: "INBOX",
     to: "ASSIGNED",
     allowedActors: ["agent", "human", "system"],
     requiresArtifacts: ["assigneeIds"],
@@ -49,6 +56,12 @@ export const TRANSITION_RULES: TransitionRule[] = [
   },
 
   // FROM: ASSIGNED
+  {
+    from: "ASSIGNED",
+    to: "READY",
+    allowedActors: ["human", "system"],
+    description: "Normalize a legacy assigned task to ready",
+  },
   {
     from: "ASSIGNED",
     to: "IN_PROGRESS",
@@ -81,6 +94,38 @@ export const TRANSITION_RULES: TransitionRule[] = [
     description: "Unassign task (human only)",
   },
 
+  // FROM: READY
+  {
+    from: "READY",
+    to: "IN_PROGRESS",
+    allowedActors: ["agent", "human"],
+    requiresArtifacts: ["workPlan"],
+    description: "Start a ready task",
+  },
+  {
+    from: "READY",
+    to: "INBOX",
+    allowedActors: ["human"],
+    description: "Return a ready task to intake",
+  },
+  {
+    from: "READY",
+    to: "NEEDS_APPROVAL",
+    allowedActors: ["system"],
+    description: "Require approval before starting a ready task",
+  },
+  {
+    from: "READY",
+    to: "BLOCKED",
+    allowedActors: ["system", "human"],
+    description: "Block a ready task",
+  },
+  {
+    from: "READY",
+    to: "CANCELED",
+    allowedActors: ["human"],
+    description: "Cancel a ready task",
+  },
   // FROM: IN_PROGRESS
   {
     from: "IN_PROGRESS",
@@ -124,8 +169,8 @@ export const TRANSITION_RULES: TransitionRule[] = [
   {
     from: "REVIEW",
     to: "IN_PROGRESS",
-    allowedActors: ["agent", "human"],
-    description: "Request revisions",
+    allowedActors: ["human"],
+    description: "Request revisions with retained reviewer context",
   },
   {
     from: "REVIEW",
@@ -211,6 +256,12 @@ export const TRANSITION_RULES: TransitionRule[] = [
   },
 
   // FROM: BLOCKED
+  {
+    from: "BLOCKED",
+    to: "READY",
+    allowedActors: ["human"],
+    description: "Resolve blocker and return to ready",
+  },
   {
     from: "BLOCKED",
     to: "ASSIGNED",

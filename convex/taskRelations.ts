@@ -139,7 +139,19 @@ export const create = mutation({
       const isDone =
         targetTask.status === "DONE" || targetTask.status === "CANCELED";
       if (!isDone) {
-        await ctx.db.patch(args.targetTaskId, { status: "CANCELED" });
+        const now = Date.now();
+        const reason = `Duplicate of task "${sourceTask.title}"`;
+        await ctx.db.patch(args.targetTaskId, { status: "CANCELED", stateEnteredAt: now });
+        await ctx.db.insert("taskTransitions", {
+          projectId: targetTask.projectId,
+          idempotencyKey: `duplicate:${relationId}:${args.targetTaskId}`,
+          taskId: args.targetTaskId,
+          fromStatus: targetTask.status,
+          toStatus: "CANCELED",
+          actorType: "SYSTEM",
+          reason,
+          validationResult: { valid: true },
+        });
         await ctx.db.insert("activities", {
           projectId: targetTask.projectId,
           actorType: "SYSTEM",

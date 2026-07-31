@@ -97,7 +97,7 @@ export class AgentBot {
         const tasks = await this.convex.query(api.tasks.listByAgent, { agentId: this.agentId });
 
         const activeTasks = tasks.filter((t: any) =>
-          t.status === "IN_PROGRESS" || t.status === "ASSIGNED"
+          t.status === "IN_PROGRESS" || t.status === "READY" || t.status === "ASSIGNED"
         );
 
         let message = `📊 ${this.agentName} Status:\n\n`;
@@ -142,7 +142,7 @@ export class AgentBot {
           byStatus[task.status].push(task);
         });
 
-        const statusOrder = ["IN_PROGRESS", "ASSIGNED", "REVIEW", "BLOCKED", "DONE"];
+        const statusOrder = ["IN_PROGRESS", "READY", "ASSIGNED", "REVIEW", "BLOCKED", "DONE"];
 
         statusOrder.forEach(status => {
           const statusTasks = byStatus[status] || [];
@@ -232,6 +232,7 @@ export class AgentBot {
   private getStatusEmoji(status: string): string {
     const emojis: Record<string, string> = {
       "INBOX": "📥",
+      "READY": "📌",
       "ASSIGNED": "📌",
       "IN_PROGRESS": "🔄",
       "REVIEW": "👀",

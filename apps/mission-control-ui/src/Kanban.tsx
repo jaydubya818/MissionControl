@@ -53,7 +53,7 @@ type TaskStatus = Doc<"tasks">["status"];
 
 const COLUMNS: { status: TaskStatus; label: string; color: string; icon: LucideIcon }[] = [
   { status: "INBOX", label: "Inbox", color: "text-ink-muted", icon: Inbox },
-  { status: "ASSIGNED", label: "Assigned", color: "text-ink-muted", icon: UserCheck },
+  { status: "READY", label: "Ready", color: "text-ink-muted", icon: UserCheck },
   { status: "IN_PROGRESS", label: "In Progress", color: "text-ink-muted", icon: Play },
   { status: "REVIEW", label: "Review", color: "text-ink-muted", icon: Eye },
   { status: "NEEDS_APPROVAL", label: "Needs Approval", color: "text-ink-muted", icon: ShieldAlert },
@@ -66,6 +66,7 @@ const COLUMNS: { status: TaskStatus; label: string; color: string; icon: LucideI
 /** Flat status-dot colors per UI_STYLE_GUIDE task-state mapping. */
 const COLUMN_DOT: Record<string, string> = {
   INBOX: "bg-ink-muted",
+  READY: "bg-info-accent",
   ASSIGNED: "bg-ink-muted",
   IN_PROGRESS: "bg-info-accent",
   REVIEW: "bg-info-accent",
@@ -81,12 +82,21 @@ type Task = {
   title: string;
   type: string;
   status: TaskStatus;
+  presentationStatus: TaskStatus;
   priority: number;
   actualCost: number;
   estimatedCost?: number;
   assigneeIds: Id<"agents">[];
   labels?: string[];
   blockedReason?: string;
+  blocker?: {
+    type: string;
+    reason: string;
+    ownerRef?: string;
+    requiredAction?: string;
+    blockedSince: number;
+    resolvedAt?: number;
+  };
   source?: string;
   sourceRef?: string;
   identifier?: string;
@@ -129,7 +139,8 @@ const SOURCE_CONFIG: Record<string, { label: string; isSpecial?: boolean }> = {
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   INBOX: "Inbox",
-  ASSIGNED: "Assigned",
+  READY: "Ready",
+  ASSIGNED: "Ready (legacy)",
   IN_PROGRESS: "In Progress",
   REVIEW: "Review",
   NEEDS_APPROVAL: "Needs Approval",
@@ -206,7 +217,7 @@ export function Kanban({
     (agents as Doc<"agents">[]).map((a: Doc<"agents">) => [a._id, a])
   );
   const byStatus = (status: TaskStatus) =>
-    filteredTasks.filter((t: Doc<"tasks">) => t.status === status);
+    filteredTasks.filter((task) => task.presentationStatus === status);
 
   const handleMoveTo = async (taskId: Id<"tasks">, fromStatus: TaskStatus, toStatus: TaskStatus) => {
     try {
@@ -554,10 +565,10 @@ function Card({
         )}
 
         {/* Blocked reason */}
-        {task.blockedReason && (
+        {task.status === "BLOCKED" && (task.blocker?.reason || task.blockedReason) && (
           <div className="text-[12.5px] px-2 py-1.5 bg-err-soft text-err rounded-md mb-2 flex items-start gap-1.5">
             <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" strokeWidth={1.75} />
-            <span className="line-clamp-2">{task.blockedReason}</span>
+            <span className="line-clamp-2">{task.blocker?.reason ?? task.blockedReason}</span>
           </div>
         )}
 

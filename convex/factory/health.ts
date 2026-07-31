@@ -170,7 +170,7 @@ export const getFactoryHealth = query({
     };
 
     const maturityStage: MaturityStage = computeMaturityStage({
-      hasIssueDispatch: workOrders.length > 0 || tasks.some((t) => t.status === "ASSIGNED"),
+      hasIssueDispatch: workOrders.length > 0 || tasks.some((t) => t.status === "READY" || t.status === "ASSIGNED"),
       hasOuterLoop: activeVerifiers.length > 0 || completedEvals.length > 0,
       hasMetaLoop: metaFiltered.length > 0,
       interactiveOnly: runsCurrent.length > 0 && doneCurrent.length === 0,
@@ -379,7 +379,7 @@ export const workLedger = query({
       tasks = tasks.filter((t) => t.projectId === args.projectId);
     }
 
-    const todo = tasks.filter((t) => t.status === "INBOX" || t.status === "ASSIGNED");
+    const todo = tasks.filter((t) => t.status === "INBOX" || t.status === "READY" || t.status === "ASSIGNED");
     const inProgress = tasks.filter(
       (t) => t.status === "IN_PROGRESS" || t.status === "REVIEW" || t.status === "NEEDS_APPROVAL"
     );

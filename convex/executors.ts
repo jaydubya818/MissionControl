@@ -86,8 +86,29 @@ export const handleExecutionCallback = mutation({
     
     // Update task based on result
     if (args.status === "COMPLETED") {
+      const now = Date.now();
+      const review = {
+        enteredAt: now,
+        resubmissionCount: task.review?.resubmissionCount ?? task.reviewCycles,
+        history: task.review?.history ?? [],
+      };
       await ctx.db.patch(args.taskId, {
         status: "REVIEW",
+        stateEnteredAt: now,
+        submittedAt: now,
+        review,
+      });
+
+      await ctx.db.insert("taskTransitions", {
+        projectId: task.projectId,
+        idempotencyKey: `executor-completed:${args.taskId}:${now}`,
+        taskId: args.taskId,
+        fromStatus: task.status,
+        toStatus: "REVIEW",
+        actorType: "SYSTEM",
+        reason: "Executor completed the task and submitted it for review.",
+        validationResult: { valid: true },
+        artifactsSnapshot: { review },
       });
       
       // Log activity
@@ -101,8 +122,32 @@ export const handleExecutionCallback = mutation({
         metadata: { result: args.result, artifacts: args.artifacts },
       });
     } else if (args.status === "FAILED") {
+      const now = Date.now();
+      const reason = args.error?.trim() || "Executor failed without returning an error message.";
+      const blocker = {
+        type: "UNKNOWN" as const,
+        reason,
+        ownerRef: "operator",
+        requiredAction: "Inspect the failed execution evidence, then retry or reassign the task.",
+        blockedSince: now,
+      };
       await ctx.db.patch(args.taskId, {
         status: "BLOCKED",
+        stateEnteredAt: now,
+        blockedReason: reason,
+        blocker,
+      });
+
+      await ctx.db.insert("taskTransitions", {
+        projectId: task.projectId,
+        idempotencyKey: `executor-failed:${args.taskId}:${now}`,
+        taskId: args.taskId,
+        fromStatus: task.status,
+        toStatus: "BLOCKED",
+        actorType: "SYSTEM",
+        reason,
+        validationResult: { valid: true },
+        artifactsSnapshot: { blocker },
       });
       
       // Log activity

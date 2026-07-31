@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
-  ClipboardCheck,
   FlaskConical,
   Layers,
   Rocket,
@@ -91,6 +90,48 @@ export const DOCS_SITE_SECTIONS: DocsSiteSection[] = [
         description: "Invalid workspace recovery, isolation, and browser evidence",
         path: "software-factory-enhancement/docs-001-workspace-routing-results",
       },
+      {
+        id: "task-workorder-pr1-implementation",
+        title: "Task-to-Work-Order PR 1",
+        description: "Canonical Task parentage, governance, and Attempt projection",
+        path: "software-factory-enhancement/implementation/task-workorder-pr1",
+      },
+      {
+        id: "task-workorder-pr1-browser-results",
+        title: "Task-to-Work-Order Browser Results",
+        description: "Deterministic governed and Ungoverned Task evidence",
+        path: "software-factory-enhancement/testing/task-workorder-browser-results",
+      },
+      {
+        id: "ci-schema-drift-repair",
+        title: "CI Schema Drift Repair",
+        description: "Release-gate and automation contract restoration",
+        path: "software-factory-enhancement/testing/ci-schema-drift-repair",
+      },
+      {
+        id: "task-attempt-scheduler-pr2-implementation",
+        title: "Task Attempt Scheduler PR 2",
+        description: "Explicit scheduling, immutable Attempts, and governed retry",
+        path: "software-factory-enhancement/implementation/task-attempt-scheduler-pr2",
+      },
+      {
+        id: "task-attempt-scheduler-pr2-browser-results",
+        title: "Task Attempt Scheduler Browser Results",
+        description: "Deterministic start, failure, retry, and persistence evidence",
+        path: "software-factory-enhancement/testing/task-attempt-scheduler-browser-results",
+      },
+      {
+        id: "workflow-state-cleanup-pr3-implementation",
+        title: "Workflow State Cleanup PR 3",
+        description: "Canonical Ready state and structured Review/Blocked context",
+        path: "software-factory-enhancement/implementation/workflow-state-cleanup-pr3",
+      },
+      {
+        id: "workflow-state-cleanup-pr3-browser-results",
+        title: "Workflow State Cleanup Browser Results",
+        description: "Reasoned transitions, persistence, compatibility, and audit evidence",
+        path: "software-factory-enhancement/testing/workflow-state-cleanup-browser-results",
+      },
     ],
   },
   {
@@ -165,43 +206,6 @@ export const DOCS_SITE_SECTIONS: DocsSiteSection[] = [
       { id: "discover", title: "Discover & install", path: "registry/discover-and-install" },
       { id: "cdl", title: "Context CDL", path: "registry/context-cdl" },
       { id: "evals", title: "Eval runs", path: "registry/eval-runs" },
-    ],
-  },
-  {
-    id: "software-factory-enhancement",
-    label: "Software Factory Enhancement",
-    icon: ClipboardCheck,
-    pages: [
-      {
-        id: "task-workorder-pr1-implementation",
-        title: "Task-to-Work-Order PR 1",
-        description: "Canonical Task parentage, governance, and Attempt projection",
-        path: "software-factory-enhancement/implementation/task-workorder-pr1",
-      },
-      {
-        id: "task-workorder-pr1-browser-results",
-        title: "Task-to-Work-Order Browser Results",
-        description: "Deterministic governed and Ungoverned Task evidence",
-        path: "software-factory-enhancement/testing/task-workorder-browser-results",
-      },
-      {
-        id: "ci-schema-drift-repair",
-        title: "CI Schema Drift Repair",
-        description: "Release-gate and automation contract restoration",
-        path: "software-factory-enhancement/testing/ci-schema-drift-repair",
-      },
-      {
-        id: "task-attempt-scheduler-pr2-implementation",
-        title: "Task Attempt Scheduler PR 2",
-        description: "Explicit scheduling, immutable Attempts, and governed retry",
-        path: "software-factory-enhancement/implementation/task-attempt-scheduler-pr2",
-      },
-      {
-        id: "task-attempt-scheduler-pr2-browser-results",
-        title: "Task Attempt Scheduler Browser Results",
-        description: "Deterministic start, failure, retry, and persistence evidence",
-        path: "software-factory-enhancement/testing/task-attempt-scheduler-browser-results",
-      },
     ],
   },
   {

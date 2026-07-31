@@ -183,6 +183,7 @@ export async function updateThreadStatus(
     const priorityEmoji = task.priority === 1 ? "🔴" : task.priority === 2 ? "🟠" : "🔵";
     const statusEmoji = {
       INBOX: "📥",
+      READY: "📌",
       ASSIGNED: "👤",
       IN_PROGRESS: "⚙️",
       REVIEW: "👀",

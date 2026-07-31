@@ -15,7 +15,7 @@ describe("Transition Rules", () => {
 
   it("all rules reference valid states", () => {
     const validStates = [
-      "INBOX", "ASSIGNED", "IN_PROGRESS", "REVIEW",
+      "INBOX", "READY", "ASSIGNED", "IN_PROGRESS", "REVIEW",
       "NEEDS_APPROVAL", "BLOCKED", "FAILED", "DONE", "CANCELED",
     ];
     for (const rule of TRANSITION_RULES) {
@@ -63,6 +63,7 @@ describe("getValidTransitions", () => {
     const transitions = getValidTransitions("INBOX");
     expect(transitions.length).toBeGreaterThan(0);
     const targets = transitions.map((r) => r.to);
+    expect(targets).toContain("READY");
     expect(targets).toContain("ASSIGNED");
     expect(targets).toContain("CANCELED");
   });
@@ -89,6 +90,12 @@ describe("findTransitionRule", () => {
     expect(rule?.requiresArtifacts).toContain("assigneeIds");
   });
 
+  it("finds the canonical INBOX -> READY rule", () => {
+    const rule = findTransitionRule("INBOX", "READY");
+    expect(rule).toBeDefined();
+    expect(rule?.requiresArtifacts).toContain("assigneeIds");
+  });
+
   it("returns undefined for invalid transition", () => {
     const rule = findTransitionRule("INBOX", "DONE");
     expect(rule).toBeUndefined();
@@ -103,6 +110,8 @@ describe("findTransitionRule", () => {
 describe("isValidTransition", () => {
   it("allows valid transitions", () => {
     expect(isValidTransition("INBOX", "ASSIGNED")).toBe(true);
+    expect(isValidTransition("INBOX", "READY")).toBe(true);
+    expect(isValidTransition("READY", "IN_PROGRESS")).toBe(true);
     expect(isValidTransition("ASSIGNED", "IN_PROGRESS")).toBe(true);
     expect(isValidTransition("IN_PROGRESS", "REVIEW")).toBe(true);
     expect(isValidTransition("REVIEW", "DONE")).toBe(true);
@@ -117,7 +126,7 @@ describe("isValidTransition", () => {
   });
 
   it("allows self-loop detection: no state can transition to itself", () => {
-    const states = ["INBOX", "ASSIGNED", "IN_PROGRESS", "REVIEW",
+    const states = ["INBOX", "READY", "ASSIGNED", "IN_PROGRESS", "REVIEW",
       "NEEDS_APPROVAL", "BLOCKED", "FAILED", "DONE", "CANCELED"] as const;
     for (const state of states) {
       expect(isValidTransition(state, state)).toBe(false);

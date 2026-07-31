@@ -171,21 +171,35 @@ async function blockTaskForLoop(
     detail?: string;
   }
 ) {
+  const now = Date.now();
+  const reason = `Loop detected: ${loopData.type} (${loopData.count} > ${loopData.threshold})${loopData.detail ? ` — ${loopData.detail}` : ""}`;
+  const blocker = {
+    type: "POLICY" as const,
+    reason,
+    ownerRef: "operator",
+    requiredAction: "Review the loop evidence and choose retry, reassignment, or cancellation.",
+    blockedSince: now,
+  };
+
   // Move task to BLOCKED
   await ctx.db.patch(task._id, {
     status: "BLOCKED",
-    blockedReason: `Loop detected: ${loopData.type} (${loopData.count} > ${loopData.threshold})${loopData.detail ? ` — ${loopData.detail}` : ""}`,
+    stateEnteredAt: now,
+    blockedReason: reason,
+    blocker,
   });
   
   // Create transition record
   await ctx.db.insert("taskTransitions", {
     projectId: task.projectId,
-    idempotencyKey: `loop:${task._id}:${Date.now()}`,
+    idempotencyKey: `loop:${task._id}:${now}`,
     taskId: task._id,
     fromStatus: task.status,
     toStatus: "BLOCKED",
     actorType: "SYSTEM",
     reason: `Loop detected: ${loopData.type}`,
+    validationResult: { valid: true },
+    artifactsSnapshot: { blocker },
   });
   
   // Create alert

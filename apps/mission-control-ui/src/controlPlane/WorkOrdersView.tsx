@@ -259,7 +259,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
     const tasks = selected?.childTasks ?? [];
     return {
       total: tasks.length,
-      active: tasks.filter((task) => ["ASSIGNED", "IN_PROGRESS"].includes(task.status)).length,
+      active: tasks.filter((task) => ["READY", "ASSIGNED", "IN_PROGRESS"].includes(task.status)).length,
       review: tasks.filter((task) => ["REVIEW", "NEEDS_APPROVAL"].includes(task.status)).length,
       blocked: tasks.filter((task) => task.status === "BLOCKED").length,
       completed: tasks.filter((task) => task.status === "DONE").length,
@@ -888,7 +888,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                             </SelectTrigger>
                             <SelectContent>
                               {selected.childTasks
-                                .filter((task) => ["ASSIGNED", "IN_PROGRESS"].includes(task.status))
+                                .filter((task) => ["READY", "ASSIGNED", "IN_PROGRESS"].includes(task.status))
                                 .map((task) => (
                                   <SelectItem key={task._id} value={task._id}>
                                     {task.identifier ? `${task.identifier} · ` : ""}

@@ -199,6 +199,7 @@ export const decomposeTask = mutation({
         description: `${phase.description} for: ${task.description ?? task.title}`,
         type: (phase.subtaskType ?? task.type) as any,
         status: "INBOX",
+        stateEnteredAt: Date.now(),
         priority: task.priority,
         assigneeIds: [],
         assigneeInstanceIds: [],

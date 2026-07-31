@@ -96,6 +96,7 @@ export const seed = mutation({
       title: "E2E: Verify inbox claim/complete",
       type: "ENGINEERING",
       status: "INBOX",
+      stateEnteredAt: Date.now(),
       priority: 2,
       description: `Test task for E2E inbox roundtrip validation. Run: ${runId}`,
       assigneeIds: [],
@@ -106,7 +107,7 @@ export const seed = mutation({
       metadata: {
         e2eRunId: runId,
         testType: "inbox_roundtrip",
-        expectedStates: ["INBOX", "ASSIGNED", "IN_PROGRESS", "DONE"],
+        expectedStates: ["INBOX", "READY", "IN_PROGRESS", "DONE"],
       },
     });
     
@@ -122,6 +123,7 @@ export const seed = mutation({
       title: "E2E: Submit content drop",
       type: "ENGINEERING",
       status: "INBOX",
+      stateEnteredAt: Date.now(),
       priority: 2,
       description: `Test task for E2E content drop validation. Run: ${runId}`,
       assigneeIds: [],
@@ -148,6 +150,7 @@ export const seed = mutation({
       title: "E2E: Budget ledger write/read",
       type: "ENGINEERING",
       status: "INBOX",
+      stateEnteredAt: Date.now(),
       priority: 2,
       description: `Test task for E2E budget validation. Run: ${runId}`,
       assigneeIds: [],

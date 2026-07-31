@@ -9,11 +9,13 @@ export type AgentStatus = "ACTIVE" | "PAUSED" | "QUARANTINED" | "OFFLINE";
 
 export type TaskStatus =
   | "INBOX"
+  | "READY"
   | "ASSIGNED"
   | "IN_PROGRESS"
   | "REVIEW"
   | "NEEDS_APPROVAL"
   | "BLOCKED"
+  | "FAILED"
   | "DONE"
   | "CANCELED";
 

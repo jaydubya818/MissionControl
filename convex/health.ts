@@ -144,6 +144,7 @@ export const metrics = query({
     
     const tasksByStatus = {
       inbox: tasks.filter((t) => t.status === "INBOX").length,
+      ready: tasks.filter((t) => t.status === "READY" || t.status === "ASSIGNED").length,
       assigned: tasks.filter((t) => t.status === "ASSIGNED").length,
       inProgress: tasks.filter((t) => t.status === "IN_PROGRESS").length,
       review: tasks.filter((t) => t.status === "REVIEW").length,

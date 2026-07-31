@@ -68,8 +68,12 @@ async function evaluateRunPolicy(
       .query("tasks")
       .withIndex("by_status", (q: any) => q.eq("status", "ASSIGNED"))
       .take(1);
-    if (inProgress ?? assigned) {
-      return { allowed: false, reason: "Agents busy (tasks IN_PROGRESS or ASSIGNED)" };
+    const ready = await ctx.db
+      .query("tasks")
+      .withIndex("by_status", (q: any) => q.eq("status", "READY"))
+      .take(1);
+    if (inProgress ?? ready ?? assigned) {
+      return { allowed: false, reason: "Agents busy (tasks IN_PROGRESS or READY)" };
     }
     return { allowed: true, reason: "System idle" };
   }

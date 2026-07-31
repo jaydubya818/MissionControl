@@ -141,7 +141,7 @@ export const reversePrompt = action({
 
     // Build context for AI
     const activeTasks = tasks.filter((t: any) => 
-      t.status === "IN_PROGRESS" || t.status === "ASSIGNED" || t.status === "REVIEW"
+      t.status === "IN_PROGRESS" || t.status === "READY" || t.status === "ASSIGNED" || t.status === "REVIEW"
     );
     const completedTasks = tasks.filter((t: any) => t.status === "DONE");
     const activeAgents = agents.filter((a: any) => a.status === "ACTIVE");

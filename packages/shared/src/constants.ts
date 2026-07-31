@@ -12,6 +12,7 @@ import { TaskStatus, TaskType, AutonomyLevel, ToolRisk } from "./types";
  */
 export const TASK_STATUSES: TaskStatus[] = [
   "INBOX",
+  "READY",
   "ASSIGNED",
   "IN_PROGRESS",
   "REVIEW",
@@ -26,6 +27,7 @@ export const TERMINAL_STATUSES: TaskStatus[] = ["DONE", "CANCELED", "FAILED"];
 
 export const ACTIVE_STATUSES: TaskStatus[] = [
   "INBOX",
+  "READY",
   "ASSIGNED",
   "IN_PROGRESS",
   "REVIEW",

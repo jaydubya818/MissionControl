@@ -29,6 +29,7 @@ const agentStatus = v.union(
 
 const taskStatus = v.union(
   v.literal("INBOX"),
+  v.literal("READY"),
   v.literal("ASSIGNED"),
   v.literal("IN_PROGRESS"),
   v.literal("REVIEW"),
@@ -1427,6 +1428,8 @@ export default defineSchema({
     description: v.optional(v.string()),
     type: taskType,
     status: taskStatus,
+    // Canonical state age anchor. Optional until legacy records are classified.
+    stateEnteredAt: v.optional(v.number()),
     priority: taskPriority,
     
     // Telegram thread reference
@@ -1475,6 +1478,32 @@ export default defineSchema({
       })),
     })),
     reviewCycles: v.number(),
+    review: v.optional(v.object({
+      ownerId: v.optional(v.id("agents")),
+      enteredAt: v.optional(v.number()),
+      completedAt: v.optional(v.number()),
+      result: v.optional(v.union(
+        v.literal("APPROVED"),
+        v.literal("CHANGES_REQUESTED"),
+        v.literal("ESCALATED")
+      )),
+      reason: v.optional(v.string()),
+      findings: v.optional(v.array(v.string())),
+      findingsCount: v.optional(v.number()),
+      resubmissionCount: v.number(),
+      decidedBy: v.optional(v.string()),
+      history: v.optional(v.array(v.object({
+        result: v.union(
+          v.literal("APPROVED"),
+          v.literal("CHANGES_REQUESTED"),
+          v.literal("ESCALATED")
+        ),
+        reason: v.optional(v.string()),
+        findings: v.optional(v.array(v.string())),
+        completedAt: v.number(),
+        decidedBy: v.optional(v.string()),
+      }))),
+    })),
     
     // Cost tracking
     estimatedCost: v.optional(v.number()),
@@ -1506,6 +1535,30 @@ export default defineSchema({
     
     // Block reason
     blockedReason: v.optional(v.string()),
+    blocker: v.optional(v.object({
+      type: v.union(
+        v.literal("TASK"),
+        v.literal("EXTERNAL"),
+        v.literal("POLICY"),
+        v.literal("APPROVAL"),
+        v.literal("CAPACITY"),
+        v.literal("UNKNOWN")
+      ),
+      reason: v.string(),
+      blockingTaskId: v.optional(v.id("tasks")),
+      ownerRef: v.optional(v.string()),
+      requiredAction: v.optional(v.string()),
+      blockedSince: v.number(),
+      escalationAt: v.optional(v.number()),
+      resolvedAt: v.optional(v.number()),
+      resolution: v.optional(v.union(
+        v.literal("RESOLVED"),
+        v.literal("WAIVED"),
+        v.literal("REPLACED")
+      )),
+      resolutionReason: v.optional(v.string()),
+      resolvedBy: v.optional(v.string()),
+    })),
 
     // Redaction tracking
     redactedFields: v.optional(v.array(v.string())),
@@ -1542,6 +1595,7 @@ export default defineSchema({
     .index("by_source", ["source"])
     .index("by_project", ["projectId"])
     .index("by_project_status", ["projectId", "status"])
+    .index("by_project_status_state_entered", ["projectId", "status", "stateEnteredAt"])
     .index("by_work_order", ["workOrderId"])
     .index("by_project_work_order", ["projectId", "workOrderId"])
     .index("by_project_work_order_status", ["projectId", "workOrderId", "status"]),

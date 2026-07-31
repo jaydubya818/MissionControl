@@ -81,7 +81,7 @@ export function AtcBoardView({
     );
   }
 
-  const activeTaskStatuses = new Set(["ASSIGNED", "IN_PROGRESS", "REVIEW"]);
+  const activeTaskStatuses = new Set(["READY", "ASSIGNED", "IN_PROGRESS", "REVIEW"]);
   const busyAgentIds = new Set(
     tasks
       .filter((t) => activeTaskStatuses.has(t.status))

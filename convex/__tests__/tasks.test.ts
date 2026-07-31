@@ -14,8 +14,8 @@ import { describe, it, expect } from "vitest";
 // Types (mirrored from convex/tasks.ts to keep tests self-contained)
 // ============================================================================
 
-type TaskStatus = 
-  | "INBOX" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW" 
+type TaskStatus =
+  | "INBOX" | "READY" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW"
   | "NEEDS_APPROVAL" | "BLOCKED" | "FAILED" | "DONE" | "CANCELED";
 
 type TaskSource = "DASHBOARD" | "TELEGRAM" | "GITHUB" | "AGENT" | "API" | "SEED";
@@ -36,13 +36,22 @@ interface TransitionRule {
 
 const TRANSITION_RULES: TransitionRule[] = [
   // FROM INBOX
+  { from: "INBOX", to: "READY", allowedActors: ["AGENT", "HUMAN", "SYSTEM"] },
   { from: "INBOX", to: "ASSIGNED", allowedActors: ["AGENT", "HUMAN", "SYSTEM"] },
   { from: "INBOX", to: "CANCELED", allowedActors: ["HUMAN"] },
   
   // FROM ASSIGNED
+  { from: "ASSIGNED", to: "READY", allowedActors: ["HUMAN", "SYSTEM"] },
   { from: "ASSIGNED", to: "IN_PROGRESS", allowedActors: ["AGENT", "HUMAN"], requiresWorkPlan: true },
   { from: "ASSIGNED", to: "INBOX", allowedActors: ["HUMAN"] },
   { from: "ASSIGNED", to: "CANCELED", allowedActors: ["HUMAN"] },
+
+  // FROM READY
+  { from: "READY", to: "IN_PROGRESS", allowedActors: ["AGENT", "HUMAN"], requiresWorkPlan: true },
+  { from: "READY", to: "INBOX", allowedActors: ["HUMAN"] },
+  { from: "READY", to: "BLOCKED", allowedActors: ["HUMAN", "SYSTEM"] },
+  { from: "READY", to: "NEEDS_APPROVAL", allowedActors: ["SYSTEM"] },
+  { from: "READY", to: "CANCELED", allowedActors: ["HUMAN"] },
   
   // FROM IN_PROGRESS
   { from: "IN_PROGRESS", to: "REVIEW", allowedActors: ["AGENT", "HUMAN"], requiresDeliverable: true, requiresChecklist: true },
@@ -52,7 +61,7 @@ const TRANSITION_RULES: TransitionRule[] = [
   { from: "IN_PROGRESS", to: "FAILED", allowedActors: ["AGENT", "SYSTEM"] },
   
   // FROM REVIEW
-  { from: "REVIEW", to: "IN_PROGRESS", allowedActors: ["AGENT", "HUMAN"] },
+  { from: "REVIEW", to: "IN_PROGRESS", allowedActors: ["HUMAN"] },
   { from: "REVIEW", to: "DONE", allowedActors: ["HUMAN"], humanOnly: true },
   { from: "REVIEW", to: "BLOCKED", allowedActors: ["HUMAN", "SYSTEM"] },
   { from: "REVIEW", to: "NEEDS_APPROVAL", allowedActors: ["HUMAN", "SYSTEM"] },
@@ -68,6 +77,7 @@ const TRANSITION_RULES: TransitionRule[] = [
   { from: "NEEDS_APPROVAL", to: "CANCELED", allowedActors: ["HUMAN"] },
   
   // FROM BLOCKED
+  { from: "BLOCKED", to: "READY", allowedActors: ["HUMAN"] },
   { from: "BLOCKED", to: "ASSIGNED", allowedActors: ["HUMAN"] },
   { from: "BLOCKED", to: "IN_PROGRESS", allowedActors: ["HUMAN"] },
   { from: "BLOCKED", to: "NEEDS_APPROVAL", allowedActors: ["HUMAN", "SYSTEM"] },
@@ -121,7 +131,7 @@ describe("INBOX Invariant", () => {
     // This test ensures no rule has `to: "INBOX"` from a non-existent state.
     const toInbox = TRANSITION_RULES.filter(r => r.to === "INBOX");
     // Transitions TO INBOX are only from ASSIGNED, NEEDS_APPROVAL, FAILED
-    const validFromStates = ["ASSIGNED", "NEEDS_APPROVAL", "FAILED"];
+    const validFromStates = ["READY", "ASSIGNED", "NEEDS_APPROVAL", "FAILED"];
     for (const rule of toInbox) {
       expect(validFromStates).toContain(rule.from);
     }
@@ -138,17 +148,17 @@ describe("INBOX Invariant", () => {
     // The only path to IN_PROGRESS is from ASSIGNED (requires work plan)
     // or from REVIEW (revision) or NEEDS_APPROVAL/BLOCKED (human override)
     const toInProgress = TRANSITION_RULES.filter(r => r.to === "IN_PROGRESS");
-    const validFromStates = ["ASSIGNED", "REVIEW", "NEEDS_APPROVAL", "BLOCKED"];
+    const validFromStates = ["READY", "ASSIGNED", "REVIEW", "NEEDS_APPROVAL", "BLOCKED"];
     for (const rule of toInProgress) {
       expect(validFromStates).toContain(rule.from);
     }
   });
 
-  it("INBOX -> ASSIGNED is the only forward path from INBOX (besides CANCELED)", () => {
+  it("INBOX prefers READY while retaining the legacy ASSIGNED path", () => {
     const fromInbox = TRANSITION_RULES.filter(r => r.from === "INBOX");
-    expect(fromInbox).toHaveLength(2);
+    expect(fromInbox).toHaveLength(3);
     const targets = fromInbox.map(r => r.to).sort();
-    expect(targets).toEqual(["ASSIGNED", "CANCELED"]);
+    expect(targets).toEqual(["ASSIGNED", "CANCELED", "READY"]);
   });
 });
 
@@ -159,6 +169,12 @@ describe("INBOX Invariant", () => {
 describe("Transition Rules", () => {
   it("ASSIGNED -> IN_PROGRESS requires a work plan", () => {
     const rule = findTransitionRule("ASSIGNED", "IN_PROGRESS");
+    expect(rule).toBeDefined();
+    expect(rule!.requiresWorkPlan).toBe(true);
+  });
+
+  it("READY -> IN_PROGRESS requires a work plan", () => {
+    const rule = findTransitionRule("READY", "IN_PROGRESS");
     expect(rule).toBeDefined();
     expect(rule!.requiresWorkPlan).toBe(true);
   });

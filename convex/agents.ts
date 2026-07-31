@@ -324,10 +324,17 @@ export const heartbeat = mutation({
     const budgetExceeded = budgetRemaining <= 0;
     
     // Find pending work for this agent
-    const pendingTasks = await ctx.db
-      .query("tasks")
-      .withIndex("by_status", (q) => q.eq("status", "ASSIGNED"))
-      .take(200);
+    const [readyTasks, legacyAssignedTasks] = await Promise.all([
+      ctx.db
+        .query("tasks")
+        .withIndex("by_status", (q) => q.eq("status", "READY"))
+        .take(200),
+      ctx.db
+        .query("tasks")
+        .withIndex("by_status", (q) => q.eq("status", "ASSIGNED"))
+        .take(200),
+    ]);
+    const pendingTasks = [...readyTasks, ...legacyAssignedTasks];
     
     const myPendingTasks = pendingTasks.filter(t => 
       t.projectId === agent.projectId && t.assigneeIds.includes(args.agentId)
@@ -725,9 +732,32 @@ export const detectStaleAgents = internalMutation({
         if (agent.currentTaskId) {
           const task = await ctx.db.get(agent.currentTaskId);
           if (task && task.status === "IN_PROGRESS") {
+            const reason = `Agent "${agent.name}" is unresponsive (stale heartbeat). Task needs reassignment.`;
+            const blocker = {
+              type: "CAPACITY" as const,
+              reason,
+              ownerRef: "operator",
+              requiredAction: "Reassign the task to a healthy agent or restore the current agent.",
+              blockedSince: now,
+            };
             await ctx.db.patch(task._id, {
               status: "BLOCKED",
-              blockedReason: `Agent "${agent.name}" is unresponsive (stale heartbeat). Task needs reassignment.`,
+              stateEnteredAt: now,
+              blockedReason: reason,
+              blocker,
+            });
+
+            await ctx.db.insert("taskTransitions", {
+              projectId: task.projectId,
+              idempotencyKey: `stale-agent:${agent._id}:${task._id}:${now}`,
+              taskId: task._id,
+              fromStatus: task.status,
+              toStatus: "BLOCKED",
+              actorType: "SYSTEM",
+              actorAgentId: agent._id,
+              reason,
+              validationResult: { valid: true },
+              artifactsSnapshot: { blocker },
             });
             
             // Alert for the blocked task
@@ -755,22 +785,51 @@ export const detectStaleAgents = internalMutation({
           }
         }
         
-        // Also find any ASSIGNED tasks for this agent and block them
-        const assignedTasks = await ctx.db
-          .query("tasks")
-          .withIndex("by_status", (q) => q.eq("status", "ASSIGNED"))
-          .collect();
+        // Also find any READY or legacy ASSIGNED tasks for this agent and block them.
+        const [readyTasks, assignedTasks] = await Promise.all([
+          ctx.db
+            .query("tasks")
+            .withIndex("by_status", (q) => q.eq("status", "READY"))
+            .collect(),
+          ctx.db
+            .query("tasks")
+            .withIndex("by_status", (q) => q.eq("status", "ASSIGNED"))
+            .collect(),
+        ]);
         
-        const agentAssignedTasks = assignedTasks.filter((t) =>
+        const agentAssignedTasks = [...readyTasks, ...assignedTasks].filter((t) =>
           t.assigneeIds.includes(agent._id)
         );
         
         for (const task of agentAssignedTasks) {
           // Only block if this is the sole assignee
           if (task.assigneeIds.length === 1) {
+            const reason = `Sole assignee "${agent.name}" is unresponsive. Task needs reassignment.`;
+            const blocker = {
+              type: "CAPACITY" as const,
+              reason,
+              ownerRef: "operator",
+              requiredAction: "Reassign the task to a healthy agent or restore the current agent.",
+              blockedSince: now,
+            };
             await ctx.db.patch(task._id, {
               status: "BLOCKED",
-              blockedReason: `Sole assignee "${agent.name}" is unresponsive. Task needs reassignment.`,
+              stateEnteredAt: now,
+              blockedReason: reason,
+              blocker,
+            });
+
+            await ctx.db.insert("taskTransitions", {
+              projectId: task.projectId,
+              idempotencyKey: `stale-agent:${agent._id}:${task._id}:${now}`,
+              taskId: task._id,
+              fromStatus: task.status,
+              toStatus: "BLOCKED",
+              actorType: "SYSTEM",
+              actorAgentId: agent._id,
+              reason,
+              validationResult: { valid: true },
+              artifactsSnapshot: { blocker },
             });
           }
         }

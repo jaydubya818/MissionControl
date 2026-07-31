@@ -12,7 +12,7 @@ describe("validateTransition", () => {
   it("allows valid transition with correct actor", () => {
     const result = validateTransition({
       from: "INBOX",
-      to: "ASSIGNED",
+      to: "READY",
       actor: "agent",
       artifacts: { assigneeIds: ["agent-1"] },
     });
@@ -188,6 +188,7 @@ describe("canActorTransition", () => {
 describe("getValidNextStatuses", () => {
   it("returns valid next statuses for INBOX by agent", () => {
     const next = getValidNextStatuses("INBOX", "agent");
+    expect(next).toContain("READY");
     expect(next).toContain("ASSIGNED");
     expect(next).not.toContain("DONE");
     expect(next).not.toContain("CANCELED");

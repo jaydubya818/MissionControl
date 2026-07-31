@@ -356,7 +356,7 @@ export class MissionControlClient {
     const pending = result.pendingTasks || [];
 
     for (const task of pending) {
-      if (task.status === "ASSIGNED") {
+      if (task.status === "READY" || task.status === "ASSIGNED") {
         await this.executeTask(task);
       } else if (task.status === "IN_PROGRESS") {
         // Resume task if handler exists
@@ -391,7 +391,7 @@ export class MissionControlClient {
 
     try {
       // Start task if not already started
-      if (task.status === "ASSIGNED") {
+      if (task.status === "READY" || task.status === "ASSIGNED") {
         const workPlan = {
           bullets: ["1. Analyze requirements", "2. Execute task", "3. Deliver results"],
           estimatedCost: 0.5,

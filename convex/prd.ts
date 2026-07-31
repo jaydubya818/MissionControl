@@ -150,6 +150,7 @@ export const bulkCreateFromPrd = mutation({
         description: t.description?.slice(0, 5000),
         type,
         status: "INBOX",
+        stateEnteredAt: Date.now(),
         priority,
         assigneeIds: [],
         reviewCycles: 0,

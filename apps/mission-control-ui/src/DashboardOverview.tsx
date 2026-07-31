@@ -492,10 +492,14 @@ export function DashboardOverview({
     unblockTask: async (taskId) => {
       await transitionTask({
         taskId,
-        toStatus: "ASSIGNED",
+        toStatus: "READY",
         actorType: "HUMAN",
         actorUserId: "operator",
         reason: "Unblocked from Overview",
+        blockerResolution: {
+          resolution: "RESOLVED",
+          reason: "Operator resolved the blocker from the overview queue",
+        },
         idempotencyKey: `overview-unblock-${taskId}-${Date.now()}`,
       });
     },

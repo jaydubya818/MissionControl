@@ -116,6 +116,7 @@ import type * as lib_stateMachine from "../lib/stateMachine.js";
 import type * as lib_taskAttemptScheduler from "../lib/taskAttemptScheduler.js";
 import type * as lib_taskEvents from "../lib/taskEvents.js";
 import type * as lib_taskProjection from "../lib/taskProjection.js";
+import type * as lib_taskWorkflowState from "../lib/taskWorkflowState.js";
 import type * as lib_workOrderCompat from "../lib/workOrderCompat.js";
 import type * as lib_workOrderDispatch from "../lib/workOrderDispatch.js";
 import type * as lib_workOrderGovernance from "../lib/workOrderGovernance.js";
@@ -315,6 +316,7 @@ declare const fullApi: ApiFromModules<{
   "lib/taskAttemptScheduler": typeof lib_taskAttemptScheduler;
   "lib/taskEvents": typeof lib_taskEvents;
   "lib/taskProjection": typeof lib_taskProjection;
+  "lib/taskWorkflowState": typeof lib_taskWorkflowState;
   "lib/workOrderCompat": typeof lib_workOrderCompat;
   "lib/workOrderDispatch": typeof lib_workOrderDispatch;
   "lib/workOrderGovernance": typeof lib_workOrderGovernance;

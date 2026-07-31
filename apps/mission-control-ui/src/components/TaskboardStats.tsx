@@ -29,6 +29,7 @@ export function TaskboardStats({ projectId, className }: TaskboardStatsProps) {
   const inProgress = tasks.filter(
     (t) =>
       t.status === "IN_PROGRESS" ||
+      t.status === "READY" ||
       t.status === "ASSIGNED" ||
       t.status === "REVIEW" ||
       t.status === "NEEDS_APPROVAL"

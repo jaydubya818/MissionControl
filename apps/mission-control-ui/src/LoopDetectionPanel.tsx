@@ -139,9 +139,13 @@ export function LoopDetectionPanel({
     try {
       await transitionTask({
         taskId,
-        toStatus: "ASSIGNED",
+        toStatus: "READY",
         actorType: "HUMAN",
         reason: "Unblocked from Loop Detection Panel",
+        blockerResolution: {
+          resolution: "RESOLVED",
+          reason: "Loop condition reviewed and cleared by the operator",
+        },
         idempotencyKey: `unblock-loop-${taskId}-${Date.now()}`,
       });
       await resolveAlert({ alertId, resolutionNote: "Task unblocked by operator" });

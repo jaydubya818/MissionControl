@@ -19,7 +19,7 @@ export type TaskAttemptSelectionResult =
 
 const ACTIVE_ATTEMPT_STATUSES = new Set(["PENDING", "RUNNING", "PAUSED"]);
 const TERMINAL_TASK_STATUSES = new Set(["DONE", "CANCELED"]);
-const SCHEDULABLE_TASK_STATUSES = new Set(["ASSIGNED", "IN_PROGRESS"]);
+const SCHEDULABLE_TASK_STATUSES = new Set(["READY", "ASSIGNED", "IN_PROGRESS"]);
 
 export function validateTaskAttemptSelection(args: {
   workOrderId: string;
@@ -115,7 +115,7 @@ export function taskAttemptErrorMessage(reason: string) {
     return "A completed or canceled Task cannot start an Attempt.";
   }
   if (reason.startsWith("task-not-schedulable:")) {
-    return "Assign this Task before starting an Attempt.";
+    return "Move this Task to Ready before starting an Attempt.";
   }
   if (reason === "active-task-attempt-exists") {
     return "This Task already has an active Attempt.";

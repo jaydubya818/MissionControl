@@ -3,6 +3,7 @@ import { StatusBadge, type StatusBadgeProps } from "@/components/factory/badges"
 
 type TaskStatus =
   | "INBOX"
+  | "READY"
   | "ASSIGNED"
   | "IN_PROGRESS"
   | "REVIEW"
@@ -15,7 +16,8 @@ type TaskStatus =
 /** Task-state → badge tone mapping per UI_STYLE_GUIDE.md. */
 const STATUS_CONFIG: Record<TaskStatus, { label: string; tone: StatusBadgeProps["tone"] }> = {
   INBOX: { label: "Inbox", tone: "neutral" },
-  ASSIGNED: { label: "Assigned", tone: "neutral" },
+  READY: { label: "Ready", tone: "info" },
+  ASSIGNED: { label: "Ready (legacy)", tone: "neutral" },
   IN_PROGRESS: { label: "In Progress", tone: "info" },
   REVIEW: { label: "Review", tone: "info" },
   NEEDS_APPROVAL: { label: "Needs Approval", tone: "warning" },

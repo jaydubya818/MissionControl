@@ -2,7 +2,7 @@
  * Planning — AI Task Planning Q&A
  *
  * Generate clarifying questions for a task, then produce a work plan from answers.
- * Submit plan attaches workPlan + planningQa to task and transitions INBOX -> ASSIGNED.
+ * Submit plan attaches workPlan + planningQa to task and transitions INBOX -> READY.
  */
 
 import { v } from "convex/values";
@@ -28,7 +28,7 @@ export const getTaskForPlanning = query({
 // ============================================================================
 
 /**
- * Attach work plan and Q&A to task, then transition INBOX -> ASSIGNED.
+ * Attach work plan and Q&A to task, then transition INBOX -> READY.
  * If assigneeIds is provided, patches task with assignees first.
  */
 export const submitPlan = mutation({
@@ -94,7 +94,7 @@ export const submitPlan = mutation({
 
     await ctx.runMutation(api.tasks.transition, {
       taskId: args.taskId,
-      toStatus: "ASSIGNED",
+      toStatus: "READY",
       actorType: "HUMAN",
       actorUserId: "operator",
       idempotencyKey: args.idempotencyKey,

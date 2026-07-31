@@ -1174,7 +1174,7 @@ export const run = mutation({
     ] as const;
     const taskStatuses = [
       "INBOX",
-      "ASSIGNED",
+      "READY",
       "IN_PROGRESS",
       "REVIEW",
       "NEEDS_APPROVAL",
@@ -1189,11 +1189,12 @@ export const run = mutation({
     for (const epic of [
       ["task:epic:policy", "ARM Policy Hardening Program", "ENGINEERING", "IN_PROGRESS"],
       ["task:epic:growth", "Growth Ops Automation Sprint", "OPS", "REVIEW"],
-      ["task:epic:reliability", "Reliability and Recovery Program", "OPS", "ASSIGNED"],
+      ["task:epic:reliability", "Reliability and Recovery Program", "OPS", "READY"],
     ] as const) {
       const [key, title, type, status] = epic;
       let task = await ctx.db.query("tasks").withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", key)).first();
       if (!task) {
+        const stateEnteredAt = now - DAY;
         const taskId = await ctx.db.insert("tasks", {
           tenantId: tenant._id,
           projectId: project._id,
@@ -1202,9 +1203,15 @@ export const run = mutation({
           description: `${title} - seeded mission program`,
           type,
           status,
+          stateEnteredAt,
           priority: 1,
           assigneeIds: [pick(activeAgents, taskIdByKey.size)._id],
           reviewCycles: status === "REVIEW" ? 2 : 0,
+          review: status === "REVIEW" ? {
+            enteredAt: stateEnteredAt,
+            resubmissionCount: 0,
+            history: [],
+          } : undefined,
           actualCost: 12.75,
           estimatedCost: 15,
           source: "SEED",
@@ -1261,6 +1268,9 @@ export const run = mutation({
                 estimatedDuration: `${45 + (i % 4) * 15} minutes`,
               }
             : undefined;
+        const stateEnteredAt = now - (i % 6) * HOUR;
+        const reviewerId = status === "REVIEW" ? pick(activeAgents, i + 2)._id : undefined;
+        const blockerReason = "Awaiting upstream dependency and operator review";
 
         const taskId = await ctx.db.insert("tasks", {
           tenantId: tenant._id,
@@ -1270,18 +1280,25 @@ export const run = mutation({
           description: `Seeded task ${i + 1} for Mission Control view coverage`,
           type,
           status,
+          stateEnteredAt,
           priority: ((i % 4) + 1) as 1 | 2 | 3 | 4,
           assigneeIds: status === "INBOX" || status === "CANCELED" ? [] : [assignee._id, ...(secondAssignee ? [secondAssignee] : [])],
           assigneeInstanceIds:
             status === "INBOX" || status === "CANCELED"
               ? []
               : [instanceByAgentId.get(assignee._id)?._id, ...(secondAssignee ? [instanceByAgentId.get(secondAssignee)?._id] : [])].filter(Boolean),
-          reviewerId: status === "REVIEW" ? pick(activeAgents, i + 2)._id : undefined,
+          reviewerId,
           parentTaskId,
           workPlan,
           deliverable,
           reviewChecklist,
           reviewCycles: status === "REVIEW" ? 1 + (i % 2) : 0,
+          review: status === "REVIEW" ? {
+            ownerId: reviewerId,
+            enteredAt: stateEnteredAt,
+            resubmissionCount: 0,
+            history: [],
+          } : undefined,
           estimatedCost: 0.8 + (i % 9) * 0.35,
           actualCost: 0.25 + (i % 8) * 0.22,
           dueAt: now + ((i % 14) - 7) * DAY,
@@ -1306,7 +1323,14 @@ export const run = mutation({
             type.toLowerCase(),
             status.toLowerCase(),
           ],
-          blockedReason: status === "BLOCKED" ? "Awaiting upstream dependency and operator review" : undefined,
+          blockedReason: status === "BLOCKED" ? blockerReason : undefined,
+          blocker: status === "BLOCKED" ? {
+            type: "TASK" as const,
+            reason: blockerReason,
+            ownerRef: "operator",
+            requiredAction: "Resolve or replace the upstream dependency.",
+            blockedSince: stateEnteredAt,
+          } : undefined,
           source: "SEED",
           sourceRef: `seed://${key}`,
           createdBy: "SYSTEM",

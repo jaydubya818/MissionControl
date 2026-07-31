@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import { STATE_DEFINITIONS, isTerminalStatus, getRequiredArtifacts } from "../states";
 
 describe("State Definitions", () => {
-  it("defines exactly 9 states", () => {
-    expect(Object.keys(STATE_DEFINITIONS)).toHaveLength(9);
+  it("defines exactly 10 states", () => {
+    expect(Object.keys(STATE_DEFINITIONS)).toHaveLength(10);
   });
 
   it("includes all expected states", () => {
     const expected = [
-      "INBOX", "ASSIGNED", "IN_PROGRESS", "REVIEW",
+      "INBOX", "READY", "ASSIGNED", "IN_PROGRESS", "REVIEW",
       "NEEDS_APPROVAL", "BLOCKED", "FAILED", "DONE", "CANCELED",
     ];
     expect(Object.keys(STATE_DEFINITIONS).sort()).toEqual(expected.sort());
@@ -21,7 +21,7 @@ describe("State Definitions", () => {
   });
 
   it("marks non-terminal states correctly", () => {
-    const nonTerminal = ["INBOX", "ASSIGNED", "IN_PROGRESS", "REVIEW", "NEEDS_APPROVAL", "BLOCKED"];
+    const nonTerminal = ["INBOX", "READY", "ASSIGNED", "IN_PROGRESS", "REVIEW", "NEEDS_APPROVAL", "BLOCKED"];
     for (const status of nonTerminal) {
       expect(STATE_DEFINITIONS[status as keyof typeof STATE_DEFINITIONS].terminal).toBe(false);
     }
@@ -50,6 +50,7 @@ describe("isTerminalStatus", () => {
 
   it("returns false for non-terminal states", () => {
     expect(isTerminalStatus("INBOX")).toBe(false);
+    expect(isTerminalStatus("READY")).toBe(false);
     expect(isTerminalStatus("ASSIGNED")).toBe(false);
     expect(isTerminalStatus("IN_PROGRESS")).toBe(false);
     expect(isTerminalStatus("REVIEW")).toBe(false);
@@ -79,6 +80,7 @@ describe("getRequiredArtifacts", () => {
 
   it("returns empty array for states without required artifacts", () => {
     expect(getRequiredArtifacts("INBOX")).toEqual([]);
+    expect(getRequiredArtifacts("READY")).toEqual([]);
     expect(getRequiredArtifacts("ASSIGNED")).toEqual([]);
     expect(getRequiredArtifacts("BLOCKED")).toEqual([]);
     expect(getRequiredArtifacts("CANCELED")).toEqual([]);

@@ -63,6 +63,7 @@ function taskStatusToVerification(status: Doc<"tasks">["status"]): VerificationS
     case "REVIEW":
     case "NEEDS_APPROVAL":
     case "BLOCKED":
+    case "READY":
     case "ASSIGNED":
     case "INBOX":
       return "pending";

@@ -24,6 +24,7 @@ interface MissionDAGViewProps {
 
 const STATUS_COLORS: Record<string, string> = {
   INBOX: "#64748b",
+  READY: "#2563eb",
   ASSIGNED: "#2563eb",
   IN_PROGRESS: "#3b82f6",
   REVIEW: "#f59e0b",

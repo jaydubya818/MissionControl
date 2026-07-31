@@ -482,6 +482,7 @@ function taskStatusTone(status: TaskStatus): StatusBadgeProps["tone"] {
   switch (status) {
     case "DONE":
       return "success";
+    case "READY":
     case "IN_PROGRESS":
     case "REVIEW":
       return "info";
@@ -575,13 +576,14 @@ function TimelineItem({ item, isLast }: { item: TimelineEntry; isLast: boolean }
 
 function getAvailableTransitions(currentStatus: TaskStatus): TaskStatus[] {
   const transitions: Record<TaskStatus, TaskStatus[]> = {
-    INBOX: ["ASSIGNED", "CANCELED"],
-    ASSIGNED: ["IN_PROGRESS", "INBOX", "CANCELED"],
+    INBOX: ["READY", "CANCELED"],
+    READY: ["IN_PROGRESS", "INBOX", "BLOCKED", "CANCELED"],
+    ASSIGNED: ["READY", "IN_PROGRESS", "INBOX", "CANCELED"],
     IN_PROGRESS: ["REVIEW", "BLOCKED", "FAILED", "CANCELED"],
     REVIEW: ["IN_PROGRESS", "DONE", "BLOCKED", "CANCELED"],
-    NEEDS_APPROVAL: ["INBOX", "ASSIGNED", "IN_PROGRESS", "REVIEW", "BLOCKED", "DONE", "CANCELED"],
-    BLOCKED: ["ASSIGNED", "IN_PROGRESS", "NEEDS_APPROVAL", "CANCELED"],
-    FAILED: ["INBOX", "ASSIGNED", "CANCELED"],
+    NEEDS_APPROVAL: ["INBOX", "READY", "IN_PROGRESS", "REVIEW", "BLOCKED", "DONE", "CANCELED"],
+    BLOCKED: ["READY", "IN_PROGRESS", "NEEDS_APPROVAL", "CANCELED"],
+    FAILED: ["INBOX", "READY", "CANCELED"],
     DONE: [],
     CANCELED: [],
   };
