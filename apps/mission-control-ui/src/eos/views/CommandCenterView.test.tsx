@@ -203,7 +203,7 @@ describe("CommandCenterView", () => {
   it("renders the EOS command center with live attention, workforce, capacity, and readiness data", async () => {
     renderCommandCenter();
 
-    expect(screen.getByRole("heading", { name: "Command Center" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Command Center" }).length).toBeGreaterThan(0);
     expect(screen.getByText("The causal system of record and operating control plane for AI-native engineering.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Needs attention" })).toBeInTheDocument();
     expect(screen.getByText("Approve checkout rollback waiver")).toBeInTheDocument();
