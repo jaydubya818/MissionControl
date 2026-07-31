@@ -4,7 +4,10 @@ import { RefreshCw, ShieldCheck } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { RUNTIME_CONTRACT_VERSION } from "../../../convex/lib/runtimeContract";
 import { Button } from "@/components/ui/button";
-import { evaluateRuntimeCompatibility } from "@/lib/runtimeCompatibility";
+import {
+  evaluateRuntimeCompatibility,
+  shouldBypassRuntimeCompatibility,
+} from "@/lib/runtimeCompatibility";
 
 export function RuntimeCompatibilityNotice({
   clientVersion,
@@ -77,8 +80,14 @@ export function RuntimeCompatibilityGate({ children }: { children: ReactNode }) 
   const convex = useConvex();
   const [serverVersion, setServerVersion] = useState<number>();
   const [checkError, setCheckError] = useState<string>();
+  const bypassForE2E = shouldBypassRuntimeCompatibility(
+    import.meta.env.DEV,
+    import.meta.env.VITE_RUNTIME_CONTRACT_E2E_BYPASS,
+  );
 
   useEffect(() => {
+    if (bypassForE2E) return;
+
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let consecutiveFailures = 0;
@@ -108,7 +117,9 @@ export function RuntimeCompatibilityGate({ children }: { children: ReactNode }) 
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [convex]);
+  }, [bypassForE2E, convex]);
+
+  if (bypassForE2E) return children;
 
   const simulateMismatch =
     import.meta.env.DEV &&

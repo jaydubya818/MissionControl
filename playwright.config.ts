@@ -23,6 +23,9 @@ export default defineConfig({
       VITE_FLAG_UI_SHELL_V2: "true",
       VITE_FLAG_CONTEXT_REGISTRY: "true",
       VITE_FLAG_EOS_COMMAND_CENTER_PREVIEW: "true",
+      // This shell-only E2E runs without a Convex backend. Production builds
+      // cannot honor the bypass because RuntimeCompatibilityGate also requires DEV.
+      VITE_RUNTIME_CONTRACT_E2E_BYPASS: "true",
     },
   },
   projects: [

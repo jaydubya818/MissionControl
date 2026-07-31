@@ -14,7 +14,7 @@ operator console mounts normal query consumers.
 
 ## Verification
 
-Seventeen focused assertions, workspace TypeScript, the UI production build, and
+Nineteen focused assertions, workspace TypeScript, the UI production build, and
 skill lint passed. Real-browser checks passed for compatible SFRL Tasks startup,
 dark mismatch recovery, and light mismatch recovery, with zero page errors and no
 new final Convex runtime errors.
@@ -27,6 +27,11 @@ operator in a render error.
 The Docs browser check found duplicate registrations for two Task-to-Work-Order
 pages. The redundant entries were removed, unique page IDs and paths are now
 enforced by tests, and the clean browser console check passed after the repair.
+
+PR CI also confirmed that the retained-route Playwright test starts without a
+Convex backend. Its web server now opts into a development-only compatibility
+bypass; production builds cannot honor the flag, so the shipped gate remains
+fail-closed.
 
 Screenshots are retained under
 `docs/testing/evidence/runtime-contract-recovery/`. The full evidence record is

@@ -63,11 +63,18 @@ registrations were removed from the broad enhancement section, leaving the pages
 in their dedicated Task and Work Order Delivery section. Configuration tests now
 enforce unique page IDs and paths so this regression cannot silently return.
 
+The first PR CI run exposed a test-harness contract: the retained-route E2E
+intentionally starts the Vite shell without a Convex backend. The production gate
+correctly waited and the shell assertion timed out. The Playwright web server now
+sets an explicit E2E-only bypass that is accepted only when Vite reports
+development mode. Production builds cannot honor the flag, and normal local/demo
+runs continue to fail closed.
+
 ## Automated and browser evidence
 
-- Runtime compatibility and error classification: PASS, 10 focused tests.
+- Runtime compatibility, E2E bypass, and error classification: PASS, 12 focused tests.
 - Mission Control Docs configuration and uniqueness: PASS, 7 focused tests.
-- Total focused assertions: 17 passed.
+- Total focused assertions: 19 passed.
 - Workspace TypeScript gate: PASS.
 - Mission Control UI production build: PASS.
 - Skill lint: PASS, 10 skills with zero errors and warnings.
@@ -78,6 +85,7 @@ enforce unique page IDs and paths so this regression cannot silently return.
 - Fresh browser page errors: 0.
 - Fresh browser console: Vite and React development notices only.
 - Runtime Contract Recovery page and deduplicated Docs navigation: PASS.
+- Retained operator-route Playwright E2E without Convex: PASS.
 - Convex log after final browser journeys: no new runtime errors.
 - Full repository suite: intentionally not run under the bounded-cost policy.
 

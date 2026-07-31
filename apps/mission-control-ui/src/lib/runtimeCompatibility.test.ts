@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateRuntimeCompatibility,
   isRuntimeContractError,
+  shouldBypassRuntimeCompatibility,
 } from "./runtimeCompatibility";
 
 describe("runtime compatibility", () => {
@@ -22,6 +23,18 @@ describe("runtime compatibility", () => {
       clientVersion,
       serverVersion,
     });
+  });
+});
+
+describe("runtime compatibility E2E bypass", () => {
+  it("allows the explicit bypass only in development", () => {
+    expect(shouldBypassRuntimeCompatibility(true, "true")).toBe(true);
+    expect(shouldBypassRuntimeCompatibility(false, "true")).toBe(false);
+  });
+
+  it("keeps the gate enabled by default", () => {
+    expect(shouldBypassRuntimeCompatibility(true, undefined)).toBe(false);
+    expect(shouldBypassRuntimeCompatibility(true, "false")).toBe(false);
   });
 });
 

@@ -16,6 +16,13 @@ export function evaluateRuntimeCompatibility(
   return { status: "RELOAD_REQUIRED", clientVersion, serverVersion };
 }
 
+export function shouldBypassRuntimeCompatibility(
+  isDevelopment: boolean,
+  e2eBypass: string | undefined,
+): boolean {
+  return isDevelopment && e2eBypass === "true";
+}
+
 export function isRuntimeContractError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
   return [
