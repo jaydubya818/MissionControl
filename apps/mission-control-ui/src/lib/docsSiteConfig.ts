@@ -132,6 +132,12 @@ export const DOCS_SITE_SECTIONS: DocsSiteSection[] = [
         description: "Reasoned transitions, persistence, compatibility, and audit evidence",
         path: "software-factory-enhancement/testing/workflow-state-cleanup-browser-results",
       },
+      {
+        id: "task-drawer-accessibility-pr4-results",
+        title: "Task Drawer Accessibility PR 4",
+        description: "Dark/light contrast, target size, and deterministic Axe evidence",
+        path: "software-factory-enhancement/testing/task-drawer-accessibility-results",
+      },
     ],
   },
   {
@@ -269,6 +275,7 @@ export function docsMarkdownForPath(relativePath: string): string | null {
 
 export const LEGACY_REPO_DOCS = [
   { title: "PRD V2", path: "docs/PRD_V2.md", description: "Product requirements" },
+  { title: "Design System", path: "docs/design.md", description: "UI tokens and accessibility standards" },
   { title: "Architecture", path: "docs/ARCHITECTURE.md", description: "System architecture" },
   { title: "Backend Structure", path: "docs/BACKEND_STRUCTURE.md", description: "Convex API surface" },
   { title: "Frontend Guidelines", path: "docs/FRONTEND_GUIDELINES.md", description: "UI/UX standards" },

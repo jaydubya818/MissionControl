@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { Button } from "@/components/ui/button";
 
 interface ExportReportButtonProps {
   taskId: Id<"tasks">;
@@ -22,24 +23,12 @@ export function ExportReportButton({ taskId }: ExportReportButtonProps) {
   };
   
   return (
-    <button
+    <Button
+      size="sm"
       onClick={handleExport}
       disabled={!reportData}
-      style={{
-        padding: "8px 16px",
-        background: reportData ? "#3b82f6" : "#334155",
-        border: "none",
-        borderRadius: "6px",
-        color: "white",
-        fontSize: "14px",
-        fontWeight: 500,
-        cursor: reportData ? "pointer" : "not-allowed",
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-      }}
     >
       Export Report
-    </button>
+    </Button>
   );
 }

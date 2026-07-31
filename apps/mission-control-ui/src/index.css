@@ -748,7 +748,7 @@ main {
   --border-emphasized: #3a3e46;
   --text-primary: #f4f5f7;
   --text-secondary: #a7abb4;
-  --text-muted: #717680;
+  --text-muted: #7f848e;
   --status-success: #32e875;
   --status-success-subtle: rgba(50, 232, 117, 0.1);
   --status-warning: #f3c744;
@@ -780,7 +780,15 @@ main {
   --border-emphasized: #c9cdd3;
   --text-primary: #16181c;
   --text-secondary: #4d525b;
-  --text-muted: #82878f;
+  --text-muted: #666b73;
+  --status-success: #16733a;
+  --status-success-subtle: rgba(22, 115, 58, 0.1);
+  --status-warning: #8a5d00;
+  --status-warning-subtle: rgba(138, 93, 0, 0.12);
+  --status-error: #b42318;
+  --status-error-subtle: rgba(180, 35, 24, 0.12);
+  --status-info: #315ab7;
+  --status-info-subtle: rgba(49, 90, 183, 0.12);
   --action-primary: #16181c;
   --action-primary-text: #ffffff;
 }
@@ -1270,6 +1278,11 @@ body.schematic-no-tele .schematic-tele {
   --registry-accent-soft: rgba(74, 222, 128, 0.12);
   --registry-accent-glow: rgba(74, 222, 128, 0.35);
 }
+[data-theme="light"] {
+  --registry-accent: #187a3f;
+  --registry-accent-soft: rgba(24, 122, 63, 0.12);
+  --registry-accent-glow: rgba(24, 122, 63, 0.24);
+}
 .text-registry-accent {
   color: var(--registry-accent);
 }
@@ -1282,9 +1295,6 @@ body.schematic-no-tele .schematic-tele {
 
 /* Unified factory page scope (registry + harness + operator surfaces) */
 .factory-page {
-  --registry-accent: #4ade80;
-  --registry-accent-soft: rgba(74, 222, 128, 0.12);
-  --registry-accent-glow: rgba(74, 222, 128, 0.35);
   --schematic-accent: var(--registry-accent);
   --schematic-accent-soft: var(--registry-accent-soft);
 }
@@ -1749,4 +1759,3 @@ body.schematic-no-tele .schematic-tele {
   background: var(--border-emphasized);
   border-radius: 99px;
 }
-
