@@ -19,3 +19,7 @@ violations in dark and light themes.
 Screenshots and the retained intermediate failure trace are stored under
 `docs/testing/evidence/task-drawer-contrast/`. Full engineering record:
 `docs/testing/task-drawer-accessibility-results.md`.
+
+Publication: implementation commit `6d647ad`,
+[PR #51](https://github.com/jaydubya818/MissionControl/pull/51), and green
+[CI run 30658214586](https://github.com/jaydubya818/MissionControl/actions/runs/30658214586).

@@ -75,3 +75,11 @@ While restarting the local stack, the existing scheduler logged repeated
 `modelRoutingPolicies:getActive` call received a Task ID as `projectId`. These are
 not caused by this CSS/control change. They should become the next bounded runtime
 correctness cycle, starting with deterministic reproduction before any fix.
+
+## Publication evidence
+
+- Implementation commit: `6d647ad` (`fix(ui): meet task drawer accessibility standards`)
+- Pull request: [#51](https://github.com/jaydubya818/MissionControl/pull/51)
+- Substantive CI run: [30658214586](https://github.com/jaydubya818/MissionControl/actions/runs/30658214586)
+- CI result: PASS for build, TypeScript, unit tests, E2E, lint, smoke, and both
+  Vercel preview deployments.
