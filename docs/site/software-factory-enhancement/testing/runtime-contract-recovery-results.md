@@ -33,6 +33,10 @@ Convex backend. Its web server now opts into a development-only compatibility
 bypass; production builds cannot honor the flag, so the shipped gate remains
 fail-closed.
 
+Pull request 53 passed corrected CI run 30665288772 across build, lint, smoke,
+TypeScript, unit, E2E, and both preview deployments. The initial failed E2E run
+30664768978 is retained as evidence for the harness correction.
+
 Screenshots are retained under
 `docs/testing/evidence/runtime-contract-recovery/`. The full evidence record is
 in `docs/testing/runtime-contract-recovery-results.md`.

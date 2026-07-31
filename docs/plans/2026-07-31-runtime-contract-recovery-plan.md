@@ -1,6 +1,6 @@
 ---
 title: Runtime contract recovery
-status: active
+status: complete
 date: 2026-07-31
 owner: Codex
 scope: bounded-runtime-correctness
@@ -31,7 +31,8 @@ scope: bounded-runtime-correctness
 - [x] Add focused unit and component regression coverage.
 - [x] Capture healthy and simulated-mismatch browser evidence with console checks.
 - [x] Run bounded typecheck, build, and documentation checks.
-- [ ] Publish result docs, commit, open a PR, monitor CI, and squash-merge to `main`.
+- [x] Publish result docs, commit, open a PR, monitor CI, and approve the verified
+  change set for squash merge to `main`.
 
 ## Bounded validation
 

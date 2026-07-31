@@ -105,7 +105,10 @@ multi-version negotiation are not needed for the current product.
 
 ## Publication evidence
 
-- Implementation commit: pending
-- Pull request: pending
-- CI run: pending
-- Merge target: canonical `main`
+- Implementation commits: `5c53aac`, `45545d7`
+- Pull request: [#53](https://github.com/jaydubya818/MissionControl/pull/53)
+- Initial CI run: [30664768978](https://github.com/jaydubya818/MissionControl/actions/runs/30664768978)
+  exposed the backend-free E2E harness contract described above.
+- Corrected CI run: [30665288772](https://github.com/jaydubya818/MissionControl/actions/runs/30665288772),
+  PASS for build, lint, smoke, TypeScript, unit, E2E, and both preview deployments.
+- Merge target: canonical `main`, squash merge after this evidence update.
