@@ -91,7 +91,10 @@ not attempt a 743-function migration in one cycle.
 
 ## Publication evidence
 
-- Implementation commit: pending
-- Pull request: pending
-- CI run: pending
-- Merge target: canonical `main`
+- Implementation commit: `9dcbd3e`
+- Pull request: [#54](https://github.com/jaydubya818/MissionControl/pull/54)
+- CI run: [30669030979](https://github.com/jaydubya818/MissionControl/actions/runs/30669030979),
+  PASS for build, lint, smoke, TypeScript, unit, E2E, and both preview deployments.
+- Guard job evidence: lint job `91282548913` executed against base `ec1f6bf` and
+  reported PASS across 743 public functions.
+- Merge target: canonical `main`, squash merge after this evidence update.

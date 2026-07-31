@@ -1,6 +1,6 @@
 ---
 title: Runtime contract CI guard
-status: active
+status: complete
 date: 2026-07-31
 owner: Codex
 scope: bounded-ci-contract-safety
@@ -31,7 +31,8 @@ scope: bounded-ci-contract-safety
 - [x] Add focused unit and temporary-repository integration tests.
 - [x] Wire the command into package scripts and the existing lint CI job.
 - [x] Publish repository and Mission Control Docs evidence.
-- [ ] Run bounded validation, commit, open a PR, monitor CI, and merge to `main`.
+- [x] Run bounded validation, commit, open a PR, monitor CI, and approve the
+  verified change set for squash merge to `main`.
 
 ## Bounded validation
 
