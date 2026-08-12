@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "./Toast";
 import { Rocket, RotateCcw, Server } from "lucide-react";
+import { FactoryReleasesPanel } from "./releases/FactoryReleasesPanel";
 
 function fmtTime(ts?: number) {
   if (!ts) return "—";
@@ -256,10 +257,17 @@ export function DeploymentsView({ projectId }: { projectId: Id<"projects"> | nul
     <section className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <PageHeader
         title="Deployments"
-        description="Promote approved versions through environments. Activate and rollback from the board."
+        description="Govern code releases through staging proof, then manage agent-version deployments separately."
       />
 
       <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-6">
+      <FactoryReleasesPanel projectId={projectId} />
+
+      <div className="border-t border-line pt-5">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted">Agent runtime deployments</div>
+        <p className="mt-1 text-[12px] text-ink-muted">Legacy agent-template version promotion remains a separate lifecycle.</p>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-muted">Tenant</span>
         <select

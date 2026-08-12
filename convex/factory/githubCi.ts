@@ -28,6 +28,9 @@ export const applyCiIngest = internalMutation({
     branch: v.optional(v.string()),
     title: v.optional(v.string()),
     prState: v.optional(v.union(v.literal("OPEN"), v.literal("CLOSED"), v.literal("MERGED"))),
+    mergeActor: v.optional(v.string()),
+    mergedAt: v.optional(v.number()),
+    mergeCommitSha: v.optional(v.string()),
     ciStatus: v.optional(
       v.union(
         v.literal("PASS"),
@@ -147,6 +150,9 @@ export const applyCiIngest = internalMutation({
       branch: args.branch,
       title: args.title,
       prState: args.prState,
+      mergeActor: args.mergeActor,
+      mergedAt: args.mergedAt,
+      mergeCommitSha: args.mergeCommitSha,
       ciStatus: args.ciStatus ?? "UNKNOWN",
       ciRunUrl: args.ciRunUrl,
       ciProvider: "github",
@@ -239,6 +245,17 @@ export const applyCiIngest = internalMutation({
     }
     if (releaseDeploymentId) {
       await ctx.scheduler.runAfter(0, internal.governance.releaseGateAutomation.fromGithubCi, { harnessPrCheckId: id });
+    }
+    if (
+      doc.prState === "MERGED"
+      && doc.mergeCommitSha
+      && doc.mergedAt
+      && doc.workOrderId
+      && doc.workflowRunId
+    ) {
+      await ctx.scheduler.runAfter(0, internal.factory.releases.ensureFromMergedPrInternal, {
+        evaluationId: id,
+      });
     }
     return id;
   },

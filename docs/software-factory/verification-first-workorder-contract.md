@@ -200,10 +200,15 @@ mc work-order inspect <work-order-id> --json
 
 ## Deliberately deferred
 
-This P0 slice does not yet include remote sandbox policy enforcement, network
-egress controls, provider CI/GitHub check ingestion, coverage-delta calculation,
-mutation testing, flaky-test quarantine, deployment verification, or automatic
-workflow improvement. Factory-level verified-throughput metrics,
-learning-ledger CRUD, and trust scoring are also deferred until their underlying outcomes exist. Those capabilities build on the
-same WorkOrder, Attempt, evidence, receipt, and event contracts rather than
-introducing parallel lifecycles.
+This original P0 slice does not include remote sandbox policy enforcement,
+network egress controls, coverage-delta calculation, mutation testing,
+flaky-test quarantine, or automatic workflow improvement. Provider CI/GitHub
+check ingestion and staging deployment verification are implemented by the
+downstream PR and governed-release contracts; see
+`docs/software-factory/durable-codex-github-pr.md` and
+`docs/software-factory/governed-staging-release.md`. Production deployment,
+automatic provider deployment, Factory-level verified-throughput metrics,
+learning-ledger CRUD, and trust scoring remain deferred until their underlying
+outcomes exist. Those capabilities build on the same WorkOrder, Attempt,
+evidence, receipt, and event contracts rather than introducing parallel
+lifecycles.

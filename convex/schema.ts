@@ -274,6 +274,23 @@ const deploymentStatus = v.union(
   v.literal("RETIRED")
 );
 
+const factoryReleaseState = v.union(
+  v.literal("MERGED"),
+  v.literal("DEPLOYED"),
+  v.literal("VERIFIED"),
+  v.literal("ROLLED_BACK")
+);
+
+const factoryReleaseEvidenceKind = v.union(
+  v.literal("MERGE"),
+  v.literal("DEPLOYMENT_APPROVAL"),
+  v.literal("DEPLOYMENT"),
+  v.literal("PROVENANCE"),
+  v.literal("SMOKE_TEST"),
+  v.literal("HEALTH_CHECK"),
+  v.literal("ROLLBACK")
+);
+
 const contextPackageType = v.union(
   v.literal("SKILL"),
   v.literal("RULES"),
@@ -6128,6 +6145,83 @@ export default defineSchema({
   })
     .index("by_deployment", ["deploymentId"])
     .index("by_automation_key", ["automationKey"]),
+
+  // -----------------------------------------------------------------------
+  // SOFTWARE FACTORY: CODE RELEASES (exact merge -> staging verification)
+  // -----------------------------------------------------------------------
+  factoryReleases: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.id("workflowRuns"),
+    taskId: v.optional(v.id("tasks")),
+    repositoryId: v.id("workspaceRepositories"),
+    factoryDefinitionVersionId: v.optional(v.id("factoryDefinitionVersions")),
+    environmentId: v.id("environments"),
+    prEvaluationId: v.id("harnessPrChecks"),
+    prUrl: v.string(),
+    prNumber: v.optional(v.number()),
+    sourceHeadSha: v.string(),
+    mergeCommitSha: v.string(),
+    mergeActor: v.optional(v.string()),
+    mergedAt: v.number(),
+    state: factoryReleaseState,
+    deploymentApprovalStatus: v.union(
+      v.literal("PENDING"),
+      v.literal("APPROVED")
+    ),
+    deploymentApprovedBy: v.optional(v.string()),
+    deploymentApprovedAt: v.optional(v.number()),
+    deploymentApprovalRationale: v.optional(v.string()),
+    deploymentProvider: v.optional(v.string()),
+    providerDeploymentId: v.optional(v.string()),
+    deploymentUrl: v.optional(v.string()),
+    provenanceUrl: v.optional(v.string()),
+    smokeUrl: v.optional(v.string()),
+    healthUrl: v.optional(v.string()),
+    deployedAt: v.optional(v.number()),
+    verifiedAt: v.optional(v.number()),
+    rolledBackAt: v.optional(v.number()),
+    restoredCommitSha: v.optional(v.string()),
+    blockingIssue: v.optional(v.string()),
+    requiredHumanAction: v.optional(v.string()),
+    verificationAttemptCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_state", ["projectId", "state"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_pr_evaluation", ["prEvaluationId"])
+    .index("by_merge_sha", ["repositoryId", "mergeCommitSha"])
+    .index("by_environment", ["environmentId"]),
+
+  factoryReleaseEvidence: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    releaseId: v.id("factoryReleases"),
+    kind: factoryReleaseEvidenceKind,
+    status: v.union(
+      v.literal("PASS"),
+      v.literal("FAIL"),
+      v.literal("INFO")
+    ),
+    subjectSha: v.string(),
+    providerRef: v.optional(v.string()),
+    evidenceUrl: v.optional(v.string()),
+    httpStatus: v.optional(v.number()),
+    latencyMs: v.optional(v.number()),
+    contentDigest: v.optional(v.string()),
+    summary: v.string(),
+    actorType: actorType,
+    actorId: v.optional(v.string()),
+    idempotencyKey: v.string(),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_release", ["releaseId", "createdAt"])
+    .index("by_project", ["projectId", "createdAt"])
+    .index("by_idempotency", ["idempotencyKey"]),
 
   // -------------------------------------------------------------------------
   // KNOWLEDGE GRAPH (Agentic-KB Graphify overlay + future Obsidian sync)

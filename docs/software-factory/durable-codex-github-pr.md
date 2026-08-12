@@ -5,11 +5,12 @@
 This is the single V1 mutation path from an approved Mission Task Attempt to a
 review-ready GitHub pull request. It targets the repository already bound to
 the active Factory; it does not create repositories, merge pull requests, or
-deploy code.
+deploy code. The governed staging-release contract takes ownership only after
+GitHub reports the exact merge.
 
 ## Authoritative flow
 
-`Mission → approved plan → released WorkOrder → Task → workflowRun Attempt → Factory version → Git commit → independent verification → optional human-review checkpoint → publication permit → pull-request artifact`
+`Mission → approved plan → released WorkOrder → Task → workflowRun Attempt → Factory version → Git commit → independent verification → optional human-review checkpoint → publication permit → pull-request artifact → GitHub merge → governed staging release → release verification evidence`
 
 Dispatch freezes the repository, code scopes, worktree, branch, executor,
 model, tool list, timeout, budget, Factory digest, and current WorkOrder
@@ -41,6 +42,10 @@ revision. The durable worker then:
    token, pushes the exact branch, and finds or creates the pull request.
 11. Persists commit, pull request, changed files, installation identity, and the
    complete Mission-to-Factory lineage before marking the Attempt complete.
+12. After GitHub reports the PR merged, creates one separate code-release
+    aggregate bound to the exact merge commit. Human staging approval,
+    deployment receipt, independent provenance/smoke/health evidence, and
+    rollback follow `docs/software-factory/governed-staging-release.md`.
 
 The GitHub installation token is held only in worker memory during push and PR
 publication. Codex never inherits the App private key, installation token,

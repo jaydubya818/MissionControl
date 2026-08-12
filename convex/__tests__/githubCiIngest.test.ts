@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  githubPullRequestMergeEvidence,
   canonicalGithubPullRequestUrl,
   extractPrFromWebhookEvent,
   isSupportedPullRequestWebhookAction,
@@ -94,6 +95,24 @@ describe("githubCiIngest", () => {
     expect(isSupportedPullRequestWebhookAction("edited")).toBe(true);
     expect(isSupportedPullRequestWebhookAction("closed")).toBe(true);
     expect(isSupportedPullRequestWebhookAction("labeled")).toBe(false);
+  });
+
+  it("preserves exact provider merge identity only for merged pull requests", () => {
+    expect(githubPullRequestMergeEvidence({
+      merged: true,
+      merged_at: "2026-08-11T20:15:30Z",
+      merge_commit_sha: "a".repeat(40),
+      merged_by: { login: "release-operator" },
+    })).toEqual({
+      mergeActor: "release-operator",
+      mergedAt: Date.parse("2026-08-11T20:15:30Z"),
+      mergeCommitSha: "a".repeat(40),
+    });
+    expect(githubPullRequestMergeEvidence({
+      merged: false,
+      merged_at: "2026-08-11T20:15:30Z",
+      merge_commit_sha: "b".repeat(40),
+    })).toEqual({});
   });
 });
 

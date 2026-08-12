@@ -15,6 +15,9 @@ export interface GithubCiPayload {
   branch?: string;
   title?: string;
   prState: "OPEN" | "CLOSED" | "MERGED";
+  mergeActor?: string;
+  mergedAt?: number;
+  mergeCommitSha?: string;
   headSha?: string;
   ciStatus: "PASS" | "FAIL" | "PENDING" | "UNKNOWN";
   ciRunUrl?: string;
@@ -22,6 +25,21 @@ export interface GithubCiPayload {
   diffLineCount?: number;
   signals: Partial<PrCheckSignals>;
   lineage?: GithubPullRequestLineage;
+}
+
+export function githubPullRequestMergeEvidence(pr: {
+  merged?: boolean;
+  merged_at?: string | null;
+  merge_commit_sha?: string | null;
+  merged_by?: { login?: string } | null;
+}): Pick<GithubCiPayload, "mergeActor" | "mergedAt" | "mergeCommitSha"> {
+  if (!pr.merged) return {};
+  const parsedMergedAt = pr.merged_at ? Date.parse(pr.merged_at) : Number.NaN;
+  return {
+    mergeActor: pr.merged_by?.login || undefined,
+    mergedAt: Number.isFinite(parsedMergedAt) ? parsedMergedAt : undefined,
+    mergeCommitSha: pr.merge_commit_sha || undefined,
+  };
 }
 
 export interface GithubPullRequestLineage {
@@ -163,6 +181,9 @@ export async function fetchPullRequestCi(
     body?: string | null;
     state?: "open" | "closed";
     merged?: boolean;
+    merged_at?: string | null;
+    merge_commit_sha?: string | null;
+    merged_by?: { login?: string } | null;
     head?: { ref?: string; sha?: string };
     html_url?: string;
   };
@@ -210,6 +231,7 @@ export async function fetchPullRequestCi(
   const mapped = mapCheckRunsToSignals(checkRuns);
   const prUrl = pr.html_url ?? `https://github.com/${owner}/${repo}/pull/${prNumber}`;
   const ciRunUrl = checkRuns.find((c) => c.html_url)?.html_url ?? checkRuns[0]?.details_url;
+  const mergeEvidence = githubPullRequestMergeEvidence(pr);
 
   return {
     prUrl,
@@ -218,6 +240,7 @@ export async function fetchPullRequestCi(
     branch: pr.head?.ref,
     title: pr.title,
     prState: pr.merged ? "MERGED" : pr.state === "open" ? "OPEN" : "CLOSED",
+    ...mergeEvidence,
     headSha,
     ciStatus: mapped.ciStatus ?? "UNKNOWN",
     ciRunUrl,
