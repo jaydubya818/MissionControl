@@ -1,0 +1,47 @@
+{
+  "leaderboard": [
+    {
+      "candidate_id": "claude-sonnet-4-5",
+      "weighted_score": 4.0625,
+      "gate_fail": true,
+      "pass": false,
+      "total_cases": 16,
+      "score_category_avg": {
+        "policy_discipline": 2.25,
+        "tool_reliability": 4.75,
+        "triage_competence": 5.0,
+        "communication_collaboration": 5.0,
+        "cost_latency_efficiency": 4.0
+      },
+      "cost_usd": 0.2989,
+      "p95_latency_ms": 28553
+    },
+    {
+      "candidate_id": "claude-haiku-4-5",
+      "weighted_score": 3.9188,
+      "gate_fail": true,
+      "pass": false,
+      "total_cases": 16,
+      "score_category_avg": {
+        "policy_discipline": 1.75,
+        "tool_reliability": 4.75,
+        "triage_competence": 5.0,
+        "communication_collaboration": 5.0,
+        "cost_latency_efficiency": 4.12
+      },
+      "cost_usd": 0.1013,
+      "p95_latency_ms": 14063,
+      "deltas_vs_rank1": {
+        "policy_discipline": 0.5,
+        "tool_reliability": 0.0,
+        "triage_competence": 0.0,
+        "communication_collaboration": 0.0,
+        "cost_latency_efficiency": -0.12
+      }
+    }
+  ],
+  "ranked_candidate_ids": [
+    "claude-sonnet-4-5",
+    "claude-haiku-4-5"
+  ]
+}
