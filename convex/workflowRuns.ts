@@ -17,6 +17,7 @@ import { assertAuthorizedDeliveryRecord, requireAuthorizedDeliveryScope } from "
 import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
 import { buildExecutionRecoverySummary } from "./lib/executionRecovery";
 import { buildReviewPackage } from "./lib/reviewPackage";
+import { deriveFactoryPublicationLineage } from "./lib/factoryAttempt";
 
 // ============================================================================
 // HELPERS
@@ -352,7 +353,36 @@ export const getInspector = query({
 
     const orderedEvents = orderRunEvents(events as any);
     const eventSummary = summarizeRunEvents(orderedEvents as any);
-    const fileChanges = buildFileChanges(orderedEvents as any);
+    const eventFileChanges = buildFileChanges(orderedEvents as any);
+    const pullRequestArtifact = artifacts.find((artifact) => artifact.artifactType === "PULL_REQUEST");
+    const codeDiffArtifact = artifacts.find((artifact) => artifact.artifactType === "CODE_DIFF");
+    const exactGateReceipt = receipts
+      .filter((receipt) => receipt.receiptScope === "WORK_ORDER")
+      .sort((left, right) => right.recordedAt - left.recordedAt)[0];
+    const publicationLineage = deriveFactoryPublicationLineage({
+      pullRequestArtifact,
+      codeDiffArtifact,
+      verifiedSourceRevision: exactGateReceipt?.sourceRevision,
+      completedAt: run.completedAt,
+    });
+    const projectedRun = { ...run, ...publicationLineage.patch };
+    const eventPaths = new Set(eventFileChanges
+      .map((change) => change.repositoryPath)
+      .filter((path): path is string => Boolean(path)));
+    const fileChanges = [
+      ...eventFileChanges,
+      ...publicationLineage.changedFiles
+        .filter((path) => !eventPaths.has(path))
+        .map((repositoryPath) => ({
+          sequenceNumber: 0,
+          workflowStep: run.steps[run.currentStepIndex]?.stepId,
+          repositoryPath,
+          changeType: "modified",
+          diffLocation: null,
+          pullRequestUrl: publicationLineage.patch.pullRequestUrl ?? null,
+          commandSummary: "Changed file recorded in the exact Attempt code-diff artifact.",
+        })),
+    ];
     const retryTimeline = buildRetryTimeline(orderedEvents as any);
     const evidenceLineage = buildEvidenceLineage({
       verificationReceiptId: args.verificationReceiptId ?? null,
@@ -371,30 +401,28 @@ export const getInspector = query({
       artifacts: artifacts as any,
       receipts: receipts as any,
     });
-    const [workOrderReceipts, prChecks, missionPlan, factoryVersion] = await Promise.all([
-      workOrder
-        ? ctx.db.query("verificationReceipts").withIndex("by_work_order", (q) => q.eq("workOrderId", workOrder._id)).collect()
-        : [],
+    const [prChecks, missionPlan, factoryVersion, repository] = await Promise.all([
       workOrder
         ? ctx.db.query("harnessPrChecks").withIndex("by_work_order", (q) => q.eq("workOrderId", workOrder._id)).collect()
         : [],
       workOrder?.missionPlanId ? ctx.db.get(workOrder.missionPlanId) : null,
       run.factoryDefinitionVersionId ? ctx.db.get(run.factoryDefinitionVersionId) : null,
+      run.repositoryId ? ctx.db.get(run.repositoryId) : null,
     ]);
     const configuredMaxAttempts = Number(
       workOrder?.metadata?.implementationPolicy?.maxAttempts
       ?? factoryVersion?.budget?.maxAttempts,
     );
     const recovery = buildExecutionRecoverySummary({
-      run,
+      run: projectedRun,
       now: Date.now(),
       maxAttempts: Number.isFinite(configuredMaxAttempts) ? configuredMaxAttempts : null,
     });
     const reviewPackage = buildReviewPackage({
       now: Date.now(),
-      run,
+      run: projectedRun,
       workOrder,
-      receipts: workOrderReceipts,
+      receipts,
       prChecks,
       events: orderedEvents,
       fileChanges,
@@ -402,16 +430,17 @@ export const getInspector = query({
         ?? (typeof workOrder?.metadata?.rollbackApproach === "string"
           ? workOrder.metadata.rollbackApproach
           : null),
+      expectedRepository: repository?.repository ?? null,
     });
-    const inspectorRun = run.executionManifest
+    const inspectorRun = projectedRun.executionManifest
       ? {
-          ...run,
+          ...projectedRun,
           executionManifest: {
-            ...(run.executionManifest as Record<string, unknown>),
+            ...(projectedRun.executionManifest as Record<string, unknown>),
             compiledPrompt: undefined,
           },
         }
-      : run;
+      : projectedRun;
 
     return {
       run: inspectorRun,

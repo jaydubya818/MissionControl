@@ -64,6 +64,12 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       candidateRevision: expect.any(String),
       sourceRevision: expect.any(String),
     });
+    const pullRequestArtifact = fixture.reports.at(-1)?.artifacts?.find((artifact: any) => artifact.artifactType === "PULL_REQUEST");
+    expect(pullRequestArtifact?.metadata).toMatchObject({
+      sourceRevision: expect.stringMatching(/^[a-f0-9]{40}$/),
+      headSha: expect.stringMatching(/^[a-f0-9]{40}$/),
+      changedFiles: ["src/feature.ts"],
+    });
     expect(fixture.reports.at(-1)?.terminal).toEqual({ status: "COMPLETED" });
     await fixture.worker.stop();
   });
@@ -104,10 +110,16 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     );
     expect(fixture.executeCodex).toHaveBeenCalledOnce();
     expect(fixture.executeVerification).toHaveBeenCalledOnce();
+    expect(fixture.reports.at(-1)?.artifacts?.find((artifact: any) => artifact.artifactType === "PULL_REQUEST")?.metadata)
+      .toMatchObject({ sourceRevision: verifiedSha(), headSha: expect.stringMatching(/^[a-f0-9]{40}$/) });
     expect(fixture.reports.at(-1)?.terminal).toEqual({ status: "COMPLETED" });
     await restartedWorker.stop();
   });
 });
+
+function verifiedSha() {
+  return expect.stringMatching(/^[a-f0-9]{40}$/);
+}
 
 async function runFixture(serverVerdict: "VERIFIED" | "NOT_VERIFIED" | "REQUIRES_HUMAN_REVIEW") {
   const checkoutRoot = await mkdtemp(path.join(tmpdir(), "mc-verification-first-worker-"));

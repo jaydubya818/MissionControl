@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Clock3, ExternalLink, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, ExternalLink, GitPullRequest, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,11 +13,26 @@ export type ReviewEvidencePackageData = {
     workOrderId: string | null;
     workOrderRevisionNumber: number | null;
     repositoryId: string | null;
+    repository: string | null;
     branch: string | null;
     baseSha: string | null;
     headSha: string | null;
     pullRequestUrl: string | null;
     pullRequestNumber: number | null;
+    executionManifestDigest: string | null;
+  };
+  gate: {
+    status: string;
+    receiptId: string | null;
+    verificationRunId: string | null;
+    verdict: string | null;
+    verifier: string | null;
+    sourceRevision: string | null;
+    candidateRevision: string | null;
+    recordedAt: number | null;
+    validUntil: number | null;
+    reasons: string[];
+    integrityIssue: string | null;
   };
   ci: {
     status: string;
@@ -43,30 +58,53 @@ export type ReviewEvidencePackageData = {
   deviations: string[];
   failedChecks: string[];
   risks: string[];
+  riskLevel: string | null;
+  reviewerFocus: string[];
   rollbackApproach: string | null;
   recovery: { attempts: number; staleRecoveries: number };
 };
 
 const packageTone = {
-  READY: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-  BLOCKED: "border-red-500/30 bg-red-500/10 text-red-200",
-  INCOMPLETE: "border-amber-500/30 bg-amber-500/10 text-amber-200",
+  READY: "border-success/30 bg-success/10 text-success",
+  BLOCKED: "border-danger/30 bg-danger/10 text-danger",
+  INCOMPLETE: "border-warning/30 bg-warning/10 text-warning",
 };
 
 const evidenceTone: Record<string, string> = {
-  PASS: "border-emerald-500/30 text-emerald-200",
-  WAIVED: "border-sky-500/30 text-sky-200",
-  FAIL: "border-red-500/30 text-red-200",
-  STALE: "border-red-500/30 text-red-200",
-  UNKNOWN: "border-red-500/30 text-red-200",
-  PENDING: "border-amber-500/30 text-amber-200",
-  MISSING: "border-amber-500/30 text-amber-200",
+  PASS: "border-success/30 text-success",
+  WAIVED: "border-info/30 text-info",
+  FAIL: "border-danger/30 text-danger",
+  STALE: "border-danger/30 text-danger",
+  UNKNOWN: "border-danger/30 text-danger",
+  PENDING: "border-warning/30 text-warning",
+  MISSING: "border-warning/30 text-warning",
 };
+
+function externalHttpUrl(value: string | null) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function externalHttpsUrl(value: string | null) {
+  const url = externalHttpUrl(value);
+  return url?.startsWith("https:") ? url : null;
+}
+
+function shortRevision(value: string | null) {
+  return value?.slice(0, 10) ?? "—";
+}
 
 export function ReviewEvidencePackage({ review }: { review: ReviewEvidencePackageData }) {
   const StatusIcon = review.status === "READY" ? CheckCircle2 : review.status === "BLOCKED" ? AlertTriangle : Clock3;
+  const pullRequestUrl = externalHttpsUrl(review.identity.pullRequestUrl);
+  const ciRunUrl = externalHttpsUrl(review.ci.runUrl);
   return (
-    <Card id="run-review-package" className="scroll-mt-4 p-4">
+    <Card id="run-review-package" className="scroll-mt-4 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <StatusIcon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -75,7 +113,7 @@ export function ReviewEvidencePackage({ review }: { review: ReviewEvidencePackag
             <p className="mt-1 text-sm text-muted-foreground">{review.summary}</p>
           </div>
         </div>
-        <span className={`rounded border px-2 py-1 text-[10px] font-semibold tracking-wide ${packageTone[review.status]}`}>
+        <span role="status" aria-live="polite" className={`rounded border px-2 py-1 text-[10px] font-semibold tracking-wide ${packageTone[review.status]}`}>
           {review.status}
         </span>
       </div>
@@ -86,7 +124,7 @@ export function ReviewEvidencePackage({ review }: { review: ReviewEvidencePackag
       </div>
 
       {review.blockers.length > 0 ? (
-        <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+        <div className="mt-4 rounded-lg border border-warning/20 bg-warning/5 p-3">
           <div className="text-xs font-medium text-foreground">Required before review</div>
           <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
             {review.blockers.map((blocker) => <li key={blocker}>• {blocker}</li>)}
@@ -94,11 +132,15 @@ export function ReviewEvidencePackage({ review }: { review: ReviewEvidencePackag
         </div>
       ) : null}
 
-      <div className="mt-4 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+        <PackageMeta label="Repository" value={review.identity.repository ?? "—"} mono />
         <PackageMeta label="WorkOrder revision" value={review.identity.workOrderRevisionNumber ? `v${review.identity.workOrderRevisionNumber}` : "—"} />
         <PackageMeta label="Branch" value={review.identity.branch ?? "—"} mono />
-        <PackageMeta label="Base → head" value={[review.identity.baseSha?.slice(0, 10), review.identity.headSha?.slice(0, 10)].filter(Boolean).join(" → ") || "—"} mono />
+        <PackageMeta label="Base → head" value={`${shortRevision(review.identity.baseSha)} → ${shortRevision(review.identity.headSha)}`} mono />
+        <PackageMeta label="Attempt" value={review.identity.runId} mono />
+        <PackageMeta label="Manifest digest" value={shortRevision(review.identity.executionManifestDigest)} mono />
         <PackageMeta label="Attempts / recoveries" value={`${review.recovery.attempts} / ${review.recovery.staleRecoveries}`} />
+        <PackageMeta label="Risk" value={review.riskLevel ?? "Not classified"} />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.75fr)]">
@@ -107,7 +149,9 @@ export function ReviewEvidencePackage({ review }: { review: ReviewEvidencePackag
           <div className="space-y-2">
             {review.criteria.length === 0 ? (
               <p className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3 text-sm text-muted-foreground">No criterion evidence is bound.</p>
-            ) : review.criteria.map((criterion) => (
+            ) : review.criteria.map((criterion) => {
+              const evidenceUrl = externalHttpUrl(criterion.evidenceLocation);
+              return (
               <div key={criterion.id} className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -120,29 +164,49 @@ export function ReviewEvidencePackage({ review }: { review: ReviewEvidencePackag
                 </div>
                 {criterion.result ? <p className="mt-2 text-xs text-muted-foreground">{criterion.result}</p> : null}
                 {criterion.integrityIssue ? (
-                  <p role="alert" className="mt-2 text-xs text-red-200">{criterion.integrityIssue}</p>
+                  <p role="alert" className="mt-2 text-xs text-danger">{criterion.integrityIssue}</p>
                 ) : null}
-                {criterion.evidenceLocation ? (
+                {evidenceUrl ? (
                   <Button asChild variant="link" size="sm" className="mt-1 h-auto p-0 text-xs">
-                    <a href={criterion.evidenceLocation} target="_blank" rel="noreferrer">Open evidence <ExternalLink className="ml-1 h-3 w-3" aria-hidden="true" /></a>
+                    <a href={evidenceUrl} target="_blank" rel="noreferrer">Open evidence <ExternalLink className="ml-1 h-3 w-3" aria-hidden="true" /></a>
                   </Button>
+                ) : criterion.evidenceLocation ? (
+                  <p className="mt-2 break-all font-mono text-xs text-muted-foreground">Evidence reference: {criterion.evidenceLocation}</p>
                 ) : null}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
         <div className="space-y-3">
           <div className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-medium text-foreground"><ShieldCheck className="h-4 w-4" aria-hidden="true" />Authoritative verification gate</div>
+              <Badge variant="outline" className={evidenceTone[review.gate.status] ?? ""}>{review.gate.status}</Badge>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <PackageMeta label="Verdict" value={review.gate.verdict ?? "No verdict"} />
+              <PackageMeta label="Candidate" value={shortRevision(review.gate.candidateRevision)} mono />
+              <PackageMeta label="Verifier" value={review.gate.verifier ?? "Verifier missing"} />
+              <PackageMeta label="Valid until" value={review.gate.validUntil ? new Date(review.gate.validUntil).toLocaleString() : "No expiry recorded"} />
+            </div>
+            {review.gate.integrityIssue ? <p role="alert" className="mt-3 text-xs text-danger">{review.gate.integrityIssue}</p> : null}
+            {review.gate.reasons.length > 0 ? <p className="mt-3 text-xs text-muted-foreground">{review.gate.reasons.join(" ")}</p> : null}
+          </div>
+          <div className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-medium text-foreground"><ShieldCheck className="h-4 w-4" aria-hidden="true" />Exact-head CI</div>
+              <div className="flex items-center gap-2 text-xs font-medium text-foreground"><GitPullRequest className="h-4 w-4" aria-hidden="true" />Pull request and exact-head CI</div>
               <div className="flex items-center gap-2"><Badge variant="outline">PR {review.ci.prState}</Badge><Badge variant="outline">{review.ci.status}</Badge></div>
             </div>
             <div className="mt-2 break-all font-mono text-xs text-muted-foreground">{review.ci.headSha ?? "No matching head SHA"}</div>
-            {review.ci.runUrl ? <Button asChild size="sm" variant="outline" className="mt-3"><a href={review.ci.runUrl} target="_blank" rel="noreferrer">Open CI</a></Button> : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {pullRequestUrl ? <Button asChild size="sm"><a href={pullRequestUrl} target="_blank" rel="noreferrer">Open pull request <ExternalLink className="ml-1 h-3 w-3" aria-hidden="true" /></a></Button> : null}
+              {ciRunUrl ? <Button asChild size="sm" variant="outline"><a href={ciRunUrl} target="_blank" rel="noreferrer">Open CI</a></Button> : null}
+            </div>
           </div>
+          <PackageList label="Reviewer focus" values={review.reviewerFocus} empty="No elevated focus areas recorded." />
           <PackageList label="Changed files" values={review.changedFiles} empty="No structured file lineage." mono />
-          <PackageList label="Unresolved risks" values={review.risks} empty="No unresolved risks recorded." />
           <div className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3">
             <div className="text-xs font-medium text-foreground">Rollback guidance</div>
             <p className="mt-2 text-xs text-muted-foreground">{review.rollbackApproach ?? "No rollback guidance recorded."}</p>
@@ -158,10 +222,22 @@ function PackageMeta({ label, value, mono = false }: { label: string; value: str
 }
 
 function PackageList({ label, values, empty, mono = false }: { label: string; values: string[]; empty: string; mono?: boolean }) {
+  const visibleValues = values.slice(0, 8);
+  const remainingValues = values.slice(8);
   return (
     <div className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3">
       <div className="text-xs font-medium text-foreground">{label}</div>
-      {values.length > 0 ? <ul className={`mt-2 space-y-1 break-all text-xs text-muted-foreground ${mono ? "font-mono" : ""}`}>{values.slice(0, 8).map((value) => <li key={value}>• {value}</li>)}</ul> : <p className="mt-2 text-xs text-muted-foreground">{empty}</p>}
+      {values.length > 0 ? (
+        <>
+          <ul className={`mt-2 space-y-1 break-all text-xs text-muted-foreground ${mono ? "font-mono" : ""}`}>{visibleValues.map((value) => <li key={value}>• {value}</li>)}</ul>
+          {remainingValues.length > 0 ? (
+            <details className="mt-2 text-xs text-muted-foreground">
+              <summary className="cursor-pointer rounded-sm py-1 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Show {remainingValues.length} more</summary>
+              <ul className={`mt-2 space-y-1 break-all ${mono ? "font-mono" : ""}`}>{remainingValues.map((value) => <li key={value}>• {value}</li>)}</ul>
+            </details>
+          ) : null}
+        </>
+      ) : <p className="mt-2 text-xs text-muted-foreground">{empty}</p>}
     </div>
   );
 }

@@ -81,14 +81,14 @@ export function ExecutionRunInspector({
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-[1100px] overflow-hidden p-0">
-        <DialogHeader className="border-b border-[var(--panel-line)] px-6 py-4">
+        <DialogHeader className="border-b border-[var(--panel-line)] px-4 py-4 sm:px-6">
           <DialogTitle>Execution Run Inspector</DialogTitle>
           <DialogDescription className="sr-only">
             Inspect execution state, continuous evidence lineage, artifacts, verification, and recovery history.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[80vh] overflow-y-auto p-6">
+        <div className="max-h-[80vh] overflow-y-auto p-4 sm:p-6">
           {unavailable ? (
             <Card role="alert" className="border-red-500/30 p-6">
               <div className="text-sm font-medium text-foreground">Run unavailable</div>
@@ -98,9 +98,15 @@ export function ExecutionRunInspector({
               <Button className="mt-4" variant="outline" onClick={onClose}>Close inspector</Button>
             </Card>
           ) : !workflowRunId ? (
-            <Card className="p-6 text-sm text-muted-foreground">Select a run to inspect.</Card>
+            <Card className="p-6">
+              <div className="text-sm font-medium text-foreground">Select an Attempt</div>
+              <p className="mt-2 text-sm text-muted-foreground">Choose a current WorkOrder Attempt to inspect its review evidence and recovery history.</p>
+            </Card>
           ) : inspector === undefined ? (
-            <Card className="p-6 text-sm text-muted-foreground" aria-live="polite">Loading run inspector…</Card>
+            <Card role="status" className="p-6" aria-live="polite">
+              <div className="text-sm font-medium text-foreground">Loading review evidence</div>
+              <p className="mt-2 text-sm text-muted-foreground">Resolving the exact Attempt, candidate, verification gate, and pull-request lineage…</p>
+            </Card>
           ) : inspector === null ? (
             <Card role="alert" className="border-red-500/30 p-6">
               <div className="text-sm font-medium text-foreground">Run unavailable</div>

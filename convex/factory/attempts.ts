@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { activeLeaseMatches, evaluateAttemptClaim, factoryAttemptMutationIsAuthorized, renewAttemptLease } from "../lib/factoryAttempt";
+import { activeLeaseMatches, deriveFactoryPublicationLineage, evaluateAttemptClaim, factoryAttemptMutationIsAuthorized, renewAttemptLease } from "../lib/factoryAttempt";
 import {
   PUBLICATION_SAFETY_WINDOW_MS,
   validatePublicationPermit,
@@ -485,12 +485,24 @@ export const reportInternal = internalMutation({
       if (!["COMPLETED", "FAILED", "CANCELED"].includes(terminal.status)) {
         throw new Error("Factory attempt terminal status is invalid.");
       }
-      if (terminal.status === "COMPLETED" && run.isMutating !== false) {
-        const existingPr = await ctx.db.query("runArtifacts")
+      const reportedArtifacts = artifactResults.map((result: any) => result.artifact);
+      const pullRequestArtifact = reportedArtifacts.find((artifact: any) => artifact?.artifactType === "PULL_REQUEST")
+        ?? await ctx.db.query("runArtifacts")
           .withIndex("by_run_type", (q) => q.eq("workflowRunId", run._id).eq("artifactType", "PULL_REQUEST"))
           .first();
-        const packetHasPr = artifacts.some((artifact: any) => artifact.artifactType === "PULL_REQUEST");
-        if (!existingPr && !packetHasPr) throw new Error("A mutating Factory attempt cannot complete without a pull-request artifact.");
+      const codeDiffArtifact = reportedArtifacts.find((artifact: any) => artifact?.artifactType === "CODE_DIFF")
+        ?? await ctx.db.query("runArtifacts")
+          .withIndex("by_run_type", (q) => q.eq("workflowRunId", run._id).eq("artifactType", "CODE_DIFF"))
+          .first();
+      const exactGateReceipt = run.workOrderId
+        ? await ctx.db.query("verificationReceipts")
+          .withIndex("by_run", (q) => q.eq("workflowRunId", run._id))
+          .filter((q) => q.eq(q.field("receiptScope"), "WORK_ORDER"))
+          .order("desc")
+          .first()
+        : null;
+      if (terminal.status === "COMPLETED" && run.isMutating !== false) {
+        if (!pullRequestArtifact) throw new Error("A mutating Factory attempt cannot complete without a pull-request artifact.");
       }
       if (terminal.status === "COMPLETED" && run.workOrderId) {
         const workOrder = await ctx.db.get(run.workOrderId);
@@ -537,6 +549,16 @@ export const reportInternal = internalMutation({
         }
       }
       const completedAt = Date.now();
+      const publicationLineage = deriveFactoryPublicationLineage({
+        pullRequestArtifact,
+        codeDiffArtifact,
+        verifiedSourceRevision: exactGateReceipt?.sourceRevision,
+        completedAt: terminal.status === "COMPLETED" ? completedAt : undefined,
+      });
+      if (terminal.status === "COMPLETED" && run.isMutating !== false
+        && (!publicationLineage.patch.headSha || !publicationLineage.patch.pullRequestUrl)) {
+        throw new Error("A completed mutating Factory attempt requires durable pull-request head and URL lineage.");
+      }
       const failureReason = optionalText(terminal.failureReason, 2_000);
       const steps = terminal.status === "COMPLETED"
         ? run.steps.map((step) => ({
@@ -552,6 +574,7 @@ export const reportInternal = internalMutation({
         steps,
         lease: undefined,
         executionPhase: "TERMINAL",
+        ...publicationLineage.patch,
         factoryContinuation: run.factoryContinuation
           ? {
               ...run.factoryContinuation,
@@ -806,6 +829,7 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
     : result.verdict === "REQUIRES_HUMAN_REVIEW"
       ? "PENDING"
       : "FAILED";
+  const receiptValidUntil = verificationValidUntil(governancePolicy, receiptRecordedAt);
   const verificationReceiptId = await ctx.db.insert("verificationReceipts", {
     tenantId: run.tenantId,
     projectId: run.projectId,
@@ -832,7 +856,7 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
     sourceRevision: result.sourceRevision,
     candidateRevision: result.candidateRevision,
     workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
-    validUntil: verificationValidUntil(governancePolicy, receiptRecordedAt),
+    validUntil: receiptValidUntil,
     recordedAt: receiptRecordedAt,
     metadata: { engineVersion: result.engineVersion, serverRecomputed: true, leaseId },
   });
@@ -855,6 +879,7 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
       sourceRevision: result.sourceRevision,
       candidateRevision: result.candidateRevision,
       workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
+      validUntil: receiptValidUntil,
       recordedAt: Date.now(),
       metadata: { engineVersion: result.engineVersion, serverRecomputed: true, leaseId },
     });

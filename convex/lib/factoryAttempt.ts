@@ -9,6 +9,80 @@ export interface AttemptLease {
   expiresAt: number;
 }
 
+type PublicationArtifactLike = {
+  artifactType?: string;
+  externalLocation?: string;
+  metadata?: Record<string, unknown>;
+};
+
+type FactoryPublicationPatch = {
+  executionBaseSha?: string;
+  headSha?: string;
+  pullRequestNumber?: number;
+  pullRequestUrl?: string;
+  publishedAt?: number;
+};
+
+function gitRevision(value: unknown) {
+  return typeof value === "string" && /^[a-f0-9]{40,64}$/i.test(value) ? value : undefined;
+}
+
+function httpUrl(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function deriveFactoryPublicationLineage(input: {
+  pullRequestArtifact?: PublicationArtifactLike | null;
+  codeDiffArtifact?: PublicationArtifactLike | null;
+  verifiedSourceRevision?: string;
+  completedAt?: number;
+}): { changedFiles: string[]; patch: FactoryPublicationPatch } {
+  const pullRequest = input.pullRequestArtifact?.artifactType === "PULL_REQUEST"
+    ? input.pullRequestArtifact
+    : undefined;
+  const codeDiff = input.codeDiffArtifact?.artifactType === "CODE_DIFF"
+    ? input.codeDiffArtifact
+    : undefined;
+  const pullRequestMetadata = pullRequest?.metadata ?? {};
+  const codeDiffMetadata = codeDiff?.metadata ?? {};
+  const headSha = gitRevision(pullRequestMetadata.headSha) ?? gitRevision(codeDiffMetadata.headSha);
+  const sourceRevision = gitRevision(pullRequestMetadata.sourceRevision)
+    ?? gitRevision(codeDiffMetadata.sourceRevision)
+    ?? gitRevision(input.verifiedSourceRevision);
+  const pullRequestUrl = httpUrl(pullRequest?.externalLocation ?? pullRequestMetadata.pullRequestUrl);
+  const pullRequestNumber = Number.isSafeInteger(pullRequestMetadata.pullRequestNumber)
+    && Number(pullRequestMetadata.pullRequestNumber) > 0
+    ? Number(pullRequestMetadata.pullRequestNumber)
+    : undefined;
+  const changedFileValues = Array.isArray(codeDiffMetadata.changedFiles)
+    ? codeDiffMetadata.changedFiles
+    : Array.isArray(pullRequestMetadata.changedFiles)
+      ? pullRequestMetadata.changedFiles
+      : [];
+  const changedFiles = [...new Set(changedFileValues
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim())
+    .filter(Boolean))].slice(0, 1_000);
+
+  if (!pullRequest || !headSha || !pullRequestUrl) return { changedFiles, patch: {} };
+  return {
+    changedFiles,
+    patch: {
+      ...(sourceRevision ? { executionBaseSha: sourceRevision } : {}),
+      headSha,
+      ...(pullRequestNumber ? { pullRequestNumber } : {}),
+      pullRequestUrl,
+      ...(input.completedAt ? { publishedAt: input.completedAt } : {}),
+    },
+  };
+}
+
 export function factoryAttemptMutationIsAuthorized(run: {
   status: string;
   cancellationRequestedAt?: number;

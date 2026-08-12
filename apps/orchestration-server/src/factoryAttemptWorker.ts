@@ -212,6 +212,7 @@ export class FactoryAttemptWorker {
           structuredResult,
           changedFiles: scopeResult.changedFiles,
           verificationRecord: checkpoint.verification,
+          sourceRevision: checkpoint.sourceRevision,
           headSha: checkpoint.candidateRevision,
           report,
           leaseId,
@@ -310,6 +311,7 @@ export class FactoryAttemptWorker {
             linesAdded: candidate.linesAdded,
             linesDeleted: candidate.linesDeleted,
             branch: claim.branch,
+            sourceRevision: candidate.sourceRevision,
             headSha,
           },
         },
@@ -352,6 +354,7 @@ export class FactoryAttemptWorker {
         structuredResult,
         changedFiles: scopeResult.changedFiles,
         verificationRecord,
+        sourceRevision: candidate.sourceRevision,
         headSha,
         report,
         leaseId,
@@ -396,6 +399,7 @@ export class FactoryAttemptWorker {
     structuredResult: ReturnType<typeof validateFactoryResult>;
     changedFiles: string[];
     verificationRecord: any;
+    sourceRevision: string;
     headSha: string;
     report: (packet: any) => Promise<any>;
     leaseId: string;
@@ -460,6 +464,7 @@ export class FactoryAttemptWorker {
       repository: input.claim.repository,
       installationId: input.claim.installation.installationId,
       branch: input.claim.branch,
+      sourceRevision: input.sourceRevision,
       headSha: input.headSha,
       pullRequestNumber: pullRequest.number,
       pullRequestUrl: pullRequest.url,

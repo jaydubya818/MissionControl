@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeLeaseMatches, evaluateAttemptClaim, factoryAttemptMutationIsAuthorized, renewAttemptLease } from "../lib/factoryAttempt";
+import { activeLeaseMatches, deriveFactoryPublicationLineage, evaluateAttemptClaim, factoryAttemptMutationIsAuthorized, renewAttemptLease } from "../lib/factoryAttempt";
 
 describe("Factory attempt leases", () => {
   it("claims a pending attempt with a bounded durable lease", () => {
@@ -31,5 +31,62 @@ describe("Factory attempt leases", () => {
     expect(factoryAttemptMutationIsAuthorized({ status: "RUNNING" })).toBe(true);
     expect(factoryAttemptMutationIsAuthorized({ status: "RUNNING", cancellationRequestedAt: 100 })).toBe(false);
     expect(factoryAttemptMutationIsAuthorized({ status: "CANCELED", cancellationRequestedAt: 100 })).toBe(false);
+  });
+
+  it("derives durable Attempt, pull-request, and file lineage from exact-run artifacts", () => {
+    const lineage = deriveFactoryPublicationLineage({
+      pullRequestArtifact: {
+        artifactType: "PULL_REQUEST",
+        externalLocation: "https://github.com/acme/repo/pull/42",
+        metadata: {
+          sourceRevision: "a".repeat(40),
+          headSha: "b".repeat(40),
+          pullRequestNumber: 42,
+          changedFiles: ["src/fallback.ts"],
+        },
+      },
+      codeDiffArtifact: {
+        artifactType: "CODE_DIFF",
+        metadata: {
+          sourceRevision: "a".repeat(40),
+          headSha: "b".repeat(40),
+          changedFiles: ["src/feature.ts", "src/feature.ts", "src/test.ts"],
+        },
+      },
+      completedAt: 123,
+    });
+
+    expect(lineage).toEqual({
+      changedFiles: ["src/feature.ts", "src/test.ts"],
+      patch: {
+        executionBaseSha: "a".repeat(40),
+        headSha: "b".repeat(40),
+        pullRequestNumber: 42,
+        pullRequestUrl: "https://github.com/acme/repo/pull/42",
+        publishedAt: 123,
+      },
+    });
+  });
+
+  it("fails closed on unsafe or incomplete pull-request lineage", () => {
+    const lineage = deriveFactoryPublicationLineage({
+      pullRequestArtifact: {
+        artifactType: "PULL_REQUEST",
+        externalLocation: "javascript:alert(1)",
+        metadata: { headSha: "not-a-git-sha", changedFiles: ["", 12] },
+      },
+      verifiedSourceRevision: "a".repeat(40),
+    });
+
+    expect(lineage).toEqual({ changedFiles: [], patch: {} });
+
+    const insecure = deriveFactoryPublicationLineage({
+      pullRequestArtifact: {
+        artifactType: "PULL_REQUEST",
+        externalLocation: "http://github.com/acme/repo/pull/42",
+        metadata: { headSha: "b".repeat(40) },
+      },
+    });
+    expect(insecure.patch).toEqual({});
   });
 });
