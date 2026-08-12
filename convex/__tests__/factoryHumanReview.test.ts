@@ -27,6 +27,13 @@ describe("factory human-review continuation", () => {
     )).toBe(false);
   });
 
+  it("does not leave review authority live after the Attempt is canceled", () => {
+    expect(isFactoryHumanReviewCheckpoint(
+      { _id: "approval-factory", approvalType: "HUMAN_REVIEW" },
+      { status: "CANCELED", factoryContinuation: { approvalDecisionId: "approval-factory", status: "AWAITING_HUMAN_REVIEW" } },
+    )).toBe(false);
+  });
+
   it("accepts a current approval for the exact paused attempt", () => {
     expect(validateHumanReviewApprovalContext({
       approval: { _id: "approval-1", approvalType: "HUMAN_REVIEW", workflowRunId: "run-1", workOrderRevisionNumber: 2, status: "PENDING" },

@@ -69,7 +69,7 @@ export async function createOrReusePullRequest(input: {
   );
   const exact = existing.find((pull) => pull?.head?.ref === input.branch && pull?.base?.ref === input.base);
   if (exact) {
-    return normalizePullRequest(exact, input.headSha, true);
+    return normalizePullRequest(exact, input, true);
   }
   if (existing.length > 0) throw new Error("An open pull request exists for the branch with a different base branch.");
   const created = await githubJson<any>(
@@ -87,7 +87,7 @@ export async function createOrReusePullRequest(input: {
     },
     input.fetchImpl
   );
-  return normalizePullRequest(created, input.headSha, false);
+  return normalizePullRequest(created, input, false);
 }
 
 export function createGithubAppJwt(input: { appId: string; privateKey: string; now?: number }) {
@@ -119,15 +119,25 @@ async function githubJson<T>(url: string, init: RequestInit, fetchImpl: typeof f
   return await response.json() as T;
 }
 
-function normalizePullRequest(pull: any, headSha: string, reused: boolean) {
+function normalizePullRequest(
+  pull: any,
+  expected: { branch: string; base: string; headSha: string },
+  reused: boolean,
+) {
   if (!Number.isInteger(pull?.number) || typeof pull?.html_url !== "string") {
     throw new Error("GitHub returned an invalid pull-request record.");
+  }
+  if (pull?.head?.ref !== expected.branch || pull?.base?.ref !== expected.base) {
+    throw new Error("GitHub pull-request refs do not match the approved publication target.");
+  }
+  if (typeof pull?.head?.sha !== "string" || pull.head.sha !== expected.headSha) {
+    throw new Error("GitHub pull-request head does not match the independently verified candidate.");
   }
   return {
     number: pull.number as number,
     url: pull.html_url as string,
     nodeId: typeof pull.node_id === "string" ? pull.node_id : undefined,
-    headSha,
+    headSha: pull.head.sha,
     reused,
   };
 }

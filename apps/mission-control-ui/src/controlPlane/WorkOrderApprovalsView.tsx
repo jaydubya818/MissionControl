@@ -84,6 +84,7 @@ export function WorkOrderApprovalsView({ projectId }: { projectId: Id<"projects"
   const [decisionReason, setDecisionReason] = useState("");
   const [conditionNotes, setConditionNotes] = useState("");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [outcomeNotice, setOutcomeNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const approvals = useQuery(api.workOrders.approvalQueue, projectId ? { projectId, status } : { status });
   const decideApprovalDecision = useMutation(api.workOrders.decideApprovalDecision);
 
@@ -95,7 +96,8 @@ export function WorkOrderApprovalsView({ projectId }: { projectId: Id<"projects"
   const packet = selected ? buildOperatorDecisionPacket(selected) : null;
   const resumesVerifiedAttempt = selected?.approvalType === "HUMAN_REVIEW"
     && selected.latestRun?.status === "PAUSED"
-    && selected.latestRun?.factoryContinuationStatus === "AWAITING_HUMAN_REVIEW";
+    && selected.latestRun?.factoryContinuationStatus === "AWAITING_HUMAN_REVIEW"
+    && selected.latestRun?.factoryApprovalDecisionId === selected._id;
   const workOrderHref = packet?.workOrderId
     ? projectId
       ? workspacePath(`/v2/control-work-orders?workOrder=${packet.workOrderId}`, String(projectId))
@@ -153,7 +155,7 @@ export function WorkOrderApprovalsView({ projectId }: { projectId: Id<"projects"
         ?.factoryContinuationOutcome;
       const decisionRejectedReason = (result as { decisionRejectedReason?: string } | null)?.decisionRejectedReason;
       if (decisionRejectedReason) {
-        setMessage({ type: "error", text: decisionRejectedReason });
+        setOutcomeNotice({ type: "error", text: decisionRejectedReason });
         return;
       }
       const continuationMessage = continuationOutcome === "RESUME_PUBLISH"
@@ -161,7 +163,7 @@ export function WorkOrderApprovalsView({ projectId }: { projectId: Id<"projects"
         : continuationOutcome === "FAIL_ATTEMPT"
             ? "The paused Attempt is closed and cannot publish."
             : "Dispatch remains a separate governed action.";
-      setMessage({ type: "success", text: `${resultLabel}. ${continuationMessage}` });
+      setOutcomeNotice({ type: "success", text: `${resultLabel}. ${continuationMessage}` });
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "Decision could not be recorded." });
     } finally {
@@ -199,6 +201,21 @@ export function WorkOrderApprovalsView({ projectId }: { projectId: Id<"projects"
             </Select>
           </div>
         </div>
+
+        {outcomeNotice ? (
+          <div
+            role={outcomeNotice.type === "error" ? "alert" : "status"}
+            className={cn(
+              "mt-4 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-[12.5px]",
+              outcomeNotice.type === "error"
+                ? "border-red-500/30 bg-red-500/[0.08] text-red-200"
+                : "border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-200",
+            )}
+          >
+            <span>{outcomeNotice.text}</span>
+            <Button size="sm" variant="ghost" onClick={() => setOutcomeNotice(null)}>Dismiss</Button>
+          </div>
+        ) : null}
 
         {approvals === undefined ? (
           <Card className="mt-4 flex items-center justify-center gap-2 p-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading governed decisions…</Card>

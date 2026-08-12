@@ -70,11 +70,14 @@ orchestration-server path for ordered Factory execution events, artifacts, and
 terminal status; the former generic HTTP event/artifact write routes return
 `410 Gone`.
 
-The `attempts.*` capability set is retained for the disabled legacy manifest
-worker. The documented V1 golden path uses `executions.*`. Runtime startup fails
-if both `FACTORY_EXECUTION_ENABLED=1` and
-`CODEX_FACTORY_WORKER_ENABLED=true` are configured, preventing competing claims
-against the same Attempt.
+The documented V1 golden path uses the `attempts.*` capability set for the
+repository-scoped verification-first worker. `CODEX_FACTORY_WORKER_ENABLED=true`
+also requires an exact project and repository binding, and queries claimable
+runs through that repository scope. `executions.*` remains a compatibility API
+surface but has no supported production launcher. Runtime startup fails if both
+the unscoped `FACTORY_EXECUTION_ENABLED=1` mode and the bounded
+`CODEX_FACTORY_WORKER_ENABLED=true` mode are configured, preventing competing
+claims against the same Attempt.
 
 Additional scheduler, task-transition, approval-request, and handoff
 commands must be added as named capabilities before those callers can be treated

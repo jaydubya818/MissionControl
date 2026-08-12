@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { activeLeaseMatches, evaluateAttemptClaim, renewAttemptLease } from "../lib/factoryAttempt";
+import { activeLeaseMatches, evaluateAttemptClaim, factoryAttemptMutationIsAuthorized, renewAttemptLease } from "../lib/factoryAttempt";
 import {
   PUBLICATION_SAFETY_WINDOW_MS,
   validatePublicationPermit,
@@ -118,7 +118,9 @@ export const claimInternal = internalMutation({
           .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", `factory:${run.runId}:code-diff:${continuation.candidateRevision}`))
           .first(),
         ctx.db.query("approvalDecisions")
-          .withIndex("by_work_order", (q) => q.eq("workOrderId", workOrder._id))
+          .withIndex("by_work_order_revision", (q) => q
+            .eq("workOrderId", workOrder._id)
+            .eq("workOrderRevisionNumber", workOrder.currentRevisionNumber ?? 1))
           .collect(),
       ]);
       if (continuation.status === "READY_TO_PUBLISH") {
@@ -254,36 +256,73 @@ export const authorizePublicationInternal = internalMutation({
   handler: async (ctx, args) => {
     const now = Date.now();
     const run = await ctx.db.get(args.workflowRunId);
-    if (!run || !activeLeaseMatches({ lease: run.lease, leaseId: args.leaseId, ownerId: args.ownerId, now })) {
+    if (!run || !factoryAttemptMutationIsAuthorized(run)
+      || !activeLeaseMatches({ lease: run.lease, leaseId: args.leaseId, ownerId: args.ownerId, now })) {
       throw new Error("Factory publication authorization requires the active matching lease.");
     }
-    const continuation = run.factoryContinuation;
-    if (!run.workOrderId || !continuation || continuation.status !== "READY_TO_PUBLISH"
-      || continuation.candidateRevision !== args.candidateRevision) {
-      throw new Error("Factory publication checkpoint is not ready for authorization.");
-    }
+    if (!run.workOrderId) throw new Error("Factory publication requires a WorkOrder-bound Attempt.");
     const workOrder = await ctx.db.get(run.workOrderId);
     if (!workOrder || workOrder.currentExecutionRunId !== run._id
-      || workOrder.currentRevisionNumber !== continuation.workOrderRevisionNumber) {
+      || workOrder.currentRevisionNumber !== run.workOrderRevisionNumber) {
       throw new Error("Factory publication WorkOrder authority changed before publication.");
     }
-    const [approval, sourceReceipt, resolvedReceipt, approvals] = await Promise.all([
-      continuation.approvalDecisionId ? ctx.db.get(continuation.approvalDecisionId) : null,
-      ctx.db.get(continuation.verificationReceiptId),
-      continuation.resolvedVerificationReceiptId ? ctx.db.get(continuation.resolvedVerificationReceiptId) : null,
+    const revisionNumber = workOrder.currentRevisionNumber ?? 1;
+    let continuation = run.factoryContinuation;
+    let approval: any = null;
+    let sourceReceipt: any = null;
+    let resolvedReceipt: any = null;
+    const [approvals, latestReceipt] = await Promise.all([
       ctx.db.query("approvalDecisions")
-        .withIndex("by_work_order", (q) => q.eq("workOrderId", workOrder._id))
+        .withIndex("by_work_order_revision", (q) => q
+          .eq("workOrderId", workOrder._id)
+          .eq("workOrderRevisionNumber", revisionNumber))
         .collect(),
+      ctx.db.query("verificationReceipts")
+        .withIndex("by_work_order_scope", (q) => q.eq("workOrderId", workOrder._id).eq("receiptScope", "WORK_ORDER"))
+        .order("desc")
+        .first(),
     ]);
-    const validation = validatePublishContinuation({
-      run: run as any,
-      workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
-      approval: approval as any,
-      sourceReceipt: sourceReceipt as any,
-      resolvedReceipt: resolvedReceipt as any,
-      now,
-    });
-    if (!validation.ok) throw new Error(`Factory publication authority is invalid (${validation.reason}).`);
+    if (continuation) {
+      if (continuation.status !== "READY_TO_PUBLISH" || continuation.candidateRevision !== args.candidateRevision) {
+        throw new Error("Factory publication checkpoint is not ready for authorization.");
+      }
+      [approval, sourceReceipt, resolvedReceipt] = await Promise.all([
+        continuation.approvalDecisionId ? ctx.db.get(continuation.approvalDecisionId) : null,
+        ctx.db.get(continuation.verificationReceiptId),
+        continuation.resolvedVerificationReceiptId ? ctx.db.get(continuation.resolvedVerificationReceiptId) : null,
+      ]);
+      const validation = validatePublishContinuation({
+        run: run as any,
+        workOrderRevisionNumber: revisionNumber,
+        approval,
+        sourceReceipt,
+        resolvedReceipt,
+        now,
+      });
+      if (!validation.ok) throw new Error(`Factory publication authority is invalid (${validation.reason}).`);
+    } else {
+      resolvedReceipt = latestReceipt;
+      sourceReceipt = latestReceipt;
+      if (!resolvedReceipt
+        || resolvedReceipt.workflowRunId !== run._id
+        || resolvedReceipt.workOrderRevisionNumber !== revisionNumber
+        || resolvedReceipt.status !== "PASSED"
+        || resolvedReceipt.verdict !== "VERIFIED"
+        || resolvedReceipt.candidateRevision !== args.candidateRevision
+        || typeof resolvedReceipt.validUntil !== "number") {
+        throw new Error("Factory publication requires a current VERIFIED receipt for the exact candidate.");
+      }
+      continuation = {
+        status: "READY_TO_PUBLISH" as const,
+        verificationRunId: resolvedReceipt.verificationRunId,
+        verificationReceiptId: resolvedReceipt._id,
+        resolvedVerificationReceiptId: resolvedReceipt._id,
+        workOrderRevisionNumber: revisionNumber,
+        sourceRevision: resolvedReceipt.sourceRevision,
+        candidateRevision: resolvedReceipt.candidateRevision,
+        pausedAt: now,
+      };
+    }
     const approvalsByType = latestApprovalByType(approvals as any[]);
     const missingApproval = requiredApprovalTypes({
       riskLevel: workOrder.riskLevel as any,
@@ -291,7 +330,7 @@ export const authorizePublicationInternal = internalMutation({
     }).find((approvalType) => {
       const candidate = approvalsByType.get(approvalType) as any;
       return !candidate
-        || candidate.workOrderRevisionNumber !== (workOrder.currentRevisionNumber ?? 1)
+        || candidate.workOrderRevisionNumber !== revisionNumber
         || !isApprovalUsable(candidate, now);
     });
     if (missingApproval) throw new Error(`Required approval ${missingApproval} changed before publication.`);
@@ -336,7 +375,9 @@ export const renewInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
-    if (!run || run.status !== "RUNNING") return { renewed: false as const, reason: "attempt-not-running" };
+    if (!run || !factoryAttemptMutationIsAuthorized(run)) {
+      return { renewed: false as const, reason: run?.cancellationRequestedAt ? "cancellation-requested" : "attempt-not-running" };
+    }
     const result = renewAttemptLease({
       lease: run.lease,
       leaseId: args.leaseId,
@@ -359,7 +400,8 @@ export const reportInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
-    if (!run || !activeLeaseMatches({ lease: run.lease, leaseId: args.leaseId, ownerId: args.ownerId, now: Date.now() })) {
+    if (!run || !factoryAttemptMutationIsAuthorized(run)
+      || !activeLeaseMatches({ lease: run.lease, leaseId: args.leaseId, ownerId: args.ownerId, now: Date.now() })) {
       throw new Error("Factory attempt report requires the active matching lease.");
     }
     const packet = args.packet && typeof args.packet === "object" ? args.packet : {};
@@ -645,6 +687,8 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
   if ((workOrder.currentRevisionNumber ?? 1) !== (run.workOrderRevisionNumber ?? 1)) {
     throw new Error("Verification packet is stale because the WorkOrder revision changed.");
   }
+  const receiptRecordedAt = Date.now();
+  const governancePolicy = await resolveGovernancePolicy(ctx, workOrder);
   const result = recomputeVerificationPacket(workOrder, packet);
   const idempotencyKey = `factory-verification:${run.runId}:${result.candidateRevision}`;
   const existing = await ctx.db
@@ -788,7 +832,8 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
     sourceRevision: result.sourceRevision,
     candidateRevision: result.candidateRevision,
     workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
-    recordedAt: Date.now(),
+    validUntil: verificationValidUntil(governancePolicy, receiptRecordedAt),
+    recordedAt: receiptRecordedAt,
     metadata: { engineVersion: result.engineVersion, serverRecomputed: true, leaseId },
   });
 

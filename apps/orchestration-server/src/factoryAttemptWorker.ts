@@ -37,6 +37,11 @@ export interface FactoryAttemptWorkerDependencies {
   createOrReusePullRequest: typeof createOrReusePullRequest;
 }
 
+export interface FactoryAttemptWorkerScope {
+  projectId: string;
+  repositoryId: string;
+}
+
 const DEFAULT_DEPENDENCIES: FactoryAttemptWorkerDependencies = {
   ensureFactoryWorktree,
   listChangedFiles,
@@ -66,7 +71,8 @@ export class FactoryAttemptWorker {
     private readonly adapter = new CodexV1ExecutorAdapter(),
     private readonly enabled = process.env.FACTORY_EXECUTION_ENABLED === "1",
     private readonly pollIntervalMs = boundedInteger(process.env.FACTORY_EXECUTION_POLL_MS, 5_000, 300_000, 15_000),
-    private readonly dependencies: FactoryAttemptWorkerDependencies = DEFAULT_DEPENDENCIES
+    private readonly dependencies: FactoryAttemptWorkerDependencies = DEFAULT_DEPENDENCIES,
+    private readonly scope?: FactoryAttemptWorkerScope,
   ) {}
 
   start() {
@@ -106,12 +112,12 @@ export class FactoryAttemptWorker {
     this.lastPollAt = Date.now();
     try {
       const [pending, running] = await Promise.all([
-        this.client.query(ConvexQueries.workflowRuns.list as any, { status: "PENDING", limit: 100 }),
-        this.client.query(ConvexQueries.workflowRuns.list as any, { status: "RUNNING", limit: 100 }),
+        this.client.query(ConvexQueries.workflowRuns.list as any, factoryRunQueryArgs("PENDING", this.scope)),
+        this.client.query(ConvexQueries.workflowRuns.list as any, factoryRunQueryArgs("RUNNING", this.scope)),
       ]) as [any[], any[]];
       for (const run of [...pending, ...running]) {
         if (this.stopped || this.active.size > 0) break;
-        if (!isBoundFactoryAttempt(run) || this.active.has(String(run._id))) continue;
+        if (!isBoundFactoryAttempt(run) || !matchesWorkerScope(run, this.scope) || this.active.has(String(run._id))) continue;
         const controller = new AbortController();
         this.active.set(String(run._id), controller);
         void this.execute(run, controller)
@@ -349,6 +355,7 @@ export class FactoryAttemptWorker {
         headSha,
         report,
         leaseId,
+        requirePublicationPermit: true,
         events: verificationResult ? [] : mappedEvents,
         artifacts: verificationResult ? [] : baseArtifacts,
       });
@@ -477,6 +484,19 @@ export class FactoryAttemptWorker {
       terminal: { status: "COMPLETED" },
     });
   }
+}
+
+export function matchesWorkerScope(run: any, scope?: FactoryAttemptWorkerScope) {
+  return !scope || (String(run?.projectId) === scope.projectId && String(run?.repositoryId) === scope.repositoryId);
+}
+
+export function factoryRunQueryArgs(status: "PENDING" | "RUNNING", scope?: FactoryAttemptWorkerScope) {
+  return {
+    status,
+    limit: 100,
+    projectId: scope?.projectId,
+    repositoryId: scope?.repositoryId,
+  };
 }
 
 function isBoundFactoryAttempt(run: any) {

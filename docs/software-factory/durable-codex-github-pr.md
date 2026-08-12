@@ -112,17 +112,18 @@ Set these on the orchestration runtime:
 CODEX_FACTORY_WORKER_ENABLED=true
 CODEX_WORKER_PROJECT_ID=<Convex project ID>
 CODEX_WORKER_REPOSITORY_ID=<Convex workspaceRepositories ID>
-CODEX_WORKER_REPOSITORY_ROOT=<absolute local checkout>
-CODEX_WORKER_ID=codex-worker:<host identity>
 MISSION_CONTROL_SERVICE_ID=orchestration-server
 MISSION_CONTROL_SERVICE_COMMAND_SECRET=<server-only HMAC secret>
 GITHUB_APP_ID=<bound GitHub App ID>
 GITHUB_APP_PRIVATE_KEY=<server-only PEM>
 ```
 
-Keep the compatibility worker disabled (`FACTORY_EXECUTION_ENABLED=0`). The
-orchestration server refuses to start when both worker modes are enabled, so
-two lease models cannot execute the same Attempt concurrently.
+Keep unscoped compatibility mode disabled (`FACTORY_EXECUTION_ENABLED=0`). The
+bounded production setting now starts the same verification-first Attempt
+worker used by the human-review checkpoint contract, restricted to the exact
+project and repository IDs above. The older parallel durable-worker runtime is
+no longer selected at startup, so verification and publication cannot diverge
+between two lease models.
 
 Configure the same service ID and HMAC secret on the Convex deployment. Keep
 all credentials out of `VITE_*` variables. The worker intentionally handles one

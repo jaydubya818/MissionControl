@@ -1706,6 +1706,7 @@ export default defineSchema({
     metadata: v.optional(v.any()),
   })
     .index("by_work_order", ["workOrderId"])
+    .index("by_work_order_revision", ["workOrderId", "workOrderRevisionNumber"])
     .index("by_work_order_status", ["workOrderId", "status"])
     .index("by_project_status", ["projectId", "status"])
     .index("by_run", ["workflowRunId"])
@@ -5509,6 +5510,17 @@ export default defineSchema({
       decisionReason: v.optional(v.string()),
       verifiedBy: v.optional(v.string()),
       verifiedAt: v.optional(v.number()),
+      researchSourceId: v.optional(v.id("researchSources")),
+      researchSourceRunId: v.optional(v.id("researchSourceRuns")),
+      researchObservationId: v.optional(v.id("researchObservations")),
+      runArtifactId: v.optional(v.id("runArtifacts")),
+      verificationReceiptId: v.optional(v.id("verificationReceipts")),
+      providerItemId: v.optional(v.string()),
+      contentHash: v.optional(v.string()),
+      safetyScanStatus: v.optional(v.union(
+        v.literal("PASSED"),
+        v.literal("QUARANTINED")
+      )),
     })),
     claims: v.optional(v.array(v.object({
       id: v.string(),
@@ -5567,6 +5579,7 @@ export default defineSchema({
     })),
     taskIds: v.array(v.id("tasks")),
     workOrderIds: v.array(v.id("workOrders")),
+    researchSourceRunIds: v.optional(v.array(v.id("researchSourceRuns"))),
     rootWorkOrderId: v.optional(v.id("workOrders")),
     latestWorkflowRunId: v.optional(v.id("workflowRuns")),
     projectedRunCompletedAt: v.optional(v.number()),

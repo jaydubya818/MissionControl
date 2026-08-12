@@ -60,6 +60,7 @@ export interface OperatorApproval {
     executionPhase?: string;
     checkpointSummary?: string;
     factoryContinuationStatus?: string;
+    factoryApprovalDecisionId?: string;
     candidateRevision?: string;
   } | null;
   verificationReceipts?: OperatorReceipt[];

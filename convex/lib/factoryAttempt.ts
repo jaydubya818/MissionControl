@@ -9,6 +9,13 @@ export interface AttemptLease {
   expiresAt: number;
 }
 
+export function factoryAttemptMutationIsAuthorized(run: {
+  status: string;
+  cancellationRequestedAt?: number;
+}) {
+  return run.status === "RUNNING" && !run.cancellationRequestedAt;
+}
+
 export function evaluateAttemptClaim(input: {
   status: string;
   lease?: AttemptLease;

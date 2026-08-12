@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeLeaseMatches, evaluateAttemptClaim, renewAttemptLease } from "../lib/factoryAttempt";
+import { activeLeaseMatches, evaluateAttemptClaim, factoryAttemptMutationIsAuthorized, renewAttemptLease } from "../lib/factoryAttempt";
 
 describe("Factory attempt leases", () => {
   it("claims a pending attempt with a bounded durable lease", () => {
@@ -25,5 +25,11 @@ describe("Factory attempt leases", () => {
     expect(renewAttemptLease({ lease, leaseId: "lease-1", ownerId: "worker-b", leaseDurationMs: 60_000, now: 20 })).toMatchObject({ ok: false, reason: "lease-mismatch" });
     const result = renewAttemptLease({ lease, leaseId: "lease-1", ownerId: "worker-a", leaseDurationMs: 60_000, now: 20 });
     expect(result.ok && activeLeaseMatches({ lease: result.lease, leaseId: "lease-1", ownerId: "worker-a", now: 21 })).toBe(true);
+  });
+
+  it("revokes report and publication authority as soon as cancellation is requested", () => {
+    expect(factoryAttemptMutationIsAuthorized({ status: "RUNNING" })).toBe(true);
+    expect(factoryAttemptMutationIsAuthorized({ status: "RUNNING", cancellationRequestedAt: 100 })).toBe(false);
+    expect(factoryAttemptMutationIsAuthorized({ status: "CANCELED", cancellationRequestedAt: 100 })).toBe(false);
   });
 });

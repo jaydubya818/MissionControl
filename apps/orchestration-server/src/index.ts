@@ -36,8 +36,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { executeAutomation } from "./automationAdapter.js";
 import { discoverLocalInference } from "./localInference.js";
 import { FactoryAttemptWorker } from "./factoryAttemptWorker.js";
-import { DurableCodexWorker } from "./durableCodexWorker.js";
-import { GithubAppPublisher } from "./githubAppPublisher.js";
 
 const envSearchPaths = [
   path.resolve(process.cwd(), ".env.local"),
@@ -63,6 +61,13 @@ const TICK_INTERVAL_MS = parseInt(process.env.TICK_INTERVAL_MS ?? "30000", 10);
 const AGENTS_DIR = process.env.AGENTS_DIR ?? path.resolve(process.cwd(), "../../agents");
 const AUTOMATION_REPOSITORY_ROOT = path.resolve(process.env.AUTOMATION_REPOSITORY_ROOT ?? process.cwd());
 const CODEX_FACTORY_WORKER_ENABLED = process.env.CODEX_FACTORY_WORKER_ENABLED === "true";
+const LEGACY_FACTORY_WORKER_ENABLED = process.env.FACTORY_EXECUTION_ENABLED === "1";
+const FACTORY_WORKER_SCOPE = CODEX_FACTORY_WORKER_ENABLED
+  ? {
+      projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"),
+      repositoryId: requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ID"),
+    }
+  : undefined;
 
 if (!CONVEX_URL) {
   console.error("[orchestration] CONVEX_URL is required. Set it in .env or environment.");
@@ -78,7 +83,14 @@ const CONVEX_SERVICE_AUTH_TOKEN = process.env.CONVEX_SERVICE_AUTH_TOKEN?.trim();
 if (CONVEX_SERVICE_AUTH_TOKEN) {
   client.setAuth(CONVEX_SERVICE_AUTH_TOKEN);
 }
-const factoryAttemptWorker = new FactoryAttemptWorker(client);
+const factoryAttemptWorker = new FactoryAttemptWorker(
+  client,
+  undefined,
+  CODEX_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED,
+  undefined,
+  undefined,
+  FACTORY_WORKER_SCOPE,
+);
 const coordinator = new CoordinatorLoop({ pollIntervalMs: TICK_INTERVAL_MS });
 const activeAgents = new Map<string, AgentLifecycle>();
 const memoryManagers = new Map<string, MemoryManager>();
@@ -91,7 +103,6 @@ let lastTickAt: number | null = null;
 let lastTickResult: any = null;
 let tickCount = 0;
 let startedAt: number | null = null;
-let durableCodexWorker: DurableCodexWorker | null = null;
 
 // ============================================================================
 // COORDINATOR TICK
@@ -1279,34 +1290,19 @@ export function startServer() {
   runTick().then((result) => {
     console.log(`[orchestration] Initial tick complete:`, result);
   });
-  if (CODEX_FACTORY_WORKER_ENABLED && process.env.FACTORY_EXECUTION_ENABLED === "1") {
+  if (CODEX_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED) {
     throw new Error("Configure exactly one Factory execution worker; legacy and durable workers cannot run together.");
   }
   factoryAttemptWorker.start();
 
   if (CODEX_FACTORY_WORKER_ENABLED) {
-    const projectId = requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID");
-    const repositoryId = requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ID");
-    const repositoryRoot = path.resolve(requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ROOT"));
-    const appId = requiredRuntimeSetting("GITHUB_APP_ID");
-    const privateKey = requiredRuntimeSetting("GITHUB_APP_PRIVATE_KEY");
-    durableCodexWorker = new DurableCodexWorker({
-      client,
-      projectId,
-      repositoryId,
-      repositoryRoot,
-      workerId: process.env.CODEX_WORKER_ID,
-      publisher: new GithubAppPublisher(appId, privateKey),
-    });
-    durableCodexWorker.start();
-    console.log(`[orchestration] Durable codex/v1 worker enabled for one governed repository.`);
+    console.log(`[orchestration] Durable verification-first codex/v1 worker enabled for one governed repository.`);
   }
 
   process.on("SIGINT", async () => {
     console.log("\n[orchestration] Shutting down...");
     if (tickTimer) clearInterval(tickTimer);
     await factoryAttemptWorker.stop();
-    await durableCodexWorker?.stop();
     for (const [name] of activeAgents) {
       try {
         await stopAgent(name);
@@ -1321,7 +1317,6 @@ export function startServer() {
     console.log("\n[orchestration] SIGTERM received, shutting down...");
     if (tickTimer) clearInterval(tickTimer);
     await factoryAttemptWorker.stop();
-    await durableCodexWorker?.stop();
     process.exit(0);
   });
 

@@ -91,6 +91,7 @@ describe("WorkOrderApprovalsView", () => {
         status: "PAUSED",
         executionPhase: "AWAITING_HUMAN_REVIEW",
         factoryContinuationStatus: "AWAITING_HUMAN_REVIEW",
+        factoryApprovalDecisionId: "approval-1",
         candidateRevision: "abcdef1234567890",
       },
       metadata: {
@@ -104,5 +105,58 @@ describe("WorkOrderApprovalsView", () => {
     expect(screen.getByRole("button", { name: "Require retry with conditions" })).toBeEnabled();
     expect(screen.getByText(/Same Attempt · candidate/)).toHaveTextContent("abcdef123456");
     expect(screen.getByText(/no agent or verifier rerun/)).toBeInTheDocument();
+  });
+
+  it("does not offer publication resume for a different human-review decision on the same run", () => {
+    mocks.approvals = [{
+      ...pendingDecision,
+      approvalType: "HUMAN_REVIEW",
+      latestRun: {
+        runId: "attempt-1",
+        status: "PAUSED",
+        factoryContinuationStatus: "AWAITING_HUMAN_REVIEW",
+        factoryApprovalDecisionId: "factory-approval",
+        candidateRevision: "abcdef1234567890",
+      },
+    }];
+
+    render(<WorkOrderApprovalsView projectId={"project-1" as never} />);
+
+    expect(screen.getByRole("button", { name: "Approve scope" })).toBeEnabled();
+    expect(screen.queryByText(/Same Attempt · candidate/)).not.toBeInTheDocument();
+  });
+
+  it("preserves the publication outcome after the pending queue refreshes", async () => {
+    mocks.decide.mockResolvedValue({ status: "APPROVED", factoryContinuationOutcome: "RESUME_PUBLISH" });
+    const { rerender } = render(<WorkOrderApprovalsView projectId={"project-1" as never} />);
+
+    fireEvent.change(screen.getByLabelText("Decision reason"), { target: { value: "Verified candidate is safe to publish." } });
+    fireEvent.click(screen.getByRole("button", { name: "Approve scope" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("queued to resume"));
+
+    mocks.approvals = [];
+    rerender(<WorkOrderApprovalsView projectId={"project-1" as never} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("queued to resume");
+    expect(screen.getByText("No pending decisions")).toBeInTheDocument();
+  });
+
+  it("preserves a rejected continuation outcome after the pending queue refreshes", async () => {
+    mocks.decide.mockResolvedValue({
+      status: "EXPIRED",
+      factoryContinuationOutcome: "FAIL_ATTEMPT",
+      decisionRejectedReason: "Human-review evidence expired before publication could be safely authorized",
+    });
+    const { rerender } = render(<WorkOrderApprovalsView projectId={"project-1" as never} />);
+
+    fireEvent.change(screen.getByLabelText("Decision reason"), { target: { value: "Review the current authority." } });
+    fireEvent.click(screen.getByRole("button", { name: "Approve scope" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("evidence expired"));
+
+    mocks.approvals = [];
+    rerender(<WorkOrderApprovalsView projectId={"project-1" as never} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("evidence expired");
+    expect(screen.getByText("No pending decisions")).toBeInTheDocument();
   });
 });

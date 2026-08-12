@@ -136,8 +136,10 @@ closed when it is missing, stale, or mismatched.
 The production durable worker is enabled only with all of the following
 server-side settings: `CODEX_FACTORY_WORKER_ENABLED=true`,
 `CODEX_WORKER_PROJECT_ID`, `CODEX_WORKER_REPOSITORY_ID`,
-`CODEX_WORKER_REPOSITORY_ROOT`, `MISSION_CONTROL_SERVICE_ID`,
-`MISSION_CONTROL_SERVICE_COMMAND_SECRET`, `GITHUB_APP_ID`, and
-`GITHUB_APP_PRIVATE_KEY`. One worker is pinned to one governed repository in
-V1; additional repository schedulers wait until the single golden path is
-proven durable.
+`MISSION_CONTROL_SERVICE_ID`, `MISSION_CONTROL_SERVICE_COMMAND_SECRET`,
+`GITHUB_APP_ID`, and either `GITHUB_APP_PRIVATE_KEY` or the owner-controlled
+`GITHUB_APP_PRIVATE_KEY_FILE`. The immutable execution manifest and verified
+host binding supply the governed checkout/worktree path; operators do not
+provide a second repository-root setting. One worker is pinned to one governed
+repository in V1; additional repository schedulers wait until the single golden
+path is proven durable.

@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodexV1ExecutorAdapter } from "../codexExecutorAdapter.js";
 import {
   FactoryAttemptWorker,
+  factoryRunQueryArgs,
+  matchesWorkerScope,
   type FactoryAttemptWorkerDependencies,
 } from "../factoryAttemptWorker.js";
 import {
@@ -35,6 +37,19 @@ afterEach(async () => {
 });
 
 describe("FactoryAttemptWorker verification-first lifecycle", () => {
+  it("claims only the repository bound by the documented durable-worker configuration", () => {
+    const scope = { projectId: "project-1", repositoryId: "repository-1" };
+    expect(matchesWorkerScope({ projectId: "project-1", repositoryId: "repository-1" }, scope)).toBe(true);
+    expect(matchesWorkerScope({ projectId: "project-1", repositoryId: "repository-other" }, scope)).toBe(false);
+    expect(matchesWorkerScope({ projectId: "project-other", repositoryId: "repository-1" }, scope)).toBe(false);
+    expect(factoryRunQueryArgs("PENDING", scope)).toEqual({
+      status: "PENDING",
+      limit: 100,
+      projectId: "project-1",
+      repositoryId: "repository-1",
+    });
+  });
+
   it("turns governed issue intent into a verified, evidence-linked pull request", async () => {
     const fixture = await runFixture("VERIFIED");
 

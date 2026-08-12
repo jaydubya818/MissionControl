@@ -29,7 +29,7 @@ describe("GitHub App runtime", () => {
       number: 42,
       html_url: "https://github.com/sellerfi/sandbox/pull/42",
       node_id: "PR_42",
-      head: { ref: "mc/work-order-1" },
+      head: { ref: "mc/work-order-1", sha: "abc123" },
       base: { ref: "main" },
     }]), { status: 200, headers: { "Content-Type": "application/json" } }));
     const result = await createOrReusePullRequest({
@@ -46,6 +46,26 @@ describe("GitHub App runtime", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it("refuses to attest a reused pull request at a different head commit", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify([{
+      number: 42,
+      html_url: "https://github.com/sellerfi/sandbox/pull/42",
+      head: { ref: "mc/work-order-1", sha: "unverified-head" },
+      base: { ref: "main" },
+    }]), { status: 200, headers: { "Content-Type": "application/json" } }));
+
+    await expect(createOrReusePullRequest({
+      repository: "sellerfi/sandbox",
+      branch: "mc/work-order-1",
+      base: "main",
+      title: "Add buyer gate",
+      body: "Evidence",
+      token: "not-logged",
+      headSha: "verified-head",
+      fetchImpl,
+    })).rejects.toThrow("head does not match the independently verified candidate");
+  });
+
   it("creates a review-ready pull request when the branch has none", async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } }))
@@ -53,6 +73,8 @@ describe("GitHub App runtime", () => {
         number: 43,
         html_url: "https://github.com/sellerfi/sandbox/pull/43",
         node_id: "PR_43",
+        head: { ref: "mc/work-order-1", sha: "def456" },
+        base: { ref: "main" },
       }), { status: 201, headers: { "Content-Type": "application/json" } }));
     const result = await createOrReusePullRequest({
       repository: "sellerfi/sandbox",

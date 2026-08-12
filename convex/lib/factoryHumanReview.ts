@@ -17,10 +17,12 @@ export function isFactoryHumanReviewCheckpoint(approvalDecision: {
   _id: string;
   approvalType: string;
 }, run?: {
+  status?: string;
   factoryContinuation?: { approvalDecisionId?: string; status: string };
 } | null) {
   return Boolean(
     approvalDecision.approvalType === "HUMAN_REVIEW"
+    && !["COMPLETED", "FAILED", "CANCELED"].includes(run?.status ?? "")
     && run?.factoryContinuation?.approvalDecisionId === approvalDecision._id
     && ["AWAITING_HUMAN_REVIEW", "READY_TO_PUBLISH"].includes(run.factoryContinuation.status),
   );

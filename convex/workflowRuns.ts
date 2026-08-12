@@ -215,12 +215,25 @@ function redactExecutionPrompt<T extends Record<string, any> | null>(run: T): T 
 export const list = query({
   args: {
     projectId: v.optional(v.id("projects")),
+    repositoryId: v.optional(v.id("workspaceRepositories")),
     workflowId: v.optional(v.string()),
     status: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Build query based on filters
+    if (args.repositoryId && args.status) {
+      return (await ctx.db
+        .query("workflowRuns")
+        .withIndex("by_repository_status", (q) =>
+          q.eq("repositoryId", args.repositoryId).eq("status", args.status as any)
+        )
+        .order("desc")
+        .take(args.limit ?? 100))
+        .filter((run) => !args.projectId || run.projectId === args.projectId)
+        .map(redactExecutionPrompt);
+    }
+
     if (args.projectId && args.status) {
       return (await ctx.db
         .query("workflowRuns")
@@ -1016,6 +1029,13 @@ export const requestCancellation = mutation({
     const now = Date.now();
     const reason = args.reason.trim();
     if (!reason) throw new Error("A cancellation reason is required.");
+    if (run.factoryContinuation?.status === "PUBLICATION_AUTHORIZED") {
+      return {
+        requested: false,
+        status: run.status,
+        reason: "Publication is already authorized and must reconcile the exact provider write before cancellation can be evaluated.",
+      };
+    }
     await ctx.db.patch(run._id, {
       cancellationRequestedAt: run.cancellationRequestedAt ?? now,
       cancellationRequestedBy: args.actorId ?? "operator",
@@ -1036,7 +1056,34 @@ export const requestCancellation = mutation({
       idempotencyKey: `cancellation-request:${run._id}`,
     });
     const hasActiveLease = Boolean(run.executionClaimId && (run.executionLeaseExpiresAt ?? 0) > now);
-    if (hasActiveLease) return { requested: true, status: run.status };
+    const isFactoryAttempt = Boolean(run.factoryDefinitionVersionId && run.executionManifestDigest);
+    if (hasActiveLease && !isFactoryAttempt) return { requested: true, status: run.status };
+
+    if (isFactoryAttempt && run.factoryContinuation) {
+      const continuation = run.factoryContinuation;
+      if (continuation.approvalDecisionId) {
+        const approval = await ctx.db.get(continuation.approvalDecisionId);
+        if (approval && ["PENDING", "APPROVED"].includes(approval.status)) {
+          await ctx.db.patch(approval._id, {
+            status: "REVOKED",
+            decidedAt: now,
+            revokedAt: now,
+            reason,
+          });
+        }
+      }
+      for (const receiptId of [continuation.verificationReceiptId, continuation.resolvedVerificationReceiptId]) {
+        if (!receiptId) continue;
+        const receipt = await ctx.db.get(receiptId);
+        if (receipt && receipt.status !== "STALE") {
+          await ctx.db.patch(receipt._id, {
+            status: "STALE",
+            invalidatedAt: now,
+            invalidationReason: reason,
+          });
+        }
+      }
+    }
 
     const steps = reconcileTerminalWorkflowSteps(run.steps, "CANCELED", reason, now);
     await ctx.db.patch(run._id, {
@@ -1046,6 +1093,15 @@ export const requestCancellation = mutation({
       failureReason: reason,
       executionPhase: "TERMINAL",
       executionLeaseExpiresAt: now,
+      lease: undefined,
+      factoryContinuation: run.factoryContinuation
+        ? {
+            ...run.factoryContinuation,
+            status: "CLOSED",
+            closedAt: now,
+            closureReason: reason,
+          }
+        : undefined,
     });
     await insertRunEvent(ctx, {
       workflowRunId: run._id,
