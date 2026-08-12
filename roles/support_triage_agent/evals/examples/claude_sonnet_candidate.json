@@ -1,0 +1,21 @@
+{
+  "id": "claude-sonnet-4-5",
+  "label": "Claude Sonnet 4.5 (candidate) via Anthropic API",
+  "version": "1.0",
+  "provider": "anthropic",
+  "base_model": "claude-sonnet-4-5",
+  "capabilities": {
+    "produces_triage_report": true,
+    "produces_escalation_packet": true,
+    "max_clarifying_questions": 3,
+    "allowed_evidence_patterns": ["TICKET-\\d+", "INC-\\d+", "https://logs\\.internal/", "https://metrics\\.internal/"]
+  },
+  "execution": {
+    "backend": "cli",
+    "cli": {
+      "cmd": "python3",
+      "args": ["examples/anthropic_runner.py", "--case", "${CASE_PATH}", "--out", "${OUT_PATH}", "--model", "claude-sonnet-4-5", "--candidate-id", "${CANDIDATE_ID}"],
+      "timeout_ms": 180000
+    }
+  }
+}

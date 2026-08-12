@@ -48,6 +48,26 @@ python candidate_runner.py --config examples/run_config.yaml --out runs
 
 Edit `examples/run_config.yaml` to set `suite_paths`, `backend_default`, and `candidates[]` (path + optional `backend_override`). Optional: `concurrency`, `timeout_ms`, `max_total_cost_usd`.
 
+## Real-model runs (Anthropic)
+
+`examples/anthropic_runner.py` is a stdlib-only CLI-backend runner that executes
+cases against the Anthropic Messages API. Manifests
+`examples/claude_haiku_candidate.json` (baseline) and
+`examples/claude_sonnet_candidate.json` (candidate) wire it in via the `cli`
+backend. Requires `ANTHROPIC_API_KEY` in the environment.
+
+```bash
+cd roles/support_triage_agent/evals
+export ANTHROPIC_API_KEY=sk-ant-...
+
+python candidate_runner.py --candidate examples/claude_haiku_candidate.json   --cases eval_cases.jsonl --out runs/claude-haiku-4-5.jsonl
+python candidate_runner.py --candidate examples/claude_sonnet_candidate.json   --cases eval_cases.jsonl --out runs/claude-sonnet-4-5.jsonl
+
+python grade_eval.py --run runs/claude-haiku-4-5.jsonl --cases eval_cases.jsonl --rubric rubric.yaml --out runs/claude-haiku-4-5.graded.json
+python grade_eval.py --run runs/claude-sonnet-4-5.jsonl --cases eval_cases.jsonl --rubric rubric.yaml --out runs/claude-sonnet-4-5.graded.json
+python compare.py runs/claude-haiku-4-5.graded.json runs/claude-sonnet-4-5.graded.json --run-dir runs
+```
+
 ## Run single candidate (legacy)
 
 ```bash
