@@ -48,6 +48,30 @@ appropriate human decision.
 *The Command Center turns a large delivery portfolio into a ranked queue of
 decisions, blockers, and evidence—not a wall of agent activity.*
 
+## The five-minute tour
+
+Evaluating this project? In plain terms: Mission Control lets a human describe
+an outcome, approve a plan, and then supervise AI coding agents that do the
+work — inside hard boundaries, with every action budgeted, logged, verified by
+someone other than the agent that did it, and merged only by a human. These
+are the load-bearing pieces, mapped to the code that implements them:
+
+| Claim | Where it lives |
+|---|---|
+| **Execution loop & harness** — poll → decompose → delegate → monitor → escalate; durable lease-based workers; idempotent, sequenced event streams; frozen execution envelopes | [`packages/coordinator/src/loop.ts`](packages/coordinator/src/loop.ts) · [`convex/executionWorker.ts`](convex/executionWorker.ts) · [`convex/lib/executionManifest.ts`](convex/lib/executionManifest.ts) |
+| **Agent definitions** — 13 declarative personas with risk profiles, allowed tools, and per-run/daily budget caps | [`agents/`](agents/) (e.g. [`agents/coder.yaml`](agents/coder.yaml)) |
+| **Governance & control** — risk-tiered policy evaluation, budget enforcement, human approvals, signed service commands, per-attempt worktrees with enforced file-scope boundaries | [`packages/policy-engine/src/evaluator.ts`](packages/policy-engine/src/evaluator.ts) · [`convex/approvals.ts`](convex/approvals.ts) · [`convex/serviceCommands.ts`](convex/serviceCommands.ts) · [`apps/orchestration-server/src/factoryPathScope.ts`](apps/orchestration-server/src/factoryPathScope.ts) |
+| **Evaluations** — deterministic rubric-weighted grading with auto-fail gates and committed real baseline-vs-candidate model runs; 8-dimension operator evals; context evals | [`roles/support_triage_agent/evals/`](roles/support_triage_agent/evals/) ([results](roles/support_triage_agent/evals/runs/README.md)) · [`convex/operatorEvals.ts`](convex/operatorEvals.ts) · [`convex/context/evals.ts`](convex/context/evals.ts) |
+| **Self-improvement** — a meta loop that proposes verifier, skill, eval-scenario, and rule changes, gated by human approval | [`convex/factory/metaLoop.ts`](convex/factory/metaLoop.ts) · [`convex/loopEngineering.ts`](convex/loopEngineering.ts) |
+| **Skills framework** — typed frontmatter standard with a linter enforced in CI | [`skills/`](skills/) · [`packages/context-tools/src/skillFrontmatter.ts`](packages/context-tools/src/skillFrontmatter.ts) |
+| **Proof, not demo** — live App-authored pull requests with browser-captured evidence bundles | [PR #61](https://github.com/jaydubya818/MissionControl/pull/61) · [PR #62](https://github.com/jaydubya818/MissionControl/pull/62) · [PR #72](https://github.com/jaydubya818/MissionControl/pull/72) · [`docs/testing/evidence/`](docs/testing/evidence/) |
+
+Scale and hygiene: a ~200K-line TypeScript monorepo (16 packages, 3 apps,
+158-table Convex schema), 190+ test suites plus Playwright E2E, and a CI
+pipeline with typecheck, lint, unit, build, startup-smoke, and skill-quality
+gates. The [Project status](#project-status) table below states plainly what
+is implemented versus deferred.
+
 ## Contents
 
 - [Why software factories and Mission Control matter](#why-software-factories-and-mission-control-matter)
