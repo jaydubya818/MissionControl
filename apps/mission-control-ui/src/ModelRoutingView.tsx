@@ -36,6 +36,7 @@ type CatalogEntry = {
   provider: string;
   tier: Tier;
   availability: string;
+  riskApproved: boolean;
   deprecated: boolean;
   estimatedCostPerRunUsd?: number;
 };
@@ -68,7 +69,7 @@ const OPERATING_LANES = [
     title: "Plan",
     model: "Approved planning pool",
     icon: BrainCircuit,
-    tone: "text-sky-300 border-sky-400/25 bg-sky-400/5",
+    tone: "text-ink border-line bg-surface-2",
     use: "Architecture, decomposition, tradeoffs, and high-context planning.",
     boundary: "Use GPT-5.6 Sol for difficult architecture and high-context planning.",
   },
@@ -78,7 +79,7 @@ const OPERATING_LANES = [
     title: "Execute",
     model: "Approved execution pool",
     icon: Code2,
-    tone: "text-violet-300 border-violet-400/25 bg-violet-400/5",
+    tone: "text-ink border-line bg-surface-2",
     use: "Focused implementation tasks with a clear acceptance contract.",
     boundary: "Prefer Composer for bounded coding; escalate by complexity and tools.",
   },
@@ -88,7 +89,7 @@ const OPERATING_LANES = [
     title: "Review",
     model: "Approved reviewer pool",
     icon: ShieldCheck,
-    tone: "text-amber-300 border-amber-400/25 bg-amber-400/5",
+    tone: "text-ink border-line bg-surface-2",
     use: "Code review, risk analysis, verification, and release gates.",
     boundary: "Reserve Claude Opus for consequential, high-risk, or large reviews.",
   },
@@ -98,7 +99,7 @@ const OPERATING_LANES = [
     title: "Local",
     model: "Approved local pool",
     icon: Bot,
-    tone: "text-emerald-300 border-emerald-400/25 bg-emerald-400/5",
+    tone: "text-ink border-line bg-surface-2",
     use: "QA, automation, documentation, classification, and small private tasks.",
     boundary: "Use only when the node is healthy and the policy rule is explicit.",
   },
@@ -108,7 +109,7 @@ const OPERATING_LANES = [
     title: "Long-running",
     model: "Approved cloud pool",
     icon: Cloud,
-    tone: "text-rose-300 border-rose-400/25 bg-rose-400/5",
+    tone: "text-ink border-line bg-surface-2",
     use: "Night and weekend work with checkpoints, evidence, budgets, and escalation.",
     boundary: "Cloud only · select the execution model by complexity and risk.",
   },
@@ -185,7 +186,7 @@ function OperatingLanes({
               {onSelectLane && (
                 <button
                   type="button"
-                  className="mt-3 text-[10.5px] font-medium text-accent hover:underline"
+                  className="mt-3 text-[10.5px] font-medium text-ink-secondary underline underline-offset-2 hover:text-ink"
                   onClick={() => onSelectLane(lane.lane)}
                 >
                   {approved.length ? `${approved.length} approved · Manage` : "Select approved models"}
@@ -213,16 +214,16 @@ function OperatingLanes({
           {onUpdatePool && (
             <div className="mt-3 grid gap-2 sm:grid-cols-4">
               <Field label="Daily spend limit">
-                <Input type="number" min="0" step="0.01" placeholder="No limit" value={selectedPool?.dailyBudgetUsd ?? ""} onChange={(event) => onUpdatePool(selectedLane, { dailyBudgetUsd: event.target.value ? Number(event.target.value) : undefined })} />
+                <Input aria-label="Daily spend limit" type="number" min="0" step="0.01" placeholder="No limit" value={selectedPool?.dailyBudgetUsd ?? ""} onChange={(event) => onUpdatePool(selectedLane, { dailyBudgetUsd: event.target.value ? Number(event.target.value) : undefined })} />
               </Field>
               <Field label="Monthly spend limit">
-                <Input type="number" min="0" step="0.01" placeholder="No limit" value={selectedPool?.monthlyBudgetUsd ?? ""} onChange={(event) => onUpdatePool(selectedLane, { monthlyBudgetUsd: event.target.value ? Number(event.target.value) : undefined })} />
+                <Input aria-label="Monthly spend limit" type="number" min="0" step="0.01" placeholder="No limit" value={selectedPool?.monthlyBudgetUsd ?? ""} onChange={(event) => onUpdatePool(selectedLane, { monthlyBudgetUsd: event.target.value ? Number(event.target.value) : undefined })} />
               </Field>
               <Field label="Minimum providers">
-                <Input type="number" min="1" step="1" value={selectedPool?.minProviderCount ?? (selectedLane === "LONG_RUNNING" ? 2 : 1)} onChange={(event) => onUpdatePool(selectedLane, { minProviderCount: Math.max(1, Number(event.target.value) || 1) })} />
+                <Input aria-label="Minimum providers" type="number" min="1" step="1" value={selectedPool?.minProviderCount ?? (selectedLane === "LONG_RUNNING" ? 2 : 1)} onChange={(event) => onUpdatePool(selectedLane, { minProviderCount: Math.max(1, Number(event.target.value) || 1) })} />
               </Field>
               <Field label="New-model canary">
-                <Input type="number" min="0" max="100" step="1" value={selectedPool?.canaryPercent ?? 10} onChange={(event) => onUpdatePool(selectedLane, { canaryPercent: Math.min(100, Math.max(0, Number(event.target.value) || 0)) })} />
+                <Input aria-label="New-model canary percentage" type="number" min="0" max="100" step="1" value={selectedPool?.canaryPercent ?? 10} onChange={(event) => onUpdatePool(selectedLane, { canaryPercent: Math.min(100, Math.max(0, Number(event.target.value) || 0)) })} />
               </Field>
             </div>
           )}
@@ -293,7 +294,7 @@ function formatTime(timestamp: number) {
 }
 
 export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
-  const catalog = useQuery(api.modelCatalog.list);
+  const catalog = useQuery(api.modelCatalog.list, { projectId });
   const policy = useQuery(api.modelRoutingPolicies.getActive, { projectId });
   const decisions = useQuery(api.modelRoutingDecisions.listRecent, { projectId, limit: 30 });
   const enforcementEnabled = useQuery(api.featureFlags.isEnabled, {
@@ -316,7 +317,8 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
   const [lanePools, setLanePools] = useState<LanePool[]>([]);
   const [selectedLane, setSelectedLane] = useState<OperatingLane>("REVIEW");
   const [saving, setSaving] = useState(false);
-  const [discoveringLocal, setDiscoveringLocal] = useState(false);
+  const [initializingCatalog, setInitializingCatalog] = useState(false);
+  const [togglingEnforcement, setTogglingEnforcement] = useState(false);
   const [simTaskType, setSimTaskType] = useState("ENGINEERING");
   const [simLane, setSimLane] = useState<OperatingLane>("EXECUTE");
   const [simRisk, setSimRisk] = useState<Risk>("MEDIUM");
@@ -359,8 +361,10 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
 
   useEffect(() => {
     if (!catalog?.length || defaultModelId) return;
-    const balanced = catalog.find((model) => model.tier === "BALANCED") ?? catalog[0];
-    const powerful = catalog.find((model) => model.tier === "POWERFUL") ?? balanced;
+    const available = catalog.filter((model) => !model.deprecated && model.availability !== "UNAVAILABLE");
+    const balanced = available.find((model) => model.tier === "BALANCED") ?? available[0];
+    if (!balanced) return;
+    const powerful = available.find((model) => model.tier === "POWERFUL" && model.riskApproved) ?? balanced;
     setDefaultModelId(balanced.modelId);
     setSafeFallbackModelId(powerful.modelId);
     setFallbackChain([powerful.modelId]);
@@ -400,7 +404,6 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
         budgetLimitUsd: budgetLimit ? Number(budgetLimit) : undefined,
         canaryPercent: Number(canaryPercent),
         killSwitch,
-        actorId: "operator",
       });
       toast("Routing policy activated");
     } catch (cause) {
@@ -410,19 +413,19 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
     }
   }
 
-  async function discoverLocalModels() {
-    setDiscoveringLocal(true);
+  async function toggleEnforcement() {
+    setTogglingEnforcement(true);
     try {
-      const baseUrl = import.meta.env.VITE_ORCHESTRATION_URL ?? "http://localhost:4100";
-      const response = await fetch(`${baseUrl}/local-inference/sync`, { method: "POST" });
-      const result = await response.json() as { providers?: Array<{ provider: string; status: string; models: unknown[] }>; error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Local model discovery failed");
-      const healthy = result.providers?.filter((provider) => provider.status === "HEALTHY") ?? [];
-      toast(healthy.length ? `Synced ${healthy.reduce((count, provider) => count + provider.models.length, 0)} local model route(s)` : "No local model servers are available");
+      await setFlag({
+        key: "model-routing.enabled",
+        enabled: !enforcementEnabled,
+        projectId,
+      });
+      toast(enforcementEnabled ? "Routing returned to shadow mode" : "Routing enforcement enabled");
     } catch (cause) {
-      toast(cause instanceof Error ? cause.message : "Local model discovery failed", true);
+      toast(cause instanceof Error ? cause.message : "Unable to change routing enforcement", true);
     } finally {
-      setDiscoveringLocal(false);
+      setTogglingEnforcement(false);
     }
   }
 
@@ -470,7 +473,7 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
   const activationIssues = OPERATING_LANES.flatMap(({ lane, title }) => {
     const pool = lanePools.find((item) => item.lane === lane);
     const models = (pool?.modelIds ?? []).map((modelId) => catalog.find((model) => model.modelId === modelId)).filter(Boolean);
-    const healthy = models.filter((model) => model?.availability === "HEALTHY");
+    const healthy = models.filter((model) => model?.availability === "HEALTHY" && !model.deprecated);
     if (!models.length) return [`${title} has no approved models`];
     if (!healthy.length) return [`${title} has no healthy approved model`];
     if (["PLAN", "REVIEW", "LONG_RUNNING"].includes(lane) && !healthy.some((model) => model?.tier === "POWERFUL")) return [`${title} has no powerful fallback`];
@@ -496,18 +499,10 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
           <Button
             size="sm"
             variant={enforcementEnabled ? "outline" : "default"}
-            disabled={!policy || catalog.length === 0}
-            onClick={async () => {
-              await setFlag({
-                key: "model-routing.enabled",
-                enabled: !enforcementEnabled,
-                projectId,
-                actorId: "operator",
-              });
-              toast(enforcementEnabled ? "Routing returned to shadow mode" : "Routing enforcement enabled");
-            }}
+            disabled={!policy || catalog.length === 0 || togglingEnforcement}
+            onClick={toggleEnforcement}
           >
-            {enforcementEnabled ? "Use shadow mode" : "Enable enforcement"}
+            {togglingEnforcement ? "Updating…" : enforcementEnabled ? "Use shadow mode" : "Enable enforcement"}
           </Button>
         }
       />
@@ -547,20 +542,33 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
                 {catalog.length === 0 && (
                   <Button
                     size="sm"
+                    disabled={initializingCatalog}
                     onClick={async () => {
-                      const result = await initializeCatalog({ actorId: "operator" });
-                      toast(`Initialized ${result.created} model routes`);
+                      setInitializingCatalog(true);
+                      try {
+                        const result = await initializeCatalog({ projectId });
+                        toast(`Initialized ${result.created} model routes`);
+                      } catch (cause) {
+                        toast(cause instanceof Error ? cause.message : "Catalog initialization failed", true);
+                      } finally {
+                        setInitializingCatalog(false);
+                      }
                     }}
                   >
-                    Initialize safe catalog
+                    {initializingCatalog ? "Initializing…" : "Initialize safe catalog"}
                   </Button>
                 )}
-                <Button size="sm" variant="outline" disabled={discoveringLocal} onClick={discoverLocalModels}>
-                  {discoveringLocal ? "Discovering…" : "Discover local models"}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  title="Requires a signed orchestration service connection"
+                >
+                  Managed local sync required
                 </Button>
               </div>
               {catalog.length ? (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto" tabIndex={0} aria-label="Model provider catalog">
                   <table className="w-full min-w-[680px] text-left">
                     <thead className="bg-surface-2 text-[10.5px] uppercase tracking-[0.06em] text-ink-muted">
                       <tr>
@@ -568,6 +576,7 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
                         <th className="px-3 py-2.5">Provider</th>
                         <th className="px-3 py-2.5">Tier</th>
                         <th className="px-3 py-2.5">Capabilities</th>
+                        <th className="px-3 py-2.5">High-risk use</th>
                         <th className="px-4 py-2.5">Health</th>
                       </tr>
                     </thead>
@@ -581,6 +590,11 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
                           <td className="px-3 py-3 text-ink-secondary">{model.provider}</td>
                           <td className="px-3 py-3 text-ink-secondary">{model.tier}</td>
                           <td className="px-3 py-3 text-ink-secondary">{model.capabilities.join(", ")}</td>
+                          <td className="px-3 py-3">
+                            <StatusBadge tone={model.riskApproved ? "success" : "warning"}>
+                              {model.riskApproved ? "Approved" : "Low / medium only"}
+                            </StatusBadge>
+                          </td>
                           <td className="px-4 py-3">
                             <StatusBadge tone={model.availability === "HEALTHY" ? "success" : model.availability === "DEGRADED" ? "warning" : "error"}>
                               {model.availability}
@@ -619,34 +633,34 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
               )}
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Policy name">
-                  <Input value={name} onChange={(event) => setName(event.target.value)} />
+                  <Input aria-label="Policy name" value={name} onChange={(event) => setName(event.target.value)} />
                 </Field>
                 <Field label="Canary enforcement" hint="0% stays in shadow; increase after decision review.">
-                  <Input type="number" min="0" max="100" value={canaryPercent} onChange={(event) => setCanaryPercent(event.target.value)} />
+                  <Input aria-label="Canary enforcement percentage" type="number" min="0" max="100" value={canaryPercent} onChange={(event) => setCanaryPercent(event.target.value)} />
                 </Field>
                 <Field label="Workspace default">
                   <Select value={defaultModelId} onValueChange={setDefaultModelId}>
-                    <SelectTrigger><SelectValue placeholder="Select model route" /></SelectTrigger>
+                    <SelectTrigger aria-label="Workspace default model"><SelectValue placeholder="Select model route" /></SelectTrigger>
                     <SelectContent>
-                      {catalog.map((model) => <SelectItem key={model._id} value={model.modelId}>{model.displayName}</SelectItem>)}
+                      {catalog.filter((model) => !model.deprecated && model.availability !== "UNAVAILABLE").map((model) => <SelectItem key={model._id} value={model.modelId}>{model.displayName}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field label="Safe fallback">
                   <Select value={safeFallbackModelId} onValueChange={setSafeFallbackModelId}>
-                    <SelectTrigger><SelectValue placeholder="Select safe fallback" /></SelectTrigger>
+                    <SelectTrigger aria-label="Safe fallback model"><SelectValue placeholder="Select safe fallback" /></SelectTrigger>
                     <SelectContent>
-                      {catalog.filter((model) => model.riskApproved).map((model) => (
+                      {catalog.filter((model) => model.riskApproved && !model.deprecated).map((model) => (
                         <SelectItem key={model._id} value={model.modelId}>{model.displayName}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field label="Per-run budget cap" hint="Optional routing estimate cap in USD.">
-                  <Input type="number" min="0" step="0.01" value={budgetLimit} onChange={(event) => setBudgetLimit(event.target.value)} placeholder="No cap" />
+                  <Input aria-label="Per-run budget cap" type="number" min="0" step="0.01" value={budgetLimit} onChange={(event) => setBudgetLimit(event.target.value)} placeholder="No cap" />
                 </Field>
                 <Field label="Fallback chain" hint="Comma-separated ordered model route IDs.">
-                  <Input value={fallbackChain.join(", ")} onChange={(event) => setFallbackChain(event.target.value.split(",").map((value) => value.trim()).filter(Boolean))} />
+                  <Input aria-label="Fallback model chain" value={fallbackChain.join(", ")} onChange={(event) => setFallbackChain(event.target.value.split(",").map((value) => value.trim()).filter(Boolean))} />
                 </Field>
                 <label className="flex items-center gap-2 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2.5 text-[12.5px] text-ink md:col-span-2">
                   <input type="checkbox" checked={killSwitch} onChange={(event) => setKillSwitch(event.target.checked)} />
@@ -664,7 +678,7 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={!catalog.length}
+                  disabled={!catalog.some((model) => !model.deprecated && model.availability !== "UNAVAILABLE")}
                   onClick={() =>
                     setRules((current) => [
                       ...current,
@@ -672,7 +686,10 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
                         id: `rule-${Date.now()}`,
                         order: current.length,
                         taskType: "ENGINEERING",
-                        modelId: defaultModelId || catalog[0]?.modelId,
+                        modelId:
+                          defaultModelId ||
+                          catalog.find((model) => !model.deprecated && model.availability !== "UNAVAILABLE")?.modelId ||
+                          "",
                       },
                     ])
                   }
@@ -687,37 +704,37 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
                     <div key={rule.id} className="grid items-center gap-2 rounded-lg border border-line bg-surface-2 p-3 md:grid-cols-[40px_1fr_1fr_1fr_1fr_1.2fr_36px]">
                       <span className="text-center font-mono text-xs text-ink-muted">{index + 1}</span>
                       <Select value={rule.operatingLane ?? "ANY"} onValueChange={(value) => setRules((current) => current.map((item) => item.id === rule.id ? { ...item, operatingLane: value === "ANY" ? undefined : value as OperatingLane } : item))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger aria-label={`Rule ${index + 1} operating lane`}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="ANY">Any lane</SelectItem>
                           {OPERATING_LANES.map(({ lane, title }) => <SelectItem key={lane} value={lane}>{title}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <Select value={rule.taskType ?? "ANY"} onValueChange={(value) => setRules((current) => current.map((item) => item.id === rule.id ? { ...item, taskType: value === "ANY" ? undefined : value } : item))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger aria-label={`Rule ${index + 1} task type`}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="ANY">Any task</SelectItem>
                           {TASK_TYPES.map((taskType) => <SelectItem key={taskType} value={taskType}>{taskType}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <Select value={rule.riskLevel ?? "ANY"} onValueChange={(value) => setRules((current) => current.map((item) => item.id === rule.id ? { ...item, riskLevel: value === "ANY" ? undefined : value as Risk } : item))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger aria-label={`Rule ${index + 1} risk level`}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="ANY">Any risk</SelectItem>
                           {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((riskLevel) => <SelectItem key={riskLevel} value={riskLevel}>{riskLevel}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <Select value={rule.complexity ?? "ANY"} onValueChange={(value) => setRules((current) => current.map((item) => item.id === rule.id ? { ...item, complexity: value === "ANY" ? undefined : value as Complexity } : item))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger aria-label={`Rule ${index + 1} complexity`}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="ANY">Any size</SelectItem>
                           {(["SMALL", "STANDARD", "LARGE"] as const).map((complexity) => <SelectItem key={complexity} value={complexity}>{complexity}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <Select value={rule.modelId} onValueChange={(modelId) => setRules((current) => current.map((item) => item.id === rule.id ? { ...item, modelId } : item))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger aria-label={`Rule ${index + 1} model`}><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {catalog.map((model) => <SelectItem key={model._id} value={model.modelId}>{model.displayName}</SelectItem>)}
+                          {catalog.filter((model) => !model.deprecated && model.availability !== "UNAVAILABLE").map((model) => <SelectItem key={model._id} value={model.modelId}>{model.displayName}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setRules((current) => current.filter((item) => item.id !== rule.id))} aria-label="Remove rule">
@@ -744,39 +761,39 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                 <Field label="Operating lane" hint="The approved pool is evaluated before generic workflow defaults.">
                   <Select value={simLane} onValueChange={(value) => setSimLane(value as OperatingLane)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label="Simulator operating lane"><SelectValue /></SelectTrigger>
                     <SelectContent>{OPERATING_LANES.map(({ lane, title }) => <SelectItem key={lane} value={lane}>{title}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
                 <Field label="Task type">
                   <Select value={simTaskType} onValueChange={setSimTaskType}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label="Simulator task type"><SelectValue /></SelectTrigger>
                     <SelectContent>{TASK_TYPES.map((taskType) => <SelectItem key={taskType} value={taskType}>{taskType}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
                 <Field label="Risk">
                   <Select value={simRisk} onValueChange={(value) => setSimRisk(value as Risk)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label="Simulator risk"><SelectValue /></SelectTrigger>
                     <SelectContent>{(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
                 <Field label="Complexity">
                   <Select value={simComplexity} onValueChange={(value) => setSimComplexity(value as Complexity)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label="Simulator complexity"><SelectValue /></SelectTrigger>
                     <SelectContent>{(["SMALL", "STANDARD", "LARGE"] as const).map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
                 <Field label="Workflow tier">
                   <Select value={simTier} onValueChange={(value) => setSimTier(value as Tier)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label="Simulator workflow tier"><SelectValue /></SelectTrigger>
                     <SelectContent>{(["FAST", "BALANCED", "POWERFUL"] as const).map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
                 <Field label="Required capabilities">
-                  <Input value={simCapabilities} onChange={(event) => setSimCapabilities(event.target.value)} />
+                  <Input aria-label="Simulator required capabilities" value={simCapabilities} onChange={(event) => setSimCapabilities(event.target.value)} />
                 </Field>
                 <Field label="Budget remaining">
-                  <Input type="number" min="0" step="0.01" value={simBudget} onChange={(event) => setSimBudget(event.target.value)} placeholder="No request cap" />
+                  <Input aria-label="Simulator budget remaining" type="number" min="0" step="0.01" value={simBudget} onChange={(event) => setSimBudget(event.target.value)} placeholder="No request cap" />
                 </Field>
               </div>
               <div className="mt-4 rounded-lg border border-line bg-surface-2 p-4">
@@ -808,7 +825,7 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
                 <p className="text-[11.5px] text-ink-muted">Immutable evidence from Work Order dispatch.</p>
               </div>
               {decisions.length ? (
-                <div className="max-h-[520px] divide-y divide-line overflow-y-auto">
+                <div className="max-h-[520px] divide-y divide-line overflow-y-auto" tabIndex={0} aria-label="Routing decision history">
                   {decisions.map((decision) => (
                     <div key={decision._id} className="p-4">
                       <div className="flex items-start justify-between gap-3">

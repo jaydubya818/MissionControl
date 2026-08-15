@@ -6,6 +6,24 @@ Each developer owns the quality and cost of an agent fleet. A routing policy is
 healthy when it chooses the lowest-cost approved route that meets the task's
 risk, complexity, capability, evidence, and availability requirements.
 
+## Authorization boundary
+
+Model Routing is workspace-scoped even though the V1 catalog is stored globally.
+Every public catalog, policy, simulator, override, and decision read must first
+authorize `factory.read` for the selected workspace. Policy activation, catalog
+initialization, and enforcement changes require `factory.automation.manage`.
+Agent override changes require `factory.improve`; Work Order overrides require
+`factory.approve` plus the existing delivery approval authority.
+
+Write attribution is resolved from the authenticated operator on the server.
+Clients must never provide an actor identity for routing changes. Provider health
+and catalog synchronization are internal service operations, not public browser
+mutations.
+
+Local discovery remains read-only until the orchestration server has a signed,
+workspace-scoped command path. The UI must show this as unavailable rather than
+claiming that a browser-triggered sync is trusted.
+
 ## Activation checklist
 
 - Every lane has at least one healthy approved route.
@@ -27,6 +45,8 @@ Watch:
 - validation pass rate, review outcome, approval outcome, and fallback rate;
 - exhausted routes, unavailable providers, budget rejections, and canary use;
 - long-running queues with fewer than two healthy providers.
+- authorization failures, cross-workspace denials, and routing writes attributed
+  to placeholder actors instead of authenticated operator IDs.
 
 Healthy signals:
 

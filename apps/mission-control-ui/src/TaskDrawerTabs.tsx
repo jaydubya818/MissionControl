@@ -1090,7 +1090,10 @@ function OverviewTab({
 
 function TaskModelRoutingSection({ taskId }: { taskId: Id<"tasks"> }) {
   const routing = useQuery(api.modelRoutingDecisions.getForTask, { taskId });
-  const catalog = useQuery(api.modelCatalog.list);
+  const catalog = useQuery(
+    api.modelCatalog.list,
+    routing?.projectId ? { projectId: routing.projectId } : "skip"
+  );
   const setOverride = useMutation(api.workOrders.setAuthorizedModelOverride);
   const { toast } = useToast();
   const [modelId, setModelId] = useState("");
@@ -1102,7 +1105,7 @@ function TaskModelRoutingSection({ taskId }: { taskId: Id<"tasks"> }) {
     setReason(routing?.overrideReason ?? "");
   }, [routing?.overrideModelId, routing?.overrideReason]);
 
-  if (routing === undefined || catalog === undefined) {
+  if (routing === undefined || (routing?.projectId && catalog === undefined)) {
     return <Section title="Model routing"><p className="text-sm text-ink-muted">Loading route…</p></Section>;
   }
   if (!routing?.workOrderId) {
@@ -1122,7 +1125,6 @@ function TaskModelRoutingSection({ taskId }: { taskId: Id<"tasks"> }) {
         workOrderId: routing.workOrderId!,
         modelId,
         reason: reason.trim(),
-        actorId: "operator",
       });
       toast("Model override saved for the next dispatch");
     } catch (error) {
@@ -1155,7 +1157,7 @@ function TaskModelRoutingSection({ taskId }: { taskId: Id<"tasks"> }) {
               className="w-full rounded-md border border-line bg-surface-1 px-3 py-2 text-sm text-ink"
             >
               <option value="">Follow workspace policy</option>
-              {catalog.filter((model) => !model.deprecated && model.availability === "HEALTHY").map((model) => (
+              {(catalog ?? []).filter((model) => !model.deprecated && model.availability === "HEALTHY").map((model) => (
                 <option key={model._id} value={model.modelId}>{model.displayName} · {model.tier}</option>
               ))}
             </select>
@@ -1175,7 +1177,7 @@ function TaskModelRoutingSection({ taskId }: { taskId: Id<"tasks"> }) {
                 <Button size="sm" variant="outline" onClick={async () => {
                   setSaving(true);
                   try {
-                    await setOverride({ workOrderId: routing.workOrderId!, actorId: "operator" });
+                    await setOverride({ workOrderId: routing.workOrderId! });
                     toast("Model override cleared; workspace policy will apply");
                   } catch (error) {
                     toast(error instanceof Error ? error.message : "Unable to clear model override", true);

@@ -146,7 +146,7 @@ export function AgentSettingsPanel({
   const updateAgent = useMutation(api.agents.update);
   const setAgentOverride = useMutation(api.modelRoutingPolicies.setAgentOverride);
   const clearAgentOverride = useMutation(api.modelRoutingPolicies.clearAgentOverride);
-  const modelCatalog = useQuery(api.modelCatalog.list);
+  const modelCatalog = useQuery(api.modelCatalog.list, { projectId });
   const modelOverride = useQuery(api.modelRoutingPolicies.getAgentOverride, {
     projectId,
     agentId: agent._id,
@@ -236,14 +236,13 @@ export function AgentSettingsPanel({
         maxSubAgents,
       });
       if (modelOverrideId === "INHERIT" && modelOverride) {
-        await clearAgentOverride({ projectId, agentId: agent._id, actorId: "operator" });
+        await clearAgentOverride({ projectId, agentId: agent._id });
       } else if (modelOverrideId !== "INHERIT" && modelOverrideId !== modelOverride?.modelId) {
         await setAgentOverride({
           projectId,
           agentId: agent._id,
           modelId: modelOverrideId,
           reason: "Operator configured agent-specific routing",
-          actorId: "operator",
         });
       }
       setEditing(false);
@@ -310,7 +309,7 @@ export function AgentSettingsPanel({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="INHERIT">Inherit workspace policy</SelectItem>
-                  {(modelCatalog ?? []).map((model) => (
+                  {(modelCatalog ?? []).filter((model) => !model.deprecated && model.availability !== "UNAVAILABLE").map((model) => (
                     <SelectItem key={model._id} value={model.modelId}>
                       {model.displayName}
                     </SelectItem>

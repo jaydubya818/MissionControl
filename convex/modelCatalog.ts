@@ -1,5 +1,9 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
+import {
+  FACTORY_PERMISSIONS,
+  requireWorkspacePermission,
+} from "./lib/companyAccess";
 
 const DEFAULT_MODELS = [
   {
@@ -44,13 +48,21 @@ const DEFAULT_MODELS = [
 ];
 
 export const list = query({
-  args: {},
-  handler: async (ctx) => ctx.db.query("modelCatalog").collect(),
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.VIEW);
+    return ctx.db.query("modelCatalog").collect();
+  },
 });
 
 export const initializeDefaults = mutation({
-  args: { actorId: v.optional(v.string()) },
+  args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
+    const access = await requireWorkspacePermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.MANAGE_AUTOMATION
+    );
     const now = Date.now();
     let created = 0;
     for (const model of DEFAULT_MODELS) {
@@ -63,8 +75,10 @@ export const initializeDefaults = mutation({
       created += 1;
     }
     await ctx.db.insert("activities", {
+      tenantId: access.project.tenantId,
+      projectId: access.project._id,
       actorType: "HUMAN",
-      actorId: args.actorId ?? "operator",
+      actorId: access.actorId,
       action: "MODEL_CATALOG_INITIALIZED",
       description: `Initialized ${created} safe runtime model route(s)`,
       targetType: "MODEL_CATALOG",
@@ -74,7 +88,7 @@ export const initializeDefaults = mutation({
   },
 });
 
-export const reportHealth = mutation({
+export const reportHealth = internalMutation({
   args: {
     modelId: v.string(),
     availability: v.union(
@@ -99,7 +113,7 @@ export const reportHealth = mutation({
 });
 
 /** Registers models discovered by the trusted orchestration server. */
-export const syncLocalModels = mutation({
+export const syncLocalModels = internalMutation({
   args: {
     provider: v.union(v.literal("OLLAMA"), v.literal("LM_STUDIO"), v.literal("MLX"), v.literal("VLLM")),
     models: v.array(v.object({
@@ -109,7 +123,6 @@ export const syncLocalModels = mutation({
       supportsTools: v.boolean(),
       contextWindow: v.number(),
     })),
-    actorId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -146,7 +159,7 @@ export const syncLocalModels = mutation({
     }
     await ctx.db.insert("activities", {
       actorType: "SYSTEM",
-      actorId: args.actorId ?? "orchestration",
+      actorId: "orchestration",
       action: "LOCAL_MODEL_CATALOG_SYNCED",
       description: `Synced ${args.models.length} local ${args.provider} model route(s)`,
       targetType: "MODEL_CATALOG",
