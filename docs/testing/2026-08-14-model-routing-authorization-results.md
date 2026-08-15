@@ -102,11 +102,19 @@ generic audit writer now requires a workspace-authorized service identity,
 derives tenant and actor attribution on the server, rejects cross-workspace
 task or agent references, and accepts service events only.
 
+The same continuation review also closed a platform-authority escalation in
+custom role creation. A company administrator can no longer mint a reserved
+`platform.*` permission it does not already hold, preventing company A from
+granting itself tenant-provisioning authority and escaping into company B.
+
 Focused automated evidence:
 
 - `convex/__tests__/activitiesAuthorization.test.ts` proves anonymous denial,
   company A positive access, A-to-B denial, unscoped filtering, action/task/agent
   isolation, cross-company write denial, and server-derived attribution.
+- `convex/__tests__/governanceRolesAuthorization.test.ts` proves that company
+  owners cannot mint platform authority while a pre-authorized platform
+  administrator can delegate only its existing reserved permission.
 - The activity, Model Routing, and company-access suites pass together: 3 files,
   23 tests.
 - Convex type-checking and the runtime-contract guard pass. Public function
