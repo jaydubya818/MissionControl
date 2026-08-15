@@ -20,3 +20,4 @@ export { SessionMemory, type SessionEntry } from "./session.js";
 export { ProjectMemory, type WorkingDoc, type DailyNote } from "./project.js";
 export { GlobalMemory, type PerformanceRecord, type PatternRecord } from "./global.js";
 export { MemoryManager, type MemoryConfig } from "./manager.js";
+export * from "./factory/index.js";

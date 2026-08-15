@@ -17,11 +17,16 @@ import {
   resolveFlag,
   type FlagRow,
 } from "./lib/flags";
-import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";
+import {
+  COMPANY_PERMISSIONS,
+  FACTORY_PERMISSIONS,
+  requireWorkspaceAccess,
+  requireWorkspacePermission,
+} from "./lib/companyAccess";
 
 async function loadRowsForKey(
   ctx: { db: any },
-  key: string
+  key: string,
 ): Promise<Array<FlagRow & { _id: string }>> {
   return await ctx.db
     .query("featureFlags")
@@ -47,6 +52,14 @@ export const isEnabled = query({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
+    if (args.key.startsWith("factory-memory.")) {
+      if (!args.projectId) return false;
+      await requireWorkspacePermission(
+        ctx,
+        args.projectId,
+        FACTORY_PERMISSIONS.VIEW,
+      );
+    }
     const rows = (await loadRowsForKey(ctx, args.key)) as FlagRow[];
     return resolveFlag(rows, args.key, args.projectId ?? null).enabled;
   },
@@ -64,13 +77,25 @@ export const setFlag = mutation({
   handler: async (ctx, args) => {
     if (!isValidFlagKey(args.key)) {
       throw new Error(
-        `Invalid flag key "${args.key}" — expected dot-separated lowercase segments, e.g. "ui.shell.v2"`
+        `Invalid flag key "${args.key}" — expected dot-separated lowercase segments, e.g. "ui.shell.v2"`,
       );
     }
-    if (args.key.startsWith("control-plane.")) {
-      if (!args.projectId) throw new Error("Control-plane flags must be scoped to a workspace.");
+    let actorId = args.actorId;
+    if (args.key.startsWith("factory-memory.")) {
+      if (!args.projectId)
+        throw new Error("Factory Memory flags must be scoped to a workspace.");
+      const access = await requireWorkspacePermission(
+        ctx,
+        args.projectId,
+        FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
+      );
+      actorId = access.actorId;
+    } else if (args.key.startsWith("control-plane.")) {
+      if (!args.projectId)
+        throw new Error("Control-plane flags must be scoped to a workspace.");
       const project = await ctx.db.get(args.projectId);
-      if (!project?.tenantId) throw new Error("Workspace company assignment is incomplete.");
+      if (!project?.tenantId)
+        throw new Error("Workspace company assignment is incomplete.");
       await requireWorkspaceAccess(ctx, project.tenantId, project._id, {
         permission: COMPANY_PERMISSIONS.MANAGE_WORKSPACES,
       });
@@ -78,7 +103,7 @@ export const setFlag = mutation({
 
     const now = Date.now();
     const existing = (await loadRowsForKey(ctx, args.key)).find((row: any) =>
-      args.projectId ? row.projectId === args.projectId : !row.projectId
+      args.projectId ? row.projectId === args.projectId : !row.projectId,
     ) as any;
 
     let flagId;
@@ -88,7 +113,7 @@ export const setFlag = mutation({
         ...(args.description !== undefined
           ? { description: args.description }
           : {}),
-        updatedBy: args.actorId,
+        updatedBy: actorId,
         updatedAt: now,
       });
       flagId = existing._id;
@@ -98,7 +123,7 @@ export const setFlag = mutation({
         enabled: args.enabled,
         description: args.description,
         projectId: args.projectId,
-        updatedBy: args.actorId,
+        updatedBy: actorId,
         createdAt: now,
         updatedAt: now,
       });
@@ -107,7 +132,7 @@ export const setFlag = mutation({
     await ctx.db.insert("activities", {
       projectId: args.projectId,
       actorType: "HUMAN",
-      actorId: args.actorId,
+      actorId,
       action: "FEATURE_FLAG_SET",
       description: `Feature flag "${args.key}" set to ${args.enabled}${
         args.projectId ? " (project scope)" : " (global)"

@@ -10,3 +10,4 @@ export * from "./utils.js";
 export * from "./logger.js";
 export * from "./retry.js";
 export * from "./serviceCommandEnvelope.js";
+export * from "./factoryMemorySecurity.js";

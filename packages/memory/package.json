@@ -18,7 +18,8 @@
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "golden-path": "tsx src/factory/goldenPathCli.ts"
   },
   "dependencies": {
     "@mission-control/shared": "workspace:*"

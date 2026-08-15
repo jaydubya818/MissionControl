@@ -29,6 +29,7 @@ tutorials/automating-repetitive-tasks.md — Workflows, scheduled jobs, software
 harness/software-factory.md — IndyDevDan / Eric workshop patterns in Mission Control.
 harness/architect-mode.md — Architect don't code — merge gates and adoption metrics.
 harness/code-review-wizard.md — Seven-step PR review wizard end-to-end.
+harness/factory-memory.md — Five-phase Factory Memory operator guide: scoped retrieval, typed graph, frozen Attempt context, advisory verification, demo, and recovery.
 registry/discover-and-install.md — Registry Discover, installs, mc-context.lock.
 registry/context-cdl.md — Context CDL lifecycle: draft → publish → deprecate.
 registry/eval-runs.md — Eval runs, scenarios, framework gate.

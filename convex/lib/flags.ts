@@ -61,6 +61,11 @@ export const KNOWN_FLAGS: FlagDefinition[] = [
   { key: "control-plane.role-lenses", description: "Enable My, Team, Workspace, and Company Command Center lenses", defaultEnabled: false },
   { key: "control-plane.dispatch-scope", description: "Enforce repository and code-scope policy at dispatch", defaultEnabled: false },
   { key: "control-plane.company-rollups", description: "Enable authorized cross-workspace Company Command Center projections", defaultEnabled: false },
+  { key: "factory-memory.hybrid", description: "Factory Memory ingestion and hybrid lexical, semantic, and code-aware retrieval", defaultEnabled: false },
+  { key: "factory-memory.relationships", description: "Typed Factory entity and relationship index", defaultEnabled: false },
+  { key: "factory-memory.agentic-retrieval", description: "Bounded Context Planner and sufficiency loop", defaultEnabled: false },
+  { key: "factory-memory.knowledge-graph", description: "Bounded Factory Knowledge Graph traversal and path inspection", defaultEnabled: false },
+  { key: "factory-memory.context-engine", description: "Frozen Attempt Context Packages, verification influence, and context evals", defaultEnabled: false },
 ];
 
 const KNOWN_FLAG_MAP: Map<string, FlagDefinition> = new Map(

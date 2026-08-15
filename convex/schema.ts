@@ -20,6 +20,17 @@ import {
   verificationContractValidator,
   verificationVerdictValidator,
 } from "./lib/workOrderSpecificationValidators";
+import {
+  factoryContextBudgetValidator,
+  factoryContextItemValidator,
+  factoryEntityTypeValidator,
+  factoryKnowledgeDerivationValidator,
+  factoryMemoryProvenanceValidator,
+  factoryMemorySourceTypeValidator,
+  factoryPurposeValidator,
+  factoryRelationValidator,
+  factoryRetrievalStrategyValidator,
+} from "./lib/factoryMemoryValidators";
 
 // ============================================================================
 // ENUMS (as union types)
@@ -3755,6 +3766,9 @@ export default defineSchema({
     workOrderRevisionId: v.optional(v.id("workOrderRevisions")),
     factoryDefinitionVersionId: v.optional(v.id("factoryDefinitionVersions")),
     factoryConfigurationDigest: v.optional(v.string()),
+    // Immutable Factory Memory snapshot selected before execution. This is
+    // explanatory context only and never participates in acceptance authority.
+    factoryContextPackageId: v.optional(v.id("factoryContextPackages")),
     repositoryId: v.optional(v.id("workspaceRepositories")),
     hostBindingId: v.optional(v.id("workspaceHostBindings")),
     policyEnvelopeId: v.optional(v.id("policyEnvelopes")),
@@ -4809,6 +4823,298 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_key", ["key"])
+    .index("by_project_key", ["projectId", "key"]),
+
+  // -------------------------------------------------------------------------
+  // FACTORY MEMORY & CONTEXT INTELLIGENCE
+  // -------------------------------------------------------------------------
+  // These tables are rebuildable, provenance-backed projections over
+  // authoritative Mission Control, repository, GitHub, evidence, trace, eval,
+  // incident, and architecture records. They never become acceptance truth.
+  factoryMemoryDocuments: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    repositoryId: v.optional(v.id("workspaceRepositories")),
+    sourceType: factoryMemorySourceTypeValidator,
+    sourceId: v.string(),
+    workOrderId: v.optional(v.id("workOrders")),
+    workflowRunId: v.optional(v.id("workflowRuns")),
+    factoryDefinitionVersionId: v.optional(v.id("factoryDefinitionVersions")),
+    title: v.optional(v.string()),
+    content: v.string(),
+    metadata: v.optional(v.any()),
+    contentHash: v.string(),
+    sourceRevision: v.optional(v.string()),
+    createdAt: v.number(),
+    indexedAt: v.number(),
+    invalidatedAt: v.optional(v.number()),
+    provenance: factoryMemoryProvenanceValidator,
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_indexed", ["projectId", "indexedAt"])
+    .index("by_project_repository", ["projectId", "repositoryId"])
+    .index("by_project_repository_source", [
+      "projectId",
+      "repositoryId",
+      "sourceType",
+      "sourceId",
+    ])
+    .index("by_project_repository_source_revision", [
+      "projectId",
+      "repositoryId",
+      "sourceType",
+      "sourceId",
+      "sourceRevision",
+    ])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_workflow_run", ["workflowRunId"])
+    .index("by_factory_version", ["factoryDefinitionVersionId"])
+    .index("by_content_hash", ["contentHash"]),
+
+  factoryMemoryChunks: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    repositoryId: v.optional(v.id("workspaceRepositories")),
+    documentId: v.id("factoryMemoryDocuments"),
+    sourceType: factoryMemorySourceTypeValidator,
+    sourceId: v.string(),
+    workOrderId: v.optional(v.id("workOrders")),
+    workflowRunId: v.optional(v.id("workflowRuns")),
+    factoryDefinitionVersionId: v.optional(v.id("factoryDefinitionVersions")),
+    title: v.optional(v.string()),
+    content: v.string(),
+    searchText: v.string(),
+    chunkIndex: v.number(),
+    estimatedTokens: v.number(),
+    contentHash: v.string(),
+    metadata: v.optional(v.any()),
+    provenance: factoryMemoryProvenanceValidator,
+    invalidatedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_source", ["projectId", "sourceType"])
+    .index("by_project_repository", ["projectId", "repositoryId"])
+    .index("by_document", ["documentId"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_workflow_run", ["workflowRunId"])
+    .searchIndex("search_text", {
+      searchField: "searchText",
+      filterFields: ["projectId", "repositoryId", "sourceType"],
+    }),
+
+  factoryMemoryIngestionRuns: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    repositoryId: v.optional(v.id("workspaceRepositories")),
+    status: v.union(
+      v.literal("RUNNING"),
+      v.literal("SUCCEEDED"),
+      v.literal("DEGRADED"),
+      v.literal("FAILED"),
+    ),
+    sourceTypes: v.array(factoryMemorySourceTypeValidator),
+    indexedDocuments: v.number(),
+    indexedChunks: v.number(),
+    redactionCount: v.number(),
+    error: v.optional(v.string()),
+    actorId: v.string(),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_started", ["projectId", "startedAt"])
+    .index("by_project_repository_started", [
+      "projectId",
+      "repositoryId",
+      "startedAt",
+    ])
+    .index("by_project_status", ["projectId", "status"]),
+
+  factoryEntities: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    repositoryId: v.optional(v.id("workspaceRepositories")),
+    entityType: factoryEntityTypeValidator,
+    key: v.string(),
+    label: v.string(),
+    aliases: v.array(v.string()),
+    metadata: v.optional(v.any()),
+    provenance: v.array(factoryMemoryProvenanceValidator),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_repository", ["projectId", "repositoryId"])
+    .index("by_project_repository_key", ["projectId", "repositoryId", "key"])
+    .index("by_project_type", ["projectId", "entityType"])
+    .index("by_project_updated", ["projectId", "updatedAt"])
+    .index("by_project_repository_type", [
+      "projectId",
+      "repositoryId",
+      "entityType",
+    ])
+    .index("by_project_repository_updated", [
+      "projectId",
+      "repositoryId",
+      "updatedAt",
+    ]),
+
+  factoryRelationships: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    repositoryId: v.optional(v.id("workspaceRepositories")),
+    sourceType: factoryEntityTypeValidator,
+    sourceId: v.id("factoryEntities"),
+    relation: factoryRelationValidator,
+    targetType: factoryEntityTypeValidator,
+    targetId: v.id("factoryEntities"),
+    provenance: v.array(factoryMemoryProvenanceValidator),
+    confidence: v.optional(v.number()),
+    derivation: factoryKnowledgeDerivationValidator,
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_repository", ["projectId", "repositoryId"])
+    .index("by_project_source", ["projectId", "sourceId"])
+    .index("by_project_target", ["projectId", "targetId"])
+    .index("by_project_relation", ["projectId", "relation"])
+    .index("by_source_relation_target", ["sourceId", "relation", "targetId"]),
+
+  factoryRetrievalPlans: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    repositoryId: v.optional(v.id("workspaceRepositories")),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.optional(v.id("workflowRuns")),
+    factoryDefinitionVersionId: v.optional(v.id("factoryDefinitionVersions")),
+    objective: v.string(),
+    purpose: factoryPurposeValidator,
+    steps: v.array(
+      v.object({
+        strategy: factoryRetrievalStrategyValidator,
+        query: v.optional(v.string()),
+        entity: v.optional(
+          v.object({
+            type: factoryEntityTypeValidator,
+            id: v.id("factoryEntities"),
+          }),
+        ),
+        sourceTypes: v.optional(v.array(factoryMemorySourceTypeValidator)),
+        reason: v.string(),
+      }),
+    ),
+    budget: factoryContextBudgetValidator,
+    requiredSourceTypes: v.array(factoryMemorySourceTypeValidator),
+    maxIterations: v.number(),
+    sufficiency: v.optional(v.any()),
+    createdAt: v.number(),
+    createdBy: v.string(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_workflow_run", ["workflowRunId"]),
+
+  factoryContextPackages: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    repositoryId: v.optional(v.id("workspaceRepositories")),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.optional(v.id("workflowRuns")),
+    factoryDefinitionVersionId: v.optional(v.id("factoryDefinitionVersions")),
+    purpose: factoryPurposeValidator,
+    generatedAt: v.number(),
+    objective: v.string(),
+    items: v.array(factoryContextItemValidator),
+    estimatedTokens: v.number(),
+    budget: factoryContextBudgetValidator,
+    retrievalPlanId: v.optional(v.id("factoryRetrievalPlans")),
+    retrievalStrategies: v.array(factoryRetrievalStrategyValidator),
+    contentHash: v.string(),
+    frozen: v.literal(true),
+    metadata: v.optional(v.any()),
+    createdBy: v.string(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_repository", ["projectId", "repositoryId"])
+    .index("by_project_generated", ["projectId", "generatedAt"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_workflow_run", ["workflowRunId"])
+    .index("by_content_hash", ["contentHash"]),
+
+  factoryVerificationPlans: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    workOrderId: v.id("workOrders"),
+    contextPackageId: v.id("factoryContextPackages"),
+    checks: v.array(
+      v.object({
+        id: v.string(),
+        name: v.string(),
+        rationale: v.string(),
+        acceptanceCriterionIds: v.array(v.string()),
+        influencedBy: v.array(
+          v.object({
+            sourceType: factoryMemorySourceTypeValidator,
+            sourceId: v.string(),
+            revision: v.optional(v.string()),
+          }),
+        ),
+        evidenceRequired: v.literal(true),
+      }),
+    ),
+    advisoryOnly: v.literal(true),
+    createdAt: v.number(),
+    createdBy: v.string(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_context_package", ["contextPackageId"]),
+
+  factoryRetrievalObservations: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    workflowRunId: v.optional(v.id("workflowRuns")),
+    retrievalPlanId: v.optional(v.id("factoryRetrievalPlans")),
+    contextPackageId: v.optional(v.id("factoryContextPackages")),
+    observationType: v.union(
+      v.literal("context.plan"),
+      v.literal("memory.search"),
+      v.literal("code.search"),
+      v.literal("graph.traversal"),
+      v.literal("context.rank"),
+      v.literal("context.assemble"),
+      v.literal("context.sufficiency"),
+    ),
+    strategy: v.optional(factoryRetrievalStrategyValidator),
+    query: v.optional(v.string()),
+    resultCount: v.optional(v.number()),
+    selectedCount: v.optional(v.number()),
+    rejectedCount: v.optional(v.number()),
+    estimatedTokens: v.optional(v.number()),
+    latencyMs: v.number(),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_time", ["projectId", "createdAt"])
+    .index("by_workflow_run", ["workflowRunId"])
+    .index("by_context_package", ["contextPackageId"]),
+
+  factoryContextEvaluations: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    contextPackageId: v.id("factoryContextPackages"),
+    workflowRunId: v.optional(v.id("workflowRuns")),
+    key: v.string(),
+    score: v.number(),
+    passed: v.boolean(),
+    reason: v.string(),
+    sampleSize: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_context_package", ["contextPackageId"])
     .index("by_project_key", ["projectId", "key"]),
 
   // -------------------------------------------------------------------------

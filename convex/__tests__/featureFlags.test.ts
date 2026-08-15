@@ -24,6 +24,11 @@ describe("flag registry", () => {
     expect(keys).toContain("delivery.workorders");
     expect(keys).toContain("missions.plan-release-v1");
     expect(keys).toContain("executor.pi-bridge");
+    expect(keys).toContain("factory-memory.hybrid");
+    expect(keys).toContain("factory-memory.relationships");
+    expect(keys).toContain("factory-memory.agentic-retrieval");
+    expect(keys).toContain("factory-memory.knowledge-graph");
+    expect(keys).toContain("factory-memory.context-engine");
   });
 
   it("ships every flag default-off", () => {

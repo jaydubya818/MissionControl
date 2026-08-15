@@ -25,6 +25,10 @@ Live counts from `useNavGroupsWithCounts`:
 - Incidents → alert count
 - Registry / Memory → package and knowledge-graph counts
 
+**Knowledge → Memory** is the Factory Memory entry point. Its Overview, Memory,
+Graph, and Context tabs cover index health, scoped retrieval, typed graph
+inspection, and immutable Attempt context snapshots respectively.
+
 ## Config
 
 `apps/mission-control-ui/src/shellV2/eosNavConfig.ts`

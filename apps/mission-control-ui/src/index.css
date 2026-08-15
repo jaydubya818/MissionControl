@@ -1176,6 +1176,11 @@ body.shell-resizing {
   font-weight: 600;
   color: var(--schematic-accent);
 }
+[data-theme="light"] .schematic-arch-status,
+[data-theme="light"] .schematic-sessbtn-on {
+  color: #187a3f;
+  border-color: #187a3f;
+}
 .schematic-live-dot {
   display: inline-block;
   width: 7px;

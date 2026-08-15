@@ -64,6 +64,21 @@ incident record.
 2. Open **Factory Board** — active/blocked cards.
 3. Open **Harness → Architect Mode** — live merge gates and adoption metrics.
 
+## Factory Memory smoke test
+
+1. Open **Knowledge → Memory → Overview** — all five demo phase gates are on and
+   the latest ingestion run is successful.
+2. Open **Memory**, search `auth middleware token refresh`, and verify the
+   bounded results include source code, ADR-004, INC-12, tests, and WO-42 with
+   source revisions.
+3. Open **Graph**, resolve `auth-middleware`, and inspect paths to orders-api,
+   ADR-004, INC-12, and the end-to-end test. The `similar_to` edge must be
+   visibly inferred with confidence.
+4. Open **Context** and inspect the frozen verification package, token budget,
+   advisory evidence-required checks, observations, evals, and package diff.
+5. Open its linked Attempt in **Execution Run Inspector** and confirm the same
+   package digest and source revisions appear under **Frozen Factory context**.
+
 ## Re-seed
 
 Demo seed is idempotent. Force refresh:

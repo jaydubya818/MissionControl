@@ -12,6 +12,7 @@ import { RunRecoveryPanel } from "./RunRecoveryPanel";
 import { EvidenceLineagePanel, type EvidenceLineageStage } from "./EvidenceLineagePanel";
 import { ExecutionRecoveryCard, type ExecutionRecoveryData } from "./ExecutionRecoveryCard";
 import { ReviewEvidencePackage, type ReviewEvidencePackageData } from "./ReviewEvidencePackage";
+import { FactoryContextRunCard } from "./FactoryContextRunCard";
 
 export function ExecutionRunInspector({
   open,
@@ -51,6 +52,24 @@ export function ExecutionRunInspector({
   const routingDecision = useQuery(
     api.modelRoutingDecisions.getForWorkflowRun,
     open && workflowRunId ? { workflowRunId } : "skip"
+  );
+  const factoryContextEnabled = useQuery(
+    api.featureFlags.isEnabled,
+    open && inspector?.run.projectId
+      ? {
+          key: "factory-memory.context-engine",
+          projectId: inspector.run.projectId,
+        }
+      : "skip"
+  );
+  const factoryContext = useQuery(
+    api.factoryMemory.getContextPackage,
+    open && workflowRunId && inspector?.run.projectId && factoryContextEnabled
+      ? {
+          projectId: inspector.run.projectId,
+          workflowRunId,
+        }
+      : "skip"
   );
   const requestCancellation = useMutation(api.workflowRuns.requestCancellation);
   const [cancelReason, setCancelReason] = useState("");
@@ -148,6 +167,8 @@ export function ExecutionRunInspector({
               </Card>
 
               <ReviewEvidencePackage review={inspector.reviewPackage as ReviewEvidencePackageData} />
+
+              <FactoryContextRunCard enabled={factoryContextEnabled} detail={factoryContext} />
 
               <ExecutionRecoveryCard recovery={inspector.recovery as ExecutionRecoveryData} />
 

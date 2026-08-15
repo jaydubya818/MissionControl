@@ -1,81 +1,82 @@
+import { useState } from "react";
 import { useQuery } from "convex/react";
+import { DatabaseZap } from "lucide-react";
+
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { SchematicPageHead } from "@/components/schematic/SchematicPageHead";
 import { SchematicSubTabs } from "@/components/schematic/SchematicSubTabs";
-import { DispatchGateBar } from "@/components/schematic/DispatchGateBar";
-import { useState } from "react";
-import { MemoryView } from "../../MemoryView";
+import { FactoryMemoryContext } from "./factoryMemory/FactoryMemoryContext";
+import { FactoryMemoryGraph } from "./factoryMemory/FactoryMemoryGraph";
+import { FactoryMemoryOverview } from "./factoryMemory/FactoryMemoryOverview";
+import { FactoryMemorySearch } from "./factoryMemory/FactoryMemorySearch";
 
 export interface MemoryPillarsViewProps {
   projectId: Id<"projects"> | null;
   onNavigate: (view: string) => void;
 }
 
-/** Memory pillars with waku sub-tabs. */
-export function MemoryPillarsView({ projectId, onNavigate }: MemoryPillarsViewProps): JSX.Element {
-  const [tab, setTab] = useState("overview");
-  const stats = useQuery(api.analytics.schematicOverview, projectId ? { projectId } : {});
+type FactoryMemoryTab = "overview" | "memory" | "graph" | "context";
+
+export function MemoryPillarsView({
+  projectId,
+}: MemoryPillarsViewProps): JSX.Element {
+  const [tab, setTab] = useState<FactoryMemoryTab>("overview");
+  const overview = useQuery(
+    api.factoryMemory.overview,
+    projectId ? { projectId } : "skip",
+  );
+  const hybridEnabled = overview?.phases["factory-memory.hybrid"] ?? false;
+  const graphEnabled =
+    (overview?.phases["factory-memory.relationships"] ?? false) &&
+    (overview?.phases["factory-memory.knowledge-graph"] ?? false);
+  const contextEnabled =
+    overview?.phases["factory-memory.context-engine"] ?? false;
+  const updatedAt = overview?.latestIngestion?.completedAt;
 
   const tabs = [
     { id: "overview", label: "Overview" },
-    { id: "semantic", label: "Semantic", count: stats?.facts },
-    { id: "episodic", label: "Episodic", count: stats?.episodeCount },
-    { id: "skills", label: "Skills", count: stats?.skillCount },
-    { id: "graph", label: "Knowledge graph" },
+    { id: "memory", label: "Memory", count: overview?.indexedDocuments },
+    { id: "graph", label: "Graph", count: overview?.relationshipCount },
+    {
+      id: "context",
+      label: "Context",
+      count: overview?.contextPackageCount,
+    },
   ];
 
   return (
     <div className="pb-6">
-      <SchematicPageHead title="Memory" subtitle="three pillars + graph" updatedAt={Date.now()} />
-      <SchematicSubTabs tabs={tabs} active={tab} onChange={setTab} />
+      <SchematicPageHead
+        title="Factory Memory"
+        subtitle="retrieve · relate · plan · freeze · learn"
+        updatedAt={updatedAt}
+        live={Boolean(projectId)}
+      />
+      <SchematicSubTabs
+        tabs={tabs}
+        active={tab}
+        onChange={(next) => setTab(next as FactoryMemoryTab)}
+      />
 
-      {tab === "overview" ? (
-        <>
-          <div className="schematic-card border-schematic-accent bg-schematic-accent-soft/40">
-            <b className="text-ink">Memory vs Database — two views of one system.</b>
-            <p className="schematic-reply mt-2">
-              This tab is the curated pillar view. Open{" "}
-              <button type="button" className="text-schematic-accent underline" onClick={() => onNavigate("system")}>
-                System → Data explorer
-              </button>{" "}
-              for raw Convex table samples.
-            </p>
-          </div>
-          {stats ? (
-            <>
-              <h2 className="schematic-section-label mt-6">Work state</h2>
-              <DispatchGateBar
-                pendingApprovals={stats.pendingApprovals ?? 0}
-                blockedTasks={stats.blockedTasks ?? 0}
-              />
-            </>
-          ) : null}
-          <div className="mt-4 grid gap-2 sm:grid-cols-3">
-            {[
-              ["Semantic", "semantic", `${stats?.facts ?? "—"} facts`, "durable distilled facts"],
-              ["Episodic", "episodic", `${stats?.episodeCount ?? "—"} completed runs`, "run history; durable episode storage is planned"],
-              ["Procedural", "skills", `${stats?.skillCount ?? "—"} skills`, "context packages & SKILL.md"],
-            ].map(([title, id, n, desc]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setTab(id)}
-                className="schematic-card text-left hover:border-schematic-accent"
-              >
-                <b className="block text-[13px] text-ink">
-                  {title}{" "}
-                  <span className="schematic-meta font-normal">· {n}</span>
-                </b>
-                <span className="text-[11.5px] text-ink-secondary">{desc}</span>
-              </button>
-            ))}
-          </div>
-        </>
+      {!projectId ? (
+        <div className="mt-4 rounded-lg border border-dashed border-line bg-surface-1 px-5 py-10 text-center">
+          <DatabaseZap className="mx-auto h-7 w-7 text-ink-muted" aria-hidden />
+          <h2 className="mt-3 text-[14px] font-semibold text-ink">
+            Select a workspace
+          </h2>
+          <p className="mt-1 text-[12px] text-ink-muted">
+            Factory Memory never searches across workspace boundaries.
+          </p>
+        </div>
+      ) : tab === "overview" ? (
+        <FactoryMemoryOverview overview={overview} />
+      ) : tab === "memory" ? (
+        <FactoryMemorySearch projectId={projectId} enabled={hybridEnabled} />
       ) : tab === "graph" ? (
-        <MemoryView projectId={projectId} />
+        <FactoryMemoryGraph projectId={projectId} enabled={graphEnabled} />
       ) : (
-        <MemoryView projectId={projectId} />
+        <FactoryMemoryContext projectId={projectId} enabled={contextEnabled} />
       )}
     </div>
   );

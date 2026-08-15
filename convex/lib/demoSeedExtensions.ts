@@ -6,6 +6,7 @@
 import type { Id } from "../_generated/dataModel";
 import { deriveVerificationStatus } from "./workOrderGovernance";
 import { sha256Hex } from "./harnessPrChecks";
+import { seedFactoryMemoryGoldenPath } from "./factoryMemoryDemoSeed";
 
 export type DemoSeedContext = {
   tenantId: Id<"tenants">;
@@ -304,6 +305,11 @@ export async function seedDemoExtensions(ctx: any, input: DemoSeedContext) {
     contextInstallations: 0,
     alerts: 0,
     automationDefinitions: 0,
+    factoryMemoryDocuments: 0,
+    factoryMemoryChunks: 0,
+    factoryEntities: 0,
+    factoryRelationships: 0,
+    factoryContextPackages: 0,
   };
 
   const agents = await ctx.db
@@ -861,24 +867,44 @@ export async function seedDemoExtensions(ctx: any, input: DemoSeedContext) {
     "eos.command-center-preview",
     "executor.pi-bridge",
     "eval.framework",
+    "factory-memory.hybrid",
+    "factory-memory.relationships",
+    "factory-memory.agentic-retrieval",
+    "factory-memory.knowledge-graph",
+    "factory-memory.context-engine",
   ];
   for (const key of demoFlags) {
+    const factoryMemoryFlag = key.startsWith("factory-memory.");
     const rows = await ctx.db
       .query("featureFlags")
       .withIndex("by_key", (q: any) => q.eq("key", key))
       .collect();
-    const existing = rows.find((row: { projectId?: string }) => row.projectId == null);
+    const existing = rows.find((row: { projectId?: string }) =>
+      factoryMemoryFlag ? row.projectId === projectId : row.projectId == null,
+    );
     if (!existing) {
       await ctx.db.insert("featureFlags", {
         key,
         enabled: true,
         description: `Demo seed — ${key}`,
+        projectId: factoryMemoryFlag ? projectId : undefined,
         createdAt: now,
         updatedAt: now,
         updatedBy: "seedMissionControlDemo",
       });
     }
   }
+
+  const factoryMemoryCounts = await seedFactoryMemoryGoldenPath(ctx, {
+    tenantId,
+    projectId,
+    now,
+  });
+  counts.factoryMemoryDocuments = factoryMemoryCounts.documents;
+  counts.factoryMemoryChunks = factoryMemoryCounts.chunks;
+  counts.factoryEntities = factoryMemoryCounts.entities;
+  counts.factoryRelationships = factoryMemoryCounts.relationships;
+  counts.factoryContextPackages = factoryMemoryCounts.contextPackages;
 
   return counts;
 }
