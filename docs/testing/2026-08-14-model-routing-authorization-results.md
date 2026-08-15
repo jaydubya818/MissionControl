@@ -88,6 +88,33 @@ These are not simulated or claimed as complete:
 3. Implement a signed workspace-scoped orchestration command before re-enabling
    local model catalog sync.
 
+## Cross-company gate continuation — 2026-08-15
+
+The first live tenant-isolation probe found that `activities.listRecent` still
+accepted an unauthenticated caller and returned tenant- and workspace-scoped
+audit events. Model catalog reads failed closed in the same probe, but the audit
+result failed the cross-company release gate. PR #89 remained draft.
+
+The audit boundary is now workspace-authorized on every public read path.
+Unscoped feeds merge records only from workspaces accessible to the validated
+identity; task, agent, and action lookups retain the same project boundary. The
+generic audit writer now requires a workspace-authorized service identity,
+derives tenant and actor attribution on the server, rejects cross-workspace
+task or agent references, and accepts service events only.
+
+Focused automated evidence:
+
+- `convex/__tests__/activitiesAuthorization.test.ts` proves anonymous denial,
+  company A positive access, A-to-B denial, unscoped filtering, action/task/agent
+  isolation, cross-company write denial, and server-derived attribution.
+- The activity, Model Routing, and company-access suites pass together: 3 files,
+  23 tests.
+- Convex type-checking and the runtime-contract guard pass. Public function
+  signatures remain on the accepted v19 contract.
+
+This repair must be deployed to the isolated PR preview and re-probed before it
+counts as live evidence. The full two-real-identity A/B matrix remains required.
+
 ## Post-deploy monitoring and validation
 
 Validation window: first 24 hours and the first 25 routed runs after deployment.
