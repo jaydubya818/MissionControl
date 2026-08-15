@@ -33,6 +33,8 @@ Passed:
 - `pnpm --filter @mission-control/orchestration-server typecheck`
 - `pnpm run lint`
   - full workspace typecheck and skill lint passed
+- `pnpm run ci:runtime-contract`
+  - public routing contract changes are shipped atomically as runtime contract v18
 - `pnpm run build`
   - all workspace builds passed; Vite reported only the pre-existing large-chunk
     advisory
