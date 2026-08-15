@@ -64,7 +64,7 @@ if (!rootEl) {
         ) : auth.mode === "clerk" ? (
           <ClerkProvider publishableKey={clerkPublishableKey!} afterSignOutUrl="/">
             <ConvexProviderWithClerk
-              client={new ConvexReactClient(convexUrl)}
+              client={new ConvexReactClient(convexUrl, { verbose: true })}
               useAuth={useAuth}
             >
               <ClerkSessionBoundary>
