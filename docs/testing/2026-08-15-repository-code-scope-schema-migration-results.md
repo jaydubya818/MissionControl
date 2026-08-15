@@ -58,8 +58,8 @@ was not mutated or presented as a fresh Live READY canary.
 ## Automated verification
 
 - `pnpm run test` passed across every test-bearing workspace.
-  - Mission Control UI: 53 files, 237 tests.
-  - Convex: 79 files, 551 tests.
+  - Mission Control UI: 53 files, 238 tests.
+  - Convex: 75 files, 538 tests.
   - The repository-scope migration added 5 focused tests.
 - `pnpm run lint` passed the full workspace typecheck and skill lint.
 - `pnpm run build` passed every workspace build; Vite emitted only the existing

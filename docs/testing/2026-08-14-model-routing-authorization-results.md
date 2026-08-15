@@ -68,11 +68,12 @@ Model Routing and does not affect the tested save/restore flow.
 
 The preserved Research Lab database contains a legacy
 `repositoryCodeScopes.approvalPolicyDescription` field that is not accepted by
-the current source schema. This initially blocked `convex dev --once`. No data
-was deleted. The field was accepted temporarily only to deploy the local function
-bundle, and the source schema was restored unchanged afterward. Cleaning this
-stored schema drift remains an environment-hygiene gate before relying on a fresh
-Research Lab deploy as release evidence.
+the strict canonical shape. This initially blocked `convex dev --once`. No data
+was deleted. The compatibility validator and internal migration included in this
+change preserved the human-readable policy context, removed the retired stored
+field, and produced zero writes on a second run. See
+`2026-08-15-repository-code-scope-schema-migration-results.md` for the retained
+evidence and the one-release compatibility-removal gate.
 
 ## Required live gates
 
