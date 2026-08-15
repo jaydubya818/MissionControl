@@ -80,15 +80,38 @@ The security claim is intentionally narrow:
 
 ## Known blocker and residual risk
 
-On 2026-08-10 the live exe.dev host key matched the published fingerprint, but
-the local machine had no registered provider SSH identity. No provider resource
-was created.
+On 2026-08-10 the live exe.dev host key matched the published fingerprint and a
+dedicated public SSH key was registered through the provider's verified account
+flow. The account inventory is clean: zero VMs and zero `auto:all` integration
+attachments. The active Basic plan reports `max_vms: 0`, so allocation fails
+closed with `PROVIDER_CAPACITY_BLOCKED`. The Product Owner declined a paid-plan
+upgrade; no payment method, VM, or provider resource was created.
 
 Even after authentication, the default exe.dev image is not automatically
 approved for agent execution. If it grants passwordless sudo or if an
 agent-resistant egress policy cannot be demonstrated, the production risk
 ceiling remains GREEN/YELLOW Preview work and no sensitive repository source is
 mounted.
+
+## Free local canary boundary
+
+The zero-cost Docker canary is a development diagnostic, not a substitute for
+the remote trust boundary. It improves confidence in exact-name lifecycle,
+runtime-policy inspection, offline non-root execution, receipt extraction,
+redaction, timeout handling, and cleanup. Its immutable cached image and
+`--pull=never` posture avoid an implicit network or supply-chain change during
+the check. Readiness also rejects non-local Docker endpoints and an ambient
+`DOCKER_HOST` override so the local diagnostic cannot silently mutate a remote
+daemon.
+
+Residual risk is materially different from a remote sandbox: the container
+still depends on the operator's machine, Docker daemon, Docker Desktop Linux VM,
+storage, power, and network uplink. A Docker-daemon or virtualization-boundary
+compromise can reach beyond the canary, and simultaneous containers do not
+provide N independent machines. Therefore no private repository, model key,
+GitHub identity, customer data, production credential, public port, or host
+bind mount is permitted in this local diagnostic, and its evidence cannot
+satisfy any remote-provider promotion gate.
 
 ## Security exit evidence
 

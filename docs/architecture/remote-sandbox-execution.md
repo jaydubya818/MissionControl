@@ -95,6 +95,34 @@ or model workload, and removes only that exact VM in a bounded cleanup path.
 `EXEDEV_IDENTITY_FILE` may select a dedicated registered private key. The
 doctor never prints key material or copies the key to the VM.
 
+## Zero-cost local development canary
+
+When remote capacity is unavailable, the following development-only diagnostic
+exercises the lifecycle and cleanup contract against the operator's existing
+Docker engine:
+
+```bash
+node scripts/local-sandbox-doctor.mjs --canary --repeat=3
+```
+
+The diagnostic uses a cached Alpine image by immutable repository digest with
+`--pull=never` and fails closed unless the active Docker endpoint is a local
+Unix socket with no `DOCKER_HOST` override. Each canary has no network,
+environment secret, host bind mount, published port, or elevated privilege. It
+runs as UID/GID 65534 with a read-only root filesystem, all Linux capabilities
+dropped, no-new-privileges, bounded CPU/memory/PIDs, and tmpfs-only writable
+storage. The outer process validates the inspected Docker policy and the
+in-container receipt before removing the container by its returned Docker
+identity and rechecking the exact generated name.
+
+This is not a provider adapter and must not be selected for a governed Factory
+Attempt. It proves local lifecycle mechanics, policy inspection, result
+extraction, failure cleanup, and deterministic teardown only. It does not prove
+an independent computer, host-failure isolation, remote restart recovery,
+private provider previews, credential vending/revocation, provider spend
+controls, or best-of-N scaling across machines. Those remote promotion gates
+remain blocked until capacity is explicitly approved.
+
 ## Lifecycle contract
 
 ```text
