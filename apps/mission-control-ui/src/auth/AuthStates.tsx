@@ -1,8 +1,13 @@
-import { SignInButton, UserButton, useAuth } from "@clerk/react";
+import { SignInButton, SignOutButton, UserButton, useAuth } from "@clerk/react";
 import { useConvexAuth } from "convex/react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ShieldCheck } from "lucide-react";
 import { AuthRuntimeProvider } from "./AuthRuntimeContext";
+import {
+  probeClerkConvexToken,
+  type ClerkConvexTokenProbe,
+  type ClerkTokenFetcher,
+} from "./clerkConvexDiagnostic";
 
 function AuthStateLayout({
   title,
@@ -27,12 +32,87 @@ function AuthStateLayout({
   );
 }
 
-export function AuthConfigurationError({ message }: { message: string }) {
+export function AuthConfigurationError({
+  message,
+  action,
+}: {
+  message: string;
+  action?: ReactNode;
+}) {
   return (
     <AuthStateLayout
       title="Authentication setup required"
       description={`${message} Mission Control is closed until its identity configuration is complete.`}
+      action={action}
     />
+  );
+}
+
+function diagnosticMessage(probe: ClerkConvexTokenProbe | null): string {
+  if (!probe) {
+    return "Checking whether Clerk can issue the token required by Convex.";
+  }
+  if (probe.status === "issued") {
+    const tokenLabel =
+      probe.source === "session"
+        ? "audience-qualified session token"
+        : "legacy Convex-template token";
+    return `Clerk issued the ${tokenLabel}, but Convex rejected it. Verify the deployed issuer and audience configuration.`;
+  }
+  if (probe.status === "missing") {
+    return probe.source === "template"
+      ? "Clerk did not issue the Convex-template token. Confirm that the Convex integration is active for this Clerk instance."
+      : "Clerk did not issue its audience-qualified session token. Sign out, then establish a new session.";
+  }
+  return `Clerk could not issue the ${probe.source === "session" ? "session" : "Convex-template"} token (error: ${probe.errorCode}).`;
+}
+
+function ClerkConvexDiagnostic({
+  getToken,
+  sessionClaims,
+}: {
+  getToken: ClerkTokenFetcher;
+  sessionClaims: unknown;
+}) {
+  const [probe, setProbe] = useState<ClerkConvexTokenProbe | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const probeInput = useRef({ getToken, sessionClaims });
+  probeInput.current = { getToken, sessionClaims };
+
+  useEffect(() => {
+    let active = true;
+    setProbe(null);
+    void probeClerkConvexToken(probeInput.current).then((result) => {
+      if (active) setProbe(result);
+    });
+    return () => {
+      active = false;
+    };
+  }, [attempt]);
+
+  return (
+    <div className="space-y-3" data-auth-diagnostic={probe?.status ?? "checking"}>
+      <p className="text-sm leading-relaxed text-ink-secondary">
+        {diagnosticMessage(probe)}
+      </p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setAttempt((value) => value + 1)}
+          className="flex h-10 flex-1 items-center justify-center rounded-lg border border-line bg-surface-2 px-4 text-sm font-semibold text-ink transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Retry validation
+        </button>
+        <SignOutButton>
+          <button
+            type="button"
+            className="flex h-10 flex-1 items-center justify-center rounded-lg bg-act px-4 text-sm font-semibold text-act-ink transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Sign out
+          </button>
+        </SignOutButton>
+      </div>
+    </div>
   );
 }
 
@@ -70,7 +150,15 @@ export function ClerkSessionBoundary({ children }: { children: ReactNode }) {
 
   if (!convex.isAuthenticated) {
     return (
-      <AuthConfigurationError message="Clerk signed you in, but Convex could not validate the session token." />
+      <AuthConfigurationError
+        message="Clerk signed you in, but Convex could not validate the session token."
+        action={
+          <ClerkConvexDiagnostic
+            getToken={clerk.getToken}
+            sessionClaims={clerk.sessionClaims}
+          />
+        }
+      />
     );
   }
 
