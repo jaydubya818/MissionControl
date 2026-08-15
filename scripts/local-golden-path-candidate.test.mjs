@@ -15,6 +15,7 @@ const candidatePath = fileURLToPath(
 const expectedOutput = `${JSON.stringify({
   schemaVersion: "local-golden-path-candidate/v1",
   outcome: "deterministic-local-candidate",
+  recoveryMarker: "deterministic-recovery-v1",
   executionBoundary: "LOCAL_ONLY",
   publicationAuthority: "CONTROL_PLANE",
 })}\n`;
@@ -32,6 +33,7 @@ function runCandidate() {
 
 test("candidate has the frozen local-only contract", () => {
   assert.equal(Object.isFrozen(LOCAL_GOLDEN_PATH_CANDIDATE), true);
+  assert.equal(LOCAL_GOLDEN_PATH_CANDIDATE.recoveryMarker, "deterministic-recovery-v1");
   assert.equal(renderLocalGoldenPathCandidate(), expectedOutput);
 });
 

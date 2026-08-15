@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 export const LOCAL_GOLDEN_PATH_CANDIDATE = Object.freeze({
   schemaVersion: "local-golden-path-candidate/v1",
   outcome: "deterministic-local-candidate",
+  recoveryMarker: "deterministic-recovery-v1",
   executionBoundary: "LOCAL_ONLY",
   publicationAuthority: "CONTROL_PLANE",
 });
