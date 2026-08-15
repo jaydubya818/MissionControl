@@ -107,6 +107,10 @@ export function AgentRegistryView({
   const resetAll = useMutation(api.agents.resetAll);
   const { toast } = useToast();
 
+  const currentSettingsAgent = settingsAgent
+    ? agents?.find((agent) => agent._id === settingsAgent._id) ?? settingsAgent
+    : null;
+
   const taskCountByAgent = useMemo(() => {
     const map = new Map<Id<"agents">, number>();
     if (!tasks) return map;
@@ -462,12 +466,12 @@ export function AgentRegistryView({
           )}
         </div>
 
-      {settingsAgent && (
+      {currentSettingsAgent && (
         <AgentSettingsPanel
-          agent={settingsAgent}
+          agent={currentSettingsAgent}
           projectId={projectId!}
           effectiveModel={project.swarmConfig?.defaultModel ?? "operator-default"}
-          open={!!settingsAgent}
+          open={!!currentSettingsAgent}
           initialEditing={settingsMode === "edit"}
           onClose={() => setSettingsAgent(null)}
           onNavigateToIdentity={() => {
@@ -476,7 +480,7 @@ export function AgentRegistryView({
           }}
           onDeactivate={() => {
             setSettingsAgent(null);
-            void setStatus(settingsAgent, "DRAINED", "Operator deactivated agent");
+            void setStatus(currentSettingsAgent, "DRAINED", "Operator deactivated agent");
           }}
         />
       )}

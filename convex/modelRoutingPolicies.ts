@@ -6,6 +6,10 @@ import {
   type CatalogModel,
   type RoutingPolicyInput,
 } from "./lib/modelRouting";
+import {
+  FACTORY_PERMISSIONS,
+  requireWorkspacePermission,
+} from "./lib/companyAccess";
 
 const tier = v.union(
   v.literal("FAST"),
@@ -62,7 +66,10 @@ async function loadActive(ctx: { db: any }, projectId: any) {
 
 export const getActive = query({
   args: { projectId: v.id("projects") },
-  handler: async (ctx, args) => loadActive(ctx, args.projectId),
+  handler: async (ctx, args) => {
+    await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.VIEW);
+    return loadActive(ctx, args.projectId);
+  },
 });
 
 export const getAgentOverride = query({
@@ -71,6 +78,11 @@ export const getAgentOverride = query({
     agentId: v.id("agents"),
   },
   handler: async (ctx, args) => {
+    await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.VIEW);
+    const agent = await ctx.db.get(args.agentId);
+    if (!agent || agent.projectId !== args.projectId) {
+      throw new Error("Agent is unavailable or unauthorized.");
+    }
     const override = await ctx.db
       .query("agentModelOverrides")
       .withIndex("by_project_agent", (q) =>
@@ -89,9 +101,13 @@ export const setAgentOverride = mutation({
     modelId: v.string(),
     reason: v.string(),
     expiresAt: v.optional(v.number()),
-    actorId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const access = await requireWorkspacePermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.IMPROVE
+    );
     const [agent, model] = await Promise.all([
       ctx.db.get(args.agentId),
       ctx.db
@@ -100,9 +116,13 @@ export const setAgentOverride = mutation({
         .first(),
     ]);
     if (!agent || agent.projectId !== args.projectId) {
-      throw new Error("Agent does not belong to the selected workspace");
+      throw new Error("Agent is unavailable or unauthorized.");
     }
-    if (!model || model.deprecated || model.availability === "UNAVAILABLE") {
+    if (
+      !model ||
+      model.deprecated ||
+      model.availability === "UNAVAILABLE"
+    ) {
       throw new Error("Override model route is unavailable");
     }
     if (!args.reason.trim()) throw new Error("Override reason is required");
@@ -121,7 +141,7 @@ export const setAgentOverride = mutation({
           modelId: args.modelId,
           reason: args.reason.trim(),
           expiresAt: args.expiresAt,
-          createdBy: args.actorId ?? "operator",
+          createdBy: access.actorId,
           createdAt: now,
           updatedAt: now,
         });
@@ -134,9 +154,10 @@ export const setAgentOverride = mutation({
       });
     }
     await ctx.db.insert("activities", {
+      tenantId: access.project.tenantId,
       projectId: args.projectId,
       actorType: "HUMAN",
-      actorId: args.actorId ?? "operator",
+      actorId: access.actorId,
       action: "AGENT_MODEL_OVERRIDE_SET",
       description: `Agent "${agent.name}" model override set to ${args.modelId}`,
       targetType: "AGENT",
@@ -152,12 +173,16 @@ export const clearAgentOverride = mutation({
   args: {
     projectId: v.id("projects"),
     agentId: v.id("agents"),
-    actorId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const access = await requireWorkspacePermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.IMPROVE
+    );
     const agent = await ctx.db.get(args.agentId);
     if (!agent || agent.projectId !== args.projectId) {
-      throw new Error("Agent does not belong to the selected workspace");
+      throw new Error("Agent is unavailable or unauthorized.");
     }
     const existing = await ctx.db
       .query("agentModelOverrides")
@@ -168,9 +193,10 @@ export const clearAgentOverride = mutation({
     if (!existing) return { removed: false };
     await ctx.db.delete(existing._id);
     await ctx.db.insert("activities", {
+      tenantId: access.project.tenantId,
       projectId: args.projectId,
       actorType: "HUMAN",
-      actorId: args.actorId ?? "operator",
+      actorId: access.actorId,
       action: "AGENT_MODEL_OVERRIDE_CLEARED",
       description: `Agent "${agent.name}" returned to workspace model routing`,
       targetType: "AGENT",
@@ -195,11 +221,14 @@ export const save = mutation({
     latencyTargetMs: v.optional(v.number()),
     canaryPercent: v.number(),
     killSwitch: v.boolean(),
-    actorId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const project = await ctx.db.get(args.projectId);
-    if (!project) throw new Error("Workspace not found");
+    const access = await requireWorkspacePermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.MANAGE_AUTOMATION
+    );
+    const project = access.project;
     if (!args.name.trim()) throw new Error("Policy name is required");
     if (args.canaryPercent < 0 || args.canaryPercent > 100) {
       throw new Error("Canary percentage must be between 0 and 100");
@@ -235,7 +264,11 @@ export const save = mutation({
         .query("modelCatalog")
         .withIndex("by_model_id", (q) => q.eq("modelId", modelId))
         .first();
-      if (!model || model.deprecated) {
+      if (
+        !model ||
+        model.deprecated ||
+        model.availability === "UNAVAILABLE"
+      ) {
         throw new Error(`Model route "${modelId}" is unavailable`);
       }
     }
@@ -258,15 +291,16 @@ export const save = mutation({
       canaryPercent: args.canaryPercent,
       killSwitch: args.killSwitch,
       version: (current?.version ?? 0) + 1,
-      createdBy: args.actorId ?? "operator",
-      updatedBy: args.actorId ?? "operator",
+      createdBy: access.actorId,
+      updatedBy: access.actorId,
       createdAt: now,
       updatedAt: now,
     });
     await ctx.db.insert("activities", {
+      tenantId: access.project.tenantId,
       projectId: args.projectId,
       actorType: "HUMAN",
-      actorId: args.actorId ?? "operator",
+      actorId: access.actorId,
       action: "MODEL_ROUTING_POLICY_ACTIVATED",
       description: `Activated model routing policy v${(current?.version ?? 0) + 1}`,
       targetType: "MODEL_ROUTING_POLICY",
@@ -293,8 +327,18 @@ export const simulate = query({
     allowCanary: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const project = await ctx.db.get(args.projectId);
-    if (!project) throw new Error("Workspace not found");
+    const access = await requireWorkspacePermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.VIEW
+    );
+    const project = access.project;
+    if (args.agentId) {
+      const agent = await ctx.db.get(args.agentId);
+      if (!agent || agent.projectId !== args.projectId) {
+        throw new Error("Agent is unavailable or unauthorized.");
+      }
+    }
     const active = await loadActive(ctx, args.projectId);
     const catalog = (await ctx.db.query("modelCatalog").collect()) as CatalogModel[];
     const override = args.agentId

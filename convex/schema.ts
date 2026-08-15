@@ -1055,6 +1055,8 @@ export default defineSchema({
     ),
     verificationPolicy: v.optional(v.string()),
     approvalPolicy: v.optional(v.string()),
+    // One-release compatibility for the internal schema-drift migration.
+    // Remove only after every deployment reports zero legacy rows.
     approvalPolicyDescription: v.optional(v.string()),
     migrationVersion: v.optional(v.number()),
     fixtureKey: v.optional(v.string()),

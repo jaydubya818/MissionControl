@@ -73,7 +73,12 @@ import {
   validateTaskAttemptSelection,
   validateTaskAttemptStart,
 } from "./lib/taskAttemptScheduler";
-import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";
+import {
+  COMPANY_PERMISSIONS,
+  FACTORY_PERMISSIONS,
+  requireWorkspaceAccess,
+  requireWorkspacePermission,
+} from "./lib/companyAccess";
 import { assertAuthorizedDeliveryRecord, canAccessDeliveryRecord, requireAuthorizedDeliveryScope } from "./lib/deliveryAuthorization";
 import { combineCodeScopePolicies, validateDispatchScope } from "./lib/softwareFactoryControlPlane";
 import {
@@ -2747,11 +2752,15 @@ export const setAuthorizedModelOverride = mutation({
     workOrderId: v.id("workOrders"),
     modelId: v.optional(v.string()),
     reason: v.optional(v.string()),
-    actorId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const workOrder = await ctx.db.get(args.workOrderId);
-    if (!workOrder) throw new Error("Work Order not found");
+    if (!workOrder?.projectId) throw new Error("Work Order is unavailable or unauthorized.");
+    const access = await requireWorkspacePermission(
+      ctx,
+      workOrder.projectId,
+      FACTORY_PERMISSIONS.APPROVE
+    );
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
     assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
     const runs = await ctx.db
@@ -2763,11 +2772,24 @@ export const setAuthorizedModelOverride = mutation({
     }
 
     if (!args.modelId) {
+      const previousModelId = workOrder.authorizedModelOverride;
       await ctx.db.patch(workOrder._id, {
         authorizedModelOverride: undefined,
         authorizedModelOverrideReason: undefined,
         authorizedModelOverrideUpdatedAt: Date.now(),
         updatedAt: Date.now(),
+      });
+      await ctx.db.insert("activities", {
+        tenantId: access.project.tenantId,
+        projectId: access.project._id,
+        actorType: "HUMAN",
+        actorId: access.actorId,
+        action: "WORK_ORDER_MODEL_OVERRIDE_CLEARED",
+        description: `Returned ${workOrder.title} to workspace model routing`,
+        targetType: "WORK_ORDER",
+        targetId: workOrder._id,
+        beforeState: previousModelId ? { modelId: previousModelId } : undefined,
+        afterState: { modelId: null },
       });
       return { cleared: true };
     }
@@ -2801,7 +2823,7 @@ export const setAuthorizedModelOverride = mutation({
       tenantId: workOrder.tenantId,
       projectId: workOrder.projectId,
       actorType: "HUMAN",
-      actorId: args.actorId ?? "operator",
+      actorId: access.actorId,
       action: "WORK_ORDER_MODEL_OVERRIDE_SET",
       description: `Set the next dispatch model for ${workOrder.title} to ${model.displayName}`,
       targetType: "WORK_ORDER",

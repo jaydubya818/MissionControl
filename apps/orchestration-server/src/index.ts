@@ -1213,15 +1213,10 @@ app.get("/local-inference/discover", async (c) => {
 });
 
 app.post("/local-inference/sync", async (c) => {
-  const providers = await discoverLocalInference();
-  const synced = await Promise.all(providers
-    .filter((provider) => provider.status === "HEALTHY")
-    .map((provider) => client.mutation(ConvexMutations.modelCatalog.syncLocalModels as any, {
-      provider: provider.provider,
-      models: provider.models,
-      actorId: "orchestration",
-    })));
-  return c.json({ providers, synced });
+  return c.json(
+    { error: "Local model sync requires a signed workspace-scoped service command." },
+    501
+  );
 });
 
 // Tier 2 context classification (LLM fallback when Tier 1 confidence is low)

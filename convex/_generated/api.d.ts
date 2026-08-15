@@ -181,6 +181,7 @@ import type * as memoryLifecycle from "../memoryLifecycle.js";
 import type * as messages from "../messages.js";
 import type * as metrics from "../metrics.js";
 import type * as migrations_backfillInstanceRefs from "../migrations/backfillInstanceRefs.js";
+import type * as migrations_cleanupRepositoryCodeScopeSchema from "../migrations/cleanupRepositoryCodeScopeSchema.js";
 import type * as mission from "../mission.js";
 import type * as missionChat from "../missionChat.js";
 import type * as missions from "../missions.js";
@@ -437,6 +438,7 @@ declare const fullApi: ApiFromModules<{
   messages: typeof messages;
   metrics: typeof metrics;
   "migrations/backfillInstanceRefs": typeof migrations_backfillInstanceRefs;
+  "migrations/cleanupRepositoryCodeScopeSchema": typeof migrations_cleanupRepositoryCodeScopeSchema;
   mission: typeof mission;
   missionChat: typeof missionChat;
   missions: typeof missions;
