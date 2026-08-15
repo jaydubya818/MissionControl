@@ -1,8 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
-import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { ClerkProvider, useAuth } from "@clerk/react";
+import {
+  ConvexProvider,
+  ConvexProviderWithAuth,
+  ConvexReactClient,
+} from "convex/react";
+import { ClerkProvider } from "@clerk/react";
 import { BrowserRouter } from "react-router-dom";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { SetupMessage } from "./SetupMessage";
@@ -12,6 +15,7 @@ import App from "./App";
 import { resolveAuthMode } from "./auth/authMode";
 import { AuthRuntimeProvider } from "./auth/AuthRuntimeContext";
 import { AuthConfigurationError, ClerkSessionBoundary } from "./auth/AuthStates";
+import { useNativeClerkConvexAuth } from "./auth/clerkConvexAuth";
 import "./index.css";
 
 const convexUrl = (import.meta.env.VITE_CONVEX_URL as string)?.trim() || "";
@@ -63,14 +67,14 @@ if (!rootEl) {
           <AuthConfigurationError message={auth.error ?? "Authentication is not configured."} />
         ) : auth.mode === "clerk" ? (
           <ClerkProvider publishableKey={clerkPublishableKey!} afterSignOutUrl="/">
-            <ConvexProviderWithClerk
-              client={new ConvexReactClient(convexUrl, { verbose: true })}
-              useAuth={useAuth}
+            <ConvexProviderWithAuth
+              client={new ConvexReactClient(convexUrl)}
+              useAuth={useNativeClerkConvexAuth}
             >
               <ClerkSessionBoundary>
                 <ProductApplication />
               </ClerkSessionBoundary>
-            </ConvexProviderWithClerk>
+            </ConvexProviderWithAuth>
           </ClerkProvider>
         ) : (
           <ConvexProvider client={new ConvexReactClient(convexUrl)}>

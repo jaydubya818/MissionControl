@@ -32,6 +32,19 @@ Convex authentication has finished unsuccessfully. It must mirror
 The failure surface will explain which boundary failed, offer a retry, and
 offer sign-out so an operator can recover without browser-storage surgery.
 
+## Confirmed Root Cause
+
+The staging trace showed that `ConvexProviderWithClerk` attempted its legacy
+`convex` JWT-template fallback while Clerk's native-integration audience claim
+was still hydrating. Clerk correctly has no legacy template, so both token
+fetches returned `null`; Convex never received or rejected a JWT.
+
+Mission Control requires the native Clerk/Convex integration. Replace the
+ambiguous provider adapter with `ConvexProviderWithAuth` and a bounded Clerk
+hook that always requests the default audience-qualified session token. Keep
+Clerk as the identity provider and Convex as the token validator; only token
+selection changes.
+
 ## Acceptance Criteria
 
 - [ ] A matching session audience probes the default Clerk session-token path.
@@ -41,6 +54,7 @@ offer sign-out so an operator can recover without browser-storage surgery.
 - [ ] Error codes are character- and length-limited before display.
 - [ ] The existing fail-closed behavior remains in place until Convex reports
   `isAuthenticated: true`.
+- [ ] The runtime never requests the legacy `convex` JWT template.
 - [ ] Unit tests, UI typecheck, build, and authenticated staging browser
   validation pass before production is considered.
 
@@ -53,4 +67,3 @@ useful as a safe operational failure state after the root cause is fixed.
 
 Rollback is a normal application release to the prior exact commit. No schema,
 data, Clerk configuration, or Convex environment changes are required.
-
