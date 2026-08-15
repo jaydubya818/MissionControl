@@ -52,6 +52,7 @@ export interface LoopWorkflowProjection {
   approvalId?: string;
   approvalEvidenceDigest?: string;
   cleanStop: boolean;
+  targetPhase?: "VERIFY" | "RECOMMEND" | "AWAITING_APPROVAL" | "READY_FOR_NEXT_CYCLE";
 }
 
 const LANES = [

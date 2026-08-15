@@ -1,0 +1,97 @@
+{
+  "status": "COMPLETED",
+  "evidenceStatus": "NEW_EVIDENCE",
+  "claims": [
+    {
+      "claimId": "claim-governance-provenance",
+      "statement": "Safety, security, transparency, and provenance practices are presented as supporting responsible AI governance.",
+      "confidence": "MEDIUM",
+      "supportingEvidence": [
+        {
+          "observationId": "mx7g3z43hm6akxxmvavk05aky18c946b",
+          "artifactId": "v970cnp16sa8xpf9x81gpsjzvn8c9k89",
+          "quote": "OpenAI shares how its safety, security, transparency, and provenance practices support responsible AI governance in Europe."
+        }
+      ]
+    },
+    {
+      "claimId": "claim-agentic-workflow-efficiency",
+      "statement": "GPT-5.6 is reported to improve efficiency across models, inference, and agentic workflows, increasing useful intelligence per dollar.",
+      "confidence": "MEDIUM",
+      "supportingEvidence": [
+        {
+          "observationId": "mx7m73c36nj8sj2cs7wayqs3sd8c8myh",
+          "artifactId": "v970cnp16sa8xpf9x81gpsjzvn8c9k89",
+          "quote": "GPT-5.6 improves AI efficiency across models, inference, and agentic workflows, helping deliver more useful intelligence per dollar."
+        }
+      ]
+    },
+    {
+      "claimId": "claim-evaluation-security-risk",
+      "statement": "A security incident occurred during AI model evaluation and produced lessons relevant to defenders.",
+      "confidence": "MEDIUM",
+      "supportingEvidence": [
+        {
+          "observationId": "mx7th1wzseascwbvgntnbh3xgh8c9kn3",
+          "artifactId": "v970cnp16sa8xpf9x81gpsjzvn8c9k89",
+          "quote": "OpenAI and Hugging Face share early findings from a security incident during AI model evaluation, highlighting advanced cyber capabilities and lessons for defenders."
+        }
+      ]
+    },
+    {
+      "claimId": "claim-reasoning-compaction-evaluation",
+      "statement": "Retaining reasoning and enabling compaction are reported to improve GPT-5.6 benchmark scores and efficiency on ARC-AGI-3.",
+      "confidence": "MEDIUM",
+      "supportingEvidence": [
+        {
+          "observationId": "mx7vv5vgxf4af6z1mvazxq1bq98c9qnt",
+          "artifactId": "v970cnp16sa8xpf9x81gpsjzvn8c9k89",
+          "quote": "How two API settings improved GPT-5.6 performance on ARC-AGI-3, boosting scores and efficiency by retaining reasoning and enabling compaction."
+        }
+      ]
+    },
+    {
+      "claimId": "claim-secure-incident-analysis",
+      "statement": "NTT DATA Group reports using ChatGPT Enterprise and Codex to reduce incident analysis to 30 minutes while scaling secure AI adoption.",
+      "confidence": "MEDIUM",
+      "supportingEvidence": [
+        {
+          "observationId": "mx7y6kspffzhe7ycsxab8xh56x8c95sv",
+          "artifactId": "v970cnp16sa8xpf9x81gpsjzvn8c9k89",
+          "quote": "NTT DATA Group uses ChatGPT Enterprise and Codex to help 9,000 employees automate work, cut incident analysis to 30 minutes, and scale secure AI adoption."
+        }
+      ]
+    },
+    {
+      "claimId": "claim-agent-misuse-threat",
+      "statement": "AI systems were used to support investment, romance, gambling, and impersonation scams, demonstrating an operator-safety threat relevant to agent controls.",
+      "confidence": "MEDIUM",
+      "supportingEvidence": [
+        {
+          "observationId": "mx7qb145n3rsqn2bne2q87m6158c8b4q",
+          "artifactId": "v970cnp16sa8xpf9x81gpsjzvn8c9k89",
+          "quote": "OpenAI disrupted a Cambodia-based scam operation using ChatGPT to support investment, romance, gambling, and impersonation schemes."
+        }
+      ]
+    },
+    {
+      "claimId": "claim-agent-platform-workflows",
+      "statement": "OpenAI Presence is presented as an enterprise agent platform for deploying voice and chat agents into customer and internal workflows.",
+      "confidence": "MEDIUM",
+      "supportingEvidence": [
+        {
+          "observationId": "mx7jhfdppzp88qmbgv8q6yrmzs8c8368",
+          "artifactId": "v970cnp16sa8xpf9x81gpsjzvn8c9k89",
+          "quote": "Introducing OpenAI Presence, a proven enterprise AI agent platform that helps organizations deploy trusted voice and chat agents for customer and internal workflows."
+        }
+      ]
+    }
+  ],
+  "conflicts": [],
+  "limitations": [
+    "The packet contains bounded excerpts rather than full source content.",
+    "All included observations come from one OpenAI source run and have trustClassification UNKNOWN.",
+    "Reported performance, efficiency, adoption, and security outcomes were not independently corroborated within the frozen packet.",
+    "The evidence supports claim extraction only; it does not establish applicability, implementation priority, or approval for Mission Control changes."
+  ]
+}

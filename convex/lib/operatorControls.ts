@@ -1,7 +1,12 @@
 import type { DatabaseReader } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 
-export type OperatorMode = "NORMAL" | "PAUSED" | "DRAINING" | "QUARANTINED";
+import {
+  DEFAULT_WORKFLOW_EXECUTION_POLICY,
+  type WorkflowExecutionPolicy,
+} from "./workflowExecutionControl";
+
+export type OperatorMode = "NORMAL" | "PAUSED" | "DRAINING" | "KILLED" | "QUARANTINED";
 
 export interface EffectiveOperatorControl {
   mode: OperatorMode;
@@ -9,6 +14,23 @@ export interface EffectiveOperatorControl {
   updatedAt?: number;
   updatedBy?: string;
   source: "PROJECT" | "GLOBAL" | "DEFAULT";
+  executionPolicy: WorkflowExecutionPolicy;
+}
+
+function executionPolicyFromControl(control?: Partial<WorkflowExecutionPolicy>) {
+  return {
+    continuousSchedulingEnabled:
+      control?.continuousSchedulingEnabled
+      ?? DEFAULT_WORKFLOW_EXECUTION_POLICY.continuousSchedulingEnabled,
+    dailyBudgetUsd: control?.dailyBudgetUsd ?? DEFAULT_WORKFLOW_EXECUTION_POLICY.dailyBudgetUsd,
+    perRunBudgetUsd: control?.perRunBudgetUsd ?? DEFAULT_WORKFLOW_EXECUTION_POLICY.perRunBudgetUsd,
+    maxConcurrentRuns:
+      control?.maxConcurrentRuns ?? DEFAULT_WORKFLOW_EXECUTION_POLICY.maxConcurrentRuns,
+    leaseDurationMs:
+      control?.leaseDurationMs ?? DEFAULT_WORKFLOW_EXECUTION_POLICY.leaseDurationMs,
+    staleRecoveryLimit:
+      control?.staleRecoveryLimit ?? DEFAULT_WORKFLOW_EXECUTION_POLICY.staleRecoveryLimit,
+  };
 }
 
 export async function getEffectiveOperatorControl(
@@ -29,6 +51,7 @@ export async function getEffectiveOperatorControl(
         updatedAt: projectControl.updatedAt,
         updatedBy: projectControl.updatedBy,
         source: "PROJECT",
+        executionPolicy: executionPolicyFromControl(projectControl),
       };
     }
   }
@@ -45,12 +68,14 @@ export async function getEffectiveOperatorControl(
       updatedAt: globalControl.updatedAt,
       updatedBy: globalControl.updatedBy,
       source: "GLOBAL",
+      executionPolicy: executionPolicyFromControl(globalControl),
     };
   }
 
   return {
     mode: "NORMAL",
     source: "DEFAULT",
+    executionPolicy: executionPolicyFromControl(),
   };
 }
 
@@ -99,6 +124,13 @@ export function evaluateOperatorGate(args: {
     return {
       decision: "ALLOW",
       reason: "System is DRAINING. Non-run operation allowed.",
+    };
+  }
+
+  if (mode === "KILLED") {
+    return {
+      decision: "DENY",
+      reason: `System is KILLED. ${operation} is blocked until an operator explicitly restores normal mode.`,
     };
   }
 

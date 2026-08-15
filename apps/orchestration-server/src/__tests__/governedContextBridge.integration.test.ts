@@ -54,6 +54,24 @@ describe.skipIf(process.env.RUN_GOVERNED_CONTEXT_BRIDGE_INTEGRATION !== "1")("go
     const convex = client as any;
     const { app } = await import("../index.js");
 
+    const project = await convex.query("projects:getBySlug", {
+      slug: "codex-queue-canary",
+    }) as any;
+    expect(project?._id).toBeTruthy();
+    const repositories = await convex.query("projects:listRepositories", {
+      projectId: project._id,
+    }) as any[];
+    const repository = repositories.find((candidate) =>
+      candidate.repositoryId && candidate.repository === "jaydubya818/MissionControl"
+    );
+    expect(repository?.repositoryId).toBeTruthy();
+    const activeFactory = await convex.query("factory/configuration:getActiveForRepository", {
+      projectId: project._id,
+      repositoryId: repository.repositoryId,
+    }) as any;
+    expect(activeFactory?.definition?.status).toBe("ACTIVE");
+    expect(activeFactory?.version?._id).toBeTruthy();
+
     const packageRow = await convex.query("context/packages:getBySlug", { slug: PACKAGE_SLUG }) as any;
     expect(packageRow?._id).toBeTruthy();
 
@@ -135,12 +153,13 @@ describe.skipIf(process.env.RUN_GOVERNED_CONTEXT_BRIDGE_INTEGRATION !== "1")("go
       });
 
       const workOrderResult = await convex.mutation("workOrders:create", {
+        projectId: project._id,
         idempotencyKey: `${FIXTURE_ID}:work-order`,
         title: "Pi · Governed context bridge fixture",
         desiredOutcome: "Exercise governed context dispatch through the orchestration bridge.",
         context: "Software Factory Research Lab integration fixture.",
         workflowId: WORKFLOW_ID,
-        repository: REPO_SLUG,
+        repository: repository.repository,
         riskLevel: "LOW",
         requestedBy: "Pi",
         assignedAgent: "Pi",
@@ -160,28 +179,29 @@ describe.skipIf(process.env.RUN_GOVERNED_CONTEXT_BRIDGE_INTEGRATION !== "1")("go
 
       const workOrderId = workOrderResult.workOrder._id;
 
-      const dispatchResponse = await app.request(`/workorders/${workOrderId}/dispatch`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          workflowId: WORKFLOW_ID,
-          actorType: "SYSTEM",
-          actorId: "pi-governed-context-bridge-e2e",
-          idempotencyKey: `${FIXTURE_ID}:dispatch`,
-          runtime: "Pi governed context integration test",
-          worktree: WORKTREE_PATH,
-          contextRepoSlug: REPO_SLUG,
-        }),
-      });
-      expect(dispatchResponse.status).toBe(200);
-      const dispatchBody = await dispatchResponse.json() as any;
-      expect(dispatchBody.success).toBe(true);
-      expect(dispatchBody.result?.run?._id).toBeTruthy();
-      expect(dispatchBody.contextActivation?.receiptId).toBeTruthy();
+      const dispatchIdempotencyKey = `${FIXTURE_ID}:dispatch`;
+      const dispatchResult = await convex.mutation("workOrders:dispatch", {
+        workOrderId,
+        workflowId: WORKFLOW_ID,
+        actorType: "HUMAN",
+        actorId: "pi-governed-context-bridge-e2e",
+        idempotencyKey: dispatchIdempotencyKey,
+        runtime: "Pi governed context integration test",
+        worktree: WORKTREE_PATH,
+      }) as any;
+      expect(dispatchResult.run?._id).toBeTruthy();
 
-      const workflowRunId = dispatchBody.result.run._id as string;
-      const activationReceiptId = dispatchBody.contextActivation.receiptId as string;
-      const activatedPackage = dispatchBody.contextActivation.packages.find(
+      const workflowRunId = dispatchResult.run._id as string;
+      const contextActivation = await convex.mutation("context/activation:activateForWorkflowRun", {
+        repoSlug: REPO_SLUG,
+        workflowRunId,
+        idempotencyKey: `${dispatchIdempotencyKey}:context-activation`,
+        actorId: "pi-governed-context-bridge-e2e",
+      }) as any;
+      expect(contextActivation.receiptId).toBeTruthy();
+
+      const activationReceiptId = contextActivation.receiptId as string;
+      const activatedPackage = contextActivation.packages.find(
         (pkg: any) => pkg.packageSlug === PACKAGE_SLUG
       );
 
@@ -200,6 +220,9 @@ describe.skipIf(process.env.RUN_GOVERNED_CONTEXT_BRIDGE_INTEGRATION !== "1")("go
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          projectId: project._id,
+          repositoryId: repository.repositoryId,
+          factoryDefinitionVersionId: activeFactory.version._id,
           workflowRunId,
           piSessionId: `${FIXTURE_ID}:pi-session`,
           markRunCompleted: true,
@@ -225,6 +248,9 @@ describe.skipIf(process.env.RUN_GOVERNED_CONTEXT_BRIDGE_INTEGRATION !== "1")("go
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          projectId: project._id,
+          repositoryId: repository.repositoryId,
+          factoryDefinitionVersionId: activeFactory.version._id,
           workflowRunId,
           piSessionId: `${FIXTURE_ID}:pi-session`,
           markRunCompleted: true,
@@ -240,8 +266,8 @@ describe.skipIf(process.env.RUN_GOVERNED_CONTEXT_BRIDGE_INTEGRATION !== "1")("go
           ],
         }),
       });
-      expect(positiveResponse.status).toBe(200);
       const positiveBody = await positiveResponse.json() as any;
+      expect(positiveResponse.status, JSON.stringify(positiveBody)).toBe(200);
       expect(positiveBody.success).toBe(true);
       expect(positiveBody.result).toMatchObject({
         ingested: true,

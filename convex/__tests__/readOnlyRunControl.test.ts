@@ -78,6 +78,8 @@ describe("read-only workflow operational controls", () => {
       .toMatchObject({ ok: false, reason: "queue-not-running", mode: "PAUSED" });
     expect(evaluateReadOnlyExecutionClaim({ ...claimInput, operatorMode: "DRAINING" }))
       .toMatchObject({ ok: false, reason: "queue-not-running", mode: "DRAINING" });
+    expect(evaluateReadOnlyExecutionClaim({ ...claimInput, operatorMode: "KILLED" }))
+      .toMatchObject({ ok: false, reason: "queue-not-running", mode: "KILLED" });
     expect(evaluateReadOnlyExecutionClaim({ ...claimInput, operatorMode: "QUARANTINED" }))
       .toMatchObject({ ok: false, reason: "queue-quarantined", mode: "QUARANTINED" });
   });

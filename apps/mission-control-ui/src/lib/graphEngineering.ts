@@ -88,3 +88,58 @@ export function graphDispatchState(args: {
   }
   return "UNAVAILABLE";
 }
+
+export type GraphDispatchTarget =
+  | {
+      kind: "CONTINUOUS_RESEARCH";
+      cycleId: string;
+    }
+  | {
+      kind: "LEGACY";
+      workOrderId: string;
+      idempotencyKey: string;
+    };
+
+export function buildGraphDispatchTarget(args: {
+  cycleId: string;
+  workOrderId: string;
+  workOrderRevision: number;
+  researchSourceRunIds?: readonly string[];
+}): GraphDispatchTarget {
+  if ((args.researchSourceRunIds ?? []).length > 0) {
+    return {
+      kind: "CONTINUOUS_RESEARCH",
+      cycleId: args.cycleId,
+    };
+  }
+
+  return {
+    kind: "LEGACY",
+    workOrderId: args.workOrderId,
+    idempotencyKey: `graph-cycle:${args.cycleId}:dispatch:${args.workOrderRevision}`,
+  };
+}
+
+export function graphDispatchPresentation(args: {
+  evidenceBound: boolean;
+  observationCount: number;
+}) {
+  if (!args.evidenceBound) {
+    return {
+      title: "Multi-agent execution graph",
+      buttonLabel: "Dispatch graph",
+      retryButtonLabel: "Retry graph",
+      readyDetail: "Review the WorkOrder, then explicitly start the bounded read-only research graph.",
+      boundaryDetail: "Dispatch starts research and verification Tasks only. Repository changes still require the cycle's explicit approval gate.",
+    };
+  }
+
+  const observationLabel = `${args.observationCount} frozen observation${args.observationCount === 1 ? "" : "s"}`;
+  return {
+    title: "Frozen-evidence claim graph",
+    buttonLabel: "Dispatch evidence graph",
+    retryButtonLabel: "Replace and retry safely",
+    readyDetail: `Dispatch creates a read-only claim-extraction Task over ${observationLabel}, followed by a separate Evidence Reviewer Task.`,
+    boundaryDetail: "Only the exact frozen observation IDs and their cited artifacts are provided. Web discovery, recommendations, messaging, and repository changes are excluded.",
+  };
+}

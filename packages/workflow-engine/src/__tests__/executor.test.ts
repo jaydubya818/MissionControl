@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   WorkflowExecutor,
   compileAuthorizedTaskInput,
+  effectiveStepTimeoutMs,
   legacyExecutorOwnsRun,
   validateRunTaskAuthority,
   workflowDefinitionForRun,
@@ -72,6 +73,10 @@ const gateRun = {
 };
 
 describe("WorkflowExecutor reliability", () => {
+  it("enforces the lower workflow deadline or operational timeout ceiling", () => {
+    expect(effectiveStepTimeoutMs(20, 60_000)).toBe(60_000);
+    expect(effectiveStepTimeoutMs(1, 120_000)).toBe(60_000);
+  });
   it("does not race the leased Factory attempt worker", () => {
     expect(legacyExecutorOwnsRun({})).toBe(true);
     expect(legacyExecutorOwnsRun({ factoryDefinitionVersionId: "factory-version-1" })).toBe(false);
@@ -527,6 +532,23 @@ describe("WorkflowExecutor reliability", () => {
 
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0][1]).toEqual({ workflowRunId: "workflow-run-id" });
+    expect(mutation).toHaveBeenCalledTimes(2);
+  });
+
+  it("projects a completed continuous-research run through the same governed handoff", async () => {
+    const mutation = vi.fn().mockResolvedValue({ success: true });
+    const action = vi.fn().mockResolvedValue({ projected: true });
+    const executor = executorWithClient({ mutation, action });
+
+    await executor.completeRun({
+      _id: "continuous-run-id",
+      runId: "continuous-run-123",
+      projectId: "project-1",
+      workflowId: "continuous-research",
+    });
+
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(action.mock.calls[0][1]).toEqual({ workflowRunId: "continuous-run-id" });
     expect(mutation).toHaveBeenCalledTimes(2);
   });
 

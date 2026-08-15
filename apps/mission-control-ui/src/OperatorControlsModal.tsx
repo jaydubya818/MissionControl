@@ -3,10 +3,13 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
-const MODES: Array<{ id: "NORMAL" | "PAUSED" | "DRAINING" | "QUARANTINED"; label: string; detail: string; color: string }> = [
+type OperatorMode = "NORMAL" | "PAUSED" | "DRAINING" | "KILLED" | "QUARANTINED";
+
+const MODES: Array<{ id: OperatorMode; label: string; detail: string; color: string }> = [
   { id: "NORMAL", label: "Normal", detail: "All automation and transitions allowed", color: "#16a34a" },
   { id: "PAUSED", label: "Paused", detail: "Blocks non-human execution immediately", color: "#f59e0b" },
   { id: "DRAINING", label: "Draining", detail: "Blocks new runs while allowing safe completion", color: "#0284c7" },
+  { id: "KILLED", label: "Killed", detail: "Cancels queued work and signals active workflow leases to stop", color: "#991b1b" },
   { id: "QUARANTINED", label: "Quarantined", detail: "Hard block on autonomous execution", color: "#dc2626" },
 ];
 
@@ -27,26 +30,48 @@ export function OperatorControlsModal({
   );
   const setMode = useMutation(api.operatorControls.setMode);
 
-  const [mode, setModeState] = useState<"NORMAL" | "PAUSED" | "DRAINING" | "QUARANTINED">("NORMAL");
+  const [mode, setModeState] = useState<OperatorMode>("NORMAL");
   const [reason, setReason] = useState("");
+  const [dailyBudgetUsd, setDailyBudgetUsd] = useState("25");
+  const [perRunBudgetUsd, setPerRunBudgetUsd] = useState("5");
+  const [maxConcurrentRuns, setMaxConcurrentRuns] = useState("1");
+  const [leaseDurationMs, setLeaseDurationMs] = useState("60000");
+  const [staleRecoveryLimit, setStaleRecoveryLimit] = useState("1");
+  const [killConfirmed, setKillConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (current?.mode) {
       setModeState(current.mode);
+      setDailyBudgetUsd(String(current.executionPolicy.dailyBudgetUsd));
+      setPerRunBudgetUsd(String(current.executionPolicy.perRunBudgetUsd));
+      setMaxConcurrentRuns(String(current.executionPolicy.maxConcurrentRuns));
+      setLeaseDurationMs(String(current.executionPolicy.leaseDurationMs));
+      setStaleRecoveryLimit(String(current.executionPolicy.staleRecoveryLimit));
     }
-  }, [current?.mode]);
+  }, [current]);
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
+      if (mode !== "NORMAL" && !reason.trim()) {
+        throw new Error("A reason is required for pause, drain, kill, or quarantine.");
+      }
+      if (mode === "KILLED" && !killConfirmed) {
+        throw new Error("Confirm the workspace kill before applying it.");
+      }
       await setMode({
         projectId: projectId ?? undefined,
         mode,
         reason: reason.trim() || undefined,
         userId: "operator",
+        dailyBudgetUsd: Number(dailyBudgetUsd),
+        perRunBudgetUsd: Number(perRunBudgetUsd),
+        maxConcurrentRuns: Number(maxConcurrentRuns),
+        leaseDurationMs: Number(leaseDurationMs),
+        staleRecoveryLimit: Number(staleRecoveryLimit),
       });
       onClose();
     } catch (err) {
@@ -60,8 +85,12 @@ export function OperatorControlsModal({
     <Modal onClose={onClose}>
       <h2 style={{ margin: "0 0 12px", fontSize: "1.2rem", fontWeight: 700 }}>Operator Controls</h2>
       <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: "0.85rem" }}>
-        Control execution posture for this project. Use quarantined mode for incident containment.
+        Control workflow execution posture for this workspace. Continuous scheduling is locked off until the recovery proof is approved.
       </p>
+
+      <div style={{ marginBottom: 12, padding: "9px 10px", border: "1px solid var(--border)", borderRadius: 7, color: "var(--muted-foreground)", fontSize: "0.8rem" }}>
+        Continuous scheduling: <strong style={{ color: "#f59e0b" }}>DISABLED</strong>
+      </div>
 
       <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
         {MODES.map((entry) => {
@@ -90,6 +119,28 @@ export function OperatorControlsModal({
         })}
       </div>
 
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginBottom: 12 }}>
+        {[
+          ["Daily budget (USD)", dailyBudgetUsd, setDailyBudgetUsd, "0.01"],
+          ["Per-run budget (USD)", perRunBudgetUsd, setPerRunBudgetUsd, "0.01"],
+          ["Concurrent runs", maxConcurrentRuns, setMaxConcurrentRuns, "1"],
+          ["Lease duration (ms)", leaseDurationMs, setLeaseDurationMs, "1000"],
+          ["Stale recoveries", staleRecoveryLimit, setStaleRecoveryLimit, "1"],
+        ].map(([label, value, setter, step]) => (
+          <label key={label as string} style={{ display: "grid", gap: 4, color: "var(--muted-foreground)", fontSize: "0.75rem" }}>
+            {label as string}
+            <input
+              type="number"
+              min="0"
+              step={step as string}
+              value={value as string}
+              onChange={(event) => (setter as (next: string) => void)(event.target.value)}
+              style={{ padding: "7px 8px", background: "var(--background)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--foreground)" }}
+            />
+          </label>
+        ))}
+      </div>
+
       <textarea
         value={reason}
         onChange={(event) => setReason(event.target.value)}
@@ -106,6 +157,17 @@ export function OperatorControlsModal({
           resize: "vertical",
         }}
       />
+
+      {mode === "KILLED" && (
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 10, color: "#fecaca", fontSize: "0.8rem" }}>
+          <input
+            type="checkbox"
+            checked={killConfirmed}
+            onChange={(event) => setKillConfirmed(event.target.checked)}
+          />
+          I understand this cancels queued workflow runs and signals active leases to stop.
+        </label>
+      )}
 
       {error && (
         <div

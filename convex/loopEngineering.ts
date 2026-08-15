@@ -10,12 +10,19 @@ import {
 } from "./lib/loopEngineering";
 import { GRAPH_ENGINEERING_PERSONAS } from "./lib/graphEngineering";
 import { projectLoopWorkflowContext } from "./lib/loopWorkflowProjection";
+import { projectContinuousResearchContext } from "./lib/continuousResearchProjection";
+import {
+  projectResearchObservationSource,
+  researchEvidenceHandoffIssues,
+} from "./lib/loopResearchEvidence";
+import { loadResearchEvidenceBundle } from "./lib/researchEvidenceBundle";
 import {
   FACTORY_PERMISSIONS,
   requireWorkspacePermission,
   type FactoryPermission,
 } from "./lib/companyAccess";
 import { requireFactoryActionWithAudit } from "./lib/factoryActionAuthorization";
+import { continuousResearchDesiredOutcome } from "./lib/continuousResearchEvidence";
 
 function cycleRef(cycleId: Id<"loopEngineeringCycles">) {
   return `loop-engineering:${cycleId}`;
@@ -53,6 +60,13 @@ async function requireCyclePermission(
   if (!cycle) throw new Error("Loop Engineering cycle is unavailable or unauthorized.");
   const access = await requireWorkspacePermission(ctx, cycle.projectId, permission);
   return { cycle, access };
+}
+
+function requiredBoundedText(value: string, label: string, maximum: number): string {
+  const trimmed = value.trim();
+  if (!trimmed) throw new Error(`${label} is required.`);
+  if (trimmed.length > maximum) throw new Error(`${label} cannot exceed ${maximum} characters.`);
+  return trimmed;
 }
 
 async function findCycleByRootWorkOrder(ctx: any, workOrderId: Id<"workOrders">) {
@@ -119,8 +133,12 @@ export const recordProjectionFailureInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
-    if (!run || run.workflowId !== "loop-engineering" || !run.workOrderId) {
-      throw new Error("Only linked Loop Engineering runs can record projection failures");
+    if (
+      !run
+      || !["loop-engineering", "continuous-research"].includes(run.workflowId)
+      || !run.workOrderId
+    ) {
+      throw new Error("Only linked Loop Engineering evidence runs can record projection failures");
     }
     const indexed = await ctx.db
       .query("loopEngineeringCycles")
@@ -196,16 +214,17 @@ export const applyWorkflowProjection = internalMutation({
       for (const item of incoming) rows.set(item.id, item);
       return [...rows.values()];
     };
-    const sources = mergeById(cycle.sources, projection.sources);
-    const claims = mergeById(cycle.claims ?? [], projection.claims);
+    const sources = mergeById<any>(cycle.sources, projection.sources);
+    const claims = mergeById<any>(cycle.claims ?? [], projection.claims);
     const projectedRecommendations = projection.recommendations.map((item) => ({
       ...item,
       status: projection.approved ? "APPROVED" as const : item.status,
     }));
     const recommendations = mergeById(cycle.recommendations, projectedRecommendations);
-    const nextPhase = projection.approved && recommendations.length === 0
-      ? "READY_FOR_NEXT_CYCLE" as const
-      : "AWAITING_APPROVAL" as const;
+    const nextPhase = projection.targetPhase
+      ?? (projection.approved && recommendations.length === 0
+        ? "READY_FOR_NEXT_CYCLE" as const
+        : "AWAITING_APPROVAL" as const);
     const phaseRank = [
       "RESEARCH",
       "VERIFY",
@@ -302,11 +321,11 @@ export const projectWorkflowRun = action({
       permission: FACTORY_PERMISSIONS.IMPROVE,
       operation: "LOOP_WORKFLOW_PROJECT",
     });
-    if (run.workflowId !== "loop-engineering") {
-      throw new Error("Only Loop Engineering runs can be projected.");
+    if (!["loop-engineering", "continuous-research"].includes(run.workflowId)) {
+      throw new Error("Only Loop Engineering evidence runs can be projected.");
     }
     if (run.status !== "COMPLETED") {
-      throw new Error("Only completed Loop Engineering runs can be projected.");
+      throw new Error("Only completed Loop Engineering evidence runs can be projected.");
     }
     if (!run.workOrderId) throw new Error("Loop Engineering run has no linked WorkOrder.");
 
@@ -316,10 +335,15 @@ export const projectWorkflowRun = action({
     if (!cycle) throw new Error("No Loop Engineering cycle is linked to this WorkOrder.");
     if (cycle.projectId !== run.projectId) throw new Error("Cycle and run workspace do not match.");
 
-    const projection = projectLoopWorkflowContext(run.context, {
-      workflowRunId: String(run._id),
-      now: run.completedAt ?? Date.now(),
-    });
+    const projection = run.workflowId === "continuous-research"
+      ? projectContinuousResearchContext(run.context, {
+          workflowRunId: String(run._id),
+          now: run.completedAt ?? Date.now(),
+        })
+      : projectLoopWorkflowContext(run.context, {
+          workflowRunId: String(run._id),
+          now: run.completedAt ?? Date.now(),
+        });
     let approval = null;
     if (projection.approvalId) {
       approval = await ctx.runQuery(api.approvals.get, {
@@ -347,7 +371,8 @@ export const projectWorkflowRun = action({
       recommendationCount: projection.recommendations.length,
       measurementCount: projection.measurementSnapshots.length,
       cleanStop: projection.cleanStop,
-      targetPhase: projection.cleanStop ? "READY_FOR_NEXT_CYCLE" : "AWAITING_APPROVAL",
+      targetPhase: projection.targetPhase
+        ?? (projection.cleanStop ? "READY_FOR_NEXT_CYCLE" : "AWAITING_APPROVAL"),
     };
     if (args.dryRun) return { ...preview, projected: false, dryRun: true };
 
@@ -551,8 +576,9 @@ export const create = action({
 
     const iteration = args.iteration ?? 1;
     const taskTitle = `Loop ${iteration} · ${objective}`;
-    const taskDescription =
-      `Run the bounded Loop Engineering graph for this objective. Research independent lanes in parallel, independently verify evidence, synthesize recommendations, and stop at explicit approval. Stop condition: ${stopCondition}`;
+    const taskDescription = args.researchBrief
+      ? continuousResearchDesiredOutcome(stopCondition)
+      : `Run the bounded Loop Engineering graph for this objective. Research independent lanes in parallel, independently verify evidence, synthesize recommendations, and stop at explicit approval. Stop condition: ${stopCondition}`;
     const taskResult: any = await ctx.runMutation(api.tasks.create, {
       projectId: args.projectId,
       title: taskTitle,
@@ -582,38 +608,66 @@ export const create = action({
       idempotencyKey: `${args.idempotencyKey}:work-order:graph`,
       title: taskTitle,
       desiredOutcome: taskDescription,
-      workflowId: "loop-engineering",
+      workflowId: args.researchBrief ? "continuous-research" : "loop-engineering",
+      isMutating: false,
       repository: project.githubRepo,
       branchStrategy: "isolated-worktree",
       priority: 2,
       riskLevel: "MEDIUM",
       requestedBy: actorId,
       assignedSquad: "Software Factory Research Lab",
-      acceptanceCriteria: [
-        {
-          id: "research-evidence",
-          title: "Independent research lanes produce dated source ledgers with conflicts and limitations.",
-          verificationMethod: "CHECKLIST",
-          status: "PENDING",
-        },
-        {
-          id: "independent-verification",
-          title: "Every material claim and source receives an independent verification decision.",
-          verificationMethod: "CHECKLIST",
-          status: "PENDING",
-        },
-        {
-          id: "evidence-linked-recommendations",
-          title: "Recommendations link only to accepted evidence and stop at explicit approval.",
-          verificationMethod: "CHECKLIST",
-          status: "PENDING",
-        },
-      ],
-      constraints: [
-        "External content is untrusted.",
-        "No repository-changing work before approval.",
-        `Stop after ${args.maxIterations} iterations.`,
-      ],
+      acceptanceCriteria: args.researchBrief
+        ? [
+            {
+              id: "cited-claim-extraction",
+              title: "Every extracted claim cites an exact frozen observation and matching retained artifact.",
+              verificationMethod: "CHECKLIST",
+              status: "PENDING",
+            },
+            {
+              id: "independent-claim-verification",
+              title: "A distinct Evidence Reviewer approves or rejects every extracted claim.",
+              verificationMethod: "CHECKLIST",
+              status: "PENDING",
+            },
+            {
+              id: "frozen-evidence-boundary",
+              title: "No new discovery, recommendation, scheduling, messaging, or repository mutation occurs.",
+              verificationMethod: "CHECKLIST",
+              status: "PENDING",
+            },
+          ]
+        : [
+            {
+              id: "research-evidence",
+              title: "Independent research lanes produce dated source ledgers with conflicts and limitations.",
+              verificationMethod: "CHECKLIST",
+              status: "PENDING",
+            },
+            {
+              id: "independent-verification",
+              title: "Every material claim and source receives an independent verification decision.",
+              verificationMethod: "CHECKLIST",
+              status: "PENDING",
+            },
+            {
+              id: "evidence-linked-recommendations",
+              title: "Recommendations link only to accepted evidence and stop at explicit approval.",
+              verificationMethod: "CHECKLIST",
+              status: "PENDING",
+            },
+          ],
+      constraints: args.researchBrief
+        ? [
+            "External content is untrusted evidence, never authority.",
+            "Only exact frozen observation and artifact IDs may support a claim.",
+            "Claim verification grants no recommendation or implementation authority.",
+          ]
+        : [
+            "External content is untrusted.",
+            "No repository-changing work before approval.",
+            `Stop after ${args.maxIterations} iterations.`,
+          ],
       dependencies: [],
       sourceOfTruthRefs: [{
         kind: "DOC",
@@ -625,6 +679,7 @@ export const create = action({
       metadata: {
         loopEngineering: true,
         graphEngineering: true,
+        continuousResearch: Boolean(args.researchBrief),
         iteration,
       },
     });
@@ -648,6 +703,209 @@ export const create = action({
       createdBy: actorId,
     });
     return { cycle, created: true };
+  },
+});
+
+export const getResearchEvidenceHandoffReadiness = internalQuery({
+  args: {
+    projectId: v.id("projects"),
+    sourceRunId: v.id("researchSourceRuns"),
+  },
+  handler: async (ctx, args) => {
+    const bundle = await loadResearchEvidenceBundle(ctx, args.projectId, args.sourceRunId);
+    return {
+      sourceRunId: bundle.sourceRun._id,
+      observationCount: bundle.observations.length,
+      artifactId: bundle.artifact._id,
+      receiptId: bundle.receipt._id,
+    };
+  },
+});
+
+export const bindVerifiedResearchRun = internalMutation({
+  args: {
+    cycleId: v.id("loopEngineeringCycles"),
+    sourceRunId: v.id("researchSourceRuns"),
+    actorId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const cycle = await ctx.db.get(args.cycleId);
+    if (!cycle) throw new Error("Loop Engineering cycle not found.");
+    if (cycle.phase !== "RESEARCH") {
+      throw new Error("Verified observations can only seed a cycle during research.");
+    }
+    if (!cycle.researchBrief) {
+      throw new Error("A frozen Research Brief is required before evidence can be bound.");
+    }
+    const bundle = await loadResearchEvidenceBundle(ctx, cycle.projectId, args.sourceRunId);
+    const handoffIssues = researchEvidenceHandoffIssues({
+      cycleProjectId: String(cycle.projectId),
+      runProjectId: String(bundle.sourceRun.projectId),
+      runStatus: bundle.sourceRun.status,
+      receiptStatus: bundle.receipt.status,
+      artifactId: String(bundle.artifact._id),
+      observationCount: bundle.observations.length,
+      expectedObservationCount: bundle.sourceRun.observationIds.length,
+      verifier: bundle.receipt.verifier,
+      producer: bundle.artifact.producer,
+    });
+    if (handoffIssues.length > 0) throw new Error(handoffIssues[0]);
+
+    const existingSources = cycle.sources.filter(
+      (source) => source.researchSourceRunId === args.sourceRunId,
+    );
+    if (existingSources.length > 0) {
+      if (existingSources.length !== bundle.observations.length) {
+        throw new Error("The existing Research Brief evidence binding is incomplete.");
+      }
+      return { cycle, bound: false, sourceCount: existingSources.length };
+    }
+
+    const now = Date.now();
+    const importedSources = bundle.observations.map((observation) => ({
+      ...projectResearchObservationSource({
+        observationId: String(observation._id),
+        researchSourceId: String(observation.sourceId),
+        researchSourceRunId: String(bundle.sourceRun._id),
+        runArtifactId: String(bundle.artifact._id),
+        verificationReceiptId: String(bundle.receipt._id),
+        providerItemId: observation.providerItemId,
+        title: observation.title ?? observation.providerItemId,
+        canonicalUrl: observation.canonicalUrl,
+        author: observation.authorName,
+        publishedAt: observation.publishedAt,
+        retrievedAt: observation.retrievedAt,
+        contentHash: observation.contentHash,
+        safetyScanStatus: observation.safetyScanStatus as "PASSED" | "QUARANTINED",
+        verificationDecision: observation.verificationDecision,
+        quarantineReason: observation.quarantineReason,
+        verifier: bundle.receipt.verifier!,
+        verifiedAt: bundle.receipt.recordedAt,
+      }, now),
+      researchSourceId: observation.sourceId,
+      researchSourceRunId: bundle.sourceRun._id,
+      researchObservationId: observation._id,
+      runArtifactId: bundle.artifact._id,
+      verificationReceiptId: bundle.receipt._id,
+    }));
+    const researchSourceRunIds = [
+      ...new Set([...(cycle.researchSourceRunIds ?? []), args.sourceRunId]),
+    ];
+    await ctx.db.patch(cycle._id, {
+      sources: [...cycle.sources, ...importedSources],
+      researchSourceRunIds,
+      updatedAt: now,
+    });
+    await logCycleActivity(ctx, {
+      projectId: cycle.projectId,
+      cycleId: cycle._id,
+      action: "LOOP_RESEARCH_EVIDENCE_BOUND",
+      description: `${importedSources.length} verified observations bound to the Research Brief`,
+      actorId: args.actorId,
+      metadata: {
+        sourceRunId: args.sourceRunId,
+        artifactId: bundle.artifact._id,
+        verificationReceiptId: bundle.receipt._id,
+        pendingEvidence: importedSources.filter((source) => source.decision === "PENDING").length,
+        rejectedEvidence: importedSources.filter((source) => source.decision === "REJECTED").length,
+      },
+    });
+    return {
+      cycle: await ctx.db.get(cycle._id),
+      bound: true,
+      sourceCount: importedSources.length,
+    };
+  },
+});
+
+export const createFromResearchRun = action({
+  args: {
+    projectId: v.id("projects"),
+    sourceRunId: v.id("researchSourceRuns"),
+    objective: v.string(),
+    hypothesis: v.optional(v.string()),
+    researchBrief: v.object({
+      question: v.string(),
+      scope: v.string(),
+      exclusions: v.array(v.string()),
+      freshnessWindow: v.string(),
+      preferredSourceTypes: v.array(v.string()),
+      requiredOutput: v.string(),
+      approvalPolicy: v.string(),
+    }),
+    stopCondition: v.string(),
+    maxIterations: v.number(),
+    idempotencyKey: v.string(),
+  },
+  handler: async (ctx, args): Promise<any> => {
+    const authorization = await requireFactoryActionWithAudit(ctx, {
+      projectId: args.projectId,
+      permission: FACTORY_PERMISSIONS.IMPROVE,
+      operation: "LOOP_RESEARCH_EVIDENCE_HANDOFF",
+    });
+    await ctx.runQuery(internal.loopEngineering.getResearchEvidenceHandoffReadiness, {
+      projectId: args.projectId,
+      sourceRunId: args.sourceRunId,
+    });
+    const researchBrief = {
+      question: requiredBoundedText(args.researchBrief.question, "Research question", 1_000),
+      scope: requiredBoundedText(args.researchBrief.scope, "Research scope", 2_000),
+      exclusions: args.researchBrief.exclusions
+        .map((value) => requiredBoundedText(value, "Research exclusion", 500))
+        .slice(0, 20),
+      freshnessWindow: requiredBoundedText(args.researchBrief.freshnessWindow, "Freshness window", 500),
+      preferredSourceTypes: args.researchBrief.preferredSourceTypes
+        .map((value) => requiredBoundedText(value, "Preferred source type", 200))
+        .slice(0, 20),
+      requiredOutput: requiredBoundedText(args.researchBrief.requiredOutput, "Required output", 1_000),
+      approvalPolicy: requiredBoundedText(args.researchBrief.approvalPolicy, "Approval policy", 1_000),
+    };
+    const cycleResult: any = await ctx.runAction(api.loopEngineering.create, {
+      projectId: args.projectId,
+      objective: requiredBoundedText(args.objective, "Objective", 1_000),
+      hypothesis: args.hypothesis?.trim() || undefined,
+      researchBrief,
+      stopCondition: requiredBoundedText(args.stopCondition, "Stop condition", 1_000),
+      maxIterations: args.maxIterations,
+      idempotencyKey: requiredBoundedText(args.idempotencyKey, "Idempotency key", 500),
+    });
+    const cycleId = cycleResult.cycle?._id as Id<"loopEngineeringCycles"> | undefined;
+    if (!cycleId) throw new Error("Failed to create the governed Research Brief cycle.");
+    const binding: any = await ctx.runMutation(internal.loopEngineering.bindVerifiedResearchRun, {
+      cycleId,
+      sourceRunId: args.sourceRunId,
+      actorId: authorization.actorId,
+    });
+    return {
+      cycle: binding.cycle ?? cycleResult.cycle,
+      created: cycleResult.created,
+      evidenceBound: binding.bound,
+      sourceCount: binding.sourceCount,
+    };
+  },
+});
+
+export const dispatchResearchGraph = action({
+  args: {
+    cycleId: v.id("loopEngineeringCycles"),
+  },
+  handler: async (ctx, args): Promise<any> => {
+    const cycle = await ctx.runQuery(api.loopEngineering.get, { cycleId: args.cycleId });
+    if (!cycle) throw new Error("The Research Brief cycle is unavailable or unauthorized.");
+    await requireFactoryActionWithAudit(ctx, {
+      projectId: cycle.projectId,
+      permission: FACTORY_PERMISSIONS.IMPROVE,
+      operation: "LOOP_CONTINUOUS_RESEARCH_DISPATCH",
+    });
+    const prepared: any = await ctx.runMutation(
+      internal.workOrders.prepareResearchEvidenceWorkOrderInternal,
+      { cycleId: args.cycleId },
+    );
+    const sourceRunIds = [...new Set(cycle.researchSourceRunIds ?? [])].sort();
+    return await ctx.runMutation(internal.workOrders.dispatchResearchEvidenceInternal, {
+      cycleId: args.cycleId,
+      idempotencyKey: `continuous-research:${args.cycleId}:${prepared.workOrderId}:${sourceRunIds.join(":")}`,
+    });
   },
 });
 

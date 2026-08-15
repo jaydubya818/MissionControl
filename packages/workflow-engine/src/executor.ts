@@ -25,6 +25,9 @@ export interface WorkflowExecutorConfig {
   serviceAuthToken?: string;
   pollIntervalMs?: number;
   stepTimeoutMs?: number;
+  ownerId?: string;
+  dispatchMode?: "MANUAL" | "SCHEDULED";
+  estimatedCostUsd?: number;
 }
 
 export interface StepExecutionResult {
@@ -42,6 +45,20 @@ export async function workflowEvidenceDigest(input: string): Promise<string> {
     byte.toString(16).padStart(2, "0")
   ).join("");
   return `sha256:${hex}`;
+}
+
+export function effectiveStepTimeoutMs(
+  timeoutMinutes: number,
+  operationalCeilingMs: number,
+) {
+  const workflowTimeoutMs = timeoutMinutes * 60 * 1_000;
+  if (!Number.isFinite(workflowTimeoutMs) || workflowTimeoutMs <= 0) {
+    throw new Error("Workflow step timeout must be positive.");
+  }
+  if (!Number.isFinite(operationalCeilingMs) || operationalCeilingMs <= 0) {
+    throw new Error("Operational timeout ceiling must be positive.");
+  }
+  return Math.min(workflowTimeoutMs, operationalCeilingMs);
 }
 
 export function workflowDefinitionForRun(
@@ -132,6 +149,10 @@ export class WorkflowExecutor {
   private client: ConvexHttpClient;
   private pollIntervalMs: number;
   private stepTimeoutMs: number;
+  private ownerId: string;
+  private dispatchMode: "MANUAL" | "SCHEDULED";
+  private estimatedCostUsd: number;
+  private leases = new Map<string, string>();
   private running = false;
 
   constructor(config: WorkflowExecutorConfig) {
@@ -141,6 +162,9 @@ export class WorkflowExecutor {
     }
     this.pollIntervalMs = config.pollIntervalMs ?? 5000;
     this.stepTimeoutMs = config.stepTimeoutMs ?? 60000;
+    this.ownerId = config.ownerId?.trim() || `workflow-executor:${globalThis.crypto.randomUUID()}`;
+    this.dispatchMode = config.dispatchMode ?? "MANUAL";
+    this.estimatedCostUsd = config.estimatedCostUsd ?? 1;
   }
 
   async start(): Promise<void> {
@@ -164,25 +188,97 @@ export class WorkflowExecutor {
 
   /** Exposed for deterministic integration tests and one-shot runtime ticks. */
   async tick(): Promise<void> {
-    const pendingRuns = await this.client.query(api.workflowRuns.list, {
-      status: "PENDING",
-      limit: 10,
-    });
-    for (const run of pendingRuns) {
-      if (!legacyExecutorOwnsRun(run)) continue;
-      await this.client.mutation(api.workflowRuns.updateStatus, {
-        runId: run.runId,
-        status: "RUNNING",
-      });
+    for (const [runId, leaseId] of [...this.leases.entries()]) {
+      try {
+        const heartbeat = await this.client.mutation(api.workflowRuns.heartbeatExecution, {
+          runId,
+          leaseId,
+          ownerId: this.ownerId,
+        });
+        if (["PAUSE", "BUDGET_STOP", "QUARANTINE"].includes(heartbeat.directive)) {
+          await this.client.mutation(api.workflowRuns.releaseExecution, {
+            runId,
+            leaseId,
+            ownerId: this.ownerId,
+            disposition: "PAUSED",
+            reason: `Executor stopped by ${heartbeat.directive}.`,
+          });
+          this.leases.delete(runId);
+          continue;
+        }
+        if (heartbeat.directive === "KILL") {
+          const run = await this.client.query(api.workflowRuns.get, { runId });
+          if (run) await this.cancelRunningTasks(run);
+          await this.client.mutation(api.workflowRuns.releaseExecution, {
+            runId,
+            leaseId,
+            ownerId: this.ownerId,
+            disposition: "CANCELED",
+            reason: "Workspace execution was killed by an operator.",
+          });
+          this.leases.delete(runId);
+          continue;
+        }
+        const run = await this.client.query(api.workflowRuns.get, { runId });
+        if (!run || !["PENDING", "RUNNING"].includes(run.status)) {
+          this.leases.delete(runId);
+          continue;
+        }
+        await this.processRun(run);
+        const current = await this.client.query(api.workflowRuns.get, { runId });
+        if (!current?.lease || ["COMPLETED", "FAILED", "CANCELED", "PAUSED"].includes(current.status)) {
+          this.leases.delete(runId);
+        }
+      } catch (error) {
+        this.leases.delete(runId);
+        console.error(`[WorkflowExecutor] Lease loop failed for ${runId}:`, error);
+      }
     }
 
-    const runningRuns = await this.client.query(api.workflowRuns.list, {
-      status: "RUNNING",
-      limit: 10,
-    });
-    for (const run of runningRuns) {
-      if (!legacyExecutorOwnsRun(run)) continue;
-      await this.processRun(run);
+    const candidateRuns: any[] = [];
+    for (const status of ["PENDING", "RUNNING", "PAUSED"] as const) {
+      const runs = await this.client.query(api.workflowRuns.list, { status, limit: 10 });
+      candidateRuns.push(...runs);
+    }
+    for (const run of candidateRuns) {
+      if (!legacyExecutorOwnsRun(run) || this.leases.has(run.runId)) continue;
+      const leaseId = `workflow-lease:${run.runId}:${globalThis.crypto.randomUUID()}`;
+      const claim = await this.client.mutation(api.workflowRuns.claimExecution, {
+        runId: run.runId,
+        leaseId,
+        ownerId: this.ownerId,
+        dispatchMode: this.dispatchMode,
+        estimatedCostUsd: this.estimatedCostUsd,
+      });
+      if (!claim.claimed) continue;
+      this.leases.set(run.runId, leaseId);
+      const claimedRun = await this.client.query(api.workflowRuns.get, { runId: run.runId });
+      if (claimedRun) await this.processRun(claimedRun);
+      const current = await this.client.query(api.workflowRuns.get, { runId: run.runId });
+      if (!current?.lease || ["COMPLETED", "FAILED", "CANCELED", "PAUSED"].includes(current.status)) {
+        this.leases.delete(run.runId);
+      }
+    }
+  }
+
+  private executionFence(run: any) {
+    if (!run.lease) return {};
+    const leaseId = this.leases.get(run.runId);
+    if (!leaseId) throw new Error(`Executor does not own lease for ${run.runId}.`);
+    return { leaseId, ownerId: this.ownerId };
+  }
+
+  private async cancelRunningTasks(run: any) {
+    for (const step of run.steps ?? []) {
+      if (!step.taskId || ["DONE", "FAILED", "CANCELED"].includes(step.status)) continue;
+      await this.client.mutation(api.tasks.transition, {
+        taskId: step.taskId,
+        toStatus: "CANCELED",
+        actorType: "SYSTEM",
+        actorUserId: this.ownerId,
+        idempotencyKey: `workflow:${run.runId}:${step.stepId}:workspace-kill`,
+        reason: "Workspace execution was killed by an operator.",
+      });
     }
   }
 
@@ -251,6 +347,7 @@ export class WorkflowExecutor {
       if (!evaluateWorkflowCondition(stepDefinition.condition, run.context)) {
         await this.client.mutation(api.workflowRuns.updateStep, {
           runId: run.runId,
+          ...this.executionFence(run),
           stepIndex,
           status: "SKIPPED",
           conditionResult: false,
@@ -268,6 +365,7 @@ export class WorkflowExecutor {
     if (!authority.ok) {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "FAILED",
         error: `Workflow Task authority scope is ${authority.reason}.`,
@@ -278,6 +376,7 @@ export class WorkflowExecutor {
     if (missingVariables.length > 0) {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "FAILED",
         error: `Missing context variables: ${missingVariables.join(", ")}`,
@@ -291,6 +390,7 @@ export class WorkflowExecutor {
     if (!agentDefinition) {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "FAILED",
         error: `Agent not defined: ${stepDefinition.agent}`,
@@ -305,6 +405,7 @@ export class WorkflowExecutor {
     if (!agent) {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "FAILED",
         error: `Agent persona not available: ${agentDefinition.persona}`,
@@ -370,6 +471,7 @@ export class WorkflowExecutor {
     if (!taskId) {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "FAILED",
         error: "Task creation did not return a task id.",
@@ -392,6 +494,7 @@ export class WorkflowExecutor {
     if (!assignment.success) {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "FAILED",
         taskId,
@@ -405,6 +508,7 @@ export class WorkflowExecutor {
 
     await this.client.mutation(api.workflowRuns.updateStep, {
       runId: run.runId,
+      ...this.executionFence(run),
       stepIndex,
       status: "RUNNING",
       taskId,
@@ -436,6 +540,7 @@ export class WorkflowExecutor {
     if (!step.taskId) {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "FAILED",
         error: "Running node has no linked task.",
@@ -447,6 +552,7 @@ export class WorkflowExecutor {
     if (!task) {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "FAILED",
         error: `Linked task not found: ${step.taskId}`,
@@ -478,6 +584,7 @@ export class WorkflowExecutor {
           "errors" in contractResult ? contractResult.errors.join("; ") : stepDefinition.expects;
         await this.client.mutation(api.workflowRuns.updateStep, {
           runId: run.runId,
+          ...this.executionFence(run),
           stepIndex,
           status: "FAILED",
           output,
@@ -490,6 +597,7 @@ export class WorkflowExecutor {
       if (!completion.ok) {
         await this.client.mutation(api.workflowRuns.updateStep, {
           runId: run.runId,
+          ...this.executionFence(run),
           stepIndex,
           status: "FAILED",
           error: completion.error,
@@ -504,6 +612,7 @@ export class WorkflowExecutor {
       if (!contextUpdate.ok) {
         await this.client.mutation(api.workflowRuns.updateStep, {
           runId: run.runId,
+          ...this.executionFence(run),
           stepIndex,
           status: "FAILED",
           error: contextUpdate.error,
@@ -512,6 +621,7 @@ export class WorkflowExecutor {
       }
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "DONE",
         output,
@@ -519,6 +629,7 @@ export class WorkflowExecutor {
       });
       await this.client.mutation(api.workflowRuns.updateContext, {
         runId: run.runId,
+        ...this.executionFence(run),
         context: contextUpdate.update,
       });
       return;
@@ -527,6 +638,7 @@ export class WorkflowExecutor {
     if (task.status === "FAILED" || task.status === "CANCELED") {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "FAILED",
         error: task.blockedReason ?? `Task ended as ${task.status}`,
@@ -534,16 +646,17 @@ export class WorkflowExecutor {
       return;
     }
 
-    const timeoutMs = Math.min(
-      stepDefinition.timeoutMinutes * 60 * 1000,
-      Math.max(this.stepTimeoutMs, stepDefinition.timeoutMinutes * 60 * 1000)
+    const timeoutMs = effectiveStepTimeoutMs(
+      stepDefinition.timeoutMinutes,
+      this.stepTimeoutMs,
     );
     if (step.startedAt && Date.now() - step.startedAt > timeoutMs) {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "FAILED",
-        error: `Timeout after ${stepDefinition.timeoutMinutes} minutes`,
+        error: `Timeout after ${timeoutMs}ms (workflow limit ${stepDefinition.timeoutMinutes} minutes)`,
       });
     }
   }
@@ -585,10 +698,12 @@ export class WorkflowExecutor {
     if (step.retryCount < definition.retryLimit) {
       await this.client.mutation(api.workflowRuns.incrementRetry, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
       });
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: run.runId,
+        ...this.executionFence(run),
         stepIndex,
         status: "PENDING",
       });
@@ -671,6 +786,7 @@ export class WorkflowExecutor {
       if (!step.agentId) {
         await this.client.mutation(api.workflowRuns.updateStep, {
           runId: args.run.runId,
+          ...this.executionFence(args.run),
           stepIndex: args.stepIndex,
           status: "FAILED",
           error: "Gate task has no requestor agent.",
@@ -692,6 +808,7 @@ export class WorkflowExecutor {
     if (["DENIED", "EXPIRED", "CANCELED"].includes(approval.status)) {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: args.run.runId,
+        ...this.executionFence(args.run),
         stepIndex: args.stepIndex,
         status: "FAILED",
         error: `Workflow gate ${approval.status.toLowerCase()}: ${
@@ -717,6 +834,7 @@ export class WorkflowExecutor {
     if (!resolution?.success) {
       await this.client.mutation(api.workflowRuns.updateStep, {
         runId: args.run.runId,
+        ...this.executionFence(args.run),
         stepIndex: args.stepIndex,
         status: "FAILED",
         error: resolution?.error ?? "Approved gate could not be resolved.",
@@ -726,12 +844,14 @@ export class WorkflowExecutor {
 
     await this.client.mutation(api.workflowRuns.updateStep, {
       runId: args.run.runId,
+      ...this.executionFence(args.run),
       stepIndex: args.stepIndex,
       status: "DONE",
       output: "APPROVED",
     });
     await this.client.mutation(api.workflowRuns.updateContext, {
       runId: args.run.runId,
+      ...this.executionFence(args.run),
       context: {
         [`${step.stepId}Output`]: "APPROVED",
         approvalId: approval._id,
@@ -743,6 +863,7 @@ export class WorkflowExecutor {
   private async completeRun(run: any): Promise<void> {
     await this.client.mutation(api.workflowRuns.updateStatus, {
       runId: run.runId,
+      ...this.executionFence(run),
       status: "COMPLETED",
     });
     await this.client.mutation(api.activities.create, {
@@ -753,7 +874,7 @@ export class WorkflowExecutor {
       targetType: "WORKFLOW_RUN",
       targetId: run._id,
     });
-    if (run.workflowId === "loop-engineering") {
+    if (["loop-engineering", "continuous-research"].includes(run.workflowId)) {
       try {
         await this.client.action(api.loopEngineering.projectWorkflowRun, {
           workflowRunId: run._id,
@@ -771,6 +892,7 @@ export class WorkflowExecutor {
   private async failRun(run: any, reason: string): Promise<void> {
     await this.client.mutation(api.workflowRuns.updateStatus, {
       runId: run.runId,
+      ...this.executionFence(run),
       status: "FAILED",
       failureReason: reason,
     });

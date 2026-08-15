@@ -25,6 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertTriangle,
+  BookOpenCheck,
   CheckCircle2,
   CirclePause,
   ExternalLink,
@@ -90,7 +91,13 @@ function safeCanonicalUrl(value?: string) {
   return value?.startsWith("https://") ? value : undefined;
 }
 
-export function ResearchWatchlistPanel({ projectId }: { projectId: Id<"projects"> }) {
+export function ResearchWatchlistPanel({
+  projectId,
+  onCycleCreated,
+}: {
+  projectId: Id<"projects">;
+  onCycleCreated?: (cycleId: Id<"loopEngineeringCycles">) => void;
+}) {
   const sources = useQuery(api.researchSources.listByProject, { projectId });
   const createDraft = useMutation(api.researchSources.createDraft);
   const validateSource = useMutation(api.researchSources.validate);
@@ -100,10 +107,12 @@ export function ResearchWatchlistPanel({ projectId }: { projectId: Id<"projects"
   const retire = useMutation(api.researchSources.retire);
   const runOnce = useAction(api.researchIngestionActions.runOnce);
   const verifyRun = useAction(api.researchIngestionActions.verifyRun);
+  const createResearchBrief = useAction(api.loopEngineering.createFromResearchRun);
   const { toast } = useToast();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedSourceId, setSelectedSourceId] = useState<Id<"researchSources"> | null>(null);
+  const [briefRun, setBriefRun] = useState<ResearchSourceRun | null>(null);
   const [busySourceId, setBusySourceId] = useState<Id<"researchSources"> | "create" | null>(null);
   const events = useQuery(
     api.researchSources.listEvents,
@@ -291,6 +300,7 @@ export function ResearchWatchlistPanel({ projectId }: { projectId: Id<"projects"
               () => verifyRun({ projectId, sourceRunId: runRecord._id }),
               "Independent evidence verification passed",
             )}
+            onStartResearchBrief={(runRecord) => setBriefRun(runRecord)}
           />
         </div>
       )}
@@ -312,6 +322,43 @@ export function ResearchWatchlistPanel({ projectId }: { projectId: Id<"projects"
             toast("Research source draft created");
           } catch (error) {
             toast(error instanceof Error ? error.message : "Research source creation failed", true);
+          } finally {
+            setBusySourceId(null);
+          }
+        }}
+      />
+      <ResearchBriefDialog
+        open={briefRun !== null}
+        run={briefRun}
+        busy={briefRun !== null && busySourceId === briefRun.sourceId}
+        onClose={() => setBriefRun(null)}
+        onCreate={async (values) => {
+          if (!briefRun) return;
+          setBusySourceId(briefRun.sourceId);
+          try {
+            const result = await createResearchBrief({
+              projectId,
+              sourceRunId: briefRun._id,
+              objective: values.objective,
+              hypothesis: values.hypothesis || undefined,
+              researchBrief: {
+                question: values.question,
+                scope: values.scope,
+                exclusions: splitLines(values.exclusions),
+                freshnessWindow: values.freshnessWindow,
+                preferredSourceTypes: ["Verified Research Watchlist observation"],
+                requiredOutput: values.requiredOutput,
+                approvalPolicy: "Explicit operator approval before implementation",
+              },
+              stopCondition: values.stopCondition,
+              maxIterations: 1,
+              idempotencyKey: `research-brief:${projectId}:${briefRun._id}`,
+            });
+            if (result.cycle?._id) onCycleCreated?.(result.cycle._id);
+            setBriefRun(null);
+            toast(`Research Brief created with ${result.sourceCount} provenance-linked observations`);
+          } catch (error) {
+            toast(error instanceof Error ? error.message : "Research Brief creation failed", true);
           } finally {
             setBusySourceId(null);
           }
@@ -467,12 +514,14 @@ function RunHistory({
   busy,
   onRetry,
   onVerify,
+  onStartResearchBrief,
 }: {
   runs: ResearchSourceRun[] | undefined;
   observations: Doc<"researchObservations">[] | undefined;
   busy: boolean;
   onRetry: (run: ResearchSourceRun) => void;
   onVerify: (run: ResearchSourceRun) => void;
+  onStartResearchBrief: (run: ResearchSourceRun) => void;
 }) {
   const latest = runs?.[0];
   return (
@@ -529,6 +578,16 @@ function RunHistory({
           {latest.status === "VERIFIED" && latest.discoveredItemCount === 0 && (
             <p className="mt-3 text-[11.5px] text-ink-secondary">No source changes; the cursor checkpoint was still verified.</p>
           )}
+          {latest.status === "VERIFIED" && latest.insertedObservationCount > 0 && (
+            <div className="mt-3 border-t border-line pt-3">
+              <Button size="sm" variant="success" disabled={busy} onClick={() => onStartResearchBrief(latest)}>
+                <BookOpenCheck className="h-3.5 w-3.5" /> Start research brief
+              </Button>
+              <p className="mt-1.5 text-[11px] text-ink-muted">
+                Creates governed research work from this exact verified artifact. Claims and recommendations still require separate review.
+              </p>
+            </div>
+          )}
           {observations === undefined && latest.insertedObservationCount > 0 ? (
             <p className="mt-3 text-[11.5px] text-ink-secondary">Loading persisted observations…</p>
           ) : observations && observations.length > 0 ? (
@@ -551,6 +610,128 @@ function RunHistory({
         </div>
       )}
     </div>
+  );
+}
+
+function ResearchBriefDialog({
+  open,
+  run,
+  busy,
+  onClose,
+  onCreate,
+}: {
+  open: boolean;
+  run: ResearchSourceRun | null;
+  busy: boolean;
+  onClose: () => void;
+  onCreate: (values: {
+    objective: string;
+    hypothesis: string;
+    question: string;
+    scope: string;
+    exclusions: string;
+    freshnessWindow: string;
+    requiredOutput: string;
+    stopCondition: string;
+  }) => Promise<void>;
+}) {
+  const [objective, setObjective] = useState("");
+  const [hypothesis, setHypothesis] = useState("");
+  const [question, setQuestion] = useState("");
+  const [scope, setScope] = useState("Mission Control Software Factory research and operating model");
+  const [exclusions, setExclusions] = useState("Repository changes\nPolicy changes\nAutomatic scheduling");
+  const [freshnessWindow, setFreshnessWindow] = useState("Use the publication and retrieval dates frozen in this verified source run");
+  const [requiredOutput, setRequiredOutput] = useState("Claim ledger with accepted, rejected, conflicting, unsupported, and unknown findings");
+  const [stopCondition, setStopCondition] = useState("Stop after every material claim has an independent evidence decision; do not implement recommendations");
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => { if (!next && !busy) onClose(); }}>
+      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Start a Research Brief</DialogTitle>
+          <DialogDescription>
+            Bind the exact verified observations to one governed Loop Engineering cycle. This does not run a schedule, accept claims, or authorize repository changes.
+          </DialogDescription>
+        </DialogHeader>
+        {run && (
+          <div className="rounded-lg border border-line bg-surface-2 px-4 py-3 text-[12px] text-ink-secondary">
+            <span className="font-medium text-ink">Frozen evidence:</span>{" "}
+            {run.insertedObservationCount} observations · attempt {run.attemptCount}/3 · verified {formatTime(run.verifiedAt)}
+          </div>
+        )}
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="research-brief-objective">Objective</Label>
+            <Textarea
+              id="research-brief-objective"
+              value={objective}
+              onChange={(event) => setObjective(event.target.value)}
+              placeholder="Determine whether the new evidence should change Mission Control's agent execution architecture"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="research-brief-hypothesis">Hypothesis (optional)</Label>
+            <Textarea id="research-brief-hypothesis" value={hypothesis} onChange={(event) => setHypothesis(event.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="research-brief-question">Research question</Label>
+            <Textarea
+              id="research-brief-question"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              placeholder="Which material claims are supported by this evidence, and what would falsify them?"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="research-brief-scope">Scope</Label>
+            <Textarea id="research-brief-scope" value={scope} onChange={(event) => setScope(event.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="research-brief-exclusions">Exclusions (one per line)</Label>
+            <Textarea id="research-brief-exclusions" value={exclusions} onChange={(event) => setExclusions(event.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="research-brief-freshness">Freshness window</Label>
+            <Input id="research-brief-freshness" value={freshnessWindow} onChange={(event) => setFreshnessWindow(event.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="research-brief-output">Required output</Label>
+            <Input id="research-brief-output" value={requiredOutput} onChange={(event) => setRequiredOutput(event.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="research-brief-stop">Stop condition</Label>
+            <Textarea id="research-brief-stop" value={stopCondition} onChange={(event) => setStopCondition(event.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
+          <Button
+            disabled={
+              busy
+              || !objective.trim()
+              || !question.trim()
+              || !scope.trim()
+              || !freshnessWindow.trim()
+              || !requiredOutput.trim()
+              || !stopCondition.trim()
+            }
+            onClick={() => void onCreate({
+              objective,
+              hypothesis,
+              question,
+              scope,
+              exclusions,
+              freshnessWindow,
+              requiredOutput,
+              stopCondition,
+            })}
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookOpenCheck className="h-4 w-4" />}
+            Create governed research
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

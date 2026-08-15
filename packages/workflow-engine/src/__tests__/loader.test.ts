@@ -6,6 +6,27 @@ import { describe, it, expect } from "vitest";
 import { loadWorkflow, validateWorkflow } from "../loader.js";
 
 describe("validateWorkflow", () => {
+  it("loads the bounded continuous-research evidence workflow", () => {
+    const workflow = loadWorkflow("../../workflows/continuous-research.yaml");
+
+    expect(workflow.id).toBe("continuous-research");
+    expect(workflow.topology).toBe("LINEAR");
+    expect(workflow.maxConcurrency).toBe(1);
+    expect(workflow.agents.map((agent) => agent.id)).toEqual([
+      "claim-extractor",
+      "claim-verifier",
+    ]);
+    expect(workflow.steps.map((step) => ({
+      id: step.id,
+      kind: step.kind,
+      isolation: step.isolation,
+    }))).toEqual([
+      { id: "extractClaims", kind: "AGENT", isolation: "READ_ONLY" },
+      { id: "verifyClaims", kind: "VERIFY", isolation: "READ_ONLY" },
+    ]);
+    expect(validateWorkflow(workflow)).toEqual([]);
+  });
+
   it("keeps repository-changing feature steps in isolated worktrees", () => {
     const workflow = loadWorkflow("../../workflows/feature-dev.yaml");
     const isolation = Object.fromEntries(workflow.steps.map((step) => [step.id, step.isolation]));

@@ -43,4 +43,12 @@ describe("operator controls gate", () => {
     expect(result.decision).toBe("DENY");
     expect(result.reason).toContain("DRAINING");
   });
+
+  it("denies every operation in KILLED mode", () => {
+    expect(evaluateOperatorGate({
+      mode: "KILLED",
+      actorType: "HUMAN",
+      operation: "TRANSITION",
+    })).toMatchObject({ decision: "DENY" });
+  });
 });

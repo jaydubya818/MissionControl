@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   retire: vi.fn(),
   runOnce: vi.fn(),
   verifyRun: vi.fn(),
+  createFromResearchRun: vi.fn(),
   toast: vi.fn(),
 }));
 
@@ -45,6 +46,9 @@ vi.mock("../../../../../convex/_generated/api", () => ({
     researchIngestionActions: {
       runOnce: "researchIngestionActions.runOnce",
       verifyRun: "researchIngestionActions.verifyRun",
+    },
+    loopEngineering: {
+      createFromResearchRun: "loopEngineering.createFromResearchRun",
     },
   },
 }));
@@ -75,6 +79,7 @@ vi.mock("convex/react", () => ({
     const handlers: Record<string, ReturnType<typeof vi.fn>> = {
       "researchIngestionActions.runOnce": mocks.runOnce,
       "researchIngestionActions.verifyRun": mocks.verifyRun,
+      "loopEngineering.createFromResearchRun": mocks.createFromResearchRun,
     };
     const handler = handlers[action];
     if (!handler) throw new Error(`Unexpected action: ${action}`);
@@ -143,6 +148,7 @@ describe("ResearchWatchlistPanel", () => {
       mocks.retire,
       mocks.runOnce,
       mocks.verifyRun,
+      mocks.createFromResearchRun,
     ]) mutation.mockReset().mockResolvedValue({});
     mocks.toast.mockReset();
   });
@@ -332,5 +338,69 @@ describe("ResearchWatchlistPanel", () => {
       projectId: "project-1",
       sourceRunId: "run-awaiting-verification",
     }));
+  });
+
+  it("creates a governed Research Brief from the exact verified run", async () => {
+    mocks.sources = [source({
+      state: "ACTIVE",
+      validationStatus: "PASSED",
+      policyReviewState: "APPROVED",
+    })];
+    mocks.runs = [{
+      _id: "run-verified",
+      sourceId: "source-1",
+      status: "VERIFIED",
+      attemptCount: 1,
+      discoveredItemCount: 2,
+      insertedObservationCount: 2,
+      duplicateObservationCount: 0,
+      quarantinedObservationCount: 0,
+      idempotencyKey: "manual-run-verified",
+      verifiedAt: Date.UTC(2026, 7, 11),
+      updatedAt: Date.UTC(2026, 7, 11),
+    }];
+    mocks.observations = [{
+      _id: "observation-1",
+      title: "Bounded execution",
+      providerItemId: "provider-1",
+      canonicalUrl: "https://example.com/bounded-execution",
+      safetyScanStatus: "PASSED",
+    }];
+    mocks.createFromResearchRun.mockResolvedValue({
+      cycle: { _id: "cycle-1" },
+      sourceCount: 2,
+    });
+    const onCycleCreated = vi.fn();
+    render(
+      <ResearchWatchlistPanel
+        projectId={"project-1" as any}
+        onCycleCreated={onCycleCreated}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Example engineering feed" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start research brief" }));
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("This does not run a schedule");
+    fireEvent.change(screen.getByLabelText("Objective"), {
+      target: { value: "Assess bounded agent execution evidence" },
+    });
+    fireEvent.change(screen.getByLabelText("Research question"), {
+      target: { value: "Which claims are supported?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create governed research" }));
+
+    await waitFor(() => expect(mocks.createFromResearchRun).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: "project-1",
+      sourceRunId: "run-verified",
+      objective: "Assess bounded agent execution evidence",
+      idempotencyKey: "research-brief:project-1:run-verified",
+      maxIterations: 1,
+      researchBrief: expect.objectContaining({
+        question: "Which claims are supported?",
+        approvalPolicy: "Explicit operator approval before implementation",
+      }),
+    })));
+    expect(onCycleCreated).toHaveBeenCalledWith("cycle-1");
+    expect(mocks.toast).toHaveBeenCalledWith("Research Brief created with 2 provenance-linked observations");
   });
 });

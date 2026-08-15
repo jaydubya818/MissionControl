@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { graphDispatchState, summarizeGraphExecution } from "./graphEngineering";
+import {
+  buildGraphDispatchTarget,
+  graphDispatchPresentation,
+  graphDispatchState,
+  summarizeGraphExecution,
+} from "./graphEngineering";
 
 describe("Graph Engineering presentation", () => {
   it("summarizes fan-out, verification, failures, and progress", () => {
@@ -52,5 +57,32 @@ describe("Graph Engineering presentation", () => {
         steps: [{ status: "RUNNING", kind: "GATE" }],
       },
     })).toBe("AWAITING_APPROVAL");
+  });
+
+  it("routes a frozen Research Brief through the server-owned claim graph", () => {
+    expect(buildGraphDispatchTarget({
+      cycleId: "cycle-1",
+      workOrderId: "work-order-1",
+      workOrderRevision: 3,
+      researchSourceRunIds: ["run-b", "run-a", "run-a"],
+    })).toEqual({
+      kind: "CONTINUOUS_RESEARCH",
+      cycleId: "cycle-1",
+    });
+  });
+
+  it("explains the frozen evidence and independent verification boundary", () => {
+    const presentation = graphDispatchPresentation({
+      evidenceBound: true,
+      observationCount: 2,
+    });
+
+    expect(presentation.title).toBe("Frozen-evidence claim graph");
+    expect(presentation.buttonLabel).toBe("Dispatch evidence graph");
+    expect(presentation.retryButtonLabel).toBe("Replace and retry safely");
+    expect(presentation.readyDetail).toContain("2 frozen observations");
+    expect(presentation.readyDetail).toContain("separate Evidence Reviewer Task");
+    expect(presentation.boundaryDetail).toContain("Web discovery");
+    expect(presentation.boundaryDetail).toContain("repository changes are excluded");
   });
 });

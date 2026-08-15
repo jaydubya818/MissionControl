@@ -1,0 +1,93 @@
+{
+  "status": "COMPLETED",
+  "noNewEvidence": false,
+  "acceptedClaims": [
+    {
+      "claimId": "claim-governance-provenance",
+      "statement": "Safety, security, transparency, and provenance practices are presented as supporting responsible AI governance.",
+      "supportingObservationIds": ["mx7g3z43hm6akxxmvavk05aky18c946b"],
+      "supportingArtifactIds": ["v970cnp16sa8xpf9x81gpsjzvn8c9k89"],
+      "confidence": "MEDIUM",
+      "reason": "The frozen excerpt explicitly presents these practices as supporting responsible AI governance."
+    },
+    {
+      "claimId": "claim-agentic-workflow-efficiency",
+      "statement": "GPT-5.6 is reported to improve efficiency across models, inference, and agentic workflows, increasing useful intelligence per dollar.",
+      "supportingObservationIds": ["mx7m73c36nj8sj2cs7wayqs3sd8c8myh"],
+      "supportingArtifactIds": ["v970cnp16sa8xpf9x81gpsjzvn8c9k89"],
+      "confidence": "MEDIUM",
+      "reason": "The frozen excerpt reports improved efficiency across the named areas and more useful intelligence per dollar."
+    },
+    {
+      "claimId": "claim-evaluation-security-risk",
+      "statement": "A security incident occurred during AI model evaluation and produced lessons relevant to defenders.",
+      "supportingObservationIds": ["mx7th1wzseascwbvgntnbh3xgh8c9kn3"],
+      "supportingArtifactIds": ["v970cnp16sa8xpf9x81gpsjzvn8c9k89"],
+      "confidence": "MEDIUM",
+      "reason": "The frozen excerpt explicitly describes a security incident during model evaluation and lessons for defenders."
+    },
+    {
+      "claimId": "claim-reasoning-compaction-evaluation",
+      "statement": "Retaining reasoning and enabling compaction are reported to improve GPT-5.6 benchmark scores and efficiency on ARC-AGI-3.",
+      "supportingObservationIds": ["mx7vv5vgxf4af6z1mvazxq1bq98c9qnt"],
+      "supportingArtifactIds": ["v970cnp16sa8xpf9x81gpsjzvn8c9k89"],
+      "confidence": "MEDIUM",
+      "reason": "The frozen excerpt directly attributes improved ARC-AGI-3 scores and efficiency to retaining reasoning and enabling compaction."
+    },
+    {
+      "claimId": "claim-secure-incident-analysis",
+      "statement": "NTT DATA Group reports using ChatGPT Enterprise and Codex to reduce incident analysis to 30 minutes while scaling secure AI adoption.",
+      "supportingObservationIds": ["mx7y6kspffzhe7ycsxab8xh56x8c95sv"],
+      "supportingArtifactIds": ["v970cnp16sa8xpf9x81gpsjzvn8c9k89"],
+      "confidence": "MEDIUM",
+      "reason": "The frozen excerpt directly reports the named tools, the 30-minute incident-analysis result, and scaled secure AI adoption."
+    },
+    {
+      "claimId": "claim-agent-platform-workflows",
+      "statement": "OpenAI Presence is presented as an enterprise agent platform for deploying voice and chat agents into customer and internal workflows.",
+      "supportingObservationIds": ["mx7jhfdppzp88qmbgv8q6yrmzs8c8368"],
+      "supportingArtifactIds": ["v970cnp16sa8xpf9x81gpsjzvn8c9k89"],
+      "confidence": "MEDIUM",
+      "reason": "The frozen excerpt explicitly presents the platform and the stated voice, chat, customer, and internal workflow use cases."
+    }
+  ],
+  "rejectedClaims": [
+    {
+      "claimId": "claim-agent-misuse-threat",
+      "statement": "AI systems were used to support investment, romance, gambling, and impersonation scams, demonstrating an operator-safety threat relevant to agent controls.",
+      "supportingObservationIds": ["mx7qb145n3rsqn2bne2q87m6158c8b4q"],
+      "supportingArtifactIds": ["v970cnp16sa8xpf9x81gpsjzvn8c9k89"],
+      "confidence": "MEDIUM",
+      "reason": "The excerpt supports ChatGPT-assisted scam activity, but it does not establish the added interpretation about Mission Control operator safety or agent-control relevance."
+    }
+  ],
+  "sourceDecisions": [
+    {"observationId": "mx7g3z43hm6akxxmvavk05aky18c946b", "decision": "ACCEPTED", "reason": "It directly supports an accepted governance-provenance claim."},
+    {"observationId": "mx7gvs9kszhdj6r5ag70vqand98c9s22", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7jhfdppzp88qmbgv8q6yrmzs8c8368", "decision": "ACCEPTED", "reason": "It directly supports an accepted enterprise-agent-platform claim."},
+    {"observationId": "mx7m73c36nj8sj2cs7wayqs3sd8c8myh", "decision": "ACCEPTED", "reason": "It directly supports an accepted agentic-workflow-efficiency claim."},
+    {"observationId": "mx7qb145n3rsqn2bne2q87m6158c8b4q", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7qpfjvwc6a3tx8p4mk37h8418c8cn8", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7rn2z1tbfxw9c8ctv2r29t5d8c9wgy", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7s00rzpyhk5ph2jqfrc0xj718c8avf", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7s7v2c46d2pjcg8r7xz0x48d8c8cqg", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7sgtypnps0wy29amk51s8cjn8c8rpg", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7t2y10g2qks6d9n55qrrrm5d8c80k9", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7th1wzseascwbvgntnbh3xgh8c9kn3", "decision": "ACCEPTED", "reason": "It directly supports an accepted model-evaluation security claim."},
+    {"observationId": "mx7v740nhmgmhk6pfd8adxv5ys8c9fd7", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7vv5vgxf4af6z1mvazxq1bq98c9qnt", "decision": "ACCEPTED", "reason": "It directly supports an accepted reasoning-and-compaction evaluation claim."},
+    {"observationId": "mx7x0q5tvag8kjx4e0ngdjvxcs8c9c86", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7y6kspffzhe7ycsxab8xh56x8c95sv", "decision": "ACCEPTED", "reason": "It directly supports an accepted incident-analysis claim."},
+    {"observationId": "mx7yhm3r8g6c8thpymvt0rh9wx8c8b27", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7yx5kwdznv2qj0k0seqd69rn8c9amr", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7z8vj1cwjp127k6yqhrzv8498c87sx", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."},
+    {"observationId": "mx7zy98a4f49hmqb3ea9aam2rn8c8bds", "decision": "REJECTED", "reason": "No accepted material claim cites this observation."}
+  ],
+  "conflicts": [],
+  "limitations": [
+    "Verification is limited to the 20 frozen excerpts and does not establish the accuracy of their underlying source assertions.",
+    "All observations come from one source run and have trustClassification UNKNOWN.",
+    "Accepted claims remain reported source claims and are not independently corroborated facts.",
+    "No decision here establishes Mission Control applicability, implementation priority, recommendation approval, or authority to change software."
+  ]
+}

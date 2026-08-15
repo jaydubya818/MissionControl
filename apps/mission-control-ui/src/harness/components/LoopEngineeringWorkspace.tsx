@@ -7,6 +7,8 @@ import { useToast } from "../../Toast";
 import { ExecutionRunInspector } from "../../controlPlane/ExecutionRunInspector";
 import { ResearchWatchlistPanel } from "./ResearchWatchlistPanel";
 import {
+  buildGraphDispatchTarget,
+  graphDispatchPresentation,
   graphDispatchState,
   summarizeGraphExecution,
 } from "../../lib/graphEngineering";
@@ -145,9 +147,14 @@ export function LoopEngineeringWorkspace({
     projectId ? { projectId } : "skip"
   );
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
+  const executionControl = useQuery(
+    api.operatorControls.getCurrent,
+    projectId ? { projectId } : "skip",
+  );
   const createCycle = useAction(api.loopEngineering.create);
   const projectWorkflowRun = useAction(api.loopEngineering.projectWorkflowRun);
-  const dispatchGraph = useMutation(api.workOrders.dispatch);
+  const dispatchLegacyGraph = useMutation(api.workOrders.dispatch);
+  const dispatchResearchGraph = useAction(api.loopEngineering.dispatchResearchGraph);
   const addSource = useMutation(api.loopEngineering.addSource);
   const decideSource = useMutation(api.loopEngineering.decideSource);
   const addClaim = useMutation(api.loopEngineering.addClaim);
@@ -181,9 +188,10 @@ export function LoopEngineeringWorkspace({
   useEffect(() => {
     onCycleScopeChange?.({ cycleId: cycle?._id ?? null });
   }, [cycle?._id, onCycleScopeChange]);
+  const selectedWorkOrderId = cycle?.rootWorkOrderId ?? cycle?.workOrderIds[0];
   const workOrderDetail = useQuery(
     api.workOrders.get,
-    cycle?.workOrderIds[0] ? { workOrderId: cycle.workOrderIds[0] } : "skip"
+    selectedWorkOrderId ? { workOrderId: selectedWorkOrderId } : "skip"
   );
   const latestGraphRunSummary = workOrderDetail?.executionRuns[0];
   const latestGraphRun = useQuery(
@@ -195,6 +203,10 @@ export function LoopEngineeringWorkspace({
     [tasks]
   );
   const rootWorkOrder = workOrderDetail?.workOrder;
+  const researchObservationCount = cycle?.sources.filter(
+    (source) => Boolean(source.researchObservationId)
+  ).length ?? 0;
+  const evidenceBound = Boolean(cycle?.researchSourceRunIds?.length);
   const graphLoading = workOrderDetail === undefined
     || (latestGraphRunSummary !== undefined && latestGraphRun === undefined);
 
@@ -231,7 +243,10 @@ export function LoopEngineeringWorkspace({
 
   return (
     <div className="space-y-6">
-      <ResearchWatchlistPanel projectId={projectId} />
+      <ResearchWatchlistPanel
+        projectId={projectId}
+        onCycleCreated={(cycleId) => setSelectedId(cycleId)}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -278,16 +293,29 @@ export function LoopEngineeringWorkspace({
             loading={graphLoading}
             workOrder={rootWorkOrder}
             run={latestGraphRun}
+            evidenceBound={evidenceBound}
+            observationCount={researchObservationCount}
+            executionControl={executionControl}
             busy={busy}
             onDispatch={() => {
               if (!rootWorkOrder) return;
               void run(
                 async () => {
-                  const result = await dispatchGraph({
+                  const target = buildGraphDispatchTarget({
+                    cycleId: cycle._id,
                     workOrderId: rootWorkOrder._id,
-                    actorType: "HUMAN",
-                    idempotencyKey: `graph-cycle:${cycle._id}:dispatch:${rootWorkOrder.currentRevisionNumber ?? 1}`,
+                    workOrderRevision: rootWorkOrder.currentRevisionNumber ?? 1,
+                    researchSourceRunIds: cycle.researchSourceRunIds,
                   });
+                  const result = target.kind === "CONTINUOUS_RESEARCH"
+                    ? await dispatchResearchGraph({
+                        cycleId: target.cycleId as Id<"loopEngineeringCycles">,
+                      })
+                    : await dispatchLegacyGraph({
+                        workOrderId: target.workOrderId as Id<"workOrders">,
+                        actorType: "HUMAN",
+                        idempotencyKey: target.idempotencyKey,
+                      });
                   if (!result.run) {
                     throw new Error(
                       result.reason === "routing-exhausted"
@@ -572,6 +600,9 @@ function GraphExecutionCard({
   loading,
   workOrder,
   run,
+  evidenceBound,
+  observationCount,
+  executionControl,
   busy,
   onDispatch,
   onInspect,
@@ -585,6 +616,17 @@ function GraphExecutionCard({
     currentRevisionNumber?: number;
   } | null;
   run?: Doc<"workflowRuns"> | null;
+  evidenceBound: boolean;
+  observationCount: number;
+  executionControl?: {
+    mode: "NORMAL" | "PAUSED" | "DRAINING" | "KILLED" | "QUARANTINED";
+    executionPolicy: {
+      continuousSchedulingEnabled: boolean;
+      dailyBudgetUsd: number;
+      perRunBudgetUsd: number;
+      maxConcurrentRuns: number;
+    };
+  };
   busy: boolean;
   onDispatch: () => void;
   onInspect: () => void;
@@ -592,6 +634,8 @@ function GraphExecutionCard({
 }) {
   const state = graphDispatchState({ loading, workOrder, run });
   const summary = run ? summarizeGraphExecution(run) : null;
+  const presentation = graphDispatchPresentation({ evidenceBound, observationCount });
+  const workspaceAllowsManualDispatch = executionControl?.mode === "NORMAL";
   const stateCopy: Record<typeof state, { label: string; detail: string }> = {
     LOADING: {
       label: "Loading",
@@ -603,7 +647,7 @@ function GraphExecutionCard({
     },
     READY: {
       label: "Ready to dispatch",
-      detail: "Review the WorkOrder, then explicitly start the bounded read-only research graph.",
+      detail: presentation.readyDetail,
     },
     QUEUED: {
       label: "Queued",
@@ -645,13 +689,26 @@ function GraphExecutionCard({
           <div className="flex flex-wrap items-center gap-2">
             <GitBranch className="h-4 w-4 text-registry-accent" aria-hidden />
             <h2 id="graph-execution-title" className="text-[16px] font-semibold text-ink">
-              Multi-agent execution graph
+              {presentation.title}
             </h2>
             <StatusBadge tone={tone}>{stateCopy[state].label}</StatusBadge>
           </div>
           <p className="mt-2 max-w-[78ch] text-[12.5px] leading-relaxed text-ink-secondary">
             {stateCopy[state].detail}
           </p>
+          <div className="mt-2 flex flex-wrap gap-2 text-[11.5px] text-ink-muted">
+            <span>Workspace: {executionControl?.mode ?? "loading"}</span>
+            <span>·</span>
+            <span>Continuous scheduling: {executionControl?.executionPolicy.continuousSchedulingEnabled ? "enabled" : "disabled"}</span>
+            {executionControl && (
+              <>
+                <span>·</span>
+                <span>Run limit: {executionControl.executionPolicy.maxConcurrentRuns}</span>
+                <span>·</span>
+                <span>Budget: ${executionControl.executionPolicy.perRunBudgetUsd.toFixed(2)} / run</span>
+              </>
+            )}
+          </div>
           {workOrder && (
             <p className="mt-2 text-[11.5px] text-ink-muted">
               {workOrder.title} · revision {workOrder.currentRevisionNumber ?? 1}
@@ -662,9 +719,15 @@ function GraphExecutionCard({
 
         <div className="flex flex-wrap gap-2">
           {state === "READY" && (
-            <Button size="sm" disabled={busy} onClick={onDispatch}>
+            <Button size="sm" disabled={busy || !workspaceAllowsManualDispatch} onClick={onDispatch}>
               {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Play className="mr-1.5 h-4 w-4" />}
-              Dispatch graph
+              {presentation.buttonLabel}
+            </Button>
+          )}
+          {state === "RECOVERY_REQUIRED" && evidenceBound && (
+            <Button size="sm" disabled={busy || !workspaceAllowsManualDispatch} onClick={onDispatch}>
+              {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-1.5 h-4 w-4" />}
+              {presentation.retryButtonLabel}
             </Button>
           )}
           {run && (
@@ -713,8 +776,16 @@ function GraphExecutionCard({
         </>
       ) : state === "READY" ? (
         <div className="mt-4 flex items-start gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] text-ink-secondary">
-          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ok" />
-          <span>Dispatch starts research and verification Tasks only. Repository changes still require the cycle's explicit approval gate.</span>
+          {workspaceAllowsManualDispatch ? (
+            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ok" />
+          ) : (
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+          )}
+          <span>
+            {workspaceAllowsManualDispatch
+              ? presentation.boundaryDetail
+              : `Manual dispatch is blocked while the workspace is ${executionControl?.mode ?? "loading"}.`}
+          </span>
         </div>
       ) : null}
     </section>
@@ -1077,6 +1148,13 @@ function EvidenceLedger({
                     {source.vendorClaim ? " · Vendor claim" : ""}
                     {source.syndicatedFromUrl ? " · Syndicated content" : ""}
                   </p>
+                  {source.researchObservationId && (
+                    <p className="mt-1 font-mono text-[10.5px] text-info-accent">
+                      Verified observation {String(source.researchObservationId).slice(-8)}
+                      {source.runArtifactId ? ` · artifact ${String(source.runArtifactId).slice(-8)}` : ""}
+                      {source.safetyScanStatus ? ` · ${humanize(source.safetyScanStatus)}` : ""}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <StatusBadge tone="neutral">{humanize(source.freshness)}</StatusBadge>

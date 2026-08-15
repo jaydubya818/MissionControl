@@ -18,6 +18,12 @@ import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
 import { buildExecutionRecoverySummary } from "./lib/executionRecovery";
 import { buildReviewPackage } from "./lib/reviewPackage";
 import { deriveFactoryPublicationLineage } from "./lib/factoryAttempt";
+import { getEffectiveOperatorControl } from "./lib/operatorControls";
+import {
+  evaluateWorkflowClaim,
+  workflowHeartbeatDirective,
+  workflowLeaseMatches,
+} from "./lib/workflowExecutionControl";
 
 // ============================================================================
 // HELPERS
@@ -193,6 +199,104 @@ async function appendReceiptArtifactLink(ctx: any, verificationReceiptId: any, a
   if (!receipt) return;
   const linked = Array.from(new Set([...(receipt.linkedRunArtifactIds ?? []), artifactId]));
   await ctx.db.patch(verificationReceiptId, { linkedRunArtifactIds: linked });
+}
+
+function assertWorkflowExecutionFence(
+  run: { lease?: { leaseId: string; ownerId: string; expiresAt: number } },
+  leaseId?: string,
+  ownerId?: string,
+) {
+  if (!run.lease) return;
+  if (!workflowLeaseMatches({ lease: run.lease as any, leaseId, ownerId, now: Date.now() })) {
+    throw new Error("Workflow execution lease is missing, mismatched, or expired.");
+  }
+}
+
+async function createExecutionCheckpoint(ctx: any, input: {
+  run: any;
+  leaseId: string;
+  summary: string;
+  idempotencyKey: string;
+}) {
+  const stepIndex = Math.max(0, Math.min(input.run.currentStepIndex, input.run.steps.length - 1));
+  const step = input.run.steps[stepIndex];
+  const artifactResult = await insertRunArtifact(ctx, {
+    workflowRunId: input.run._id,
+    workOrderId: input.run.workOrderId,
+    projectId: input.run.projectId,
+    tenantId: input.run.tenantId,
+    idempotencyKey: input.idempotencyKey,
+    artifactType: "CHECKPOINT",
+    name: `Workflow cursor checkpoint · ${input.run.runId}`,
+    description: input.summary,
+    producer: input.run.lease?.ownerId ?? "workflow-executor",
+    retentionPolicy: "WORKFLOW_LIFETIME",
+    sensitivity: "INTERNAL",
+    metadata: {
+      checkpointVersion: 1,
+      leaseId: input.leaseId,
+      stepIndex,
+      stepId: step?.stepId,
+      stepStatus: step?.status,
+      retryCount: step?.retryCount ?? 0,
+      taskId: step?.taskId,
+      stepStatuses: input.run.steps.map((candidate: any) => ({
+        stepId: candidate.stepId,
+        status: candidate.status,
+        retryCount: candidate.retryCount,
+        taskId: candidate.taskId,
+      })),
+    },
+  });
+  const now = Date.now();
+  const checkpoint = {
+    checkpointId: `checkpoint-${input.run.runId}-${stepIndex}-${step?.retryCount ?? 0}-${now}`,
+    leaseId: input.leaseId,
+    artifactId: artifactResult.artifact._id,
+    createdAt: now,
+    stepIndex,
+    stepId: step?.stepId,
+    retryCount: step?.retryCount ?? 0,
+    taskId: step?.taskId,
+    summary: input.summary,
+  };
+  await ctx.db.patch(input.run._id, {
+    checkpointAt: now,
+    checkpointSummary: input.summary,
+    executionCheckpoint: checkpoint,
+  });
+  if (artifactResult.created) {
+    await insertRunEvent(ctx, {
+      workflowRunId: input.run._id,
+      workOrderId: input.run.workOrderId,
+      projectId: input.run.projectId,
+      tenantId: input.run.tenantId,
+      eventType: "CHECKPOINT_CREATED",
+      workflowStep: step?.stepId,
+      actor: input.run.lease?.ownerId ?? "workflow-executor",
+      status: step?.status,
+      commandSummary: input.summary,
+      evidenceArtifactIds: [artifactResult.artifact._id],
+      metadata: { checkpointId: checkpoint.checkpointId, leaseId: input.leaseId },
+      idempotencyKey: `${input.idempotencyKey}:event`,
+    });
+  }
+  return checkpoint;
+}
+
+async function dailyWorkflowCommitmentUsd(ctx: any, projectId: any, now: number) {
+  const startOfDay = new Date(now);
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const runs = await ctx.db
+    .query("workflowRuns")
+    .withIndex("by_project", (q: any) => q.eq("projectId", projectId))
+    .collect();
+  return runs
+    .filter((run: any) => run.startedAt >= startOfDay.getTime())
+    .reduce(
+      (total: number, run: any) => total + (run.spentUsd ?? 0) + (run.reservedCostUsd ?? 0),
+      0,
+    );
 }
 
 function redactExecutionPrompt<T extends Record<string, any> | null>(run: T): T {
@@ -507,6 +611,298 @@ export const search = query({
 // MUTATIONS
 // ============================================================================
 
+export const claimExecution = mutation({
+  args: {
+    runId: v.string(),
+    leaseId: v.string(),
+    ownerId: v.string(),
+    dispatchMode: v.union(v.literal("MANUAL"), v.literal("SCHEDULED")),
+    estimatedCostUsd: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db
+      .query("workflowRuns")
+      .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
+      .first();
+    if (!run) throw new Error(`Workflow run not found: ${args.runId}`);
+    if (!run.projectId) return { claimed: false as const, reason: "workspace-required" };
+    if (run.factoryDefinitionVersionId || run.executionManifestDigest) {
+      return { claimed: false as const, reason: "factory-worker-owned" };
+    }
+    if (!args.leaseId.trim() || !args.ownerId.trim()) {
+      return { claimed: false as const, reason: "lease-identity-invalid" };
+    }
+
+    const now = Date.now();
+    const control = await getEffectiveOperatorControl(ctx.db, run.projectId);
+    const projectRuns = await ctx.db
+      .query("workflowRuns")
+      .withIndex("by_project", (q) => q.eq("projectId", run.projectId))
+      .collect();
+    const activeLeaseCount = projectRuns.filter(
+      (candidate) => candidate._id !== run._id && candidate.lease && candidate.lease.expiresAt > now,
+    ).length;
+    const dailyCommittedUsd = Math.max(
+      0,
+      (await dailyWorkflowCommitmentUsd(ctx, run.projectId, now)) - (run.reservedCostUsd ?? 0),
+    );
+    const decision = evaluateWorkflowClaim({
+      mode: control.mode,
+      policy: control.executionPolicy,
+      dispatchMode: args.dispatchMode,
+      runStatus: run.status,
+      cancellationRequested: Boolean(run.cancellationRequestedAt),
+      quarantined: Boolean(run.executionQuarantine),
+      existingLease: run.lease,
+      hasRecoveryCheckpoint: Boolean(
+        run.lease
+        && run.executionCheckpoint
+        && run.executionCheckpoint.leaseId === run.lease.leaseId,
+      ),
+      staleRecoveryCount: run.executionStaleRecoveryCount ?? 0,
+      activeLeaseCount,
+      dailyCommittedUsd,
+      runSpentUsd: run.spentUsd ?? 0,
+      estimatedCostUsd: args.estimatedCostUsd ?? 0,
+      now,
+    });
+    if (!decision.ok) {
+      if (decision.quarantine) {
+        const staleRecoveryCount = decision.staleRecoveryCount;
+        await ctx.db.patch(run._id, {
+          status: "PAUSED",
+          lease: undefined,
+          reservedCostUsd: 0,
+          executionStaleRecoveryCount: staleRecoveryCount,
+          executionQuarantine: {
+            code: decision.reason,
+            reason: `Automatic recovery stopped: ${decision.reason}`,
+            quarantinedAt: now,
+            actor: args.ownerId,
+            staleRecoveryCount,
+          },
+          checkpointAt: now,
+          checkpointSummary: `Run quarantined: ${decision.reason}`,
+        });
+        await insertRunEvent(ctx, {
+          workflowRunId: run._id,
+          workOrderId: run.workOrderId,
+          projectId: run.projectId,
+          tenantId: run.tenantId,
+          eventType: "RUN_QUARANTINED",
+          workflowStep: run.steps[run.currentStepIndex]?.stepId,
+          actor: args.ownerId,
+          status: "PAUSED",
+          errorCategory: decision.reason,
+          errorSummary: `Automatic recovery stopped: ${decision.reason}`,
+          metadata: { staleRecoveryCount },
+          idempotencyKey: `run-quarantined:${run.runId}:${staleRecoveryCount}`,
+        });
+      }
+      return {
+        claimed: false as const,
+        reason: decision.reason,
+        quarantined: Boolean(decision.quarantine),
+      };
+    }
+
+    const lease = {
+      leaseId: args.leaseId,
+      ownerId: args.ownerId,
+      claimedAt: now,
+      heartbeatAt: now,
+      expiresAt: now + control.executionPolicy.leaseDurationMs,
+    };
+    const attemptNumber = (run.executionAttemptNumber ?? 0) + (decision.recovering ? 0 : 1);
+    await ctx.db.patch(run._id, {
+      status: "RUNNING",
+      lease,
+      reservedCostUsd: args.estimatedCostUsd ?? 0,
+      budgetUsd: run.budgetUsd ?? control.executionPolicy.perRunBudgetUsd,
+      spentUsd: run.spentUsd ?? 0,
+      executionAttemptNumber: Math.max(1, attemptNumber),
+      executionStaleRecoveryCount: decision.staleRecoveryCount,
+      executorHostId: args.ownerId,
+    });
+    const leasedRun = { ...run, status: "RUNNING", lease };
+    const checkpoint = await createExecutionCheckpoint(ctx, {
+      run: leasedRun,
+      leaseId: lease.leaseId,
+      summary: decision.recovering
+        ? "Stale ownership recovered from the last durable cursor."
+        : "Execution claimed before starting work.",
+      idempotencyKey: `execution-claim-checkpoint:${run.runId}:${lease.leaseId}`,
+    });
+    await insertRunEvent(ctx, {
+      workflowRunId: run._id,
+      workOrderId: run.workOrderId,
+      projectId: run.projectId,
+      tenantId: run.tenantId,
+      eventType: decision.recovering ? "STALE_RUN_RECOVERED" : "EXECUTION_CLAIMED",
+      workflowStep: run.steps[run.currentStepIndex]?.stepId,
+      actor: args.ownerId,
+      status: "RUNNING",
+      startedAt: now,
+      metadata: {
+        leaseId: lease.leaseId,
+        expiresAt: lease.expiresAt,
+        dispatchMode: args.dispatchMode,
+        checkpointArtifactId: checkpoint.artifactId,
+        staleRecoveryCount: decision.staleRecoveryCount,
+      },
+      idempotencyKey: `execution-claimed:${run.runId}:${lease.leaseId}`,
+    });
+    return {
+      claimed: true as const,
+      recovering: decision.recovering,
+      runId: run.runId,
+      lease,
+      checkpoint,
+      policy: control.executionPolicy,
+    };
+  },
+});
+
+export const heartbeatExecution = mutation({
+  args: {
+    runId: v.string(),
+    leaseId: v.string(),
+    ownerId: v.string(),
+    costDeltaUsd: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db
+      .query("workflowRuns")
+      .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
+      .first();
+    if (!run) throw new Error(`Workflow run not found: ${args.runId}`);
+    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
+    if (!run.projectId || !run.lease) throw new Error("Workflow run has no active workspace lease.");
+    const costDeltaUsd = args.costDeltaUsd ?? 0;
+    if (!Number.isFinite(costDeltaUsd) || costDeltaUsd < 0) {
+      throw new Error("Heartbeat cost delta must be a non-negative number.");
+    }
+    const now = Date.now();
+    const control = await getEffectiveOperatorControl(ctx.db, run.projectId);
+    const runSpentUsd = (run.spentUsd ?? 0) + costDeltaUsd;
+    const dailyCommittedUsd = await dailyWorkflowCommitmentUsd(ctx, run.projectId, now);
+    const directive = workflowHeartbeatDirective({
+      mode: control.mode,
+      quarantined: Boolean(run.executionQuarantine),
+      cancellationRequested: Boolean(run.cancellationRequestedAt),
+      runSpentUsd,
+      runBudgetUsd: run.budgetUsd ?? control.executionPolicy.perRunBudgetUsd,
+      dailyCommittedUsd,
+      dailyBudgetUsd: control.executionPolicy.dailyBudgetUsd,
+    });
+    const renew = directive === "CONTINUE" || directive === "DRAIN";
+    const lease = renew
+      ? {
+          ...run.lease,
+          heartbeatAt: now,
+          expiresAt: now + control.executionPolicy.leaseDurationMs,
+        }
+      : run.lease;
+    await ctx.db.patch(run._id, {
+      lease,
+      spentUsd: runSpentUsd,
+      reservedCostUsd: Math.max(0, (run.reservedCostUsd ?? 0) - costDeltaUsd),
+    });
+    await insertRunEvent(ctx, {
+      workflowRunId: run._id,
+      workOrderId: run.workOrderId,
+      projectId: run.projectId,
+      tenantId: run.tenantId,
+      eventType: "EXECUTION_HEARTBEAT",
+      workflowStep: run.steps[run.currentStepIndex]?.stepId,
+      actor: args.ownerId,
+      status: directive,
+      startedAt: now,
+      metadata: { leaseId: args.leaseId, directive, costDeltaUsd, expiresAt: lease.expiresAt },
+      idempotencyKey: `execution-heartbeat:${run.runId}:${args.leaseId}:${now}`,
+    });
+    return { directive, lease, runSpentUsd, policy: control.executionPolicy };
+  },
+});
+
+export const checkpointExecution = mutation({
+  args: {
+    runId: v.string(),
+    leaseId: v.string(),
+    ownerId: v.string(),
+    summary: v.string(),
+    idempotencyKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db
+      .query("workflowRuns")
+      .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
+      .first();
+    if (!run) throw new Error(`Workflow run not found: ${args.runId}`);
+    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
+    return await createExecutionCheckpoint(ctx, {
+      run,
+      leaseId: args.leaseId,
+      summary: args.summary,
+      idempotencyKey: args.idempotencyKey,
+    });
+  },
+});
+
+export const releaseExecution = mutation({
+  args: {
+    runId: v.string(),
+    leaseId: v.string(),
+    ownerId: v.string(),
+    disposition: v.union(v.literal("PAUSED"), v.literal("CANCELED")),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db
+      .query("workflowRuns")
+      .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
+      .first();
+    if (!run) throw new Error(`Workflow run not found: ${args.runId}`);
+    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
+    const checkpoint = await createExecutionCheckpoint(ctx, {
+      run,
+      leaseId: args.leaseId,
+      summary: args.reason,
+      idempotencyKey: `execution-release:${run.runId}:${args.leaseId}:${args.disposition}`,
+    });
+    const now = Date.now();
+    await ctx.db.patch(run._id, {
+      status: args.disposition,
+      lease: undefined,
+      reservedCostUsd: 0,
+      checkpointAt: now,
+      checkpointSummary: args.reason,
+      ...(args.disposition === "CANCELED"
+        ? {
+            completedAt: now,
+            failureReason: args.reason,
+            steps: reconcileTerminalWorkflowSteps(run.steps, "CANCELED", args.reason, now),
+          }
+        : {}),
+    });
+    await insertRunEvent(ctx, {
+      workflowRunId: run._id,
+      workOrderId: run.workOrderId,
+      projectId: run.projectId,
+      tenantId: run.tenantId,
+      eventType: args.disposition === "CANCELED" ? "RUN_CANCELED" : "RUN_PAUSED",
+      workflowStep: run.steps[run.currentStepIndex]?.stepId,
+      actor: args.ownerId,
+      status: args.disposition,
+      endedAt: now,
+      errorSummary: args.reason,
+      evidenceArtifactIds: [checkpoint.artifactId],
+      idempotencyKey: `execution-release-event:${run.runId}:${args.leaseId}:${args.disposition}`,
+    });
+    return { released: true as const, status: args.disposition, checkpoint };
+  },
+});
+
 /**
  * Start a new workflow run
  */
@@ -795,6 +1191,8 @@ export const linkArtifactToVerificationReceipt = mutation({
 export const updateStep = mutation({
   args: {
     runId: v.string(),
+    leaseId: v.optional(v.string()),
+    ownerId: v.optional(v.string()),
     stepIndex: v.number(),
     status: v.union(
       v.literal("PENDING"),
@@ -821,6 +1219,7 @@ export const updateStep = mutation({
     if (!run) {
       throw new Error(`Workflow run not found: ${args.runId}`);
     }
+    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
     
     const steps = [...run.steps];
     const step = steps[args.stepIndex];
@@ -968,6 +1367,18 @@ export const updateStep = mutation({
           error: args.error,
         },
       });
+    }
+
+    if (run.lease) {
+      const checkpointRun = await ctx.db.get(run._id);
+      if (checkpointRun) {
+        await createExecutionCheckpoint(ctx, {
+          run: checkpointRun,
+          leaseId: run.lease.leaseId,
+          summary: `Step ${step.stepId} transitioned to ${args.status}.`,
+          idempotencyKey: `step-checkpoint:${run.runId}:${args.stepIndex}:${step.retryCount}:${args.status}`,
+        });
+      }
     }
 
     return { success: true };
@@ -1161,6 +1572,8 @@ export const requestCancellation = mutation({
 export const updateStatus = mutation({
   args: {
     runId: v.string(),
+    leaseId: v.optional(v.string()),
+    ownerId: v.optional(v.string()),
     status: v.string(),
     failureReason: v.optional(v.string()),
   },
@@ -1173,6 +1586,16 @@ export const updateStatus = mutation({
     if (!run) {
       throw new Error(`Workflow run not found: ${args.runId}`);
     }
+    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
+
+    if (run.lease && ["COMPLETED", "FAILED", "CANCELED", "PAUSED"].includes(args.status)) {
+      await createExecutionCheckpoint(ctx, {
+        run,
+        leaseId: run.lease.leaseId,
+        summary: `Run transitioned to ${args.status}${args.failureReason ? `: ${args.failureReason}` : "."}`,
+        idempotencyKey: `run-status-checkpoint:${run.runId}:${run.lease.leaseId}:${args.status}`,
+      });
+    }
     
     const updates: any = {
       status: args.status,
@@ -1184,10 +1607,15 @@ export const updateStatus = mutation({
     
     if (args.status === "COMPLETED" || args.status === "FAILED") {
       updates.completedAt = Date.now();
+      updates.lease = undefined;
+      updates.spentUsd = (run.spentUsd ?? 0) + (run.reservedCostUsd ?? 0);
+      updates.reservedCostUsd = 0;
     }
 
     if (args.status === "CANCELED") {
       updates.completedAt = Date.now();
+      updates.lease = undefined;
+      updates.reservedCostUsd = 0;
     }
 
     if (args.status === "FAILED" || args.status === "CANCELED") {
@@ -1270,6 +1698,23 @@ export const updateStatus = mutation({
       });
     }
 
+    if (args.status === "CANCELED") {
+      await insertRunEvent(ctx, {
+        workflowRunId: run._id,
+        workOrderId: run.workOrderId,
+        projectId: run.projectId,
+        tenantId: run.tenantId,
+        eventType: "RUN_CANCELED",
+        workflowStep: run.steps[run.currentStepIndex]?.stepId,
+        actor: args.ownerId ?? "system",
+        status: "CANCELED",
+        startedAt: run.startedAt,
+        endedAt: updates.completedAt,
+        errorSummary: args.failureReason,
+        idempotencyKey: `run-canceled:${run.runId}`,
+      });
+    }
+
     if (run.workOrderId) {
       await ctx.runMutation(internal.workOrders.syncExecutionOutcome, {
         workflowRunId: run._id,
@@ -1295,6 +1740,8 @@ export const updateStatus = mutation({
 export const updateContext = mutation({
   args: {
     runId: v.string(),
+    leaseId: v.optional(v.string()),
+    ownerId: v.optional(v.string()),
     context: v.any(),
   },
   handler: async (ctx, args) => {
@@ -1306,6 +1753,7 @@ export const updateContext = mutation({
     if (!run) {
       throw new Error(`Workflow run not found: ${args.runId}`);
     }
+    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
     
     await ctx.db.patch(run._id, {
       context: { ...run.context, ...args.context },
@@ -1321,6 +1769,8 @@ export const updateContext = mutation({
 export const incrementRetry = mutation({
   args: {
     runId: v.string(),
+    leaseId: v.optional(v.string()),
+    ownerId: v.optional(v.string()),
     stepIndex: v.number(),
   },
   handler: async (ctx, args) => {
@@ -1332,6 +1782,7 @@ export const incrementRetry = mutation({
     if (!run) {
       throw new Error(`Workflow run not found: ${args.runId}`);
     }
+    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
     
     const steps = [...run.steps];
     const step = steps[args.stepIndex];
@@ -1339,6 +1790,15 @@ export const incrementRetry = mutation({
     if (!step) {
       throw new Error(`Step index out of bounds: ${args.stepIndex}`);
     }
+
+    const checkpoint = run.lease
+      ? await createExecutionCheckpoint(ctx, {
+          run,
+          leaseId: run.lease.leaseId,
+          summary: `Checkpoint before retry ${step.retryCount + 1} for ${step.stepId}.`,
+          idempotencyKey: `retry-checkpoint:${run.runId}:${args.stepIndex}:${step.retryCount + 1}`,
+        })
+      : undefined;
     
     steps[args.stepIndex] = {
       ...step,
@@ -1358,7 +1818,7 @@ export const incrementRetry = mutation({
       status: "RUNNING",
       retryNumber: step.retryCount + 1,
       errorSummary: step.error,
-      metadata: { checkpointArtifactId: null },
+      metadata: { checkpointArtifactId: checkpoint?.artifactId ?? null },
       idempotencyKey: `retry-start:${run.runId}:${args.stepIndex}:${step.retryCount + 1}`,
     });
 
@@ -1368,6 +1828,9 @@ export const incrementRetry = mutation({
       });
     }
     
-    return { retryCount: steps[args.stepIndex].retryCount };
+    return {
+      retryCount: steps[args.stepIndex].retryCount,
+      checkpointArtifactId: checkpoint?.artifactId,
+    };
   },
 });

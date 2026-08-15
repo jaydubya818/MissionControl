@@ -14,10 +14,11 @@ decisions without surrendering human authority.
 ## Software Factory: governed recursive self-improvement
 
 The Mission Control Software Factory is designed as a **governed Recursive
-Self-Improvement (RSI) and continuous-learning system**. It continuously
-researches operator-approved sources, learns from delivery evidence, recommends
-improvements, implements approved changes, verifies the result, measures the
-outcome, and uses that evidence to propose the next bounded iteration.
+Self-Improvement (RSI) and continuous-learning system**. Its target operating
+model continuously researches operator-approved sources, learns from delivery
+evidence, recommends improvements, implements approved changes, verifies the
+result, measures the outcome, and uses that evidence to propose the next
+bounded iteration.
 
 The operating loop is:
 
@@ -32,10 +33,22 @@ Mission Control hierarchy:
 
 `Mission -> WorkOrder -> Task -> Attempt -> evidence -> pull request -> release`
 
-Continuous read-only research may run within explicit source, cost, time, and
-retention limits. Material changes still require governed scope, independent
-verification, measurable acceptance criteria, rollback controls, and the
-appropriate human decision.
+The current safe boundary is operator-triggered Web/RSS research with atomic
+artifact, observation, cursor, and verification-receipt lineage. A verified run
+can seed one frozen Research Brief and an operator can explicitly dispatch a
+read-only claim extractor followed by a distinct evidence verifier over only
+those frozen observation IDs. Broad discovery, automatic scheduling,
+recommendation generation, and repository changes remain disabled. Material
+changes still require governed scope, measurable acceptance criteria, rollback
+controls, and the appropriate human decision.
+
+The manual research executor now uses an atomic workspace lease, lease-fenced
+state writes, owner heartbeats, durable cursor checkpoints, reasoned retries,
+stale-owner recovery, budget reservations, workspace concurrency admission,
+automatic quarantine, and audited pause/drain/kill controls. A bounded live
+Research Lab drill independently verified each control and restored the
+workspace to `NORMAL`. This proof does not enable recurrence: scheduled claims
+still fail closed while `continuousSchedulingEnabled` is `false`.
 
 - [Governed Continuous Learning implementation plan](docs/plans/2026-08-08-feat-governed-continuous-learning-plan.md)
 - [Governed Continuous Learning operator and source contract](docs/software-factory/CONTINUOUS_LEARNING.md)
