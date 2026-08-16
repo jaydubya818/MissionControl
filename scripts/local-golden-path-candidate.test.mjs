@@ -14,6 +14,8 @@ const candidatePath = fileURLToPath(
 );
 const expectedOutput = `${JSON.stringify({
   schemaVersion: "local-golden-path-candidate/v1",
+  runtimeContractVersion: 24,
+  policyVersion: "verification-contract/v2",
   outcome: "deterministic-local-candidate",
   executionBoundary: "LOCAL_ONLY",
   publicationAuthority: "CONTROL_PLANE",
