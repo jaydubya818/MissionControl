@@ -1,0 +1,87 @@
+{
+  "schema": "mission-control-remote-sandbox-hardening-checks/v1",
+  "baselineSha": "627d55b3a572300863dee3fa15ff5a0cb32be7a6",
+  "recordedAt": "2026-08-19T19:16:00Z",
+  "decision": "HOLD",
+  "checks": [
+    {
+      "name": "focused provider/runtime/structured-result/worker/routing tests",
+      "status": "PASS",
+      "tests": 52
+    },
+    {
+      "name": "exact linux/amd64 image build",
+      "status": "PASS",
+      "imageId": "sha256:906c8e09ba3dc72018f991f5450d7c99fd6cda5898d5e86b7c116f317d959ed0"
+    },
+    {
+      "name": "two-container guest network/toolchain/credential/filesystem qualification",
+      "status": "PASS",
+      "samples": 2
+    },
+    {
+      "name": "SPDX 2.3 SBOM generation",
+      "status": "PASS",
+      "packages": 141,
+      "sha256": "sha256:2ead6dfd944ed91989f5916395ac88f693d6e5106f364596a7b62ecadc5ebc98"
+    },
+    {
+      "name": "pinned Codex package graph npm audit",
+      "status": "PASS",
+      "critical": 0,
+      "high": 0,
+      "moderate": 0,
+      "low": 0
+    },
+    {
+      "name": "image Critical/High vulnerability gate",
+      "status": "FAIL_CLOSED",
+      "critical": 0,
+      "high": 7,
+      "publicationBlocked": true
+    },
+    {
+      "name": "exe.dev provider egress capability",
+      "status": "UNSUPPORTED",
+      "providerEnforced": false,
+      "productionRoutingBlocked": true
+    },
+    {
+      "name": "pnpm run qualify:factory",
+      "status": "PASS",
+      "durationMs": 131227,
+      "coverage": [
+        "dependency/security gates",
+        "repository secret scan",
+        "Remote Sandbox",
+        "Generic Harness",
+        "worker/lease/recovery",
+        "Verification Factory",
+        "Review Intelligence",
+        "Factory Learning",
+        "routing",
+        "full repository tests",
+        "TypeScript",
+        "skill lint",
+        "runtime guard",
+        "production build",
+        "orchestration smoke",
+        "git diff --check"
+      ]
+    },
+    {
+      "name": "historical evidence preservation",
+      "status": "PASS",
+      "generatedQualificationOutputsRestored": [
+        "docs/testing/evidence/system-factory-e2e-v2/automated-checks.json",
+        "docs/testing/evidence/system-factory-e2e-v2/scenario-evidence.json"
+      ]
+    },
+    {
+      "name": "live three-workload gate",
+      "status": "NOT_RUN",
+      "allocatedVms": 0,
+      "reason": "Pre-live provider-egress and image-vulnerability gates failed."
+    }
+  ]
+}

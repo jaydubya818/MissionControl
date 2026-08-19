@@ -1,0 +1,63 @@
+{
+  "schema": "mission-control-remote-sandbox-hardening-baseline/v1",
+  "recordedAt": "2026-08-19",
+  "runtimeContract": "v30",
+  "publication": {
+    "pullRequest": 123,
+    "preMergeMainSha": "db44819ec59e79cdd71ba9ed36fce8064a120af3",
+    "qualifiedHeadSha": "f85c372f348df4ae30a9be6ace9cf07f77381cf6",
+    "mergeCommitSha": "627d55b3a572300863dee3fa15ff5a0cb32be7a6",
+    "mergedAt": "2026-08-19T18:13:04Z",
+    "postMergeCiRunId": 32286083942,
+    "postMergeCi": "9/9 PASS",
+    "postMergeVercel": "2/2 PASS",
+    "publishedDecision": "HUMAN-GOVERNED PRODUCTION PILOT READY"
+  },
+  "hardeningBaselineSha": "627d55b3a572300863dee3fa15ff5a0cb32be7a6",
+  "priorCertification": {
+    "remoteSandboxLiveCertification": {
+      "path": "docs/software-factory/remote-sandbox-live-certification-v1.md",
+      "sha256": "bdb01ac1aba4dc7421e2f1e06dde4ac7de1878b54652c28548e04664059ce5c2",
+      "decision": "LIVE CERTIFIED WITH KNOWN LIMITATIONS"
+    },
+    "remoteCodexStructuredOutputV1": {
+      "files": 14,
+      "aggregateSha256": "ac4e657649cc10e00cad5f99274d83c212eba306549c46ca9f45b1b5e3cddc93"
+    },
+    "remoteRuntimeReliabilityV1": {
+      "files": 16,
+      "aggregateSha256": "7f33c2b46329e96d13d73395be0604ca448411ac2dbd82a6db185d36308fafc8"
+    },
+    "productionFactoryPilotV3": {
+      "directory": "docs/testing/evidence/production-factory-pilot-v3",
+      "sha256SumsFileSha256": "a01715032972a309dc82943e98e91bc7212435c22958ec5923fc80d7afdd3c69",
+      "workloads": 15,
+      "accepted": 15,
+      "remoteFirstPass": "3/3",
+      "finalVmInventory": 0
+    }
+  },
+  "existingExeDevProfile": {
+    "profileKey": "exe-production-pilot-v3-n1",
+    "version": 1,
+    "provider": "EXE_DEV",
+    "providerProfile": "individual-small",
+    "providerProfileVersion": "production-pilot-v3",
+    "image": "node:24-bookworm",
+    "cpu": 2,
+    "memoryMb": 4096,
+    "diskGb": 20,
+    "egress": "UNRESTRICTED",
+    "readiness": "DEGRADED",
+    "codexStartup": "npx @openai/codex@0.146.0",
+    "harness": "codex-cli/0.146.0",
+    "knownLimitations": [
+      "unrestricted outbound egress",
+      "ephemeral Codex installation",
+      "no per-VM provider price",
+      "Remote Sandbox remains Preview",
+      "Guarded Auto remains disabled"
+    ]
+  },
+  "historicalEvidenceModified": false
+}

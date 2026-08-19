@@ -1,0 +1,45 @@
+{
+  "schema": "mission-control-exedev-capability-audit/v1",
+  "observedAt": "2026-08-19",
+  "authenticated": true,
+  "capacity": {
+    "vmCount": 0,
+    "maxVms": 50,
+    "available": true
+  },
+  "automaticIntegrations": [],
+  "customImage": {
+    "supported": true,
+    "cliOption": "new --image",
+    "immutableDigestAcceptance": "NOT_LIVE_TESTED"
+  },
+  "networkPolicy": {
+    "providerControlFound": false,
+    "newCommandOptionsInspected": [
+      "comment",
+      "cpu",
+      "disk",
+      "env",
+      "image",
+      "integration",
+      "memory",
+      "name",
+      "pool",
+      "registry-auth",
+      "setup-script",
+      "tag"
+    ],
+    "firewallOrEgressOptionFound": false,
+    "officialDocsInspected": [
+      "https://exe.dev/docs/faq/how-exedev-works",
+      "https://exe.dev/docs/all",
+      "https://exe.dev/docs/cli-new",
+      "https://exe.dev/docs/customization",
+      "https://exe.dev/docs/private-image",
+      "https://exe.dev/docs/api"
+    ],
+    "conclusion": "No exe.dev control-plane egress/firewall primitive was exposed. Guest nftables cannot be represented as provider-enforced isolation."
+  },
+  "liveAllocationPerformed": false,
+  "reason": "The supply-chain and provider-egress gates failed before the live workload admission point."
+}

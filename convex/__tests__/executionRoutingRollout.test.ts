@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Id } from "../_generated/dataModel";
-import { executionRoutingRequested } from "../lib/executionRouting";
+import { executionRoutingRequested, sandboxProfileProductionEligible } from "../lib/executionRouting";
 
 describe("execution routing rollout", () => {
   it("preserves legacy dispatch unless an exact Factory baseline or pin opts in", () => {
@@ -17,5 +17,15 @@ describe("execution routing rollout", () => {
         pinnedAt: 1,
       },
     })).toBe(true);
+  });
+
+  it("keeps qualification-only sandbox profiles out of production routing", () => {
+    expect(sandboxProfileProductionEligible({ immutableSnapshot: {
+      security: { qualificationOnly: true },
+    } })).toBe(false);
+    expect(sandboxProfileProductionEligible({ immutableSnapshot: {
+      security: { qualificationOnly: false },
+    } })).toBe(true);
+    expect(sandboxProfileProductionEligible({ immutableSnapshot: {} })).toBe(true);
   });
 });

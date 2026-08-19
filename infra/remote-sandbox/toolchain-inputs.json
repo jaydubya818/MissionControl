@@ -1,0 +1,35 @@
+{
+  "schema": "mission-control-remote-toolchain-inputs/v1",
+  "profile": "remote-sandbox/exe-dev/restricted-candidate-v1",
+  "platform": "linux/amd64",
+  "baseImage": {
+    "reference": "cgr.dev/chainguard/node:latest-dev",
+    "indexDigest": "sha256:a80a0ccda073dd286414fe410189d2c749038af4c874e5e2be6d6fb8acc53182",
+    "platformDigest": "sha256:7d3fb5f2b096635e0a97491b46aa9f2a32df780c6882d47d5684bdcc4932f694"
+  },
+  "nodeVersion": "v26.7.0",
+  "codex": {
+    "package": "@openai/codex",
+    "version": "0.146.0",
+    "packageIntegrity": "sha512-yG3sPWNda/2YAIQIDq9MrrjoCTIQ7rxYM5IasrG3VBcuhCLTkgeg/JzqmJq1V98RE4MJ5jCxDXXQlOjrditFRw==",
+    "linuxX64PackageIntegrity": "sha512-fswvyGprAPCMiOEue/7MKMk7pCjh9kZIJfJX5i9atmfnmGYbYCcUhZsEH9LEP0+0t5xyPqDbfNXY7NSxIVuXxA=="
+  },
+  "executionUser": {
+    "name": "mc-attempt",
+    "uid": 10001,
+    "gid": 10001
+  },
+  "packageOverrides": {
+    "busybox": "1.38.0-r1"
+  },
+  "requiredTools": [
+    "ca-certificates",
+    "git",
+    "iproute2",
+    "nftables",
+    "procps",
+    "setpriv",
+    "shadow",
+    "util-linux-misc"
+  ]
+}

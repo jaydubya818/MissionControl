@@ -1,0 +1,14 @@
+{
+  "status": "ready",
+  "readiness": {
+    "authenticated": true,
+    "vmCount": 0,
+    "maxVms": 50,
+    "providerCapacityAvailable": true,
+    "billingPlanReadable": true,
+    "billingUsageReadable": true,
+    "automaticIntegrations": [],
+    "liveAllocationAllowed": true
+  },
+  "blockers": []
+}

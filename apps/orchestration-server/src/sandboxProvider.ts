@@ -3,6 +3,8 @@ import { canonicalDigest } from "@mission-control/shared";
 export const SANDBOX_PROFILE_SCHEMA = "factory-sandbox-profile/v1" as const;
 export const SANDBOX_RESULT_SCHEMA = "factory-sandbox-result/v1" as const;
 export const SANDBOX_SUPERVISOR_VERSION = "mission-control-supervisor/v1" as const;
+export const SANDBOX_SECURITY_SCHEMA = "factory-sandbox-security/v1" as const;
+export const RESTRICTED_CANDIDATE_PROFILE = "remote-sandbox/exe-dev/restricted-candidate-v1" as const;
 
 export type SandboxProviderKind = "EXE_DEV" | "FAKE";
 export type SandboxReadinessState = "READY" | "DEGRADED" | "BLOCKED";
@@ -73,6 +75,40 @@ export interface SandboxProfileSnapshot {
     liveCertified?: boolean;
     evidenceReference?: string;
   };
+  security?: {
+    schema: typeof SANDBOX_SECURITY_SCHEMA;
+    profile: typeof RESTRICTED_CANDIDATE_PROFILE;
+    qualificationOnly: true;
+    image: {
+      digest: string;
+      provenanceReference: string;
+      sbomDigest: string;
+    };
+    toolchain: {
+      nodeVersion: string;
+      codexVersion: string;
+      codexBinarySha256: string;
+      toolchainInputsSha256: string;
+    };
+    execution: {
+      user: "mc-attempt";
+      uid: 10_001;
+      gid: 10_001;
+      homePath: "/var/lib/mission-control/attempt/home";
+      temporaryPath: "/var/lib/mission-control/attempt/tmp";
+      noNewPrivileges: true;
+    };
+    network: {
+      enforcement: "GUEST_NFTABLES";
+      providerEnforced: false;
+      allowedHttpsHosts: string[];
+      dnsMode: "CONTROL_PLANE_RESOLVE_ETC_HOSTS";
+      denyPrivateNetworks: true;
+      denyLinkLocal: true;
+      denyMetadata: true;
+      denyUnexpectedDns: true;
+    };
+  };
 }
 
 export interface SandboxProfileValidation {
@@ -122,6 +158,7 @@ export interface SandboxStartRequest {
   attemptId: string;
   sourceSha: string;
   profileDigest: string;
+  security?: SandboxProfileSnapshot["security"];
   environmentDescriptor: {
     provider: SandboxProviderKind;
     image: string;
@@ -146,6 +183,39 @@ export interface SandboxStartReceipt {
   processId: string;
   startedAt: number;
   state: "RUNNING";
+  securityProof?: SandboxSecurityProof;
+}
+
+export interface SandboxSecurityProof {
+  schema: "factory-sandbox-security-proof/v1";
+  profile: typeof RESTRICTED_CANDIDATE_PROFILE;
+  observedAt: number;
+  toolchain: {
+    nodeVersion: string;
+    codexVersion: string;
+    codexBinarySha256: string;
+    toolchainInputsSha256: string;
+    executionUid: number;
+    executionGid: number;
+  };
+  filesystem: {
+    repositoryOwnerUid: number;
+    repositoryOwnerGid: number;
+    protectedPathsReadOnly: boolean;
+  };
+  network: {
+    enforcement: "GUEST_NFTABLES";
+    providerEnforced: false;
+    policyDigest: string;
+    allowedHttpsHosts: string[];
+    resolvedAddresses: string[];
+    controlExternalEndpointReachable: boolean;
+    approvedEndpointReachable: boolean;
+    arbitraryExternalBlocked: boolean;
+    privateNetworkBlocked: boolean;
+    metadataBlocked: boolean;
+    unexpectedDnsBlocked: boolean;
+  };
 }
 
 export interface SandboxTerminationReceipt {
@@ -208,6 +278,44 @@ export function validateSandboxProfile(profile: SandboxProfileSnapshot): Sandbox
   if (profile.readiness.state === "READY" && profile.network.egress === "UNRESTRICTED") errors.push("An unrestricted-egress profile cannot be marked READY.");
   if (profile.provider === "EXE_DEV" && profile.readiness.liveCertified !== true) errors.push("Live exe.dev lifecycle certification is not recorded.");
   if (profile.readiness.state === "BLOCKED") errors.push(`Provider readiness is blocked: ${profile.readiness.reason}`);
+  if (profile.security) {
+    const security = profile.security;
+    const imageDigest = profile.machine.image.match(/@(sha256:[a-f0-9]{64})$/i)?.[1]?.toLowerCase();
+    if (security.schema !== SANDBOX_SECURITY_SCHEMA || security.profile !== RESTRICTED_CANDIDATE_PROFILE) {
+      errors.push("Sandbox security profile identity is unsupported.");
+    }
+    if (security.qualificationOnly !== true) errors.push("The restricted exe.dev candidate must remain qualification-only.");
+    if (!imageDigest || imageDigest !== security.image.digest.toLowerCase()) errors.push("Restricted candidate image must be pinned by its exact OCI digest.");
+    if (![security.image.digest, security.image.sbomDigest, security.toolchain.codexBinarySha256, security.toolchain.toolchainInputsSha256]
+      .every((value) => /^sha256:[a-f0-9]{64}$/i.test(value))) {
+      errors.push("Restricted candidate provenance and toolchain digests must be exact SHA-256 values.");
+    }
+    if (!security.image.provenanceReference.trim()) errors.push("Restricted candidate image provenance is required.");
+    if (security.toolchain.nodeVersion !== "v26.7.0" || security.toolchain.codexVersion !== "codex-cli 0.146.0") {
+      errors.push("Restricted candidate toolchain identity is not certified.");
+    }
+    if (security.execution.user !== "mc-attempt" || security.execution.uid !== 10_001 || security.execution.gid !== 10_001
+      || security.execution.homePath !== "/var/lib/mission-control/attempt/home"
+      || security.execution.temporaryPath !== "/var/lib/mission-control/attempt/tmp"
+      || security.execution.noNewPrivileges !== true) {
+      errors.push("Restricted candidate execution identity is invalid.");
+    }
+    const normalizedAllowlist = [...new Set(security.network.allowedHttpsHosts)].sort();
+    if (security.network.enforcement !== "GUEST_NFTABLES" || security.network.providerEnforced !== false
+      || security.network.dnsMode !== "CONTROL_PLANE_RESOLVE_ETC_HOSTS"
+      || !security.network.denyPrivateNetworks || !security.network.denyLinkLocal
+      || !security.network.denyMetadata || !security.network.denyUnexpectedDns
+      || normalizedAllowlist.length !== 1 || normalizedAllowlist[0] !== "openrouter.ai") {
+      errors.push("Restricted candidate network policy is outside the qualified guest-kernel boundary.");
+    }
+    if (profile.network.egress !== "RESTRICTED_ALLOWLIST"
+      || JSON.stringify(profile.network.egressAllowlist) !== JSON.stringify(["openrouter.ai:443"])
+      || !profile.readiness.egressEnforcementProven) {
+      errors.push("Restricted candidate egress declaration does not match its frozen allowlist.");
+    }
+    if (profile.readiness.state !== "DEGRADED") errors.push("Guest-only egress enforcement must remain visibly DEGRADED.");
+    warnings.push("exe.dev exposes no provider-level egress control; guest nftables enforcement is qualification-only defense in depth.");
+  }
   const readiness = errors.length > 0 ? "BLOCKED" : profile.network.egress === "UNRESTRICTED" ? "DEGRADED" : profile.readiness.state;
   return {
     valid: errors.length === 0,

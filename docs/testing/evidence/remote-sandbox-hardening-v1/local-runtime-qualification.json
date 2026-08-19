@@ -1,0 +1,128 @@
+{
+  "schema": "mission-control-remote-sandbox-local-qualification/v1",
+  "observedAt": 1787166771610,
+  "image": "mc-remote-candidate:local",
+  "localImageId": "sha256:906c8e09ba3dc72018f991f5450d7c99fd6cda5898d5e86b7c116f317d959ed0",
+  "platform": "linux/amd64",
+  "toolchain": {
+    "nodeVersion": "v26.7.0",
+    "codexVersion": "codex-cli 0.146.0",
+    "codexBinarySha256": "2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04",
+    "toolchainInputsSha256": "a72e80a8ef14f2d35901e8705e763a813dc14a56b509a9965e0565415f1f0e56",
+    "uid": 10001,
+    "gid": 10001,
+    "setprivVersion": "setpriv from util-linux 2.42.2",
+    "setsidVersion": "setsid from util-linux 2.42.2",
+    "nftVersion": "nftables v1.1.6 (Commodore Bullmoose #7)"
+  },
+  "supplyChainCertified": false,
+  "providerEgressEnforced": false,
+  "credentialEnvironment": {
+    "present": [
+      "OPENAI_API_KEY",
+      "OPENAI_BASE_URL"
+    ],
+    "absent": [
+      "OPENROUTER_MANAGEMENT_API_KEY",
+      "GITHUB_TOKEN",
+      "GH_TOKEN",
+      "CONVEX_DEPLOY_KEY",
+      "EXE_DEV_TOKEN",
+      "MISSION_CONTROL_SERVICE_TOKEN"
+    ]
+  },
+  "sequentialFreshContainers": [
+    {
+      "label": "first",
+      "durationMs": 2697,
+      "previousAttemptArtifactAbsent": true,
+      "credentialNegativeChecksPassed": true,
+      "workspaceWriteAllowed": true,
+      "protectedPathsReadOnly": true,
+      "proof": {
+        "schema": "factory-sandbox-security-proof/v1",
+        "profile": "remote-sandbox/exe-dev/restricted-candidate-v1",
+        "observedAt": 1787166768662,
+        "toolchain": {
+          "nodeVersion": "v26.7.0",
+          "codexVersion": "codex-cli 0.146.0",
+          "codexBinarySha256": "sha256:2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04",
+          "toolchainInputsSha256": "sha256:a72e80a8ef14f2d35901e8705e763a813dc14a56b509a9965e0565415f1f0e56",
+          "executionUid": 10001,
+          "executionGid": 10001
+        },
+        "filesystem": {
+          "repositoryOwnerUid": 10001,
+          "repositoryOwnerGid": 10001,
+          "protectedPathsReadOnly": true
+        },
+        "network": {
+          "enforcement": "GUEST_NFTABLES",
+          "providerEnforced": false,
+          "policyDigest": "sha256:9786bfac28a3a6ab4803c6aea27172a97b38e43ae2290945226a4ae7174530e0",
+          "allowedHttpsHosts": [
+            "openrouter.ai"
+          ],
+          "resolvedAddresses": [
+            "104.18.2.115",
+            "104.18.3.115",
+            "2606:4700::6812:273",
+            "2606:4700::6812:373"
+          ],
+          "controlExternalEndpointReachable": true,
+          "approvedEndpointReachable": true,
+          "arbitraryExternalBlocked": true,
+          "privateNetworkBlocked": true,
+          "metadataBlocked": true,
+          "unexpectedDnsBlocked": true
+        }
+      }
+    },
+    {
+      "label": "second",
+      "durationMs": 2747,
+      "previousAttemptArtifactAbsent": true,
+      "credentialNegativeChecksPassed": true,
+      "workspaceWriteAllowed": true,
+      "protectedPathsReadOnly": true,
+      "proof": {
+        "schema": "factory-sandbox-security-proof/v1",
+        "profile": "remote-sandbox/exe-dev/restricted-candidate-v1",
+        "observedAt": 1787166771403,
+        "toolchain": {
+          "nodeVersion": "v26.7.0",
+          "codexVersion": "codex-cli 0.146.0",
+          "codexBinarySha256": "sha256:2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04",
+          "toolchainInputsSha256": "sha256:a72e80a8ef14f2d35901e8705e763a813dc14a56b509a9965e0565415f1f0e56",
+          "executionUid": 10001,
+          "executionGid": 10001
+        },
+        "filesystem": {
+          "repositoryOwnerUid": 10001,
+          "repositoryOwnerGid": 10001,
+          "protectedPathsReadOnly": true
+        },
+        "network": {
+          "enforcement": "GUEST_NFTABLES",
+          "providerEnforced": false,
+          "policyDigest": "sha256:9786bfac28a3a6ab4803c6aea27172a97b38e43ae2290945226a4ae7174530e0",
+          "allowedHttpsHosts": [
+            "openrouter.ai"
+          ],
+          "resolvedAddresses": [
+            "104.18.2.115",
+            "104.18.3.115",
+            "2606:4700::6812:273",
+            "2606:4700::6812:373"
+          ],
+          "controlExternalEndpointReachable": true,
+          "approvedEndpointReachable": true,
+          "arbitraryExternalBlocked": true,
+          "privateNetworkBlocked": true,
+          "metadataBlocked": true,
+          "unexpectedDnsBlocked": true
+        }
+      }
+    }
+  ]
+}

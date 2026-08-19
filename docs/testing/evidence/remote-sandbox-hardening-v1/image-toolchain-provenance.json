@@ -1,0 +1,37 @@
+{
+  "schema": "mission-control-remote-image-candidate-provenance/v1",
+  "qualificationState": "BLOCKED_BEFORE_PUBLICATION",
+  "platform": "linux/amd64",
+  "baseImage": {
+    "reference": "cgr.dev/chainguard/node:latest-dev",
+    "indexDigest": "sha256:a80a0ccda073dd286414fe410189d2c749038af4c874e5e2be6d6fb8acc53182",
+    "platformDigest": "sha256:7d3fb5f2b096635e0a97491b46aa9f2a32df780c6882d47d5684bdcc4932f694"
+  },
+  "localCandidateImageId": "sha256:906c8e09ba3dc72018f991f5450d7c99fd6cda5898d5e86b7c116f317d959ed0",
+  "registryDigest": null,
+  "registryPublication": false,
+  "provenanceAttestation": false,
+  "nodeVersion": "v26.7.0",
+  "codexVersion": "codex-cli 0.146.0",
+  "codexPackageIntegrity": "sha512-yG3sPWNda/2YAIQIDq9MrrjoCTIQ7rxYM5IasrG3VBcuhCLTkgeg/JzqmJq1V98RE4MJ5jCxDXXQlOjrditFRw==",
+  "codexLinuxX64PackageIntegrity": "sha512-fswvyGprAPCMiOEue/7MKMk7pCjh9kZIJfJX5i9atmfnmGYbYCcUhZsEH9LEP0+0t5xyPqDbfNXY7NSxIVuXxA==",
+  "codexBinarySha256": "sha256:2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04",
+  "toolchainInputsSha256": "sha256:a72e80a8ef14f2d35901e8705e763a813dc14a56b509a9965e0565415f1f0e56",
+  "sbom": {
+    "format": "SPDX-2.3",
+    "generator": "syft-1.51.0",
+    "packages": 141,
+    "sha256": "sha256:2ead6dfd944ed91989f5916395ac88f693d6e5106f364596a7b62ecadc5ebc98"
+  },
+  "execution": {
+    "user": "mc-attempt",
+    "uid": 10001,
+    "gid": 10001,
+    "setpriv": "util-linux 2.42.2",
+    "setsid": "util-linux 2.42.2",
+    "nftables": "1.1.6",
+    "runtimePackageInstallation": false,
+    "npmExecutablePresent": false,
+    "npxExecutablePresent": false
+  }
+}

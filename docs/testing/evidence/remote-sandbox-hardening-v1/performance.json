@@ -1,0 +1,24 @@
+{
+  "schema": "mission-control-remote-sandbox-hardening-performance/v1",
+  "existingProfile": {
+    "source": "docs/testing/evidence/production-factory-pilot-v3/README.md",
+    "samples": 3,
+    "allocationMedianMs": 3613,
+    "readinessMedianMs": 4385,
+    "executionMedianMs": 68886,
+    "teardownMedianMs": 3603,
+    "totalCycleMedianMs": 31616
+  },
+  "restrictedCandidate": {
+    "localFreshContainerSamples": 2,
+    "localBootstrapAndNegativeTestMs": [2697, 2747],
+    "allocationMs": null,
+    "readinessMs": null,
+    "startupMs": null,
+    "executionMs": null,
+    "teardownMs": null,
+    "totalCycleMs": null,
+    "reason": "No published certified image existed, so no comparable exe.dev workload was admitted. Local bootstrap timings are not treated as provider timings."
+  },
+  "regressionDecision": "NOT_COMPARABLE"
+}

@@ -1,0 +1,8 @@
+{
+  "schema": "mission-control-remote-sandbox-hardening-costs/v1",
+  "modelCostUsd": null,
+  "providerCostUsd": null,
+  "imageStorageCostUsd": null,
+  "liveWorkloadCostUsd": null,
+  "reason": "No live candidate workload or registry image was created. exe.dev does not expose a per-VM scenario price, and no storage price was incurred or inferred."
+}

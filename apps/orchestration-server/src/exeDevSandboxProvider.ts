@@ -9,11 +9,13 @@ import type {
   SandboxProvider,
   SandboxProfileSnapshot,
   SandboxProfileValidation,
+  SandboxSecurityProof,
   SandboxStartReceipt,
   SandboxStartRequest,
   SandboxTerminationReceipt,
 } from "./sandboxProvider.js";
 import { assertSafeSandboxResourceName, redactSandboxText, validateSandboxProfile } from "./sandboxProvider.js";
+import { standaloneRestrictedSandboxBootstrapSource } from "./standaloneRestrictedSandboxBootstrapSource.js";
 
 const execFileAsync = promisify(execFile);
 const EXE_DEV_HOST = "exe.dev";
@@ -22,6 +24,9 @@ const EXE_DEV_TAG = "mission-control-factory-attempt";
 const READY_STATES = new Set(["ready", "running"]);
 const TERMINAL_STATES = new Set(["stopped", "failed", "error"]);
 const REMOTE_ROOT = "/var/lib/mission-control/attempt";
+const RESTRICTED_BOOTSTRAP_PATH = `${REMOTE_ROOT}/restricted-bootstrap.mjs`;
+const RESTRICTED_BOOTSTRAP_CONFIG_PATH = `${REMOTE_ROOT}/restricted-bootstrap.json`;
+const RESTRICTED_SECURITY_PROOF_PATH = `${REMOTE_ROOT}/security-proof.json`;
 
 export interface ExeDevTransport {
   lobbyJson(command: string[]): Promise<any>;
@@ -106,6 +111,17 @@ export class ExeDevSandboxProvider implements SandboxProvider {
         throw new Error("Remote harness output schema must use the bounded Attempt schema path.");
       }
     }
+    if (request.security) {
+      const environmentKeys = Object.keys(request.environment).sort();
+      if (request.executor.resultPath !== `${REMOTE_ROOT}/executor-result.json`) {
+        throw new Error("Restricted sandbox executor result must use the bounded Attempt result path.");
+      }
+      if (JSON.stringify(environmentKeys) !== JSON.stringify(["OPENAI_API_KEY", "OPENAI_BASE_URL"])
+        || !request.environment.OPENAI_API_KEY
+        || request.environment.OPENAI_BASE_URL !== "https://openrouter.ai/api/v1") {
+        throw new Error("Restricted sandbox environment exceeds Attempt-scoped inference authority.");
+      }
+    }
     const config = {
       executionManifest: request.executionManifest,
       attemptId: request.attemptId,
@@ -125,6 +141,7 @@ export class ExeDevSandboxProvider implements SandboxProvider {
         resultPath: request.executor.resultPath,
         timeoutMs: request.executor.timeoutMs,
       },
+      ...(request.security ? { executionSecurity: request.security.execution } : {}),
       environment: request.environment,
     };
     await this.upload(request.allocation.resourceName, `${REMOTE_ROOT}/repository.bundle`, request.repositoryArchive);
@@ -132,20 +149,49 @@ export class ExeDevSandboxProvider implements SandboxProvider {
     if (request.executor.outputSchema) {
       await this.upload(request.allocation.resourceName, outputSchemaPath, Buffer.from(JSON.stringify(request.executor.outputSchema), "utf8"));
     }
-    await this.upload(request.allocation.resourceName, `${REMOTE_ROOT}/config.json`, Buffer.from(JSON.stringify(config), "utf8"));
     await this.transport.vmText(request.allocation.resourceName, [
       "set -eu",
       `rm -rf ${REMOTE_ROOT}/repository`,
       `git clone --quiet ${REMOTE_ROOT}/repository.bundle ${REMOTE_ROOT}/repository`,
       `git -C ${REMOTE_ROOT}/repository checkout --quiet ${request.sourceSha}`,
       `rm -f ${REMOTE_ROOT}/repository.bundle`,
-      `rm -f ${REMOTE_ROOT}/result.json ${REMOTE_ROOT}/result.json.tmp-* ${REMOTE_ROOT}/diagnostics.json ${REMOTE_ROOT}/diagnostics.json.tmp-* ${REMOTE_ROOT}/executor-result.json`,
+      `rm -f ${REMOTE_ROOT}/result.json ${REMOTE_ROOT}/result.json.tmp-* ${REMOTE_ROOT}/diagnostics.json ${REMOTE_ROOT}/diagnostics.json.tmp-* ${REMOTE_ROOT}/executor-result.json ${RESTRICTED_SECURITY_PROOF_PATH}`,
+    ].join("\n"));
+    let securityProof: SandboxSecurityProof | undefined;
+    if (request.security) {
+      const observedProviderImage = String(request.allocation.providerMetadata?.image ?? "");
+      if (!observedProviderImage) throw new Error("exe.dev did not report the allocated image identity.");
+      await this.upload(request.allocation.resourceName, RESTRICTED_BOOTSTRAP_PATH, Buffer.from(standaloneRestrictedSandboxBootstrapSource(), "utf8"));
+      await this.upload(request.allocation.resourceName, RESTRICTED_BOOTSTRAP_CONFIG_PATH, Buffer.from(JSON.stringify({
+        security: request.security,
+        expectedImage: request.environmentDescriptor.image,
+        observedProviderImage,
+        remoteRoot: REMOTE_ROOT,
+        repositoryRoot: `${REMOTE_ROOT}/repository`,
+        executorResultPath: request.executor.resultPath,
+        outputSchemaPath: request.executor.outputSchemaPath,
+        proofPath: RESTRICTED_SECURITY_PROOF_PATH,
+      }), "utf8"));
+      const proofOutput = await this.transport.vmText(
+        request.allocation.resourceName,
+        `node ${RESTRICTED_BOOTSTRAP_PATH} ${RESTRICTED_BOOTSTRAP_CONFIG_PATH}`,
+      );
+      securityProof = assertRestrictedSecurityProof(JSON.parse(proofOutput), request.security);
+    }
+    await this.upload(request.allocation.resourceName, `${REMOTE_ROOT}/config.json`, Buffer.from(JSON.stringify(config), "utf8"));
+    await this.transport.vmText(request.allocation.resourceName, [
+      "set -eu",
       "command -v setsid >/dev/null",
       `nohup setsid node ${REMOTE_ROOT}/supervisor.mjs ${REMOTE_ROOT}/config.json >${REMOTE_ROOT}/supervisor.log 2>&1 &`,
       `printf '%s' \"$!\" >${REMOTE_ROOT}/pid`,
       `cat ${REMOTE_ROOT}/pid`,
     ].join("\n"));
-    return { processId: `${request.allocation.providerResourceId}:supervisor`, startedAt: this.now(), state: "RUNNING" };
+    return {
+      processId: `${request.allocation.providerResourceId}:supervisor`,
+      startedAt: this.now(),
+      state: "RUNNING",
+      ...(securityProof ? { securityProof } : {}),
+    };
   }
 
   async fetchResult(allocation: SandboxAllocation): Promise<Buffer | null> {
@@ -195,7 +241,7 @@ export class ExeDevSandboxProvider implements SandboxProvider {
         `if test -f ${REMOTE_ROOT}/pid; then`,
         `pid="$(cat ${REMOTE_ROOT}/pid)"`,
         'kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true',
-        "for attempt in 1 2 3 4 5 6 7 8 9 10; do",
+        "for attempt in $(seq 1 50); do",
         'if ! kill -0 -- "-$pid" 2>/dev/null; then exit 0; fi',
         "sleep 0.1",
         "done",
@@ -241,6 +287,39 @@ export class ExeDevSandboxProvider implements SandboxProvider {
     }
     throw lastError;
   }
+}
+
+function assertRestrictedSecurityProof(
+  value: unknown,
+  expected: NonNullable<SandboxProfileSnapshot["security"]>,
+): SandboxSecurityProof {
+  const proof = value as SandboxSecurityProof;
+  if (!proof || proof.schema !== "factory-sandbox-security-proof/v1"
+    || proof.profile !== expected.profile
+    || !Number.isFinite(proof.observedAt)
+    || proof.toolchain?.nodeVersion !== expected.toolchain.nodeVersion
+    || proof.toolchain?.codexVersion !== expected.toolchain.codexVersion
+    || proof.toolchain?.codexBinarySha256 !== expected.toolchain.codexBinarySha256
+    || proof.toolchain?.toolchainInputsSha256 !== expected.toolchain.toolchainInputsSha256
+    || proof.network?.enforcement !== "GUEST_NFTABLES"
+    || proof.network?.providerEnforced !== false
+    || !/^sha256:[a-f0-9]{64}$/i.test(proof.network.policyDigest)
+    || JSON.stringify(proof.network.allowedHttpsHosts) !== JSON.stringify(expected.network.allowedHttpsHosts)
+    || !Array.isArray(proof.network.resolvedAddresses) || proof.network.resolvedAddresses.length === 0
+    || !proof.network.controlExternalEndpointReachable
+    || !proof.network.approvedEndpointReachable
+    || !proof.network.arbitraryExternalBlocked
+    || !proof.network.privateNetworkBlocked
+    || !proof.network.metadataBlocked
+    || !proof.network.unexpectedDnsBlocked
+    || !proof.filesystem?.protectedPathsReadOnly
+    || proof.filesystem.repositoryOwnerUid !== expected.execution.uid
+    || proof.filesystem.repositoryOwnerGid !== expected.execution.gid
+    || proof.toolchain?.executionUid !== expected.execution.uid
+    || proof.toolchain?.executionGid !== expected.execution.gid) {
+    throw new Error("Restricted sandbox bootstrap returned an invalid or incomplete security proof.");
+  }
+  return proof;
 }
 
 export class ExeDevSshTransport implements ExeDevTransport {

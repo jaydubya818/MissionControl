@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -10,6 +10,7 @@ import { InMemoryRemoteSandboxJournal, RemoteSandboxExecutionError, RemoteSandbo
 import { createPatchDescriptor, createSandboxResultBundle, encodeSandboxResultBundle, parseAndValidateSandboxResultBundle } from "../sandboxResultBundle.js";
 import { runSandboxSupervisor, standaloneSandboxSupervisorSource } from "../sandboxSupervisor.js";
 import { sandboxProfileDigest, stableSandboxResourceName, validateSandboxProfile, type SandboxProfileSnapshot } from "../sandboxProvider.js";
+import { standaloneRestrictedSandboxBootstrapSource } from "../standaloneRestrictedSandboxBootstrapSource.js";
 import { canonicalHash } from "@mission-control/shared";
 
 const execFileAsync = promisify(execFile);
@@ -35,6 +36,22 @@ describe("remote sandbox contracts", () => {
     expect(validation.errors.join(" ")).toMatch(/Public ingress/);
     expect(validation.errors.join(" ")).toMatch(/Restricted egress/);
     expect(validation.errors.join(" ")).toMatch(/non-resumable/);
+  });
+
+  it("accepts the restricted candidate only as guest-enforced, qualification-only, and DEGRADED", () => {
+    const validation = validateSandboxProfile(restrictedCandidateProfile());
+    expect(validation).toMatchObject({ valid: true, dispatchable: true, readiness: "DEGRADED" });
+    expect(validation.warnings).toContain(
+      "exe.dev exposes no provider-level egress control; guest nftables enforcement is qualification-only defense in depth.",
+    );
+
+    const promoted = restrictedCandidateProfile();
+    promoted.readiness.state = "READY";
+    expect(validateSandboxProfile(promoted).errors).toContain("Guest-only egress enforcement must remain visibly DEGRADED.");
+
+    const mutable = restrictedCandidateProfile();
+    mutable.machine.image = "ghcr.io/jaydubya818/mission-control-remote-sandbox:latest";
+    expect(validateSandboxProfile(mutable).errors).toContain("Restricted candidate image must be pinned by its exact OCI digest.");
   });
 
   it("detects result bundle and patch tampering", () => {
@@ -292,6 +309,17 @@ describe("RemoteSandboxRuntime", () => {
 });
 
 describe("sandbox supervisor", () => {
+  it("emits a dependency-free restricted bootstrap with valid Node syntax", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "mc-restricted-bootstrap-syntax-"));
+    try {
+      const bootstrapPath = path.join(directory, "restricted-bootstrap.mjs");
+      await writeFile(bootstrapPath, standaloneRestrictedSandboxBootstrapSource());
+      await expect(execFileAsync(process.execPath, ["--check", bootstrapPath])).resolves.toMatchObject({ stderr: "" });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("pins the source, runs a bounded executor, and writes a content-addressed binary patch", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "mc-supervisor-test-"));
     try {
@@ -489,7 +517,126 @@ describe("sandbox supervisor", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it("bounds executor output in memory while preserving full byte counts and stream digests", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "mc-standalone-bounded-output-"));
+    try {
+      const head = await initializeRepository(directory);
+      const executionManifest = remoteExecutionManifest({ sourceSha: head, profileDigest: "sha256:profile" });
+      const manifestDigest = `sha256:${canonicalHash(executionManifest)}`;
+      const supervisorPath = path.join(directory, "supervisor.mjs");
+      const configPath = path.join(directory, "config.json");
+      const outputPath = path.join(directory, "result.json");
+      const diagnosticsPath = path.join(directory, "diagnostics.json");
+      await writeFile(supervisorPath, standaloneSandboxSupervisorSource());
+      await writeFile(configPath, JSON.stringify({
+        executionManifest,
+        attemptId: "attempt-1",
+        workOrderId: "work-order-1",
+        workOrderRevisionNumber: 1,
+        workflowRunId: "run-1",
+        manifestDigest,
+        profileDigest: "sha256:profile",
+        sourceSha: head,
+        environmentDescriptor: { provider: "FAKE", image: "debian:bookworm" },
+        repositoryRoot: directory,
+        outputPath,
+        diagnosticsPath,
+        executor: { command: process.execPath, args: ["-e", 'process.stdout.write("x".repeat(1100000))'], timeoutMs: 5_000 },
+        environment: {},
+      }));
+
+      await execFileAsync(process.execPath, [supervisorPath, configPath], { cwd: directory });
+      const diagnostics = JSON.parse(await readFile(diagnosticsPath, "utf8"));
+      const bundle = JSON.parse(await readFile(outputPath, "utf8"));
+      expect(diagnostics).toMatchObject({
+        executor: {
+          stdoutByteLength: 1_100_000,
+          stderrByteLength: 0,
+          stderrTruncatedBytes: 0,
+        },
+        failure: { class: "NON_RETRYABLE_RESULT", code: "JSONL_TOO_LARGE" },
+      });
+      expect(diagnostics.executor.stdoutTruncatedBytes).toBeGreaterThan(0);
+      expect(diagnostics.executor.stdoutTail.length).toBeLessThanOrEqual(16_000);
+      expect(diagnostics.executor.stdoutDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(bundle.executor.stdoutTail.length).toBeLessThanOrEqual(16_000);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("terminates the executor process group and preserves a typed cancellation bundle", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "mc-standalone-cancel-"));
+    try {
+      const head = await initializeRepository(directory);
+      const executionManifest = remoteExecutionManifest({ sourceSha: head, profileDigest: "sha256:profile" });
+      const manifestDigest = `sha256:${canonicalHash(executionManifest)}`;
+      const supervisorPath = path.join(directory, "supervisor.mjs");
+      const configPath = path.join(directory, "config.json");
+      const outputPath = path.join(directory, "result.json");
+      const diagnosticsPath = path.join(directory, "diagnostics.json");
+      const startedPath = path.join(directory, "executor-started");
+      await writeFile(supervisorPath, standaloneSandboxSupervisorSource());
+      await writeFile(configPath, JSON.stringify({
+        executionManifest,
+        attemptId: "attempt-1",
+        workOrderId: "work-order-1",
+        workOrderRevisionNumber: 1,
+        workflowRunId: "run-1",
+        manifestDigest,
+        profileDigest: "sha256:profile",
+        sourceSha: head,
+        environmentDescriptor: { provider: "FAKE", image: "debian:bookworm" },
+        repositoryRoot: directory,
+        outputPath,
+        diagnosticsPath,
+        executor: {
+          command: process.execPath,
+          args: ["-e", `require("node:fs").writeFileSync(${JSON.stringify(startedPath)}, "started"); setInterval(() => {}, 1000)`],
+          timeoutMs: 30_000,
+        },
+        environment: {},
+      }));
+
+      const supervisor = spawn(process.execPath, [supervisorPath, configPath], { cwd: directory, stdio: "ignore" });
+      await waitForFile(startedPath);
+      supervisor.kill("SIGTERM");
+      const exit = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+        supervisor.once("error", reject);
+        supervisor.once("close", (code, signal) => resolve({ code, signal }));
+      });
+
+      expect(exit).toEqual({ code: 0, signal: null });
+      expect(JSON.parse(await readFile(outputPath, "utf8"))).toMatchObject({
+        status: "CANCELED",
+        failure: { class: "UNKNOWN", code: "ATTEMPT_CANCELED", retryable: false },
+        executor: { exitCode: 143 },
+      });
+      expect(JSON.parse(await readFile(diagnosticsPath, "utf8"))).toMatchObject({
+        phase: "EXECUTOR_FINISHED",
+        executor: { exitCode: 143, canceled: true, timedOut: false },
+        failure: { code: "ATTEMPT_CANCELED" },
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 });
+
+async function waitForFile(file: string) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    try {
+      await readFile(file);
+      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(`Timed out waiting for ${file}.`);
+}
 
 async function initializeRepository(directory: string) {
   await execFileAsync("git", ["init", "-q"], { cwd: directory });
@@ -516,6 +663,67 @@ function profile(): SandboxProfileSnapshot {
     teardown: { terminateOnEveryTerminalState: true, verifyResourceAbsent: true, supportsResume: false },
     preview: { mode: "DISABLED" },
     readiness: { state: "DEGRADED", checkedAt: Date.now(), reason: "Fake provider; unrestricted egress represented honestly.", egressEnforcementProven: false },
+  };
+}
+
+function restrictedCandidateProfile(): SandboxProfileSnapshot {
+  const digest = `sha256:${"a".repeat(64)}`;
+  return {
+    ...profile(),
+    profileKey: "exe-remote-restricted-candidate-v1",
+    provider: "EXE_DEV",
+    providerProfileVersion: "restricted-candidate-v1",
+    machine: {
+      ...profile().machine,
+      image: `ghcr.io/jaydubya818/mission-control-remote-sandbox@${digest}`,
+    },
+    network: {
+      egress: "RESTRICTED_ALLOWLIST",
+      egressAllowlist: ["openrouter.ai:443"],
+      publicIngress: false,
+      exposedPorts: [],
+    },
+    readiness: {
+      state: "DEGRADED",
+      checkedAt: Date.now(),
+      reason: "Guest nftables is evidenced; exe.dev provider-level egress control is unavailable.",
+      egressEnforcementProven: true,
+      liveCertified: true,
+    },
+    security: {
+      schema: "factory-sandbox-security/v1",
+      profile: "remote-sandbox/exe-dev/restricted-candidate-v1",
+      qualificationOnly: true,
+      image: {
+        digest,
+        provenanceReference: "https://github.com/jaydubya818/MissionControl/actions/runs/1",
+        sbomDigest: `sha256:${"b".repeat(64)}`,
+      },
+      toolchain: {
+        nodeVersion: "v26.7.0",
+        codexVersion: "codex-cli 0.146.0",
+        codexBinarySha256: `sha256:${"c".repeat(64)}`,
+        toolchainInputsSha256: `sha256:${"d".repeat(64)}`,
+      },
+      execution: {
+        user: "mc-attempt",
+        uid: 10_001,
+        gid: 10_001,
+        homePath: "/var/lib/mission-control/attempt/home",
+        temporaryPath: "/var/lib/mission-control/attempt/tmp",
+        noNewPrivileges: true,
+      },
+      network: {
+        enforcement: "GUEST_NFTABLES",
+        providerEnforced: false,
+        allowedHttpsHosts: ["openrouter.ai"],
+        dnsMode: "CONTROL_PLANE_RESOLVE_ETC_HOSTS",
+        denyPrivateNetworks: true,
+        denyLinkLocal: true,
+        denyMetadata: true,
+        denyUnexpectedDns: true,
+      },
+    },
   };
 }
 

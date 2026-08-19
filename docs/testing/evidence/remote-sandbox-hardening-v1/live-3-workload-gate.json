@@ -1,0 +1,16 @@
+{
+  "schema": "mission-control-remote-sandbox-live-hardening-gate/v1",
+  "status": "NOT_RUN",
+  "maximumConcurrentVms": 1,
+  "allocatedVms": 0,
+  "workloads": [
+    { "class": "BUG_FIX", "status": "NOT_RUN" },
+    { "class": "SECURITY_POLICY", "status": "NOT_RUN" },
+    { "class": "DATA_SCHEMA_MIGRATION", "status": "NOT_RUN" }
+  ],
+  "firstPassCandidate": null,
+  "firstPassIndependentVerification": null,
+  "acceptanceEligibility": null,
+  "reason": "The provider-enforced egress requirement and no-High/no-Critical image gate failed before live admission. Running paid live workloads could not change either result.",
+  "priorProductionPilotV3RemoteResult": "3/3 first-pass on the prior DEGRADED unrestricted profile; preserved as baseline evidence only."
+}

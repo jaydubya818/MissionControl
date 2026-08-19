@@ -50,6 +50,14 @@ export function executionRoutingRequested(input: {
   return Boolean(input.factoryDefinitionVersionId || input.executionRoutingPin);
 }
 
+export function sandboxProfileProductionEligible(profile: { immutableSnapshot?: unknown } | null | undefined) {
+  const snapshot = profile?.immutableSnapshot;
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return true;
+  const security = (snapshot as { security?: unknown }).security;
+  if (!security || typeof security !== "object" || Array.isArray(security)) return true;
+  return (security as { qualificationOnly?: unknown }).qualificationOnly !== true;
+}
+
 function tupleKey(version: Doc<"factoryDefinitionVersions">) {
   return `${String(version._id)}:${version.configurationDigest}`;
 }
@@ -390,6 +398,7 @@ export async function buildExecutionRoutingPreview(
       && sandboxProfile.readinessState !== "BLOCKED"
       && sandboxProfile.readinessExpiresAt > cutoffAt
       && sandboxProfile.egressEnforcementProven
+      && sandboxProfileProductionEligible(sandboxProfile)
     );
     const modelApproved = Boolean(
       primaryAgent?.status === "APPROVED"

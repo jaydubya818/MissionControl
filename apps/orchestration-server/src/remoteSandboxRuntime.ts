@@ -215,6 +215,7 @@ export class RemoteSandboxRuntime {
         manifestDigest: request.manifestDigest,
         sourceSha: request.sourceSha,
         profileDigest,
+        security: request.profile.security,
         environmentDescriptor: { provider: request.profile.provider, image: request.profile.machine.image },
         repositoryArchive: request.repositoryBundle,
         supervisorSource: request.supervisorSource,
@@ -228,7 +229,10 @@ export class RemoteSandboxRuntime {
       await this.resourceObserver?.started({ allocation, processId: start.processId });
       resourceObservedRunning = Boolean(this.resourceObserver);
       await this.journal.recordAllocation(allocation);
-      await emit("SANDBOX_STARTED", { processId: start.processId });
+      await emit("SANDBOX_STARTED", {
+        processId: start.processId,
+        ...(start.securityProof ? { securityProof: start.securityProof } : {}),
+      });
       failureStage = "RESULT_READ";
       bundle = await this.waitForResult(allocation, request, executionWorkflowRunId, profileDigest, emit);
       allocation = { ...allocation, state: "RESULT_READY", resultDigest: bundle.digest };

@@ -100,8 +100,7 @@ const inspectFile = (file) => {
   const result = parseResult(JSON.stringify(candidate));
   return result ? { state: "VALID", ...evidence, validationIssues: [], result } : { state: "SCHEMA_INVALID", ...evidence, validationIssues };
 };
-const inspectJsonl = (stdout) => {
-  const byteLength = Buffer.byteLength(stdout, "utf8");
+const inspectJsonl = (stdout, byteLength = Buffer.byteLength(stdout, "utf8")) => {
   const lines = stdout.split("\n").filter((line) => line.trim());
   let malformedLineCount = 0;
   let terminalCompletedCount = 0;
@@ -185,21 +184,83 @@ if (!manifest || manifest.version !== "factory-execution-manifest/v1" || manifes
 const startedAt = Date.now();
 const source = execFileSync("git", ["rev-parse", "HEAD"], { cwd: config.repositoryRoot, encoding: "utf8" }).trim();
 if (source !== config.sourceSha) throw new Error("Frozen source SHA mismatch.");
-const child = spawn(config.executor.command, config.executor.args, { cwd: config.repositoryRoot, env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", ...config.environment }, stdio: ["ignore", "pipe", "pipe"] });
-let stdout = "";
-let stderr = "";
+const executionSecurity = config.executionSecurity;
+if (executionSecurity && (executionSecurity.user !== "mc-attempt" || executionSecurity.uid !== 10001 || executionSecurity.gid !== 10001
+  || executionSecurity.homePath !== "/var/lib/mission-control/attempt/home"
+  || executionSecurity.temporaryPath !== "/var/lib/mission-control/attempt/tmp" || executionSecurity.noNewPrivileges !== true)) {
+  throw new Error("Frozen non-root execution identity is invalid.");
+}
+const childCommand = executionSecurity ? "setpriv" : config.executor.command;
+const childArgs = executionSecurity ? [
+  "--no-new-privs",
+  "--reuid=" + executionSecurity.uid,
+  "--regid=" + executionSecurity.gid,
+  "--clear-groups",
+  "--",
+  config.executor.command,
+  ...config.executor.args,
+] : config.executor.args;
+const childEnvironment = executionSecurity
+  ? { PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", HOME: executionSecurity.homePath, TMPDIR: executionSecurity.temporaryPath, ...config.environment }
+  : { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", ...config.environment };
+const child = spawn(childCommand, childArgs, { cwd: config.repositoryRoot, env: childEnvironment, stdio: ["ignore", "pipe", "pipe"], detached: true });
+const boundedCapture = (namespace) => {
+  const hash = createHash("sha256").update(namespace + "\0");
+  let byteLength = 0;
+  let tail = "";
+  return {
+    push(chunk) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      hash.update(buffer);
+      byteLength += buffer.length;
+      tail = (tail + buffer.toString("utf8")).slice(-MAX_BYTES);
+    },
+    finish() {
+      const retainedBytes = Buffer.byteLength(tail, "utf8");
+      return { tail, byteLength, truncatedBytes: Math.max(0, byteLength - retainedBytes), digest: "sha256:" + hash.digest("hex") };
+    },
+  };
+};
+const stdoutCapture = boundedCapture("factory-sandbox-stdout/v1");
+const stderrCapture = boundedCapture("factory-sandbox-stderr/v1");
 let timedOut = false;
-child.stdout.on("data", (chunk) => stdout += chunk);
-child.stderr.on("data", (chunk) => stderr += chunk);
-const timer = setTimeout(() => { timedOut = true; child.kill("SIGTERM"); }, config.executor.timeoutMs);
-const exitCode = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", (code) => resolve(code)); });
+let canceled = false;
+child.stdout.on("data", (chunk) => stdoutCapture.push(chunk));
+child.stderr.on("data", (chunk) => stderrCapture.push(chunk));
+const terminateChild = (signal) => {
+  try { process.kill(-child.pid, signal); } catch { try { child.kill(signal); } catch {} }
+};
+let forceKillTimer;
+const requestTermination = (reason) => {
+  if (reason === "timeout") timedOut = true;
+  else canceled = true;
+  terminateChild("SIGTERM");
+  forceKillTimer = setTimeout(() => terminateChild("SIGKILL"), 2000);
+  forceKillTimer.unref();
+};
+const cancel = () => requestTermination("canceled");
+process.once("SIGTERM", cancel);
+process.once("SIGINT", cancel);
+const timer = setTimeout(() => requestTermination("timeout"), config.executor.timeoutMs);
+const childExit = await new Promise((resolve, reject) => {
+  child.once("error", reject);
+  child.once("close", (code, signal) => resolve({ code, signal }));
+});
 clearTimeout(timer);
+if (forceKillTimer) clearTimeout(forceKillTimer);
+process.removeListener("SIGTERM", cancel);
+process.removeListener("SIGINT", cancel);
+const exitCode = childExit.code ?? (childExit.signal === "SIGKILL" ? 137 : childExit.signal === "SIGTERM" ? 143 : 1);
+const stdoutEvidence = stdoutCapture.finish();
+const stderrEvidence = stderrCapture.finish();
+const stdout = stdoutEvidence.tail;
+const stderr = stderrEvidence.tail;
 
 const file = inspectFile(config.executor.resultPath);
-const jsonl = inspectJsonl(stdout);
+const jsonl = inspectJsonl(stdout, stdoutEvidence.byteLength);
 let structured = file.result;
 let resultSource = structured ? "OUTPUT_FILE" : "NONE";
-if (!structured && file.state === "NOT_REQUESTED") {
+if (!structured && file.state === "NOT_REQUESTED" && stdoutEvidence.byteLength <= MAX_BYTES) {
   structured = parseResult(stdout);
   if (structured) resultSource = "EXECUTOR_STDOUT";
 }
@@ -208,7 +269,8 @@ if (!structured && jsonl.result) {
   resultSource = "CODEX_JSONL_RECONSTRUCTION";
 }
 let decision;
-if (timedOut) decision = makeFailure("RETRYABLE_EXECUTION", "EXECUTOR_TIMEOUT", "EXECUTOR", "Remote executor exceeded the frozen Attempt timeout.");
+if (canceled) decision = makeFailure("UNKNOWN", "ATTEMPT_CANCELED", "EXECUTOR", "Remote executor was canceled by the control plane.");
+else if (timedOut) decision = makeFailure("RETRYABLE_EXECUTION", "EXECUTOR_TIMEOUT", "EXECUTOR", "Remote executor exceeded the frozen Attempt timeout.");
 else if (exitCode !== 0) {
   const detail = stderr || "Remote executor exited non-zero.";
   if (/\b429\b|rate[ -]?limit|too many requests/i.test(detail)) decision = makeFailure("RETRYABLE_EXECUTION", "MODEL_RATE_LIMIT", "EXECUTOR", detail);
@@ -227,7 +289,19 @@ atomicWrite(diagnosticsPath, JSON.stringify({
   manifestDigest: config.manifestDigest,
   sourceSha: config.sourceSha,
   phase: "EXECUTOR_FINISHED",
-  executor: { exitCode, timedOut, canceled: false, stdoutDigest: digest("factory-sandbox-stdout/v1", stdout), stderrDigest: digest("factory-sandbox-stderr/v1", stderr), stdoutTail: redact(stdout).slice(-16000), stderrTail: redact(stderr).slice(-16000) },
+  executor: {
+    exitCode,
+    timedOut,
+    canceled,
+    stdoutDigest: stdoutEvidence.digest,
+    stderrDigest: stderrEvidence.digest,
+    stdoutByteLength: stdoutEvidence.byteLength,
+    stderrByteLength: stderrEvidence.byteLength,
+    stdoutTruncatedBytes: stdoutEvidence.truncatedBytes,
+    stderrTruncatedBytes: stderrEvidence.truncatedBytes,
+    stdoutTail: redact(stdout).slice(-16000),
+    stderrTail: redact(stderr).slice(-16000),
+  },
   resultProvenance,
   resultOutput: { state: file.state, byteLength: file.byteLength, digest: file.digest, tail: file.tail, validationIssues: file.validationIssues },
   failure: decision ?? null,
@@ -252,7 +326,7 @@ const bundle = {
   environment: config.environmentDescriptor,
   startedAt,
   finishedAt,
-  status: timedOut ? "TIMED_OUT" : accepted ? "COMPLETED" : "FAILED",
+  status: canceled ? "CANCELED" : timedOut ? "TIMED_OUT" : accepted ? "COMPLETED" : "FAILED",
   resultProvenance: { ...resultProvenance, context: { attemptId: config.attemptId, manifestDigest: config.manifestDigest, sourceSha: config.sourceSha } },
   ...(decision ? { failure: decision } : {}),
   structuredResult: structured,
@@ -263,7 +337,7 @@ const bundle = {
   artifacts: [],
   events: [{ type: "SUPERVISOR_STARTED", occurredAt: startedAt }, { type: "EXECUTOR_FINISHED", occurredAt: finishedAt }, { type: "DIAGNOSTICS_WRITTEN", occurredAt: finishedAt }, { type: "RESULT_WRITTEN", occurredAt: finishedAt }],
   patch: { format: "GIT_BINARY_DIFF", encoding: "BASE64", byteLength: patch.length, digest: digest("factory-sandbox-patch/v1", patchContent), content: patchContent },
-  executor: { exitCode, stdoutDigest: digest("factory-sandbox-stdout/v1", stdout), stderrDigest: digest("factory-sandbox-stderr/v1", stderr), stdoutTail: redact(stdout).slice(-16000), stderrTail: redact(stderr).slice(-16000), resultOutput: { state: file.state, byteLength: file.byteLength, digest: file.digest, tail: file.tail, validationIssues: file.validationIssues } },
+  executor: { exitCode, stdoutDigest: stdoutEvidence.digest, stderrDigest: stderrEvidence.digest, stdoutTail: redact(stdout).slice(-16000), stderrTail: redact(stderr).slice(-16000), resultOutput: { state: file.state, byteLength: file.byteLength, digest: file.digest, tail: file.tail, validationIssues: file.validationIssues } },
   usage: { providerCostUsd: null, inferenceCostUsd: null, inputTokens: jsonl.inputTokens, outputTokens: jsonl.outputTokens, observedAt: finishedAt, providerRuntimeMs: finishedAt - startedAt, enforcement: "OBSERVATION_ONLY" },
 };
 bundle.digest = digest("factory-sandbox-result/v1", bundle);
