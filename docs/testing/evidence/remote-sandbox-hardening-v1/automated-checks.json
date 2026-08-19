@@ -1,7 +1,7 @@
 {
   "schema": "mission-control-remote-sandbox-hardening-checks/v1",
   "baselineSha": "627d55b3a572300863dee3fa15ff5a0cb32be7a6",
-  "recordedAt": "2026-08-19T19:16:00Z",
+  "recordedAt": "2026-08-19T19:25:37Z",
   "decision": "HOLD",
   "checks": [
     {
@@ -76,6 +76,31 @@
         "docs/testing/evidence/system-factory-e2e-v2/automated-checks.json",
         "docs/testing/evidence/system-factory-e2e-v2/scenario-evidence.json"
       ]
+    },
+    {
+      "name": "GitHub standard CI at implementation commit",
+      "status": "PASS",
+      "runId": 32292312069,
+      "jobs": 9,
+      "headSha": "6966cc3e81e340ed9f3d1d16b66d4602cff9c093"
+    },
+    {
+      "name": "remote sandbox image publication gate",
+      "status": "FAIL_CLOSED",
+      "runId": 32292285409,
+      "headSha": "6966cc3e81e340ed9f3d1d16b66d4602cff9c093",
+      "imageBuild": "PASS",
+      "sbom": "PASS",
+      "critical": 0,
+      "high": 7,
+      "evidenceUpload": "PASS",
+      "publish": "SKIPPED",
+      "provenanceAttestation": "SKIPPED"
+    },
+    {
+      "name": "Vercel preview deployments",
+      "status": "PASS",
+      "deployments": 2
     },
     {
       "name": "live three-workload gate",
