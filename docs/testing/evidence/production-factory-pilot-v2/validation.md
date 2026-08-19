@@ -24,4 +24,10 @@ The nonzero Pilot V2 finalization exit is the intended fail-closed behavior for 
 
 ## Hosted qualification
 
-Fresh CI and Vercel results are recorded in the draft pull request created for this packet.
+Draft PR #122 received fresh hosted evidence on commit `9800325245b69e15d12cd3cb0842228ff8a65ded`:
+
+- CI run `32225382868`: TypeScript, build, System Qualification V2, unit tests, lint/runtime guard, release security, smoke, and browser security/accessibility passed.
+- The non-blocking E2E job never left `playwright install --with-deps chromium` on two separate runners. The first stalled attempt was cancelled after 17 minutes; the targeted retry was cancelled after 15 minutes. No E2E test ran or failed. The immediately preceding main run had passed the same job, and deterministic hosted browser gates plus local full qualification passed for this packet.
+- Both Vercel deployments passed: `mission-control-mission-control-ui/9amjphhsVLZRw71PZLNPswNCTHTj` and `mission-control-ui/78Xr9uWBiK2TNwDx2s8p9Xap8tCB`.
+
+The cancelled non-blocking E2E installer is retained as an operational hosted-runner limitation. It does not change the pilot decision, which was already blocked by the frozen remote reliability bar.

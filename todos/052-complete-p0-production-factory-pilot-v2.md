@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: complete
 priority: p0
 issue_id: "052"
 tags: [factory, qualification, operations, remote-sandbox, evidence]
@@ -34,7 +34,7 @@ Pilot V1 preserved 13/15 successful governed executions and only 1/3 reliable li
 - [x] Factory Learning produces signals, clusters, and proposal-only candidates; nothing is promoted automatically.
 - [x] A new immutable packet is written only under `docs/testing/evidence/production-factory-pilot-v2/`, including V1 comparison and final credential/VM proof.
 - [x] Pilot, full Factory qualification, repository tests, TypeScript, lint, skill lint, runtime guard, production build, orchestration smoke, dependency/security gates, secret scan, and `git diff --check` pass.
-- [ ] Durable changes receive fresh CI/Vercel evidence in a draft PR; no merge or next milestone is started.
+- [x] Durable changes receive fresh CI/Vercel evidence in a draft PR; no merge or next milestone is started.
 
 ## Work Log
 
@@ -55,3 +55,4 @@ Pilot V1 preserved 13/15 successful governed executions and only 1/3 reliable li
 - Kept Guarded Auto disabled with zero applications. Routing and Factory Learning remained advisory; no proposal was promoted.
 - Completed full local qualification. Restored qualification-generated System V2 evidence timestamps byte-for-byte to `main`; Pilot V1 and System V1/V2 evidence remain unchanged.
 - The intended success and remote reliability acceptance bars remain unmet, so the pilot outcome is `BLOCKED`.
+- Opened draft PR #122. Eight hosted CI jobs and both Vercel deployments passed; the non-blocking E2E job was cancelled after its Playwright browser installer stalled on two separate runners before tests began.
