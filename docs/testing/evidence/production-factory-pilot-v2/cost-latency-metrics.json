@@ -1,0 +1,89 @@
+{
+  "missionToPlan": {
+    "medianMs": 1,
+    "sampleCount": 15,
+    "coverage": 1
+  },
+  "planToWorkOrder": {
+    "medianMs": 0,
+    "sampleCount": 15,
+    "coverage": 1
+  },
+  "queueAdmission": {
+    "medianMs": 0,
+    "sampleCount": 15,
+    "coverage": 1
+  },
+  "localExecution": {
+    "medianMs": 29633.5,
+    "sampleCount": 12,
+    "coverage": 0.8
+  },
+  "remoteAllocation": {
+    "medianMs": 3404,
+    "sampleCount": 3,
+    "coverage": 0.2
+  },
+  "remoteReadiness": {
+    "medianMs": 4217,
+    "sampleCount": 3,
+    "coverage": 0.2
+  },
+  "remoteExecution": {
+    "medianMs": 79032,
+    "sampleCount": 3,
+    "coverage": 0.2
+  },
+  "execution": {
+    "medianMs": 33563,
+    "sampleCount": 15,
+    "coverage": 1
+  },
+  "verification": {
+    "medianMs": 278.5,
+    "sampleCount": 14,
+    "coverage": 0.9333333333333333
+  },
+  "review": {
+    "medianMs": 0,
+    "sampleCount": 14,
+    "coverage": 0.9333333333333333
+  },
+  "teardown": {
+    "medianMs": 3362,
+    "sampleCount": 3,
+    "coverage": 0.2
+  },
+  "totalCycle": {
+    "medianMs": 33609,
+    "sampleCount": 15,
+    "coverage": 1
+  },
+  "firstPassStructuredResultRate": 1,
+  "firstPassVerificationRate": 0.9333333333333333,
+  "eventualVerificationRate": 0.9333333333333333,
+  "retryRate": 0,
+  "cancellationRate": 0,
+  "tokenUsage": {
+    "inputTokens": 1187316,
+    "outputTokens": 20503,
+    "sampleCount": 15
+  },
+  "modelCostUsd": null,
+  "infrastructureCostUsd": null,
+  "attempts": {
+    "total": 15,
+    "replacements": 0,
+    "failed": 1,
+    "recoveryEvents": 0,
+    "retrySuccessRate": null,
+    "infraFailures": 0,
+    "executionFailures": 0,
+    "nonRetryableFailures": 1,
+    "unknownFailures": 0
+  },
+  "contextMisses": 0,
+  "staleCurrentnessEvents": 0,
+  "workerRecoveryEvents": 0,
+  "reviewCorrections": 0
+}

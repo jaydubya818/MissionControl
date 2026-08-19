@@ -1,0 +1,300 @@
+{
+  "signalCount": 8,
+  "signals": [
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "DETERMINISTIC_GATE_FAILURE",
+      "deterministicKey": "deterministic gate failure",
+      "evidenceFingerprint": "sha256:e1ad8765fe274585c50287746c60e901573cd29c3c890dcc131c36c0b4ce550d",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/4"
+      ],
+      "observedAt": 1787121833091,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected deterministic gate failure was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "VERIFICATION_FAILURE",
+      "deterministicKey": "independent verification failure",
+      "evidenceFingerprint": "sha256:5ed025ec844c51543939cc8017c221d3575756b29c9d2815e92fea39e4bd6ce2",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/5"
+      ],
+      "observedAt": 1787121833092,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected independent verification failure was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "CONTEXT_MISS",
+      "deterministicKey": "missing required policy context",
+      "evidenceFingerprint": "sha256:5046680ddc1273eaf8ac9f0c4401801140223b85109e6c5d46266eae0a015221",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/8"
+      ],
+      "observedAt": 1787121833093,
+      "confidence": 1,
+      "severity": "MEDIUM",
+      "reason": "The injected context miss was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "MODEL_ROUTING_MISMATCH",
+      "deterministicKey": "missing cost telemetry",
+      "evidenceFingerprint": "sha256:f2e4e6ff24c689233927c8d0ca9a58a55cfffb1547c8c31ecfb9890615c0c58f",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/15"
+      ],
+      "observedAt": 1787121833094,
+      "confidence": 1,
+      "severity": "MEDIUM",
+      "reason": "The injected missing telemetry was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "DETERMINISTIC_GATE_FAILURE",
+      "deterministicKey": "remote-sandbox fail-closed NON_RETRYABLE_RESULT:RESULT_ACCEPTANCE_CONTEXT_INVALID",
+      "evidenceFingerprint": "sha256:1953b237a87bb108bb3c54792df7c173c6f43bd37d5f03699a5f47be155ee169",
+      "evidenceRefs": [
+        "run-results.json#executions/11/attempts/0"
+      ],
+      "observedAt": 1787121316200,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt failed closed without authorized retry: Remote supervisor returned FAILED. Unable to comply: required JSON output not applicable to current request. Reading additional input from stdin...\nnpm notice\nnpm notice New major version of npm available! 11.17.0 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\n",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "REPEATED_REVIEW_FINDING",
+      "deterministicKey": "human.defect:missing deterministic review coverage",
+      "evidenceFingerprint": "sha256:def15e3901801f7d8e9fe6aa2a1c5a5b0c98fa36ab138d23e109b202c46a0916",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/16",
+        "run-results.json#executions/3/review"
+      ],
+      "observedAt": 1787121833191,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "REPEATED_REVIEW_FINDING",
+      "deterministicKey": "human.defect:missing deterministic review coverage",
+      "evidenceFingerprint": "sha256:86595df1f8f340d2fec07972d9b94fa01d63fcf8463466a3f386ebce69749b9b",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/16",
+        "run-results.json#executions/4/review"
+      ],
+      "observedAt": 1787121833192,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "REPEATED_REVIEW_FINDING",
+      "deterministicKey": "human.defect:missing deterministic review coverage",
+      "evidenceFingerprint": "sha256:b425dfc25bc3502e7607fdd8faad17e6ca1d1cd57dc7f7e85580e20f6ca7fa89",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/16",
+        "run-results.json#executions/5/review"
+      ],
+      "observedAt": 1787121833193,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    }
+  ],
+  "clusters": [
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "REPEATED_REVIEW_FINDING",
+      "deterministicKey": "human.defect:missing deterministic review coverage",
+      "clusterKey": "production-factory-pilot-v2|sellerfi-pilot/operational-fixtures|REPEATED_REVIEW_FINDING|human.defect:missing deterministic review coverage",
+      "occurrenceCount": 3,
+      "evidenceCount": 4,
+      "evidenceFingerprints": [
+        "sha256:def15e3901801f7d8e9fe6aa2a1c5a5b0c98fa36ab138d23e109b202c46a0916",
+        "sha256:86595df1f8f340d2fec07972d9b94fa01d63fcf8463466a3f386ebce69749b9b",
+        "sha256:b425dfc25bc3502e7607fdd8faad17e6ca1d1cd57dc7f7e85580e20f6ca7fa89"
+      ],
+      "evidenceRefs": [
+        "run-results.json#failureInjections/16",
+        "run-results.json#executions/3/review",
+        "run-results.json#executions/4/review",
+        "run-results.json#executions/5/review"
+      ],
+      "firstObservedAt": 1787121833191,
+      "lastObservedAt": 1787121833193,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+      "qualifiesForCandidate": true,
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "MODEL_ROUTING_MISMATCH",
+      "deterministicKey": "missing cost telemetry",
+      "clusterKey": "production-factory-pilot-v2|sellerfi-pilot/operational-fixtures|MODEL_ROUTING_MISMATCH|missing cost telemetry",
+      "occurrenceCount": 1,
+      "evidenceCount": 1,
+      "evidenceFingerprints": [
+        "sha256:f2e4e6ff24c689233927c8d0ca9a58a55cfffb1547c8c31ecfb9890615c0c58f"
+      ],
+      "evidenceRefs": [
+        "run-results.json#failureInjections/15"
+      ],
+      "firstObservedAt": 1787121833094,
+      "lastObservedAt": 1787121833094,
+      "confidence": 1,
+      "severity": "MEDIUM",
+      "reason": "The injected missing telemetry was rejected before acceptance and preserved as an independent failure observation.",
+      "qualifiesForCandidate": false,
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "CONTEXT_MISS",
+      "deterministicKey": "missing required policy context",
+      "clusterKey": "production-factory-pilot-v2|sellerfi-pilot/operational-fixtures|CONTEXT_MISS|missing required policy context",
+      "occurrenceCount": 1,
+      "evidenceCount": 1,
+      "evidenceFingerprints": [
+        "sha256:5046680ddc1273eaf8ac9f0c4401801140223b85109e6c5d46266eae0a015221"
+      ],
+      "evidenceRefs": [
+        "run-results.json#failureInjections/8"
+      ],
+      "firstObservedAt": 1787121833093,
+      "lastObservedAt": 1787121833093,
+      "confidence": 1,
+      "severity": "MEDIUM",
+      "reason": "The injected context miss was rejected before acceptance and preserved as an independent failure observation.",
+      "qualifiesForCandidate": false,
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "VERIFICATION_FAILURE",
+      "deterministicKey": "independent verification failure",
+      "clusterKey": "production-factory-pilot-v2|sellerfi-pilot/operational-fixtures|VERIFICATION_FAILURE|independent verification failure",
+      "occurrenceCount": 1,
+      "evidenceCount": 1,
+      "evidenceFingerprints": [
+        "sha256:5ed025ec844c51543939cc8017c221d3575756b29c9d2815e92fea39e4bd6ce2"
+      ],
+      "evidenceRefs": [
+        "run-results.json#failureInjections/5"
+      ],
+      "firstObservedAt": 1787121833092,
+      "lastObservedAt": 1787121833092,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected independent verification failure was rejected before acceptance and preserved as an independent failure observation.",
+      "qualifiesForCandidate": false,
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "DETERMINISTIC_GATE_FAILURE",
+      "deterministicKey": "deterministic gate failure",
+      "clusterKey": "production-factory-pilot-v2|sellerfi-pilot/operational-fixtures|DETERMINISTIC_GATE_FAILURE|deterministic gate failure",
+      "occurrenceCount": 1,
+      "evidenceCount": 1,
+      "evidenceFingerprints": [
+        "sha256:e1ad8765fe274585c50287746c60e901573cd29c3c890dcc131c36c0b4ce550d"
+      ],
+      "evidenceRefs": [
+        "run-results.json#failureInjections/4"
+      ],
+      "firstObservedAt": 1787121833091,
+      "lastObservedAt": 1787121833091,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected deterministic gate failure was rejected before acceptance and preserved as an independent failure observation.",
+      "qualifiesForCandidate": false,
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v2",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "DETERMINISTIC_GATE_FAILURE",
+      "deterministicKey": "remote-sandbox fail-closed non_retryable_result:result_acceptance_context_invalid",
+      "clusterKey": "production-factory-pilot-v2|sellerfi-pilot/operational-fixtures|DETERMINISTIC_GATE_FAILURE|remote-sandbox fail-closed non_retryable_result:result_acceptance_context_invalid",
+      "occurrenceCount": 1,
+      "evidenceCount": 1,
+      "evidenceFingerprints": [
+        "sha256:1953b237a87bb108bb3c54792df7c173c6f43bd37d5f03699a5f47be155ee169"
+      ],
+      "evidenceRefs": [
+        "run-results.json#executions/11/attempts/0"
+      ],
+      "firstObservedAt": 1787121316200,
+      "lastObservedAt": 1787121316200,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt failed closed without authorized retry: Remote supervisor returned FAILED. Unable to comply: required JSON output not applicable to current request. Reading additional input from stdin... npm notice npm notice New major version of npm available! 11.17.0 -> 12.0.2 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2 npm notice To update run: npm install -g npm@12.0.2 npm notice",
+      "qualifiesForCandidate": false,
+      "acceptanceAuthority": false
+    }
+  ],
+  "candidates": [
+    {
+      "candidateType": "ADD_DETERMINISTIC_GATE",
+      "problemStatement": "3 recurring repeated review finding signals: The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+      "proposedChange": "Add a deterministic check at the earliest applicable Factory phase.",
+      "expectedBenefit": "Fail earlier and avoid repeated model interpretation or repair work.",
+      "risk": "HIGH",
+      "estimatedEffort": "SMALL",
+      "evidenceCount": 4,
+      "confidence": 1,
+      "acceptanceAuthority": false
+    }
+  ],
+  "duplicatesSuppressed": 0,
+  "strongestExperimentProposal": {
+    "id": "experiment-proposal-production-pilot-v2",
+    "candidate": {
+      "candidateType": "ADD_DETERMINISTIC_GATE",
+      "problemStatement": "3 recurring repeated review finding signals: The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+      "proposedChange": "Add a deterministic check at the earliest applicable Factory phase.",
+      "expectedBenefit": "Fail earlier and avoid repeated model interpretation or repair work.",
+      "risk": "HIGH",
+      "estimatedEffort": "SMALL",
+      "evidenceCount": 4,
+      "confidence": 1,
+      "acceptanceAuthority": false
+    },
+    "status": "PROPOSED",
+    "autoPromote": false,
+    "releasedWorkOrders": [],
+    "nextStep": "Human-review the evidence-backed candidate in a separate bounded experiment; no automatic promotion or authority change is permitted."
+  },
+  "acceptanceAuthority": false
+}

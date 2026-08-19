@@ -1,0 +1,117 @@
+{
+  "totalAttempts": 15,
+  "replacementAttempts": 0,
+  "failedAttempts": 1,
+  "retrySuccessRate": null,
+  "infraFailures": 0,
+  "executionFailures": 0,
+  "nonRetryableFailures": 1,
+  "unknownFailures": 0,
+  "byWorkload": [
+    {
+      "executionId": "bug-fix-1",
+      "workloadKey": "bug-fix",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "bug-fix-2",
+      "workloadKey": "bug-fix",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "bug-fix-3",
+      "workloadKey": "bug-fix",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "feature-1",
+      "workloadKey": "feature",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "feature-2",
+      "workloadKey": "feature",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "feature-3",
+      "workloadKey": "feature",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "refactor-1",
+      "workloadKey": "refactor",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "refactor-2",
+      "workloadKey": "refactor",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "refactor-3",
+      "workloadKey": "refactor",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "security-policy-1",
+      "workloadKey": "security-policy",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "security-policy-2",
+      "workloadKey": "security-policy",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "security-policy-3",
+      "workloadKey": "security-policy",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": false
+    },
+    {
+      "executionId": "data-migration-1",
+      "workloadKey": "data-migration",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "data-migration-2",
+      "workloadKey": "data-migration",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    },
+    {
+      "executionId": "data-migration-3",
+      "workloadKey": "data-migration",
+      "attempts": 1,
+      "replacements": 0,
+      "eventualSuccess": true
+    }
+  ]
+}

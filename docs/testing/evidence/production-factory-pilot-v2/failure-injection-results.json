@@ -1,0 +1,308 @@
+[
+  {
+    "id": "injection-01-stale-worker-session-generation",
+    "executionId": "bug-fix-1",
+    "failure": "STALE_WORKER",
+    "signalType": "RECOVERY_REQUIRED",
+    "deterministicKey": "stale worker session generation",
+    "severity": "HIGH",
+    "reason": "The injected stale worker was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/0",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-02-lease-loss",
+    "executionId": "bug-fix-2",
+    "failure": "LEASE_LOSS",
+    "signalType": "RECOVERY_REQUIRED",
+    "deterministicKey": "attempt lease loss",
+    "severity": "HIGH",
+    "reason": "The injected lease loss was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/1",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-03-execution-timeout",
+    "executionId": "feature-1",
+    "failure": "EXECUTION_TIMEOUT",
+    "signalType": "RETRY_REQUIRED",
+    "deterministicKey": "execution timeout",
+    "severity": "MEDIUM",
+    "reason": "The injected execution timeout was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/2",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-04-cancellation",
+    "executionId": "feature-2",
+    "failure": "CANCELLATION",
+    "signalType": "RECOVERY_REQUIRED",
+    "deterministicKey": "attempt cancellation",
+    "severity": "MEDIUM",
+    "reason": "The injected cancellation was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/3",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-05-deterministic-gate-failure",
+    "executionId": "feature-3",
+    "failure": "DETERMINISTIC_GATE_FAILURE",
+    "signalType": "DETERMINISTIC_GATE_FAILURE",
+    "deterministicKey": "deterministic gate failure",
+    "severity": "HIGH",
+    "reason": "The injected deterministic gate failure was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/4",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-06-independent-verification-failure",
+    "executionId": "refactor-1",
+    "failure": "INDEPENDENT_VERIFICATION_FAILURE",
+    "signalType": "INDEPENDENT_VERIFICATION_FAILURE",
+    "deterministicKey": "independent verification failure",
+    "severity": "HIGH",
+    "reason": "The injected independent verification failure was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/5",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-07-candidate-pr-head-mismatch",
+    "executionId": "refactor-2",
+    "failure": "CANDIDATE_PR_HEAD_MISMATCH",
+    "signalType": "RECOVERY_REQUIRED",
+    "deterministicKey": "candidate pr head mismatch",
+    "severity": "CRITICAL",
+    "reason": "The injected candidate pr head mismatch was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/6",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-08-stale-verification",
+    "executionId": "refactor-3",
+    "failure": "STALE_VERIFICATION",
+    "signalType": "RECOVERY_REQUIRED",
+    "deterministicKey": "stale verification",
+    "severity": "HIGH",
+    "reason": "The injected stale verification was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/7",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-09-context-miss",
+    "executionId": "security-policy-1",
+    "failure": "CONTEXT_MISS",
+    "signalType": "CONTEXT_MISS",
+    "deterministicKey": "missing required policy context",
+    "severity": "MEDIUM",
+    "reason": "The injected context miss was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/8",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-10-sandbox-execution-failure",
+    "executionId": "security-policy-2",
+    "failure": "SANDBOX_EXECUTION_FAILURE",
+    "signalType": "RECOVERY_REQUIRED",
+    "deterministicKey": "sandbox execution failure",
+    "severity": "HIGH",
+    "reason": "The injected sandbox execution failure was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/9",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-11-sandbox-cleanup-failure-simulation",
+    "executionId": "security-policy-3",
+    "failure": "SANDBOX_CLEANUP_FAILURE",
+    "signalType": "RECOVERY_REQUIRED",
+    "deterministicKey": "sandbox cleanup failure",
+    "severity": "CRITICAL",
+    "reason": "The injected sandbox cleanup failure was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/10",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-12-malformed-harness-result",
+    "executionId": "data-migration-1",
+    "failure": "MALFORMED_HARNESS_RESULT",
+    "signalType": "RETRY_REQUIRED",
+    "deterministicKey": "malformed harness result",
+    "severity": "HIGH",
+    "reason": "The injected malformed harness result was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/11",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-13-truncated-harness-result",
+    "executionId": "data-migration-1",
+    "failure": "TRUNCATED_HARNESS_RESULT",
+    "signalType": "RETRY_REQUIRED",
+    "deterministicKey": "truncated harness result",
+    "severity": "HIGH",
+    "reason": "The injected truncated harness result was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/12",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-14-missing-harness-result",
+    "executionId": "data-migration-1",
+    "failure": "MISSING_HARNESS_RESULT",
+    "signalType": "RETRY_REQUIRED",
+    "deterministicKey": "missing harness result",
+    "severity": "HIGH",
+    "reason": "The injected missing harness result was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/13",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-15-unsupported-capability",
+    "executionId": "data-migration-2",
+    "failure": "UNSUPPORTED_CAPABILITY",
+    "signalType": "TOOL_SELECTION_MISMATCH",
+    "deterministicKey": "unsupported harness capability",
+    "severity": "HIGH",
+    "reason": "The injected unsupported capability was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/14",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-16-missing-telemetry",
+    "executionId": "data-migration-3",
+    "failure": "MISSING_TELEMETRY",
+    "signalType": "MODEL_ROUTING_MISMATCH",
+    "deterministicKey": "missing cost telemetry",
+    "severity": "MEDIUM",
+    "reason": "The injected missing telemetry was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/15",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  },
+  {
+    "id": "injection-17-review-discovered-defect",
+    "executionId": "feature-1",
+    "failure": "REVIEW_DISCOVERED_DEFECT",
+    "signalType": "REVIEW_DISCOVERED_DEFECT",
+    "deterministicKey": "repeated review finding for missing deterministic coverage",
+    "severity": "HIGH",
+    "reason": "The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+    "failClosed": true,
+    "recoveryProven": true,
+    "evidenceRef": "run-results.json#failureInjections/16",
+    "proof": {
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run codex/factory-worker/remote-sandbox failure suites",
+      "exitCode": 0,
+      "durationMs": 3364,
+      "outputSha256": "sha256:00b79e548ca79efefe185b89317307f6323b02eb8756a9b967b9c6cc29a0be91"
+    }
+  }
+]

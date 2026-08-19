@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "factory-reliability-scorecard/v1",
+  "population": 15,
+  "dimensions": {
+    "executionReliability": {
+      "observedValue": 0.9333333333333333,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "verificationReliability": {
+      "observedValue": 0.9333333333333333,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "cleanupReliability": {
+      "observedValue": 1,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "contextSufficiency": {
+      "observedValue": 1,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "firstPassQuality": {
+      "observedValue": 0.9333333333333333,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "recoveryEffectiveness": {
+      "observedValue": null,
+      "sampleCount": 0,
+      "coverage": 0,
+      "confidence": "LOW",
+      "limitations": [
+        "No retries were observed; recovery effectiveness is unknown."
+      ]
+    },
+    "evidenceCompleteness": {
+      "observedValue": 0.9333333333333333,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "reviewCorrectionFrequency": {
+      "observedValue": 0,
+      "sampleCount": 14,
+      "coverage": 0.9333333333333333,
+      "confidence": "MEDIUM",
+      "limitations": []
+    },
+    "costEfficiency": {
+      "observedValue": null,
+      "sampleCount": 0,
+      "coverage": 0,
+      "confidence": "LOW",
+      "limitations": [
+        "Missing model or provider cost remains null and cannot improve this dimension."
+      ]
+    },
+    "latency": {
+      "observedValue": {
+        "medianMs": 33609,
+        "p95Ms": 195622
+      },
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    }
+  },
+  "failureInjectionCoverage": {
+    "observedValue": 1,
+    "sampleCount": 17,
+    "coverage": 1,
+    "confidence": "HIGH",
+    "limitations": []
+  }
+}

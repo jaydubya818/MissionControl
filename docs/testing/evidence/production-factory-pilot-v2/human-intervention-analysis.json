@@ -1,0 +1,188 @@
+{
+  "requiredGovernance": [
+    {
+      "executionId": "bug-fix-1",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "bug-fix-1",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "bug-fix-2",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "bug-fix-2",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "bug-fix-3",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "bug-fix-3",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "feature-1",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "feature-1",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "feature-2",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "feature-2",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "feature-3",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "feature-3",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "refactor-1",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "refactor-1",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "refactor-2",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "refactor-2",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "refactor-3",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "refactor-3",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "security-policy-1",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "security-policy-1",
+      "category": "RISK_REVIEW",
+      "count": 1
+    },
+    {
+      "executionId": "security-policy-1",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "security-policy-2",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "security-policy-2",
+      "category": "RISK_REVIEW",
+      "count": 1
+    },
+    {
+      "executionId": "security-policy-2",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "security-policy-3",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "security-policy-3",
+      "category": "RISK_REVIEW",
+      "count": 1
+    },
+    {
+      "executionId": "security-policy-3",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "data-migration-1",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "data-migration-1",
+      "category": "RISK_REVIEW",
+      "count": 1
+    },
+    {
+      "executionId": "data-migration-1",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "data-migration-2",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "data-migration-2",
+      "category": "RISK_REVIEW",
+      "count": 1
+    },
+    {
+      "executionId": "data-migration-2",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    },
+    {
+      "executionId": "data-migration-3",
+      "category": "PLAN_APPROVAL",
+      "count": 1
+    },
+    {
+      "executionId": "data-migration-3",
+      "category": "RISK_REVIEW",
+      "count": 1
+    },
+    {
+      "executionId": "data-migration-3",
+      "category": "ACCEPTANCE_DECISION",
+      "count": 1
+    }
+  ],
+  "avoidableOperationalToil": [],
+  "requiredGovernanceCount": 36,
+  "avoidableOperationalToilCount": 0,
+  "note": "Plan approval, risk review, and acceptance are required governance and are not classified as defects."
+}

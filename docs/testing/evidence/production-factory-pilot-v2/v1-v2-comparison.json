@@ -1,0 +1,39 @@
+{
+  "v1": {
+    "source": "PR #120 immutable BLOCKED evidence at 604e2c482bc1b87d8a2cbca35f4c09ca13264e13",
+    "governedExecutions": 15,
+    "eventualSuccesses": 13,
+    "localSuccesses": 12,
+    "localSamples": 12,
+    "remoteSuccesses": 1,
+    "remoteSamples": 3,
+    "attempts": 29,
+    "failedAttempts": 16,
+    "remoteStructuredOutputFailures": 2,
+    "retries": 16,
+    "contextMisses": 0,
+    "verificationFailures": 2,
+    "humanReviewCorrections": 0,
+    "firstPassStructuredResultRate": 0.8667,
+    "firstPassVerificationRate": 0.8667,
+    "finalVmCount": 0
+  },
+  "v2": {
+    "governedExecutions": 15,
+    "eventualSuccesses": 14,
+    "localSuccesses": 12,
+    "localSamples": 12,
+    "remoteSuccesses": 2,
+    "remoteSamples": 3,
+    "attempts": 15,
+    "failedAttempts": 1,
+    "remoteStructuredOutputFailures": 0,
+    "retries": 0,
+    "contextMisses": 0,
+    "verificationFailures": 1,
+    "humanReviewCorrections": 0,
+    "firstPassStructuredResultRate": 1,
+    "firstPassVerificationRate": 0.9333333333333333,
+    "finalVmCount": 0
+  }
+}

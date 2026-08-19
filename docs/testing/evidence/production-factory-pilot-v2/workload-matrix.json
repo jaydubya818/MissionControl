@@ -1,0 +1,37 @@
+[
+  {
+    "key": "bug-fix",
+    "class": "BUG_FIX",
+    "title": "Correct integer-cent listing fee behavior",
+    "risk": "LOW",
+    "repetitions": 3
+  },
+  {
+    "key": "feature",
+    "class": "FEATURE",
+    "title": "Add a multi-file pricing preview",
+    "risk": "MEDIUM",
+    "repetitions": 3
+  },
+  {
+    "key": "refactor",
+    "class": "REFACTOR",
+    "title": "Extract pricing policy without behavior change",
+    "risk": "LOW",
+    "repetitions": 3
+  },
+  {
+    "key": "security-policy",
+    "class": "SECURITY_POLICY",
+    "title": "Fail closed when authorization context is missing",
+    "risk": "HIGH",
+    "repetitions": 3
+  },
+  {
+    "key": "data-migration",
+    "class": "DATA_SCHEMA_MIGRATION",
+    "title": "Migrate listing ownership with compatibility and rollback",
+    "risk": "HIGH",
+    "repetitions": 3
+  }
+]

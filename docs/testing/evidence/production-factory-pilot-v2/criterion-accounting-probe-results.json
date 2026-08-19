@@ -1,0 +1,2384 @@
+{
+  "schemaVersion": "production-factory-pilot/v2",
+  "decision": "IN_PROGRESS",
+  "startedAt": "2026-08-19T06:21:42.991Z",
+  "pilotRunId": "ef62d95d278d",
+  "completedAt": null,
+  "baseline": {
+    "sha": "db44819ec59e79cdd71ba9ed36fce8064a120af3",
+    "executionHead": "db44819ec59e79cdd71ba9ed36fce8064a120af3",
+    "originMain": "db44819ec59e79cdd71ba9ed36fce8064a120af3",
+    "runtimeContract": 30,
+    "node": "v24.18.1",
+    "pnpm": "9.0.0",
+    "codex": "codex-cli 0.146.0"
+  },
+  "authority": {
+    "specFinalize": "PLANNING_READY_ONLY",
+    "planApproval": "RELEASES_WORK_ORDERS",
+    "harnessAuthority": "NONE",
+    "workerExecutionRequiresLease": true,
+    "remoteSandboxAuthority": "EXECUTION_ONLY",
+    "verification": "INDEPENDENT",
+    "reviewIntelligence": "PROJECTION_ADVISORY",
+    "memory": "ADVISORY",
+    "observability": "DIAGNOSTIC",
+    "learning": "ADVISORY",
+    "routing": "ADVISORY",
+    "guardedAutoEnabled": false,
+    "canonicalAcceptance": "workOrders.accept",
+    "humanMergeSeparate": true
+  },
+  "workloadMatrix": [
+    {
+      "key": "bug-fix",
+      "class": "BUG_FIX",
+      "title": "Correct integer-cent listing fee behavior",
+      "risk": "LOW",
+      "repetitions": 3
+    },
+    {
+      "key": "feature",
+      "class": "FEATURE",
+      "title": "Add a multi-file pricing preview",
+      "risk": "MEDIUM",
+      "repetitions": 3
+    },
+    {
+      "key": "refactor",
+      "class": "REFACTOR",
+      "title": "Extract pricing policy without behavior change",
+      "risk": "LOW",
+      "repetitions": 3
+    },
+    {
+      "key": "security-policy",
+      "class": "SECURITY_POLICY",
+      "title": "Fail closed when authorization context is missing",
+      "risk": "HIGH",
+      "repetitions": 3
+    },
+    {
+      "key": "data-migration",
+      "class": "DATA_SCHEMA_MIGRATION",
+      "title": "Migrate listing ownership with compatibility and rollback",
+      "risk": "HIGH",
+      "repetitions": 3
+    }
+  ],
+  "executions": [
+    {
+      "executionId": "bug-fix-1",
+      "workloadKey": "bug-fix",
+      "workloadClass": "BUG_FIX",
+      "title": "Correct integer-cent listing fee behavior",
+      "repetition": 1,
+      "risk": "LOW",
+      "backend": "persistent-worker",
+      "lineage": {
+        "constitutionRevisionId": "constitution-production-factory-pilot-v2",
+        "constitutionDigest": "sha256:3f4e964ad3b98534e761fba55f37ab63c961460b8d5f8b7b3e555cc48b2c5492",
+        "missionId": "mission-bug-fix-1",
+        "specRevisionId": "spec-bug-fix-1-r1",
+        "specDigest": "sha256:03a729e1a59db0ad0b7ac8964731eab6c5b58520061a72cfe152b00ea09c4ee8",
+        "specQuality": {
+          "result": "PASS",
+          "findingCount": 0,
+          "authority": "PLANNING_READY_ONLY"
+        },
+        "planId": "plan-bug-fix-1",
+        "planRevision": 1,
+        "planAuthoredBy": "pilot-operator-author",
+        "planApprovedBy": "pilot-operator-approver",
+        "planApprovalSeparate": true,
+        "qualityContractDigest": "sha256:fa582aef3a676784290e7305a7e8818dbbd9c3f1c9d29f799adf6e5e3d98319e",
+        "workOrderId": "work-order-bug-fix-1",
+        "workOrderRevision": 1,
+        "factoryVersionId": "factory-codex-local-v1",
+        "factoryMemory": {
+          "authority": "ADVISORY",
+          "result": "CONTEXT_PACKAGE_ASSEMBLED"
+        },
+        "contextPackageId": "context-bug-fix-1",
+        "timings": {
+          "missionToPlanMs": 3,
+          "planToWorkOrderMs": 0,
+          "queueAdmissionMs": 0
+        }
+      },
+      "context": {
+        "sufficient": true,
+        "contextPackageId": "context-bug-fix-1",
+        "missingSources": []
+      },
+      "attempts": [
+        {
+          "attemptId": "attempt-ef62d95d278d-bug-fix-1-1",
+          "attemptNumber": 1,
+          "retryOfAttemptId": null,
+          "worker": {
+            "workerId": "worker-production-local-codex",
+            "sessionId": "session-production-pilot-v2-ef62d95d278d-persistent-worker",
+            "generation": 1,
+            "current": true,
+            "maxConcurrentRuns": 1
+          },
+          "lease": {
+            "id": "lease-ef62d95d278d-bug-fix-1-1",
+            "current": true,
+            "acquiredAt": "2026-08-19T06:21:46.261Z"
+          },
+          "sourceSha": "04f462a5f3989eb673ce03c5e590ce0a2360ae9f",
+          "backend": "persistent-worker",
+          "status": "COMPLETED",
+          "startedAt": "2026-08-19T06:21:46.261Z",
+          "events": [
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-1-1:local",
+              "sequence": 1,
+              "type": "EXECUTION_STARTED",
+              "occurredAt": 1787120506386,
+              "summary": "Codex execution started.",
+              "metadata": {
+                "adapter": "codex/v1",
+                "harness": "codex-cli/0.146.0",
+                "isolation": "WORKSPACE_WRITE",
+                "allowedPaths": [
+                  "src/**"
+                ]
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-1-1:local",
+              "sequence": 2,
+              "type": "COMMAND_STARTED",
+              "occurredAt": 1787120506386,
+              "summary": "Codex CLI command started."
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-1-1:local",
+              "sequence": 3,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120531607,
+              "summary": "Codex tool item completed: command_execution.",
+              "metadata": {
+                "itemType": "command_execution"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-1-1:local",
+              "sequence": 4,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120531607,
+              "summary": "Codex tool item completed: file_change.",
+              "metadata": {
+                "itemType": "file_change"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-1-1:local",
+              "sequence": 5,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120531607,
+              "summary": "Codex tool item completed: command_execution.",
+              "metadata": {
+                "itemType": "command_execution"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-1-1:local",
+              "sequence": 6,
+              "type": "COMMAND_COMPLETED",
+              "occurredAt": 1787120531607,
+              "summary": "Codex CLI command completed.",
+              "metadata": {
+                "exitCode": 0,
+                "signal": null
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-1-1:local",
+              "sequence": 7,
+              "type": "ARTIFACT_PRODUCED",
+              "occurredAt": 1787120531607,
+              "summary": "Codex produced the execution result.",
+              "metadata": {
+                "artifactType": "CODEX_RESULT"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-1-1:local",
+              "sequence": 8,
+              "type": "EXECUTION_COMPLETED",
+              "occurredAt": 1787120531607,
+              "summary": "Codex execution completed."
+            }
+          ],
+          "harness": {
+            "adapter": "codex",
+            "version": "v1",
+            "harnessVersion": "0.146.0",
+            "authority": {
+              "worker": "NONE",
+              "verification": "NONE",
+              "publication": "NONE",
+              "acceptance": "NONE",
+              "memory": "NONE",
+              "observability": "NONE",
+              "learning": "NONE"
+            },
+            "actualTuple": {
+              "provider": "openai",
+              "model": "gpt-5.6-terra",
+              "backend": "persistent-worker"
+            }
+          },
+          "usage": {
+            "inputTokens": 63001,
+            "outputTokens": 864,
+            "cacheReadTokens": 44288,
+            "cacheWriteTokens": null,
+            "costUsd": null
+          },
+          "cleanup": {
+            "observed": true,
+            "passed": true,
+            "status": "COMPLETED",
+            "resourceAbsent": null
+          },
+          "remoteResult": null,
+          "structuredResult": {
+            "schema": "factory-result/v1",
+            "status": "COMPLETED",
+            "summary": "Corrected the listing fee to five percent with nearest-cent rounding while preserving strict validation.",
+            "completedAcceptanceCriterionIds": [
+              "BUG-001",
+              "BUG-002"
+            ],
+            "incompleteAcceptanceCriterionIds": [],
+            "unknownAcceptanceCriterionIds": [],
+            "verificationCommands": [
+              "npm test",
+              "git diff --check"
+            ],
+            "knownRisks": [],
+            "nextAction": "No further action needed."
+          },
+          "terminalStructuredResult": true,
+          "failure": null,
+          "executionMetrics": {
+            "executionMs": 25219,
+            "allocationMs": null,
+            "readinessMs": null,
+            "teardownMs": null
+          },
+          "candidate": {
+            "sourceSha": "04f462a5f3989eb673ce03c5e590ce0a2360ae9f",
+            "candidateSha": "752338b2ef2e6e27234c27373e785c571660c333",
+            "treeSha": "391f7a4faad52c4f95009dce7f6ca799d04961e8",
+            "changedFiles": [
+              "src/listingFee.mjs"
+            ],
+            "linesAdded": 1,
+            "linesDeleted": 1,
+            "diffSha256": "sha256:a48ce5e03574579857f0f93821213f198da9cc4212098e1f74ee14103dbef20a"
+          },
+          "verification": {
+            "attemptId": "verification-bug-fix-1",
+            "sourceAttemptId": null,
+            "verifierId": "verifier-bug-fix-1",
+            "independent": true,
+            "candidateSha": "752338b2ef2e6e27234c27373e785c571660c333",
+            "treeSha": "391f7a4faad52c4f95009dce7f6ca799d04961e8",
+            "verdict": "VERIFIED",
+            "reason": "Independent exact-candidate gate passed.",
+            "command": "npm test",
+            "exitCode": 0,
+            "outputSha256": "sha256:7fdb8f5b330e9cc368850b987e9c59b560b6e5b026e67f140875c395fca7ab4c",
+            "durationMs": 262,
+            "acceptanceAuthority": false
+          },
+          "retryDecision": {
+            "allowed": false,
+            "reason": "NOT_REQUIRED"
+          },
+          "finishedAt": "2026-08-19T06:22:11.951Z",
+          "durationMs": 25690
+        }
+      ],
+      "terminalStructuredResult": true,
+      "firstPassStructuredResultSuccess": true,
+      "firstPassVerificationSuccess": true,
+      "eventualVerificationSuccess": true,
+      "firstPassSuccess": true,
+      "eventualSuccess": true,
+      "retries": 0,
+      "cancellationCount": 0,
+      "verification": {
+        "attemptId": "verification-bug-fix-1",
+        "sourceAttemptId": null,
+        "verifierId": "verifier-bug-fix-1",
+        "independent": true,
+        "candidateSha": "752338b2ef2e6e27234c27373e785c571660c333",
+        "treeSha": "391f7a4faad52c4f95009dce7f6ca799d04961e8",
+        "verdict": "VERIFIED",
+        "reason": "Independent exact-candidate gate passed.",
+        "command": "npm test",
+        "exitCode": 0,
+        "outputSha256": "sha256:7fdb8f5b330e9cc368850b987e9c59b560b6e5b026e67f140875c395fca7ab4c",
+        "durationMs": 262,
+        "acceptanceAuthority": false
+      },
+      "evidence": {
+        "envelopes": [
+          {
+            "id": "evidence-bug-fix-1-bug-001",
+            "criterionId": "BUG-001",
+            "sourceAttemptId": "attempt-ef62d95d278d-bug-fix-1-1",
+            "verificationAttemptId": "verification-bug-fix-1-1",
+            "sourceRevision": "04f462a5f3989eb673ce03c5e590ce0a2360ae9f",
+            "candidateRevision": "752338b2ef2e6e27234c27373e785c571660c333",
+            "producer": {
+              "actorId": "verifier-bug-fix-1",
+              "independent": true
+            }
+          },
+          {
+            "id": "evidence-bug-fix-1-bug-002",
+            "criterionId": "BUG-002",
+            "sourceAttemptId": "attempt-ef62d95d278d-bug-fix-1-1",
+            "verificationAttemptId": "verification-bug-fix-1-1",
+            "sourceRevision": "04f462a5f3989eb673ce03c5e590ce0a2360ae9f",
+            "candidateRevision": "752338b2ef2e6e27234c27373e785c571660c333",
+            "producer": {
+              "actorId": "verifier-bug-fix-1",
+              "independent": true
+            }
+          }
+        ],
+        "unknown": []
+      },
+      "evidenceCompleteness": 1,
+      "qualityGate": {
+        "state": "ELIGIBLE",
+        "exactCurrent": true,
+        "acceptanceAuthority": false
+      },
+      "prLineage": {
+        "mode": "DETERMINISTIC_PROVIDER_FIXTURE",
+        "repository": "sellerfi-pilot/bug-fix",
+        "headSha": "752338b2ef2e6e27234c27373e785c571660c333",
+        "url": "https://github.com/sellerfi-pilot/bug-fix/pull/1",
+        "published": false,
+        "humanMergeRequired": true
+      },
+      "review": {
+        "authority": "PROJECTION_ADVISORY",
+        "residualAiEnabled": false,
+        "unknownEvidence": 0,
+        "residualRisk": [],
+        "implementationDecisions": [
+          {
+            "decision": "Use the bounded bug-fix implementation.",
+            "attributableTo": "attempt-ef62d95d278d-bug-fix-1-1"
+          }
+        ],
+        "semanticGroups": [
+          {
+            "id": "other",
+            "name": "Other",
+            "method": "DETERMINISTIC",
+            "authority": "ADVISORY",
+            "files": [
+              {
+                "path": "src/listingFee.mjs"
+              }
+            ]
+          }
+        ],
+        "criterionTrace": [
+          {
+            "criterion": {
+              "id": "BUG-001",
+              "title": "Five-percent regression passes",
+              "description": null,
+              "requirementIds": [
+                "REQ-001",
+                "REQ-002"
+              ]
+            },
+            "specRequirements": [
+              {
+                "id": "REQ-001",
+                "title": "Listing fees use five percent of non-negative integer cents.",
+                "priority": "MUST"
+              },
+              {
+                "id": "REQ-002",
+                "title": "Invalid monetary inputs fail deterministically.",
+                "priority": "MUST"
+              }
+            ],
+            "planAssertions": [],
+            "verificationChecks": [],
+            "evidence": [],
+            "result": "PASS",
+            "method": "node --test",
+            "receiptId": "receipt-bug-fix-1-bug-001",
+            "verifier": "verifier-bug-fix-1",
+            "current": true,
+            "integrityIssue": null,
+            "lineage": {
+              "missionSpecRevisionId": "spec-bug-fix-1-r1",
+              "missionSpecDigest": "sha256:03a729e1a59db0ad0b7ac8964731eab6c5b58520061a72cfe152b00ea09c4ee8",
+              "missionPlanId": "plan-bug-fix-1",
+              "missionPlanRevisionNumber": 1,
+              "qualityContractDigest": "sha256:fa582aef3a676784290e7305a7e8818dbbd9c3f1c9d29f799adf6e5e3d98319e",
+              "workOrderId": "work-order-bug-fix-1",
+              "workOrderRevisionNumber": 1,
+              "workflowRunId": "attempt-ef62d95d278d-bug-fix-1-1",
+              "candidateRevision": "752338b2ef2e6e27234c27373e785c571660c333",
+              "verificationRunId": "verification-bug-fix-1",
+              "verificationSubjectId": null,
+              "verificationSubjectDigest": null,
+              "verificationPlanId": null,
+              "verificationPlanDigest": null,
+              "evidenceSetDigest": null,
+              "qualityGateDecisionId": null
+            }
+          },
+          {
+            "criterion": {
+              "id": "BUG-002",
+              "title": "Invalid inputs fail closed",
+              "description": null,
+              "requirementIds": [
+                "REQ-001",
+                "REQ-002"
+              ]
+            },
+            "specRequirements": [
+              {
+                "id": "REQ-001",
+                "title": "Listing fees use five percent of non-negative integer cents.",
+                "priority": "MUST"
+              },
+              {
+                "id": "REQ-002",
+                "title": "Invalid monetary inputs fail deterministically.",
+                "priority": "MUST"
+              }
+            ],
+            "planAssertions": [],
+            "verificationChecks": [],
+            "evidence": [],
+            "result": "PASS",
+            "method": "node --test",
+            "receiptId": "receipt-bug-fix-1-bug-002",
+            "verifier": "verifier-bug-fix-1",
+            "current": true,
+            "integrityIssue": null,
+            "lineage": {
+              "missionSpecRevisionId": "spec-bug-fix-1-r1",
+              "missionSpecDigest": "sha256:03a729e1a59db0ad0b7ac8964731eab6c5b58520061a72cfe152b00ea09c4ee8",
+              "missionPlanId": "plan-bug-fix-1",
+              "missionPlanRevisionNumber": 1,
+              "qualityContractDigest": "sha256:fa582aef3a676784290e7305a7e8818dbbd9c3f1c9d29f799adf6e5e3d98319e",
+              "workOrderId": "work-order-bug-fix-1",
+              "workOrderRevisionNumber": 1,
+              "workflowRunId": "attempt-ef62d95d278d-bug-fix-1-1",
+              "candidateRevision": "752338b2ef2e6e27234c27373e785c571660c333",
+              "verificationRunId": "verification-bug-fix-1",
+              "verificationSubjectId": null,
+              "verificationSubjectDigest": null,
+              "verificationPlanId": null,
+              "verificationPlanDigest": null,
+              "evidenceSetDigest": null,
+              "qualityGateDecisionId": null
+            }
+          }
+        ],
+        "correctionRequired": false,
+        "durationMs": 1
+      },
+      "acceptance": {
+        "operation": "workOrders.accept",
+        "fixtureActorType": "HUMAN",
+        "eligible": true,
+        "blockingReasons": [],
+        "accepted": true,
+        "mergePerformed": false
+      },
+      "cleanup": {
+        "observed": true,
+        "passed": true,
+        "status": "COMPLETED",
+        "resourceAbsent": null
+      },
+      "cost": {
+        "observed": false,
+        "modelUsd": null,
+        "infrastructureUsd": null,
+        "totalUsd": null,
+        "limitation": "Codex CLI emitted token counts but no priced model-cost field; local infrastructure cost is unavailable."
+      },
+      "metrics": {
+        "missionToPlanMs": 3,
+        "planToWorkOrderMs": 0,
+        "queueAdmissionMs": 0,
+        "localExecutionMs": 25219,
+        "remoteAllocationMs": null,
+        "remoteReadinessMs": null,
+        "remoteExecutionMs": null,
+        "teardownMs": null,
+        "executionMs": 25690,
+        "verificationMs": 262,
+        "reviewMs": 1,
+        "totalCycleMs": 25737
+      }
+    },
+    {
+      "executionId": "bug-fix-2",
+      "workloadKey": "bug-fix",
+      "workloadClass": "BUG_FIX",
+      "title": "Correct integer-cent listing fee behavior",
+      "repetition": 2,
+      "risk": "LOW",
+      "backend": "persistent-worker",
+      "lineage": {
+        "constitutionRevisionId": "constitution-production-factory-pilot-v2",
+        "constitutionDigest": "sha256:3f4e964ad3b98534e761fba55f37ab63c961460b8d5f8b7b3e555cc48b2c5492",
+        "missionId": "mission-bug-fix-2",
+        "specRevisionId": "spec-bug-fix-2-r1",
+        "specDigest": "sha256:03a729e1a59db0ad0b7ac8964731eab6c5b58520061a72cfe152b00ea09c4ee8",
+        "specQuality": {
+          "result": "PASS",
+          "findingCount": 0,
+          "authority": "PLANNING_READY_ONLY"
+        },
+        "planId": "plan-bug-fix-2",
+        "planRevision": 1,
+        "planAuthoredBy": "pilot-operator-author",
+        "planApprovedBy": "pilot-operator-approver",
+        "planApprovalSeparate": true,
+        "qualityContractDigest": "sha256:87dad11d87d3decb91e48a82d6180b94f0cdb2d73fc52213f6126d4169cb9da4",
+        "workOrderId": "work-order-bug-fix-2",
+        "workOrderRevision": 1,
+        "factoryVersionId": "factory-codex-local-v1",
+        "factoryMemory": {
+          "authority": "ADVISORY",
+          "result": "CONTEXT_PACKAGE_ASSEMBLED"
+        },
+        "contextPackageId": "context-bug-fix-2",
+        "timings": {
+          "missionToPlanMs": 1,
+          "planToWorkOrderMs": 0,
+          "queueAdmissionMs": 0
+        }
+      },
+      "context": {
+        "sufficient": true,
+        "contextPackageId": "context-bug-fix-2",
+        "missingSources": []
+      },
+      "attempts": [
+        {
+          "attemptId": "attempt-ef62d95d278d-bug-fix-2-1",
+          "attemptNumber": 1,
+          "retryOfAttemptId": null,
+          "worker": {
+            "workerId": "worker-production-local-codex",
+            "sessionId": "session-production-pilot-v2-ef62d95d278d-persistent-worker",
+            "generation": 1,
+            "current": true,
+            "maxConcurrentRuns": 1
+          },
+          "lease": {
+            "id": "lease-ef62d95d278d-bug-fix-2-1",
+            "current": true,
+            "acquiredAt": "2026-08-19T06:22:12.002Z"
+          },
+          "sourceSha": "858ed6d45640dbb20b6aeca5af85ebf9bc2c8d08",
+          "backend": "persistent-worker",
+          "status": "COMPLETED",
+          "startedAt": "2026-08-19T06:22:12.002Z",
+          "events": [
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-2-1:local",
+              "sequence": 1,
+              "type": "EXECUTION_STARTED",
+              "occurredAt": 1787120532133,
+              "summary": "Codex execution started.",
+              "metadata": {
+                "adapter": "codex/v1",
+                "harness": "codex-cli/0.146.0",
+                "isolation": "WORKSPACE_WRITE",
+                "allowedPaths": [
+                  "src/**"
+                ]
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-2-1:local",
+              "sequence": 2,
+              "type": "COMMAND_STARTED",
+              "occurredAt": 1787120532133,
+              "summary": "Codex CLI command started."
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-2-1:local",
+              "sequence": 3,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120559384,
+              "summary": "Codex tool item completed: command_execution.",
+              "metadata": {
+                "itemType": "command_execution"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-2-1:local",
+              "sequence": 4,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120559384,
+              "summary": "Codex tool item completed: file_change.",
+              "metadata": {
+                "itemType": "file_change"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-2-1:local",
+              "sequence": 5,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120559384,
+              "summary": "Codex tool item completed: command_execution.",
+              "metadata": {
+                "itemType": "command_execution"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-2-1:local",
+              "sequence": 6,
+              "type": "COMMAND_COMPLETED",
+              "occurredAt": 1787120559384,
+              "summary": "Codex CLI command completed.",
+              "metadata": {
+                "exitCode": 0,
+                "signal": null
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-2-1:local",
+              "sequence": 7,
+              "type": "ARTIFACT_PRODUCED",
+              "occurredAt": 1787120559384,
+              "summary": "Codex produced the execution result.",
+              "metadata": {
+                "artifactType": "CODEX_RESULT"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-bug-fix-2-1:local",
+              "sequence": 8,
+              "type": "EXECUTION_COMPLETED",
+              "occurredAt": 1787120559384,
+              "summary": "Codex execution completed."
+            }
+          ],
+          "harness": {
+            "adapter": "codex",
+            "version": "v1",
+            "harnessVersion": "0.146.0",
+            "authority": {
+              "worker": "NONE",
+              "verification": "NONE",
+              "publication": "NONE",
+              "acceptance": "NONE",
+              "memory": "NONE",
+              "observability": "NONE",
+              "learning": "NONE"
+            },
+            "actualTuple": {
+              "provider": "openai",
+              "model": "gpt-5.6-terra",
+              "backend": "persistent-worker"
+            }
+          },
+          "usage": {
+            "inputTokens": 62349,
+            "outputTokens": 880,
+            "cacheReadTokens": 54272,
+            "cacheWriteTokens": null,
+            "costUsd": null
+          },
+          "cleanup": {
+            "observed": true,
+            "passed": true,
+            "status": "COMPLETED",
+            "resourceAbsent": null
+          },
+          "remoteResult": null,
+          "structuredResult": {
+            "schema": "factory-result/v1",
+            "status": "COMPLETED",
+            "summary": "Corrected the listing fee to five percent with exact nearest-cent rounding and retained strict validation. Tests pass.",
+            "completedAcceptanceCriterionIds": [
+              "BUG-001",
+              "BUG-002"
+            ],
+            "incompleteAcceptanceCriterionIds": [],
+            "unknownAcceptanceCriterionIds": [],
+            "verificationCommands": [
+              "npm test"
+            ],
+            "knownRisks": [],
+            "nextAction": "No further action required."
+          },
+          "terminalStructuredResult": true,
+          "failure": null,
+          "executionMetrics": {
+            "executionMs": 27251,
+            "allocationMs": null,
+            "readinessMs": null,
+            "teardownMs": null
+          },
+          "candidate": {
+            "sourceSha": "858ed6d45640dbb20b6aeca5af85ebf9bc2c8d08",
+            "candidateSha": "8cc55fe1e2044eaa1aea2231dc81f44202dd8cea",
+            "treeSha": "391f7a4faad52c4f95009dce7f6ca799d04961e8",
+            "changedFiles": [
+              "src/listingFee.mjs"
+            ],
+            "linesAdded": 1,
+            "linesDeleted": 1,
+            "diffSha256": "sha256:a48ce5e03574579857f0f93821213f198da9cc4212098e1f74ee14103dbef20a"
+          },
+          "verification": {
+            "attemptId": "verification-bug-fix-2",
+            "sourceAttemptId": null,
+            "verifierId": "verifier-bug-fix-2",
+            "independent": true,
+            "candidateSha": "8cc55fe1e2044eaa1aea2231dc81f44202dd8cea",
+            "treeSha": "391f7a4faad52c4f95009dce7f6ca799d04961e8",
+            "verdict": "VERIFIED",
+            "reason": "Independent exact-candidate gate passed.",
+            "command": "npm test",
+            "exitCode": 0,
+            "outputSha256": "sha256:0b3b1653b99d5db152a238131701427e5552453470c1335bea9f97d00e568a9e",
+            "durationMs": 260,
+            "acceptanceAuthority": false
+          },
+          "retryDecision": {
+            "allowed": false,
+            "reason": "NOT_REQUIRED"
+          },
+          "finishedAt": "2026-08-19T06:22:39.736Z",
+          "durationMs": 27734
+        }
+      ],
+      "terminalStructuredResult": true,
+      "firstPassStructuredResultSuccess": true,
+      "firstPassVerificationSuccess": true,
+      "eventualVerificationSuccess": true,
+      "firstPassSuccess": true,
+      "eventualSuccess": true,
+      "retries": 0,
+      "cancellationCount": 0,
+      "verification": {
+        "attemptId": "verification-bug-fix-2",
+        "sourceAttemptId": null,
+        "verifierId": "verifier-bug-fix-2",
+        "independent": true,
+        "candidateSha": "8cc55fe1e2044eaa1aea2231dc81f44202dd8cea",
+        "treeSha": "391f7a4faad52c4f95009dce7f6ca799d04961e8",
+        "verdict": "VERIFIED",
+        "reason": "Independent exact-candidate gate passed.",
+        "command": "npm test",
+        "exitCode": 0,
+        "outputSha256": "sha256:0b3b1653b99d5db152a238131701427e5552453470c1335bea9f97d00e568a9e",
+        "durationMs": 260,
+        "acceptanceAuthority": false
+      },
+      "evidence": {
+        "envelopes": [
+          {
+            "id": "evidence-bug-fix-2-bug-001",
+            "criterionId": "BUG-001",
+            "sourceAttemptId": "attempt-ef62d95d278d-bug-fix-2-1",
+            "verificationAttemptId": "verification-bug-fix-2-1",
+            "sourceRevision": "858ed6d45640dbb20b6aeca5af85ebf9bc2c8d08",
+            "candidateRevision": "8cc55fe1e2044eaa1aea2231dc81f44202dd8cea",
+            "producer": {
+              "actorId": "verifier-bug-fix-2",
+              "independent": true
+            }
+          },
+          {
+            "id": "evidence-bug-fix-2-bug-002",
+            "criterionId": "BUG-002",
+            "sourceAttemptId": "attempt-ef62d95d278d-bug-fix-2-1",
+            "verificationAttemptId": "verification-bug-fix-2-1",
+            "sourceRevision": "858ed6d45640dbb20b6aeca5af85ebf9bc2c8d08",
+            "candidateRevision": "8cc55fe1e2044eaa1aea2231dc81f44202dd8cea",
+            "producer": {
+              "actorId": "verifier-bug-fix-2",
+              "independent": true
+            }
+          }
+        ],
+        "unknown": []
+      },
+      "evidenceCompleteness": 1,
+      "qualityGate": {
+        "state": "ELIGIBLE",
+        "exactCurrent": true,
+        "acceptanceAuthority": false
+      },
+      "prLineage": {
+        "mode": "DETERMINISTIC_PROVIDER_FIXTURE",
+        "repository": "sellerfi-pilot/bug-fix",
+        "headSha": "8cc55fe1e2044eaa1aea2231dc81f44202dd8cea",
+        "url": "https://github.com/sellerfi-pilot/bug-fix/pull/2",
+        "published": false,
+        "humanMergeRequired": true
+      },
+      "review": {
+        "authority": "PROJECTION_ADVISORY",
+        "residualAiEnabled": false,
+        "unknownEvidence": 0,
+        "residualRisk": [],
+        "implementationDecisions": [
+          {
+            "decision": "Use the bounded bug-fix implementation.",
+            "attributableTo": "attempt-ef62d95d278d-bug-fix-2-1"
+          }
+        ],
+        "semanticGroups": [
+          {
+            "id": "other",
+            "name": "Other",
+            "method": "DETERMINISTIC",
+            "authority": "ADVISORY",
+            "files": [
+              {
+                "path": "src/listingFee.mjs"
+              }
+            ]
+          }
+        ],
+        "criterionTrace": [
+          {
+            "criterion": {
+              "id": "BUG-001",
+              "title": "Five-percent regression passes",
+              "description": null,
+              "requirementIds": [
+                "REQ-001",
+                "REQ-002"
+              ]
+            },
+            "specRequirements": [
+              {
+                "id": "REQ-001",
+                "title": "Listing fees use five percent of non-negative integer cents.",
+                "priority": "MUST"
+              },
+              {
+                "id": "REQ-002",
+                "title": "Invalid monetary inputs fail deterministically.",
+                "priority": "MUST"
+              }
+            ],
+            "planAssertions": [],
+            "verificationChecks": [],
+            "evidence": [],
+            "result": "PASS",
+            "method": "node --test",
+            "receiptId": "receipt-bug-fix-2-bug-001",
+            "verifier": "verifier-bug-fix-2",
+            "current": true,
+            "integrityIssue": null,
+            "lineage": {
+              "missionSpecRevisionId": "spec-bug-fix-2-r1",
+              "missionSpecDigest": "sha256:03a729e1a59db0ad0b7ac8964731eab6c5b58520061a72cfe152b00ea09c4ee8",
+              "missionPlanId": "plan-bug-fix-2",
+              "missionPlanRevisionNumber": 1,
+              "qualityContractDigest": "sha256:87dad11d87d3decb91e48a82d6180b94f0cdb2d73fc52213f6126d4169cb9da4",
+              "workOrderId": "work-order-bug-fix-2",
+              "workOrderRevisionNumber": 1,
+              "workflowRunId": "attempt-ef62d95d278d-bug-fix-2-1",
+              "candidateRevision": "8cc55fe1e2044eaa1aea2231dc81f44202dd8cea",
+              "verificationRunId": "verification-bug-fix-2",
+              "verificationSubjectId": null,
+              "verificationSubjectDigest": null,
+              "verificationPlanId": null,
+              "verificationPlanDigest": null,
+              "evidenceSetDigest": null,
+              "qualityGateDecisionId": null
+            }
+          },
+          {
+            "criterion": {
+              "id": "BUG-002",
+              "title": "Invalid inputs fail closed",
+              "description": null,
+              "requirementIds": [
+                "REQ-001",
+                "REQ-002"
+              ]
+            },
+            "specRequirements": [
+              {
+                "id": "REQ-001",
+                "title": "Listing fees use five percent of non-negative integer cents.",
+                "priority": "MUST"
+              },
+              {
+                "id": "REQ-002",
+                "title": "Invalid monetary inputs fail deterministically.",
+                "priority": "MUST"
+              }
+            ],
+            "planAssertions": [],
+            "verificationChecks": [],
+            "evidence": [],
+            "result": "PASS",
+            "method": "node --test",
+            "receiptId": "receipt-bug-fix-2-bug-002",
+            "verifier": "verifier-bug-fix-2",
+            "current": true,
+            "integrityIssue": null,
+            "lineage": {
+              "missionSpecRevisionId": "spec-bug-fix-2-r1",
+              "missionSpecDigest": "sha256:03a729e1a59db0ad0b7ac8964731eab6c5b58520061a72cfe152b00ea09c4ee8",
+              "missionPlanId": "plan-bug-fix-2",
+              "missionPlanRevisionNumber": 1,
+              "qualityContractDigest": "sha256:87dad11d87d3decb91e48a82d6180b94f0cdb2d73fc52213f6126d4169cb9da4",
+              "workOrderId": "work-order-bug-fix-2",
+              "workOrderRevisionNumber": 1,
+              "workflowRunId": "attempt-ef62d95d278d-bug-fix-2-1",
+              "candidateRevision": "8cc55fe1e2044eaa1aea2231dc81f44202dd8cea",
+              "verificationRunId": "verification-bug-fix-2",
+              "verificationSubjectId": null,
+              "verificationSubjectDigest": null,
+              "verificationPlanId": null,
+              "verificationPlanDigest": null,
+              "evidenceSetDigest": null,
+              "qualityGateDecisionId": null
+            }
+          }
+        ],
+        "correctionRequired": false,
+        "durationMs": 0
+      },
+      "acceptance": {
+        "operation": "workOrders.accept",
+        "fixtureActorType": "HUMAN",
+        "eligible": true,
+        "blockingReasons": [],
+        "accepted": true,
+        "mergePerformed": false
+      },
+      "cleanup": {
+        "observed": true,
+        "passed": true,
+        "status": "COMPLETED",
+        "resourceAbsent": null
+      },
+      "cost": {
+        "observed": false,
+        "modelUsd": null,
+        "infrastructureUsd": null,
+        "totalUsd": null,
+        "limitation": "Codex CLI emitted token counts but no priced model-cost field; local infrastructure cost is unavailable."
+      },
+      "metrics": {
+        "missionToPlanMs": 1,
+        "planToWorkOrderMs": 0,
+        "queueAdmissionMs": 0,
+        "localExecutionMs": 27251,
+        "remoteAllocationMs": null,
+        "remoteReadinessMs": null,
+        "remoteExecutionMs": null,
+        "teardownMs": null,
+        "executionMs": 27734,
+        "verificationMs": 260,
+        "reviewMs": 0,
+        "totalCycleMs": 27782
+      }
+    },
+    {
+      "executionId": "bug-fix-3",
+      "workloadKey": "bug-fix",
+      "workloadClass": "BUG_FIX",
+      "title": "Correct integer-cent listing fee behavior",
+      "repetition": 3,
+      "risk": "LOW",
+      "backend": "remote-sandbox",
+      "lineage": {
+        "constitutionRevisionId": "constitution-production-factory-pilot-v2",
+        "constitutionDigest": "sha256:3f4e964ad3b98534e761fba55f37ab63c961460b8d5f8b7b3e555cc48b2c5492",
+        "missionId": "mission-bug-fix-3",
+        "specRevisionId": "spec-bug-fix-3-r1",
+        "specDigest": "sha256:03a729e1a59db0ad0b7ac8964731eab6c5b58520061a72cfe152b00ea09c4ee8",
+        "specQuality": {
+          "result": "PASS",
+          "findingCount": 0,
+          "authority": "PLANNING_READY_ONLY"
+        },
+        "planId": "plan-bug-fix-3",
+        "planRevision": 1,
+        "planAuthoredBy": "pilot-operator-author",
+        "planApprovedBy": "pilot-operator-approver",
+        "planApprovalSeparate": true,
+        "qualityContractDigest": "sha256:18650e68637f9d89e4178aef043dedf80cc41f049583bb6694eb671f5f8c2648",
+        "workOrderId": "work-order-bug-fix-3",
+        "workOrderRevision": 1,
+        "factoryVersionId": "factory-codex-exedev-certified-v1",
+        "factoryMemory": {
+          "authority": "ADVISORY",
+          "result": "CONTEXT_PACKAGE_ASSEMBLED"
+        },
+        "contextPackageId": "context-bug-fix-3",
+        "timings": {
+          "missionToPlanMs": 1,
+          "planToWorkOrderMs": 0,
+          "queueAdmissionMs": 0
+        }
+      },
+      "context": {
+        "sufficient": true,
+        "contextPackageId": "context-bug-fix-3",
+        "missingSources": []
+      },
+      "attempts": [
+        {
+          "attemptId": "attempt-ef62d95d278d-bug-fix-3-1",
+          "attemptNumber": 1,
+          "retryOfAttemptId": null,
+          "worker": {
+            "workerId": "worker-production-exedev-n1",
+            "sessionId": "session-production-pilot-v2-ef62d95d278d-remote-sandbox",
+            "generation": 1,
+            "current": true,
+            "maxConcurrentRuns": 1
+          },
+          "lease": {
+            "id": "lease-ef62d95d278d-bug-fix-3-1",
+            "current": true,
+            "acquiredAt": "2026-08-19T06:22:39.785Z"
+          },
+          "sourceSha": "e5ea61c0c8a0ca55fe276cf62f8a259a2d838670",
+          "backend": "remote-sandbox",
+          "status": "FAILED",
+          "startedAt": "2026-08-19T06:22:39.785Z",
+          "events": [
+            {
+              "type": "SANDBOX_REQUESTED",
+              "occurredAt": 1787120564056,
+              "resourceName": "mc-attempt-ef56f16dd1e74a97",
+              "attemptId": "attempt-ef62d95d278d-bug-fix-3-1",
+              "metadata": {
+                "provider": "EXE_DEV",
+                "profileDigest": "sha256:f84f31ad1756023aa36fabd3759ca0e269697bae786373d0fdb2854cadfd7ce5",
+                "readiness": "DEGRADED"
+              }
+            },
+            {
+              "type": "SANDBOX_ALLOCATED",
+              "occurredAt": 1787120567441,
+              "resourceName": "mc-attempt-ef56f16dd1e74a97",
+              "attemptId": "attempt-ef62d95d278d-bug-fix-3-1",
+              "metadata": {
+                "providerResourceId": "mc-attempt-ef56f16dd1e74a97"
+              }
+            },
+            {
+              "type": "SANDBOX_STARTED",
+              "occurredAt": 1787120571952,
+              "resourceName": "mc-attempt-ef56f16dd1e74a97",
+              "attemptId": "attempt-ef62d95d278d-bug-fix-3-1",
+              "metadata": {
+                "processId": "mc-attempt-ef56f16dd1e74a97:supervisor"
+              }
+            },
+            {
+              "type": "SANDBOX_RESULT_RECEIVED",
+              "occurredAt": 1787120706415,
+              "resourceName": "mc-attempt-ef56f16dd1e74a97",
+              "attemptId": "attempt-ef62d95d278d-bug-fix-3-1",
+              "metadata": {
+                "resultDigest": "sha256:d29444ef7843ddc0e3dcad62ad2d86dfcf57c5cd1352459731668e518ab8b22d",
+                "status": "FAILED",
+                "providerCostUsd": null,
+                "inferenceCostUsd": null
+              }
+            },
+            {
+              "type": "SANDBOX_CREDENTIAL_REVOKED",
+              "occurredAt": 1787120706856,
+              "resourceName": "mc-attempt-ef56f16dd1e74a97",
+              "attemptId": "attempt-ef62d95d278d-bug-fix-3-1",
+              "metadata": {
+                "grantKey": "mc-attempt-75b1c2dce651228a6a14",
+                "externalCredentialId": "4b8bd83312428a757c9e708fdb7c9ecbf741e0101411ed1080f9d5b2bf6c49ea"
+              }
+            },
+            {
+              "type": "SANDBOX_TERMINATION_REQUESTED",
+              "occurredAt": 1787120706856,
+              "resourceName": "mc-attempt-ef56f16dd1e74a97",
+              "attemptId": "attempt-ef62d95d278d-bug-fix-3-1",
+              "metadata": {
+                "providerResourceId": "mc-attempt-ef56f16dd1e74a97"
+              }
+            },
+            {
+              "type": "SANDBOX_TERMINATED",
+              "occurredAt": 1787120709806,
+              "resourceName": "mc-attempt-ef56f16dd1e74a97",
+              "attemptId": "attempt-ef62d95d278d-bug-fix-3-1",
+              "metadata": {
+                "confirmedAbsentAt": 1787120709806
+              }
+            }
+          ],
+          "harness": {
+            "adapter": "codex",
+            "version": "v1",
+            "harnessVersion": "0.146.0",
+            "authority": {
+              "worker": "NONE",
+              "verification": "NONE",
+              "publication": "NONE",
+              "acceptance": "NONE",
+              "memory": "NONE",
+              "observability": "NONE",
+              "learning": "NONE"
+            },
+            "actualTuple": {
+              "provider": "openrouter",
+              "model": "openai/gpt-5.1-codex-mini",
+              "backend": "remote-sandbox"
+            }
+          },
+          "usage": {
+            "providerCostUsd": null,
+            "inferenceCostUsd": null,
+            "inputTokens": 112689,
+            "outputTokens": 1419,
+            "observedAt": 1787120706320,
+            "providerRuntimeMs": 134323,
+            "enforcement": "OBSERVATION_ONLY"
+          },
+          "cleanup": {
+            "observed": true,
+            "passed": true,
+            "status": "COMPLETED",
+            "credentialRevoked": true,
+            "resourceAbsent": true,
+            "resourceName": "mc-attempt-ef56f16dd1e74a97",
+            "finalVmCount": 0
+          },
+          "remoteResult": {
+            "invocation": {
+              "outputSchemaPath": "/var/lib/mission-control/attempt/factory-result.schema.json",
+              "outputSchema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "schema",
+                  "status",
+                  "summary",
+                  "completedAcceptanceCriterionIds",
+                  "incompleteAcceptanceCriterionIds",
+                  "unknownAcceptanceCriterionIds",
+                  "verificationCommands",
+                  "knownRisks",
+                  "nextAction"
+                ],
+                "properties": {
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "factory-result/v1"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "COMPLETED",
+                      "BLOCKED",
+                      "FAILED"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "completedAcceptanceCriterionIds": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    }
+                  },
+                  "incompleteAcceptanceCriterionIds": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    }
+                  },
+                  "unknownAcceptanceCriterionIds": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    }
+                  },
+                  "verificationCommands": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    }
+                  },
+                  "knownRisks": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    }
+                  },
+                  "nextAction": {
+                    "type": "string",
+                    "maxLength": 4000
+                  }
+                }
+              }
+            },
+            "identity": {
+              "publicRunId": "run-ef62d95d278d-bug-fix-3-1",
+              "workflowDocumentId": "workflow-doc-ef62d95d278d-bug-fix-3-1",
+              "manifestResourceName": "mc-attempt-ef56f16dd1e74a97",
+              "allocatedResourceName": "mc-attempt-ef56f16dd1e74a97"
+            },
+            "bundleStatus": "FAILED",
+            "structuredStatus": "COMPLETED",
+            "resultProvenance": {
+              "source": "OUTPUT_FILE",
+              "outputFile": {
+                "state": "VALID",
+                "byteLength": 405
+              },
+              "jsonl": {
+                "byteLength": 7900,
+                "lineCount": 29,
+                "malformedLineCount": 0,
+                "terminalCompletedCount": 1,
+                "terminalFailureCount": 0,
+                "validCandidateCount": 1
+              },
+              "context": {
+                "attemptId": "attempt-ef62d95d278d-bug-fix-3-1",
+                "manifestDigest": "sha256:c7af56f5f3728973bc6617c79b0b723caf2154720e1c082dffa3ccec74057aaa",
+                "sourceSha": "e5ea61c0c8a0ca55fe276cf62f8a259a2d838670"
+              }
+            },
+            "resultOutput": {
+              "state": "VALID",
+              "byteLength": 405,
+              "digest": "sha256:3555a1c1dc1949b9033a8bef04f68214c874f71190195ce9bb81de9e9187502c",
+              "tail": "{\"schema\":\"factory-result/v1\",\"status\":\"COMPLETED\",\"summary\":\"Updated the fee calculation to round five percent of valid cents while keeping strict input validation and confirmed via tests.\",\"completedAcceptanceCriterionIds\":[\"BUG-001\"],\"incompleteAcceptanceCriterionIds\":[],\"unknownAcceptanceCriterionIds\":[],\"verificationCommands\":[\"npm test\"],\"knownRisks\":[],\"nextAction\":\"Review the exact candidate.\"}",
+              "validationIssues": []
+            },
+            "summary": "Updated the fee calculation to round five percent of valid cents while keeping strict input validation and confirmed via tests.",
+            "executorExitCode": 0,
+            "stdoutDigest": "sha256:2057f64c4206cdb6c212d7623f7e6df1ecfab7638e9694204ab4d1e3ceee4b8e",
+            "stderrDigest": "sha256:96a27fbba212394304ee38175d936800eecec24e0dc902d4da83e5d5f72299e0",
+            "stderrTail": "Reading additional input from stdin...\nnpm notice\nnpm notice New major version of npm available! 11.17.0 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\n"
+          },
+          "structuredResult": {
+            "schema": "factory-result/v1",
+            "status": "COMPLETED",
+            "summary": "Updated the fee calculation to round five percent of valid cents while keeping strict input validation and confirmed via tests.",
+            "completedAcceptanceCriterionIds": [
+              "BUG-001"
+            ],
+            "incompleteAcceptanceCriterionIds": [],
+            "unknownAcceptanceCriterionIds": [],
+            "verificationCommands": [
+              "npm test"
+            ],
+            "knownRisks": [],
+            "nextAction": "Review the exact candidate."
+          },
+          "terminalStructuredResult": true,
+          "failure": {
+            "class": "NON_RETRYABLE_RESULT",
+            "code": "RESULT_ACCEPTANCE_CONTEXT_INVALID",
+            "stage": "RESULT_VALIDATION",
+            "retryable": false,
+            "summary": "factory-result/v1 acceptance-criterion accounting did not match the frozen WorkOrder."
+          },
+          "executionMetrics": {
+            "allocationMs": 3385,
+            "readinessMs": 4511,
+            "executionMs": 134463,
+            "teardownMs": 3391
+          },
+          "failureReason": "Remote supervisor returned FAILED. Updated the fee calculation to round five percent of valid cents while keeping strict input validation and confirmed via tests. Reading additional input from stdin...\nnpm notice\nnpm notice New major version of npm available! 11.17.0 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\n",
+          "finishedAt": "2026-08-19T06:25:13.998Z",
+          "durationMs": 154213,
+          "retryDecision": {
+            "allowed": false,
+            "reason": "FAILURE_CLASS_NOT_RETRYABLE"
+          }
+        }
+      ],
+      "terminalStructuredResult": true,
+      "firstPassStructuredResultSuccess": true,
+      "firstPassVerificationSuccess": false,
+      "eventualVerificationSuccess": false,
+      "firstPassSuccess": false,
+      "eventualSuccess": false,
+      "retries": 0,
+      "verification": {
+        "verdict": "NOT_VERIFIED"
+      },
+      "evidenceCompleteness": 0,
+      "review": {
+        "correctionRequired": null
+      },
+      "cleanup": {
+        "observed": true,
+        "passed": true,
+        "status": "COMPLETED",
+        "credentialRevoked": true,
+        "resourceAbsent": true,
+        "resourceName": "mc-attempt-ef56f16dd1e74a97",
+        "finalVmCount": 0
+      },
+      "cost": {
+        "observed": false,
+        "modelUsd": null,
+        "infrastructureUsd": null,
+        "totalUsd": null
+      },
+      "metrics": {
+        "totalCycleMs": 154261
+      }
+    },
+    {
+      "executionId": "feature-1",
+      "workloadKey": "feature",
+      "workloadClass": "FEATURE",
+      "title": "Add a multi-file pricing preview",
+      "repetition": 1,
+      "risk": "MEDIUM",
+      "backend": "persistent-worker",
+      "lineage": {
+        "constitutionRevisionId": "constitution-production-factory-pilot-v2",
+        "constitutionDigest": "sha256:3f4e964ad3b98534e761fba55f37ab63c961460b8d5f8b7b3e555cc48b2c5492",
+        "missionId": "mission-feature-1",
+        "specRevisionId": "spec-feature-1-r1",
+        "specDigest": "sha256:13616ae8c90120482eabb8ca2016e22f74a76d24508422471c5cdf8393c6d18f",
+        "specQuality": {
+          "result": "PASS",
+          "findingCount": 0,
+          "authority": "PLANNING_READY_ONLY"
+        },
+        "planId": "plan-feature-1",
+        "planRevision": 1,
+        "planAuthoredBy": "pilot-operator-author",
+        "planApprovedBy": "pilot-operator-approver",
+        "planApprovalSeparate": true,
+        "qualityContractDigest": "sha256:7d8d70868dae283a564691979506b9e8871e37c0b79a2cee9bd7dc80edfc2e74",
+        "workOrderId": "work-order-feature-1",
+        "workOrderRevision": 1,
+        "factoryVersionId": "factory-codex-local-v1",
+        "factoryMemory": {
+          "authority": "ADVISORY",
+          "result": "CONTEXT_PACKAGE_ASSEMBLED"
+        },
+        "contextPackageId": "context-feature-1",
+        "timings": {
+          "missionToPlanMs": 3,
+          "planToWorkOrderMs": 0,
+          "queueAdmissionMs": 0
+        }
+      },
+      "context": {
+        "sufficient": true,
+        "contextPackageId": "context-feature-1",
+        "missingSources": []
+      },
+      "attempts": [
+        {
+          "attemptId": "attempt-ef62d95d278d-feature-1-1",
+          "attemptNumber": 1,
+          "retryOfAttemptId": null,
+          "worker": {
+            "workerId": "worker-production-local-codex",
+            "sessionId": "session-production-pilot-v2-ef62d95d278d-persistent-worker",
+            "generation": 1,
+            "current": true,
+            "maxConcurrentRuns": 1
+          },
+          "lease": {
+            "id": "lease-ef62d95d278d-feature-1-1",
+            "current": true,
+            "acquiredAt": "2026-08-19T06:25:14.052Z"
+          },
+          "sourceSha": "b8f8bd23b3475be06c80e206fb123a7dddbcbf1e",
+          "backend": "persistent-worker",
+          "status": "COMPLETED",
+          "startedAt": "2026-08-19T06:25:14.052Z",
+          "events": [
+            {
+              "executionId": "attempt-ef62d95d278d-feature-1-1:local",
+              "sequence": 1,
+              "type": "EXECUTION_STARTED",
+              "occurredAt": 1787120714177,
+              "summary": "Codex execution started.",
+              "metadata": {
+                "adapter": "codex/v1",
+                "harness": "codex-cli/0.146.0",
+                "isolation": "WORKSPACE_WRITE",
+                "allowedPaths": [
+                  "src/**"
+                ]
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-1-1:local",
+              "sequence": 2,
+              "type": "COMMAND_STARTED",
+              "occurredAt": 1787120714177,
+              "summary": "Codex CLI command started."
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-1-1:local",
+              "sequence": 3,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120751058,
+              "summary": "Codex tool item completed: command_execution.",
+              "metadata": {
+                "itemType": "command_execution"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-1-1:local",
+              "sequence": 4,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120751058,
+              "summary": "Codex tool item completed: command_execution.",
+              "metadata": {
+                "itemType": "command_execution"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-1-1:local",
+              "sequence": 5,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120751058,
+              "summary": "Codex tool item completed: file_change.",
+              "metadata": {
+                "itemType": "file_change"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-1-1:local",
+              "sequence": 6,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120751058,
+              "summary": "Codex tool item completed: command_execution.",
+              "metadata": {
+                "itemType": "command_execution"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-1-1:local",
+              "sequence": 7,
+              "type": "COMMAND_COMPLETED",
+              "occurredAt": 1787120751058,
+              "summary": "Codex CLI command completed.",
+              "metadata": {
+                "exitCode": 0,
+                "signal": null
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-1-1:local",
+              "sequence": 8,
+              "type": "ARTIFACT_PRODUCED",
+              "occurredAt": 1787120751058,
+              "summary": "Codex produced the execution result.",
+              "metadata": {
+                "artifactType": "CODEX_RESULT"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-1-1:local",
+              "sequence": 9,
+              "type": "EXECUTION_COMPLETED",
+              "occurredAt": 1787120751058,
+              "summary": "Codex execution completed."
+            }
+          ],
+          "harness": {
+            "adapter": "codex",
+            "version": "v1",
+            "harnessVersion": "0.146.0",
+            "authority": {
+              "worker": "NONE",
+              "verification": "NONE",
+              "publication": "NONE",
+              "acceptance": "NONE",
+              "memory": "NONE",
+              "observability": "NONE",
+              "learning": "NONE"
+            },
+            "actualTuple": {
+              "provider": "openai",
+              "model": "gpt-5.6-terra",
+              "backend": "persistent-worker"
+            }
+          },
+          "usage": {
+            "inputTokens": 96097,
+            "outputTokens": 1403,
+            "cacheReadTokens": 86528,
+            "cacheWriteTokens": null,
+            "costUsd": null
+          },
+          "cleanup": {
+            "observed": true,
+            "passed": true,
+            "status": "COMPLETED",
+            "resourceAbsent": null
+          },
+          "remoteResult": null,
+          "structuredResult": {
+            "schema": "factory-result/v1",
+            "status": "COMPLETED",
+            "summary": "Implemented pricing preview calculation and exact preview formatting; all tests pass.",
+            "completedAcceptanceCriterionIds": [
+              "FEATURE-001",
+              "FEATURE-002"
+            ],
+            "incompleteAcceptanceCriterionIds": [],
+            "unknownAcceptanceCriterionIds": [],
+            "verificationCommands": [
+              "npm test",
+              "git diff --check"
+            ],
+            "knownRisks": [],
+            "nextAction": "Ready for review."
+          },
+          "terminalStructuredResult": true,
+          "failure": null,
+          "executionMetrics": {
+            "executionMs": 36881,
+            "allocationMs": null,
+            "readinessMs": null,
+            "teardownMs": null
+          },
+          "candidate": {
+            "sourceSha": "b8f8bd23b3475be06c80e206fb123a7dddbcbf1e",
+            "candidateSha": "0331c98e24acb4d56546b180b21337ccf828ce5f",
+            "treeSha": "dbc53ab5d471396b8256889618c92ff8d6922cd9",
+            "changedFiles": [
+              "src/formatPricingPreview.mjs",
+              "src/pricingPreview.mjs"
+            ],
+            "linesAdded": 19,
+            "linesDeleted": 0,
+            "diffSha256": "sha256:6bb746abf74036bb5fd48deca5a26a1ab0c7ddeaab722a3aa2f4edb12a198edb"
+          },
+          "verification": {
+            "attemptId": "verification-feature-1",
+            "sourceAttemptId": null,
+            "verifierId": "verifier-feature-1",
+            "independent": true,
+            "candidateSha": "0331c98e24acb4d56546b180b21337ccf828ce5f",
+            "treeSha": "dbc53ab5d471396b8256889618c92ff8d6922cd9",
+            "verdict": "VERIFIED",
+            "reason": "Independent exact-candidate gate passed.",
+            "command": "npm test",
+            "exitCode": 0,
+            "outputSha256": "sha256:6ed4829c41b9b275b50e8bd66f7d1af22571e04d65123de0ae0d255d386add2e",
+            "durationMs": 270,
+            "acceptanceAuthority": false
+          },
+          "retryDecision": {
+            "allowed": false,
+            "reason": "NOT_REQUIRED"
+          },
+          "finishedAt": "2026-08-19T06:25:51.406Z",
+          "durationMs": 37354
+        }
+      ],
+      "terminalStructuredResult": true,
+      "firstPassStructuredResultSuccess": true,
+      "firstPassVerificationSuccess": true,
+      "eventualVerificationSuccess": true,
+      "firstPassSuccess": true,
+      "eventualSuccess": true,
+      "retries": 0,
+      "cancellationCount": 0,
+      "verification": {
+        "attemptId": "verification-feature-1",
+        "sourceAttemptId": null,
+        "verifierId": "verifier-feature-1",
+        "independent": true,
+        "candidateSha": "0331c98e24acb4d56546b180b21337ccf828ce5f",
+        "treeSha": "dbc53ab5d471396b8256889618c92ff8d6922cd9",
+        "verdict": "VERIFIED",
+        "reason": "Independent exact-candidate gate passed.",
+        "command": "npm test",
+        "exitCode": 0,
+        "outputSha256": "sha256:6ed4829c41b9b275b50e8bd66f7d1af22571e04d65123de0ae0d255d386add2e",
+        "durationMs": 270,
+        "acceptanceAuthority": false
+      },
+      "evidence": {
+        "envelopes": [
+          {
+            "id": "evidence-feature-1-feature-001",
+            "criterionId": "FEATURE-001",
+            "sourceAttemptId": "attempt-ef62d95d278d-feature-1-1",
+            "verificationAttemptId": "verification-feature-1-1",
+            "sourceRevision": "b8f8bd23b3475be06c80e206fb123a7dddbcbf1e",
+            "candidateRevision": "0331c98e24acb4d56546b180b21337ccf828ce5f",
+            "producer": {
+              "actorId": "verifier-feature-1",
+              "independent": true
+            }
+          },
+          {
+            "id": "evidence-feature-1-feature-002",
+            "criterionId": "FEATURE-002",
+            "sourceAttemptId": "attempt-ef62d95d278d-feature-1-1",
+            "verificationAttemptId": "verification-feature-1-1",
+            "sourceRevision": "b8f8bd23b3475be06c80e206fb123a7dddbcbf1e",
+            "candidateRevision": "0331c98e24acb4d56546b180b21337ccf828ce5f",
+            "producer": {
+              "actorId": "verifier-feature-1",
+              "independent": true
+            }
+          }
+        ],
+        "unknown": []
+      },
+      "evidenceCompleteness": 1,
+      "qualityGate": {
+        "state": "ELIGIBLE",
+        "exactCurrent": true,
+        "acceptanceAuthority": false
+      },
+      "prLineage": {
+        "mode": "DETERMINISTIC_PROVIDER_FIXTURE",
+        "repository": "sellerfi-pilot/feature",
+        "headSha": "0331c98e24acb4d56546b180b21337ccf828ce5f",
+        "url": "https://github.com/sellerfi-pilot/feature/pull/1",
+        "published": false,
+        "humanMergeRequired": true
+      },
+      "review": {
+        "authority": "PROJECTION_ADVISORY",
+        "residualAiEnabled": false,
+        "unknownEvidence": 0,
+        "residualRisk": [],
+        "implementationDecisions": [
+          {
+            "decision": "Use the bounded feature implementation.",
+            "attributableTo": "attempt-ef62d95d278d-feature-1-1"
+          }
+        ],
+        "semanticGroups": [
+          {
+            "id": "other",
+            "name": "Other",
+            "method": "DETERMINISTIC",
+            "authority": "ADVISORY",
+            "files": [
+              {
+                "path": "src/formatPricingPreview.mjs"
+              },
+              {
+                "path": "src/pricingPreview.mjs"
+              }
+            ]
+          }
+        ],
+        "criterionTrace": [
+          {
+            "criterion": {
+              "id": "FEATURE-001",
+              "title": "Preview API returns exact integer-cent totals",
+              "description": null,
+              "requirementIds": [
+                "REQ-001",
+                "REQ-002"
+              ]
+            },
+            "specRequirements": [
+              {
+                "id": "REQ-001",
+                "title": "Pricing preview exposes subtotal, five-percent fee, and total in cents.",
+                "priority": "MUST"
+              },
+              {
+                "id": "REQ-002",
+                "title": "A separate formatter produces a stable human-readable summary.",
+                "priority": "MUST"
+              }
+            ],
+            "planAssertions": [],
+            "verificationChecks": [],
+            "evidence": [],
+            "result": "PASS",
+            "method": "node --test",
+            "receiptId": "receipt-feature-1-feature-001",
+            "verifier": "verifier-feature-1",
+            "current": true,
+            "integrityIssue": null,
+            "lineage": {
+              "missionSpecRevisionId": "spec-feature-1-r1",
+              "missionSpecDigest": "sha256:13616ae8c90120482eabb8ca2016e22f74a76d24508422471c5cdf8393c6d18f",
+              "missionPlanId": "plan-feature-1",
+              "missionPlanRevisionNumber": 1,
+              "qualityContractDigest": "sha256:7d8d70868dae283a564691979506b9e8871e37c0b79a2cee9bd7dc80edfc2e74",
+              "workOrderId": "work-order-feature-1",
+              "workOrderRevisionNumber": 1,
+              "workflowRunId": "attempt-ef62d95d278d-feature-1-1",
+              "candidateRevision": "0331c98e24acb4d56546b180b21337ccf828ce5f",
+              "verificationRunId": "verification-feature-1",
+              "verificationSubjectId": null,
+              "verificationSubjectDigest": null,
+              "verificationPlanId": null,
+              "verificationPlanDigest": null,
+              "evidenceSetDigest": null,
+              "qualityGateDecisionId": null
+            }
+          },
+          {
+            "criterion": {
+              "id": "FEATURE-002",
+              "title": "Preview formatter is stable",
+              "description": null,
+              "requirementIds": [
+                "REQ-001",
+                "REQ-002"
+              ]
+            },
+            "specRequirements": [
+              {
+                "id": "REQ-001",
+                "title": "Pricing preview exposes subtotal, five-percent fee, and total in cents.",
+                "priority": "MUST"
+              },
+              {
+                "id": "REQ-002",
+                "title": "A separate formatter produces a stable human-readable summary.",
+                "priority": "MUST"
+              }
+            ],
+            "planAssertions": [],
+            "verificationChecks": [],
+            "evidence": [],
+            "result": "PASS",
+            "method": "node --test",
+            "receiptId": "receipt-feature-1-feature-002",
+            "verifier": "verifier-feature-1",
+            "current": true,
+            "integrityIssue": null,
+            "lineage": {
+              "missionSpecRevisionId": "spec-feature-1-r1",
+              "missionSpecDigest": "sha256:13616ae8c90120482eabb8ca2016e22f74a76d24508422471c5cdf8393c6d18f",
+              "missionPlanId": "plan-feature-1",
+              "missionPlanRevisionNumber": 1,
+              "qualityContractDigest": "sha256:7d8d70868dae283a564691979506b9e8871e37c0b79a2cee9bd7dc80edfc2e74",
+              "workOrderId": "work-order-feature-1",
+              "workOrderRevisionNumber": 1,
+              "workflowRunId": "attempt-ef62d95d278d-feature-1-1",
+              "candidateRevision": "0331c98e24acb4d56546b180b21337ccf828ce5f",
+              "verificationRunId": "verification-feature-1",
+              "verificationSubjectId": null,
+              "verificationSubjectDigest": null,
+              "verificationPlanId": null,
+              "verificationPlanDigest": null,
+              "evidenceSetDigest": null,
+              "qualityGateDecisionId": null
+            }
+          }
+        ],
+        "correctionRequired": false,
+        "durationMs": 1
+      },
+      "acceptance": {
+        "operation": "workOrders.accept",
+        "fixtureActorType": "HUMAN",
+        "eligible": true,
+        "blockingReasons": [],
+        "accepted": true,
+        "mergePerformed": false
+      },
+      "cleanup": {
+        "observed": true,
+        "passed": true,
+        "status": "COMPLETED",
+        "resourceAbsent": null
+      },
+      "cost": {
+        "observed": false,
+        "modelUsd": null,
+        "infrastructureUsd": null,
+        "totalUsd": null,
+        "limitation": "Codex CLI emitted token counts but no priced model-cost field; local infrastructure cost is unavailable."
+      },
+      "metrics": {
+        "missionToPlanMs": 3,
+        "planToWorkOrderMs": 0,
+        "queueAdmissionMs": 0,
+        "localExecutionMs": 36881,
+        "remoteAllocationMs": null,
+        "remoteReadinessMs": null,
+        "remoteExecutionMs": null,
+        "teardownMs": null,
+        "executionMs": 37354,
+        "verificationMs": 270,
+        "reviewMs": 1,
+        "totalCycleMs": 37410
+      }
+    },
+    {
+      "executionId": "feature-2",
+      "workloadKey": "feature",
+      "workloadClass": "FEATURE",
+      "title": "Add a multi-file pricing preview",
+      "repetition": 2,
+      "risk": "MEDIUM",
+      "backend": "persistent-worker",
+      "lineage": {
+        "constitutionRevisionId": "constitution-production-factory-pilot-v2",
+        "constitutionDigest": "sha256:3f4e964ad3b98534e761fba55f37ab63c961460b8d5f8b7b3e555cc48b2c5492",
+        "missionId": "mission-feature-2",
+        "specRevisionId": "spec-feature-2-r1",
+        "specDigest": "sha256:13616ae8c90120482eabb8ca2016e22f74a76d24508422471c5cdf8393c6d18f",
+        "specQuality": {
+          "result": "PASS",
+          "findingCount": 0,
+          "authority": "PLANNING_READY_ONLY"
+        },
+        "planId": "plan-feature-2",
+        "planRevision": 1,
+        "planAuthoredBy": "pilot-operator-author",
+        "planApprovedBy": "pilot-operator-approver",
+        "planApprovalSeparate": true,
+        "qualityContractDigest": "sha256:b13704b630a63bf9ff2d8eb4c66fb637dceed91ad0a99bb2034dfa0b898c4f97",
+        "workOrderId": "work-order-feature-2",
+        "workOrderRevision": 1,
+        "factoryVersionId": "factory-codex-local-v1",
+        "factoryMemory": {
+          "authority": "ADVISORY",
+          "result": "CONTEXT_PACKAGE_ASSEMBLED"
+        },
+        "contextPackageId": "context-feature-2",
+        "timings": {
+          "missionToPlanMs": 1,
+          "planToWorkOrderMs": 0,
+          "queueAdmissionMs": 0
+        }
+      },
+      "context": {
+        "sufficient": true,
+        "contextPackageId": "context-feature-2",
+        "missingSources": []
+      },
+      "attempts": [
+        {
+          "attemptId": "attempt-ef62d95d278d-feature-2-1",
+          "attemptNumber": 1,
+          "retryOfAttemptId": null,
+          "worker": {
+            "workerId": "worker-production-local-codex",
+            "sessionId": "session-production-pilot-v2-ef62d95d278d-persistent-worker",
+            "generation": 1,
+            "current": true,
+            "maxConcurrentRuns": 1
+          },
+          "lease": {
+            "id": "lease-ef62d95d278d-feature-2-1",
+            "current": true,
+            "acquiredAt": "2026-08-19T06:25:51.453Z"
+          },
+          "sourceSha": "d5b519e4baed7862ba7885475af1b788259b4d22",
+          "backend": "persistent-worker",
+          "status": "COMPLETED",
+          "startedAt": "2026-08-19T06:25:51.453Z",
+          "events": [
+            {
+              "executionId": "attempt-ef62d95d278d-feature-2-1:local",
+              "sequence": 1,
+              "type": "EXECUTION_STARTED",
+              "occurredAt": 1787120751582,
+              "summary": "Codex execution started.",
+              "metadata": {
+                "adapter": "codex/v1",
+                "harness": "codex-cli/0.146.0",
+                "isolation": "WORKSPACE_WRITE",
+                "allowedPaths": [
+                  "src/**"
+                ]
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-2-1:local",
+              "sequence": 2,
+              "type": "COMMAND_STARTED",
+              "occurredAt": 1787120751582,
+              "summary": "Codex CLI command started."
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-2-1:local",
+              "sequence": 3,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120781675,
+              "summary": "Codex tool item completed: command_execution.",
+              "metadata": {
+                "itemType": "command_execution"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-2-1:local",
+              "sequence": 4,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120781675,
+              "summary": "Codex tool item completed: command_execution.",
+              "metadata": {
+                "itemType": "command_execution"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-2-1:local",
+              "sequence": 5,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120781675,
+              "summary": "Codex tool item completed: file_change.",
+              "metadata": {
+                "itemType": "file_change"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-2-1:local",
+              "sequence": 6,
+              "type": "TOOL_CALLED",
+              "occurredAt": 1787120781675,
+              "summary": "Codex tool item completed: command_execution.",
+              "metadata": {
+                "itemType": "command_execution"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-2-1:local",
+              "sequence": 7,
+              "type": "COMMAND_COMPLETED",
+              "occurredAt": 1787120781675,
+              "summary": "Codex CLI command completed.",
+              "metadata": {
+                "exitCode": 0,
+                "signal": null
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-2-1:local",
+              "sequence": 8,
+              "type": "ARTIFACT_PRODUCED",
+              "occurredAt": 1787120781675,
+              "summary": "Codex produced the execution result.",
+              "metadata": {
+                "artifactType": "CODEX_RESULT"
+              }
+            },
+            {
+              "executionId": "attempt-ef62d95d278d-feature-2-1:local",
+              "sequence": 9,
+              "type": "EXECUTION_COMPLETED",
+              "occurredAt": 1787120781675,
+              "summary": "Codex execution completed."
+            }
+          ],
+          "harness": {
+            "adapter": "codex",
+            "version": "v1",
+            "harnessVersion": "0.146.0",
+            "authority": {
+              "worker": "NONE",
+              "verification": "NONE",
+              "publication": "NONE",
+              "acceptance": "NONE",
+              "memory": "NONE",
+              "observability": "NONE",
+              "learning": "NONE"
+            },
+            "actualTuple": {
+              "provider": "openai",
+              "model": "gpt-5.6-terra",
+              "backend": "persistent-worker"
+            }
+          },
+          "usage": {
+            "inputTokens": 79457,
+            "outputTokens": 1060,
+            "cacheReadTokens": 54272,
+            "cacheWriteTokens": null,
+            "costUsd": null
+          },
+          "cleanup": {
+            "observed": true,
+            "passed": true,
+            "status": "COMPLETED",
+            "resourceAbsent": null
+          },
+          "remoteResult": null,
+          "structuredResult": {
+            "schema": "factory-result/v1",
+            "status": "COMPLETED",
+            "summary": "Implemented pricing preview calculation and exact display formatting; tests pass.",
+            "completedAcceptanceCriterionIds": [
+              "FEATURE-001",
+              "FEATURE-002"
+            ],
+            "incompleteAcceptanceCriterionIds": [],
+            "unknownAcceptanceCriterionIds": [],
+            "verificationCommands": [
+              "npm test",
+              "git diff --check"
+            ],
+            "knownRisks": [],
+            "nextAction": "Ready for review."
+          },
+          "terminalStructuredResult": true,
+          "failure": null,
+          "executionMetrics": {
+            "executionMs": 30093,
+            "allocationMs": null,
+            "readinessMs": null,
+            "teardownMs": null
+          },
+          "candidate": {
+            "sourceSha": "d5b519e4baed7862ba7885475af1b788259b4d22",
+            "candidateSha": "4e92ff03bb6ccc35073ef85940dd0a67c93d4d38",
+            "treeSha": "8f51accea031867bcbcb0070596647730cb2fdd2",
+            "changedFiles": [
+              "src/formatPricingPreview.mjs",
+              "src/pricingPreview.mjs"
+            ],
+            "linesAdded": 20,
+            "linesDeleted": 0,
+            "diffSha256": "sha256:7d410222d841f56cb35c85143a485e2c437bec9dec06acc4517b60e7bcd1f58c"
+          },
+          "verification": {
+            "attemptId": "verification-feature-2",
+            "sourceAttemptId": null,
+            "verifierId": "verifier-feature-2",
+            "independent": true,
+            "candidateSha": "4e92ff03bb6ccc35073ef85940dd0a67c93d4d38",
+            "treeSha": "8f51accea031867bcbcb0070596647730cb2fdd2",
+            "verdict": "VERIFIED",
+            "reason": "Independent exact-candidate gate passed.",
+            "command": "npm test",
+            "exitCode": 0,
+            "outputSha256": "sha256:efc8cc3abcd3a9f5b0eba3dc134d26706e29578d2143da9cb6de47bf32e09116",
+            "durationMs": 283,
+            "acceptanceAuthority": false
+          },
+          "retryDecision": {
+            "allowed": false,
+            "reason": "NOT_REQUIRED"
+          },
+          "finishedAt": "2026-08-19T06:26:22.040Z",
+          "durationMs": 30587
+        }
+      ],
+      "terminalStructuredResult": true,
+      "firstPassStructuredResultSuccess": true,
+      "firstPassVerificationSuccess": true,
+      "eventualVerificationSuccess": true,
+      "firstPassSuccess": true,
+      "eventualSuccess": true,
+      "retries": 0,
+      "cancellationCount": 0,
+      "verification": {
+        "attemptId": "verification-feature-2",
+        "sourceAttemptId": null,
+        "verifierId": "verifier-feature-2",
+        "independent": true,
+        "candidateSha": "4e92ff03bb6ccc35073ef85940dd0a67c93d4d38",
+        "treeSha": "8f51accea031867bcbcb0070596647730cb2fdd2",
+        "verdict": "VERIFIED",
+        "reason": "Independent exact-candidate gate passed.",
+        "command": "npm test",
+        "exitCode": 0,
+        "outputSha256": "sha256:efc8cc3abcd3a9f5b0eba3dc134d26706e29578d2143da9cb6de47bf32e09116",
+        "durationMs": 283,
+        "acceptanceAuthority": false
+      },
+      "evidence": {
+        "envelopes": [
+          {
+            "id": "evidence-feature-2-feature-001",
+            "criterionId": "FEATURE-001",
+            "sourceAttemptId": "attempt-ef62d95d278d-feature-2-1",
+            "verificationAttemptId": "verification-feature-2-1",
+            "sourceRevision": "d5b519e4baed7862ba7885475af1b788259b4d22",
+            "candidateRevision": "4e92ff03bb6ccc35073ef85940dd0a67c93d4d38",
+            "producer": {
+              "actorId": "verifier-feature-2",
+              "independent": true
+            }
+          },
+          {
+            "id": "evidence-feature-2-feature-002",
+            "criterionId": "FEATURE-002",
+            "sourceAttemptId": "attempt-ef62d95d278d-feature-2-1",
+            "verificationAttemptId": "verification-feature-2-1",
+            "sourceRevision": "d5b519e4baed7862ba7885475af1b788259b4d22",
+            "candidateRevision": "4e92ff03bb6ccc35073ef85940dd0a67c93d4d38",
+            "producer": {
+              "actorId": "verifier-feature-2",
+              "independent": true
+            }
+          }
+        ],
+        "unknown": []
+      },
+      "evidenceCompleteness": 1,
+      "qualityGate": {
+        "state": "ELIGIBLE",
+        "exactCurrent": true,
+        "acceptanceAuthority": false
+      },
+      "prLineage": {
+        "mode": "DETERMINISTIC_PROVIDER_FIXTURE",
+        "repository": "sellerfi-pilot/feature",
+        "headSha": "4e92ff03bb6ccc35073ef85940dd0a67c93d4d38",
+        "url": "https://github.com/sellerfi-pilot/feature/pull/2",
+        "published": false,
+        "humanMergeRequired": true
+      },
+      "review": {
+        "authority": "PROJECTION_ADVISORY",
+        "residualAiEnabled": false,
+        "unknownEvidence": 0,
+        "residualRisk": [],
+        "implementationDecisions": [
+          {
+            "decision": "Use the bounded feature implementation.",
+            "attributableTo": "attempt-ef62d95d278d-feature-2-1"
+          }
+        ],
+        "semanticGroups": [
+          {
+            "id": "other",
+            "name": "Other",
+            "method": "DETERMINISTIC",
+            "authority": "ADVISORY",
+            "files": [
+              {
+                "path": "src/formatPricingPreview.mjs"
+              },
+              {
+                "path": "src/pricingPreview.mjs"
+              }
+            ]
+          }
+        ],
+        "criterionTrace": [
+          {
+            "criterion": {
+              "id": "FEATURE-001",
+              "title": "Preview API returns exact integer-cent totals",
+              "description": null,
+              "requirementIds": [
+                "REQ-001",
+                "REQ-002"
+              ]
+            },
+            "specRequirements": [
+              {
+                "id": "REQ-001",
+                "title": "Pricing preview exposes subtotal, five-percent fee, and total in cents.",
+                "priority": "MUST"
+              },
+              {
+                "id": "REQ-002",
+                "title": "A separate formatter produces a stable human-readable summary.",
+                "priority": "MUST"
+              }
+            ],
+            "planAssertions": [],
+            "verificationChecks": [],
+            "evidence": [],
+            "result": "PASS",
+            "method": "node --test",
+            "receiptId": "receipt-feature-2-feature-001",
+            "verifier": "verifier-feature-2",
+            "current": true,
+            "integrityIssue": null,
+            "lineage": {
+              "missionSpecRevisionId": "spec-feature-2-r1",
+              "missionSpecDigest": "sha256:13616ae8c90120482eabb8ca2016e22f74a76d24508422471c5cdf8393c6d18f",
+              "missionPlanId": "plan-feature-2",
+              "missionPlanRevisionNumber": 1,
+              "qualityContractDigest": "sha256:b13704b630a63bf9ff2d8eb4c66fb637dceed91ad0a99bb2034dfa0b898c4f97",
+              "workOrderId": "work-order-feature-2",
+              "workOrderRevisionNumber": 1,
+              "workflowRunId": "attempt-ef62d95d278d-feature-2-1",
+              "candidateRevision": "4e92ff03bb6ccc35073ef85940dd0a67c93d4d38",
+              "verificationRunId": "verification-feature-2",
+              "verificationSubjectId": null,
+              "verificationSubjectDigest": null,
+              "verificationPlanId": null,
+              "verificationPlanDigest": null,
+              "evidenceSetDigest": null,
+              "qualityGateDecisionId": null
+            }
+          },
+          {
+            "criterion": {
+              "id": "FEATURE-002",
+              "title": "Preview formatter is stable",
+              "description": null,
+              "requirementIds": [
+                "REQ-001",
+                "REQ-002"
+              ]
+            },
+            "specRequirements": [
+              {
+                "id": "REQ-001",
+                "title": "Pricing preview exposes subtotal, five-percent fee, and total in cents.",
+                "priority": "MUST"
+              },
+              {
+                "id": "REQ-002",
+                "title": "A separate formatter produces a stable human-readable summary.",
+                "priority": "MUST"
+              }
+            ],
+            "planAssertions": [],
+            "verificationChecks": [],
+            "evidence": [],
+            "result": "PASS",
+            "method": "node --test",
+            "receiptId": "receipt-feature-2-feature-002",
+            "verifier": "verifier-feature-2",
+            "current": true,
+            "integrityIssue": null,
+            "lineage": {
+              "missionSpecRevisionId": "spec-feature-2-r1",
+              "missionSpecDigest": "sha256:13616ae8c90120482eabb8ca2016e22f74a76d24508422471c5cdf8393c6d18f",
+              "missionPlanId": "plan-feature-2",
+              "missionPlanRevisionNumber": 1,
+              "qualityContractDigest": "sha256:b13704b630a63bf9ff2d8eb4c66fb637dceed91ad0a99bb2034dfa0b898c4f97",
+              "workOrderId": "work-order-feature-2",
+              "workOrderRevisionNumber": 1,
+              "workflowRunId": "attempt-ef62d95d278d-feature-2-1",
+              "candidateRevision": "4e92ff03bb6ccc35073ef85940dd0a67c93d4d38",
+              "verificationRunId": "verification-feature-2",
+              "verificationSubjectId": null,
+              "verificationSubjectDigest": null,
+              "verificationPlanId": null,
+              "verificationPlanDigest": null,
+              "evidenceSetDigest": null,
+              "qualityGateDecisionId": null
+            }
+          }
+        ],
+        "correctionRequired": false,
+        "durationMs": 1
+      },
+      "acceptance": {
+        "operation": "workOrders.accept",
+        "fixtureActorType": "HUMAN",
+        "eligible": true,
+        "blockingReasons": [],
+        "accepted": true,
+        "mergePerformed": false
+      },
+      "cleanup": {
+        "observed": true,
+        "passed": true,
+        "status": "COMPLETED",
+        "resourceAbsent": null
+      },
+      "cost": {
+        "observed": false,
+        "modelUsd": null,
+        "infrastructureUsd": null,
+        "totalUsd": null,
+        "limitation": "Codex CLI emitted token counts but no priced model-cost field; local infrastructure cost is unavailable."
+      },
+      "metrics": {
+        "missionToPlanMs": 1,
+        "planToWorkOrderMs": 0,
+        "queueAdmissionMs": 0,
+        "localExecutionMs": 30093,
+        "remoteAllocationMs": null,
+        "remoteReadinessMs": null,
+        "remoteExecutionMs": null,
+        "teardownMs": null,
+        "executionMs": 30587,
+        "verificationMs": 283,
+        "reviewMs": 1,
+        "totalCycleMs": 30633
+      }
+    }
+  ],
+  "preflightFailures": [],
+  "environmentControls": {
+    "attemptScopedCodexHome": true,
+    "inheritedHostModelCache": false
+  },
+  "v1ComparisonBaseline": {
+    "source": "PR #120 immutable BLOCKED evidence at 604e2c482bc1b87d8a2cbca35f4c09ca13264e13",
+    "governedExecutions": 15,
+    "eventualSuccesses": 13,
+    "localSuccesses": 12,
+    "localSamples": 12,
+    "remoteSuccesses": 1,
+    "remoteSamples": 3,
+    "attempts": 29,
+    "failedAttempts": 16,
+    "remoteStructuredOutputFailures": 2,
+    "retries": 16,
+    "contextMisses": 0,
+    "verificationFailures": 2,
+    "humanReviewCorrections": 0,
+    "firstPassStructuredResultRate": 0.8667,
+    "firstPassVerificationRate": 0.8667,
+    "finalVmCount": 0
+  },
+  "failureInjections": [],
+  "routingShadow": {
+    "mode": "ADVISORY",
+    "guardedAutoEnabled": false,
+    "decisions": []
+  },
+  "factoryLearning": null,
+  "scorecard": null,
+  "limitations": [
+    "Provider PR lineage is a deterministic fixture; no external repository or pull request is mutated.",
+    "Human Plan approval and workOrders.accept are exercised as authorized operator fixtures, not unattended production mutations.",
+    "Residual AI review remains disabled."
+  ]
+}

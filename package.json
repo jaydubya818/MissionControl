@@ -57,6 +57,7 @@
     "release:security": "pnpm run security:audit && pnpm run security:secrets",
     "qualify:factory": "node scripts/system-factory-e2e-qualification.mjs",
     "qualify:factory:v2": "node scripts/system-factory-e2e-qualification.mjs",
+    "qualify:pilot:v2": "tsx scripts/production-factory-pilot.mts",
     "taskmaster:plan": "taskmaster plan docs/PRD_V2.md",
     "taskmaster": "taskmaster"
   },
