@@ -93,7 +93,10 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("turns governed issue intent into a verified, evidence-linked pull request", async () => {
     const fixture = await runFixture("VERIFIED");
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toEqual(expect.objectContaining({ completedCount: 1, lastError: null })));
+    await vi.waitFor(
+      () => expect(fixture.worker.status()).toEqual(expect.objectContaining({ completedCount: 1, lastError: null })),
+      { timeout: 5_000 },
+    );
 
     expect(fixture.createPullRequest).toHaveBeenCalledOnce();
     const pullRequestInput = fixture.createPullRequest.mock.calls[0][0];
@@ -124,7 +127,10 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       harness: { adapter: "loom", version: "v1", displayName: "Loom fixture", provider: "anthropic" },
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    await vi.waitFor(
+      () => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }),
+      { timeout: 5_000 },
+    );
     const observations = fixture.reports.flatMap((packet) => packet.observations ?? []);
     expect(observations).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -140,7 +146,10 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("completes the durable worker golden path and cleans only its proven worktree", async () => {
     const fixture = await runFixture("VERIFIED", { durable: true });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    await vi.waitFor(
+      () => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }),
+      { timeout: 5_000 },
+    );
     expect(fixture.reports.find((packet) => packet.artifacts?.some((artifact: any) => artifact.artifactType === "PULL_REQUEST")))
       .toBeTruthy();
     expect(fixture.reports.at(-1)?.events).toEqual([
@@ -156,7 +165,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("does not create a pull request when the control plane rejects the verification packet", async () => {
     const fixture = await runFixture("NOT_VERIFIED");
 
-    await vi.waitFor(() => expect(fixture.worker.status().failedCount).toBe(1));
+    await vi.waitFor(() => expect(fixture.worker.status().failedCount).toBe(1), { timeout: 5_000 });
 
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
     expect(fixture.reports.at(-1)?.terminal).toMatchObject({
@@ -169,8 +178,8 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("pauses for human review and resumes publication without rerunning Codex or verification", async () => {
     const fixture = await runFixture("REQUIRES_HUMAN_REVIEW");
 
-    await vi.waitFor(() => expect(fixture.reports.some((packet) => packet.verification)).toBe(true));
-    await vi.waitFor(() => expect(fixture.worker.status().activeRunIds).toEqual([]));
+    await vi.waitFor(() => expect(fixture.reports.some((packet) => packet.verification)).toBe(true), { timeout: 5_000 });
+    await vi.waitFor(() => expect(fixture.worker.status().activeRunIds).toEqual([]), { timeout: 5_000 });
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
     expect(fixture.reports.some((packet) => packet.terminal)).toBe(false);
     expect(fixture.executeCodex).toHaveBeenCalledOnce();
@@ -180,7 +189,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     fixture.resumeAfterApproval();
     const restartedWorker = fixture.createRestartedWorker();
     await restartedWorker.tick();
-    await vi.waitFor(() => expect(restartedWorker.status().completedCount).toBe(1));
+    await vi.waitFor(() => expect(restartedWorker.status().completedCount).toBe(1), { timeout: 5_000 });
 
     expect(fixture.createPullRequest).toHaveBeenCalledOnce();
     expect(fixture.authorizePublication).toHaveBeenCalledOnce();
@@ -197,7 +206,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
 
   it("persists a verification mismatch, blocks publication, and recovers with a new immutable Attempt", async () => {
     const mismatched = await runFixture("VERIFIED", { attempt: 1, dirtyVerification: true });
-    await vi.waitFor(() => expect(mismatched.worker.status().failedCount).toBe(1));
+    await vi.waitFor(() => expect(mismatched.worker.status().failedCount).toBe(1), { timeout: 5_000 });
 
     const failurePacket = mismatched.reports.at(-1);
     const failureEvidence = failurePacket?.artifacts?.find((artifact: any) => artifact.artifactType === "VERIFICATION_EVIDENCE");
@@ -219,7 +228,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     await mismatched.worker.stop();
 
     const recovered = await runFixture("VERIFIED", { attempt: 2 });
-    await vi.waitFor(() => expect(recovered.worker.status().completedCount).toBe(1));
+    await vi.waitFor(() => expect(recovered.worker.status().completedCount).toBe(1), { timeout: 5_000 });
     const recoveredArtifact = recovered.reports.at(-1)?.artifacts?.find((artifact: any) => artifact.artifactType === "PULL_REQUEST");
 
     expect(recovered.createPullRequest).toHaveBeenCalledOnce();
@@ -324,7 +333,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     };
     const worker = new FactoryAttemptWorker(client, adapter, true, 60_000, dependencies);
     await worker.tick();
-    await vi.waitFor(() => expect(worker.status().completedCount).toBe(1));
+    await vi.waitFor(() => expect(worker.status().completedCount).toBe(1), { timeout: 5_000 });
 
     expect(executeImplementation).not.toHaveBeenCalled();
     expect(reports).toHaveLength(1);

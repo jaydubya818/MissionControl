@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "production-factory-pilot-remote-inventory/v1",
+  "provider": "exe.dev",
+  "maximumObservedConcurrency": 1,
+  "liveExecutionIds": [
+    "bug-fix-3",
+    "security-policy-3",
+    "data-migration-3"
+  ],
+  "liveExecutionResult": {
+    "scheduled": 3,
+    "successful": 1,
+    "failed": 2,
+    "preservedAttempts": 17
+  },
+  "allocatedAttemptsWithCleanupEvidence": 14,
+  "allocatedAttemptsPassingCleanup": 14,
+  "cleanupInvariant": {
+    "credentialRevoked": true,
+    "resourceAbsent": true,
+    "allObservedAllocatedResourcesTerminated": true
+  },
+  "finalInventory": {
+    "checkedAt": "2026-08-18T20:59:58.400Z",
+    "authenticated": true,
+    "vmCount": 0,
+    "maxVms": 50,
+    "automaticIntegrationCount": 0,
+    "providerCostPerVmUsd": null
+  },
+  "limitations": [
+    "The first failed bug-fix Attempt and two early failure paths did not produce allocated-resource cleanup records; every Attempt that exposed an allocated resource produced credential-revocation and confirmed-absence evidence.",
+    "Provider infrastructure cost was not emitted and remains null."
+  ],
+  "canonicalEvidence": "run-results.json#remoteSandboxInventory"
+}

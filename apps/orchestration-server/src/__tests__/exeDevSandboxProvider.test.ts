@@ -83,16 +83,25 @@ describe("ExeDevSandboxProvider", () => {
       allocation, executionManifest, workOrderId: "w1", workOrderRevisionNumber: 1, workflowRunId: "r1", attemptId: "a1",
       manifestDigest: `sha256:${canonicalHash(executionManifest)}`, sourceSha: "a".repeat(40), profileDigest: "sha256:profile",
       environmentDescriptor: { provider: "EXE_DEV", image: "debian:bookworm" }, repositoryArchive: Buffer.from("bundle"), supervisorSource: "// supervisor",
-      executor: { command: "codex", args: ["exec"], prompt: "p", allowedPaths: ["src/**"], timeoutMs: 60_000 },
+      executor: {
+        command: "codex",
+        args: ["exec", "--output-schema", "/var/lib/mission-control/attempt/factory-result.schema.json"],
+        outputSchemaPath: "/var/lib/mission-control/attempt/factory-result.schema.json",
+        outputSchema: { type: "object", required: ["status"] },
+        prompt: "p",
+        allowedPaths: ["src/**"],
+        timeoutMs: 60_000,
+      },
       environment: { OPENAI_API_KEY: "attempt-only", OPENAI_BASE_URL: "https://openrouter.ai/api/v1" },
     });
 
-    expect(vmText).toHaveBeenCalledTimes(5);
+    expect(vmText).toHaveBeenCalledTimes(6);
     expect(vmText.mock.calls[0][1]).toBe(vmText.mock.calls[1][1]);
     expect(vmText.mock.calls[0][2]).toBe(vmText.mock.calls[1][2]);
-    const uploadedConfig = JSON.parse(Buffer.from(vmText.mock.calls[3][2], "base64").toString("utf8"));
+    expect(JSON.parse(Buffer.from(vmText.mock.calls[3][2], "base64").toString("utf8"))).toEqual({ type: "object", required: ["status"] });
+    const uploadedConfig = JSON.parse(Buffer.from(vmText.mock.calls[4][2], "base64").toString("utf8"));
     expect(uploadedConfig.executionManifest).toEqual(executionManifest);
-    const supervisorLaunch = vmText.mock.calls[4][1];
+    const supervisorLaunch = vmText.mock.calls[5][1];
     expect(supervisorLaunch).toContain("git clone --quiet");
     expect(supervisorLaunch).toContain("command -v setsid");
     expect(supervisorLaunch).toContain("nohup setsid node");
@@ -100,7 +109,7 @@ describe("ExeDevSandboxProvider", () => {
     expect(supervisorLaunch).not.toContain("&;");
     expect(supervisorLaunch).not.toContain("attempt-only");
     await provider.cancel(allocation, "test cancellation");
-    const cancellation = vmText.mock.calls[5][1];
+    const cancellation = vmText.mock.calls[6][1];
     expect(cancellation).toContain('kill -TERM -- "-$pid"');
     expect(cancellation).toContain('kill -KILL -- "-$pid"');
     const receipt = await provider.terminate(allocation);

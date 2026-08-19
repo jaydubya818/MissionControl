@@ -100,6 +100,12 @@ export class ExeDevSandboxProvider implements SandboxProvider {
     assertSafeSandboxResourceName(request.allocation.resourceName);
     if (request.allocation.provider !== this.kind) throw new Error("Sandbox allocation belongs to a different provider.");
     if (!/^[a-f0-9]{40,64}$/i.test(request.sourceSha)) throw new Error("Sandbox start requires an immutable source SHA.");
+    const outputSchemaPath = `${REMOTE_ROOT}/factory-result.schema.json`;
+    if (request.executor.outputSchemaPath !== undefined || request.executor.outputSchema !== undefined) {
+      if (request.executor.outputSchemaPath !== outputSchemaPath || !request.executor.outputSchema) {
+        throw new Error("Remote harness output schema must use the bounded Attempt schema path.");
+      }
+    }
     const config = {
       executionManifest: request.executionManifest,
       attemptId: request.attemptId,
@@ -122,6 +128,9 @@ export class ExeDevSandboxProvider implements SandboxProvider {
     };
     await this.upload(request.allocation.resourceName, `${REMOTE_ROOT}/repository.bundle`, request.repositoryArchive);
     await this.upload(request.allocation.resourceName, `${REMOTE_ROOT}/supervisor.mjs`, Buffer.from(request.supervisorSource, "utf8"));
+    if (request.executor.outputSchema) {
+      await this.upload(request.allocation.resourceName, outputSchemaPath, Buffer.from(JSON.stringify(request.executor.outputSchema), "utf8"));
+    }
     await this.upload(request.allocation.resourceName, `${REMOTE_ROOT}/config.json`, Buffer.from(JSON.stringify(config), "utf8"));
     await this.transport.vmText(request.allocation.resourceName, [
       "set -eu",

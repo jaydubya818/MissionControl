@@ -1,0 +1,566 @@
+{
+  "signalCount": 23,
+  "signals": [
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "DETERMINISTIC_GATE_FAILURE",
+      "deterministicKey": "deterministic gate failure",
+      "evidenceFingerprint": "sha256:e1ad8765fe274585c50287746c60e901573cd29c3c890dcc131c36c0b4ce550d",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/4"
+      ],
+      "observedAt": 1787086798403,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected deterministic gate failure was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "VERIFICATION_FAILURE",
+      "deterministicKey": "independent verification failure",
+      "evidenceFingerprint": "sha256:5ed025ec844c51543939cc8017c221d3575756b29c9d2815e92fea39e4bd6ce2",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/5"
+      ],
+      "observedAt": 1787086798404,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected independent verification failure was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "CONTEXT_MISS",
+      "deterministicKey": "missing required policy context",
+      "evidenceFingerprint": "sha256:5046680ddc1273eaf8ac9f0c4401801140223b85109e6c5d46266eae0a015221",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/8"
+      ],
+      "observedAt": 1787086798405,
+      "confidence": 1,
+      "severity": "MEDIUM",
+      "reason": "The injected context miss was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "MODEL_ROUTING_MISMATCH",
+      "deterministicKey": "missing cost telemetry",
+      "evidenceFingerprint": "sha256:0168a1350b5d5ad1c8dbc0ff048fe111b5e03f5c9ebcaf97a6bfd7eca222f359",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/13"
+      ],
+      "observedAt": 1787086798406,
+      "confidence": 1,
+      "severity": "MEDIUM",
+      "reason": "The injected missing telemetry was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:9b5bcc6008d85af7ca283a83bdbe67dde6892132061842de44b8d3dd645d4005",
+      "evidenceRefs": [
+        "run-results.json#executions/2/attempts/0"
+      ],
+      "observedAt": 1787083200046,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Sandbox result bundle failed schema validation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:9a18958d8fad1798bd5f20c8ef9f490580c3f4b09c554edb3d08aa2e0123f85c",
+      "evidenceRefs": [
+        "run-results.json#executions/2/attempts/1"
+      ],
+      "observedAt": 1787083278473,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Harness completed without a reviewable code change.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:5472eb60a4a013823097fe108e3e18a553b11f0c90a6a3811909603c8aa4643d",
+      "evidenceRefs": [
+        "run-results.json#executions/2/attempts/2"
+      ],
+      "observedAt": 1787084739349,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:35b0df0d5b1b70378c93e893d58ea8fcaf281757baa9327e41f5b6bb0724505d",
+      "evidenceRefs": [
+        "run-results.json#executions/2/attempts/3"
+      ],
+      "observedAt": 1787084846835,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:47fce02a1d04624688356f55f0bebc932606be10558b1a00b9278ee58774827d",
+      "evidenceRefs": [
+        "run-results.json#executions/2/attempts/4"
+      ],
+      "observedAt": 1787085406853,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED. Executor did not return valid factory-result/v1 JSON. Reading additional input from stdin...\nnpm notice\nnpm notice New major version of npm available! 11.17.0 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\n",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:3d4aec99935fb971ec65353efc4b2a41eb221d1ea30b1b017d44e21c60683d42",
+      "evidenceRefs": [
+        "run-results.json#executions/2/attempts/5"
+      ],
+      "observedAt": 1787085556853,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED. Executor did not return valid factory-result/v1 JSON. Reading additional input from stdin...\nnpm notice\nnpm notice New major version of npm available! 11.17.0 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\n",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:7015e80554acc4f1e27cebe64bb75ef7542333c2143bf0afde06faa1d08c1fe5",
+      "evidenceRefs": [
+        "run-results.json#executions/2/attempts/6"
+      ],
+      "observedAt": 1787086245011,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED. Executor did not return valid factory-result/v1 JSON. Reading additional input from stdin...\nnpm notice\nnpm notice New major version of npm available! 11.17.0 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\n",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:bb62c66c98f77fa3612dfa50ad538e9e19ae3779f04d8cc723f73860caaa5966",
+      "evidenceRefs": [
+        "run-results.json#executions/2/attempts/7"
+      ],
+      "observedAt": 1787086332982,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED. Executor did not return valid factory-result/v1 JSON. Reading additional input from stdin...\nnpm notice\nnpm notice New major version of npm available! 11.17.0 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\n",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:5362cb4e0a9c9a6f2df19a25403be84d39c7762774278cfa378dc723b977bed0",
+      "evidenceRefs": [
+        "run-results.json#executions/14/attempts/0"
+      ],
+      "observedAt": 1787083994947,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Sandbox execution exceeded the frozen Attempt timeout.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:6cdfe201d3647cd03892266295747738fdad37d4da0e2d95f22992077596ce6a",
+      "evidenceRefs": [
+        "run-results.json#executions/14/attempts/1"
+      ],
+      "observedAt": 1787084190696,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Sandbox execution exceeded the frozen Attempt timeout.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:483f75907f328f82e2bd3fc3c0154e8a8d03df4bbb6d7d010dbb39350adaf40a",
+      "evidenceRefs": [
+        "run-results.json#executions/14/attempts/2"
+      ],
+      "observedAt": 1787085080424,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:71d59893d9811f064d3d08a4fc939231100170f66c5732f9692e706052808634",
+      "evidenceRefs": [
+        "run-results.json#executions/14/attempts/3"
+      ],
+      "observedAt": 1787085165875,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: exe.dev command failed: jaywest@exe.dev: Permission denied (publickey,keyboard-interactive).",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:0eeb3214b710b32fbab130864fcd8076e8fd54acc028f3c8e4b12feb5109509b",
+      "evidenceRefs": [
+        "run-results.json#executions/14/attempts/4"
+      ],
+      "observedAt": 1787085834611,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED. Executor did not return valid factory-result/v1 JSON. Reading additional input from stdin...\nnpm notice\nnpm notice New major version of npm available! 11.17.0 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\n",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:2673ce49ba13777ef31cec11c5c633c05a9fa10c0d2a59071d704799d507132f",
+      "evidenceRefs": [
+        "run-results.json#executions/14/attempts/5"
+      ],
+      "observedAt": 1787086075616,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED. Executor did not return valid factory-result/v1 JSON. Reading additional input from stdin...\nnpm notice\nnpm notice New major version of npm available! 11.17.0 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\n",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:d8497d087b898ff70c8d14393e9b957b705762832e51d23076f45fb6d1292719",
+      "evidenceRefs": [
+        "run-results.json#executions/14/attempts/6"
+      ],
+      "observedAt": 1787086577029,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED. Executor did not return valid factory-result/v1 JSON. Reading additional input from stdin...\nnpm notice\nnpm notice New major version of npm available! 11.17.0 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\n",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "evidenceFingerprint": "sha256:60f3c04ad99db353ed5359db2ca8236821a6aa87d04701647a525eb0729f8e9b",
+      "evidenceRefs": [
+        "run-results.json#executions/14/attempts/7"
+      ],
+      "observedAt": 1787086794463,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED. Executor did not return valid factory-result/v1 JSON. Reading additional input from stdin...\nnpm notice\nnpm notice New major version of npm available! 11.17.0 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\n",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "REPEATED_REVIEW_FINDING",
+      "deterministicKey": "human.defect:missing deterministic review coverage",
+      "evidenceFingerprint": "sha256:a3850db0f699998e461cf1b5bd62df56de5004cbe6117d008459d04eae26365a",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/14",
+        "run-results.json#executions/3/review"
+      ],
+      "observedAt": 1787086798503,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "REPEATED_REVIEW_FINDING",
+      "deterministicKey": "human.defect:missing deterministic review coverage",
+      "evidenceFingerprint": "sha256:faea206a34077bbbc35e0326b7a2e2276fdfa716c5c55e6e8a3438686166ddaf",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/14",
+        "run-results.json#executions/4/review"
+      ],
+      "observedAt": 1787086798504,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "REPEATED_REVIEW_FINDING",
+      "deterministicKey": "human.defect:missing deterministic review coverage",
+      "evidenceFingerprint": "sha256:02225d83f1b057b21806be761e1cfed243696fd0de385f9fa5d207695ba80c45",
+      "evidenceRefs": [
+        "run-results.json#failureInjections/14",
+        "run-results.json#executions/5/review"
+      ],
+      "observedAt": 1787086798505,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+      "acceptanceAuthority": false
+    }
+  ],
+  "clusters": [
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "REPEATED_REVIEW_FINDING",
+      "deterministicKey": "human.defect:missing deterministic review coverage",
+      "clusterKey": "production-factory-pilot-v1|sellerfi-pilot/operational-fixtures|REPEATED_REVIEW_FINDING|human.defect:missing deterministic review coverage",
+      "occurrenceCount": 3,
+      "evidenceCount": 4,
+      "evidenceFingerprints": [
+        "sha256:a3850db0f699998e461cf1b5bd62df56de5004cbe6117d008459d04eae26365a",
+        "sha256:faea206a34077bbbc35e0326b7a2e2276fdfa716c5c55e6e8a3438686166ddaf",
+        "sha256:02225d83f1b057b21806be761e1cfed243696fd0de385f9fa5d207695ba80c45"
+      ],
+      "evidenceRefs": [
+        "run-results.json#failureInjections/14",
+        "run-results.json#executions/3/review",
+        "run-results.json#executions/4/review",
+        "run-results.json#executions/5/review"
+      ],
+      "firstObservedAt": 1787086798503,
+      "lastObservedAt": 1787086798505,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+      "qualifiesForCandidate": true,
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "MODEL_ROUTING_MISMATCH",
+      "deterministicKey": "missing cost telemetry",
+      "clusterKey": "production-factory-pilot-v1|sellerfi-pilot/operational-fixtures|MODEL_ROUTING_MISMATCH|missing cost telemetry",
+      "occurrenceCount": 1,
+      "evidenceCount": 1,
+      "evidenceFingerprints": [
+        "sha256:0168a1350b5d5ad1c8dbc0ff048fe111b5e03f5c9ebcaf97a6bfd7eca222f359"
+      ],
+      "evidenceRefs": [
+        "run-results.json#failureInjections/13"
+      ],
+      "firstObservedAt": 1787086798406,
+      "lastObservedAt": 1787086798406,
+      "confidence": 1,
+      "severity": "MEDIUM",
+      "reason": "The injected missing telemetry was rejected before acceptance and preserved as an independent failure observation.",
+      "qualifiesForCandidate": false,
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "CONTEXT_MISS",
+      "deterministicKey": "missing required policy context",
+      "clusterKey": "production-factory-pilot-v1|sellerfi-pilot/operational-fixtures|CONTEXT_MISS|missing required policy context",
+      "occurrenceCount": 1,
+      "evidenceCount": 1,
+      "evidenceFingerprints": [
+        "sha256:5046680ddc1273eaf8ac9f0c4401801140223b85109e6c5d46266eae0a015221"
+      ],
+      "evidenceRefs": [
+        "run-results.json#failureInjections/8"
+      ],
+      "firstObservedAt": 1787086798405,
+      "lastObservedAt": 1787086798405,
+      "confidence": 1,
+      "severity": "MEDIUM",
+      "reason": "The injected context miss was rejected before acceptance and preserved as an independent failure observation.",
+      "qualifiesForCandidate": false,
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "VERIFICATION_FAILURE",
+      "deterministicKey": "independent verification failure",
+      "clusterKey": "production-factory-pilot-v1|sellerfi-pilot/operational-fixtures|VERIFICATION_FAILURE|independent verification failure",
+      "occurrenceCount": 1,
+      "evidenceCount": 1,
+      "evidenceFingerprints": [
+        "sha256:5ed025ec844c51543939cc8017c221d3575756b29c9d2815e92fea39e4bd6ce2"
+      ],
+      "evidenceRefs": [
+        "run-results.json#failureInjections/5"
+      ],
+      "firstObservedAt": 1787086798404,
+      "lastObservedAt": 1787086798404,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected independent verification failure was rejected before acceptance and preserved as an independent failure observation.",
+      "qualifiesForCandidate": false,
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "DETERMINISTIC_GATE_FAILURE",
+      "deterministicKey": "deterministic gate failure",
+      "clusterKey": "production-factory-pilot-v1|sellerfi-pilot/operational-fixtures|DETERMINISTIC_GATE_FAILURE|deterministic gate failure",
+      "occurrenceCount": 1,
+      "evidenceCount": 1,
+      "evidenceFingerprints": [
+        "sha256:e1ad8765fe274585c50287746c60e901573cd29c3c890dcc131c36c0b4ce550d"
+      ],
+      "evidenceRefs": [
+        "run-results.json#failureInjections/4"
+      ],
+      "firstObservedAt": 1787086798403,
+      "lastObservedAt": 1787086798403,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "The injected deterministic gate failure was rejected before acceptance and preserved as an independent failure observation.",
+      "qualifiesForCandidate": false,
+      "acceptanceAuthority": false
+    },
+    {
+      "projectId": "production-factory-pilot-v1",
+      "repositoryKey": "sellerfi-pilot/operational-fixtures",
+      "signalType": "RECOVERY_REQUIRED",
+      "deterministicKey": "remote-sandbox operational instability requiring bounded recovery",
+      "clusterKey": "production-factory-pilot-v1|sellerfi-pilot/operational-fixtures|RECOVERY_REQUIRED|remote-sandbox operational instability requiring bounded recovery",
+      "occurrenceCount": 16,
+      "evidenceCount": 16,
+      "evidenceFingerprints": [
+        "sha256:9b5bcc6008d85af7ca283a83bdbe67dde6892132061842de44b8d3dd645d4005",
+        "sha256:9a18958d8fad1798bd5f20c8ef9f490580c3f4b09c554edb3d08aa2e0123f85c",
+        "sha256:5362cb4e0a9c9a6f2df19a25403be84d39c7762774278cfa378dc723b977bed0",
+        "sha256:6cdfe201d3647cd03892266295747738fdad37d4da0e2d95f22992077596ce6a",
+        "sha256:5472eb60a4a013823097fe108e3e18a553b11f0c90a6a3811909603c8aa4643d",
+        "sha256:35b0df0d5b1b70378c93e893d58ea8fcaf281757baa9327e41f5b6bb0724505d",
+        "sha256:483f75907f328f82e2bd3fc3c0154e8a8d03df4bbb6d7d010dbb39350adaf40a",
+        "sha256:71d59893d9811f064d3d08a4fc939231100170f66c5732f9692e706052808634",
+        "sha256:47fce02a1d04624688356f55f0bebc932606be10558b1a00b9278ee58774827d",
+        "sha256:3d4aec99935fb971ec65353efc4b2a41eb221d1ea30b1b017d44e21c60683d42",
+        "sha256:0eeb3214b710b32fbab130864fcd8076e8fd54acc028f3c8e4b12feb5109509b",
+        "sha256:2673ce49ba13777ef31cec11c5c633c05a9fa10c0d2a59071d704799d507132f",
+        "sha256:7015e80554acc4f1e27cebe64bb75ef7542333c2143bf0afde06faa1d08c1fe5",
+        "sha256:bb62c66c98f77fa3612dfa50ad538e9e19ae3779f04d8cc723f73860caaa5966",
+        "sha256:d8497d087b898ff70c8d14393e9b957b705762832e51d23076f45fb6d1292719",
+        "sha256:60f3c04ad99db353ed5359db2ca8236821a6aa87d04701647a525eb0729f8e9b"
+      ],
+      "evidenceRefs": [
+        "run-results.json#executions/2/attempts/0",
+        "run-results.json#executions/2/attempts/1",
+        "run-results.json#executions/14/attempts/0",
+        "run-results.json#executions/14/attempts/1",
+        "run-results.json#executions/2/attempts/2",
+        "run-results.json#executions/2/attempts/3",
+        "run-results.json#executions/14/attempts/2",
+        "run-results.json#executions/14/attempts/3",
+        "run-results.json#executions/2/attempts/4",
+        "run-results.json#executions/2/attempts/5",
+        "run-results.json#executions/14/attempts/4",
+        "run-results.json#executions/14/attempts/5",
+        "run-results.json#executions/2/attempts/6",
+        "run-results.json#executions/2/attempts/7",
+        "run-results.json#executions/14/attempts/6",
+        "run-results.json#executions/14/attempts/7"
+      ],
+      "firstObservedAt": 1787083200046,
+      "lastObservedAt": 1787086794463,
+      "confidence": 1,
+      "severity": "HIGH",
+      "reason": "Remote Attempt required recovery: Remote supervisor returned FAILED. Executor did not return valid factory-result/v1 JSON. Reading additional input from stdin... npm notice npm notice New major version of npm available! 11.17.0 -> 12.0.2 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2 npm notice To update run: npm install -g npm@12.0.2 npm notice",
+      "qualifiesForCandidate": true,
+      "acceptanceAuthority": false
+    }
+  ],
+  "candidates": [
+    {
+      "candidateType": "ADD_DETERMINISTIC_GATE",
+      "problemStatement": "3 recurring repeated review finding signals: The injected review discovered defect was rejected before acceptance and preserved as an independent failure observation.",
+      "proposedChange": "Add a deterministic check at the earliest applicable Factory phase.",
+      "expectedBenefit": "Fail earlier and avoid repeated model interpretation or repair work.",
+      "risk": "HIGH",
+      "estimatedEffort": "SMALL",
+      "evidenceCount": 4,
+      "confidence": 1,
+      "acceptanceAuthority": false
+    },
+    {
+      "candidateType": "CHANGE_RETRY_POLICY",
+      "problemStatement": "16 recurring recovery required signals: Remote Attempt required recovery: Remote supervisor returned FAILED. Executor did not return valid factory-result/v1 JSON. Reading additional input from stdin... npm notice npm notice New major version of npm available! 11.17.0 -> 12.0.2 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2 npm notice To update run: npm install -g npm@12.0.2 npm notice",
+      "proposedChange": "Evaluate a bounded retry-policy change under higher-risk governance.",
+      "expectedBenefit": "Reduce repeated recovery while preserving worker fencing and lineage.",
+      "risk": "HIGH",
+      "estimatedEffort": "LARGE",
+      "evidenceCount": 16,
+      "confidence": 1,
+      "acceptanceAuthority": false
+    }
+  ],
+  "duplicatesSuppressed": 0,
+  "strongestExperimentProposal": {
+    "id": "experiment-proposal-production-pilot-v1",
+    "candidate": {
+      "candidateType": "CHANGE_RETRY_POLICY",
+      "problemStatement": "16 recurring recovery required signals: Remote Attempt required recovery: Remote supervisor returned FAILED. Executor did not return valid factory-result/v1 JSON. Reading additional input from stdin... npm notice npm notice New major version of npm available! 11.17.0 -> 12.0.2 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2 npm notice To update run: npm install -g npm@12.0.2 npm notice",
+      "proposedChange": "Evaluate a bounded retry-policy change under higher-risk governance.",
+      "expectedBenefit": "Reduce repeated recovery while preserving worker fencing and lineage.",
+      "risk": "HIGH",
+      "estimatedEffort": "LARGE",
+      "evidenceCount": 16,
+      "confidence": 1,
+      "acceptanceAuthority": false
+    },
+    "status": "PROPOSED",
+    "autoPromote": false,
+    "releasedWorkOrders": [],
+    "nextStep": "Run a governed experiment comparing the repaired supervisor and five-minute remote profile against the frozen pilot failures; human approval remains required before promotion."
+  },
+  "acceptanceAuthority": false
+}

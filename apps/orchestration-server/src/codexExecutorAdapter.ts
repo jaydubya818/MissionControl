@@ -416,10 +416,13 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
 
   createRemoteInvocation(request: ExecutorRequest, context: { repositoryRoot: string; resultPath: string }) {
     const remoteRequest = { ...request, repositoryRoot: context.repositoryRoot, workingDirectory: context.repositoryRoot };
+    const outputSchemaPath = path.posix.join(path.posix.dirname(context.resultPath), "factory-result.schema.json");
     return {
       command: this.executable,
-      args: commandArguments(remoteRequest, context.resultPath, undefined, REMOTE_OPENROUTER_CONFIG_OVERRIDES),
+      args: commandArguments(remoteRequest, context.resultPath, outputSchemaPath, REMOTE_OPENROUTER_CONFIG_OVERRIDES),
       resultPath: context.resultPath,
+      outputSchemaPath,
+      outputSchema: structuredClone(FACTORY_RESULT_SCHEMA),
       model: request.model,
       prompt: request.prompt,
       allowedPaths: request.allowedPaths,

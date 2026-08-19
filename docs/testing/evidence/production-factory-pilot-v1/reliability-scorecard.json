@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "factory-reliability-scorecard/v1",
+  "population": 15,
+  "dimensions": {
+    "executionReliability": {
+      "observedValue": 0.8666666666666667,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "verificationReliability": {
+      "observedValue": 0.8666666666666667,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "cleanupReliability": {
+      "observedValue": 1,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "contextSufficiency": {
+      "observedValue": 1,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "firstPassQuality": {
+      "observedValue": 0.8666666666666667,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "recoveryEffectiveness": {
+      "observedValue": 0,
+      "sampleCount": 2,
+      "coverage": 0.13333333333333333,
+      "confidence": "LOW",
+      "limitations": []
+    },
+    "evidenceCompleteness": {
+      "observedValue": 0.8666666666666667,
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    },
+    "reviewCorrectionFrequency": {
+      "observedValue": 0,
+      "sampleCount": 13,
+      "coverage": 0.8666666666666667,
+      "confidence": "MEDIUM",
+      "limitations": []
+    },
+    "costEfficiency": {
+      "observedValue": null,
+      "sampleCount": 0,
+      "coverage": 0,
+      "confidence": "LOW",
+      "limitations": [
+        "Missing model or provider cost remains null and cannot improve this dimension."
+      ]
+    },
+    "latency": {
+      "observedValue": {
+        "medianMs": 31449,
+        "p95Ms": 461479
+      },
+      "sampleCount": 15,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "limitations": []
+    }
+  },
+  "failureInjectionCoverage": {
+    "observedValue": 1,
+    "sampleCount": 15,
+    "coverage": 1,
+    "confidence": "HIGH",
+    "limitations": []
+  }
+}

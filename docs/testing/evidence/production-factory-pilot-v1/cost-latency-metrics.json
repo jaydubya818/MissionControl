@@ -1,0 +1,48 @@
+{
+  "missionToPlan": {
+    "medianMs": 1,
+    "sampleCount": 13,
+    "coverage": 0.8666666666666667
+  },
+  "planToWorkOrder": {
+    "medianMs": 0,
+    "sampleCount": 13,
+    "coverage": 0.8666666666666667
+  },
+  "queueAdmission": {
+    "medianMs": 0,
+    "sampleCount": 13,
+    "coverage": 0.8666666666666667
+  },
+  "execution": {
+    "medianMs": 30770,
+    "sampleCount": 13,
+    "coverage": 0.8666666666666667
+  },
+  "verification": {
+    "medianMs": 278,
+    "sampleCount": 13,
+    "coverage": 0.8666666666666667
+  },
+  "review": {
+    "medianMs": 0,
+    "sampleCount": 13,
+    "coverage": 0.8666666666666667
+  },
+  "totalCycle": {
+    "medianMs": 31449,
+    "sampleCount": 15,
+    "coverage": 1
+  },
+  "firstPassVerificationRate": 0.8666666666666667,
+  "eventualVerificationRate": 0.8666666666666667,
+  "retryRate": 0.13333333333333333,
+  "cancellationRate": 0,
+  "tokenUsage": {
+    "inputTokens": 933271,
+    "outputTokens": 14888,
+    "sampleCount": 12
+  },
+  "modelCostUsd": null,
+  "infrastructureCostUsd": null
+}

@@ -8,7 +8,7 @@ import { FakeSandboxProvider } from "../fakeSandboxProvider.js";
 import { FakeSandboxCredentialBroker } from "../sandboxCredentials.js";
 import { InMemoryRemoteSandboxJournal, RemoteSandboxRuntime } from "../remoteSandboxRuntime.js";
 import { createPatchDescriptor, createSandboxResultBundle, encodeSandboxResultBundle, parseAndValidateSandboxResultBundle } from "../sandboxResultBundle.js";
-import { runSandboxSupervisor } from "../sandboxSupervisor.js";
+import { runSandboxSupervisor, standaloneSandboxSupervisorSource } from "../sandboxSupervisor.js";
 import { sandboxProfileDigest, stableSandboxResourceName, validateSandboxProfile, type SandboxProfileSnapshot } from "../sandboxProvider.js";
 import { canonicalHash } from "@mission-control/shared";
 
@@ -162,6 +162,126 @@ describe("sandbox supervisor", () => {
       expect(bundle.status).toBe("COMPLETED");
       expect(bundle.patch.byteLength).toBeGreaterThan(0);
       expect(JSON.parse(await readFile(outputPath, "utf8")).digest).toBe(bundle.digest);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("normalizes malformed remote harness output into a fail-closed result bundle", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "mc-standalone-supervisor-test-"));
+    try {
+      await execFileAsync("git", ["init", "-q"], { cwd: directory });
+      await writeFile(path.join(directory, "README.md"), "before\n");
+      await execFileAsync("git", ["add", "README.md"], { cwd: directory });
+      await execFileAsync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "base"], { cwd: directory });
+      const head = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: directory })).stdout.trim();
+      const profileDigest = "sha256:profile";
+      const executionManifest = remoteExecutionManifest({ sourceSha: head, profileDigest });
+      const manifestDigest = `sha256:${canonicalHash(executionManifest)}`;
+      const supervisorPath = path.join(directory, "standalone-supervisor.mjs");
+      const configPath = path.join(directory, "config.json");
+      const outputPath = path.join(directory, "result.json");
+      await writeFile(supervisorPath, standaloneSandboxSupervisorSource());
+      await writeFile(configPath, JSON.stringify({
+        executionManifest,
+        attemptId: "attempt-malformed",
+        workOrderId: "work-order-1",
+        workOrderRevisionNumber: 1,
+        workflowRunId: "run-1",
+        manifestDigest,
+        profileDigest,
+        sourceSha: head,
+        environmentDescriptor: { provider: "FAKE", image: "debian:bookworm" },
+        repositoryRoot: directory,
+        outputPath,
+        executor: {
+          command: process.execPath,
+          args: ["-e", "process.stdout.write(JSON.stringify({status:'COMPLETED'}))"],
+          timeoutMs: 5_000,
+        },
+        environment: {},
+      }));
+
+      await execFileAsync(process.execPath, [supervisorPath, configPath], { cwd: directory });
+      const bundle = parseAndValidateSandboxResultBundle(Buffer.from(await readFile(outputPath)), {
+        attemptId: "attempt-malformed",
+        workOrderId: "work-order-1",
+        workOrderRevisionNumber: 1,
+        workflowRunId: "run-1",
+        manifestDigest,
+        profileDigest,
+        sourceSha: head,
+        supervisorVersion: "mission-control-supervisor/v1",
+        environment: { provider: "FAKE", image: "debian:bookworm" },
+        maxRuntimeMs: 60_000,
+      });
+      expect(bundle.structuredResult).toMatchObject({
+        status: "FAILED",
+        summary: "Executor did not return valid factory-result/v1 JSON.",
+      });
+      expect(bundle.status).toBe("FAILED");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the last Codex agent message when the remote output file is empty", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "mc-standalone-supervisor-jsonl-test-"));
+    try {
+      await execFileAsync("git", ["init", "-q"], { cwd: directory });
+      await writeFile(path.join(directory, "README.md"), "before\n");
+      await execFileAsync("git", ["add", "README.md"], { cwd: directory });
+      await execFileAsync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "base"], { cwd: directory });
+      const head = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: directory })).stdout.trim();
+      const profileDigest = "sha256:profile";
+      const executionManifest = remoteExecutionManifest({ sourceSha: head, profileDigest });
+      const manifestDigest = `sha256:${canonicalHash(executionManifest)}`;
+      const supervisorPath = path.join(directory, "standalone-supervisor.mjs");
+      const configPath = path.join(directory, "config.json");
+      const outputPath = path.join(directory, "result.json");
+      const executorResultPath = path.join(directory, "executor-result.json");
+      const jsonlEvent = { type: "item.completed", item: { type: "agent_message", text: JSON.stringify(structuredResult()) } };
+      await writeFile(supervisorPath, standaloneSandboxSupervisorSource());
+      await writeFile(executorResultPath, "");
+      await writeFile(configPath, JSON.stringify({
+        executionManifest,
+        attemptId: "attempt-jsonl",
+        workOrderId: "work-order-1",
+        workOrderRevisionNumber: 1,
+        workflowRunId: "run-1",
+        manifestDigest,
+        profileDigest,
+        sourceSha: head,
+        environmentDescriptor: { provider: "FAKE", image: "debian:bookworm" },
+        repositoryRoot: directory,
+        outputPath,
+        executor: {
+          command: process.execPath,
+          args: ["-e", `process.stdout.write(${JSON.stringify(`${JSON.stringify(jsonlEvent)}\n`)})`],
+          resultPath: executorResultPath,
+          timeoutMs: 5_000,
+        },
+        environment: {},
+      }));
+
+      await execFileAsync(process.execPath, [supervisorPath, configPath], { cwd: directory });
+      const bundle = parseAndValidateSandboxResultBundle(Buffer.from(await readFile(outputPath)), {
+        attemptId: "attempt-jsonl",
+        workOrderId: "work-order-1",
+        workOrderRevisionNumber: 1,
+        workflowRunId: "run-1",
+        manifestDigest,
+        profileDigest,
+        sourceSha: head,
+        supervisorVersion: "mission-control-supervisor/v1",
+        environment: { provider: "FAKE", image: "debian:bookworm" },
+        maxRuntimeMs: 60_000,
+      });
+      expect(bundle.status).toBe("COMPLETED");
+      expect(bundle.structuredResult).toMatchObject({
+        status: "COMPLETED",
+        summary: "Implemented the requested change.",
+      });
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

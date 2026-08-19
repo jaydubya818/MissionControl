@@ -132,6 +132,8 @@ export interface SandboxStartRequest {
     command: string;
     args: string[];
     resultPath?: string;
+    outputSchemaPath?: string;
+    outputSchema?: Record<string, unknown>;
     model?: string;
     prompt: string;
     allowedPaths: string[];

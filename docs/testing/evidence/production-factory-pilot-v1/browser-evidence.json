@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "production-factory-pilot-browser-evidence/v1",
+  "testedAt": "2026-08-18",
+  "applicationUrl": "http://127.0.0.1:5180",
+  "dataSource": "real local Convex development data seeded for Software Factory Demo",
+  "flags": {
+    "VITE_FLAG_UI_SHELL_V2": true,
+    "VITE_FLAG_CONTEXT_REGISTRY": true,
+    "VITE_FLAG_EOS_COMMAND_CENTER_PREVIEW": true
+  },
+  "surfaces": [
+    "Command Center",
+    "Mission Overview",
+    "Mission Specification",
+    "Mission Plan",
+    "Mission Execution",
+    "Work Orders",
+    "Execution Run Inspector",
+    "Review Package projection",
+    "Factory Board",
+    "Factory Learning signals"
+  ],
+  "presentationCoverage": ["Basic", "Intermediate", "Advanced"],
+  "viewportAndThemeCoverage": [
+    { "viewport": "desktop 1440x1000", "themes": ["light", "dark"] },
+    { "viewport": "tablet", "themes": ["dark"] },
+    { "viewport": "mobile 390px", "themes": ["dark"] }
+  ],
+  "navigation": {
+    "directUrls": "PASS",
+    "refresh": "PASS",
+    "browserBackForward": "PASS",
+    "keyboardFocus": "PASS",
+    "leftNavigationReachability": "PASS"
+  },
+  "runtime": {
+    "pageErrors": [],
+    "unexpectedConsoleErrors": [],
+    "network": "Local application resources observed as HTTP 200/304 after environment repair.",
+    "desktopHorizontalOverflow": false,
+    "mobileHorizontalOverflow": false
+  },
+  "accessibility": [
+    {
+      "surface": "Mission Specification",
+      "viewport": "desktop",
+      "standard": "WCAG 2 A/AA",
+      "passes": 26,
+      "incomplete": 0,
+      "violations": 0
+    },
+    {
+      "surface": "Factory Learning signals",
+      "viewport": "mobile",
+      "standard": "WCAG 2 A/AA",
+      "passes": 18,
+      "incomplete": 0,
+      "violations": 0
+    }
+  ],
+  "reviewPackageFixture": {
+    "workOrderId": "yh70dhz3y7s8n2e99hdsz3fqw18bpsq6",
+    "workflowRunId": "ys7ff24rcv1jrx3e4a6ecz33358bpadm",
+    "status": "INCOMPLETE",
+    "observedNextAction": "Attempt is missing its frozen WorkOrder revision identity.",
+    "authorityCopyObserved": "Deterministic verification is canonical; Review Package and AI findings are advisory; acceptance remains workOrders.accept."
+  },
+  "uiDefect": {
+    "description": "Long immutable validation identifiers overflowed the Mission Overview validation-coverage card into the adjacent metadata column.",
+    "reproduced": true,
+    "regressionTest": "apps/mission-control-ui/src/eos/views/MissionDetailView.test.ts",
+    "correction": "Added min-width containment and anywhere word wrapping to decision/validation card content.",
+    "postFixMeasurement": {
+      "sectionRight": 719,
+      "paragraphRight": 702,
+      "contained": true,
+      "scrollWidth": 175,
+      "clientWidth": 175,
+      "wrap": "break-word"
+    }
+  },
+  "environmentRepair": {
+    "category": "AVOIDABLE_OPERATIONAL_TOIL",
+    "count": 1,
+    "description": "The first UI launch inherited a conflicting Convex URL and remained in runtime reconnect. Restarting with one explicit VITE_CONVEX_URL restored the real UI."
+  },
+  "screenshots": [
+    "browser/desktop-dark-command-center.png",
+    "browser/desktop-dark-mission-specification.png",
+    "browser/desktop-dark-mission-specification-advanced.png",
+    "browser/desktop-dark-mission-plan.png",
+    "browser/desktop-dark-mission-execution.png",
+    "browser/desktop-dark-work-order-run-inspector.png",
+    "browser/desktop-dark-factory-basic.png",
+    "browser/desktop-dark-factory-advanced.png",
+    "browser/desktop-dark-factory-learning-signals-intermediate.png",
+    "browser/tablet-dark-mission-specification.png",
+    "browser/mobile-dark-factory-learning-signals.png",
+    "browser/desktop-light-mission-overview.png",
+    "browser/desktop-light-mission-overview-fixed.png",
+    "browser/desktop-light-review-package.png"
+  ],
+  "limitations": [
+    "The harness change-review preview route was disabled in this runtime and redirected to Command Center. Review Package proof instead used the production Work Orders projection backed by a real seeded WorkOrder.",
+    "No external provider PR was opened for browser proof; the Review Package fixture truthfully displayed missing exact-head lineage."
+  ]
+}
