@@ -1,0 +1,23 @@
+{
+  "schema": "production-routing-evidence-bootstrap-provider-health/v1",
+  "recordedAt": "2026-08-21T16:34:42Z",
+  "serverOwnedObservations": {
+    "localCodex": null,
+    "remoteCodex": null,
+    "reason": "Production has no model-catalog records to receive internal server-owned health updates."
+  },
+  "exeDevReadOnlyControlPlane": {
+    "authenticated": true,
+    "vmCount": 0,
+    "maxVms": 50,
+    "providerCapacityAvailable": true,
+    "automaticIntegrationCount": 0,
+    "liveAllocationAllowed": true
+  },
+  "egress": {
+    "providerEnforced": false,
+    "guestEnforcement": "GUEST_NFTABLES",
+    "productionRoutingEligible": false
+  },
+  "finalVmInventory": 0
+}

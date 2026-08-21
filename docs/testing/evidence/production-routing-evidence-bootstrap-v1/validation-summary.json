@@ -1,0 +1,45 @@
+{
+  "schema": "production-routing-evidence-bootstrap-validation/v1",
+  "recordedAt": "2026-08-21T16:34:42Z",
+  "sourceSha": "95b6b2d18fb9f14b610d908338fb4e9d8054e171",
+  "focusedValidation": {
+    "ciPrepare": "PASS",
+    "factoryConfiguration": "PASS",
+    "workerAdmission": "PASS",
+    "executionRouting": "PASS",
+    "modelRoutingAuthorization": "PASS",
+    "hardenedRemoteSandboxRegression": "PASS",
+    "structuredVerification": "PASS",
+    "genericHarnessVerification": "PASS",
+    "reviewIntelligence": "PASS",
+    "factoryLearningCompatibility": "PASS",
+    "testFiles": 17,
+    "tests": 145,
+    "failures": 0
+  },
+  "productionPreflight": {
+    "githubAppInstallation": "MISSING",
+    "githubAppServerConfiguration": "MISSING",
+    "qualifiedRemoteRuntimeValidation": "PASS_DEGRADED",
+    "qualifiedRemoteProductionRoutingEligibility": "FAIL_QUALIFICATION_ONLY",
+    "serverOwnedProviderHealth": "MISSING",
+    "currentFactoryVersions": 0,
+    "currentVerifiedAttempts": 0,
+    "productionMutationsPerformed": 0
+  },
+  "fullQualification": {
+    "finalResult": "PASS",
+    "command": "MC_QUALIFICATION_EVIDENCE_SLUG=production-routing-evidence-bootstrap-v1 pnpm run qualify:factory",
+    "checksPassed": 17,
+    "checksFailed": 0,
+    "startedAt": "2026-08-21T16:39:43.224Z",
+    "completedAt": "2026-08-21T16:42:11.879Z",
+    "initialRun": {
+      "result": "FAIL",
+      "detail": "Two worker tests timed out during the composed parallel group; their exact serial diagnostic rerun passed 13/13, and the unchanged complete qualification rerun passed all 17 gates."
+    }
+  },
+  "ci": "PENDING_DURABLE_CHANGE",
+  "vercel": "PENDING_DURABLE_CHANGE",
+  "gitDiffCheck": "PASS"
+}

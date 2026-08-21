@@ -1,0 +1,66 @@
+{
+  "schema": "production-routing-evidence-bootstrap-failure-matrix/v1",
+  "recordedAt": "2026-08-21T16:34:42Z",
+  "result": "PASS_FAIL_CLOSED",
+  "checks": [
+    {
+      "condition": "Factory Version mismatch",
+      "result": "PASS",
+      "enforcement": "Exact Factory Version and configuration digest are required by the routing pin and current verification join."
+    },
+    {
+      "condition": "stale capability digest",
+      "result": "PASS",
+      "enforcement": "factoryWorkerEligibility returns worker-harness-manifest-mismatch."
+    },
+    {
+      "condition": "stale configuration digest",
+      "result": "PASS",
+      "enforcement": "Readiness and pinning compare the exact immutable Factory configuration digest."
+    },
+    {
+      "condition": "missing worker",
+      "result": "PASS",
+      "enforcement": "Factory readiness requires one current eligible canonical worker."
+    },
+    {
+      "condition": "sandbox-profile mismatch",
+      "result": "PASS",
+      "enforcement": "Remote admission compares exact profile ID and digest; qualification-only is rejected for production routing."
+    },
+    {
+      "condition": "repository mismatch",
+      "result": "PASS",
+      "enforcement": "Worker repository access and routing evidence are exact repository-bound."
+    },
+    {
+      "condition": "provider unhealthy",
+      "result": "PASS",
+      "enforcement": "Unavailable catalog health excludes a tuple and cannot grant verification authority."
+    },
+    {
+      "condition": "missing telemetry",
+      "result": "PASS",
+      "enforcement": "Missing values remain null/undefined and do not become successful or cost-complete evidence."
+    },
+    {
+      "condition": "cross-workspace configuration",
+      "result": "PASS",
+      "enforcement": "Factory, repository, profile, verifier, agent, and worker scopes are project checked."
+    },
+    {
+      "condition": "unqualified adapter",
+      "result": "PASS",
+      "enforcement": "Unknown/invalid frozen manifests and unsupported adapter versions fail admission."
+    }
+  ],
+  "focusedRegression": {
+    "convexTestFiles": 9,
+    "convexTests": 62,
+    "workflowEngineTestFiles": 4,
+    "workflowEngineTests": 36,
+    "orchestrationTestFiles": 4,
+    "orchestrationTests": 47,
+    "failures": 0
+  }
+}

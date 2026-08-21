@@ -1,0 +1,62 @@
+{
+  "schema": "production-routing-evidence-bootstrap-readiness/v1",
+  "recordedAt": "2026-08-21T16:34:42Z",
+  "decision": "BLOCKED",
+  "guardedAuto": {
+    "enabled": false,
+    "policyCount": 0,
+    "decisionCount": 0,
+    "thresholds": {
+      "minimumVerifiedAttempts": 5,
+      "minimumEvidenceCoverage": 0.6,
+      "minimumScoreMargin": 5,
+      "evidenceWindowDays": 30
+    },
+    "thresholdsModified": false,
+    "thresholdsSatisfied": false
+  },
+  "samples": {
+    "local": {
+      "verifiedCurrentAttemptCount": 0,
+      "workloadDistribution": {},
+      "firstPassRate": null
+    },
+    "remote": {
+      "verifiedCurrentAttemptCount": 0,
+      "workloadDistribution": {},
+      "firstPassRate": null
+    }
+  },
+  "coverage": {
+    "local": {
+      "reliability": 0,
+      "latency": 0,
+      "cost": 0,
+      "diagnostics": 0,
+      "overallGoverned": 0
+    },
+    "remote": {
+      "reliability": 0,
+      "latency": 0,
+      "cost": 0,
+      "diagnostics": 0,
+      "overallGoverned": 0
+    }
+  },
+  "providerHealth": {
+    "local": "MISSING_SERVER_OWNED_OBSERVATION",
+    "remote": "MISSING_SERVER_OWNED_OBSERVATION",
+    "exeDevControlPlaneReadiness": "REACHABLE",
+    "qualificationAuthorityGranted": false
+  },
+  "blockingConditions": [
+    "github-app-installation-missing",
+    "github-app-server-configuration-missing",
+    "remote-profile-qualification-only",
+    "remote-profile-production-routing-ineligible",
+    "sandbox-profile-ingestion-primitive-cannot-record-qualified-snapshot",
+    "exact-openai-model-catalog-creation-unavailable",
+    "all-current-production-workflows-fail-structured-status-contract",
+    "canonical-factory-prerequisites-missing"
+  ]
+}
