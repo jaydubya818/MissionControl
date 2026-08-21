@@ -22,6 +22,7 @@ import {
   type PrCheckSignals,
 } from "../lib/harnessPrChecks";
 import { computeMergeGates } from "../lib/mergeGates";
+import { classifyPrCheckAuthority, evaluateCiMergeAuthority } from "../lib/evidenceAuthority";
 import { fetchPullRequestCi, githubPrAttestationExpiresAt } from "../lib/githubCiIngest";
 import { mintGithubInstallationToken } from "../lib/githubAppAuth";
 import { buildFileChanges } from "../lib/runInspector";
@@ -386,6 +387,13 @@ async function upsertPrCheck(
   existingRows.sort((a: any, b: any) => b.syncedAt - a.syncedAt);
   const existing = existingRows[0];
 
+  // `ciProvider: "github"` used to be stamped on EVERY row, including
+  // CODEGEN/WORKFLOW/MANUAL rows that never touched GitHub. Combined with a
+  // `ciStatus` derived from the run's own `status === "COMPLETED"`, that made an
+  // execution claim indistinguishable from a GitHub check at the point every
+  // consumer reads it. The provider is now only named when a provider was
+  // actually involved.
+  const externallyObserved = input.source === "GITHUB";
   const doc = {
     projectId: input.projectId,
     prUrl: input.prUrl,
@@ -395,7 +403,7 @@ async function upsertPrCheck(
     title: input.title,
     ciStatus: input.ciStatus ?? (signals.testFailCount ? "FAIL" : signals.testPassCount ? "PASS" : "UNKNOWN"),
     ciRunUrl: input.ciRunUrl,
-    ciProvider: "github",
+    ciProvider: externallyObserved ? "github" : undefined,
     source: input.source,
     sourceRef: input.sourceRef,
     changeReviewLenses,
@@ -567,13 +575,27 @@ export const recordMerge = mutation({
     });
     const workOrder = evaluation.workOrderId ? await ctx.db.get(evaluation.workOrderId) : null;
     if (evaluation.workOrderId && !workOrder) throw new Error("Linked WorkOrder not found");
+    // CI authority is now proven, not assumed from `ciStatus`. See
+    // lib/evidenceAuthority.ts: a workflow run reporting its own completion used
+    // to satisfy this.
+    const ciAuthority = evaluateCiMergeAuthority({
+      row: evaluation,
+      expectedHeadSha: evaluation.headSha,
+      expectedProviderRepositoryId: evaluation.providerRepositoryId,
+      now: Date.now(),
+    });
     if (!mergeAuthoritySatisfied({
       ciStatus: evaluation.ciStatus ?? "UNKNOWN",
       gatesPass: gates.every((gate) => gate.passed),
       approvalStatus: workOrder?.approvalStatus,
       humanConfirmed: args.humanConfirmed,
+      ciAuthoritySatisfied: ciAuthority.satisfied,
     })) {
-      throw new Error("Passing gates, WorkOrder approval, and explicit merge confirmation are required before merge");
+      throw new Error(
+        ciAuthority.satisfied
+          ? "Passing gates, WorkOrder approval, and explicit merge confirmation are required before merge"
+          : `Merge requires external CI attestation: ${ciAuthority.detail}`,
+      );
     }
     const actorId = access.actorId;
     const mergeCommitSha = args.mergeCommitSha.trim();

@@ -20,6 +20,9 @@ import {
 
 const http = httpRouter();
 
+/** Maximum accepted age of a Stripe signature timestamp. */
+const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 300;
+
 /**
  * Verify Stripe-Signature header (HMAC-SHA256) using Web Crypto.
  * Header format: "t=timestamp,v1=hex_signature[,v0=...]"
@@ -39,6 +42,15 @@ async function verifyStripeSignature(
   const timestamp = parts["t"];
   const v1 = parts["v1"];
   if (!timestamp || !v1) return false;
+  // Bound how long a captured, still-valid signature stays usable. Stripe's own
+  // libraries apply the same 5-minute tolerance. Exactly-once semantics come
+  // from `revenue.record`, which dedupes on the Stripe `event.id`
+  // (`externalId`, `by_external_id`); this check bounds the injection window
+  // for events that have not been seen at all.
+  const issuedAtSeconds = Number(timestamp);
+  if (!Number.isFinite(issuedAtSeconds)) return false;
+  const skewSeconds = Math.abs(Date.now() / 1000 - issuedAtSeconds);
+  if (skewSeconds > STRIPE_SIGNATURE_TOLERANCE_SECONDS) return false;
   const signedPayload = `${timestamp}.${rawBody}`;
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -72,11 +84,14 @@ http.route({
     const signature = request.headers.get("stripe-signature");
     const secret = process.env.STRIPE_WEBHOOK_SECRET;
 
-    if (secret) {
-      const valid = await verifyStripeSignature(body, signature, secret);
-      if (!valid) {
-        return new Response("Webhook signature verification failed", { status: 401 });
-      }
+    // Fail closed when the webhook is unconfigured — matching /github/webhook.
+    // An unverified body must never be able to write revenue records.
+    if (!secret) {
+      return new Response("Stripe webhook is not configured", { status: 503 });
+    }
+    const valid = await verifyStripeSignature(body, signature, secret);
+    if (!valid) {
+      return new Response("Webhook signature verification failed", { status: 401 });
     }
 
     let event: {
