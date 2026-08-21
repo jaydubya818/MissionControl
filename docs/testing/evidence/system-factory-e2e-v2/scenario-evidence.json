@@ -1,7 +1,7 @@
 {
   "schemaVersion": "system-factory-e2e-qualification/v2",
   "result": "SYSTEM QUALIFIED V2 WITH KNOWN LIMITATIONS",
-  "baseSha": "11a51cac1e446488cddf34781cc9663b922c7684",
+  "baseSha": "95b6b2d18fb9f14b610d908338fb4e9d8054e171",
   "runtimeContractVersion": 28,
   "hardeningV1": {
     "decision": "HARDENING V1 PASSED",
@@ -37,9 +37,9 @@
   },
   "fixture": {
     "repository": "sellerfi/system-factory-qualification-fixture",
-    "baseSha": "920eb7f3de2759bfc96d5dcf7306e3a174a57bee",
+    "baseSha": "0f5f338e65391f5196f1144213118d87fa9cccfc",
     "baseTreeSha": "60e1c7d797ecac6280eb995c95ef60c4371feceb",
-    "finalCandidateSha": "9ba871d9efad9b224b2f2cd432fbfb5cfbc9d461",
+    "finalCandidateSha": "279f1b144371ef02ac0a5dca95a6405174cfa70b",
     "definitionOfDone": "node scripts/verify.mjs exits zero in an independent checkout."
   },
   "lineage": {
@@ -69,7 +69,7 @@
     "recipe": "progressive-software-delivery",
     "factoryVersionId": "factory-version-progressive-software-v1",
     "verificationFactoryVersionId": "factory-version-independent-verification-v1",
-    "contextPackageId": "d855eccfc7176fed31fe1ff4",
+    "contextPackageId": "41f6e3237eb6264d11170605",
     "worker": {
       "workerId": "worker-system-factory-v2",
       "sessionId": "worker-session-current",
@@ -83,23 +83,23 @@
       "attempt-source-repaired",
       "attempt-source-current-head"
     ],
-    "executionManifestDigest": "sha256:0474504988f48d311e58bb6eb5c58d5f3cfacf65a90e51cf0bd91fada319dd0e",
+    "executionManifestDigest": "sha256:6a685cb07ceca7363ed9f51ab7f36dc4bc5699dca779da3ac0cddf8191334041",
     "executionBackend": "remote-sandbox",
     "candidateShas": [
-      "911cc67e464c075ddd7081ac5d72ceb2e9dc11bc",
-      "c0a4802fa86333248831375766e2393eaef37f80",
-      "4aec47c3d14f18b432ea5b14b9233e535104f567",
-      "b830028fb294f4b14cbdf1bc3b8505e843ff1fbf",
-      "9ba871d9efad9b224b2f2cd432fbfb5cfbc9d461"
+      "2a555d22ca583131c38f00fd40b9b2361c9767ed",
+      "c9cb9eee83a484eb63e822338210b907885ba2aa",
+      "22252db22e6bcc7c9112bf79ce65c4f2b95b1e24",
+      "fe0e87f34c78dee4e22afefb0b03898e7e3b11ea",
+      "279f1b144371ef02ac0a5dca95a6405174cfa70b"
     ],
     "verificationAttemptIds": [
       "attempt-verification-failed-3",
       "attempt-verification-repaired",
       "attempt-verification-current-head"
     ],
-    "verificationSubjectId": "verification-subject:3c09429b8a87ce4b3e748d185b1b1417cf1397e7a6e178c991d2e6c2bb40f4be",
-    "verificationPlanId": "verification-plan:b821ce55b9523c9f15f6cf7be550746853da86ca755557bd2a401d379638171f",
-    "verificationPlanDigest": "sha256:b821ce55b9523c9f15f6cf7be550746853da86ca755557bd2a401d379638171f",
+    "verificationSubjectId": "verification-subject:e06fd975606bb428deea0b238e3600411dd12092ae1fffd250f436373f628fff",
+    "verificationPlanId": "verification-plan:6fda04e3e2f330f33161492280a449ff2c04c8e88fc4837194be7ddd98ccab45",
+    "verificationPlanDigest": "sha256:6fda04e3e2f330f33161492280a449ff2c04c8e88fc4837194be7ddd98ccab45",
     "verificationRunId": "verification-run:attempt-verification-current-head",
     "evidenceIds": [
       "evidence:attempt-verification-current-head:factory-negative-constraints",
@@ -111,7 +111,7 @@
     "qualityGateState": "ELIGIBLE",
     "providerPullRequestId": "provider-pr-system-factory-v2",
     "providerPullRequestUrl": "https://github.invalid/sellerfi/system-factory-qualification-fixture/pull/1",
-    "providerHeadSha": "9ba871d9efad9b224b2f2cd432fbfb5cfbc9d461",
+    "providerHeadSha": "279f1b144371ef02ac0a5dca95a6405174cfa70b",
     "acceptanceEvent": "WORK_ORDER_ACCEPTED via workOrders.accept only",
     "acceptanceActor": "human operator"
   },
@@ -232,9 +232,9 @@
     "sandboxHasGithubAuthority": false
   },
   "performance": {
-    "durationMs": 8883,
-    "sourceGateDurationMs": 3404,
-    "verificationDurationMs": 4991,
+    "durationMs": 30918,
+    "sourceGateDurationMs": 12160,
+    "verificationDurationMs": 17391,
     "sandboxProviderRuntimeMs": 1,
     "deterministicGateRuns": 7,
     "sourceAttempts": 5,
