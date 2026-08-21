@@ -14,15 +14,15 @@ Runtime toggles gating incomplete or risky Software Factory subsystems. Introduc
 1. `VITE_FLAG_<KEY>` env override (UI only — CI and local dev; dots/dashes → underscores, uppercased)
 2. Project-scoped row (`projectId` set)
 3. Global row (no `projectId`)
-4. Registered default from `KNOWN_FLAGS` (`false` for new subsystems; `context.registry` now defaults to `true` — the registry is the primary skills surface)
+4. Registered default from `KNOWN_FLAGS` — **every** registered flag currently ships `defaultEnabled: false`, asserted by `convex/__tests__/featureFlags.test.ts`
 5. Unknown keys resolve to `false` — never throw
 
 ## Registered flags
 
 | Key | Gates | Introduced |
 |-----|-------|-----------|
-| `ui.shell.v2` | Left-sidebar AppShell + router navigation | PR 1 |
-| `context.registry` | Context package registry backend + UI (defaults **on**; RegistryView is the only skills surface) | PR 2, 18 |
+| `ui.shell.v2` | Left-sidebar AppShell + router navigation. Registered but never read; the live gate is the unregistered `ui.shell.v1` opt-out in `App.tsx` | PR 1 |
+| `context.registry` | Context package registry backend + UI. Defaults **off**, and no production code currently reads it — the shell decision was inverted to the opt-out `ui.shell.v1`, so the `VITE_FLAG_CONTEXT_REGISTRY` / `VITE_FLAG_UI_SHELL_V2` overrides set by `dev:demo` and `playwright.config.ts` are inert | PR 2, 18 |
 | `context.cbom` | Context Bill of Materials snapshot at run start | PR 6 |
 | `context.gates` | Context quality gates blocking publication | PR 10 |
 | `eval.framework` | Baseline/candidate evaluation execution | PR 7–9 |

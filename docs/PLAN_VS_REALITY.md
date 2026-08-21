@@ -1,5 +1,10 @@
 # Plan vs Reality
 
+> **Superseded.** This is a February 2026 snapshot; several "no implementation"
+> entries have since shipped (for example `convex/sessionBootstrap.ts`). Use the
+> "Project status" table in the root `README.md` for current capability status.
+
+
 Last updated: 2026-02-09
 
 Gap analysis comparing all planning documents against current implementation.

@@ -1,5 +1,13 @@
 # Mission Control Architecture
 
+> **Superseded.** This document describes an earlier product shape (task
+> orchestrator with a Telegram entry point) and does not include the current
+> authority model — Missions, Plans, Quality Contracts, WorkOrders, Attempts,
+> Verification Subjects, Quality Gate Decisions, Factory Versions, the GitHub
+> App publisher, or the sandbox backends. See the architecture diagram and
+> "The delivery contract" section in the root `README.md` instead.
+
+
 ## System Overview
 
 ```

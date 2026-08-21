@@ -341,20 +341,20 @@ if [[ -n "$E2E_RUN_ID" ]]; then
     # Check if seed data exists
     log_info "Checking E2E seed data..."
     
-    VALIDATION_OUTPUT=$(cd "$MC_DIR" && npx convex run api.e2e.validate --arg "{\"runId\": \"$E2E_RUN_ID\"}" 2>&1)
+    VALIDATION_OUTPUT=$(cd "$MC_DIR" && npx convex run e2e:validate --arg "{\"runId\": \"$E2E_RUN_ID\"}" 2>&1)
     
     if [[ $? -ne 0 ]]; then
         log_fail "E2E validation query failed"
         log_info "Attempting to seed data..."
         
         # Try to seed
-        SEED_OUTPUT=$(cd "$MC_DIR" && npx convex run api.e2e.seed --arg "{\"runId\": \"$E2E_RUN_ID\"}" 2>&1)
+        SEED_OUTPUT=$(cd "$MC_DIR" && npx convex run e2e:seed --arg "{\"runId\": \"$E2E_RUN_ID\"}" 2>&1)
         if [[ $? -ne 0 ]]; then
             log_fail "E2E seed failed: $SEED_OUTPUT"
         else
             log_pass "E2E seed completed"
             # Re-run validation
-            VALIDATION_OUTPUT=$(cd "$MC_DIR" && npx convex run api.e2e.validate --arg "{\"runId\": \"$E2E_RUN_ID\"}" 2>&1)
+            VALIDATION_OUTPUT=$(cd "$MC_DIR" && npx convex run e2e:validate --arg "{\"runId\": \"$E2E_RUN_ID\"}" 2>&1)
         fi
     fi
     

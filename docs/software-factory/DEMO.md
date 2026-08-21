@@ -19,20 +19,26 @@ task prefix `DEMO`, repo `demo/atlas-checkout`).
 ## Commands
 
 ```bash
-mc demo seed        # seed (force: reseeds cleanly if already present)
-mc demo status      # row counts per table
-mc demo clear       # remove ALL demo rows
+# Seed (idempotent). Use the :force variant to clear and reseed.
+pnpm run convex:seed:demo
+pnpm run convex:seed:demo:force
 
-# equivalents
-pnpm run demo:seed
-pnpm run demo:clear
-npx convex run seedFactoryDemo:run '{"force":true}'
-npx convex run seedFactoryDemo:status
-npx convex run seedFactoryDemo:clear '{}'
+# Seed the demo plus Factory Memory fixtures.
+pnpm run convex:seed:demo:full
+
+# Direct Convex equivalent.
+npx convex run seedMissionControlDemo:run '{"force": true}'
 ```
 
 `run` is idempotent: if the demo project already exists and `force` is not
 set, it is a no-op. With `force: true` it clears then reseeds.
+
+> **Command names corrected.** Earlier revisions of this document referenced
+> `mc demo …`, `pnpm run demo:seed` / `demo:clear`, and a `seedFactoryDemo`
+> Convex module. None of those exist: the CLI has no `demo` subcommand, the
+> package scripts are named `convex:seed:demo*`, and the module is
+> `convex/seedMissionControlDemo.ts`, whose only export is `run`. There is no
+> separate `status` or `clear` entry point — `force: true` performs the clear.
 
 ## The seedTag cleanup guarantee
 

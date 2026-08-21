@@ -18,6 +18,7 @@ import type * as alerts from "../alerts.js";
 import type * as analytics from "../analytics.js";
 import type * as apiCollections from "../apiCollections.js";
 import type * as approvals from "../approvals.js";
+import type * as authorization from "../authorization.js";
 import type * as automationExecutions from "../automationExecutions.js";
 import type * as automationScheduler from "../automationScheduler.js";
 import type * as automations from "../automations.js";
@@ -310,6 +311,7 @@ declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
   apiCollections: typeof apiCollections;
   approvals: typeof approvals;
+  authorization: typeof authorization;
   automationExecutions: typeof automationExecutions;
   automationScheduler: typeof automationScheduler;
   automations: typeof automations;

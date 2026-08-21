@@ -163,7 +163,7 @@ and the human-gated learning continuation. This is strong implementation proof;
 it is not a claim of fleet-scale production operation or live Remote Sandbox
 certification.
 
-The current public client/backend runtime contract is **v28**.
+The current public client/backend runtime contract is **v31**.
 
 | Capability                                 | Current status                                   | Boundary                                                                                        |
 | ------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
@@ -178,7 +178,7 @@ The current public client/backend runtime contract is **v28**.
 | Generic Harness Contract                   | **Production architecture**                      | One execution-only lifecycle with exact capability admission                                    |
 | Codex adapter                              | **Production admission**                         | Canonical `codex/v1` path                                                                       |
 | DeepSeek Harness                           | **Experimental; disabled by default**            | Exact pinned local persistent-worker path only                                                  |
-| Remote Sandbox N=1                         | **Preview / Not Live Certified**                 | Deterministic Fake-provider proof only; no live exe.dev certification                           |
+| Remote Sandbox N=1                         | **Live certified with known limitations; Preview** | Certified against live exe.dev on 2026-08-17; still globally disabled and outside Guarded Auto  |
 | Loom admission                             | **Future**                                       | Configuration discovery and fixtures exist; no pinned runtime adapter                           |
 | System Qualification                       | **V1 merged; known limitations**                 | Deterministic command plus durable repository evidence; no live-provider claim                  |
 
@@ -483,13 +483,17 @@ all identities and digests, materializes the patch into a clean owned worktree,
 independently verifies the candidate, revokes the Attempt credential, and
 requires provider resource-absence proof before publication can proceed.
 
-Current status is **Preview / Not Live Certified**. The deterministic
-`FakeSandboxProvider` proves lifecycle, failure, credential revocation,
-materialization, independent verification, publication handoff, and cleanup
-without provider spend. It does not certify live exe.dev capacity, isolation,
-credentials, teardown, or operational readiness.
+Current status is **Live certified with known limitations**, and it remains
+**Preview**: globally disabled and unavailable to Guarded Auto routing. The
+security and cleanup boundaries passed against live exe.dev on 2026-08-17. The
+deterministic `FakeSandboxProvider` still proves lifecycle, failure, credential
+revocation, materialization, independent verification, publication handoff, and
+cleanup without provider spend, and the complete canonical
+`FactoryAttemptWorker` lease → verification → publication path remains proven by
+the fake provider rather than by an external product pull request.
 
-See [Remote Sandbox Runtime](docs/software-factory/remote-sandbox-runtime.md).
+See [Remote Sandbox Runtime](docs/software-factory/remote-sandbox-runtime.md)
+and the [live certification record](docs/software-factory/remote-sandbox-live-certification-v1.md).
 
 ### 7. Factory Memory and Context Packages
 
@@ -703,13 +707,22 @@ results.
 Merge and production promotion remain human decisions. The deterministic
 full-system V1 qualification now composes this golden path with worker/runtime,
 memory, policy-v2 verification, exact currentness, Remote Sandbox abstraction,
-observability, and learning. Live Remote Sandbox certification, additional Git
-providers, and hundred-agent operation remain unqualified.
+observability, and learning. The deterministic qualification command itself uses
+`FakeSandboxProvider`; live Remote Sandbox behaviour is covered separately by
+the [live certification record](docs/software-factory/remote-sandbox-live-certification-v1.md).
+Additional Git providers and hundred-agent operation remain unqualified.
 
 ## Operator surfaces
 
-The EOS V2 shell uses a route-maturity registry. Live routes are available by
-default; Preview and Demo routes remain labeled and can be hidden.
+The EOS V2 shell uses a route-maturity registry. Every route is labeled with its
+maturity (`Preview`, `Demo`, `Global`) in navigation, always. Whether non-Live
+routes are additionally *hidden* depends on the `eos.command-center-preview`
+project flag: with it enabled the navigation is the curated EOS route set below
+and Preview/Demo routes are hidden unless `ui.navigation.previews` /
+`ui.navigation.demo-routes` are also enabled. With it disabled — the shipped
+default — the broader legacy navigation is shown, and the non-Live routes in it
+are labeled rather than hidden. Only the routes marked Live in the table below
+are governed, Convex-backed operator surfaces.
 
 The screenshots below use the deterministic `sf-demo` fixture. Counts,
 timestamps, names, and outcomes are demonstration data—not measured production
@@ -816,6 +829,34 @@ HTTP actions—there is no separate Express REST backend.
 | `workflows/`                 | Versioned YAML workflow definitions                                                                                              |
 | `scripts/mc`                 | Mission Control CLI                                                                                                              |
 | `docs/`                      | Product doctrine, architecture, security contracts, plans, and verification evidence                                             |
+| `agents/`, `roles/`, `skills/`, `templates/`, `automations/` | Agent, role, skill, and automation definitions loaded by the orchestration service and skill linter          |
+| `tests/`                     | Playwright browser and accessibility specs                                                                                       |
+| `todos/`                     | Tracked delivery items with explicit status front matter                                                                         |
+| `api/`                       | Vercel serverless entry points for the deployed UI                                                                               |
+
+### Current versus superseded top-level documents
+
+Only four top-level Markdown files are current doctrine: **`README.md`**,
+**`CLAUDE.md`**, **`AGENTS.md`**, and **`SKILL.md`**.
+
+The remaining root-level `*.md` files (`FINAL_STATUS.md`, `FIXES_SUMMARY.md`,
+`VIEWS_FIXED.md`, `CHAT_*.md`, `QC_*.md`, `WORKFLOW_*.md`,
+`LEAD_AGENT_SYSTEM_DEPLOYED.md`, `UNIFIED_SCHEMA_MAPPING.md`,
+`MIGRATION_PLAN.md`, `FORK_BOUNDARY.md`, `ARM_PRD_REVIEW.md`,
+`MISSION_STATEMENT_FEATURE.md`, `SELLERFI_PROFITFOUNDER_UPGRADE.md`) are
+**superseded session artifacts from an earlier product shape**. They describe a
+task-orchestrator with CRM/Telegram/meetings surfaces and an abandoned "ARM"
+merge, and several of their claims are demonstrably stale — for example
+`UNIFIED_SCHEMA_MAPPING.md` states 55 tables where `convex/schema.ts` now
+defines 190, and `LEAD_AGENT_SYSTEM_DEPLOYED.md` references a
+`convex/agents/schema.ts` that does not exist. They are retained for history;
+do not treat them as current architecture. The same applies to the legacy
+guides under `docs/guides/` (`GETTING_STARTED.md`, `START_HERE.md`,
+`DEPLOY_NOW.md`, `QUICK_START_NOW.md`, `TELEGRAM_*.md`, `SELLERFI_AGENTS_GUIDE.md`,
+`EDITING_GUIDE.md`, `PROJECTS_GUIDE.md`) and to `docs/ARCHITECTURE.md` and
+`docs/PLAN_VS_REALITY.md`; the current run/troubleshoot guides are
+`docs/guides/RUN.md`, `docs/guides/TROUBLESHOOTING.md`, and
+`docs/guides/governed-production-release.md`.
 
 ## Technology
 
@@ -832,7 +873,8 @@ HTTP actions—there is no separate Express REST backend.
 
 ### Prerequisites
 
-- Node.js 18 or newer; Node 20 matches CI
+- Node.js 20.6 or newer; Node 20 matches CI. `pnpm run dev:demo` and
+  `pnpm run workflows:seed` use `node --env-file`, which requires 20.6+
 - pnpm 9 or newer; the repository pins `pnpm@9.0.0`
 - Git
 - A Convex development deployment
@@ -913,7 +955,10 @@ GitHub or remote-provider credentials.
 | Canonical worker        | `CODEX_FACTORY_WORKER_ENABLED`, `CODEX_WORKER_PROJECT_ID`, `CODEX_WORKER_REPOSITORY_ID`, `CODEX_WORKER_CHECKOUT_ROOT`, `CODEX_WORKER_HOST_ID`, `CODEX_WORKER_MAX_CONCURRENT_RUNS` | Keep disabled until repository, Factory, GitHub App, and worker readiness are current                                  |
 | Harness runtime         | `CODEX_EXECUTABLE`; optional DeepSeek enablement and exact checkout root                                                                                                          | DeepSeek is experimental and disabled by default                                                                       |
 | GitHub App              | `GITHUB_APP_ID`, private key or key-file path, OAuth client values, and `GITHUB_WEBHOOK_SECRET`                                                                                   | Follow the [GitHub App contract](docs/security/github-app-connection.md); use repository-scoped installation authority |
-| Remote Sandbox          | `CODEX_WORKER_REMOTE_SANDBOX_ENABLED`, `EXEDEV_IDENTITY_FILE`, `OPENROUTER_MANAGEMENT_API_KEY`                                                                                    | Preview only; configuration does not establish live certification                                                      |
+| Remote Sandbox          | `CODEX_WORKER_REMOTE_SANDBOX_ENABLED`, `EXEDEV_IDENTITY_FILE`, `OPENROUTER_MANAGEMENT_API_KEY`                                                                                    | Preview only; configuration does not enable rollout                                                                    |
+| Browser origin          | `MISSION_CONTROL_APP_URL`, `VITE_ORCHESTRATION_URL`                                                                                                                              | Scopes orchestration CORS and the Gateway WebSocket upgrade allowlist; comma-separated for multiple origins            |
+| Revenue webhook         | `STRIPE_WEBHOOK_SECRET`                                                                                                                                                          | `/stripe/webhook` fails closed with 503 until it is set; signatures older than 5 minutes are rejected                   |
+| Model providers         | `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, optional local `*_BASE_URL` values                                                                                                        | Convex deployment only; never `VITE_`-prefixed                                                                         |
 
 Project flags such as `missions.spec-intake-v1` and the five
 `factory-memory.*` phases are stored and authorized in the control plane, not
@@ -942,7 +987,7 @@ pnpm run smoke:orchestration-start
 
 ## Built-in workflows
 
-The repository includes six YAML workflow definitions:
+The repository includes seven YAML workflow definitions:
 
 - `feature-dev`
 - `bug-fix`
@@ -950,6 +995,7 @@ The repository includes six YAML workflow definitions:
 - `security-audit`
 - `quality-audit`
 - `loop-engineering`
+- `continuous-research`
 
 They are installed into the versioned workflow catalog and snapshotted onto
 Attempts so later catalog edits do not rewrite execution history.
@@ -999,6 +1045,11 @@ pnpm run build
 pnpm run smoke:orchestration-start
 pnpm run ci:runtime-contract
 ```
+
+`pnpm run typecheck` builds the workspace packages, typechecks every workspace,
+and typechecks `convex/` against `convex/tsconfig.json`. `pnpm run lint` runs
+that same typecheck plus the skill-quality linter — the repository has no
+ESLint/Biome configuration, so "lint" does not mean stylistic JS/TS linting.
 
 Critical browser checks:
 
@@ -1093,6 +1144,8 @@ Start with the [Mission Control North Star](docs/product/mission-control-north-s
 - [Factory Memory and Context Intelligence](docs/architecture/factory-memory-context-intelligence.md)
 - [Factory Learning and Continuous Improvement](docs/architecture/factory-learning-continuous-improvement.md)
 - [System Qualification V1 Evidence](docs/testing/evidence/system-factory-e2e-v1/README.md)
+- [Authorization: boundary wrappers, rollout, and the CI ratchet](docs/AUTHORIZATION.md)
+- [Evidence, and what Mission Control refuses to invent](docs/EVIDENCE_AND_FABRICATION.md)
 
 ## Product doctrine
 

@@ -39,7 +39,7 @@ fi
 # Run cleanup
 echo "🗑️  Cleaning up E2E data..."
 
-CLEANUP_OUTPUT=$(cd "$MC_DIR" && npx convex run api.e2e.cleanup --arg "{\"runId\": \"$RUN_ID\"}" 2>&1)
+CLEANUP_OUTPUT=$(cd "$MC_DIR" && npx convex run e2e:cleanup --arg "{\"runId\": \"$RUN_ID\"}" 2>&1)
 
 if [[ $? -ne 0 ]]; then
     echo "❌ Cleanup failed:"

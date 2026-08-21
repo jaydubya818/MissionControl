@@ -30,11 +30,11 @@
 - Frontend stack: React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui.
 - Product vision: enterprise-grade agentic mission control where one operator runs 20+ parallel epics with full visibility into tasks, agents, branches, reviews, and blockers.
 - Software Factory demo runs from **main repo** with `pnpm run dev:demo` (port 5199, EOS Command Center); seed version `mc-demo-v2` via `pnpm convex:seed:demo:force` (project slug `sf-demo`, Atlas Checkout narrative).
-- V2 operator shell lives at `/v2/*` with flags `VITE_FLAG_UI_SHELL_V2` and `VITE_FLAG_CONTEXT_REGISTRY`.
+- V2 operator shell lives at `/v2/*` and is the default. The `ui.shell.v2` and `context.registry` flags are registered but never read, so the `VITE_FLAG_UI_SHELL_V2` / `VITE_FLAG_CONTEXT_REGISTRY` overrides set by `dev:demo` and `playwright.config.ts` have no effect. The live gate is the opt-*out* `ui.shell.v1` read in `App.tsx`; the EOS navigation set is gated by the `eos.command-center-preview` project flag.
 - EOS v2 nav splits Delivery into Work Orders (`control-work-orders`) and Tasks (`/v2/tasks`); experimental views live in a collapsed Labs group; Control Portfolio/Fleet stubs hidden unless `ui.control.stubs=true`.
 - Memory page includes an Agentic-KB knowledge graph overlay (Graph tab), imported from `~/Agentic-KB/graphify-out/graph.json`.
 - Tessl-style docs site at `docs/site/`; browsed in-app via Knowledge → Docs → Documentation tab.
-- Harness engineering UI lives in `apps/mission-control-ui/src/harness/` (12 views under Control + Intelligence nav groups).
+- Harness engineering UI lives in `apps/mission-control-ui/src/harness/` (19 views under Control + Intelligence nav groups; only a subset has a declared route capability and is reachable when EOS enforcement is on).
 - Orchestration server (port 4100) ingests Pi receipt packets at `POST /workorders/:id/receipt-packets` when `executor.pi-bridge` flag is enabled.
 - `mc-context scan` (scripts/mc-context.mjs) discovers local SKILL.md files and syncs installations to Convex.
 

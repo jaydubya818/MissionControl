@@ -37,7 +37,11 @@ test("mobile shell keeps navigation and chat off canvas", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open chat" })).toBeVisible();
 
-  await expect(page.getByText("No work orders match the current filters.", { exact: true })).toBeVisible();
+  // This shell-only suite runs without a Convex backend, so the Work Orders
+  // query never resolves. The queue must say so rather than claiming the
+  // workspace is empty — "no results" and "not loaded yet" are different
+  // operator facts.
+  await expect(page.getByText("Loading Work Orders…", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Open navigation" }).click();
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();

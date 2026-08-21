@@ -91,6 +91,11 @@ jobs:
         env:
           RUNTIME_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
+      # Ratchet: a new internet-callable Convex function with no server-side
+      # authorization fails the build. The baseline may only shrink.
+      - name: Guard Convex authorization boundary
+        run: pnpm run security:authorization
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest

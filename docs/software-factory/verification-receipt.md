@@ -9,7 +9,7 @@ Create and inspect a first-class WorkOrder with acceptance criteria and linked E
 | Criterion | Result | Evidence |
 | --- | --- | --- |
 | A first-class WorkOrder schema exists | PASS | `convex/schema.ts`, `convex/workOrders.ts` |
-| WorkOrders can be queried and created | PASS | `convex/workOrders.ts`, `npx convex run workOrders:seedDemo "{}"` |
+| WorkOrders can be queried and created | PASS | `convex/workOrders.ts`, `npx convex run workOrders:seedDemo '{"projectId": "<your workspace id>"}'` |
 | Execution runs can link directly to a WorkOrder | PASS | `convex/schema.ts`, `convex/workflowRuns.ts` |
 | A Work Queue UI exists in the main product shell | PASS | `apps/mission-control-ui/src/controlPlane/WorkOrdersView.tsx`, screenshot `tmp/work-orders-queue.png` |
 | WorkOrder detail shows outcome, acceptance criteria, and linked runs | PASS | `apps/mission-control-ui/src/controlPlane/WorkOrdersView.tsx`, screenshot `tmp/work-orders-detail-selected.png` |
@@ -21,7 +21,7 @@ Create and inspect a first-class WorkOrder with acceptance criteria and linked E
 
 ```bash
 npx convex codegen --typecheck disable
-npx convex run workOrders:seedDemo "{}"
+npx convex run workOrders:seedDemo '{"projectId": "<your workspace id>"}'
 pnpm exec vitest run convex/__tests__/workOrders.test.ts apps/mission-control-ui/src/controlPlane/workOrdersModel.test.ts
 pnpm --filter mission-control-ui typecheck
 pnpm --filter mission-control-ui build

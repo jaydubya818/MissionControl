@@ -1,5 +1,12 @@
 # Getting Started with Mission Control
 
+> **Superseded.** The "Project Structure" and build steps below reference
+> packages (`packages/api`, `packages/ui`, `packages/workers`) and documents
+> that do not exist, and instruct building an Express REST API that the current
+> architecture explicitly rejects — Convex is the only backend. Use the
+> "Local development" section of the root `README.md` and `docs/guides/RUN.md`.
+
+
 **Welcome to Mission Control for OpenClaw!**
 
 This guide will help you understand the project structure and get started with development.

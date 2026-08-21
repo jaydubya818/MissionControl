@@ -30,7 +30,7 @@ cleanup_on_exit() {
     fi
 
     log_info "Emergency cleanup for interrupted run $RUN_ID..."
-    if npx convex run api.e2e.cleanup "{\"runId\": \"$RUN_ID\"}" >/dev/null 2>&1; then
+    if npx convex run e2e:cleanup "{\"runId\": \"$RUN_ID\"}" >/dev/null 2>&1; then
         log_pass "Interrupted E2E data cleaned up"
     else
         log_fail "Emergency E2E cleanup failed for $RUN_ID"
@@ -72,7 +72,7 @@ echo ""
 # ============================================================================
 log_info "TEST 1: Seeding E2E data..."
 
-SEED_RESULT=$(npx convex run api.e2e.seed "{\"runId\": \"$RUN_ID\"}") || {
+SEED_RESULT=$(npx convex run e2e:seed "{\"runId\": \"$RUN_ID\"}") || {
     log_fail "E2E seed failed"
     exit 1
 }
@@ -94,7 +94,7 @@ fi
 echo ""
 log_info "TEST 2: Validating seed data..."
 
-VALIDATE_RESULT=$(npx convex run api.e2e.validate "{\"runId\": \"$RUN_ID\"}") || {
+VALIDATE_RESULT=$(npx convex run e2e:validate "{\"runId\": \"$RUN_ID\"}") || {
     log_fail "E2E validation failed"
     exit 1
 }
@@ -191,7 +191,7 @@ fi
 echo ""
 log_info "TEST 8: Cleaning up E2E data..."
 
-CLEANUP_RESULT=$(npx convex run api.e2e.cleanup "{\"runId\": \"$RUN_ID\"}") || {
+CLEANUP_RESULT=$(npx convex run e2e:cleanup "{\"runId\": \"$RUN_ID\"}") || {
     log_fail "E2E cleanup failed"
 }
 

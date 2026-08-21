@@ -13,6 +13,7 @@
  *   node scripts/import-knowledge-graph.mjs --project-slug sf-demo
  */
 
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
@@ -71,12 +72,33 @@ if (projectSlug) {
   projectId = project._id;
 }
 
-const result = await client.mutation("knowledgeGraph:importGraphifyJson", {
+// `knowledgeGraph:importGraphifyJson` is an `internalMutation`: it writes
+// governed knowledge-graph state and has no browser caller, so it is not
+// internet-callable. `ConvexHttpClient` cannot address internal functions —
+// this line used to be a `client.mutation(...)` and broke when the function was
+// made internal. `npx convex run` authenticates with deployment admin
+// credentials and can, which is the same path the seeders and migrations use.
+const importArgs = JSON.stringify({
   projectId,
   source: "agentic-kb",
   payload,
   idempotencyKey: `knowledge-graph:agentic-kb:${contentHash.slice(0, 16)}`,
 });
+const run = spawnSync("npx", ["convex", "run", "knowledgeGraph:importGraphifyJson", importArgs], {
+  encoding: "utf8",
+  cwd: join(dirname(fileURLToPath(import.meta.url)), ".."),
+});
+if (run.status !== 0) {
+  console.error(run.stderr?.trim() || "convex run failed");
+  process.exit(1);
+}
+const result = (() => {
+  try {
+    return JSON.parse(run.stdout.trim().split("\n").pop() ?? "{}");
+  } catch {
+    return { output: run.stdout.trim() };
+  }
+})();
 
 console.log("Knowledge graph import complete:");
 console.log(

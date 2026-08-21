@@ -40,7 +40,7 @@ echo ""
 # Create seed data via Convex mutation
 echo "🌱 Seeding E2E data..."
 
-SEED_OUTPUT=$(cd "$MC_DIR" && npx convex run api.e2e.seed --arg "{\"runId\": \"$RUN_ID\"}" 2>&1)
+SEED_OUTPUT=$(cd "$MC_DIR" && npx convex run e2e:seed --arg "{\"runId\": \"$RUN_ID\"}" 2>&1)
 
 if [[ $? -ne 0 ]]; then
     echo "❌ Seed failed:"

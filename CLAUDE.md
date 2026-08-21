@@ -8,7 +8,7 @@
 
 **MissionControl** is a Turbo monorepo orchestration platform managing AI agent workflows.
 
-- **Monorepo:** Turbo + pnpm workspaces
+- **Monorepo:** pnpm workspaces (`turbo` is declared but only drives `pnpm run clean`; build/test/typecheck run through `pnpm -r`)
 - **Apps:** `mission-control-ui` (dashboard), `orchestration-server` (agent routing), `workflow-executor` (task runner)
 - **Backend:** Convex (real-time DB + functions)
 - **Task Management:** TaskmasterAI
@@ -38,12 +38,15 @@ The orchestration-server routes agent tasks. Errors here cascade.
 ## Dev Commands
 
 ```bash
-pnpm dev              # start all apps
-pnpm dev:ui           # UI only
+pnpm dev               # start all apps
+pnpm dev:ui            # UI only
 pnpm dev:orchestration # orchestration server only
-pnpm test             # unit tests
-pnpm test:integration # integration tests
-pnpm build            # full build
+pnpm test              # every workspace suite + Convex contract suite + script suites
+pnpm test:integration  # orchestration-server + workflow-engine + Convex suites
+pnpm typecheck         # workspaces AND convex/ (convex has no build step)
+pnpm lint              # typecheck + skill-quality linter (no ESLint/Biome in this repo)
+pnpm build             # full build
+pnpm run qualify:factory # deterministic full-system V1 qualification
 ```
 
 ---

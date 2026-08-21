@@ -23,12 +23,14 @@
     "build": "pnpm -r --if-present run build",
     "build:workspaces": "pnpm -r --filter './packages/*' build",
     "smoke:orchestration-start": "pnpm run ci:prepare && pnpm --filter @mission-control/orchestration-server build && pnpm --filter @mission-control/orchestration-server smoke:start",
-    "test": "pnpm run ci:prepare && pnpm -r --if-present run test && pnpm exec vitest run convex/__tests__",
-    "test:integration": "npx vitest run",
+    "test": "pnpm run ci:prepare && pnpm -r --if-present run test && pnpm exec vitest run convex/__tests__ && pnpm run test:scripts",
+    "test:scripts": "node --test scripts/governed-vercel-production.test.mjs scripts/local-golden-path-candidate.test.mjs scripts/lib/agent-config-registry.test.mjs",
+    "test:integration": "pnpm run ci:prepare && pnpm --filter @mission-control/orchestration-server test && pnpm --filter @mission-control/workflow-engine test && pnpm exec vitest run convex/__tests__",
     "test:e2e:arm": "npx playwright test -c playwright.config.ts tests/e2e/arm-ui.e2e.spec.ts",
     "test:e2e:critical": "npx playwright test -c playwright.config.ts tests/e2e/critical-accessibility.e2e.spec.ts tests/e2e/dashboard-smoke.e2e.spec.ts tests/e2e/v2-routes-smoke.e2e.spec.ts",
     "lint": "pnpm run typecheck && node scripts/skill-lint.mjs",
-    "typecheck": "pnpm run ci:prepare && pnpm -r --if-present run typecheck",
+    "typecheck": "pnpm run ci:prepare && pnpm -r --if-present run typecheck && pnpm run typecheck:convex",
+    "typecheck:convex": "tsc -p convex/tsconfig.json --noEmit",
     "clean": "turbo run clean && rm -rf node_modules",
     "setup": "pnpm install && pnpm run build",
     "convex:dev": "npx convex dev",
@@ -80,7 +82,7 @@
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=20.6.0",
     "pnpm": ">=9.0.0"
   },
   "pnpm": {

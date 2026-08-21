@@ -3,7 +3,35 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 
-const PUBLIC_BUILDERS = new Set(["query", "mutation", "action"]);
+/**
+ * Every builder that produces an internet-callable Convex function.
+ *
+ * The authorization wrappers in `convex/lib/authedFunctions.ts` return a real
+ * `query`/`mutation`, so a function declared with `workspaceQuery` is just as
+ * public — and just as contract-breaking to change — as one declared with
+ * `query`. Omitting them here would have made the runtime contract guard blind
+ * to exactly the functions the authorization migration is moving onto.
+ *
+ * Note the wrappers inject scope arguments (`projectId` / `tenantId`) that do
+ * not appear in the literal `args` object, so a function's canonical args
+ * change when it is converted to a wrapper. That is correct: converting a
+ * function to a wrapper IS a breaking contract change for existing clients.
+ */
+const PUBLIC_BUILDERS = new Set([
+  "query",
+  "mutation",
+  "action",
+  "authedQuery",
+  "authedMutation",
+  "workspaceQuery",
+  "workspaceMutation",
+  "companyQuery",
+  "companyMutation",
+  "adminQuery",
+  "adminMutation",
+  "publicQuery",
+  "publicMutation",
+]);
 const VERSION_FILE = "convex/lib/runtimeContract.ts";
 const VERSION_EXPORT = "RUNTIME_CONTRACT_VERSION";
 

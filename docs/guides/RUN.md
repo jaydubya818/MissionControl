@@ -3,7 +3,7 @@
 Exact commands to run Mission Control locally.
 
 > **Software Factory demo (v2 shell + EOS Command Center + registry):** see the root
-> [README § Software Factory Demo](../README.md#software-factory-demo-local-end-to-end).
+> [README § Deterministic Software Factory demo](../../README.md#deterministic-software-factory-demo).
 > Run `pnpm run dev:demo` from the main repo (UI on **http://localhost:5199**).
 > This command starts Convex, the workflow graph executor, and the UI together.
 > Legacy worktree flow (`sf-19-ui-migration` + `sf-90-demo`) still works but is optional.
