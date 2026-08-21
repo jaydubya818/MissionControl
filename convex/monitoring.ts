@@ -5,6 +5,8 @@
  */
 
 import { v } from "convex/values";
+import { requireAuthorizedDeliveryScope } from "./lib/deliveryAuthorization";
+import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
 import { mutation, query } from "./_generated/server";
 
 // ============================================================================
@@ -107,6 +109,12 @@ export const logPerformance = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    // Client-supplied `success` feeds the performance projections operators read.
+    // Authority class: SYSTEM OBSERVATION. It is not evidence and must
+    // never be read as verification, but it is still operator-visible
+    // state and must not be writable by the internet.
+    await requireAuthorizedDeliveryScope(ctx, args.projectId, COMPANY_PERMISSIONS.DISPATCH_WORK);
+
     await ctx.db.insert("activities", {
       projectId: args.projectId,
       actorType: "SYSTEM",

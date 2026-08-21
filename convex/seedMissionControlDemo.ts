@@ -10,7 +10,13 @@
  *   npx convex run seedMissionControlDemo:run
  */
 
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
+// INTERNAL ONLY. Convex `query`/`mutation`/`action` exports are internet-callable
+// by anyone holding the deployment URL (shipped to the browser as
+// `VITE_CONVEX_URL`). Everything here is destructive, deployment-wide, or
+// fixture tooling with no browser caller, so it is declared `internal*`.
+// Operators still invoke these through `npx convex run`, which authenticates
+// with deployment admin credentials and can call internal functions.
 import type { Id } from "./_generated/dataModel";
 import { computeGenomeHash } from "./lib/genomeHash";
 import { seedDemoExtensions } from "./lib/demoSeedExtensions";
@@ -746,7 +752,7 @@ async function collectCounts(ctx: any, projectId: Id<"projects">, tenantId: Id<"
   };
 }
 
-export const run = mutation({
+export const run = internalMutation({
   args: {
     force: v.optional(v.boolean()),
   },
@@ -2556,7 +2562,11 @@ export const run = mutation({
         initiatorId: i % 4 === 2 ? pick(allAgents, i)._id : undefined,
         findingCounts,
         gatePassed: status === "COMPLETED" ? riskGrade !== "RED" : undefined,
-        evidenceHash: status === "COMPLETED" ? `sha256:${Math.random().toString(36).substring(2)}` : undefined,
+        // Deliberately NOT shaped like a digest. This used to read
+        // `sha256:${Math.random()...}`, which is indistinguishable from a real
+        // content hash to every reader and verifier, while hashing nothing.
+        // Seeded runs have no evidence, and the value now says so.
+        evidenceHash: status === "COMPLETED" ? `seed-fixture-no-evidence:${runId}` : undefined,
         startedAt,
         completedAt,
         durationMs,

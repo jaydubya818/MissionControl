@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
 import { api } from "./_generated/api";
+import { executionRunnerUnavailable } from "./execution";
 
 function buildWorkflowId(): string {
   return `hyb_${Math.random().toString(36).slice(2, 10)}`;
@@ -81,34 +82,12 @@ export const execute: any = action({
     id: v.id("hybridWorkflows"),
     executedBy: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<any> => {
+  handler: async (ctx, args): Promise<never> => {
     const workflow = await ctx.runQuery(api.hybridWorkflows.get, { id: args.id });
     if (!workflow) throw new Error("Hybrid workflow not found");
-
-    const apiSteps = workflow.apiSetupSteps.map((step: any, index: number) => ({
-      name: String((step as { title?: string }).title ?? `api-step-${index + 1}`),
-    }));
-
-    const execution = await ctx.runAction(api.execution.executeHybrid, {
-      projectId: workflow.projectId,
-      executedBy: args.executedBy,
-      apiSteps,
-      uiCommands: workflow.uiValidationSteps,
-    });
-
-    await ctx.runMutation(api.execution.storeResult, {
-      projectId: workflow.projectId,
-      executionType: "hybrid",
-      workflowId: args.id,
-      steps: (execution.steps as unknown[]) ?? [],
-      totalTime: Number(execution.totalTime ?? 0),
-      passed: Number(execution.passed ?? 0),
-      failed: Number(execution.failed ?? 0),
-      success: Boolean(execution.success),
-      context: execution.context,
-      executedBy: args.executedBy,
-    });
-
-    return execution;
+    // Previously: `execution.executeHybrid` invented a per-step verdict for
+    // every API step and marked every UI command "passed" without running one,
+    // then persisted the totals to `executionResults`. Fail closed instead.
+    throw executionRunnerUnavailable();
   },
 });

@@ -32,10 +32,35 @@ import {
   finishAttemptTrace,
   recordRunEventObservation,
 } from "./lib/observabilityPersistence";
+import { safeLinkHref } from "./lib/outboundUrlPolicy";
 
 // ============================================================================
 // HELPERS
 // ============================================================================
+
+/**
+ * Mark a VERIFICATION-purpose Attempt as superseded when it reaches a
+ * non-COMPLETED terminal state.
+ *
+ * A Verification Subject is immutable, so `schedulePolicyV2VerificationAttempt`
+ * refuses to create a second Attempt while a non-superseded one exists for the
+ * same subject digest, and `evaluateCurrentVerificationEligibility` denies on a
+ * newest-FAILED/CANCELED Attempt. Without this marker the candidate becomes
+ * permanently unverifiable — and therefore permanently unacceptable.
+ *
+ * Safe against resurrecting an older pass: a COMPLETED Attempt is never
+ * superseded, and the scheduler will not create a sibling while one exists.
+ */
+function markVerificationAttemptSuperseded(
+  run: { attemptPurpose?: string; metadata?: any },
+  status: string,
+  now: number,
+): Record<string, unknown> | null {
+  if (run.attemptPurpose !== "VERIFICATION") return null;
+  if (status === "COMPLETED") return null;
+  if (run.metadata?.verificationSupersededAt) return null;
+  return { metadata: { ...(run.metadata ?? {}), verificationSupersededAt: now } };
+}
 
 function generateRunId(): string {
   // Generate short 8-character ID (similar to Antfarm's run IDs)
@@ -223,6 +248,13 @@ async function insertRunArtifact(ctx: any, args: {
     if (existing) return { artifact: existing, created: false };
   }
 
+  // `externalLocation` is rendered as an operator-clickable link. Agent and
+  // harness output is untrusted, so only http(s) destinations are stored;
+  // anything else (javascript:, data:, file:) is dropped rather than persisted.
+  const externalLocation = args.externalLocation === undefined
+    ? undefined
+    : safeLinkHref(args.externalLocation) ?? undefined;
+
   const artifactId = await ctx.db.insert("runArtifacts", {
     tenantId: args.tenantId,
     projectId: args.projectId,
@@ -233,7 +265,7 @@ async function insertRunArtifact(ctx: any, args: {
     name: args.name,
     description: args.description,
     repositoryPath: args.repositoryPath,
-    externalLocation: args.externalLocation,
+    externalLocation,
     contentHash: args.contentHash,
     producer: args.producer,
     verificationReceiptId: args.verificationReceiptId,
@@ -1146,6 +1178,22 @@ export const recordEventInternal = internalMutation({
   },
 });
 
+/**
+ * Create a run artifact and, optionally, splice it into a verification receipt.
+ *
+ * This had no authorization: `convex/workflowRuns.ts` contains zero permission
+ * calls. Anyone holding the deployment URL could insert a `runArtifacts` row
+ * with an arbitrary `contentHash` and `producer`, then attach it to an existing
+ * verification receipt's `linkedRunArtifactIds` — i.e. inject fabricated
+ * evidence into a real receipt. Note the contrast with
+ * `workOrders.recordVerificationReceipt`, which carefully validates that linked
+ * artifacts belong to the run; that validation was worth little while the
+ * artifact itself could be created by anyone.
+ *
+ * `contentHash` remains caller-supplied because only the producer has the
+ * bytes — but the caller must now hold dispatch authority in the run's own
+ * workspace, and the producing actor is recorded server-side.
+ */
 export const createArtifact = mutation({
   args: {
     workflowRunId: v.id("workflowRuns"),
@@ -1169,6 +1217,7 @@ export const createArtifact = mutation({
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
     if (!run) throw new Error("Workflow run not found");
+    await requireAuthorizedDeliveryScope(ctx, run.projectId, COMPANY_PERMISSIONS.DISPATCH_WORK);
     const result = await insertRunArtifact(ctx, {
       ...args,
       workOrderId: run.workOrderId,
@@ -1199,6 +1248,7 @@ export const createArtifact = mutation({
   },
 });
 
+/** Attach an existing artifact to a verification receipt. Same authority as creating one. */
 export const linkArtifactToVerificationReceipt = mutation({
   args: {
     runArtifactId: v.id("runArtifacts"),
@@ -1210,6 +1260,7 @@ export const linkArtifactToVerificationReceipt = mutation({
       ctx.db.get(args.verificationReceiptId),
     ]);
     if (!artifact || !receipt) throw new Error("Artifact or verification receipt not found");
+    await requireAuthorizedDeliveryScope(ctx, artifact.projectId, COMPANY_PERMISSIONS.DISPATCH_WORK);
     if (artifact.workflowRunId !== receipt.workflowRunId || artifact.workOrderId !== receipt.workOrderId) {
       throw new Error("Artifact and verification receipt must belong to the same run and work order");
     }
@@ -1564,6 +1615,7 @@ export const requestCancellation = mutation({
 
     const steps = reconcileTerminalWorkflowSteps(run.steps, "CANCELED", reason, now);
     await ctx.db.patch(run._id, {
+      ...(markVerificationAttemptSuperseded(run, "CANCELED", now) ?? {}),
       status: "CANCELED",
       steps,
       completedAt: now,
@@ -1654,6 +1706,11 @@ export const updateStatus = mutation({
       updates.lease = undefined;
       updates.reservedCostUsd = 0;
     }
+
+    Object.assign(
+      updates,
+      markVerificationAttemptSuperseded(run, args.status, Date.now()) ?? {},
+    );
 
     if (args.status === "FAILED" || args.status === "CANCELED") {
       updates.steps = reconcileTerminalWorkflowSteps(

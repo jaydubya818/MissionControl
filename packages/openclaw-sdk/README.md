@@ -42,6 +42,7 @@ client.onTask('CODE_CHANGE', async (context) => {
     summary: 'Completed the code change',
     artifactIds: ['file1.ts', 'file2.ts'],
     evidence: 'All tests passing',
+    usage: { inputTokens: 8_412, outputTokens: 1_903, costUsd: 0.0412 }, // measured, never estimated
   };
 });
 
@@ -110,6 +111,7 @@ client.onTask('CUSTOMER_RESEARCH', async (context) => {
   return {
     summary: 'Research complete',
     artifactIds: ['report.md'],
+    usage: { inputTokens: 8_412, outputTokens: 1_903, costUsd: 0.0412 }, // measured, never estimated
   };
 });
 ```
@@ -121,6 +123,7 @@ client.onAnyTask(async (context) => {
   // Handle any task type
   return {
     summary: `Completed ${context.task.type} task`,
+    usage: { inputTokens: 8_412, outputTokens: 1_903, costUsd: 0.0412 }, // measured, never estimated
   };
 });
 ```
@@ -166,7 +169,7 @@ client.onTask('CODE_CHANGE', async (context) => {
   }
   
   // Continue with work...
-  return { summary: 'Done!' };
+  return { summary: 'Done!', usage: reportedUsage }; // usage is required
 });
 ```
 
@@ -190,6 +193,7 @@ client.onTask('RESEARCH', async (context) => {
   return {
     summary: 'Research complete',
     evidence: 'Analyzed 100+ sources',
+    usage: { inputTokens: 8_412, outputTokens: 1_903, costUsd: 0.0412 }, // measured, never estimated
   };
 });
 ```
@@ -370,7 +374,11 @@ Check:
 Check:
 - Run started with `startTask()`
 - Run completed with `completeTask()`
-- Cost passed to `completeTask()`
+- `deliverable.usage` populated with the harness's **measured** `inputTokens`,
+  `outputTokens` and `costUsd`. This is required — `completeTask()` throws
+  without it. The SDK does not estimate or default these values, because a
+  guessed number is indistinguishable from a measured one once it reaches the
+  cost dashboards.
 
 ## API Reference
 
@@ -385,7 +393,7 @@ Check:
 - `heartbeat(): Promise<HeartbeatResult>` - Manual heartbeat
 - `claimTask(taskId): Promise<Task>` - Claim specific task
 - `startTask(taskId, workPlan): Promise<Run>` - Start task
-- `completeTask(taskId, deliverable, cost): Promise<void>` - Complete task
+- `completeTask(taskId, deliverable): Promise<void>` - Complete task. `deliverable.usage` (measured tokens + `costUsd`) is required.
 - `requestApproval(...)` - Request approval
 - `postComment(taskId, content)` - Post comment
 

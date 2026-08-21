@@ -3,6 +3,7 @@
  */
 
 import { v } from "convex/values";
+import { authedMutation } from "./lib/authedFunctions";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { resolveAgentRef } from "./lib/agentResolver";
@@ -39,22 +40,35 @@ export const listByTask = query({
 // MUTATIONS
 // ============================================================================
 
-export const post = mutation({
+/**
+ * Post a task comment.
+ *
+ * `authorUserId` used to be a caller-supplied string, and the only caller sent
+ * the literal `"operator"`. That string was written to the comment AND used as
+ * `activities.actorId` — i.e. the audit trail's author was chosen by whoever
+ * made the request. Anyone holding the deployment URL could post a comment
+ * attributed to any name they liked.
+ *
+ * The human author is now the authenticated operator, resolved server-side.
+ * Actor identity is never an argument.
+ */
+export const post = authedMutation({
   args: {
     taskId: v.id("tasks"),
     content: v.string(),
     authorType: v.union(v.literal("AGENT"), v.literal("HUMAN"), v.literal("SYSTEM")),
     authorAgentId: v.optional(v.id("agents")),
-    authorUserId: v.optional(v.string()),
     mentions: v.optional(v.array(v.id("agents"))),
     idempotencyKey: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx: any, args: any) => {
+    const authorUserId: string | undefined =
+      args.authorType === "AGENT" ? undefined : ctx.access.actorId;
     // Check idempotency
     if (args.idempotencyKey) {
       const existing = await ctx.db
         .query("messages")
-        .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", args.idempotencyKey))
+        .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", args.idempotencyKey))
         .first();
 
       if (existing) {
@@ -76,7 +90,7 @@ export const post = mutation({
     for (const name of mentionedNames) {
       const agent = await ctx.db
         .query("agents")
-        .filter((q) => q.eq(q.field("name"), name))
+        .filter((q: any) => q.eq(q.field("name"), name))
         .first();
       if (agent) {
         mentionedAgents.push(agent._id);
@@ -99,7 +113,7 @@ export const post = mutation({
       authorType: args.authorType,
       authorAgentId: args.authorAgentId,
       authorInstanceId: authorRef?.instanceId,
-      authorUserId: args.authorUserId,
+      authorUserId,
       content: args.content,
     });
 
@@ -120,7 +134,7 @@ export const post = mutation({
     await ctx.db.insert("activities", {
       projectId: task.projectId,
       actorType: args.authorType,
-      actorId: args.authorUserId || args.authorAgentId,
+      actorId: authorUserId || args.authorAgentId,
       action: "COMMENT_POSTED",
       description: `Posted comment on task: ${task.title}`,
       taskId: args.taskId,

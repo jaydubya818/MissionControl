@@ -9,6 +9,24 @@ describe("accepted WorkOrder parent sync", () => {
     });
   });
 
+  it("treats READY as an actionable parent state", () => {
+    // Regression: `READY` is a live tasks.status value and is what
+    // reopenWorkOrder resets a canceled parent task to, but it was in neither
+    // the actionable nor the protected set — so accept() threw
+    // "unsupported state READY" and the WorkOrder could never be accepted.
+    expect(
+      planAcceptedWorkOrderParentSync({
+        legacyTaskId: "task-1",
+        workOrderProjectId: "project-1",
+        parentTask: { status: "READY", projectId: "project-1" },
+      })
+    ).toEqual({
+      action: "SYNC",
+      reason: "accepted-work-order",
+      fromStatus: "READY",
+    });
+  });
+
   it("rejects a missing linked parent", () => {
     expect(
       planAcceptedWorkOrderParentSync({

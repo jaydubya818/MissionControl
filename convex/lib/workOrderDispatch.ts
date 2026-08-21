@@ -27,11 +27,17 @@ export function publicDispatchActorAllowed(actorType: "HUMAN" | "SYSTEM" | "AGEN
  * the previous result non-current through the canonical exact-current
  * evaluator; dispatch must not rewrite the previous receipt to express that.
  * Legacy verification continues to use receipt invalidation for currentness.
+ *
+ * The exact-current evaluator only runs at acceptance for ENFORCED policy-v2
+ * contracts (`workOrders.accept`). An OBSERVE_ONLY v2 contract therefore gets
+ * neither mechanism unless dispatch keeps invalidating receipts, which would
+ * let evidence from a superseded Attempt clear acceptance after re-dispatch.
  */
 export function dispatchInvalidatesVerificationReceipts(workOrder: {
-  verificationContract?: { schemaVersion?: number };
+  verificationContract?: { schemaVersion?: number; enforcementMode?: string };
 }): boolean {
-  return workOrder.verificationContract?.schemaVersion !== 2;
+  const contract = workOrder.verificationContract;
+  return contract?.schemaVersion !== 2 || contract.enforcementMode !== "ENFORCED";
 }
 
 export function dispatchApprovalAllowed(args: {

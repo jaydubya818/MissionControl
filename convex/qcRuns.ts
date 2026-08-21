@@ -637,15 +637,12 @@ export const execute = action({
         }
       }
       
-      // TODO: Policy evaluation (qc_scan tool, YELLOW risk)
-      // For now, proceed without policy check
-      //
-      // Extension point: Replace mockAssuranceCall/mockAgentOutputCall with real QC adapters
-      // (e.g. AssuranceAgents.AI, SonarQube, or custom analyzers). Implement in a dedicated
-      // adapter module and call it here so dashboards reflect real run signals.
-      const evidencePack = run.checkType === "AGENT_OUTPUT"
-        ? await mockAgentOutputCall({ runId: run.runId })
-        : await mockAssuranceCall({
+      // The evidence pack must come from something that inspected the actual
+      // repository at the actual commit. There is no such adapter configured,
+      // so this throws and the catch below marks the run FAILED. See
+      // `runQcAnalyzer`.
+      const evidencePack = await runQcAnalyzer({
+        checkType: run.checkType,
         runId: run.runId,
         repoUrl: run.repoUrl,
         commitSha: run.commitSha,
@@ -654,7 +651,7 @@ export const execute = action({
         scopeSpec: run.scopeSpec,
         rulesetConfig,
       });
-      
+
       // Validate schemaVersion
       if (!evidencePack.schemaVersion) {
         throw new Error("Evidence pack missing required schemaVersion field");
@@ -807,10 +804,40 @@ export const transitionToRunning = internalMutation({
 });
 
 // ============================================================================
-// MOCK ASSURANCE CALL (STUB for v1)
+// QC ANALYZER SEAM
 // ============================================================================
 
-async function mockAssuranceCall(request: {
+/**
+ * There is no QC analyzer wired to this deployment.
+ *
+ * What used to be here: `mockAssuranceCall` and `mockAgentOutputCall`, two
+ * functions that returned a hardcoded `QCEvidencePack` — `qualityScore: 82`,
+ * `commitSha: "abc123def456"`, 78% unit coverage, a requirement-traceability
+ * row naming real repository files as evidence for a requirement nobody wrote,
+ * and every `deliveryGate.passed === true`. `execute` then hashed that constant
+ * into an `evidenceHash`, stored it as an `EVIDENCE_PACK_JSON` artifact,
+ * recorded `quality_score` and `gate_passed` metrics for the dashboards, and
+ * completed the run as passing. Every QC run against every repository at every
+ * commit produced the same "82 / gates passed" verdict.
+ *
+ * That is precisely the failure mode Mission Control exists to prevent:
+ * evidence must be produced by something that actually looked at the subject.
+ * A run that cannot be analyzed now fails, and `execute`'s existing catch marks
+ * it `FAILED` with this reason — visibly missing rather than invisibly false.
+ *
+ * To restore the capability, implement a real adapter (repository checkout at
+ * `commitSha`, docs index, coverage parse, gate evaluation against
+ * `rulesetConfig`) and return its output here. The downstream pipeline —
+ * findings, artifacts, deterministic `computeRiskGrade`, metrics, RED alerting
+ * — is unchanged and expects a `QCEvidencePack`.
+ */
+export const QC_ANALYZER_UNAVAILABLE =
+  "QC_ANALYZER_UNAVAILABLE: no quality-control analyzer is configured for this deployment. " +
+  "Mission Control does not synthesize evidence packs, quality scores, or gate verdicts. " +
+  "Configure a QC analyzer adapter before running quality control.";
+
+async function runQcAnalyzer(_request: {
+  checkType: string;
   runId: string;
   repoUrl: string;
   commitSha?: string;
@@ -819,119 +846,5 @@ async function mockAssuranceCall(request: {
   scopeSpec?: any;
   rulesetConfig: any;
 }): Promise<QCEvidencePack> {
-  // Mock evidence pack for testing
-  return {
-    schemaVersion: "1.0.0",
-    producer: "assurance-agents-stub/0.1.0",
-    runId: request.runId,
-    repoUrl: request.repoUrl,
-    commitSha: request.commitSha ?? "abc123def456",
-    timestamp: new Date().toISOString(),
-    docsIndex: [
-      { path: "README.md", type: "README", lastModified: "2026-02-15T10:00:00Z" },
-      { path: "docs/PRD_V2.md", type: "PRD", lastModified: "2026-02-10T14:30:00Z" },
-    ],
-    requirementTraceability: [
-      {
-        requirementId: "REQ-001",
-        requirementText: "System must support multi-agent workflows",
-        sourceDoc: "docs/PRD_V2.md",
-        implementationFiles: [
-          { path: "packages/workflow-engine/src/executor.ts", lineRange: [1, 50] },
-        ],
-        testFiles: [
-          { path: "packages/workflow-engine/src/__tests__/executor.test.ts" },
-        ],
-        evidence: "Workflow engine implements deterministic multi-agent execution",
-        status: "COVERED",
-      },
-    ],
-    findings: [
-      {
-        severity: "YELLOW",
-        category: "DOCS_DRIFT",
-        title: "README outdated",
-        description: "README.md last updated 5 days before recent code changes",
-        filePaths: ["README.md"],
-        confidence: 0.85,
-      },
-      {
-        severity: "GREEN",
-        category: "COVERAGE_GAP",
-        title: "Test coverage acceptable",
-        description: "Unit test coverage at 78%, above threshold",
-        confidence: 0.95,
-      },
-    ],
-    coverageSummary: {
-      unit: { covered: 156, total: 200, percentage: 78 },
-      integration: { covered: 24, total: 40, percentage: 60 },
-      e2e: { covered: 8, total: 15, percentage: 53 },
-      missingAreas: ["Error handling in workflow executor"],
-    },
-    deliveryGates: [
-      {
-        name: "PRD exists",
-        passed: true,
-        rationale: "Found docs/PRD_V2.md",
-        severity: "YELLOW",
-      },
-      {
-        name: "Tests exist",
-        passed: true,
-        rationale: "Test coverage above minimum threshold",
-        severity: "RED",
-      },
-    ],
-    riskGrade: "YELLOW",
-    qualityScore: 82,
-    policyNotes: ["All gates passed except docs drift"],
-    summary: `# QC Run ${request.runId}\n\n**Status:** PASSED (with warnings)\n\n## Findings\n- 1 YELLOW: README outdated\n- 1 GREEN: Coverage acceptable\n\n## Coverage\n- Unit: 78%\n- Integration: 60%\n- E2E: 53%`,
-  };
-}
-
-/**
- * Mock agent output QC (task completion, format compliance, hallucination detection)
- */
-async function mockAgentOutputCall(request: { runId: string }): Promise<QCEvidencePack> {
-  return {
-    schemaVersion: "1.0.0",
-    producer: "assurance-agents-stub/agent-output/0.1.0",
-    runId: request.runId,
-    repoUrl: "",
-    commitSha: "",
-    timestamp: new Date().toISOString(),
-    docsIndex: [],
-    requirementTraceability: [],
-    findings: [
-      {
-        severity: "GREEN",
-        category: "TASK_INCOMPLETE",
-        title: "Task completion rate",
-        description: "Agent task completion rate within acceptable range",
-        confidence: 0.92,
-      },
-      {
-        severity: "YELLOW",
-        category: "OUTPUT_FORMAT_ERROR",
-        title: "Format compliance",
-        description: "One output did not match expected schema",
-        confidence: 0.78,
-      },
-    ],
-    coverageSummary: {
-      unit: { covered: 0, total: 0, percentage: 0 },
-      integration: { covered: 0, total: 0, percentage: 0 },
-      e2e: { covered: 0, total: 0, percentage: 0 },
-      missingAreas: [],
-    },
-    deliveryGates: [
-      { name: "Task completion", passed: true, rationale: "Completion rate above threshold", severity: "GREEN" },
-      { name: "Format compliance", passed: true, rationale: "Minor format issues only", severity: "YELLOW" },
-    ],
-    riskGrade: "GREEN",
-    qualityScore: 88,
-    policyNotes: [],
-    summary: `# Agent Output QC ${request.runId}\n\n**Status:** PASSED\n\nTask completion and format compliance within acceptable range.`,
-  };
+  throw new Error(QC_ANALYZER_UNAVAILABLE);
 }

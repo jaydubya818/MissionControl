@@ -1,4 +1,6 @@
 import { v } from "convex/values";
+import { requireAuthorizedDeliveryScope } from "./lib/deliveryAuthorization";
+import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
 import { mutation, query } from "./_generated/server";
 
 /**
@@ -183,8 +185,17 @@ export const recordTaskCompletion = mutation({
     costUsd: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Client-supplied `success` feeds agent learning signals and success-rate
+    // projections. Authority class: SYSTEM OBSERVATION — never evidence, but
+    // operator-visible state that must not be writable by the internet.
+    //
+    // The scope is the task's own workspace. An earlier revision of this guard
+    // passed `undefined`, which `requireAuthorizedDeliveryScope` rejects
+    // outright once enforcement is on ("An authorized workspace is required"),
+    // so the function threw unconditionally rather than authorizing anything.
     const task = await ctx.db.get(args.taskId);
     if (!task) return { success: false, error: "Task not found" };
+    await requireAuthorizedDeliveryScope(ctx, task.projectId, COMPANY_PERMISSIONS.DISPATCH_WORK);
 
     for (const agentId of task.assigneeIds || []) {
       // Find or create performance record for this agent + task type

@@ -115,7 +115,10 @@ export const reversePrompt = action({
     autoCreate: v.optional(v.boolean()),
     maxSuggestions: v.optional(v.number()),
   },
-  handler: async (ctx, args): Promise<{ suggestions: TaskSuggestion[] }> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ suggestions: TaskSuggestion[]; available: boolean; reason?: string }> => {
     // Get mission statement
     const missionData = await ctx.runQuery(api.mission.getMission, {
       tenantId: args.tenantId,
@@ -213,55 +216,23 @@ Respond with valid JSON only, no markdown:
 }`;
 
     try {
-      // For now, return mock suggestions. In production, call OpenAI/Anthropic API here
-      // Example: const response = await fetch("https://api.openai.com/v1/chat/completions", {...})
-      
-      const mockSuggestions: TaskSuggestion[] = [
-        {
-          title: "Analyze mission progress metrics and identify bottlenecks",
-          description: "Review the current task completion rate, agent utilization, and mission alignment scores. Identify 3-5 specific bottlenecks preventing faster progress toward the mission. Create a report with actionable recommendations for optimization.",
-          type: "OPS",
-          priority: 2,
-          suggestedAssignee: activeAgents[0]?.name,
-          reasoning: "Understanding current performance is critical to accelerating mission progress. This meta-analysis will reveal systemic improvements.",
-        },
-        {
-          title: "Develop automated mission alignment scoring system",
-          description: "Create a system that automatically scores each completed task on how well it advances the mission statement. Use this to guide future task prioritization and agent assignments. Include a dashboard visualization.",
-          type: "ENGINEERING",
-          priority: 2,
-          suggestedAssignee: activeAgents.find((a: any) => a.role === "SPECIALIST")?.name,
-          reasoning: "Automated scoring ensures every task contributes meaningfully to the mission, preventing drift and busywork.",
-        },
-        {
-          title: "Research and document best practices for autonomous organizations",
-          description: "Survey existing autonomous AI organizations, multi-agent systems, and DAO governance models. Document 10-15 best practices that could be applied to improve our mission execution. Focus on coordination, decision-making, and value creation patterns.",
-          type: "DOCS",
-          priority: 3,
-          suggestedAssignee: activeAgents.find((a: any) => a.role === "INTERN")?.name,
-          reasoning: "Learning from other autonomous systems will accelerate our evolution and help us avoid common pitfalls.",
-        },
-      ];
-
-      // If autoCreate is true, create the tasks
-      if (args.autoCreate) {
-        for (const suggestion of mockSuggestions) {
-          // Find the suggested agent
-          const agent = suggestion.suggestedAssignee 
-            ? agents.find((a: any) => a.name === suggestion.suggestedAssignee)
-            : null;
-
-          await ctx.runMutation(api.tasks.create, buildMissionSuggestionIntake({
-            projectId: args.projectId,
-            suggestion,
-            suggestedAgentId: agent?._id,
-          }));
-        }
-
-        // Note: Activity logging would go here, but activities.ts has no create mutation
-      }
-
-      return { suggestions: mockSuggestions };
+      // No model provider is wired into this path. It previously returned three
+      // hardcoded suggestions — identical for every mission, task set, and
+      // workspace — after building the prompt above and discarding it, and with
+      // `autoCreate: true` (which the `mission_prompt` cron uses) inserted them
+      // into `tasks` as real, scheduled, unreviewed work.
+      //
+      // Fabricated work items in a governed queue are worse than none: an
+      // operator cannot tell them from mission-aligned proposals. Return an
+      // explicit empty result with a reason instead.
+      void prompt;
+      return {
+        suggestions: [] as TaskSuggestion[],
+        available: false as const,
+        reason:
+          "Mission-aligned task suggestion needs a configured model provider. " +
+          "None is wired into this path, so no suggestions were generated.",
+      };
     } catch (error) {
       console.error("Error in reversePrompt:", error);
       throw new Error(`Failed to generate mission-aligned task suggestions: ${error}`);

@@ -1,5 +1,6 @@
 export type ParentTaskStatus =
   | "INBOX"
+  | "READY"
   | "ASSIGNED"
   | "IN_PROGRESS"
   | "REVIEW"
@@ -25,6 +26,10 @@ export type WorkOrderParentSyncPlan =
 
 const ACTIONABLE_PARENT_STATUSES = new Set<ParentTaskStatus>([
   "INBOX",
+  // `READY` is a live schema status (tasks.status) and is what reopenWorkOrder
+  // resets a canceled parent task to. Omitting it made every such WorkOrder
+  // permanently unacceptable with "unsupported state READY".
+  "READY",
   "ASSIGNED",
   "IN_PROGRESS",
   "REVIEW",

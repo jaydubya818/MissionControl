@@ -7,6 +7,7 @@
  */
 
 import { v } from "convex/values";
+import { resolveAuthenticated } from "./lib/authedFunctions";
 import { mutation, query } from "./_generated/server";
 import { api } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -1451,6 +1452,25 @@ export const transition = mutation({
     })),
   },
   handler: async (ctx, args) => {
+    /**
+     * Human actor identity is derived server-side, never taken from the
+     * request.
+     *
+     * `actorUserId` was a caller-supplied string, and every UI call site sent
+     * the literal `"operator"`. That string became `activities.actorId` and the
+     * task event's `actorId` — i.e. the governed audit trail recorded whatever
+     * the caller typed. Anyone holding the deployment URL could transition a
+     * task and attribute it to any name.
+     *
+     * AGENT and SYSTEM transitions are server-originated (workflow executor,
+     * approval application) and keep their supplied identifier; only the HUMAN
+     * path is re-derived, and it now requires an authenticated operator.
+     */
+    if (args.actorType === "HUMAN") {
+      const access = await resolveAuthenticated(ctx as any);
+      args = { ...args, actorUserId: access.actorId };
+    }
+
     // 1. Check idempotency - return existing if same key
     const existingTransition = await ctx.db
       .query("taskTransitions")
@@ -2248,6 +2268,12 @@ export const assign = mutation({
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args): Promise<{ success: boolean; error?: string; task?: any }> => {
+    // Same rule as `transition`: a HUMAN actor is the authenticated operator,
+    // not a string the caller chose. See the note on `transition`.
+    if (args.actorType === "HUMAN") {
+      const access = await resolveAuthenticated(ctx as any);
+      args = { ...args, actorUserId: access.actorId };
+    }
     const task = await ctx.db.get(args.taskId);
     if (!task) {
       return { success: false, error: "Task not found" };

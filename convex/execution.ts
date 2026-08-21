@@ -1,31 +1,51 @@
-import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
+/**
+ * Test execution results.
+ *
+ * ## What changed and why
+ *
+ * `executeApi`, `executeUi` and `executeHybrid` used to *invent* their results:
+ * `evaluateSteps` marked every step "passed" unless the caller passed
+ * `shouldFail`, timed it as `60 + index * 20` ms, and returned a `success`
+ * boolean derived from nothing. `testGeneration.execute` and
+ * `hybridWorkflows.execute` then persisted that into `executionResults`, and
+ * `ExecutionView` rendered it with no marker distinguishing it from a real run.
+ * A green "12 passed / 0 failed" panel was produced without a runner ever
+ * existing.
+ *
+ * Mission Control's rule is that a missing capability beats fabricated
+ * evidence, so these actions now fail closed. The real automation path is
+ * `apps/orchestration-server/src/automationAdapter.ts` (allowlisted executables,
+ * artifact hash verification, redacted logs, normalized results); until an
+ * execution runner is wired to it, there is no result to report.
+ *
+ * `storeResult` is `internal` because it writes pass/fail evidence: as a public
+ * mutation, anyone holding the deployment URL could POST `success: true`. It
+ * now also requires a `producer` attesting where the numbers came from, so a
+ * fixture row can never be mistaken for a runner row by a later reader.
+ */
 
-// Extension point: executeApi / executeUi / executeHybrid currently simulate steps.
-// To wire real runners (e.g. Playwright, API client), replace evaluateSteps with
-// adapter calls that return the same shape (evaluated steps, passed/failed counts, totalTime).
+import { v } from "convex/values";
+import { internalMutation, query } from "./_generated/server";
+
+/** Thrown by every execution action while no runner is configured. */
+export const EXECUTION_RUNNER_UNAVAILABLE =
+  "EXECUTION_RUNNER_UNAVAILABLE: no test execution runner is configured for this deployment. " +
+  "Mission Control does not synthesize test results. Run the suite through the orchestration " +
+  "server's automation adapter (apps/orchestration-server/src/automationAdapter.ts), which " +
+  "produces a normalized result with real exit codes, artifacts and redacted logs.";
+
+export function executionRunnerUnavailable(): Error {
+  return new Error(EXECUTION_RUNNER_UNAVAILABLE);
+}
+
+/**
+ * Where a stored result came from. Rows are only trustworthy as evidence when
+ * this is `AUTOMATION_ADAPTER`; anything else must be rendered as such.
+ */
+export const EXECUTION_PRODUCERS = ["AUTOMATION_ADAPTER", "MANUAL_IMPORT", "FIXTURE"] as const;
 
 function buildResultId(): string {
   return `exec_${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function evaluateSteps(steps: Array<{ name: string; shouldFail?: boolean }>) {
-  const startedAt = Date.now();
-  const evaluated = steps.map((step, index) => ({
-    step: step.name,
-    status: step.shouldFail ? "failed" : "passed",
-    responseTimeMs: 60 + index * 20,
-    error: step.shouldFail ? "Simulated failure" : undefined,
-  }));
-  const passed = evaluated.filter((s) => s.status === "passed").length;
-  const failed = evaluated.length - passed;
-  return {
-    evaluated,
-    passed,
-    failed,
-    success: failed === 0,
-    totalTime: Date.now() - startedAt + evaluated.length * 10,
-  };
 }
 
 export const list = query({
@@ -47,68 +67,21 @@ export const get = query({
   handler: async (ctx, args) => await ctx.db.get(args.id),
 });
 
-export const executeApi = action({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    executedBy: v.optional(v.string()),
-    steps: v.array(v.object({ name: v.string(), shouldFail: v.optional(v.boolean()) })),
-  },
-  handler: async (_ctx, args) => {
-    const result = evaluateSteps(args.steps.map((step) => ({ name: step.name, shouldFail: step.shouldFail })));
-    return { ...result };
-  },
-});
-
-export const executeUi = action({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    executedBy: v.optional(v.string()),
-    commands: v.array(v.string()),
-  },
-  handler: async (_ctx, args) => {
-    const steps = args.commands.map((command) => ({ step: command, status: "passed", responseTimeMs: 80 })) as Array<{ step: string; status: string; responseTimeMs: number }>;
-    return {
-      success: true,
-      passed: steps.length,
-      failed: 0,
-      totalTime: steps.length * 80,
-      steps,
-    };
-  },
-});
-
-export const executeHybrid = action({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    executedBy: v.optional(v.string()),
-    apiSteps: v.array(v.object({ name: v.string(), shouldFail: v.optional(v.boolean()) })),
-    uiCommands: v.array(v.string()),
-  },
-  handler: async (_ctx, args) => {
-    const api = evaluateSteps(args.apiSteps);
-    const uiPassed = args.uiCommands.length;
-    const failed = api.failed;
-    return {
-      success: failed === 0,
-      passed: api.passed + uiPassed,
-      failed,
-      totalTime: api.totalTime + uiPassed * 75,
-      context: { apiContextReady: api.success },
-      steps: [
-        ...api.evaluated,
-        ...args.uiCommands.map((command) => ({ step: command, status: "passed", responseTimeMs: 75 })),
-      ],
-    };
-  },
-});
-
-export const storeResult = mutation({
+export const storeResult = internalMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     executionType: v.union(v.literal("api"), v.literal("ui"), v.literal("hybrid")),
     suiteId: v.optional(v.id("testSuites")),
     workflowId: v.optional(v.id("hybridWorkflows")),
     jobId: v.optional(v.id("scheduledJobs")),
+    /** Attestation of origin. Required — an unattributed pass count is not evidence. */
+    producer: v.union(
+      v.literal("AUTOMATION_ADAPTER"),
+      v.literal("MANUAL_IMPORT"),
+      v.literal("FIXTURE"),
+    ),
+    /** Identifier of the runner/importer, for audit attribution. */
+    producedBy: v.string(),
     steps: v.array(v.any()),
     totalTime: v.number(),
     passed: v.number(),
@@ -135,6 +108,7 @@ export const storeResult = mutation({
       context: args.context,
       executedAt: Date.now(),
       executedBy: args.executedBy,
+      metadata: { producer: args.producer, producedBy: args.producedBy },
     });
     return { id, resultId };
   },

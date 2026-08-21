@@ -9,6 +9,33 @@ import { api } from "../../../../convex/_generated/api.js";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { userProjects } from "./basic.js";
 
+/**
+ * Approval decisions are deliberately NOT available from Telegram.
+ *
+ * `approvals.approve` / `approvals.deny` now resolve the deciding operator
+ * server-side from an authenticated Mission Control identity, because RED-risk
+ * dual control is enforced by comparing the first and second decider. This bot
+ * holds no operator identity: it previously passed the sender's Telegram
+ * username as the decider, which meant anyone in the chat could approve a
+ * consequential action and could satisfy both halves of dual control alone.
+ *
+ * Reading the pending queue from chat stays supported; deciding does not.
+ */
+function approvalDecisionUnavailableMessage(approvalRef: string): string {
+  const base = process.env.MISSION_CONTROL_APP_URL?.trim();
+  const where = base
+    ? `${base.replace(/\/+$/, "")}/v2/control-approvals`
+    : "Mission Control → Approvals";
+  return [
+    `🔒 Approval ${approvalRef} cannot be decided from Telegram.`,
+    "",
+    "Consequential approvals require an authenticated Mission Control operator so the",
+    "decision is attributable and dual control cannot be satisfied by one person.",
+    "",
+    `Decide it here: ${where}`,
+  ].join("\n");
+}
+
 interface BotContext extends Context {
   convex: any;
   userProjectId: Id<"projects"> | null;
@@ -100,17 +127,7 @@ export async function handleApprove(ctx: BotContext) {
       return;
     }
     
-    const result = await ctx.convex.mutation(api.approvals.approve, {
-      approvalId: approval._id,
-      decidedByUserId: ctx.from?.username || ctx.from?.id.toString() || "operator",
-      reason: "Approved via Telegram",
-    });
-    
-    if (result.success) {
-      await ctx.reply(`✅ Approved: ${approval.actionSummary}`);
-    } else {
-      await ctx.reply(`❌ Failed: ${result.error}`);
-    }
+    await ctx.reply(approvalDecisionUnavailableMessage(`#${approvalIdSuffix}`));
   } catch (error) {
     console.error("Error in /approve:", error);
     await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -144,17 +161,8 @@ export async function handleDeny(ctx: BotContext) {
       return;
     }
     
-    const result = await ctx.convex.mutation(api.approvals.deny, {
-      approvalId: approval._id,
-      decidedByUserId: ctx.from?.username || ctx.from?.id.toString() || "operator",
-      reason,
-    });
-    
-    if (result.success) {
-      await ctx.reply(`🚫 Denied: ${approval.actionSummary}\nReason: ${reason}`);
-    } else {
-      await ctx.reply(`❌ Failed: ${result.error}`);
-    }
+    void reason;
+    await ctx.reply(approvalDecisionUnavailableMessage(`#${approvalIdSuffix}`));
   } catch (error) {
     console.error("Error in /deny:", error);
     await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`);

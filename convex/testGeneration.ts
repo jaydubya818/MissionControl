@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
 import { api } from "./_generated/api";
+import { executionRunnerUnavailable } from "./execution";
 
 function buildSuiteId(): string {
   return `suite_${Math.random().toString(36).slice(2, 10)}`;
@@ -125,29 +126,13 @@ export const generate: any = action({
       tags: ["generated"],
     });
 
-    let executionResult: Record<string, unknown> | undefined;
-    if (args.autoExecute) {
-      if (args.testType === "hybrid_workflow") {
-        executionResult = await ctx.runAction(api.execution.executeHybrid, {
-          projectId: args.projectId,
-          executedBy: args.createdBy,
-          apiSteps: apiTests.map((step, index) => ({ name: String(step.title ?? `step-${index + 1}`) })),
-          uiCommands: uiTests,
-        });
-      } else if (args.testType.includes("api")) {
-        executionResult = await ctx.runAction(api.execution.executeApi, {
-          projectId: args.projectId,
-          executedBy: args.createdBy,
-          steps: apiTests.map((step, index) => ({ name: String(step.title ?? `step-${index + 1}`) })),
-        });
-      } else {
-        executionResult = await ctx.runAction(api.execution.executeUi, {
-          projectId: args.projectId,
-          executedBy: args.createdBy,
-          commands: uiTests,
-        });
-      }
-    }
+    // `autoExecute` used to call the simulated execution actions and return an
+    // invented pass count alongside the generated suite. Generation is real;
+    // execution is not available, and reporting a fabricated result would be
+    // worse than reporting none. See `convex/execution.ts`.
+    const executionResult = args.autoExecute
+      ? { available: false as const, reason: executionRunnerUnavailable().message }
+      : undefined;
 
     return {
       suiteId: created.suiteId,
@@ -167,45 +152,12 @@ export const execute = action({
     id: v.id("testSuites"),
     executedBy: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<never> => {
     const suite = await ctx.runQuery(api.testGeneration.get, { id: args.id });
     if (!suite) throw new Error("Test suite not found");
-
-    let executionResult: Record<string, unknown>;
-    if (suite.testType === "hybrid_workflow") {
-      executionResult = await ctx.runAction(api.execution.executeHybrid, {
-        projectId: suite.projectId,
-        executedBy: args.executedBy,
-        apiSteps: (suite.apiTests ?? []).map((step: any, index: number) => ({ name: String(step.title ?? `step-${index + 1}`) })),
-        uiCommands: suite.uiTests ?? [],
-      });
-    } else if (suite.testType.includes("api")) {
-      executionResult = await ctx.runAction(api.execution.executeApi, {
-        projectId: suite.projectId,
-        executedBy: args.executedBy,
-        steps: (suite.apiTests ?? []).map((step: any, index: number) => ({ name: String(step.title ?? `step-${index + 1}`) })),
-      });
-    } else {
-      executionResult = await ctx.runAction(api.execution.executeUi, {
-        projectId: suite.projectId,
-        executedBy: args.executedBy,
-        commands: suite.uiTests ?? [],
-      });
-    }
-
-    await ctx.runMutation(api.execution.storeResult, {
-      projectId: suite.projectId,
-      executionType: suite.executionMode === "hybrid" ? "hybrid" : suite.executionMode === "api_only" ? "api" : "ui",
-      suiteId: args.id,
-      steps: (executionResult.steps as unknown[]) ?? [],
-      totalTime: Number(executionResult.totalTime ?? 0),
-      passed: Number(executionResult.passed ?? 0),
-      failed: Number(executionResult.failed ?? 0),
-      success: Boolean(executionResult.success),
-      context: executionResult.context,
-      executedBy: args.executedBy,
-    });
-
-    return executionResult;
+    // Previously: called `execution.execute*`, which synthesized per-step
+    // "passed" verdicts, then persisted them to `executionResults` as though a
+    // runner had produced them. Fail closed instead.
+    throw executionRunnerUnavailable();
   },
 });

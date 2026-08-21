@@ -129,10 +129,32 @@ export interface WorkPlan {
   estimatedCost: number;
 }
 
+/**
+ * Real usage reported by the harness that actually ran the model.
+ *
+ * The SDK previously sent `inputTokens: 1000, outputTokens: 500` on every
+ * completion, with a hardcoded `costUsd` of 0.25 — invented telemetry that fed
+ * the cost and usage dashboards as though it were measured. There is no way for
+ * the SDK to know these numbers, so the harness must supply them.
+ */
+export interface RunUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  /** Actual spend for the run, in USD, as reported by the provider. */
+  costUsd: number;
+}
+
 export interface Deliverable {
   summary: string;
   artifactIds?: string[];
   evidence?: string;
+  /**
+   * Required. A task cannot be completed without reporting what it actually
+   * consumed; Mission Control does not estimate on the agent's behalf.
+   */
+  usage: RunUsage;
 }
 
 export interface HeartbeatResult {

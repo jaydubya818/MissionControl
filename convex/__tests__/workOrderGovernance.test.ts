@@ -71,6 +71,24 @@ describe("work order governance helpers", () => {
     expect(result.missingCriteriaIds).toEqual(["ac-1"]);
   });
 
+  it("blocks acceptance when no acceptance criteria are defined", () => {
+    // Regression: with an empty criteria list every criterion check below was a
+    // no-op and nothing else supplied a floor, so a LOW-risk WorkOrder with no
+    // verification contract reached DONE with zero evidence of any kind.
+    const result = evaluateAcceptance({
+      riskLevel: "LOW",
+      requiredApprovals: [],
+      approvalDecisions: [],
+      acceptanceCriteria: [],
+      verificationReceipts: [],
+    });
+
+    expect(result.eligible).toBe(false);
+    expect(result.blockingReasons).toContain(
+      "No acceptance criteria are defined for this Work Order"
+    );
+  });
+
   it("blocks acceptance when a receipt failed", () => {
     const result = evaluateAcceptance({
       riskLevel: "LOW",

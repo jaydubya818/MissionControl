@@ -6,6 +6,8 @@
  */
 
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
+import { RATE_LIMIT_POLICIES } from "./lib/rateLimit";
 import { mutation, query, action } from "./_generated/server";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -121,6 +123,15 @@ export const generateQuestions = action({
     type: v.string(),
   },
   handler: async (ctx, args): Promise<{ questions: string[] }> => {
+    // LLM generation on caller-supplied text: authenticate and bound the spend.
+    const access = await ctx.runQuery(internal.authorization.assertAuthenticated, {});
+    const decision = await ctx.runMutation(internal.authorization.consumeRateLimit, {
+      operation: RATE_LIMIT_POLICIES.planningGeneration.operation,
+      limit: RATE_LIMIT_POLICIES.planningGeneration.limit,
+      windowMs: RATE_LIMIT_POLICIES.planningGeneration.windowMs,
+      actorId: access.actorId,
+    });
+    if (!decision.allowed) throw new Error(decision.message);
     const apiKey = process.env.OPENAI_API_KEY;
     if (apiKey) {
       const prompt = `You are helping clarify a task before an AI agent works on it. Given this task, generate 3 to 5 short clarifying questions that will help create a precise work plan. One question per line. No numbering. Be concise.
@@ -184,21 +195,40 @@ export const generatePlanFromAnswers = action({
     bullets: string[];
     estimatedCost?: number;
     estimatedDuration?: string;
+    /** "MODEL" when a model produced this plan; "TEMPLATE" when it is a stub. */
+    source: "MODEL" | "TEMPLATE";
+    /** Present when `source` is "TEMPLATE": why generation did not happen. */
+    unavailableReason?: string;
   }> => {
+    // LLM generation on caller-supplied text: authenticate and bound the spend.
+    const access = await ctx.runQuery(internal.authorization.assertAuthenticated, {});
+    const decision = await ctx.runMutation(internal.authorization.consumeRateLimit, {
+      operation: RATE_LIMIT_POLICIES.planningGeneration.operation,
+      limit: RATE_LIMIT_POLICIES.planningGeneration.limit,
+      windowMs: RATE_LIMIT_POLICIES.planningGeneration.windowMs,
+      actorId: access.actorId,
+    });
+    if (!decision.allowed) throw new Error(decision.message);
     const apiKey = process.env.OPENAI_API_KEY;
     const qaBlock = args.answers
       .map((a) => `Q: ${a.question}\nA: ${a.answer}`)
       .join("\n\n");
 
-    const defaultPlan = {
+    // The fallback used to carry `estimatedCost: 0.5` and "1–2 hours" — numbers
+    // nothing estimated, returned through the same shape as a model-generated
+    // plan, so the operator could not tell a real estimate from a placeholder.
+    // The stub now estimates nothing and says so.
+    const templatePlan = (reason: string) => ({
       bullets: [
         "Review requirements and context",
         "Execute main deliverables",
         "Self-review and submit for review",
       ],
-      estimatedCost: 0.5,
-      estimatedDuration: "1–2 hours",
-    };
+      estimatedCost: undefined,
+      estimatedDuration: undefined,
+      source: "TEMPLATE" as const,
+      unavailableReason: reason,
+    });
 
     if (apiKey) {
       const prompt = `You are creating a work plan for an AI agent task. Based on the task and the Q&A, output a JSON object with:
@@ -243,21 +273,29 @@ Respond with valid JSON only, no markdown:`;
           estimatedCost?: number;
           estimatedDuration?: string;
         };
-        const bullets = Array.isArray(parsed.bullets)
-          ? parsed.bullets.map((b) => String(b).slice(0, 300))
-          : defaultPlan.bullets;
-        const estimatedCost =
-          typeof parsed.estimatedCost === "number" ? parsed.estimatedCost : defaultPlan.estimatedCost;
-        const estimatedDuration =
-          typeof parsed.estimatedDuration === "string"
-            ? parsed.estimatedDuration.slice(0, 100)
-            : defaultPlan.estimatedDuration;
-        return { bullets, estimatedCost, estimatedDuration };
-      } catch {
-        return defaultPlan;
+        if (!Array.isArray(parsed.bullets) || parsed.bullets.length === 0) {
+          return templatePlan("The planning model returned no usable steps.");
+        }
+        return {
+          bullets: parsed.bullets.map((b) => String(b).slice(0, 300)),
+          // Only pass through an estimate the model actually produced.
+          estimatedCost:
+            typeof parsed.estimatedCost === "number" ? parsed.estimatedCost : undefined,
+          estimatedDuration:
+            typeof parsed.estimatedDuration === "string"
+              ? parsed.estimatedDuration.slice(0, 100)
+              : undefined,
+          source: "MODEL" as const,
+        };
+      } catch (error) {
+        // Previously swallowed silently and returned the stub as though it were
+        // a generated plan.
+        return templatePlan(
+          `Plan generation failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
-    return defaultPlan;
+    return templatePlan("No planning model is configured (OPENAI_API_KEY is unset).");
   },
 });
 

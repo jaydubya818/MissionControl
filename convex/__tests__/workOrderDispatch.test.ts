@@ -24,8 +24,22 @@ describe("public work order dispatch authority", () => {
 describe("work order dispatch policy", () => {
   it("preserves immutable policy-v2 receipt history across recovery dispatch", () => {
     expect(dispatchInvalidatesVerificationReceipts({
-      verificationContract: { schemaVersion: 2 },
+      verificationContract: { schemaVersion: 2, enforcementMode: "ENFORCED" },
     })).toBe(false);
+  });
+
+  it("still invalidates receipts for an OBSERVE_ONLY policy-v2 contract", () => {
+    // Regression: the exact-current evaluator only runs at acceptance for
+    // ENFORCED policy-v2 contracts. Skipping receipt invalidation for every
+    // schemaVersion 2 contract left OBSERVE_ONLY work with neither mechanism,
+    // so a PASSED receipt from a superseded Attempt could clear acceptance
+    // after re-dispatch.
+    expect(dispatchInvalidatesVerificationReceipts({
+      verificationContract: { schemaVersion: 2, enforcementMode: "OBSERVE_ONLY" },
+    })).toBe(true);
+    expect(dispatchInvalidatesVerificationReceipts({
+      verificationContract: { schemaVersion: 2 },
+    })).toBe(true);
   });
 
   it("retains legacy receipt invalidation on dispatch", () => {

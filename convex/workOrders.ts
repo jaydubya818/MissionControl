@@ -4170,6 +4170,18 @@ export const accept = mutation({
     if (!workOrder) throw new Error("WorkOrder not found");
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
     assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
+    // Acceptance is the most authoritative event Mission Control emits, and its
+    // actor was whatever string the caller sent. `POST /workorders/:id/accept`
+    // on the orchestration server defaulted it to `"orchestration-server"` with
+    // `actorType: "SYSTEM"`, so the audit trail for acceptance recorded a label
+    // chosen by the requester rather than the operator the permission check
+    // actually resolved. The permission check was real; the attribution was not.
+    //
+    // The resolved operator now wins wherever one exists. `args.actorId` is
+    // retained only for the unenforced-legacy state (see
+    // lib/authorizationRollout.ts), where there is no operator to resolve.
+    const resolvedOperatorId = deliveryAccess?.membership?.operatorId;
+    const acceptActorId = resolvedOperatorId ? String(resolvedOperatorId) : args.actorId;
     const existingEvent = await ctx.db
       .query("workOrderEvents")
       .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", `${args.idempotencyKey}:accepted`))
@@ -4244,7 +4256,7 @@ export const accept = mutation({
         workflowRunId: currentVerification.verificationAttemptId,
         eventType: "WORK_ORDER_ACCEPTANCE_INELIGIBLE",
         actorType: args.actorType,
-        actorId: args.actorId,
+        actorId: acceptActorId,
         summary: `Work order is not acceptance eligible: ${currentVerification.reasons.join(" ")}`,
         idempotencyKey: `${args.idempotencyKey}:ineligible`,
         metadata: currentVerificationMetadata,
@@ -4256,7 +4268,7 @@ export const accept = mutation({
         workflowRunId: currentVerification.verificationAttemptId,
         eventType: "WORK_ORDER_ACCEPTANCE_REJECTED",
         actorType: args.actorType,
-        actorId: args.actorId,
+        actorId: acceptActorId,
         summary: `Authorized acceptance was rejected by policy-v2 verification currentness`,
         idempotencyKey: `${args.idempotencyKey}:verification-rejected`,
         metadata: currentVerificationMetadata,
@@ -4331,7 +4343,7 @@ export const accept = mutation({
         fromStatus: parentSync.fromStatus,
         toStatus: "DONE",
         actorType: args.actorType,
-        actorUserId: args.actorType === "HUMAN" ? args.actorId : undefined,
+        actorUserId: args.actorType === "HUMAN" ? acceptActorId : undefined,
         reason: `Parent outcome synchronized from accepted WorkOrder ${workOrder._id}.`,
         validationResult: { valid: true },
         artifactsSnapshot: {
@@ -4368,7 +4380,7 @@ export const accept = mutation({
         tenantId: parentTask.tenantId,
         projectId: parentTask.projectId,
         actorType: args.actorType,
-        actorId: args.actorId,
+        actorId: acceptActorId,
         action: "TASK_TRANSITION",
         description: `Parent task synchronized: ${parentSync.fromStatus} → DONE after WorkOrder acceptance`,
         targetType: "TASK",
@@ -4388,7 +4400,7 @@ export const accept = mutation({
         projectId: parentTask.projectId,
         eventType: "TASK_TRANSITION",
         actorType: args.actorType,
-        actorId: args.actorId,
+        actorId: acceptActorId,
         relatedId: parentTransitionId,
         beforeState: { status: parentSync.fromStatus },
         afterState: { status: "DONE" },
@@ -4407,7 +4419,7 @@ export const accept = mutation({
         workflowRunId: acceptanceRun._id,
         eventType: "STATE_SYNCED",
         actorType: args.actorType,
-        actorId: args.actorId,
+        actorId: acceptActorId,
         summary: `Accepted WorkOrder synchronized parent task ${parentTask._id} to DONE`,
         idempotencyKey: `${args.idempotencyKey}:parent-state-synced`,
         metadata: {
@@ -4429,7 +4441,7 @@ export const accept = mutation({
       fromState: workOrder.state,
       toState: "DONE",
       actorType: args.actorType,
-      actorId: args.actorId,
+      actorId: acceptActorId,
       summary: `Work order accepted after approval and verification gates cleared`,
       idempotencyKey: `${args.idempotencyKey}:accepted`,
     });
@@ -4522,8 +4534,18 @@ export const requestWorkOrderRevision = mutation({
       requiresReapproval: impact.requiresReapproval,
       requiresReverification: impact.requiresReverification,
       requiresFullReopen: impact.requiresFullReopen,
-      impactedAcceptanceCriteria: args.impactedAcceptanceCriteria ?? impact.impactedAcceptanceCriteria,
-      impactedApprovals: args.impactedApprovalTypes ?? impact.impactedApprovalTypes,
+      // Caller-supplied impact is ADDITIVE only. Replacing the deterministic
+      // set would let a caller with UPDATE_DELIVERY materially rewrite scope
+      // while keeping the approval and receipts granted against the old one —
+      // an effective APPROVE_DELIVERY escalation.
+      impactedAcceptanceCriteria: [...new Set([
+        ...impact.impactedAcceptanceCriteria,
+        ...(args.impactedAcceptanceCriteria ?? []),
+      ])],
+      impactedApprovals: [...new Set([
+        ...impact.impactedApprovalTypes,
+        ...(args.impactedApprovalTypes ?? []),
+      ])],
       impactedVerificationReceiptIds: impactedReceiptIds,
       requestedChanges: args.patch,
       previousSnapshot: currentSnapshot,
@@ -4631,7 +4653,14 @@ export const reopenWorkOrder = mutation({
     const impactedCriteria = args.acceptanceCriteriaImpacted ?? workOrder.acceptanceCriteria.map((criterion: any) => criterion.id);
     const invalidatedReceipts = (args.invalidatedReceiptIds?.length
       ? receipts.filter((receipt: any) => args.invalidatedReceiptIds?.includes(receipt._id))
-      : receipts.filter((receipt: any) => impactedCriteria.includes(receipt.acceptanceCriterionId) && receipt.status !== "STALE"));
+      : receipts.filter((receipt: any) =>
+          receipt.status !== "STALE"
+          // A WORK_ORDER-scope receipt carries no acceptanceCriterionId, so a
+          // criteria-only filter never stales it and a reopened WorkOrder stays
+          // immediately acceptable on pre-reopen evidence. Mirrors the revision
+          // path in requestWorkOrderRevision.
+          && (receipt.receiptScope === "WORK_ORDER"
+            || impactedCriteria.includes(receipt.acceptanceCriterionId))));
     const invalidatedApprovals = (args.invalidatedApprovalIds?.length
       ? approvals.filter((approval: any) => args.invalidatedApprovalIds?.includes(approval._id))
       : approvals.filter((approval: any) => ["APPROVED", "CONDITIONAL"].includes(approval.status)));
@@ -4859,11 +4888,27 @@ export const expireGovernanceRecords = mutation({
   },
 });
 
+/**
+ * Seed the deterministic Software Factory demo rows into ONE exact workspace.
+ *
+ * This writes real WorkOrder/run records, so it requires workspace management
+ * authority and an explicit workspace. It previously took no arguments and
+ * attached every row to `projects.order("asc").first()`, which meant an
+ * operator clicking "Seed demo" while viewing workspace B wrote demo delivery
+ * records into workspace A.
+ */
 export const seedDemo = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project?.tenantId) throw new Error("Workspace company assignment is incomplete.");
+    await requireWorkspaceAccess(ctx, project.tenantId, project._id, {
+      permission: COMPANY_PERMISSIONS.MANAGE_WORKSPACES,
+    });
+
     const existing = await ctx.db
       .query("workOrders")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .order("desc")
       .take(20);
 
@@ -4871,7 +4916,7 @@ export const seedDemo = mutation({
       return { seeded: false, reason: "already-seeded" };
     }
 
-    const firstProject = await ctx.db.query("projects").order("asc").first();
+    const firstProject = project;
     const now = Date.now();
     const featureWorkflow = await ctx.db
       .query("workflows")

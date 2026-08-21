@@ -210,6 +210,12 @@ export function evaluateAcceptance(args: {
   }
 
   const blockingReasons: string[] = [];
+  // A WorkOrder with no acceptance criteria has no evidence expectation at
+  // all, so every criterion loop below is a no-op and nothing else supplies a
+  // floor. Acceptance must not be reachable without something to verify.
+  if (args.acceptanceCriteria.length === 0) {
+    blockingReasons.push("No acceptance criteria are defined for this Work Order");
+  }
   if (missingApprovalTypes.length > 0) blockingReasons.push(`Missing approvals: ${missingApprovalTypes.join(", ")}`);
   if (expiredApprovalTypes.length > 0) blockingReasons.push(`Expired approvals: ${expiredApprovalTypes.join(", ")}`);
   if (revokedApprovalTypes.length > 0) blockingReasons.push(`Revoked approvals: ${revokedApprovalTypes.join(", ")}`);

@@ -114,8 +114,16 @@ export const onExecutionStart = mutation({
 
 /**
  * Callback from executor when execution completes.
+ *
+ * `internalMutation`, not `mutation`. As a public mutation this accepted a
+ * client-supplied `success: boolean` and wrote `status: COMPLETED` plus an
+ * `EXECUTION_COMPLETED` activity attributed to a client-supplied `executorId` —
+ * with no authorization anywhere in the file. Anyone holding the deployment URL
+ * could mark any execution request successful. It has no in-repo caller; the
+ * executor reports through the signed service-command envelope
+ * (`serviceCommands:reportExecution` / `finalizeExecution`).
  */
-export const onExecutionComplete = mutation({
+export const onExecutionComplete = internalMutation({
   args: {
     requestId: v.id("executionRequests"),
     executorId: v.string(),

@@ -1,4 +1,6 @@
 import { v } from "convex/values";
+import { requireAuthorizedDeliveryScope } from "./lib/deliveryAuthorization";
+import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
 import { mutation, query } from "./_generated/server";
 
 export const list = query({
@@ -28,6 +30,12 @@ export const recordRun = mutation({
     responseTimeMs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Client-supplied pass/fail drives `failureRatio` and `isActive`, so an unauthenticated caller could mark a genuinely failing step healthy.
+    // Authority class: SYSTEM OBSERVATION. It is not evidence and must
+    // never be read as verification, but it is still operator-visible
+    // state and must not be writable by the internet.
+    await requireAuthorizedDeliveryScope(ctx, args.projectId, COMPANY_PERMISSIONS.DISPATCH_WORK);
+
     const existing = await ctx.db.query("flakySteps").withIndex("by_step", (q) => q.eq("stepName", args.stepName)).first();
     const now = Date.now();
     if (!existing) {

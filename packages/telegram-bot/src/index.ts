@@ -28,6 +28,33 @@ import {
 } from "./commands/squad.js";
 import { handleThreadReply } from "./threads.js";
 
+/**
+ * Approval decisions are deliberately NOT available from Telegram.
+ *
+ * `approvals.approve` / `approvals.deny` now resolve the deciding operator
+ * server-side from an authenticated Mission Control identity, because RED-risk
+ * dual control is enforced by comparing the first and second decider. This bot
+ * holds no operator identity: it previously passed the sender's Telegram
+ * username as the decider, which meant anyone in the chat could approve a
+ * consequential action and could satisfy both halves of dual control alone.
+ *
+ * Reading the pending queue from chat stays supported; deciding does not.
+ */
+function approvalDecisionUnavailableMessage(approvalRef: string): string {
+  const base = process.env.MISSION_CONTROL_APP_URL?.trim();
+  const where = base
+    ? `${base.replace(/\/+$/, "")}/v2/control-approvals`
+    : "Mission Control → Approvals";
+  return [
+    `🔒 Approval ${approvalRef} cannot be decided from Telegram.`,
+    "",
+    "Consequential approvals require an authenticated Mission Control operator so the",
+    "decision is attributable and dual control cannot be satisfied by one person.",
+    "",
+    `Decide it here: ${where}`,
+  ].join("\n");
+}
+
 dotenv.config();
 
 // ============================================================================
@@ -149,20 +176,9 @@ bot.on("callback_query", async (ctx) => {
   const [action, approvalId] = data.split(":");
   
   if (action === "approve") {
-    try {
-      await convex.mutation(api.approvals.approve, {
-        approvalId: approvalId as any,
-        decidedByAgentId: undefined, // Human approval
-        reason: "Approved via Telegram",
-      });
-      
-      await ctx.answerCbQuery("✅ Approved!");
-      await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-      await ctx.reply(`✅ Approval ${approvalId} has been approved.`);
-    } catch (error) {
-      await ctx.answerCbQuery("❌ Error approving");
-      await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-    }
+    // Deciding an approval requires an authenticated Mission Control operator.
+    await ctx.answerCbQuery("Decide in Mission Control");
+    await ctx.reply(approvalDecisionUnavailableMessage(approvalId));
   } else if (action === "deny") {
     // For deny, we need a reason - prompt user
     await ctx.answerCbQuery("Use /deny command with reason");
@@ -192,15 +208,8 @@ bot.on("callback_query", async (ctx) => {
     const [action, approvalId] = data.split(":");
     
     if (action === "approve") {
-      await convex.mutation(api.approvals.approve, {
-        approvalId: approvalId as any,
-        decidedByUserId: ctx.from?.username || ctx.from?.id.toString() || "operator",
-        reason: "Approved via Telegram inline button",
-      });
-      
-      await ctx.answerCbQuery("✅ Approved!");
-      await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-      await ctx.reply(`✅ Approval ${approvalId.slice(-6)} has been approved.`);
+      await ctx.answerCbQuery("Decide in Mission Control");
+      await ctx.reply(approvalDecisionUnavailableMessage(approvalId.slice(-6)));
     } else if (action === "deny") {
       // For deny, we need a reason - prompt user
       await ctx.answerCbQuery("Use /deny command with reason");

@@ -10,6 +10,13 @@ export function validateWorkOrderSpecification(input: any) {
   const requiredRisks = input.verificationContract?.schemaVersion === 2
     ? input.verificationContract.requiredRisks ?? []
     : [];
+  // A WorkOrder with no acceptance criteria has no evidence expectation, which
+  // makes `evaluateAcceptance` vacuously eligible. Reject it here — at creation
+  // and revision — so the failure surfaces where it can still be fixed rather
+  // than at the accept gate, where the only remedy is a new revision.
+  if (criteria.length === 0) {
+    issues.push("A Work Order needs at least one acceptance criterion.");
+  }
   validateUniqueIds(requirements, "requirement", issues);
   validateUniqueIds(criteria, "acceptance criterion", issues);
   validateUniqueIds(constraints, "negative constraint", issues);

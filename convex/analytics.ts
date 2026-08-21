@@ -7,6 +7,7 @@
  */
 
 import { v } from "convex/values";
+import { countPendingApprovals } from "./lib/approvalQueue";
 import { query } from "./_generated/server";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -267,31 +268,51 @@ export const activityHeatmap = query({
 export const schematicOverview = query({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
-    let runs = await ctx.db.query("runs").order("desc").take(500);
-    if (args.projectId) {
-      runs = runs.filter((r) => r.projectId === args.projectId);
-    }
+    // Every source below is SCOPED BEFORE IT IS LIMITED.
+    //
+    // The previous shape — `.order("desc").take(500)` and then a JS filter on
+    // `projectId` — reads the newest N rows across the whole deployment and
+    // then discards everything belonging to another workspace. On any busy
+    // installation the selected workspace's KPI strip and every sidebar badge
+    // silently read zero while that workspace is demonstrably active.
+    const projectId = args.projectId;
 
-    let activities = await ctx.db.query("activities").order("desc").take(200);
-    if (args.projectId) {
-      activities = activities.filter((a) => a.projectId === args.projectId);
-    }
+    const runs = await (projectId
+      ? ctx.db
+          .query("runs")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId))
+          .order("desc")
+          .take(500)
+      : ctx.db.query("runs").order("desc").take(500));
 
-    const toolCalls = await ctx.db.query("toolCalls").take(2000);
-    const toolCallCount = args.projectId
-      ? toolCalls.filter((t) => t.projectId === args.projectId).length
-      : toolCalls.length;
+    const activities = await (projectId
+      ? ctx.db
+          .query("activities")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId))
+          .order("desc")
+          .take(200)
+      : ctx.db.query("activities").order("desc").take(200));
 
-    const packages = await ctx.db.query("contextPackages").take(500);
-    const skillCount = args.projectId
-      ? packages.filter((p) => p.projectId === args.projectId).length
-      : packages.length;
+    const toolCallCount = (await (projectId
+      ? ctx.db
+          .query("toolCalls")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId))
+          .take(2000)
+      : ctx.db.query("toolCalls").take(2000))).length;
 
-    let factCount = 0;
-    const nodes = await ctx.db.query("knowledgeGraphNodes").take(5000);
-    factCount = args.projectId
-      ? nodes.filter((n) => n.projectId === args.projectId).length
-      : nodes.length;
+    const skillCount = (await (projectId
+      ? ctx.db
+          .query("contextPackages")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId))
+          .take(500)
+      : ctx.db.query("contextPackages").take(500))).length;
+
+    const factCount = (await (projectId
+      ? ctx.db
+          .query("knowledgeGraphNodes")
+          .withIndex("by_project_source", (q) => q.eq("projectId", projectId))
+          .take(5000)
+      : ctx.db.query("knowledgeGraphNodes").take(5000))).length;
 
     const totalCost = runs.reduce((s, r) => s + r.costUsd, 0);
     const withDuration = runs.filter((r) => r.durationMs != null);
@@ -300,43 +321,33 @@ export const schematicOverview = query({
         ? withDuration.reduce((s, r) => s + (r.durationMs ?? 0), 0) / withDuration.length
         : null;
 
-    const tasks = await ctx.db.query("tasks").collect();
-    const scopedTasks = args.projectId
-      ? tasks.filter((t) => t.projectId === args.projectId)
-      : tasks;
+    const scopedTasks = await (projectId
+      ? ctx.db
+          .query("tasks")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId))
+          .collect()
+      : ctx.db.query("tasks").collect());
 
-    let opEvents = await ctx.db.query("opEvents").take(2000);
-    if (args.projectId) {
-      opEvents = opEvents.filter((e) => e.projectId === args.projectId);
-    }
+    const opEvents = await (projectId
+      ? ctx.db
+          .query("opEvents")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId))
+          .take(2000)
+      : ctx.db.query("opEvents").take(2000));
 
-    let alertCount = 0;
-    if (args.projectId) {
-      const alerts = await ctx.db
-        .query("alerts")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
-        .collect();
-      alertCount = alerts.length;
-    } else {
-      alertCount = (await ctx.db.query("alerts").take(5000)).length;
-    }
+    const alertCount = (await (projectId
+      ? ctx.db
+          .query("alerts")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId))
+          .collect()
+      : ctx.db.query("alerts").take(5000))).length;
 
-    let pendingApprovals = 0;
-    if (args.projectId) {
-      const pending = await ctx.db
-        .query("approvals")
-        .withIndex("by_project_status", (q) =>
-          q.eq("projectId", args.projectId!).eq("status", "PENDING")
-        )
-        .collect();
-      pendingApprovals = pending.length;
-    } else {
-      const pending = await ctx.db
-        .query("approvals")
-        .withIndex("by_status", (q) => q.eq("status", "PENDING"))
-        .collect();
-      pendingApprovals = pending.length;
-    }
+    // One definition of "pending" across the product: PENDING ∪ ESCALATED.
+    // `escalateOverdue` moves rows PENDING -> ESCALATED on a timer, so counting
+    // PENDING alone makes the badge DROP as work becomes more urgent.
+    const pendingApprovals = (
+      await countPendingApprovals(ctx, projectId ?? null)
+    ).total;
 
     const blockedTasks = scopedTasks.filter((t) => t.status === "BLOCKED").length;
     const approvalTasks = scopedTasks.filter((t) => t.status === "NEEDS_APPROVAL").length;
@@ -372,16 +383,31 @@ export const recentRunTurns = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 20;
-    let runs = await ctx.db.query("runs").order("desc").take(limit * 2);
-    if (args.projectId) {
-      runs = runs.filter((r) => r.projectId === args.projectId);
-    }
-    runs = runs.slice(0, limit);
+    const projectId = args.projectId;
+    const runs = await (projectId
+      ? ctx.db
+          .query("runs")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId))
+          .order("desc")
+          .take(limit)
+      : ctx.db.query("runs").order("desc").take(limit));
 
-    const toolCalls = await ctx.db.query("toolCalls").take(5000);
+    // Join per run through the run index instead of a globally truncated scan,
+    // which silently reported 0 tool calls once `toolCalls` exceeded 5000 rows.
+    const toolCallsByRun = new Map(
+      await Promise.all(
+        runs.map(async (r) => [
+          String(r._id),
+          await ctx.db
+            .query("toolCalls")
+            .withIndex("by_run", (q) => q.eq("runId", r._id))
+            .take(50),
+        ] as const),
+      ),
+    );
 
     return runs.map((r) => {
-      const tools = toolCalls.filter((t) => t.runId === r._id);
+      const tools = toolCallsByRun.get(String(r._id)) ?? [];
       return {
         id: r._id,
         label: r.model ?? `Run ${String(r._id).slice(-6)}`,
@@ -398,10 +424,10 @@ export const recentRunTurns = query({
           summary: (t.outputPreview ?? t.error)?.slice(0, 120),
           output: t.outputPreview ?? t.error,
         })),
-        gate:
-          r.status === "FAILED" || r.status === "TIMEOUT"
-            ? { decision: "retrieve", reason: "run did not complete cleanly" }
-            : { decision: "skip", reason: "auto-routed" },
+        // No gate/policy engine participated in this run, so there is no gate
+        // verdict to report. Synthesizing one from `status` rendered a
+        // governance badge ("gate · skip / auto-routed") that no gate produced.
+        gate: null,
       };
     });
   },
@@ -415,10 +441,14 @@ export const recentHarnessEvents = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 10;
-    let activities = await ctx.db.query("activities").order("desc").take(limit * 2);
-    if (args.projectId) {
-      activities = activities.filter((a) => a.projectId === args.projectId);
-    }
+    const scopedProjectId = args.projectId;
+    const activities = await (scopedProjectId
+      ? ctx.db
+          .query("activities")
+          .withIndex("by_project", (q) => q.eq("projectId", scopedProjectId))
+          .order("desc")
+          .take(limit * 2)
+      : ctx.db.query("activities").order("desc").take(limit * 2));
     return activities.slice(0, limit).map((a) => ({
       id: a._id,
       type: a.action,

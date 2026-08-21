@@ -234,9 +234,25 @@ export class MissionControlClient {
   /**
    * Complete a task
    */
-  async completeTask(taskId: Id<"tasks">, deliverable: Deliverable, costUsd: number): Promise<void> {
+  async completeTask(taskId: Id<"tasks">, deliverable: Deliverable): Promise<void> {
     if (!this.agent) {
       throw new Error("Agent not initialized");
+    }
+    const usage = deliverable.usage;
+    if (
+      !usage ||
+      !Number.isFinite(usage.inputTokens) ||
+      !Number.isFinite(usage.outputTokens) ||
+      !Number.isFinite(usage.costUsd)
+    ) {
+      // Previously the SDK filled these in: `inputTokens: 1000`,
+      // `outputTokens: 500`, and a caller-supplied `costUsd` that the only
+      // in-repo caller hardcoded to 0.25. Those numbers reached the cost and
+      // token dashboards indistinguishable from measured ones. Refuse instead.
+      throw new Error(
+        "Deliverable.usage is required: report the run's actual inputTokens, outputTokens and costUsd. " +
+          "The SDK will not estimate or invent telemetry.",
+      );
     }
 
     // Post deliverable
@@ -253,9 +269,11 @@ export class MissionControlClient {
     if (this.currentRun) {
       await this.client.mutation("runs:complete" as any, {
         runId: this.currentRun._id,
-        inputTokens: 1000, // TODO: Track actual tokens
-        outputTokens: 500,
-        costUsd,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheReadTokens: usage.cacheReadTokens,
+        cacheWriteTokens: usage.cacheWriteTokens,
+        costUsd: usage.costUsd,
       });
     }
 
@@ -271,12 +289,18 @@ export class MissionControlClient {
         content: deliverable.evidence,
         artifactIds: deliverable.artifactIds || [],
       },
+      // The agent does not get to tick its own review boxes. "Acceptance
+      // criteria addressed" and "ready for independent review" were both
+      // hardcoded `checked: true` — an agent self-attestation rendered in the
+      // reviewer's UI as if a reviewer had confirmed it. Only the mechanically
+      // checkable item is pre-filled; the judgement items start unchecked and
+      // belong to the human reviewer.
       reviewChecklist: {
         type: "AGENT_SUBMISSION",
         items: [
-          { label: "Acceptance criteria addressed", checked: true },
+          { label: "Acceptance criteria addressed", checked: false },
           { label: "Evidence attached", checked: !!deliverable.evidence },
-          { label: "Deliverable ready for independent review", checked: true },
+          { label: "Deliverable ready for independent review", checked: false },
         ],
       },
     });
@@ -392,9 +416,17 @@ export class MissionControlClient {
     try {
       // Start task if not already started
       if (task.status === "READY" || task.status === "ASSIGNED") {
+        // This is `executeTask`'s auto-start path, where no handler-authored
+        // plan exists yet. It used to post three generic bullets and
+        // `estimatedCost: 0.5` — a dollar figure nothing estimated, shown to
+        // operators next to real ones. The plan now says what it is and
+        // estimates nothing.
         const workPlan = {
-          bullets: ["1. Analyze requirements", "2. Execute task", "3. Deliver results"],
-          estimatedCost: 0.5,
+          bullets: [
+            "No work plan was authored for this task.",
+            `Auto-started by the ${this.agent.name ?? "OpenClaw"} SDK on claim; call startTask() with a plan to replace this.`,
+          ],
+          estimatedCost: 0,
         };
         const run = await this.startTask(task._id, workPlan);
         this.currentRun = run;
@@ -418,8 +450,9 @@ export class MissionControlClient {
 
       const deliverable = await handler(context);
 
-      // Complete task
-      await this.completeTask(task._id, deliverable, 0.25);
+      // Complete task. Cost and tokens come from `deliverable.usage`, which the
+      // handler must report; the SDK no longer supplies a placeholder.
+      await this.completeTask(task._id, deliverable);
     } catch (error) {
       this.config.onError(error as Error);
 

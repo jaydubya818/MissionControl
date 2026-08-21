@@ -6,14 +6,20 @@ function buildRequestId(): string {
   return `cg_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function makeMockDiff(filePath: string, prompt: string): string {
-  return [
-    `--- a/${filePath}`,
-    `+++ b/${filePath}`,
-    "@@",
-    `+// CodeGen suggestion: ${prompt}`,
-  ].join("\n");
-}
+/**
+ * CodeGen has no generator or Git integration wired up.
+ *
+ * It previously wrote a stub diff, `commitHash: "mock-<timestamp>"`, and
+ * `prUrl: https://github.com/mock-org/mock-repo/pull/<random>` — and the UI
+ * rendered that URL as a live pull-request link. In a product whose entire
+ * value proposition is attributable evidence, a fabricated PR link is worse
+ * than a missing feature: the operator cannot tell it from a real one.
+ *
+ * Until a real executor exists, the request fails closed with a reason.
+ */
+const CODEGEN_EXECUTOR_UNAVAILABLE =
+  "CodeGen has no configured generator or Git integration. No diff, commit, or " +
+  "pull request can be produced. Dispatch a governed WorkOrder instead.";
 
 export const list = query({
   args: {
@@ -63,31 +69,21 @@ export const generateDiff = action({
     const request = await ctx.runQuery(api.codegen.get, { id: args.id });
     if (!request) throw new Error("CodeGen request not found");
 
-    await ctx.runMutation(api.codegen.updateStatus, { id: args.id, status: "GENERATING" });
-    const diff = makeMockDiff(request.filePath, request.prompt);
-
-    await ctx.runMutation(api.codegen.complete, {
+    await ctx.runMutation(api.codegen.updateStatus, {
       id: args.id,
-      diff,
-      branchName: `patch/${request.requestId}`,
-      commitHash: `mock-${Date.now()}`,
-      prUrl: `https://github.com/mock-org/mock-repo/pull/${Math.floor(Math.random() * 9000) + 1000}`,
+      status: "FAILED",
+      error: CODEGEN_EXECUTOR_UNAVAILABLE,
     });
-
-    return { success: true, diff };
+    throw new Error(CODEGEN_EXECUTOR_UNAVAILABLE);
   },
 });
 
-export const applyAndPR: any = action({
+export const applyAndPR = action({
   args: { id: v.id("codegenRequests") },
-  handler: async (ctx, args): Promise<any> => {
-    const request = await ctx.runQuery(api.codegen.get, { id: args.id });
-    if (!request) throw new Error("CodeGen request not found");
-    if (!request.prUrl) {
-      await ctx.runAction(api.codegen.generateDiff, { id: args.id });
-    }
-    const latest = await ctx.runQuery(api.codegen.get, { id: args.id });
-    return { success: true, prUrl: latest?.prUrl, branchName: latest?.branchName };
+  handler: async (): Promise<never> => {
+    // Publication authority belongs to the permit-gated GitHub App publisher on
+    // an exact verified candidate — never to this surface.
+    throw new Error(CODEGEN_EXECUTOR_UNAVAILABLE);
   },
 });
 
@@ -95,9 +91,13 @@ export const updateStatus = mutation({
   args: {
     id: v.id("codegenRequests"),
     status: v.union(v.literal("PENDING"), v.literal("GENERATING"), v.literal("COMPLETED"), v.literal("FAILED")),
+    error: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.id, { status: args.status });
+    await ctx.db.patch(args.id, {
+      status: args.status,
+      ...(args.error !== undefined ? { error: args.error } : {}),
+    });
     return { success: true };
   },
 });

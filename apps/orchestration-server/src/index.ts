@@ -860,8 +860,35 @@ app.post("/workorders/:workOrderId/automation-cancel", async (c) => {
 });
 
 /**
- * Independent verifier boundary. It consumes the completed run and evidence;
- * it never executes the approved adapter itself.
+ * Automation verification INGESTION boundary.
+ *
+ * ## What this endpoint was doing, and why it was wrong
+ *
+ * It described itself as the "independent verifier", but it verified nothing.
+ * It read the manifest, checked the run was COMPLETED, and then:
+ *
+ * - defaulted the verdict to PASSED (`body.status === "FAILED" ? "FAILED" : "PASSED"`),
+ *   so an empty POST body produced a pass;
+ * - defaulted the observation to the hardcoded string "Completed adapter run
+ *   and approved artifact hash confirmed";
+ * - hashed that fabricated observation into an `integrityHash` and stamped the
+ *   receipt `independent: true`;
+ * - wrote PASSED receipts for **every** acceptance criterion; and
+ * - called `workOrders.accept`.
+ *
+ * So a single authenticated POST with `{}` accepted a WorkOrder on fabricated
+ * evidence that claimed to be independent. The bearer token this route requires
+ * is an infrastructure credential — it is held by CI and the dev proxy — not an
+ * acceptance authority.
+ *
+ * ## What it does now
+ *
+ * It ingests a verdict that some external verifier actually reached, and it
+ * refuses to invent any part of it: the status, the observed result and the
+ * evidence location are all required. It does not accept the WorkOrder, because
+ * a verifier attesting is not governance deciding — acceptance remains a
+ * separate governed decision made through Mission Control. And it no longer
+ * claims independence it cannot establish.
  */
 app.post("/workorders/:workOrderId/automation-verification", async (c) => {
   try {
@@ -870,12 +897,28 @@ app.post("/workorders/:workOrderId/automation-verification", async (c) => {
     const manifest = await client.query(ConvexQueries.skillAutomations.getExecutionManifest as any, { workOrderId, allowCompleted: true }) as any;
     const run = await client.query(ConvexQueries.workflowRuns.get as any, { runId: manifest.runId }) as any;
     if (run?.status !== "COMPLETED") return c.json({ error: "Independent verification requires a completed execution run" }, 409);
-    const observed = body.observedResult ?? "Completed adapter run and approved artifact hash confirmed";
-    const integrityHash = `sha256:${createHash("sha256").update(JSON.stringify({
+    // Every field below was previously defaulted to a success value. None of
+    // them can be: this endpoint has not looked at anything, so a value it
+    // supplies is a fabrication.
+    if (body.status !== "PASSED" && body.status !== "FAILED") {
+      return c.json({ error: "An explicit status of PASSED or FAILED is required; it is never defaulted." }, 400);
+    }
+    const observed = typeof body.observedResult === "string" ? body.observedResult.trim() : "";
+    if (!observed) {
+      return c.json({ error: "observedResult is required: the verifier must report what it actually observed." }, 400);
+    }
+    const evidenceLocation = typeof body.evidenceLocation === "string" ? body.evidenceLocation.trim() : "";
+    if (!evidenceLocation) {
+      return c.json({ error: "evidenceLocation is required: a verdict with no retrievable evidence is not evidence." }, 400);
+    }
+    // Binds the reported verdict to the exact subject it claims to be about.
+    // It is NOT an integrity proof of the observation — this endpoint did not
+    // observe anything — so it is named for what it is.
+    const reportBindingHash = `sha256:${createHash("sha256").update(JSON.stringify({
       workOrderId, workflowRunId: manifest.workflowRunId, definitionId: manifest.definitionId,
-      artifactHash: manifest.artifactContentHash, observed,
+      artifactHash: manifest.artifactContentHash, observed, evidenceLocation,
     })).digest("hex")}`;
-    const receiptStatus = body.status === "FAILED" ? "FAILED" : "PASSED";
+    const receiptStatus = body.status;
     const receiptResults = [];
     for (const criterion of manifest.acceptanceCriteria as any[]) {
       receiptResults.push(await client.mutation(ConvexMutations.workOrders.recordVerificationReceipt as any, {
@@ -886,7 +929,7 @@ app.post("/workorders/:workOrderId/automation-verification", async (c) => {
         verificationMethod: "TEST",
         commandOrCheck: "independent normalized-result and artifact-integrity verification",
         result: observed,
-        evidenceLocation: body.evidenceLocation ?? manifest.artifactPath,
+        evidenceLocation,
         artifactReference: manifest.artifactPath,
         verifier: "independent-automation-verifier",
         status: receiptStatus,
@@ -894,32 +937,42 @@ app.post("/workorders/:workOrderId/automation-verification", async (c) => {
           definitionId: manifest.definitionId,
           evaluationId: manifest.evaluationId,
           correlationId: manifest.correlationId,
-          independent: true,
-          integrityHash,
+          // NOT `independent: true`. This endpoint ingests a third party's
+          // verdict; it does not establish that the third party was
+          // independent of the thing it judged. Claiming otherwise is the
+          // exact fabrication this boundary exists to prevent.
+          ingestedVia: "orchestration:automation-verification",
+          reportBindingHash,
           expectedResult: "Completed run using the approved immutable artifact with all acceptance criteria satisfied",
           observedResult: observed,
           recommendedFollowUp: receiptStatus === "PASSED" ? "None" : "Pause the Definition and inspect adapter evidence",
         },
       }));
     }
-    if (receiptStatus === "PASSED") {
-      await client.mutation(ConvexMutations.workOrders.accept as any, {
-        workOrderId,
-        actorType: "SYSTEM",
-        actorId: "independent-automation-verifier",
-        idempotencyKey: `automation-verifier:${manifest.workflowRunId}:accept`,
-      });
-    }
+    // Deliberately absent: the `workOrders.accept` call that used to live here.
+    //
+    // Verification success is not acceptance. A verifier that can accept its
+    // own subject collapses two of the four separations the Factory is built
+    // on (Verification success != Gate eligibility != Acceptance), and it made
+    // this HTTP route an alternative acceptance path reachable with an
+    // infrastructure token. Acceptance stays with `workOrders.accept`, invoked
+    // through Mission Control's governed decision surface.
     const finalDecision = await client.mutation(ConvexMutations.skillAutomations.finalizeVerification as any, {
       workOrderId,
       workflowRunId: manifest.workflowRunId,
       receiptStatus,
-      actorId: "independent-automation-verifier",
       reason: receiptStatus === "PASSED"
         ? "Independent verification confirmed the expected result and artifact integrity"
         : body.reason ?? "Independent verification rejected the observed result",
     });
-    return c.json({ success: receiptStatus === "PASSED", receipts: receiptResults, finalDecision });
+    return c.json({
+      success: receiptStatus === "PASSED",
+      receipts: receiptResults,
+      finalDecision,
+      accepted: false,
+      acceptanceNote:
+        "Receipts were recorded. Acceptance is a separate governed decision and is not performed by this endpoint.",
+    });
   } catch (err: any) {
     return c.json({ error: safeClientError(err) }, 400);
   }
@@ -1110,6 +1163,16 @@ app.post("/workorders/:workOrderId/verification-receipts", async (c) => {
   }
 });
 
+/**
+ * Operator-initiated acceptance proxy.
+ *
+ * `actorId` is no longer forwarded. It used to default to
+ * `"orchestration-server"` with `actorType: "SYSTEM"`, so the acceptance event
+ * — the most authoritative record Mission Control emits — was attributed to a
+ * label the requester chose. `workOrders.accept` now derives the actor from the
+ * operator its own `APPROVE_DELIVERY` check resolved, which is the only
+ * identity that means anything here.
+ */
 app.post("/workorders/:workOrderId/accept", async (c) => {
   try {
     const workOrderId = c.req.param("workOrderId");
@@ -1117,7 +1180,6 @@ app.post("/workorders/:workOrderId/accept", async (c) => {
     const result = await client.mutation(ConvexMutations.workOrders.accept as any, {
       workOrderId,
       actorType: body.actorType ?? "SYSTEM",
-      actorId: body.actorId ?? "orchestration-server",
       idempotencyKey: body.idempotencyKey ?? `orch-accept:${workOrderId}`,
     });
     return c.json({ success: true, result });
