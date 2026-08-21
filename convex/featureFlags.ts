@@ -12,7 +12,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
+  flagRequiresWorkspaceScope,
+  isFactoryControlFlag,
   isValidFlagKey,
+  requiredFlagWriteAuthority,
   resolveAllFlags,
   resolveFlag,
   type FlagRow,
@@ -20,6 +23,7 @@ import {
 import {
   COMPANY_PERMISSIONS,
   FACTORY_PERMISSIONS,
+  listCompanyMemberships,
   requireWorkspaceAccess,
   requireWorkspacePermission,
 } from "./lib/companyAccess";
@@ -34,11 +38,6 @@ async function loadRowsForKey(
     .collect();
 }
 
-function isFactoryControlFlag(key: string) {
-  return key.startsWith("factory-memory.")
-    || key.startsWith("model-routing.")
-    || key.startsWith("execution-routing.");
-}
 
 /** All flags (known registry + any ad-hoc rows), resolved for optional project scope. */
 export const list = query({
@@ -89,22 +88,31 @@ export const setFlag = mutation({
     if (args.description !== undefined && args.description.trim().length > 1_000) {
       throw new Error("Feature flag descriptions must be at most 1,000 characters.");
     }
-    let actorId = args.actorId;
+    // Authority is resolved server-side for EVERY key. Flags gate the
+    // authorization checks themselves (`company.context`,
+    // `control-plane.team-authorization`), so an unauthenticated writer here
+    // would be able to disable the control plane's own access control.
+    if (flagRequiresWorkspaceScope(args.key) && !args.projectId) {
+      throw new Error(
+        isFactoryControlFlag(args.key)
+          ? "Factory control flags must be scoped to a workspace."
+          : "Control-plane flags must be scoped to a workspace.",
+      );
+    }
+
+    const authority = requiredFlagWriteAuthority(args.key, Boolean(args.projectId));
+    let actorId: string;
     let tenantId;
-    if (isFactoryControlFlag(args.key)) {
-      if (!args.projectId)
-        throw new Error("Factory control flags must be scoped to a workspace.");
+    if (authority === "WORKSPACE_FACTORY_AUTOMATION") {
       const access = await requireWorkspacePermission(
         ctx,
-        args.projectId,
+        args.projectId!,
         FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
       );
       actorId = access.actorId;
       tenantId = access.project.tenantId;
-    } else if (args.key.startsWith("control-plane.")) {
-      if (!args.projectId)
-        throw new Error("Control-plane flags must be scoped to a workspace.");
-      const project = await ctx.db.get(args.projectId);
+    } else if (authority === "WORKSPACE_MANAGE") {
+      const project = await ctx.db.get(args.projectId!);
       if (!project?.tenantId)
         throw new Error("Workspace company assignment is incomplete.");
       const access = await requireWorkspaceAccess(ctx, project.tenantId, project._id, {
@@ -112,6 +120,18 @@ export const setFlag = mutation({
       });
       actorId = String(access.membership.operatorId ?? "demo:company-administrator");
       tenantId = project.tenantId;
+    } else {
+      // Global row: only a company administrator may change deployment-wide
+      // behaviour. Attribution comes from the membership, never the client.
+      const memberships = await listCompanyMemberships(ctx);
+      const admin = memberships.find((membership) => membership.canManageCompany);
+      if (!admin) {
+        throw new Error(
+          "Company administrator access is required to change a global feature flag.",
+        );
+      }
+      actorId = String(admin.operatorId ?? "demo:company-administrator");
+      tenantId = admin.tenant._id;
     }
 
     const now = Date.now();

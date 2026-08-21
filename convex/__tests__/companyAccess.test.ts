@@ -243,6 +243,19 @@ describe("company access", () => {
     expect(canAccessDeliveryRecord(access, { owningTeamId: "team-a" as Id<"scrumTeams"> })).toBe(true);
     expect(canAccessDeliveryRecord(access, { ownerMemberId: "member-a" as Id<"orgMembers"> })).toBe(true);
     expect(canAccessDeliveryRecord(access, { owningTeamId: "team-b" as Id<"scrumTeams"> })).toBe(false);
-    expect(canAccessDeliveryRecord(access, {})).toBe(false);
+    // Deliberate semantic change. `canAccessDeliveryRecord` narrows by
+    // OWNERSHIP; it runs only after `requireAuthorizedDeliveryScope` has already
+    // required the company permission in this record's workspace. A record with
+    // no owner has nothing to narrow by, so the permission check is the whole
+    // check and this returns true.
+    //
+    // It used to return false. That was invisible while the delivery gate was
+    // flag-gated off, but enforcement is now driven by deployment provisioning
+    // (lib/authorizationRollout.ts), and delivery records are created unowned by
+    // default — so `false` would have made every unowned WorkOrder permanently
+    // unreachable by every operator except a company admin, with an error
+    // message ("unavailable or unauthorized") that gives no way out.
+    // See convex/__tests__/deliveryRecordScope.test.ts.
+    expect(canAccessDeliveryRecord(access, {})).toBe(true);
   });
 });

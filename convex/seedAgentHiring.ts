@@ -5,10 +5,16 @@
  * Requires at least one project to exist (e.g. run seedMissionControlDemo first or create a project).
  */
 
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
+// INTERNAL ONLY. Convex `query`/`mutation`/`action` exports are internet-callable
+// by anyone holding the deployment URL (shipped to the browser as
+// `VITE_CONVEX_URL`). Everything here is destructive, deployment-wide, or
+// fixture tooling with no browser caller, so it is declared `internal*`.
+// Operators still invoke these through `npx convex run`, which authenticates
+// with deployment admin credentials and can call internal functions.
 import type { Id } from "./_generated/dataModel";
 
-export const run = mutation({
+export const run = internalMutation({
   args: {},
   handler: async (ctx) => {
     const project = await ctx.db.query("projects").first();

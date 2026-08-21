@@ -6,6 +6,12 @@
  */
 
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
+import {
+  PROVIDER_INPUT_LIMITS,
+  RATE_LIMIT_POLICIES,
+  assertInputWithinLimit,
+} from "./lib/rateLimit";
 import { query, mutation, action } from "./_generated/server";
 
 // ============================================================================
@@ -115,6 +121,16 @@ export const synthesize = action({
     similarityBoost: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // TTS is metered provider spend on caller-supplied text.
+    const access = await ctx.runQuery(internal.authorization.assertAuthenticated, {});
+    const decision = await ctx.runMutation(internal.authorization.consumeRateLimit, {
+      operation: RATE_LIMIT_POLICIES.voiceSynthesis.operation,
+      limit: RATE_LIMIT_POLICIES.voiceSynthesis.limit,
+      windowMs: RATE_LIMIT_POLICIES.voiceSynthesis.windowMs,
+      actorId: access.actorId,
+    });
+    if (!decision.allowed) throw new Error(decision.message);
+    assertInputWithinLimit(args.text, PROVIDER_INPUT_LIMITS.voiceTextChars, "Speech text");
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) {
       throw new Error("ELEVENLABS_API_KEY environment variable is required for voice synthesis");

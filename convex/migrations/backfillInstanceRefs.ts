@@ -1,5 +1,16 @@
+/**
+ * INTERNAL ONLY.
+ *
+ * Every function in this module is destructive, deployment-wide, or fixture
+ * tooling with no legitimate browser caller. Convex `query`/`mutation`/`action`
+ * exports are internet-callable by anyone holding the deployment URL — which
+ * ships in the client bundle as `VITE_CONVEX_URL` — so these are declared
+ * `internal*`. Operators still invoke them through `npx convex run`, which
+ * authenticates with deployment admin credentials and can call internal
+ * functions.
+ */
 import { v } from "convex/values";
-import { action, internalMutation, mutation, query } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery, query } from "../_generated/server";
 import { api } from "../_generated/api";
 import { resolveAgentRef } from "../lib/agentResolver";
 import { preferInstanceRefs } from "../lib/armCompat";
@@ -65,7 +76,7 @@ async function collectMigrationHealthSnapshot(ctx: { db: any }) {
   };
 }
 
-export const listTasksNeedingBackfill = query({
+export const listTasksNeedingBackfill = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("tasks").collect();
@@ -75,7 +86,7 @@ export const listTasksNeedingBackfill = query({
   },
 });
 
-export const listRunsNeedingBackfill = query({
+export const listRunsNeedingBackfill = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("runs").collect();
@@ -85,7 +96,7 @@ export const listRunsNeedingBackfill = query({
   },
 });
 
-export const listToolCallsNeedingBackfill = query({
+export const listToolCallsNeedingBackfill = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("toolCalls").collect();
@@ -95,7 +106,7 @@ export const listToolCallsNeedingBackfill = query({
   },
 });
 
-export const listMessagesNeedingBackfill = query({
+export const listMessagesNeedingBackfill = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("messages").collect();
@@ -105,7 +116,7 @@ export const listMessagesNeedingBackfill = query({
   },
 });
 
-export const getMigrationHealth = query({
+export const getMigrationHealth = internalQuery({
   args: {},
   handler: async (ctx) => {
     const snapshot = await collectMigrationHealthSnapshot(ctx);
@@ -182,7 +193,7 @@ export const guardMigrationHealth = internalMutation({
   },
 });
 
-export const listProjectsNeedingTenantBackfill = query({
+export const listProjectsNeedingTenantBackfill = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("projects").collect();
@@ -190,7 +201,7 @@ export const listProjectsNeedingTenantBackfill = query({
   },
 });
 
-export const listAgentsNeedingTenantBackfill = query({
+export const listAgentsNeedingTenantBackfill = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("agents").collect();
@@ -198,7 +209,7 @@ export const listAgentsNeedingTenantBackfill = query({
   },
 });
 
-export const listTasksNeedingTenantBackfill = query({
+export const listTasksNeedingTenantBackfill = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("tasks").collect();
@@ -206,7 +217,7 @@ export const listTasksNeedingTenantBackfill = query({
   },
 });
 
-export const listRunsNeedingTenantBackfill = query({
+export const listRunsNeedingTenantBackfill = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("runs").collect();
@@ -214,7 +225,7 @@ export const listRunsNeedingTenantBackfill = query({
   },
 });
 
-export const listToolCallsNeedingTenantBackfill = query({
+export const listToolCallsNeedingTenantBackfill = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("toolCalls").collect();
@@ -222,7 +233,7 @@ export const listToolCallsNeedingTenantBackfill = query({
   },
 });
 
-export const listMessagesNeedingTenantBackfill = query({
+export const listMessagesNeedingTenantBackfill = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("messages").collect();
@@ -230,7 +241,7 @@ export const listMessagesNeedingTenantBackfill = query({
   },
 });
 
-export const listApprovalsNeedingTenantBackfill = query({
+export const listApprovalsNeedingTenantBackfill = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("approvals").collect();
@@ -238,7 +249,7 @@ export const listApprovalsNeedingTenantBackfill = query({
   },
 });
 
-export const backfillProjectTenant = mutation({
+export const backfillProjectTenant = internalMutation({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
@@ -255,7 +266,7 @@ export const backfillProjectTenant = mutation({
   },
 });
 
-export const backfillAgentTenant = mutation({
+export const backfillAgentTenant = internalMutation({
   args: { agentId: v.id("agents") },
   handler: async (ctx, args) => {
     const agent = await ctx.db.get(args.agentId);
@@ -273,7 +284,7 @@ export const backfillAgentTenant = mutation({
   },
 });
 
-export const backfillTaskTenant = mutation({
+export const backfillTaskTenant = internalMutation({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
@@ -296,7 +307,7 @@ export const backfillTaskTenant = mutation({
   },
 });
 
-export const backfillRunTenant = mutation({
+export const backfillRunTenant = internalMutation({
   args: { runId: v.id("runs") },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
@@ -319,7 +330,7 @@ export const backfillRunTenant = mutation({
   },
 });
 
-export const backfillToolCallTenant = mutation({
+export const backfillToolCallTenant = internalMutation({
   args: { toolCallId: v.id("toolCalls") },
   handler: async (ctx, args) => {
     const toolCall = await ctx.db.get(args.toolCallId);
@@ -343,7 +354,7 @@ export const backfillToolCallTenant = mutation({
   },
 });
 
-export const backfillMessageTenant = mutation({
+export const backfillMessageTenant = internalMutation({
   args: { messageId: v.id("messages") },
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
@@ -366,7 +377,7 @@ export const backfillMessageTenant = mutation({
   },
 });
 
-export const backfillApprovalTenant = mutation({
+export const backfillApprovalTenant = internalMutation({
   args: { approvalId: v.id("approvals") },
   handler: async (ctx, args) => {
     const approval = await ctx.db.get(args.approvalId);
@@ -392,7 +403,7 @@ export const backfillApprovalTenant = mutation({
   },
 });
 
-export const backfillTask = mutation({
+export const backfillTask = internalMutation({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
@@ -413,7 +424,7 @@ export const backfillTask = mutation({
   },
 });
 
-export const backfillRun = mutation({
+export const backfillRun = internalMutation({
   args: { runId: v.id("runs") },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
@@ -434,7 +445,7 @@ export const backfillRun = mutation({
   },
 });
 
-export const backfillToolCall = mutation({
+export const backfillToolCall = internalMutation({
   args: { toolCallId: v.id("toolCalls") },
   handler: async (ctx, args) => {
     const toolCall = await ctx.db.get(args.toolCallId);
@@ -454,7 +465,7 @@ export const backfillToolCall = mutation({
   },
 });
 
-export const backfillMessage = mutation({
+export const backfillMessage = internalMutation({
   args: { messageId: v.id("messages") },
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
@@ -473,7 +484,7 @@ export const backfillMessage = mutation({
   },
 });
 
-export const runBackfill = action({
+export const runBackfill = internalAction({
   args: {
     tasksOffset: v.optional(v.number()),
     runsOffset: v.optional(v.number()),
@@ -555,7 +566,7 @@ export const runBackfill = action({
   },
 });
 
-export const runTenantBackfill = action({
+export const runTenantBackfill = internalAction({
   args: {
     projectsOffset: v.optional(v.number()),
     agentsOffset: v.optional(v.number()),

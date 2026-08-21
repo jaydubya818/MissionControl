@@ -479,7 +479,10 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_auth_id", ["authId"])
     .index("by_tenant_auth_id", ["tenantId", "authId"])
-    .index("by_tenant_email", ["tenantId", "email"]),
+    .index("by_tenant_email", ["tenantId", "email"])
+    // Used by the authorization rollout: the presence of any active operator is
+    // what flips a deployment from legacy fail-open to enforced.
+    .index("by_active", ["active"]),
 
   // -------------------------------------------------------------------------
   // ARM: ROLES (RBAC Role Definitions)
@@ -2128,6 +2131,7 @@ export default defineSchema({
     .index("by_work_order_revision", ["workOrderId", "workOrderRevisionNumber"])
     .index("by_work_order_status", ["workOrderId", "status"])
     .index("by_project_status", ["projectId", "status"])
+    .index("by_project", ["projectId"])
     .index("by_run", ["workflowRunId"])
     .index("by_idempotency", ["idempotencyKey"]),
 
@@ -3194,7 +3198,9 @@ export default defineSchema({
     .index("by_severity", ["severity"])
     .index("by_agent", ["agentId"])
     .index("by_task", ["taskId"])
-    .index("by_project", ["projectId"]),
+    .index("by_project", ["projectId"])
+    // Open-alert counts are workspace-scoped and must not scan the table.
+    .index("by_project_status", ["projectId", "status"]),
 
   // -------------------------------------------------------------------------
   // NOTIFICATIONS (@mentions, assignments — delivered to agents via heartbeat)
@@ -5749,7 +5755,9 @@ export default defineSchema({
     .index("by_slug", ["slug"])
     .index("by_type", ["type"])
     .index("by_status", ["status"])
-    .index("by_owner", ["owner"]),
+    .index("by_owner", ["owner"])
+    // Workspace-scoped counts must filter before limiting.
+    .index("by_project", ["projectId"]),
 
   // -------------------------------------------------------------------------
   // CONTEXT REGISTRY: PACKAGE VERSIONS (Software Factory Epic 1)
@@ -7851,4 +7859,19 @@ export default defineSchema({
     .index("by_project_source", ["projectId", "source"])
     .index("by_source", ["source"])
     .index("by_external", ["source", "externalId"]),
+
+  /**
+   * Fixed-window rate-limit counters for expensive externally reachable
+   * operations (provider-backed LLM/TTS calls, queue writes, denial receipts).
+   *
+   * `key` is always derived server-side from the resolved caller identity —
+   * never from a client argument — so a caller cannot escape a bucket by
+   * relabelling their request.
+   */
+  rateLimits: defineTable({
+    key: v.string(),
+    windowStartedAt: v.number(),
+    count: v.number(),
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
 });

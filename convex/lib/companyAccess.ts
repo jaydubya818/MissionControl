@@ -45,6 +45,16 @@ function anonymousDemoEnabled(): boolean {
   return process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT === "1";
 }
 
+/**
+ * Company administration is the authority to change deployment-wide state
+ * (global feature flags, the Gateway connection, the permission catalog).
+ *
+ * `projects.create` deliberately does NOT confer it: that permission is the
+ * grant for `CREATE_WORKSPACES` (see the dedicated branch in
+ * `roleGrantsPermission`) and is routinely delegated to non-administrators.
+ * Treating it as administration made every workspace creator an implicit
+ * company admin, which in turn satisfied every escalation branch below.
+ */
 export function isCompanyAdminRole(role: Doc<"roles">): boolean {
   const name = role.name.trim().toLowerCase();
   return (
@@ -52,9 +62,56 @@ export function isCompanyAdminRole(role: Doc<"roles">): boolean {
     name === "company owner" ||
     name === "admin" ||
     name === "company admin" ||
-    role.permissions.includes("settings.manage") ||
-    role.permissions.includes("projects.create")
+    role.permissions.includes(COMPANY_PERMISSIONS.MANAGE_COMPANY) ||
+    role.permissions.includes("settings.manage")
   );
+}
+
+
+/**
+ * Legacy permission strings that already grant a delivery authority.
+ *
+ * ## Why this exists
+ *
+ * There are two permission ladders in this file, and they disagreed.
+ * `roleGrantsFactoryPermission` has always honoured an alias table — a role
+ * holding `approvals.decide` gets `FACTORY_PERMISSIONS.APPROVE`.
+ * `roleGrantsPermission` (the company ladder) did not, and resolved the
+ * delivery permissions by matching role *names* against "workspace lead",
+ * "product manager" and "team lead".
+ *
+ * Neither shipped role catalog uses those names. `convex/companyMembers.ts`
+ * ships Company Owner / Portfolio Owner / Scrum Lead / Developer / Read-only
+ * Auditor; the demo seed ships Owner / Operator / Reviewer / Observer. So the
+ * only role that could satisfy `APPROVE_DELIVERY` was the one matching
+ * `isCompanyAdminRole`.
+ *
+ * That was invisible while `requireAuthorizedDeliveryScope` returned null on a
+ * flag-off deployment. Once enforcement became provisioning-driven
+ * (`lib/authorizationRollout.ts`), it became a live lockout: a Portfolio Owner
+ * holding `missions.approve` and `approvals.decide` was refused
+ * `workOrders.accept`, and RED-risk dual control — which needs two *distinct*
+ * approvers — became unsatisfiable on a deployment with one Company Owner.
+ *
+ * This does not widen authority. Every alias below is an explicit legacy grant
+ * of the same authority, and each is already trusted to confer the equivalent
+ * factory permission a few lines down. It makes the two ladders agree.
+ */
+const LEGACY_DELIVERY_PERMISSION_ALIASES: Partial<Record<CompanyPermission, string[]>> = {
+  [COMPANY_PERMISSIONS.APPROVE_DELIVERY]: ["approvals.decide", "missions.approve"],
+  [COMPANY_PERMISSIONS.DISPATCH_WORK]: ["workorders.dispatch"],
+  [COMPANY_PERMISSIONS.UPDATE_DELIVERY]: ["workorders.write", "tasks.write", "evidence.write"],
+  [COMPANY_PERMISSIONS.VERIFY_DELIVERY]: ["evidence.write", "approvals.decide"],
+  [COMPANY_PERMISSIONS.ASSIGN_DELIVERY]: ["tasks.assign"],
+};
+
+function roleGrantsDeliveryPermissionByLegacyAlias(
+  role: Doc<"roles">,
+  permission: CompanyPermission,
+): boolean {
+  const aliases = LEGACY_DELIVERY_PERMISSION_ALIASES[permission];
+  if (!aliases) return false;
+  return aliases.some((alias) => role.permissions.includes(alias));
 }
 
 export function roleGrantsPermission(
@@ -82,17 +139,21 @@ export function roleGrantsPermission(
     ) {
       return true;
     }
+    // Name matches grant; a non-match falls through to the legacy alias table
+    // rather than returning false. These used to `return` directly, which is
+    // why no shipped role could reach APPROVE_DELIVERY.
     if (
       permission === COMPANY_PERMISSIONS.MANAGE_TEAMS ||
       permission === COMPANY_PERMISSIONS.ASSIGN_DELIVERY ||
       permission === COMPANY_PERMISSIONS.DISPATCH_WORK ||
       permission === COMPANY_PERMISSIONS.APPROVE_DELIVERY
     ) {
-      return normalized === "workspace lead" || normalized === "product manager" || normalized === "team lead";
+      if (normalized === "workspace lead" || normalized === "product manager" || normalized === "team lead") return true;
     }
-    if (permission === COMPANY_PERMISSIONS.UPDATE_DELIVERY) return normalized === "developer" || normalized === "software engineer";
-    if (permission === COMPANY_PERMISSIONS.VERIFY_DELIVERY) return normalized === "developer" || normalized === "software engineer" || normalized === "qa" || normalized === "qa engineer";
-    return false;
+    if (permission === COMPANY_PERMISSIONS.UPDATE_DELIVERY && (normalized === "developer" || normalized === "software engineer")) return true;
+    if (permission === COMPANY_PERMISSIONS.VERIFY_DELIVERY
+      && (normalized === "developer" || normalized === "software engineer" || normalized === "qa" || normalized === "qa engineer")) return true;
+    return roleGrantsDeliveryPermissionByLegacyAlias(role, permission);
   }
   if (permission === COMPANY_PERMISSIONS.CREATE_WORKSPACES) {
     return isCompanyAdminRole(role) || role.permissions.includes("projects.create");
@@ -268,6 +329,33 @@ export async function listCompanyMemberships(ctx: CompanyCtx): Promise<CompanyMe
     canManageCompany: true,
     mode: "DEMO" as const,
   }));
+}
+
+/**
+ * Require a company administrator for deployment-wide configuration that is
+ * not bound to a single workspace (global feature flags, Gateway connection).
+ *
+ * Fails closed: an anonymous caller has no memberships, so there is no
+ * administrator to resolve.
+ */
+export async function requireCompanyAdministrator(
+  ctx: CompanyCtx
+): Promise<CompanyMembership> {
+  const memberships = await listCompanyMemberships(ctx);
+  for (const membership of memberships) {
+    try {
+      // Route through the real permission check rather than trusting the
+      // derived `canManageCompany` convenience flag.
+      return await requireCompanyPermission(
+        ctx,
+        membership.tenant._id,
+        COMPANY_PERMISSIONS.MANAGE_COMPANY
+      );
+    } catch {
+      // Try the caller's other company memberships.
+    }
+  }
+  throw new Error("Company administrator access is required.");
 }
 
 export async function requireCompanyPermission(

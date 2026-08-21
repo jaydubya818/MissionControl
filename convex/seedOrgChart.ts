@@ -3,10 +3,16 @@
  * Run: npx convex run seedOrgChart:run
  */
 
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
+// INTERNAL ONLY. Convex `query`/`mutation`/`action` exports are internet-callable
+// by anyone holding the deployment URL (shipped to the browser as
+// `VITE_CONVEX_URL`). Everything here is destructive, deployment-wide, or
+// fixture tooling with no browser caller, so it is declared `internal*`.
+// Operators still invoke these through `npx convex run`, which authenticates
+// with deployment admin credentials and can call internal functions.
 import type { Id } from "./_generated/dataModel";
 
-export const run = mutation({
+export const run = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Get or create default project
@@ -186,7 +192,7 @@ export const run = mutation({
 /**
  * Clear all org members and agents (for testing)
  */
-export const clear = mutation({
+export const clear = internalMutation({
   args: {},
   handler: async (ctx) => {
     const members = await ctx.db.query("orgMembers").collect();

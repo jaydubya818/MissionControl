@@ -5,9 +5,15 @@
  */
 
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import { mutation, query, action } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
+import {
+  PROVIDER_INPUT_LIMITS,
+  RATE_LIMIT_POLICIES,
+  assertInputWithinLimit,
+} from "./lib/rateLimit";
 import {
   fingerprintPrdContent,
   normalizePrdContent,
@@ -234,6 +240,15 @@ export const parsePrd = action({
     maxTasks: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<{ tasks: ParsedTaskPreview[] }> => {
+    const access = await ctx.runQuery(internal.authorization.assertAuthenticated, {});
+    const decision = await ctx.runMutation(internal.authorization.consumeRateLimit, {
+      operation: RATE_LIMIT_POLICIES.prdParse.operation,
+      limit: RATE_LIMIT_POLICIES.prdParse.limit,
+      windowMs: RATE_LIMIT_POLICIES.prdParse.windowMs,
+      actorId: access.actorId,
+    });
+    if (!decision.allowed) throw new Error(decision.message);
+    assertInputWithinLimit(args.content ?? "", PROVIDER_INPUT_LIMITS.prdChars, "PRD content");
     const maxTasks = args.maxTasks ?? 20;
     const content = args.content.trim();
     if (!content) return { tasks: [] };

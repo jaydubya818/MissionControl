@@ -4,7 +4,7 @@
 
 import { v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import {
   getNeighborhoodForNode,
@@ -286,7 +286,7 @@ export const getNeighborhood = query({
   },
 });
 
-export const importSnapshot = mutation({
+export const importSnapshot = internalMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     source: graphSource,
@@ -301,7 +301,7 @@ export const importSnapshot = mutation({
 });
 
 /** Import from raw Graphify JSON payload (normalizes server-side). */
-export const importGraphifyJson = mutation({
+export const importGraphifyJson = internalMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     source: v.optional(graphSource),

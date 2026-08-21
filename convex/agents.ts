@@ -6,6 +6,12 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { ensureInstanceForLegacyAgent, resolveAgentRef } from "./lib/agentResolver";
 import { appendChangeRecord } from "./lib/armAudit";
+import type { Id } from "./_generated/dataModel";
+import {
+  COMPANY_PERMISSIONS,
+  requireCompanyAdministrator,
+  requireWorkspaceAccess,
+} from "./lib/companyAccess";
 
 // ============================================================================
 // QUERIES
@@ -425,6 +431,28 @@ export const updateStatus = mutation({
 });
 
 /** Pause all ACTIVE agents (emergency "Pause squad") */
+/**
+ * Authorize a fleet control action and return the server-derived actor.
+ *
+ * `resetAll` also clears quarantine, which is a safety state set by the control
+ * plane — reversing it is a governance decision, never an anonymous one.
+ */
+async function requireAgentFleetAuthority(
+  ctx: any,
+  projectId?: Id<"projects">,
+): Promise<string> {
+  if (!projectId) {
+    const admin = await requireCompanyAdministrator(ctx);
+    return String(admin.operatorId ?? "demo:company-administrator");
+  }
+  const project = await ctx.db.get(projectId);
+  if (!project?.tenantId) throw new Error("Workspace is unavailable or unauthorized.");
+  const access = await requireWorkspaceAccess(ctx, project.tenantId, project._id, {
+    permission: COMPANY_PERMISSIONS.MANAGE_WORKSPACES,
+  });
+  return String(access.membership.operatorId ?? "demo:company-administrator");
+}
+
 export const pauseAll = mutation({
   args: {
     projectId: v.optional(v.id("projects")),
@@ -432,6 +460,10 @@ export const pauseAll = mutation({
     userId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Fleet-wide kill switches. `projectId` is optional and omitting it targets
+    // EVERY agent in the deployment, so an unscoped call requires company
+    // administration; a scoped call requires workspace management.
+    const actorId = await requireAgentFleetAuthority(ctx, args.projectId);
     let active;
     if (args.projectId) {
       active = await ctx.db
@@ -452,7 +484,7 @@ export const pauseAll = mutation({
       await ctx.db.insert("activities", {
         projectId: agent.projectId,
         actorType: "HUMAN",
-        actorId: args.userId ?? "operator",
+        actorId,
         action: "AGENT_PAUSED",
         description: `Agent "${agent.name}" paused (Pause squad)`,
         targetType: "AGENT",
@@ -474,6 +506,10 @@ export const resumeAll = mutation({
     userId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Fleet-wide kill switches. `projectId` is optional and omitting it targets
+    // EVERY agent in the deployment, so an unscoped call requires company
+    // administration; a scoped call requires workspace management.
+    const actorId = await requireAgentFleetAuthority(ctx, args.projectId);
     let paused;
     if (args.projectId) {
       paused = await ctx.db
@@ -494,7 +530,7 @@ export const resumeAll = mutation({
       await ctx.db.insert("activities", {
         projectId: agent.projectId,
         actorType: "HUMAN",
-        actorId: args.userId ?? "operator",
+        actorId,
         action: "AGENT_RESUMED",
         description: `Agent "${agent.name}" resumed`,
         targetType: "AGENT",
@@ -863,6 +899,10 @@ export const resetAll = mutation({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
+    // Fleet-wide kill switches. `projectId` is optional and omitting it targets
+    // EVERY agent in the deployment, so an unscoped call requires company
+    // administration; a scoped call requires workspace management.
+    const actorId = await requireAgentFleetAuthority(ctx, args.projectId);
     const now = Date.now();
     const agents = args.projectId
       ? await ctx.db

@@ -3,12 +3,22 @@
  */
 
 import { v } from "convex/values";
+import { workspaceQuery } from "./lib/authedFunctions";
 import { mutation, query } from "./_generated/server";
 import { api } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
 import { appendChangeRecord, appendOpEvent } from "./lib/armAudit";
 import { resolveAgentRef } from "./lib/agentResolver";
+import {
+  COMPANY_PERMISSIONS,
+  requireWorkspaceAccess,
+} from "./lib/companyAccess";
+import {
+  countPendingApprovals,
+  pendingApprovalSummary,
+  sortByCreationDesc,
+} from "./lib/approvalQueue";
 
 const approvalStatusValidator = v.union(
   v.literal("PENDING"),
@@ -19,41 +29,58 @@ const approvalStatusValidator = v.union(
   v.literal("CANCELED")
 );
 
-function sortByCreationDesc<T extends { _creationTime: number }>(rows: T[]): T[] {
-  return [...rows].sort((a, b) => b._creationTime - a._creationTime);
+
+
+/**
+ * Resolve the deciding operator server-side.
+ *
+ * A human approval gate cannot accept a client-supplied decider: dual control
+ * for RED actions is enforced by comparing the first and second decider, so a
+ * caller who names their own identity can satisfy both halves. The returned
+ * id is the ONLY value that may be written to `firstDecisionByUserId` /
+ * `decidedByUserId` or to the audit trail.
+ *
+ * Fails closed: an approval with no resolvable workspace cannot be decided.
+ */
+async function requireApprovalDecisionAuthority(
+  ctx: any,
+  approval: Doc<"approvals">,
+  requiresDualControl = false,
+): Promise<string> {
+  if (!approval.projectId) {
+    throw new Error(
+      "Approval is not bound to a workspace and cannot be decided; recreate it with a workspace scope.",
+    );
+  }
+  const project = await ctx.db.get(approval.projectId);
+  if (!project?.tenantId) {
+    throw new Error("Workspace company assignment is incomplete.");
+  }
+  const access = await requireWorkspaceAccess(ctx, project.tenantId, project._id, {
+    permission: COMPANY_PERMISSIONS.APPROVE_DELIVERY,
+  });
+  if (access.membership.operatorId) return String(access.membership.operatorId);
+  // DEMO/anonymous mode resolves every caller to one synthetic identity, so
+  // there is no second approver to satisfy dual control with. Say so instead
+  // of writing the shared constant and later reporting the misleading
+  // "a different approver must provide the second decision".
+  if (access.membership.mode === "DEMO") {
+    if (requiresDualControl) {
+      throw new Error(
+        "Dual-control approvals require two authenticated operators; this deployment is running in anonymous demo mode.",
+      );
+    }
+    return "demo:company-administrator";
+  }
+  throw new Error("Authenticated operator membership is required.");
 }
 
 async function queryPendingLike(
   ctx: any,
   args: { projectId?: string; limit: number }
 ) {
-  if (args.projectId) {
-    const [pending, escalated] = await Promise.all([
-      ctx.db
-        .query("approvals")
-        .withIndex("by_project_status", (q: any) => q.eq("projectId", args.projectId).eq("status", "PENDING"))
-        .collect(),
-      ctx.db
-        .query("approvals")
-        .withIndex("by_project_status", (q: any) => q.eq("projectId", args.projectId).eq("status", "ESCALATED"))
-        .collect(),
-    ]);
-
-    return sortByCreationDesc([...pending, ...escalated]).slice(0, args.limit);
-  }
-
-  const [pending, escalated] = await Promise.all([
-    ctx.db
-      .query("approvals")
-      .withIndex("by_status", (q: any) => q.eq("status", "PENDING"))
-      .collect(),
-    ctx.db
-      .query("approvals")
-      .withIndex("by_status", (q: any) => q.eq("status", "ESCALATED"))
-      .collect(),
-  ]);
-
-  return sortByCreationDesc([...pending, ...escalated]).slice(0, args.limit);
+  const summary = await pendingApprovalSummary(ctx, (args.projectId as any) ?? null, args.limit);
+  return summary.items;
 }
 
 // ============================================================================
@@ -78,6 +105,30 @@ export const list = query({
       .order("desc")
       .take(args.limit ?? 100);
   },
+});
+
+/**
+ * THE pending-approval count.
+ *
+ * Every surface that displays "N approvals" must read `total` from here. It is
+ * exact — not `listPending(limit).length`, which is why the header bell, the
+ * sidebar badge and the Command Center chip used to show three different
+ * numbers for the same queue at the same time.
+ */
+export const pendingSummary = workspaceQuery({
+  // `projectId` is required by the wrapper. It was optional, and an omitted
+  // projectId read every workspace's approval queue across every company —
+  // a cross-tenant read reachable by anyone holding the deployment URL.
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx: any, args: any) =>
+    await pendingApprovalSummary(ctx, args.projectId, args.limit ?? 25),
+});
+
+/** Exact count only, for badges that render no list. */
+export const countPending = workspaceQuery({
+  args: {},
+  handler: async (ctx: any, args: any) =>
+    await countPendingApprovals(ctx, args.projectId),
 });
 
 export const listPending = query({
@@ -388,8 +439,6 @@ export const approve = mutation({
   args: {
     approvalId: v.id("approvals"),
     projectId: v.optional(v.id("projects")),
-    decidedByAgentId: v.optional(v.id("agents")),
-    decidedByUserId: v.optional(v.string()),
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -400,6 +449,13 @@ export const approve = mutation({
     if (args.projectId && approval.projectId !== args.projectId) {
       return { success: false, error: "Approval does not belong to the selected workspace" };
     }
+    // Authority first: nothing below may write before the deciding operator is
+    // resolved and authorized server-side.
+    const decider = await requireApprovalDecisionAuthority(
+      ctx,
+      approval,
+      (approval.requiredDecisionCount ?? (approval.riskLevel === "RED" ? 2 : 1)) > 1,
+    );
 
     if (!["PENDING", "ESCALATED"].includes(approval.status)) {
       return { success: false, error: `Approval already ${approval.status}` };
@@ -421,11 +477,6 @@ export const approve = mutation({
       return { success: false, error: "Approval has expired" };
     }
 
-    const decider = args.decidedByUserId ?? args.decidedByAgentId?.toString();
-    if (!decider) {
-      return { success: false, error: "A deciding user or agent is required" };
-    }
-
     const requiredDecisionCount = approval.requiredDecisionCount ?? (approval.riskLevel === "RED" ? 2 : 1);
 
     // Dual-control step for RED actions
@@ -441,7 +492,7 @@ export const approve = mutation({
 
         await ctx.db.insert("activities", {
           projectId: approval.projectId,
-          actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
+          actorType: "HUMAN",
           actorId: decider,
           action: "APPROVAL_FIRST_APPROVAL",
           description: `First approval recorded for: ${approval.actionSummary}`,
@@ -459,7 +510,7 @@ export const approve = mutation({
             projectId: approval.projectId,
             taskId: approval.taskId,
             eventType: "APPROVAL_ESCALATED",
-            actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
+            actorType: "HUMAN",
             actorId: decider,
             relatedId: args.approvalId,
             metadata: {
@@ -486,8 +537,7 @@ export const approve = mutation({
 
     await ctx.db.patch(args.approvalId, {
       status: "APPROVED",
-      decidedByAgentId: args.decidedByAgentId,
-      decidedByUserId: args.decidedByUserId,
+      decidedByUserId: decider,
       decidedAt: now,
       decisionReason: args.reason,
       decisionCount: requiredDecisionCount > 1 ? 2 : 1,
@@ -507,7 +557,7 @@ export const approve = mutation({
     // Log activity
     await ctx.db.insert("activities", {
       projectId: approval.projectId,
-      actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
+      actorType: "HUMAN",
       actorId: decider,
       action: "APPROVAL_APPROVED",
       description: `Approval granted: ${approval.actionSummary}`,
@@ -525,7 +575,7 @@ export const approve = mutation({
         projectId: approval.projectId,
         taskId: approval.taskId,
         eventType: "APPROVAL_APPROVED",
-        actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
+        actorType: "HUMAN",
         actorId: decider,
         relatedId: args.approvalId,
         metadata: {
@@ -553,8 +603,7 @@ export const approve = mutation({
       payload: {
         approvalId: args.approvalId,
         decision: "APPROVED",
-        decidedByUserId: args.decidedByUserId,
-        decidedByAgentId: args.decidedByAgentId,
+        decidedByUserId: decider,
       },
       relatedTable: "approvals",
       relatedId: args.approvalId,
@@ -580,8 +629,6 @@ export const approve = mutation({
 export const deny = mutation({
   args: {
     approvalId: v.id("approvals"),
-    decidedByAgentId: v.optional(v.id("agents")),
-    decidedByUserId: v.optional(v.string()),
     reason: v.string(),
   },
   handler: async (
@@ -601,6 +648,7 @@ export const deny = mutation({
     if (!approval) {
       return { success: false, error: "Approval not found" };
     }
+    const decider = await requireApprovalDecisionAuthority(ctx, approval);
 
     if (!["PENDING", "ESCALATED"].includes(approval.status)) {
       return { success: false, error: `Approval already ${approval.status}` };
@@ -608,8 +656,7 @@ export const deny = mutation({
 
     await ctx.db.patch(args.approvalId, {
       status: "DENIED",
-      decidedByAgentId: args.decidedByAgentId,
-      decidedByUserId: args.decidedByUserId,
+      decidedByUserId: decider,
       decidedAt: Date.now(),
       decisionReason: reason,
       decisionCount: (approval.decisionCount ?? 0) + 1,
@@ -629,8 +676,8 @@ export const deny = mutation({
     // Log activity
     await ctx.db.insert("activities", {
       projectId: approval.projectId,
-      actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
-      actorId: args.decidedByUserId ?? args.decidedByAgentId?.toString(),
+      actorType: "HUMAN",
+      actorId: decider,
       action: "APPROVAL_DENIED",
       description: `Approval denied: ${approval.actionSummary} — ${reason}`,
       targetType: "APPROVAL",
@@ -644,8 +691,8 @@ export const deny = mutation({
         projectId: approval.projectId,
         taskId: approval.taskId,
         eventType: "APPROVAL_DENIED",
-        actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
-        actorId: args.decidedByUserId ?? args.decidedByAgentId?.toString(),
+        actorType: "HUMAN",
+        actorId: decider,
         relatedId: args.approvalId,
         metadata: {
           reason,
@@ -697,9 +744,8 @@ export const deny = mutation({
         taskTransition = (await ctx.runMutation(api.tasks.transition, {
           taskId: approval.taskId,
           toStatus: "IN_PROGRESS",
-          actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
-          actorAgentId: args.decidedByAgentId,
-          actorUserId: args.decidedByUserId,
+          actorType: "HUMAN",
+          actorUserId: decider,
           idempotencyKey: `approval-denied:${args.approvalId}`,
           reason: `Review rejected: ${reason}`,
         })) as { success: boolean; errors?: Array<{ message: string }> };
@@ -730,6 +776,7 @@ export const cancel = mutation({
     if (!approval) {
       return { success: false, error: "Approval not found" };
     }
+    await requireApprovalDecisionAuthority(ctx, approval);
 
     if (!["PENDING", "ESCALATED"].includes(approval.status)) {
       return { success: false, error: `Approval already ${approval.status}` };

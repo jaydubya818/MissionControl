@@ -5,7 +5,46 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";
+import {
+  COMPANY_PERMISSIONS,
+  requireCompanyAdministrator,
+  requireCompanyPermission,
+  requireWorkspaceAccess,
+} from "./lib/companyAccess";
+
+/**
+ * `orgMembers.projectAccess` is one of the three grants `requireWorkspaceAccess`
+ * accepts, so writing it IS a permission grant. Every mutation that can change
+ * a member's role, permissions, project access, or active flag must therefore
+ * resolve `members.manage` server-side against the affected company.
+ *
+ * Fails closed: a member row with no resolvable company cannot be administered.
+ */
+async function requireMemberAdministration(
+  ctx: any,
+  member: { tenantId?: Id<"tenants">; projectId?: Id<"projects"> },
+  scopeProjectId?: Id<"projects">,
+) {
+  const projectId = scopeProjectId ?? member.projectId;
+  const project = projectId ? await ctx.db.get(projectId) : null;
+  const tenantId = member.tenantId ?? project?.tenantId;
+  if (!tenantId) {
+    // A legacy row with no resolvable company still has to be administrable —
+    // deactivating a departing member must never be blocked by a data
+    // completeness gap. Fall back to company administration rather than a
+    // hard refusal.
+    return await requireCompanyAdministrator(ctx);
+  }
+  if (project && project.tenantId !== tenantId) {
+    throw new Error("Workspace does not belong to the member's company account.");
+  }
+  if (project) {
+    return await requireWorkspaceAccess(ctx, tenantId, project._id, {
+      permission: COMPANY_PERMISSIONS.MANAGE_MEMBERS,
+    });
+  }
+  return await requireCompanyPermission(ctx, tenantId, COMPANY_PERMISSIONS.MANAGE_MEMBERS);
+}
 
 // ============================================================================
 // RBAC VALIDATORS
@@ -247,10 +286,16 @@ export const create = mutation({
     if (args.projectId && (!project || !project.tenantId)) {
       throw new Error("Workspace company assignment is incomplete");
     }
+    // `orgMembers.projectAccess`/`permissions`/`systemRole` are permission
+    // grants, so creating a row is a privileged write whether or not a
+    // workspace is named. Authorize unconditionally rather than only when a
+    // `projectId` happens to be supplied.
     if (project?.tenantId) {
       await requireWorkspaceAccess(ctx, project.tenantId, project._id, {
-        permission: COMPANY_PERMISSIONS.MANAGE_WORKSPACES,
+        permission: COMPANY_PERMISSIONS.MANAGE_MEMBERS,
       });
+    } else {
+      await requireCompanyAdministrator(ctx);
     }
     // Check for duplicate email
     if (args.email) {
@@ -294,6 +339,9 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
+    const member = await ctx.db.get(id);
+    if (!member) throw new Error("Member not found");
+    await requireMemberAdministration(ctx, member);
     const filtered = Object.fromEntries(
       Object.entries(updates).filter(([_, v]) => v !== undefined)
     );
@@ -315,6 +363,7 @@ export const updatePermissions = mutation({
   handler: async (ctx, args) => {
     const member = await ctx.db.get(args.id);
     if (!member) throw new Error("Member not found");
+    await requireMemberAdministration(ctx, member);
 
     const updates: Record<string, any> = {};
     if (args.systemRole !== undefined) updates.systemRole = args.systemRole;
@@ -338,6 +387,7 @@ export const addProjectAccess = mutation({
   handler: async (ctx, args) => {
     const member = await ctx.db.get(args.memberId);
     if (!member) throw new Error("Member not found");
+    await requireMemberAdministration(ctx, member, args.projectId);
 
     const existing = member.projectAccess || [];
     // Remove any existing access for this project
@@ -365,6 +415,7 @@ export const removeProjectAccess = mutation({
   handler: async (ctx, args) => {
     const member = await ctx.db.get(args.memberId);
     if (!member) throw new Error("Member not found");
+    await requireMemberAdministration(ctx, member, args.projectId);
 
     const existing = member.projectAccess || [];
     const filtered = existing.filter(
@@ -384,6 +435,9 @@ export const remove = mutation({
     id: v.id("orgMembers"),
   },
   handler: async (ctx, args) => {
+    const member = await ctx.db.get(args.id);
+    if (!member) throw new Error("Member not found");
+    await requireMemberAdministration(ctx, member);
     await ctx.db.patch(args.id, { active: false });
     return args.id;
   },

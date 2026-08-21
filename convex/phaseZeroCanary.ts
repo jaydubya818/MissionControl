@@ -1,5 +1,16 @@
+/**
+ * INTERNAL ONLY.
+ *
+ * Every function in this module is destructive, deployment-wide, or fixture
+ * tooling with no legitimate browser caller. Convex `query`/`mutation`/`action`
+ * exports are internet-callable by anyone holding the deployment URL — which
+ * ships in the client bundle as `VITE_CONVEX_URL` — so these are declared
+ * `internal*`. Operators still invoke them through `npx convex run`, which
+ * authenticates with deployment admin credentials and can call internal
+ * functions.
+ */
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { sha256Hex } from "./lib/harnessPrChecks";
@@ -280,7 +291,7 @@ async function insertWorkOrderFixture(ctx: MutationCtx, input: {
   return { workOrderId, workflowRunId, evaluationId };
 }
 
-export const seed = mutation({
+export const seed = internalMutation({
   args: { confirmation: v.literal(CANARY_CONFIRMATION) },
   handler: async (ctx, args) => {
     assertCanaryEnabled(args.confirmation);
@@ -409,7 +420,7 @@ export const seed = mutation({
   },
 });
 
-export const status = query({
+export const status = internalQuery({
   args: {},
   handler: async (ctx) => {
     assertCanaryEnabled();

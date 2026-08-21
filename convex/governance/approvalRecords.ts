@@ -2,6 +2,10 @@ import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { appendChangeRecord } from "../lib/armAudit";
 import { resolveActiveTenantId } from "../lib/getActiveTenant";
+import {
+  COMPANY_PERMISSIONS,
+  requireCompanyPermission,
+} from "../lib/companyAccess";
 
 const statusValidator = v.union(
   v.literal("PENDING"),
@@ -68,11 +72,26 @@ export const decideApproval = mutation({
   handler: async (ctx, args) => {
     const existing = await ctx.db.get(args.approvalRecordId);
     if (!existing) throw new Error("Approval record not found");
+    // Approval records are the ARM audit trail for consequential decisions.
+    // Authority is resolved server-side and the decision is append-once: a
+    // decided record may not be re-decided or reversed in place.
+    if (!existing.tenantId) {
+      throw new Error("Approval record is not bound to a company account.");
+    }
+    if (existing.status !== "PENDING") {
+      throw new Error(`Approval record is already ${existing.status}.`);
+    }
+    const actor = await requireCompanyPermission(
+      ctx,
+      existing.tenantId,
+      COMPANY_PERMISSIONS.APPROVE_DELIVERY,
+    );
 
     await ctx.db.patch(args.approvalRecordId, {
       status: args.status,
       decisionReason: args.decisionReason,
-      decidedBy: args.decidedBy,
+      // Attribution is server-derived; a client-named decider is ignored.
+      decidedBy: actor.operatorId,
       decidedAt: Date.now(),
     });
 

@@ -1,5 +1,16 @@
+/**
+ * INTERNAL ONLY.
+ *
+ * Every function in this module is destructive, deployment-wide, or fixture
+ * tooling with no legitimate browser caller. Convex `query`/`mutation`/`action`
+ * exports are internet-callable by anyone holding the deployment URL — which
+ * ships in the client bundle as `VITE_CONVEX_URL` — so these are declared
+ * `internal*`. Operators still invoke them through `npx convex run`, which
+ * authenticates with deployment admin credentials and can call internal
+ * functions.
+ */
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 
@@ -129,7 +140,7 @@ async function seedFixture(ctx: MutationCtx, input: {
   return { key: input.key, created: true, runId, workflowRunId, workOrderId };
 }
 
-export const seed = mutation({
+export const seed = internalMutation({
   args: {
     projectId: v.id("projects"),
     confirmation: v.literal(CANARY_CONFIRMATION),
@@ -158,7 +169,7 @@ export const seed = mutation({
   },
 });
 
-export const status = query({
+export const status = internalQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
     assertCanaryEnabled();
@@ -198,7 +209,7 @@ export const status = query({
   },
 });
 
-export const verify = mutation({
+export const verify = internalMutation({
   args: {
     projectId: v.id("projects"),
     confirmation: v.literal(CANARY_CONFIRMATION),

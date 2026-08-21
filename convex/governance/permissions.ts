@@ -1,6 +1,11 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
+import { requireCompanyAdministrator } from "../lib/companyAccess";
 
+/**
+ * The permission catalog is deployment-wide RBAC vocabulary; only a company
+ * administrator may extend it.
+ */
 export const createPermission = mutation({
   args: {
     resource: v.string(),
@@ -9,6 +14,7 @@ export const createPermission = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    await requireCompanyAdministrator(ctx);
     const existing = await ctx.db
       .query("permissions")
       .withIndex("by_resource_action", (q) => q.eq("resource", args.resource).eq("action", args.action))

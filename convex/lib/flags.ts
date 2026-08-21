@@ -88,6 +88,59 @@ export function isValidFlagKey(key: string): boolean {
 }
 
 /**
+ * Authority required to write one flag row.
+ *
+ * Flags are control-plane configuration: `company.context` and the
+ * `control-plane.*` family gate the server-side authorization checks
+ * themselves, so no flag may be written by an unauthenticated caller.
+ *
+ * - `WORKSPACE_FACTORY_AUTOMATION` — Factory subsystem flags; workspace
+ *   `factory.automation.manage`. Workspace scope is mandatory.
+ * - `WORKSPACE_MANAGE` — any flag written against an exact workspace;
+ *   company `workspaces.manage` on that workspace.
+ * - `COMPANY_ADMIN` — a global (unscoped) row; company administrator.
+ */
+export type FlagWriteAuthority =
+  | "WORKSPACE_FACTORY_AUTOMATION"
+  | "WORKSPACE_MANAGE"
+  | "COMPANY_ADMIN";
+
+const WORKSPACE_SCOPED_FLAG_PREFIXES = [
+  "factory-memory.",
+  "model-routing.",
+  "execution-routing.",
+  "control-plane.",
+];
+
+const FACTORY_CONTROL_FLAG_PREFIXES = [
+  "factory-memory.",
+  "model-routing.",
+  "execution-routing.",
+];
+
+/** True when the flag may only ever be written against an exact workspace. */
+export function flagRequiresWorkspaceScope(key: string): boolean {
+  return WORKSPACE_SCOPED_FLAG_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+/** True for Factory subsystem flags gated by `factory.automation.manage`. */
+export function isFactoryControlFlag(key: string): boolean {
+  return FACTORY_CONTROL_FLAG_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+/**
+ * Deterministic authority required to write `key`. Fail-closed: every key
+ * resolves to a real authority, including keys that are not registered.
+ */
+export function requiredFlagWriteAuthority(
+  key: string,
+  scopedToWorkspace: boolean,
+): FlagWriteAuthority {
+  if (isFactoryControlFlag(key)) return "WORKSPACE_FACTORY_AUTOMATION";
+  return scopedToWorkspace ? "WORKSPACE_MANAGE" : "COMPANY_ADMIN";
+}
+
+/**
  * Resolve one flag from the set of database rows for that key.
  * `rows` may contain both the global row and any project-scoped rows.
  */

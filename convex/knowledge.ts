@@ -6,6 +6,12 @@
  */
 
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
+import {
+  PROVIDER_INPUT_LIMITS,
+  RATE_LIMIT_POLICIES,
+  assertInputWithinLimit,
+} from "./lib/rateLimit";
 import { mutation, query, action } from "./_generated/server";
 import { api } from "./_generated/api";
 import type { Id, Doc } from "./_generated/dataModel";
@@ -174,6 +180,30 @@ async function embedText(apiKey: string, text: string): Promise<number[]> {
 /**
  * Index a single document (provided as raw markdown content).
  */
+/**
+ * Authorize + rate-limit a provider-backed action.
+ *
+ * These actions spend the deployment's `OPENAI_API_KEY` / `ELEVENLABS_API_KEY`
+ * on caller-supplied text. Unauthenticated and unbounded, they are a direct
+ * billing-abuse primitive and (for `semanticSearch`) a knowledge-base
+ * exfiltration primitive. Identity is resolved server-side and used as the
+ * rate-limit key, so a caller cannot relabel their way into a fresh bucket.
+ */
+async function authorizeProviderCall(
+  ctx: any,
+  policy: { operation: string; limit: number; windowMs: number },
+): Promise<{ actorId: string; tenantId: string }> {
+  const access = await ctx.runQuery(internal.authorization.assertAuthenticated, {});
+  const decision = await ctx.runMutation(internal.authorization.consumeRateLimit, {
+    operation: policy.operation,
+    limit: policy.limit,
+    windowMs: policy.windowMs,
+    actorId: access.actorId,
+  });
+  if (!decision.allowed) throw new Error(decision.message);
+  return access;
+}
+
 export const indexDocument = action({
   args: {
     source: v.string(),
@@ -181,6 +211,8 @@ export const indexDocument = action({
     content: v.string(),
   },
   handler: async (ctx, args) => {
+    await authorizeProviderCall(ctx, RATE_LIMIT_POLICIES.knowledgeIndex);
+    assertInputWithinLimit(args.content, PROVIDER_INPUT_LIMITS.knowledgeDocumentChars, "Document content");
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY not set in Convex env");
 
@@ -208,6 +240,7 @@ export const indexDocument = action({
 export const indexAllDocs = action({
   args: {},
   handler: async (ctx) => {
+    await authorizeProviderCall(ctx, RATE_LIMIT_POLICIES.knowledgeIndexAll);
     const BASE =
       "https://raw.githubusercontent.com/jaydubya818/MissionControl/main/";
 
@@ -277,6 +310,8 @@ export const semanticSearch = action({
     ctx,
     args
   ): Promise<(Doc<"knowledgeChunks"> & { score: number })[]> => {
+    await authorizeProviderCall(ctx, RATE_LIMIT_POLICIES.knowledgeSearch);
+    assertInputWithinLimit(args.query, PROVIDER_INPUT_LIMITS.knowledgeQuestionChars, "Search query");
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY not set in Convex env");
 
@@ -327,6 +362,8 @@ export const chatWithRepo = action({
     ),
   },
   handler: async (ctx, args) => {
+    await authorizeProviderCall(ctx, RATE_LIMIT_POLICIES.knowledgeChat);
+    assertInputWithinLimit(args.question, PROVIDER_INPUT_LIMITS.knowledgeQuestionChars, "Question");
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY not set in Convex env");
 

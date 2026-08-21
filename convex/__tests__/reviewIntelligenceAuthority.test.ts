@@ -55,9 +55,25 @@ describe("Review Intelligence negative authority and access contract", () => {
       auth: { getUserIdentity: async () => null },
       db: {
         get: async (id: string) => records[id] ?? null,
+        // The gate reads `featureFlags` by the `by_key` index and `operators`
+        // by `by_active` (deployment provisioning is now part of resolving the
+        // authorization mode — see lib/authorizationRollout.ts), so the double
+        // has to answer both, and answer them through `withIndex`.
         query: (table: string) => {
-          if (table !== "featureFlags") throw new Error(`Unexpected query ${table}`);
-          return { collect: async () => [{ key: "control-plane.team-authorization", enabled: true, projectId: "project-a" }] };
+          const rows =
+            table === "featureFlags"
+              ? [{ key: "control-plane.team-authorization", enabled: true, projectId: "project-a" }]
+              : table === "operators"
+                ? [{ _id: "operator-a", active: true }]
+                : (() => {
+                    throw new Error(`Unexpected query ${table}`);
+                  })();
+          const cursor = {
+            withIndex: () => cursor,
+            collect: async () => rows,
+            first: async () => rows[0] ?? null,
+          };
+          return cursor;
         },
       },
     } as any;

@@ -5,9 +5,15 @@
  * Run with: npx convex run seed:seedV0
  */
 
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
+// INTERNAL ONLY. Convex `query`/`mutation`/`action` exports are internet-callable
+// by anyone holding the deployment URL (shipped to the browser as
+// `VITE_CONVEX_URL`). Everything here is destructive, deployment-wide, or
+// fixture tooling with no browser caller, so it is declared `internal*`.
+// Operators still invoke these through `npx convex run`, which authenticates
+// with deployment admin credentials and can call internal functions.
 
-export const seedV0 = mutation({
+export const seedV0 = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Check if already seeded
@@ -648,7 +654,7 @@ export const seedV0 = mutation({
  * Safe to run multiple times — skips if documents already exist.
  * Run with: npx convex run seed:backfillBJDocs
  */
-export const backfillBJDocs = mutation({
+export const backfillBJDocs = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Find BJ
@@ -838,7 +844,7 @@ export const backfillBJDocs = mutation({
   },
 });
 
-export const clearAll = mutation({
+export const clearAll = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Clear all tables (for development reset)
@@ -878,7 +884,7 @@ export const clearAll = mutation({
  * Safe to run multiple times — skips if documents already exist.
  * Run with: npx convex run seed:backfillSofieDocs
  */
-export const backfillSofieDocs = mutation({
+export const backfillSofieDocs = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Find Sofie
@@ -1049,7 +1055,7 @@ export const backfillSofieDocs = mutation({
   },
 });
 
-export const getSeededStatus = query({
+export const getSeededStatus = internalQuery({
   args: {},
   handler: async (ctx) => {
     const projects = await ctx.db.query("projects").take(1);
@@ -1072,7 +1078,7 @@ export const getSeededStatus = query({
  * heartbeat and creates dedicated IN_PROGRESS tasks.
  * Run with: npx convex run seed:activateAgentsForDemo
  */
-export const activateAgentsForDemo = mutation({
+export const activateAgentsForDemo = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
@@ -1147,7 +1153,7 @@ export const activateAgentsForDemo = mutation({
  * Creates realistic multi-agent decision-making data for the Council view.
  * Run with: npx convex run seed:seedCouncilData
  */
-export const seedCouncilData = mutation({
+export const seedCouncilData = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();

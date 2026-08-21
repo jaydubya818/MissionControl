@@ -412,7 +412,12 @@ describe("Model Routing authorization", () => {
       reason: "One dispatch only",
     })).rejects.toThrow("does not permit");
 
-    const allowed = createContext({ permissions: ["factory.read", "factory.approve"] });
+    // `delivery.approve` is the COMPANY-scope permission the delivery gate now
+    // requires. It used to be unnecessary here only because the gate returned
+    // null while the feature flag was off; enforcement is no longer flag-only
+    // (see lib/authorizationRollout.ts), so an authorized fixture must actually
+    // hold the permission it is asserting authority with.
+    const allowed = createContext({ permissions: ["factory.read", "factory.approve", "delivery.approve"] });
     allowed.tables.workOrders.push({
       _id: "work-order-a",
       _creationTime: 30,
@@ -442,7 +447,9 @@ describe("Model Routing authorization", () => {
   });
 
   it("requires approval authority and server attribution for exact tuple pins", async () => {
-    const state = createContext({ permissions: ["factory.read", "factory.approve"] });
+    // See the note above: the authorized path needs the company-scope
+    // `delivery.approve` permission now that the delivery gate enforces.
+    const state = createContext({ permissions: ["factory.read", "factory.approve", "delivery.approve"] });
     const repositoryId = "repository-a";
     const workflowId = "workflow-a";
     const versionId = "factory-version-a";

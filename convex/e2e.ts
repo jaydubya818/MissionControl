@@ -6,13 +6,19 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
+// INTERNAL ONLY. Convex `query`/`mutation`/`action` exports are internet-callable
+// by anyone holding the deployment URL (shipped to the browser as
+// `VITE_CONVEX_URL`). Everything here is destructive, deployment-wide, or
+// fixture tooling with no browser caller, so it is declared `internal*`.
+// Operators still invoke these through `npx convex run`, which authenticates
+// with deployment admin credentials and can call internal functions.
 
 /**
  * Seed E2E test data
  * Creates agents, tasks, content drops, and budget entries for validation.
  */
-export const seed = mutation({
+export const seed = internalMutation({
   args: {
     runId: v.string(),
   },
@@ -310,7 +316,7 @@ export const seed = mutation({
  * Cleanup E2E test data
  * Deletes or archives all objects with matching runId.
  */
-export const cleanup = mutation({
+export const cleanup = internalMutation({
   args: {
     runId: v.string(),
   },
@@ -397,7 +403,7 @@ export const cleanup = mutation({
  * Validate E2E seed data
  * Checks that all expected objects exist and are valid.
  */
-export const validate = query({
+export const validate = internalQuery({
   args: {
     runId: v.string(),
   },

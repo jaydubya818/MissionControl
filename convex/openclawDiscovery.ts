@@ -30,7 +30,9 @@ export type DiscoveredAgent = {
 export const discoverAgents = action({
   args: {},
   handler: async (ctx): Promise<{ agents: DiscoveredAgent[]; error?: string }> => {
-    const conn = await ctx.runQuery(api.gatewayConnection.get, {});
+    // Administrator-only: this call attaches the deployment Gateway token to a
+    // request built from operator-configured state.
+    const conn = await ctx.runQuery(api.gatewayConnection.getAuthorized, {});
     const baseUrl =
       (conn?.url?.trim()) || process.env.OPENCLAW_GATEWAY_URL || "";
     const token =

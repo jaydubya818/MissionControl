@@ -15,6 +15,7 @@ import { appendChangeRecord, appendOpEvent } from "./lib/armAudit";
 import { resolveAgentRef } from "./lib/agentResolver";
 import { evaluatePolicyEnvelopes, type ArmDecision } from "./lib/armPolicy";
 import { evaluateLegacyToolPolicy } from "./lib/legacyToolPolicy";
+import { requireCompanyAdministrator } from "./lib/companyAccess";
 
 // ============================================================================
 // ALLOWLIST HELPERS
@@ -778,6 +779,8 @@ export const create = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Policies are the guardrail rows every downstream evaluation consults.
+    await requireCompanyAdministrator(ctx);
     // Get next version
     const existing = await ctx.db
       .query("policies")
@@ -813,6 +816,7 @@ export const create = mutation({
 export const deactivate = mutation({
   args: { policyId: v.id("policies") },
   handler: async (ctx, args) => {
+    await requireCompanyAdministrator(ctx);
     await ctx.db.patch(args.policyId, { active: false });
     return { success: true };
   },
