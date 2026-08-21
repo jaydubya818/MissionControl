@@ -156,25 +156,50 @@ export class RemoteSandboxRuntime {
       if (cleanupPromise) return await cleanupPromise;
       cleanupPromise = (async () => {
         let cleanupError: unknown;
+        // Cleanup runs precisely when the lease is most likely to be gone, and
+        // every journal/event write is lease-fenced and throws once it is. A
+        // failed bookkeeping write must never skip the external teardown that
+        // follows it, or the provider resource keeps running and billing with
+        // no ownership record. Record best-effort; terminate authoritatively.
+        const record = async (label: string, write: () => Promise<unknown>) => {
+          try {
+            await write();
+          } catch (error) {
+            cleanupError = combineErrors(cleanupError, error, `${label} could not be journaled.`);
+          }
+        };
         if (grant && !credentialRevocation) {
           try {
             credentialRevocation = await this.credentialBroker.revoke(grant);
-            await this.journal.recordCredentialRevoked(credentialRevocation);
-            await emit("SANDBOX_CREDENTIAL_REVOKED", { grantKey: grant.grantKey, externalCredentialId: grant.externalCredentialId });
           } catch (error) {
             cleanupError = combineErrors(cleanupError, error, "Attempt credential revocation failed.");
           }
+          if (credentialRevocation) {
+            const revocation = credentialRevocation;
+            await record("Credential revocation", () => this.journal.recordCredentialRevoked(revocation));
+            await record("Credential revocation", () =>
+              emit("SANDBOX_CREDENTIAL_REVOKED", { grantKey: grant!.grantKey, externalCredentialId: grant!.externalCredentialId }));
+          }
         }
         if (allocation && !termination) {
+          await record("Sandbox termination request", () =>
+            emit("SANDBOX_TERMINATION_REQUESTED", { providerResourceId: allocation!.providerResourceId }));
           try {
-            await emit("SANDBOX_TERMINATION_REQUESTED", { providerResourceId: allocation.providerResourceId });
             termination = await this.provider.terminate(allocation);
             if (!termination.resourceAbsent) throw new Error("Provider teardown did not prove resource absence.");
             if (resourceObservedRunning) await this.resourceObserver?.terminated(termination);
-            await this.journal.recordTermination(termination);
-            await emit("SANDBOX_TERMINATED", { confirmedAbsentAt: termination.confirmedAbsentAt });
           } catch (error) {
             cleanupError = combineErrors(cleanupError, error, "Sandbox teardown failed.");
+          }
+          // Only a receipt that PROVED resource absence may be journaled. The
+          // assignment above happens before the `resourceAbsent` assertion, so
+          // gating on `termination` alone would write a SANDBOX_TERMINATED
+          // event asserting confirmed absence for a resource still running.
+          if (termination?.resourceAbsent) {
+            const receipt = termination;
+            await record("Sandbox termination", () => this.journal.recordTermination(receipt));
+            await record("Sandbox termination", () =>
+              emit("SANDBOX_TERMINATED", { confirmedAbsentAt: receipt.confirmedAbsentAt }));
           }
         }
         if (cleanupError) throw cleanupError;

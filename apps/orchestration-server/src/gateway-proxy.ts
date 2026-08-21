@@ -109,6 +109,11 @@ export function createGatewayProxy(options: GatewayProxyOptions): {
 
   wss.on("connection", (browserWs: WebSocket) => {
     let upstreamWs: WebSocket | null = null;
+    // Set synchronously on entering the connect branch. The message handler is
+    // async and awaits `loadUpstreamSettings()` before assigning `upstreamWs`,
+    // so two back-to-back connect frames would otherwise both take that branch,
+    // open two authenticated upstream sockets, and leak the first.
+    let upstreamConnecting = false;
     let upstreamReady = false;
     let connectRequestId: string | null = null;
     let connectResponseSent = false;
@@ -152,6 +157,10 @@ export function createGatewayProxy(options: GatewayProxyOptions): {
       }
 
       if (!upstreamWs) {
+        if (upstreamConnecting) {
+          closeBoth(1008, "connect already in progress");
+          return;
+        }
         if (parsed.type !== "req" || parsed.method !== "connect") {
           closeBoth(1008, "connect required");
           return;
@@ -161,6 +170,7 @@ export function createGatewayProxy(options: GatewayProxyOptions): {
           closeBoth(1008, "connect id required");
           return;
         }
+        upstreamConnecting = true;
         connectRequestId = id;
         const browserHasAuth = hasBrowserAuth(parsed);
 

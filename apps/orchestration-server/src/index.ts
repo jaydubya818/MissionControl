@@ -22,7 +22,7 @@ import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { ConvexHttpClient } from "convex/browser";
 import { createGatewayProxy } from "./gateway-proxy.js";
-import { requireAuth } from "./auth.js";
+import { gatewayUpgradeDenialReason, requireAuth, resolveAllowedGatewayOrigins } from "./auth.js";
 import { ConvexActions, ConvexQueries, ConvexMutations } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
 import { CoordinatorLoop } from "@mission-control/coordinator";
@@ -371,10 +371,44 @@ async function stopAgent(personaName: string): Promise<void> {
 // HONO APP
 // ============================================================================
 
+const ALLOWED_GATEWAY_ORIGINS = resolveAllowedGatewayOrigins(
+  process.env.MISSION_CONTROL_APP_URL,
+  process.env.NODE_ENV === "production",
+);
+
+/**
+ * A production deployment with no configured operator origin silently strips
+ * `Access-Control-Allow-Origin` from every response and denies every browser
+ * WebSocket upgrade. That is a misconfiguration, not a policy — surface it at
+ * startup instead of as an unexplained per-request failure.
+ */
+export function assertBrowserOriginPolicyConfigured(
+  production: boolean,
+  allowedOrigins: string[],
+): void {
+  if (production && allowedOrigins.length === 0) {
+    throw new Error(
+      "MISSION_CONTROL_APP_URL must list the operator UI origin(s) in production; " +
+        "without it every browser request is refused by CORS and the Gateway upgrade.",
+    );
+  }
+}
+
 export const app = new Hono();
 
-// CORS so UI (different origin/port) can call gateway/status and other endpoints
-app.use("*", cors());
+// CORS so the operator UI (different origin/port) can call gateway/status and
+// other endpoints. Wildcard `cors()` would let any page the operator visits
+// read responses from — and drive — this server, which in tokenless local
+// development is unauthenticated. Restrict to the same origin allowlist the
+// Gateway WebSocket upgrade uses.
+app.use(
+  "*",
+  cors({
+    origin: (origin) =>
+      !origin || ALLOWED_GATEWAY_ORIGINS.includes(origin) ? origin ?? "*" : null,
+    credentials: false,
+  }),
+);
 
 // Default-deny every orchestration route except the explicit public health and
 // connection-status probes declared in auth.ts. This avoids silently exposing
@@ -656,7 +690,9 @@ app.post("/orchestration/workorders/:workOrderId/github-pr-evidence", async (c) 
       installationToken = "";
     }
   } catch (error) {
-    return c.json({ error: error instanceof Error ? error.message : "GitHub PR evidence sync failed" }, 500);
+    // This handler loads the GitHub App private key and mints an installation
+    // token; a raw exception message can carry PEM material or host paths.
+    return c.json({ error: safeClientError(error) }, 500);
   }
 });
 
@@ -1492,8 +1528,8 @@ app.post("/classify", requireAuth(), async (c) => {
     const result = await router.routeAsync(context);
     return c.json(result);
   } catch (err: any) {
-    console.error("[orchestration] /classify error:", err);
-    return c.json({ error: err?.message ?? "Classification failed" }, 500);
+    console.error("[orchestration] /classify error:", safeClientError(err));
+    return c.json({ error: safeClientError(err) }, 500);
   }
 });
 
@@ -1502,6 +1538,25 @@ app.post("/classify", requireAuth(), async (c) => {
 // ============================================================================
 
 const gatewayProxy = createGatewayProxy({
+  // The upgrade bypasses Hono middleware, so authorization is enforced here.
+  allowWs: (req) => {
+    const denial = gatewayUpgradeDenialReason({
+      pathname: (() => {
+        try {
+          return new URL(req.url ?? "", "http://localhost").pathname;
+        } catch {
+          return null;
+        }
+      })(),
+      origin: req.headers.origin as string | undefined,
+      authorization: req.headers.authorization as string | undefined,
+      expectedToken: (process.env.ORCHESTRATION_API_TOKEN || process.env.MC_API_TOKEN || "").trim() || null,
+      production: process.env.NODE_ENV === "production",
+      allowedOrigins: ALLOWED_GATEWAY_ORIGINS,
+    });
+    if (denial) console.warn(`[gateway] upgrade denied: ${denial}`);
+    return denial === null;
+  },
   loadUpstreamSettings: async () => {
     const conn = await client.query(ConvexQueries.gatewayConnection.get as any, {});
     const url = conn?.url?.trim() ?? "";
@@ -1517,6 +1572,10 @@ const gatewayProxy = createGatewayProxy({
 // ============================================================================
 
 export function startServer() {
+  assertBrowserOriginPolicyConfigured(
+    process.env.NODE_ENV === "production",
+    ALLOWED_GATEWAY_ORIGINS,
+  );
   console.log(`[orchestration] Mission Control Orchestration Server`);
   console.log(`[orchestration] Convex URL: ${CONVEX_URL ? "configured" : "MISSING"}`);
   console.log(`[orchestration] Project: ${PROJECT_SLUG}`);

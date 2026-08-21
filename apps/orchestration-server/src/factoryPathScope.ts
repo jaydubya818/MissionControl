@@ -7,12 +7,30 @@ export interface FrozenCodeScope {
 }
 
 export function validateChangedFileScope(changedFiles: string[], scope: FrozenCodeScope) {
+  // A path that cannot be normalized (absolute, traversing, empty) must fail
+  // the scope gate rather than being silently dropped — dropping it made the
+  // gate return ok:true for exactly the inputs it exists to reject. The
+  // equivalent workflow-engine implementation (repositoryScope) fails closed.
+  const invalidPaths = Array.from(new Set(
+    changedFiles.filter((file) => !normalizeRepositoryPath(file)).map((file) => String(file)),
+  )).sort();
   const normalized = Array.from(new Set(changedFiles.map(normalizeRepositoryPath).filter(Boolean))).sort();
-  const outsideScope = normalized.filter((file) =>
-    !scope.allowedPaths.some((pattern) => matchesRepositoryPattern(file, pattern))
-    || scope.excludedPaths.some((pattern) => matchesRepositoryPattern(file, pattern))
-  );
-  return { ok: outsideScope.length === 0, changedFiles: normalized, outsideScope };
+  const outsideScope = [
+    ...invalidPaths,
+    ...normalized.filter((file) =>
+      !scope.allowedPaths.some((pattern) => matchesRepositoryPattern(file, pattern))
+      || scope.excludedPaths.some((pattern) => matchesRepositoryPattern(file, pattern))
+    ),
+  ];
+  // `changedFiles` is what callers render and record as "what changed"; keeping
+  // the rejected entries out of it would re-introduce the silent drop this
+  // function exists to remove, just one boundary later.
+  return {
+    ok: outsideScope.length === 0,
+    changedFiles: [...normalized, ...invalidPaths].sort(),
+    outsideScope,
+    invalidPaths,
+  };
 }
 
 export function assertWorktreeBoundary(checkoutRoot: string, worktree: string) {

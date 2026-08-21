@@ -16,6 +16,15 @@ import type {
 } from "./sandboxProvider.js";
 import { assertSafeSandboxResourceName, redactSandboxText, validateSandboxProfile } from "./sandboxProvider.js";
 import { standaloneRestrictedSandboxBootstrapSource } from "./standaloneRestrictedSandboxBootstrapSource.js";
+import { MAX_SANDBOX_RESULT_BYTES } from "./sandboxResultBundle.js";
+
+/**
+ * `fetchResult` base64-encodes the result bundle over ssh, which inflates it by
+ * 4/3. A buffer smaller than the accepted bundle size turns a legitimately
+ * large result into an opaque ENOBUFS after the model spend has already
+ * happened, instead of the intended size error.
+ */
+const SSH_MAX_BUFFER_BYTES = Math.ceil((MAX_SANDBOX_RESULT_BYTES * 4) / 3) + 1024 * 1024;
 
 const execFileAsync = promisify(execFile);
 const EXE_DEV_HOST = "exe.dev";
@@ -166,7 +175,12 @@ export class ExeDevSandboxProvider implements SandboxProvider {
       `git clone --quiet ${REMOTE_ROOT}/repository.bundle ${REMOTE_ROOT}/repository`,
       `git -C ${REMOTE_ROOT}/repository checkout --quiet ${request.sourceSha}`,
       `rm -f ${REMOTE_ROOT}/repository.bundle`,
-      `rm -f ${REMOTE_ROOT}/result.json ${REMOTE_ROOT}/result.json.tmp-* ${REMOTE_ROOT}/diagnostics.json ${REMOTE_ROOT}/diagnostics.json.tmp-* ${REMOTE_ROOT}/executor-result.json ${RESTRICTED_SECURITY_PROOF_PATH} ${SUPERVISOR_LIFECYCLE_PATH} ${SUPERVISOR_EXIT_PATH}`,
+      // `allocate()` adopts a surviving VM with the same deterministic resource
+      // name, so a previous lease's result and supervisor pid must be cleared
+      // before the poll loop starts — otherwise the first fetchResult returns
+      // the old bundle, which is indistinguishable from this lease's because
+      // the bundle binds attempt/run/work-order/manifest but not the lease.
+      `rm -f ${REMOTE_ROOT}/result.json ${REMOTE_ROOT}/result.json.tmp-* ${REMOTE_ROOT}/diagnostics.json ${REMOTE_ROOT}/diagnostics.json.tmp-* ${REMOTE_ROOT}/executor-result.json ${RESTRICTED_SECURITY_PROOF_PATH} ${SUPERVISOR_LIFECYCLE_PATH} ${SUPERVISOR_EXIT_PATH} ${REMOTE_ROOT}/pid`,
     ].join("\n"));
     let securityProof: SandboxSecurityProof | undefined;
     if (request.security) {
@@ -392,7 +406,7 @@ export class ExeDevSshTransport implements ExeDevTransport {
     args.push(host, ...remoteCommand);
     try {
       if (input === undefined) {
-        const result = await execFileAsync("ssh", args, { maxBuffer: 12 * 1024 * 1024, timeout: 60_000 });
+        const result = await execFileAsync("ssh", args, { maxBuffer: SSH_MAX_BUFFER_BYTES, timeout: 60_000 });
         return result.stdout;
       }
       return (await spawnWithInput("ssh", args, input, 60_000)).stdout;

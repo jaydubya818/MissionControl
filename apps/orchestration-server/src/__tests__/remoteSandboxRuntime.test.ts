@@ -306,6 +306,43 @@ describe("RemoteSandboxRuntime", () => {
     }));
     expect(provider.inventory()[0].state).not.toBe("TERMINATED");
   });
+
+  it("still tears the provider resource down when the lease-fenced journal write fails", async () => {
+    // Regression: cleanup emitted SANDBOX_TERMINATION_REQUESTED before calling
+    // provider.terminate(), inside the same try. Every journal/event write is
+    // lease-fenced, and cleanup runs precisely when the lease has been lost, so
+    // the emit threw and the VM was never destroyed — it kept running and
+    // billing with no ownership record.
+    const selectedProfile = profile();
+    const bundle = resultBundle(selectedProfile);
+    const provider = new FakeSandboxProvider({ result: encodeSandboxResultBundle(bundle) });
+    const credentials = new FakeSandboxCredentialBroker();
+    const journal = new InMemoryRemoteSandboxJournal();
+    let leaseLost = false;
+    const fenced = Object.create(journal) as InMemoryRemoteSandboxJournal;
+    (fenced as any).recordEvent = async (event: any) => {
+      if (leaseLost) throw new Error("Factory attempt lease was lost before evidence could be recorded.");
+      return await journal.recordEvent(event);
+    };
+    (fenced as any).recordTermination = async (receipt: any) => {
+      if (leaseLost) throw new Error("Factory attempt lease was lost before evidence could be recorded.");
+      return await journal.recordTermination(receipt);
+    };
+    (fenced as any).recordCredentialRevoked = async (receipt: any) => {
+      if (leaseLost) throw new Error("Factory attempt lease was lost before evidence could be recorded.");
+      return await journal.recordCredentialRevoked(receipt);
+    };
+    const runtime = new RemoteSandboxRuntime(provider, credentials, fenced);
+
+    const session = await runtime.execute(request(selectedProfile), { deferCleanup: true });
+    leaseLost = true;
+    await expect(session.cleanup()).rejects.toThrow(/could not be journaled/);
+
+    // The external resource is gone and the credential is revoked even though
+    // none of it could be journaled.
+    expect(provider.inventory()[0].state).toBe("TERMINATED");
+    expect(credentials.active.size).toBe(0);
+  });
 });
 
 describe("sandbox supervisor", () => {

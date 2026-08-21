@@ -329,6 +329,15 @@ export class FactoryAttemptWorker {
       });
     }, HEARTBEAT_INTERVAL_MS);
 
+    // Irreversible external side effects (branch push, pull-request creation)
+    // must re-check fencing immediately before they run, not only at the last
+    // await boundary before them.
+    const assertLeaseCurrent = () => {
+      if (!leaseHealthy || controller.signal.aborted) {
+        throw new Error("Factory attempt lease was lost before publication could proceed.");
+      }
+    };
+
     const report = async (packet: any) => {
       if (packet?.terminal) {
         clearInterval(heartbeat);
@@ -418,6 +427,7 @@ export class FactoryAttemptWorker {
           headSha: checkpoint.candidateRevision,
           report,
           leaseId,
+          assertLeaseCurrent,
           publicationPermit: checkpoint.publicationPermit,
           requirePublicationPermit: true,
         });
@@ -739,6 +749,7 @@ export class FactoryAttemptWorker {
         policyV2,
         report,
         leaseId,
+        assertLeaseCurrent,
         requirePublicationPermit: true,
         events: verificationResult ? [] : mappedEvents,
         observations: verificationResult ? [] : traceObservations,
@@ -802,6 +813,14 @@ export class FactoryAttemptWorker {
     policyV2?: boolean;
     report: (packet: any) => Promise<any>;
     leaseId: string;
+    /**
+     * Re-assert that this worker still holds a healthy, un-aborted lease.
+     * `assertPublicationPermitCurrent` only compares in-memory values against
+     * the local clock, so without this a fenced-out worker whose heartbeat has
+     * already failed can still push a branch and open a pull request — an
+     * external, non-revocable side effect performed without authority.
+     */
+    assertLeaseCurrent?: () => void;
     publicationPermit?: { id: string; leaseId: string; validUntil: number };
     requirePublicationPermit?: boolean;
     events?: any[];
@@ -838,6 +857,7 @@ export class FactoryAttemptWorker {
       };
     }
     if (input.requirePublicationPermit) assertPublicationPermitCurrent(publicationPermit, input.leaseId, input.headSha);
+    input.assertLeaseCurrent?.();
     const installationToken = await this.dependencies.mintInstallationToken({
       appId: configuredAppId,
       installationId: input.claim.installation.installationId,
@@ -847,6 +867,7 @@ export class FactoryAttemptWorker {
     if (installationToken.expiresAt <= Date.now() + 60_000) throw new Error("GitHub installation token expires too soon for a safe push.");
     if (input.requirePublicationPermit) assertPublicationPermitCurrent(publicationPermit, input.leaseId, input.headSha);
     await this.dependencies.assertFactoryCandidateUnchanged(input.claim.worktree, input.headSha);
+    input.assertLeaseCurrent?.();
     await this.dependencies.pushFactoryBranch({
       worktree: input.claim.worktree,
       repository: input.claim.repository,
@@ -854,6 +875,7 @@ export class FactoryAttemptWorker {
       installationToken: installationToken.token,
     });
     if (input.requirePublicationPermit) assertPublicationPermitCurrent(publicationPermit, input.leaseId, input.headSha);
+    input.assertLeaseCurrent?.();
     const pullRequest = await this.dependencies.createOrReusePullRequest({
       repository: input.claim.repository,
       branch: input.claim.branch,

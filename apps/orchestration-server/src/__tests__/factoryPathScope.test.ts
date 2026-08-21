@@ -10,7 +10,24 @@ describe("Factory path scope", () => {
       ok: false,
       changedFiles: ["apps/ui/generated/schema.ts", "apps/ui/src/App.tsx"],
       outsideScope: ["apps/ui/generated/schema.ts"],
+      invalidPaths: [],
     });
+  });
+
+  it("fails the scope gate closed for paths that cannot be normalized", () => {
+    // Regression: unnormalizable entries used to be dropped by `.filter(Boolean)`,
+    // so an absolute or traversing path could never appear in outsideScope and
+    // the gate returned ok:true for exactly the inputs it exists to reject.
+    const result = validateChangedFileScope(
+      ["apps/ui/src/App.tsx", "/etc/shadow", "../../outside.ts", ""],
+      { allowedPaths: ["apps/ui/**"], excludedPaths: [] }
+    );
+    expect(result.ok).toBe(false);
+    expect(result.invalidPaths).toEqual(["", "../../outside.ts", "/etc/shadow"]);
+    expect(result.outsideScope).toEqual(expect.arrayContaining(["/etc/shadow", "../../outside.ts"]));
+    // Rejected entries stay visible in changedFiles so a caller rendering
+    // "what changed" cannot disagree with the gate that blocked it.
+    expect(result.changedFiles).toEqual(["", "../../outside.ts", "/etc/shadow", "apps/ui/src/App.tsx"]);
   });
 
   it("treats a non-glob directory as a subtree", () => {

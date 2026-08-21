@@ -399,9 +399,20 @@ atomicWrite(diagnosticsPath, JSON.stringify({
 trace("DIAGNOSTICS_WRITTEN", { file: fileObservation(diagnosticsPath) });
 if (config.faultInjection?.crashAfterDiagnostics) throw new Error("Injected supervisor crash after executor diagnostics persistence.");
 
-const patch = repositoryGit(["diff", "--binary", "--full-index", config.sourceSha, "--"], { maxBuffer: 8388608 });
+// Stage the harness's changes (respecting .gitignore) before computing the
+// candidate, bounded by the frozen code scope. A harness creates new files
+// without staging them, and \`git diff <sha>\` cannot see untracked paths, so
+// the bundle would carry a half-change that the host's changed-file
+// cross-check cannot detect — the host list is derived from the same patch.
+// The pathspec mirrors the host-side \`stagingPathspec\` in sandboxSupervisor.ts;
+// standaloneSupervisorStagingPathspec keeps the two derivations equivalent.
+const stagePaths = (Array.isArray(manifest.repository && manifest.repository.allowedPaths) ? manifest.repository.allowedPaths : [])
+  .map((entry) => String(entry === undefined || entry === null ? "" : entry).trim())
+  .filter((entry) => entry.length > 0 && !entry.startsWith("/") && !entry.includes(".."));
+repositoryGit(["add", "-A", "--", ...(stagePaths.length > 0 ? stagePaths : ["."])], { encoding: "utf8" });
+const patch = repositoryGit(["diff", "--cached", "--binary", "--full-index", config.sourceSha, "--"], { maxBuffer: 8388608 });
 const patchContent = patch.toString("base64");
-const changedFiles = repositoryGit(["diff", "--name-only", config.sourceSha, "--"], { encoding: "utf8" }).split("\n").map((item) => item.trim()).filter(Boolean).sort();
+const changedFiles = repositoryGit(["diff", "--cached", "--name-only", config.sourceSha, "--"], { encoding: "utf8" }).split("\n").map((item) => item.trim()).filter(Boolean).sort();
 const finishedAt = Date.now();
 trace("RESULT_FINALIZATION_STARTED", { changedFileCount: changedFiles.length });
 const bundle = {
