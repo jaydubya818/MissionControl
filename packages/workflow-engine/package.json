@@ -17,6 +17,11 @@
       "import": "./dist/verification.js",
       "default": "./dist/verification.js"
     },
+    "./verification-authority": {
+      "types": "./dist/verificationAuthority.d.ts",
+      "import": "./dist/verificationAuthority.js",
+      "default": "./dist/verificationAuthority.js"
+    },
     "./verification-identity": {
       "types": "./dist/verificationIdentity.d.ts",
       "import": "./dist/verificationIdentity.js",

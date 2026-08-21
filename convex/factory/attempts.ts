@@ -1319,6 +1319,17 @@ export const reportVerificationInternal = internalMutation({
         lease: undefined,
         executionPhase: "TERMINAL",
         steps: reconcileTerminalWorkflowSteps(run.steps, terminal.status, failureReason, now),
+        // A Verification Subject is immutable, so without an explicit
+        // supersede marker `schedulePolicyV2VerificationAttempt` keeps
+        // returning this failed Attempt and the exact-current evaluator keeps
+        // denying on it — the candidate would be permanently unverifiable.
+        // Marking it superseded allows exactly one replacement Attempt for the
+        // same subject; it never resurrects an older passing result, because a
+        // passing Attempt is never superseded and therefore blocks rescheduling.
+        // The other two paths that terminate a Verification Attempt
+        // (`workflowRuns.requestCancellation` and `workflowRuns.updateStatus`)
+        // apply the same marker via `markVerificationAttemptSuperseded`.
+        metadata: { ...(run.metadata ?? {}), verificationSupersededAt: now },
       });
       await insertEvent(ctx, run, {
         idempotencyKey: `verification-terminal:${run.runId}:${terminal.status}`,
@@ -1413,6 +1424,10 @@ export const reportVerificationInternal = internalMutation({
       } as any,
       isolation,
       reportCapability: "verification:report",
+      // Derived from the packet, server-side: the authority check is a system
+      // check the verifier cannot omit, so its absence is as meaningful as a
+      // failure and is reported as "not ruled out" rather than as a pass.
+      authorityStatus: verificationAuthorityStatusFromPacket(packet),
     });
     const plan = verificationRun.verificationPlan;
     const requiredEvidenceById = new Map(plan.requiredEvidence.map((item: any) => [item.id, item]));
@@ -1907,6 +1922,22 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     verificationSubject: subject,
     verificationSubjectDigest: subject.digest,
   };
+  // Validate the frozen Verification Plan BEFORE any write. A Convex mutation
+  // does not roll back writes when the caller catches the error, so compiling
+  // after the insert leaves an orphan PENDING VERIFICATION Attempt with no
+  // verificationRuns row — which then blocks accept, dispatch, and every
+  // rescheduling attempt (the reuse guard matches it by subject digest).
+  compilePolicyV2VerificationPlan({
+    now,
+    workOrder,
+    sourceAttempt,
+    verificationAttemptId: "verification-attempt-precheck",
+    verificationSubject: subject,
+    factoryDefinitionId: String(definition._id),
+    factoryDefinitionVersionId: String(version._id),
+    executorInvocationId,
+  });
+
   const workflowRunId = await ctx.db.insert("workflowRuns", {
     tenantId: workOrder.tenantId,
     runId,
@@ -2949,4 +2980,20 @@ function optionalText(value: unknown, max: number): string | undefined {
 
 function finiteNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/**
+ * Read the always-on verification-authority check out of a reported packet.
+ *
+ * Returns "FAIL" when the check failed, "PASS" when it passed, and `undefined`
+ * when the packet contains no such check at all — which an older or a
+ * tampered-with verifier would produce. `deriveVerificationIndependence`
+ * treats `undefined` as "not ruled out", never as a pass.
+ */
+function verificationAuthorityStatusFromPacket(packet: any): "PASS" | "FAIL" | undefined {
+  const check = (packet?.checks ?? []).find(
+    (item: any) => item?.verifierId === "factory-verification-authority",
+  );
+  if (!check) return undefined;
+  return check.status === "PASS" ? "PASS" : "FAIL";
 }

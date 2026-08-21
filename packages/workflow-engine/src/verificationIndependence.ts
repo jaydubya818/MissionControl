@@ -61,6 +61,19 @@ export type VerificationIndependenceInput = {
     outputSnapshotContentHash?: string;
   };
   reportCapability: string;
+  /**
+   * Verdict of the always-on verification-authority check.
+   *
+   * Lineage isolation (separate Attempt, lease, worktree, invocation) proves
+   * the verifier was a *different process*. It does not prove the verifier
+   * applied a *different standard*: a candidate that rewrote its own
+   * `package.json#scripts.test` is verified by a perfectly isolated verifier
+   * running the candidate's own definition of success.
+   *
+   * Independence is therefore not established when this is "FAIL". Absent is
+   * treated as absent, not as pass — see the check below.
+   */
+  authorityStatus?: "PASS" | "FAIL";
 };
 
 export type VerificationIndependenceResult = {
@@ -121,6 +134,9 @@ export function deriveVerificationIndependence(input: VerificationIndependenceIn
     reasons.push("Verification must use a separate execution lease.");
   }
   if (input.reportCapability !== "verification:report") reasons.push("Evidence did not arrive through the Verification Factory report capability.");
+  if (input.authorityStatus === "FAIL") {
+    reasons.push("The candidate modified files that determine its own verification verdict; isolation cannot make that independent.");
+  }
   if (input.isolation.mode === "LOCAL_DOCKER_CANARY") reasons.push("The development-only local Docker canary cannot establish verification independence.");
   if (!input.isolation.sandboxId || !input.isolation.rootBindingDigest) reasons.push("Verification isolation attestation is incomplete.");
   const { rootBindingDigest: _reportedRootBindingDigest, ...isolationBinding } = input.isolation;
@@ -169,7 +185,14 @@ export function deriveVerificationIndependence(input: VerificationIndependenceIn
     sourceAttemptId: expected.sourceAttemptId,
     verificationAttemptId: expected.verificationAttemptId,
     passed: reasons.length === 0,
-    reasons: reasons.length ? reasons : ["Mission Control proved separate Attempt, FactoryVersion, invocation, lease, capability, and isolated subject lineage."],
+    reasons: reasons.length
+      ? reasons
+      : [
+          "Mission Control proved separate Attempt, FactoryVersion, invocation, lease, capability, and isolated subject lineage" +
+            (input.authorityStatus === "PASS"
+              ? ", and the candidate did not modify any file determining its own verdict."
+              : ". Verification-authority status was not reported, so self-certification was not ruled out on this axis."),
+        ],
   };
 }
 

@@ -99,7 +99,11 @@ describe("VerificationEngine", () => {
     const result = await new VerificationEngine(baseVerifiers()).execute({ workflowRunId: "run-1", workOrder: workOrder(), candidate });
     expect(result.verdict).toBe("VERIFIED");
     expect(result.coverage).toEqual([expect.objectContaining({ criterionId: "ac-1", status: "EVIDENCED" })]);
-    expect(result.checks.map((check) => check.status)).toEqual(["PASS", "PASS", "PASS"]);
+    // Four, not three: the always-on verification-authority system check runs
+    // ahead of the change budget and negative constraints. See
+    // verificationAuthority.ts — it cannot be omitted by the WorkOrder under test.
+    expect(result.checks.map((check) => check.status)).toEqual(["PASS", "PASS", "PASS", "PASS"]);
+    expect(result.checks.map((check) => check.verifierId)).toContain("factory-verification-authority");
   });
 
   it("returns NOT_VERIFIED when tests pass but mandatory criterion evidence is missing", async () => {

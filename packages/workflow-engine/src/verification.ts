@@ -1,3 +1,9 @@
+import {
+  authorityDigestInput,
+  evaluateVerificationAuthority,
+  type VerificationAuthorityPolicy,
+} from "./verificationAuthority.js";
+
 export type VerificationCheckStatus = "PASS" | "FAIL" | "SKIPPED" | "NOT_CONFIGURED" | "ERROR";
 export type VerificationVerdict = "VERIFIED" | "NOT_VERIFIED" | "BLOCKED" | "REQUIRES_HUMAN_REVIEW";
 
@@ -17,10 +23,43 @@ export type CommandClass =
   | "MIGRATION" | "INFRASTRUCTURE" | "PRODUCTION_ACCESS" | "SECRETS_ACCESS"
   | "DESTRUCTIVE" | "PUBLISH";
 
+/**
+ * How independent the evidence for a criterion has to be.
+ *
+ * Two different properties were previously collapsed into one boolean:
+ *
+ * - **Lineage independence** — the verifier ran as a separate Attempt, lease and
+ *   executor invocation from the builder. This is what `independent: boolean`
+ *   has always meant, and it is what `deriveVerificationIndependence` proves.
+ * - **Definition independence** — the candidate does not control what the check
+ *   considers "passing". `pnpm test` is lineage-independent and definition-
+ *   dependent at the same time.
+ *
+ * `independent: true` keeps its original lineage meaning so existing contracts
+ * are unchanged. `independenceLevel` is the new, explicit axis, and it defaults
+ * to `CANDIDATE_DEPENDENT_ALLOWED` — i.e. exactly the behaviour every existing
+ * contract already has. A contract opts in to the stronger requirement; nothing
+ * is silently tightened underneath deployments that never asked for it.
+ */
+export type EvidenceIndependenceLevel =
+  /** Any evidence for the category counts. */
+  | "ANY_VERIFICATION"
+  /** Repository-defined checks count. The default, and correct for most work. */
+  | "CANDIDATE_DEPENDENT_ALLOWED"
+  /** Only evidence the candidate cannot have defined counts. */
+  | "INDEPENDENT_REQUIRED";
+
 export interface EvidenceRequirement {
   category: EvidenceCategory;
   minimumCount: number;
+  /** Lineage independence: produced by a verifier separate from the builder. */
   independent: boolean;
+  /**
+   * Definition independence. Absent means `CANDIDATE_DEPENDENT_ALLOWED`.
+   * Set `INDEPENDENT_REQUIRED` for security, authorization, sandbox isolation,
+   * publication authority, and acceptance invariants.
+   */
+  independenceLevel?: EvidenceIndependenceLevel;
 }
 
 export interface AcceptanceCriterionSpec {
@@ -76,6 +115,16 @@ export interface VerificationContract {
   enforcementMode: "OBSERVE_ONLY" | "ENFORCED";
   checks: VerificationCheckSpec[];
   requireHumanReview: boolean;
+  /**
+   * Permission for this WorkOrder's candidate to change files that determine
+   * its own verification verdict (package scripts, Makefiles, test configs,
+   * tests themselves).
+   *
+   * Absent means "not permitted", which is the safe default. It is part of the
+   * FROZEN contract precisely so that the decision predates the candidate:
+   * a candidate can never grant itself this. See `verificationAuthority.ts`.
+   */
+  authorityPolicy?: VerificationAuthorityPolicy;
 }
 
 export interface WorkOrderVerificationSpec {
@@ -107,7 +156,18 @@ export interface VerificationEvidenceDraft {
   result: VerificationCheckStatus;
   summary: string;
   acceptanceCriterionIds: string[];
-  producer: { id: string; role: string; independent: boolean };
+  producer: {
+    id: string;
+    role: string;
+    /** Lineage independence — a separate verifier process produced this. */
+    independent: boolean;
+    /**
+     * Definition independence — whether the candidate controls what this check
+     * treats as passing. Absent on evidence produced before the axis existed,
+     * and treated as CANDIDATE_DEPENDENT (the safe reading) when required.
+     */
+    definitionAuthority?: "CANDIDATE_DEPENDENT" | "INDEPENDENT";
+  };
   contentHash?: string;
   artifactReferences?: string[];
   metadata?: Record<string, unknown>;
@@ -172,6 +232,15 @@ export interface VerificationEngineResult {
   verdictReasons: string[];
 }
 
+/**
+ * Always-on system check. Unlike a negative constraint, this is NOT opt-in:
+ * a WorkOrder cannot escape it by simply not declaring it. See
+ * `verificationAuthority.ts` for why.
+ */
+const VERIFICATION_AUTHORITY_CHECK: VerificationCheckSpec = {
+  id: "factory-verification-authority", name: "Verification authority", category: "POLICY",
+  verifierId: "factory-verification-authority", mandatory: true, acceptanceCriterionIds: [], evidenceCategory: "POLICY_RESULT",
+};
 const CHANGE_BUDGET_CHECK: VerificationCheckSpec = {
   id: "factory-change-budget", name: "Change budget", category: "CHANGE_BUDGET",
   verifierId: "factory-change-budget", mandatory: true, acceptanceCriterionIds: [], evidenceCategory: "POLICY_RESULT",
@@ -182,7 +251,18 @@ const NEGATIVE_CONSTRAINTS_CHECK: VerificationCheckSpec = {
 };
 
 export class VerificationEngine {
-  constructor(private readonly verifiers: Verifier[], private readonly engineVersion = "verification-engine/v1") {}
+  private readonly verifiers: Verifier[];
+
+  constructor(verifiers: Verifier[], private readonly engineVersion = "verification-engine/v1") {
+    // The authority verifier is supplied by the engine rather than by the
+    // caller. A control that a caller can forget to register is a control an
+    // attacker only has to get omitted once; making it structural means no
+    // call site can produce a VERIFIED verdict without it having run.
+    const hasAuthorityVerifier = verifiers.some(
+      (verifier) => verifier.id === VERIFICATION_AUTHORITY_CHECK.verifierId,
+    );
+    this.verifiers = hasAuthorityVerifier ? verifiers : [new VerificationAuthorityVerifier(), ...verifiers];
+  }
 
   async execute(context: VerificationExecutionContext): Promise<VerificationEngineResult> {
     const startedAt = Date.now();
@@ -294,6 +374,48 @@ export class NegativeConstraintVerifier implements Verifier {
   }
 }
 
+/**
+ * Always-on check that the candidate did not redefine its own proof.
+ *
+ * Emits `metadata.blocking = true` on failure, so `evaluateVerificationOutcome`
+ * returns BLOCKED rather than merely NOT_VERIFIED — this is a governance
+ * violation, not a failing test.
+ */
+export class VerificationAuthorityVerifier implements Verifier {
+  readonly id = "factory-verification-authority";
+  readonly name = "Verification authority verifier";
+  supports(check: VerificationCheckSpec) { return check.verifierId === this.id; }
+
+  async execute(context: VerificationExecutionContext, check: VerificationCheckSpec): Promise<VerificationCheckResult> {
+    const startedAt = Date.now();
+    const contract = context.workOrder.verificationContract;
+    const evaluation = evaluateVerificationAuthority({
+      candidate: context.candidate,
+      checks: contract?.checks ?? [],
+      policy: contract?.authorityPolicy,
+    });
+    const violations = evaluation.findings.map((finding) => finding.message);
+    const completedAt = Date.now();
+    return {
+      checkId: check.id, name: check.name, category: check.category, verifierId: this.id, mandatory: check.mandatory,
+      status: evaluation.status, summary: evaluation.summary, acceptanceCriterionIds: [],
+      startedAt, completedAt, durationMs: Math.max(0, completedAt - startedAt), violations,
+      evidence: [{
+        evidenceKey: `${context.workflowRunId}:${check.id}`, category: "POLICY_RESULT", result: evaluation.status,
+        summary: evaluation.summary, acceptanceCriterionIds: [],
+        producer: { id: this.id, role: "FACTORY_POLICY", independent: true },
+        metadata: {
+          findings: evaluation.findings,
+          allowedMutations: evaluation.allowed,
+          commandAuthority: evaluation.commandAuthority,
+          authorityDigestInput: authorityDigestInput(evaluation),
+        },
+      }],
+      metadata: { blocking: evaluation.status === "FAIL" },
+    };
+  }
+}
+
 export function calculateCriterionCoverage(criteria: AcceptanceCriterionSpec[], checks: VerificationCheckResult[]): CriterionCoverage[] {
   const usableEvidence = checks.filter((check) => check.status === "PASS").flatMap((check) => check.evidence).filter((evidence) => evidence.result === "PASS");
   return criteria.map((criterion) => {
@@ -301,8 +423,26 @@ export function calculateCriterionCoverage(criteria: AcceptanceCriterionSpec[], 
     const required = criterion.requiredEvidence?.length ? criterion.requiredEvidence : [{ category: undefined, minimumCount: 1, independent: false }];
     const missingEvidence: string[] = [];
     for (const requirement of required) {
-      const matches = criterionEvidence.filter((evidence) => (!requirement.category || evidence.category === requirement.category) && (!requirement.independent || evidence.producer.independent));
-      if (matches.length < requirement.minimumCount) missingEvidence.push(`${requirement.category ?? "ANY"}: ${matches.length}/${requirement.minimumCount}${requirement.independent ? " independent" : ""}`);
+      const level = (requirement as EvidenceRequirement).independenceLevel ?? "CANDIDATE_DEPENDENT_ALLOWED";
+      const matches = criterionEvidence.filter((evidence) => {
+        if (requirement.category && evidence.category !== requirement.category) return false;
+        // Lineage requirement, unchanged.
+        if (requirement.independent && !evidence.producer.independent) return false;
+        // Definition requirement. Missing definitionAuthority reads as
+        // CANDIDATE_DEPENDENT, so old evidence can never satisfy a new
+        // INDEPENDENT_REQUIRED criterion by omission.
+        if (level === "INDEPENDENT_REQUIRED" && evidence.producer.definitionAuthority !== "INDEPENDENT") {
+          return false;
+        }
+        return true;
+      });
+      if (matches.length < requirement.minimumCount) {
+        const qualifiers = [
+          requirement.independent ? "independent" : "",
+          level === "INDEPENDENT_REQUIRED" ? "candidate-independent" : "",
+        ].filter(Boolean).join(", ");
+        missingEvidence.push(`${requirement.category ?? "ANY"}: ${matches.length}/${requirement.minimumCount}${qualifiers ? ` ${qualifiers}` : ""}`);
+      }
     }
     return {
       criterionId: criterion.id, title: criterion.title, status: missingEvidence.length ? "MISSING" : "EVIDENCED",
@@ -339,6 +479,10 @@ export function matchesRepositoryPattern(file: string, rawPattern: string) {
 function addSystemChecks(checks: VerificationCheckSpec[], workOrder: WorkOrderVerificationSpec) {
   const result = [...checks];
   if (workOrder.changeBudget && !result.some((check) => check.verifierId === CHANGE_BUDGET_CHECK.verifierId)) result.unshift(CHANGE_BUDGET_CHECK);
+  // Unconditional: the change budget and negative constraints are opt-in per
+  // WorkOrder, but "the candidate may not redefine its own proof" is not
+  // negotiable by the WorkOrder that is being proved.
+  if (!result.some((check) => check.verifierId === VERIFICATION_AUTHORITY_CHECK.verifierId)) result.unshift(VERIFICATION_AUTHORITY_CHECK);
   if (workOrder.negativeConstraints.length && !result.some((check) => check.verifierId === NEGATIVE_CONSTRAINTS_CHECK.verifierId)) result.unshift(NEGATIVE_CONSTRAINTS_CHECK);
   return result;
 }

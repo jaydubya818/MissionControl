@@ -2,8 +2,13 @@ import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
+  classifyAuthorityMutations,
+  resolveCheckIndependence,
+} from "@mission-control/workflow-engine/verification-authority";
+import {
   ChangeBudgetVerifier,
   NegativeConstraintVerifier,
+  VerificationAuthorityVerifier,
   VerificationEngine,
   type CandidateChange,
   type VerificationCheckResult,
@@ -32,6 +37,9 @@ export async function executeIndependentVerification(input: {
 }) {
   const workOrder = normalizeSpecification(input);
   const engine = new VerificationEngine([
+    // Authority first: if the candidate redefined its own proof, the command
+    // results below are meaningless regardless of what they report.
+    new VerificationAuthorityVerifier(),
     new ChangeBudgetVerifier(),
     new NegativeConstraintVerifier(),
     new FactoryCommandVerifier(input.repositoryRoot),
@@ -70,14 +78,14 @@ class FactoryCommandVerifier implements Verifier {
     try {
       const result = await execFileAsync(command.executable, command.args, {
         cwd: this.repositoryRoot,
-        env: sanitizedEnvironment(),
+        env: sanitizedEnvironment(this.repositoryRoot),
         timeout: command.timeoutMs,
         maxBuffer: 4 * 1024 * 1024,
         signal: context.signal,
       });
       const completedAt = Date.now();
       const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
-      return commandResult(check, startedAt, completedAt, "PASS", "Command completed successfully.", output, command);
+      return commandResult(check, startedAt, completedAt, "PASS", "Command completed successfully.", output, command, context);
     } catch (error: any) {
       const completedAt = Date.now();
       const output = `${error?.stdout ?? ""}\n${error?.stderr ?? ""}`.trim();
@@ -85,7 +93,7 @@ class FactoryCommandVerifier implements Verifier {
       const summary = timedOut
         ? `Command timed out after ${command.timeoutMs}ms.`
         : `Command failed${Number.isSafeInteger(error?.code) ? ` with exit ${error.code}` : ""}.`;
-      return commandResult(check, startedAt, completedAt, timedOut ? "ERROR" : "FAIL", summary, output, command);
+      return commandResult(check, startedAt, completedAt, timedOut ? "ERROR" : "FAIL", summary, output, command, context);
     }
   }
 }
@@ -98,9 +106,20 @@ function commandResult(
   summary: string,
   output: string,
   command: NonNullable<VerificationCheckSpec["command"]>,
+  context: VerificationExecutionContext,
 ): VerificationCheckResult {
   const safeOutput = redact(output).slice(-20_000);
   const evidenceKey = `${check.id}:command-output`;
+  // `independent: true` used to be hardcoded here, on every command result,
+  // including `pnpm test` against a package.json the candidate had just
+  // rewritten. `calculateCriterionCoverage` filters acceptance evidence on this
+  // exact flag, so a Quality Contract requiring independent evidence was being
+  // satisfied by the candidate's own definition of passing. It is now derived.
+  const independence = resolveCheckIndependence({
+    verifierId: check.verifierId,
+    command,
+    mutatedSurfaces: classifyAuthorityMutations(context.candidate).map((mutation) => mutation.surface),
+  });
   return {
     checkId: check.id, name: check.name, category: check.category, verifierId: check.verifierId, mandatory: check.mandatory,
     status, summary, acceptanceCriterionIds: check.acceptanceCriterionIds, startedAt, completedAt,
@@ -108,7 +127,16 @@ function commandResult(
     evidence: [{
       evidenceKey, category: check.evidenceCategory, result: status, summary,
       acceptanceCriterionIds: check.acceptanceCriterionIds,
-      producer: { id: "factory-command/v1", role: "INDEPENDENT_VERIFIER", independent: true },
+      producer: {
+        id: "factory-command/v1",
+        role: "INDEPENDENT_VERIFIER",
+        // Lineage independence: the Verification Attempt genuinely is a
+        // separate attempt, lease and invocation from the builder. Unchanged.
+        independent: true,
+        // Definition independence: derived, never self-declared. This is the
+        // axis that says whether the candidate wrote what "passing" means.
+        definitionAuthority: independence.independent ? "INDEPENDENT" : "CANDIDATE_DEPENDENT",
+      },
       contentHash: `sha256:${createHash("sha256").update(output).digest("hex")}`,
       metadata: {
         executable: command.executable,
@@ -116,6 +144,8 @@ function commandResult(
         commandClass: command.commandClass,
         output: safeOutput,
         outputTruncated: output.length > safeOutput.length,
+        // Surfaced so an operator can see WHY a green check is not independent.
+        independenceReason: independence.reason,
       },
     }],
     metadata: {
@@ -160,9 +190,38 @@ function normalizeSpecification(input: { workOrderId: string; workOrderRevisionN
   };
 }
 
-function sanitizedEnvironment() {
-  const allowed = ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "CI", "NODE_ENV"];
-  return Object.fromEntries(allowed.flatMap((key) => process.env[key] ? [[key, process.env[key]!]] : []));
+/**
+ * Environment handed to a candidate-controlled command.
+ *
+ * `HOME` used to be forwarded. That is a credential-discovery vector, not a
+ * convenience: the verifier runs on the same host as the Factory worker, so
+ * `$HOME` is where `~/.ssh/`, `~/.config/gh/hosts.yml` (GitHub CLI tokens),
+ * `~/.npmrc` (registry auth), `~/.git-credentials` and `~/.aws/credentials`
+ * live. A candidate whose `package.json#scripts.test` reads those files and
+ * prints them gets them straight into the verification log — and the command
+ * allowlist never sees anything but `pnpm`.
+ *
+ * `HOME` is now redirected to a caller-supplied scratch directory (the
+ * candidate worktree if none is given), so tools that require a home directory
+ * still work and none of them resolve to the operator's real one.
+ *
+ * Lifecycle scripts are disabled across the Node package managers. `preinstall`
+ * / `postinstall` / `prepare` are candidate-authored shell that would otherwise
+ * execute before any check began.
+ */
+function sanitizedEnvironment(scratchHome: string) {
+  const allowed = ["PATH", "TMPDIR", "LANG", "LC_ALL", "CI", "NODE_ENV"];
+  return {
+    ...Object.fromEntries(allowed.flatMap((key) => (process.env[key] ? [[key, process.env[key]!]] : []))),
+    HOME: scratchHome,
+    npm_config_ignore_scripts: "true",
+    npm_config_yes: "false",
+    NPM_CONFIG_IGNORE_SCRIPTS: "true",
+    // Refuse implicit registry auth even if a candidate writes its own .npmrc.
+    npm_config_userconfig: `${scratchHome}/.npmrc-verifier-empty`,
+    GIT_TERMINAL_PROMPT: "0",
+    GIT_ASKPASS: "",
+  };
 }
 
 function redact(value: string) {
