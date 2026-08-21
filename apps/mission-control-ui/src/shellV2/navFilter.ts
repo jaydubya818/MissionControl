@@ -45,7 +45,13 @@ export function filterNavGroups(
         })
         .map((item) => ({
           ...item,
-          badge: enforceRouteCapabilities ? routeBadge(item.view) : item.badge,
+          // Maturity labelling is unconditional. Enforcement decides whether a
+          // Preview/Demo route is *hidden*; it must not decide whether the
+          // operator can *tell* a demo surface from a governed Live one.
+          badge:
+            routeBadge(item.view, {
+              labelUndeclaredAsPreview: !enforceRouteCapabilities,
+            }) ?? item.badge,
         })),
     }))
     .filter((group) => group.items.length > 0);

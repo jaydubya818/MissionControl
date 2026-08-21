@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { safeExternalUrl, safeHttpsUrl } from "../lib/safeExternalUrl";
 
 type ReviewLevel = "BASIC" | "INTERMEDIATE" | "ADVANCED";
 
@@ -137,20 +138,9 @@ const evidenceTone: Record<string, string> = {
   MISSING: "border-warning/30 text-warning",
 };
 
-function externalHttpUrl(value: string | null) {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
-  } catch {
-    return null;
-  }
-}
-
-function externalHttpsUrl(value: string | null) {
-  const url = externalHttpUrl(value);
-  return url?.startsWith("https:") ? url : null;
-}
+// Thin aliases over the single shared policy in lib/safeExternalUrl.
+const externalHttpUrl = (value: string | null) => safeExternalUrl(value) ?? null;
+const externalHttpsUrl = (value: string | null) => safeHttpsUrl(value) ?? null;
 
 function shortRevision(value: string | null) {
   return value?.slice(0, 10) ?? "—";

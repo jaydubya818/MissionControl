@@ -1,3 +1,4 @@
+import { safeExternalUrl } from "./safeExternalUrl";
 export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -8,8 +9,10 @@ export function escapeHtml(text: string): string {
 
 function safeExternalHref(href: string): string {
   const trimmed = href.trim();
-  if (/^https?:\/\//i.test(trimmed) || /^mailto:/i.test(trimmed)) return trimmed;
-  return "#";
+  // Same http(s) policy as every other external link in the app, plus mailto,
+  // which is safe and meaningful inside rendered documentation.
+  if (/^mailto:/i.test(trimmed)) return trimmed;
+  return safeExternalUrl(trimmed) ?? "#";
 }
 
 function inlineMarkdown(

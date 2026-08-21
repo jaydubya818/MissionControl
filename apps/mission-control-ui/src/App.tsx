@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { type MainView, type CommandSection } from "./TopNav";
+import { RouteErrorBoundary } from "./RouteErrorBoundary";
 import { CommandNav } from "./components/CommandNav";
 import { TabBar, type TabItem } from "./components/TabBar";
 import { AppTopBar } from "./components/AppTopBar";
@@ -776,9 +777,12 @@ export default function App() {
     },
     [availableProjects, requestedProjectId]
   );
+  // Exact count from the single authoritative queue definition. Reading
+  // `listPending(limit).length` here is what made the header bell and the
+  // sidebar badge disagree about the same queue on the same screen.
   const pendingApprovals = useQuery(
-    api.approvals.listPending,
-    projectId ? { projectId, limit: 10 } : "skip"
+    api.approvals.countPending,
+    projectId ? { projectId } : "skip"
   );
 
   // ── Effects ──────────────────────────────────────────────────────────────
@@ -1300,11 +1304,19 @@ export default function App() {
             }
             footer={authRuntime.userControl}
             onOpenSearch={() => open("commandPalette")}
-            pendingApprovals={pendingApprovals?.length ?? 0}
+            pendingApprovals={pendingApprovals?.total ?? 0}
             onOpenApprovals={() => open("approvals")}
             projectId={projectId}
           >
-            <Suspense fallback={<SectionLoadingState />}>{renderSection()}</Suspense>
+            {/* Route-scoped isolation: a broken view must not take the shell
+                down with it. Keyed by route so navigating away recovers. */}
+            <RouteErrorBoundary
+              key={currentView}
+              viewKey={currentView}
+              onNavigateHome={() => setCurrentView("home")}
+            >
+              <Suspense fallback={<SectionLoadingState />}>{renderSection()}</Suspense>
+            </RouteErrorBoundary>
           </AppShellV2>
           <Suspense fallback={null}>
             <TaskDrawerTabs
@@ -1391,7 +1403,7 @@ export default function App() {
           aiStatus={aiStatus}
           timeStr={timeStr}
           dateStr={dateStr}
-          pendingApprovals={pendingApprovals?.length ?? 0}
+          pendingApprovals={pendingApprovals?.total ?? 0}
           projectId={projectId}
           onNewTask={() => open("createTask")}
           onOpenControls={() => open("operatorControls")}
@@ -1427,9 +1439,15 @@ export default function App() {
 
         <div className="flex flex-1 overflow-hidden">
           <PageTransition viewKey={currentView}>
-            <Suspense fallback={<SectionLoadingState />}>
-              {renderSection()}
-            </Suspense>
+            <RouteErrorBoundary
+              key={currentView}
+              viewKey={currentView}
+              onNavigateHome={() => setCurrentView("home")}
+            >
+              <Suspense fallback={<SectionLoadingState />}>
+                {renderSection()}
+              </Suspense>
+            </RouteErrorBoundary>
           </PageTransition>
         </div>
 

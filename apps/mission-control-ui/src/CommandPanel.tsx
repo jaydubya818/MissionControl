@@ -37,7 +37,6 @@ const QUICK_ACTIONS: QuickAction[] = [
   { id: "reverse-prompt",  label: "Reverse Prompt",     description: "AI suggests tasks to advance your mission",  icon: Sparkles,      accent: "text-ink-secondary", variant: "default"  },
   { id: "pause-all",       label: "Pause All Agents",   description: "Immediately halt all active agents",         icon: Pause,         accent: "text-warn",          variant: "warning"  },
   { id: "resume-all",      label: "Resume All Agents",  description: "Resume all paused agents",                   icon: Play,          accent: "text-ok",            variant: "success"  },
-  { id: "approve-all",     label: "Bulk Approve",       description: "Approve all pending low-risk items",         icon: CheckCircle2,  accent: "text-ok",            variant: "success"  },
   { id: "broadcast",       label: "Broadcast",          description: "Send directive to all active agents",        icon: Radio,         accent: "text-ink-secondary", variant: "info"     },
   { id: "emergency-stop",  label: "Emergency Stop",     description: "Kill switch — quarantine all agents",        icon: AlertTriangle, accent: "text-err",           variant: "danger"   },
 ];
@@ -157,13 +156,13 @@ function AgentFleet({ projectId, onToast }: { projectId: Id<"projects"> | null; 
 // ---------------------------------------------------------------------------
 
 function ApprovalQueue({ projectId, onToast }: { projectId: Id<"projects"> | null; onToast: (msg: string, err?: boolean) => void }) {
-  const approvals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 6 } : { limit: 6 });
+  const approvals = useQuery(api.approvals.pendingSummary, projectId ? { projectId, limit: 6 } : "skip");
   const approve = useMutation(api.approvals.approve);
   const deny = useMutation(api.approvals.deny);
   const [loading, setLoading] = useState<string | null>(null);
 
   if (!approvals) return <div className="text-[12.5px] text-ink-muted text-center py-4">Loading…</div>;
-  if (approvals.length === 0) return (
+  if (approvals.total === 0) return (
     <div className="flex items-center justify-center gap-2 py-4 text-[12.5px] text-ink-muted">
       <CheckCircle2 className="h-3.5 w-3.5 text-ok" strokeWidth={1.75} />
       All clear — no pending approvals
@@ -173,7 +172,7 @@ function ApprovalQueue({ projectId, onToast }: { projectId: Id<"projects"> | nul
   const handleApprove = async (id: Id<"approvals">) => {
     setLoading(id);
     try {
-      await approve({ approvalId: id, decidedByUserId: "operator", reason: "Command Panel approval" });
+      await approve({ approvalId: id, reason: "Command Panel approval" });
       onToast("Approved");
     } catch (e) { onToast(e instanceof Error ? e.message : "Failed", true); }
     finally { setLoading(null); }
@@ -182,7 +181,7 @@ function ApprovalQueue({ projectId, onToast }: { projectId: Id<"projects"> | nul
   const handleDeny = async (id: Id<"approvals">) => {
     setLoading(id);
     try {
-      await deny({ approvalId: id, decidedByUserId: "operator", reason: "Command Panel denial" });
+      await deny({ approvalId: id, reason: "Command Panel denial" });
       onToast("Denied");
     } catch (e) { onToast(e instanceof Error ? e.message : "Failed", true); }
     finally { setLoading(null); }
@@ -190,7 +189,7 @@ function ApprovalQueue({ projectId, onToast }: { projectId: Id<"projects"> | nul
 
   return (
     <div className="space-y-2">
-      {approvals.map((a) => (
+      {approvals.items.map((a) => (
         <div key={a._id} className="flex items-start gap-3 px-3 py-2.5 rounded-lg border border-line bg-surface-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
@@ -442,13 +441,13 @@ export function CommandPanel({ projectId, onOpenSuggestionsDrawer }: CommandPane
   const pauseAll = useMutation(api.agents.pauseAll);
   const resumeAll = useMutation(api.agents.resumeAll);
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
-  const approvals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 10 } : { limit: 10 });
+  const approvals = useQuery(api.approvals.pendingSummary, projectId ? { projectId, limit: 10 } : "skip");
   const allTasks = useQuery(api.tasks.list, { projectId: projectId ?? undefined });
   const approve = useMutation(api.approvals.approve);
 
   const activeCount  = agents?.filter((a) => a.status === "ACTIVE").length ?? 0;
   const pausedCount  = agents?.filter((a) => a.status === "PAUSED").length ?? 0;
-  const pendingCount = approvals?.length ?? 0;
+  const pendingCount = approvals?.total ?? 0;
   const taskCount    = allTasks?.length ?? 0;
   const doneCount    = allTasks?.filter((t) => t.status === "DONE").length ?? 0;
 
@@ -466,19 +465,13 @@ export function CommandPanel({ projectId, onOpenSuggestionsDrawer }: CommandPane
           else toast("Reverse Prompt drawer not available");
           break;
         case "pause-all": {
-          const r = await pauseAll({ projectId: projectId ?? undefined, reason: "Command Panel", userId: "operator" });
+          const r = await pauseAll({ projectId: projectId ?? undefined, reason: "Command Panel" });
           toast(`Paused ${(r as { paused: number }).paused} agent(s)`);
           break;
         }
         case "resume-all": {
-          const r = await resumeAll({ projectId: projectId ?? undefined, reason: "Command Panel", userId: "operator" });
+          const r = await resumeAll({ projectId: projectId ?? undefined, reason: "Command Panel" });
           toast(`Resumed ${(r as { resumed: number }).resumed} agent(s)`);
-          break;
-        }
-        case "approve-all": {
-          const low = approvals?.filter((a) => a.riskLevel === "GREEN") ?? [];
-          await Promise.all(low.map((a) => approve({ approvalId: a._id, decidedByUserId: "operator", reason: "Bulk approve" })));
-          toast(`Approved ${low.length} low-risk item(s)`);
           break;
         }
         case "broadcast":

@@ -5,6 +5,7 @@ import { ExternalLink, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MetricBlock, MetricRow } from "./components/factory/MetricBlock";
 import { CHART_SERIES } from "./components/factory/chartTheme";
+import { safeExternalUrl } from "./lib/safeExternalUrl";
 
 interface CostAnalyticsProps {
   projectId: Id<"projects"> | null;
@@ -184,7 +185,7 @@ export function CostAnalytics({ projectId, onClose }: CostAnalyticsProps) {
                     {links.map(({ name, url }) => (
                       <li key={name}>
                         <a
-                          href={url}
+                          href={safeExternalUrl(url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="group flex items-center justify-between gap-2 rounded-md px-3 py-2 text-[13px] text-ink-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-ink"

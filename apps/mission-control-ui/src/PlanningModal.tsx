@@ -33,6 +33,8 @@ export function PlanningModal({
     bullets: string[];
     estimatedCost?: number;
     estimatedDuration?: string;
+    source?: "MODEL" | "TEMPLATE";
+    unavailableReason?: string;
   } | null>(null);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
@@ -183,6 +185,13 @@ export function PlanningModal({
             {step === "plan" && plan && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">Review the work plan, then submit to assign.</p>
+                {plan.source === "TEMPLATE" && (
+                  <p role="status" className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-ink-secondary">
+                    This is a generic template, not a generated plan
+                    {plan.unavailableReason ? `: ${plan.unavailableReason}` : "."} Edit it before
+                    submitting — no cost or duration has been estimated.
+                  </p>
+                )}
                 <ul className="list-disc pl-5 text-sm text-foreground/90 space-y-1">
                   {plan.bullets.map((b, i) => (
                     <li key={i}>{b}</li>

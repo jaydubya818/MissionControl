@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/factory/badges";
 import { useToast } from "../../Toast";
 import { cn } from "@/lib/utils";
+import { safeExternalUrl } from "../../lib/safeExternalUrl";
 
 function shortSha(value?: string) {
   return value ? value.slice(0, 8) : "not recorded";
@@ -218,7 +219,7 @@ export function PrEvidenceReconciliationInbox({
                   </p>
                 </div>
                 <a
-                  href={selectedEvidence.prUrl}
+                  href={safeExternalUrl(selectedEvidence.prUrl)}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-registry-accent underline"

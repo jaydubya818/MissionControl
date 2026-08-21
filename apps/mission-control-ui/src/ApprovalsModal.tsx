@@ -118,14 +118,12 @@ export function ApprovalsModal({
                       onApprove={async (reason) => {
                         return await approveMutation({
                           approvalId: approval._id,
-                          decidedByUserId: "operator",
                           reason,
                         });
                       }}
                       onDeny={async (reason) => {
                         return await denyMutation({
                           approvalId: approval._id,
-                          decidedByUserId: "operator",
                           reason,
                         });
                       }}

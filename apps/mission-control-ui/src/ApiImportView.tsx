@@ -9,7 +9,7 @@ interface ApiImportViewProps {
 }
 
 const INPUT_CLASS =
-  "h-9 rounded-lg border border-line bg-surface-1 px-3 text-[13.5px] text-ink placeholder:text-ink-muted";
+  "h-9 rounded-lg border border-line-control bg-surface-1 px-3 text-[13.5px] text-ink placeholder:text-ink-muted";
 
 export function ApiImportView({ projectId }: ApiImportViewProps) {
   const [name, setName] = useState("Sample Collection");

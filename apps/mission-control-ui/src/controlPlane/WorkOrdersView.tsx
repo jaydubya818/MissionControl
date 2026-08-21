@@ -38,6 +38,7 @@ import {
   type WorkOrderQuickFilter,
 } from "./workOrdersModel";
 import { ExecutionRunInspector } from "./ExecutionRunInspector";
+import { useFlag } from "@/hooks/useFlag";
 import { ReviewEvidencePackage, type ReviewEvidencePackageData } from "./ReviewEvidencePackage";
 import { splitCurrentAndHistoricalRevisions, summarizeRevisionEffects } from "./workOrderLifecycleModel";
 import { CreateTaskModal } from "../CreateTaskModal";
@@ -234,6 +235,8 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   const expireGovernanceRecords = useMutation(api.workOrders.expireGovernanceRecords);
   const recordReviewJudgment = useMutation(api.reviewIntelligence.recordReviewJudgment);
   const seedDemo = useMutation(api.workOrders.seedDemo);
+  // Seeding writes real delivery records; keep it on the explicit demo surface.
+  const showDemoRoutes = useFlag("ui.navigation.demo-routes");
 
   const filtered = useMemo(() => filterWorkOrders(workOrders ?? [], filters), [workOrders, filters]);
 
@@ -304,9 +307,13 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   }, [workOrders]);
 
   async function handleSeed() {
+    if (!projectId) return;
     setSeeding(true);
+    setError(null);
     try {
-      await seedDemo({});
+      await seedDemo({ projectId: projectId as Id<"projects"> });
+    } catch (seedError) {
+      setError(seedError instanceof Error ? seedError.message : "Seeding the demo failed.");
     } finally {
       setSeeding(false);
     }
@@ -418,10 +425,18 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
         icon={<ClipboardList className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleSeed} disabled={seeding}>
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-              {seeding ? "Seeding…" : "Seed demo"}
-            </Button>
+            {showDemoRoutes ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSeed}
+                disabled={seeding || !projectId}
+                title={projectId ? "Write demo Work Orders into this workspace" : "Select a workspace first"}
+              >
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                {seeding ? "Seeding…" : "Seed demo"}
+              </Button>
+            ) : null}
             {selected ? (
               <Button variant="outline" size="sm" onClick={() => setCreateTaskOpen(true)}>
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
@@ -478,9 +493,15 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
 
         <div className="mt-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr))]">
           <div className={`${mobileDetailOpen ? "hidden xl:block" : "block"} min-w-0 space-y-3`}>
-            {filtered.length === 0 ? (
+            {workOrders === undefined ? (
+              <Card className="p-8 text-center text-sm text-muted-foreground" aria-busy="true">
+                Loading Work Orders…
+              </Card>
+            ) : filtered.length === 0 ? (
               <Card className="p-8 text-center text-sm text-muted-foreground">
-                No work orders match the current filters.
+                {workOrders.length === 0
+                  ? "No Work Orders exist in this workspace yet."
+                  : "No work orders match the current filters."}
               </Card>
             ) : (
               filtered.map((item) => {

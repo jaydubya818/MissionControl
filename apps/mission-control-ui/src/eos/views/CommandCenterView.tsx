@@ -19,7 +19,7 @@ import { FactorySchematicOverview } from "../../components/schematic";
 import { EmptyState } from "../../components/ui/empty-state";
 import { QuotaFuelGauge } from "../../components/QuotaFuelGauge";
 import { cn } from "../../lib/utils";
-import { buildAttentionItems, exceptionCounts } from "../../lib/attentionQueue";
+import { buildAttentionQueue, exceptionCounts } from "../../lib/attentionQueue";
 import { loadGatewayStatus } from "../../lib/gatewayStatus";
 import { useFlag } from "../../hooks/useFlag";
 import {
@@ -512,7 +512,7 @@ export function CommandCenterView({
   }, []);
 
   // ── Live Convex data ───────────────────────────────────────────────────────
-  const approvals = useQuery(api.approvals.listPending, { projectId, limit: 25 });
+  const approvals = useQuery(api.approvals.pendingSummary, { projectId, limit: 25 });
   const tasks = useQuery(api.tasks.listAll, { projectId });
   const openAlerts = useQuery(api.alerts.listOpen, { projectId, limit: 10 });
   const agents = useQuery(api.agents.listAll, { projectId });
@@ -546,8 +546,8 @@ export function CommandCenterView({
     void taskId;
   };
 
-  const attentionItems = buildAttentionItems({
-    approvals: approvals ?? [],
+  const attentionQueue = buildAttentionQueue({
+    approvals: approvals?.items ?? [],
     blockedTasks: blockedTasksList,
     needsApprovalTasks,
     failedTasks: failedTasksList,
@@ -559,7 +559,7 @@ export function CommandCenterView({
   });
 
   const exceptions = exceptionCounts({
-    approvals: approvals ?? [],
+    approvals: approvals?.items ?? [],
     blockedTasks: blockedTasksList,
     failedTasks: failedTasksList,
     alerts: alertsList,
@@ -632,7 +632,9 @@ export function CommandCenterView({
           <LoadingRows count={4} />
         ) : (
           <AttentionQueuePanel
-            items={attentionItems}
+            items={attentionQueue.items}
+            hiddenCount={attentionQueue.hiddenCount}
+            totalCount={attentionQueue.totalCount}
             scannedAt={scannedAt}
             counts={exceptions}
             onOpenApprovals={() => onNavigate("audit")}

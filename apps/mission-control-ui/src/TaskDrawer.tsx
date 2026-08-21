@@ -118,7 +118,6 @@ function TaskDrawerContent({
     taskId: Id<"tasks">;
     toStatus: TaskStatus;
     actorType: "HUMAN";
-    actorUserId: string;
     idempotencyKey: string;
     reason?: string;
   }) => Promise<{ success: boolean; errors?: Array<{ message: string }> }>;
@@ -156,7 +155,6 @@ function TaskDrawerContent({
         taskId,
         toStatus,
         actorType: "HUMAN",
-        actorUserId: "operator",
         idempotencyKey: `transition:${taskId}:${toStatus}:${Date.now()}`,
         reason: "Manual transition from UI",
       });

@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  EvidenceAuthorityBadge,
+  authorityKindForProducer,
+} from "@/components/EvidenceAuthorityBadge";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -13,6 +17,7 @@ import { EvidenceLineagePanel, type EvidenceLineageStage } from "./EvidenceLinea
 import { ExecutionRecoveryCard, type ExecutionRecoveryData } from "./ExecutionRecoveryCard";
 import { ReviewEvidencePackage, type ReviewEvidencePackageData } from "./ReviewEvidencePackage";
 import { FactoryContextRunCard } from "./FactoryContextRunCard";
+import { safeExternalUrl } from "../lib/safeExternalUrl";
 
 type FrozenExecutionRoutingSnapshot = {
   algorithmVersion: string;
@@ -274,8 +279,27 @@ export function ExecutionRunInspector({
                     </div>
                     <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--panel-line)]">
                       <table className="w-full text-left text-xs">
-                        <thead className="border-b border-[var(--panel-line)] text-muted-foreground"><tr><th className="px-3 py-2 font-medium">Check</th><th className="px-3 py-2 font-medium">Status</th><th className="px-3 py-2 font-medium">Evidence</th><th className="px-3 py-2 font-medium">Duration</th></tr></thead>
-                        <tbody className="divide-y divide-[var(--panel-line)]">{verificationRun.checks.map((check: any) => <tr key={check.checkId}><td className="px-3 py-2 text-foreground">{check.name}</td><td className={check.status === "PASS" ? "px-3 py-2 text-success" : "px-3 py-2 text-danger"}>{check.status}</td><td className="px-3 py-2 text-muted-foreground">{check.evidenceIds.length}</td><td className="px-3 py-2 text-muted-foreground">{check.durationMs}ms</td></tr>)}</tbody>
+                        <thead className="border-b border-[var(--panel-line)] text-muted-foreground"><tr><th className="px-3 py-2 font-medium">Check</th><th className="px-3 py-2 font-medium">Status</th><th className="px-3 py-2 font-medium">Authority</th><th className="px-3 py-2 font-medium">Evidence</th><th className="px-3 py-2 font-medium">Duration</th></tr></thead>
+                        <tbody className="divide-y divide-[var(--panel-line)]">{verificationRun.checks.map((check: any) => {
+                            // A PASS and an independent PASS are different
+                            // claims. Showing only the first let an operator
+                            // read a candidate-defined `pnpm test` as proof.
+                            const producer = check.producer ?? check.evidence?.[0]?.producer;
+                            return (
+                              <tr key={check.checkId}>
+                                <td className="px-3 py-2 text-foreground">{check.name}</td>
+                                <td className={check.status === "PASS" ? "px-3 py-2 text-success" : "px-3 py-2 text-danger"}>{check.status}</td>
+                                <td className="px-3 py-2">
+                                  <EvidenceAuthorityBadge
+                                    kind={authorityKindForProducer(producer)}
+                                    reason={check.evidence?.[0]?.metadata?.independenceReason}
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-muted-foreground">{check.evidenceIds.length}</td>
+                                <td className="px-3 py-2 text-muted-foreground">{check.durationMs}ms</td>
+                              </tr>
+                            );
+                          })}</tbody>
                       </table>
                     </div>
                     <p className="mt-3 text-xs text-muted-foreground">{verificationRun.verdictReasons.join(" ")}</p>
@@ -313,7 +337,7 @@ export function ExecutionRunInspector({
                   <div className="rounded-lg border border-[var(--panel-line)] bg-background/30 px-3 py-2">
                     <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Pull request</div>
                     {inspector.run.pullRequestUrl ? (
-                      <a className="mt-1 block break-all text-sm text-primary underline-offset-4 hover:underline" href={inspector.run.pullRequestUrl} target="_blank" rel="noreferrer">
+                      <a className="mt-1 block break-all text-sm text-primary underline-offset-4 hover:underline" href={safeExternalUrl(inspector.run.pullRequestUrl)} target="_blank" rel="noreferrer">
                         #{inspector.run.pullRequestNumber ?? "open"} · {inspector.run.pullRequestUrl}
                       </a>
                     ) : <div className="mt-1 break-words text-sm text-foreground">Not published</div>}
@@ -584,7 +608,7 @@ export function ExecutionRunInspector({
                             </div>
                             <div className="mt-2 text-xs text-muted-foreground">Criterion: {artifact.acceptanceCriterionId ?? "—"}</div>
                             <div className="mt-2 flex flex-wrap gap-2">
-                              {artifact.externalLocation ? <Button asChild size="sm" variant="outline"><a href={artifact.externalLocation} target="_blank" rel="noreferrer">Open</a></Button> : null}
+                              {safeExternalUrl(artifact.externalLocation) ? <Button asChild size="sm" variant="outline"><a href={safeExternalUrl(artifact.externalLocation)} target="_blank" rel="noreferrer">Open</a></Button> : null}
                               {artifact.repositoryPath ? <Badge variant="outline">{artifact.repositoryPath}</Badge> : null}
                             </div>
                           </div>
@@ -688,7 +712,7 @@ export function RemoteSandboxCard({ sandbox }: { sandbox: any }) {
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--panel-line)] pt-3 text-xs text-muted-foreground">
         <span>No repository, GitHub App, provider-management, or long-lived inference credentials are stored in this record.</span>
-        {privatePreviewUrl ? <Button asChild size="sm" variant="outline"><a href={privatePreviewUrl} target="_blank" rel="noreferrer">Open private preview</a></Button> : <span>Private preview unavailable</span>}
+        {safeExternalUrl(privatePreviewUrl) ? <Button asChild size="sm" variant="outline"><a href={safeExternalUrl(privatePreviewUrl)} target="_blank" rel="noreferrer">Open private preview</a></Button> : <span>Private preview unavailable</span>}
       </div>
     </Card>
   );

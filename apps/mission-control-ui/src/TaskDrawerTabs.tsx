@@ -210,7 +210,6 @@ export function TaskDrawerTabs({
                 taskId,
                 toStatus,
                 actorType: "HUMAN",
-                actorUserId: "operator",
                 idempotencyKey: `transition:${taskId}:${toStatus}:${Date.now()}`,
                 reason: options.reason ?? "Manual transition from UI",
                 reviewFindings: options.reviewFindings,
@@ -802,7 +801,6 @@ function OverviewTab({
     taskId: Id<"tasks">;
     agentIds: Id<"agents">[];
     actorType: "HUMAN";
-    actorUserId: string;
     idempotencyKey: string;
   }) => Promise<unknown>;
   requestApproval: (args: {
@@ -1412,7 +1410,6 @@ function ReassignDropdown({
     taskId: Id<"tasks">;
     agentIds: Id<"agents">[];
     actorType: "HUMAN";
-    actorUserId: string;
     idempotencyKey: string;
   }) => Promise<unknown>;
   setLoading: (value: boolean) => void;
@@ -1433,7 +1430,6 @@ function ReassignDropdown({
         taskId,
         agentIds: nextIds,
         actorType: "HUMAN",
-        actorUserId: "operator",
         idempotencyKey: `assign:${taskId}:${nextIds.join(",")}:${Date.now()}`,
       });
       const assignment = result as { success?: boolean; error?: string };
@@ -1870,7 +1866,6 @@ function ApprovalsTab({
                       try {
                         const result = await approve({
                           approvalId: a._id,
-                          decidedByUserId: "operator",
                           reason: decisionReasons[a._id].trim(),
                         });
                         if (!result.success) window.alert(result.error ?? "Approval failed.");
@@ -1892,7 +1887,6 @@ function ApprovalsTab({
                       try {
                         const result = await deny({
                           approvalId: a._id,
-                          decidedByUserId: "operator",
                           reason: decisionReasons[a._id].trim(),
                         });
                         if (!result.success) window.alert(result.error ?? "Rejection failed.");

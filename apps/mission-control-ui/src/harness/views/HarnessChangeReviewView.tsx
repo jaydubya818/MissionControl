@@ -13,6 +13,7 @@ import {
 import { HarnessFirstCallout, SmallPrIncentiveCallout } from "../components/HarnessPrinciples";
 import { HarnessFirstReviewModal } from "../components/HarnessFirstReviewModal";
 import { HarnessMergeGatesPanel } from "../components/HarnessMergeGatesPanel";
+import { openExternalUrl, safeExternalUrl } from "../../lib/safeExternalUrl";
 
 function prDiffLines(check: { metadata?: unknown } | null | undefined): number | undefined {
   if (!check?.metadata || typeof check.metadata !== "object") return undefined;
@@ -109,9 +110,9 @@ export function HarnessChangeReviewView({
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
             Sync internal PR sources
           </Button>
-          {latest?.prUrl ? (
+          {safeExternalUrl(latest?.prUrl) ? (
             <span className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
-              <a href={latest.prUrl} target="_blank" rel="noreferrer" className="text-registry-accent underline">
+              <a href={safeExternalUrl(latest.prUrl)} target="_blank" rel="noreferrer" className="text-registry-accent underline">
                 Latest: {latest.repoFullName}
                 {latest.prNumber ? ` #${latest.prNumber}` : ""}
               </a>
@@ -122,8 +123,8 @@ export function HarnessChangeReviewView({
                   prLines={prDiffLines(latest)}
                 />
               ) : null}
-              {latest.ciRunUrl ? (
-                <a href={latest.ciRunUrl} target="_blank" rel="noreferrer" className="text-registry-accent underline">
+              {safeExternalUrl(latest.ciRunUrl) ? (
+                <a href={safeExternalUrl(latest.ciRunUrl)} target="_blank" rel="noreferrer" className="text-registry-accent underline">
                   CI run
                 </a>
               ) : null}
@@ -175,7 +176,7 @@ export function HarnessChangeReviewView({
           onClose={() => setReviewModalOpen(false)}
           onProceedComment={() => {
             setReviewModalOpen(false);
-            if (latest?.prUrl) window.open(latest.prUrl, "_blank", "noopener,noreferrer");
+            openExternalUrl(latest?.prUrl);
           }}
         />
 
@@ -185,10 +186,17 @@ export function HarnessChangeReviewView({
             <ul className="mt-2 space-y-1 text-xs text-ink-secondary">
               {allChecks.map((c) => (
                 <li key={c._id}>
-                  <a href={c.prUrl} target="_blank" rel="noreferrer" className="text-registry-accent underline">
-                    {c.repoFullName}
-                    {c.prNumber ? ` #${c.prNumber}` : ""}
-                  </a>
+                  {safeExternalUrl(c.prUrl) ? (
+                    <a href={safeExternalUrl(c.prUrl)} target="_blank" rel="noreferrer" className="text-registry-accent underline">
+                      {c.repoFullName}
+                      {c.prNumber ? ` #${c.prNumber}` : ""}
+                    </a>
+                  ) : (
+                    <span className="text-ink-muted">
+                      {c.repoFullName}
+                      {c.prNumber ? ` #${c.prNumber}` : ""}
+                    </span>
+                  )}
                   {" · "}
                   {c.source} · {c.ciStatus ?? "unknown"}
                 </li>

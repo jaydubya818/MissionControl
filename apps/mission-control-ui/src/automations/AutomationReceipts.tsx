@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatDate, statusTone, workspacePath } from "./automationModel";
+import { safeExternalUrl } from "../lib/safeExternalUrl";
 
 const FILTERS = ["ALL", "FRESH", "REJECTED", "INCONCLUSIVE", "MISSING", "STALE", "EXPIRED", "WAIVED"] as const;
 
@@ -76,7 +77,14 @@ export function AutomationReceipts({ projectId, receipts }: { projectId: Id<"pro
               </details>
               <div className="mt-3 flex flex-wrap gap-3 text-xs">
                 <a href={workspacePath(`/v2/control-work-orders?workOrder=${receipt.workOrderId}`, projectId)} className="inline-flex items-center gap-1 text-registry-accent hover:text-foreground">Open WorkOrder <ArrowUpRight className="h-3 w-3" /></a>
-                {receipt.evidenceLocation ? <a href={receipt.evidenceLocation} className="inline-flex items-center gap-1 text-registry-accent hover:text-foreground">Open evidence <ArrowUpRight className="h-3 w-3" /></a> : null}
+                {safeExternalUrl(receipt.evidenceLocation)
+                  ? <a href={safeExternalUrl(receipt.evidenceLocation)} className="inline-flex items-center gap-1 text-registry-accent hover:text-foreground">Open evidence <ArrowUpRight className="h-3 w-3" /></a>
+                  : receipt.evidenceLocation
+                    // Evidence locators are not always navigable URLs (e.g.
+                    // `mission-control://…`, repository-relative paths). Show the
+                    // reference rather than hiding the evidence pointer entirely.
+                    ? <span className="text-ink-muted" title="Evidence reference is not a navigable link">Evidence: {receipt.evidenceLocation}</span>
+                    : null}
               </div>
             </Card>
           ))}

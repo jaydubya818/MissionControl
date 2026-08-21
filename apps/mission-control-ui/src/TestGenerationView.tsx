@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -9,19 +9,19 @@ interface TestGenerationViewProps {
 }
 
 const INPUT_CLASS =
-  "h-9 rounded-lg border border-line bg-surface-1 px-3 text-[13.5px] text-ink placeholder:text-ink-muted";
+  "h-9 rounded-lg border border-line-control bg-surface-1 px-3 text-[13.5px] text-ink placeholder:text-ink-muted";
 
 export function TestGenerationView({ projectId }: TestGenerationViewProps) {
   const [testType, setTestType] = useState("api_functional");
   const [suiteName, setSuiteName] = useState("Generated Suite");
   const [sourceText, setSourceText] = useState('{"endpoints":[{"method":"GET","url":"/health"}]}');
   const [selectedSuiteId, setSelectedSuiteId] = useState<string | null>(null);
+  const [executionError, setExecutionError] = useState<string | null>(null);
 
   const suites = useQuery((api as any).testGeneration.list, { projectId: projectId ?? undefined, limit: 30 });
   const generate = useAction((api as any).testGeneration.generate);
   const execute = useAction((api as any).testGeneration.execute);
   const suite = useQuery((api as any).testGeneration.get, selectedSuiteId ? { id: selectedSuiteId } : "skip");
-  const storeExecution = useMutation((api as any).execution.storeResult);
 
   return (
     <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-6 py-6">
@@ -83,23 +83,26 @@ export function TestGenerationView({ projectId }: TestGenerationViewProps) {
             size="sm"
             className="self-start"
             onClick={async () => {
-              const result = await execute({ id: suite._id, executedBy: "operator" });
-              await storeExecution({
-                projectId: suite.projectId,
-                executionType: suite.executionMode === "hybrid" ? "hybrid" : suite.executionMode === "api_only" ? "api" : "ui",
-                suiteId: suite._id,
-                steps: result.steps ?? [],
-                totalTime: result.totalTime ?? 0,
-                passed: result.passed ?? 0,
-                failed: result.failed ?? 0,
-                success: result.success ?? false,
-                context: result.context,
-                executedBy: "operator",
-              });
+              // The result is no longer written from the client. Persisting
+              // pass/fail evidence is a server responsibility (`internal`
+              // `execution.storeResult`); this button previously wrote the
+              // suite result a second time on top of the one the action had
+              // already stored, doubling every row in Execution Results.
+              setExecutionError(null);
+              try {
+                await execute({ id: suite._id, executedBy: "operator" });
+              } catch (error) {
+                setExecutionError(error instanceof Error ? error.message : String(error));
+              }
             }}
           >
             Execute Selected Suite
           </Button>
+          {executionError && (
+            <p role="alert" className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[12.5px] text-ink-secondary">
+              {executionError}
+            </p>
+          )}
         </section>
       )}
 

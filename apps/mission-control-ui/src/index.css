@@ -1,5 +1,31 @@
-@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+/*
+ * Self-hosted typefaces.
+ *
+ * These were two `@import url("https://fonts.googleapis.com/...")` statements,
+ * which made every page load of an operator control plane a blocking,
+ * render-critical request to a third party. That meant: the UI does not render
+ * text in an air-gapped or egress-restricted deployment (the exact environment
+ * a governed control plane is most likely to run in); every operator's IP and
+ * User-Agent are disclosed to Google on every load; and a third-party outage
+ * degrades the console used to respond to incidents. It also made the six
+ * Playwright failures in this repo's own E2E run environmental rather than real.
+ *
+ * The families are unchanged. Fira Code was imported but referenced by no
+ * `font-family` declaration anywhere in the app, so it is simply gone.
+ *
+ * `@fontsource*` packages ship the WOFF2 files and their `@font-face` rules;
+ * Vite fingerprints and bundles them like any other asset.
+ */
+@import "@fontsource/fira-sans/400.css";
+@import "@fontsource/fira-sans/500.css";
+@import "@fontsource/fira-sans/600.css";
+@import "@fontsource/fira-sans/700.css";
+@import "@fontsource/fira-sans/800.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
 @import "tailwindcss";
 
 @theme inline {
@@ -59,6 +85,8 @@
   --color-surface-2: var(--surface-secondary);
   --color-surface-3: var(--surface-elevated);
   --color-line: var(--border-subtle);
+  /* 3:1 control boundary — see --border-control. */
+  --color-line-control: var(--border-control);
   --color-line-strong: var(--border-emphasized);
   --color-ink: var(--text-primary);
   --color-ink-secondary: var(--text-secondary);
@@ -745,6 +773,23 @@ main {
   --surface-secondary: #17181b;
   --surface-elevated: #1b1d21;
   --border-subtle: #272a2f;
+  /*
+   * Boundary of an interactive control (input, textarea, select trigger).
+   *
+   * WCAG 2.2 SC 1.4.11 (Non-text Contrast) requires 3:1 for the visual
+   * boundary that identifies a UI component. `--border-subtle` is 1.30:1
+   * against `--surface-primary` and 1.23:1 against `--surface-secondary`, so a
+   * text field previously had no perceivable edge for a low-vision operator —
+   * the field was indistinguishable from the panel it sat in.
+   *
+   * `--border-subtle` is retained for decorative dividers and card edges, which
+   * 1.4.11 does not cover; only control boundaries are raised, so the visual
+   * language is unchanged everywhere it was already conformant.
+   *
+   * #6b7079 measures 4.00 / 3.93 / 3.77 / 3.57 / 3.39 against app, sidebar,
+   * surface-1, surface-2 and surface-3 respectively.
+   */
+  --border-control: #6b7079;
   --border-emphasized: #3a3e46;
   --text-primary: #f4f5f7;
   --text-secondary: #a7abb4;
@@ -777,6 +822,9 @@ main {
   --surface-secondary: #f1f2f4;
   --surface-elevated: #ffffff;
   --border-subtle: #e3e5e8;
+  /* See the dark-theme note. #82868e measures 3.41 / 3.65 / 3.26 against
+   * background-app, surface-primary and surface-secondary. */
+  --border-control: #82868e;
   --border-emphasized: #c9cdd3;
   --text-primary: #16181c;
   --text-secondary: #4d525b;
@@ -831,7 +879,7 @@ main {
   --accent-foreground: var(--text-primary);
   --destructive: var(--status-error);
   --border: var(--border-subtle);
-  --input: var(--border-subtle);
+  --input: var(--border-control);
   --ring: var(--status-info);
   --panel-line: var(--border-subtle);
   --neon-green: var(--status-success);

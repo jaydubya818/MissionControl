@@ -146,7 +146,6 @@ export function TaskEditMode({ task, onSave, onCancel, onSaveError }: TaskEditMo
           type: task.reviewChecklist?.type ?? "SUBMISSION",
           items: reviewItems,
         },
-        actorUserId: "operator",
         idempotencyKey: `task-editor:${task._id}:${status}:${Date.now()}`,
       });
       onSave();

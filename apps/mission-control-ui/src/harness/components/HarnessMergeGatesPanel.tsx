@@ -4,6 +4,7 @@ import type { Id } from "../../../../../convex/_generated/dataModel";
 import { MERGE_GATES } from "@/lib/harnessArchitect";
 import { CheckCircle2, Shield, Terminal, Bug, FileCode, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { safeExternalUrl } from "../../lib/safeExternalUrl";
 
 const GATE_ICONS = {
   "code-review": FileCode,
@@ -82,10 +83,10 @@ export function HarnessMergeGatesPanel({
             </p>
           ) : null}
           <p className="mt-0.5 text-[12.5px] text-ink-muted">
-            {live?.prUrl ? (
+            {safeExternalUrl(live?.prUrl) ? (
               <>
                 Live from{" "}
-                <a href={live.prUrl} target="_blank" rel="noreferrer" className="text-registry-accent underline">
+                <a href={safeExternalUrl(live.prUrl)} target="_blank" rel="noreferrer" className="text-registry-accent underline">
                   {live.scope === "WORKSPACE_LATEST" ? "workspace latest PR (unscoped)" : "correlated PR"}
                 </a>
               </>

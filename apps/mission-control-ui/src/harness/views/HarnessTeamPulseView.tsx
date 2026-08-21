@@ -4,6 +4,7 @@ import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { HarnessPage } from "../components/HarnessUi";
 import { TeamSyncCallout } from "../components/HarnessPrinciples";
+import { safeExternalUrl } from "../../lib/safeExternalUrl";
 
 export function HarnessTeamPulseView({
   projectId,
@@ -74,7 +75,7 @@ export function HarnessTeamPulseView({
                 <ul className="mt-3 space-y-2">
                   {pulse.recentPrs.map((pr) => (
                     <li key={pr.prUrl} className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <a href={pr.prUrl} target="_blank" rel="noreferrer" className="text-registry-accent underline">
+                      <a href={safeExternalUrl(pr.prUrl)} target="_blank" rel="noreferrer" className="text-registry-accent underline">
                         {pr.repoFullName}
                       </a>
                       <span className="text-ink-muted">

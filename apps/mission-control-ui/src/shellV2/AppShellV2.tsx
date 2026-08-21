@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { BellRing, Menu, MessageSquare } from "lucide-react";
 import type { MainView } from "../TopNav";
+import { MobileOverlay } from "./MobileOverlay";
 import { Sidebar } from "./Sidebar";
 import { ChatDock } from "./ChatDock";
 import { ResizerHandle } from "./ResizerHandle";
@@ -132,7 +133,9 @@ export function AppShellV2({
     ...(group ? [{ label: group.label }] : []),
     ...(item ? [{ label: item.label, current: true }] : []),
   ];
-  const activeRouteBadge = eosPreview ? routeBadge(activeView) : undefined;
+  const activeRouteBadge = routeBadge(activeView, {
+    labelUndeclaredAsPreview: !eosPreview,
+  });
 
   useEffect(() => {
     const normalizedMission = canonicalMissionLocation(
@@ -234,14 +237,13 @@ export function AppShellV2({
     <div className="shell-v2 flex h-screen overflow-hidden">
       {compactShell ? (
         mobileNavOpen ? (
-          <div className="fixed inset-0 z-50">
-            <button
-              type="button"
-              aria-label="Close navigation"
-              className="absolute inset-0 bg-black/65"
-              onClick={() => setMobileNavOpen(false)}
-            />
-            <div className="relative z-10 h-full w-[min(86vw,320px)] shadow-2xl">
+          <MobileOverlay
+            label="Navigation"
+            dismissLabel="Close navigation"
+            onDismiss={() => setMobileNavOpen(false)}
+            className="w-[min(86vw,320px)]"
+          >
+            <div className="h-full">
               <Sidebar
                 width={Math.min(columns.navWidth, 320)}
                 groups={navGroups}
@@ -257,7 +259,7 @@ export function AppShellV2({
                 onHide={() => setMobileNavOpen(false)}
               />
             </div>
-          </div>
+          </MobileOverlay>
         ) : null
       ) : !columns.navHidden ? (
         <>
@@ -387,14 +389,14 @@ export function AppShellV2({
       </div>
 
       {compactShell && mobileDockOpen ? (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <button
-            type="button"
-            aria-label="Close chat"
-            className="absolute inset-0 bg-black/65"
-            onClick={() => setMobileDockOpen(false)}
-          />
-          <div className="relative z-10 h-full w-full max-w-[440px] shadow-2xl">
+        <MobileOverlay
+          label="Chat"
+          dismissLabel="Close chat"
+          align="end"
+          onDismiss={() => setMobileDockOpen(false)}
+          className="w-full max-w-[440px]"
+        >
+          <div className="h-full">
             <ChatDock
               width="100%"
               onClose={() => setMobileDockOpen(false)}
@@ -406,7 +408,7 @@ export function AppShellV2({
               }}
             />
           </div>
-        </div>
+        </MobileOverlay>
       ) : null}
     </div>
   );

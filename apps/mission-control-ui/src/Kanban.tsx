@@ -225,7 +225,6 @@ export function Kanban({
         taskId,
         toStatus,
         actorType: "HUMAN",
-        actorUserId: "operator",
         idempotencyKey: `ui-${taskId}-${toStatus}-${Date.now()}`,
       });
       if (result && typeof result === "object" && "success" in result && !result.success) {
@@ -247,7 +246,6 @@ export function Kanban({
         taskId: lastMove.taskId,
         toStatus: lastMove.fromStatus,
         actorType: "HUMAN",
-        actorUserId: "operator",
         idempotencyKey: `undo-${lastMove.taskId}-${Date.now()}`,
       });
       toast("Undone");

@@ -11,6 +11,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
   const [newComment, setNewComment] = useState("");
   const [showMentions, setShowMentions] = useState(false);
   const [mentionSearch, setMentionSearch] = useState("");
+  const [postError, setPostError] = useState<string | null>(null);
 
   const comments = useQuery(api.comments.listByTask, { taskId });
   const agents = useQuery(api.agents.listAll, {});
@@ -22,16 +23,19 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
     if (!newComment.trim()) return;
 
     try {
+      // The author is resolved server-side from the authenticated identity.
+      // This used to send `authorUserId: "operator"`, a client-chosen string
+      // that became the audit trail's actor.
       await postComment({
         taskId,
         content: newComment,
         authorType: "HUMAN",
-        authorUserId: "operator", // TODO: Get from auth
       });
-      
+
       setNewComment("");
+      setPostError(null);
     } catch (error) {
-      console.error("Failed to post comment:", error);
+      setPostError(error instanceof Error ? error.message : "Failed to post comment.");
     }
   };
 
@@ -172,6 +176,11 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
         padding: "16px",
         position: "relative",
       }}>
+        {postError && (
+          <div role="alert" style={{ marginBottom: "8px", fontSize: "12.5px", color: "#b45309" }}>
+            {postError}
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
           <textarea
             value={newComment}

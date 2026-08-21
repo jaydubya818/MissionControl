@@ -68,6 +68,9 @@ export function MissionSuggestionsDrawer({ projectId, onClose }: MissionSuggesti
         maxSuggestions: 3,
       });
       setSuggestions(result.suggestions);
+      // The backend reports availability explicitly rather than returning
+      // fabricated suggestions when no model provider is configured.
+      if (!result.available && result.reason) setError(result.reason);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate suggestions");
     } finally {

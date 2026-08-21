@@ -42,14 +42,30 @@ export function FactorySchematicOverview({
         <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
           <h1 className="text-[17px] font-semibold text-ink">{title}</h1>
           <p className="font-mono text-[12px] text-ink-muted">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-ok opacity-40" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-ok" />
+            {/* Freshness must describe the data, not the render. While the
+                workspace projection has not resolved, "live · updated 0s ago"
+                is a false signal — the panels below are skeletons and the
+                backend may be unreachable. */}
+            {loading ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-warn"
+                title="The workspace projection has not resolved yet"
+              >
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-warn" />
+                loading
               </span>
-              live
-            </span>
-            {" · "}updated {formatRelativeSeconds(scannedAt)}
+            ) : (
+              <>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-ok opacity-40" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-ok" />
+                  </span>
+                  live
+                </span>
+                {" · "}updated {formatRelativeSeconds(scannedAt)}
+              </>
+            )}
             {projectLabel ? ` · ${projectLabel}` : ""}
           </p>
         </div>

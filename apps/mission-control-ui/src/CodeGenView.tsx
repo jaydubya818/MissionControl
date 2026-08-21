@@ -3,6 +3,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
+import { safeExternalUrl } from "./lib/safeExternalUrl";
 
 interface CodeGenViewProps {
   projectId: Id<"projects"> | null;
@@ -72,10 +73,10 @@ export function CodeGenView({ projectId }: CodeGenViewProps) {
               {row.diff && (
                 <pre className="overflow-x-auto rounded-lg bg-surface-2 p-2 font-mono text-[12px] leading-relaxed text-ink-secondary">{row.diff}</pre>
               )}
-              {row.prUrl && (
+              {safeExternalUrl(row.prUrl) && (
                 <a
                   className="text-[12.5px] text-ink underline underline-offset-4 hover:text-ink-secondary"
-                  href={row.prUrl}
+                  href={safeExternalUrl(row.prUrl)}
                   target="_blank"
                   rel="noreferrer"
                 >

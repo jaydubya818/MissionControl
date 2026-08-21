@@ -116,16 +116,14 @@ export function ChatDock({
               ? { kind: "user", text: message.content }
               : {
                   kind: "turn",
+                  // A persisted work record carries no measured latency, cost,
+                  // iteration count or gate decision. Those fields used to be
+                  // filled with 0 / 1 / "allow" / "mission-control", rendering
+                  // "gate · allow · 0.0s · 1 iter · $0.00" under every historical
+                  // message as though it had been measured. Omitted fields are
+                  // simply not rendered by TurnCard.
                   turn: {
                     reply: message.content,
-                    gate: {
-                      decision: "allow",
-                      reason: "Persisted Mission Control work record",
-                    },
-                    latencyMs: 0,
-                    iterations: 1,
-                    cost: 0,
-                    model: "mission-control",
                   },
                 }
           ),
@@ -217,13 +215,15 @@ export function ChatDock({
     if (mode === "factory") {
       void factoryReply(text, startedAt)
         .then(({ reply, gate }) => {
+          // `factoryReply` is deterministic client-side keyword routing: no
+          // model is invoked and nothing is billed. `cost: 0.004` and
+          // `model: "factory-agent-router"` were invented and rendered in the
+          // same footer that shows real model spend elsewhere. Latency is the
+          // only measured value here.
           finish({
             reply,
             gate,
             latencyMs: Date.now() - startedAt,
-            iterations: 1,
-            cost: 0.004,
-            model: "factory-agent-router",
           });
         })
         .catch((error) => {

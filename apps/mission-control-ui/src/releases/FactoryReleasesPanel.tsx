@@ -32,8 +32,9 @@ import {
   type FactoryProductionReleaseState,
   type FactoryReleaseState,
 } from "./factoryReleaseModel";
+import { safeExternalUrl } from "../lib/safeExternalUrl";
 
-const INPUT_CLASS = "mt-1.5 h-9 w-full rounded-lg border border-line bg-surface-1 px-3 text-[13px] text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const INPUT_CLASS = "mt-1.5 h-9 w-full rounded-lg border border-line-control bg-surface-1 px-3 text-[13px] text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const TEXTAREA_CLASS = "mt-1.5 w-full rounded-lg border border-line bg-surface-1 p-3 text-[13px] text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function fmtTime(value?: number) {
@@ -307,7 +308,7 @@ export function FactoryReleasesPanel({ projectId }: { projectId: Id<"projects"> 
                     </div>
 
                     <div className="flex min-w-[240px] flex-col items-stretch gap-2 xl:items-end">
-                      <a href={release.prUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-end gap-1 text-[11.5px] text-info-accent hover:underline">
+                      <a href={safeExternalUrl(release.prUrl)} target="_blank" rel="noreferrer" className="inline-flex items-center justify-end gap-1 text-[11.5px] text-info-accent hover:underline">
                         Pull request {release.prNumber ? `#${release.prNumber}` : "evidence"} <ExternalLink className="h-3 w-3" />
                       </a>
                       <span className="text-[10.5px] text-ink-muted">Merged {fmtTime(release.mergedAt)}</span>

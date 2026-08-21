@@ -105,12 +105,26 @@ export function isRouteVisible(
   return false;
 }
 
+export interface RouteBadgeOptions {
+  /**
+   * When route-capability enforcement is off, undeclared routes are still
+   * shown. They are, by construction, not governed Live surfaces, so label
+   * them `Preview` rather than presenting them as indistinguishable from a
+   * qualified route.
+   */
+  labelUndeclaredAsPreview?: boolean;
+}
+
 export function routeBadge(
-  view: MainView
+  view: MainView,
+  options: RouteBadgeOptions = {}
 ): "Global" | "Preview" | "Demo" | undefined {
   const capability = routeCapability(view);
   if (capability.maturity === "preview") return "Preview";
   if (capability.maturity === "demo") return "Demo";
+  if (capability.maturity === "hidden") {
+    return options.labelUndeclaredAsPreview ? "Preview" : undefined;
+  }
   if (capability.scope === "global") return "Global";
   return undefined;
 }

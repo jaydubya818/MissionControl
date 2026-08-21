@@ -38,8 +38,8 @@ export function Sidebar({
     return window.localStorage.getItem("mc.sidebar_collapsed") === "1";
   });
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
-  const pendingApprovals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 10 } : { limit: 10 });
-  const pendingCount = pendingApprovals?.length ?? 0;
+  const pendingApprovals = useQuery(api.approvals.countPending, projectId ? { projectId } : "skip");
+  const pendingCount = pendingApprovals?.total ?? 0;
   const agentCount = agents?.length ?? 0;
   const pausedCount = agents?.filter((a) => a.status === "PAUSED").length ?? 0;
 

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "../../components/factory/badges";
 import { deriveMissionExecutionAction } from "../missionExecutionModel";
+import { safeExternalUrl } from "../../lib/safeExternalUrl";
 
 function workOrderHref(projectId: Id<"projects">, workOrderId: Id<"workOrders">) {
   return `/v2/control-work-orders?workspace=${encodeURIComponent(String(projectId))}&workOrder=${encodeURIComponent(String(workOrderId))}`;
@@ -113,7 +114,7 @@ export function MissionExecutionWorkspace({
               <EvidenceField label="GitHub App PR" value={review?.identity?.pullRequestNumber ? `#${review.identity.pullRequestNumber} · installation ${review.identity.githubAppInstallationId ?? "missing"}` : "Not published"} />
               <EvidenceField label="Exact-current verification" value={canonicalVerification ? canonicalVerification.eligible ? "ELIGIBLE" : "INELIGIBLE" : review?.status ?? "NOT EVALUATED"} />
               <EvidenceField label="Quality Gate audit" value={latestQualityGate ? `${latestQualityGate.state} · non-authoritative projection` : "Not evaluated"} />
-              {review?.identity?.pullRequestUrl ? <div className="sm:col-span-2 lg:col-span-4"><a className="inline-flex items-center text-accent hover:underline" href={review.identity.pullRequestUrl} target="_blank" rel="noreferrer">Open exact candidate pull request <ExternalLink className="ml-1 h-3 w-3" /></a></div> : null}
+              {review?.identity?.pullRequestUrl ? <div className="sm:col-span-2 lg:col-span-4"><a className="inline-flex items-center text-accent hover:underline" href={safeExternalUrl(review.identity.pullRequestUrl)} target="_blank" rel="noreferrer">Open exact candidate pull request <ExternalLink className="ml-1 h-3 w-3" /></a></div> : null}
               {(canonicalVerification?.reasons?.length ?? 0) > 0 ? <div className="text-warning sm:col-span-2 lg:col-span-4">
                 <div>Canonical verification status</div>
                 <ul className="mt-1 list-disc space-y-0.5 pl-4">

@@ -340,7 +340,6 @@ function PendingApprovalCard({ approval, agentMap }: PendingApprovalCardProps) {
     try {
       await approveMutation({
         approvalId: approval._id,
-        decidedByUserId: "jay",
         reason: reason || "Approved via Council dashboard",
       });
     } finally {
@@ -355,7 +354,6 @@ function PendingApprovalCard({ approval, agentMap }: PendingApprovalCardProps) {
     try {
       await denyMutation({
         approvalId: approval._id,
-        decidedByUserId: "jay",
         reason,
       });
     } finally {

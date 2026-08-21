@@ -50,7 +50,15 @@ export function DiscoverAgentsModal({
       setDiscovered(result.agents);
       if (result.error) setError(result.error);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Discovery failed");
+      // Gateway discovery reads a URL the server then calls with the
+      // deployment's GATEWAY_TOKEN, so it is company-administrator only.
+      // Say that plainly instead of surfacing a raw authorization throw.
+      const message = e instanceof Error ? e.message : "Discovery failed";
+      setError(
+        /administrator/i.test(message)
+          ? "Discovering agents reads the shared Gateway connection, so it requires company administrator access. Ask an administrator to run discovery, or add agents manually."
+          : message,
+      );
     } finally {
       setLoading(false);
     }

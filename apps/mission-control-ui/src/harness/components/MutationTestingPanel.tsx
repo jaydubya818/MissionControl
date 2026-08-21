@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
+import { safeExternalUrl } from "../../lib/safeExternalUrl";
 
 export function MutationTestingPanel({
   projectId,
@@ -45,9 +46,9 @@ export function MutationTestingPanel({
     <div className="registry-mutation-panel rounded-xl border border-line bg-surface-1 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-semibold text-ink">Mutation testing (PR diff)</div>
-        {check.prUrl ? (
+        {safeExternalUrl(check.prUrl) ? (
           <a
-            href={check.prUrl}
+            href={safeExternalUrl(check.prUrl)}
             target="_blank"
             rel="noreferrer"
             className="text-[11px] text-registry-accent underline"

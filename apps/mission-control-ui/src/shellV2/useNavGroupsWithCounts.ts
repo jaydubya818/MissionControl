@@ -18,14 +18,14 @@ export function useNavGroupsWithCounts(
     projectId ? { projectId } : "skip"
   );
   const approvals = useQuery(
-    api.approvals.listPending,
-    projectId ? { projectId, limit: 100 } : "skip"
+    api.approvals.countPending,
+    projectId ? { projectId } : "skip"
   );
 
   if (!stats) return groups;
 
   const taskCount = tasks?.length ?? stats.taskCount ?? 0;
-  const approvalCount = approvals?.length ?? 0;
+  const approvalCount = approvals?.total ?? 0;
 
   return groups.map((group) => ({
     ...group,

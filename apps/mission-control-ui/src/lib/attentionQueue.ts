@@ -13,6 +13,37 @@ export interface AttentionItem {
   onUnblock?: () => void | Promise<void>;
 }
 
+/**
+ * Display order for the attention queue.
+ *
+ * The queue used to be built strictly by category — every approval, then every
+ * blocked task, then needs-approval, then failed, then alerts — and then
+ * `slice(0, 12)`. With 12 pending approvals, every open alert and every failed
+ * task was silently cut from the list, with no indication anything had been
+ * dropped. The queue is meant to be read during an incident, which is exactly
+ * when there are many approvals AND alerts, so the highest-severity rows were
+ * the ones most reliably hidden.
+ *
+ * Error-tone rows (RED approvals, failed tasks, open alerts) now sort ahead of
+ * warning-tone rows, ties broken by the original category order so the result is
+ * stable. Whatever still does not fit is *reported*, never silently dropped.
+ */
+const TONE_RANK: Record<AttentionBadgeTone, number> = {
+  error: 0,
+  warning: 1,
+  neutral: 2,
+  success: 3,
+};
+
+export interface AttentionQueue {
+  /** The rows to render, severity-ordered and capped at `limit`. */
+  items: AttentionItem[];
+  /** Every row that qualified, before the cap. */
+  totalCount: number;
+  /** How many qualifying rows are not shown. Render this; never hide it. */
+  hiddenCount: number;
+}
+
 export interface AttentionQueueInput {
   approvals: Doc<"approvals">[];
   blockedTasks: Doc<"tasks">[];
@@ -50,14 +81,33 @@ function groupApprovals(approvals: Doc<"approvals">[]): Array<{
   }));
 }
 
+/** Severity-ordered queue plus an explicit account of anything not shown. */
+export function buildAttentionQueue(input: AttentionQueueInput): AttentionQueue {
+  const all = collectAttentionItems(input);
+  const limit = input.limit ?? 12;
+  const ranked = all
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => TONE_RANK[a.item.badgeTone] - TONE_RANK[b.item.badgeTone] || a.index - b.index)
+    .map((entry) => entry.item);
+  return {
+    items: ranked.slice(0, limit),
+    totalCount: ranked.length,
+    hiddenCount: Math.max(0, ranked.length - limit),
+  };
+}
+
+/** Back-compatible shape: the capped, severity-ordered rows only. */
 export function buildAttentionItems(input: AttentionQueueInput): AttentionItem[] {
+  return buildAttentionQueue(input).items;
+}
+
+function collectAttentionItems(input: AttentionQueueInput): AttentionItem[] {
   const {
     approvals,
     blockedTasks,
     needsApprovalTasks,
     failedTasks,
     alerts,
-    limit = 12,
     openApproval,
     openTask,
     openApprovalsModal,
@@ -128,7 +178,7 @@ export function buildAttentionItems(input: AttentionQueueInput): AttentionItem[]
     });
   }
 
-  return items.slice(0, limit);
+  return items;
 }
 
 export interface ExceptionCounts {

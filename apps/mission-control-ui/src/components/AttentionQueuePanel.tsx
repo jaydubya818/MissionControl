@@ -67,11 +67,17 @@ export function ExceptionSummaryStrip({
 export interface NeedsAttentionCardProps {
   items: AttentionItem[];
   scannedAt: number;
+  /** Qualifying rows not rendered because of the display cap. */
+  hiddenCount?: number;
+  /** Qualifying rows in total, including hidden ones. */
+  totalCount?: number;
 }
 
 export function NeedsAttentionCard({
   items,
   scannedAt,
+  hiddenCount = 0,
+  totalCount,
 }: NeedsAttentionCardProps): JSX.Element {
   const scanLabel = new Date(scannedAt).toLocaleTimeString([], {
     hour: "2-digit",
@@ -84,7 +90,10 @@ export function NeedsAttentionCard({
         <SectionTitle>Needs attention</SectionTitle>
         {items.length > 0 ? (
           <span className="text-[12.5px] text-ink-muted">
-            {items.length} item{items.length === 1 ? "" : "s"}
+            {/* Show the TOTAL, not the rendered count. `items.length` capped at
+                the display limit meant "12 items" was displayed whether there
+                were 12 or 300. */}
+            {totalCount ?? items.length} item{(totalCount ?? items.length) === 1 ? "" : "s"}
           </span>
         ) : (
           <span className="text-[12.5px] text-ink-muted">Last scan {scanLabel}</span>
@@ -132,6 +141,14 @@ export function NeedsAttentionCard({
           ))}
         </ul>
       )}
+      {hiddenCount ? (
+        /* Never truncate silently: an operator who cannot see that rows were
+           dropped has no way to know the queue is incomplete. */
+        <p className="border-t border-line px-4 py-2.5 text-[12.5px] text-ink-muted">
+          {hiddenCount} more item{hiddenCount === 1 ? "" : "s"} need attention and are not shown
+          here. Open Approvals, Tasks, or Alerts for the full queue.
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -139,6 +156,8 @@ export function NeedsAttentionCard({
 export interface AttentionQueuePanelProps {
   items: AttentionItem[];
   scannedAt: number;
+  hiddenCount?: number;
+  totalCount?: number;
   counts: ReturnType<typeof exceptionCounts>;
   onOpenApprovals?: () => void;
   onOpenTasks?: () => void;
@@ -149,6 +168,8 @@ export interface AttentionQueuePanelProps {
 export function AttentionQueuePanel({
   items,
   scannedAt,
+  hiddenCount,
+  totalCount,
   counts,
   onOpenApprovals,
   onOpenTasks,
@@ -156,7 +177,12 @@ export function AttentionQueuePanel({
 }: AttentionQueuePanelProps): JSX.Element {
   return (
     <div className="flex flex-col gap-4">
-      <NeedsAttentionCard items={items} scannedAt={scannedAt} />
+      <NeedsAttentionCard
+        items={items}
+        scannedAt={scannedAt}
+        hiddenCount={hiddenCount}
+        totalCount={totalCount}
+      />
       <ExceptionSummaryStrip
         counts={counts}
         onOpenApprovals={onOpenApprovals}

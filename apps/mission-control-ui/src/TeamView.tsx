@@ -173,10 +173,10 @@ export function TeamView({ projectId: _projectId, onNavigate }: TeamViewProps) {
     <section className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
       <PageHeader
         title="Team"
-        description="A readable map of who does what inside Mission Control so operators can understand ownership before they delegate work."
+        description="A static reference model of who does what inside Mission Control. These are role definitions, not live agents — open Agents for the deployment's actual fleet and its real status."
         eyebrow="Comms"
         icon={<Bot size={16} strokeWidth={1.7} />}
-        status={<StatusBadge tone="neutral">{totalAgents} active roles</StatusBadge>}
+        status={<StatusBadge tone="neutral">{totalAgents} roles defined</StatusBadge>}
         actions={
           <div className="flex gap-2">
             {onNavigate ? (
@@ -199,7 +199,7 @@ export function TeamView({ projectId: _projectId, onNavigate }: TeamViewProps) {
             <MetricBlock label="Roles mapped" value={totalAgents} detail="Named responsibilities represented in the operating model" />
           </Card>
           <Card className="p-4">
-            <MetricBlock label="Leadership" value={1} detail="Sofie remains the primary coordination layer for operator intent" />
+            <MetricBlock label="Leadership" value={1} detail="Sofie is the model\u2019s coordination layer for operator intent" />
           </Card>
           <Card className="p-4">
             <MetricBlock label="Execution bands" value={TEAM_SECTIONS.length} detail="Operations, signal/output, and meta-system work" />

@@ -241,6 +241,11 @@ export function StartQcRunModal({
               </SelectContent>
             </Select>
           </div>
+          <p className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-ink-secondary">
+            This deployment has no quality-control analyzer configured. The run will be recorded and
+            queued, but no evidence pack, quality score, or gate verdict will be produced until one is
+            wired up — Mission Control does not synthesize them.
+          </p>
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}

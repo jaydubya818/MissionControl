@@ -37,6 +37,7 @@ import {
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
+import { safeHttpsUrl } from "../../lib/safeExternalUrl";
 
 type ResearchSource = Doc<"researchSources">;
 type ResearchSourceRun = Doc<"researchSourceRuns">;
@@ -87,9 +88,8 @@ function formatTime(value?: number) {
     : "Never";
 }
 
-function safeCanonicalUrl(value?: string) {
-  return value?.startsWith("https://") ? value : undefined;
-}
+// Research sources are HTTPS-only by policy (see convex/lib/researchSourcePolicy).
+const safeCanonicalUrl = (value?: string) => safeHttpsUrl(value);
 
 export function ResearchWatchlistPanel({
   projectId,

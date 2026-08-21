@@ -46,6 +46,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { safeExternalUrl } from "../../lib/safeExternalUrl";
 
 type LoopCycle = Doc<"loopEngineeringCycles">;
 type Freshness = LoopCycle["sources"][number]["freshness"];
@@ -1132,7 +1133,7 @@ function EvidenceLedger({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <a
-                    href={source.url}
+                    href={safeExternalUrl(source.url) ?? undefined}
                     target="_blank"
                     rel="noreferrer"
                     className="text-[13px] font-medium text-ink hover:underline"

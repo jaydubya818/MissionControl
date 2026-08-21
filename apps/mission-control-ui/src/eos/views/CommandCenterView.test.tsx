@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../../../../convex/_generated/api", () => ({
   api: {
     approvals: {
-      listPending: "approvals.listPending",
+      pendingSummary: "approvals.pendingSummary",
       approve: "approvals.approve",
     },
     tasks: {
@@ -54,16 +54,23 @@ vi.mock("../../../../../convex/_generated/api", () => ({
 vi.mock("convex/react", () => ({
   useQuery: (query: string) => {
     switch (query) {
-      case "approvals.listPending":
-        return [
-          {
-            _id: "approval-1",
-            taskId: "task-needs-approval",
-            actionSummary: "Approve checkout rollback waiver",
-            justification: "PCI gate needs explicit operator approval.",
-            riskLevel: "RED",
-          },
-        ];
+      case "approvals.pendingSummary":
+        // The single authoritative queue shape: an exact total plus a capped
+        // page of rows. Badges read `total`, lists read `items`.
+        return {
+          total: 1,
+          pending: 1,
+          escalated: 0,
+          items: [
+            {
+              _id: "approval-1",
+              taskId: "task-needs-approval",
+              actionSummary: "Approve checkout rollback waiver",
+              justification: "PCI gate needs explicit operator approval.",
+              riskLevel: "RED",
+            },
+          ],
+        };
       case "tasks.listAll":
         return [
           {

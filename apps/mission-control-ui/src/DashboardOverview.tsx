@@ -25,7 +25,7 @@ import {
 import { QuotaFuelGauge } from "@/components/QuotaFuelGauge";
 import { cn } from "@/lib/utils";
 import {
-  buildAttentionItems,
+  buildAttentionQueue,
   exceptionCounts,
 } from "@/lib/attentionQueue";
 import { loadGatewayStatus } from "@/lib/gatewayStatus";
@@ -378,7 +378,7 @@ export function DashboardOverview({
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
   const scheduledJobs = useQuery(api.scheduledJobs.list, projectId ? { projectId } : {});
-  const approvals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 100 } : { limit: 100 });
+  const approvals = useQuery(api.approvals.pendingSummary, projectId ? { projectId, limit: 100 } : "skip");
   const openAlerts = useQuery(api.alerts.listOpen, { limit: 10 });
   const activities = useQuery(api.activities.listRecent, projectId ? { projectId, limit: 12 } : { limit: 12 });
   const missionData = useQuery(api.mission.getMission, projectId ? { projectId } : {});
@@ -472,8 +472,8 @@ export function DashboardOverview({
   const chartWindowLabel =
     chartWindowHours === 24 ? "24h" : chartWindowHours === 168 ? "7d" : "30d";
 
-  const attentionItems = buildAttentionItems({
-    approvals,
+  const attentionQueue = buildAttentionQueue({
+    approvals: approvals.items,
     blockedTasks: blockedTasksList,
     needsApprovalTasks,
     failedTasks: failedTasksList,
@@ -485,7 +485,6 @@ export function DashboardOverview({
     approveApproval: async (approvalId) => {
       await approveApproval({
         approvalId,
-        decidedByUserId: "operator",
         reason: "Approved from Overview",
       });
     },
@@ -494,7 +493,6 @@ export function DashboardOverview({
         taskId,
         toStatus: "READY",
         actorType: "HUMAN",
-        actorUserId: "operator",
         reason: "Unblocked from Overview",
         blockerResolution: {
           resolution: "RESOLVED",
@@ -506,14 +504,14 @@ export function DashboardOverview({
   });
 
   const exceptions = exceptionCounts({
-    approvals,
+    approvals: approvals.items,
     blockedTasks: blockedTasksList,
     failedTasks: failedTasksList,
     alerts: alertsList,
   });
 
   const healthy =
-    quarantinedAgents === 0 && failedTasks === 0 && blockedTasks === 0 && approvals.length === 0;
+    quarantinedAgents === 0 && failedTasks === 0 && blockedTasks === 0 && approvals.total === 0;
 
   const now = Date.now();
   const nextJob = (scheduledJobs ?? [])
@@ -622,7 +620,9 @@ export function DashboardOverview({
         )}
 
         <AttentionQueuePanel
-          items={attentionItems}
+          items={attentionQueue.items}
+            hiddenCount={attentionQueue.hiddenCount}
+            totalCount={attentionQueue.totalCount}
           scannedAt={scannedAt}
           counts={exceptions}
           onOpenApprovals={onOpenApprovals}
@@ -690,11 +690,11 @@ export function DashboardOverview({
             />
             <MetricBlock
               label="Pending approvals"
-              value={approvals.length}
+              value={approvals.total}
               adornment={
-                approvals.length > 0 ? <StatusBadge tone="warning">Action</StatusBadge> : undefined
+                approvals.total > 0 ? <StatusBadge tone="warning">Action</StatusBadge> : undefined
               }
-              detail={approvals.length > 0 ? "Human review required" : "All clear"}
+              detail={approvals.total > 0 ? "Human review required" : "All clear"}
             />
             <MetricBlock
               label="Blocked"
