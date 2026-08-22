@@ -1,0 +1,31 @@
+{
+  "schema": "factory-workflow-run-compatibility-audit/v1",
+  "observedAt": "2026-08-21T22:08:00Z",
+  "projectId": "px7590t3cmf3qsmgacnnytnshs8cbxp5",
+  "sourceRecordsMutated": false,
+  "classificationCounts": {
+    "CURRENT": 0,
+    "LEGACY_BUT_VALID": 0,
+    "MALFORMED": 0,
+    "INCOMPLETE": 3,
+    "STALE_SCHEMA": 9,
+    "GENUINELY_INVALID": 1
+  },
+  "runs": [
+    { "runId": "7k1ntmye", "workflowId": "factory-intake-plan", "sourceStatus": "COMPLETED", "classification": "GENUINELY_INVALID", "reason": "terminal COMPLETED source has three PENDING steps; no normalized terminal state is invented" },
+    { "runId": "an5kwmww", "workflowId": "factory-intake-plan", "sourceStatus": "PENDING", "classification": "STALE_SCHEMA", "reason": "snapshot present; every non-gate step lacks schema-required string status" },
+    { "runId": "54dx8ikn", "workflowId": "factory-intake-plan", "sourceStatus": "RUNNING", "classification": "STALE_SCHEMA", "reason": "snapshot present; every non-gate step lacks schema-required string status" },
+    { "runId": "vkqra62s", "workflowId": "factory-intake-plan", "sourceStatus": "PENDING", "classification": "STALE_SCHEMA", "reason": "snapshot present; every non-gate step lacks schema-required string status" },
+    { "runId": "rua0xed9", "workflowId": "factory-intake-plan", "sourceStatus": "PENDING", "classification": "STALE_SCHEMA", "reason": "snapshot present; every non-gate step lacks schema-required string status" },
+    { "runId": "i2o3qlyo", "workflowId": "factory-intake-plan", "sourceStatus": "PENDING", "classification": "STALE_SCHEMA", "reason": "snapshot present; every non-gate step lacks schema-required string status" },
+    { "runId": "xgprv84b", "workflowId": "factory-intake-plan", "sourceStatus": "PENDING", "classification": "STALE_SCHEMA", "reason": "snapshot present; every non-gate step lacks schema-required string status" },
+    { "runId": "gtsbic7m", "workflowId": "factory-intake-plan", "sourceStatus": "PENDING", "classification": "STALE_SCHEMA", "reason": "snapshot present; every non-gate step lacks schema-required string status" },
+    { "runId": "fb7himnh", "workflowId": "factory-intake-plan", "sourceStatus": "FAILED", "classification": "STALE_SCHEMA", "reason": "source FAILED/BLOCKED status is preserved; snapshot lacks structured status" },
+    { "runId": "0ajayre2", "workflowId": "factory-intake-plan", "sourceStatus": "FAILED", "classification": "STALE_SCHEMA", "reason": "source FAILED/BLOCKED status is preserved; snapshot lacks structured status" },
+    { "runId": "factory-mission-control-factory-3", "workflowId": "factory-writeback-preview", "sourceStatus": "PENDING", "classification": "INCOMPLETE", "reason": "legacy nonterminal record has no workflow version or snapshot" },
+    { "runId": "factory-mission-control-factory-2", "workflowId": "factory-pi-execute-verify", "sourceStatus": "RUNNING", "classification": "INCOMPLETE", "reason": "legacy nonterminal record has no workflow version or snapshot" },
+    { "runId": "factory-mission-control-factory-1", "workflowId": "factory-intake-plan", "sourceStatus": "PENDING", "classification": "INCOMPLETE", "reason": "legacy nonterminal record has no workflow version or snapshot" }
+  ],
+  "readCompatibility": "PRESERVE_SOURCE_OR_UNRESOLVED",
+  "newProductionExecutionRule": "workspace-owned factory-workflow-contract/v1 only"
+}

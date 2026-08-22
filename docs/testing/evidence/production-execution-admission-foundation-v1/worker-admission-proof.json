@@ -1,0 +1,26 @@
+{
+  "schema": "production-factory-worker-admission-proof/v1",
+  "productionWorkerCount": 0,
+  "productionAdmissionResult": "BLOCKED_MISSING_WORKER",
+  "requiredExactMatch": [
+    "factoryDefinitionVersionId",
+    "factoryConfigurationDigest",
+    "adapter",
+    "version",
+    "provider",
+    "model",
+    "capabilityManifestSha256",
+    "effectiveConfigSha256",
+    "executionBackend",
+    "modelRouteDigest",
+    "sandboxProfileDigest",
+    "repositoryId"
+  ],
+  "serverValidation": "worker report is rejected unless every advertised value equals the canonical Factory Version",
+  "admissionBoundaries": ["readiness", "routing preview", "dispatch", "verification scheduling", "Attempt claim"],
+  "focusedTests": {
+    "status": "PASS",
+    "mismatchResult": "worker-factory-version-mismatch",
+    "registrationMismatch": "factory-version-bindings-invalid or canonical configuration rejection"
+  }
+}

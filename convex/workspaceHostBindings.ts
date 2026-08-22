@@ -66,6 +66,20 @@ export const report = mutation({
         repositoryId: v.id("workspaceRepositories"),
         access: v.union(v.literal("READ"), v.literal("READ_WRITE")),
       })),
+      factoryVersionBindings: v.optional(v.array(v.object({
+        factoryDefinitionVersionId: v.id("factoryDefinitionVersions"),
+        factoryConfigurationDigest: v.string(),
+        adapter: v.string(),
+        version: v.string(),
+        provider: v.string(),
+        model: v.string(),
+        capabilityManifestSha256: v.string(),
+        effectiveConfigSha256: v.string(),
+        executionBackend: v.string(),
+        modelRouteDigest: v.string(),
+        sandboxProfileDigest: v.optional(v.string()),
+        repositoryId: v.id("workspaceRepositories"),
+      }))),
       readiness: v.union(
         v.literal("STARTING"),
         v.literal("READY"),
@@ -113,6 +127,11 @@ export const report = mutation({
           ...item,
           repositoryId: String(item.repositoryId),
         })),
+        factoryVersionBindings: args.workerRuntime.factoryVersionBindings?.map((item) => ({
+          ...item,
+          factoryDefinitionVersionId: String(item.factoryDefinitionVersionId),
+          repositoryId: String(item.repositoryId),
+        })),
       });
       if (issues.length) throw new Error(`Worker runtime registration is invalid (${issues.join(", ")})`);
       if (!args.repositoryId || !args.workerRuntime.repositoryAccess.some((item) => item.repositoryId === args.repositoryId)) {
@@ -123,6 +142,30 @@ export const report = mutation({
       );
       if (advertisedRepositories.some((item) => !item || item.projectId !== args.projectId)) {
         throw new Error("Worker runtime repository access cannot exceed its workspace scope");
+      }
+      if (args.workerRuntime.factoryVersionBindings?.some((item) => item.repositoryId !== args.repositoryId)) {
+        throw new Error("Worker Factory Version bindings cannot exceed the bound repository scope");
+      }
+      const advertisedVersions = await Promise.all(
+        (args.workerRuntime.factoryVersionBindings ?? []).map((item) => ctx.db.get(item.factoryDefinitionVersionId))
+      );
+      if (advertisedVersions.some((version, index) => {
+        const binding = args.workerRuntime!.factoryVersionBindings![index];
+        return !version
+          || version.projectId !== args.projectId
+          || version.repositoryId !== binding.repositoryId
+          || version.configurationDigest !== binding.factoryConfigurationDigest
+          || version.executor.adapter !== binding.adapter
+          || version.executor.version !== binding.version
+          || version.harnessCapabilityManifestDigest !== binding.capabilityManifestSha256
+          || version.harnessEffectiveConfigSha256 !== binding.effectiveConfigSha256
+          || (version.executionBackend ?? "persistent-worker") !== binding.executionBackend
+          || version.modelRouteDigest !== binding.modelRouteDigest
+          || (version.modelRouteSnapshot as any)?.provider !== binding.provider
+          || (version.modelRouteSnapshot as any)?.modelId !== binding.model
+          || version.sandboxProfileDigest !== binding.sandboxProfileDigest;
+      })) {
+        throw new Error("Worker Factory Version attestation does not match canonical configuration");
       }
       if (!args.baseBranch || !args.baseCommit || args.baseBranch !== repository?.defaultBranch) {
         throw new Error("Worker runtime requires the exact bound repository default-branch revision");

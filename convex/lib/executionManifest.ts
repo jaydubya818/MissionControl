@@ -7,6 +7,7 @@ import {
   harnessSupportsModel,
 } from "@mission-control/workflow-engine/harness-contract";
 import { factoryHarnessCapabilityRequirements } from "./harnessCapabilities";
+import { exactModelRouteDigest, exactModelRouteIssues } from "./modelRouteAdmission";
 
 export function factorySandboxResourceName(input: {
   projectId: string;
@@ -47,6 +48,12 @@ export interface FactoryExecutionManifestInput {
     effectiveConfigSha256: string;
   };
   executionBackend: string;
+  modelRoute?: {
+    catalogId: string;
+    routeDigest: string;
+    routeSnapshot: unknown;
+    qualificationDigest: string;
+  };
   sandboxProfile: {
     isolation: "READ_ONLY" | "WORKSPACE_WRITE";
     requiredCapabilities: string[];
@@ -157,6 +164,13 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
   if (input.executionBackend !== "remote-sandbox" && input.sandbox) {
     throw new Error("A Sandbox Profile cannot be attached to a non-sandbox execution backend.");
   }
+  if (input.modelRoute && (
+    exactModelRouteIssues(input.modelRoute.routeSnapshot).length > 0
+    || exactModelRouteDigest(input.modelRoute.routeSnapshot) !== input.modelRoute.routeDigest
+    || !/^sha256:[a-f0-9]{64}$/i.test(input.modelRoute.qualificationDigest)
+  )) {
+    throw new Error("Execution manifest requires an exact qualified model-route binding.");
+  }
   const allowedPaths = Array.from(new Set(input.codeScopes.flatMap((scope) => scope.includePaths))).sort();
   const excludedPaths = Array.from(new Set(input.codeScopes.flatMap((scope) => scope.excludePaths))).sort();
   const contextHash = `sha256:${computeCanonicalHash(input.initialContext)}`;
@@ -185,6 +199,17 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
   const firstStep = steps[0];
   if (!firstStep || !harnessSupportsModel(input.executor.capabilityManifest, firstStep.modelConfiguration.provider, firstStep.modelRoute)) {
     throw new Error("Selected harness capability manifest does not admit the frozen provider/model route.");
+  }
+  const routeSnapshot = input.modelRoute?.routeSnapshot as Record<string, any> | undefined;
+  if (routeSnapshot && (
+    routeSnapshot.provider !== firstStep.modelConfiguration.provider
+    || routeSnapshot.modelId !== firstStep.modelRoute
+    || routeSnapshot.capabilityIdentity?.adapter !== input.executor.adapter
+    || routeSnapshot.capabilityIdentity?.version !== input.executor.version
+    || routeSnapshot.capabilityIdentity?.capabilityManifestDigest !== input.executor.capabilityManifestSha256
+    || routeSnapshot.capabilityIdentity?.effectiveConfigSha256 !== input.executor.effectiveConfigSha256
+  )) {
+    throw new Error("Execution manifest model route does not match the frozen harness and agent identity.");
   }
   const requiredHarnessCapabilities = factoryHarnessCapabilityRequirements(input.sandboxProfile.isolation);
   if (!harnessCapabilityRequirementsSatisfied(input.executor.capabilityManifest, requiredHarnessCapabilities)) {
@@ -248,6 +273,10 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
       effectiveConfigSha256: input.executor.effectiveConfigSha256,
       provider: firstStep.modelConfiguration.provider,
       model: firstStep.modelRoute,
+      modelCatalogId: input.modelRoute?.catalogId,
+      modelRouteDigest: input.modelRoute?.routeDigest,
+      modelRouteSnapshot: input.modelRoute?.routeSnapshot,
+      modelQualificationDigest: input.modelRoute?.qualificationDigest,
       isolation: input.sandboxProfile.isolation,
       executionBackend: input.executionBackend,
       requiredCapabilities: [...new Set(input.sandboxProfile.requiredCapabilities)].sort(),

@@ -44,7 +44,7 @@ import {
   effectivePolicyV2VerificationChecks,
   normalizePolicyV2VerificationResults,
 } from "../lib/policyV2Verification";
-import { buildFactoryExecutionManifest } from "../lib/executionManifest";
+import { buildFactoryExecutionManifest, factorySandboxResourceName } from "../lib/executionManifest";
 import { snapshotWorkflowDefinition } from "../lib/workflowSnapshot";
 import { selectCurrentFactoryHost } from "../lib/factoryDispatch";
 import {
@@ -52,7 +52,9 @@ import {
   getCurrentVerificationResult,
 } from "../lib/currentVerification";
 import { computeCanonicalHash } from "../lib/genomeHash";
-import { resolveFrozenHarnessBinding } from "../lib/harnessCapabilities";
+import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } from "../lib/harnessCapabilities";
+import { modelRouteProductionEligible } from "../lib/modelRouteAdmission";
+import { sandboxProfileProductionEligible } from "../lib/sandboxProfileAdmission";
 
 const EVENT_TYPES = new Set([
   "RUN_STARTED", "STEP_STARTED", "STEP_COMPLETED", "TOOL_CALLED",
@@ -299,6 +301,10 @@ export const claimInternal = internalMutation({
       || frozenManifest?.harness?.version !== run.executorVersion
       || version.executor.adapter !== run.executorAdapter
       || version.executor.version !== run.executorVersion
+      || !version.modelCatalogId
+      || frozenManifest?.harness?.modelCatalogId !== String(version.modelCatalogId)
+      || frozenManifest?.harness?.modelRouteDigest !== version.modelRouteDigest
+      || frozenManifest?.harness?.modelQualificationDigest !== version.modelQualificationDigest
       || frozenManifest?.harness?.executionBackend !== executionBackend
       || frozenManifest?.repository?.baseSha !== host?.baseCommit) {
       throw new Error("Factory Attempt does not match its frozen backend and source binding.");
@@ -387,6 +393,11 @@ export const claimInternal = internalMutation({
               ...item,
               repositoryId: String(item.repositoryId),
             })),
+            factoryVersionBindings: host.workerRuntime.factoryVersionBindings?.map((item) => ({
+              ...item,
+              factoryDefinitionVersionId: String(item.factoryDefinitionVersionId),
+              repositoryId: String(item.repositoryId),
+            })),
           } : undefined,
         },
         requirements: {
@@ -403,6 +414,10 @@ export const claimInternal = internalMutation({
           isolation: manifest.harness?.isolation,
           sandboxCapabilities: manifest.harness?.requiredCapabilities ?? [],
           executionBackend: manifest.harness?.executionBackend,
+          factoryDefinitionVersionId: manifest.causation?.factoryDefinitionVersionId,
+          factoryConfigurationDigest: manifest.causation?.factoryConfigurationDigest,
+          modelRouteDigest: manifest.harness?.modelRouteDigest,
+          sandboxProfileDigest: manifest.sandbox?.profileDigest,
         },
         activeWorkerLeaseCount,
         now,
@@ -1822,21 +1837,75 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   if (!version || version.factoryDefinitionId !== definition._id || version.purpose !== "VERIFICATION") {
     throw new Error("Active Verification Factory version is unavailable or has the wrong purpose.");
   }
-  const [repository, workflow, assessments, bindings, codeScopes, agentVersions] = await Promise.all([
+  const [repository, workflow, assessments, bindings, codeScopes, agentVersions, modelRoute, sandboxProfile] = await Promise.all([
     ctx.db.get(version.repositoryId),
     ctx.db.get(version.workflowId),
     ctx.db.query("factoryReadinessAssessments").withIndex("by_version", (q: any) => q.eq("factoryDefinitionVersionId", version._id)).collect(),
     ctx.db.query("workspaceHostBindings").withIndex("by_project", (q: any) => q.eq("projectId", version.projectId)).collect(),
     Promise.all((version.codeScopeIds ?? []).map((id: any) => ctx.db.get(id))),
     Promise.all((version.agentBindings ?? []).map((binding: any) => ctx.db.get(binding.agentVersionId))),
+    version.modelCatalogId ? ctx.db.get(version.modelCatalogId) : null,
+    version.sandboxProfileId ? ctx.db.get(version.sandboxProfileId) : null,
   ]);
   const now = Date.now();
   const assessment = assessments.sort((left: any, right: any) => right.assessedAt - left.assessedAt)[0];
-  const host: any = repository ? selectCurrentFactoryHost(bindings as any[], repository.repository, now) : null;
+  const frozenHarness = resolveFrozenHarnessBinding(version);
+  const executionBackend = version.executionBackend ?? "persistent-worker";
+  const requiredSandboxCapabilities = executionBackend === "remote-sandbox"
+    ? ["git-worktree", "read-only", "remote-sandbox", "sandbox-provider:exe-dev"]
+    : ["git-worktree", "read-only"];
+  const eligibleBindings = repository ? bindings.filter((binding: any) => factoryWorkerEligibility({
+    worker: {
+      workerId: binding.hostId,
+      status: binding.status,
+      dirty: binding.dirty,
+      capacity: binding.capacity,
+      workerRuntime: binding.workerRuntime ? {
+        ...binding.workerRuntime,
+        repositoryAccess: binding.workerRuntime.repositoryAccess.map((item: any) => ({ ...item, repositoryId: String(item.repositoryId) })),
+        factoryVersionBindings: binding.workerRuntime.factoryVersionBindings?.map((item: any) => ({
+          ...item,
+          factoryDefinitionVersionId: String(item.factoryDefinitionVersionId),
+          repositoryId: String(item.repositoryId),
+        })),
+      } : undefined,
+    },
+    requirements: {
+      repositoryId: String(repository._id),
+      executor: {
+        adapter: frozenHarness.adapter,
+        version: frozenHarness.version,
+        capabilityManifestSha256: frozenHarness.capabilityManifestSha256,
+        effectiveConfigSha256: frozenHarness.effectiveConfigSha256,
+      },
+      provider: (version.modelRouteSnapshot as any)?.provider ?? null,
+      model: (version.modelRouteSnapshot as any)?.modelId ?? null,
+      harnessCapabilities: factoryHarnessCapabilityRequirements("READ_ONLY"),
+      isolation: "READ_ONLY",
+      sandboxCapabilities: requiredSandboxCapabilities,
+      executionBackend,
+      factoryDefinitionVersionId: String(version._id),
+      factoryConfigurationDigest: version.configurationDigest,
+      modelRouteDigest: version.modelRouteDigest,
+      sandboxProfileDigest: version.sandboxProfileDigest,
+    },
+    activeWorkerLeaseCount: 0,
+    now,
+  }).eligible) : [];
+  const host: any = repository ? selectCurrentFactoryHost(eligibleBindings as any[], repository.repository, now) : null;
   if (!repository || repository._id !== sourceAttempt.repositoryId || repository.status !== "READY"
     || !workflow?.active || !assessment || assessment.status !== "PASS" || assessment.expiresAt <= now
     || assessment.configurationDigest !== version.configurationDigest || !host || host.dirty
-    || agentVersions.some((agentVersion: any) => !agentVersion)) {
+    || agentVersions.some((agentVersion: any) => !agentVersion)
+    || !modelRoute
+    || modelRoute.routeDigest !== version.modelRouteDigest
+    || modelRoute.qualificationDigest !== version.modelQualificationDigest
+    || !modelRouteProductionEligible(modelRoute)
+    || (executionBackend === "remote-sandbox" && (
+      !sandboxProfile
+      || sandboxProfile.profileDigest !== version.sandboxProfileDigest
+      || !sandboxProfileProductionEligible(sandboxProfile)
+    ))) {
     throw new Error("Candidate is ready, but the active Verification Factory no longer has current readiness for the exact repository and host.");
   }
   const runId = Math.random().toString(36).slice(2, 10);
@@ -1861,12 +1930,32 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     baseSha: subject.kind === "GIT_CANDIDATE" ? subject.candidateSha : sourceAttempt.headSha,
     branch: sourceAttempt.branch,
     worktree,
-    executor: resolveFrozenHarnessBinding(version),
-    executionBackend: host.workerRuntime?.executionBackends[0] ?? "persistent-worker",
+    executor: frozenHarness,
+    executionBackend,
+    modelRoute: {
+      catalogId: String(modelRoute._id),
+      routeDigest: modelRoute.routeDigest,
+      routeSnapshot: modelRoute.routeSnapshot,
+      qualificationDigest: modelRoute.qualificationDigest,
+    },
     sandboxProfile: {
       isolation: "READ_ONLY",
-      requiredCapabilities: ["git-worktree", "read-only"],
+      requiredCapabilities: requiredSandboxCapabilities,
     },
+    sandbox: executionBackend === "remote-sandbox" ? {
+      resourceName: factorySandboxResourceName({
+        projectId: String(version.projectId),
+        workflowRunId: runId,
+        attemptId: runId,
+      }),
+      profileId: String(sandboxProfile!._id),
+      profileDigest: sandboxProfile!.profileDigest,
+      profileSnapshot: sandboxProfile!.immutableSnapshot,
+      supervisorVersion: "mission-control-supervisor/v1",
+      resultContract: { schema: "factory-sandbox-result/v1", independentHostValidationRequired: true },
+      credentialGrants: [{ kind: "INFERENCE", secretValueIncluded: false, githubAuthority: "NONE", providerAuthority: "NONE" }],
+      teardown: { credentialsRevokedBeforePublication: true, resourceAbsenceRequiredBeforePublication: true },
+    } : undefined,
     workflow: workflowSnapshot as any,
     workOrder: {
       title: workOrder.title,

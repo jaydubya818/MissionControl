@@ -1,0 +1,38 @@
+{
+  "schema": "production-admission-hardened-image-requalification/v1",
+  "observedAt": "2026-08-21T22:12:45.132638093Z",
+  "image": "ghcr.io/jaydubya818/mission-control-remote-sandbox@sha256:41a66f1d6f7b90618a6c58fb9a1a336ef69ab2794fc1322233e4a5d9788782b8",
+  "dockerContentId": "sha256:41a66f1d6f7b90618a6c58fb9a1a336ef69ab2794fc1322233e4a5d9788782b8",
+  "platform": "linux/amd64",
+  "freshGrypeDatabaseBuiltAt": "2026-08-21T06:17:24Z",
+  "vulnerabilities": {
+    "critical": 0,
+    "high": 0,
+    "medium": 2,
+    "mediumDetails": [
+      { "id": "CVE-2025-60876", "package": "busybox", "version": "1.37.0-r30" },
+      { "id": "CVE-2025-60876", "package": "busybox-binsh", "version": "1.37.0-r30" }
+    ],
+    "genericSuppressions": 0,
+    "wgetApplet": "ABSENT"
+  },
+  "sbom": {
+    "reference": "../remote-sandbox-final-blocker-qualification-v1/published-image-sbom.spdx.json",
+    "fileSha256": "sha256:7706d0e318cd9583a04d541ac06277d84c063eca149dd081f0bc34c78f9afbfd",
+    "qualifiedSbomDigest": "sha256:46b2708e56068a39c9e681416b847bf2af5c9899ec0e373be9446c573b85a9f2"
+  },
+  "toolchain": {
+    "nodeVersion": "v26.7.0",
+    "codexVersion": "codex-cli 0.146.0",
+    "codexBinarySha256": "sha256:2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04",
+    "gitVersion": "git version 2.55.0",
+    "gitBinarySha256": "sha256:7127059b4ebea64f4a50fc3c64601b69a9694196f3ee0396efec6378a0b45078",
+    "busyboxVersion": "BusyBox v1.37.0",
+    "busyboxBinarySha256": "sha256:6a925a6f54ad5263762a91c25cc0a14b8093a86c2b9c1d5f8fae09ccaaeac222",
+    "toolchainInputsSha256": "sha256:76858cb0bebf67e0f9bac7ffed49e2bd83059095cf001466398b316b4b52b883",
+    "uid": 10001,
+    "gid": 10001
+  },
+  "localSecurityQualification": "PASS_TWO_FRESH_CONTAINERS",
+  "providerEgressEnforced": false
+}

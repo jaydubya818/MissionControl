@@ -1,0 +1,29 @@
+{
+  "schema": "production-execution-admission-state/v1",
+  "observedAt": "2026-08-21T22:10:42.929Z",
+  "projectId": "px7590t3cmf3qsmgacnnytnshs8cbxp5",
+  "counts": {
+    "githubAppInstallations": 0,
+    "modelCatalog": 0,
+    "factorySandboxProfiles": 0,
+    "workspaceHostBindings": 0,
+    "repositoryCodeScopes": 0,
+    "contextVerifiers": 0,
+    "policyEnvelopes": 0,
+    "factoryDefinitions": 0,
+    "factoryDefinitionVersions": 0,
+    "factoryReadinessAssessments": 0,
+    "factoryAttempts": 0,
+    "modelRoutingPolicies": 0,
+    "modelRoutingDecisions": 0
+  },
+  "convexEnvironmentNames": ["VERCEL_AUTOMATION_BYPASS_SECRET"],
+  "guardedAutoEnabled": false,
+  "exeDev": {
+    "authenticated": true,
+    "vmCount": 0,
+    "maxVms": 50,
+    "providerCapacityAvailable": true,
+    "automaticIntegrationCount": 0
+  }
+}

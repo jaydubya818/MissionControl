@@ -25,7 +25,7 @@ describe("execution routing rollout", () => {
     } })).toBe(false);
     expect(sandboxProfileProductionEligible({ immutableSnapshot: {
       security: { qualificationOnly: false },
-    } })).toBe(true);
-    expect(sandboxProfileProductionEligible({ immutableSnapshot: {} })).toBe(true);
+    } })).toBe(false);
+    expect(sandboxProfileProductionEligible({ immutableSnapshot: {} })).toBe(false);
   });
 });

@@ -72,8 +72,25 @@ export interface SandboxProfileSnapshot {
     checkedAt: number;
     reason: string;
     egressEnforcementProven: boolean;
+    providerEgressEnforcementProven?: boolean;
+    guestEgressEnforcementProven?: boolean;
     liveCertified?: boolean;
     evidenceReference?: string;
+  };
+  qualification?: {
+    evidencePacketReference: string;
+    evidencePacketDigest: string;
+    egressPolicyDigest: string;
+    credentialRevocationBoundMs: number;
+    supportedWorkloadClasses: string[];
+    supportedRiskClasses: Array<"GREEN" | "YELLOW">;
+    workloadTimeouts: Array<{ workloadClass: string; maxRuntimeMs: number }>;
+    providerEgress: {
+      providerEnforced: false;
+      guestEnforced: true;
+      enforcement: "GUEST_NFTABLES";
+      limitation: "PROVIDER_ENFORCEMENT_UNAVAILABLE";
+    };
   };
   security?: {
     schema: typeof SANDBOX_SECURITY_SCHEMA;
@@ -347,6 +364,21 @@ export function validateSandboxProfile(profile: SandboxProfileSnapshot): Sandbox
     }
     if (profile.readiness.state !== "DEGRADED") errors.push("Guest-only egress enforcement must remain visibly DEGRADED.");
     warnings.push("exe.dev exposes no provider-level egress control; guest nftables enforcement is qualification-only defense in depth.");
+    if (profile.qualification) {
+      const qualification = profile.qualification;
+      if (!/^sha256:[a-f0-9]{64}$/i.test(qualification.evidencePacketDigest)
+        || !/^sha256:[a-f0-9]{64}$/i.test(qualification.egressPolicyDigest)
+        || !qualification.evidencePacketReference.trim()
+        || !Number.isSafeInteger(qualification.credentialRevocationBoundMs)
+        || qualification.credentialRevocationBoundMs < 1_000
+        || qualification.credentialRevocationBoundMs > 60_000
+        || qualification.providerEgress.providerEnforced !== false
+        || qualification.providerEgress.guestEnforced !== true
+        || qualification.providerEgress.enforcement !== "GUEST_NFTABLES"
+        || qualification.providerEgress.limitation !== "PROVIDER_ENFORCEMENT_UNAVAILABLE") {
+        errors.push("Restricted candidate qualification evidence is invalid.");
+      }
+    }
   }
   const readiness = errors.length > 0 ? "BLOCKED" : profile.network.egress === "UNRESTRICTED" ? "DEGRADED" : profile.readiness.state;
   return {

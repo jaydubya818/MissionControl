@@ -1,0 +1,29 @@
+{
+  "schema": "production-factory-version-identities/v1",
+  "observedAt": "2026-08-21T22:08:00Z",
+  "local": {
+    "factoryDefinitionVersionId": null,
+    "state": "NOT_CREATED",
+    "reason": "production exact route, GitHub App, workflow, policy, verifier, code scope, and worker configuration are absent"
+  },
+  "remote": {
+    "factoryDefinitionVersionId": null,
+    "state": "NOT_CREATED",
+    "reason": "production exact route and promoted hardened Sandbox Profile do not exist"
+  },
+  "implementedFrozenFields": [
+    "adapter/version",
+    "capability manifest digest",
+    "effective configuration digest",
+    "model catalog ID",
+    "model route digest and snapshot",
+    "model qualification digest and snapshot",
+    "execution backend",
+    "Sandbox Profile ID/digest/snapshot where remote",
+    "repository/code scopes",
+    "agent bindings",
+    "workload/risk eligibility",
+    "budget/recovery"
+  ],
+  "executionAuthorityGrantedByCreation": false
+}

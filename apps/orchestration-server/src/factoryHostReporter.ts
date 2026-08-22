@@ -31,6 +31,20 @@ export interface FactoryHostReporterConfig {
     isolationModes: Array<"READ_ONLY" | "WORKSPACE_WRITE">;
   }>;
   sandboxCapabilities: string[];
+  factoryVersionBindings?: Array<{
+    factoryDefinitionVersionId: string;
+    factoryConfigurationDigest: string;
+    adapter: string;
+    version: string;
+    provider: string;
+    model: string;
+    capabilityManifestSha256: string;
+    effectiveConfigSha256: string;
+    executionBackend: string;
+    modelRouteDigest: string;
+    sandboxProfileDigest?: string;
+    repositoryId: string;
+  }>;
   readiness?: "STARTING" | "READY" | "DRAINING" | "BLOCKED";
   draining?: boolean;
   intervalMs?: number;
@@ -113,6 +127,9 @@ export class FactoryHostReporter {
           })),
           sandboxCapabilities: this.config.sandboxCapabilities,
           repositoryAccess: [{ repositoryId: this.config.repositoryId, access: "READ_WRITE" }],
+          ...(this.config.factoryVersionBindings
+            ? { factoryVersionBindings: this.config.factoryVersionBindings }
+            : {}),
           readiness: this.config.readiness ?? "READY",
           draining: this.config.draining ?? false,
         },

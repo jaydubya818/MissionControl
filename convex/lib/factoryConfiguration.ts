@@ -6,6 +6,8 @@ export interface FactoryConfigurationInput {
   harnessCapabilityManifest: unknown;
   harnessCapabilityManifestDigest: string;
   harnessEffectiveConfigSha256: string;
+  modelCatalogId: string;
+  modelRouteDigest: string;
   executionBackend: "persistent-worker" | "remote-sandbox";
   sandboxProfileId?: string;
   sandboxProfileDigest?: string;

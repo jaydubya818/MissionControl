@@ -2,6 +2,26 @@ import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
 import { loadModelCatalogForProject } from "./lib/modelCatalogScope";
+import { computeCanonicalHash } from "./lib/genomeHash";
+import {
+  MODEL_ROUTE_QUALIFICATION_SCHEMA,
+  exactModelRouteDigest,
+  exactModelRouteSnapshot,
+} from "./lib/modelRouteAdmission";
+
+const tier = v.union(v.literal("FAST"), v.literal("BALANCED"), v.literal("POWERFUL"));
+const exactCapabilityIdentity = v.object({
+  adapter: v.string(),
+  version: v.string(),
+  capabilityManifestDigest: v.string(),
+  effectiveConfigSha256: v.string(),
+});
+const exactRuntimeIdentity = v.object({
+  kind: v.literal("CODEX_CLI"),
+  cliVersion: v.string(),
+  executableSha256: v.optional(v.string()),
+  imageDigest: v.optional(v.string()),
+});
 
 const DEFAULT_MODELS = [
   {
@@ -77,6 +97,173 @@ export const list = query({
   handler: async (ctx, args) => {
     await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.VIEW);
     return loadModelCatalogForProject(ctx, args.projectId);
+  },
+});
+
+/** Register an immutable exact route. This records identity only; it does not
+ * qualify or admit the route for production execution. */
+export const registerExactRoute = mutation({
+  args: {
+    projectId: v.id("projects"),
+    provider: v.string(),
+    providerRoute: v.string(),
+    modelId: v.string(),
+    displayName: v.string(),
+    tier,
+    capabilities: v.array(v.string()),
+    supportsTools: v.boolean(),
+    contextWindow: v.number(),
+    capabilityIdentity: exactCapabilityIdentity,
+    runtimeIdentity: exactRuntimeIdentity,
+  },
+  handler: async (ctx, args) => {
+    const access = await requireWorkspacePermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
+    );
+    validateDiscoveredModels([{
+      modelId: args.modelId,
+      displayName: args.displayName,
+      capabilities: args.capabilities,
+      contextWindow: args.contextWindow,
+    }]);
+    const routeSnapshot = exactModelRouteSnapshot(args);
+    const routeDigest = exactModelRouteDigest(routeSnapshot);
+    const matches = await ctx.db.query("modelCatalog")
+      .withIndex("by_project_model", (q) => q.eq("projectId", args.projectId).eq("modelId", routeSnapshot.modelId))
+      .collect();
+    const existing = matches.find((candidate) => candidate.provider === routeSnapshot.provider);
+    if (existing) {
+      if (existing.routeDigest !== routeDigest) {
+        throw new Error("The exact model route is already registered with a different immutable identity.");
+      }
+      return existing._id;
+    }
+    const now = Date.now();
+    const id = await ctx.db.insert("modelCatalog", {
+      tenantId: access.project.tenantId,
+      projectId: args.projectId,
+      provider: routeSnapshot.provider,
+      providerRoute: routeSnapshot.providerRoute,
+      modelId: routeSnapshot.modelId,
+      displayName: args.displayName.trim(),
+      tier: args.tier,
+      capabilities: [...new Set(args.capabilities)].sort(),
+      supportsTools: args.supportsTools,
+      riskApproved: false,
+      contextWindow: args.contextWindow,
+      availability: "UNAVAILABLE",
+      deprecated: false,
+      routeSnapshot,
+      routeDigest,
+      capabilityManifestDigest: routeSnapshot.capabilityIdentity.capabilityManifestDigest,
+      effectiveConfigSha256: routeSnapshot.capabilityIdentity.effectiveConfigSha256,
+      runtimeIdentity: routeSnapshot.runtimeIdentity,
+      enabled: false,
+      qualificationStatus: "UNQUALIFIED",
+      admissionStatus: "DISABLED",
+      registeredBy: access.actorId,
+      registeredAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.insert("activities", {
+      tenantId: access.project.tenantId,
+      projectId: args.projectId,
+      actorType: "HUMAN",
+      actorId: access.actorId,
+      action: "EXACT_MODEL_ROUTE_REGISTERED",
+      description: `Registered disabled exact model route ${routeSnapshot.provider}/${routeSnapshot.modelId}`,
+      targetType: "MODEL_CATALOG",
+      targetId: id,
+      metadata: { routeDigest, providerRoute: routeSnapshot.providerRoute },
+    });
+    return id;
+  },
+});
+
+/** Bind reviewed qualification evidence to an already frozen route. */
+export const promoteExactRoute = mutation({
+  args: {
+    modelCatalogId: v.id("modelCatalog"),
+    expectedRouteDigest: v.string(),
+    evidenceReference: v.string(),
+    evidenceDigest: v.string(),
+    workloadClasses: v.array(v.string()),
+    riskClasses: v.array(v.union(v.literal("GREEN"), v.literal("YELLOW"), v.literal("RED"))),
+  },
+  handler: async (ctx, args) => {
+    const route = await ctx.db.get(args.modelCatalogId);
+    if (!route?.projectId || !route.routeSnapshot || !route.routeDigest) {
+      throw new Error("Exact model route is unavailable or is a legacy catalog alias.");
+    }
+    const access = await requireWorkspacePermission(ctx, route.projectId, FACTORY_PERMISSIONS.APPROVE);
+    if (route.admissionStatus === "PRODUCTION_PILOT_ELIGIBLE" || route.qualificationDigest) {
+      throw new Error("Exact model route qualification is immutable after promotion.");
+    }
+    if (route.routeDigest !== args.expectedRouteDigest
+      || exactModelRouteDigest(route.routeSnapshot) !== args.expectedRouteDigest) {
+      throw new Error("Exact model route digest does not match the reviewed identity.");
+    }
+    if (!/^sha256:[a-f0-9]{64}$/i.test(args.evidenceDigest)
+      || !args.evidenceReference.trim()
+      || args.evidenceReference.length > 1_000
+      || args.workloadClasses.length < 1
+      || args.workloadClasses.length > 20
+      || new Set(args.workloadClasses).size !== args.workloadClasses.length
+      || args.workloadClasses.some((item) => item !== item.trim() || !/^[A-Z][A-Z0-9_]{1,63}$/.test(item))) {
+      throw new Error("Exact model route qualification evidence or scope is invalid.");
+    }
+    if (args.riskClasses.length < 1
+      || new Set(args.riskClasses).size !== args.riskClasses.length) {
+      throw new Error("Exact model route qualification requires a non-empty unique risk scope.");
+    }
+    const promotedAt = Date.now();
+    const qualificationSnapshot = {
+      schema: MODEL_ROUTE_QUALIFICATION_SCHEMA,
+      routeDigest: route.routeDigest,
+      evidence: { reference: args.evidenceReference.trim(), digest: args.evidenceDigest.toLowerCase() },
+      scope: {
+        workloadClasses: [...args.workloadClasses].sort(),
+        riskClasses: [...new Set(args.riskClasses)].sort(),
+      },
+      promotedBy: access.actorId,
+      promotedAt,
+      authority: {
+        executionOnly: true,
+        routing: false,
+        verification: false,
+        acceptance: false,
+        publication: false,
+        merge: false,
+      },
+    };
+    const qualificationDigest = `sha256:${computeCanonicalHash({
+      namespace: MODEL_ROUTE_QUALIFICATION_SCHEMA,
+      value: qualificationSnapshot,
+    })}`;
+    await ctx.db.patch(route._id, {
+      enabled: true,
+      qualificationStatus: "EVIDENCE_QUALIFIED",
+      admissionStatus: "PRODUCTION_PILOT_ELIGIBLE",
+      qualificationSnapshot,
+      qualificationDigest,
+      promotedBy: access.actorId,
+      promotedAt,
+      updatedAt: promotedAt,
+    });
+    await ctx.db.insert("activities", {
+      tenantId: route.tenantId,
+      projectId: route.projectId,
+      actorType: "HUMAN",
+      actorId: access.actorId,
+      action: "EXACT_MODEL_ROUTE_PROMOTED",
+      description: `Promoted exact model route ${route.provider}/${route.modelId} for production-pilot execution`,
+      targetType: "MODEL_CATALOG",
+      targetId: route._id,
+      metadata: { routeDigest: route.routeDigest, qualificationDigest },
+    });
+    return { modelCatalogId: route._id, routeDigest: route.routeDigest, qualificationDigest };
   },
 });
 

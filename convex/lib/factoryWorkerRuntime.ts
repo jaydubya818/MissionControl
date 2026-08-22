@@ -32,9 +32,25 @@ export interface FactoryWorkerRuntimeSnapshot {
     repositoryId: string;
     access: "READ" | "READ_WRITE";
   }>;
+  factoryVersionBindings?: FactoryWorkerVersionBinding[];
   readiness: FactoryWorkerReadiness;
   draining: boolean;
   lastHeartbeatAt: number;
+}
+
+export interface FactoryWorkerVersionBinding {
+  factoryDefinitionVersionId: string;
+  factoryConfigurationDigest: string;
+  adapter: string;
+  version: string;
+  provider: string;
+  model: string;
+  capabilityManifestSha256: string;
+  effectiveConfigSha256: string;
+  executionBackend: string;
+  modelRouteDigest: string;
+  sandboxProfileDigest?: string;
+  repositoryId: string;
 }
 
 export interface FactoryWorkerCandidate {
@@ -62,6 +78,10 @@ export interface FactoryWorkerRequirements {
   isolation: "READ_ONLY" | "WORKSPACE_WRITE";
   sandboxCapabilities: string[];
   executionBackend?: string;
+  factoryDefinitionVersionId?: string;
+  factoryConfigurationDigest?: string;
+  modelRouteDigest?: string;
+  sandboxProfileDigest?: string;
 }
 
 export function nextFactoryWorkerGeneration(
@@ -138,6 +158,31 @@ export function factoryWorkerEligibility(input: {
   if (!repository || repository.access !== "READ_WRITE") {
     return { eligible: false as const, reason: "worker-repository-access-missing" };
   }
+  const exactBindingValues = [
+    requirements.factoryDefinitionVersionId,
+    requirements.factoryConfigurationDigest,
+    requirements.modelRouteDigest,
+  ];
+  if (exactBindingValues.some(Boolean) && !exactBindingValues.every(Boolean)) {
+    return { eligible: false as const, reason: "worker-version-requirements-incomplete" };
+  }
+  if (requirements.factoryDefinitionVersionId) {
+    const exactBinding = runtime.factoryVersionBindings?.find((binding) =>
+      binding.factoryDefinitionVersionId === requirements.factoryDefinitionVersionId
+      && binding.factoryConfigurationDigest === requirements.factoryConfigurationDigest
+      && binding.adapter === requirements.executor.adapter
+      && binding.version === requirements.executor.version
+      && binding.provider === requirements.provider
+      && binding.model === requirements.model
+      && binding.capabilityManifestSha256 === requirements.executor.capabilityManifestSha256
+      && binding.effectiveConfigSha256 === requirements.executor.effectiveConfigSha256
+      && binding.executionBackend === requirements.executionBackend
+      && binding.modelRouteDigest === requirements.modelRouteDigest
+      && binding.sandboxProfileDigest === requirements.sandboxProfileDigest
+      && binding.repositoryId === requirements.repositoryId
+    );
+    if (!exactBinding) return { eligible: false as const, reason: "worker-factory-version-mismatch" };
+  }
   return {
     eligible: true as const,
     workerId: worker.workerId,
@@ -169,6 +214,7 @@ export function factoryWorkerRegistrationIssues(input: {
   supportedExecutors: FactoryWorkerExecutorCapability[];
   sandboxCapabilities: string[];
   repositoryAccess: Array<{ repositoryId: string; access: "READ" | "READ_WRITE" }>;
+  factoryVersionBindings?: FactoryWorkerVersionBinding[];
 }) {
   const issues: string[] = [];
   if (!boundedIdentity(input.sessionId, 200)) issues.push("session-id-invalid");
@@ -198,6 +244,25 @@ export function factoryWorkerRegistrationIssues(input: {
     || input.repositoryAccess.some((repository) => !boundedIdentity(repository.repositoryId, 200))) {
     issues.push("repository-access-invalid");
   }
+  if (input.factoryVersionBindings !== undefined && (
+    input.factoryVersionBindings.length < 1
+    || input.factoryVersionBindings.length > 32
+    || new Set(input.factoryVersionBindings.map((binding) => binding.factoryDefinitionVersionId)).size !== input.factoryVersionBindings.length
+    || input.factoryVersionBindings.some((binding) =>
+      !boundedIdentity(binding.factoryDefinitionVersionId, 200)
+      || !/^factory-v1-[a-f0-9]{8}$/i.test(binding.factoryConfigurationDigest)
+      || !boundedIdentity(binding.adapter, 100)
+      || !boundedIdentity(binding.version, 100)
+      || !boundedIdentity(binding.provider, 100)
+      || !boundedIdentity(binding.model, 200)
+      || !/^sha256:[a-f0-9]{64}$/i.test(binding.capabilityManifestSha256)
+      || !/^[a-f0-9]{64}$/i.test(binding.effectiveConfigSha256)
+      || !boundedIdentity(binding.executionBackend, 100)
+      || !/^sha256:[a-f0-9]{64}$/i.test(binding.modelRouteDigest)
+      || (binding.sandboxProfileDigest !== undefined && !/^sha256:[a-f0-9]{64}$/i.test(binding.sandboxProfileDigest))
+      || !boundedIdentity(binding.repositoryId, 200)
+    )
+  )) issues.push("factory-version-bindings-invalid");
   return issues;
 }
 

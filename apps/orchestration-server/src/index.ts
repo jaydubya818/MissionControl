@@ -36,7 +36,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { executeAutomation } from "./automationAdapter.js";
 import { discoverLocalInference } from "./localInference.js";
 import { FactoryAttemptWorker } from "./factoryAttemptWorker.js";
-import { FactoryHostReporter } from "./factoryHostReporter.js";
+import { FactoryHostReporter, type FactoryHostReporterConfig } from "./factoryHostReporter.js";
 import {
   fetchGithubPullRequestEvidence,
   loadGithubAppPrivateKey,
@@ -159,6 +159,10 @@ const factoryHostReporter = FACTORY_WORKER_SCOPE
         "git-worktree", "workspace-write", "read-only", "github-app-publication",
         ...(REMOTE_SANDBOX_BACKEND_READY ? ["remote-sandbox", "sandbox-provider:exe-dev"] : []),
       ],
+      factoryVersionBindings: parseFactoryVersionBindings(
+        process.env.CODEX_WORKER_FACTORY_VERSION_BINDINGS_JSON,
+        FACTORY_WORKER_SCOPE.repositoryId,
+      ),
       onError: (error) => console.error("[orchestration] Factory host report failed:", error),
     })
   : null;
@@ -1678,6 +1682,32 @@ function boundedPositiveInteger(value: string | undefined, fallback: number) {
 function commaSeparatedValues(value: string | undefined) {
   const values = value?.split(",").map((item) => item.trim()).filter(Boolean);
   return values?.length ? values : undefined;
+}
+
+function parseFactoryVersionBindings(
+  value: string | undefined,
+  repositoryId: string,
+): FactoryHostReporterConfig["factoryVersionBindings"] {
+  if (!value?.trim()) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("CODEX_WORKER_FACTORY_VERSION_BINDINGS_JSON must be valid JSON.");
+  }
+  if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 32) {
+    throw new Error("CODEX_WORKER_FACTORY_VERSION_BINDINGS_JSON must contain 1-32 bindings.");
+  }
+  return parsed.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error("Every Factory Version worker binding must be an object.");
+    }
+    const binding = item as Record<string, unknown>;
+    if (binding.repositoryId !== repositoryId) {
+      throw new Error("Factory Version worker bindings must use CODEX_WORKER_REPOSITORY_ID.");
+    }
+    return binding as unknown as NonNullable<FactoryHostReporterConfig["factoryVersionBindings"]>[number];
+  });
 }
 
 function attestationStatus(value: string | undefined) {

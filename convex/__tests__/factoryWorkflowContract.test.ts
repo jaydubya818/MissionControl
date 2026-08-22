@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { factoryWorkflowContractIssues } from "../lib/factoryWorkflowContract";
+import { factoryWorkflowContractIssues, workflowRunCompatibilityProjection } from "../lib/factoryWorkflowContract";
 
 describe("Factory workflow contract", () => {
   it("accepts schema-validated execution with a human gate", () => {
@@ -21,5 +21,41 @@ describe("Factory workflow contract", () => {
       "pr:structured-status-required",
       "pr:provider-authority-forbidden",
     ]);
+  });
+
+  it("preserves honest compatibility lineage without inventing terminal status", () => {
+    const currentWorkflow = {
+      active: true,
+      steps: [{ id: "implement", outputSchema: { type: "object", required: ["status"], properties: { status: { type: "string" } } } }],
+    };
+    expect(workflowRunCompatibilityProjection({
+      status: "FAILED",
+      workflowId: "legacy",
+      steps: [{ status: "BLOCKED" }],
+    }, currentWorkflow)).toMatchObject({
+      classification: "LEGACY_BUT_VALID",
+      normalized: { status: "FAILED", lineage: "PRESERVED_SOURCE" },
+      executionEligible: false,
+    });
+    expect(workflowRunCompatibilityProjection({
+      status: "COMPLETED",
+      workflowId: "unsafe",
+      workflowVersion: 1,
+      workflowSnapshot: { active: true, steps: [{ id: "implement" }] },
+      steps: [{ status: "PENDING" }],
+    }, currentWorkflow)).toMatchObject({
+      classification: "GENUINELY_INVALID",
+      normalized: { status: null, lineage: "UNRESOLVED" },
+    });
+    expect(workflowRunCompatibilityProjection({
+      status: "FAILED",
+      workflowId: "stale",
+      workflowVersion: 1,
+      workflowSnapshot: { active: true, steps: [{ id: "implement" }] },
+      steps: [{ status: "BLOCKED" }],
+    }, currentWorkflow)).toMatchObject({
+      classification: "STALE_SCHEMA",
+      normalized: { status: "FAILED", lineage: "PRESERVED_SOURCE" },
+    });
   });
 });

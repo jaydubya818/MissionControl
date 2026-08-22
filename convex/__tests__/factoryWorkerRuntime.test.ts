@@ -80,6 +80,44 @@ describe("Factory worker runtime", () => {
     })).toMatchObject({ eligible: false, reason: "worker-draining" });
   });
 
+  it("requires one exact worker attestation for a frozen Factory Version", () => {
+    const exactRequirements: FactoryWorkerRequirements = {
+      ...requirements,
+      factoryDefinitionVersionId: "factory-version-1",
+      factoryConfigurationDigest: "factory-v1-deadbeef",
+      modelRouteDigest: `sha256:${"a".repeat(64)}`,
+    };
+    expect(factoryWorkerEligibility({ worker, requirements: exactRequirements, activeWorkerLeaseCount: 0, now }))
+      .toMatchObject({ eligible: false, reason: "worker-factory-version-mismatch" });
+    const exactWorker: FactoryWorkerCandidate = {
+      ...worker,
+      workerRuntime: {
+        ...worker.workerRuntime!,
+        factoryVersionBindings: [{
+          factoryDefinitionVersionId: exactRequirements.factoryDefinitionVersionId!,
+          factoryConfigurationDigest: exactRequirements.factoryConfigurationDigest!,
+          adapter: requirements.executor.adapter,
+          version: requirements.executor.version,
+          provider: requirements.provider!,
+          model: requirements.model!,
+          capabilityManifestSha256: requirements.executor.capabilityManifestSha256,
+          effectiveConfigSha256: requirements.executor.effectiveConfigSha256,
+          executionBackend: requirements.executionBackend!,
+          modelRouteDigest: exactRequirements.modelRouteDigest!,
+          repositoryId: requirements.repositoryId,
+        }],
+      },
+    };
+    expect(factoryWorkerEligibility({ worker: exactWorker, requirements: exactRequirements, activeWorkerLeaseCount: 0, now }))
+      .toMatchObject({ eligible: true });
+    expect(factoryWorkerEligibility({
+      worker: exactWorker,
+      requirements: { ...exactRequirements, modelRouteDigest: `sha256:${"b".repeat(64)}` },
+      activeWorkerLeaseCount: 0,
+      now,
+    })).toMatchObject({ eligible: false, reason: "worker-factory-version-mismatch" });
+  });
+
   it("rejects capacity exhaustion using active server-side session leases", () => {
     expect(factoryWorkerEligibility({ worker, requirements, activeWorkerLeaseCount: 2, now }))
       .toMatchObject({ eligible: false, reason: "worker-capacity-exhausted" });

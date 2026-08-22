@@ -16,6 +16,8 @@ const configuration: FactoryConfigurationInput = {
   harnessCapabilityManifest: CODEX_V1_HARNESS_MANIFEST,
   harnessCapabilityManifestDigest: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
   harnessEffectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+  modelCatalogId: "model-route-1",
+  modelRouteDigest: `sha256:${"a".repeat(64)}`,
   executionBackend: "persistent-worker",
   codeScopeIds: ["scope-b", "scope-a"],
   agentBindings: [
@@ -50,6 +52,12 @@ describe("Factory configuration", () => {
       factoryConfigurationDigest({
         ...configuration,
         harnessEffectiveConfigSha256: "f".repeat(64),
+      })
+    );
+    expect(factoryConfigurationDigest(configuration)).not.toBe(
+      factoryConfigurationDigest({
+        ...configuration,
+        modelRouteDigest: `sha256:${"b".repeat(64)}`,
       })
     );
   });

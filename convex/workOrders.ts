@@ -80,6 +80,8 @@ import { buildWorkOrderTaskAuthority } from "./lib/taskAuthority";
 import { buildFactoryExecutionManifest, factorySandboxResourceName } from "./lib/executionManifest";
 import { loadFactoryAttemptReviewReadModel } from "./lib/factoryReviewReadModel";
 import { factoryWorkflowContractIssues } from "./lib/factoryWorkflowContract";
+import { modelRouteProductionEligible } from "./lib/modelRouteAdmission";
+import { sandboxProfileProductionEligible } from "./lib/sandboxProfileAdmission";
 import { createWorkOrderRecord } from "./lib/workOrderCreate";
 import {
   appendCurrentVerificationQualityGateDecision,
@@ -2581,6 +2583,12 @@ async function dispatchWorkOrder(
           worktree: factoryBinding.worktree,
           executor: resolveFrozenHarnessBinding(factoryBinding.version),
           executionBackend: factoryBinding.executionBackend,
+          modelRoute: {
+            catalogId: String(factoryBinding.modelRoute._id),
+            routeDigest: factoryBinding.modelRoute.routeDigest,
+            routeSnapshot: factoryBinding.modelRoute.routeSnapshot,
+            qualificationDigest: factoryBinding.modelRoute.qualificationDigest,
+          },
           sandboxProfile: {
             isolation: "WORKSPACE_WRITE",
             requiredCapabilities: factoryBinding.requiredSandboxCapabilities,
@@ -3177,7 +3185,7 @@ async function resolveFactoryDispatchBinding(
   const now = Date.now();
   const version = await ctx.db.get(args.factoryDefinitionVersionId);
   if (!version) throw new Error("Factory dispatch blocked (factory-version-not-found): Select an available Factory version.");
-  const [definition, repository, policy, installation, assessments, bindings, verifiers, codeScopes, agentVersions, sandboxProfile] = await Promise.all([
+  const [definition, repository, policy, installation, assessments, bindings, verifiers, codeScopes, agentVersions, sandboxProfile, modelRoute] = await Promise.all([
     ctx.db.get(version.factoryDefinitionId),
     ctx.db.get(version.repositoryId),
     version.policyEnvelopeId ? ctx.db.get(version.policyEnvelopeId) : null,
@@ -3188,6 +3196,7 @@ async function resolveFactoryDispatchBinding(
     Promise.all((version.codeScopeIds ?? []).map((id) => ctx.db.get(id))),
     Promise.all((version.agentBindings ?? []).map((binding) => ctx.db.get(binding.agentVersionId))),
     version.sandboxProfileId ? ctx.db.get(version.sandboxProfileId) : null,
+    version.modelCatalogId ? ctx.db.get(version.modelCatalogId) : null,
   ]);
   const latestAssessment = assessments.sort((left, right) => right.assessedAt - left.assessedAt)[0];
   const github = installation ? evaluateGithubAppCapabilities(installation) : null;
@@ -3212,6 +3221,11 @@ async function resolveFactoryDispatchBinding(
         workerRuntime: binding.workerRuntime ? {
           ...binding.workerRuntime,
           repositoryAccess: binding.workerRuntime.repositoryAccess.map((item) => ({ ...item, repositoryId: String(item.repositoryId) })),
+          factoryVersionBindings: binding.workerRuntime.factoryVersionBindings?.map((item) => ({
+            ...item,
+            factoryDefinitionVersionId: String(item.factoryDefinitionVersionId),
+            repositoryId: String(item.repositoryId),
+          })),
         } : undefined,
       },
       requirements: {
@@ -3228,6 +3242,10 @@ async function resolveFactoryDispatchBinding(
         isolation: "WORKSPACE_WRITE",
         sandboxCapabilities: requiredSandboxCapabilities,
         executionBackend: selectedExecutionBackend,
+        factoryDefinitionVersionId: String(version._id),
+        factoryConfigurationDigest: version.configurationDigest,
+        modelRouteDigest: version.modelRouteDigest,
+        sandboxProfileDigest: version.sandboxProfileDigest,
       },
       activeWorkerLeaseCount: 0,
       now,
@@ -3243,6 +3261,16 @@ async function resolveFactoryDispatchBinding(
     && sandboxProfile.profileDigest === version.sandboxProfileDigest
     && sandboxProfile.readinessState !== "BLOCKED"
     && sandboxProfile.readinessExpiresAt > now
+    && sandboxProfileProductionEligible(sandboxProfile)
+  );
+  const modelRouteReady = Boolean(
+    modelRoute
+    && modelRoute._id === version.modelCatalogId
+    && modelRoute.routeDigest === version.modelRouteDigest
+    && modelRoute.qualificationDigest === version.modelQualificationDigest
+    && JSON.stringify(modelRoute.routeSnapshot) === JSON.stringify(version.modelRouteSnapshot)
+    && JSON.stringify(modelRoute.qualificationSnapshot) === JSON.stringify(version.modelQualificationSnapshot)
+    && modelRouteProductionEligible(modelRoute)
   );
   const activeStatuses = ["PENDING", "RUNNING", "PAUSED"] as const;
   const activeRuns = repository
@@ -3282,6 +3310,7 @@ async function resolveFactoryDispatchBinding(
         && Boolean(agentVersion.genome.modelConfig.modelId.trim())
       )
       && agentTemplates.every((template) => template?.active)
+      && modelRouteReady
     ),
     policyReady: Boolean(policy?.active && (!policy.projectId || policy.projectId === workOrder.projectId)),
     verifiersReady: verifiers.length > 0 && verifiers.every((item) => item?.active && item.projectId === workOrder.projectId),
@@ -3319,6 +3348,7 @@ async function resolveFactoryDispatchBinding(
     executionBackend: selectedExecutionBackend,
     requiredSandboxCapabilities,
     sandboxProfile,
+    modelRoute,
     branch: args.branch?.trim() || `mc/${String(workOrder._id).slice(-12)}-${args.attemptRunId}`,
     worktree: args.worktree?.trim() || `${host.checkoutRoot.replace(/\/+$/, "")}/.mission-control/worktrees/${String(workOrder._id).slice(-12)}-${args.attemptRunId}`,
     allowedTools: Array.isArray(workflow.metadata?.allowedTools) ? workflow.metadata.allowedTools.filter((item: unknown): item is string => typeof item === "string") : [],

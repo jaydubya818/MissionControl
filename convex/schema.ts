@@ -1046,7 +1046,17 @@ export default defineSchema({
     readinessCheckedAt: v.number(),
     readinessExpiresAt: v.number(),
     egressEnforcementProven: v.boolean(),
+    providerEgressEnforcementProven: v.optional(v.boolean()),
+    guestEgressEnforcementProven: v.optional(v.boolean()),
     immutableSnapshot: v.any(),
+    admissionState: v.optional(v.union(
+      v.literal("QUALIFICATION_ONLY"),
+      v.literal("PRODUCTION_PILOT_ELIGIBLE")
+    )),
+    admissionSnapshot: v.optional(v.any()),
+    admissionDigest: v.optional(v.string()),
+    promotedBy: v.optional(v.string()),
+    promotedAt: v.optional(v.number()),
     status: v.union(v.literal("ACTIVE"), v.literal("ARCHIVED")),
     createdBy: v.string(),
     createdAt: v.number(),
@@ -1069,6 +1079,11 @@ export default defineSchema({
     harnessCapabilityManifest: v.optional(v.any()),
     harnessCapabilityManifestDigest: v.optional(v.string()),
     harnessEffectiveConfigSha256: v.optional(v.string()),
+    modelCatalogId: v.optional(v.id("modelCatalog")),
+    modelRouteDigest: v.optional(v.string()),
+    modelRouteSnapshot: v.optional(v.any()),
+    modelQualificationDigest: v.optional(v.string()),
+    modelQualificationSnapshot: v.optional(v.any()),
     executionBackend: v.optional(v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"))),
     sandboxProfileId: v.optional(v.id("factorySandboxProfiles")),
     sandboxProfileDigest: v.optional(v.string()),
@@ -1311,6 +1326,20 @@ export default defineSchema({
         repositoryId: v.id("workspaceRepositories"),
         access: v.union(v.literal("READ"), v.literal("READ_WRITE")),
       })),
+      factoryVersionBindings: v.optional(v.array(v.object({
+        factoryDefinitionVersionId: v.id("factoryDefinitionVersions"),
+        factoryConfigurationDigest: v.string(),
+        adapter: v.string(),
+        version: v.string(),
+        provider: v.string(),
+        model: v.string(),
+        capabilityManifestSha256: v.string(),
+        effectiveConfigSha256: v.string(),
+        executionBackend: v.string(),
+        modelRouteDigest: v.string(),
+        sandboxProfileDigest: v.optional(v.string()),
+        repositoryId: v.id("workspaceRepositories"),
+      }))),
       readiness: v.union(
         v.literal("STARTING"),
         v.literal("READY"),
@@ -1361,6 +1390,29 @@ export default defineSchema({
     ),
     estimatedCostPerRunUsd: v.optional(v.number()),
     deprecated: v.boolean(),
+    // Additive exact-route lifecycle. Historical catalog aliases intentionally
+    // omit these fields and cannot satisfy new production admission.
+    providerRoute: v.optional(v.string()),
+    routeSnapshot: v.optional(v.any()),
+    routeDigest: v.optional(v.string()),
+    capabilityManifestDigest: v.optional(v.string()),
+    effectiveConfigSha256: v.optional(v.string()),
+    runtimeIdentity: v.optional(v.any()),
+    enabled: v.optional(v.boolean()),
+    qualificationStatus: v.optional(v.union(
+      v.literal("UNQUALIFIED"),
+      v.literal("EVIDENCE_QUALIFIED")
+    )),
+    admissionStatus: v.optional(v.union(
+      v.literal("DISABLED"),
+      v.literal("PRODUCTION_PILOT_ELIGIBLE")
+    )),
+    qualificationSnapshot: v.optional(v.any()),
+    qualificationDigest: v.optional(v.string()),
+    registeredBy: v.optional(v.string()),
+    registeredAt: v.optional(v.number()),
+    promotedBy: v.optional(v.string()),
+    promotedAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     .index("by_model_id", ["modelId"])
@@ -4268,6 +4320,8 @@ export default defineSchema({
   // -------------------------------------------------------------------------
   workflows: defineTable({
     // Identity
+    projectId: v.optional(v.id("projects")),
+    contractVersion: v.optional(v.literal("factory-workflow-contract/v1")),
     workflowId: v.string(), // e.g., "feature-dev", "bug-fix", "security-audit"
     name: v.string(),
     description: v.string(),
@@ -4343,6 +4397,7 @@ export default defineSchema({
     metadata: v.optional(v.any()),
   })
     .index("by_workflow_id", ["workflowId"])
+    .index("by_project", ["projectId"])
     .index("by_active", ["active"]),
 
   // -------------------------------------------------------------------------

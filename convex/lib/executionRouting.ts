@@ -13,6 +13,8 @@ import { countActiveFactoryWorkerLeases, factoryWorkerEligibility } from "./fact
 import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } from "./harnessCapabilities";
 import { loadModelCatalogForProject } from "./modelCatalogScope";
 import { getCurrentVerificationRoutingOutcome } from "./currentVerification";
+import { sandboxProfileProductionEligible } from "./sandboxProfileAdmission";
+import { modelRouteProductionEligible } from "./modelRouteAdmission";
 import {
   harnessCapabilityRequirementsSatisfied,
   harnessSupportsModel,
@@ -50,13 +52,7 @@ export function executionRoutingRequested(input: {
   return Boolean(input.factoryDefinitionVersionId || input.executionRoutingPin);
 }
 
-export function sandboxProfileProductionEligible(profile: { immutableSnapshot?: unknown } | null | undefined) {
-  const snapshot = profile?.immutableSnapshot;
-  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return true;
-  const security = (snapshot as { security?: unknown }).security;
-  if (!security || typeof security !== "object" || Array.isArray(security)) return true;
-  return (security as { qualificationOnly?: unknown }).qualificationOnly !== true;
-}
+export { sandboxProfileProductionEligible } from "./sandboxProfileAdmission";
 
 function tupleKey(version: Doc<"factoryDefinitionVersions">) {
   return `${String(version._id)}:${version.configurationDigest}`;
@@ -261,10 +257,11 @@ function workerReasonPriority(reason: string) {
   const priorities: Record<string, number> = {
     "worker-heartbeat-stale": 0,
     "worker-repository-access-missing": 1,
-    "worker-harness-manifest-mismatch": 2,
-    "worker-harness-model-unsupported": 3,
-    "worker-harness-capability-missing": 4,
-    "worker-backend-unsupported": 5,
+    "worker-factory-version-mismatch": 2,
+    "worker-harness-manifest-mismatch": 3,
+    "worker-harness-model-unsupported": 4,
+    "worker-harness-capability-missing": 5,
+    "worker-backend-unsupported": 6,
   };
   return priorities[reason] ?? 100;
 }
@@ -335,9 +332,9 @@ export async function buildExecutionRoutingPreview(
     }
     const primaryAgent = primaryAgentVersion(workflow, version, agentVersions);
     const primaryModel = primaryAgent?.genome.modelConfig;
-    const catalogModel = catalog.find((model) =>
-      model.modelId === primaryModel?.modelId && model.provider === primaryModel?.provider
-    );
+    const catalogModel = version.modelCatalogId
+      ? catalog.find((model) => model._id === version.modelCatalogId)
+      : undefined;
     const backend = version.executionBackend ?? "persistent-worker";
     const requiredSandboxCapabilities = backend === "remote-sandbox"
       ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
@@ -352,6 +349,11 @@ export async function buildExecutionRoutingPreview(
           ...binding.workerRuntime,
           repositoryAccess: binding.workerRuntime.repositoryAccess.map((item) => ({
             ...item,
+            repositoryId: String(item.repositoryId),
+          })),
+          factoryVersionBindings: binding.workerRuntime.factoryVersionBindings?.map((item) => ({
+            ...item,
+            factoryDefinitionVersionId: String(item.factoryDefinitionVersionId),
             repositoryId: String(item.repositoryId),
           })),
         } : undefined,
@@ -370,6 +372,10 @@ export async function buildExecutionRoutingPreview(
         isolation: "WORKSPACE_WRITE",
         sandboxCapabilities: requiredSandboxCapabilities,
         executionBackend: backend,
+        factoryDefinitionVersionId: String(version._id),
+        factoryConfigurationDigest: version.configurationDigest,
+        modelRouteDigest: version.modelRouteDigest,
+        sandboxProfileDigest: version.sandboxProfileDigest,
       },
       activeWorkerLeaseCount: countActiveFactoryWorkerLeases({
         runs: activeRuns,
@@ -403,6 +409,8 @@ export async function buildExecutionRoutingPreview(
     const modelApproved = Boolean(
       primaryAgent?.status === "APPROVED"
       && catalogModel
+      && catalogModel.routeDigest === version.modelRouteDigest
+      && modelRouteProductionEligible(catalogModel)
       && !catalogModel.deprecated
       && (
         !(workOrder.riskLevel === "HIGH" || workOrder.riskLevel === "CRITICAL")
@@ -475,7 +483,9 @@ export async function buildExecutionRoutingPreview(
             ),
         modelApproved,
         modelAvailable: Boolean(catalogModel && ["HEALTHY", "DEGRADED"].includes(catalogModel.availability)),
-        productionCertified: assessment?.status === "PASS" && manifest?.admission.maturity === "PRODUCTION",
+        productionCertified: assessment?.status === "PASS"
+          && manifest?.admission.maturity === "PRODUCTION"
+          && modelRouteProductionEligible(catalogModel),
       },
       evidence: aggregateExecutionRoutingEvidence(version._id, workOrder.repositoryId, evidenceBundle),
     });

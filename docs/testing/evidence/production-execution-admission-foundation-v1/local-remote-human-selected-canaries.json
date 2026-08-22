@@ -1,0 +1,23 @@
+{
+  "schema": "production-execution-admission-canaries/v1",
+  "humanSelectionRequired": true,
+  "guardedAutoEnabled": false,
+  "local": {
+    "status": "NOT_RUN",
+    "attemptCount": 0,
+    "reason": "no exact production Factory Version or worker attestation exists"
+  },
+  "remote": {
+    "status": "NOT_RUN",
+    "attemptCount": 0,
+    "reason": "no exact production Factory Version, promoted profile, or worker attestation exists"
+  },
+  "githubPublication": {
+    "status": "NOT_RUN",
+    "reason": "no legitimate production GitHub App installation exists; PAT fallback prohibited"
+  },
+  "productionWorkOrderMutations": 0,
+  "productionAttemptMutations": 0,
+  "routingDecisionMutations": 0,
+  "countsTowardGuardedAutoEvidence": false
+}

@@ -13,6 +13,7 @@ import { buildContinuousEvidenceLineage, buildEvidenceLineage, buildRetryTimelin
 import { summarizeWorkflowObservability } from "./lib/workflowObservability";
 import { reconcileTerminalWorkflowSteps } from "./lib/workflowRunState";
 import { snapshotWorkflowDefinition } from "./lib/workflowSnapshot";
+import { factoryWorkflowContractIssues } from "./lib/factoryWorkflowContract";
 import { assertAuthorizedDeliveryRecord, requireAuthorizedDeliveryScope } from "./lib/deliveryAuthorization";
 import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
 import { buildExecutionRecoverySummary } from "./lib/executionRecovery";
@@ -997,6 +998,13 @@ export const start = mutation({
     
     if (!workflow.active) {
       throw new Error(`Workflow is not active: ${args.workflowId}`);
+    }
+    if (args.projectId && (
+      workflow.projectId !== args.projectId
+      || workflow.contractVersion !== "factory-workflow-contract/v1"
+      || factoryWorkflowContractIssues(workflow).length > 0
+    )) {
+      throw new Error("New production workflow runs require the current workspace-owned structured-status contract.");
     }
     
     // Initialize step states

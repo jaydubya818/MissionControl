@@ -1,0 +1,55 @@
+{
+  "schema": "production-execution-model-catalog-identities/v1",
+  "observedAt": "2026-08-21T22:12:45Z",
+  "productionCatalogCount": 0,
+  "registrationGrantsQualification": false,
+  "promotionRequiresHumanApproval": true,
+  "routes": [
+    {
+      "name": "local-codex",
+      "modelCatalogId": null,
+      "registrationState": "NOT_CONFIGURED",
+      "routeDigest": "sha256:026b1d795909f7b6cf7592e750fd421829081b65ce3016f7f5f50a243a155e1f",
+      "routeSnapshot": {
+        "schema": "factory-model-route/v1",
+        "provider": "openai",
+        "providerRoute": "openai",
+        "modelId": "gpt-5.6-terra",
+        "capabilityIdentity": {
+          "adapter": "codex",
+          "version": "v1",
+          "capabilityManifestDigest": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+          "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081"
+        },
+        "runtimeIdentity": {
+          "kind": "CODEX_CLI",
+          "cliVersion": "0.146.0",
+          "executableSha256": "ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02"
+        }
+      }
+    },
+    {
+      "name": "hardened-remote-codex",
+      "modelCatalogId": null,
+      "registrationState": "NOT_CONFIGURED",
+      "routeDigest": "sha256:637bd2b5f255bf4d94e593b18021c6159f50f74c0cb687a63b4925b9155404c1",
+      "routeSnapshot": {
+        "schema": "factory-model-route/v1",
+        "provider": "openai",
+        "providerRoute": "openrouter",
+        "modelId": "openai/gpt-5.1-codex-mini",
+        "capabilityIdentity": {
+          "adapter": "codex",
+          "version": "v1",
+          "capabilityManifestDigest": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+          "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081"
+        },
+        "runtimeIdentity": {
+          "kind": "CODEX_CLI",
+          "cliVersion": "0.146.0",
+          "imageDigest": "sha256:41a66f1d6f7b90618a6c58fb9a1a336ef69ab2794fc1322233e4a5d9788782b8"
+        }
+      }
+    }
+  ]
+}
