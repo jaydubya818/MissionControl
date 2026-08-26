@@ -93,16 +93,28 @@ export async function runSandboxSupervisor(input: SandboxSupervisorInput, signal
   if (input.faultInjection?.crashAfterDiagnostics) {
     throw new Error("Injected supervisor crash after executor diagnostics persistence.");
   }
-  const patch = await execFileAsync("git", ["diff", "--binary", "--full-index", input.sourceSha, "--"], {
+  // Stage the harness's changes (respecting .gitignore) before computing the
+  // candidate, bounded by the frozen code scope.
+  //
+  // A harness creates new files without staging them, and `git diff <sha>`
+  // cannot see untracked paths — the bundle would carry a half-change that the
+  // host's `sameStringSet(materializedFiles, bundle.changedFiles)` cross-check
+  // cannot detect, because the host list is derived from the same patch. The
+  // local persistent-worker backend already includes untracked files
+  // (factoryGitRuntime.listChangedFiles); this keeps the backends equivalent.
+  await execFileAsync("git", ["add", "-A", "--", ...stagingPathspec(input.executionManifest)], {
+    cwd: input.repositoryRoot,
+  });
+  const patch = await execFileAsync("git", ["diff", "--cached", "--binary", "--full-index", input.sourceSha, "--"], {
     cwd: input.repositoryRoot,
     maxBuffer: 8 * 1024 * 1024,
     encoding: "buffer",
   });
   const structuredResult = resolution.result;
   const status = execution.timedOut ? "TIMED_OUT" : execution.canceled ? "CANCELED" : resolution.accepted ? "COMPLETED" : "FAILED";
-  const changedFiles = (await execFileAsync("git", ["diff", "--name-only", input.sourceSha, "--"], { cwd: input.repositoryRoot })).stdout
+  const changedFiles = (await execFileAsync("git", ["diff", "--cached", "--name-only", input.sourceSha, "--"], { cwd: input.repositoryRoot })).stdout
     .split("\n").map((value) => value.trim()).filter(Boolean).sort();
-  const numstat = (await execFileAsync("git", ["diff", "--numstat", input.sourceSha, "--"], { cwd: input.repositoryRoot })).stdout;
+  const numstat = (await execFileAsync("git", ["diff", "--cached", "--numstat", input.sourceSha, "--"], { cwd: input.repositoryRoot })).stdout;
   const { linesAdded, linesDeleted } = summarizeNumstat(numstat);
   const finishedAt = Date.now();
   const harness = harnessIdentity(input.executionManifest as any);
@@ -170,6 +182,27 @@ export async function runSandboxSupervisorFromConfig(configPath: string) {
 
 export function standaloneSandboxSupervisorSource() {
   return standaloneRemoteSupervisorSource();
+}
+
+/**
+ * Pathspec for staging the candidate.
+ *
+ * `git add -A` with no pathspec would sweep in every non-ignored artifact the
+ * executor happened to write — agent session state, a generated `.env.local`,
+ * caches — and those would enter the patch, the changed-file set, and the
+ * published pull request. Bound staging to the manifest's frozen
+ * `repository.allowedPaths` so the bundle can only ever contain paths the
+ * WorkOrder already authorized. Falls back to the whole tree only when the
+ * manifest declares no scope, in which case the host-side
+ * `validateChangedFileScope` remains the control.
+ */
+export function stagingPathspec(executionManifest: Record<string, unknown> | undefined): string[] {
+  const repository = (executionManifest as any)?.repository;
+  const allowed = Array.isArray(repository?.allowedPaths) ? repository.allowedPaths : [];
+  const pathspec = allowed
+    .map((entry: unknown) => String(entry ?? "").trim())
+    .filter((entry: string) => entry.length > 0 && !entry.startsWith("/") && !entry.includes(".."));
+  return pathspec.length > 0 ? pathspec : ["."];
 }
 
 function validateSupervisorInput(input: SandboxSupervisorInput) {
