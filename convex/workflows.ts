@@ -6,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query, action, internalAction } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 import { workflowDefinitionChanged } from "./lib/workflowSnapshot";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
@@ -357,7 +357,13 @@ export const remove = mutation({
  * Install a workflow from YAML definition
  * (In production, this would parse YAML files from workflows/ directory)
  */
-export const install = action({
+/**
+ * Install a workflow from YAML.
+ *
+ * Unimplemented, and `internalAction` rather than `action` so it is not a
+ * public surface while it waits. Nothing calls it.
+ */
+export const install = internalAction({
   args: {
     workflowId: v.string(),
     yamlContent: v.optional(v.string()),
