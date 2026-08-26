@@ -36,6 +36,7 @@ type RepositoryRow = {
   validatedAt?: number;
   validationError?: string;
   webhookStatus: "MISSING" | "CONFIGURED" | "READY" | "ERROR";
+  dataClassification?: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED" | "UNCLASSIFIED";
   scopeCount: number;
 };
 
@@ -140,6 +141,7 @@ export function WorkspaceRepositoriesPanel({ project }: WorkspaceRepositoriesPan
         ) : (
           repositoryRows.map((row) => {
             const selected = row.repositoryId !== null && row.repositoryId === selectedRepositoryId;
+            const dataClassification = row.dataClassification ?? "UNCLASSIFIED";
             return (
               <div
                 key={row.repositoryId ?? `legacy-${row.repository}`}
@@ -159,6 +161,9 @@ export function WorkspaceRepositoriesPanel({ project }: WorkspaceRepositoriesPan
                       <span className="font-mono text-[13px] font-medium text-ink">{row.repository}</span>
                       {row.isDefault ? <StatusBadge tone="success">Default</StatusBadge> : null}
                       <StatusBadge tone={statusTone(row.status)}>{row.status.toLowerCase()}</StatusBadge>
+                      <StatusBadge tone={dataClassification === "UNCLASSIFIED" ? "warning" : "neutral"}>
+                        {dataClassification.toLowerCase()}
+                      </StatusBadge>
                       {row.source === "LEGACY" ? <StatusBadge tone="neutral">Compatibility</StatusBadge> : null}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-ink-muted">
@@ -222,8 +227,13 @@ export function WorkspaceRepositoriesPanel({ project }: WorkspaceRepositoriesPan
 
       {selectedRepository?.repositoryId ? (
         <>
+          <RepositoryDataClassificationPanel key={selectedRepository.repositoryId} repository={selectedRepository} />
           <GitHubAppReadinessPanel repositoryId={selectedRepository.repositoryId} />
-          <FactoryConfigurationPanel projectId={project._id} repositoryId={selectedRepository.repositoryId} />
+          <FactoryConfigurationPanel
+            projectId={project._id}
+            repositoryId={selectedRepository.repositoryId}
+            repositoryDataClassification={selectedRepository.dataClassification ?? "UNCLASSIFIED"}
+          />
           <CodeScopeList
             projectId={project._id}
             repositoryId={selectedRepository.repositoryId}
@@ -245,6 +255,93 @@ export function WorkspaceRepositoriesPanel({ project }: WorkspaceRepositoriesPan
         />
       ) : null}
     </Card>
+  );
+}
+
+function RepositoryDataClassificationPanel({ repository }: { repository: RepositoryRow & { repositoryId: Id<"workspaceRepositories"> } }) {
+  const setRepositoryDataClassification = useMutation(api.projects.setRepositoryDataClassification);
+  const currentDataClassification = repository.dataClassification ?? "UNCLASSIFIED";
+  const [dataClassification, setDataClassification] = useState<"PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED">(
+    currentDataClassification === "UNCLASSIFIED" ? "INTERNAL" : currentDataClassification,
+  );
+  const [reason, setReason] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setDataClassification(currentDataClassification === "UNCLASSIFIED" ? "INTERNAL" : currentDataClassification);
+  }, [currentDataClassification]);
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    setPending(true);
+    setError("");
+    setSaved(false);
+    try {
+      const result = await setRepositoryDataClassification({
+        repositoryId: repository.repositoryId,
+        dataClassification,
+        reason: reason.trim(),
+      });
+      if (!result.success) {
+        setError(result.error || "Repository classification could not be saved.");
+        return;
+      }
+      setSaved(true);
+      setReason("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Repository classification could not be saved.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const sensitive = dataClassification !== "PUBLIC";
+  return (
+    <section className="mt-5 border-t border-line pt-5" aria-labelledby="repository-classification-title">
+      <div>
+        <div id="repository-classification-title" className="flex items-center gap-2 text-[12.5px] font-medium text-ink-secondary">
+          <ShieldCheck size={14} aria-hidden /> Repository data boundary
+        </div>
+        <div className="mt-1 text-[12px] leading-relaxed text-ink-muted">
+          Unclassified and non-public repositories are sensitive. Remote execution requires provider-enforced egress evidence; approved local execution remains eligible.
+        </div>
+      </div>
+      <form className="mt-3 grid gap-3 rounded-lg border border-line bg-surface-2 p-3 md:grid-cols-[minmax(180px,0.35fr)_1fr_auto] md:items-end" onSubmit={save}>
+        <Field id="repository-data-classification" label="Repository data classification">
+          <select
+            id="repository-data-classification"
+            value={dataClassification}
+            onChange={(event) => { setDataClassification(event.target.value as typeof dataClassification); setSaved(false); }}
+            className="h-9 w-full rounded-md border border-line bg-surface-1 px-3 text-[13px] text-ink outline-none focus:border-info-accent focus:ring-2 focus:ring-info-accent/25"
+          >
+            <option value="PUBLIC">Public</option>
+            <option value="INTERNAL">Internal</option>
+            <option value="CONFIDENTIAL">Confidential</option>
+            <option value="RESTRICTED">Restricted</option>
+          </select>
+        </Field>
+        <Field id="repository-classification-reason" label="Decision reason">
+          <Input
+            id="repository-classification-reason"
+            value={reason}
+            onChange={(event) => { setReason(event.target.value); setSaved(false); }}
+            placeholder="Why this classification is appropriate"
+          />
+        </Field>
+        <Button type="submit" size="sm" disabled={pending || !reason.trim()}>
+          {pending ? "Saving…" : "Save classification"}
+        </Button>
+      </form>
+      <div className={`mt-2 text-[11.5px] ${sensitive ? "text-warning" : "text-ink-muted"}`}>
+        {sensitive
+          ? "Remote Sandbox is denied until the selected profile proves provider-enforced egress at every admission boundary."
+          : "Public repository work may use a qualified remote profile; WorkOrder data boundaries can still require provider-enforced egress."}
+      </div>
+      {error ? <ErrorNotice message={error} /> : null}
+      {saved ? <div role="status" className="mt-2 text-[11.5px] text-success">Classification saved. Create a new Factory version before dispatch.</div> : null}
+    </section>
   );
 }
 
@@ -534,6 +631,7 @@ function AddRepositoryDialog({
   const [repository, setRepository] = useState("");
   const [defaultBranch, setDefaultBranch] = useState("main");
   const [makeDefault, setMakeDefault] = useState(false);
+  const [dataClassification, setDataClassification] = useState<"PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED">("INTERNAL");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -547,6 +645,7 @@ function AddRepositoryDialog({
         repository: repository.trim(),
         defaultBranch: defaultBranch.trim(),
         makeDefault,
+        dataClassification,
       });
       if (!result.success) {
         setError(result.error || "Repository could not be connected.");
@@ -576,6 +675,20 @@ function AddRepositoryDialog({
             </Field>
             <Field id="new-repository-branch" label="Default branch">
               <Input id="new-repository-branch" value={defaultBranch} onChange={(event) => setDefaultBranch(event.target.value)} />
+            </Field>
+            <Field id="new-repository-classification" label="Data classification">
+              <select
+                id="new-repository-classification"
+                value={dataClassification}
+                onChange={(event) => setDataClassification(event.target.value as typeof dataClassification)}
+                className="h-9 w-full rounded-md border border-line bg-surface-1 px-3 text-[13px] text-ink outline-none focus:border-info-accent focus:ring-2 focus:ring-info-accent/25"
+              >
+                <option value="PUBLIC">Public</option>
+                <option value="INTERNAL">Internal</option>
+                <option value="CONFIDENTIAL">Confidential</option>
+                <option value="RESTRICTED">Restricted</option>
+              </select>
+              <div className="mt-1 text-[11.5px] text-ink-muted">Internal is the safe default. Non-public repositories cannot use guest-only remote egress.</div>
             </Field>
             <label className="flex items-start gap-3 rounded-lg border border-line bg-surface-2 px-3 py-3 text-[12.5px] text-ink-secondary">
               <input type="checkbox" checked={makeDefault} onChange={(event) => setMakeDefault(event.target.checked)} className="mt-0.5" />

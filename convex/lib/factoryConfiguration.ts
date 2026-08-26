@@ -1,6 +1,7 @@
 export interface FactoryConfigurationInput {
   purpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGENT_AUTOMATION";
   repositoryId: string;
+  repositoryDataClassification?: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
   workflowId: string;
   executor: { adapter: string; version: string };
   harnessCapabilityManifest: unknown;

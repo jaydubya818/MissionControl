@@ -1,9 +1,10 @@
 # Remote Sandbox Runtime
 
-**Status:** Preview / Not Live Certified
+**Status:** Production-pilot eligible / Preview; not general production certified
 **Canonical worker prerequisite:** PR #102, merged as `c97b31d59911543c6f95b2cd35fded957b2eddc6`
 **Canonical Mission-to-PR prerequisite:** PR #95, merged as `d0e5ff2ff57da7e5037da6f6ee8083ed275d911f`
 **Deterministic implementation proof:** `FakeSandboxProvider`
+**Bounded live pilot evidence:** [Production Factory Pilot V3](../testing/evidence/production-factory-pilot-v3/README.md)
 
 Remote Sandbox is an execution backend beneath the canonical worker runtime. It does not introduce a second worker, lease, recovery state machine, verifier, publication path, or acceptance authority.
 

@@ -2,9 +2,16 @@
 title: "Software Factory Capability Map"
 date: 2026-07-28
 baseline_commit: 478cac7c24bca636015bc9ba52d397ce403c2b59
+status: superseded
+superseded_by: ../product/software-factory-capability-maturity.md
 ---
 
 # Software Factory Capability Map
+
+> Historical baseline only. This map describes commit `478cac7c` and is not a
+> statement of current capability. Use the
+> [Software Factory Capability Maturity Ledger](../product/software-factory-capability-maturity.md)
+> for current status.
 
 Status meanings:
 

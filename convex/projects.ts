@@ -24,6 +24,11 @@ import {
   requireWorkspaceAccess,
 } from "./lib/companyAccess";
 import { isCompanyContextEnforced } from "./lib/companyContextGate";
+import {
+  DEFAULT_REPOSITORY_DATA_CLASSIFICATION,
+  REPOSITORY_DATA_CLASSIFICATIONS,
+  type RepositoryDataClassification,
+} from "./lib/repositoryExecutionPolicy";
 
 async function enforceProjectAccess(
   ctx: any,
@@ -74,6 +79,7 @@ async function syncDefaultRepositoryConnection(
       validatedAt: input.validatedAt,
       validationError: input.validationError,
       webhookStatus: project.githubWebhookSecret ? "CONFIGURED" : "MISSING",
+      dataClassification: matching.dataClassification ?? DEFAULT_REPOSITORY_DATA_CLASSIFICATION,
       migrationVersion: 1,
       updatedAt: now,
     });
@@ -97,6 +103,7 @@ async function syncDefaultRepositoryConnection(
         validatedAt: input.validatedAt,
         validationError: input.validationError,
         webhookStatus: project.githubWebhookSecret ? "CONFIGURED" : "MISSING",
+        dataClassification: currentDefault.dataClassification ?? DEFAULT_REPOSITORY_DATA_CLASSIFICATION,
         migrationVersion: 1,
         updatedAt: now,
       });
@@ -116,6 +123,7 @@ async function syncDefaultRepositoryConnection(
     validatedAt: input.validatedAt,
     validationError: input.validationError,
     webhookStatus: project.githubWebhookSecret ? "CONFIGURED" : "MISSING",
+    dataClassification: DEFAULT_REPOSITORY_DATA_CLASSIFICATION,
     migrationVersion: 1,
     createdAt: now,
     updatedAt: now,
@@ -299,6 +307,7 @@ export const listRepositories = query({
         validatedAt: project.repositoryValidatedAt,
         validationError: project.repositoryValidationError,
         webhookStatus: project.githubWebhookSecret ? "CONFIGURED" as const : "MISSING" as const,
+        dataClassification: "UNCLASSIFIED" as const,
         scopeCount: 0,
       }];
     }
@@ -322,6 +331,7 @@ export const listRepositories = query({
             validatedAt: connection.validatedAt,
             validationError: connection.validationError,
             webhookStatus: connection.webhookStatus,
+            dataClassification: connection.dataClassification ?? "UNCLASSIFIED" as const,
             scopeCount: scopes.filter((scope) => scope.active).length,
           };
         })
@@ -636,6 +646,12 @@ export const createRepositoryConnection = mutation({
     repository: v.string(),
     defaultBranch: v.string(),
     makeDefault: v.optional(v.boolean()),
+    dataClassification: v.optional(v.union(
+      v.literal("PUBLIC"),
+      v.literal("INTERNAL"),
+      v.literal("CONFIDENTIAL"),
+      v.literal("RESTRICTED")
+    )),
   },
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
@@ -675,6 +691,7 @@ export const createRepositoryConnection = mutation({
       isDefault: makeDefault,
       status: "CONFIGURED",
       webhookStatus: "MISSING",
+      dataClassification: args.dataClassification ?? DEFAULT_REPOSITORY_DATA_CLASSIFICATION,
       migrationVersion: 1,
       createdAt: now,
       updatedAt: now,
@@ -696,9 +713,64 @@ export const createRepositoryConnection = mutation({
       description: `${repository} connected to workspace "${project.name}"`,
       targetType: "WORKSPACE_REPOSITORY",
       targetId: repositoryId,
-      metadata: { repository, defaultBranch, makeDefault },
+      metadata: {
+        repository,
+        defaultBranch,
+        makeDefault,
+        dataClassification: args.dataClassification ?? DEFAULT_REPOSITORY_DATA_CLASSIFICATION,
+      },
     });
     return { success: true, repositoryId };
+  },
+});
+
+/** Classify repository data before governed Factory admission. */
+export const setRepositoryDataClassification = mutation({
+  args: {
+    repositoryId: v.id("workspaceRepositories"),
+    dataClassification: v.union(
+      v.literal("PUBLIC"),
+      v.literal("INTERNAL"),
+      v.literal("CONFIDENTIAL"),
+      v.literal("RESTRICTED")
+    ),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const repository = await ctx.db.get(args.repositoryId);
+    if (!repository) return { success: false, error: "Repository connection not found" };
+    const project = await ctx.db.get(repository.projectId);
+    if (!project) return { success: false, error: "Workspace not found" };
+    const access = await enforceProjectAccess(ctx, project, COMPANY_PERMISSIONS.MANAGE_REPOSITORIES);
+    const reason = args.reason.trim();
+    if (!reason || reason.length > 1_000 || /[\0\r]/.test(reason)) {
+      return { success: false, error: "A classification reason between 1 and 1,000 characters is required." };
+    }
+    if (!REPOSITORY_DATA_CLASSIFICATIONS.includes(args.dataClassification as RepositoryDataClassification)) {
+      return { success: false, error: "Repository data classification is invalid." };
+    }
+    const priorClassification = repository.dataClassification ?? "UNCLASSIFIED";
+    const now = Date.now();
+    await ctx.db.patch(repository._id, {
+      dataClassification: args.dataClassification,
+      updatedAt: now,
+    });
+    await ctx.db.insert("activities", {
+      tenantId: repository.tenantId,
+      projectId: repository.projectId,
+      actorType: "HUMAN",
+      actorId: access?.membership?.operatorId,
+      action: "WORKSPACE_REPOSITORY_DATA_CLASSIFIED",
+      description: `Classified ${repository.repository} as ${args.dataClassification}`,
+      targetType: "WORKSPACE_REPOSITORY",
+      targetId: repository._id,
+      metadata: {
+        priorClassification,
+        dataClassification: args.dataClassification,
+        reason,
+      },
+    });
+    return { success: true, dataClassification: args.dataClassification };
   },
 });
 

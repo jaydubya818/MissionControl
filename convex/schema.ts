@@ -884,6 +884,14 @@ export default defineSchema({
       v.literal("READY"),
       v.literal("ERROR")
     ),
+    // Missing legacy values fail closed as UNCLASSIFIED. Every non-public
+    // repository requires provider-enforced egress for remote execution.
+    dataClassification: v.optional(v.union(
+      v.literal("PUBLIC"),
+      v.literal("INTERNAL"),
+      v.literal("CONFIDENTIAL"),
+      v.literal("RESTRICTED")
+    )),
     policyOverrides: v.optional(v.any()),
     migrationVersion: v.optional(v.number()),
     fixtureKey: v.optional(v.string()),
@@ -1070,6 +1078,12 @@ export default defineSchema({
     version: v.number(),
     configurationDigest: v.string(),
     repositoryId: v.id("workspaceRepositories"),
+    repositoryDataClassification: v.optional(v.union(
+      v.literal("PUBLIC"),
+      v.literal("INTERNAL"),
+      v.literal("CONFIDENTIAL"),
+      v.literal("RESTRICTED")
+    )),
     purpose: v.optional(factoryPurposeValidator),
     workflowId: v.id("workflows"),
     executor: v.object({ adapter: v.string(), version: v.string() }),

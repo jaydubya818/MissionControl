@@ -237,6 +237,7 @@ async function ensureWorkspaceRepository(
     validatedAt: input.now,
     validationError: undefined,
     webhookStatus: "READY" as const,
+    dataClassification: "INTERNAL" as const,
     updatedAt: input.now,
   };
 

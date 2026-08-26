@@ -1,12 +1,18 @@
 ---
 title: "feat: Build Observability, Traces & Evals V1"
 type: feat
-status: active
+status: complete
 date: 2026-08-15
 source: ../brainstorms/2026-08-15-observability-evals-v1-brainstorm.md
+completion_evidence: ../testing/evidence/observability-evals-v1/README.md
 ---
 
 # Observability, Traces & Evals V1
+
+> Status reconciled on 2026-08-25. The diagnostic system is implemented and
+> browser-qualified. The planning checklist below is retained as historical
+> implementation context; current maturity is tracked in the
+> [capability ledger](../product/software-factory-capability-maturity.md).
 
 ## Problem
 

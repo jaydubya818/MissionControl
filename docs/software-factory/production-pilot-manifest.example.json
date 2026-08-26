@@ -1,0 +1,83 @@
+{
+  "schema": "mission-control-production-pilot/v1",
+  "pilotId": "<pilot-id>",
+  "repository": {
+    "repository": "<owner/repository>",
+    "defaultBranch": "main",
+    "dataClassification": "INTERNAL"
+  },
+  "designPartner": {
+    "team": "<design-partner-team>",
+    "champion": "<internal-champion>",
+    "forwardDeployedEngineer": "<forward-deployed-engineer>"
+  },
+  "execution": {
+    "backend": "LOCAL",
+    "approvedHostBinding": "<approved-host-binding>",
+    "providerEnforcedEgressProven": false
+  },
+  "incidentDrill": {
+    "incidentCommander": "<incident-commander>",
+    "completedAt": "<ISO-8601-timestamp>",
+    "scenario": "Credential revocation plus sandbox cleanup failure",
+    "evidenceReferences": ["<preflight-evidence-reference>"],
+    "stages": [
+      { "stage": "CLARIFY", "owner": "<owner>", "action": "<action>", "evidenceReferences": ["<evidence>"] },
+      { "stage": "CONTAIN", "owner": "<owner>", "action": "<action>", "evidenceReferences": ["<evidence>"] },
+      { "stage": "OBSERVE", "owner": "<owner>", "action": "<action>", "evidenceReferences": ["<evidence>"] },
+      { "stage": "ISOLATE", "owner": "<owner>", "action": "<action>", "evidenceReferences": ["<evidence>"] },
+      { "stage": "RESTORE", "owner": "<owner>", "action": "<action>", "evidenceReferences": ["<evidence>"] },
+      { "stage": "CORRECT", "owner": "<owner>", "action": "<action>", "evidenceReferences": ["<evidence>"] },
+      { "stage": "PREVENT", "owner": "<owner>", "action": "<action>", "evidenceReferences": ["<evidence>"] },
+      { "stage": "MEASURE", "owner": "<owner>", "action": "<action>", "evidenceReferences": ["<evidence>"] }
+    ]
+  },
+  "workOrderPortfolio": [
+    { "id": "PILOT-01", "title": "<bug-fix>", "class": "BUG_FIX" },
+    { "id": "PILOT-02", "title": "<feature>", "class": "FEATURE" },
+    { "id": "PILOT-03", "title": "<refactor>", "class": "REFACTOR" },
+    { "id": "PILOT-04", "title": "<security-or-policy-change>", "class": "SECURITY_POLICY" },
+    { "id": "PILOT-05", "title": "<work-order>", "class": "BUG_FIX" },
+    { "id": "PILOT-06", "title": "<work-order>", "class": "FEATURE" },
+    { "id": "PILOT-07", "title": "<work-order>", "class": "REFACTOR" },
+    { "id": "PILOT-08", "title": "<work-order>", "class": "SECURITY_POLICY" },
+    { "id": "PILOT-09", "title": "<work-order>", "class": "BUG_FIX" },
+    { "id": "PILOT-10", "title": "<work-order>", "class": "FEATURE" }
+  ],
+  "failureDrills": [
+    { "kind": "PROCESS_RESTART", "owner": "<owner>" },
+    { "kind": "PROVIDER_OUTAGE_OR_RATE_LIMIT", "owner": "<owner>" },
+    { "kind": "LATE_EVENT", "owner": "<owner>" },
+    { "kind": "CANCELLATION", "owner": "<owner>" },
+    { "kind": "STALE_EVIDENCE", "owner": "<owner>" },
+    { "kind": "PR_HEAD_DRIFT", "owner": "<owner>" },
+    { "kind": "CREDENTIAL_REVOCATION", "owner": "<owner>" },
+    { "kind": "CLEANUP_FAILURE", "owner": "<owner>" }
+  ],
+  "results": [],
+  "safetySummary": {
+    "authorityBoundaryEscapes": null,
+    "crossCompanyEscapes": null,
+    "secretEscapes": null,
+    "repositoryScopeEscapes": null
+  },
+  "exitDecision": {
+    "decision": "<GO-or-NO_GO>",
+    "decidedBy": "<product-owner>",
+    "decidedAt": "<ISO-8601-timestamp>",
+    "acceptedWorkOrderCount": 0,
+    "remoteSandboxEgressResidualRisk": "<recorded-residual-risk>",
+    "costEfficiencyClaimed": false,
+    "evidenceReferences": ["<exit-decision-evidence-reference>"]
+  },
+  "authority": {
+    "humanPlanApproval": true,
+    "independentVerification": true,
+    "humanAcceptance": true,
+    "humanMerge": true,
+    "guardedAuto": false,
+    "autonomousMerge": false,
+    "autonomousDeployment": false,
+    "learningPromotion": false
+  }
+}

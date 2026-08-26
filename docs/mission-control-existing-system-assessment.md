@@ -1,13 +1,19 @@
 ---
 title: "Mission Control Existing-System Assessment"
 date: 2026-08-02
-status: current
+status: historical-baseline
 baseline_commit: 04b5e64
 working_branch: codex/AI_FDE
 related_plan: docs/plans/2026-08-02-feat-ai-software-factory-v1-program-plan.md
+superseded_by: docs/product/software-factory-capability-maturity.md
 ---
 
 # Mission Control Existing-System Assessment
+
+> Historical baseline only. This assessment records the system at commit
+> `04b5e64`; several gaps described below have since been implemented. Use the
+> [Software Factory Capability Maturity Ledger](product/software-factory-capability-maturity.md)
+> for current status.
 
 ## Executive verdict
 

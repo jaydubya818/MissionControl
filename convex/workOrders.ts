@@ -82,6 +82,10 @@ import { loadFactoryAttemptReviewReadModel } from "./lib/factoryReviewReadModel"
 import { factoryWorkflowContractIssues } from "./lib/factoryWorkflowContract";
 import { modelRouteProductionEligible } from "./lib/modelRouteAdmission";
 import { sandboxProfileProductionEligible } from "./lib/sandboxProfileAdmission";
+import {
+  evaluateRepositoryRemoteExecutionPolicy,
+  normalizeRepositoryDataClassification,
+} from "./lib/repositoryExecutionPolicy";
 import { createWorkOrderRecord } from "./lib/workOrderCreate";
 import {
   appendCurrentVerificationQualityGateDecision,
@@ -2577,6 +2581,7 @@ async function dispatchWorkOrder(
           factoryPurpose: factoryBinding.version.purpose ?? "SOFTWARE",
           repositoryId: String(factoryBinding.repository._id),
           repository: factoryBinding.repository.repository,
+          repositoryDataClassification: factoryBinding.repositoryDataClassification,
           defaultBranch: factoryBinding.repository.defaultBranch,
           baseSha: factoryBinding.baseSha,
           branch: factoryBinding.branch,
@@ -3171,6 +3176,7 @@ async function resolveFactoryDispatchBinding(
       factoryRequired: Boolean(workOrder.missionId || workOrder.repositoryId), versionProvided: false,
       definitionActive: false, versionIsActive: false, assessmentPasses: false,
       assessmentCurrent: false, digestMatches: false, repositoryReady: false,
+      repositoryPolicyReady: false, remoteEgressPolicyReady: false,
       githubReady: false, workflowMatches: false, executorReady: false,
       workflowContractReady: false,
       codeScopesReady: false, agentManifestsReady: false,
@@ -3263,6 +3269,15 @@ async function resolveFactoryDispatchBinding(
     && sandboxProfile.readinessExpiresAt > now
     && sandboxProfileProductionEligible(sandboxProfile)
   );
+  const repositoryDataClassification = normalizeRepositoryDataClassification(repository?.dataClassification);
+  const repositoryPolicyReady = repositoryDataClassification !== "UNCLASSIFIED"
+    && repositoryDataClassification === (version.repositoryDataClassification ?? "UNCLASSIFIED");
+  const remoteExecutionPolicy = evaluateRepositoryRemoteExecutionPolicy({
+    executionBackend: selectedExecutionBackend,
+    repositoryDataClassification,
+    sandboxProfileSnapshot: sandboxProfile?.immutableSnapshot,
+    dataBoundaryCount: workOrder.dataBoundaries?.length ?? 0,
+  });
   const modelRouteReady = Boolean(
     modelRoute
     && modelRoute._id === version.modelCatalogId
@@ -3287,6 +3302,8 @@ async function resolveFactoryDispatchBinding(
     assessmentCurrent: Boolean(latestAssessment && latestAssessment.expiresAt > now),
     digestMatches: latestAssessment?.configurationDigest === version.configurationDigest,
     repositoryReady: Boolean(repository && repository.projectId === workOrder.projectId && repository.status === "READY"),
+    repositoryPolicyReady,
+    remoteEgressPolicyReady: remoteExecutionPolicy.allowed,
     githubReady: Boolean(installation?.status === "CONNECTED" && github?.ready && !githubInstallationIsStale(installation.verifiedAt, now)),
     workflowMatches: version.workflowId === workflow._id,
     workflowContractReady: factoryWorkflowContractIssues(workflow).length === 0,
@@ -3343,6 +3360,7 @@ async function resolveFactoryDispatchBinding(
   return {
     version,
     repository,
+    repositoryDataClassification,
     host,
     baseSha: host.baseCommit,
     executionBackend: selectedExecutionBackend,

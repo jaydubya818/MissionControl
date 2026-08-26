@@ -55,6 +55,10 @@ import { computeCanonicalHash } from "../lib/genomeHash";
 import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } from "../lib/harnessCapabilities";
 import { modelRouteProductionEligible } from "../lib/modelRouteAdmission";
 import { sandboxProfileProductionEligible } from "../lib/sandboxProfileAdmission";
+import {
+  evaluateRepositoryRemoteExecutionPolicy,
+  normalizeRepositoryDataClassification,
+} from "../lib/repositoryExecutionPolicy";
 
 const EVENT_TYPES = new Set([
   "RUN_STARTED", "STEP_STARTED", "STEP_COMPLETED", "TOOL_CALLED",
@@ -336,6 +340,21 @@ export const claimInternal = internalMutation({
     }
     if (!workOrder || workOrder.currentExecutionRunId !== run._id || workOrder.currentRevisionNumber !== run.workOrderRevisionNumber) {
       throw new Error("Factory attempt is no longer the current Work Order revision.");
+    }
+    const repositoryDataClassification = normalizeRepositoryDataClassification(repository.dataClassification);
+    if (repositoryDataClassification === "UNCLASSIFIED"
+      || repositoryDataClassification !== (version.repositoryDataClassification ?? "UNCLASSIFIED")
+      || frozenManifest.repository?.dataClassification !== repositoryDataClassification) {
+      throw new Error("Factory attempt repository classification no longer matches its immutable Factory version.");
+    }
+    const remoteExecutionPolicy = evaluateRepositoryRemoteExecutionPolicy({
+      executionBackend,
+      repositoryDataClassification,
+      sandboxProfileSnapshot: frozenManifest.sandbox?.profileSnapshot,
+      dataBoundaryCount: workOrder.dataBoundaries?.length ?? 0,
+    });
+    if (!remoteExecutionPolicy.allowed) {
+      throw new Error("Sensitive repository remote execution requires provider-enforced egress evidence.");
     }
     const frozenWorktree = (run.executionManifest as any).repository?.worktree;
     const checkoutPrefix = `${host?.checkoutRoot?.replace(/\/+$/, "")}/`;
@@ -1838,6 +1857,13 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   const assessment = assessments.sort((left: any, right: any) => right.assessedAt - left.assessedAt)[0];
   const frozenHarness = resolveFrozenHarnessBinding(version);
   const executionBackend = version.executionBackend ?? "persistent-worker";
+  const repositoryDataClassification = normalizeRepositoryDataClassification(repository?.dataClassification);
+  const remoteExecutionPolicy = evaluateRepositoryRemoteExecutionPolicy({
+    executionBackend,
+    repositoryDataClassification,
+    sandboxProfileSnapshot: sandboxProfile?.immutableSnapshot,
+    dataBoundaryCount: workOrder.dataBoundaries?.length ?? 0,
+  });
   const requiredSandboxCapabilities = executionBackend === "remote-sandbox"
     ? ["git-worktree", "read-only", "remote-sandbox", "sandbox-provider:exe-dev"]
     : ["git-worktree", "read-only"];
@@ -1881,6 +1907,9 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   }).eligible) : [];
   const host: any = repository ? selectCurrentFactoryHost(eligibleBindings as any[], repository.repository, now) : null;
   if (!repository || repository._id !== sourceAttempt.repositoryId || repository.status !== "READY"
+    || repositoryDataClassification === "UNCLASSIFIED"
+    || repositoryDataClassification !== (version.repositoryDataClassification ?? "UNCLASSIFIED")
+    || !remoteExecutionPolicy.allowed
     || !workflow?.active || !assessment || assessment.status !== "PASS" || assessment.expiresAt <= now
     || assessment.configurationDigest !== version.configurationDigest || !host || host.dirty
     || agentVersions.some((agentVersion: any) => !agentVersion)
@@ -1913,6 +1942,7 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     factoryPurpose: "VERIFICATION",
     repositoryId: String(repository._id),
     repository: repository.repository,
+    repositoryDataClassification,
     defaultBranch: repository.defaultBranch,
     baseSha: subject.kind === "GIT_CANDIDATE" ? subject.candidateSha : sourceAttempt.headSha,
     branch: sourceAttempt.branch,

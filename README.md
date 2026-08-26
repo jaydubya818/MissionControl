@@ -13,6 +13,14 @@ Mission Spec through Plan approval, WorkOrders, Attempts, independent
 verification, evidence, pull-request publication, human acceptance, and
 proposal-only learning.
 
+The factory can be summarized at two levels:
+
+- **Builder loop:** `Intent → Plan → Configure agents, harnesses, skills, and tools → Execute → Verify and evaluate → Deliver → Observe → Improve`
+- **Governed delivery lifecycle:** `Mission → approved Plan → WorkOrder → Task → Attempt → candidate → independent evidence → pull request → human decision → release → observed outcome → governed learning`
+
+Agent definitions, skills, tools, and harnesses configure execution; they do
+not create a second lifecycle or authority hierarchy.
+
 > Mission Control is not an AI coding agent, multi-agent chat application,
 > workflow UI, or test runner. It is the durable authority layer that composes
 > those capabilities into a bounded, inspectable, recoverable delivery system.
@@ -127,6 +135,23 @@ managing every agent interaction manually.
 | **Continuity**        | A process restart or lost chat destroys operational state               | Durable Tasks, Attempts, events, leases, receipts, and idempotent commands                                    |
 | **Accountability**    | It is difficult to explain who authorized a change or why it shipped    | End-to-end lineage from intent through plan, execution, PR, approval, release, and production evidence        |
 
+The current production-convergence work therefore prioritizes stronger
+evidence and narrower authority—not more agents or model choices. Repository
+data classification now participates in Factory admission. Unclassified and
+non-public repositories remain eligible for approved local execution but cannot
+use Remote Sandbox unless immutable profile evidence independently proves
+provider-enforced egress. The same policy is re-evaluated when a Factory version
+is created, assessed, dispatched, claimed by a worker, and scheduled for
+independent verification.
+
+The next promotion gate is one named product-repository pilot with at least ten
+accepted WorkOrders, an eight-stage preflight incident drill, actual or
+explicitly unknown cost attribution, observed outcomes, failure evidence, and a
+human `GO` or `NO_GO` decision. Guarded Auto, autonomous merge, autonomous
+deployment, and learning promotion remain disabled. Factory Incident Command,
+the first read-only MCP broker proof, shared QA/product/design intent, and
+outcome-aware routing follow only after that pilot evidence exists.
+
 ### The developer becomes an operator
 
 At fleet scale, the human role changes. Developers spend less time driving each
@@ -157,13 +182,13 @@ Mission Control is in active V1 development.
 
 The repository has a deterministic full-system V1 qualification with known
 limitations. It composes governed intent, Factory configuration, worker
-admission, local and fake-remote execution, immutable candidates, independent
-verification, exact pull-request currentness, canonical WorkOrder acceptance,
-and the human-gated learning continuation. This is strong implementation proof;
-it is not a claim of fleet-scale production operation or live Remote Sandbox
-certification.
+admission, local, fake-remote, and bounded live-remote execution, immutable
+candidates, independent verification, exact pull-request currentness, canonical
+WorkOrder acceptance, and the human-gated learning continuation. This is strong
+implementation proof; it is not a claim of fleet-scale production operation or
+general Remote Sandbox certification.
 
-The current public client/backend runtime contract is **v28**.
+The current public client/backend runtime contract is **v33**.
 
 | Capability                                 | Current status                                   | Boundary                                                                                        |
 | ------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
@@ -178,9 +203,15 @@ The current public client/backend runtime contract is **v28**.
 | Generic Harness Contract                   | **Production architecture**                      | One execution-only lifecycle with exact capability admission                                    |
 | Codex adapter                              | **Production admission**                         | Canonical `codex/v1` path                                                                       |
 | DeepSeek Harness                           | **Experimental; disabled by default**            | Exact pinned local persistent-worker path only                                                  |
-| Remote Sandbox N=1                         | **Preview / Not Live Certified**                 | Deterministic Fake-provider proof only; no live exe.dev certification                           |
+| Repository execution classification        | **Implemented; fail-closed**                     | New repositories default to `INTERNAL`; sensitive remote execution requires provider-enforced egress evidence |
+| Real product-repository pilot gates         | **Implemented; pilot pending**                   | Deterministic preflight and exit assessment exist; the named team and ten accepted WorkOrders remain real-world evidence work |
+| Remote Sandbox N=1                         | **Production-pilot eligible; Preview**           | 3/3 live exe.dev cohort; provider-enforced egress and sustained real-work evidence remain missing |
 | Loom admission                             | **Future**                                       | Configuration discovery and fixtures exist; no pinned runtime adapter                           |
 | System Qualification                       | **V1 merged; known limitations**                 | Deterministic command plus durable repository evidence; no live-provider claim                  |
+
+The canonical status, evidence, limitation, and promotion gate for each major
+capability is maintained in the
+[Software Factory Capability Maturity Ledger](docs/product/software-factory-capability-maturity.md).
 
 The original baseline and delivery history remain available in the
 [existing-system assessment](docs/mission-control-existing-system-assessment.md),
@@ -329,6 +360,15 @@ separate host binding.
 
 Authorization is resolved server-side. The browser does not decide which
 company, workspace, repository, team, or delivery record an operator may act on.
+
+Repository connections also carry an audited `PUBLIC`, `INTERNAL`,
+`CONFIDENTIAL`, or `RESTRICTED` data classification. New connections default to
+`INTERNAL`; legacy records without a value are treated as sensitive rather than
+silently downgraded. The selected classification is frozen into the immutable
+Factory version and execution manifest, then compared with the live repository
+at readiness, dispatch, worker claim, and independent-verification admission.
+A later reclassification therefore requires a new Factory version instead of
+silently changing an active execution boundary.
 
 ### 2. Spec-driven Mission intake and Plan governance
 
@@ -483,11 +523,17 @@ all identities and digests, materializes the patch into a clean owned worktree,
 independently verifies the candidate, revokes the Attempt credential, and
 requires provider resource-absence proof before publication can proceed.
 
-Current status is **Preview / Not Live Certified**. The deterministic
+Current status is **Production-pilot eligible; Preview**. The deterministic
 `FakeSandboxProvider` proves lifecycle, failure, credential revocation,
 materialization, independent verification, publication handoff, and cleanup
-without provider spend. It does not certify live exe.dev capacity, isolation,
-credentials, teardown, or operational readiness.
+without provider spend. A later bounded live exe.dev cohort completed 3/3
+first-pass Attempts with exact credential revocation and resource-absence proof.
+Provider-enforced outbound egress is not proven, Codex installation remains
+ephemeral, the live sample contains only three Attempts, and the exercised
+repositories were disposable workloads. Sensitive and unclassified
+repositories therefore fail closed on Remote Sandbox while governed local
+execution remains eligible. These limits prevent general production
+certification.
 
 See [Remote Sandbox Runtime](docs/software-factory/remote-sandbox-runtime.md).
 
@@ -614,6 +660,29 @@ commit, open pull request, CI result, changed files, risks, and rollback
 guidance. Missing or mismatched lineage remains visibly blocked instead of
 borrowing WorkOrder-wide evidence. See the
 [review evidence browser proof](docs/testing/evidence/v1-review-browser-hardening/README.md).
+
+### 13. Real product-repository pilot gates
+
+The production pilot uses two deterministic, human-governed checks around the
+normal browser lifecycle. `pnpm run pilot:preflight -- <manifest>` blocks first
+dispatch until the repository, team, champion, forward-deployed engineer,
+incident commander, local or remote execution boundary, ten-WorkOrder
+portfolio, eight failure drills, and retained human authorities are explicit.
+
+After the observation window, `pnpm run pilot:assess -- <manifest>` requires at
+least ten accepted results spanning bug fix, feature, refactor, and
+security/policy work. Every accepted result must retain exact intent-to-PR
+lineage, human acceptance and merge decisions, review and recovery measures,
+six cost components, and an observed outcome with incident or rollback linkage
+when applicable. Unavailable cost remains `null` with a reason and coverage
+impact; it cannot support an efficiency claim.
+
+The exit gate permits a fully evidenced `NO_GO` result but never a silent pass.
+It requires zero authority-boundary, cross-company, secret, or repository-scope
+escapes and preserves Guarded Auto, autonomous merge, autonomous deployment,
+and learning promotion as disabled. See the
+[real product-repository pilot operations](docs/software-factory/production-pilot-operations.md)
+and [example evidence manifest](docs/software-factory/production-pilot-manifest.example.json).
 
 ## Governance and authority
 
@@ -998,6 +1067,7 @@ pnpm run lint
 pnpm run build
 pnpm run smoke:orchestration-start
 pnpm run ci:runtime-contract
+pnpm run docs:factory-check
 ```
 
 Critical browser checks:
@@ -1092,6 +1162,8 @@ Start with the [Mission Control North Star](docs/product/mission-control-north-s
 - [Remote Sandbox Runtime](docs/software-factory/remote-sandbox-runtime.md)
 - [Factory Memory and Context Intelligence](docs/architecture/factory-memory-context-intelligence.md)
 - [Factory Learning and Continuous Improvement](docs/architecture/factory-learning-continuous-improvement.md)
+- [Software Factory Capability Maturity Ledger](docs/product/software-factory-capability-maturity.md)
+- [Real Product-Repository Pilot Operations](docs/software-factory/production-pilot-operations.md)
 - [System Qualification V1 Evidence](docs/testing/evidence/system-factory-e2e-v1/README.md)
 
 ## Product doctrine

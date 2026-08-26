@@ -25,6 +25,10 @@ import {
 } from "../lib/sandboxProfileAdmission";
 import { loadModelCatalogForProject } from "../lib/modelCatalogScope";
 import { exactModelRouteDigest, modelRouteProductionEligible } from "../lib/modelRouteAdmission";
+import {
+  evaluateRepositoryRemoteExecutionPolicy,
+  normalizeRepositoryDataClassification,
+} from "../lib/repositoryExecutionPolicy";
 
 const budget = v.object({
   maxCostUsd: v.number(),
@@ -539,6 +543,10 @@ export const createVersion = mutation({
       loadModelCatalogForProject(ctx, definition.projectId),
     ]);
     if (!repository || repository.projectId !== definition.projectId) throw new Error("Factory repository scope is invalid.");
+    const repositoryDataClassification = normalizeRepositoryDataClassification(repository.dataClassification);
+    if (repositoryDataClassification === "UNCLASSIFIED") {
+      throw new Error("Classify the Factory repository before creating an executable version.");
+    }
     if (!workflow) throw new Error("Workflow not found.");
     if (workflow.projectId !== definition.projectId || workflow.contractVersion !== "factory-workflow-contract/v1") {
       throw new Error("Factory versions require a current workspace-owned production workflow.");
@@ -672,6 +680,14 @@ export const createVersion = mutation({
       if (!(sandboxProfile!.admissionSnapshot as any)?.scope?.riskClasses?.includes(args.riskBoundary)) {
         throw new Error("The promoted Sandbox Profile is not eligible for this Factory risk boundary.");
       }
+      const repositoryExecutionPolicy = evaluateRepositoryRemoteExecutionPolicy({
+        executionBackend: selectedExecutionBackend,
+        repositoryDataClassification,
+        sandboxProfileSnapshot: sandboxProfile!.immutableSnapshot,
+      });
+      if (!repositoryExecutionPolicy.allowed) {
+        throw new Error("Sensitive repository remote execution requires provider-enforced egress evidence.");
+      }
     } else if (args.sandboxProfileId) {
       throw new Error("A Sandbox Profile can only be attached to the remote-sandbox execution backend.");
     } else if (!routeSnapshot.runtimeIdentity?.executableSha256) {
@@ -696,6 +712,7 @@ export const createVersion = mutation({
     const configuration: FactoryConfigurationInput = {
       purpose: definition.purpose ?? "SOFTWARE",
       repositoryId: String(repository._id),
+      repositoryDataClassification,
       workflowId: String(workflow._id),
       executor: args.executor,
       harnessCapabilityManifest: harness.capabilityManifest,
@@ -732,6 +749,7 @@ export const createVersion = mutation({
       version,
       configurationDigest,
       repositoryId: repository._id,
+      repositoryDataClassification,
       purpose: definition.purpose ?? "SOFTWARE",
       workflowId: workflow._id,
       executor: args.executor,
@@ -838,6 +856,14 @@ export const assessReadiness = mutation({
           now,
         }).eligible) ?? null
       : null;
+    const liveRepositoryDataClassification = normalizeRepositoryDataClassification(repository?.dataClassification);
+    const repositoryClassificationReady = liveRepositoryDataClassification !== "UNCLASSIFIED"
+      && liveRepositoryDataClassification === (version.repositoryDataClassification ?? "UNCLASSIFIED");
+    const repositoryExecutionPolicy = evaluateRepositoryRemoteExecutionPolicy({
+      executionBackend: selectedExecutionBackend,
+      repositoryDataClassification: liveRepositoryDataClassification,
+      sandboxProfileSnapshot: sandboxProfile?.immutableSnapshot,
+    });
     const sandboxProfileReady = selectedExecutionBackend !== "remote-sandbox" || Boolean(
       sandboxProfile
       && sandboxProfile._id === version.sandboxProfileId
@@ -861,6 +887,8 @@ export const assessReadiness = mutation({
     const checks = [
       check("github", "GitHub App connection", githubReady, now, expiry, "Install or repair the exact least-privilege GitHub App connection."),
       check("repository", "Repository access", repository?.status === "READY", now, expiry, "Validate repository access before activation."),
+      check("repository-classification", "Repository data classification", repositoryClassificationReady, now, undefined, "Classify the repository and create a new immutable Factory version."),
+      check("provider-egress", "Sensitive repository egress boundary", repositoryExecutionPolicy.allowed, now, expiry, "Use Local execution or a remote profile with provider-enforced egress evidence."),
       check("workflow", "Workflow version", workflow?.active === true, now, undefined, "Select an active versioned workflow."),
       check("workflow-contract", "Structured workflow contract", factoryWorkflowContractIssues(workflow).length === 0, now, undefined, "Replace heuristic completion and provider authority with schema-validated handoffs."),
       check("executor", "Generic harness adapter", validFactoryExecutorBinding(version.executor), now, undefined, "Select an exact adapter/version advertised by the canonical worker."),

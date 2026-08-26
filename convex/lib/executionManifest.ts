@@ -36,6 +36,7 @@ export interface FactoryExecutionManifestInput {
   factoryPurpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGENT_AUTOMATION";
   repositoryId: string;
   repository: string;
+  repositoryDataClassification?: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
   defaultBranch: string;
   baseSha: string;
   branch: string;
@@ -235,6 +236,7 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
     repository: {
       repositoryId: input.repositoryId,
       repository: input.repository,
+      dataClassification: input.repositoryDataClassification,
       defaultBranch: input.defaultBranch,
       baseSha: input.baseSha,
       branch: input.branch,

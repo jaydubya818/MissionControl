@@ -1,8 +1,8 @@
 ---
 title: Software Factory Documentation Map
 status: ACTIVE
-last_verified: 2026-08-11
-baseline_commit: 2b1a7c4
+last_verified: 2026-08-26
+baseline_commit: b3dfcee
 ---
 
 # Software Factory Documentation Map
@@ -27,6 +27,9 @@ below and open a reconciliation change; do not silently choose the newest prose.
 | --- | --- | --- | --- |
 | Product North Star | [Mission Control North Star](../product/mission-control-north-star.md) | Active | Enduring product doctrine and ship gate |
 | V1 scope | [Mission Control V1 Product Strategy](../product/mission-control-v1-product-strategy.md) | Active | Golden path, users, priorities, and non-goals |
+| Capability maturity | [Software Factory Capability Maturity Ledger](../product/software-factory-capability-maturity.md) | Active | Current status, evidence, limitations, and promotion gates |
+| Real product pilot | [Real Product-Repository Pilot Operations](./production-pilot-operations.md) | Active | Named entry gate, incident drill, portfolio, measures, failure drills, and exit decision |
+| Pilot gates | `pnpm run pilot:preflight -- <manifest>` and `pnpm run pilot:assess -- <manifest>` | Implemented | Deterministic admission and evidence-completeness checks without granting production authority |
 | Core decisions | [AI Software Factory V1 Decisions](../decisions/ai-software-factory-v1-decisions.md) | Accepted | Existing product decisions |
 | Verification decisions | [Verification-First Architecture Decisions](../decisions/verification-first-architecture-decisions.md) | Accepted | Verification-specific ownership and boundaries |
 | Authoritative domain | [Domain Contracts](./domain-contracts.md) | Implemented, evolving | Existing Mission, WorkOrder, run, approval, and receipt contracts |

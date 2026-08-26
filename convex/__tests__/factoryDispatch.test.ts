@@ -16,6 +16,8 @@ const ready: FactoryDispatchPreflightInput = {
   assessmentCurrent: true,
   digestMatches: true,
   repositoryReady: true,
+  repositoryPolicyReady: true,
+  remoteEgressPolicyReady: true,
   githubReady: true,
   workflowMatches: true,
   workflowContractReady: true,
@@ -52,6 +54,14 @@ describe("Factory dispatch preflight", () => {
     expect(evaluateFactoryDispatchPreflight({ ...ready, activeRepositoryMutation: true })).toMatchObject({
       ok: false,
       blocker: "repository-mutation-already-active",
+    });
+  });
+
+  it("blocks sensitive remote work without provider-enforced egress", () => {
+    expect(evaluateFactoryDispatchPreflight({ ...ready, remoteEgressPolicyReady: false })).toEqual({
+      ok: false,
+      blocker: "provider-egress-required",
+      remediation: "Use Local execution or a remote profile with provider-enforced egress evidence.",
     });
   });
 

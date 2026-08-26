@@ -89,6 +89,17 @@ Execute Option 1 only while every result is evidence-backed. Fall back to Option
 
 ## Work Log
 
+### 2026-08-25 - Sensitive-repository policy decision
+
+**Actions:**
+- Product Owner approved provider-enforced egress as mandatory for sensitive repositories.
+- Preserved exe.dev guest nftables as defense in depth only and kept sensitive remote routing ineligible.
+- Selected controlled local execution as the safe pilot path until a compliant provider is explicitly qualified.
+
+**Learnings:**
+- A bounded live cohort does not satisfy a provider-enforced egress requirement.
+- Missing provider capability must block the route rather than be converted into an exception or waiver.
+
 ### 2026-08-19 - Exact-baseline kickoff
 
 **Actions:**

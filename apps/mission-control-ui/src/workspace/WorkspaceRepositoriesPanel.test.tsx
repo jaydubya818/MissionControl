@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   readiness: undefined as any,
   deliveries: [] as any[],
   setDefault: vi.fn(),
+  setClassification: vi.fn(),
   backfill: vi.fn(),
   beginInstallation: vi.fn(),
   verifyInstallation: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock("../../../../convex/_generated/api", () => ({
       listRepositories: "projects.listRepositories",
       listCodeScopes: "projects.listCodeScopes",
       setDefaultRepository: "projects.setDefaultRepository",
+      setRepositoryDataClassification: "projects.setRepositoryDataClassification",
       backfillLegacyRepositories: "projects.backfillLegacyRepositories",
       createRepositoryConnection: "projects.createRepositoryConnection",
       createRepositoryCodeScope: "projects.createRepositoryCodeScope",
@@ -59,6 +61,7 @@ vi.mock("convex/react", () => ({
   },
   useMutation: (mutation: string) => {
     if (mutation === "projects.setDefaultRepository") return mocks.setDefault;
+    if (mutation === "projects.setRepositoryDataClassification") return mocks.setClassification;
     if (mutation === "projects.backfillLegacyRepositories") return mocks.backfill;
     if (mutation === "governancePolicies.activateVerificationFirstV1") return vi.fn();
     return vi.fn();
@@ -87,6 +90,7 @@ describe("WorkspaceRepositoriesPanel", () => {
     mocks.readiness = undefined;
     mocks.deliveries = [];
     mocks.setDefault.mockResolvedValue({ success: true });
+    mocks.setClassification.mockResolvedValue({ success: true, dataClassification: "CONFIDENTIAL" });
     mocks.backfill.mockResolvedValue({ created: 1, existing: 0, skipped: 0, failed: 0 });
     mocks.beginInstallation.mockResolvedValue({
       ok: true,
@@ -115,6 +119,7 @@ describe("WorkspaceRepositoriesPanel", () => {
         isDefault: true,
         status: "READY",
         webhookStatus: "READY",
+        dataClassification: "INTERNAL",
         scopeCount: 1,
       },
       {
@@ -126,6 +131,7 @@ describe("WorkspaceRepositoriesPanel", () => {
         isDefault: false,
         status: "CONFIGURED",
         webhookStatus: "MISSING",
+        dataClassification: "PUBLIC",
         scopeCount: 0,
       },
     ];
@@ -149,6 +155,34 @@ describe("WorkspaceRepositoriesPanel", () => {
     expect(screen.getByText("Buyer portal")).toBeInTheDocument();
     expect(screen.getByText("apps/buyer-portal")).toBeInTheDocument();
     expect(screen.queryByText(/Users\//)).not.toBeInTheDocument();
+  });
+
+  it("classifies a repository with a reason and shows the remote-execution boundary", async () => {
+    mocks.repositories = [{
+      repositoryId: "repository-1",
+      source: "CONNECTION",
+      repository: "sellerfi/marketplace",
+      displayName: "marketplace",
+      defaultBranch: "main",
+      isDefault: true,
+      status: "READY",
+      webhookStatus: "READY",
+      dataClassification: "INTERNAL",
+      scopeCount: 0,
+    }];
+
+    render(<WorkspaceRepositoriesPanel project={project} />);
+    fireEvent.change(screen.getByLabelText("Repository data classification"), { target: { value: "CONFIDENTIAL" } });
+    fireEvent.change(screen.getByLabelText("Decision reason"), { target: { value: "Contains private product source" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save classification" }));
+
+    await waitFor(() => expect(mocks.setClassification).toHaveBeenCalledWith({
+      repositoryId: "repository-1",
+      dataClassification: "CONFIDENTIAL",
+      reason: "Contains private product source",
+    }));
+    expect(screen.getByText(/Remote Sandbox is denied/)).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent("Create a new Factory version");
   });
 
   it("materializes a legacy repository before monorepo scopes are added", async () => {

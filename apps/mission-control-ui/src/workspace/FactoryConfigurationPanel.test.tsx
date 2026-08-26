@@ -96,8 +96,14 @@ vi.mock("convex/react", () => ({
   },
 }));
 
-function renderPanel() {
-  return render(<FactoryConfigurationPanel projectId={"project-1" as any} repositoryId={"repository-1" as any} />);
+function renderPanel(repositoryDataClassification: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED" | "UNCLASSIFIED" = "PUBLIC") {
+  return render(
+    <FactoryConfigurationPanel
+      projectId={"project-1" as any}
+      repositoryId={"repository-1" as any}
+      repositoryDataClassification={repositoryDataClassification}
+    />
+  );
 }
 
 function detailWith(status: "PASS" | "BLOCKED") {
@@ -212,6 +218,16 @@ describe("FactoryConfigurationPanel", () => {
     expect(screen.getByLabelText("Local")).toBeInTheDocument();
     expect(screen.getByLabelText("Isolated Sandbox")).toBeInTheDocument();
     expect(screen.queryByRole("tablist", { name: /Factory configuration detail/i })).not.toBeInTheDocument();
+  });
+
+  it("denies remote selection for sensitive repositories without provider-enforced egress", () => {
+    window.localStorage.setItem("mc.factory.experience-level", "basic");
+    mocks.definitions = [{ _id: "factory-1", repositoryId: "repository-1", status: "DRAFT" }];
+    mocks.detail = { definition: { _id: "factory-1", status: "DRAFT" }, versions: [], assessments: [] };
+    renderPanel("INTERNAL");
+
+    expect(screen.getByLabelText("Isolated Sandbox")).toBeDisabled();
+    expect(screen.getByText(/internal repository: no eligible profile proves provider-enforced egress/i)).toBeInTheDocument();
   });
 
   it("shows experimental harness capability detail only in Advanced and disables selection until a worker advertises the exact pin", () => {

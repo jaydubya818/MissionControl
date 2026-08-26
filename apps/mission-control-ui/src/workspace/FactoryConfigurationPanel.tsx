@@ -11,9 +11,11 @@ import { CheckCircle2, Cpu, Factory, Server, ShieldAlert, SlidersHorizontal } fr
 export function FactoryConfigurationPanel({
   projectId,
   repositoryId,
+  repositoryDataClassification,
 }: {
   projectId: Id<"projects">;
   repositoryId: Id<"workspaceRepositories">;
+  repositoryDataClassification: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED" | "UNCLASSIFIED";
 }) {
   const definitions = useQuery(api["factory/configuration"].list, { projectId });
   const createFactory = useMutation(api["factory/configuration"].create);
@@ -64,7 +66,12 @@ export function FactoryConfigurationPanel({
           No Factory exists for this repository. Creating one does not activate or dispatch work.
         </div>
       ) : (
-        <FactoryVersionEditor factoryDefinitionId={definition._id} projectId={projectId} repositoryId={repositoryId} />
+        <FactoryVersionEditor
+          factoryDefinitionId={definition._id}
+          projectId={projectId}
+          repositoryId={repositoryId}
+          repositoryDataClassification={repositoryDataClassification}
+        />
       )}
     </section>
   );
@@ -74,10 +81,12 @@ function FactoryVersionEditor({
   factoryDefinitionId,
   projectId,
   repositoryId,
+  repositoryDataClassification,
 }: {
   factoryDefinitionId: Id<"factoryDefinitions">;
   projectId: Id<"projects">;
   repositoryId: Id<"workspaceRepositories">;
+  repositoryDataClassification: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED" | "UNCLASSIFIED";
 }) {
   const detail = useQuery(api["factory/configuration"].getDetail, { factoryDefinitionId });
   const workflows = useQuery(api.workflows.list, { activeOnly: true });
@@ -329,6 +338,17 @@ function FactoryVersionEditor({
     }
   }, [workflows, policies, verifiers, versionOptions, workflowId, policyId, verifierIds.length, codeScopeIds.length, sandboxProfileId]);
 
+  const providerEgressProfileAvailable = Boolean(versionOptions?.sandboxProfiles?.some((profile) =>
+    profile.readinessState !== "BLOCKED" && profile.providerEgressEnforcementProven === true
+  ));
+  const remoteSandboxEligible = repositoryDataClassification === "PUBLIC" || providerEgressProfileAvailable;
+
+  useEffect(() => {
+    if (!remoteSandboxEligible && executionBackend === "remote-sandbox") {
+      setExecutionBackend("persistent-worker");
+    }
+  }, [executionBackend, remoteSandboxEligible]);
+
   if (!detail || !workflows || !policies || !verifiers || !agentTemplates || !versionOptions) {
     return <div className="mt-3 h-28 animate-pulse rounded-lg bg-surface-2" aria-label="Loading Factory version editor" />;
   }
@@ -437,6 +457,10 @@ function FactoryVersionEditor({
       setError("Select a dispatchable Sandbox Profile before creating an isolated Factory version.");
       return;
     }
+    if (executionBackend === "remote-sandbox" && !remoteSandboxEligible) {
+      setError("Remote Sandbox requires provider-enforced egress evidence for this repository classification.");
+      return;
+    }
     if (executionBackend === "remote-sandbox" && risk === "RED") {
       setError("Remote sandbox execution is limited to GREEN and YELLOW risk boundaries in N=1.");
       return;
@@ -535,6 +559,10 @@ function FactoryVersionEditor({
           profileId={sandboxProfileId}
           onProfileChange={setSandboxProfileId}
           showProfileDetails={experienceLevel !== "basic"}
+          remoteEligible={remoteSandboxEligible}
+          remoteBlockReason={remoteSandboxEligible
+            ? undefined
+            : `${repositoryDataClassification.toLowerCase()} repository: no eligible profile proves provider-enforced egress.`}
         />
         {experienceLevel === "basic" ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
@@ -742,6 +770,8 @@ function ExecutionBackendSelector({
   profileId,
   onProfileChange,
   showProfileDetails,
+  remoteEligible,
+  remoteBlockReason,
 }: {
   backend: "persistent-worker" | "remote-sandbox";
   onBackendChange: (backend: "persistent-worker" | "remote-sandbox") => void;
@@ -749,6 +779,8 @@ function ExecutionBackendSelector({
   profileId: string;
   onProfileChange: (profileId: string) => void;
   showProfileDetails: boolean;
+  remoteEligible: boolean;
+  remoteBlockReason?: string;
 }) {
   const selected = profiles.find((profile) => profile._id === profileId);
   return (
@@ -759,9 +791,14 @@ function ExecutionBackendSelector({
           <input aria-label="Local" className="mt-1" type="radio" name="factory-execution-backend" checked={backend === "persistent-worker"} onChange={() => onBackendChange("persistent-worker")} />
           <span><span className="block text-[12.5px] font-medium text-ink">Local</span><span className="mt-0.5 block text-[11.5px] text-ink-muted">Execute in the canonical worker's owned host worktree. No provider spend.</span></span>
         </label>
-        <label className={`flex min-h-16 cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${backend === "remote-sandbox" ? "border-[var(--focus-ring)] bg-surface-1" : "border-line bg-surface-1/50"}`}>
-          <input aria-label="Isolated Sandbox" className="mt-1" type="radio" name="factory-execution-backend" checked={backend === "remote-sandbox"} onChange={() => onBackendChange("remote-sandbox")} />
-          <span><span className="block text-[12.5px] font-medium text-ink">Isolated Sandbox</span><span className="mt-0.5 block text-[11.5px] text-ink-muted">Execute on an attempt-scoped disposable machine beneath the same worker lease.</span></span>
+        <label className={`flex min-h-16 items-start gap-3 rounded-md border p-3 transition-colors ${remoteEligible ? "cursor-pointer" : "cursor-not-allowed opacity-70"} ${backend === "remote-sandbox" ? "border-[var(--focus-ring)] bg-surface-1" : "border-line bg-surface-1/50"}`}>
+          <input aria-label="Isolated Sandbox" className="mt-1" type="radio" name="factory-execution-backend" checked={backend === "remote-sandbox"} disabled={!remoteEligible} onChange={() => onBackendChange("remote-sandbox")} />
+          <span>
+            <span className="block text-[12.5px] font-medium text-ink">Isolated Sandbox</span>
+            <span className="mt-0.5 block text-[11.5px] text-ink-muted">
+              {remoteBlockReason ?? "Execute on an attempt-scoped disposable machine beneath the same worker lease."}
+            </span>
+          </span>
         </label>
       </div>
       {backend === "remote-sandbox" ? (

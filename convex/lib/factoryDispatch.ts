@@ -7,6 +7,8 @@ export interface FactoryDispatchPreflightInput {
   assessmentCurrent: boolean;
   digestMatches: boolean;
   repositoryReady: boolean;
+  repositoryPolicyReady: boolean;
+  remoteEgressPolicyReady: boolean;
   githubReady: boolean;
   workflowMatches: boolean;
   workflowContractReady: boolean;
@@ -91,6 +93,8 @@ const checks: Array<{
   { key: "assessmentCurrent", blocker: "factory-readiness-stale", remediation: "Run a current Factory readiness assessment." },
   { key: "digestMatches", blocker: "factory-digest-mismatch", remediation: "Reassess the immutable Factory version." },
   { key: "repositoryReady", blocker: "repository-not-ready", remediation: "Repair repository access before dispatch." },
+  { key: "repositoryPolicyReady", blocker: "repository-classification-stale", remediation: "Classify the repository and create, assess, and activate a new immutable Factory version." },
+  { key: "remoteEgressPolicyReady", blocker: "provider-egress-required", remediation: "Use Local execution or a remote profile with provider-enforced egress evidence." },
   { key: "githubReady", blocker: "github-app-not-ready", remediation: "Repair and reverify the GitHub App installation." },
   { key: "workflowMatches", blocker: "workflow-version-mismatch", remediation: "Use the workflow frozen in the Factory version." },
   { key: "workflowContractReady", blocker: "workflow-contract-unsafe", remediation: "Replace heuristic completion and provider authority with structured handoffs." },

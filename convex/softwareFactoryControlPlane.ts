@@ -978,6 +978,7 @@ export const seedScaleFixture = mutation({
         isDefault: true,
         status: "READY",
         webhookStatus: "READY",
+        dataClassification: "INTERNAL",
         fixtureKey: SCALE_FIXTURE_KEY,
         createdAt: now,
         updatedAt: now,

@@ -1,5 +1,11 @@
 # Mission Control - Operations Runbook
 
+> **Historical runbook — do not execute these commands.** This document retains
+> the former REST/Express operating model for provenance. The referenced
+> `localhost:3000/api/*` endpoints are not the current Mission Control contract.
+> Use the [current operations guide](../MISSION_CONTROL_RUNBOOK.md) and
+> [troubleshooting index](../guides/TROUBLESHOOTING.md).
+
 **Version:** 0.9.0  
 **Last Updated:** 2026-02-01
 
@@ -131,7 +137,8 @@ When operating on a project:
 - **Resume squad** affects only paused agents in the current project
 - **Standup report** shows stats for the current project only
 
-See [docs/MULTI_PROJECT_MODEL.md](MULTI_PROJECT_MODEL.md) for complete documentation.
+See [Multi-Project Model](../architecture/MULTI_PROJECT_MODEL.md) for the
+historical architecture context.
 
 ```bash
 # From repo root; CONVEX_URL or VITE_CONVEX_URL must be set

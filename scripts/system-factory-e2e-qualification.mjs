@@ -36,6 +36,9 @@ const steps = [
     args: [
       "exec", "vitest", "run",
       "scripts/lib/dependency-audit-gate.test.mjs",
+      "scripts/lib/factory-docs-consistency.test.mjs",
+      "scripts/lib/production-pilot-preflight.test.mjs",
+      "scripts/lib/production-pilot-evidence.test.mjs",
       "scripts/lib/repository-secret-scan.test.mjs",
       "scripts/lib/release-config.test.mjs",
     ],
