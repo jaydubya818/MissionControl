@@ -159,7 +159,9 @@ describe("observability golden path", () => {
 
   it("backfills existing Attempts with authorization, bounded idempotency, and audit history", async () => {
     const previousDemoFlag = process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
+    const previousDeploymentClass = process.env.MC_BACKEND_DEPLOYMENT_CLASS;
     process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT = "1";
+    process.env.MC_BACKEND_DEPLOYMENT_CLASS = "local";
     try {
       const tenant = { _id: "tenant-1", active: true };
       const project = { _id: "project-1", tenantId: tenant._id, name: "Factory", slug: "factory" };
@@ -190,12 +192,16 @@ describe("observability golden path", () => {
     } finally {
       if (previousDemoFlag === undefined) delete process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
       else process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT = previousDemoFlag;
+      if (previousDeploymentClass === undefined) delete process.env.MC_BACKEND_DEPLOYMENT_CLASS;
+      else process.env.MC_BACKEND_DEPLOYMENT_CLASS = previousDeploymentClass;
     }
   });
 
   it("keeps deterministic scores reproducible and rejects cross-workspace experiment variants", async () => {
     const previousDemoFlag = process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
+    const previousDeploymentClass = process.env.MC_BACKEND_DEPLOYMENT_CLASS;
     process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT = "1";
+    process.env.MC_BACKEND_DEPLOYMENT_CLASS = "local";
     try {
       const tenant = { _id: "tenant-1", active: true };
       const project = { _id: "project-1", tenantId: tenant._id, name: "Factory", slug: "factory" };
@@ -252,6 +258,8 @@ describe("observability golden path", () => {
     } finally {
       if (previousDemoFlag === undefined) delete process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
       else process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT = previousDemoFlag;
+      if (previousDeploymentClass === undefined) delete process.env.MC_BACKEND_DEPLOYMENT_CLASS;
+      else process.env.MC_BACKEND_DEPLOYMENT_CLASS = previousDeploymentClass;
     }
   });
 
@@ -293,7 +301,9 @@ describe("observability golden path", () => {
 
   it("records bounded human experiment outcomes without a significance claim", async () => {
     const previousDemoFlag = process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
+    const previousDeploymentClass = process.env.MC_BACKEND_DEPLOYMENT_CLASS;
     process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT = "1";
+    process.env.MC_BACKEND_DEPLOYMENT_CLASS = "local";
     try {
       const tenant = { _id: "tenant-1", active: true };
       const project = { _id: "project-1", tenantId: tenant._id, name: "Factory", slug: "factory" };
@@ -330,6 +340,8 @@ describe("observability golden path", () => {
     } finally {
       if (previousDemoFlag === undefined) delete process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
       else process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT = previousDemoFlag;
+      if (previousDeploymentClass === undefined) delete process.env.MC_BACKEND_DEPLOYMENT_CLASS;
+      else process.env.MC_BACKEND_DEPLOYMENT_CLASS = previousDeploymentClass;
     }
   });
 });

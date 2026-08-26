@@ -26,6 +26,7 @@ import { executeIndependentVerification } from "../factoryVerification.js";
 
 const execFileAsync = promisify(execFile);
 const cleanup: string[] = [];
+const WORKER_SETTLE_TIMEOUT_MS = 10_000;
 let previousServiceSecret: string | undefined;
 
 beforeEach(() => {
@@ -224,7 +225,10 @@ describe("FactoryAttemptWorker remote Sandbox backend", () => {
     );
 
     await worker.tick();
-    await vi.waitFor(() => expect(worker.status().completedCount).toBe(1));
+    await vi.waitFor(
+      () => expect(worker.status().completedCount).toBe(1),
+      { timeout: WORKER_SETTLE_TIMEOUT_MS },
+    );
 
     expect(credentials.active.size).toBe(0);
     expect(provider.inventory()[0].state).toBe("TERMINATED");

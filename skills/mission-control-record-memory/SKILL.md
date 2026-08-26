@@ -1,16 +1,17 @@
 ---
 name: mission-control-record-memory
 description: >-
-  Retired V1 compatibility skill. Agent Documents are operator-managed until a
-  scoped signed agent-memory command is approved and implemented.
+  Use this skill when an agent is asked to write or enumerate Agent Documents.
+  The V1 direct-agent path is retired until a scoped signed agent-memory command
+  is approved and implemented.
 version: 2.0.0
 owner: software-factory
 risk: high
-capabilities: []
-requires_tools: []
 ---
 
 # Agent Documents — retired direct-agent path
+
+## V1 contract
 
 Do not write or enumerate Agent Documents directly from an agent or legacy
 runtime. The active `agentDocuments` actions are authenticated operator

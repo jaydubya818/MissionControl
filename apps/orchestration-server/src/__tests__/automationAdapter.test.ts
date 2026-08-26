@@ -92,6 +92,24 @@ describe("Automation adapter safety", () => {
     }
   });
 
+  it("cancels the process tree when abort is already requested at spawn", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "mc-automation-"));
+    const content = "#!/usr/bin/env bash\nsleep 5\n";
+    const controller = new AbortController();
+    controller.abort();
+    try {
+      const result = await executeAutomation({
+        adapterType: "SHELL", repository: "test/repo", repositoryRoot: root, workingDirectory: ".",
+        artifactPath: "automations/pre-cancelled.sh", artifactContent: content, artifactContentHash: hash(content),
+        timeoutMs: 5_000, secretReferences: [], configuration: {},
+      }, controller.signal);
+      expect(result.status).toBe("cancelled");
+      expect(result.durationMs).toBeLessThan(1_000);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("rejects a repository artifact that differs from the approved hash", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "mc-automation-"));
     const first = "#!/usr/bin/env bash\nprintf first\n";

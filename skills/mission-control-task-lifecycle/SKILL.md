@@ -1,16 +1,17 @@
 ---
 name: mission-control-task-lifecycle
 description: >-
-  Retired V1 compatibility skill. Direct agent calls to human Task actions are
-  not an authenticated service boundary; use the canonical Factory worker.
+  Use this skill when an agent needs to create or transition a Task. Direct
+  agent calls to human Task actions are retired; use the canonical Factory
+  worker.
 version: 2.0.0
 owner: software-factory
 risk: high
-capabilities: []
-requires_tools: []
 ---
 
 # Task lifecycle — retired direct-agent path
+
+## V1 contract
 
 Do not call `tasks.create`, `tasks.assign`, or `tasks.transition` directly from
 an agent, bot, shell script, or legacy worker. Those public actions are for an

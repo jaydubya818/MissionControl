@@ -123,23 +123,29 @@ async function executeArgv(manifest: ExecutionManifest, argv: string[], signal?:
     child.stdout.on("data", chunk => { stdout += String(chunk); });
     child.stderr.on("data", chunk => { stderr += String(chunk); });
     let timedOut = false;
+    let terminationRequested = false;
+    let terminationRetryTimer: ReturnType<typeof setTimeout> | null = null;
     let forceKillTimer: ReturnType<typeof setTimeout> | null = null;
-    const terminate = () => {
-      if (child.exitCode !== null || child.signalCode !== null) return;
-      try {
-        if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGTERM");
-        else child.kill("SIGTERM");
-      } catch {
-        child.kill("SIGTERM");
-      }
-      forceKillTimer = setTimeout(() => {
-        if (child.exitCode !== null || child.signalCode !== null) return;
+    const signalProcessTree = (terminationSignal: "SIGTERM" | "SIGKILL") => {
+      if (process.platform !== "win32" && child.pid) {
         try {
-          if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGKILL");
-          else child.kill("SIGKILL");
+          process.kill(-child.pid, terminationSignal);
+          return;
         } catch {
-          child.kill("SIGKILL");
+          // The process group can briefly be unavailable immediately after
+          // spawn. Fall through to the direct child and retry the group below.
         }
+      }
+      if (child.exitCode === null && child.signalCode === null) child.kill(terminationSignal);
+    };
+    const terminate = () => {
+      if (terminationRequested) return;
+      terminationRequested = true;
+      signalProcessTree("SIGTERM");
+      terminationRetryTimer = setTimeout(() => signalProcessTree("SIGTERM"), 25);
+      terminationRetryTimer.unref?.();
+      forceKillTimer = setTimeout(() => {
+        signalProcessTree("SIGKILL");
       }, 1_000);
       forceKillTimer.unref?.();
     };
@@ -147,9 +153,13 @@ async function executeArgv(manifest: ExecutionManifest, argv: string[], signal?:
     const abort = () => terminate();
     const cleanup = () => {
       clearTimeout(timer);
+      if (terminationRetryTimer) clearTimeout(terminationRetryTimer);
       if (forceKillTimer) clearTimeout(forceKillTimer);
       signal?.removeEventListener("abort", abort);
     };
+    child.once("spawn", () => {
+      if (terminationRequested) signalProcessTree("SIGTERM");
+    });
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
     child.on("error", (error) => {
