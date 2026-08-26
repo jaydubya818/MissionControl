@@ -5,25 +5,25 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { action, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { appendOpEvent } from "./lib/armAudit";
+import { appendChangeRecord, appendOpEvent } from "./lib/armAudit";
 import { resolveAgentRef } from "./lib/agentResolver";
 import { buildContinuousEvidenceLineage, buildEvidenceLineage, buildRetryTimeline, orderRunEvents, summarizeRunEvents } from "./lib/runInspector";
 import { summarizeWorkflowObservability } from "./lib/workflowObservability";
 import { reconcileTerminalWorkflowSteps } from "./lib/workflowRunState";
 import { snapshotWorkflowDefinition } from "./lib/workflowSnapshot";
 import { factoryWorkflowContractIssues } from "./lib/factoryWorkflowContract";
-import { assertAuthorizedDeliveryRecord, requireAuthorizedDeliveryScope } from "./lib/deliveryAuthorization";
+import {
+  assertAuthorizedDeliveryRecord,
+  authorizedDeliveryActor,
+  requireAuthorizedDeliveryScope,
+} from "./lib/deliveryAuthorization";
 import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
 import { buildExecutionRecoverySummary } from "./lib/executionRecovery";
 import { buildFactoryAttemptReviewReadModel, loadFactoryAttemptReviewReadModel } from "./lib/factoryReviewReadModel";
 import { getEffectiveOperatorControl } from "./lib/operatorControls";
-import {
-  automationDesignValidator,
-  automationOutputSnapshotValidator,
-  traceContextValidator,
-} from "./lib/workOrderSpecificationValidators";
+import { traceContextValidator } from "./lib/workOrderSpecificationValidators";
 import {
   evaluateWorkflowClaim,
   workflowHeartbeatDirective,
@@ -33,6 +33,7 @@ import {
   finishAttemptTrace,
   recordRunEventObservation,
 } from "./lib/observabilityPersistence";
+import { runAuditedHumanMutation } from "./lib/humanActionAudit";
 
 // ============================================================================
 // HELPERS
@@ -106,22 +107,6 @@ const runEventType = v.union(
   v.literal("RUN_FAILED"),
   v.literal("RUN_CANCELED"),
   v.literal("RUN_COMPLETED")
-);
-
-const runArtifactType = v.union(
-  v.literal("CODE_DIFF"),
-  v.literal("TEST_OUTPUT"),
-  v.literal("BUILD_OUTPUT"),
-  v.literal("LOG_BUNDLE"),
-  v.literal("SCREENSHOT"),
-  v.literal("GENERATED_DOCUMENT"),
-  v.literal("VERIFICATION_EVIDENCE"),
-  v.literal("PULL_REQUEST"),
-  v.literal("CHECKPOINT"),
-  v.literal("STRUCTURED_OUTPUT"),
-  v.literal("AUTOMATION_DESIGN"),
-  v.literal("AUTOMATION_OUTPUT_SNAPSHOT"),
-  v.literal("OTHER")
 );
 
 async function nextSequenceNumber(ctx: any, workflowRunId: any) {
@@ -381,6 +366,14 @@ function redactExecutionPrompt<T extends Record<string, any> | null>(run: T): T 
   } as T;
 }
 
+async function requireWorkflowRunRead(ctx: any, run: any) {
+  if (!run) return null;
+  const workOrder = run.workOrderId ? await ctx.db.get(run.workOrderId) : null;
+  const access = await requireAuthorizedDeliveryScope(ctx, workOrder?.projectId ?? run.projectId);
+  if (workOrder) assertAuthorizedDeliveryRecord(access, workOrder);
+  return access;
+}
+
 // ============================================================================
 // QUERIES
 // ============================================================================
@@ -397,6 +390,17 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    let projectId = args.projectId;
+    if (args.repositoryId) {
+      const repository = await ctx.db.get(args.repositoryId);
+      if (!repository) return [];
+      if (projectId && repository.projectId !== projectId) {
+        throw new Error("Repository does not belong to the selected workspace.");
+      }
+      projectId = projectId ?? repository.projectId;
+    }
+    await requireAuthorizedDeliveryScope(ctx, projectId);
+
     // Build query based on filters
     if (args.repositoryId && args.status) {
       return (await ctx.db
@@ -457,10 +461,12 @@ export const list = query({
 export const get = query({
   args: { runId: v.string() },
   handler: async (ctx, args) => {
-    return redactExecutionPrompt(await ctx.db
+    const run = await ctx.db
       .query("workflowRuns")
       .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
-      .first());
+      .first();
+    await requireWorkflowRunRead(ctx, run);
+    return redactExecutionPrompt(run);
   },
 });
 
@@ -470,13 +476,18 @@ export const get = query({
 export const getById = query({
   args: { id: v.id("workflowRuns") },
   handler: async (ctx, args) => {
-    return redactExecutionPrompt(await ctx.db.get(args.id));
+    const run = await ctx.db.get(args.id);
+    await requireWorkflowRunRead(ctx, run);
+    return redactExecutionPrompt(run);
   },
 });
 
 export const listEvents = query({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.workflowRunId);
+    await requireWorkflowRunRead(ctx, run);
+    if (!run) return [];
     const events = await ctx.db
       .query("runEvents")
       .withIndex("by_run_sequence", (q) => q.eq("workflowRunId", args.workflowRunId))
@@ -488,6 +499,9 @@ export const listEvents = query({
 export const listArtifacts = query({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.workflowRunId);
+    await requireWorkflowRunRead(ctx, run);
+    if (!run) return [];
     return await ctx.db
       .query("runArtifacts")
       .withIndex("by_run", (q) => q.eq("workflowRunId", args.workflowRunId))
@@ -639,6 +653,7 @@ export const search = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireAuthorizedDeliveryScope(ctx, args.projectId);
     let runs = await ctx.db
       .query("workflowRuns")
       .order("desc")
@@ -660,7 +675,7 @@ export const search = query({
 // MUTATIONS
 // ============================================================================
 
-export const claimExecution = mutation({
+export const claimExecution = internalMutation({
   args: {
     runId: v.string(),
     leaseId: v.string(),
@@ -812,7 +827,7 @@ export const claimExecution = mutation({
   },
 });
 
-export const heartbeatExecution = mutation({
+export const heartbeatExecution = internalMutation({
   args: {
     runId: v.string(),
     leaseId: v.string(),
@@ -874,31 +889,7 @@ export const heartbeatExecution = mutation({
   },
 });
 
-export const checkpointExecution = mutation({
-  args: {
-    runId: v.string(),
-    leaseId: v.string(),
-    ownerId: v.string(),
-    summary: v.string(),
-    idempotencyKey: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const run = await ctx.db
-      .query("workflowRuns")
-      .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
-      .first();
-    if (!run) throw new Error(`Workflow run not found: ${args.runId}`);
-    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
-    return await createExecutionCheckpoint(ctx, {
-      run,
-      leaseId: args.leaseId,
-      summary: args.summary,
-      idempotencyKey: args.idempotencyKey,
-    });
-  },
-});
-
-export const releaseExecution = mutation({
+export const releaseExecution = internalMutation({
   args: {
     runId: v.string(),
     leaseId: v.string(),
@@ -955,19 +946,21 @@ export const releaseExecution = mutation({
 /**
  * Start a new workflow run
  */
-export const start = mutation({
-  args: {
-    workflowId: v.string(),
-    projectId: v.optional(v.id("projects")),
-    workOrderId: v.optional(v.id("workOrders")),
-    workOrderRevisionNumber: v.optional(v.number()),
-    workOrderRevisionId: v.optional(v.id("workOrderRevisions")),
-    parentTaskId: v.optional(v.id("tasks")),
-    initialInput: v.string(),
-    runtime: v.optional(v.string()),
-    model: v.optional(v.string()),
-    worktree: v.optional(v.string()),
-  },
+const startArgs = {
+  workflowId: v.string(),
+  projectId: v.optional(v.id("projects")),
+  workOrderId: v.optional(v.id("workOrders")),
+  workOrderRevisionNumber: v.optional(v.number()),
+  workOrderRevisionId: v.optional(v.id("workOrderRevisions")),
+  parentTaskId: v.optional(v.id("tasks")),
+  initialInput: v.string(),
+  runtime: v.optional(v.string()),
+  model: v.optional(v.string()),
+  worktree: v.optional(v.string()),
+};
+
+export const startInternal = internalMutation({
+  args: startArgs,
   handler: async (ctx, args) => {
     // Get workflow definition
     const workflow = await ctx.db
@@ -982,13 +975,24 @@ export const start = mutation({
     if (!workflow.active) {
       throw new Error(`Workflow is not active: ${args.workflowId}`);
     }
-    if (args.projectId && (
-      workflow.projectId !== args.projectId
+    const workOrder = args.workOrderId ? await ctx.db.get(args.workOrderId) : null;
+    if (args.workOrderId && !workOrder) throw new Error("Linked WorkOrder not found.");
+    const projectId = args.projectId ?? workOrder?.projectId ?? workflow.projectId;
+    if (!projectId) throw new Error("Workflow launch requires a workspace.");
+    if ((workOrder && workOrder.projectId !== projectId) || (
+      workflow.projectId !== projectId
       || workflow.contractVersion !== "factory-workflow-contract/v1"
       || factoryWorkflowContractIssues(workflow).length > 0
     )) {
       throw new Error("New production workflow runs require the current workspace-owned structured-status contract.");
     }
+    const access = await requireAuthorizedDeliveryScope(
+      ctx,
+      projectId,
+      COMPANY_PERMISSIONS.UPDATE_DELIVERY,
+    );
+    const actor = authorizedDeliveryActor(access);
+    args.projectId = projectId;
     
     // Initialize step states
     const topology = workflow.topology ?? "LINEAR";
@@ -1023,7 +1027,8 @@ export const start = mutation({
       workflowId: args.workflowId,
       workflowVersion: workflow.version,
       workflowSnapshot,
-      projectId: args.projectId,
+      tenantId: access?.project.tenantId,
+      projectId,
       workOrderId: args.workOrderId,
       workOrderRevisionNumber: args.workOrderRevisionNumber,
       workOrderRevisionId: args.workOrderRevisionId,
@@ -1055,8 +1060,9 @@ export const start = mutation({
     
     // Log activity
     await ctx.db.insert("activities", {
-      projectId: args.projectId,
-      actorType: "SYSTEM",
+      projectId,
+      actorType: "HUMAN",
+      actorId: actor.actorId,
       action: "WORKFLOW_STARTED",
       description: `Started workflow run ${runId} for ${workflow.name}`,
       targetType: "WORKFLOW_RUN",
@@ -1071,67 +1077,42 @@ export const start = mutation({
     await insertRunEvent(ctx, {
       workflowRunId: id,
       workOrderId: args.workOrderId,
-      projectId: args.projectId,
+      projectId,
+      tenantId: access?.project.tenantId,
       eventType: "RUN_STARTED",
       workflowStep: workflow.steps[0]?.id,
-      actor: "system",
+      actor: actor.actorId,
       status: "PENDING",
       startedAt: now,
       commandSummary: `Workflow ${args.workflowId} created`,
       metadata: { runId, workflowId: args.workflowId, initialInput: args.initialInput },
       idempotencyKey: `run-start:${runId}`,
     });
+    await appendChangeRecord(ctx.db as any, {
+      tenantId: access?.project.tenantId,
+      projectId,
+      operatorId: actor.operatorId,
+      type: "WORKFLOW_RUN_STARTED",
+      summary: `Workflow run ${runId} started`,
+      payload: { workflowRunId: id, workflowId: args.workflowId, workOrderId: args.workOrderId },
+      relatedTable: "workflowRuns",
+      relatedId: String(id),
+    });
     
     return { runId, id };
   },
 });
 
-export const recordEvent = mutation({
-  args: {
-    workflowRunId: v.id("workflowRuns"),
-    idempotencyKey: v.optional(v.string()),
-    eventType: runEventType,
-    workflowStep: v.optional(v.string()),
-    sequenceNumber: v.optional(v.number()),
-    actor: v.optional(v.string()),
-    agentId: v.optional(v.id("agents")),
-    toolName: v.optional(v.string()),
-    commandSummary: v.optional(v.string()),
-    status: v.optional(v.string()),
-    startedAt: v.optional(v.number()),
-    endedAt: v.optional(v.number()),
-    durationMs: v.optional(v.number()),
-    retryNumber: v.optional(v.number()),
-    verificationReceiptId: v.optional(v.id("verificationReceipts")),
-    evidenceArtifactIds: v.optional(v.array(v.id("runArtifacts"))),
-    errorCategory: v.optional(v.string()),
-    errorSummary: v.optional(v.string()),
-    traceContext: v.optional(traceContextValidator),
-    metadata: v.optional(v.any()),
-  },
-  handler: async (ctx, args) => {
-    const run = await ctx.db.get(args.workflowRunId);
-    if (!run) throw new Error("Workflow run not found");
-
-    const result = await insertRunEvent(ctx, {
-      ...args,
-      workOrderId: run.workOrderId,
-      projectId: run.projectId,
-      tenantId: run.tenantId,
-    });
-
-    if (args.eventType === "HUMAN_INTERVENTION_REQUESTED") {
-      await ctx.db.patch(run._id, { humanInterventions: (run.humanInterventions ?? 0) + 1 });
-    }
-    if (args.eventType === "RUN_PAUSED") {
-      await ctx.db.patch(run._id, { status: "PAUSED" });
-    }
-    if (args.eventType === "RUN_RESUMED") {
-      await ctx.db.patch(run._id, { status: "RUNNING" });
-    }
-
-    return result;
-  },
+export const start = action({
+  args: startArgs,
+  handler: async (ctx, args): Promise<any> =>
+    await runAuditedHumanMutation(
+      ctx,
+      internal.workflowRuns.startInternal,
+      args,
+      "workflowRuns.start",
+      { projectId: args.projectId, workOrderId: args.workOrderId },
+    ),
 });
 
 export const recordEventInternal = internalMutation({
@@ -1169,70 +1150,13 @@ export const recordEventInternal = internalMutation({
   },
 });
 
-export const createArtifact = mutation({
-  args: {
-    workflowRunId: v.id("workflowRuns"),
-    idempotencyKey: v.optional(v.string()),
-    artifactType: runArtifactType,
-    name: v.string(),
-    description: v.optional(v.string()),
-    repositoryPath: v.optional(v.string()),
-    externalLocation: v.optional(v.string()),
-    contentHash: v.optional(v.string()),
-    producer: v.optional(v.string()),
-    verificationReceiptId: v.optional(v.id("verificationReceipts")),
-    acceptanceCriterionId: v.optional(v.string()),
-    producingEventId: v.optional(v.id("runEvents")),
-    retentionPolicy: v.optional(v.string()),
-    sensitivity: v.optional(v.string()),
-    automationDesign: v.optional(automationDesignValidator),
-    automationOutputSnapshot: v.optional(automationOutputSnapshotValidator),
-    metadata: v.optional(v.any()),
-  },
-  handler: async (ctx, args) => {
-    const run = await ctx.db.get(args.workflowRunId);
-    if (!run) throw new Error("Workflow run not found");
-    const access = await requireAuthorizedDeliveryScope(
-      ctx,
-      run.projectId,
-      COMPANY_PERMISSIONS.UPDATE_DELIVERY,
-    );
-    if (!access) throw new Error("Artifact writes require an authorized workspace.");
-    const result = await insertRunArtifact(ctx, {
-      ...args,
-      workOrderId: run.workOrderId,
-      projectId: run.projectId,
-      tenantId: run.tenantId,
-    });
-    if (result.created && args.verificationReceiptId) {
-      await appendReceiptArtifactLink(ctx, args.verificationReceiptId, result.artifact._id);
-    }
-    if (result.created) {
-      await insertRunEvent(ctx, {
-        workflowRunId: run._id,
-        workOrderId: run.workOrderId,
-        projectId: run.projectId,
-        tenantId: run.tenantId,
-        eventType: args.artifactType === "CHECKPOINT" ? "CHECKPOINT_CREATED" : "ARTIFACT_CREATED",
-        workflowStep: run.steps[run.currentStepIndex]?.stepId,
-        actor: args.producer,
-        status: "COMPLETED",
-        commandSummary: args.name,
-        evidenceArtifactIds: [result.artifact._id],
-        verificationReceiptId: args.verificationReceiptId,
-        metadata: { artifactType: args.artifactType, repositoryPath: args.repositoryPath, externalLocation: args.externalLocation },
-        idempotencyKey: args.idempotencyKey ? `${args.idempotencyKey}:event` : undefined,
-      });
-    }
-    return result;
-  },
-});
+const linkArtifactArgs = {
+  runArtifactId: v.id("runArtifacts"),
+  verificationReceiptId: v.id("verificationReceipts"),
+};
 
-export const linkArtifactToVerificationReceipt = mutation({
-  args: {
-    runArtifactId: v.id("runArtifacts"),
-    verificationReceiptId: v.id("verificationReceipts"),
-  },
+export const linkArtifactToVerificationReceiptInternal = internalMutation({
+  args: linkArtifactArgs,
   handler: async (ctx, args) => {
     const [artifact, receipt] = await Promise.all([
       ctx.db.get(args.runArtifactId),
@@ -1246,7 +1170,7 @@ export const linkArtifactToVerificationReceipt = mutation({
       run.projectId,
       COMPANY_PERMISSIONS.UPDATE_DELIVERY,
     );
-    if (!access) throw new Error("Artifact links require an authorized workspace.");
+    const actor = authorizedDeliveryActor(access);
     if (artifact.workflowRunId !== receipt.workflowRunId || artifact.workOrderId !== receipt.workOrderId) {
       throw new Error("Artifact and verification receipt must belong to the same run and work order");
     }
@@ -1255,14 +1179,40 @@ export const linkArtifactToVerificationReceipt = mutation({
       acceptanceCriterionId: receipt.acceptanceCriterionId,
     });
     await appendReceiptArtifactLink(ctx, receipt._id, artifact._id);
+    await appendChangeRecord(ctx.db as any, {
+      tenantId: run.tenantId ?? access?.project.tenantId,
+      projectId: run.projectId,
+      operatorId: actor.operatorId,
+      type: "RUN_ARTIFACT_LINKED",
+      summary: `Run artifact ${artifact._id} linked to verification receipt`,
+      payload: {
+        workflowRunId: run._id,
+        runArtifactId: artifact._id,
+        verificationReceiptId: receipt._id,
+      },
+      relatedTable: "runArtifacts",
+      relatedId: String(artifact._id),
+    });
     return await ctx.db.get(args.runArtifactId);
   },
+});
+
+export const linkArtifactToVerificationReceipt = action({
+  args: linkArtifactArgs,
+  handler: async (ctx, args): Promise<any> =>
+    await runAuditedHumanMutation(
+      ctx,
+      internal.workflowRuns.linkArtifactToVerificationReceiptInternal,
+      args,
+      "workflowRuns.linkArtifactToVerificationReceipt",
+      { runArtifactId: args.runArtifactId },
+    ),
 });
 
 /**
  * Update step status
  */
-export const updateStep = mutation({
+export const updateStep = internalMutation({
   args: {
     runId: v.string(),
     leaseId: v.optional(v.string()),
@@ -1460,75 +1410,16 @@ export const updateStep = mutation({
 });
 
 /**
- * Advance workflow to next step
- */
-export const advance = mutation({
-  args: {
-    runId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const run = await ctx.db
-      .query("workflowRuns")
-      .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
-      .first();
-    
-    if (!run) {
-      throw new Error(`Workflow run not found: ${args.runId}`);
-    }
-    
-    const nextIndex = run.currentStepIndex + 1;
-    
-    if (nextIndex >= run.totalSteps) {
-      // Workflow complete
-      await ctx.db.patch(run._id, {
-        status: "COMPLETED",
-        completedAt: Date.now(),
-      });
-
-      await insertRunEvent(ctx, {
-        workflowRunId: run._id,
-        workOrderId: run.workOrderId,
-        projectId: run.projectId,
-        tenantId: run.tenantId,
-        eventType: "RUN_COMPLETED",
-        workflowStep: run.steps[run.currentStepIndex]?.stepId,
-        actor: "system",
-        status: "COMPLETED",
-        startedAt: run.startedAt,
-        endedAt: Date.now(),
-        idempotencyKey: `run-complete:${run.runId}`,
-      });
-
-      if (run.workOrderId) {
-        await ctx.runMutation(internal.workOrders.syncExecutionOutcome, {
-          workflowRunId: run._id,
-          eventType: "RUN_COMPLETED",
-          summary: `Workflow run ${run.runId} completed`,
-        });
-      }
-      
-      return { complete: true };
-    }
-    
-    // Move to next step
-    await ctx.db.patch(run._id, {
-      currentStepIndex: nextIndex,
-    });
-    
-    return { complete: false, nextIndex };
-  },
-});
-
-/**
  * Durable operator cancellation. Active workers observe this through their
  * signed heartbeat; unclaimed/expired work is canceled immediately.
  */
-export const requestCancellation = mutation({
-  args: {
-    workflowRunId: v.id("workflowRuns"),
-    reason: v.string(),
-    actorId: v.optional(v.string()),
-  },
+const requestCancellationArgs = {
+  workflowRunId: v.id("workflowRuns"),
+  reason: v.string(),
+};
+
+export const requestCancellationInternal = internalMutation({
+  args: requestCancellationArgs,
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
     if (!run) throw new Error("Workflow run not found");
@@ -1537,6 +1428,7 @@ export const requestCancellation = mutation({
     if (!workOrder) throw new Error("Linked WorkOrder not found");
     const access = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId, COMPANY_PERMISSIONS.UPDATE_DELIVERY);
     assertAuthorizedDeliveryRecord(access, workOrder);
+    const actor = authorizedDeliveryActor(access);
     if (["COMPLETED", "FAILED", "CANCELED"].includes(run.status)) {
       return { requested: false, status: run.status };
     }
@@ -1552,7 +1444,7 @@ export const requestCancellation = mutation({
     }
     await ctx.db.patch(run._id, {
       cancellationRequestedAt: run.cancellationRequestedAt ?? now,
-      cancellationRequestedBy: args.actorId ?? "operator",
+      cancellationRequestedBy: actor.actorId,
       checkpointSummary: `Cancellation requested: ${reason}`,
       checkpointAt: now,
     });
@@ -1563,11 +1455,21 @@ export const requestCancellation = mutation({
       tenantId: run.tenantId,
       eventType: "CANCELLATION_REQUESTED",
       workflowStep: run.steps[run.currentStepIndex]?.stepId,
-      actor: args.actorId ?? "operator",
+      actor: actor.actorId,
       status: "PENDING",
       startedAt: now,
       commandSummary: reason,
       idempotencyKey: `cancellation-request:${run._id}`,
+    });
+    await appendChangeRecord(ctx.db as any, {
+      tenantId: run.tenantId ?? access?.project.tenantId,
+      projectId: workOrder.projectId,
+      operatorId: actor.operatorId,
+      type: "WORKFLOW_CANCELLATION_REQUESTED",
+      summary: `Cancellation requested for workflow run ${run.runId}`,
+      payload: { workflowRunId: run._id, workOrderId: workOrder._id, reason },
+      relatedTable: "workflowRuns",
+      relatedId: String(run._id),
     });
     const hasActiveLease = Boolean(run.executionClaimId && (run.executionLeaseExpiresAt ?? 0) > now);
     const isFactoryAttempt = Boolean(run.factoryDefinitionVersionId && run.executionManifestDigest);
@@ -1625,7 +1527,7 @@ export const requestCancellation = mutation({
       tenantId: run.tenantId,
       eventType: "RUN_CANCELED",
       workflowStep: run.steps[run.currentStepIndex]?.stepId,
-      actor: args.actorId ?? "operator",
+      actor: actor.actorId,
       status: "CANCELED",
       startedAt: run.startedAt,
       endedAt: now,
@@ -1641,10 +1543,22 @@ export const requestCancellation = mutation({
   },
 });
 
+export const requestCancellation = action({
+  args: requestCancellationArgs,
+  handler: async (ctx, args): Promise<any> =>
+    await runAuditedHumanMutation(
+      ctx,
+      internal.workflowRuns.requestCancellationInternal,
+      args,
+      "workflowRuns.requestCancellation",
+      { workflowRunId: args.workflowRunId },
+    ),
+});
+
 /**
  * Update workflow run status
  */
-export const updateStatus = mutation({
+export const updateStatus = internalMutation({
   args: {
     runId: v.string(),
     leaseId: v.optional(v.string()),
@@ -1813,7 +1727,7 @@ export const updateStatus = mutation({
 /**
  * Update workflow context (variables passed between steps)
  */
-export const updateContext = mutation({
+export const updateContext = internalMutation({
   args: {
     runId: v.string(),
     leaseId: v.optional(v.string()),
@@ -1842,7 +1756,7 @@ export const updateContext = mutation({
 /**
  * Increment retry count for a step
  */
-export const incrementRetry = mutation({
+export const incrementRetry = internalMutation({
   args: {
     runId: v.string(),
     leaseId: v.optional(v.string()),

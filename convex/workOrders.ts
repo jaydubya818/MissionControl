@@ -78,6 +78,7 @@ import { loadTaskProjections } from "./lib/taskProjection";
 import { snapshotWorkflowDefinition } from "./lib/workflowSnapshot";
 import { buildWorkOrderTaskAuthority } from "./lib/taskAuthority";
 import { buildFactoryExecutionManifest, factorySandboxResourceName } from "./lib/executionManifest";
+import { assessFactoryCostEnforcement } from "@mission-control/workflow-engine/cost-enforcement";
 import { loadFactoryAttemptReviewReadModel } from "./lib/factoryReviewReadModel";
 import { factoryWorkflowContractIssues } from "./lib/factoryWorkflowContract";
 import { modelRouteProductionEligible } from "./lib/modelRouteAdmission";
@@ -1258,7 +1259,9 @@ function summarizeRun(run: any) {
     checkpointSummary: run.checkpointSummary,
     factoryContinuationStatus: run.factoryContinuation?.status,
     factoryApprovalDecisionId: run.factoryContinuation?.approvalDecisionId,
-    candidateRevision: run.factoryContinuation?.candidateRevision,
+    candidateRevision: run.factoryContinuation?.candidateRevision ?? run.headSha,
+    executionAttemptNumber: run.executionAttemptNumber,
+    executionStaleRecoveryCount: run.executionStaleRecoveryCount,
     startedAt: run.startedAt,
     completedAt: run.completedAt,
   };
@@ -3217,6 +3220,9 @@ async function resolveFactoryDispatchBinding(
         workerId: binding.hostId,
         status: binding.status,
         dirty: binding.dirty,
+        networkPolicyStatus: binding.networkPolicyStatus,
+        secretPolicyStatus: binding.secretPolicyStatus,
+        attestedAt: binding.attestedAt,
         capacity: binding.capacity,
         workerRuntime: binding.workerRuntime ? {
           ...binding.workerRuntime,
@@ -3272,6 +3278,13 @@ async function resolveFactoryDispatchBinding(
     && JSON.stringify(modelRoute.qualificationSnapshot) === JSON.stringify(version.modelQualificationSnapshot)
     && modelRouteProductionEligible(modelRoute)
   );
+  const costEnforcement = assessFactoryCostEnforcement({
+    deploymentClass: process.env.MC_BACKEND_DEPLOYMENT_CLASS as "local" | "shared" | "production" | undefined,
+    executionBackend: selectedExecutionBackend,
+    maxCostUsd: version.budget.maxCostUsd,
+    maxAttempts: version.budget.maxAttempts,
+    sandboxSpend: (sandboxProfile?.immutableSnapshot as any)?.spend,
+  });
   const activeStatuses = ["PENDING", "RUNNING", "PAUSED"] as const;
   const activeRuns = repository
     ? (await Promise.all(activeStatuses.map((status) => ctx.db.query("workflowRuns")
@@ -3323,7 +3336,7 @@ async function resolveFactoryDispatchBinding(
       && typeof host.baseCommit === "string"
       && /^[a-f0-9]{40,64}$/i.test(host.baseCommit)
     ),
-    budgetReady: validFactoryBudget(version.budget),
+    budgetReady: validFactoryBudget(version.budget) && costEnforcement.allowed,
     recoveryReady: genericHarnessV1RecoveryReady(version.recovery) && sandboxProfileReady && validFactoryExecutionBinding({
       executionBackend: selectedExecutionBackend,
       sandboxProfileId: version.sandboxProfileId ? String(version.sandboxProfileId) : undefined,

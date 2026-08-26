@@ -21,13 +21,16 @@ interface FeedbackViewProps {
 export function FeedbackView({ projectId, onNavigate }: FeedbackViewProps) {
   const qcFindings = useQuery(
     api.qcFindings.listRecent,
-    projectId ? { projectId, limit: 10 } : { limit: 10 }
+    projectId ? { projectId, limit: 10 } : "skip"
   );
   const approvals = useQuery(
     api.approvals.listPending,
-    projectId ? { projectId, limit: 10 } : { limit: 10 }
+    projectId ? { projectId, limit: 10 } : "skip"
   );
-  const alerts = useQuery(api.alerts.listOpen, { limit: 10 });
+  const alerts = useQuery(
+    api.alerts.listOpen,
+    projectId ? { projectId, limit: 10 } : "skip",
+  );
   const activities = useQuery(
     api.activities.listRecent,
     projectId ? { projectId, limit: 8 } : { limit: 8 }

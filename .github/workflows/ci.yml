@@ -174,6 +174,75 @@ jobs:
         env:
           CI: true
 
+  mission-golden-path:
+    name: V1 Mission to PR Golden Path
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build shared packages
+        run: pnpm run ci:prepare
+
+      - name: Start ephemeral local Convex
+        run: |
+          CONVEX_AGENT_MODE=anonymous pnpm exec convex dev \
+            --tail-logs disable \
+            --typecheck disable \
+            --codegen disable \
+            --local-cloud-port 3212 \
+            --local-site-port 3213 \
+            > "$RUNNER_TEMP/v1-golden-convex.log" 2>&1 &
+          echo "CONVEX_LOCAL_PID=$!" >> "$GITHUB_ENV"
+          ready=0
+          for _ in $(seq 1 60); do
+            if grep -q "Convex functions ready" "$RUNNER_TEMP/v1-golden-convex.log"; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$!" 2>/dev/null; then
+              cat "$RUNNER_TEMP/v1-golden-convex.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat "$RUNNER_TEMP/v1-golden-convex.log"
+            exit 1
+          fi
+
+      - name: Seed exact Mission qualification fixture
+        run: |
+          pnpm exec convex env set MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT 1
+          pnpm exec convex env set MC_BACKEND_DEPLOYMENT_CLASS local
+          pnpm exec convex run seedMissionControlDemo:run '{"force":true}'
+          pnpm exec convex run seedV1GoldenPathQualification:run '{}' > "$RUNNER_TEMP/v1-golden-seed.json"
+          node scripts/export-v1-golden-path-env.mjs "$RUNNER_TEMP/v1-golden-seed.json" >> "$GITHUB_ENV"
+
+      - name: Run blocking Mission-to-PR browser proof
+        run: pnpm run ci:test:e2e:golden-path
+        env:
+          CI: true
+          MISSION_CONTROL_URL: http://127.0.0.1:4173
+          VITE_CONVEX_URL: http://127.0.0.1:3212
+
+      - name: Print local Convex diagnostics on failure
+        if: failure()
+        run: cat "$RUNNER_TEMP/v1-golden-convex.log"
+
   release-security:
     name: Release Security Gates
     runs-on: ubuntu-latest

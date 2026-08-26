@@ -65,6 +65,8 @@ describe("Factory host reporting", () => {
       checkoutRoot: repository,
       maxConcurrentRuns: 1,
       getCurrentRuns: () => 0,
+      networkPolicyStatus: "READY",
+      secretPolicyStatus: "READY",
       hostRuntimeType: "persistent-worker",
       executionBackends: ["persistent-worker"],
       supportedExecutors: [{
@@ -92,6 +94,11 @@ describe("Factory host reporting", () => {
       supportsResume: false,
       isolationModes: ["READ_ONLY", "WORKSPACE_WRITE"],
     }]);
+    expect(report).toMatchObject({
+      networkPolicyStatus: "READY",
+      secretPolicyStatus: "READY",
+      attestedAt: expect.any(Number),
+    });
 
     await writeFile(path.join(repository, "README.md"), "dirty\n");
     expect((await inspectFactoryCheckout(repository)).dirty).toBe(true);

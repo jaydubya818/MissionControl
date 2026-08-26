@@ -54,7 +54,7 @@ export function MissionSuggestionsDrawer({ projectId, onClose }: MissionSuggesti
   const [error, setError] = useState<string | null>(null);
 
   const reversePrompt = useAction(api.mission.reversePrompt);
-  const createTask = useMutation(api.tasks.create);
+  const createTask = useAction(api.tasks.create);
 
   const handleGenerate = async () => {
     setIsGenerating(true);

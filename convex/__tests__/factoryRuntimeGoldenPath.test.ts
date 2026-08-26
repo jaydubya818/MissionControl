@@ -11,6 +11,9 @@ describe("Factory worker runtime golden path", () => {
       workerId: "worker-local-1",
       status: "READY",
       dirty: false,
+      networkPolicyStatus: "READY",
+      secretPolicyStatus: "READY",
+      attestedAt: 1_000,
       capacity: { maxConcurrentRuns: 1, currentRuns: 0 },
       workerRuntime: {
         sessionId: "session-1",

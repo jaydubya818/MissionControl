@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
@@ -35,24 +35,24 @@ export function ApprovalsModal({
 
   const pending = useQuery(
     api.approvals.listByStatus,
-    projectId ? { projectId, status: "PENDING", limit: 100 } : { status: "PENDING", limit: 100 }
+    projectId ? { projectId, status: "PENDING", limit: 100 } : "skip"
   );
   const escalated = useQuery(
     api.approvals.listByStatus,
-    projectId ? { projectId, status: "ESCALATED", limit: 100 } : { status: "ESCALATED", limit: 100 }
+    projectId ? { projectId, status: "ESCALATED", limit: 100 } : "skip"
   );
   const approved = useQuery(
     api.approvals.listByStatus,
-    projectId ? { projectId, status: "APPROVED", limit: 100 } : { status: "APPROVED", limit: 100 }
+    projectId ? { projectId, status: "APPROVED", limit: 100 } : "skip"
   );
   const denied = useQuery(
     api.approvals.listByStatus,
-    projectId ? { projectId, status: "DENIED", limit: 100 } : { status: "DENIED", limit: 100 }
+    projectId ? { projectId, status: "DENIED", limit: 100 } : "skip"
   );
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
 
-  const approveMutation = useMutation(api.approvals.approve);
-  const denyMutation = useMutation(api.approvals.deny);
+  const approveMutation = useAction(api.approvals.approve);
+  const denyMutation = useAction(api.approvals.deny);
 
   const isLoading = !pending || !escalated || !approved || !denied || !agents;
 
@@ -118,14 +118,12 @@ export function ApprovalsModal({
                       onApprove={async (reason) => {
                         return await approveMutation({
                           approvalId: approval._id,
-                          decidedByUserId: "operator",
                           reason,
                         });
                       }}
                       onDeny={async (reason) => {
                         return await denyMutation({
                           approvalId: approval._id,
-                          decidedByUserId: "operator",
                           reason,
                         });
                       }}

@@ -58,3 +58,21 @@ export async function requireAuthorizedDeliveryRecord(
   assertAuthorizedDeliveryRecord(access, record);
   return access;
 }
+
+export function authorizedDeliveryActor(
+  access: Awaited<ReturnType<typeof requireAuthorizedDeliveryScope>>,
+): { actorId: string; operatorId?: Id<"operators"> } {
+  if (!access) {
+    throw new Error("An authenticated operator is required for this delivery write.");
+  }
+  if (access.membership.mode === "DEMO") {
+    return { actorId: "demo:company-administrator" };
+  }
+  if (!access.membership.operatorId) {
+    throw new Error("Authenticated operator membership is required.");
+  }
+  return {
+    actorId: String(access.membership.operatorId),
+    operatorId: access.membership.operatorId,
+  };
+}

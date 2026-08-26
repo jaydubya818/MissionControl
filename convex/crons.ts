@@ -16,14 +16,14 @@ const crons = cronJobs();
 crons.interval(
   "expire stale approvals",
   { minutes: 15 },
-  api.approvals.expireStale
+  internal.approvals.expireStale
 );
 
 // Escalate pending approvals breaching SLA every 10 minutes
 crons.interval(
   "escalate overdue approvals",
   { minutes: 10 },
-  api.approvals.escalateOverdue,
+  internal.approvals.escalateOverdue,
   {}
 );
 
@@ -55,13 +55,6 @@ crons.interval(
   "detect stale heartbeats",
   { minutes: 2 },
   internal.agents.detectStaleAgents
-);
-
-// Auto-route execution requests every 5 minutes
-crons.interval(
-  "auto-route executions",
-  { minutes: 5 },
-  internal.executorRouter.autoRoute
 );
 
 // Guard against migration drift (missing instance refs or tenant IDs) every 30 minutes

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, action, internalQuery } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 /**
  * GitHub Integration
@@ -221,7 +221,7 @@ export const upsertTaskFromIssue = mutation({
     }
     
     // ── CREATE new task via api.tasks.create (enforces INBOX invariant) ──
-    const result: any = await ctx.runMutation(api.tasks.create, {
+    const result: any = await ctx.runMutation(internal.tasks.createInternal, {
       projectId: args.projectId,
       title: `[GH-${args.issue.number}] ${args.issue.title}`,
       description: args.issue.body,

@@ -26,7 +26,10 @@ interface RadarViewProps {
 export function RadarView({ projectId, onNavigate, onTaskSelect }: RadarViewProps) {
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
   const jobs = useQuery(api.scheduledJobs.list, projectId ? { projectId } : {});
-  const alerts = useQuery(api.alerts.listOpen, { limit: 20 });
+  const alerts = useQuery(
+    api.alerts.listOpen,
+    projectId ? { projectId, limit: 20 } : "skip",
+  );
   const now = Date.now();
 
   const tasksList = tasks ?? [];

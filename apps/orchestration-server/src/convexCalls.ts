@@ -44,6 +44,9 @@ export const ConvexQueries = {
 } as const;
 
 export const ConvexActions = {
+  workflowRuns: {
+    linkArtifactToVerificationReceipt: "workflowRuns:linkArtifactToVerificationReceipt",
+  },
   serviceCommands: {
     bindGithubInstallation: "serviceCommands:bindGithubInstallation",
     ingestGithubPrEvidence: "serviceCommands:ingestGithubPrEvidence",
@@ -71,9 +74,6 @@ export const ConvexMutations = {
   context: {
     activateForWorkflowRun: "context/activation:activateForWorkflowRun",
   },
-  coordinator: {
-    decomposeTask: "coordinator:decomposeTask",
-  },
   workOrders: {
     requestApprovalDecision: "workOrders:requestApprovalDecision",
     decideApprovalDecision: "workOrders:decideApprovalDecision",
@@ -93,11 +93,6 @@ export const ConvexMutations = {
     recordValidationResult: "missions:recordValidationResult",
     accept: "missions:accept",
   },
-  workflowRuns: {
-    linkArtifactToVerificationReceipt: "workflowRuns:linkArtifactToVerificationReceipt",
-    updateStatus: "workflowRuns:updateStatus",
-    requestCancellation: "workflowRuns:requestCancellation",
-  },
   automationExecutions: {
     claim: "automationExecutions:claim",
     renew: "automationExecutions:renew",
@@ -107,12 +102,6 @@ export const ConvexMutations = {
   skillAutomations: {
     recordExecutionResult: "skillAutomations:recordExecutionResult",
     finalizeVerification: "skillAutomations:finalizeVerification",
-  },
-  taskRouter: {
-    autoAssign: "taskRouter:autoAssign",
-  },
-  alerts: {
-    create: "alerts:create",
   },
   workspaceHostBindings: {
     report: "workspaceHostBindings:report",

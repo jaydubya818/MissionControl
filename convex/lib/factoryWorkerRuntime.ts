@@ -7,6 +7,7 @@ import {
 } from "@mission-control/workflow-engine/harness-contract";
 
 export const FACTORY_WORKER_HEARTBEAT_MAX_AGE_MS = 2 * 60_000;
+export const FACTORY_WORKER_ATTESTATION_MAX_AGE_MS = 2 * 60_000;
 
 export type FactoryWorkerReadiness = "STARTING" | "READY" | "DRAINING" | "BLOCKED";
 
@@ -57,6 +58,9 @@ export interface FactoryWorkerCandidate {
   workerId: string;
   status: string;
   dirty: boolean;
+  networkPolicyStatus?: "READY" | "BLOCKED" | "UNKNOWN";
+  secretPolicyStatus?: "READY" | "BLOCKED" | "UNKNOWN";
+  attestedAt?: number;
   capacity?: {
     maxConcurrentRuns: number;
     currentRuns: number;
@@ -111,6 +115,22 @@ export function factoryWorkerEligibility(input: {
   }
   if (now - runtime.lastHeartbeatAt > FACTORY_WORKER_HEARTBEAT_MAX_AGE_MS) {
     return { eligible: false as const, reason: "worker-heartbeat-stale" };
+  }
+  if (worker.attestedAt === undefined
+    || worker.networkPolicyStatus === undefined
+    || worker.secretPolicyStatus === undefined) {
+    return { eligible: false as const, reason: "worker-policy-attestation-missing" };
+  }
+  if (!Number.isFinite(worker.attestedAt)
+    || worker.attestedAt > now
+    || now - worker.attestedAt > FACTORY_WORKER_ATTESTATION_MAX_AGE_MS) {
+    return { eligible: false as const, reason: "worker-policy-attestation-stale" };
+  }
+  if (worker.networkPolicyStatus !== "READY") {
+    return { eligible: false as const, reason: "worker-network-policy-not-ready" };
+  }
+  if (worker.secretPolicyStatus !== "READY") {
+    return { eligible: false as const, reason: "worker-secret-policy-not-ready" };
   }
   if (!worker.capacity
     || !Number.isSafeInteger(worker.capacity.maxConcurrentRuns)

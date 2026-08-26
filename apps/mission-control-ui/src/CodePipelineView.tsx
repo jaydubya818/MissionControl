@@ -14,8 +14,8 @@ interface CodePipelineViewProps {
 }
 
 export function CodePipelineView({ projectId, onTaskSelect }: CodePipelineViewProps) {
-  const workflowRuns = useQuery(api.workflowRuns.list, projectId ? { projectId } : {});
-  const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
+  const workflowRuns = useQuery(api.workflowRuns.list, projectId ? { projectId } : "skip");
+  const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : "skip");
 
   const isLoading = !workflowRuns || !tasks;
 

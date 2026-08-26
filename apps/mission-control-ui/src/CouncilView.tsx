@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
@@ -17,12 +17,14 @@ type Tab = "decisions" | "pending" | "coordinator";
 export function CouncilView({ projectId }: CouncilViewProps) {
   const [activeTab, setActiveTab] = useState<Tab>("decisions");
 
-  const approvals = useQuery(api.approvals.list, {
-    projectId: projectId ?? undefined,
-  });
-  const pendingApprovals = useQuery(api.approvals.listPending, {
-    projectId: projectId ?? undefined,
-  });
+  const approvals = useQuery(
+    api.approvals.list,
+    projectId ? { projectId } : "skip",
+  );
+  const pendingApprovals = useQuery(
+    api.approvals.listPending,
+    projectId ? { projectId } : "skip",
+  );
   const activities = useQuery(api.activities.list, {
     projectId: projectId ?? undefined,
     limit: 50,
@@ -328,8 +330,8 @@ function PendingApprovalCard({ approval, agentMap }: PendingApprovalCardProps) {
   const [isActing, setIsActing] = useState(false);
   const [reason, setReason] = useState("");
   const [showActions, setShowActions] = useState(false);
-  const approveMutation = useMutation(api.approvals.approve);
-  const denyMutation = useMutation(api.approvals.deny);
+  const approveMutation = useAction(api.approvals.approve);
+  const denyMutation = useAction(api.approvals.deny);
 
   const requestor = agentMap.get(approval.requestorAgentId);
   const timeLeft = approval.expiresAt - Date.now();
@@ -340,7 +342,6 @@ function PendingApprovalCard({ approval, agentMap }: PendingApprovalCardProps) {
     try {
       await approveMutation({
         approvalId: approval._id,
-        decidedByUserId: "jay",
         reason: reason || "Approved via Council dashboard",
       });
     } finally {
@@ -355,7 +356,6 @@ function PendingApprovalCard({ approval, agentMap }: PendingApprovalCardProps) {
     try {
       await denyMutation({
         approvalId: approval._id,
-        decidedByUserId: "jay",
         reason,
       });
     } finally {

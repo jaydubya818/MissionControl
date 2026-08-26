@@ -1,9 +1,16 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 
-const PUBLIC_BUILDERS = new Set(["query", "mutation", "action"]);
+const PUBLIC_BUILDERS = new Map([
+  ["query", "query"],
+  ["mutation", "mutation"],
+  ["action", "action"],
+  // Explicit unauthenticated wrappers still expose ordinary Convex contracts.
+  ["publicQuery", "query"],
+  ["publicMutation", "mutation"],
+]);
 const VERSION_FILE = "convex/lib/runtimeContract.ts";
 const VERSION_EXPORT = "RUNTIME_CONTRACT_VERSION";
 
@@ -109,8 +116,9 @@ export function extractPublicConvexContracts(source, filePath) {
       if (!ts.isCallExpression(declaration.initializer)) continue;
       if (!ts.isIdentifier(declaration.initializer.expression)) continue;
 
-      const kind = declaration.initializer.expression.text;
-      if (!PUBLIC_BUILDERS.has(kind)) continue;
+      const builder = declaration.initializer.expression.text;
+      const kind = PUBLIC_BUILDERS.get(builder);
+      if (!kind) continue;
       const config = declaration.initializer.arguments[0];
       if (!config || !ts.isObjectLiteralExpression(config)) continue;
 
@@ -229,7 +237,9 @@ function baseEntries(cwd, baseRef) {
 
 function currentEntries(cwd) {
   const files = gitFiles(cwd, ["ls-files", "-co", "--exclude-standard", "-z", "--", "convex"]);
-  return files.map((filePath) => [filePath, readFileSync(path.join(cwd, filePath), "utf8")]);
+  return files
+    .filter((filePath) => existsSync(path.join(cwd, filePath)))
+    .map((filePath) => [filePath, readFileSync(path.join(cwd, filePath), "utf8")]);
 }
 
 function resolveBaseRef(cwd, requestedBase) {

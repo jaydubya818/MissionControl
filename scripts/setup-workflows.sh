@@ -5,7 +5,7 @@
 # Sets up the complete workflow system:
 # - Seeds built-in workflows
 # - Builds executor and CLI
-# - Configures PM2
+# - Points operators to the canonical orchestration runtime
 # - Runs tests
 
 set -e
@@ -57,28 +57,7 @@ if [ -z "$CONVEX_URL" ]; then
   echo ""
 fi
 
-# 6. Setup PM2 (optional)
-read -p "Install PM2 for workflow executor? (y/n) " -n 1 -r
-echo ""
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-  echo "📦 Installing PM2..."
-  npm install -g pm2
-  
-  echo "🚀 Starting workflow executor..."
-  cd apps/workflow-executor
-  pm2 start ecosystem.config.js
-  pm2 save
-  
-  echo ""
-  echo "✅ Workflow executor started"
-  echo "   View logs: pm2 logs workflow-executor"
-  echo "   Monitor: pm2 monit"
-  echo ""
-  
-  cd ../..
-fi
-
-# 7. Setup CLI alias (optional)
+# 6. Setup CLI alias (optional)
 read -p "Create 'mc' command alias? (y/n) " -n 1 -r
 echo ""
 if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -96,13 +75,13 @@ echo "✅ Workflow setup complete!"
 echo ""
 echo "Next steps:"
 echo "  1. Set CONVEX_URL in .env"
-echo "  2. Start executor: cd apps/workflow-executor && pnpm dev"
+echo "  2. Build and start the canonical worker: pnpm run ci:prepare && pnpm --filter @mission-control/orchestration-server build && pnpm run pm2:start"
 echo "  3. List workflows: mc workflow list"
 echo "  4. Run a workflow: mc workflow run feature-dev \"Add OAuth\""
 echo ""
 echo "Documentation:"
 echo "  - Workflows: docs/WORKFLOWS.md"
 echo "  - Creating workflows: docs/CREATING_WORKFLOWS.md"
-echo "  - Executor: docs/WORKFLOW_EXECUTOR.md"
+echo "  - Worker runtime: docs/WORKFLOW_EXECUTOR.md"
 echo "  - CLI: docs/WORKFLOW_CLI.md"
 echo ""

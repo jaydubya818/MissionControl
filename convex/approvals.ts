@@ -3,12 +3,18 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { api } from "./_generated/api";
+import { action, internalMutation, internalQuery, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
 import { appendChangeRecord, appendOpEvent } from "./lib/armAudit";
 import { resolveAgentRef } from "./lib/agentResolver";
+import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
+import {
+  authorizedDeliveryActor,
+  requireAuthorizedDeliveryScope,
+} from "./lib/deliveryAuthorization";
+import { runAuditedHumanMutation } from "./lib/humanActionAudit";
 
 const approvalStatusValidator = v.union(
   v.literal("PENDING"),
@@ -56,6 +62,27 @@ async function queryPendingLike(
   return sortByCreationDesc([...pending, ...escalated]).slice(0, args.limit);
 }
 
+async function approvalProjectId(ctx: any, approval: any) {
+  if (approval.projectId) return approval.projectId;
+  if (approval.taskId) {
+    const task = await ctx.db.get(approval.taskId);
+    if (task?.projectId) return task.projectId;
+  }
+  const requestor = await ctx.db.get(approval.requestorAgentId);
+  return requestor?.projectId;
+}
+
+async function requireApprovalAccess(
+  ctx: any,
+  approval: any,
+  permission?: (typeof COMPANY_PERMISSIONS)[keyof typeof COMPANY_PERMISSIONS],
+) {
+  const projectId = await approvalProjectId(ctx, approval);
+  if (!projectId) throw new Error("Approval is not assigned to a workspace.");
+  const access = await requireAuthorizedDeliveryScope(ctx, projectId, permission);
+  return { projectId, access };
+}
+
 // ============================================================================
 // QUERIES
 // ============================================================================
@@ -66,6 +93,7 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireAuthorizedDeliveryScope(ctx, args.projectId);
     if (args.projectId) {
       return await ctx.db
         .query("approvals")
@@ -86,34 +114,11 @@ export const listPending = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireAuthorizedDeliveryScope(ctx, args.projectId);
     return await queryPendingLike(ctx, {
       projectId: args.projectId,
       limit: args.limit ?? 50,
     });
-  },
-});
-
-export const listEscalated = query({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    if (args.projectId) {
-      return await ctx.db
-        .query("approvals")
-        .withIndex("by_project_status", (q) =>
-          q.eq("projectId", args.projectId).eq("status", "ESCALATED")
-        )
-        .order("desc")
-        .take(args.limit ?? 50);
-    }
-
-    return await ctx.db
-      .query("approvals")
-      .withIndex("by_status", (q) => q.eq("status", "ESCALATED"))
-      .order("desc")
-      .take(args.limit ?? 50);
   },
 });
 
@@ -128,6 +133,7 @@ export const listByStatus = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 100;
+    await requireAuthorizedDeliveryScope(ctx, args.projectId);
 
     if (args.projectId) {
       return await ctx.db
@@ -153,6 +159,9 @@ export const listByTask = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    if (!task) return [];
+    await requireAuthorizedDeliveryScope(ctx, task.projectId);
     return await ctx.db
       .query("approvals")
       .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
@@ -161,64 +170,10 @@ export const listByTask = query({
   },
 });
 
-export const listByRequestor = query({
-  args: {
-    agentId: v.id("agents"),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("approvals")
-      .withIndex("by_requestor", (q) => q.eq("requestorAgentId", args.agentId))
-      .order("desc")
-      .take(args.limit ?? 50);
-  },
-});
-
-export const get = query({
+export const getInternal = internalQuery({
   args: { approvalId: v.id("approvals") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.approvalId);
-  },
-});
-
-export const getDecisionChain = query({
-  args: {
-    approvalId: v.id("approvals"),
-  },
-  handler: async (ctx, args) => {
-    const approval = await ctx.db.get(args.approvalId);
-    if (!approval) {
-      return null;
-    }
-
-    const activities = await ctx.db
-      .query("activities")
-      .filter((q) => q.eq(q.field("targetId"), args.approvalId))
-      .collect();
-
-    const taskEvents = approval.taskId
-      ? await ctx.db
-          .query("taskEvents")
-          .withIndex("by_task", (q) => q.eq("taskId", approval.taskId!))
-          .collect()
-      : [];
-
-    const approvalEvents = taskEvents.filter((event) =>
-      [
-        "APPROVAL_REQUESTED",
-        "APPROVAL_ESCALATED",
-        "APPROVAL_APPROVED",
-        "APPROVAL_DENIED",
-        "APPROVAL_EXPIRED",
-      ].includes(event.eventType)
-    );
-
-    return {
-      approval,
-      activities: sortByCreationDesc(activities),
-      taskEvents: sortByCreationDesc(approvalEvents),
-    };
   },
 });
 
@@ -226,34 +181,25 @@ export const getDecisionChain = query({
 // MUTATIONS
 // ============================================================================
 
-export const request = mutation({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    taskId: v.optional(v.id("tasks")),
-    toolCallId: v.optional(v.id("toolCalls")),
-    requestorAgentId: v.id("agents"),
-    actionType: v.string(),
-    actionSummary: v.string(),
-    riskLevel: v.string(),
-    actionPayload: v.optional(v.any()),
-    estimatedCost: v.optional(v.number()),
-    rollbackPlan: v.optional(v.string()),
-    justification: v.string(),
-    expiresInMinutes: v.optional(v.number()),
-    idempotencyKey: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    // Check idempotency
-    if (args.idempotencyKey) {
-      const existing = await ctx.db
-        .query("approvals")
-        .filter((q) => q.eq(q.field("idempotencyKey"), args.idempotencyKey))
-        .first();
-      if (existing) {
-        return { approval: existing, created: false };
-      }
-    }
+const requestArgs = {
+  projectId: v.optional(v.id("projects")),
+  taskId: v.optional(v.id("tasks")),
+  toolCallId: v.optional(v.id("toolCalls")),
+  requestorAgentId: v.id("agents"),
+  actionType: v.string(),
+  actionSummary: v.string(),
+  riskLevel: v.string(),
+  actionPayload: v.optional(v.any()),
+  estimatedCost: v.optional(v.number()),
+  rollbackPlan: v.optional(v.string()),
+  justification: v.string(),
+  expiresInMinutes: v.optional(v.number()),
+  idempotencyKey: v.optional(v.string()),
+};
 
+export const requestInternal = internalMutation({
+  args: requestArgs,
+  handler: async (ctx, args) => {
     // Get projectId from task if not provided
     let projectId = args.projectId;
     if (!projectId && args.taskId) {
@@ -261,9 +207,31 @@ export const request = mutation({
       projectId = task?.projectId;
     }
 
+    const requestor = await ctx.db.get(args.requestorAgentId);
+    if (!projectId) projectId = requestor?.projectId;
+    if (!projectId) throw new Error("Approval requests require a workspace.");
+    if (requestor?.projectId && requestor.projectId !== projectId) {
+      throw new Error("Approval requestor does not belong to the selected workspace.");
+    }
+    const access = await requireAuthorizedDeliveryScope(
+      ctx,
+      projectId,
+      COMPANY_PERMISSIONS.UPDATE_DELIVERY,
+    );
+    const actor = authorizedDeliveryActor(access);
+
+    if (args.idempotencyKey) {
+      const existing = await ctx.db
+        .query("approvals")
+        .filter((q) => q.eq(q.field("idempotencyKey"), args.idempotencyKey))
+        .first();
+      if (existing?.projectId === projectId) {
+        return { approval: existing, created: false };
+      }
+    }
+
     const dualControlRequired = args.riskLevel.toUpperCase() === "RED";
     const expiresAt = Date.now() + (args.expiresInMinutes ?? 60) * 60 * 1000;
-    const requestor = await ctx.db.get(args.requestorAgentId);
     const requestorRef = await resolveAgentRef(
       { db: ctx.db as any },
       { agentId: args.requestorAgentId, createIfMissing: true }
@@ -271,7 +239,7 @@ export const request = mutation({
     const requestorInstance = requestorRef?.instanceId
       ? await ctx.db.get(requestorRef.instanceId)
       : null;
-    const effectiveTenantId = requestor?.tenantId ?? requestorInstance?.tenantId;
+    const effectiveTenantId = access?.project.tenantId ?? requestor?.tenantId ?? requestorInstance?.tenantId;
 
     // Auto-approve LOW risk tasks (no human approval needed)
     const isLowRisk = args.riskLevel.toUpperCase() === "LOW" || args.riskLevel.toUpperCase() === "GREEN";
@@ -293,7 +261,7 @@ export const request = mutation({
       justification: args.justification,
       status: shouldAutoApprove ? "APPROVED" : "PENDING",
       decidedAt: shouldAutoApprove ? Date.now() : undefined,
-      decidedByAgentId: shouldAutoApprove ? args.requestorAgentId : undefined,
+      decidedByUserId: shouldAutoApprove ? actor.actorId : undefined,
       decisionReason: shouldAutoApprove ? "Auto-approved (LOW risk)" : undefined,
       expiresAt,
       requiredDecisionCount: dualControlRequired ? 2 : 1,
@@ -311,8 +279,12 @@ export const request = mutation({
       rollbackPlan: args.rollbackPlan,
       justification: args.justification,
       escalationLevel: 0,
-      status: "PENDING",
+      status: shouldAutoApprove ? "APPROVED" : "PENDING",
+      requestedBy: actor.operatorId,
       requestedAt: Date.now(),
+      decidedBy: shouldAutoApprove ? actor.operatorId : undefined,
+      decidedAt: shouldAutoApprove ? Date.now() : undefined,
+      decisionReason: shouldAutoApprove ? "Auto-approved (LOW risk)" : undefined,
     });
     const changeRecordId = await appendChangeRecord(ctx.db as any, {
       tenantId: effectiveTenantId,
@@ -320,6 +292,7 @@ export const request = mutation({
       instanceId: requestorRef?.instanceId,
       versionId: requestorRef?.versionId,
       legacyAgentId: args.requestorAgentId,
+      operatorId: actor.operatorId,
       type: "APPROVAL_REQUESTED",
       summary: `Approval requested: ${args.actionSummary}`,
       payload: {
@@ -349,8 +322,8 @@ export const request = mutation({
     const agent = requestor;
     await ctx.db.insert("activities", {
       projectId,
-      actorType: "AGENT",
-      actorId: args.requestorAgentId.toString(),
+      actorType: "HUMAN",
+      actorId: actor.actorId,
       action: "APPROVAL_REQUESTED",
       description: `${agent?.name || "Agent"} requested approval for: ${args.actionSummary}`,
       targetType: "APPROVAL",
@@ -368,8 +341,8 @@ export const request = mutation({
         projectId,
         taskId: args.taskId,
         eventType: "APPROVAL_REQUESTED",
-        actorType: "AGENT",
-        actorId: args.requestorAgentId.toString(),
+        actorType: "HUMAN",
+        actorId: actor.actorId,
         relatedId: approvalId,
         metadata: {
           actionType: args.actionType,
@@ -384,14 +357,26 @@ export const request = mutation({
   },
 });
 
-export const approve = mutation({
-  args: {
-    approvalId: v.id("approvals"),
-    projectId: v.optional(v.id("projects")),
-    decidedByAgentId: v.optional(v.id("agents")),
-    decidedByUserId: v.optional(v.string()),
-    reason: v.optional(v.string()),
-  },
+export const request = action({
+  args: requestArgs,
+  handler: async (ctx, args): Promise<any> =>
+    await runAuditedHumanMutation(
+      ctx,
+      internal.approvals.requestInternal,
+      args,
+      "approvals.request",
+      { projectId: args.projectId, taskId: args.taskId, agentId: args.requestorAgentId },
+    ),
+});
+
+const approveArgs = {
+  approvalId: v.id("approvals"),
+  projectId: v.optional(v.id("projects")),
+  reason: v.optional(v.string()),
+};
+
+export const approveInternal = internalMutation({
+  args: approveArgs,
   handler: async (ctx, args) => {
     const approval = await ctx.db.get(args.approvalId);
     if (!approval) {
@@ -400,6 +385,15 @@ export const approve = mutation({
     if (args.projectId && approval.projectId !== args.projectId) {
       return { success: false, error: "Approval does not belong to the selected workspace" };
     }
+    const { projectId, access } = await requireApprovalAccess(
+      ctx,
+      approval,
+      COMPANY_PERMISSIONS.APPROVE_DELIVERY,
+    );
+    if (args.projectId && projectId !== args.projectId) {
+      return { success: false, error: "Approval does not belong to the selected workspace" };
+    }
+    const actor = authorizedDeliveryActor(access);
 
     if (!["PENDING", "ESCALATED"].includes(approval.status)) {
       return { success: false, error: `Approval already ${approval.status}` };
@@ -421,10 +415,7 @@ export const approve = mutation({
       return { success: false, error: "Approval has expired" };
     }
 
-    const decider = args.decidedByUserId ?? args.decidedByAgentId?.toString();
-    if (!decider) {
-      return { success: false, error: "A deciding user or agent is required" };
-    }
+    const decider = actor.actorId;
 
     const requiredDecisionCount = approval.requiredDecisionCount ?? (approval.riskLevel === "RED" ? 2 : 1);
 
@@ -440,8 +431,8 @@ export const approve = mutation({
         });
 
         await ctx.db.insert("activities", {
-          projectId: approval.projectId,
-          actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
+          projectId,
+          actorType: "HUMAN",
           actorId: decider,
           action: "APPROVAL_FIRST_APPROVAL",
           description: `First approval recorded for: ${approval.actionSummary}`,
@@ -456,10 +447,10 @@ export const approve = mutation({
 
         if (approval.taskId) {
           await logTaskEvent(ctx, {
-            projectId: approval.projectId,
+            projectId,
             taskId: approval.taskId,
             eventType: "APPROVAL_ESCALATED",
-            actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
+            actorType: "HUMAN",
             actorId: decider,
             relatedId: args.approvalId,
             metadata: {
@@ -469,6 +460,34 @@ export const approve = mutation({
           });
         }
 
+        const firstDecisionRecordId = await appendChangeRecord(ctx.db as any, {
+          tenantId: access?.project.tenantId ?? approval.tenantId,
+          projectId,
+          operatorId: actor.operatorId,
+          legacyAgentId: approval.requestorAgentId,
+          type: "APPROVAL_DECIDED",
+          summary: `First approval recorded: ${approval.actionSummary}`,
+          payload: {
+            approvalId: args.approvalId,
+            decision: "FIRST_APPROVAL",
+            requiredDecisionCount,
+          },
+          relatedTable: "approvals",
+          relatedId: String(args.approvalId),
+        });
+        await appendOpEvent(ctx.db as any, {
+          tenantId: access?.project.tenantId ?? approval.tenantId,
+          projectId,
+          taskId: approval.taskId,
+          type: "DECISION_MADE",
+          changeRecordId: firstDecisionRecordId,
+          payload: {
+            stage: "FIRST_APPROVAL",
+            approvalId: args.approvalId,
+            requiredDecisionCount,
+          },
+        });
+
         return {
           success: true,
           pendingSecondDecision: true,
@@ -477,6 +496,20 @@ export const approve = mutation({
       }
 
       if (approval.firstDecisionByUserId === decider) {
+        await appendChangeRecord(ctx.db as any, {
+          tenantId: access?.project.tenantId ?? approval.tenantId,
+          projectId,
+          operatorId: actor.operatorId,
+          legacyAgentId: approval.requestorAgentId,
+          type: "POLICY_DENIED",
+          summary: `Dual-control approval denied for ${approval.actionSummary}`,
+          payload: {
+            approvalId: args.approvalId,
+            policy: "distinct-second-approver",
+          },
+          relatedTable: "approvals",
+          relatedId: String(args.approvalId),
+        });
         return {
           success: false,
           error: "Dual-control required: a different approver must provide the second decision",
@@ -486,8 +519,8 @@ export const approve = mutation({
 
     await ctx.db.patch(args.approvalId, {
       status: "APPROVED",
-      decidedByAgentId: args.decidedByAgentId,
-      decidedByUserId: args.decidedByUserId,
+      decidedByAgentId: undefined,
+      decidedByUserId: decider,
       decidedAt: now,
       decisionReason: args.reason,
       decisionCount: requiredDecisionCount > 1 ? 2 : 1,
@@ -499,6 +532,7 @@ export const approve = mutation({
     if (approvalRecord) {
       await ctx.db.patch(approvalRecord._id, {
         status: "APPROVED",
+        decidedBy: actor.operatorId,
         decidedAt: now,
         decisionReason: args.reason,
       });
@@ -506,8 +540,8 @@ export const approve = mutation({
 
     // Log activity
     await ctx.db.insert("activities", {
-      projectId: approval.projectId,
-      actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
+      projectId,
+      actorType: "HUMAN",
       actorId: decider,
       action: "APPROVAL_APPROVED",
       description: `Approval granted: ${approval.actionSummary}`,
@@ -522,10 +556,10 @@ export const approve = mutation({
 
     if (approval.taskId) {
       await logTaskEvent(ctx, {
-        projectId: approval.projectId,
+        projectId,
         taskId: approval.taskId,
         eventType: "APPROVAL_APPROVED",
-        actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
+        actorType: "HUMAN",
         actorId: decider,
         relatedId: args.approvalId,
         metadata: {
@@ -541,27 +575,27 @@ export const approve = mutation({
     const requestorInstance = requestorRef?.instanceId
       ? await ctx.db.get(requestorRef.instanceId)
       : null;
-    const effectiveTenantId = approval.tenantId ?? requestorInstance?.tenantId;
+    const effectiveTenantId = access?.project.tenantId ?? approval.tenantId ?? requestorInstance?.tenantId;
     const changeRecordId = await appendChangeRecord(ctx.db as any, {
       tenantId: effectiveTenantId,
-      projectId: approval.projectId,
+      projectId,
       instanceId: requestorRef?.instanceId,
       versionId: requestorRef?.versionId,
       legacyAgentId: approval.requestorAgentId,
+      operatorId: actor.operatorId,
       type: "APPROVAL_DECIDED",
       summary: `Approval approved: ${approval.actionSummary}`,
       payload: {
         approvalId: args.approvalId,
         decision: "APPROVED",
-        decidedByUserId: args.decidedByUserId,
-        decidedByAgentId: args.decidedByAgentId,
+        decidedByUserId: decider,
       },
       relatedTable: "approvals",
       relatedId: args.approvalId,
     });
     await appendOpEvent(ctx.db as any, {
       tenantId: effectiveTenantId,
-      projectId: approval.projectId,
+      projectId,
       instanceId: requestorRef?.instanceId,
       versionId: requestorRef?.versionId,
       taskId: approval.taskId ?? undefined,
@@ -577,13 +611,26 @@ export const approve = mutation({
   },
 });
 
-export const deny = mutation({
-  args: {
-    approvalId: v.id("approvals"),
-    decidedByAgentId: v.optional(v.id("agents")),
-    decidedByUserId: v.optional(v.string()),
-    reason: v.string(),
-  },
+export const approve = action({
+  args: approveArgs,
+  handler: async (ctx, args): Promise<any> =>
+    await runAuditedHumanMutation(
+      ctx,
+      internal.approvals.approveInternal,
+      args,
+      "approvals.approve",
+      { projectId: args.projectId, approvalId: args.approvalId },
+    ),
+});
+
+const denyArgs = {
+  approvalId: v.id("approvals"),
+  projectId: v.optional(v.id("projects")),
+  reason: v.string(),
+};
+
+export const denyInternal = internalMutation({
+  args: denyArgs,
   handler: async (
     ctx,
     args
@@ -601,6 +648,15 @@ export const deny = mutation({
     if (!approval) {
       return { success: false, error: "Approval not found" };
     }
+    const { projectId, access } = await requireApprovalAccess(
+      ctx,
+      approval,
+      COMPANY_PERMISSIONS.APPROVE_DELIVERY,
+    );
+    if (args.projectId && projectId !== args.projectId) {
+      return { success: false, error: "Approval does not belong to the selected workspace" };
+    }
+    const actor = authorizedDeliveryActor(access);
 
     if (!["PENDING", "ESCALATED"].includes(approval.status)) {
       return { success: false, error: `Approval already ${approval.status}` };
@@ -608,8 +664,8 @@ export const deny = mutation({
 
     await ctx.db.patch(args.approvalId, {
       status: "DENIED",
-      decidedByAgentId: args.decidedByAgentId,
-      decidedByUserId: args.decidedByUserId,
+      decidedByAgentId: undefined,
+      decidedByUserId: actor.actorId,
       decidedAt: Date.now(),
       decisionReason: reason,
       decisionCount: (approval.decisionCount ?? 0) + 1,
@@ -621,6 +677,7 @@ export const deny = mutation({
     if (approvalRecord) {
       await ctx.db.patch(approvalRecord._id, {
         status: "DENIED",
+        decidedBy: actor.operatorId,
         decidedAt: Date.now(),
         decisionReason: reason,
       });
@@ -628,9 +685,9 @@ export const deny = mutation({
 
     // Log activity
     await ctx.db.insert("activities", {
-      projectId: approval.projectId,
-      actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
-      actorId: args.decidedByUserId ?? args.decidedByAgentId?.toString(),
+      projectId,
+      actorType: "HUMAN",
+      actorId: actor.actorId,
       action: "APPROVAL_DENIED",
       description: `Approval denied: ${approval.actionSummary} — ${reason}`,
       targetType: "APPROVAL",
@@ -641,11 +698,11 @@ export const deny = mutation({
 
     if (approval.taskId) {
       await logTaskEvent(ctx, {
-        projectId: approval.projectId,
+        projectId,
         taskId: approval.taskId,
         eventType: "APPROVAL_DENIED",
-        actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
-        actorId: args.decidedByUserId ?? args.decidedByAgentId?.toString(),
+        actorType: "HUMAN",
+        actorId: actor.actorId,
         relatedId: args.approvalId,
         metadata: {
           reason,
@@ -659,13 +716,14 @@ export const deny = mutation({
     const requestorInstance = requestorRef?.instanceId
       ? await ctx.db.get(requestorRef.instanceId)
       : null;
-    const effectiveTenantId = approval.tenantId ?? requestorInstance?.tenantId;
+    const effectiveTenantId = access?.project.tenantId ?? approval.tenantId ?? requestorInstance?.tenantId;
     const changeRecordId = await appendChangeRecord(ctx.db as any, {
       tenantId: effectiveTenantId,
-      projectId: approval.projectId,
+      projectId,
       instanceId: requestorRef?.instanceId,
       versionId: requestorRef?.versionId,
       legacyAgentId: approval.requestorAgentId,
+      operatorId: actor.operatorId,
       type: "APPROVAL_DECIDED",
       summary: `Approval denied: ${approval.actionSummary}`,
       payload: {
@@ -678,7 +736,7 @@ export const deny = mutation({
     });
     await appendOpEvent(ctx.db as any, {
       tenantId: effectiveTenantId,
-      projectId: approval.projectId,
+      projectId,
       instanceId: requestorRef?.instanceId,
       versionId: requestorRef?.versionId,
       taskId: approval.taskId ?? undefined,
@@ -694,12 +752,12 @@ export const deny = mutation({
     if (approval.taskId) {
       const task = await ctx.db.get(approval.taskId);
       if (task?.status === "REVIEW") {
-        taskTransition = (await ctx.runMutation(api.tasks.transition, {
+        taskTransition = (await ctx.runMutation(internal.tasks.transitionInternal, {
           taskId: approval.taskId,
+          projectId,
           toStatus: "IN_PROGRESS",
-          actorType: args.decidedByUserId ? "HUMAN" : "AGENT",
-          actorAgentId: args.decidedByAgentId,
-          actorUserId: args.decidedByUserId,
+          actorType: "HUMAN",
+          actorUserId: actor.actorId,
           idempotencyKey: `approval-denied:${args.approvalId}`,
           reason: `Review rejected: ${reason}`,
         })) as { success: boolean; errors?: Array<{ message: string }> };
@@ -720,31 +778,19 @@ export const deny = mutation({
   },
 });
 
-export const cancel = mutation({
-  args: {
-    approvalId: v.id("approvals"),
-    reason: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const approval = await ctx.db.get(args.approvalId);
-    if (!approval) {
-      return { success: false, error: "Approval not found" };
-    }
-
-    if (!["PENDING", "ESCALATED"].includes(approval.status)) {
-      return { success: false, error: `Approval already ${approval.status}` };
-    }
-
-    await ctx.db.patch(args.approvalId, {
-      status: "CANCELED",
-      decisionReason: args.reason,
-    });
-
-    return { success: true, approval: await ctx.db.get(args.approvalId) };
-  },
+export const deny = action({
+  args: denyArgs,
+  handler: async (ctx, args): Promise<any> =>
+    await runAuditedHumanMutation(
+      ctx,
+      internal.approvals.denyInternal,
+      args,
+      "approvals.deny",
+      { projectId: args.projectId, approvalId: args.approvalId },
+    ),
 });
 
-export const expireStale = mutation({
+export const expireStale = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
@@ -778,11 +824,10 @@ export const expireStale = mutation({
   },
 });
 
-export const escalateOverdue = mutation({
+export const escalateOverdue = internalMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     slaMinutes: v.optional(v.number()),
-    escalatedBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -809,7 +854,7 @@ export const escalateOverdue = mutation({
       await ctx.db.patch(approval._id, {
         status: "ESCALATED",
         escalatedAt: now,
-        escalatedBy: args.escalatedBy ?? "system",
+        escalatedBy: "system:approval-sla-cron",
         escalationReason: `Approval open for ${Math.round(ageMs / 60000)} minutes`,
         escalationLevel: nextLevel,
       });
@@ -817,7 +862,7 @@ export const escalateOverdue = mutation({
       await ctx.db.insert("activities", {
         projectId: approval.projectId,
         actorType: "SYSTEM",
-        actorId: args.escalatedBy ?? "system",
+        actorId: "system:approval-sla-cron",
         action: "APPROVAL_ESCALATED",
         description: `Approval escalated (level ${nextLevel}): ${approval.actionSummary}`,
         targetType: "APPROVAL",
@@ -836,7 +881,7 @@ export const escalateOverdue = mutation({
           taskId: approval.taskId,
           eventType: "APPROVAL_ESCALATED",
           actorType: "SYSTEM",
-          actorId: args.escalatedBy ?? "system",
+          actorId: "system:approval-sla-cron",
           relatedId: approval._id,
           metadata: {
             level: nextLevel,

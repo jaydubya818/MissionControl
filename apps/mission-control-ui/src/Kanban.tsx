@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useToast } from "./Toast";
@@ -174,7 +174,7 @@ export function Kanban({
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
   const allowedMap = useQuery(api.tasks.getAllowedTransitionsForHuman);
-  const transitionTask = useMutation(api.tasks.transition);
+  const transitionTask = useAction(api.tasks.transition);
   const { toast } = useToast();
   
   const sensors = useSensors(

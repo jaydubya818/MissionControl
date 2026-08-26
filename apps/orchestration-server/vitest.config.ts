@@ -15,6 +15,7 @@ export default defineConfig({
       "@mission-control/context-router": path.resolve(repoRoot, "packages/context-router/src/index.ts"),
       "@mission-control/shared": path.resolve(repoRoot, "packages/shared/src/index.ts"),
       "@mission-control/workflow-engine/harness-contract": path.resolve(repoRoot, "packages/workflow-engine/src/harnessContract.ts"),
+      "@mission-control/workflow-engine/cost-enforcement": path.resolve(repoRoot, "packages/workflow-engine/src/factoryCostEnforcement.ts"),
       "@mission-control/workflow-engine/verification": path.resolve(repoRoot, "packages/workflow-engine/src/verification.ts"),
       "@mission-control/workflow-engine/verification-authority": path.resolve(repoRoot, "packages/workflow-engine/src/verificationAuthority.ts"),
       "@mission-control/workflow-engine/verification-identity": path.resolve(repoRoot, "packages/workflow-engine/src/verificationIdentity.ts"),

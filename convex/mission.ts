@@ -6,7 +6,7 @@
 
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { resolveActiveTenantId } from "./lib/getActiveTenant";
 import { buildMissionSuggestionIntake } from "./lib/missionPromptScheduling";
@@ -251,7 +251,7 @@ Respond with valid JSON only, no markdown:
             ? agents.find((a: any) => a.name === suggestion.suggestedAssignee)
             : null;
 
-          await ctx.runMutation(api.tasks.create, buildMissionSuggestionIntake({
+          await ctx.runMutation(internal.tasks.createInternal, buildMissionSuggestionIntake({
             projectId: args.projectId,
             suggestion,
             suggestedAgentId: agent?._id,

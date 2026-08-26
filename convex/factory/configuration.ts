@@ -25,6 +25,7 @@ import {
 } from "../lib/sandboxProfileAdmission";
 import { loadModelCatalogForProject } from "../lib/modelCatalogScope";
 import { exactModelRouteDigest, modelRouteProductionEligible } from "../lib/modelRouteAdmission";
+import { assessFactoryCostEnforcement } from "@mission-control/workflow-engine/cost-enforcement";
 
 const budget = v.object({
   maxCostUsd: v.number(),
@@ -629,6 +630,9 @@ export const createVersion = mutation({
           workerId: binding.hostId,
           status: binding.status,
           dirty: binding.dirty,
+          networkPolicyStatus: binding.networkPolicyStatus,
+          secretPolicyStatus: binding.secretPolicyStatus,
+          attestedAt: binding.attestedAt,
           capacity: binding.capacity,
           workerRuntime: binding.workerRuntime ? {
             ...binding.workerRuntime,
@@ -804,6 +808,9 @@ export const assessReadiness = mutation({
             workerId: binding.hostId,
             status: binding.status,
             dirty: binding.dirty,
+            networkPolicyStatus: binding.networkPolicyStatus,
+            secretPolicyStatus: binding.secretPolicyStatus,
+            attestedAt: binding.attestedAt,
             capacity: binding.capacity,
             workerRuntime: binding.workerRuntime ? {
               ...binding.workerRuntime,
@@ -858,6 +865,13 @@ export const assessReadiness = mutation({
       && JSON.stringify(modelRoute.qualificationSnapshot) === JSON.stringify(version.modelQualificationSnapshot)
       && modelRouteProductionEligible(modelRoute)
     );
+    const costEnforcement = assessFactoryCostEnforcement({
+      deploymentClass: process.env.MC_BACKEND_DEPLOYMENT_CLASS as "local" | "shared" | "production" | undefined,
+      executionBackend: selectedExecutionBackend,
+      maxCostUsd: version.budget.maxCostUsd,
+      maxAttempts: version.budget.maxAttempts,
+      sandboxSpend: (sandboxProfile?.immutableSnapshot as any)?.spend,
+    });
     const checks = [
       check("github", "GitHub App connection", githubReady, now, expiry, "Install or repair the exact least-privilege GitHub App connection."),
       check("repository", "Repository access", repository?.status === "READY", now, expiry, "Validate repository access before activation."),
@@ -883,7 +897,10 @@ export const assessReadiness = mutation({
         && agentTemplates.every((template) => template?.active)
       ), now, undefined, "Bind every workflow agent to an approved agent version."),
       check("policy", "Governance policy", Boolean(policy?.active), now, undefined, "Select an active workspace policy envelope."),
-      check("budget", "Bounded budget", validFactoryBudget(version.budget), now, undefined, "Set positive V1 limits: cost <= $1,000, runtime <= 480 minutes, attempts <= 3."),
+      check("budget", "Enforceable bounded budget", validFactoryBudget(version.budget) && costEnforcement.allowed, now, undefined,
+        costEnforcement.allowed === true
+          ? "Set positive V1 limits: cost <= $1,000, runtime <= 480 minutes, attempts <= 3."
+          : `Use an Attempt-scoped provider key cap whose aggregate maximum fits the Factory budget (${costEnforcement.reason}). Persistent workers are local-only until their provider exposes a hard spend cap.`),
       check("verifiers", "Independent verifiers", verifiers.length > 0 && verifiers.every((item) => item?.active && item.projectId === version.projectId), now, expiry, "Select at least one active workspace verifier."),
       check("sandbox-profile", "Sandbox Profile", sandboxProfileReady, now, expiry, "Select a current dispatchable Sandbox Profile or use Local execution."),
       check("host", "Canonical worker admission", Boolean(host), now, expiry, `Report a clean current worker offering ${selectedExecutionBackend} and its required capabilities.`),

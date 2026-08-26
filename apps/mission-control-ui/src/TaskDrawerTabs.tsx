@@ -4,7 +4,7 @@
  * Enhanced task detail view with Overview, Timeline, Artifacts, Approvals, Cost tabs.
  */
 
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useEffect, useState } from "react";
@@ -140,11 +140,11 @@ export function TaskDrawerTabs({
     taskId ? { userId: "operator", entityType: "TASK" } : "skip"
   );
   const postMessage = useMutation(api.messages.post);
-  const transitionTask = useMutation(api.tasks.transition);
-  const updateTask = useMutation(api.tasks.update);
-  const assignTask = useMutation(api.tasks.assign);
+  const transitionTask = useAction(api.tasks.transition);
+  const updateTask = useAction(api.tasks.update);
+  const assignTask = useAction(api.tasks.assign);
   const toggleWatch = useMutation(api.watchSubscriptions.toggle);
-  const requestApproval = useMutation(api.approvals.request);
+  const requestApproval = useAction(api.approvals.request);
   const { toast } = useToast();
 
   if (!taskId) return null;
@@ -426,7 +426,7 @@ function ParentDeliverySection({
     api.workOrders.list,
     projectId ? { projectId, limit: 200 } : "skip"
   );
-  const linkToWorkOrder = useMutation(api.tasks.linkToWorkOrder);
+  const linkToWorkOrder = useAction(api.tasks.linkToWorkOrder);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState("");
   const [linking, setLinking] = useState(false);
   const { toast } = useToast();
@@ -1815,8 +1815,8 @@ function ApprovalsTab({
   approvals: Doc<"approvals">[];
   agentMap: Map<Id<"agents">, Doc<"agents">>;
 }) {
-  const approve = useMutation(api.approvals.approve);
-  const deny = useMutation(api.approvals.deny);
+  const approve = useAction(api.approvals.approve);
+  const deny = useAction(api.approvals.deny);
   const [decisionReasons, setDecisionReasons] = useState<Record<string, string>>({});
   const [busyApprovalId, setBusyApprovalId] = useState<string | null>(null);
 
@@ -1870,7 +1870,6 @@ function ApprovalsTab({
                       try {
                         const result = await approve({
                           approvalId: a._id,
-                          decidedByUserId: "operator",
                           reason: decisionReasons[a._id].trim(),
                         });
                         if (!result.success) window.alert(result.error ?? "Approval failed.");
@@ -1892,7 +1891,6 @@ function ApprovalsTab({
                       try {
                         const result = await deny({
                           approvalId: a._id,
-                          decidedByUserId: "operator",
                           reason: decisionReasons[a._id].trim(),
                         });
                         if (!result.success) window.alert(result.error ?? "Rejection failed.");

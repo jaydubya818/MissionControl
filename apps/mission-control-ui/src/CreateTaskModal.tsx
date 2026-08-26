@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { Bot, CalendarDays, Flag, Layers3, Link2, ShieldAlert } from "lucide-react";
@@ -74,7 +74,7 @@ export function CreateTaskModal({
     api.missions.list,
     projectId ? { projectId, limit: 200 } : "skip"
   );
-  const createTask = useMutation(api.tasks.create);
+  const createTask = useAction(api.tasks.create);
   const selectedWorkOrder = workOrders?.find((item) => item._id === workOrderId);
   const parentMission = missions?.find(
     (mission) => mission._id === selectedWorkOrder?.missionId

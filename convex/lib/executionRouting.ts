@@ -255,13 +255,17 @@ export function aggregateExecutionRoutingEvidence(
 
 function workerReasonPriority(reason: string) {
   const priorities: Record<string, number> = {
-    "worker-heartbeat-stale": 0,
-    "worker-repository-access-missing": 1,
-    "worker-factory-version-mismatch": 2,
-    "worker-harness-manifest-mismatch": 3,
-    "worker-harness-model-unsupported": 4,
-    "worker-harness-capability-missing": 5,
-    "worker-backend-unsupported": 6,
+    "worker-policy-attestation-missing": 0,
+    "worker-policy-attestation-stale": 1,
+    "worker-network-policy-not-ready": 2,
+    "worker-secret-policy-not-ready": 3,
+    "worker-heartbeat-stale": 4,
+    "worker-repository-access-missing": 5,
+    "worker-factory-version-mismatch": 6,
+    "worker-harness-manifest-mismatch": 7,
+    "worker-harness-model-unsupported": 8,
+    "worker-harness-capability-missing": 9,
+    "worker-backend-unsupported": 10,
   };
   return priorities[reason] ?? 100;
 }
@@ -344,6 +348,9 @@ export async function buildExecutionRoutingPreview(
         workerId: binding.hostId,
         status: binding.status,
         dirty: binding.dirty,
+        networkPolicyStatus: binding.networkPolicyStatus,
+        secretPolicyStatus: binding.secretPolicyStatus,
+        attestedAt: binding.attestedAt,
         capacity: binding.capacity,
         workerRuntime: binding.workerRuntime ? {
           ...binding.workerRuntime,

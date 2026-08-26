@@ -35,8 +35,10 @@ of truth for company access.
    pnpm --filter mission-control-ui build
    ```
 
-4. Keep `MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT` unset on every non-local Convex
-   deployment.
+4. Set `MC_BACKEND_DEPLOYMENT_CLASS=shared` on preview/staging and
+   `MC_BACKEND_DEPLOYMENT_CLASS=production` on production. Keep
+   `MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT` unset on both. Anonymous demo access is
+   rejected unless the backend class is explicitly `local`.
 
 The issuer must match the Clerk application that minted the browser token. A
 publishable key alone does not authorize access; Convex validates the token and

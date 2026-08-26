@@ -7,7 +7,7 @@
 
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { resolveAgentRef } from "./lib/agentResolver";
 import { preferInstanceRefs } from "./lib/armCompat";
@@ -92,7 +92,7 @@ export const submitPlan = mutation({
         : {}),
     });
 
-    await ctx.runMutation(api.tasks.transition, {
+    await ctx.runMutation(internal.tasks.transitionInternal, {
       taskId: args.taskId,
       toStatus: "READY",
       actorType: "HUMAN",

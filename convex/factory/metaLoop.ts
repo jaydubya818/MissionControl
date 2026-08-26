@@ -417,7 +417,7 @@ export const resolve = action({
       },
     });
     const workOrderId = workOrderResult.workOrder._id;
-    const taskResult = await ctx.runMutation(api.tasks.create, {
+    const taskResult = await ctx.runMutation(internal.tasks.createInternal, {
       projectId: suggestion.projectId,
       workOrderId,
       title: suggestion.title,

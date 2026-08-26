@@ -33,6 +33,8 @@ const AUTHORIZATION_MARKERS = [
   "requireWebhookWorkspace",
   "requireAgentFleetAuthority",
   "requireFactoryActionWithAudit",
+  // Public human action -> internal authorized mutation -> durable denial audit.
+  "runAuditedHumanMutation",
   "authorizeProviderCall",
   "assertWorkspaceAccess",
   "assertCompanyAdministrator",

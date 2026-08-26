@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
@@ -89,7 +89,7 @@ export function ExecutionRunInspector({
         }
       : "skip"
   );
-  const requestCancellation = useMutation(api.workflowRuns.requestCancellation);
+  const requestCancellation = useAction(api.workflowRuns.requestCancellation);
   const recordReviewJudgment = useMutation(api.reviewIntelligence.recordReviewJudgment);
   const [cancelReason, setCancelReason] = useState("");
   const [canceling, setCanceling] = useState(false);
@@ -345,7 +345,6 @@ export function ExecutionRunInspector({
                           const result = await requestCancellation({
                             workflowRunId: inspector.run._id,
                             reason: cancelReason.trim(),
-                            actorId: "operator",
                           });
                           setCancelConfirmation(result.status === "CANCELED"
                             ? "Attempt canceled."

@@ -82,12 +82,16 @@ explicit backend demo adapter:
 
 ```bash
 VITE_FLAG_COMPANY_CONTEXT=true
+MC_BACKEND_DEPLOYMENT_CLASS=local
 MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT=1
 ```
 
-`MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT` must never be enabled in production. With
-the adapter disabled, company access resolves only from authenticated operator
-records linked by `authId`.
+`MC_BACKEND_DEPLOYMENT_CLASS` is a backend authorization contract with exactly
+three values: `local`, `shared`, or `production`. Anonymous company context is
+rejected unless the class is explicitly `local`; missing, invalid, `shared`,
+and `production` classifications fail closed. With the adapter disabled,
+company access resolves only from authenticated operator records linked by
+`authId`.
 
 ## Human authentication rollout
 

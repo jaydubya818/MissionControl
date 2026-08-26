@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc } from "../../../convex/_generated/dataModel";
 import { formatDateInputValue, parseDateInputValue } from "@/lib/dateInput";
@@ -23,7 +23,7 @@ export function QuickEditModal({ task, onClose, onSave }: QuickEditModalProps) {
   );
   const [saving, setSaving] = useState(false);
   
-  const updateTask = useMutation(api.tasks.update);
+  const updateTask = useAction(api.tasks.update);
   
   const handleSave = async () => {
     setSaving(true);

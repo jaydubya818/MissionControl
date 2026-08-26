@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import type { MainView } from "./TopNav";
@@ -378,8 +378,11 @@ export function DashboardOverview({
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
   const scheduledJobs = useQuery(api.scheduledJobs.list, projectId ? { projectId } : {});
-  const approvals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 100 } : { limit: 100 });
-  const openAlerts = useQuery(api.alerts.listOpen, { limit: 10 });
+  const approvals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 100 } : "skip");
+  const openAlerts = useQuery(
+    api.alerts.listOpen,
+    projectId ? { projectId, limit: 10 } : "skip",
+  );
   const activities = useQuery(api.activities.listRecent, projectId ? { projectId, limit: 12 } : { limit: 12 });
   const missionData = useQuery(api.mission.getMission, projectId ? { projectId } : {});
   const usageByModel = useQuery(api.runs.getUsageByModel, projectId ? { projectId, windowHours: 24 } : { windowHours: 24 });
@@ -405,8 +408,8 @@ export function DashboardOverview({
   );
   // Retained mutation (squad deploy flows re-attach here); intentionally unused in v2 render.
   const deploySquad = useMutation(api.squad.deploySquad);
-  const approveApproval = useMutation(api.approvals.approve);
-  const transitionTask = useMutation(api.tasks.transition);
+  const approveApproval = useAction(api.approvals.approve);
+  const transitionTask = useAction(api.tasks.transition);
   void deploySquad;
 
   const isLoading = !agents || !tasks || !approvals || !activities;
@@ -485,7 +488,6 @@ export function DashboardOverview({
     approveApproval: async (approvalId) => {
       await approveApproval({
         approvalId,
-        decidedByUserId: "operator",
         reason: "Approved from Overview",
       });
     },

@@ -1,48 +1,21 @@
 ---
 name: mission-control-record-memory
 description: >-
-  Persists agent knowledge across sessions using the Mission Control agent
-  documents system. Use this skill when depositing session memory before
-  shutting down, keeping a WORKING_MD scratchpad up to date, writing daily
-  notes, or reading back previously stored memories at session start.
-version: 1.0.0
+  Retired V1 compatibility skill. Agent Documents are operator-managed until a
+  scoped signed agent-memory command is approved and implemented.
+version: 2.0.0
 owner: software-factory
-risk: low
-capabilities:
-  - memory-deposit
-  - memory-retrieval
-  - session-persistence
-requires_tools:
-  - convex
-related_skills:
-  - mission-control-register-agent
-  - mission-control-heartbeat
+risk: high
+capabilities: []
+requires_tools: []
 ---
 
-# Deposit Memories
+# Agent Documents — retired direct-agent path
 
-Persist knowledge across sessions using the agent documents system.
+Do not write or enumerate Agent Documents directly from an agent or legacy
+runtime. The active `agentDocuments` actions are authenticated operator
+surfaces, workspace-scoped, audited, and actor-derived on the server.
 
-## Write a Memory
-
-```
-Mutation: api.agentDocuments.upsert (or create)
-Args:
-  agentId: Id<"agents">
-  type: "WORKING_MD" | "DAILY_NOTE" | "SESSION_MEMORY"
-  content: string
-  projectId?: Id<"projects">
-```
-
-## Read Your Memories
-
-```
-Query: api.agentDocuments.getByAgent
-Args: { agentId: Id<"agents"> }
-```
-
-## Rules
-
-1. **Deposit memories** — persist important context for future sessions; deposit `SESSION_MEMORY` before shutting down.
-2. Read your memories back at session start, right after registering.
-3. Use `WORKING_MD` for the living scratchpad, `DAILY_NOTE` for day summaries, `SESSION_MEMORY` for handoff context.
+For V1, use the Memory view in Mission Control. A future agent-memory writer
+requires a separately approved, signed service capability with exact Agent and
+workspace scope; do not recreate the removed convenience APIs.

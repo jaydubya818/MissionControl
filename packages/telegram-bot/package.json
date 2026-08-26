@@ -3,25 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "V1 tombstone for the unauthenticated Telegram runtime",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
-    "dev:bj": "tsx watch src/bj-bot.ts",
+    "dev": "pnpm run build && pnpm run start",
+    "dev:bj": "pnpm run build && pnpm run start:bj",
     "start": "node dist/index.js",
     "start:bj": "node dist/bj-bot.js",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@mission-control/model-router": "workspace:*",
-    "convex": "^1.17.2",
-    "dotenv": "^16.4.5",
-    "telegraf": "^4.16.3"
-  },
   "devDependencies": {
     "@types/node": "^20.11.5",
-    "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }
 }

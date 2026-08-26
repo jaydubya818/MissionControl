@@ -45,7 +45,7 @@ export function PipelineView({ projectId, onNavigate }: PipelineViewProps) {
   const missionData = useQuery(api.mission.getMission, projectId ? { projectId } : {});
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
-  const approvals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 100 } : { limit: 100 });
+  const approvals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 100 } : "skip");
 
   useEffect(() => {
     let cancelled = false;

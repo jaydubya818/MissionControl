@@ -178,6 +178,14 @@ export const report = mutation({
       )
       .first();
 
+    // Worker policy freshness is server-derived. The authenticated reporter
+    // supplies the decisions, but cannot extend their lifetime with a
+    // caller-controlled timestamp.
+    const attestedAt = args.workerRuntime
+      && args.networkPolicyStatus !== undefined
+      && args.secretPolicyStatus !== undefined
+      ? checkedAt
+      : args.attestedAt;
     const value = {
       projectId: args.projectId,
       hostId,
@@ -199,7 +207,7 @@ export const report = mutation({
         generation: nextFactoryWorkerGeneration(existing?.workerRuntime, args.workerRuntime.sessionId),
         lastHeartbeatAt: checkedAt,
       } : existing?.workerRuntime,
-      attestedAt: args.attestedAt,
+      attestedAt,
       status: args.status,
       error: args.error,
       checkedAt,
@@ -229,7 +237,7 @@ export const report = mutation({
           networkPolicyStatus: args.networkPolicyStatus,
           secretPolicyStatus: args.secretPolicyStatus,
           capacity: args.maxConcurrentRuns === undefined ? undefined : { maxConcurrentRuns: args.maxConcurrentRuns, currentRuns: args.currentRuns },
-          attestedAt: args.attestedAt,
+          attestedAt,
           error: args.error,
           checkedAt,
         },

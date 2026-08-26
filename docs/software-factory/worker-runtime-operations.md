@@ -33,7 +33,13 @@ CODEX_WORKER_REPOSITORY_ID=<workspaceRepositories ID>
 CODEX_WORKER_CHECKOUT_ROOT=<absolute clean checkout root>
 CODEX_WORKER_HOST_ID=<stable host identity>
 CODEX_WORKER_MAX_CONCURRENT_RUNS=1
+CODEX_WORKER_NETWORK_POLICY_STATUS=READY
+CODEX_WORKER_SECRET_POLICY_STATUS=READY
 ```
+
+Shared/production workers also require the remote sandbox and Attempt-scoped
+provider cap settings from `.env.example`. Persistent adapters are local-only
+while their dollar cost remains unknown and they have no provider hard cap.
 
 The worker reports its repository, exact default-branch commit, harness and
 adapter identity, adapter-effective capability manifest and digest, effective
@@ -53,7 +59,8 @@ creates a new session and server-derived generation.
 2. `attempts.claim` atomically checks the current registration, heartbeat,
    readiness/draining state, repository access, executor, isolation, required
    harness capabilities, exact capability/configuration digests, provider/model,
-   sandbox capabilities, backend, and server-counted active leases. Capacity is
+   current network/secret policy attestations, sandbox capabilities, backend,
+   enforceable cost policy, and server-counted active leases. Capacity is
    counted across all repositories and sessions for the stable worker ID; the
    reported `currentRuns` value is observational only.
 3. A successful claim writes a unique lease ID plus worker ID, session, and

@@ -2,13 +2,8 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "../../",
+    "rootDir": "./src",
     "composite": true
   },
-  "include": ["src/**/*", "../../convex/lib/**/*.ts"],
-  "references": [
-    { "path": "../shared" },
-    { "path": "../model-router" },
-    { "path": "../workflow-engine" }
-  ]
+  "include": ["src/**/*"]
 }

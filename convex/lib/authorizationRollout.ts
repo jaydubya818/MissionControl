@@ -3,6 +3,36 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 type RolloutCtx = QueryCtx | MutationCtx;
 
 export type AuthorizationMode = "ENFORCED" | "UNPROVISIONED" | "ANONYMOUS_DEMO";
+export type BackendDeploymentClass = "local" | "shared" | "production";
+
+const BACKEND_DEPLOYMENT_CLASSES = new Set<BackendDeploymentClass>([
+  "local",
+  "shared",
+  "production",
+]);
+
+export function parseBackendDeploymentClass(
+  value: string | undefined,
+): BackendDeploymentClass | null {
+  const normalized = value?.trim().toLowerCase();
+  return normalized && BACKEND_DEPLOYMENT_CLASSES.has(normalized as BackendDeploymentClass)
+    ? normalized as BackendDeploymentClass
+    : null;
+}
+
+export function anonymousDemoEnabledFor(input: {
+  requested: boolean;
+  deploymentClass: string | undefined;
+}): boolean {
+  if (!input.requested) return false;
+  const deploymentClass = parseBackendDeploymentClass(input.deploymentClass);
+  if (deploymentClass !== "local") {
+    throw new Error(
+      "MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT requires MC_BACKEND_DEPLOYMENT_CLASS=local.",
+    );
+  }
+  return true;
+}
 
 export function resolveAuthorizationMode(input: {
   flagEnabled: boolean;
@@ -64,7 +94,10 @@ export async function hasProvisionedOperator(ctx: RolloutCtx): Promise<boolean> 
 }
 
 export function anonymousDemoEnabled(): boolean {
-  return process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT === "1";
+  return anonymousDemoEnabledFor({
+    requested: process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT === "1",
+    deploymentClass: process.env.MC_BACKEND_DEPLOYMENT_CLASS,
+  });
 }
 
 export async function resolveDeploymentAuthorizationMode(

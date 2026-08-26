@@ -56,6 +56,11 @@
       "types": "./dist/harnessContract.d.ts",
       "import": "./dist/harnessContract.js",
       "default": "./dist/harnessContract.js"
+    },
+    "./cost-enforcement": {
+      "types": "./dist/factoryCostEnforcement.d.ts",
+      "import": "./dist/factoryCostEnforcement.js",
+      "default": "./dist/factoryCostEnforcement.js"
     }
   },
   "scripts": {
@@ -70,7 +75,6 @@
     "@mission-control/shared": "workspace:*",
     "@mission-control/state-machine": "workspace:*",
     "@mission-control/policy-engine": "workspace:*",
-    "convex": "^1.31.7",
     "mustache": "^4.2.0",
     "yaml": "^2.3.4"
   },

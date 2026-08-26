@@ -1338,8 +1338,10 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                             <div>Runtime: <span className="text-foreground/85">{run.runtime ?? "—"}</span></div>
                             <div>Model: <span className="text-foreground/85">{run.model ?? "—"}</span></div>
                             <div>Worktree: <span className="font-mono text-foreground/85">{run.worktree ?? "—"}</span></div>
+                            <div>Candidate: <span className="font-mono text-foreground/85">{run.candidateRevision ?? "—"}</span></div>
                             <div>Current step: <span className="text-foreground/85">{run.currentStepLabel ?? "—"}</span></div>
                             <div>Retries: <span className="text-foreground/85">{run.retryCount}</span></div>
+                            <div>Attempt: <span className="text-foreground/85">{run.executionAttemptNumber ?? "—"} · recoveries {run.executionStaleRecoveryCount ?? 0}</span></div>
                             <div>Human interventions: <span className="text-foreground/85">{run.humanInterventions}</span></div>
                           </div>
                           {run.failureReason ? (

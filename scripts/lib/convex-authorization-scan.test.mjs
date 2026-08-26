@@ -129,6 +129,26 @@ describe("convex authorization scan", () => {
     expect(scanConvexAuthorization(root).unauthorized).toEqual([]);
   });
 
+  it("recognizes the audited human action authorization boundary", () => {
+    const root = fixture({
+      "tasks.ts": `
+        export const update = action({
+          args: {},
+          handler: async (ctx, args) => {
+            return await runAuditedHumanMutation(
+              ctx,
+              internal.tasks.updateInternal,
+              args,
+              "tasks.update",
+              { taskId: args.taskId },
+            );
+          },
+        });
+      `,
+    });
+    expect(scanConvexAuthorization(root).unauthorized).toEqual([]);
+  });
+
   it("treats internal functions as out of scope entirely", () => {
     const root = fixture({
       "seed.ts": `

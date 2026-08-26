@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { formatDateInputValue, parseDateInputValue } from "@/lib/dateInput";
@@ -93,7 +93,7 @@ export function TaskEditMode({ task, onSave, onCancel, onSaveError }: TaskEditMo
   const [saveError, setSaveError] = useState<string | null>(null);
   const requiredOutputFields = getRequiredOutputFields(task.metadata);
 
-  const updateTask = useMutation(api.tasks.update);
+  const updateTask = useAction(api.tasks.update);
   const agents = useQuery(api.agents.listAll, { projectId: task.projectId });
   const allowedTransitions = useQuery(api.tasks.getAllowedTransitionsForHuman);
 

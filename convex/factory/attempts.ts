@@ -55,6 +55,7 @@ import { computeCanonicalHash } from "../lib/genomeHash";
 import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } from "../lib/harnessCapabilities";
 import { modelRouteProductionEligible } from "../lib/modelRouteAdmission";
 import { sandboxProfileProductionEligible } from "../lib/sandboxProfileAdmission";
+import { assessFactoryCostEnforcement } from "@mission-control/workflow-engine/cost-enforcement";
 
 const EVENT_TYPES = new Set([
   "RUN_STARTED", "STEP_STARTED", "STEP_COMPLETED", "TOOL_CALLED",
@@ -327,6 +328,16 @@ export const claimInternal = internalMutation({
     } else if (frozenManifest.sandbox) {
       throw new Error("Persistent-worker Attempt cannot contain a remote Sandbox Profile binding.");
     }
+    const costEnforcement = assessFactoryCostEnforcement({
+      deploymentClass: process.env.MC_BACKEND_DEPLOYMENT_CLASS as "local" | "shared" | "production" | undefined,
+      executionBackend,
+      maxCostUsd: version.budget.maxCostUsd,
+      maxAttempts: version.budget.maxAttempts,
+      sandboxSpend: frozenManifest.sandbox?.profileSnapshot?.spend,
+    });
+    if (costEnforcement.allowed === false) {
+      throw new Error(`Factory attempt cost enforcement is not ready (${costEnforcement.reason}).`);
+    }
     const definition = await ctx.db.get(version.factoryDefinitionId);
     if (!definition || definition.status !== "ACTIVE" || definition.activeVersionId !== version._id) {
       throw new Error("Factory attempt requires the exact active Factory version.");
@@ -386,6 +397,9 @@ export const claimInternal = internalMutation({
           workerId: host.hostId,
           status: host.status,
           dirty: host.dirty,
+          networkPolicyStatus: host.networkPolicyStatus,
+          secretPolicyStatus: host.secretPolicyStatus,
+          attestedAt: host.attestedAt,
           capacity: host.capacity,
           workerRuntime: host.workerRuntime ? {
             ...host.workerRuntime,
@@ -1846,6 +1860,9 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
       workerId: binding.hostId,
       status: binding.status,
       dirty: binding.dirty,
+      networkPolicyStatus: binding.networkPolicyStatus,
+      secretPolicyStatus: binding.secretPolicyStatus,
+      attestedAt: binding.attestedAt,
       capacity: binding.capacity,
       workerRuntime: binding.workerRuntime ? {
         ...binding.workerRuntime,

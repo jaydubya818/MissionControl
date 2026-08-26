@@ -157,9 +157,9 @@ function AgentFleet({ projectId, onToast }: { projectId: Id<"projects"> | null; 
 // ---------------------------------------------------------------------------
 
 function ApprovalQueue({ projectId, onToast }: { projectId: Id<"projects"> | null; onToast: (msg: string, err?: boolean) => void }) {
-  const approvals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 6 } : { limit: 6 });
-  const approve = useMutation(api.approvals.approve);
-  const deny = useMutation(api.approvals.deny);
+  const approvals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 6 } : "skip");
+  const approve = useAction(api.approvals.approve);
+  const deny = useAction(api.approvals.deny);
   const [loading, setLoading] = useState<string | null>(null);
 
   if (!approvals) return <div className="text-[12.5px] text-ink-muted text-center py-4">Loading…</div>;
@@ -173,7 +173,7 @@ function ApprovalQueue({ projectId, onToast }: { projectId: Id<"projects"> | nul
   const handleApprove = async (id: Id<"approvals">) => {
     setLoading(id);
     try {
-      await approve({ approvalId: id, decidedByUserId: "operator", reason: "Command Panel approval" });
+      await approve({ approvalId: id, projectId: projectId ?? undefined, reason: "Command Panel approval" });
       onToast("Approved");
     } catch (e) { onToast(e instanceof Error ? e.message : "Failed", true); }
     finally { setLoading(null); }
@@ -182,7 +182,7 @@ function ApprovalQueue({ projectId, onToast }: { projectId: Id<"projects"> | nul
   const handleDeny = async (id: Id<"approvals">) => {
     setLoading(id);
     try {
-      await deny({ approvalId: id, decidedByUserId: "operator", reason: "Command Panel denial" });
+      await deny({ approvalId: id, projectId: projectId ?? undefined, reason: "Command Panel denial" });
       onToast("Denied");
     } catch (e) { onToast(e instanceof Error ? e.message : "Failed", true); }
     finally { setLoading(null); }
@@ -235,7 +235,7 @@ function QuickTaskCreator({ projectId, onToast }: { projectId: Id<"projects"> | 
   const [type, setType] = useState("ENGINEERING");
   const [priority, setPriority] = useState(2);
   const [loading, setLoading] = useState(false);
-  const createTask = useMutation(api.tasks.create);
+  const createTask = useAction(api.tasks.create);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleCreate = async () => {
@@ -442,9 +442,9 @@ export function CommandPanel({ projectId, onOpenSuggestionsDrawer }: CommandPane
   const pauseAll = useMutation(api.agents.pauseAll);
   const resumeAll = useMutation(api.agents.resumeAll);
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
-  const approvals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 10 } : { limit: 10 });
+  const approvals = useQuery(api.approvals.listPending, projectId ? { projectId, limit: 10 } : "skip");
   const allTasks = useQuery(api.tasks.list, { projectId: projectId ?? undefined });
-  const approve = useMutation(api.approvals.approve);
+  const approve = useAction(api.approvals.approve);
 
   const activeCount  = agents?.filter((a) => a.status === "ACTIVE").length ?? 0;
   const pausedCount  = agents?.filter((a) => a.status === "PAUSED").length ?? 0;
@@ -477,7 +477,7 @@ export function CommandPanel({ projectId, onOpenSuggestionsDrawer }: CommandPane
         }
         case "approve-all": {
           const low = approvals?.filter((a) => a.riskLevel === "GREEN") ?? [];
-          await Promise.all(low.map((a) => approve({ approvalId: a._id, decidedByUserId: "operator", reason: "Bulk approve" })));
+          await Promise.all(low.map((a) => approve({ approvalId: a._id, projectId: projectId ?? undefined, reason: "Bulk approve" })));
           toast(`Approved ${low.length} low-risk item(s)`);
           break;
         }

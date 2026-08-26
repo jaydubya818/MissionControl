@@ -32,6 +32,9 @@ const worker: FactoryWorkerCandidate = {
   workerId: "worker-1",
   status: "READY",
   dirty: false,
+  networkPolicyStatus: "READY",
+  secretPolicyStatus: "READY",
+  attestedAt: now,
   capacity: { maxConcurrentRuns: 2, currentRuns: 0 },
   workerRuntime: {
     sessionId: "session-1",
@@ -78,6 +81,27 @@ describe("Factory worker runtime", () => {
       activeWorkerLeaseCount: 0,
       now,
     })).toMatchObject({ eligible: false, reason: "worker-draining" });
+  });
+
+  it("fails closed on missing, stale, unknown, or blocked policy attestations", () => {
+    const evaluate = (candidate: FactoryWorkerCandidate) => factoryWorkerEligibility({
+      worker: candidate,
+      requirements,
+      activeWorkerLeaseCount: 0,
+      now,
+    });
+    expect(evaluate({ ...worker, attestedAt: undefined }))
+      .toMatchObject({ eligible: false, reason: "worker-policy-attestation-missing" });
+    expect(evaluate({ ...worker, attestedAt: now - 2 * 60_000 - 1 }))
+      .toMatchObject({ eligible: false, reason: "worker-policy-attestation-stale" });
+    expect(evaluate({ ...worker, networkPolicyStatus: "UNKNOWN" }))
+      .toMatchObject({ eligible: false, reason: "worker-network-policy-not-ready" });
+    expect(evaluate({ ...worker, networkPolicyStatus: "BLOCKED" }))
+      .toMatchObject({ eligible: false, reason: "worker-network-policy-not-ready" });
+    expect(evaluate({ ...worker, secretPolicyStatus: "UNKNOWN" }))
+      .toMatchObject({ eligible: false, reason: "worker-secret-policy-not-ready" });
+    expect(evaluate({ ...worker, secretPolicyStatus: "BLOCKED" }))
+      .toMatchObject({ eligible: false, reason: "worker-secret-policy-not-ready" });
   });
 
   it("requires one exact worker attestation for a frozen Factory Version", () => {

@@ -6,7 +6,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
@@ -74,18 +74,21 @@ const SEVERITY_CONFIG: Record<string, { label: string; tone: StatusBadgeProps["t
 };
 
 export function LoopDetectionPanel({
-  projectId: _projectId,
+  projectId,
   onTaskSelect,
 }: LoopDetectionPanelProps) {
   const [filter, setFilter] = useState<"all" | "OPEN" | "ACKNOWLEDGED">("all");
   const [expanded, setExpanded] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const openAlerts = useQuery(api.alerts.listOpen, { limit: 100 });
-  const acknowledgeAlert = useMutation(api.alerts.acknowledge);
-  const resolveAlert = useMutation(api.alerts.resolve);
-  const ignoreAlert = useMutation(api.alerts.ignore);
-  const transitionTask = useMutation(api.tasks.transition);
+  const openAlerts = useQuery(
+    api.alerts.listOpen,
+    projectId ? { projectId, limit: 100 } : "skip",
+  );
+  const acknowledgeAlert = useAction(api.alerts.acknowledge);
+  const resolveAlert = useAction(api.alerts.resolve);
+  const ignoreAlert = useAction(api.alerts.ignore);
+  const transitionTask = useAction(api.tasks.transition);
 
   const loopAlerts = (openAlerts ?? []).filter((a) => a.type === "LOOP_DETECTED");
   const filteredAlerts = filter === "all" ? loopAlerts : loopAlerts.filter((a) => a.status === filter);
@@ -110,7 +113,7 @@ export function LoopDetectionPanel({
   const handleAcknowledge = async (alertId: Id<"alerts">) => {
     setActionLoading(alertId);
     try {
-      await acknowledgeAlert({ alertId, acknowledgedBy: "operator" });
+      await acknowledgeAlert({ alertId });
     } finally {
       setActionLoading(null);
     }

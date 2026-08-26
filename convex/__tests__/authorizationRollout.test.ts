@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  anonymousDemoEnabledFor,
   authorizationIsEnforced,
   authorizationModeSummary,
   authorizationRequiredFor,
+  parseBackendDeploymentClass,
   resolveAuthorizationMode,
 } from "../lib/authorizationRollout";
 
@@ -59,6 +61,34 @@ describe("authorization rollout", () => {
     expect(summary.detail).toMatch(/MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT/);
     expect(authorizationRequiredFor(mode, "WRITE")).toBe(false);
   });
+
+  it.each([
+    [undefined, null],
+    ["", null],
+    ["preview", null],
+    ["LOCAL", "local"],
+    ["shared", "shared"],
+    ["production", "production"],
+  ])("parses backend deployment class %s", (value, expected) => {
+    expect(parseBackendDeploymentClass(value)).toBe(expected);
+  });
+
+  it("allows anonymous demo access only for an explicitly local backend", () => {
+    expect(
+      anonymousDemoEnabledFor({ requested: true, deploymentClass: "local" }),
+    ).toBe(true);
+    expect(
+      anonymousDemoEnabledFor({ requested: false, deploymentClass: "production" }),
+    ).toBe(false);
+  });
+
+  it.each([undefined, "", "preview", "shared", "production"])(
+    "rejects anonymous demo access for backend class %s",
+    (deploymentClass) => {
+      expect(() => anonymousDemoEnabledFor({ requested: true, deploymentClass }))
+        .toThrow(/MC_BACKEND_DEPLOYMENT_CLASS=local/);
+    },
+  );
 
   it("describes the enforced state without hedging", () => {
     const summary = authorizationModeSummary("ENFORCED");

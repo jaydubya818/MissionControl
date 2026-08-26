@@ -37,10 +37,13 @@ export function SystemView({
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
   const approvals = useQuery(
     api.approvals.listPending,
-    projectId ? { projectId, limit: 50 } : { limit: 50 }
+    projectId ? { projectId, limit: 50 } : "skip"
   );
   const scheduledJobs = useQuery(api.scheduledJobs.list, projectId ? { projectId } : {});
-  const openAlerts = useQuery(api.alerts.listOpen, { limit: 20 });
+  const openAlerts = useQuery(
+    api.alerts.listOpen,
+    projectId ? { projectId, limit: 20 } : "skip",
+  );
 
   const agentsList = agents ?? [];
   const tasksList = tasks ?? [];

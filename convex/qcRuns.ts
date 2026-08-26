@@ -769,7 +769,7 @@ export const execute = action({
       
       // If RED, create alert and notify
       if (riskGrade === "RED") {
-        await ctx.runMutation(api.alerts.create, {
+        await ctx.runMutation(internal.alerts.createInternal, {
           projectId: run.projectId,
           severity: "CRITICAL",
           type: "QC_GATE_FAILED",

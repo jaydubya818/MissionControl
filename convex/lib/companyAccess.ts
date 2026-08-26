@@ -1,5 +1,6 @@
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import { anonymousDemoEnabled } from "./authorizationRollout";
 
 type CompanyCtx = QueryCtx | MutationCtx;
 
@@ -39,10 +40,6 @@ export interface CompanyMembership {
   permissions: string[];
   canManageCompany: boolean;
   mode: CompanyAccessMode;
-}
-
-function anonymousDemoEnabled(): boolean {
-  return process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT === "1";
 }
 
 export function isCompanyAdminRole(role: Doc<"roles">): boolean {

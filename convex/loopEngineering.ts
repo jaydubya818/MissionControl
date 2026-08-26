@@ -346,7 +346,7 @@ export const projectWorkflowRun = action({
         });
     let approval = null;
     if (projection.approvalId) {
-      approval = await ctx.runQuery(api.approvals.get, {
+      approval = await ctx.runQuery(internal.approvals.getInternal, {
         approvalId: projection.approvalId as Id<"approvals">,
       });
     }
@@ -579,7 +579,7 @@ export const create = action({
     const taskDescription = args.researchBrief
       ? continuousResearchDesiredOutcome(stopCondition)
       : `Run the bounded Loop Engineering graph for this objective. Research independent lanes in parallel, independently verify evidence, synthesize recommendations, and stop at explicit approval. Stop condition: ${stopCondition}`;
-    const taskResult: any = await ctx.runMutation(api.tasks.create, {
+    const taskResult: any = await ctx.runMutation(internal.tasks.createInternal, {
       projectId: args.projectId,
       title: taskTitle,
       description: taskDescription,
@@ -1283,7 +1283,7 @@ export const approveRecommendations = action({
 
     const links = [];
     for (const recommendation of cycle.recommendations) {
-      const taskResult: any = await ctx.runMutation(api.tasks.create, {
+      const taskResult: any = await ctx.runMutation(internal.tasks.createInternal, {
         projectId: cycle.projectId,
         title: `Implement: ${recommendation.title}`,
         description:
@@ -1357,7 +1357,7 @@ export const approveRecommendations = action({
       });
       const workOrderId = workOrderResult.workOrder?._id as Id<"workOrders"> | undefined;
       if (!workOrderId) throw new Error("Failed to create implementation WorkOrder.");
-      await ctx.runMutation(api.tasks.linkToWorkOrder, {
+      await ctx.runMutation(internal.tasks.linkToWorkOrderInternal, {
         taskId,
         projectId: cycle.projectId,
         workOrderId,

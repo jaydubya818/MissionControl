@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 
 const CHAT_KIND = "MISSION_CONTROL_CHAT";
@@ -130,7 +130,7 @@ export const submitRequest = mutation({
     let createdWork = false;
 
     if (!taskId || !workOrderId) {
-      const taskResult = (await ctx.runMutation(api.tasks.create, {
+      const taskResult = (await ctx.runMutation(internal.tasks.createInternal, {
         projectId: args.projectId,
         title: requestTitle(content),
         description: content,

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -46,6 +46,16 @@ describe("runtime contract extraction", () => {
 
     expect([...contracts.keys()]).toEqual(["alerts:list"]);
     expect(contracts.get("alerts:list")).toMatchObject({ kind: "query", returns: null });
+  });
+
+  it("normalizes explicitly public wrappers to their Convex contract kind", () => {
+    const contracts = extractPublicConvexContracts(`
+      import { query } from "./_generated/server";
+      const publicQuery = query;
+      export const transitionMap = publicQuery({ args: {}, handler: async () => ({}) });
+    `, "convex/tasks.ts");
+
+    expect(contracts.get("tasks:transitionMap")).toMatchObject({ kind: "query" });
   });
 
   it("normalizes formatting while retaining validator structure", () => {
@@ -200,5 +210,19 @@ describe("Git-base runtime contract guard", () => {
 
     expect(result.ok).toBe(true);
     expect(result.message).toContain("version v1 → v2");
+  });
+
+  it("reports a tracked public function file deleted from the worktree", () => {
+    const cwd = createRepository();
+    rmSync(path.join(cwd, "convex", "alerts.ts"));
+    writeFileSync(
+      path.join(cwd, "convex", "lib", "runtimeContract.ts"),
+      "export const RUNTIME_CONTRACT_VERSION = 2;\n",
+    );
+
+    const result = runRuntimeContractGuard({ cwd, baseRef: "HEAD" });
+
+    expect(result.ok).toBe(true);
+    expect(result.changes).toEqual([{ name: "alerts:list", reason: "removed" }]);
   });
 });

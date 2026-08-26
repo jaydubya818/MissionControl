@@ -12,16 +12,6 @@
  */
 
 export {
-  WorkflowExecutor,
-  createExecutor,
-  legacyExecutorOwnsRun,
-  workflowDefinitionForRun,
-  workflowEvidenceDigest,
-  type WorkflowExecutorConfig,
-  type StepExecutionResult,
-} from "./executor.js";
-
-export {
   render,
   extractVariables,
   validateContext,
@@ -117,6 +107,13 @@ export {
   findKnownHarnessManifest,
   harnessSupportsModel,
 } from "./harnessManifests.js";
+
+export {
+  assessFactoryCostEnforcement,
+  observedFactoryCostWithinBound,
+  type FactoryCostEnforcementDecision,
+  type FactoryDeploymentClass,
+} from "./factoryCostEnforcement.js";
 
 export {
   matchesRepositoryGlob,

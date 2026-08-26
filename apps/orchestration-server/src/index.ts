@@ -69,6 +69,8 @@ const PORT = parseInt(process.env.ORCHESTRATION_PORT ?? "4100", 10);
 const CONVEX_URL = process.env.CONVEX_URL ?? "";
 const PROJECT_SLUG = process.env.PROJECT_SLUG ?? "openclaw";
 const TICK_INTERVAL_MS = parseInt(process.env.TICK_INTERVAL_MS ?? "30000", 10);
+const LEGACY_COORDINATOR_ENABLED = process.env.ORCHESTRATION_LEGACY_COORDINATOR_ENABLED === "1";
+const BACKEND_DEPLOYMENT_CLASS = process.env.MC_BACKEND_DEPLOYMENT_CLASS?.trim();
 const AGENTS_DIR = process.env.AGENTS_DIR ?? path.resolve(process.cwd(), "../../agents");
 const AUTOMATION_REPOSITORY_ROOT = path.resolve(process.env.AUTOMATION_REPOSITORY_ROOT ?? process.cwd());
 const CODEX_FACTORY_WORKER_ENABLED = process.env.CODEX_FACTORY_WORKER_ENABLED === "true";
@@ -84,12 +86,34 @@ const FACTORY_WORKER_SCOPE = DURABLE_FACTORY_WORKER_ENABLED
 const FACTORY_WORKER_SESSION_ID = randomUUID();
 const FACTORY_WORKER_ID = process.env.CODEX_WORKER_HOST_ID?.trim() || `orchestration:${os.hostname()}`;
 const FACTORY_WORKER_MAX_CONCURRENT_RUNS = boundedPositiveInteger(process.env.CODEX_WORKER_MAX_CONCURRENT_RUNS, 1);
+const FACTORY_WORKER_NETWORK_POLICY_STATUS = attestationStatus(process.env.CODEX_WORKER_NETWORK_POLICY_STATUS);
+const FACTORY_WORKER_SECRET_POLICY_STATUS = attestationStatus(process.env.CODEX_WORKER_SECRET_POLICY_STATUS);
 const REMOTE_SANDBOX_BACKEND_READY = process.env.CODEX_WORKER_REMOTE_SANDBOX_ENABLED === "1"
   && Boolean(process.env.EXEDEV_IDENTITY_FILE?.trim())
   && Boolean(process.env.OPENROUTER_MANAGEMENT_API_KEY?.trim());
 const FACTORY_WORKER_EXECUTION_BACKENDS = REMOTE_SANDBOX_BACKEND_READY
   ? ["persistent-worker", "remote-sandbox"] as const
   : ["persistent-worker"] as const;
+
+if (LEGACY_COORDINATOR_ENABLED && BACKEND_DEPLOYMENT_CLASS !== "local") {
+  throw new Error(
+    "ORCHESTRATION_LEGACY_COORDINATOR_ENABLED is local-only; set MC_BACKEND_DEPLOYMENT_CLASS=local or leave it disabled."
+  );
+}
+if (LEGACY_FACTORY_WORKER_ENABLED && BACKEND_DEPLOYMENT_CLASS !== "local") {
+  throw new Error(
+    "FACTORY_EXECUTION_ENABLED is local-only; production Factory work requires the bounded worker and remote sandbox."
+  );
+}
+if (DURABLE_FACTORY_WORKER_ENABLED && BACKEND_DEPLOYMENT_CLASS !== "local") {
+  if (!REMOTE_SANDBOX_BACKEND_READY) {
+    throw new Error("Shared/production Factory workers require the remote sandbox and Attempt-scoped provider key cap.");
+  }
+  if (FACTORY_WORKER_NETWORK_POLICY_STATUS !== "READY"
+    || FACTORY_WORKER_SECRET_POLICY_STATUS !== "READY") {
+    throw new Error("Shared/production Factory workers require explicit READY network and secret policy attestations.");
+  }
+}
 
 if (!CONVEX_URL) {
   console.error("[orchestration] CONVEX_URL is required. Set it in .env or environment.");
@@ -135,8 +159,8 @@ const factoryHostReporter = FACTORY_WORKER_SCOPE
       maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
       getCurrentRuns: () => factoryAttemptWorker.status().activeRunIds.length,
       approvedModelIds: commaSeparatedValues(process.env.CODEX_WORKER_APPROVED_MODEL_IDS),
-      networkPolicyStatus: attestationStatus(process.env.CODEX_WORKER_NETWORK_POLICY_STATUS),
-      secretPolicyStatus: attestationStatus(process.env.CODEX_WORKER_SECRET_POLICY_STATUS),
+      networkPolicyStatus: FACTORY_WORKER_NETWORK_POLICY_STATUS,
+      secretPolicyStatus: FACTORY_WORKER_SECRET_POLICY_STATUS,
       hostRuntimeType: "persistent-worker",
       executionBackends: [...FACTORY_WORKER_EXECUTION_BACKENDS],
       supportedExecutors: factoryHarnessRegistry.registrations().map((registration) => {
@@ -187,9 +211,12 @@ let startedAt: number | null = null;
  * Run one coordinator tick:
  *   1. Fetch system state from Convex
  *   2. Run coordinator logic (decompose, delegate, detect stuck)
- *   3. Apply actions back to Convex
+ *   3. Report recommendations without applying autonomous writes
  */
 async function runTick(): Promise<any> {
+  if (!LEGACY_COORDINATOR_ENABLED) {
+    return { enabled: false, mode: "disabled" };
+  }
   try {
     // 1. Fetch current state from Convex
     const [inboxTasks, allTasks, agents] = await Promise.all([
@@ -248,73 +275,19 @@ async function runTick(): Promise<any> {
     // 3. Run coordinator tick
     const actions = coordinator.tick(state);
 
-    // 4. Apply decomposition results transactionally in Convex
-    let decompositionsApplied = 0;
-    let decompositionErrors = 0;
-    for (const decomp of actions.tasksToDecompose) {
-      try {
-        const result = await client.mutation(
-          ConvexMutations.coordinator.decomposeTask as any,
-          {
-            taskId: decomp.parentTaskId,
-            maxSubtasks: decomp.subtasks.length,
-          }
-        );
-        if (result?.success) {
-          decompositionsApplied++;
-        } else {
-          decompositionErrors++;
-          console.error(
-            `[orchestration] Failed to decompose task ${decomp.parentTaskId}: ${result?.error ?? "Unknown error"}`
-          );
-        }
-      } catch (err) {
-        decompositionErrors++;
-        console.error(`[orchestration] Failed to decompose task ${decomp.parentTaskId}`, err);
-      }
-    }
-
-    // 5. Apply delegations: assign agents to tasks
-    for (const delegation of actions.delegations) {
-      try {
-        await client.mutation(ConvexMutations.taskRouter.autoAssign as any, {
-          taskId: delegation.taskId,
-          actorType: "SYSTEM",
-          idempotencyKey: `delegate-${delegation.taskId}-${Date.now()}`,
-        });
-      } catch (err) {
-        console.error(`[orchestration] Failed to delegate task ${delegation.taskId}`, err);
-      }
-    }
-
-    // 6. Create alerts for stuck tasks
-    for (const stuck of actions.stuckAlerts) {
-      try {
-        await client.mutation(ConvexMutations.alerts.create as any, {
-          severity: "WARNING",
-          type: "STUCK_TASK",
-          title: `Task stuck: ${stuck.taskTitle}`,
-          description: `Task has been in progress for ${Math.round(stuck.stuckDurationMs / 60000)} minutes without activity`,
-          taskId: stuck.taskId,
-          agentId: stuck.agentId ?? undefined,
-        });
-      } catch (err) {
-        // Alert creation may not exist; log and continue
-        console.warn(`[orchestration] Could not create stuck alert for ${stuck.taskId}`);
-      }
-    }
-
-    // 7. Log escalations
+    // Legacy coordinator autonomy is a V1 non-goal. Keep the local diagnostic
+    // loop observable, but do not let recommendations mutate delivery state.
     for (const esc of actions.escalations) {
       console.warn(`[orchestration] Escalation: ${esc.taskTitle} — ${esc.reason}`);
     }
 
     lastTickAt = Date.now();
     lastTickResult = {
-      decompositions: decompositionsApplied,
-      decompositionErrors,
-      delegations: actions.delegations.length,
-      stuckAlerts: actions.stuckAlerts.length,
+      enabled: true,
+      mode: "observe-only",
+      proposedDecompositions: actions.tasksToDecompose.length,
+      proposedDelegations: actions.delegations.length,
+      detectedStuckTasks: actions.stuckAlerts.length,
       escalations: actions.escalations.length,
     };
     tickCount++;
@@ -426,6 +399,9 @@ app.get("/status", (c) => {
 
 // Manual tick trigger
 app.post("/tick", async (c) => {
+  if (!LEGACY_COORDINATOR_ENABLED) {
+    return c.json({ error: "Legacy coordinator tick is disabled for V1." }, 409);
+  }
   const result = await runTick();
   return c.json({ success: true, result });
 });
@@ -684,7 +660,6 @@ app.post("/workorders/:workOrderId/automation-execution", async (c) => {
   let heartbeatTask: Promise<void> | null = null;
   let claimHealthy = true;
   let claimAcquired = false;
-  let claimedRunId: string | null = null;
   let claimedWorkflowRunId: string | null = null;
   try {
     const claim = await client.mutation(ConvexMutations.automationExecutions.claim as any, {
@@ -703,7 +678,6 @@ app.post("/workorders/:workOrderId/automation-execution", async (c) => {
       }, 409);
     }
     claimAcquired = true;
-    claimedRunId = claim.runId;
     claimedWorkflowRunId = claim.workflowRunId;
     activeAutomationExecutions.set(workOrderId, { claimId, controller });
     heartbeat = setInterval(() => {
@@ -773,11 +747,6 @@ app.post("/workorders/:workOrderId/automation-execution", async (c) => {
         workflowRunId: manifest.workflowRunId,
       }, 202);
     }
-    await client.mutation(ConvexMutations.workflowRuns.updateStatus as any, {
-      runId: manifest.runId,
-      status: outcome.terminalStatus,
-      failureReason: result.error ?? undefined,
-    });
     return c.json({
       success: outcome.disposition === "AWAITING_VERIFICATION",
       result,
@@ -807,13 +776,6 @@ app.post("/workorders/:workOrderId/automation-execution", async (c) => {
         result: failureResult,
         costUsd: 0,
       }).catch(() => null) as any;
-      if (recovery?.terminalStatus && claimedRunId) {
-        await client.mutation(ConvexMutations.workflowRuns.updateStatus as any, {
-          runId: claimedRunId,
-          status: recovery.terminalStatus,
-          failureReason: failureResult.error,
-        }).catch(() => undefined);
-      }
       if (recovery?.retryAllowed) {
         return c.json({
           error: failureResult.error,
@@ -845,13 +807,6 @@ app.post("/workorders/:workOrderId/automation-cancel", async (c) => {
     if (!result?.requested) return c.json({ success: false, result }, 409);
     const active = activeAutomationExecutions.get(workOrderId);
     if (active && (!result.claimId || active.claimId === result.claimId)) active.controller.abort();
-    if (!result.activeLease) {
-      await client.mutation(ConvexMutations.workflowRuns.updateStatus as any, {
-        runId: result.runId,
-        status: "CANCELED",
-        failureReason: body.reason ?? "Operator requested cancellation",
-      });
-    }
     return c.json({
       success: true,
       cancellationRequested: true,
@@ -1330,7 +1285,7 @@ app.post("/run-artifacts/:runArtifactId/link-receipt", async (c) => {
   try {
     const runArtifactId = c.req.param("runArtifactId");
     const body = await c.req.json().catch(() => ({}));
-    const result = await client.mutation(ConvexMutations.workflowRuns.linkArtifactToVerificationReceipt as any, {
+    const result = await client.action(ConvexActions.workflowRuns.linkArtifactToVerificationReceipt as any, {
       runArtifactId,
       verificationReceiptId: body.verificationReceiptId,
     });
@@ -1460,19 +1415,22 @@ export function startServer() {
   console.log(`[orchestration] Convex URL: ${CONVEX_URL ? "configured" : "MISSING"}`);
   console.log(`[orchestration] Project: ${PROJECT_SLUG}`);
   console.log(`[orchestration] Tick interval: ${TICK_INTERVAL_MS}ms`);
+  console.log(`[orchestration] Legacy coordinator: ${LEGACY_COORDINATOR_ENABLED ? "observe-only" : "disabled"}`);
   console.log(`[orchestration] Agents dir: ${AGENTS_DIR}`);
 
   startedAt = Date.now();
 
-  tickTimer = setInterval(() => {
-    runTick().catch((err) => {
-      console.error("[orchestration] Tick loop error:", err);
-    });
-  }, TICK_INTERVAL_MS);
+  if (LEGACY_COORDINATOR_ENABLED) {
+    tickTimer = setInterval(() => {
+      runTick().catch((err) => {
+        console.error("[orchestration] Tick loop error:", err);
+      });
+    }, TICK_INTERVAL_MS);
 
-  runTick().then((result) => {
-    console.log(`[orchestration] Initial tick complete:`, result);
-  });
+    runTick().then((result) => {
+      console.log(`[orchestration] Initial legacy coordinator tick complete:`, result);
+    });
+  }
   if (DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED) {
     throw new Error("Configure exactly one Factory execution worker; legacy and durable workers cannot run together.");
   }

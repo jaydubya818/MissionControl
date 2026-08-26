@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { Bot, Brain, Clock, Globe, Package, Pencil, Trash2, type LucideIcon } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -60,8 +60,8 @@ function MemoryModal({
   const [content, setContent] = useState(initialValues?.content ?? "");
   const [saving, setSaving] = useState(false);
 
-  const createDoc = useMutation(api.agentDocuments.create);
-  const updateDoc = useMutation(api.agentDocuments.update);
+  const createDoc = useAction(api.agentDocuments.create);
+  const updateDoc = useAction(api.agentDocuments.update);
 
   const handleSave = async () => {
     if (!content.trim()) return;
@@ -593,7 +593,7 @@ export function MemoryView({ projectId }: MemoryViewProps) {
     projectId ? { projectId } : "skip"
   );
 
-  const removeDoc = useMutation(api.agentDocuments.remove);
+  const removeDoc = useAction(api.agentDocuments.remove);
   const removePattern = useMutation(api.agentLearning.removePattern);
 
   const agentsList = agents ?? [];

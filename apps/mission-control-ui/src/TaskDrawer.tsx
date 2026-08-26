@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { useState, useEffect } from "react";
@@ -41,8 +41,8 @@ export function TaskDrawer({
   const [loading, setLoading] = useState(false);
 
   const postMessage = useMutation(api.messages.post);
-  const transitionTask = useMutation(api.tasks.transition);
-  const updateTask = useMutation(api.tasks.update);
+  const transitionTask = useAction(api.tasks.transition);
+  const updateTask = useAction(api.tasks.update);
 
   if (!taskId) return null;
 

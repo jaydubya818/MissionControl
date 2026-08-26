@@ -7,8 +7,8 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { api } from "./_generated/api";
+import { action, internalMutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
 import { evaluateOperatorGate, getEffectiveOperatorControl } from "./lib/operatorControls";
@@ -38,6 +38,14 @@ import {
   buildWorkOrderTaskAuthority,
   workOrderTaskAuthorityIssue,
 } from "./lib/taskAuthority";
+import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
+import {
+  authorizedDeliveryActor,
+  requireAuthorizedDeliveryScope,
+} from "./lib/deliveryAuthorization";
+import { runAuditedHumanMutation } from "./lib/humanActionAudit";
+
+const publicQuery = query;
 
 // ============================================================================
 // TYPES
@@ -192,17 +200,9 @@ export const get = query({
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
     if (!task) return null;
+    await requireAuthorizedDeliveryScope(ctx, task.projectId);
+    await requireAuthorizedDeliveryScope(ctx, task.projectId);
     return (await loadTaskProjections(ctx, [task], task.projectId))[0];
-  },
-});
-
-export const getByIdentifier = query({
-  args: { identifier: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("tasks")
-      .withIndex("by_identifier", (q) => q.eq("identifier", args.identifier))
-      .first();
   },
 });
 
@@ -212,6 +212,7 @@ export const validateOutputForReview = query({
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
     if (!task) return { valid: false, errors: ["Task not found"] };
+    await requireAuthorizedDeliveryScope(ctx, task.projectId);
     const errors = validateForReview(
       task.deliverable ?? null,
       task.reviewChecklist ?? null,
@@ -228,6 +229,7 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireAuthorizedDeliveryScope(ctx, args.projectId);
     const limit = args.limit ?? 200;
     let tasks;
     if (args.projectId) {
@@ -250,6 +252,7 @@ export const listByStatus = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireAuthorizedDeliveryScope(ctx, args.projectId);
     const limit = args.limit ?? 100;
     let tasks;
 
@@ -291,6 +294,7 @@ export const listAll = query({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
+    await requireAuthorizedDeliveryScope(ctx, args.projectId);
     let tasks;
     if (args.projectId) {
       tasks = await ctx.db
@@ -318,6 +322,7 @@ export const listByWorkOrder = query({
     if (!workOrder || workOrder.projectId !== args.projectId) {
       throw new Error("Work Order is unavailable in the selected workspace.");
     }
+    await requireAuthorizedDeliveryScope(ctx, args.projectId);
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_project_work_order", (q) =>
@@ -335,6 +340,9 @@ export const listByAgent = query({
     agentId: v.id("agents"),
   },
   handler: async (ctx, args) => {
+    const agent = await ctx.db.get(args.agentId);
+    if (!agent) return [];
+    await requireAuthorizedDeliveryScope(ctx, agent.projectId);
     // assigneeIds is an array field — no direct Convex index possible.
     // Safety cap prevents unbounded full-table scan; proper fix = taskAssignments junction table.
     const tasks = await ctx.db.query("tasks").take(500);
@@ -354,7 +362,7 @@ export const listByAgent = query({
 });
 
 /** Allowed toStatus values for actor HUMAN per fromStatus (for UI "Move to" menu) */
-export const getAllowedTransitionsForHuman = query({
+export const getAllowedTransitionsForHuman = publicQuery({
   args: {},
   handler: async () => {
     const map: Record<string, string[]> = {};
@@ -368,22 +376,6 @@ export const getAllowedTransitionsForHuman = query({
   },
 });
 
-/** Update task threadRef (for Telegram thread-per-task) */
-export const updateThreadRef = mutation({
-  args: {
-    taskId: v.id("tasks"),
-    projectId: v.optional(v.id("projects")),
-    chatId: v.string(),
-    threadId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.taskId, {
-      threadRef: { chatId: args.chatId, threadId: args.threadId },
-    });
-    return { success: true };
-  },
-});
-
 /** Search tasks by title and description */
 export const search = query({
   args: {
@@ -392,6 +384,7 @@ export const search = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireAuthorizedDeliveryScope(ctx, args.projectId);
     const limit = args.limit ?? 50;
     let tasks;
     
@@ -431,6 +424,7 @@ export const exportIncidentReport = query({
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
     if (!task) return null;
+    await requireAuthorizedDeliveryScope(ctx, task.projectId);
     
     const transitions = await ctx.db
       .query("taskTransitions")
@@ -652,6 +646,7 @@ export const getWithTimeline = query({
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
     if (!task) return null;
+    await requireAuthorizedDeliveryScope(ctx, task.projectId);
     
     const transitions = await ctx.db
       .query("taskTransitions")
@@ -723,17 +718,6 @@ export const getWithTimeline = query({
   },
 });
 
-export const getUnifiedTimeline = query({
-  args: { taskId: v.id("tasks") },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("taskEvents")
-      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
-      .order("asc")
-      .collect();
-  },
-});
-
 /**
  * Read-only, workspace-scoped evidence for a future ASSIGNED -> READY migration.
  * This query never patches Tasks and deliberately reports exclusions.
@@ -741,6 +725,7 @@ export const getUnifiedTimeline = query({
 export const getWorkflowStateCompatibilityReport = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
+    await requireAuthorizedDeliveryScope(ctx, args.projectId);
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -779,6 +764,7 @@ export const simulateTransition = query({
         allowedTransitions: [],
       };
     }
+    await requireAuthorizedDeliveryScope(ctx, task.projectId);
 
     const fromStatus = task.status as TaskStatus;
     const toStatus = args.toStatus as TaskStatus;
@@ -899,6 +885,7 @@ export const simulateExecutionPlan = query({
         error: "Task not found",
       };
     }
+    await requireAuthorizedDeliveryScope(ctx, task.projectId);
 
     const actorType = (args.actorType ?? "HUMAN") as "AGENT" | "HUMAN" | "SYSTEM";
     const transitionPreview = (() => {
@@ -1080,28 +1067,49 @@ export const simulateExecutionPlan = query({
 // MUTATIONS
 // ============================================================================
 
-export const create = mutation({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    title: v.string(),
-    description: v.optional(v.string()),
-    type: v.string(),
-    priority: v.optional(v.number()),
-    assigneeIds: v.optional(v.array(v.id("agents"))),
-    labels: v.optional(v.array(v.string())),
-    estimatedCost: v.optional(v.number()),
-    goalId: v.optional(v.id("goals")),
-    workOrderId: v.optional(v.id("workOrders")),
-    idempotencyKey: v.optional(v.string()),
-    // Provenance — where the task came from
-    source: v.optional(v.string()),       // "DASHBOARD" | "TELEGRAM" | "GITHUB" | "AGENT" | "API"
-    sourceRef: v.optional(v.string()),    // e.g. "owner/repo#42", telegram msg id
-    createdBy: v.optional(v.string()),    // "HUMAN" | "AGENT" | "SYSTEM"
-    createdByRef: v.optional(v.string()), // agent id, user email, etc.
-    metadata: v.optional(v.any()),
-    dueAt: v.optional(v.number()),        // deadline timestamp (ms)
-  },
+const createArgs = {
+  projectId: v.optional(v.id("projects")),
+  title: v.string(),
+  description: v.optional(v.string()),
+  type: v.string(),
+  priority: v.optional(v.number()),
+  assigneeIds: v.optional(v.array(v.id("agents"))),
+  labels: v.optional(v.array(v.string())),
+  estimatedCost: v.optional(v.number()),
+  goalId: v.optional(v.id("goals")),
+  workOrderId: v.optional(v.id("workOrders")),
+  idempotencyKey: v.optional(v.string()),
+  source: v.optional(v.string()),
+  sourceRef: v.optional(v.string()),
+  createdBy: v.optional(v.string()),
+  createdByRef: v.optional(v.string()),
+  metadata: v.optional(v.any()),
+  dueAt: v.optional(v.number()),
+};
+
+export const createInternal = internalMutation({
+  args: createArgs,
   handler: async (ctx, args) => {
+    let authorizedProjectId = args.projectId;
+    if (args.workOrderId) {
+      const workOrder = await ctx.db.get(args.workOrderId);
+      if (!workOrder) throw new Error("The selected Work Order no longer exists.");
+      if (authorizedProjectId && workOrder.projectId !== authorizedProjectId) {
+        throw new Error("Work Order does not belong to the selected workspace.");
+      }
+      authorizedProjectId = authorizedProjectId ?? workOrder.projectId;
+    }
+    if (!authorizedProjectId) throw new Error("Task creation requires a workspace.");
+    const access = await requireAuthorizedDeliveryScope(
+      ctx,
+      authorizedProjectId,
+      COMPANY_PERMISSIONS.UPDATE_DELIVERY,
+    );
+    const actor = authorizedDeliveryActor(access);
+    args.projectId = authorizedProjectId;
+    args.createdBy = "HUMAN";
+    args.createdByRef = actor.actorId;
+
     // ── Idempotency check ──
     // If an idempotencyKey is provided, return existing task if found
     if (args.idempotencyKey) {
@@ -1237,6 +1245,7 @@ export const create = mutation({
     await ctx.db.insert("activities", {
       projectId: args.projectId,
       actorType: (args.createdBy as "AGENT" | "HUMAN" | "SYSTEM") ?? "SYSTEM",
+      actorId: args.createdByRef,
       action: "TASK_CREATED",
       description: `Task "${title}" created${sourceLabel}`,
       targetType: "TASK",
@@ -1264,6 +1273,20 @@ export const create = mutation({
         sourceRef: args.sourceRef,
       },
     });
+    await appendChangeRecord(ctx.db as any, {
+      tenantId: access?.project.tenantId,
+      projectId: args.projectId,
+      operatorId: actor.operatorId,
+      type: "TASK_CREATED",
+      summary: `Task created: ${title}`,
+      payload: {
+        taskId,
+        workOrderId: args.workOrderId,
+        source: args.source,
+      },
+      relatedTable: "tasks",
+      relatedId: String(taskId),
+    });
 
     // Creation remains immutable INBOX intake. An explicitly assigned Task is
     // then advanced through the same audited state machine used everywhere
@@ -1272,7 +1295,7 @@ export const create = mutation({
       const actorType = ["AGENT", "HUMAN", "SYSTEM"].includes(args.createdBy ?? "")
         ? args.createdBy as "AGENT" | "HUMAN" | "SYSTEM"
         : "SYSTEM";
-      const readyResult = await ctx.runMutation(api.tasks.transition, {
+      const readyResult = await ctx.runMutation(internal.tasks.transitionInternal, {
         taskId,
         projectId: args.projectId,
         toStatus: "READY",
@@ -1294,15 +1317,29 @@ export const create = mutation({
   },
 });
 
-export const linkToWorkOrder = mutation({
-  args: {
-    taskId: v.id("tasks"),
-    projectId: v.id("projects"),
-    workOrderId: v.id("workOrders"),
-    actorType: v.union(v.literal("HUMAN"), v.literal("AGENT"), v.literal("SYSTEM")),
-    actorId: v.optional(v.string()),
-    idempotencyKey: v.string(),
-  },
+export const create = action({
+  args: createArgs,
+  handler: async (ctx, args): Promise<any> =>
+    await runAuditedHumanMutation(
+      ctx,
+      internal.tasks.createInternal,
+      args,
+      "tasks.create",
+      { projectId: args.projectId, workOrderId: args.workOrderId },
+    ),
+});
+
+const linkToWorkOrderArgs = {
+  taskId: v.id("tasks"),
+  projectId: v.id("projects"),
+  workOrderId: v.id("workOrders"),
+  actorType: v.union(v.literal("HUMAN"), v.literal("AGENT"), v.literal("SYSTEM")),
+  actorId: v.optional(v.string()),
+  idempotencyKey: v.string(),
+};
+
+export const linkToWorkOrderInternal = internalMutation({
+  args: linkToWorkOrderArgs,
   handler: async (ctx, args) => {
     const [task, workOrder] = await Promise.all([
       ctx.db.get(args.taskId),
@@ -1311,6 +1348,14 @@ export const linkToWorkOrder = mutation({
     if (!task || task.projectId !== args.projectId) {
       throw new Error("Task is unavailable in the selected workspace.");
     }
+    const access = await requireAuthorizedDeliveryScope(
+      ctx,
+      args.projectId,
+      COMPANY_PERMISSIONS.UPDATE_DELIVERY,
+    );
+    const actor = authorizedDeliveryActor(access);
+    args.actorType = "HUMAN";
+    args.actorId = actor.actorId;
     const linkError = taskWorkOrderLinkError(args.projectId, workOrder);
     if (linkError) throw new Error(linkError);
     if (!workOrder) throw new Error("The selected Work Order no longer exists.");
@@ -1381,6 +1426,20 @@ export const linkToWorkOrder = mutation({
       },
       metadata: { idempotencyKey: args.idempotencyKey },
     });
+    await appendChangeRecord(ctx.db as any, {
+      tenantId: task.tenantId ?? access?.project.tenantId,
+      projectId: args.projectId,
+      operatorId: actor.operatorId,
+      type: "TASK_LINKED_TO_WORK_ORDER",
+      summary: `Task ${task._id} linked to Work Order ${workOrder._id}`,
+      payload: {
+        taskId: task._id,
+        workOrderId: workOrder._id,
+        idempotencyKey: args.idempotencyKey,
+      },
+      relatedTable: "tasks",
+      relatedId: String(task._id),
+    });
 
     const updated = await ctx.db.get(task._id);
     return {
@@ -1393,64 +1452,101 @@ export const linkToWorkOrder = mutation({
   },
 });
 
-export const transition = mutation({
-  args: {
-    taskId: v.id("tasks"),
-    projectId: v.optional(v.id("projects")),
-    toStatus: taskStatusValidator,
-    actorType: v.union(v.literal("AGENT"), v.literal("HUMAN"), v.literal("SYSTEM")),
-    actorAgentId: v.optional(v.id("agents")),
-    actorUserId: v.optional(v.string()),
-    reason: v.optional(v.string()),
-    sessionKey: v.optional(v.string()),
-    idempotencyKey: v.string(),
-    // Artifacts for transition requirements
-    workPlan: v.optional(v.object({
-      bullets: v.array(v.string()),
-      estimatedCost: v.optional(v.number()),
-      estimatedDuration: v.optional(v.string()),
+export const linkToWorkOrder = action({
+  args: linkToWorkOrderArgs,
+  handler: async (ctx, args): Promise<any> =>
+    await runAuditedHumanMutation(
+      ctx,
+      internal.tasks.linkToWorkOrderInternal,
+      args,
+      "tasks.linkToWorkOrder",
+      { projectId: args.projectId, taskId: args.taskId, workOrderId: args.workOrderId },
+    ),
+});
+
+const transitionArgs = {
+  taskId: v.id("tasks"),
+  projectId: v.optional(v.id("projects")),
+  toStatus: taskStatusValidator,
+  actorType: v.union(v.literal("AGENT"), v.literal("HUMAN"), v.literal("SYSTEM")),
+  actorAgentId: v.optional(v.id("agents")),
+  actorUserId: v.optional(v.string()),
+  reason: v.optional(v.string()),
+  sessionKey: v.optional(v.string()),
+  idempotencyKey: v.string(),
+  workPlan: v.optional(v.object({
+    bullets: v.array(v.string()),
+    estimatedCost: v.optional(v.number()),
+    estimatedDuration: v.optional(v.string()),
+  })),
+  deliverable: v.optional(v.object({
+    summary: v.optional(v.string()),
+    content: v.optional(v.string()),
+    artifactIds: v.optional(v.array(v.string())),
+  })),
+  reviewChecklist: v.optional(v.object({
+    type: v.string(),
+    items: v.array(v.object({
+      label: v.string(),
+      checked: v.boolean(),
+      note: v.optional(v.string()),
     })),
-    deliverable: v.optional(v.object({
-      summary: v.optional(v.string()),
-      content: v.optional(v.string()),
-      artifactIds: v.optional(v.array(v.string())),
-    })),
-    reviewChecklist: v.optional(v.object({
-      type: v.string(),
-      items: v.array(v.object({
-        label: v.string(),
-        checked: v.boolean(),
-        note: v.optional(v.string()),
-      })),
-    })),
-    blockedReason: v.optional(v.string()),
-    reviewOwnerId: v.optional(v.id("agents")),
-    reviewFindings: v.optional(v.array(v.string())),
-    blocker: v.optional(v.object({
-      type: v.union(
-        v.literal("TASK"),
-        v.literal("EXTERNAL"),
-        v.literal("POLICY"),
-        v.literal("APPROVAL"),
-        v.literal("CAPACITY"),
-        v.literal("UNKNOWN")
-      ),
-      reason: v.string(),
-      blockingTaskId: v.optional(v.id("tasks")),
-      ownerRef: v.optional(v.string()),
-      requiredAction: v.optional(v.string()),
-      escalationAt: v.optional(v.number()),
-    })),
-    blockerResolution: v.optional(v.object({
-      resolution: v.union(
-        v.literal("RESOLVED"),
-        v.literal("WAIVED"),
-        v.literal("REPLACED")
-      ),
-      reason: v.string(),
-    })),
-  },
+  })),
+  blockedReason: v.optional(v.string()),
+  reviewOwnerId: v.optional(v.id("agents")),
+  reviewFindings: v.optional(v.array(v.string())),
+  blocker: v.optional(v.object({
+    type: v.union(
+      v.literal("TASK"),
+      v.literal("EXTERNAL"),
+      v.literal("POLICY"),
+      v.literal("APPROVAL"),
+      v.literal("CAPACITY"),
+      v.literal("UNKNOWN")
+    ),
+    reason: v.string(),
+    blockingTaskId: v.optional(v.id("tasks")),
+    ownerRef: v.optional(v.string()),
+    requiredAction: v.optional(v.string()),
+    escalationAt: v.optional(v.number()),
+  })),
+  blockerResolution: v.optional(v.object({
+    resolution: v.union(
+      v.literal("RESOLVED"),
+      v.literal("WAIVED"),
+      v.literal("REPLACED")
+    ),
+    reason: v.string(),
+  })),
+};
+
+export const transitionInternal = internalMutation({
+  args: transitionArgs,
   handler: async (ctx, args) => {
+    const authorityTask = await ctx.db.get(args.taskId);
+    if (!authorityTask) {
+      return {
+        success: false,
+        errors: [{ field: "taskId", message: "Task not found" }],
+      };
+    }
+    if (args.projectId && authorityTask.projectId !== args.projectId) {
+      return {
+        success: false,
+        errors: [{ field: "projectId", message: "Task does not belong to the selected workspace" }],
+      };
+    }
+    const access = await requireAuthorizedDeliveryScope(
+      ctx,
+      authorityTask.projectId,
+      COMPANY_PERMISSIONS.UPDATE_DELIVERY,
+    );
+    const actor = authorizedDeliveryActor(access);
+    args.projectId = authorityTask.projectId;
+    args.actorType = "HUMAN";
+    args.actorAgentId = undefined;
+    args.actorUserId = actor.actorId;
+
     // 1. Check idempotency - return existing if same key
     const existingTransition = await ctx.db
       .query("taskTransitions")
@@ -1678,8 +1774,7 @@ export const transition = mutation({
     
     // 7. Build task update
     const now = Date.now();
-    const actorRef =
-      args.actorUserId ?? args.actorAgentId?.toString() ?? args.actorType;
+    const actorRef = args.actorUserId ?? args.actorType;
     const taskUpdate: any = {
       status: toStatus,
       stateEnteredAt: now,
@@ -1798,6 +1893,7 @@ export const transition = mutation({
     await appendChangeRecord(ctx.db as any, {
       tenantId: task.tenantId,
       projectId: task.projectId,
+      operatorId: actor.operatorId,
       legacyAgentId: args.actorAgentId,
       type: "TASK_TRANSITIONED",
       summary: `Task ${args.taskId} transitioned ${fromStatus} -> ${toStatus}`,
@@ -1817,7 +1913,7 @@ export const transition = mutation({
     await ctx.db.insert("activities", {
       projectId: task.projectId,
       actorType,
-      actorId: args.actorAgentId?.toString() ?? args.actorUserId,
+      actorId: args.actorUserId,
       action: "TASK_TRANSITION",
       description: `Task transitioned: ${fromStatus} → ${toStatus}`,
       targetType: "TASK",
@@ -1833,7 +1929,7 @@ export const transition = mutation({
       projectId: task.projectId,
       eventType: "TASK_TRANSITION",
       actorType,
-      actorId: args.actorAgentId?.toString() ?? args.actorUserId,
+      actorId: args.actorUserId,
       relatedId: transitionId,
       beforeState: { status: fromStatus, review: task.review, blocker: task.blocker },
       afterState: { status: toStatus, review: taskUpdate.review, blocker: taskUpdate.blocker },
@@ -1896,7 +1992,19 @@ export const transition = mutation({
   },
 });
 
-export const supersedeWorkflowAttempt = mutation({
+export const transition = action({
+  args: transitionArgs,
+  handler: async (ctx, args): Promise<any> =>
+    await runAuditedHumanMutation(
+      ctx,
+      internal.tasks.transitionInternal,
+      args,
+      "tasks.transition",
+      { projectId: args.projectId, taskId: args.taskId },
+    ),
+});
+
+export const supersedeWorkflowAttempt = internalMutation({
   args: {
     taskId: v.id("tasks"),
     runId: v.string(),
@@ -2045,7 +2153,7 @@ export const supersedeWorkflowAttempt = mutation({
   },
 });
 
-export const resolveApprovedWorkflowGate = mutation({
+export const resolveApprovedWorkflowGate = internalMutation({
   args: {
     taskId: v.id("tasks"),
     approvalId: v.id("approvals"),
@@ -2239,19 +2347,33 @@ export const resolveApprovedWorkflowGate = mutation({
   },
 });
 
-export const assign = mutation({
-  args: {
-    taskId: v.id("tasks"),
-    agentIds: v.array(v.id("agents")),
-    actorType: v.union(v.literal("AGENT"), v.literal("HUMAN"), v.literal("SYSTEM")),
-    actorUserId: v.optional(v.string()),
-    idempotencyKey: v.string(),
-  },
+const assignArgs = {
+  taskId: v.id("tasks"),
+  agentIds: v.array(v.id("agents")),
+  actorType: v.union(v.literal("AGENT"), v.literal("HUMAN"), v.literal("SYSTEM")),
+  actorUserId: v.optional(v.string()),
+  idempotencyKey: v.string(),
+};
+
+export const assignInternal = internalMutation({
+  args: assignArgs,
   handler: async (ctx, args): Promise<{ success: boolean; error?: string; task?: any }> => {
     const task = await ctx.db.get(args.taskId);
     if (!task) {
       return { success: false, error: "Task not found" };
     }
+    const access = await requireAuthorizedDeliveryScope(
+      ctx,
+      task.projectId,
+      COMPANY_PERMISSIONS.ASSIGN_DELIVERY,
+    );
+    const actor = authorizedDeliveryActor(access);
+    const agents = await Promise.all(args.agentIds.map((agentId) => ctx.db.get(agentId)));
+    if (agents.some((agent) => !agent || (agent.projectId && agent.projectId !== task.projectId))) {
+      return { success: false, error: "Every assignee must belong to the Task workspace" };
+    }
+    args.actorType = "HUMAN";
+    args.actorUserId = actor.actorId;
     
     // Update assignees
     const assigneeInstanceIds = await resolveAssigneeInstanceIds(ctx, args.agentIds);
@@ -2259,11 +2381,22 @@ export const assign = mutation({
       assigneeIds: args.agentIds,
       assigneeInstanceIds,
     });
+    await appendChangeRecord(ctx.db as any, {
+      tenantId: task.tenantId ?? access?.project.tenantId,
+      projectId: task.projectId,
+      operatorId: actor.operatorId,
+      type: "TASK_ASSIGNED",
+      summary: `Task ${task._id} assigned to ${args.agentIds.length} agent(s)`,
+      payload: { taskId: task._id, agentIds: args.agentIds },
+      relatedTable: "tasks",
+      relatedId: String(task._id),
+    });
     
     // If task is in INBOX, enter the canonical execution-ready state.
     if (task.status === "INBOX") {
-      return await ctx.runMutation(api.tasks.transition, {
+      return await ctx.runMutation(internal.tasks.transitionInternal, {
         taskId: args.taskId,
+        projectId: task.projectId,
         toStatus: "READY",
         actorType: args.actorType,
         actorUserId: args.actorUserId,
@@ -2277,56 +2410,78 @@ export const assign = mutation({
   },
 });
 
+export const assign = action({
+  args: assignArgs,
+  handler: async (ctx, args): Promise<any> =>
+    await runAuditedHumanMutation(
+      ctx,
+      internal.tasks.assignInternal,
+      args,
+      "tasks.assign",
+      { taskId: args.taskId },
+    ),
+});
+
 /**
  * Update editable task fields.
  * Status changes are routed through the state-machine transition mutation.
  */
-export const update = mutation({
-  args: {
-    taskId: v.id("tasks"),
-    title: v.optional(v.string()),
-    description: v.optional(v.string()),
-    priority: v.optional(v.union(v.literal(1), v.literal(2), v.literal(3), v.literal(4))),
-    status: v.optional(taskStatusValidator),
-    type: v.optional(taskTypeValidator),
+const updateArgs = {
+  taskId: v.id("tasks"),
+  title: v.optional(v.string()),
+  description: v.optional(v.string()),
+  priority: v.optional(v.union(v.literal(1), v.literal(2), v.literal(3), v.literal(4))),
+  status: v.optional(taskStatusValidator),
+  type: v.optional(taskTypeValidator),
+  estimatedCost: v.optional(v.number()),
+  assigneeIds: v.optional(v.array(v.id("agents"))),
+  dueAt: v.optional(v.union(v.number(), v.null())),
+  workPlan: v.optional(v.object({
+    bullets: v.array(v.string()),
     estimatedCost: v.optional(v.number()),
-    assigneeIds: v.optional(v.array(v.id("agents"))),
-    dueAt: v.optional(v.union(v.number(), v.null())),
-    workPlan: v.optional(v.object({
-      bullets: v.array(v.string()),
-      estimatedCost: v.optional(v.number()),
-      estimatedDuration: v.optional(v.string()),
+    estimatedDuration: v.optional(v.string()),
+  })),
+  deliverable: v.optional(v.object({
+    summary: v.optional(v.string()),
+    content: v.optional(v.string()),
+    artifactIds: v.optional(v.array(v.string())),
+  })),
+  reviewChecklist: v.optional(v.object({
+    type: v.string(),
+    items: v.array(v.object({
+      label: v.string(),
+      checked: v.boolean(),
+      note: v.optional(v.string()),
     })),
-    deliverable: v.optional(v.object({
-      summary: v.optional(v.string()),
-      content: v.optional(v.string()),
-      artifactIds: v.optional(v.array(v.string())),
-    })),
-    reviewChecklist: v.optional(v.object({
-      type: v.string(),
-      items: v.array(v.object({
-        label: v.string(),
-        checked: v.boolean(),
-        note: v.optional(v.string()),
-      })),
-    })),
-    actorUserId: v.optional(v.string()),
-    idempotencyKey: v.optional(v.string()),
-  },
+  })),
+  actorUserId: v.optional(v.string()),
+  idempotencyKey: v.optional(v.string()),
+};
+
+export const updateInternal = internalMutation({
+  args: updateArgs,
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
     if (!task) {
       throw new Error("Task not found");
     }
+    const access = await requireAuthorizedDeliveryScope(
+      ctx,
+      task.projectId,
+      COMPANY_PERMISSIONS.UPDATE_DELIVERY,
+    );
+    const actor = authorizedDeliveryActor(access);
+    args.actorUserId = actor.actorId;
 
     // Route status updates through transition rules.
     if (args.status && args.status !== task.status) {
-      const transition = await ctx.runMutation(api.tasks.transition, {
+      const transition = await ctx.runMutation(internal.tasks.transitionInternal, {
         taskId: args.taskId,
+        projectId: task.projectId,
         toStatus: args.status,
         actorType: "HUMAN",
-        actorUserId: args.actorUserId ?? "operator",
-        idempotencyKey: args.idempotencyKey ?? `update-status:${args.taskId}:${args.status}:${args.actorUserId ?? "operator"}`,
+        actorUserId: actor.actorId,
+        idempotencyKey: args.idempotencyKey ?? `update-status:${args.taskId}:${args.status}:${actor.actorId}`,
         reason: "Task updated from editor",
         workPlan: args.workPlan ?? task.workPlan,
         deliverable: args.deliverable ?? task.deliverable,
@@ -2370,8 +2525,30 @@ export const update = mutation({
         taskId: args.taskId,
         metadata: { updatedFields: Object.keys(patch) },
       });
+      await appendChangeRecord(ctx.db as any, {
+        tenantId: task.tenantId ?? access?.project.tenantId,
+        projectId: task.projectId,
+        operatorId: actor.operatorId,
+        type: "TASK_UPDATED",
+        summary: `Task ${task._id} updated`,
+        payload: { taskId: task._id, updatedFields: Object.keys(patch) },
+        relatedTable: "tasks",
+        relatedId: String(task._id),
+      });
     }
 
     return await ctx.db.get(args.taskId);
   },
+});
+
+export const update = action({
+  args: updateArgs,
+  handler: async (ctx, args): Promise<any> =>
+    await runAuditedHumanMutation(
+      ctx,
+      internal.tasks.updateInternal,
+      args,
+      "tasks.update",
+      { taskId: args.taskId },
+    ),
 });

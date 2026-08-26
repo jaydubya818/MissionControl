@@ -1586,6 +1586,9 @@ function qualifyGenericHarnessAdmission() {
     workerId: "worker-generic-harness-v2",
     status: "READY",
     dirty: false,
+    networkPolicyStatus: "READY",
+    secretPolicyStatus: "READY",
+    attestedAt: FIXED_NOW,
     capacity: { maxConcurrentRuns: 1, currentRuns: 0 },
     workerRuntime: {
       sessionId: "worker-generic-harness-session-v2",
@@ -1652,6 +1655,9 @@ function eligibleWorker(): FactoryWorkerCandidate {
     workerId: "worker-system-factory-v2",
     status: "READY",
     dirty: false,
+    networkPolicyStatus: "READY",
+    secretPolicyStatus: "READY",
+    attestedAt: FIXED_NOW,
     capacity: { maxConcurrentRuns: 1, currentRuns: 0 },
     workerRuntime: {
       sessionId: "worker-session-current",

@@ -154,6 +154,33 @@ describe("RemoteSandboxRuntime", () => {
     expect(provider.calls.at(-1)).toMatch(/^terminate:/);
   });
 
+  it("quarantines a result that reports spend above the provider-enforced Attempt cap", async () => {
+    const selectedProfile = profile();
+    const overBudget = createSandboxResultBundle({
+      ...withoutDigest(resultBundle(selectedProfile)),
+      usage: {
+        ...resultBundle(selectedProfile).usage,
+        inferenceCostUsd: selectedProfile.spend.maxUsd + 0.01,
+      },
+    });
+    const provider = new FakeSandboxProvider({ result: encodeSandboxResultBundle(overBudget) });
+    const credentials = new FakeSandboxCredentialBroker();
+    const journal = new InMemoryRemoteSandboxJournal();
+    const runtime = new RemoteSandboxRuntime(provider, credentials, journal);
+
+    const failure = await runtime.execute(request(selectedProfile)).catch((error) => error);
+
+    expect(failure).toBeInstanceOf(RemoteSandboxExecutionError);
+    expect(failure.failure).toMatchObject({
+      class: "NON_RETRYABLE_RESULT",
+      code: "MODEL_SPEND_LIMIT_EXCEEDED",
+      retryable: false,
+    });
+    expect(journal.results).toContainEqual(expect.objectContaining({ digest: overBudget.digest }));
+    expect(credentials.active.size).toBe(0);
+    expect(journal.terminations).toHaveLength(1);
+  });
+
   it("revokes and tears down after executor startup failure", async () => {
     const selectedProfile = profile();
     const provider = new FakeSandboxProvider({ failAt: "START" });
@@ -798,6 +825,14 @@ function request(selectedProfile: SandboxProfileSnapshot) {
       causation: { workflowRunId: "run-1" },
       harness: harnessIdentity(),
       intent: { acceptanceCriterionIds: ["ac-1"] },
+      retryPolicy: {
+        schema: "factory-remote-retry-policy/v1",
+        maxAttempts: 1,
+        maxTotalWallClockMs: selectedProfile.runtime.maxRuntimeMs,
+        maxModelSpendUsd: selectedProfile.spend.maxUsd,
+        maxProviderResources: 1,
+        retryableFailureClasses: ["RETRYABLE_INFRA", "RETRYABLE_EXECUTION"],
+      },
     },
     manifestDigest: "sha256:manifest",
     sourceSha,

@@ -13,12 +13,18 @@ import {
 import { canAccessDeliveryRecord } from "../lib/deliveryAuthorization";
 
 const originalDemoFlag = process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
+const originalDeploymentClass = process.env.MC_BACKEND_DEPLOYMENT_CLASS;
 
 afterEach(() => {
   if (originalDemoFlag === undefined) {
     delete process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
   } else {
     process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT = originalDemoFlag;
+  }
+  if (originalDeploymentClass === undefined) {
+    delete process.env.MC_BACKEND_DEPLOYMENT_CLASS;
+  } else {
+    process.env.MC_BACKEND_DEPLOYMENT_CLASS = originalDeploymentClass;
   }
 });
 
@@ -223,6 +229,7 @@ describe("company access", () => {
 
   it("exposes active companies only when local demo access is explicit", async () => {
     process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT = "1";
+    process.env.MC_BACKEND_DEPLOYMENT_CLASS = "local";
     const { ctx } = fakeContext();
     const memberships = await listCompanyMemberships(ctx);
     expect(memberships.map((item) => item.tenant.slug)).toEqual([
@@ -231,6 +238,22 @@ describe("company access", () => {
     ]);
     expect(memberships.every((item) => item.mode === "DEMO")).toBe(true);
   });
+
+  it.each([undefined, "shared", "production"])(
+    "rejects anonymous company access for backend class %s",
+    async (deploymentClass) => {
+      process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT = "1";
+      if (deploymentClass === undefined) {
+        delete process.env.MC_BACKEND_DEPLOYMENT_CLASS;
+      } else {
+        process.env.MC_BACKEND_DEPLOYMENT_CLASS = deploymentClass;
+      }
+      const { ctx } = fakeContext();
+      await expect(listCompanyMemberships(ctx)).rejects.toThrow(
+        /MC_BACKEND_DEPLOYMENT_CLASS=local/,
+      );
+    },
+  );
 
   it("keeps team-scoped operators inside their assigned delivery records", () => {
     const access = {

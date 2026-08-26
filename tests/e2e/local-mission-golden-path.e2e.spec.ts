@@ -14,6 +14,7 @@ const failedAttemptId = process.env.MISSION_GOLDEN_PATH_FAILED_ATTEMPT_ID ?? "";
 const candidateSha = process.env.MISSION_GOLDEN_PATH_CANDIDATE_SHA ?? "";
 const previousCandidateSha = process.env.MISSION_GOLDEN_PATH_PREVIOUS_CANDIDATE_SHA ?? "";
 const productPullRequestNumber = process.env.MISSION_GOLDEN_PATH_PRODUCT_PR ?? "";
+const deterministicFixture = process.env.MISSION_GOLDEN_PATH_CI_FIXTURE === "1";
 const liveProofConfigured = Boolean(
   appUrl
   && workspaceId
@@ -53,34 +54,45 @@ test("local Mission golden path exposes exact eligible candidate and recovery li
   await page.getByRole("tab", { name: "Execution", exact: true }).click();
   await expect(page.getByText(attemptId, { exact: true }).first()).toBeVisible();
   await expect(page.getByText(verificationAttemptId, { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(candidateSha, { exact: true })).toBeVisible();
+  await expect(page.getByText(candidateSha, { exact: true }).first()).toBeVisible();
   await expect(page.getByText(verificationSubjectDigest, { exact: true })).toBeVisible();
   await expect(page.getByText(verificationPlanId, { exact: true })).toBeVisible();
   await expect(page.getByText("Server-derived independence passed", { exact: true })).toBeVisible();
-  await expect(page.getByText("3 envelope(s)", { exact: false })).toBeVisible();
+  await expect(page.getByText(deterministicFixture ? "4 envelope(s)" : "3 envelope(s)", { exact: false })).toBeVisible();
   await expect(page.getByText(`#${productPullRequestNumber} · installation 152563527`, { exact: true })).toBeVisible();
   await expect(page.getByText("ELIGIBLE", { exact: true })).toBeVisible();
   await expect(page.getByText(/ELIGIBLE · non-authoritative projection/)).toBeVisible();
 
   await page.reload();
   await page.getByRole("tab", { name: "Execution", exact: true }).click();
-  await expect(page.getByText(candidateSha, { exact: true })).toBeVisible();
+  await expect(page.getByText(candidateSha, { exact: true }).first()).toBeVisible();
   await expect(page.getByText(verificationAttemptId, { exact: true }).first()).toBeVisible();
   await expect(page.getByText("ELIGIBLE", { exact: true })).toBeVisible();
 
   await page.goto(`${appUrl}/v2/control-work-orders?project=sf-demo&workspace=${workspaceId}&workOrder=${workOrderId}`);
   await expect(page.getByRole("heading", { name: "Work Orders", exact: true })).toBeVisible();
-  await expect(page.getByText(factoryVersionLabel, { exact: false }).first()).toBeVisible();
-  await expect(page.getByText("node --test scripts/local-golden-path-candidate.test.mjs", { exact: true })).toBeVisible();
+  if (!deterministicFixture) {
+    await expect(page.getByText(factoryVersionLabel, { exact: false }).first()).toBeVisible();
+  }
+  await expect(page.getByText(
+    deterministicFixture ? "pnpm test" : "node --test scripts/local-golden-path-candidate.test.mjs",
+    { exact: true },
+  ).first()).toBeVisible();
   await expect(page.getByText("APPROVED", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Exact-head CI and every criterion have accepted evidence. Human merge review can proceed.", { exact: true })).toBeVisible();
-  await expect(page.getByText(candidateSha, { exact: true })).toBeVisible();
+  await expect(page.getByText(candidateSha, { exact: true }).first()).toBeVisible();
   await expect(page.getByText("PR OPEN", { exact: true })).toBeVisible();
   await expect(page.getByText(attemptId, { exact: true }).first()).toBeVisible();
   await expect(page.getByText(failedAttemptId, { exact: true }).first()).toBeVisible();
   await expect(page.getByText(new RegExp(previousCandidateSha)).first()).toBeVisible();
   await expect(page.getByText("Ready for explicit acceptance.", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Accept WorkOrder", exact: true })).toBeEnabled();
+
+  if (deterministicFixture) {
+    await expect(page.getByText("Implement the approved Mission candidate", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("1 of 1 Tasks complete", { exact: true })).toBeVisible();
+    await expect(page.getByText("2 of 2 criteria verified", { exact: true })).toBeVisible();
+  }
 
   expect(capture.pageErrors).toEqual([]);
   expect(capture.failedRequests).toEqual([]);

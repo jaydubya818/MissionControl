@@ -1,96 +1,26 @@
-// PM2 Ecosystem Configuration
-// Manages all Mission Control agents
+const path = require("node:path");
+
+const repositoryRoot = __dirname;
 
 module.exports = {
   apps: [
-    // Mission Control Agents
     {
-      name: "agent-sofie",
+      name: "mission-control-orchestration",
       script: "pnpm",
-      args: "dev",
-      cwd: "/Users/jaywest/MissionControl/packages/agent-runner",
-      env: {
-        CONVEX_URL: "https://different-gopher-55.convex.cloud",
-        PROJECT_SLUG: "mission-control",
-        AGENT_NAME: "Sofie",
-      },
+      args: ["--filter", "@mission-control/orchestration-server", "start"],
+      cwd: repositoryRoot,
+      exec_mode: "fork",
+      instances: 1,
       autorestart: true,
       watch: false,
-      max_memory_restart: "500M",
-    },
-    {
-      name: "agent-backend-dev",
-      script: "pnpm",
-      args: "dev",
-      cwd: "/Users/jaywest/MissionControl/packages/agent-runner",
+      max_memory_restart: "1G",
+      kill_timeout: 10_000,
+      listen_timeout: 10_000,
+      max_restarts: 10,
+      min_uptime: "10s",
       env: {
-        CONVEX_URL: "https://different-gopher-55.convex.cloud",
-        PROJECT_SLUG: "mission-control",
-        AGENT_NAME: "Backend Developer",
+        NODE_ENV: "production",
       },
-      autorestart: true,
-      watch: false,
-      max_memory_restart: "500M",
-    },
-    {
-      name: "agent-frontend-dev",
-      script: "pnpm",
-      args: "dev",
-      cwd: "/Users/jaywest/MissionControl/packages/agent-runner",
-      env: {
-        CONVEX_URL: "https://different-gopher-55.convex.cloud",
-        PROJECT_SLUG: "mission-control",
-        AGENT_NAME: "Frontend Developer",
-      },
-      autorestart: true,
-      watch: false,
-      max_memory_restart: "500M",
-    },
-    {
-      name: "agent-devops",
-      script: "pnpm",
-      args: "dev",
-      cwd: "/Users/jaywest/MissionControl/packages/agent-runner",
-      env: {
-        CONVEX_URL: "https://different-gopher-55.convex.cloud",
-        PROJECT_SLUG: "mission-control",
-        AGENT_NAME: "DevOps",
-      },
-      autorestart: true,
-      watch: false,
-      max_memory_restart: "500M",
-    },
-    
-    // SellerFi Agents
-    {
-      name: "agent-bj",
-      script: "pnpm",
-      args: "dev",
-      cwd: "/Users/jaywest/MissionControl/packages/agent-runner",
-      env: {
-        CONVEX_URL: "https://different-gopher-55.convex.cloud",
-        PROJECT_SLUG: "sellerfi",
-        AGENT_NAME: "BJ",
-      },
-      autorestart: true,
-      watch: false,
-      max_memory_restart: "500M",
-    },
-    
-    // OpenClaw Agents
-    {
-      name: "agent-scout",
-      script: "pnpm",
-      args: "dev",
-      cwd: "/Users/jaywest/MissionControl/packages/agent-runner",
-      env: {
-        CONVEX_URL: "https://different-gopher-55.convex.cloud",
-        PROJECT_SLUG: "openclaw",
-        AGENT_NAME: "Scout",
-      },
-      autorestart: true,
-      watch: false,
-      max_memory_restart: "500M",
     },
   ],
 };

@@ -19,6 +19,10 @@ import {
   type RemoteFailure,
   type RemoteFailureStage,
 } from "./remoteExecutionPolicy.js";
+import {
+  assessFactoryCostEnforcement,
+  observedFactoryCostWithinBound,
+} from "@mission-control/workflow-engine/cost-enforcement";
 
 export type SandboxLifecycleEventType =
   | "SANDBOX_REQUESTED"
@@ -107,6 +111,22 @@ export class RemoteSandboxRuntime {
     request: RemoteSandboxExecutionRequest,
     options?: { deferCleanup?: boolean },
   ): Promise<RemoteSandboxExecutionResult | RemoteSandboxCandidateSession> {
+    const retryPolicy = request.executionManifest.retryPolicy as Record<string, unknown> | undefined;
+    const costEnforcement = assessFactoryCostEnforcement({
+      deploymentClass: "production",
+      executionBackend: "remote-sandbox",
+      maxCostUsd: Number(retryPolicy?.maxModelSpendUsd),
+      maxAttempts: Number(retryPolicy?.maxAttempts),
+      sandboxSpend: request.profile.spend,
+    });
+    if (!costEnforcement.allowed || costEnforcement.perAttemptLimitUsd === null) {
+      throw new RemoteSandboxExecutionError(remoteFailure(
+        "NON_RETRYABLE_RESULT",
+        "MODEL_SPEND_CAP_NOT_ENFORCEABLE",
+        "PROFILE",
+        `Remote model-spend enforcement is not ready (${costEnforcement.allowed ? "missing-limit" : costEnforcement.reason}).`,
+      ));
+    }
     const profileValidation = await this.provider.validateProfile(request.profile);
     if (!profileValidation.dispatchable) {
       throw new RemoteSandboxExecutionError(remoteFailure(
@@ -241,6 +261,7 @@ export class RemoteSandboxRuntime {
       allocation = { ...allocation, state: "RESULT_READY", resultDigest: bundle.digest };
       await this.journal.recordAllocation(allocation);
       await this.journal.recordResult(bundle);
+      failureStage = "RESULT_VALIDATION";
       diagnostics = this.provider.fetchDiagnostics
         ? await this.provider.fetchDiagnostics(allocation).then(sanitizeDiagnostics).catch(() => null)
         : null;
@@ -250,6 +271,18 @@ export class RemoteSandboxRuntime {
         providerCostUsd: bundle.usage.providerCostUsd,
         inferenceCostUsd: bundle.usage.inferenceCostUsd,
       });
+      const observedCost = observedFactoryCostWithinBound({
+        observedCostUsd: bundle.usage.inferenceCostUsd,
+        enforcedLimitUsd: costEnforcement.perAttemptLimitUsd,
+      });
+      if (!observedCost.allowed) {
+        throw new RemoteSandboxExecutionError(remoteFailure(
+          "NON_RETRYABLE_RESULT",
+          "MODEL_SPEND_LIMIT_EXCEEDED",
+          "RESULT_VALIDATION",
+          `Attempt model spend violated its provider-enforced $${costEnforcement.perAttemptLimitUsd.toFixed(2)} cap (${observedCost.reason}).`,
+        ));
+      }
     } catch (error) {
       const typedError = error instanceof RemoteSandboxExecutionError
         ? error

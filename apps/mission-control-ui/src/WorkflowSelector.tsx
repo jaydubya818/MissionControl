@@ -5,7 +5,7 @@
  */
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -21,12 +21,12 @@ export function WorkflowSelector({ projectId, onClose, onStarted }: WorkflowSele
   const [isStarting, setIsStarting] = useState(false);
   
   const workflows = useQuery(api.workflows.list, { activeOnly: true });
-  const startRun = useMutation(api.workflowRuns.start);
+  const startRun = useAction(api.workflowRuns.start);
   
   const selectedWorkflow = workflows?.find((w) => w.workflowId === selectedWorkflowId);
   
   const handleStart = async () => {
-    if (!selectedWorkflowId || !input.trim()) return;
+    if (!projectId || !selectedWorkflowId || !input.trim()) return;
     
     setIsStarting(true);
     try {

@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { WorkflowRunPanel } from "./WorkflowRunPanel";
 import { PageHeader } from "./components/factory/DetailLayout";
@@ -29,14 +30,14 @@ const RUN_BAR_CLASS: Record<string, string> = {
   PAUSED: "bg-warn",
 };
 
-export function WorkflowDashboard() {
+export function WorkflowDashboard({ projectId }: { projectId?: Id<"projects"> }) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
 
-  const runs = useQuery(api.workflowRuns.list, {
-    status: statusFilter,
-    limit: 50,
-  });
+  const runs = useQuery(
+    api.workflowRuns.list,
+    projectId ? { projectId, status: statusFilter, limit: 50 } : "skip",
+  );
 
   const workflows = useQuery(api.workflows.list, {});
 
