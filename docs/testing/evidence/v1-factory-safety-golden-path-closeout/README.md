@@ -1,7 +1,9 @@
 # V1 factory safety and golden-path closeout
 
-Date: 2026-08-23
-Baseline: `af534ae9b5045710ae4017c5502b4fabea6ad090`
+Date: 2026-08-25
+Original implementation baseline: `af534ae9b5045710ae4017c5502b4fabea6ad090`
+Reconciled base: `b3dfceec6f4a888deae05abee22df559d26a9156`
+Clean qualified implementation candidate: `4d7542b4ed40be72471397b2320dbb8d59585e82`
 Implementation branch: `codex/v1-factory-safety-golden-path-closeout`
 
 ## Qualification status
@@ -24,10 +26,11 @@ The local proof covers:
 - readiness for explicit human WorkOrder acceptance without performing that
   human-only action.
 
-The final clean-candidate-SHA run remains a release step: this worktree has
-uncommitted implementation changes, and repository policy requires operator
-authorization before Codex creates a commit. The blocking job will rerun the
-same proof against the committed candidate SHA.
+The clean-candidate-SHA release gate is complete. A detached worktree at
+`4d7542b4ed40be72471397b2320dbb8d59585e82` started an empty local Convex
+backend, loaded both deterministic seeds, and executed the browser proof 1/1.
+GitHub CI must reproduce the same result on the final pull-request head before
+merge.
 
 ## CI backend decision
 
@@ -82,7 +85,7 @@ CI=true pnpm run ci:test:e2e:golden-path                         PASS (1/1)
 pnpm --filter @mission-control/workflow-engine test             PASS (158; retired legacy executor removed)
 pnpm --filter @mission-control/orchestration-server test        PASS (171; 1 environment integration skipped)
 pnpm vitest run <focused Factory suites>                         PASS (68)
-pnpm vitest run <focused authorization/runtime suites>           PASS (44)
+pnpm vitest run <focused authorization/runtime suites>           PASS (58 across 6 files)
 pnpm run release:security                                       PASS (0 high/critical; scoped auth 0; no active retired consumers; no secrets)
 pnpm run typecheck                                               PASS (all workspaces)
 pnpm run ci:runtime-contract                                    PASS (v33; 62 accepted changes)

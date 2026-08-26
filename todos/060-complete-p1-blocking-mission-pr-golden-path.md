@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: complete
 priority: p1
 issue_id: "060"
 tags: [golden-path, playwright, ci, convex, evidence]
@@ -53,7 +53,7 @@ infrastructure or secrets.
 ## Acceptance Criteria
 
 - [x] CI backend option is documented and approved.
-- [ ] A clean worktree at the candidate SHA runs the complete browser flow.
+- [x] A clean worktree at the candidate SHA runs the complete browser flow.
 - [x] The golden-path CI job is blocking and complements `browser-security`.
 - [x] Failure, recovery, evidence, PR, and refresh behavior are asserted.
 - [x] Browser evidence and a refreshed qualification packet are recorded.
@@ -92,8 +92,27 @@ infrastructure or secrets.
 - Rehearsed the exact CI sequence from a fresh local backend; Playwright passed
   1/1 before and after the runtime/cost closeout.
 
-**Remaining:**
+### 2026-08-25 - Clean candidate qualification completed
 
-- Rerun the same blocking job from a clean worktree at the committed candidate
-  SHA. Repository policy requires explicit operator authorization before Codex
-  creates that commit.
+**By:** Codex
+
+**Actions:**
+
+- Committed the implementation, fetched current `origin/main`, and rebased the
+  single candidate commit without conflicts.
+- Created a detached clean worktree at candidate SHA
+  `4d7542b4ed40be72471397b2320dbb8d59585e82`.
+- Installed the frozen lockfile offline, started a fresh anonymous local Convex
+  backend, applied both deterministic seeds, and exported the dynamic fixture
+  identifiers.
+- Ran the fully provisioned blocking browser job: Playwright executed and
+  passed 1/1.
+- Re-ran workspace typechecking, authorization/security gates, focused
+  authorization/runtime tests, workflow and orchestration suites, tombstone
+  builds, runtime-contract checks, and PM2/orchestration smoke checks.
+
+**Learnings:**
+
+- The Playwright script correctly skips when the dynamic fixture environment is
+  absent. Qualification must reproduce the complete CI provisioning sequence;
+  a successful but skipped standalone browser command is not evidence.
