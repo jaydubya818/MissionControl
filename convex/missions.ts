@@ -33,6 +33,7 @@ import { assertAuthorizedDeliveryRecord, canAccessDeliveryRecord, requireAuthori
 import { evaluateAcceptance } from "./lib/workOrderGovernance";
 import { loadFactoryAttemptReviewReadModel } from "./lib/factoryReviewReadModel";
 import { getCurrentVerificationResult } from "./lib/currentVerification";
+import { computeCanonicalHash } from "./lib/genomeHash";
 import {
   MISSION_SPEC_INTAKE_FLAG,
   analyzeSpecPlanConsistency,
@@ -341,6 +342,83 @@ async function resolveOperator(ctx: any) {
     actorId: "development:local-operator",
     actorSource: "DEVELOPMENT_FALLBACK" as const,
   };
+}
+
+async function loadPlanningRunBinding(
+  ctx: MutationCtx,
+  mission: Doc<"missions">,
+  planningRunId: Id<"missionPlanningRuns">,
+) {
+  const run = await ctx.db.get(planningRunId);
+  if (!run || run.missionId !== mission._id || run.projectId !== mission.projectId) {
+    throw new Error("Planning candidate is unavailable or outside this Mission");
+  }
+  if (run.status !== "SUCCEEDED"
+    || !run.candidatePlan
+    || !run.candidateDigest
+    || !run.researchPacket
+    || !run.researchPacketDigest
+    || !run.provenance
+    || !run.outputDigest) {
+    throw new Error("Planning candidate is incomplete, failed, or has not passed validation");
+  }
+  if (!/^[a-f0-9]{40,64}$/i.test(run.planningRepositorySha)) {
+    throw new Error("Planning candidate does not bind an immutable repository SHA");
+  }
+  return run;
+}
+
+function planningPlanFields(run: Doc<"missionPlanningRuns">) {
+  return {
+    planningRunId: run._id,
+    planningRepositorySha: run.planningRepositorySha,
+    planningResearchPacketDigest: run.researchPacketDigest,
+    planningCandidateDigest: run.candidateDigest,
+    planningProvenance: run.provenance,
+  };
+}
+
+function planningCandidateEditedBeforeSave(
+  run: Doc<"missionPlanningRuns">,
+  planInput: MissionPlanInput,
+) {
+  if (run.adoptedPlanId) return false;
+  const candidate = run.candidatePlan as MissionPlanInput | undefined;
+  if (!candidate) return false;
+  const comparable = (value: MissionPlanInput) => ({
+    summary: value.summary,
+    rollbackApproach: value.rollbackApproach,
+    estimatedCostUsd: value.estimatedCostUsd,
+    workOrderBlueprints: value.workOrderBlueprints,
+    assertions: value.assertions,
+  });
+  return computeCanonicalHash(comparable(planInput)) !== computeCanonicalHash(comparable(candidate));
+}
+
+async function assertPlanningPlanBinding(
+  ctx: MutationCtx,
+  mission: Doc<"missions">,
+  plan: Doc<"missionPlans">,
+) {
+  const planningFields = [
+    plan.planningRunId,
+    plan.planningRepositorySha,
+    plan.planningResearchPacketDigest,
+    plan.planningCandidateDigest,
+    plan.planningProvenance,
+  ];
+  if (planningFields.every((field) => field === undefined)) return;
+  if (!plan.planningRunId) throw new Error("Plan planning provenance is partial; create a new revision");
+  const run = await loadPlanningRunBinding(ctx, mission, plan.planningRunId);
+  if (plan.planningRepositorySha !== run.planningRepositorySha
+    || plan.planningResearchPacketDigest !== run.researchPacketDigest
+    || plan.planningCandidateDigest !== run.candidateDigest
+    || plan.planningProvenance?.planningRunId !== String(run._id)
+    || plan.planningProvenance?.planningRepositorySha !== run.planningRepositorySha
+    || plan.planningProvenance?.researchPacketDigest !== run.researchPacketDigest
+    || plan.planningProvenance?.candidateDigest !== run.candidateDigest) {
+    throw new Error("Plan planning provenance changed after candidate validation; create a new revision");
+  }
 }
 
 async function getMissionDetail(ctx: any, mission: any) {
@@ -742,6 +820,7 @@ export const savePlanDraft = mutation({
     planId: v.optional(v.id("missionPlans")),
     basePlanId: v.optional(v.id("missionPlans")),
     expectedDraftVersion: v.optional(v.number()),
+    planningRunId: v.optional(v.id("missionPlanningRuns")),
     idempotencyKey: v.string(),
     summary: v.string(),
     rollbackApproach: v.string(),
@@ -757,11 +836,20 @@ export const savePlanDraft = mutation({
     if (!["DRAFT", "PLANNING"].includes(mission.state)) throw new Error(`Mission plan cannot be edited while ${mission.state}`);
     const operator = await resolveOperator(ctx);
     const now = Date.now();
+    const planningBinding = args.planningRunId
+      ? await loadPlanningRunBinding(ctx, mission, args.planningRunId)
+      : null;
+    const candidateEditedBeforeSave = planningBinding
+      ? planningCandidateEditedBeforeSave(planningBinding, args)
+      : false;
 
     if (args.planId) {
       const plan = await ctx.db.get(args.planId);
       if (!plan || plan.missionId !== mission._id || plan.projectId !== args.projectId) throw new Error("Mission plan not found");
       if (plan.status !== "DRAFT") throw new Error("Only a draft plan can be edited");
+      if (planningBinding?.adoptedPlanId && planningBinding.adoptedPlanId !== plan._id) {
+        throw new Error("Planning candidate is already bound to another Plan revision");
+      }
       const version = plan.draftVersion ?? 1;
       if (args.expectedDraftVersion !== version) throw new Error("Mission plan changed in another session. Reload before saving.");
       await ctx.db.patch(plan._id, {
@@ -772,7 +860,11 @@ export const savePlanDraft = mutation({
         assertions: args.assertions,
         draftVersion: version + 1,
         metadata: args.metadata,
+        ...(planningBinding ? planningPlanFields(planningBinding) : {}),
       });
+      if (planningBinding && planningBinding.adoptedPlanId !== plan._id) {
+        await ctx.db.patch(planningBinding._id, { adoptedPlanId: plan._id, updatedAt: now });
+      }
       const updated = await ctx.db.get(plan._id);
       await logMissionEvent(ctx, {
         mission,
@@ -781,7 +873,7 @@ export const savePlanDraft = mutation({
         actorId: operator.actorId,
         summary: `Saved mission plan revision ${plan.revisionNumber}`,
         idempotencyKey: args.idempotencyKey,
-        metadata: { planId: plan._id, draftVersion: version + 1, actorSource: operator.actorSource },
+        metadata: { planId: plan._id, draftVersion: version + 1, actorSource: operator.actorSource, planningRunId: planningBinding?._id, candidateEditedBeforeSave },
       });
       return { plan: updated, created: false };
     }
@@ -796,6 +888,9 @@ export const savePlanDraft = mutation({
       if (!base || base.missionId !== mission._id || !["REJECTED", "SUPERSEDED"].includes(base.status)) {
         throw new Error("Plan revision baseline is not available");
       }
+    }
+    if (planningBinding?.adoptedPlanId) {
+      throw new Error("Planning candidate is already bound to another Plan revision");
     }
     const specBinding = await isSpecIntakeEnabled(ctx, args.projectId)
       ? await loadFinalizedSpecBinding(ctx, project, mission)
@@ -815,12 +910,16 @@ export const savePlanDraft = mutation({
       rollbackApproach: args.rollbackApproach,
       estimatedCostUsd: args.estimatedCostUsd,
       createdBy: operator.actorId,
+      ...(planningBinding ? planningPlanFields(planningBinding) : {}),
       ...specBinding?.fields,
       assertions: args.assertions,
       workOrderBlueprints: args.workOrderBlueprints,
       createdAt: now,
       metadata: args.metadata,
     });
+    if (planningBinding) {
+      await ctx.db.patch(planningBinding._id, { adoptedPlanId: planId, updatedAt: now });
+    }
     if (mission.state === "DRAFT") {
       assertTransition(mission, "PLANNING");
       await ctx.db.patch(mission._id, { state: "PLANNING", updatedAt: now });
@@ -833,7 +932,7 @@ export const savePlanDraft = mutation({
       actorId: operator.actorId,
       summary: `Created mission plan revision ${revisionNumber}`,
       idempotencyKey: `${args.idempotencyKey}:created`,
-      metadata: { planId, basePlanId: args.basePlanId, actorSource: operator.actorSource },
+      metadata: { planId, basePlanId: args.basePlanId, actorSource: operator.actorSource, planningRunId: planningBinding?._id, candidateEditedBeforeSave },
     });
     return { plan: await ctx.db.get(planId), created: true };
   },
@@ -872,6 +971,7 @@ export const submitPlan = mutation({
     if (!plan || plan.missionId !== mission._id || plan.projectId !== args.projectId) throw new Error("Mission plan not found");
     if (plan.status === "PROPOSED") return { plan, created: false };
     if (plan.status !== "DRAFT" || mission.state !== "PLANNING") throw new Error("Mission plan is not ready for submission");
+    await assertPlanningPlanBinding(ctx, mission, plan);
     const workflows = await Promise.all(plan.workOrderBlueprints.map((blueprint: any) => blueprint.workflowId
       ? ctx.db.query("workflows").withIndex("by_workflow_id", (q: any) => q.eq("workflowId", blueprint.workflowId)).first()
       : null));
@@ -966,6 +1066,11 @@ export const forkPlanRevision = mutation({
       rollbackApproach: source.rollbackApproach,
       estimatedCostUsd: source.estimatedCostUsd,
       createdBy: operator.actorId,
+      planningRunId: source.planningRunId,
+      planningRepositorySha: source.planningRepositorySha,
+      planningResearchPacketDigest: source.planningResearchPacketDigest,
+      planningCandidateDigest: source.planningCandidateDigest,
+      planningProvenance: source.planningProvenance,
       ...specBinding?.fields,
       assertions: normalizedPlanAssertions(source),
       workOrderBlueprints: source.workOrderBlueprints,
@@ -995,6 +1100,7 @@ export const approvePlan = mutation({
     }
     if (mission.state !== "AWAITING_PLAN_APPROVAL" || plan.status !== "PROPOSED") throw new Error("Mission plan is not awaiting approval");
     if (plan.repository !== project.githubRepo || plan.repositoryBranch !== project.githubBranch) throw new Error("Repository configuration changed after plan submission. Create a new revision.");
+    await assertPlanningPlanBinding(ctx, mission, plan);
     assertValidPlan(plan);
     const specLineage = await loadPlanSpecLineage(ctx, mission, plan);
     const specAnalysis = specLineage ? analyzeBoundPlan(mission, plan, specLineage) : null;
@@ -1023,6 +1129,7 @@ export const approvePlan = mutation({
       sourceOfTruthRefs: mission.sourceOfTruthRefs,
       repository: plan.repository!,
       repositoryBranch: plan.repositoryBranch!,
+      planningRepositorySha: plan.planningRepositorySha,
       summary: plan.summary,
       rollbackApproach: plan.rollbackApproach,
       assertions: normalizedPlanAssertions(plan),
@@ -1098,6 +1205,8 @@ export const approvePlan = mutation({
         missionId: mission._id,
         missionPlanId: plan._id,
         missionPlanRevision: plan.revisionNumber,
+        planningRunId: plan.planningRunId,
+        planningRepositorySha: plan.planningRepositorySha,
         qualityContractDigest: qualityContract.digest,
         missionSpecLineage: specLineage ? {
           missionSpecRevisionId: specLineage.spec._id,

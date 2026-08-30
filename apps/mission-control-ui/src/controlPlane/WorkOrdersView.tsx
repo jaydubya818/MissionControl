@@ -1553,6 +1553,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
       <RequestRevisionDialog
         open={revisionOpen}
         workOrder={selected?.workOrder ?? null}
+        codeScopes={dispatchCodeScopes ?? []}
         creating={creating}
         onClose={() => setRevisionOpen(false)}
         onCreate={async (payload) => {
@@ -1570,9 +1571,18 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                 desiredOutcome: payload.desiredOutcome || undefined,
                 workflowId: payload.workflowId || undefined,
                 repository: payload.repository || undefined,
+                codeScopeIds: payload.codeScopeIds,
                 riskLevel: payload.riskLevel as any,
                 requiredApprovals: payload.requiredApprovals,
                 acceptanceCriteria: criteriaFromText(payload.acceptanceCriteria, selected.workOrder.acceptanceCriteria as any),
+                changeBudget: payload.changeBudget,
+                metadata: {
+                  ...(selected.workOrder.metadata ?? {}),
+                  implementationPolicy: {
+                    ...(selected.workOrder.metadata?.implementationPolicy ?? {}),
+                    maxCostUsd: payload.maxTotalCostUsd,
+                  },
+                },
               },
             });
             setRevisionOpen(false);
@@ -1668,6 +1678,9 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                   codeScopeIds: selected.workOrder.codeScopeIds,
                   executionEnvironment: selected.workOrder.executionEnvironment ?? "LOCAL",
                   executorHostId: governedFactoryRequired ? activeFactoryHostId : undefined,
+                  factoryDefinitionVersionId: governedFactoryRequired
+                    ? activeFactoryVersionId
+                    : undefined,
                 });
                 if (result.reason === "routing-exhausted") {
                   throw new Error("Retry blocked: no safe model route satisfies this Work Order.");
@@ -2027,12 +2040,14 @@ function RecordVerificationReceiptDialog({
 function RequestRevisionDialog({
   open,
   workOrder,
+  codeScopes,
   creating,
   onClose,
   onCreate,
 }: {
   open: boolean;
   workOrder: any;
+  codeScopes: Array<Doc<"repositoryCodeScopes">>;
   creating: boolean;
   onClose: () => void;
   onCreate: (payload: {
@@ -2042,9 +2057,12 @@ function RequestRevisionDialog({
     desiredOutcome: string;
     workflowId: string;
     repository: string;
+    codeScopeIds: Array<Id<"repositoryCodeScopes">>;
     riskLevel: string;
     requiredApprovals: string[];
     acceptanceCriteria: string;
+    changeBudget: NonNullable<Doc<"workOrders">["changeBudget"]>;
+    maxTotalCostUsd: number;
   }) => Promise<void>;
 }) {
   const [changeSummary, setChangeSummary] = useState("Clarify or revise WorkOrder scope");
@@ -2053,23 +2071,42 @@ function RequestRevisionDialog({
   const [desiredOutcome, setDesiredOutcome] = useState("");
   const [workflowId, setWorkflowId] = useState("");
   const [repository, setRepository] = useState("");
+  const [codeScopeIds, setCodeScopeIds] = useState<Array<Id<"repositoryCodeScopes">>>([]);
   const [riskLevel, setRiskLevel] = useState("MEDIUM");
   const [requiredApprovalsText, setRequiredApprovalsText] = useState("");
   const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
+  const [maxFilesChanged, setMaxFilesChanged] = useState("");
+  const [maxLinesChanged, setMaxLinesChanged] = useState("");
+  const [maxTotalCostUsd, setMaxTotalCostUsd] = useState("");
+  const [allowedPathsText, setAllowedPathsText] = useState("");
+  const [deniedPathsText, setDeniedPathsText] = useState("");
+  const [allowSchemaChanges, setAllowSchemaChanges] = useState(false);
 
   useEffect(() => {
     if (!open || !workOrder) return;
     setDesiredOutcome(workOrder.desiredOutcome ?? "");
     setWorkflowId(workOrder.workflowId ?? "");
     setRepository(workOrder.repository ?? "");
+    setCodeScopeIds(workOrder.codeScopeIds ?? []);
     setRiskLevel(workOrder.riskLevel ?? "MEDIUM");
     setRequiredApprovalsText((workOrder.requiredApprovals ?? []).join("\n"));
     setAcceptanceCriteria((workOrder.acceptanceCriteria ?? []).map((criterion: any) => criterion.title).join("\n"));
+    setMaxFilesChanged(workOrder.changeBudget?.maxFilesChanged?.toString() ?? "");
+    setMaxLinesChanged(workOrder.changeBudget?.maxLinesChanged?.toString() ?? "");
+    setMaxTotalCostUsd(workOrder.metadata?.implementationPolicy?.maxCostUsd?.toString() ?? "0");
+    setAllowedPathsText((workOrder.changeBudget?.allowedPaths ?? []).join("\n"));
+    setDeniedPathsText((workOrder.changeBudget?.deniedPaths ?? []).join("\n"));
+    setAllowSchemaChanges(Boolean(workOrder.changeBudget?.allowSchemaChanges));
   }, [open, workOrder]);
+
+  const parsedMaxTotalCostUsd = Number(maxTotalCostUsd);
+  const hasValidTotalCostCap = maxTotalCostUsd.trim().length > 0
+    && Number.isFinite(parsedMaxTotalCostUsd)
+    && parsedMaxTotalCostUsd >= 0;
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-[760px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[760px]">
         <DialogHeader>
           <DialogTitle>Request WorkOrder revision</DialogTitle>
           <DialogDescription>Version a controlled revision. Accepted work stays immutable until a revision is explicitly applied.</DialogDescription>
@@ -2086,6 +2123,27 @@ function RequestRevisionDialog({
               <div className="space-y-1.5"><Label>Workflow</Label><Input value={workflowId} onChange={(event) => setWorkflowId(event.target.value)} /></div>
               <div className="space-y-1.5"><Label>Repository</Label><Input value={repository} onChange={(event) => setRepository(event.target.value)} /></div>
             </div>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium text-foreground">Approved code scopes</legend>
+              <div className="space-y-2 rounded-lg border border-[var(--panel-line)] bg-background/40 p-3">
+                {codeScopes.filter((scope) => scope.active).map((scope) => {
+                  const checked = codeScopeIds.includes(scope._id);
+                  return (
+                    <label key={scope._id} className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={checked}
+                        onChange={(event) => setCodeScopeIds((current) => event.target.checked
+                          ? [...new Set([...current, scope._id])]
+                          : current.filter((scopeId) => scopeId !== scope._id))}
+                      />
+                      <span><span className="font-medium text-foreground">{scope.name}</span><span className="mt-0.5 block text-xs text-muted-foreground">{scope.includePaths.join(", ")}</span></span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
             <div className="space-y-1.5">
               <Label>Risk level</Label>
               <Select value={riskLevel} onValueChange={setRiskLevel}>
@@ -2095,6 +2153,26 @@ function RequestRevisionDialog({
             </div>
             <div className="space-y-1.5"><Label>Required approvals</Label><Textarea value={requiredApprovalsText} onChange={(event) => setRequiredApprovalsText(event.target.value)} rows={3} placeholder="One per line" /></div>
             <div className="space-y-1.5"><Label>Acceptance criteria</Label><Textarea value={acceptanceCriteria} onChange={(event) => setAcceptanceCriteria(event.target.value)} rows={5} placeholder="One criterion per line" /></div>
+          </div>
+          <div className="space-y-3 md:col-span-2">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground/80">Change budget</div>
+              <p className="mt-1 text-xs text-muted-foreground">Revise the cumulative cost cap and exact repository boundary the executor must enforce. Material budget or scope changes require separate approval.</p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-1.5"><Label>Total implementation cap (USD)</Label><Input aria-label="Total implementation cap (USD)" type="number" min={0} step="0.01" value={maxTotalCostUsd} onChange={(event) => setMaxTotalCostUsd(event.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Maximum files</Label><Input type="number" min={1} value={maxFilesChanged} onChange={(event) => setMaxFilesChanged(event.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Maximum lines</Label><Input type="number" min={1} value={maxLinesChanged} onChange={(event) => setMaxLinesChanged(event.target.value)} /></div>
+            </div>
+            <p className="text-xs text-muted-foreground">This is the cumulative WorkOrder authorization across attempts. The Factory still enforces its per-attempt cap.</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1.5"><Label>Allowed paths</Label><Textarea aria-label="Allowed paths" value={allowedPathsText} onChange={(event) => setAllowedPathsText(event.target.value)} rows={7} placeholder="One repository-relative path pattern per line" /></div>
+              <div className="space-y-1.5"><Label>Denied paths</Label><Textarea aria-label="Denied paths" value={deniedPathsText} onChange={(event) => setDeniedPathsText(event.target.value)} rows={7} placeholder="One repository-relative path pattern per line" /></div>
+            </div>
+            <label className="flex items-start gap-2 rounded-lg border border-[var(--panel-line)] bg-background/40 p-3 text-sm">
+              <input type="checkbox" className="mt-0.5" checked={allowSchemaChanges} onChange={(event) => setAllowSchemaChanges(event.target.checked)} />
+              <span><span className="font-medium text-foreground">Allow schema changes</span><span className="mt-0.5 block text-xs text-muted-foreground">Required only when the approved outcome explicitly includes a bounded schema change.</span></span>
+            </label>
           </div>
         </div>
         <DialogFooter>
@@ -2106,10 +2184,24 @@ function RequestRevisionDialog({
             desiredOutcome,
             workflowId,
             repository,
+            codeScopeIds,
             riskLevel,
             requiredApprovals: requiredApprovalsText.split("\n").map((line) => line.trim()).filter(Boolean),
             acceptanceCriteria,
-          })} disabled={creating || !changeSummary.trim() || !reason.trim()}>{creating ? "Saving…" : "Request revision"}</Button>
+            maxTotalCostUsd: parsedMaxTotalCostUsd,
+            changeBudget: {
+              maxFilesChanged: maxFilesChanged ? Number(maxFilesChanged) : workOrder.changeBudget?.maxFilesChanged ?? 1,
+              maxLinesChanged: maxLinesChanged ? Number(maxLinesChanged) : workOrder.changeBudget?.maxLinesChanged ?? 1,
+              allowedPaths: nonEmptyLines(allowedPathsText),
+              deniedPaths: nonEmptyLines(deniedPathsText),
+              allowedCommandClasses: workOrder.changeBudget?.allowedCommandClasses ?? [],
+              prohibitedCommandClasses: workOrder.changeBudget?.prohibitedCommandClasses ?? [],
+              allowSchemaChanges,
+              allowMigrations: Boolean(workOrder.changeBudget?.allowMigrations),
+              allowDependencyChanges: Boolean(workOrder.changeBudget?.allowDependencyChanges),
+              allowInfrastructureChanges: Boolean(workOrder.changeBudget?.allowInfrastructureChanges),
+            },
+          })} disabled={creating || !changeSummary.trim() || !reason.trim() || !hasValidTotalCostCap}>{creating ? "Saving…" : "Request revision"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

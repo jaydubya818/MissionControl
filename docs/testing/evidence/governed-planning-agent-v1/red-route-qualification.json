@@ -1,0 +1,85 @@
+{
+  "schema": "red-model-route-qualification-evidence/v1",
+  "result": "PASS",
+  "qualifiedScope": {
+    "repositoryId": "sx7swdarky96tbckcfw3bz6zfx8d9dcp",
+    "workloadClasses": [
+      "SOFTWARE_CHANGE"
+    ],
+    "riskClasses": [
+      "YELLOW",
+      "RED"
+    ],
+    "executionBackend": "persistent-worker",
+    "isolation": "WORKSPACE_WRITE",
+    "authority": {
+      "executionOnly": true,
+      "routing": false,
+      "verification": false,
+      "acceptance": false,
+      "publication": false,
+      "merge": false
+    }
+  },
+  "route": {
+    "provider": "openai",
+    "providerRoute": "codex-cli/chatgpt-auth",
+    "modelId": "gpt-5.6-sol",
+    "cliVersion": "0.146.0",
+    "executableSha256": "134063e133f0b4244fa3b251acf973d4fe4b4aeeacbdc135211bf480f59f1477",
+    "adapter": "codex",
+    "adapterVersion": "v1",
+    "capabilityManifestDigest": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+    "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081"
+  },
+  "execution": {
+    "baselineSha": "88a061f5cff497dd8549c4cc4dc32abccda5bb11",
+    "status": "COMPLETED",
+    "normalizedStatus": "COMPLETED",
+    "changedFiles": [
+      "src/safeSlug.mjs"
+    ],
+    "implementationSha256": "bb25aef29f786668ca1da64c3c4c480468390b1de2e0fce3096653d85d8ab9ed",
+    "eventTypes": [
+      "EXECUTION_STARTED",
+      "COMMAND_STARTED",
+      "TOOL_CALLED",
+      "TOOL_CALLED",
+      "TOOL_CALLED",
+      "TOOL_CALLED",
+      "COMMAND_COMPLETED",
+      "ARTIFACT_PRODUCED",
+      "EXECUTION_COMPLETED"
+    ],
+    "tokenUsage": null,
+    "toolCalls": null,
+    "startedAt": 1787852498372,
+    "completedAt": 1787852540861,
+    "durationMs": 42489
+  },
+  "independentChecks": {
+    "scopePass": true,
+    "protectedFilesUnchanged": true,
+    "testCommand": "npm test -- --test-reporter=spec",
+    "testOutput": "> test\n> node --test --test-reporter=spec\n\n✔ normalizes a bounded safe slug (0.688583ms)\n✔ rejects empty and overlong results (0.217792ms)\nℹ tests 2\nℹ suites 0\nℹ pass 2\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 76.007583"
+  },
+  "cost": {
+    "adapterEstimateUsd": null,
+    "actualCostUsd": null,
+    "actualCostUnknownReason": "Saved ChatGPT authentication exposes token usage but no authoritative USD execution cost.",
+    "policy": {
+      "method": "FULL_APPROVED_WORK_ORDER_CAP_RESERVATION",
+      "approvedPlanId": "ys7at6f5rkhgwd4z36e9mr2jfh8d866g",
+      "approvedPlanRevision": 1,
+      "workOrderId": "s57xr6201qh1wt83ca7y9v09dh8d87wj",
+      "workOrderRevision": 1,
+        "planEstimatedCostUsd": 32,
+      "workOrderEstimatedCostUsd": 24,
+      "hardLimitUsd": 24,
+      "reservedAmountUsd": 24,
+      "maxRuntimeMinutes": 60,
+      "maxAttempts": 3,
+      "retryRule": "A later Attempt must fit inside the remaining WorkOrder cap; unknown actual cost does not release the reservation."
+    }
+  }
+}

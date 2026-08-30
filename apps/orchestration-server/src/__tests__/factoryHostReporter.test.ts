@@ -4,7 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
-import { FactoryHostReporter, canonicalRepositoryFromRemote, inspectFactoryCheckout } from "../factoryHostReporter.js";
+import {
+  FactoryHostReporter,
+  canonicalRepositoryFromRemote,
+  factorySandboxCapabilities,
+  inspectFactoryCheckout,
+} from "../factoryHostReporter.js";
 import { CODEX_V1_HARNESS_MANIFEST, harnessCapabilityManifestDigest } from "@mission-control/workflow-engine";
 
 const execFileAsync = promisify(execFile);
@@ -15,6 +20,25 @@ afterEach(async () => {
 });
 
 describe("Factory host reporting", () => {
+  it("advertises optional publication and remote sandbox capabilities only when configured", () => {
+    expect(factorySandboxCapabilities({
+      githubAppPublicationReady: false,
+      remoteSandboxBackendReady: false,
+    })).toEqual(["git-worktree", "workspace-write", "read-only"]);
+
+    expect(factorySandboxCapabilities({
+      githubAppPublicationReady: true,
+      remoteSandboxBackendReady: true,
+    })).toEqual([
+      "git-worktree",
+      "workspace-write",
+      "read-only",
+      "github-app-publication",
+      "remote-sandbox",
+      "sandbox-provider:exe-dev",
+    ]);
+  });
+
   it.each([
     ["git@github.com:jaydubya818/MissionControl.git", "jaydubya818/MissionControl"],
     ["https://github.com/jaydubya818/MissionControl.git", "jaydubya818/MissionControl"],

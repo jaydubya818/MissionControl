@@ -109,14 +109,6 @@ export function compileMissionWorkOrderContract(input: {
     return {
       requirements,
       acceptanceCriteria,
-      ...(specVerificationChecks.length > 0 ? {
-        verificationContract: {
-          schemaVersion: 1 as const,
-          enforcementMode: "ENFORCED" as const,
-          checks: specVerificationChecks,
-          requireHumanReview: linkedAssertions.some((assertion) => ["MANUAL", "CHECKLIST"].includes(assertion.verificationMethod)),
-        },
-      } : {}),
       requiredApprovals: unique(input.blueprint.requiredApprovals),
       metadata: input.rollbackApproach?.trim()
         ? { rollbackApproach: input.rollbackApproach.trim(), specVerificationExpectationIds: linkedVerificationExpectationIds }

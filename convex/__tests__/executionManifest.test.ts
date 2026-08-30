@@ -4,6 +4,7 @@ import {
   factorySandboxResourceName,
   type FactoryExecutionManifestInput,
 } from "../lib/executionManifest";
+import { computeCanonicalHash } from "../lib/genomeHash";
 import { CODEX_V1_HARNESS_MANIFEST, DEEPSEEK_V1_HARNESS_MANIFEST, harnessCapabilityManifestDigest } from "@mission-control/workflow-engine";
 
 const input: FactoryExecutionManifestInput = {
@@ -118,6 +119,14 @@ describe("Factory execution manifest", () => {
     expect(second).not.toBe(first);
   });
 
+  it("keeps a Task-less manifest digest stable across Convex storage", () => {
+    const result = buildFactoryExecutionManifest({ ...input, taskId: undefined });
+    const storedManifest = JSON.parse(JSON.stringify(result.manifest));
+
+    expect(storedManifest.causation).not.toHaveProperty("taskId");
+    expect(result.digest).toBe(`sha256:${computeCanonicalHash(storedManifest)}`);
+  });
+
   it("changes its digest when the verification contract changes", () => {
     const first = buildFactoryExecutionManifest(input).digest;
     const second = buildFactoryExecutionManifest({
@@ -133,6 +142,18 @@ describe("Factory execution manifest", () => {
 
   it("fails closed when a mutable branch is supplied instead of an exact base SHA", () => {
     expect(() => buildFactoryExecutionManifest({ ...input, baseSha: "origin/main" })).toThrow(/immutable full base SHA/);
+  });
+
+  it("carries the approved planning SHA into causation and fails closed on dispatch drift", () => {
+    const planningRepositorySha = "a".repeat(40);
+    const bound = buildFactoryExecutionManifest({ ...input, planningRepositorySha });
+    expect(bound.manifest.causation.planningRepositorySha).toBe(planningRepositorySha);
+    expect(bound.manifest.repository.planningRepositorySha).toBe(planningRepositorySha);
+    expect(() => buildFactoryExecutionManifest({
+      ...input,
+      planningRepositorySha,
+      baseSha: "b".repeat(40),
+    })).toThrow(/does not match the approved Plan planning repository SHA/);
   });
 
   it("freezes remote sandbox execution into the existing v1 manifest", () => {

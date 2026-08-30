@@ -1,6 +1,6 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { constants } from "node:fs";
-import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
@@ -86,6 +86,13 @@ interface CodexExecutionHandle {
 }
 
 const PROCESS_TERMINATION_GRACE_MS = 5_000;
+export const CODEX_WORKSPACE_PERMISSION_PROFILE = "mission-planner-contained";
+export const CODEX_WORKSPACE_PERMISSION_CONFIG = [
+  `default_permissions="${CODEX_WORKSPACE_PERMISSION_PROFILE}"`,
+  `permissions.${CODEX_WORKSPACE_PERMISSION_PROFILE}.description="Repository-contained read-only planning"`,
+  `permissions.${CODEX_WORKSPACE_PERMISSION_PROFILE}.filesystem={":minimal"="read",glob_scan_max_depth=8,":workspace_roots"={"."="read",".env"="deny",".env.*"="deny","**/.env"="deny","**/.env.*"="deny"}}`,
+  `permissions.${CODEX_WORKSPACE_PERMISSION_PROFILE}.network.enabled=false`,
+] as const;
 const CODEX_PINNED_NATIVE_DIGESTS: Record<string, string> = {
   "darwin-arm64": "ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02",
 };
@@ -163,6 +170,19 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       issues.push({ field: "timeoutMs", message: "Timeout must be between one second and eight hours." });
     }
     if (request.provider && request.provider !== "openai") issues.push({ field: "provider", message: "codex/v1 uses the OpenAI provider route." });
+    if (request.structuredOutput) {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$/.test(request.structuredOutput.schemaId)) {
+        issues.push({ field: "structuredOutput.schemaId", message: "Structured-output schema identity is invalid." });
+      }
+      try {
+        const encoded = JSON.stringify(request.structuredOutput.jsonSchema);
+        if (!encoded || Buffer.byteLength(encoded) > 256_000) {
+          issues.push({ field: "structuredOutput.jsonSchema", message: "Structured-output schema must be valid JSON no larger than 256 KB." });
+        }
+      } catch {
+        issues.push({ field: "structuredOutput.jsonSchema", message: "Structured-output schema must be JSON serializable." });
+      }
+    }
     return issues;
   }
 
@@ -182,7 +202,11 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
     const outputDirectory = await mkdtemp(path.join(tmpdir(), "mc-codex-v1-"));
     try {
       const outputSchemaPath = path.join(outputDirectory, "factory-result.schema.json");
-      await writeFile(outputSchemaPath, JSON.stringify(FACTORY_RESULT_SCHEMA), { mode: 0o600 });
+      await writeFile(
+        outputSchemaPath,
+        JSON.stringify(request.structuredOutput?.jsonSchema ?? FACTORY_RESULT_SCHEMA),
+        { mode: 0o600 },
+      );
       return {
         request: {
           ...request,
@@ -223,6 +247,10 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
         harness: "codex-cli/0.146.0",
         isolation: prepared.request.isolation,
         allowedPaths: prepared.request.allowedPaths,
+        filesystemReadScope: prepared.request.filesystemReadScope ?? null,
+        permissionProfile: prepared.request.filesystemReadScope === "WORKSPACE_ONLY"
+          ? CODEX_WORKSPACE_PERMISSION_PROFILE
+          : null,
       });
       if (prepared.configurationIssues.length) {
         const error = prepared.configurationIssues.map((issue) => `${issue.field}: ${issue.message}`).join(" ");
@@ -370,7 +398,7 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       exitCode: completion.exitCode,
       signal: completion.signal,
       output: completion.output,
-      structuredOutput: structuredOutputSummary(completion.output),
+      structuredOutput: structuredOutputSummary(completion.output, handle.prepared.request.structuredOutput?.schemaId),
       error: normalizedStatus === "COMPLETED" ? null : redact(completion.diagnostics || completion.stderr || (completion.exitCode === 0
         ? "Codex protocol ended without a successful turn.completed event."
         : `Codex execution ${normalizedStatus.toLowerCase()}.`)),
@@ -426,7 +454,7 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       args: commandArguments(remoteRequest, context.resultPath, outputSchemaPath, REMOTE_OPENROUTER_CONFIG_OVERRIDES, "danger-full-access"),
       resultPath: context.resultPath,
       outputSchemaPath,
-      outputSchema: structuredClone(FACTORY_RESULT_SCHEMA),
+      outputSchema: structuredClone(request.structuredOutput?.jsonSchema ?? FACTORY_RESULT_SCHEMA),
       model: request.model,
       prompt: request.prompt,
       allowedPaths: request.allowedPaths,
@@ -448,31 +476,45 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       if (!expectedSha256 || executableSha256 !== expectedSha256) {
         return { status: "UNAVAILABLE", checkedAt: Date.now(), adapter: "codex", version: "v1", details: "Codex native executable does not match the evaluated platform digest." };
       }
+      await verifyWorkspacePermissionProfile(this.executable);
       return { status: "READY", checkedAt: Date.now(), adapter: "codex", version: "v1" };
-    } catch {
-      return { status: "UNAVAILABLE", checkedAt: Date.now(), adapter: "codex", version: "v1", details: "Codex executable is unavailable or not executable." };
+    } catch (error) {
+      return {
+        status: "UNAVAILABLE",
+        checkedAt: Date.now(),
+        adapter: "codex",
+        version: "v1",
+        details: redact(error instanceof Error ? error.message : "Codex executable is unavailable or not executable."),
+      };
     }
   }
 }
 
-function commandArguments(
+export function commandArguments(
   request: ExecutorRequest,
   outputPath: string,
   outputSchemaPath?: string,
   configOverrides: readonly string[] = [],
   sandboxMode?: "read-only" | "workspace-write" | "danger-full-access",
 ): string[] {
+  const workspaceContained = request.filesystemReadScope === "WORKSPACE_ONLY" && sandboxMode === undefined;
+  const effectiveOverrides = workspaceContained
+    ? [...configOverrides, ...CODEX_WORKSPACE_PERMISSION_CONFIG]
+    : configOverrides;
   return [
     "-a",
     "never",
-    ...configOverrides.flatMap((value) => ["-c", value]),
+    ...effectiveOverrides.flatMap((value) => ["-c", value]),
     "exec",
+    ...(workspaceContained ? ["--strict-config"] : []),
     "--json",
     "--ephemeral",
     "--ignore-user-config",
     "--ignore-rules",
-    "--sandbox",
-    sandboxMode ?? (request.isolation === "READ_ONLY" ? "read-only" : "workspace-write"),
+    ...(workspaceContained ? [] : [
+      "--sandbox",
+      sandboxMode ?? (request.isolation === "READ_ONLY" ? "read-only" : "workspace-write"),
+    ]),
     "--color",
     "never",
     "-C",
@@ -484,12 +526,48 @@ function commandArguments(
     [
       request.prompt,
       "",
-      "Repository mutation is limited to these approved repository-relative boundaries:",
+      request.isolation === "READ_ONLY"
+        ? "Repository reads are limited to these approved repository-relative boundaries:"
+        : "Repository mutation is limited to these approved repository-relative boundaries:",
       ...request.allowedPaths.map((candidate) => `- ${candidate}`),
       ...(request.deniedPaths?.length ? ["Denied repository-relative boundaries:", ...request.deniedPaths.map((candidate) => `- ${candidate}`)] : []),
       "Do not expose credentials in output, artifacts, or logs.",
     ].join("\n"),
   ];
+}
+
+export async function verifyWorkspacePermissionProfile(executable: string): Promise<void> {
+  const root = await mkdtemp(path.join(tmpdir(), "mc-codex-containment-"));
+  const workspace = path.join(root, "workspace");
+  const allowedFile = path.join(workspace, "allowed.txt");
+  const outsideFile = path.join(root, "outside.txt");
+  const forbiddenWrite = path.join(workspace, "forbidden-write.txt");
+  try {
+    await mkdir(workspace);
+    await writeFile(allowedFile, "allowed\n", { mode: 0o600 });
+    await writeFile(outsideFile, "outside\n", { mode: 0o600 });
+    const profileOverrides = CODEX_WORKSPACE_PERMISSION_CONFIG.filter((value) => !value.startsWith("default_permissions="));
+    await execFileResult(executable, [
+      "sandbox",
+      "-P",
+      CODEX_WORKSPACE_PERMISSION_PROFILE,
+      ...profileOverrides.flatMap((value) => ["-c", value]),
+      "-C",
+      workspace,
+      "--",
+      "/bin/sh",
+      "-c",
+      'test -r "$1" && ! test -r "$2" && ! touch "$3" 2>/dev/null',
+      "mission-planning-containment",
+      allowedFile,
+      outsideFile,
+      forbiddenWrite,
+    ]);
+  } catch (error) {
+    throw new Error(`Codex workspace permission profile failed its read/write containment probe: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 }
 
 async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<ProcessCompletion> {
@@ -688,10 +766,13 @@ function finiteInteger(value: unknown): number | null {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
-function structuredOutputSummary(output: string) {
+function structuredOutputSummary(output: string, expectedSchema?: string) {
   try {
-    const value = JSON.parse(output) as { summary?: unknown };
-    return { schema: "factory-result/v1", summary: typeof value.summary === "string" ? value.summary.slice(0, 4_000) : null };
+    const value = JSON.parse(output) as { schema?: unknown; summary?: unknown };
+    return {
+      schema: typeof value.schema === "string" ? value.schema : expectedSchema ?? null,
+      summary: typeof value.summary === "string" ? value.summary.slice(0, 4_000) : null,
+    };
   } catch {
     return { schema: null, summary: null };
   }
@@ -708,6 +789,18 @@ function redact(value: string): string {
 async function executableVersion(executable: string) {
   return await new Promise<string>((resolve, reject) => {
     execFile(executable, ["--version"], { timeout: 5_000 }, (error, stdout) => error ? reject(error) : resolve(stdout.trim()));
+  });
+}
+
+async function execFileResult(executable: string, argv: string[]) {
+  return await new Promise<void>((resolve, reject) => {
+    execFile(executable, argv, { timeout: 10_000 }, (error, _stdout, stderr) => {
+      if (error) {
+        reject(new Error(redact(stderr || error.message)));
+        return;
+      }
+      resolve();
+    });
   });
 }
 

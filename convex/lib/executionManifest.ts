@@ -26,6 +26,7 @@ export interface FactoryExecutionManifestInput {
   missionId?: string;
   missionPlanId?: string;
   missionPlanVersion?: number;
+  planningRepositorySha?: string;
   qualityContractDigest?: string;
   workOrderId: string;
   workOrderRevisionNumber: number;
@@ -141,6 +142,11 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
   if (!/^[a-f0-9]{40,64}$/i.test(input.baseSha)) {
     throw new Error("Execution manifest requires an immutable full base SHA.");
   }
+  if (input.planningRepositorySha !== undefined
+    && (!/^[a-f0-9]{40,64}$/i.test(input.planningRepositorySha)
+      || (input.factoryPurpose === "SOFTWARE" && input.baseSha !== input.planningRepositorySha))) {
+    throw new Error("Execution manifest does not match the approved Plan planning repository SHA.");
+  }
   if (!Number.isSafeInteger(input.maxAttempts) || input.maxAttempts < 1 || input.maxAttempts > 20
     || !Number.isFinite(input.maxCostUsd) || input.maxCostUsd <= 0 || input.maxCostUsd > 1_000
     || !Number.isSafeInteger(input.maxRuntimeMinutes) || input.maxRuntimeMinutes < 1 || input.maxRuntimeMinutes > 480) {
@@ -223,11 +229,12 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
       missionId: input.missionId,
       missionPlanId: input.missionPlanId,
       missionPlanVersion: input.missionPlanVersion,
+      planningRepositorySha: input.planningRepositorySha,
       qualityContractDigest: input.qualityContractDigest,
       workOrderId: input.workOrderId,
       workOrderRevisionNumber: input.workOrderRevisionNumber,
       workOrderRevisionId: input.workOrderRevisionId,
-      taskId: input.taskId,
+      ...(input.taskId ? { taskId: input.taskId } : {}),
       workflowRunId: input.runId,
       factoryDefinitionVersionId: input.factoryDefinitionVersionId,
       factoryConfigurationDigest: input.factoryConfigurationDigest,
@@ -239,6 +246,7 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
       dataClassification: input.repositoryDataClassification,
       defaultBranch: input.defaultBranch,
       baseSha: input.baseSha,
+      planningRepositorySha: input.planningRepositorySha,
       branch: input.branch,
       worktree: input.worktree,
       codeScopeIds: input.codeScopes.map((scope) => scope.id).sort(),
@@ -306,9 +314,10 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
     compiledPromptHash: `sha256:${computeCanonicalHash(compiledPrompt)}`,
     compiledPrompt,
   };
+  const persistedManifest = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
   return {
-    manifest,
-    digest: `sha256:${computeCanonicalHash(manifest)}`,
+    manifest: persistedManifest,
+    digest: `sha256:${computeCanonicalHash(persistedManifest)}`,
   };
 }
 

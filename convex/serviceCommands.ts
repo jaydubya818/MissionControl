@@ -792,6 +792,99 @@ export const finalizeExecution = action({
   },
 });
 
+export const claimMissionPlanningRun = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "planning.claim");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveRepositoryScope, {
+      projectId: payload.projectId,
+      repositoryId: payload.repositoryId,
+    });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(internal.missionPlanning.claimInternal, {
+        projectId: payload.projectId,
+        repositoryId: payload.repositoryId,
+        leaseId: payload.leaseId,
+        ownerId: args.envelope.serviceId,
+        workerId: payload.workerId,
+        workerSessionId: payload.workerSessionId,
+        leaseDurationMs: payload.leaseDurationMs,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: "SUCCEEDED",
+        resultReference: result?.run?._id ? String(result.run._id) : result?.reason,
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const renewMissionPlanningRun = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "planning.renew");
+    const scope = await ctx.runQuery(internal.missionPlanning.resolveScope, {
+      planningRunId: payload.planningRunId,
+    });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(internal.missionPlanning.renewInternal, {
+        planningRunId: payload.planningRunId,
+        leaseId: payload.leaseId,
+        ownerId: args.envelope.serviceId,
+        workerId: payload.workerId,
+        workerSessionId: payload.workerSessionId,
+        leaseDurationMs: payload.leaseDurationMs,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: result.renewed ? "SUCCEEDED" : "FAILED",
+        reason: result.renewed ? undefined : result.reason,
+        resultReference: String(payload.planningRunId),
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const reportMissionPlanningRun = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "planning.report");
+    const scope = await ctx.runQuery(internal.missionPlanning.resolveScope, {
+      planningRunId: payload.planningRunId,
+    });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(internal.missionPlanning.reportInternal, {
+        planningRunId: payload.planningRunId,
+        leaseId: payload.leaseId,
+        ownerId: args.envelope.serviceId,
+        workerId: payload.workerId,
+        workerSessionId: payload.workerSessionId,
+        report: payload.report,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: "SUCCEEDED",
+        resultReference: String(payload.planningRunId),
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
 async function authorize(ctx: any, candidate: ServiceCommandEnvelope, payloadJson: string, capability: string): Promise<any> {
   const expectedServiceId = process.env.MISSION_CONTROL_SERVICE_ID?.trim() || "orchestration-server";
   const secret = process.env.MISSION_CONTROL_SERVICE_COMMAND_SECRET?.trim();

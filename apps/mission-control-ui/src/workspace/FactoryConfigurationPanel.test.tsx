@@ -33,7 +33,8 @@ const mocks = vi.hoisted(() => ({
   verifiers: [{ _id: "verifier-1", label: "Independent review" }],
   versionOptions: {
     codeScopes: [{ _id: "scope-1", name: "Application", includePaths: ["apps/example/**"] }],
-    agentVersions: [{ _id: "agent-version-1", version: 2, template: { name: "Implementer" }, modelConfig: { modelId: "gpt-5" } }],
+    agentVersions: [{ _id: "agent-version-1", version: 2, template: { name: "Implementer" }, modelConfig: { provider: "openai", modelId: "gpt-5" } }],
+    modelRoutes: [{ _id: "model-route-1", provider: "openai", modelId: "gpt-5", displayName: "GPT-5" }],
     sandboxProfiles: [] as any[],
     harnesses: [] as any[],
   },
@@ -47,7 +48,7 @@ const mocks = vi.hoisted(() => ({
   agentTemplates: [] as any[],
   createAgentTemplate: vi.fn(),
   createAgentVersion: vi.fn(),
-  upsertWorkflow: vi.fn(),
+  registerProductionWorkflow: vi.fn(),
 }));
 
 vi.mock("../../../../convex/_generated/api", () => ({
@@ -62,7 +63,7 @@ vi.mock("../../../../convex/_generated/api", () => ({
       assessReadiness: "factory.assessReadiness",
       activate: "factory.activate",
     },
-    workflows: { list: "workflows.list", upsert: "workflows.upsert" },
+    workflows: { list: "workflows.list", registerProduction: "workflows.registerProduction" },
     "governance/policyEnvelopes": { listPolicyEnvelopes: "policies.list", createPolicyEnvelope: "policies.create" },
     "context/verifiers": { list: "verifiers.list", create: "verifiers.create" },
     "registry/agentTemplates": { listTemplates: "agentTemplates.list", createTemplate: "agentTemplates.create" },
@@ -91,7 +92,7 @@ vi.mock("convex/react", () => ({
     if (mutation === "verifiers.create") return mocks.createVerifier;
     if (mutation === "agentTemplates.create") return mocks.createAgentTemplate;
     if (mutation === "agentVersions.create") return mocks.createAgentVersion;
-    if (mutation === "workflows.upsert") return mocks.upsertWorkflow;
+    if (mutation === "workflows.registerProduction") return mocks.registerProductionWorkflow;
     throw new Error(`Unexpected mutation: ${mutation}`);
   },
 }));
@@ -134,7 +135,8 @@ describe("FactoryConfigurationPanel", () => {
     mocks.agentTemplates = [];
     mocks.versionOptions = {
       codeScopes: [{ _id: "scope-1", name: "Application", includePaths: ["apps/example/**"] }],
-      agentVersions: [{ _id: "agent-version-1", version: 2, template: { name: "Implementer" }, modelConfig: { modelId: "gpt-5" } }],
+      agentVersions: [{ _id: "agent-version-1", version: 2, template: { name: "Implementer" }, modelConfig: { provider: "openai", modelId: "gpt-5" } }],
+      modelRoutes: [{ _id: "model-route-1", provider: "openai", modelId: "gpt-5", displayName: "GPT-5" }],
       sandboxProfiles: [],
       harnesses: [codexHarness],
     };
@@ -148,7 +150,7 @@ describe("FactoryConfigurationPanel", () => {
     mocks.createVerifier.mockReset().mockResolvedValue("verifier-created");
     mocks.createAgentTemplate.mockReset().mockResolvedValue({ _id: "template-created", slug: "factory-local-codex-runner" });
     mocks.createAgentVersion.mockReset().mockResolvedValue({ _id: "agent-version-created" });
-    mocks.upsertWorkflow.mockReset().mockResolvedValue("workflow-created");
+    mocks.registerProductionWorkflow.mockReset().mockResolvedValue("workflow-created");
   });
 
   it("creates a draft Factory from the explicit empty state", async () => {
@@ -273,6 +275,7 @@ describe("FactoryConfigurationPanel", () => {
     await waitFor(() => expect(mocks.createVersion).toHaveBeenCalledWith(expect.objectContaining({
       executionBackend: "remote-sandbox",
       sandboxProfileId: "sandbox-profile-1",
+      modelCatalogId: "model-route-1",
       riskBoundary: "YELLOW",
     })));
     expect(screen.getByText(/Preview · Not Live Certified/i)).toBeInTheDocument();
@@ -360,7 +363,8 @@ describe("FactoryConfigurationPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Create Verification-First workflow" }));
 
-    await waitFor(() => expect(mocks.upsertWorkflow).toHaveBeenCalledWith(expect.objectContaining({
+    await waitFor(() => expect(mocks.registerProductionWorkflow).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: "project-1",
       name: "Verification-First V1 Delivery",
       agents: expect.arrayContaining([expect.objectContaining({ id: "independent-verifier" })]),
       steps: expect.arrayContaining([expect.objectContaining({ id: "verify", kind: "VERIFY" })]),

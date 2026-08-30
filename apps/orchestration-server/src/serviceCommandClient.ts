@@ -23,7 +23,10 @@ export type ServiceCapability =
   | "executions.claim"
   | "executions.heartbeat"
   | "executions.report"
-  | "executions.finalize";
+  | "executions.finalize"
+  | "planning.claim"
+  | "planning.renew"
+  | "planning.report";
 
 export function createSignedServiceCommand(args: {
   capability: ServiceCapability;

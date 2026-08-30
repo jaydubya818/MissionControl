@@ -53,6 +53,16 @@ describe("operator decision packet", () => {
     expect(packet.blockingReasons[0]).toContain("Acceptance requires");
   });
 
+  it("does not misclassify a pre-dispatch approval that explicitly reserves acceptance", () => {
+    const packet = buildOperatorDecisionPacket(approval({
+      approvalType: "Human review before execution dispatch, publication, merge, deployment, waiver, or acceptance",
+      requestedAction: "Authorize execution dispatch for this internal pilot only",
+    }), 1_000_000);
+
+    expect(packet.canDecide).toBe(true);
+    expect(packet.blockingReasons).toEqual([]);
+  });
+
   it("uses the latest receipt and treats invalidated proof as stale", () => {
     const packet = buildOperatorDecisionPacket(approval({
       verificationReceipts: [

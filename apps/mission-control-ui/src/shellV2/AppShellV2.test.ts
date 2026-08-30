@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   initialViewFromLocation,
+  shouldAutoCollapseChat,
   shouldDeferRouteWrite,
   viewFromPath,
 } from "./AppShellV2";
@@ -49,5 +50,12 @@ describe("v2 route synchronization", () => {
         "?workspace=workspace-1"
       )
     ).toBe(true);
+  });
+
+  it("prioritizes dense Plan and review surfaces on constrained desktop widths", () => {
+    expect(shouldAutoCollapseChat("mission-detail", true)).toBe(true);
+    expect(shouldAutoCollapseChat("harness-change-review", true)).toBe(true);
+    expect(shouldAutoCollapseChat("command-center", true)).toBe(false);
+    expect(shouldAutoCollapseChat("mission-detail", false)).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { canonicalHash } from "@mission-control/shared";
 
 export type IsolationMode = "READ_ONLY" | "WORKSPACE_WRITE";
+export type FilesystemReadScope = "WORKSPACE_ONLY";
 export type HarnessSupportLevel = "SUPPORTED" | "PARTIAL" | "UNSUPPORTED" | "UNKNOWN";
 export type HarnessExecutionStatus = "COMPLETED" | "FAILED" | "CANCELED" | "TIMED_OUT";
 
@@ -77,7 +78,16 @@ export interface ExecutorRequest {
   deniedPaths?: string[];
   timeoutMs: number;
   isolation: IsolationMode;
+  /**
+   * Requires the adapter to enforce an operating-system read boundary around
+   * repositoryRoot. Request metadata and prompt instructions are not enough.
+   */
+  filesystemReadScope?: FilesystemReadScope;
   outputDirectory?: string;
+  structuredOutput?: {
+    schemaId: string;
+    jsonSchema: Record<string, unknown>;
+  };
 }
 
 export interface ExecutorEvent {

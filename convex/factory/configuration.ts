@@ -24,7 +24,7 @@ import {
   sandboxProfileProductionEligible,
 } from "../lib/sandboxProfileAdmission";
 import { loadModelCatalogForProject } from "../lib/modelCatalogScope";
-import { exactModelRouteDigest, modelRouteProductionEligible } from "../lib/modelRouteAdmission";
+import { exactModelRouteDigest, modelRouteProductionEligible, modelRouteQualifiedFor } from "../lib/modelRouteAdmission";
 import {
   evaluateRepositoryRemoteExecutionPolicy,
   normalizeRepositoryDataClassification,
@@ -87,7 +87,7 @@ export const getVersionOptions = query({
     if (!repository || repository.projectId !== args.projectId) {
       throw new Error("Factory repository is outside the workspace.");
     }
-    const [codeScopes, approvedVersions, sandboxProfiles, hostBindings] = await Promise.all([
+    const [codeScopes, approvedVersions, sandboxProfiles, hostBindings, modelCatalog] = await Promise.all([
       ctx.db.query("repositoryCodeScopes")
         .withIndex("by_repository", (q) => q.eq("repositoryId", repository._id))
         .collect(),
@@ -100,6 +100,7 @@ export const getVersionOptions = query({
       ctx.db.query("workspaceHostBindings")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect(),
+      loadModelCatalogForProject(ctx, args.projectId),
     ]);
     const agentVersions = (await Promise.all(approvedVersions
       .filter((version) => !version.projectId || version.projectId === args.projectId)
@@ -120,6 +121,15 @@ export const getVersionOptions = query({
     return {
       codeScopes: codeScopes.filter((scope) => scope.active),
       agentVersions,
+      modelRoutes: modelCatalog.filter(modelRouteProductionEligible).map((route) => ({
+        _id: route._id,
+        provider: route.provider,
+        modelId: route.modelId,
+        displayName: route.displayName,
+        routeDigest: route.routeDigest,
+        qualificationStatus: route.qualificationStatus,
+        admissionStatus: route.admissionStatus,
+      })),
       sandboxProfiles: sandboxProfiles.sort((left, right) => left.profileKey.localeCompare(right.profileKey) || right.version - left.version),
       harnesses: KNOWN_HARNESS_MANIFESTS.map((manifest) => {
         const capabilityManifestSha256 = harnessCapabilityManifestDigest(manifest);
@@ -693,9 +703,17 @@ export const createVersion = mutation({
     } else if (!routeSnapshot.runtimeIdentity?.executableSha256) {
       throw new Error("Local model routes require an exact executable digest.");
     }
-    const modelQualification = modelRoute.qualificationSnapshot as Record<string, any>;
-    if (!modelQualification.scope?.riskClasses?.includes(args.riskBoundary)) {
-      throw new Error("The exact model route is not qualified for this Factory risk boundary.");
+    const requiredWorkloadClass = (definition.purpose ?? "SOFTWARE") === "SOFTWARE"
+      ? "SOFTWARE_CHANGE"
+      : (definition.purpose ?? "SOFTWARE") === "VERIFICATION"
+        ? "VERIFICATION"
+        : "AUTOMATION";
+    if (!modelRouteQualifiedFor(modelRoute, {
+      workloadClass: requiredWorkloadClass,
+      riskClass: args.riskBoundary,
+      repositoryId: String(repository._id),
+    })) {
+      throw new Error("The exact model route is not qualified for this Factory workload, repository, and risk boundary.");
     }
 
     const sandboxProfileDigest = selectedExecutionBackend === "remote-sandbox" ? sandboxProfile!.profileDigest : undefined;

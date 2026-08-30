@@ -5,7 +5,7 @@
  * Source of truth for Mission Control data model.
  */
 
-import { defineSchema, defineTable } from "convex/server";
+import { defineSchema, defineTable, type SchemaDefinition } from "convex/server";
 import { v } from "convex/values";
 import {
   acceptanceCriterionValidator,
@@ -408,11 +408,119 @@ const contextEvalRunStatus = v.union(
   v.literal("CANCELED")
 );
 
+export const missionPlanningRunsTable = defineTable({
+  tenantId: v.optional(v.id("tenants")),
+  projectId: v.id("projects"),
+  missionId: v.id("missions"),
+  repositoryId: v.id("workspaceRepositories"),
+  idempotencyKey: v.string(),
+  status: v.union(
+    v.literal("QUEUED"),
+    v.literal("RESEARCHING"),
+    v.literal("GENERATING"),
+    v.literal("VALIDATING"),
+    v.literal("SUCCEEDED"),
+    v.literal("FAILED"),
+    v.literal("CANCELED"),
+  ),
+  attemptCount: v.number(),
+  maxAttempts: v.number(),
+  nextAttemptAt: v.optional(v.number()),
+  lease: v.optional(v.object({
+    leaseId: v.string(),
+    ownerId: v.string(),
+    workerId: v.string(),
+    workerSessionId: v.string(),
+    claimedAt: v.number(),
+    heartbeatAt: v.number(),
+    expiresAt: v.number(),
+  })),
+  planningRepositorySha: v.string(),
+  hostBindingId: v.id("workspaceHostBindings"),
+  hostId: v.string(),
+  factoryDefinitionId: v.id("factoryDefinitions"),
+  factoryDefinitionVersionId: v.id("factoryDefinitionVersions"),
+  factoryConfigurationDigest: v.string(),
+  workflowId: v.id("workflows"),
+  workflowVersion: v.number(),
+  plannerIdentity: v.optional(v.any()),
+  factoryAdmissionAgentVersionId: v.optional(v.id("agentVersions")),
+  factoryAdmissionAgentSnapshot: v.optional(v.any()),
+  // Legacy fields remain readable for runs created before truthful built-in
+  // planner provenance was introduced.
+  plannerAgentVersionId: v.optional(v.id("agentVersions")),
+  plannerAgentSnapshot: v.optional(v.any()),
+  executor: v.object({
+    adapter: v.string(),
+    version: v.string(),
+    capabilityManifestSha256: v.string(),
+    effectiveConfigSha256: v.string(),
+  }),
+  modelRoutingDecisionId: v.id("modelRoutingDecisions"),
+  modelCatalogId: v.id("modelCatalog"),
+  modelProvider: v.string(),
+  modelId: v.string(),
+  modelRouteDigest: v.string(),
+  inputSnapshot: v.any(),
+  inputDigest: v.string(),
+  researchPacket: v.optional(v.any()),
+  researchPacketDigest: v.optional(v.string()),
+  harnessExecutions: v.optional(v.array(v.any())),
+  candidatePlan: v.optional(v.any()),
+  candidateDigest: v.optional(v.string()),
+  provenance: v.optional(v.any()),
+  outputDigest: v.optional(v.string()),
+  validationErrors: v.optional(v.array(v.string())),
+  failure: v.optional(v.object({
+    code: v.string(),
+    message: v.string(),
+    retryable: v.boolean(),
+    failedAt: v.number(),
+  })),
+  adoptedPlanId: v.optional(v.id("missionPlans")),
+  requestedBy: v.string(),
+  requestedActorSource: v.union(v.literal("AUTHENTICATED"), v.literal("DEVELOPMENT_FALLBACK")),
+  createdAt: v.number(),
+  startedAt: v.optional(v.number()),
+  completedAt: v.optional(v.number()),
+  updatedAt: v.number(),
+})
+  .index("by_mission", ["missionId"])
+  .index("by_mission_created", ["missionId", "createdAt"])
+  .index("by_mission_status", ["missionId", "status"])
+  .index("by_repository_status", ["repositoryId", "status"])
+  .index("by_idempotency", ["idempotencyKey"]);
+
+export const missionPlanningRunEventsTable = defineTable({
+  tenantId: v.optional(v.id("tenants")),
+  projectId: v.id("projects"),
+  missionId: v.id("missions"),
+  planningRunId: v.id("missionPlanningRuns"),
+  eventType: v.string(),
+  status: v.union(
+    v.literal("QUEUED"),
+    v.literal("RESEARCHING"),
+    v.literal("GENERATING"),
+    v.literal("VALIDATING"),
+    v.literal("SUCCEEDED"),
+    v.literal("FAILED"),
+    v.literal("CANCELED"),
+  ),
+  actorType,
+  actorId: v.optional(v.string()),
+  summary: v.string(),
+  timestamp: v.number(),
+  metadata: v.optional(v.any()),
+})
+  .index("by_run", ["planningRunId"])
+  .index("by_run_timestamp", ["planningRunId", "timestamp"])
+  .index("by_mission_timestamp", ["missionId", "timestamp"]);
+
 // ============================================================================
 // SCHEMA
 // ============================================================================
 
-export default defineSchema({
+export const schemaTablesPartOne = {
   // -------------------------------------------------------------------------
   // ARM: TENANTS (Multi-Tenancy Foundation)
   // -------------------------------------------------------------------------
@@ -1420,6 +1528,8 @@ export default defineSchema({
     )),
     qualificationSnapshot: v.optional(v.any()),
     qualificationDigest: v.optional(v.string()),
+    costPolicySnapshot: v.optional(v.any()),
+    costPolicyDigest: v.optional(v.string()),
     registeredBy: v.optional(v.string()),
     registeredAt: v.optional(v.number()),
     promotedBy: v.optional(v.string()),
@@ -1656,6 +1766,11 @@ export default defineSchema({
     estimatedCostUsd: v.optional(v.number()),
     repository: v.optional(v.string()),
     repositoryBranch: v.optional(v.string()),
+    planningRunId: v.optional(v.id("missionPlanningRuns")),
+    planningRepositorySha: v.optional(v.string()),
+    planningResearchPacketDigest: v.optional(v.string()),
+    planningCandidateDigest: v.optional(v.string()),
+    planningProvenance: v.optional(v.any()),
     createdBy: v.string(),
     submittedBy: v.optional(v.string()),
     submittedAt: v.optional(v.number()),
@@ -1746,6 +1861,13 @@ export default defineSchema({
     .index("by_mission_status", ["missionId", "status"])
     .index("by_mission_revision", ["missionId", "revisionNumber"])
     .index("by_idempotency", ["idempotencyKey"]),
+
+  // Durable, non-authoritative planning intelligence. A successful row may
+  // supply an editable candidate to the Mission Plan Workspace, but cannot
+  // submit, approve, dispatch, publish, verify, or accept delivery work.
+  missionPlanningRuns: missionPlanningRunsTable,
+
+  missionPlanningRunEvents: missionPlanningRunEventsTable,
 
   validationAssertions: defineTable({
     tenantId: v.optional(v.id("tenants")),
@@ -1904,6 +2026,8 @@ export default defineSchema({
     missionId: v.optional(v.id("missions")),
     missionPlanId: v.optional(v.id("missionPlans")),
     missionPlanRevision: v.optional(v.number()),
+    planningRunId: v.optional(v.id("missionPlanningRuns")),
+    planningRepositorySha: v.optional(v.string()),
     qualityContractDigest: v.optional(v.string()),
     missionSpecLineage: v.optional(missionSpecLineageValidator),
     missionSequence: v.optional(v.number()),
@@ -2699,6 +2823,7 @@ export default defineSchema({
     parentTaskId: v.optional(v.id("tasks")),
     // Canonical governed-delivery parent. Mission is derived through Work Order.
     workOrderId: v.optional(v.id("workOrders")),
+    planningRepositorySha: v.optional(v.string()),
     
     // Work artifacts
     workPlan: v.optional(v.object({
@@ -3879,6 +4004,9 @@ export default defineSchema({
     // for defined values (e.g., .filter(q => q.neq(q.field("systemRole"), undefined)))
     // to exclude records where systemRole is not set.
     .index("by_system_role", ["systemRole"]),
+};
+
+export const schemaTablesPartTwo = {
 
   // -------------------------------------------------------------------------
   // SOFTWARE FACTORY OPERATING STRUCTURE
@@ -4433,6 +4561,7 @@ export default defineSchema({
     executorInvocationId: v.optional(v.string()),
     primaryTraceId: v.optional(v.id("traces")),
     qualityContractDigest: v.optional(v.string()),
+    planningRepositorySha: v.optional(v.string()),
     // Immutable Factory Memory snapshot selected before execution. This is
     // explanatory context only and never participates in acceptance authority.
     factoryContextPackageId: v.optional(v.id("factoryContextPackages")),
@@ -4553,6 +4682,28 @@ export default defineSchema({
     executorHostId: v.optional(v.string()),
     budgetUsd: v.optional(v.number()),
     spentUsd: v.optional(v.number()),
+    executionCostAuthorization: v.optional(v.object({
+      schema: v.literal("work-order-cost-authorization/v1"),
+      estimatedCostUsd: v.number(),
+      reservedCostUsd: v.number(),
+      hardLimitUsd: v.number(),
+      priorCommittedUsd: v.number(),
+      remainingBeforeReservationUsd: v.number(),
+      budgetSource: v.union(
+        v.literal("WORK_ORDER_IMPLEMENTATION_POLICY"),
+        v.literal("MISSION"),
+        v.literal("FACTORY_VERSION"),
+      ),
+      estimationInputs: v.any(),
+      routeCostPolicyDigest: v.string(),
+      actualCost: v.object({
+        status: v.union(v.literal("MEASURED"), v.literal("UNAVAILABLE")),
+        usd: v.optional(v.number()),
+        reason: v.optional(v.string()),
+      }),
+      varianceUsd: v.optional(v.number()),
+      authorizedAt: v.number(),
+    })),
     stopCondition: v.optional(v.string()),
     scheduledWindow: v.optional(v.object({
       startsAt: v.number(),
@@ -7920,4 +8071,10 @@ export default defineSchema({
     .index("by_project_source", ["projectId", "source"])
     .index("by_source", ["source"])
     .index("by_external", ["source", "externalId"]),
-});
+};
+
+type MissionControlSchemaTables = typeof schemaTablesPartOne & typeof schemaTablesPartTwo;
+const schemaTables: MissionControlSchemaTables = { ...schemaTablesPartOne, ...schemaTablesPartTwo };
+const schema: SchemaDefinition<MissionControlSchemaTables, true> = defineSchema(schemaTables);
+
+export default schema;

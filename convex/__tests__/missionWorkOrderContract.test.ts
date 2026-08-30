@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { compileMissionWorkOrderContract } from "../lib/missionWorkOrderContract";
 import type { MissionPlanAssertionInput, MissionPlanBlueprintInput } from "../lib/missionPlan";
 import type { MissionSpecContent } from "../lib/missionSpec";
+import { validateWorkOrderSpecification } from "../lib/workOrderSpecification";
 
 const assertion: MissionPlanAssertionInput = {
   assertionId: "focused-tests",
@@ -166,5 +167,35 @@ describe("Mission WorkOrder contract compiler", () => {
       { category: "TEST_RESULT", minimumCount: 1, independent: true },
     ]);
     expect(JSON.stringify(contract)).not.toContain("CHECK-REQ-001");
+  });
+
+  it("does not synthesize an unenforceable verifier contract for a read-only validator WorkOrder", () => {
+    const contract = compileMissionWorkOrderContract({
+      blueprint: {
+        ...blueprint,
+        role: "VALIDATOR",
+        isMutating: false,
+        branchStrategy: undefined,
+        implementationPolicy: undefined,
+        dependsOnBlueprintIds: ["implement"],
+      },
+      assertions: [{
+        ...assertion,
+        sourceRequirementIds: ["REQ-001"],
+        sourceAcceptanceExpectationIds: ["AC-001"],
+        sourceVerificationExpectationIds: ["VERIFY-001"],
+      }],
+      codeScopes: [],
+      spec,
+    });
+
+    expect(contract).not.toHaveProperty("verificationContract");
+    expect(contract.metadata).toMatchObject({ specVerificationExpectationIds: ["VERIFY-001"] });
+    expect(validateWorkOrderSpecification({
+      title: "Validate the candidate",
+      desiredOutcome: "Produce independent read-only evidence.",
+      riskLevel: "MEDIUM",
+      ...contract,
+    })).toEqual({ valid: true, issues: [] });
   });
 });

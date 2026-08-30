@@ -6,6 +6,7 @@ import {
 import {
   aggregateExecutionRoutingEvidence,
   loadExecutionRoutingEvidenceBundle,
+  workOrderCostBudget,
 } from "../lib/executionRouting";
 import { getCurrentVerificationResult } from "../lib/currentVerification";
 
@@ -348,5 +349,22 @@ describe("execution routing Policy V2 evidence", () => {
       totalCostUsd: 20,
     });
     expect(evidence.totalCostPerVerifiedSuccessUsd).toBeCloseTo(20 / 6);
+  });
+
+  it("reserves the approved cap and blocks a retry that would exceed the remainder", () => {
+    expect(workOrderCostBudget({
+      approvedWorkOrderCapUsd: 24,
+      priorCommittedUsd: 0,
+    })).toEqual({ approvedRemainingUsd: 24, maximumEstimatedCostUsd: 24 });
+    expect(workOrderCostBudget({
+      approvedWorkOrderCapUsd: 24,
+      missionBudgetRemainingUsd: 50,
+      priorCommittedUsd: 24,
+    })).toEqual({ approvedRemainingUsd: 0, maximumEstimatedCostUsd: 0 });
+    expect(workOrderCostBudget({
+      approvedWorkOrderCapUsd: 24,
+      missionBudgetRemainingUsd: 10,
+      priorCommittedUsd: 4,
+    })).toEqual({ approvedRemainingUsd: 20, maximumEstimatedCostUsd: 10 });
   });
 });

@@ -61,6 +61,19 @@ export interface FactoryCheckoutObservation {
   dirty: boolean;
 }
 
+export function factorySandboxCapabilities(options: {
+  githubAppPublicationReady: boolean;
+  remoteSandboxBackendReady: boolean;
+}) {
+  return [
+    "git-worktree",
+    "workspace-write",
+    "read-only",
+    ...(options.githubAppPublicationReady ? ["github-app-publication"] : []),
+    ...(options.remoteSandboxBackendReady ? ["remote-sandbox", "sandbox-provider:exe-dev"] : []),
+  ];
+}
+
 export class FactoryHostReporter {
   private timer: ReturnType<typeof setInterval> | null = null;
   private reporting = false;

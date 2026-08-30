@@ -40,11 +40,12 @@
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6",
+    "@testing-library/jest-dom": "5.15.1",
     "@testing-library/react": "^14",
     "@types/node": "^25.2.2",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@types/testing-library__jest-dom": "5.14.9",
     "@vitejs/plugin-react": "^4.2.0",
     "jsdom": "^24",
     "typescript": "^5.3.3",

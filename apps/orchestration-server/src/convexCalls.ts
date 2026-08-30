@@ -64,6 +64,9 @@ export const ConvexActions = {
     heartbeatExecution: "serviceCommands:heartbeatExecution",
     reportExecution: "serviceCommands:reportExecution",
     finalizeExecution: "serviceCommands:finalizeExecution",
+    claimMissionPlanningRun: "serviceCommands:claimMissionPlanningRun",
+    renewMissionPlanningRun: "serviceCommands:renewMissionPlanningRun",
+    reportMissionPlanningRun: "serviceCommands:reportMissionPlanningRun",
   },
 } as const;
 

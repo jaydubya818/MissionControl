@@ -5,9 +5,11 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it, vi } from "vitest";
 import {
+  CODEX_WORKSPACE_PERMISSION_PROFILE,
   CodexV1ExecutorAdapter,
   codexChildEnvironment,
   codexOwnedProcessGroupExists,
+  commandArguments,
 } from "../codexExecutorAdapter.js";
 import type { ExecutorRequest, HarnessExecutionContext } from "@mission-control/workflow-engine";
 
@@ -147,6 +149,27 @@ describe("CodexV1ExecutorAdapter", () => {
     expect(child).not.toHaveProperty("OPENAI_API_KEY");
   });
 
+  it("uses a strict workspace permission profile for repository-contained planning", () => {
+    const args = commandArguments({
+      ...request,
+      isolation: "READ_ONLY",
+      filesystemReadScope: "WORKSPACE_ONLY",
+      repositoryRoot: "/var/lib/mission-control/planning/repository",
+      workingDirectory: "/var/lib/mission-control/planning/repository",
+      allowedPaths: ["."],
+      deniedPaths: [".env", ".env.*"],
+    }, "/tmp/result.json", "/tmp/result.schema.json");
+    const overrides = args.flatMap((argument, index) => argument === "-c" ? [args[index + 1]] : []);
+
+    expect(args).toContain("--strict-config");
+    expect(args).not.toContain("--sandbox");
+    expect(overrides).toContain(`default_permissions="${CODEX_WORKSPACE_PERMISSION_PROFILE}"`);
+    expect(overrides.join("\n")).toContain('":workspace_roots"');
+    expect(overrides.join("\n")).toContain('":minimal"="read"');
+    expect(overrides.join("\n")).toContain("network.enabled=false");
+    expect(args).not.toContain("--dangerously-bypass-approvals-and-sandbox");
+  });
+
   it("builds a bounded remote invocation without acquiring control-plane authority", () => {
     const adapter = new CodexV1ExecutorAdapter("/opt/codex", vi.fn() as any);
     const invocation = adapter.createRemoteInvocation(request, {
@@ -198,6 +221,33 @@ describe("CodexV1ExecutorAdapter", () => {
       observability: "NONE",
       learning: "NONE",
     });
+  });
+
+  it("binds request-scoped structured output without changing the frozen harness identity", () => {
+    const adapter = new CodexV1ExecutorAdapter("/opt/codex", vi.fn() as any);
+    const jsonSchema = {
+      type: "object",
+      additionalProperties: false,
+      required: ["schema", "findings"],
+      properties: {
+        schema: { type: "string", enum: ["repository-research-packet/v1"] },
+        findings: { type: "array", items: { type: "string" } },
+      },
+    };
+    const invocation = adapter.createRemoteInvocation({
+      ...request,
+      isolation: "READ_ONLY",
+      allowedPaths: ["**/*"],
+      structuredOutput: { schemaId: "repository-research-packet/v1", jsonSchema },
+    }, {
+      repositoryRoot: "/var/lib/mission-control/planning/repository",
+      resultPath: "/var/lib/mission-control/planning/research.json",
+    });
+
+    expect(invocation.outputSchema).toEqual(jsonSchema);
+    expect(invocation.outputSchemaPath).toBe("/var/lib/mission-control/planning/factory-result.schema.json");
+    expect(invocation.args).toContain(invocation.outputSchemaPath);
+    expect(adapter.capabilities().capabilityManifest!.identity).toMatchObject({ adapterId: "codex", adapterVersion: "v1" });
   });
 
   it.skipIf(process.platform === "win32")("cancels the dedicated owned executor process group", async () => {
