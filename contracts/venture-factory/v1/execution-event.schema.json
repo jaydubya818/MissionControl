@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://venture-factory.local/contracts/mission-control/v1/execution-event.schema.json",
+  "title": "Mission Control execution event v1",
+  "description": "A CloudEvents-shaped, signed-at-transport, sequenced Mission Control lifecycle projection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["specversion", "schema_version", "event_id", "source", "type", "subject", "time", "sequence", "correlation", "data"],
+  "properties": {
+    "specversion": { "const": "1.0" },
+    "schema_version": { "const": "execution-event/v1" },
+    "event_id": { "$ref": "#/$defs/id" },
+    "source": { "type": "string", "format": "uri" },
+    "type": {
+      "enum": [
+        "mission_control.intent.accepted",
+        "mission_control.intent.rejected",
+        "mission_control.governance.required",
+        "mission_control.work.linked",
+        "mission_control.execution.blocked",
+        "mission_control.execution.started",
+        "mission_control.verification.changed",
+        "mission_control.human_action.required",
+        "mission_control.software.accepted",
+        "mission_control.execution.canceled",
+        "mission_control.execution.superseded",
+        "mission_control.execution.failed"
+      ]
+    },
+    "subject": { "type": "string", "pattern": "^execution-intents/[A-Za-z][A-Za-z0-9_-]{5,127}$" },
+    "time": { "type": "string", "format": "date-time" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "datacontenttype": { "const": "application/json" },
+    "correlation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intent_id", "mission_control_correlation_id", "correlation_id", "causation_id"],
+      "properties": {
+        "intent_id": { "$ref": "#/$defs/id" },
+        "mission_control_correlation_id": { "$ref": "#/$defs/id" },
+        "correlation_id": { "$ref": "#/$defs/id" },
+        "causation_id": { "$ref": "#/$defs/id" }
+      }
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "summary", "external_references", "software_acceptance"],
+      "properties": {
+        "status": {
+          "enum": ["INTAKE_ACCEPTED", "INTAKE_REJECTED", "GOVERNANCE_REQUIRED", "PLANNING", "BLOCKED", "EXECUTING", "VERIFYING", "REQUIRES_HUMAN_ACTION", "SOFTWARE_ACCEPTED", "CANCELED", "SUPERSEDED", "FAILED"]
+        },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "reason_codes": { "type": "array", "maxItems": 50, "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,79}$" } },
+        "external_references": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mission_id": { "$ref": "#/$defs/id" },
+            "mission_plan_id": { "$ref": "#/$defs/id" },
+            "work_order_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+            "attempt_id": { "$ref": "#/$defs/id" },
+            "factory_version_id": { "$ref": "#/$defs/id" },
+            "verification_run_id": { "$ref": "#/$defs/id" },
+            "verification_receipt_id": { "$ref": "#/$defs/id" },
+            "quality_gate_decision_id": { "$ref": "#/$defs/id" },
+            "pull_request_url": { "type": "string", "format": "uri" },
+            "deep_link": { "type": "string", "format": "uri" }
+          }
+        },
+        "software_acceptance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["accepted"],
+          "properties": {
+            "accepted": { "type": "boolean" },
+            "work_order_id": { "$ref": "#/$defs/id" },
+            "work_order_revision": { "type": "integer", "minimum": 1 },
+            "candidate_digest": { "$ref": "#/$defs/sha256" },
+            "verification_receipt_id": { "$ref": "#/$defs/id" },
+            "quality_gate_decision_id": { "$ref": "#/$defs/id" },
+            "accepted_at": { "type": "string", "format": "date-time" }
+          }
+        },
+        "required_human_action": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["action", "owner", "deep_link"],
+          "properties": {
+            "action": { "type": "string", "minLength": 1, "maxLength": 1000 },
+            "owner": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "deep_link": { "type": "string", "format": "uri" }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "mission_control.software.accepted" } }, "required": ["type"] },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "software_acceptance": {
+                "type": "object",
+                "properties": {
+                  "accepted": { "const": true },
+                  "work_order_id": true,
+                  "work_order_revision": true,
+                  "candidate_digest": true,
+                  "verification_receipt_id": true,
+                  "quality_gate_decision_id": true,
+                  "accepted_at": true
+                },
+                "required": ["work_order_id", "work_order_revision", "candidate_digest", "verification_receipt_id", "quality_gate_decision_id", "accepted_at"]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{5,127}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

@@ -46,6 +46,11 @@ import { CodexV1ExecutorAdapter } from "./codexExecutorAdapter.js";
 import { DeepSeekHarnessExecutorAdapter } from "./deepseekHarnessExecutorAdapter.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
 import { resolvePersonaPath, safeClientError } from "./orchestrationSecurity.js";
+import {
+  createExecutionIntentShadowApp,
+  loadExecutionIntentShadowConfig,
+  type ExecutionIntentShadowStore,
+} from "./executionIntentShadow.js";
 import os from "node:os";
 
 const envSearchPaths = [
@@ -60,6 +65,8 @@ for (const envPath of envSearchPaths) {
     dotenv.config({ path: envPath });
   }
 }
+
+const EXECUTION_INTENT_SHADOW_CONFIG = loadExecutionIntentShadowConfig(process.env);
 
 // ============================================================================
 // CONFIG
@@ -105,6 +112,20 @@ const CONVEX_SERVICE_AUTH_TOKEN = process.env.CONVEX_SERVICE_AUTH_TOKEN?.trim();
 if (CONVEX_SERVICE_AUTH_TOKEN) {
   client.setAuth(CONVEX_SERVICE_AUTH_TOKEN);
 }
+const executionIntentShadowStore: ExecutionIntentShadowStore = {
+  intake: async (input) => await client.mutation(
+    ConvexMutations.executionIntents.intake as any,
+    input,
+  ) as Awaited<ReturnType<ExecutionIntentShadowStore["intake"]>>,
+  get: async (input) => await client.query(
+    ConvexQueries.executionIntents.get as any,
+    input,
+  ) as Awaited<ReturnType<ExecutionIntentShadowStore["get"]>>,
+  events: async (input) => await client.query(
+    ConvexQueries.executionIntents.listEvents as any,
+    input,
+  ) as Awaited<ReturnType<ExecutionIntentShadowStore["events"]>>,
+};
 const enabledFactoryHarnessAdapters = [
   ...((CODEX_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED) ? [new CodexV1ExecutorAdapter()] : []),
   ...(DEEPSEEK_HARNESS_EXECUTOR_ENABLED ? [new DeepSeekHarnessExecutorAdapter()] : []),
@@ -384,6 +405,11 @@ app.use("*", cors());
 // connection-status probes declared in auth.ts. This avoids silently exposing
 // new mutation routes when a path prefix is added in the future.
 app.use("*", requireAuth());
+
+app.route(
+  "/v1/execution-intents",
+  createExecutionIntentShadowApp(EXECUTION_INTENT_SHADOW_CONFIG, executionIntentShadowStore),
+);
 
 // Health check (unauthenticated for load balancers)
 app.get("/health", (c) => {
@@ -1461,6 +1487,7 @@ export function startServer() {
   console.log(`[orchestration] Project: ${PROJECT_SLUG}`);
   console.log(`[orchestration] Tick interval: ${TICK_INTERVAL_MS}ms`);
   console.log(`[orchestration] Agents dir: ${AGENTS_DIR}`);
+  console.log(`[orchestration] AVF ExecutionIntent intake: ${EXECUTION_INTENT_SHADOW_CONFIG.mode}`);
 
   startedAt = Date.now();
 

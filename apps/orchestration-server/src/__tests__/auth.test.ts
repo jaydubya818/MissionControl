@@ -26,4 +26,13 @@ describe("orchestration authentication", () => {
     expect(isPublicOrchestrationRoute("POST", "/approval-decisions/decision-1/decide")).toBe(false);
     expect(isPublicOrchestrationRoute("GET", "/status")).toBe(false);
   });
+
+  it("delegates only exact ExecutionIntent routes to their dedicated service authentication", () => {
+    expect(isPublicOrchestrationRoute("POST", "/v1/execution-intents")).toBe(true);
+    expect(isPublicOrchestrationRoute("GET", "/v1/execution-intents/executionIntent_shadow1")).toBe(true);
+    expect(isPublicOrchestrationRoute("GET", "/v1/execution-intents/executionIntent_shadow1/events")).toBe(true);
+    expect(isPublicOrchestrationRoute("DELETE", "/v1/execution-intents/executionIntent_shadow1")).toBe(false);
+    expect(isPublicOrchestrationRoute("GET", "/v1/execution-intents/../status")).toBe(false);
+    expect(isPublicOrchestrationRoute("POST", "/v1/execution-intents-extra")).toBe(false);
+  });
 });

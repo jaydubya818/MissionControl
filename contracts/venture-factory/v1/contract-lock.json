@@ -1,0 +1,12 @@
+{
+  "contract_version": "execution-intent/v1",
+  "factory_baseline": "ab7818976818c9a81d2004e1b6e6c4caba016f61",
+  "mode": "SHADOW",
+  "dispatch_authority": false,
+  "software_acceptance_authority": false,
+  "schemas": {
+    "execution-event.schema.json": "sha256:9eff66c2b3b4c086db0e89609d63b1c3120f5b97085bad1073601cd89f5e1e6f",
+    "execution-intent-response.schema.json": "sha256:ddcc99cc52a7aea67f3ad764032999036eeab15c092171a6ec5992e62ebc2057",
+    "execution-intent.schema.json": "sha256:977fa809e58dbdbb18c69d87df7740ec4e0212d536c245258862743153e3ccf0"
+  }
+}

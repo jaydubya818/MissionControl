@@ -41,6 +41,10 @@ export const ConvexQueries = {
   githubAppConnections: {
     getRepositoryReadiness: "githubAppConnections:getRepositoryReadiness",
   },
+  executionIntents: {
+    get: "executionIntents:get",
+    listEvents: "executionIntents:listEvents",
+  },
 } as const;
 
 export const ConvexActions = {
@@ -116,5 +120,8 @@ export const ConvexMutations = {
   },
   workspaceHostBindings: {
     report: "workspaceHostBindings:report",
+  },
+  executionIntents: {
+    intake: "executionIntents:intake",
   },
 } as const;

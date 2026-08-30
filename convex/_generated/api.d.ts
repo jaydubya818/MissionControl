@@ -42,6 +42,7 @@ import type * as crons from "../crons.js";
 import type * as e2e from "../e2e.js";
 import type * as eos_projections from "../eos/projections.js";
 import type * as execution from "../execution.js";
+import type * as executionIntents from "../executionIntents.js";
 import type * as executionRequests from "../executionRequests.js";
 import type * as executionRouting from "../executionRouting.js";
 import type * as executionWorker from "../executionWorker.js";
@@ -107,6 +108,7 @@ import type * as lib_deliveryAuthorization from "../lib/deliveryAuthorization.js
 import type * as lib_demoSeedExtensions from "../lib/demoSeedExtensions.js";
 import type * as lib_evalFrameworkGate from "../lib/evalFrameworkGate.js";
 import type * as lib_evidenceAuthority from "../lib/evidenceAuthority.js";
+import type * as lib_executionIntentShadow from "../lib/executionIntentShadow.js";
 import type * as lib_executionManifest from "../lib/executionManifest.js";
 import type * as lib_executionPolicy from "../lib/executionPolicy.js";
 import type * as lib_executionRecovery from "../lib/executionRecovery.js";
@@ -340,6 +342,7 @@ declare const fullApi: ApiFromModules<{
   e2e: typeof e2e;
   "eos/projections": typeof eos_projections;
   execution: typeof execution;
+  executionIntents: typeof executionIntents;
   executionRequests: typeof executionRequests;
   executionRouting: typeof executionRouting;
   executionWorker: typeof executionWorker;
@@ -405,6 +408,7 @@ declare const fullApi: ApiFromModules<{
   "lib/demoSeedExtensions": typeof lib_demoSeedExtensions;
   "lib/evalFrameworkGate": typeof lib_evalFrameworkGate;
   "lib/evidenceAuthority": typeof lib_evidenceAuthority;
+  "lib/executionIntentShadow": typeof lib_executionIntentShadow;
   "lib/executionManifest": typeof lib_executionManifest;
   "lib/executionPolicy": typeof lib_executionPolicy;
   "lib/executionRecovery": typeof lib_executionRecovery;

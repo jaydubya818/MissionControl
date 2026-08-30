@@ -52,7 +52,14 @@ export function requireAuth() {
 export function isPublicOrchestrationRoute(method: string, requestPath: string): boolean {
   const normalizedMethod = method.toUpperCase();
   return normalizedMethod === "OPTIONS"
+    || isDedicatedExecutionIntentRoute(normalizedMethod, requestPath)
     || PUBLIC_ROUTES.has(`${normalizedMethod} ${requestPath}`);
+}
+
+function isDedicatedExecutionIntentRoute(method: string, requestPath: string): boolean {
+  if (method !== "GET" && method !== "POST") return false;
+  return requestPath === "/v1/execution-intents"
+    || /^\/v1\/execution-intents\/[A-Za-z][A-Za-z0-9_-]{5,127}(?:\/events)?$/.test(requestPath);
 }
 
 function tokensMatch(candidate: string, expected: string): boolean {

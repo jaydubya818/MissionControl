@@ -414,6 +414,62 @@ const contextEvalRunStatus = v.union(
 
 export default defineSchema({
   // -------------------------------------------------------------------------
+  // AUTONOMOUS VENTURE FACTORY: EXECUTION INTENT SHADOW INTAKE
+  // -------------------------------------------------------------------------
+  executionIntents: defineTable({
+    intentId: v.string(),
+    organizationId: v.string(),
+    serviceSubject: v.string(),
+    idempotencyKey: v.string(),
+    requestDigest: v.string(),
+    requestJson: v.string(),
+    mode: v.literal("SHADOW"),
+    status: v.literal("INTAKE_ACCEPTED"),
+    missionControlCorrelationId: v.string(),
+    latestSequence: v.literal(1),
+    executionObjectsCreated: v.literal(false),
+    softwareAcceptance: v.literal(false),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_intent", ["organizationId", "intentId"])
+    .index("by_idempotency", ["organizationId", "idempotencyKey"])
+    .index("by_organization_created", ["organizationId", "createdAt"]),
+
+  executionIntentEvents: defineTable({
+    intentId: v.string(),
+    organizationId: v.string(),
+    sequence: v.literal(1),
+    eventId: v.string(),
+    eventDigest: v.string(),
+    eventJson: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_intent_sequence", ["organizationId", "intentId", "sequence"])
+    .index("by_event", ["eventId"]),
+
+  executionIntentTransportReceipts: defineTable({
+    organizationId: v.string(),
+    serviceSubject: v.string(),
+    nonce: v.string(),
+    keyId: v.string(),
+    transportTimestamp: v.number(),
+    expiresAt: v.number(),
+    requestDigest: v.string(),
+    idempotencyKey: v.string(),
+    intentId: v.string(),
+    outcome: v.union(
+      v.literal("CREATED"),
+      v.literal("DUPLICATE"),
+      v.literal("CONFLICT"),
+    ),
+    receivedAt: v.number(),
+  })
+    .index("by_service_nonce", ["serviceSubject", "nonce"])
+    .index("by_expires_at", ["expiresAt"])
+    .index("by_intent", ["organizationId", "intentId", "receivedAt"]),
+
+  // -------------------------------------------------------------------------
   // ARM: TENANTS (Multi-Tenancy Foundation)
   // -------------------------------------------------------------------------
   tenants: defineTable({

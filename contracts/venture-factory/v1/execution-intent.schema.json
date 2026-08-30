@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://venture-factory.local/contracts/mission-control/v1/execution-intent.schema.json",
+  "title": "ExecutionIntent v1",
+  "description": "A governed business intent proposed to Mission Control. It is not a WorkOrder or executor instruction.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "intent_id",
+    "organization_id",
+    "idempotency_key",
+    "created_at",
+    "requested_by",
+    "correlation",
+    "subject",
+    "desired_business_outcome",
+    "constraints",
+    "evidence_requirements",
+    "budget_ceiling",
+    "rights_constraints",
+    "governance",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "execution-intent/v1" },
+    "intent_id": { "$ref": "#/$defs/id" },
+    "organization_id": { "$ref": "#/$defs/id" },
+    "idempotency_key": { "type": "string", "minLength": 8, "maxLength": 200 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "requested_by": { "$ref": "#/$defs/actor" },
+    "correlation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correlation_id", "causation_id"],
+      "properties": {
+        "correlation_id": { "$ref": "#/$defs/id" },
+        "causation_id": { "$ref": "#/$defs/id" },
+        "trace_id": { "type": "string", "minLength": 16, "maxLength": 64 }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["portfolio_id", "venture_id", "decision_id"],
+      "properties": {
+        "portfolio_id": { "$ref": "#/$defs/id" },
+        "opportunity_id": { "$ref": "#/$defs/id" },
+        "venture_id": { "$ref": "#/$defs/id" },
+        "venture_template_id": { "$ref": "#/$defs/id" },
+        "experiment_id": { "$ref": "#/$defs/id" },
+        "experiment_version": { "type": "integer", "minimum": 1 },
+        "decision_id": { "$ref": "#/$defs/id" },
+        "product_build_id": { "$ref": "#/$defs/id" },
+        "improvement_proposal_id": { "$ref": "#/$defs/id" }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": { "experiment_id": true, "experiment_version": true },
+          "required": ["experiment_id", "experiment_version"]
+        },
+        {
+          "type": "object",
+          "properties": { "product_build_id": true },
+          "required": ["product_build_id"]
+        }
+      ]
+    },
+    "product_build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification_id",
+        "specification_revision",
+        "specification_digest",
+        "build_plan_id",
+        "build_plan_revision",
+        "build_plan_digest",
+        "repository",
+        "base_sha",
+        "definition_of_done",
+        "compute_budget_minor",
+        "target_environment",
+        "expected_verification",
+        "callback_identity"
+      ],
+      "properties": {
+        "specification_id": { "$ref": "#/$defs/id" },
+        "specification_revision": { "type": "integer", "minimum": 1 },
+        "specification_digest": { "$ref": "#/$defs/sha256" },
+        "build_plan_id": { "$ref": "#/$defs/id" },
+        "build_plan_revision": { "type": "integer", "minimum": 1 },
+        "build_plan_digest": { "$ref": "#/$defs/sha256" },
+        "repository": { "type": "string", "minLength": 3, "maxLength": 500 },
+        "base_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "definition_of_done": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "items": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        },
+        "compute_budget_minor": { "type": "integer", "minimum": 0 },
+        "target_environment": { "enum": ["LOCAL", "TEST", "PROTECTED_PREVIEW"] },
+        "expected_verification": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["TEST", "STATIC_ANALYSIS", "SECURITY", "ACCESSIBILITY", "PERFORMANCE", "BROWSER", "OPERATIONS"] }
+        },
+        "callback_identity": { "$ref": "#/$defs/id" }
+      }
+    },
+    "desired_business_outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "success_conditions", "non_goals"],
+      "properties": {
+        "statement": { "type": "string", "minLength": 20, "maxLength": 4000 },
+        "success_conditions": { "type": "array", "minItems": 1, "maxItems": 30, "items": { "$ref": "#/$defs/condition" } },
+        "non_goals": { "type": "array", "maxItems": 30, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "prohibited", "data_boundaries", "stop_conditions"],
+      "properties": {
+        "required": { "type": "array", "maxItems": 50, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "prohibited": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "data_boundaries": { "type": "array", "maxItems": 30, "items": { "$ref": "#/$defs/dataBoundary" } },
+        "stop_conditions": { "type": "array", "minItems": 1, "maxItems": 30, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "delivery_deadline": { "type": "string", "format": "date-time" }
+      }
+    },
+    "evidence_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criteria", "independent_verification_required", "human_review_required"],
+      "properties": {
+        "criteria": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "$ref": "#/$defs/evidenceCriterion" } },
+        "independent_verification_required": { "const": true },
+        "human_review_required": { "type": "boolean" }
+      }
+    },
+    "budget_ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount_minor", "currency", "reservation_id", "includes_mission_control_cost"],
+      "properties": {
+        "amount_minor": { "type": "integer", "minimum": 0 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "reservation_id": { "$ref": "#/$defs/id" },
+        "includes_mission_control_cost": { "const": true },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "rights_constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_ids", "allowed_territories", "prohibited_uses", "derived_artifact_requirements"],
+      "properties": {
+        "decision_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "allowed_territories": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 2, "maxLength": 20 } },
+        "prohibited_uses": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "derived_artifact_requirements": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "valid_until": { "type": "string", "format": "date-time" }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["risk_level", "policy_decision_id", "approval_ids", "maximum_autonomy"],
+      "properties": {
+        "risk_level": { "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+        "policy_decision_id": { "$ref": "#/$defs/id" },
+        "approval_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "maximum_autonomy": { "enum": ["L0_OBSERVE", "L1_RECOMMEND", "L2_PREPARE"] }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_digest", "decision_digest", "evidence_set_digest", "source_references"],
+      "properties": {
+        "input_digest": { "$ref": "#/$defs/sha256" },
+        "decision_digest": { "$ref": "#/$defs/sha256" },
+        "evidence_set_digest": { "$ref": "#/$defs/sha256" },
+        "source_references": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/$defs/reference" } },
+        "learning_references": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/reference" } }
+      }
+    },
+    "factory_callback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_sink_id"],
+      "properties": {
+        "event_sink_id": { "$ref": "#/$defs/id" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "subject": {
+            "type": "object",
+            "properties": { "product_build_id": true },
+            "required": ["product_build_id"]
+          }
+        },
+        "required": ["subject"]
+      },
+      "then": {
+        "type": "object",
+        "properties": { "product_build": true },
+        "required": ["product_build"]
+      }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{5,127}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actor_type", "actor_id"],
+      "properties": {
+        "actor_type": { "enum": ["HUMAN", "SERVICE", "AGENT"] },
+        "actor_id": { "$ref": "#/$defs/id" },
+        "agent_version_id": { "$ref": "#/$defs/id" }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "verification_expectation"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "verification_expectation": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "dataBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "rule"],
+      "properties": {
+        "classification": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "rule": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "evidenceCriterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "required_categories"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "required_categories": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["TEST", "STATIC_ANALYSIS", "SECURITY", "RIGHTS", "ACCESSIBILITY", "PERFORMANCE", "BROWSER", "OPERATIONS", "HUMAN_REVIEW"] } }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "version", "digest"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "id": { "$ref": "#/$defs/id" },
+        "version": { "type": "integer", "minimum": 1 },
+        "digest": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

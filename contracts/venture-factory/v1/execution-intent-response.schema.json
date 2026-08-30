@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://venture-factory.local/contracts/mission-control/v1/execution-intent-response.schema.json",
+  "title": "ExecutionIntent intake response v1",
+  "description": "Mission Control's synchronous intake result. ACCEPTED_FOR_PLANNING never means software is verified, released, or accepted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "intent_id",
+    "idempotency_key",
+    "request_digest",
+    "status",
+    "mission_control_correlation_id",
+    "received_at",
+    "reasons"
+  ],
+  "properties": {
+    "schema_version": { "const": "execution-intent-response/v1" },
+    "intent_id": { "$ref": "#/$defs/id" },
+    "idempotency_key": { "type": "string", "minLength": 8, "maxLength": 200 },
+    "request_digest": { "$ref": "#/$defs/sha256" },
+    "status": { "enum": ["ACCEPTED_FOR_PLANNING", "GOVERNANCE_REQUIRED", "REJECTED", "DUPLICATE", "CONFLICT"] },
+    "mission_control_correlation_id": { "$ref": "#/$defs/id" },
+    "received_at": { "type": "string", "format": "date-time" },
+    "reasons": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,79}$" },
+          "message": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "field": { "type": "string", "maxLength": 200 }
+        }
+      }
+    },
+    "required_human_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "owner", "deep_link"],
+      "properties": {
+        "action": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "deep_link": { "type": "string", "format": "uri" }
+      }
+    },
+    "reconcile_after": { "type": "string", "format": "date-time" },
+    "existing_result_reference": { "type": "string", "minLength": 1, "maxLength": 300 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "GOVERNANCE_REQUIRED" } }, "required": ["status"] },
+      "then": { "properties": { "required_human_action": true }, "required": ["required_human_action"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "DUPLICATE" } }, "required": ["status"] },
+      "then": { "properties": { "existing_result_reference": true }, "required": ["existing_result_reference"] }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{5,127}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

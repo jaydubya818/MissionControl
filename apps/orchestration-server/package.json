@@ -13,18 +13,21 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^4.12.34",
     "@hono/node-server": "^1.19.13",
-    "convex": "^1.31.7",
-    "ws": "^8.21.3",
-    "openai": "^4.73.0",
-    "@mission-control/coordinator": "workspace:*",
     "@mission-control/agent-runtime": "workspace:*",
     "@mission-control/context-router": "workspace:*",
+    "@mission-control/coordinator": "workspace:*",
     "@mission-control/memory": "workspace:*",
     "@mission-control/shared": "workspace:*",
     "@mission-control/workflow-engine": "workspace:*",
+    "ajv": "8.18.0",
+    "ajv-formats": "3.0.1",
+    "canonicalize": "2.1.0",
+    "convex": "^1.31.7",
     "dotenv": "^16.3.1",
+    "hono": "^4.12.34",
+    "openai": "^4.73.0",
+    "ws": "^8.21.3",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
