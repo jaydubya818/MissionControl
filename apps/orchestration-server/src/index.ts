@@ -22,7 +22,7 @@ import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { ConvexHttpClient } from "convex/browser";
 import { createGatewayProxy } from "./gateway-proxy.js";
-import { requireAuth } from "./auth.js";
+import { isShadowProviderRoute, requireAuth } from "./auth.js";
 import { ConvexActions, ConvexQueries, ConvexMutations } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
 import { CoordinatorLoop } from "@mission-control/coordinator";
@@ -67,6 +67,7 @@ for (const envPath of envSearchPaths) {
 }
 
 const EXECUTION_INTENT_SHADOW_CONFIG = loadExecutionIntentShadowConfig(process.env);
+const SHADOW_PROVIDER_ONLY = process.env.SHADOW_PROVIDER_ONLY === "true";
 
 // ============================================================================
 // CONFIG
@@ -97,6 +98,13 @@ const REMOTE_SANDBOX_BACKEND_READY = process.env.CODEX_WORKER_REMOTE_SANDBOX_ENA
 const FACTORY_WORKER_EXECUTION_BACKENDS = REMOTE_SANDBOX_BACKEND_READY
   ? ["persistent-worker", "remote-sandbox"] as const
   : ["persistent-worker"] as const;
+
+if (SHADOW_PROVIDER_ONLY && EXECUTION_INTENT_SHADOW_CONFIG.mode !== "shadow") {
+  throw new Error("SHADOW_PROVIDER_ONLY requires AVF_EXECUTION_INTENT_MODE=shadow");
+}
+if (SHADOW_PROVIDER_ONLY && (DURABLE_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED)) {
+  throw new Error("Factory execution workers cannot run in shadow-provider-only mode");
+}
 
 if (!CONVEX_URL) {
   console.error("[orchestration] CONVEX_URL is required. Set it in .env or environment.");
@@ -398,6 +406,14 @@ async function stopAgent(personaName: string): Promise<void> {
 
 export const app = new Hono();
 
+app.use("*", async (context, next) => {
+  if (!SHADOW_PROVIDER_ONLY || isShadowProviderRoute(context.req.method, context.req.path)) {
+    await next();
+    return;
+  }
+  return context.json({ error: "Shadow provider only" }, 404);
+});
+
 // CORS so UI (different origin/port) can call gateway/status and other endpoints
 app.use("*", cors());
 
@@ -422,6 +438,7 @@ app.get("/health", (c) => {
     activeAgents: Array.from(activeAgents.keys()),
     factoryAttemptWorker: factoryAttemptWorker.status(),
     codexFactoryWorker: CODEX_FACTORY_WORKER_ENABLED ? "enabled" : "disabled",
+    shadowProviderOnly: SHADOW_PROVIDER_ONLY,
   });
 });
 
@@ -1491,15 +1508,17 @@ export function startServer() {
 
   startedAt = Date.now();
 
-  tickTimer = setInterval(() => {
-    runTick().catch((err) => {
-      console.error("[orchestration] Tick loop error:", err);
-    });
-  }, TICK_INTERVAL_MS);
+  if (!SHADOW_PROVIDER_ONLY) {
+    tickTimer = setInterval(() => {
+      runTick().catch((err) => {
+        console.error("[orchestration] Tick loop error:", err);
+      });
+    }, TICK_INTERVAL_MS);
 
-  runTick().then((result) => {
-    console.log(`[orchestration] Initial tick complete:`, result);
-  });
+    runTick().then((result) => {
+      console.log(`[orchestration] Initial tick complete:`, result);
+    });
+  }
   if (DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED) {
     throw new Error("Configure exactly one Factory execution worker; legacy and durable workers cannot run together.");
   }

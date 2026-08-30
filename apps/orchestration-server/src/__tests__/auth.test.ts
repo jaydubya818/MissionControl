@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isPublicOrchestrationRoute, orchestrationAuthFailure } from "../auth.js";
+import {
+  isPublicOrchestrationRoute,
+  isShadowProviderRoute,
+  orchestrationAuthFailure,
+} from "../auth.js";
 
 describe("orchestration authentication", () => {
   it("fails closed in production when no inbound token is configured", () => {
@@ -34,5 +38,15 @@ describe("orchestration authentication", () => {
     expect(isPublicOrchestrationRoute("DELETE", "/v1/execution-intents/executionIntent_shadow1")).toBe(false);
     expect(isPublicOrchestrationRoute("GET", "/v1/execution-intents/../status")).toBe(false);
     expect(isPublicOrchestrationRoute("POST", "/v1/execution-intents-extra")).toBe(false);
+  });
+
+  it("limits shadow-provider-only mode to health and exact ExecutionIntent routes", () => {
+    expect(isShadowProviderRoute("GET", "/health")).toBe(true);
+    expect(isShadowProviderRoute("POST", "/v1/execution-intents")).toBe(true);
+    expect(isShadowProviderRoute("GET", "/v1/execution-intents/executionIntent_shadow1")).toBe(true);
+    expect(isShadowProviderRoute("GET", "/v1/execution-intents/executionIntent_shadow1/events")).toBe(true);
+    expect(isShadowProviderRoute("GET", "/gateway/status")).toBe(false);
+    expect(isShadowProviderRoute("POST", "/tick")).toBe(false);
+    expect(isShadowProviderRoute("OPTIONS", "/v1/execution-intents")).toBe(false);
   });
 });

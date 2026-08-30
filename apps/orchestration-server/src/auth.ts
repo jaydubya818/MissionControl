@@ -56,6 +56,12 @@ export function isPublicOrchestrationRoute(method: string, requestPath: string):
     || PUBLIC_ROUTES.has(`${normalizedMethod} ${requestPath}`);
 }
 
+export function isShadowProviderRoute(method: string, requestPath: string): boolean {
+  const normalizedMethod = method.toUpperCase();
+  return (normalizedMethod === "GET" && requestPath === "/health")
+    || isDedicatedExecutionIntentRoute(normalizedMethod, requestPath);
+}
+
 function isDedicatedExecutionIntentRoute(method: string, requestPath: string): boolean {
   if (method !== "GET" && method !== "POST") return false;
   return requestPath === "/v1/execution-intents"
