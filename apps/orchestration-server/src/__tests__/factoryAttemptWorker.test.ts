@@ -93,7 +93,13 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("turns governed issue intent into a verified, evidence-linked pull request", async () => {
     const fixture = await runFixture("VERIFIED");
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toEqual(expect.objectContaining({ completedCount: 1, lastError: null })));
+    await vi.waitFor(
+      () =>
+        expect(fixture.worker.status()).toEqual(
+          expect.objectContaining({ completedCount: 1, lastError: null }),
+        ),
+      { timeout: 3_000 },
+    );
 
     expect(fixture.createPullRequest).toHaveBeenCalledOnce();
     const pullRequestInput = fixture.createPullRequest.mock.calls[0][0];

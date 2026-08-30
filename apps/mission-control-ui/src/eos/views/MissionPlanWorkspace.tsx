@@ -282,6 +282,7 @@ export function MissionPlanWorkspace({
   const enabled = useFlag("missions.plan-release-v1", projectId);
   const [experienceLevel] = useFactoryExperienceLevel();
   const workflowsQuery = useQuery(api.workflows.list, { activeOnly: true });
+  const repositories = useQuery(api.projects.listRepositories, { projectId });
   const specIntake = useQuery(api.missionSpecs.getMissionIntake, { projectId, missionId: mission._id });
   const planningState = useQuery(api.missionPlanning.getForMission, { projectId, missionId: mission._id });
   const workflows = useMemo<MissionPlanWorkflowOption[]>(() => (workflowsQuery ?? []).map((workflow: any) => ({ workflowId: workflow.workflowId, name: workflow.name, version: workflow.version })), [workflowsQuery]);
@@ -290,6 +291,11 @@ export function MissionPlanWorkspace({
   const recipeWorkflow = useMemo(() => resolveRecipeWorkflow(recipeId, workflows), [recipeId, workflows]);
   const orderedPlans = useMemo(() => [...plans].sort((left, right) => right.revisionNumber - left.revisionNumber), [plans]);
   const currentPlan = orderedPlans[0] ?? null;
+  const missionRepository = repositories?.find(
+    (repository: any) => String(repository._id) === String(mission.repositoryId),
+  );
+  const repositoryName = missionRepository?.repository ?? project?.githubRepo;
+  const repositoryBranch = missionRepository?.defaultBranch ?? project?.githubBranch;
   const boundSpecRevision = currentPlan?.missionSpecRevisionId
     ? specIntake?.revisions.find((revision) => String(revision._id) === String(currentPlan.missionSpecRevisionId))
     : specIntake?.currentRevision;
@@ -300,12 +306,12 @@ export function MissionPlanWorkspace({
   const basePlan = currentPlan?.basePlanId ? orderedPlans.find((plan) => plan._id === currentPlan.basePlanId) ?? null : null;
   const initialValues = useMemo(() => {
     const values = currentPlan
-      ? planToMissionPlanValues(currentPlan, project?.githubRepo, project?.githubBranch)
+      ? planToMissionPlanValues(currentPlan, repositoryName, repositoryBranch)
       : recipe
         ? missionPlanFromFactoryRecipe({ recipe, missionTitle: mission.title, missionObjective: mission.objective, workflow: recipeWorkflow })
         : emptyMissionPlan(workflows[0]);
-    return { ...values, repository: currentPlan?.repository ?? project?.githubRepo, repositoryBranch: currentPlan?.repositoryBranch ?? project?.githubBranch };
-  }, [currentPlan?._id, currentPlan?.draftVersion, mission.objective, mission.title, project?.githubRepo, project?.githubBranch, recipe?.id, recipeWorkflow?.workflowId, workflows[0]?.workflowId]);
+    return { ...values, repository: currentPlan?.repository ?? repositoryName, repositoryBranch: currentPlan?.repositoryBranch ?? repositoryBranch };
+  }, [currentPlan?._id, currentPlan?.draftVersion, mission.objective, mission.title, recipe?.id, recipeWorkflow?.workflowId, repositoryBranch, repositoryName, workflows[0]?.workflowId]);
   const [values, setValues] = useState<MissionPlanValues>(initialValues);
   const [baseline, setBaseline] = useState<MissionPlanValues>(initialValues);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "acting" | "error">("idle");
@@ -343,16 +349,16 @@ export function MissionPlanWorkspace({
       || latestUnadoptedPlanningRun?.status !== "SUCCEEDED"
       || !latestUnadoptedPlanningRun.candidatePlan
       || appliedPlanningRunId === latestUnadoptedPlanningRun._id) return;
-    setValues(planToMissionPlanValues(latestUnadoptedPlanningRun.candidatePlan, project?.githubRepo, project?.githubBranch));
+    setValues(planToMissionPlanValues(latestUnadoptedPlanningRun.candidatePlan, repositoryName, repositoryBranch));
     setAppliedPlanningRunId(latestUnadoptedPlanningRun._id);
     setStatus("idle");
     setMessage("The validated Planning Agent candidate was applied to the unsaved editor for human review.");
-  }, [appliedPlanningRunId, currentPlan, dirty, latestUnadoptedPlanningRun?._id, latestUnadoptedPlanningRun?.status, project?.githubBranch, project?.githubRepo]);
+  }, [appliedPlanningRunId, currentPlan, dirty, latestUnadoptedPlanningRun?._id, latestUnadoptedPlanningRun?.status, repositoryBranch, repositoryName]);
 
   function applyPlanningCandidate(run: any) {
     if (!canApplyPlanningCandidate(currentPlan) || run?.status !== "SUCCEEDED" || !run.candidatePlan) return;
     if ((currentPlan || dirty) && !window.confirm("Replace the current unsaved editor content with this validated Planning Agent candidate? The saved Plan is unchanged until you save.")) return;
-    setValues(planToMissionPlanValues(run.candidatePlan, project?.githubRepo, project?.githubBranch));
+    setValues(planToMissionPlanValues(run.candidatePlan, repositoryName, repositoryBranch));
     setAppliedPlanningRunId(run._id);
     setShowValidation(false);
     setStatus("idle");
@@ -390,7 +396,7 @@ export function MissionPlanWorkspace({
         idempotencyKey: newKey("save"),
         ...missionPlanPayload(values),
       });
-      const persisted = planToMissionPlanValues(result.plan, project?.githubRepo, project?.githubBranch);
+      const persisted = planToMissionPlanValues(result.plan, repositoryName, repositoryBranch);
       setValues(persisted); setBaseline(persisted); setAppliedPlanningRunId(null); setStatus("saved"); setMessage(result.created ? "Plan draft created." : "Plan draft saved.");
       return result.plan;
     } catch (error) {
@@ -416,7 +422,7 @@ export function MissionPlanWorkspace({
     }
   }
 
-  if (workflowsQuery === undefined || specIntake === undefined || planningState === undefined) return <div className="rounded-xl border border-line bg-surface-1 px-4 py-10 text-center text-sm text-ink-muted">Loading plan workflows, lineage, and planning evidence…</div>;
+  if (workflowsQuery === undefined || repositories === undefined || specIntake === undefined || planningState === undefined) return <div className="rounded-xl border border-line bg-surface-1 px-4 py-10 text-center text-sm text-ink-muted">Loading plan workflows, lineage, and planning evidence…</div>;
 
   const readOnlyNotice = shouldShowPlanReleaseReadOnlyNotice(enabled, currentPlan) ? <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-ink-secondary">Mission plan release is read-only. Enable <code className="font-mono">missions.plan-release-v1</code> for a verified local/project scope to edit or decide.</div> : null;
   const statusMessage = message ? <div role={status === "error" ? "alert" : "status"} className={`rounded-xl border p-3 text-sm ${status === "error" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-line bg-surface-1 text-ink-secondary"}`}>{message}</div> : null;

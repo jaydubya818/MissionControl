@@ -96,11 +96,6 @@ export const request = mutation({
     if (!repository || repository.projectId !== args.projectId || repository.status !== "READY") {
       throw new Error("Mission repository is unavailable or not ready.");
     }
-    if (project.githubRepo
-      && canonicalRepositoryKey(project.githubRepo) !== canonicalRepositoryKey(repository.repository)) {
-      throw new Error("Mission repository does not match the workspace Git repository.");
-    }
-
     const definition = await ctx.db
       .query("factoryDefinitions")
       .withIndex("by_repository_purpose_status", (q) => q
