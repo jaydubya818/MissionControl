@@ -67,12 +67,14 @@ function diagnosticMessage(probe: ClerkConvexTokenProbe | null): string {
   return `Clerk could not issue the ${probe.source === "session" ? "session" : "Convex-template"} token (error: ${probe.errorCode}).`;
 }
 
-function ClerkConvexDiagnostic({
+export function ClerkConvexDiagnostic({
   getToken,
   sessionClaims,
+  onReconnect = () => window.location.reload(),
 }: {
   getToken: ClerkTokenFetcher;
   sessionClaims: unknown;
+  onReconnect?: () => void;
 }) {
   const [probe, setProbe] = useState<ClerkConvexTokenProbe | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -90,6 +92,8 @@ function ClerkConvexDiagnostic({
     };
   }, [attempt]);
 
+  const canReconnect = probe?.status === "issued";
+
   return (
     <div className="space-y-3" data-auth-diagnostic={probe?.status ?? "checking"}>
       <p className="text-sm leading-relaxed text-ink-secondary">
@@ -98,10 +102,16 @@ function ClerkConvexDiagnostic({
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => setAttempt((value) => value + 1)}
+          onClick={() => {
+            if (canReconnect) {
+              onReconnect();
+              return;
+            }
+            setAttempt((value) => value + 1);
+          }}
           className="flex h-10 flex-1 items-center justify-center rounded-lg border border-line bg-surface-2 px-4 text-sm font-semibold text-ink transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          Retry validation
+          {canReconnect ? "Reconnect Mission Control" : "Retry validation"}
         </button>
         <SignOutButton>
           <button

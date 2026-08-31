@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { ClerkTokenFetcher } from "./clerkConvexDiagnostic";
 
 export type ConvexAccessTokenFetcher = (args: {
@@ -32,9 +32,17 @@ export function useNativeClerkConvexAuth() {
     orgRole,
     sessionId,
   } = useAuth();
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
   const fetchAccessToken = useCallback(
-    createNativeConvexAccessTokenFetcher(getToken),
-    [getToken, orgId, orgRole, sessionId],
+    async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
+      try {
+        return await getTokenRef.current({ skipCache: forceRefreshToken });
+      } catch {
+        return null;
+      }
+    },
+    [orgId, orgRole, sessionId],
   );
 
   return useMemo(
