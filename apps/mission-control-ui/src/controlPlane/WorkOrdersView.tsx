@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
@@ -24,8 +24,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/PageHeader";
-import { ArrowLeft, ClipboardList, ExternalLink, PlayCircle, Plus, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ClipboardList, ExternalLink, MoreHorizontal, PlayCircle, Plus, RotateCcw, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
 import {
   countByQuickFilter,
   DEFAULT_WORK_ORDER_FILTERS,
@@ -42,6 +49,7 @@ import { ReviewEvidencePackage, type ReviewEvidencePackageData } from "./ReviewE
 import { splitCurrentAndHistoricalRevisions, summarizeRevisionEffects } from "./workOrderLifecycleModel";
 import { CreateTaskModal } from "../CreateTaskModal";
 import { getOrchestrationBaseUrl } from "@/lib/orchestrationUrl";
+import { normalizeNarrativeText } from "@/lib/displayText";
 
 const RISK_STYLES: Record<string, string> = {
   LOW: "border-success/40 text-ink",
@@ -72,9 +80,51 @@ const QUICK_FILTERS: Array<{ id: WorkOrderQuickFilter; label: string }> = [
   { id: "ready_to_dispatch", label: "Ready to dispatch" },
 ];
 
+type WorkOrderDetailTab = "overview" | "review" | "scope" | "tasks" | "audit";
+
+const WORK_ORDER_DETAIL_TABS: Array<{ id: WorkOrderDetailTab; label: string }> = [
+  { id: "overview", label: "Overview" },
+  { id: "review", label: "Review" },
+  { id: "scope", label: "Scope" },
+  { id: "tasks", label: "Tasks & runs" },
+  { id: "audit", label: "Audit trail" },
+];
+
+const SECTION_DETAIL_TAB: Record<string, WorkOrderDetailTab> = {
+  Outcome: "overview",
+  "Required attention": "overview",
+  "Independent verification": "review",
+  "Candidate decision": "review",
+  "Acceptance readiness": "review",
+  "Verification traceability matrix": "audit",
+  "Executable specification": "scope",
+  "Governed execution scope": "scope",
+  "Automation lineage": "scope",
+  "Source of truth": "scope",
+  "Child Tasks": "tasks",
+  "Execution setup": "tasks",
+  "Linked execution runs": "tasks",
+  "Approval decisions": "audit",
+  "Governance status": "audit",
+  "Revision history": "audit",
+  "Reopen and replacement lineage": "audit",
+  "Lifecycle events": "audit",
+};
+
+const WorkOrderDetailTabContext = createContext<WorkOrderDetailTab | null>(null);
+
 function prettyLabel(value: string | undefined | null) {
   if (!value) return "—";
   return value.replace(/_/g, " ");
+}
+
+function projectedTaskStatus(task: { status: string; attempt?: { currentAttemptStatus?: string | null } }) {
+  const attemptStatus = task.attempt?.currentAttemptStatus;
+  if (["PENDING", "RUNNING", "PAUSED"].includes(attemptStatus ?? "")) return "IN_PROGRESS";
+  if (attemptStatus === "COMPLETED") return "REVIEW";
+  if (attemptStatus === "FAILED") return "BLOCKED";
+  if (attemptStatus === "CANCELED") return "CANCELED";
+  return task.status;
 }
 
 function criteriaFromText(value: string, existingCriteria: Array<{ id: string; title: string; description?: string; verificationMethod?: string }> = []) {
@@ -85,6 +135,7 @@ function criteriaFromText(value: string, existingCriteria: Array<{ id: string; t
     .map((title, index) => {
       const existing = existingCriteria[index];
       return {
+        ...existing,
         id: existing?.id ?? `ac-${index + 1}`,
         title,
         description: existing?.description,
@@ -114,6 +165,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   const mobileDetailPanelRef = useRef<HTMLDivElement>(null);
   const mobileBackButtonRef = useRef<HTMLButtonElement>(null);
   const [filters, setFilters] = useState<WorkOrderQueueFilters>(DEFAULT_WORK_ORDER_FILTERS);
+  const [detailTab, setDetailTab] = useState<WorkOrderDetailTab>("overview");
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("workOrder"));
   const [mobileDetailOpen, setMobileDetailOpen] = useState(() => Boolean(searchParams.get("workOrder")));
   const [createOpen, setCreateOpen] = useState(false);
@@ -130,6 +182,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   const [revisingId, setRevisingId] = useState<string | null>(null);
   const [reopeningId, setReopeningId] = useState<string | null>(null);
   const [supersedingId, setSupersedingId] = useState<string | null>(null);
+  const [retryingVerificationId, setRetryingVerificationId] = useState<string | null>(null);
   const requestedInspectorRunId = searchParams.get("run") as Id<"workflowRuns"> | null;
   const inspectorReceiptId = searchParams.get("receipt") as Id<"verificationReceipts"> | null;
   const inspectorCriterionId = searchParams.get("criterion");
@@ -155,6 +208,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
       : "skip"
   );
   const selectedDetailId = selected?.workOrder._id ?? null;
+  const hasReviewPackage = Boolean(selected?.reviewPackage);
   const inspectorRunId = selected?.executionRuns.some((run) => run._id === requestedInspectorRunId)
     ? requestedInspectorRunId
     : null;
@@ -190,6 +244,11 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
       hadRequestedWorkOrder.current = false;
     }
   }, [searchParams, selectedId]);
+
+  useEffect(() => {
+    if (!selectedDetailId) return;
+    setDetailTab(hasReviewPackage ? "review" : "overview");
+  }, [hasReviewPackage, selectedDetailId]);
 
   const openRunInspector = (input: {
     runId: Id<"workflowRuns">;
@@ -232,6 +291,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   const reopenWorkOrder = useMutation(api.workOrders.reopenWorkOrder);
   const supersedeWorkOrder = useMutation(api.workOrders.supersedeWorkOrder);
   const expireGovernanceRecords = useMutation(api.workOrders.expireGovernanceRecords);
+  const retryVerificationAttempt = useMutation(api["factory/attempts"].retryVerification);
   const recordReviewJudgment = useMutation(api.reviewIntelligence.recordReviewJudgment);
   const seedDemo = useMutation(api.workOrders.seedDemo);
 
@@ -330,6 +390,12 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
     canAcceptSelected,
     selected?.currentVerification?.reasons ?? []
   );
+  const nextActionText = canAcceptSelected
+    ? acceptanceReadinessPresentation.heading
+    : acceptanceReadinessPresentation.reasons[0]
+      ?? acceptanceReadinessPresentation.summary
+      ?? selected?.workOrder.requiredHumanAction
+      ?? "Review the current Work Order state.";
 
   const latestReceiptMap = useMemo(
     () => latestByCriterion((selected?.verificationReceipts ?? []).map((receipt) => ({
@@ -348,6 +414,26 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
     () => splitCurrentAndHistoricalRevisions((selected?.revisions ?? []) as any[], selected?.workOrder.currentRevisionId),
     [selected]
   );
+  const pendingRevision = useMemo(
+    () => [...(selected?.revisions ?? [])]
+      .filter((revision) => revision.status === "PENDING_APPROVAL")
+      .sort((left, right) => right.revisionNumber - left.revisionNumber)[0] ?? null,
+    [selected]
+  );
+  const latestVerificationAttempt = useMemo(
+    () => selected?.executionRuns.find((run) => run.attemptPurpose === "VERIFICATION") ?? null,
+    [selected]
+  );
+  const failedVerificationAttempt = latestVerificationAttempt
+    && ["FAILED", "CANCELED"].includes(latestVerificationAttempt.status)
+    && latestVerificationAttempt.verificationSupersededAt
+    ? latestVerificationAttempt
+    : null;
+  const activeVerificationAttempt = useMemo(
+    () => selected?.executionRuns.find((run) => run.attemptPurpose === "VERIFICATION"
+      && ["PENDING", "RUNNING", "PAUSED"].includes(run.status)) ?? null,
+    [selected]
+  );
   const agentMap = useMemo(
     () =>
       new Map<Id<"agents">, Doc<"agents">>(
@@ -357,12 +443,13 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   );
   const childTaskSummary = useMemo(() => {
     const tasks = selected?.childTasks ?? [];
+    const statuses = tasks.map(projectedTaskStatus);
     return {
       total: tasks.length,
-      active: tasks.filter((task) => ["READY", "ASSIGNED", "IN_PROGRESS"].includes(task.status)).length,
-      review: tasks.filter((task) => ["REVIEW", "NEEDS_APPROVAL"].includes(task.status)).length,
-      blocked: tasks.filter((task) => task.status === "BLOCKED").length,
-      completed: tasks.filter((task) => task.status === "DONE").length,
+      active: statuses.filter((status) => ["READY", "ASSIGNED", "IN_PROGRESS"].includes(status)).length,
+      review: statuses.filter((status) => ["REVIEW", "NEEDS_APPROVAL"].includes(status)).length,
+      blocked: statuses.filter((status) => status === "BLOCKED").length,
+      completed: statuses.filter((status) => status === "DONE").length,
     };
   }, [selected]);
   const selectedDispatchTaskId = selected
@@ -418,17 +505,13 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
         icon={<ClipboardList className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleSeed} disabled={seeding}>
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-              {seeding ? "Seeding…" : "Seed demo"}
-            </Button>
-            {selected ? (
-              <Button variant="outline" size="sm" onClick={() => setCreateTaskOpen(true)}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                New Task
+            {counts.total === 0 ? (
+              <Button variant="outline" size="sm" onClick={handleSeed} disabled={seeding}>
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                {seeding ? "Seeding…" : "Seed example data"}
               </Button>
             ) : null}
-            <Button size="sm" onClick={() => {
+            <Button className={mobileDetailOpen ? "hidden xl:inline-flex" : undefined} size="sm" onClick={() => {
               setCreateRequestKey(globalThis.crypto?.randomUUID?.() ?? `work-order-${Date.now()}`);
               setCreateOpen(true);
             }}>
@@ -440,6 +523,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div className={mobileDetailOpen ? "hidden xl:block" : "block"}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="WorkOrders" value={counts.total} />
           <StatCard label="Active" value={counts.active} />
@@ -475,8 +559,9 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
           <FilterSelect label="Requested by" value={filters.requestedBy} onChange={(value) => setFilters((current) => ({ ...current, requestedBy: value }))} options={requestors} />
           <FilterSelect label="Verification" value={filters.verificationStatus} onChange={(value) => setFilters((current) => ({ ...current, verificationStatus: value }))} options={["PENDING", "PASS", "FAIL", "WAIVED", "STALE"]} />
         </div>
+        </div>
 
-        <div className="mt-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr))]">
+        <div className={`${mobileDetailOpen ? "mt-0 xl:mt-4" : "mt-4"} grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr))]`}>
           <div className={`${mobileDetailOpen ? "hidden xl:block" : "block"} min-w-0 space-y-3`}>
             {filtered.length === 0 ? (
               <Card className="p-8 text-center text-sm text-muted-foreground">
@@ -500,7 +585,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-foreground">{item.title}</div>
-                        <div className={`mt-1 text-xs line-clamp-2 ${selectedRow ? "text-foreground/75" : "text-muted-foreground"}`}>{item.desiredOutcome}</div>
+                        <div className={`mt-1 whitespace-pre-line text-xs line-clamp-2 ${selectedRow ? "text-foreground/75" : "text-muted-foreground"}`}>{normalizeNarrativeText(item.desiredOutcome)}</div>
                       </div>
                       <Badge variant="outline" className={RISK_STYLES[item.riskLevel] ?? ""}>{item.riskLevel}</Badge>
                     </div>
@@ -542,7 +627,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
             {!selected ? (
               <div className="text-sm text-muted-foreground">Select a work order to inspect requested outcome, criteria, and linked execution.</div>
             ) : (
-              <div className="space-y-5">
+              <div className="flex flex-col gap-5">
                 <Button
                   ref={mobileBackButtonRef}
                   size="sm"
@@ -565,24 +650,157 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => { setGovernanceError(null); setRevisionOpen(true); }}>Request revision</Button>
-                    <Button size="sm" variant="outline" onClick={() => { setGovernanceError(null); setReopenOpen(true); }} disabled={selected.workOrder.state === "SUPERSEDED"}>Reopen</Button>
-                    <Button size="sm" variant="outline" onClick={async () => {
-                      try {
-                        setGovernanceError(null);
-                        await expireGovernanceRecords({ workOrderId: selected.workOrder._id });
-                      } catch (err) {
-                        setGovernanceError(err instanceof Error ? err.message : "Failed to expire governance records");
-                      }
-                    }}>Refresh governance</Button>
-                    <Button size="sm" variant="outline" onClick={() => { setGovernanceError(null); setSupersedeOpen(true); }} disabled={selected.workOrder.state === "SUPERSEDED"}>Supersede</Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline" aria-label="More Work Order actions">
+                          <MoreHorizontal className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                          More
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-52">
+                        <DropdownMenuItem onSelect={() => { setGovernanceError(null); setRevisionOpen(true); }}>
+                          Request revision
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => { setGovernanceError(null); setReopenOpen(true); }}
+                          disabled={selected.workOrder.state === "SUPERSEDED"}
+                        >
+                          Reopen Work Order
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={async () => {
+                          try {
+                            setGovernanceError(null);
+                            await expireGovernanceRecords({ workOrderId: selected.workOrder._id });
+                          } catch (err) {
+                            setGovernanceError(err instanceof Error ? err.message : "Failed to expire governance records");
+                          }
+                        }}>
+                          Refresh governance
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-danger focus:text-danger"
+                          onSelect={() => { setGovernanceError(null); setSupersedeOpen(true); }}
+                          disabled={selected.workOrder.state === "SUPERSEDED"}
+                        >
+                          Supersede Work Order
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
 
+                <div className={`rounded-xl border p-4 ${canAcceptSelected ? "border-success/30 bg-success/10" : selected.workOrder.requiredHumanAction ? "border-warning/30 bg-warning/10" : "border-[var(--panel-line)] bg-background/30"}`}>
+                  <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Next action</div>
+                      <p className={`mt-1 text-sm font-medium ${canAcceptSelected ? "text-success" : "text-foreground"}`}>
+                        {nextActionText}
+                      </p>
+                    </div>
+                    {selected.reviewPackage && detailTab !== "review" ? (
+                      <Button size="sm" className="shrink-0" onClick={() => setDetailTab("review")}>
+                        <ShieldCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                        Review evidence
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <WorkOrderDetailTabs
+                  active={detailTab}
+                  onChange={setDetailTab}
+                  taskCount={selected.childTasks.length}
+                  auditCount={(selected.approvalDecisions?.length ?? 0) + (selected.events?.length ?? 0)}
+                  reviewReady={Boolean(selected.reviewPackage)}
+                />
+
+                {pendingRevision ? (
+                  <div className="rounded-xl border border-warning/40 bg-warning/10 p-4" role="status" aria-label={`Revision ${pendingRevision.revisionNumber} approval required`}>
+                    <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <TriangleAlert className="h-4 w-4 text-warning" aria-hidden />
+                          <span className="text-sm font-semibold text-foreground">Action required: approve revision r{pendingRevision.revisionNumber}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{pendingRevision.changeSummary}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{summarizeRevisionEffects(pendingRevision)}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="shrink-0"
+                        onClick={async () => {
+                          try {
+                            setGovernanceError(null);
+                            setRevisingId(pendingRevision._id);
+                            await approveWorkOrderRevision({
+                              workOrderRevisionId: pendingRevision._id as Id<"workOrderRevisions">,
+                              approvedBy: "operator",
+                            });
+                          } catch (err) {
+                            setGovernanceError(err instanceof Error ? err.message : "Failed to approve revision");
+                          } finally {
+                            setRevisingId(null);
+                          }
+                        }}
+                        disabled={revisingId === pendingRevision._id}
+                      >
+                        {revisingId === pendingRevision._id ? "Applying revision…" : `Approve revision r${pendingRevision.revisionNumber}`}
+                      </Button>
+                    </div>
+                    {governanceError ? <div className="mt-3 text-xs text-danger">{governanceError}</div> : null}
+                  </div>
+                ) : null}
+
+                {failedVerificationAttempt && !activeVerificationAttempt ? (
+                  <div className="rounded-xl border border-danger/35 bg-danger/5 p-4" role="alert" aria-label="Independent verification recovery required">
+                    <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <TriangleAlert className="h-4 w-4 text-danger" aria-hidden />
+                          <span className="text-sm font-semibold text-foreground">Independent verification failed before acceptance</span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Attempt {failedVerificationAttempt.runId} remains immutable. Retry creates a new read-only verifier bound to the same exact candidate.
+                        </p>
+                        {failedVerificationAttempt.failureReason ? <p className="mt-1 line-clamp-2 text-xs text-danger">{failedVerificationAttempt.failureReason}</p> : null}
+                      </div>
+                      <Button
+                        size="sm"
+                        className="shrink-0"
+                        onClick={async () => {
+                          try {
+                            setGovernanceError(null);
+                            setRetryingVerificationId(failedVerificationAttempt._id);
+                            await retryVerificationAttempt({
+                              workOrderId: selected.workOrder._id,
+                              failedVerificationAttemptId: failedVerificationAttempt._id,
+                              reason: `Retry exact candidate after resolving verifier infrastructure failure from ${failedVerificationAttempt.runId}.`,
+                            });
+                          } catch (err) {
+                            setGovernanceError(err instanceof Error ? err.message : "Failed to retry independent verification");
+                          } finally {
+                            setRetryingVerificationId(null);
+                          }
+                        }}
+                        disabled={retryingVerificationId === failedVerificationAttempt._id}
+                      >
+                        <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                        {retryingVerificationId === failedVerificationAttempt._id ? "Starting verifier…" : "Retry independent verification"}
+                      </Button>
+                    </div>
+                    {governanceError ? <div className="mt-3 text-xs text-danger">{governanceError}</div> : null}
+                  </div>
+                ) : null}
+
+                <WorkOrderDetailTabContext.Provider value={detailTab}>
                 <Section title="Outcome">
-                  <p className="text-sm leading-relaxed text-foreground/85">{selected.workOrder.desiredOutcome}</p>
+                  <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/85">{normalizeNarrativeText(selected.workOrder.desiredOutcome)}</p>
                   {selected.workOrder.context ? (
-                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{selected.workOrder.context}</p>
+                    <details className="mt-3 rounded-lg border border-[var(--panel-line)] bg-background/30 px-3 py-2">
+                      <summary className="cursor-pointer text-sm font-medium text-foreground">Background context</summary>
+                      <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{normalizeNarrativeText(selected.workOrder.context)}</p>
+                    </details>
                   ) : null}
                 </Section>
 
@@ -714,6 +932,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                   </div>
                   <div className="mt-3 space-y-2">
                     {selected.childTasks.length > 0 ? selected.childTasks.map((task) => {
+                      const taskStatus = projectedTaskStatus(task);
                       const assignedAgent = task.assigneeIds
                         .map((agentId) => agentMap.get(agentId)?.name)
                         .filter(Boolean)
@@ -728,9 +947,9 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              <Badge variant="outline">{task.status}</Badge>
+                              <Badge variant="outline">{taskStatus}</Badge>
                               <Badge variant="outline">{task.parentDelivery.governanceStatus}</Badge>
-                              {task.status === "BLOCKED" ? <Badge variant="outline" className="border-danger/30 text-danger">Blocked</Badge> : null}
+                              {taskStatus === "BLOCKED" ? <Badge variant="outline" className="border-danger/30 text-danger">Blocked</Badge> : null}
                             </div>
                           </div>
                           <div className="mt-2 text-xs text-muted-foreground">
@@ -779,7 +998,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                 </div>
 
                 <Section title="Acceptance readiness">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
                     <Card className="p-3">
                       <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Approval status</div>
                       <div className="mt-2 text-lg font-semibold text-foreground">{selected.workOrder.approvalStatus}</div>
@@ -949,12 +1168,12 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                   <div className="space-y-2">
                     {revisionSplit.current ? (
                       <div className="rounded-lg border border-registry-accent/30 bg-registry-accent-soft px-3 py-3">
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <div className="text-sm font-medium text-foreground">Current revision r{revisionSplit.current.revisionNumber}</div>
                             <div className="mt-1 text-xs text-muted-foreground">{revisionSplit.current.changeSummary}</div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <Badge variant="outline">{revisionSplit.current.status}</Badge>
                             {revisionSplit.current.status === "PENDING_APPROVAL" ? (
                               <Button
@@ -983,12 +1202,12 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                     ) : null}
                     {revisionSplit.historical.length ? revisionSplit.historical.map((revision: any) => (
                       <div key={revision._id} className="rounded-lg border border-[var(--panel-line)] bg-background/30 px-3 py-3">
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <div className="text-sm font-medium text-foreground">Historical revision r{revision.revisionNumber}</div>
                             <div className="mt-1 text-xs text-muted-foreground">{revision.changeSummary}</div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <Badge variant="outline">{revision.status}</Badge>
                             {revision.status === "PENDING_APPROVAL" ? (
                               <Button
@@ -1175,7 +1394,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                             </SelectTrigger>
                             <SelectContent>
                               {selected.childTasks
-                                .filter((task) => ["READY", "ASSIGNED", "IN_PROGRESS"].includes(task.status))
+                                .filter((task) => ["READY", "ASSIGNED", "IN_PROGRESS"].includes(projectedTaskStatus(task)))
                                 .map((task) => (
                                   <SelectItem key={task._id} value={task._id}>
                                     {task.identifier ? `${task.identifier} · ` : ""}
@@ -1372,6 +1591,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                     <p className="text-sm text-muted-foreground">No lifecycle events recorded yet.</p>
                   )}
                 </Section>
+                </WorkOrderDetailTabContext.Provider>
               </div>
             )}
           </Card>
@@ -1576,6 +1796,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                 requiredApprovals: payload.requiredApprovals,
                 acceptanceCriteria: criteriaFromText(payload.acceptanceCriteria, selected.workOrder.acceptanceCriteria as any),
                 changeBudget: payload.changeBudget,
+                verificationContract: payload.verificationContract,
                 metadata: {
                   ...(selected.workOrder.metadata ?? {}),
                   implementationPolicy: {
@@ -1660,10 +1881,19 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
         unavailable={inspectorUnavailable}
         retrying={!!selected && dispatchingId === selected.workOrder._id}
         onRetryFailedRun={selected
-          ? async ({ workflowRunId, reason, runtime, model }) => {
+            ? async ({ workflowRunId, reason, runtime, model }) => {
               setDispatchError(null);
               setDispatchingId(selected.workOrder._id);
               try {
+                const retryRun = selected.executionRuns.find((run) => run._id === workflowRunId);
+                if (retryRun?.attemptPurpose === "VERIFICATION") {
+                  await retryVerificationAttempt({
+                    workOrderId: selected.workOrder._id,
+                    failedVerificationAttemptId: workflowRunId,
+                    reason,
+                  });
+                  return;
+                }
                 const result = await dispatchWorkOrder({
                   workOrderId: selected.workOrder._id,
                   workflowId: selected.workOrder.workflowId,
@@ -1725,9 +1955,63 @@ function FilterSelect({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function WorkOrderDetailTabs({
+  active,
+  onChange,
+  taskCount,
+  auditCount,
+  reviewReady,
+}: {
+  active: WorkOrderDetailTab;
+  onChange: (tab: WorkOrderDetailTab) => void;
+  taskCount: number;
+  auditCount: number;
+  reviewReady: boolean;
+}) {
+  const counts: Partial<Record<WorkOrderDetailTab, number>> = {
+    tasks: taskCount,
+    audit: auditCount,
+  };
   return (
-    <section>
+    <div
+      role="tablist"
+      aria-label="Work Order detail"
+      className="grid grid-cols-2 gap-1 rounded-xl border border-[var(--panel-line)] bg-background/30 p-1 sm:grid-cols-5"
+    >
+      {WORK_ORDER_DETAIL_TABS.map((tab) => {
+        const selected = tab.id === active;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onChange(tab.id)}
+            className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors ${selected ? "bg-card text-foreground shadow-sm ring-1 ring-[var(--panel-line)]" : "text-muted-foreground hover:bg-card/60 hover:text-foreground"}`}
+          >
+            <span>{tab.label}</span>
+            {counts[tab.id] != null ? <span className="font-mono text-[10px] text-muted-foreground">{counts[tab.id]}</span> : null}
+            {tab.id === "review" && reviewReady ? <span className="h-1.5 w-1.5 rounded-full bg-success" aria-label="Review package ready" /> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }): JSX.Element | null {
+  const activeTab = useContext(WorkOrderDetailTabContext);
+  const sectionTab = SECTION_DETAIL_TAB[title] ?? "overview";
+  if (activeTab && activeTab !== sectionTab) return null;
+  const reviewOrder = title === "Acceptance readiness"
+    ? "order-1"
+    : title === "Independent verification"
+      ? "order-2"
+      : title === "Candidate decision"
+        ? "order-3"
+        : "";
+  return (
+    <section className={activeTab === "review" ? reviewOrder : undefined} data-work-order-section={sectionTab}>
       <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</div>
       {children}
     </section>
@@ -1824,7 +2108,11 @@ function IndependentVerificationPanel({ receipt, verificationRuns, onInspect }: 
           {receipt ? <Badge variant="outline">{receipt.requirementsPassed ?? 0} passed · {receipt.requirementsFailed ?? 0} missing</Badge> : null}
         </div>
         {receipt?.checks?.length ? (
-          <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--panel-line)] bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" tabIndex={0} aria-label="Verification check results">
+          <details className="mt-4 rounded-lg border border-[var(--panel-line)] bg-card" open={!successful}>
+            <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              {successful ? `Show ${receipt.checks.length} passing checks` : `Inspect ${receipt.checks.length} verification checks`}
+            </summary>
+          <div className="overflow-x-auto border-t border-[var(--panel-line)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" tabIndex={0} aria-label="Verification check results">
             <table className="w-full text-left text-xs">
               <thead className="border-b border-[var(--panel-line)] text-muted-foreground"><tr><th className="px-3 py-2 font-medium">Check</th><th className="px-3 py-2 font-medium">Status</th><th className="px-3 py-2 font-medium">Evidence</th><th className="px-3 py-2 font-medium">Summary</th></tr></thead>
               <tbody className="divide-y divide-[var(--panel-line)]">
@@ -1832,6 +2120,7 @@ function IndependentVerificationPanel({ receipt, verificationRuns, onInspect }: 
               </tbody>
             </table>
           </div>
+          </details>
         ) : null}
         {receipt?.violations?.length ? <div role="alert" className="mt-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">{receipt.violations.join(" ")}</div> : null}
         {receipt?.workflowRunId ? <Button className="mt-3" size="sm" variant="outline" onClick={() => onInspect(receipt.workflowRunId, receipt._id)}>Inspect evidence lineage</Button> : null}
@@ -1961,7 +2250,7 @@ function RecordVerificationReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-[720px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[720px]">
         <DialogHeader>
           <DialogTitle>Record verification receipt</DialogTitle>
           <DialogDescription>Attach evidence to one acceptance criterion and mark whether it passed, failed, or was waived.</DialogDescription>
@@ -2063,6 +2352,7 @@ function RequestRevisionDialog({
     acceptanceCriteria: string;
     changeBudget: NonNullable<Doc<"workOrders">["changeBudget"]>;
     maxTotalCostUsd: number;
+    verificationContract: Doc<"workOrders">["verificationContract"];
   }) => Promise<void>;
 }) {
   const [changeSummary, setChangeSummary] = useState("Clarify or revise WorkOrder scope");
@@ -2081,6 +2371,12 @@ function RequestRevisionDialog({
   const [allowedPathsText, setAllowedPathsText] = useState("");
   const [deniedPathsText, setDeniedPathsText] = useState("");
   const [allowSchemaChanges, setAllowSchemaChanges] = useState(false);
+  const [verificationCommands, setVerificationCommands] = useState<Array<{
+    id: string;
+    name: string;
+    executable: string;
+    argsText: string;
+  }>>([]);
 
   useEffect(() => {
     if (!open || !workOrder) return;
@@ -2097,12 +2393,42 @@ function RequestRevisionDialog({
     setAllowedPathsText((workOrder.changeBudget?.allowedPaths ?? []).join("\n"));
     setDeniedPathsText((workOrder.changeBudget?.deniedPaths ?? []).join("\n"));
     setAllowSchemaChanges(Boolean(workOrder.changeBudget?.allowSchemaChanges));
+    setVerificationCommands((workOrder.verificationContract?.checks ?? []).map((check: any) => ({
+      id: check.id,
+      name: check.name,
+      executable: check.command?.executable ?? "",
+      argsText: JSON.stringify(check.command?.args ?? [], null, 2),
+    })));
   }, [open, workOrder]);
 
   const parsedMaxTotalCostUsd = Number(maxTotalCostUsd);
   const hasValidTotalCostCap = maxTotalCostUsd.trim().length > 0
     && Number.isFinite(parsedMaxTotalCostUsd)
     && parsedMaxTotalCostUsd >= 0;
+  const parsedVerificationCommands = verificationCommands.map((command) => ({
+    ...command,
+    parsedArgs: parseVerificationArguments(command.argsText),
+  }));
+  const hasInvalidVerificationCommand = parsedVerificationCommands.some((command) =>
+    !command.executable.trim() || !command.parsedArgs.ok
+  );
+  const revisedVerificationContract = workOrder?.verificationContract
+    ? {
+        ...workOrder.verificationContract,
+        checks: (workOrder.verificationContract.checks ?? []).map((check: any, index: number) => {
+          const draft = parsedVerificationCommands[index];
+          if (!draft || !draft.parsedArgs.ok) return check;
+          return {
+            ...check,
+            command: {
+              ...check.command,
+              executable: draft.executable.trim(),
+              args: draft.parsedArgs.args,
+            },
+          };
+        }),
+      }
+    : undefined;
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -2174,6 +2500,45 @@ function RequestRevisionDialog({
               <span><span className="font-medium text-foreground">Allow schema changes</span><span className="mt-0.5 block text-xs text-muted-foreground">Required only when the approved outcome explicitly includes a bounded schema change.</span></span>
             </label>
           </div>
+          {verificationCommands.length > 0 ? (
+            <div className="space-y-3 md:col-span-2">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground/80">Independent verification contract</div>
+                <p className="mt-1 text-xs text-muted-foreground">Revise exact executable and argv values without shell expansion. Changing this frozen contract requires the governance resets calculated by policy.</p>
+              </div>
+              <div className="space-y-3">
+                {parsedVerificationCommands.map((command, index) => (
+                  <div key={command.id} className="rounded-lg border border-[var(--panel-line)] bg-background/40 p-3">
+                    <div className="text-sm font-medium text-foreground">{command.name}</div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-[0.6fr_1.4fr]">
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`revision-verification-executable-${index}`}>Executable</Label>
+                        <Input
+                          id={`revision-verification-executable-${index}`}
+                          aria-label={`Verification executable for ${command.name}`}
+                          value={command.executable}
+                          onChange={(event) => setVerificationCommands((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, executable: event.target.value } : item))}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`revision-verification-arguments-${index}`}>Arguments (exact JSON argv)</Label>
+                        <Textarea
+                          id={`revision-verification-arguments-${index}`}
+                          aria-label={`Verification arguments for ${command.name}`}
+                          value={command.argsText}
+                          onChange={(event) => setVerificationCommands((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, argsText: event.target.value } : item))}
+                          rows={4}
+                          spellCheck={false}
+                          className="font-mono text-xs"
+                        />
+                        {"error" in command.parsedArgs ? <p role="alert" className="text-xs text-danger">{command.parsedArgs.error}</p> : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
@@ -2189,6 +2554,7 @@ function RequestRevisionDialog({
             requiredApprovals: requiredApprovalsText.split("\n").map((line) => line.trim()).filter(Boolean),
             acceptanceCriteria,
             maxTotalCostUsd: parsedMaxTotalCostUsd,
+            verificationContract: revisedVerificationContract,
             changeBudget: {
               maxFilesChanged: maxFilesChanged ? Number(maxFilesChanged) : workOrder.changeBudget?.maxFilesChanged ?? 1,
               maxLinesChanged: maxLinesChanged ? Number(maxLinesChanged) : workOrder.changeBudget?.maxLinesChanged ?? 1,
@@ -2201,7 +2567,7 @@ function RequestRevisionDialog({
               allowDependencyChanges: Boolean(workOrder.changeBudget?.allowDependencyChanges),
               allowInfrastructureChanges: Boolean(workOrder.changeBudget?.allowInfrastructureChanges),
             },
-          })} disabled={creating || !changeSummary.trim() || !reason.trim() || !hasValidTotalCostCap}>{creating ? "Saving…" : "Request revision"}</Button>
+          })} disabled={creating || !changeSummary.trim() || !reason.trim() || !hasValidTotalCostCap || hasInvalidVerificationCommand}>{creating ? "Saving…" : "Request revision"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -2244,7 +2610,7 @@ function ReopenWorkOrderDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-[720px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[720px]">
         <DialogHeader>
           <DialogTitle>Reopen WorkOrder</DialogTitle>
           <DialogDescription>Preserve prior evidence and explicitly mark what became invalid and what must happen next.</DialogDescription>

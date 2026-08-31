@@ -738,6 +738,18 @@ export class FactoryAttemptWorker {
           return;
         }
       }
+      if (run.isMutating === false) {
+        await cleanupRemote();
+        await report({
+          events: verificationResult ? [] : mappedEvents,
+          observations: verificationResult ? [] : traceObservations,
+          artifacts: verificationResult ? [] : baseArtifacts,
+          terminal: { status: "COMPLETED" },
+        });
+        this.completedCount += 1;
+        this.lastError = null;
+        return;
+      }
       await cleanupRemote();
       await this.publishCandidate({
         claim,

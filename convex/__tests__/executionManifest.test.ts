@@ -16,6 +16,10 @@ const input: FactoryExecutionManifestInput = {
   workOrderId: "work-order-1",
   workOrderRevisionNumber: 3,
   taskId: "task-1",
+  task: {
+    title: "Implement the approved buyer gate",
+    description: "Preserve the approved copy and run the exact buyer-gate checks before committing.",
+  },
   factoryDefinitionVersionId: "factory-version-1",
   factoryConfigurationDigest: "factory-v1-test",
   factoryPurpose: "SOFTWARE",
@@ -105,8 +109,11 @@ describe("Factory execution manifest", () => {
       failClosedFailureClasses: ["NON_RETRYABLE_RESULT", "UNKNOWN"],
     });
     expect(result.manifest.intent).toMatchObject({ title: "Add the buyer gate", acceptanceCriterionIds: ["ac-1"] });
+    expect(result.manifest.intent.selectedTask).toEqual(input.task);
     expect(result.manifest.workOrderSpecification).toMatchObject({ riskLevel: "MEDIUM", acceptanceCriteria: [{ id: "ac-1" }] });
     expect(result.manifest.compiledPrompt).toContain("The control plane owns those actions.");
+    expect(result.manifest.compiledPrompt).toContain("Selected Child Task: Implement the approved buyer gate");
+    expect(result.manifest.compiledPrompt).toContain("Task instructions: Preserve the approved copy and run the exact buyer-gate checks before committing.");
     expect(result.manifest.compiledPromptHash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
@@ -120,11 +127,15 @@ describe("Factory execution manifest", () => {
   });
 
   it("keeps a Task-less manifest digest stable across Convex storage", () => {
-    const result = buildFactoryExecutionManifest({ ...input, taskId: undefined });
+    const result = buildFactoryExecutionManifest({ ...input, taskId: undefined, task: undefined });
     const storedManifest = JSON.parse(JSON.stringify(result.manifest));
 
     expect(storedManifest.causation).not.toHaveProperty("taskId");
     expect(result.digest).toBe(`sha256:${computeCanonicalHash(storedManifest)}`);
+  });
+
+  it("fails closed when a selected Task is missing its frozen instructions", () => {
+    expect(() => buildFactoryExecutionManifest({ ...input, task: undefined })).toThrow(/Task identity and instructions together/);
   });
 
   it("changes its digest when the verification contract changes", () => {

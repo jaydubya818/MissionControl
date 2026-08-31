@@ -157,11 +157,26 @@ describe("FactoryConfigurationPanel", () => {
     renderPanel();
     expect(screen.getByText(/No Factory exists for this repository/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Create Factory" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Software Factory" }));
 
     await waitFor(() => expect(mocks.createFactory).toHaveBeenCalledWith({
       repositoryId: "repository-1",
       name: "Software Factory",
+      purpose: "SOFTWARE",
+    }));
+  });
+
+  it("creates a separate Verification Factory for the same repository", async () => {
+    mocks.definitions = [{ _id: "factory-1", repositoryId: "repository-1", status: "ACTIVE", purpose: "SOFTWARE", name: "Software Factory" }];
+    mocks.detail = detailWith("PASS");
+    renderPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Verification Factory" }));
+
+    await waitFor(() => expect(mocks.createFactory).toHaveBeenCalledWith({
+      repositoryId: "repository-1",
+      name: "Verification Factory",
+      purpose: "VERIFICATION",
     }));
   });
 

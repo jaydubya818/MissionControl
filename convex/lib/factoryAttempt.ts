@@ -1,3 +1,5 @@
+import { verifyVerificationSubjectIdentity } from "@mission-control/workflow-engine/verification-subject";
+
 export const MIN_FACTORY_LEASE_MS = 15_000;
 export const MAX_FACTORY_LEASE_MS = 120_000;
 
@@ -43,6 +45,85 @@ type FactoryPublicationPatch = {
   pullRequestUrl?: string;
   publishedAt?: number;
 };
+
+type VerificationAttemptBindingLike = {
+  sourceAttemptId?: unknown;
+  workOrderId?: unknown;
+  workOrderRevisionNumber?: number;
+  verificationContractDigest?: string;
+  verificationSubjectDigest?: string;
+  verificationSubject?: any;
+};
+
+type VerificationSourceAttemptLike = {
+  _id?: unknown;
+  attemptPurpose?: string;
+  status?: string;
+  candidateReadyAt?: number;
+  repositoryId?: unknown;
+  workOrderId?: unknown;
+  workOrderRevisionNumber?: number;
+  verificationContractDigest?: string;
+  branch?: string;
+  headSha?: string;
+  verificationSubject?: any;
+};
+
+export function factoryAttemptSourceBindingMatches(input: {
+  attemptPurpose?: string;
+  manifestBaseSha?: string;
+  hostBaseCommit?: string;
+  repositoryId?: unknown;
+  workOrderId?: unknown;
+  workOrderRevisionNumber?: number;
+  verificationContractDigest?: string;
+  branch?: string;
+  verificationAttemptBinding?: VerificationAttemptBindingLike;
+  verificationSourceAttempt?: VerificationSourceAttemptLike | null;
+}) {
+  if ((input.attemptPurpose ?? "IMPLEMENTATION") !== "VERIFICATION") {
+    return Boolean(input.hostBaseCommit && input.manifestBaseSha === input.hostBaseCommit);
+  }
+
+  const binding = input.verificationAttemptBinding;
+  const subject = binding?.verificationSubject;
+  const source = input.verificationSourceAttempt;
+  if (!binding || !subject || !source || subject.kind !== "GIT_CANDIDATE") return false;
+
+  const sourceAttemptId = String(binding.sourceAttemptId ?? "");
+  const workOrderId = String(input.workOrderId ?? "");
+  const repositoryId = String(input.repositoryId ?? "");
+  return Boolean(
+    verifyVerificationSubjectIdentity(subject)
+    && sourceAttemptId
+    && sourceAttemptId === String(subject.sourceAttemptId ?? "")
+    && sourceAttemptId === String(source._id ?? "")
+    && workOrderId
+    && workOrderId === String(binding.workOrderId ?? "")
+    && workOrderId === String(subject.workOrderId ?? "")
+    && workOrderId === String(source.workOrderId ?? "")
+    && repositoryId
+    && repositoryId === String(subject.repositoryId ?? "")
+    && repositoryId === String(source.repositoryId ?? "")
+    && input.workOrderRevisionNumber === binding.workOrderRevisionNumber
+    && input.workOrderRevisionNumber === subject.workOrderRevisionNumber
+    && input.workOrderRevisionNumber === source.workOrderRevisionNumber
+    && input.verificationContractDigest
+    && input.verificationContractDigest === binding.verificationContractDigest
+    && input.verificationContractDigest === subject.verificationContractDigest
+    && input.verificationContractDigest === source.verificationContractDigest
+    && binding.verificationSubjectDigest === subject.digest
+    && source.verificationSubject?.digest === subject.digest
+    && source.attemptPurpose === "IMPLEMENTATION"
+    && source.status === "COMPLETED"
+    && Number.isFinite(source.candidateReadyAt)
+    && input.manifestBaseSha === subject.candidateSha
+    && source.headSha === subject.candidateSha
+    && subject.pullRequest?.headSha === subject.candidateSha
+    && input.branch === source.branch
+    && input.branch === subject.pullRequest?.headRef
+  );
+}
 
 function gitRevision(value: unknown) {
   return typeof value === "string" && /^[a-f0-9]{40,64}$/i.test(value) ? value : undefined;

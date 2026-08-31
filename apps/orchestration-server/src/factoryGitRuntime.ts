@@ -252,12 +252,9 @@ export async function commitFactoryChanges(input: {
   if (await gitSucceeds(input.worktree, ["diff", "--cached", "--quiet"])) {
     throw new Error("Factory attempt produced no committable changes.");
   }
-  await runGit(input.worktree, ["commit", "-m", input.title.slice(0, 200)], {
-    GIT_AUTHOR_NAME: "Mission Control Factory",
-    GIT_AUTHOR_EMAIL: "factory@mission-control.local",
-    GIT_COMMITTER_NAME: "Mission Control Factory",
-    GIT_COMMITTER_EMAIL: "factory@mission-control.local",
-  });
+  // Preserve the repository operator's configured identity. Factory execution
+  // provenance belongs in Attempt/evidence records, not in Git authorship.
+  await runGit(input.worktree, ["commit", "-m", input.title.slice(0, 200)]);
   return (await runGit(input.worktree, ["rev-parse", "HEAD"])).stdout.trim();
 }
 

@@ -19,19 +19,27 @@ export function FactoryConfigurationPanel({
 }) {
   const definitions = useQuery(api["factory/configuration"].list, { projectId });
   const createFactory = useMutation(api["factory/configuration"].create);
-  const [pending, setPending] = useState(false);
+  const [pendingPurpose, setPendingPurpose] = useState<"SOFTWARE" | "VERIFICATION" | "">("");
   const [error, setError] = useState("");
-  const definition = definitions?.find((item) => item.repositoryId === repositoryId);
+  const repositoryDefinitions = definitions?.filter((item) =>
+    item.repositoryId === repositoryId && item.status !== "ARCHIVED"
+  ) ?? [];
+  const softwareFactory = repositoryDefinitions.find((item) => (item.purpose ?? "SOFTWARE") === "SOFTWARE");
+  const verificationFactory = repositoryDefinitions.find((item) => item.purpose === "VERIFICATION");
 
-  const create = async () => {
-    setPending(true);
+  const create = async (purpose: "SOFTWARE" | "VERIFICATION") => {
+    setPendingPurpose(purpose);
     setError("");
     try {
-      await createFactory({ repositoryId, name: "Software Factory" });
+      await createFactory({
+        repositoryId,
+        name: purpose === "SOFTWARE" ? "Software Factory" : "Verification Factory",
+        purpose,
+      });
     } catch {
       setError("The Factory could not be created. Confirm workspace automation authority and try again.");
     } finally {
-      setPending(false);
+      setPendingPurpose("");
     }
   };
 
@@ -50,28 +58,47 @@ export function FactoryConfigurationPanel({
             Freeze the repository, workflow, executor, policy, budget, verifiers, and recovery boundary before activation.
           </div>
         </div>
-        {!definition ? (
-          <Button variant="outline" size="sm" disabled={pending} onClick={create}>
-            {pending ? "Creating…" : "Create Factory"}
-          </Button>
-        ) : (
-          <StatusBadge tone={definition.status === "ACTIVE" ? "success" : "neutral"}>
-            {definition.status.toLowerCase()}
-          </StatusBadge>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {!softwareFactory ? (
+            <Button variant="outline" size="sm" disabled={Boolean(pendingPurpose)} onClick={() => void create("SOFTWARE")}>
+              {pendingPurpose === "SOFTWARE" ? "Creating…" : "Create Software Factory"}
+            </Button>
+          ) : null}
+          {!verificationFactory ? (
+            <Button variant="outline" size="sm" disabled={Boolean(pendingPurpose)} onClick={() => void create("VERIFICATION")}>
+              {pendingPurpose === "VERIFICATION" ? "Creating…" : "Create Verification Factory"}
+            </Button>
+          ) : null}
+        </div>
       </div>
       {error ? <div role="alert" className="mt-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">{error}</div> : null}
-      {!definition ? (
+      {repositoryDefinitions.length === 0 ? (
         <div className="mt-3 rounded-lg border border-dashed border-line bg-surface-2 px-4 py-4 text-[12.5px] text-ink-secondary">
           No Factory exists for this repository. Creating one does not activate or dispatch work.
         </div>
       ) : (
-        <FactoryVersionEditor
-          factoryDefinitionId={definition._id}
-          projectId={projectId}
-          repositoryId={repositoryId}
-          repositoryDataClassification={repositoryDataClassification}
-        />
+        <div className="space-y-4">
+          {repositoryDefinitions.map((definition) => {
+            const purpose = definition.purpose ?? "SOFTWARE";
+            return (
+              <section key={definition._id} aria-label={`${purpose === "VERIFICATION" ? "Verification" : "Software"} Factory`} className="mt-3 rounded-lg border border-line bg-surface-1 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[12.5px] font-medium text-ink">{definition.name}</div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge tone="neutral">{purpose.toLowerCase()}</StatusBadge>
+                    <StatusBadge tone={definition.status === "ACTIVE" ? "success" : "neutral"}>{definition.status.toLowerCase()}</StatusBadge>
+                  </div>
+                </div>
+                <FactoryVersionEditor
+                  factoryDefinitionId={definition._id}
+                  projectId={projectId}
+                  repositoryId={repositoryId}
+                  repositoryDataClassification={repositoryDataClassification}
+                />
+              </section>
+            );
+          })}
+        </div>
       )}
     </section>
   );

@@ -109,7 +109,8 @@ describe("Mission WorkOrder contract compiler", () => {
     expect(contract.acceptanceCriteria[0]).toMatchObject({
       requiredEvidence: [{ category: "TEST_RESULT", minimumCount: 1, independent: true }],
     });
-    expect(contract.requiredApprovals).toEqual(["HUMAN_REVIEW"]);
+    expect(contract.requiredApprovals).toEqual([]);
+    expect(contract.metadata.planApprovalRequirements).toEqual([]);
     expect(contract.metadata.independentVerification.subject).toBe("IMMUTABLE_CANDIDATE_SHA");
   });
 
@@ -139,6 +140,24 @@ describe("Mission WorkOrder contract compiler", () => {
 
     expect(contract.metadata).toEqual({});
     expect(contract).not.toHaveProperty("verificationContract");
+  });
+
+  it("retains Plan-gate requirements as audit metadata without creating duplicate WorkOrder gates", () => {
+    const contract = compileMissionWorkOrderContract({
+      blueprint: {
+        ...blueprint,
+        requiredApprovals: ["Confirm exact planning SHA", "Approve contract decision"],
+      },
+      assertions: [assertion],
+      rollbackApproach: "Revert the candidate commit.",
+      codeScopes: [{ includePaths: ["convex/**"], excludePaths: [] }],
+    });
+
+    expect(contract.requiredApprovals).toEqual([]);
+    expect(contract.metadata.planApprovalRequirements).toEqual([
+      "Approve contract decision",
+      "Confirm exact planning SHA",
+    ]);
   });
 
   it("maps only evidence-bearing Spec expectations into WorkOrder verification", () => {

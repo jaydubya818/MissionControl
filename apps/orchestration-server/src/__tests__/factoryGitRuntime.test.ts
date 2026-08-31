@@ -42,6 +42,8 @@ describe("Factory Git runtime", () => {
     await writeFile(path.join(worktree, "apps", "ui", "App.tsx"), "export const value = 2;\n");
     expect(await listChangedFiles(worktree, baseSha)).toEqual(["apps/ui/App.tsx"]);
     const firstHead = await commitFactoryChanges({ worktree, changedFiles: ["apps/ui/App.tsx"], title: "Update app" });
+    expect((await git(worktree, ["show", "-s", "--format=%an <%ae>", firstHead])).stdout.trim())
+      .toBe("Test <test@example.com>");
     const candidate = await inspectCandidateChange(worktree, baseSha);
     expect(candidate).toMatchObject({ sourceRevision: baseSha, candidateRevision: firstHead, changedFiles: ["apps/ui/App.tsx"], linesAdded: 1, linesDeleted: 1 });
     await expect(assertFactoryCandidateUnchanged(worktree, firstHead)).resolves.toBeUndefined();

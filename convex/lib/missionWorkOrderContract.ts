@@ -106,13 +106,16 @@ export function compileMissionWorkOrderContract(input: {
   });
 
   if (!input.blueprint.isMutating || !policy) {
+    const planApprovalRequirements = unique(input.blueprint.requiredApprovals);
     return {
       requirements,
       acceptanceCriteria,
-      requiredApprovals: unique(input.blueprint.requiredApprovals),
-      metadata: input.rollbackApproach?.trim()
-        ? { rollbackApproach: input.rollbackApproach.trim(), specVerificationExpectationIds: linkedVerificationExpectationIds }
-        : linkedVerificationExpectationIds.length > 0 ? { specVerificationExpectationIds: linkedVerificationExpectationIds } : {},
+      requiredApprovals: [],
+      metadata: {
+        ...(input.rollbackApproach?.trim() ? { rollbackApproach: input.rollbackApproach.trim() } : {}),
+        ...(linkedVerificationExpectationIds.length > 0 ? { specVerificationExpectationIds: linkedVerificationExpectationIds } : {}),
+        ...(planApprovalRequirements.length > 0 ? { planApprovalRequirements } : {}),
+      },
     };
   }
 
@@ -217,7 +220,11 @@ export function compileMissionWorkOrderContract(input: {
         minimumBoundary: "SEPARATE_ATTEMPT" as const,
       },
     },
-    requiredApprovals: unique([...input.blueprint.requiredApprovals, "HUMAN_REVIEW"]),
+    // Mission Plan approval is the human authorization that releases this
+    // exact, SHA-bound contract. Requiring another pre-dispatch HUMAN_REVIEW
+    // turns one governed Plan gate into an unbounded series of duplicate human
+    // gates. Final candidate acceptance remains separately human-owned.
+    requiredApprovals: [],
     autonomyLevel: "LEVEL_2" as const,
     metadata: {
       rollbackApproach,
@@ -227,6 +234,7 @@ export function compileMissionWorkOrderContract(input: {
         minimumBoundary: "SEPARATE_ATTEMPT",
       },
       specVerificationExpectationIds: linkedVerificationExpectationIds,
+      planApprovalRequirements: unique(input.blueprint.requiredApprovals),
     },
   };
 }

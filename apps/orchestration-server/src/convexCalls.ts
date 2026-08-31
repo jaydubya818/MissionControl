@@ -60,6 +60,7 @@ export const ConvexActions = {
     recordResidualReviewAnalysis: "serviceCommands:recordResidualReviewAnalysis",
     listFactorySandboxReconcileCandidates: "serviceCommands:listFactorySandboxReconcileCandidates",
     reportFactorySandboxReconcile: "serviceCommands:reportFactorySandboxReconcile",
+    reportExactModelRouteHealth: "serviceCommands:reportExactModelRouteHealth",
     claimExecution: "serviceCommands:claimExecution",
     heartbeatExecution: "serviceCommands:heartbeatExecution",
     reportExecution: "serviceCommands:reportExecution",

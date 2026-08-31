@@ -30,7 +30,11 @@ describe("Governed Hardening authority invariants", () => {
     const workOrders = read("convex/workOrders.ts");
     expect(workOrders).toContain('if (args.actorType !== "HUMAN")');
     expect(workOrders).toContain("FACTORY_PERMISSIONS.APPROVE");
-    expect(workOrders).toContain("const acceptActorId = factoryAccess.actorId");
+    expect(workOrders).toContain("localDemoOperatorAcceptanceEnabled()");
+    expect(workOrders).toContain('? "development:local-operator"');
+    const companyAccess = read("convex/lib/companyAccess.ts");
+    expect(companyAccess).toContain('process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT === "1"');
+    expect(companyAccess).toContain('process.env.MC_ALLOW_LOCAL_OPERATOR_GOVERNED_ACCEPTANCE === "1"');
 
     const orchestration = read("apps/orchestration-server/src/index.ts");
     const verificationRouteStart = orchestration.indexOf("automation-verification");

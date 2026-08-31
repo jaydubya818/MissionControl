@@ -135,10 +135,7 @@ export function Sidebar({
 }: SidebarProps): JSX.Element {
   const navGroups = groups ?? NAV_GROUPS;
   const activeGroupId = (navGroups.find((g) => g.items.some((i) => i.view === activeView)) ?? navGroups[0]).id;
-  const [expandedIds, setExpandedIds] = useState<string[]>(() => [
-    navGroups[0].id,
-    activeGroupId,
-  ]);
+  const [expandedIds, setExpandedIds] = useState<string[]>(() => [activeGroupId]);
 
   // Keep the group owning the active view expanded as navigation happens
   const effectiveExpanded = expandedIds.includes(activeGroupId)
