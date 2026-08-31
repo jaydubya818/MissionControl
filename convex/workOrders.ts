@@ -8,6 +8,7 @@ import { logTaskEvent } from "./lib/taskEvents";
 import { deriveVerificationStatus, currentWorkflowStepLabel, totalWorkflowRetries } from "./lib/workOrders";
 import {
   ACTIVE_RUN_STATUSES,
+  codeScopeApprovalPoliciesForDispatch,
   dispatchInvalidatesVerificationReceipts,
   latestRequiredRemoteRetryRun,
   nextStateForRunStatus,
@@ -107,7 +108,13 @@ import {
   type TaskPreExecutionRecoveryProof,
   type TasklessPreExecutionRecoveryProof,
 } from "./lib/preExecutionRecovery";
-import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS, requireWorkspaceAccess, requireWorkspacePermission } from "./lib/companyAccess";
+import {
+  COMPANY_PERMISSIONS,
+  FACTORY_PERMISSIONS,
+  localDemoOperatorAcceptanceEnabled,
+  requireWorkspaceAccess,
+  requireWorkspacePermission,
+} from "./lib/companyAccess";
 import { assertAuthorizedDeliveryRecord, canAccessDeliveryRecord, requireAuthorizedDeliveryScope } from "./lib/deliveryAuthorization";
 import { combineCodeScopePolicies, validateDispatchScope } from "./lib/softwareFactoryControlPlane";
 import {
@@ -1142,10 +1149,88 @@ function describeAcceptanceReadiness(workOrder: any, acceptance: ReturnType<type
   return "Ready for explicit acceptance.";
 }
 
+async function reconcileApprovedMissionPlanDecisions(ctx: any, workOrder: any) {
+  if (!workOrder.missionId || !workOrder.missionPlanId || (workOrder.currentRevisionNumber ?? 1) !== 1) return;
+
+  const [mission, plan, policy, existingApprovals] = await Promise.all([
+    ctx.db.get(workOrder.missionId),
+    ctx.db.get(workOrder.missionPlanId),
+    resolveGovernancePolicy(ctx, workOrder),
+    listApprovalDecisionsForWorkOrder(ctx, workOrder._id),
+  ]);
+  if (!mission || !plan
+    || plan.status !== "APPROVED"
+    || mission.currentPlanId !== plan._id
+    || plan.missionId !== mission._id
+    || plan.revisionNumber !== workOrder.missionPlanRevision
+    || plan.planningRepositorySha !== workOrder.planningRepositorySha
+    || typeof plan.approvedAt !== "number"
+    || !plan.approvedBy) return;
+
+  const approvalTypes = requiredApprovalTypes({
+    riskLevel: workOrder.riskLevel,
+    requiredApprovals: workOrder.requiredApprovals,
+    isMutating: workOrder.isMutating,
+  });
+  for (const approvalType of approvalTypes) {
+    const idempotencyKey = `mission-plan:${String(plan._id)}:r${plan.revisionNumber}:work-order:${String(workOrder._id)}:approval:${approvalType}`;
+    const existingProjection = await ctx.db.query("approvalDecisions")
+      .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", idempotencyKey))
+      .first();
+    if (existingProjection) continue;
+
+    const approvalDecisionId = await ctx.db.insert("approvalDecisions", {
+      tenantId: workOrder.tenantId,
+      projectId: workOrder.projectId,
+      workOrderId: workOrder._id,
+      idempotencyKey,
+      approvalType,
+      requestedAction: `Execute the exact contract released by approved Mission Plan r${plan.revisionNumber}`,
+      riskLevel: workOrder.riskLevel,
+      requestedBy: plan.approvedBy,
+      approver: plan.approvedBy,
+      status: "APPROVED",
+      decision: "APPROVE",
+      reason: `Satisfied by exact Mission Plan approval: ${plan.decisionReason ?? "approved"}`,
+      workOrderRevisionNumber: 1,
+      expiresAt: approvalExpiresAt(workOrder.riskLevel, policy, plan.approvedAt),
+      createdAt: plan.approvedAt,
+      decidedAt: plan.approvedAt,
+      metadata: {
+        source: "mission-plan-approval",
+        missionId: mission._id,
+        missionPlanId: plan._id,
+        missionPlanRevision: plan.revisionNumber,
+        planningRepositorySha: plan.planningRepositorySha,
+      },
+    });
+
+    for (const pending of existingApprovals.filter((approval: any) =>
+      approval.approvalType === approvalType
+      && approval.status === "PENDING"
+      && (approval.workOrderRevisionNumber ?? 1) === 1
+    )) {
+      await supersedeApprovalDecision(ctx, pending, approvalDecisionId);
+    }
+    await logWorkOrderEvent(ctx, {
+      tenantId: workOrder.tenantId,
+      projectId: workOrder.projectId,
+      workOrderId: workOrder._id,
+      eventType: "APPROVAL_APPROVED",
+      actorType: "SYSTEM",
+      actorId: plan.approvedBy,
+      summary: `Mission Plan approval satisfied ${approvalType}`,
+      idempotencyKey: `${idempotencyKey}:event`,
+      metadata: { approvalDecisionId, missionPlanId: plan._id, missionPlanRevision: plan.revisionNumber },
+    });
+  }
+}
+
 async function refreshWorkOrderGovernance(ctx: any, workOrderId: any) {
   const workOrder = await ctx.db.get(workOrderId);
   if (!workOrder) throw new Error("WorkOrder not found");
 
+  await reconcileApprovedMissionPlanDecisions(ctx, workOrder);
   await expireGovernanceRecordsForWorkOrder(ctx, workOrder);
 
   const refreshedWorkOrder = await ctx.db.get(workOrderId);
@@ -1171,12 +1256,14 @@ async function refreshWorkOrderGovernance(ctx: any, workOrderId: any) {
   const computedApprovalStatus = deriveApprovalStatus({
     riskLevel: refreshedWorkOrder.riskLevel as any,
     requiredApprovals: refreshedWorkOrder.requiredApprovals,
+    isMutating: refreshedWorkOrder.isMutating,
     approvals: approvalDecisions,
     now: Date.now(),
   });
   const acceptance = evaluateAcceptance({
     riskLevel: refreshedWorkOrder.riskLevel as any,
     requiredApprovals: refreshedWorkOrder.requiredApprovals,
+    isMutating: refreshedWorkOrder.isMutating,
     approvalDecisions,
     acceptanceCriteria,
     verificationReceipts,
@@ -1262,6 +1349,7 @@ function summarizeRun(run: any) {
     taskAttemptNumber: run.metadata?.taskAttemptNumber,
     taskRetryNumber: run.metadata?.taskRetryNumber,
     workOrderRevisionNumber: run.workOrderRevisionNumber,
+    attemptPurpose: run.attemptPurpose ?? "IMPLEMENTATION",
     status: run.status,
     runtime: run.runtime,
     model: run.model,
@@ -1275,6 +1363,7 @@ function summarizeRun(run: any) {
     factoryContinuationStatus: run.factoryContinuation?.status,
     factoryApprovalDecisionId: run.factoryContinuation?.approvalDecisionId,
     candidateRevision: run.factoryContinuation?.candidateRevision,
+    verificationSupersededAt: run.metadata?.verificationSupersededAt,
     startedAt: run.startedAt,
     completedAt: run.completedAt,
   };
@@ -1669,6 +1758,7 @@ export const get = query({
     const acceptance = evaluateAcceptance({
       riskLevel: workOrder.riskLevel as any,
       requiredApprovals: workOrder.requiredApprovals,
+      isMutating: workOrder.isMutating,
       approvalDecisions,
       acceptanceCriteria: workOrder.acceptanceCriteria as any,
       verificationReceipts,
@@ -1826,6 +1916,7 @@ export const governanceValidity = query({
     const acceptance = evaluateAcceptance({
       riskLevel: workOrder.riskLevel as any,
       requiredApprovals: workOrder.requiredApprovals,
+      isMutating: workOrder.isMutating,
       approvalDecisions,
       acceptanceCriteria: workOrder.acceptanceCriteria as any,
       verificationReceipts,
@@ -2578,7 +2669,11 @@ async function dispatchWorkOrder(
           verificationPolicy: scope.verificationPolicy,
           approvalPolicy: scope.approvalPolicy,
         })));
-        effectiveRequiredApprovals = [...new Set([...effectiveRequiredApprovals, ...scopePolicyRequirements.approvalPolicies])].sort();
+        const codeScopeApprovalPolicies = codeScopeApprovalPoliciesForDispatch({
+          isMutating: refreshedWorkOrder.isMutating ?? true,
+          approvalPolicies: scopePolicyRequirements.approvalPolicies,
+        });
+        effectiveRequiredApprovals = [...new Set([...effectiveRequiredApprovals, ...codeScopeApprovalPolicies])].sort();
         const validatedScope = validateDispatchScope({
           projectId: refreshedWorkOrder.projectId,
           repository: repository ? { id: repository._id, projectId: repository.projectId, status: repository.status, repository: repository.repository } : null,
@@ -2808,6 +2903,7 @@ async function dispatchWorkOrder(
       riskLevel: refreshedWorkOrder.riskLevel,
       approvalStatus: refreshedWorkOrder.approvalStatus,
       requiredApprovals: effectiveRequiredApprovals,
+      isMutating: refreshedWorkOrder.isMutating,
       hasWorkflowId: !!resolvedWorkflowId,
       activeRunStatuses: existingRuns.map((run) => run.status as any),
     });
@@ -2929,6 +3025,10 @@ async function dispatchWorkOrder(
           workOrderRevisionNumber: refreshedWorkOrder.currentRevisionNumber ?? 1,
           workOrderRevisionId: refreshedWorkOrder.currentRevisionId ? String(refreshedWorkOrder.currentRevisionId) : undefined,
           taskId: selectedTask ? String(selectedTask._id) : undefined,
+          task: selectedTask ? {
+            title: selectedTask.title,
+            description: selectedTask.description,
+          } : undefined,
           factoryDefinitionVersionId: String(factoryBinding.version._id),
           factoryConfigurationDigest: factoryBinding.version.configurationDigest,
           factoryPurpose: factoryBinding.version.purpose ?? "SOFTWARE",
@@ -4068,6 +4168,7 @@ export const approvalQueue = query({
       const acceptance = workOrder ? evaluateAcceptance({
         riskLevel: workOrder.riskLevel as any,
         requiredApprovals: workOrder.requiredApprovals,
+        isMutating: workOrder.isMutating,
         approvalDecisions,
         acceptanceCriteria: workOrder.acceptanceCriteria as any,
         verificationReceipts: receipts,
@@ -4652,15 +4753,19 @@ export const accept = mutation({
       workOrder.projectId,
       FACTORY_PERMISSIONS.APPROVE,
     );
-    if (factoryAccess.membership.mode === "DEMO") {
+    const localDemoAcceptance = factoryAccess.membership.mode === "DEMO"
+      && localDemoOperatorAcceptanceEnabled();
+    if (factoryAccess.membership.mode === "DEMO" && !localDemoAcceptance) {
       throw new Error("Anonymous demo authority cannot accept governed work.");
     }
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
-    if (!deliveryAccess) {
+    if (!deliveryAccess && !localDemoAcceptance) {
       throw new Error("WorkOrder acceptance is unavailable until an authenticated operator is provisioned.");
     }
-    assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
-    const acceptActorId = factoryAccess.actorId;
+    if (deliveryAccess) assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
+    const acceptActorId = localDemoAcceptance
+      ? "development:local-operator"
+      : factoryAccess.actorId;
     const existingEvent = await ctx.db
       .query("workOrderEvents")
       .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", `${args.idempotencyKey}:accepted`))
@@ -4770,6 +4875,7 @@ export const accept = mutation({
       const approvalStatus = deriveApprovalStatus({
         riskLevel: workOrder.riskLevel as any,
         requiredApprovals: workOrder.requiredApprovals,
+        isMutating: workOrder.isMutating,
         approvals: approvalDecisions,
         now,
       });
@@ -4780,6 +4886,7 @@ export const accept = mutation({
       const acceptance = evaluateAcceptance({
         riskLevel: workOrder.riskLevel as any,
         requiredApprovals: workOrder.requiredApprovals,
+        isMutating: workOrder.isMutating,
         approvalDecisions,
         acceptanceCriteria: workOrder.acceptanceCriteria as any,
         verificationReceipts,
@@ -4990,8 +5097,14 @@ export const requestWorkOrderRevision = mutation({
       : [];
 
     const revisions = await listRevisionsForWorkOrder(ctx, workOrder._id);
+    for (const pendingRevision of revisions.filter((revision: any) => revision.status === "PENDING_APPROVAL")) {
+      await ctx.db.patch(pendingRevision._id, { status: "SUPERSEDED" });
+    }
     const previousRevisionId = revisions[0]?._id;
-    const revisionNumber = (workOrder.currentRevisionNumber ?? 1) + 1;
+    const revisionNumber = Math.max(
+      workOrder.currentRevisionNumber ?? 1,
+      ...revisions.map((revision: any) => revision.revisionNumber ?? 0),
+    ) + 1;
     const revisionId = await ctx.db.insert("workOrderRevisions", {
       tenantId: workOrder.tenantId,
       projectId: workOrder.projectId,
@@ -5059,6 +5172,11 @@ export const approveWorkOrderRevision = mutation({
     }
     const workOrder = await ctx.db.get(revision.workOrderId);
     if (!workOrder) throw new Error("WorkOrder not found");
+    const revisions = await listRevisionsForWorkOrder(ctx, workOrder._id);
+    const newestPendingRevision = revisions.find((candidate: any) => candidate.status === "PENDING_APPROVAL");
+    if (newestPendingRevision?._id !== revision._id) {
+      throw new Error("Only the latest pending WorkOrderRevision can be approved");
+    }
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
     assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
 
@@ -5266,6 +5384,7 @@ export const supersedeWorkOrder = mutation({
     const acceptance = evaluateAcceptance({
       riskLevel: original.riskLevel as any,
       requiredApprovals: original.requiredApprovals,
+      isMutating: original.isMutating,
       approvalDecisions: approvals,
       acceptanceCriteria: original.acceptanceCriteria as any,
       verificationReceipts: receipts,
@@ -5341,9 +5460,11 @@ export const expireGovernanceRecords = mutation({
       const result = await expireGovernanceRecordsForWorkOrder(ctx, workOrder);
       expiredApprovals += result.expiredApprovals;
       staleReceipts += result.staleReceipts;
-      if (result.expiredApprovals > 0 || result.staleReceipts > 0) {
-        await refreshWorkOrderGovernance(ctx, workOrder._id);
-      }
+      // This mutation backs the operator's explicit "Refresh governance"
+      // action. Reconcile current authority even when no record expired so
+      // newly approved Mission Plans and other durable decisions project
+      // into the WorkOrder immediately.
+      await refreshWorkOrderGovernance(ctx, workOrder._id);
     }
 
     return { expiredApprovals, staleReceipts, workOrdersTouched: workOrders.length };

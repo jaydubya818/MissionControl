@@ -84,6 +84,18 @@ export function workOrderCostBudget(input: {
   };
 }
 
+const RESERVATION_HOLDING_RUN_STATUSES = new Set(["PENDING", "RUNNING", "PAUSED"]);
+
+export function committedWorkOrderRunCostUsd(run: {
+  status: string;
+  spentUsd?: unknown;
+  reservedCostUsd?: unknown;
+}) {
+  const spentUsd = finiteNonNegative(run.spentUsd) ?? 0;
+  if (!RESERVATION_HOLDING_RUN_STATUSES.has(run.status)) return spentUsd;
+  return Math.max(spentUsd, finiteNonNegative(run.reservedCostUsd) ?? 0);
+}
+
 function rate(numerator: number, denominator: number) {
   return denominator > 0 ? numerator / denominator : undefined;
 }
@@ -288,6 +300,20 @@ function workerReasonPriority(reason: string) {
   return priorities[reason] ?? 100;
 }
 
+/**
+ * Exact route qualifications for GREEN and YELLOW work may intentionally omit
+ * a route-wide cost policy. In that case the estimate approved with the
+ * WorkOrder's Mission Plan is the conservative reservation for routing. A
+ * missing route estimate must stay unknown when the approved Plan also omitted
+ * an estimate; callers must not invent a price.
+ */
+export function executionRoutingEstimatedCost(
+  routeEstimatedCostUsd: number | undefined,
+  approvedPlanEstimateUsd: number | undefined,
+) {
+  return routeEstimatedCostUsd ?? approvedPlanEstimateUsd;
+}
+
 export async function buildExecutionRoutingPreview(
   ctx: RoutingCtx,
   input: {
@@ -447,7 +473,13 @@ export async function buildExecutionRoutingPreview(
         || catalogModel.riskApproved
       )
     );
-    const estimatedCost = catalogModel?.estimatedCostPerRunUsd;
+    const approvedPlanEstimateUsd = finiteNonNegative(
+      (workOrder.metadata as { estimatedCostUsd?: unknown } | undefined)?.estimatedCostUsd,
+    );
+    const estimatedCost = executionRoutingEstimatedCost(
+      catalogModel?.estimatedCostPerRunUsd,
+      approvedPlanEstimateUsd,
+    );
     const contextWindow = catalogModel?.contextWindow
       ?? manifest?.models.supported.find((model) =>
         model.provider === primaryModel?.provider
@@ -532,7 +564,7 @@ export async function buildExecutionRoutingPreview(
   const plannedEstimateUsd = finiteNonNegative(metadata?.estimatedCostUsd);
   const priorCommittedUsd = workOrderRuns
     .filter((run) => (run.attemptPurpose ?? "IMPLEMENTATION") === "IMPLEMENTATION")
-    .reduce((sum, run) => sum + (finiteNonNegative(run.spentUsd) ?? 0) + (finiteNonNegative(run.reservedCostUsd) ?? 0), 0);
+    .reduce((sum, run) => sum + committedWorkOrderRunCostUsd(run), 0);
   const missionBudgetRemainingUsd = mission?.budgetUsd === undefined
     ? undefined
     : Math.max(0, mission.budgetUsd - mission.spentUsd);

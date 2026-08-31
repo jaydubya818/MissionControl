@@ -38,10 +38,19 @@ export function dispatchApprovalAllowed(args: {
   riskLevel: DispatchRiskLevel;
   approvalStatus: DispatchApprovalStatus;
   requiredApprovals?: string[];
+  isMutating?: boolean;
 }) {
-  const requiresApproval = (args.requiredApprovals?.length ?? 0) > 0 || ["HIGH", "CRITICAL"].includes(args.riskLevel);
+  const requiresApproval = (args.requiredApprovals?.length ?? 0) > 0
+    || (args.isMutating !== false && ["HIGH", "CRITICAL"].includes(args.riskLevel));
   if (!requiresApproval) return true;
   return args.approvalStatus === "APPROVED" || args.approvalStatus === "CONDITIONAL";
+}
+
+export function codeScopeApprovalPoliciesForDispatch(args: {
+  isMutating: boolean;
+  approvalPolicies: string[];
+}): string[] {
+  return args.isMutating ? args.approvalPolicies : [];
 }
 
 export function findActiveRun<T extends { status: DispatchRunStatus }>(runs: T[]): T | undefined {
@@ -222,6 +231,7 @@ export function validateDispatchable(args: {
   riskLevel: DispatchRiskLevel;
   approvalStatus: DispatchApprovalStatus;
   requiredApprovals?: string[];
+  isMutating?: boolean;
   hasWorkflowId: boolean;
   activeRunStatuses: DispatchRunStatus[];
 }): { ok: true } | { ok: false; reason: string } {

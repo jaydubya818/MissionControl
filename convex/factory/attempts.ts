@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery, mutation } from "../_generated/server";
 import { internal } from "../_generated/api";
 import {
   activeLeaseMatches,
@@ -8,6 +8,7 @@ import {
   expiredFactoryLeaseIdIsReplay,
   factoryAttemptMutationIsAuthorized,
   factoryAttemptRequiresReplacementOnClaim,
+  factoryAttemptSourceBindingMatches,
   factoryExecutorIdentity,
   factoryLeaseMatchesCurrentRegistration,
   lostFactoryAttemptFailure,
@@ -59,6 +60,8 @@ import {
   evaluateRepositoryRemoteExecutionPolicy,
   normalizeRepositoryDataClassification,
 } from "../lib/repositoryExecutionPolicy";
+import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "../lib/companyAccess";
+import { assertAuthorizedDeliveryRecord } from "../lib/deliveryAuthorization";
 
 const EVENT_TYPES = new Set([
   "RUN_STARTED", "STEP_STARTED", "STEP_COMPLETED", "TOOL_CALLED",
@@ -300,6 +303,10 @@ export const claimInternal = internalMutation({
     }
     const frozenManifest = run.executionManifest as any;
     const executionBackend = version.executionBackend ?? "persistent-worker";
+    const verificationSourceAttempt = run.attemptPurpose === "VERIFICATION"
+      && run.verificationAttemptBinding?.sourceAttemptId
+      ? await ctx.db.get(run.verificationAttemptBinding.sourceAttemptId)
+      : null;
     if (frozenManifest?.version !== "factory-execution-manifest/v1"
       || frozenManifest?.harness?.adapter !== run.executorAdapter
       || frozenManifest?.harness?.version !== run.executorVersion
@@ -310,7 +317,18 @@ export const claimInternal = internalMutation({
       || frozenManifest?.harness?.modelRouteDigest !== version.modelRouteDigest
       || frozenManifest?.harness?.modelQualificationDigest !== version.modelQualificationDigest
       || frozenManifest?.harness?.executionBackend !== executionBackend
-      || frozenManifest?.repository?.baseSha !== host?.baseCommit) {
+      || !factoryAttemptSourceBindingMatches({
+        attemptPurpose: run.attemptPurpose,
+        manifestBaseSha: frozenManifest?.repository?.baseSha,
+        hostBaseCommit: host?.baseCommit,
+        repositoryId: run.repositoryId,
+        workOrderId: run.workOrderId,
+        workOrderRevisionNumber: run.workOrderRevisionNumber,
+        verificationContractDigest: run.verificationContractDigest,
+        branch: run.branch,
+        verificationAttemptBinding: run.verificationAttemptBinding,
+        verificationSourceAttempt,
+      })) {
       throw new Error("Factory Attempt does not match its frozen backend and source binding.");
     }
     if (executionBackend === "remote-sandbox") {
@@ -492,6 +510,7 @@ export const claimInternal = internalMutation({
         const missingApproval = requiredApprovalTypes({
           riskLevel: workOrder.riskLevel as any,
           requiredApprovals: workOrder.requiredApprovals,
+          isMutating: workOrder.isMutating,
         }).find((approvalType) => {
           const candidate = approvalsByType.get(approvalType) as any;
           return !candidate
@@ -626,10 +645,6 @@ export const claimInternal = internalMutation({
       },
       metadata: { configurationSnapshot: true, secretValuesIncluded: false },
     });
-    const verificationSourceAttempt = run.attemptPurpose === "VERIFICATION"
-      && run.verificationAttemptBinding?.sourceAttemptId
-      ? await ctx.db.get(run.verificationAttemptBinding.sourceAttemptId)
-      : null;
     return {
       claimed: true as const,
       reclaimed: decision.reclaimed,
@@ -785,6 +800,7 @@ export const authorizePublicationInternal = internalMutation({
     const missingApproval = requiredApprovalTypes({
       riskLevel: workOrder.riskLevel as any,
       requiredApprovals: workOrder.requiredApprovals,
+      isMutating: workOrder.isMutating,
     }).find((approvalType) => {
       const candidate = approvalsByType.get(approvalType) as any;
       return !candidate
@@ -1823,6 +1839,91 @@ async function persistPolicyV2CandidateReady(
   });
   return { run: await ctx.db.get(run._id), subject };
 }
+
+export const retryVerification = mutation({
+  args: {
+    workOrderId: v.id("workOrders"),
+    failedVerificationAttemptId: v.id("workflowRuns"),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const reason = args.reason.trim();
+    if (reason.length < 10 || reason.length > 1_000) {
+      throw new Error("Verification recovery requires a reason between 10 and 1,000 characters.");
+    }
+    const [workOrder, failedAttempt] = await Promise.all([
+      ctx.db.get(args.workOrderId),
+      ctx.db.get(args.failedVerificationAttemptId),
+    ]);
+    if (!workOrder || !workOrder.projectId || !workOrder.tenantId) {
+      throw new Error("WorkOrder is unavailable or unauthorized.");
+    }
+    const access = await requireWorkspaceAccess(ctx, workOrder.tenantId, workOrder.projectId, {
+      permission: COMPANY_PERMISSIONS.DISPATCH_WORK,
+    });
+    assertAuthorizedDeliveryRecord(access, workOrder);
+    if (!failedAttempt
+      || failedAttempt.workOrderId !== workOrder._id
+      || failedAttempt.attemptPurpose !== "VERIFICATION"
+      || !["FAILED", "CANCELED"].includes(failedAttempt.status)
+      || !failedAttempt.metadata?.verificationSupersededAt
+      || !failedAttempt.verificationAttemptBinding?.sourceAttemptId) {
+      throw new Error("Only a terminal superseded Verification Attempt can be retried.");
+    }
+    const attempts = await ctx.db.query("workflowRuns")
+      .withIndex("by_work_order_attempt_purpose", (q) => q.eq("workOrderId", workOrder._id).eq("attemptPurpose", "VERIFICATION"))
+      .collect();
+    const subjectDigest = failedAttempt.verificationAttemptBinding.verificationSubjectDigest;
+    const existing = attempts.find((attempt) => attempt._id !== failedAttempt._id
+      && attempt.verificationAttemptBinding?.verificationSubjectDigest === subjectDigest
+      && !attempt.metadata?.verificationSupersededAt);
+    if (existing) return { created: false as const, workflowRun: existing };
+    const latest = [...attempts].sort((left, right) => right.startedAt - left.startedAt
+      || String(right._id).localeCompare(String(left._id)))[0];
+    if (latest?._id !== failedAttempt._id) {
+      throw new Error("Verification recovery must reference the latest Attempt for this WorkOrder.");
+    }
+    const sourceAttempt = await ctx.db.get(failedAttempt.verificationAttemptBinding.sourceAttemptId);
+    if (!sourceAttempt
+      || sourceAttempt.workOrderId !== workOrder._id
+      || sourceAttempt.status !== "COMPLETED"
+      || sourceAttempt.attemptPurpose !== "IMPLEMENTATION"
+      || sourceAttempt.workOrderRevisionNumber !== (workOrder.currentRevisionNumber ?? 1)
+      || sourceAttempt.verificationSubject?.digest !== subjectDigest) {
+      throw new Error("Verification recovery source is no longer the exact current candidate.");
+    }
+    const result = await schedulePolicyV2VerificationAttempt(ctx, workOrder, sourceAttempt);
+    if (result.created) {
+      const actorId = access.membership.operatorId
+        ? String(access.membership.operatorId)
+        : "demo:company-administrator";
+      await ctx.db.patch(result.workflowRun._id, {
+        metadata: {
+          ...(result.workflowRun.metadata ?? {}),
+          retryOfWorkflowRunId: failedAttempt._id,
+          retryOfRunId: failedAttempt.runId,
+          retryReason: reason,
+          recoveryActorId: actorId,
+        },
+      });
+      await insertEvent(ctx, result.workflowRun, {
+        idempotencyKey: `verification-retry:${String(failedAttempt._id)}:${String(result.workflowRun._id)}`,
+        eventType: "RETRY_STARTED",
+        workflowStep: "independent-verification",
+        actor: `human:${actorId}`,
+        status: "PENDING",
+        startedAt: Date.now(),
+        commandSummary: reason,
+        metadata: {
+          retryOfWorkflowRunId: failedAttempt._id,
+          retryOfRunId: failedAttempt.runId,
+          verificationSubjectDigest: subjectDigest,
+        },
+      });
+    }
+    return result;
+  },
+});
 
 async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sourceAttempt: any) {
   const subject = sourceAttempt.verificationSubject;

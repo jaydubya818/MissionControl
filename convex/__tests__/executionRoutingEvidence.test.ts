@@ -5,6 +5,7 @@ import {
 } from "@mission-control/workflow-engine";
 import {
   aggregateExecutionRoutingEvidence,
+  committedWorkOrderRunCostUsd,
   loadExecutionRoutingEvidenceBundle,
   workOrderCostBudget,
 } from "../lib/executionRouting";
@@ -366,5 +367,23 @@ describe("execution routing Policy V2 evidence", () => {
       missionBudgetRemainingUsd: 10,
       priorCommittedUsd: 4,
     })).toEqual({ approvedRemainingUsd: 20, maximumEstimatedCostUsd: 10 });
+  });
+
+  it("releases terminal reservations and counts actual spend", () => {
+    expect(committedWorkOrderRunCostUsd({
+      status: "FAILED",
+      spentUsd: 0,
+      reservedCostUsd: 24,
+    })).toBe(0);
+    expect(committedWorkOrderRunCostUsd({
+      status: "COMPLETED",
+      spentUsd: 6,
+      reservedCostUsd: 24,
+    })).toBe(6);
+    expect(committedWorkOrderRunCostUsd({
+      status: "RUNNING",
+      spentUsd: 6,
+      reservedCostUsd: 24,
+    })).toBe(24);
   });
 });

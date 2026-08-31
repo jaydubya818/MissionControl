@@ -42,6 +42,7 @@ import {
   type ChecklistClassification,
   type MissionSpecContent,
 } from "./lib/missionSpec";
+import { resolveMissionRepositoryBinding } from "./lib/workspaceRepositories";
 
 const missionState = v.union(
   v.literal("DRAFT"), v.literal("PLANNING"), v.literal("AWAITING_PLAN_APPROVAL"),
@@ -296,6 +297,23 @@ async function assertMissionProject(ctx: any, missionId: any, projectId: any, de
   return { mission, project };
 }
 
+async function loadMissionRepositoryBinding(ctx: any, mission: Doc<"missions">, project: Doc<"projects">) {
+  const missionRepository = mission.repositoryId ? await ctx.db.get(mission.repositoryId) : null;
+  if (mission.repositoryId && !missionRepository) {
+    throw new Error("Mission repository configuration is missing");
+  }
+  return resolveMissionRepositoryBinding({
+    projectId: String(project._id),
+    missionRepository: missionRepository ? {
+      projectId: String(missionRepository.projectId),
+      repository: missionRepository.repository,
+      defaultBranch: missionRepository.defaultBranch,
+    } : null,
+    legacyRepository: project.githubRepo,
+    legacyDefaultBranch: project.githubBranch,
+  });
+}
+
 async function logMissionEvent(ctx: any, args: {
   mission: any;
   eventType: string;
@@ -483,6 +501,7 @@ async function getMissionDetail(ctx: any, mission: any) {
     const governanceAcceptance = evaluateAcceptance({
       riskLevel: workOrder.riskLevel,
       requiredApprovals: workOrder.requiredApprovals,
+      isMutating: workOrder.isMutating,
       approvalDecisions,
       acceptanceCriteria: workOrder.acceptanceCriteria,
       verificationReceipts,
@@ -980,7 +999,8 @@ export const submitPlan = mutation({
       if (!workflow || !workflow.active) throw new Error(`Active workflow not found for ${blueprint.id}`);
       return { ...blueprint, workflowVersion: workflow.version };
     });
-    const proposed = { ...plan, repository: project.githubRepo, repositoryBranch: project.githubBranch, workOrderBlueprints };
+    const repositoryBinding = await loadMissionRepositoryBinding(ctx, mission, project);
+    const proposed = { ...plan, repository: repositoryBinding.repository, repositoryBranch: repositoryBinding.defaultBranch, workOrderBlueprints };
     assertValidPlan(proposed);
     if (mission.budgetUsd !== undefined && proposed.estimatedCostUsd !== undefined && proposed.estimatedCostUsd > mission.budgetUsd) {
       throw new Error("Plan estimate exceeds the Mission budget");
@@ -992,8 +1012,8 @@ export const submitPlan = mutation({
     assertTransition(mission, "AWAITING_PLAN_APPROVAL");
     await ctx.db.patch(plan._id, {
       status: "PROPOSED",
-      repository: project.githubRepo,
-      repositoryBranch: project.githubBranch,
+      repository: repositoryBinding.repository,
+      repositoryBranch: repositoryBinding.defaultBranch,
       workOrderBlueprints,
       submittedBy: operator.actorId,
       submittedAt: now,
@@ -1099,7 +1119,8 @@ export const approvePlan = mutation({
       return { mission, plan, workOrders: existingWorkOrders, created: false };
     }
     if (mission.state !== "AWAITING_PLAN_APPROVAL" || plan.status !== "PROPOSED") throw new Error("Mission plan is not awaiting approval");
-    if (plan.repository !== project.githubRepo || plan.repositoryBranch !== project.githubBranch) throw new Error("Repository configuration changed after plan submission. Create a new revision.");
+    const repositoryBinding = await loadMissionRepositoryBinding(ctx, mission, project);
+    if (plan.repository !== repositoryBinding.repository || plan.repositoryBranch !== repositoryBinding.defaultBranch) throw new Error("Repository configuration changed after plan submission. Create a new revision.");
     await assertPlanningPlanBinding(ctx, mission, plan);
     assertValidPlan(plan);
     const specLineage = await loadPlanSpecLineage(ctx, mission, plan);

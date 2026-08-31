@@ -32,6 +32,10 @@ export interface FactoryExecutionManifestInput {
   workOrderRevisionNumber: number;
   workOrderRevisionId?: string;
   taskId?: string;
+  task?: {
+    title: string;
+    description?: string;
+  };
   factoryDefinitionVersionId: string;
   factoryConfigurationDigest: string;
   factoryPurpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGENT_AUTOMATION";
@@ -155,6 +159,9 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
   if (!input.executor.adapter.trim() || !input.executor.version.trim() || !input.executionBackend.trim()) {
     throw new Error("Execution manifest requires a provider-neutral executor and backend binding.");
   }
+  if (Boolean(input.taskId) !== Boolean(input.task)) {
+    throw new Error("Execution manifest requires the selected Task identity and instructions together.");
+  }
   if (harnessManifestIssues(input.executor.capabilityManifest).length > 0
     || input.executor.capabilityManifest.identity.adapterId !== input.executor.adapter
     || input.executor.capabilityManifest.identity.adapterVersion !== input.executor.version
@@ -257,6 +264,7 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
       title: input.workOrder.title,
       desiredOutcome: input.workOrder.desiredOutcome,
       acceptanceCriterionIds: input.workOrder.acceptanceCriteria.map((criterion) => criterion.id),
+      ...(input.task ? { selectedTask: input.task } : {}),
     },
     workOrderSpecification: {
       schemaVersion: 1,
@@ -356,6 +364,8 @@ function compileFactoryPrompt(
     `Work Order: ${input.workOrder.title}`,
     `Desired outcome: ${input.workOrder.desiredOutcome}`,
     input.workOrder.context ? `Context: ${input.workOrder.context}` : "",
+    input.task ? `Selected Child Task: ${input.task.title}` : "",
+    input.task?.description ? `Task instructions: ${input.task.description}` : "",
     "",
     "Acceptance criteria:",
     criteria,

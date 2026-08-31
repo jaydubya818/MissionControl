@@ -6,6 +6,7 @@ import {
   normalizeCodePath,
   normalizeCodePaths,
   repositoryDisplayName,
+  resolveMissionRepositoryBinding,
   validateCodeScopeInput,
   validateRepositoryInput,
 } from "../lib/workspaceRepositories";
@@ -24,6 +25,34 @@ describe("workspace repository contracts", () => {
     expect(validateRepositoryInput({ repository: "SellerFi/Marketplace", defaultBranch: "" })).toBe(
       "Default branch is required."
     );
+  });
+
+  it("uses the Mission repository binding instead of the legacy workspace default", () => {
+    expect(resolveMissionRepositoryBinding({
+      projectId: "workspace-1",
+      missionRepository: {
+        projectId: "workspace-1",
+        repository: "example/external-product",
+        defaultBranch: "stable",
+      },
+      legacyRepository: "example/control-plane",
+      legacyDefaultBranch: "main",
+    })).toEqual({
+      repository: "example/external-product",
+      defaultBranch: "stable",
+      source: "MISSION",
+    });
+  });
+
+  it("fails closed for cross-workspace Mission repository bindings", () => {
+    expect(() => resolveMissionRepositoryBinding({
+      projectId: "workspace-1",
+      missionRepository: {
+        projectId: "workspace-2",
+        repository: "example/external-product",
+        defaultBranch: "main",
+      },
+    })).toThrow("Mission repository does not belong to the selected workspace");
   });
 
   it("normalizes repository-relative code paths", () => {
