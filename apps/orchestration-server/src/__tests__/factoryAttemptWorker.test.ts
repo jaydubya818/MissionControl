@@ -408,7 +408,7 @@ async function runFixture(
   const reports: any[] = [];
   const manifest = executionManifest({ attempt, dirtyVerification: options.dirtyVerification, baseSha });
   if (options.noVerificationContract) {
-    delete manifest.workOrderSpecification.verificationContract;
+    delete (manifest.workOrderSpecification as { verificationContract?: unknown }).verificationContract;
   }
   if (options.harness) {
     const capabilityManifest = fixtureHarnessManifest(options.harness);
