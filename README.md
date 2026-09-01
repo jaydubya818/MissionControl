@@ -502,10 +502,6 @@ not need to be copied before Convex setup.
 | `CONVEX_URL` | Connects the application to the Convex backend | Written by `convex dev` |
 | `VITE_CONVEX_URL` | Connects the browser UI to Convex | Copy `CONVEX_URL` into `.env.local` |
 
-
-
-Replace it with:
-
 ```markdown
 ```bash
 git clone https://github.com/jaydubya818/MissionControl.git
