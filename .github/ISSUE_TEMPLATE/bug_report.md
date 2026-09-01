@@ -39,3 +39,4 @@ Does this reproduce against the demo (`pnpm run dev:demo`)?
 ## Additional context
 
 <!-- Add any other context, logs, or screenshots about the problem here. -->
+<!-- Before posting, redact tokens, keys, cookies, private URLs, .env contents, and sensitive workspace or user data from commands, errors, logs, and screenshots. -->
