@@ -32,6 +32,30 @@ things, and refuses to conflate them.
 - **Evidence, not assertions.** Every WorkOrder carries its traces, approvals,
   and verification records, and the resulting pull request is exact-current.
 
+## Persona access control
+
+Mission Control uses four versioned access profiles across the Agentic Platform
+and Software Factory. Clerk authenticates people; Mission Control remains the
+authorization source of truth for permissions and company, workspace, and team
+scope.
+
+| Persona | Default operating focus |
+| --- | --- |
+| Executive | Value, risk, governance, and accountable autonomy |
+| Architect | Complete-system visibility, boundaries, and contracts |
+| Builder | Delivery, diagnosis, and the path from failure to recovery |
+| Admin | All capabilities plus profile defaults, assignments, rollout, and recovery |
+
+Admins manage these defaults under **Settings → Access Profiles** and assign one
+primary persona plus a valid scope under **Company Access**. Profile changes are
+previewed, versioned, audited, and recoverable. Navigation filtering is an
+experience control, not a security boundary: server enforcement remains in
+`SHADOW` until every live domain uses the same permission and scope checks.
+
+See the [persona access decision](docs/decisions/persona-access-profiles.md) and
+[rollout runbook](docs/security/persona-access-profile-rollout.md) for the full
+permission model, migration, rollback, and final-Admin protections.
+
 ## Quickstart
 
 Requires Node 20, pnpm 9, and a Convex development deployment.
@@ -59,12 +83,30 @@ Open <http://localhost:5199/v2/command-center> and select **Software Factory
 Demo** (`sf-demo`) to watch a full Mission move through plan, execution,
 verification, and acceptance with no external providers involved.
 
+### Verify a hosted preview
+
+Hosted end-to-end verification must use a non-production Convex deployment and
+must not disable Vercel Deployment Protection. Configure the preview branch with
+its development or preview `VITE_CONVEX_URL`, enable the required V2 and company
+context feature flags, and use a dedicated Vercel automation-bypass secret in
+the `x-vercel-protection-bypass` request header. Never commit the bypass secret
+or a Convex deploy key.
+
+The preview is ready for RBAC verification only when the UI and Convex functions
+were built from the same commit, the browser reaches Mission Control rather than
+the Vercel login page, and the Executive, Architect, Builder, and Admin routes
+are verified against scoped non-production data. Production is not a preview
+test target.
+
 ## The lifecycle
 
-```
-Constitution → Mission → Specification → Plan → WorkOrder → Context
-   → Execution → Verification → Pull Request → Human Acceptance → Learning
-```
+Canonical builder loop:
+
+> Intent → Plan → Configure agents, harnesses, skills, and tools → Execute → Verify and evaluate → Deliver → Observe → Improve
+
+Governed delivery lifecycle:
+
+> Mission → approved Plan → WorkOrder → Task → Attempt → candidate → independent evidence → pull request → human decision → release → observed outcome → governed learning
 
 Each arrow is a gate, not a handoff. Nothing advances on an agent's word.
 
@@ -80,8 +122,9 @@ canonical WorkOrder acceptance, and a human-gated learning continuation all
 compose end to end.
 
 That is implementation proof. It is **not** a claim of fleet-scale production
-operation or general Remote Sandbox certification. Current public
-client/backend runtime contract: **v33**.
+operation or general Remote Sandbox certification. Remote Sandbox is
+**Production-pilot eligible; Preview**. The bounded 3/3 live exe.dev cohort is
+not general production certification. The current public client/backend runtime contract is **v33**.
 
 Per-capability status, evidence, and promotion gates live in the
 [Capability Maturity Ledger](docs/product/software-factory-capability-maturity.md).
@@ -94,6 +137,7 @@ Per-capability status, evidence, and promotion gates live in the
 | [Architecture](docs/ARCHITECTURE.md) | System architecture and repository map. |
 | [Run the demo](docs/site/get-started/run-the-demo.md) | Step-by-step demo walkthrough. |
 | [Run commands](docs/guides/RUN.md) | Every supported run mode and profile. |
+| [Persona RBAC rollout](docs/security/persona-access-profile-rollout.md) | Access-profile permissions, scopes, SHADOW rollout, rollback, and hosted verification requirements. |
 | [Golden-path proof](docs/testing/evidence/real-codex-github-pr-golden-path/README.md) | A real Codex-to-GitHub pull request, produced and verified through the browser UI. |
 
 ## Contributing
