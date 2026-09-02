@@ -502,18 +502,12 @@ not need to be copied before Convex setup.
 | `CONVEX_URL` | Connects the application to the Convex backend | Written by `convex dev` |
 | `VITE_CONVEX_URL` | Connects the browser UI to Convex | Copy `CONVEX_URL` into `.env.local` |
 
-```markdown
 ```bash
 git clone https://github.com/jaydubya818/MissionControl.git
-
 cd MissionControl
-
 corepack enable
-
 pnpm install
-
 pnpm exec convex dev --once
-
 ```
 
 Convex creates or links a development deployment and writes `CONVEX_URL`. If
