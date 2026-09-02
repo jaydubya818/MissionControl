@@ -82,6 +82,17 @@ const steps = [
     },
   },
   {
+    name: "receipt-first Mission Control golden eval",
+    command: "node",
+    args: [
+      "scripts/run-mission-control-eval.mjs",
+      "--input", path.relative(repoRoot, scenarioEvidencePath),
+      "--baseline", "evals/mission-control-golden-v1/baselines/main.json",
+      "--receipt", path.relative(repoRoot, path.join(evidenceDirectory, "eval-receipt.json")),
+      "--check-baseline",
+    ],
+  },
+  {
     name: "Mission, WorkOrder, Memory, Observability, GitHub, and Learning contracts",
     command: "pnpm",
     args: [
