@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd apps/mission-control-ui && pnpm build",
+  "buildCommand": "pnpm --filter @mission-control/shared build && pnpm --filter mission-control-ui build",
   "outputDirectory": "apps/mission-control-ui/dist",
   "installCommand": "corepack enable pnpm && pnpm install --frozen-lockfile",
   "framework": null,
