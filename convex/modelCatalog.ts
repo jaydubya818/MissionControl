@@ -4,9 +4,12 @@ import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAc
 import { loadModelCatalogForProject } from "./lib/modelCatalogScope";
 import { computeCanonicalHash } from "./lib/genomeHash";
 import {
+  MODEL_ROUTE_COST_POLICY_SCHEMA,
   MODEL_ROUTE_QUALIFICATION_SCHEMA,
   exactModelRouteDigest,
   exactModelRouteSnapshot,
+  modelRouteCostPolicyDigest,
+  modelRouteCostPolicyIssues,
 } from "./lib/modelRouteAdmission";
 
 const tier = v.union(v.literal("FAST"), v.literal("BALANCED"), v.literal("POWERFUL"));
@@ -21,6 +24,28 @@ const exactRuntimeIdentity = v.object({
   cliVersion: v.string(),
   executableSha256: v.optional(v.string()),
   imageDigest: v.optional(v.string()),
+});
+const exactRouteCostPolicy = v.object({
+  schema: v.literal(MODEL_ROUTE_COST_POLICY_SCHEMA),
+  method: v.literal("FULL_APPROVED_WORK_ORDER_CAP_RESERVATION"),
+  currency: v.literal("USD"),
+  estimatedCostPerRunUsd: v.number(),
+  reservationMode: v.literal("FULL_ESTIMATE"),
+  actualCostTelemetry: v.union(v.literal("MEASURED"), v.literal("UNAVAILABLE")),
+  unknownActualCostReason: v.optional(v.string()),
+  evidence: v.object({ reference: v.string(), digest: v.string() }),
+  source: v.object({
+    kind: v.literal("APPROVED_WORK_ORDER"),
+    workOrderId: v.id("workOrders"),
+    workOrderRevisionNumber: v.number(),
+    missionPlanId: v.id("missionPlans"),
+    missionPlanRevision: v.number(),
+    planEstimatedCostUsd: v.number(),
+    workOrderEstimatedCostUsd: v.number(),
+    hardLimitUsd: v.number(),
+    maxRuntimeMinutes: v.number(),
+    maxAttempts: v.number(),
+  }),
 });
 
 const DEFAULT_MODELS = [
@@ -182,6 +207,84 @@ export const registerExactRoute = mutation({
   },
 });
 
+/** Start a new immutable qualification revision without mutating an already
+ * promoted exact route. The provider/model/runtime identity remains exact;
+ * only the later human-reviewed qualification scope may differ. */
+export const registerQualificationRevision = mutation({
+  args: {
+    sourceModelCatalogId: v.id("modelCatalog"),
+    expectedRouteDigest: v.string(),
+    displayName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const source = await ctx.db.get(args.sourceModelCatalogId);
+    if (!source?.projectId || !source.routeSnapshot || !source.routeDigest
+      || source.routeDigest !== args.expectedRouteDigest
+      || exactModelRouteDigest(source.routeSnapshot) !== args.expectedRouteDigest
+      || source.admissionStatus !== "PRODUCTION_PILOT_ELIGIBLE"
+      || !source.qualificationDigest) {
+      throw new Error("Qualification revisions require an exact already-promoted source route.");
+    }
+    const access = await requireWorkspacePermission(
+      ctx,
+      source.projectId,
+      FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
+    );
+    const displayName = args.displayName.trim();
+    if (!displayName || displayName.length > 200) {
+      throw new Error("Qualification revision display name is invalid.");
+    }
+    const revisions = await ctx.db.query("modelCatalog")
+      .withIndex("by_project_model", (q) => q.eq("projectId", source.projectId!).eq("modelId", source.modelId))
+      .collect();
+    const existing = revisions.find((candidate) => candidate.provider === source.provider
+      && candidate.routeDigest === source.routeDigest
+      && candidate.displayName === displayName
+      && candidate.qualificationStatus === "UNQUALIFIED"
+      && candidate.admissionStatus === "DISABLED");
+    if (existing) return existing._id;
+    const now = Date.now();
+    const id = await ctx.db.insert("modelCatalog", {
+      tenantId: source.tenantId,
+      projectId: source.projectId,
+      provider: source.provider,
+      providerRoute: source.providerRoute,
+      modelId: source.modelId,
+      displayName,
+      tier: source.tier,
+      capabilities: source.capabilities,
+      supportsTools: source.supportsTools,
+      riskApproved: false,
+      contextWindow: source.contextWindow,
+      availability: "UNAVAILABLE",
+      deprecated: false,
+      routeSnapshot: source.routeSnapshot,
+      routeDigest: source.routeDigest,
+      capabilityManifestDigest: source.capabilityManifestDigest,
+      effectiveConfigSha256: source.effectiveConfigSha256,
+      runtimeIdentity: source.runtimeIdentity,
+      enabled: false,
+      qualificationStatus: "UNQUALIFIED",
+      admissionStatus: "DISABLED",
+      registeredBy: access.actorId,
+      registeredAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.insert("activities", {
+      tenantId: source.tenantId,
+      projectId: source.projectId,
+      actorType: "HUMAN",
+      actorId: access.actorId,
+      action: "EXACT_MODEL_ROUTE_QUALIFICATION_REVISION_REGISTERED",
+      description: `Registered a disabled qualification revision for ${source.provider}/${source.modelId}`,
+      targetType: "MODEL_CATALOG",
+      targetId: id,
+      metadata: { sourceModelCatalogId: source._id, routeDigest: source.routeDigest },
+    });
+    return id;
+  },
+});
+
 /** Bind reviewed qualification evidence to an already frozen route. */
 export const promoteExactRoute = mutation({
   args: {
@@ -191,6 +294,8 @@ export const promoteExactRoute = mutation({
     evidenceDigest: v.string(),
     workloadClasses: v.array(v.string()),
     riskClasses: v.array(v.union(v.literal("GREEN"), v.literal("YELLOW"), v.literal("RED"))),
+    repositoryIds: v.optional(v.array(v.id("workspaceRepositories"))),
+    costPolicy: v.optional(exactRouteCostPolicy),
   },
   handler: async (ctx, args) => {
     const route = await ctx.db.get(args.modelCatalogId);
@@ -218,6 +323,58 @@ export const promoteExactRoute = mutation({
       || new Set(args.riskClasses).size !== args.riskClasses.length) {
       throw new Error("Exact model route qualification requires a non-empty unique risk scope.");
     }
+    const repositoryIds = [...new Set((args.repositoryIds ?? []).map(String))].sort();
+    if ((args.repositoryIds?.length ?? 0) !== repositoryIds.length || repositoryIds.length > 100) {
+      throw new Error("Exact model route repository qualification scope is invalid.");
+    }
+    const repositories = await Promise.all((args.repositoryIds ?? []).map((id) => ctx.db.get(id)));
+    if (repositories.some((repository) => !repository || repository.projectId !== route.projectId)) {
+      throw new Error("Exact model route repository qualification exceeds the workspace scope.");
+    }
+    if (args.riskClasses.includes("RED") && (!args.costPolicy || repositoryIds.length < 1)) {
+      throw new Error("RED route qualification requires an auditable cost policy and explicit repository scope.");
+    }
+    let costPolicy: Record<string, any> | undefined;
+    if (args.costPolicy) {
+      costPolicy = {
+        ...args.costPolicy,
+        evidence: {
+          reference: args.costPolicy.evidence.reference.trim(),
+          digest: args.costPolicy.evidence.digest.toLowerCase(),
+        },
+        source: {
+          ...args.costPolicy.source,
+          workOrderId: String(args.costPolicy.source.workOrderId),
+          missionPlanId: String(args.costPolicy.source.missionPlanId),
+        },
+      };
+      if (modelRouteCostPolicyIssues(costPolicy).length) {
+        throw new Error("Exact model route cost policy is invalid.");
+      }
+      const [sourceWorkOrder, sourcePlan] = await Promise.all([
+        ctx.db.get(args.costPolicy.source.workOrderId),
+        ctx.db.get(args.costPolicy.source.missionPlanId),
+      ]);
+      const implementationPolicy = (sourceWorkOrder?.metadata as any)?.implementationPolicy;
+      const workOrderEstimatedCostUsd = (sourceWorkOrder?.metadata as any)?.estimatedCostUsd;
+      if (!sourceWorkOrder || sourceWorkOrder.projectId !== route.projectId
+        || sourceWorkOrder.approvalStatus !== "APPROVED"
+        || sourceWorkOrder.currentRevisionNumber !== args.costPolicy.source.workOrderRevisionNumber
+        || sourceWorkOrder.missionPlanId !== args.costPolicy.source.missionPlanId
+        || !sourceWorkOrder.repositoryId
+        || !repositoryIds.includes(String(sourceWorkOrder.repositoryId))
+        || !args.workloadClasses.includes(sourceWorkOrder.kind ?? "SOFTWARE_CHANGE")
+        || !sourcePlan
+        || sourcePlan.status !== "APPROVED"
+        || sourcePlan.revisionNumber !== args.costPolicy.source.missionPlanRevision
+        || sourcePlan.estimatedCostUsd !== args.costPolicy.source.planEstimatedCostUsd
+        || workOrderEstimatedCostUsd !== args.costPolicy.source.workOrderEstimatedCostUsd
+        || implementationPolicy?.maxCostUsd !== args.costPolicy.source.hardLimitUsd
+        || implementationPolicy?.timeoutMinutes !== args.costPolicy.source.maxRuntimeMinutes
+        || implementationPolicy?.maxAttempts !== args.costPolicy.source.maxAttempts) {
+        throw new Error("Exact model route cost policy does not match the approved WorkOrder authority.");
+      }
+    }
     const promotedAt = Date.now();
     const qualificationSnapshot = {
       schema: MODEL_ROUTE_QUALIFICATION_SCHEMA,
@@ -226,7 +383,9 @@ export const promoteExactRoute = mutation({
       scope: {
         workloadClasses: [...args.workloadClasses].sort(),
         riskClasses: [...new Set(args.riskClasses)].sort(),
+        ...(repositoryIds.length ? { repositoryIds } : {}),
       },
+      ...(costPolicy ? { costPolicy } : {}),
       promotedBy: access.actorId,
       promotedAt,
       authority: {
@@ -244,10 +403,14 @@ export const promoteExactRoute = mutation({
     })}`;
     await ctx.db.patch(route._id, {
       enabled: true,
+      riskApproved: args.riskClasses.includes("RED"),
+      estimatedCostPerRunUsd: costPolicy?.estimatedCostPerRunUsd,
       qualificationStatus: "EVIDENCE_QUALIFIED",
       admissionStatus: "PRODUCTION_PILOT_ELIGIBLE",
       qualificationSnapshot,
       qualificationDigest,
+      costPolicySnapshot: costPolicy,
+      costPolicyDigest: costPolicy ? modelRouteCostPolicyDigest(costPolicy) : undefined,
       promotedBy: access.actorId,
       promotedAt,
       updatedAt: promotedAt,
@@ -318,6 +481,37 @@ export const reportHealth = internalMutation({
       .collect();
     const model = models.find((candidate) => candidate.projectId === args.projectId);
     if (!model) throw new Error("Catalog model not found");
+    await ctx.db.patch(model._id, {
+      availability: args.availability,
+      updatedAt: Date.now(),
+    });
+    return model._id;
+  },
+});
+
+/** Records health for one immutable exact-route qualification revision.
+ * Model IDs are not unique once the same runtime identity has independently
+ * reviewed qualification scopes, so worker attestation must name the catalog
+ * row and re-prove its frozen route digest. */
+export const reportExactRouteHealth = internalMutation({
+  args: {
+    modelCatalogId: v.id("modelCatalog"),
+    expectedRouteDigest: v.string(),
+    availability: v.union(
+      v.literal("HEALTHY"),
+      v.literal("DEGRADED"),
+      v.literal("RATE_LIMITED"),
+      v.literal("UNAVAILABLE")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const model = await ctx.db.get(args.modelCatalogId);
+    if (!model?.routeSnapshot
+      || !model.routeDigest
+      || model.routeDigest !== args.expectedRouteDigest
+      || exactModelRouteDigest(model.routeSnapshot) !== args.expectedRouteDigest) {
+      throw new Error("Exact catalog route identity does not match worker attestation.");
+    }
     await ctx.db.patch(model._id, {
       availability: args.availability,
       updatedAt: Date.now(),

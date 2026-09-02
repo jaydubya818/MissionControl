@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MISSION_SPEC_LIMITS,
   analyzeSpecPlanConsistency,
+  planIncludesExcludedScope,
   assertMissionSpecBounds,
   evaluateMissionSpecQuality,
   missionSpecDigest,
@@ -158,6 +159,21 @@ describe("Mission Spec deterministic quality", () => {
 });
 
 describe("Spec to Plan requirements coverage", () => {
+  it("distinguishes explicit non-goal guardrails from affirmative scope", () => {
+    expect(planIncludesExcludedScope(
+      "Do not modify the upstream repository.",
+      "Modify the upstream repository."
+    )).toBe(false);
+    expect(planIncludesExcludedScope(
+      "Modify the upstream repository to publish the change.",
+      "Modify the upstream repository."
+    )).toBe(true);
+    expect(planIncludesExcludedScope(
+      "Modifying the upstream repository remains out of scope.",
+      "Modifying the upstream repository"
+    )).toBe(false);
+  });
+
   it("projects the full stable requirement-to-verification path", () => {
     const spec = completeSpec();
     const result = analyzeSpecPlanConsistency({

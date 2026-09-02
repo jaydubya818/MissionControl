@@ -11,6 +11,13 @@ import type { Duplex } from "stream";
 export interface GatewayProxyOptions {
   loadUpstreamSettings: () => Promise<{ url: string; token: string }>;
   allowWs?: (req: IncomingMessage) => boolean;
+  /**
+   * Authorizes the upgrade request itself. Return null to admit the socket, or
+   * an HTTP status + message to refuse it before the WebSocket handshake
+   * completes. Defaults to admitting everything (tests and embedded use);
+   * the server wires this to the same bearer check as its HTTP routes.
+   */
+  authorizeUpgrade: (req: IncomingMessage) => { status: number; error: string } | null;
   log?: (msg: string) => void;
   logError?: (msg: string, err?: unknown) => void;
 }
@@ -101,6 +108,7 @@ export function createGatewayProxy(options: GatewayProxyOptions): {
   const {
     loadUpstreamSettings,
     allowWs = (req) => resolvePathname(req.url) === "/gateway/ws",
+    authorizeUpgrade,
     log = () => {},
     logError = (msg: string, err?: unknown) => console.error(msg, err),
   } = options;
@@ -240,14 +248,15 @@ export function createGatewayProxy(options: GatewayProxyOptions): {
           }
         });
 
-        upstreamWs.on("close", (ev: { code?: number; reason?: string }) => {
-          const reason = typeof ev?.reason === "string" ? ev.reason : "";
+        // `ws` emits close as (code, reason: Buffer), not a browser CloseEvent.
+        upstreamWs.on("close", (code: number, reasonRaw: Buffer | string) => {
+          const reason = reasonRaw ? reasonRaw.toString() : "";
           if (!connectResponseSent) {
             sendToBrowser(
               buildErrorResponse(
                 connectRequestId!,
                 "studio.upstream_closed",
-                `Upstream gateway closed (${ev.code}): ${reason}`
+                `Upstream gateway closed (${code}): ${reason}`
               ) as Record<string, unknown>
             );
           }
@@ -286,6 +295,21 @@ export function createGatewayProxy(options: GatewayProxyOptions): {
 
   const handleUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer) => {
     if (!allowWs(req)) {
+      socket.destroy();
+      return;
+    }
+    const failure = authorizeUpgrade(req);
+    if (failure) {
+      log(`Refused /gateway/ws upgrade: ${failure.status} ${failure.error}`);
+      const statusText = failure.status === 503 ? "Service Unavailable" : "Unauthorized";
+      const body = JSON.stringify({ error: failure.error });
+      socket.write(
+        `HTTP/1.1 ${failure.status} ${statusText}\r\n` +
+          "Content-Type: application/json\r\n" +
+          `Content-Length: ${Buffer.byteLength(body)}\r\n` +
+          "Connection: close\r\n\r\n" +
+          body
+      );
       socket.destroy();
       return;
     }

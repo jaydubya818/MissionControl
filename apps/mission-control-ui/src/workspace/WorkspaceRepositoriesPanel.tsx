@@ -230,6 +230,7 @@ export function WorkspaceRepositoriesPanel({ project }: WorkspaceRepositoriesPan
           <RepositoryDataClassificationPanel key={selectedRepository.repositoryId} repository={selectedRepository} />
           <GitHubAppReadinessPanel repositoryId={selectedRepository.repositoryId} />
           <FactoryConfigurationPanel
+            key={`factory-${selectedRepository.repositoryId}`}
             projectId={project._id}
             repositoryId={selectedRepository.repositoryId}
             repositoryDataClassification={selectedRepository.dataClassification ?? "UNCLASSIFIED"}

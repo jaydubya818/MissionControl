@@ -13,7 +13,13 @@ const PLACEHOLDER_FRAGMENTS = [
 
 const SECRET_PATTERNS = [
   { rule: "private-key", pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]{32,}?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g },
+  { rule: "github-installation-token", pattern: /\bghs_[A-Za-z0-9._-]{36,}\b/g },
   { rule: "github-token", pattern: /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g },
+  // Fine-grained PATs are `github_pat_<base62>_<base62>`; the underscore
+  // separators keep them outside the classic `gh[pousr]_[A-Za-z0-9]+` rule.
+  { rule: "github-fine-grained-token", pattern: /\bgithub_pat_[A-Za-z0-9]{20,}_[A-Za-z0-9]{20,}\b/g },
+  // Telegram bot tokens: `<bot-id>:AA<secret>`. This repo ships a Telegram bot.
+  { rule: "telegram-bot-token", pattern: /\b\d{8,10}:AA[A-Za-z0-9_-]{30,}\b/g },
   { rule: "aws-access-key", pattern: /\bAKIA[0-9A-Z]{16}\b/g },
   { rule: "slack-token", pattern: /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/g },
   { rule: "provider-api-key", pattern: /\bsk-(?:proj-)?[A-Za-z0-9_-]{24,}\b/g },

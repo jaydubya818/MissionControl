@@ -7,11 +7,6 @@
 import type { Context, Next } from "hono";
 import { timingSafeEqual } from "node:crypto";
 
-const ORCHESTRATION_TOKEN = process.env.ORCHESTRATION_API_TOKEN?.trim();
-const MC_TOKEN = process.env.MC_API_TOKEN?.trim();
-const EXPECTED_TOKEN = ORCHESTRATION_TOKEN || MC_TOKEN || null;
-const PRODUCTION = process.env.NODE_ENV === "production";
-
 const PUBLIC_ROUTES = new Set([
   "GET /health",
   "GET /gateway/status",
@@ -43,9 +38,37 @@ export function requireAuth() {
       return;
     }
     const auth = c.req.header("Authorization");
-    const failure = orchestrationAuthFailure(EXPECTED_TOKEN, PRODUCTION, auth);
+    const { expectedToken, production } = currentAuthConfig();
+    const failure = orchestrationAuthFailure(expectedToken, production, auth);
     if (failure) return c.json({ error: failure.error }, failure.status);
     await next();
+  };
+}
+
+/**
+ * Authorization check for WebSocket upgrade requests.
+ *
+ * Hono middleware never sees `upgrade` requests — Node hands them straight to
+ * `server.on("upgrade")` — so `/gateway/ws` must apply the same bearer rule as
+ * every protected HTTP route. Same semantics as `orchestrationAuthFailure`:
+ * 401 on a missing/wrong bearer, 503 in production when no token is configured,
+ * allowed only in tokenless local development.
+ */
+export function orchestrationUpgradeFailure(
+  req: { headers: { authorization?: string | string[] } }
+): { status: 401 | 503; error: string } | null {
+  const raw = req.headers.authorization;
+  const header = Array.isArray(raw) ? raw[0] : raw;
+  const { expectedToken, production } = currentAuthConfig();
+  return orchestrationAuthFailure(expectedToken, production, header);
+}
+
+function currentAuthConfig(): { expectedToken: string | null; production: boolean } {
+  const orchestrationToken = process.env.ORCHESTRATION_API_TOKEN?.trim();
+  const legacyToken = process.env.MC_API_TOKEN?.trim();
+  return {
+    expectedToken: orchestrationToken || legacyToken || null,
+    production: process.env.NODE_ENV === "production",
   };
 }
 

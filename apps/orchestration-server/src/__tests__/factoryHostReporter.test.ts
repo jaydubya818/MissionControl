@@ -4,17 +4,47 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
-import { FactoryHostReporter, canonicalRepositoryFromRemote, inspectFactoryCheckout } from "../factoryHostReporter.js";
+import {
+  FactoryHostReporter,
+  canonicalRepositoryFromRemote,
+  factorySandboxCapabilities,
+  inspectFactoryCheckout,
+} from "../factoryHostReporter.js";
 import { CODEX_V1_HARNESS_MANIFEST, harnessCapabilityManifestDigest } from "@mission-control/workflow-engine";
 
 const execFileAsync = promisify(execFile);
 const cleanup: string[] = [];
+const originalServiceCommandSecret = process.env.MISSION_CONTROL_SERVICE_COMMAND_SECRET;
 
 afterEach(async () => {
   await Promise.all(cleanup.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  if (originalServiceCommandSecret === undefined) {
+    delete process.env.MISSION_CONTROL_SERVICE_COMMAND_SECRET;
+  } else {
+    process.env.MISSION_CONTROL_SERVICE_COMMAND_SECRET = originalServiceCommandSecret;
+  }
 });
 
 describe("Factory host reporting", () => {
+  it("advertises optional publication and remote sandbox capabilities only when configured", () => {
+    expect(factorySandboxCapabilities({
+      githubAppPublicationReady: false,
+      remoteSandboxBackendReady: false,
+    })).toEqual(["git-worktree", "workspace-write", "read-only"]);
+
+    expect(factorySandboxCapabilities({
+      githubAppPublicationReady: true,
+      remoteSandboxBackendReady: true,
+    })).toEqual([
+      "git-worktree",
+      "workspace-write",
+      "read-only",
+      "github-app-publication",
+      "remote-sandbox",
+      "sandbox-provider:exe-dev",
+    ]);
+  });
+
   it.each([
     ["git@github.com:jaydubya818/MissionControl.git", "jaydubya818/MissionControl"],
     ["https://github.com/jaydubya818/MissionControl.git", "jaydubya818/MissionControl"],
@@ -54,9 +84,12 @@ describe("Factory host reporting", () => {
     expect(clean.observedCommit).toMatch(/^[0-9a-f]{40}$/);
     expect(clean.baseCommit).toBe(clean.observedCommit);
 
+    process.env.MISSION_CONTROL_SERVICE_COMMAND_SECRET = "test-service-command-secret";
     let report: any;
+    let healthReport: any;
     const reporter = new FactoryHostReporter({
       mutation: async (_mutation: unknown, payload: unknown) => { report = payload; },
+      action: async (_action: unknown, payload: unknown) => { healthReport = payload; },
     } as any, {
       projectId: "project-1",
       repositoryId: "repository-1",
@@ -80,6 +113,19 @@ describe("Factory host reporting", () => {
         supportsRepositoryMutation: true,
       } as any],
       sandboxCapabilities: ["git-worktree", "workspace-write", "read-only"],
+      factoryVersionBindings: [{
+        factoryDefinitionVersionId: "factory-version-1",
+        factoryConfigurationDigest: "factory-v1-test",
+        adapter: "codex",
+        version: "v1",
+        provider: "openai",
+        model: "gpt-test",
+        capabilityManifestSha256: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
+        effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+        executionBackend: "persistent-worker",
+        modelRouteDigest: `sha256:${"a".repeat(64)}`,
+        repositoryId: "repository-1",
+      }],
     });
     await reporter.report();
     expect(report.workerRuntime.supportedExecutors).toEqual([{
@@ -92,6 +138,16 @@ describe("Factory host reporting", () => {
       supportsResume: false,
       isolationModes: ["READ_ONLY", "WORKSPACE_WRITE"],
     }]);
+    expect(healthReport.envelope).toMatchObject({
+      capability: "models.report-exact-route-health",
+      projectId: "project-1",
+      repositoryId: "repository-1",
+    });
+    expect(JSON.parse(healthReport.payloadJson)).toEqual({
+      factoryDefinitionVersionId: "factory-version-1",
+      expectedRouteDigest: `sha256:${"a".repeat(64)}`,
+      availability: "HEALTHY",
+    });
 
     await writeFile(path.join(repository, "README.md"), "dirty\n");
     expect((await inspectFactoryCheckout(repository)).dirty).toBe(true);

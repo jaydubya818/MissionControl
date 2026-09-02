@@ -8,6 +8,7 @@ import { logTaskEvent } from "./lib/taskEvents";
 import { deriveVerificationStatus, currentWorkflowStepLabel, totalWorkflowRetries } from "./lib/workOrders";
 import {
   ACTIVE_RUN_STATUSES,
+  codeScopeApprovalPoliciesForDispatch,
   dispatchInvalidatesVerificationReceipts,
   latestRequiredRemoteRetryRun,
   nextStateForRunStatus,
@@ -76,7 +77,10 @@ import {
 import { reconcileTerminalWorkflowSteps } from "./lib/workflowRunState";
 import { loadTaskProjections } from "./lib/taskProjection";
 import { snapshotWorkflowDefinition } from "./lib/workflowSnapshot";
-import { buildWorkOrderTaskAuthority } from "./lib/taskAuthority";
+import {
+  advanceWorkOrderTaskAuthorityForRetry,
+  buildWorkOrderTaskAuthority,
+} from "./lib/taskAuthority";
 import { buildFactoryExecutionManifest, factorySandboxResourceName } from "./lib/executionManifest";
 import { loadFactoryAttemptReviewReadModel } from "./lib/factoryReviewReadModel";
 import { factoryWorkflowContractIssues } from "./lib/factoryWorkflowContract";
@@ -97,7 +101,20 @@ import {
   validateTaskAttemptSelection,
   validateTaskAttemptStart,
 } from "./lib/taskAttemptScheduler";
-import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS, requireWorkspaceAccess, requireWorkspacePermission } from "./lib/companyAccess";
+import {
+  evaluateTaskPreExecutionRecovery,
+  evaluateTasklessPreExecutionRecovery,
+  TASKLESS_MANIFEST_VALIDATION_FAILURE,
+  type TaskPreExecutionRecoveryProof,
+  type TasklessPreExecutionRecoveryProof,
+} from "./lib/preExecutionRecovery";
+import {
+  COMPANY_PERMISSIONS,
+  FACTORY_PERMISSIONS,
+  localDemoOperatorAcceptanceEnabled,
+  requireWorkspaceAccess,
+  requireWorkspacePermission,
+} from "./lib/companyAccess";
 import { assertAuthorizedDeliveryRecord, canAccessDeliveryRecord, requireAuthorizedDeliveryScope } from "./lib/deliveryAuthorization";
 import { combineCodeScopePolicies, validateDispatchScope } from "./lib/softwareFactoryControlPlane";
 import {
@@ -337,6 +354,7 @@ async function persistExecutionRoutingDecision(
     taskId: task?._id ? String(task._id) : undefined,
     riskLevel: workOrder.riskLevel,
     evidenceCutoffAt: preview.cutoffAt,
+    budgetAuthorization: preview.budgetAuthorization,
     result: preview.result,
   };
   const decisionDigest = `sha256:${computeCanonicalHash(snapshot)}`;
@@ -574,6 +592,7 @@ const revisionPatch = v.object({
   context: v.optional(v.string()),
   workflowId: v.optional(v.string()),
   repository: v.optional(v.string()),
+  codeScopeIds: v.optional(v.array(v.id("repositoryCodeScopes"))),
   branchStrategy: v.optional(v.string()),
   priority: v.optional(v.union(v.literal(1), v.literal(2), v.literal(3), v.literal(4))),
   riskLevel: v.optional(workOrderRisk),
@@ -1130,10 +1149,88 @@ function describeAcceptanceReadiness(workOrder: any, acceptance: ReturnType<type
   return "Ready for explicit acceptance.";
 }
 
+async function reconcileApprovedMissionPlanDecisions(ctx: any, workOrder: any) {
+  if (!workOrder.missionId || !workOrder.missionPlanId || (workOrder.currentRevisionNumber ?? 1) !== 1) return;
+
+  const [mission, plan, policy, existingApprovals] = await Promise.all([
+    ctx.db.get(workOrder.missionId),
+    ctx.db.get(workOrder.missionPlanId),
+    resolveGovernancePolicy(ctx, workOrder),
+    listApprovalDecisionsForWorkOrder(ctx, workOrder._id),
+  ]);
+  if (!mission || !plan
+    || plan.status !== "APPROVED"
+    || mission.currentPlanId !== plan._id
+    || plan.missionId !== mission._id
+    || plan.revisionNumber !== workOrder.missionPlanRevision
+    || plan.planningRepositorySha !== workOrder.planningRepositorySha
+    || typeof plan.approvedAt !== "number"
+    || !plan.approvedBy) return;
+
+  const approvalTypes = requiredApprovalTypes({
+    riskLevel: workOrder.riskLevel,
+    requiredApprovals: workOrder.requiredApprovals,
+    isMutating: workOrder.isMutating,
+  });
+  for (const approvalType of approvalTypes) {
+    const idempotencyKey = `mission-plan:${String(plan._id)}:r${plan.revisionNumber}:work-order:${String(workOrder._id)}:approval:${approvalType}`;
+    const existingProjection = await ctx.db.query("approvalDecisions")
+      .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", idempotencyKey))
+      .first();
+    if (existingProjection) continue;
+
+    const approvalDecisionId = await ctx.db.insert("approvalDecisions", {
+      tenantId: workOrder.tenantId,
+      projectId: workOrder.projectId,
+      workOrderId: workOrder._id,
+      idempotencyKey,
+      approvalType,
+      requestedAction: `Execute the exact contract released by approved Mission Plan r${plan.revisionNumber}`,
+      riskLevel: workOrder.riskLevel,
+      requestedBy: plan.approvedBy,
+      approver: plan.approvedBy,
+      status: "APPROVED",
+      decision: "APPROVE",
+      reason: `Satisfied by exact Mission Plan approval: ${plan.decisionReason ?? "approved"}`,
+      workOrderRevisionNumber: 1,
+      expiresAt: approvalExpiresAt(workOrder.riskLevel, policy, plan.approvedAt),
+      createdAt: plan.approvedAt,
+      decidedAt: plan.approvedAt,
+      metadata: {
+        source: "mission-plan-approval",
+        missionId: mission._id,
+        missionPlanId: plan._id,
+        missionPlanRevision: plan.revisionNumber,
+        planningRepositorySha: plan.planningRepositorySha,
+      },
+    });
+
+    for (const pending of existingApprovals.filter((approval: any) =>
+      approval.approvalType === approvalType
+      && approval.status === "PENDING"
+      && (approval.workOrderRevisionNumber ?? 1) === 1
+    )) {
+      await supersedeApprovalDecision(ctx, pending, approvalDecisionId);
+    }
+    await logWorkOrderEvent(ctx, {
+      tenantId: workOrder.tenantId,
+      projectId: workOrder.projectId,
+      workOrderId: workOrder._id,
+      eventType: "APPROVAL_APPROVED",
+      actorType: "SYSTEM",
+      actorId: plan.approvedBy,
+      summary: `Mission Plan approval satisfied ${approvalType}`,
+      idempotencyKey: `${idempotencyKey}:event`,
+      metadata: { approvalDecisionId, missionPlanId: plan._id, missionPlanRevision: plan.revisionNumber },
+    });
+  }
+}
+
 async function refreshWorkOrderGovernance(ctx: any, workOrderId: any) {
   const workOrder = await ctx.db.get(workOrderId);
   if (!workOrder) throw new Error("WorkOrder not found");
 
+  await reconcileApprovedMissionPlanDecisions(ctx, workOrder);
   await expireGovernanceRecordsForWorkOrder(ctx, workOrder);
 
   const refreshedWorkOrder = await ctx.db.get(workOrderId);
@@ -1159,12 +1256,14 @@ async function refreshWorkOrderGovernance(ctx: any, workOrderId: any) {
   const computedApprovalStatus = deriveApprovalStatus({
     riskLevel: refreshedWorkOrder.riskLevel as any,
     requiredApprovals: refreshedWorkOrder.requiredApprovals,
+    isMutating: refreshedWorkOrder.isMutating,
     approvals: approvalDecisions,
     now: Date.now(),
   });
   const acceptance = evaluateAcceptance({
     riskLevel: refreshedWorkOrder.riskLevel as any,
     requiredApprovals: refreshedWorkOrder.requiredApprovals,
+    isMutating: refreshedWorkOrder.isMutating,
     approvalDecisions,
     acceptanceCriteria,
     verificationReceipts,
@@ -1250,6 +1349,7 @@ function summarizeRun(run: any) {
     taskAttemptNumber: run.metadata?.taskAttemptNumber,
     taskRetryNumber: run.metadata?.taskRetryNumber,
     workOrderRevisionNumber: run.workOrderRevisionNumber,
+    attemptPurpose: run.attemptPurpose ?? "IMPLEMENTATION",
     status: run.status,
     runtime: run.runtime,
     model: run.model,
@@ -1263,6 +1363,7 @@ function summarizeRun(run: any) {
     factoryContinuationStatus: run.factoryContinuation?.status,
     factoryApprovalDecisionId: run.factoryContinuation?.approvalDecisionId,
     candidateRevision: run.factoryContinuation?.candidateRevision,
+    verificationSupersededAt: run.metadata?.verificationSupersededAt,
     startedAt: run.startedAt,
     completedAt: run.completedAt,
   };
@@ -1471,6 +1572,7 @@ async function applyRevisionToWorkOrder(ctx: any, args: {
     context: nextSnapshot.context,
     workflowId: nextSnapshot.workflowId,
     repository: nextSnapshot.repository,
+    codeScopeIds: nextSnapshot.codeScopeIds,
     branchStrategy: nextSnapshot.branchStrategy,
     priority: nextSnapshot.priority,
     riskLevel: nextSnapshot.riskLevel,
@@ -1656,6 +1758,7 @@ export const get = query({
     const acceptance = evaluateAcceptance({
       riskLevel: workOrder.riskLevel as any,
       requiredApprovals: workOrder.requiredApprovals,
+      isMutating: workOrder.isMutating,
       approvalDecisions,
       acceptanceCriteria: workOrder.acceptanceCriteria as any,
       verificationReceipts,
@@ -1813,6 +1916,7 @@ export const governanceValidity = query({
     const acceptance = evaluateAcceptance({
       riskLevel: workOrder.riskLevel as any,
       requiredApprovals: workOrder.requiredApprovals,
+      isMutating: workOrder.isMutating,
       approvalDecisions,
       acceptanceCriteria: workOrder.acceptanceCriteria as any,
       verificationReceipts,
@@ -2016,6 +2120,183 @@ async function remoteRetryEvaluationState(ctx: MutationCtx, priorRun: any, exist
   };
 }
 
+async function materializeTasklessRecoveryTask(
+  ctx: MutationCtx,
+  input: {
+    workOrder: Doc<"workOrders">;
+    sourceRun: Doc<"workflowRuns">;
+    actorId?: string;
+    proof: TasklessPreExecutionRecoveryProof;
+  },
+) {
+  const now = Date.now();
+  const idempotencyKey = `taskless-recovery:${String(input.sourceRun._id)}`;
+  const existing = await ctx.db
+    .query("tasks")
+    .withIndex("by_idempotency", (query) => query.eq("idempotencyKey", idempotencyKey))
+    .first();
+  if (existing) {
+    if (existing.workOrderId !== input.workOrder._id) {
+      throw new Error("Pre-execution recovery Task is bound to another Work Order.");
+    }
+    return existing;
+  }
+
+  const authorityScope = buildWorkOrderTaskAuthority(input.workOrder);
+  const taskId = await ctx.db.insert("tasks", {
+    tenantId: input.workOrder.tenantId,
+    projectId: input.workOrder.projectId,
+    idempotencyKey,
+    workOrderId: input.workOrder._id,
+    planningRepositorySha: input.workOrder.planningRepositorySha,
+    title: `Execute ${input.workOrder.title}`,
+    description: input.workOrder.desiredOutcome,
+    type: "ENGINEERING",
+    status: "INBOX",
+    stateEnteredAt: now,
+    priority: input.workOrder.riskLevel === "CRITICAL" ? 1 : 2,
+    assigneeIds: [],
+    reviewCycles: 0,
+    actualCost: 0,
+    labels: ["governed-work-order", "factory-execution", "pre-execution-recovery"],
+    createdBy: "SYSTEM",
+    createdByRef: "control-plane:pre-execution-recovery",
+    metadata: {
+      authorityScope,
+      governanceOrigin: "GOVERNED_WORK_ORDER",
+      executionOwner: "FACTORY",
+      materializationReason: "TASKLESS_PRE_EXECUTION_RECOVERY",
+      recoveryOfWorkflowRunId: input.sourceRun._id,
+      recoveryOfRunId: input.sourceRun.runId,
+      recoveryProof: input.proof,
+      relationshipCreatedAt: now,
+      relationshipActorType: "HUMAN",
+      relationshipActorId: input.actorId,
+      relationshipIdempotencyKey: idempotencyKey,
+    },
+  });
+
+  await ctx.db.insert("activities", {
+    tenantId: input.workOrder.tenantId,
+    projectId: input.workOrder.projectId,
+    actorType: "SYSTEM",
+    actorId: "control-plane:pre-execution-recovery",
+    action: "TASK_CREATED",
+    description: `Canonical execution Task created for Work Order ${input.workOrder.title}`,
+    targetType: "TASK",
+    targetId: taskId,
+    taskId,
+    metadata: {
+      workOrderId: input.workOrder._id,
+      authorizedBy: input.actorId,
+      recoveryProof: input.proof,
+    },
+  });
+  await logTaskEvent(ctx, {
+    taskId,
+    projectId: input.workOrder.projectId,
+    eventType: "TASK_CREATED",
+    actorType: "SYSTEM",
+    actorId: "control-plane:pre-execution-recovery",
+    relatedId: String(input.workOrder._id),
+    afterState: {
+      status: "INBOX",
+      type: "ENGINEERING",
+      priority: input.workOrder.riskLevel === "CRITICAL" ? 1 : 2,
+      workOrderId: input.workOrder._id,
+      missionId: input.workOrder.missionId,
+    },
+    metadata: { authorizedBy: input.actorId, recoveryProof: input.proof },
+  });
+
+  await ctx.db.patch(taskId, { status: "READY", stateEnteredAt: now });
+  await ctx.db.insert("taskTransitions", {
+    tenantId: input.workOrder.tenantId,
+    projectId: input.workOrder.projectId,
+    idempotencyKey: `${idempotencyKey}:ready`,
+    taskId,
+    fromStatus: "INBOX",
+    toStatus: "READY",
+    actorType: "SYSTEM",
+    actorUserId: input.actorId,
+    validationResult: { valid: true },
+    reason: "Factory-owned Task materialized for proven pre-execution recovery",
+  });
+  await logTaskEvent(ctx, {
+    taskId,
+    projectId: input.workOrder.projectId,
+    eventType: "TASK_TRANSITION",
+    actorType: "SYSTEM",
+    actorId: "control-plane:pre-execution-recovery",
+    relatedId: String(input.sourceRun._id),
+    beforeState: { status: "INBOX" },
+    afterState: { status: "READY" },
+    metadata: { authorizedBy: input.actorId, recoveryProof: input.proof },
+  });
+
+  const task = await ctx.db.get(taskId);
+  if (!task) throw new Error("Pre-execution recovery Task could not be materialized.");
+  return task;
+}
+
+async function reconcilePreExecutionReservation(
+  ctx: MutationCtx,
+  input: {
+    workOrder: Doc<"workOrders">;
+    sourceRun: Doc<"workflowRuns">;
+    actorId?: string;
+    proof: TasklessPreExecutionRecoveryProof | TaskPreExecutionRecoveryProof;
+  },
+) {
+  const authorization = input.sourceRun.executionCostAuthorization;
+  if (!authorization) {
+    throw new Error("Pre-execution recovery has no frozen cost authorization.");
+  }
+  const reason = input.proof.code === "STORED_MANIFEST_DIGEST_MISMATCH_BEFORE_EXECUTOR"
+    ? "Server evidence proves the stored manifest failed validation before executor invocation; actual execution spend is zero."
+    : "Server evidence proves a valid stored manifest was rejected before executor invocation because the claim envelope omitted its frozen executor identity; actual execution spend is zero.";
+  await ctx.db.patch(input.sourceRun._id, {
+    spentUsd: 0,
+    reservedCostUsd: 0,
+    executionCostAuthorization: {
+      ...authorization,
+      reservedCostUsd: 0,
+      actualCost: { status: "MEASURED", usd: 0, reason },
+      varianceUsd: -authorization.estimatedCostUsd,
+    },
+  });
+  await logWorkOrderEvent(ctx, {
+    tenantId: input.workOrder.tenantId,
+    projectId: input.workOrder.projectId,
+    workOrderId: input.workOrder._id,
+    workflowRunId: input.sourceRun._id,
+    eventType: "STATE_SYNCED",
+    fromState: input.workOrder.state,
+    toState: input.workOrder.state,
+    actorType: "HUMAN",
+    actorId: input.actorId,
+    summary: `Released $${input.proof.releasedReservationUsd.toFixed(2)} from pre-execution run ${input.sourceRun.runId}`,
+    idempotencyKey: `pre-execution-recovery:${String(input.sourceRun._id)}:cost-reconciled`,
+    metadata: {
+      recoveryProof: input.proof,
+      previousActualCostStatus: authorization.actualCost.status,
+      actualCostUsd: 0,
+      reservationReleasedUsd: input.proof.releasedReservationUsd,
+    },
+  });
+  await ctx.db.insert("activities", {
+    tenantId: input.workOrder.tenantId,
+    projectId: input.workOrder.projectId,
+    actorType: "HUMAN",
+    actorId: input.actorId,
+    action: "PRE_EXECUTION_ATTEMPT_RECOVERED",
+    description: `Reconciled proven zero-spend run ${input.sourceRun.runId} before retry`,
+    targetType: "WORK_ORDER",
+    targetId: input.workOrder._id,
+    metadata: { workflowRunId: input.sourceRun._id, recoveryProof: input.proof },
+  });
+}
+
 async function dispatchWorkOrder(
   ctx: MutationCtx,
   args: DispatchArgs,
@@ -2072,7 +2353,7 @@ async function dispatchWorkOrder(
       throw new Error("Superseded WorkOrders cannot be dispatched");
     }
 
-    const canonicalChildTasks = await ctx.db
+    let canonicalChildTasks = await ctx.db
       .query("tasks")
       .withIndex("by_work_order", (query) =>
         query.eq("workOrderId", args.workOrderId)
@@ -2085,19 +2366,164 @@ async function dispatchWorkOrder(
       .query("workflowRuns")
       .withIndex("by_work_order", (q) => q.eq("workOrderId", args.workOrderId))
       .collect();
+    let tasklessPreExecutionRecovery:
+      | { task: Doc<"tasks">; proof: TasklessPreExecutionRecoveryProof }
+      | undefined;
+    if (args.retryOfWorkflowRunId
+      && !args.taskId
+      && canonicalChildTasks.length === 0
+      && retryOfRun?.failureReason === TASKLESS_MANIFEST_VALIDATION_FAILURE) {
+      if (args.actorType !== "HUMAN") {
+        throw new Error("Pre-execution recovery requires an authenticated human dispatch.");
+      }
+      const [events, artifacts, sandboxAllocations, sandboxCredentialGrants] = await Promise.all([
+        ctx.db.query("runEvents")
+          .withIndex("by_run_sequence", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("runArtifacts")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("sandboxAllocations")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("sandboxCredentialGrants")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+      ]);
+      const latestRun = [...existingRuns].sort((left, right) =>
+        right.startedAt - left.startedAt || String(right._id).localeCompare(String(left._id))
+      )[0];
+      const recovery = evaluateTasklessPreExecutionRecovery({
+        run: retryOfRun,
+        currentWorkOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
+        isLatestWorkOrderRun: latestRun?._id === retryOfRun._id,
+        recomputedManifestDigest: retryOfRun.executionManifest
+          ? `sha256:${computeCanonicalHash(retryOfRun.executionManifest)}`
+          : undefined,
+        events,
+        artifactCount: artifacts.length,
+        sandboxAllocationCount: sandboxAllocations.length,
+        sandboxCredentialGrantCount: sandboxCredentialGrants.length,
+      });
+      if ("reason" in recovery) {
+        throw new Error(`Pre-execution recovery is not allowed (${recovery.reason}).`);
+      }
+      const task = await materializeTasklessRecoveryTask(ctx, {
+        workOrder,
+        sourceRun: retryOfRun,
+        actorId,
+        proof: recovery.proof,
+      });
+      await reconcilePreExecutionReservation(ctx, {
+        workOrder,
+        sourceRun: retryOfRun,
+        actorId,
+        proof: recovery.proof,
+      });
+      tasklessPreExecutionRecovery = { task, proof: recovery.proof };
+      canonicalChildTasks = [task];
+    }
     const retryTask = retryOfRun?.parentTaskId
       ? canonicalChildTasks.find(
           (task) => task._id === retryOfRun.parentTaskId
         )
       : null;
+    let taskPreExecutionRecovery:
+      | { task: Doc<"tasks">; proof: TaskPreExecutionRecoveryProof }
+      | undefined;
+    if (!tasklessPreExecutionRecovery
+      && args.retryOfWorkflowRunId
+      && !args.taskId
+      && retryTask
+      && retryOfRun?.failureReason === TASKLESS_MANIFEST_VALIDATION_FAILURE) {
+      if (args.actorType !== "HUMAN") {
+        throw new Error("Pre-execution recovery requires an authenticated human dispatch.");
+      }
+      const [events, artifacts, sandboxAllocations, sandboxCredentialGrants] = await Promise.all([
+        ctx.db.query("runEvents")
+          .withIndex("by_run_sequence", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("runArtifacts")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("sandboxAllocations")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("sandboxCredentialGrants")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+      ]);
+      const latestRun = [...existingRuns].sort((left, right) =>
+        right.startedAt - left.startedAt || String(right._id).localeCompare(String(left._id))
+      )[0];
+      const recovery = evaluateTaskPreExecutionRecovery({
+        run: retryOfRun,
+        currentTaskId: String(retryTask._id),
+        currentWorkOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
+        isLatestWorkOrderRun: latestRun?._id === retryOfRun._id,
+        recomputedManifestDigest: retryOfRun.executionManifest
+          ? `sha256:${computeCanonicalHash(retryOfRun.executionManifest)}`
+          : undefined,
+        events,
+        artifactCount: artifacts.length,
+        sandboxAllocationCount: sandboxAllocations.length,
+        sandboxCredentialGrantCount: sandboxCredentialGrants.length,
+      });
+      if ("reason" in recovery) {
+        throw new Error(`Pre-execution recovery is not allowed (${recovery.reason}).`);
+      }
+      await reconcilePreExecutionReservation(ctx, {
+        workOrder,
+        sourceRun: retryOfRun,
+        actorId,
+        proof: recovery.proof,
+      });
+      taskPreExecutionRecovery = { task: retryTask, proof: recovery.proof };
+    }
+    const preExecutionRecovery = tasklessPreExecutionRecovery ?? taskPreExecutionRecovery;
     const effectiveTaskId =
       args.taskId ??
+      tasklessPreExecutionRecovery?.task._id ??
       retryTask?._id;
-    const selectedTask = effectiveTaskId
+    let selectedTask = effectiveTaskId
       ? await ctx.db.get(effectiveTaskId)
       : null;
     if (effectiveTaskId && !selectedTask) {
       throw new Error("The selected Task no longer exists.");
+    }
+    if (selectedTask && workOrder.planningRepositorySha
+      && selectedTask.planningRepositorySha !== workOrder.planningRepositorySha) {
+      throw new Error("Dispatch blocked: Task planning revision does not match the approved Plan repository SHA.");
+    }
+    if (selectedTask && retryOfRun && args.actorType === "HUMAN") {
+      const metadata = selectedTask.metadata && typeof selectedTask.metadata === "object"
+        ? selectedTask.metadata as Record<string, unknown>
+        : {};
+      const authorityScope = advanceWorkOrderTaskAuthorityForRetry({
+        scope: metadata.authorityScope,
+        workOrder,
+      });
+      if (authorityScope) {
+        const priorAuthorityScope = metadata.authorityScope;
+        const nextMetadata = { ...metadata, authorityScope };
+        await ctx.db.patch(selectedTask._id, { metadata: nextMetadata });
+        await logTaskEvent(ctx, {
+          taskId: selectedTask._id,
+          projectId: selectedTask.projectId,
+          eventType: "POLICY_DECISION",
+          actorType: "HUMAN",
+          actorId,
+          relatedId: String(retryOfRun._id),
+          beforeState: { authorityScope: priorAuthorityScope },
+          afterState: { authorityScope },
+          metadata: {
+            decision: "ADVANCE_WORK_ORDER_REVISION_FOR_RETRY",
+            workOrderId: workOrder._id,
+            retryOfWorkflowRunId: retryOfRun._id,
+          },
+        });
+        selectedTask = { ...selectedTask, metadata: nextMetadata };
+      }
     }
     const taskSelection = validateTaskAttemptSelection({
       workOrderId: workOrder._id,
@@ -2243,7 +2669,11 @@ async function dispatchWorkOrder(
           verificationPolicy: scope.verificationPolicy,
           approvalPolicy: scope.approvalPolicy,
         })));
-        effectiveRequiredApprovals = [...new Set([...effectiveRequiredApprovals, ...scopePolicyRequirements.approvalPolicies])].sort();
+        const codeScopeApprovalPolicies = codeScopeApprovalPoliciesForDispatch({
+          isMutating: refreshedWorkOrder.isMutating ?? true,
+          approvalPolicies: scopePolicyRequirements.approvalPolicies,
+        });
+        effectiveRequiredApprovals = [...new Set([...effectiveRequiredApprovals, ...codeScopeApprovalPolicies])].sort();
         const validatedScope = validateDispatchScope({
           projectId: refreshedWorkOrder.projectId,
           repository: repository ? { id: repository._id, projectId: repository.projectId, status: repository.status, repository: repository.repository } : null,
@@ -2353,6 +2783,11 @@ async function dispatchWorkOrder(
       priorRun: retryOfRun,
       lineage: existingRuns,
     });
+    if (preExecutionRecovery
+      && args.factoryDefinitionVersionId
+      && String(args.factoryDefinitionVersionId) !== preExecutionRecovery.proof.factoryDefinitionVersionId) {
+      throw new Error("Pre-execution recovery must reuse the failed Attempt's frozen Factory Version.");
+    }
     const retryFactoryDefinitionVersionId = resolveRemoteRetryFactoryVersion({
       retryingRemote: Boolean(remoteRetryState),
       priorFactoryDefinitionVersionId: remoteRetryState
@@ -2360,9 +2795,11 @@ async function dispatchWorkOrder(
         : retryOfRun?.factoryDefinitionVersionId
           ? String(retryOfRun.factoryDefinitionVersionId)
           : undefined,
-      requestedFactoryDefinitionVersionId: args.factoryDefinitionVersionId
-        ? String(args.factoryDefinitionVersionId)
-        : undefined,
+      requestedFactoryDefinitionVersionId: preExecutionRecovery
+        ? preExecutionRecovery.proof.factoryDefinitionVersionId
+        : args.factoryDefinitionVersionId
+          ? String(args.factoryDefinitionVersionId)
+          : undefined,
     }) as Id<"factoryDefinitionVersions"> | undefined;
     // Execution routing is additive for V1. Legacy dispatches do not enter the
     // Factory tuple control plane unless an exact baseline (or explicit pin)
@@ -2398,7 +2835,9 @@ async function dispatchWorkOrder(
       const taskAttemptStart = validateTaskAttemptStart({
         taskId: selectedTask._id,
         attempts: taskAttempts,
-        retryOfRun,
+        // The historical Task-less run remains Work Order retry causation, but
+        // it is not retroactively counted as an Attempt under the new Task.
+        retryOfRun: tasklessPreExecutionRecovery ? null : retryOfRun,
         retryReason: args.retryReason,
       });
       if ("reason" in taskAttemptStart) {
@@ -2464,6 +2903,7 @@ async function dispatchWorkOrder(
       riskLevel: refreshedWorkOrder.riskLevel,
       approvalStatus: refreshedWorkOrder.approvalStatus,
       requiredApprovals: effectiveRequiredApprovals,
+      isMutating: refreshedWorkOrder.isMutating,
       hasWorkflowId: !!resolvedWorkflowId,
       activeRunStatuses: existingRuns.map((run) => run.status as any),
     });
@@ -2498,6 +2938,9 @@ async function dispatchWorkOrder(
           routingDecisionId: routing.decisionId,
         },
       });
+      if (preExecutionRecovery) {
+        throw new Error("Pre-execution recovery rolled back because no safe model route satisfies this Work Order.");
+      }
       return {
         created: false,
         run: null,
@@ -2551,6 +2994,8 @@ async function dispatchWorkOrder(
         worktree: args.worktree,
         retryOfWorkflowRunId: args.retryOfWorkflowRunId,
         retryReason: retryRequest?.reason,
+        tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+        taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
         ...options.metadata,
       },
     });
@@ -2558,7 +3003,10 @@ async function dispatchWorkOrder(
     const now = Date.now();
     const workflowSnapshot = snapshotWorkflowDefinition(workflow);
     const attemptNumbers = selectedTask
-      ? nextTaskAttemptNumbers(taskAttempts, !!retryOfRun)
+      ? nextTaskAttemptNumbers(
+          taskAttempts,
+          Boolean(retryOfRun && !tasklessPreExecutionRecovery),
+        )
       : null;
     const authorityScope = buildWorkOrderTaskAuthority(refreshedWorkOrder);
     const taskInput =
@@ -2571,11 +3019,16 @@ async function dispatchWorkOrder(
           missionId: refreshedWorkOrder.missionId ? String(refreshedWorkOrder.missionId) : undefined,
           missionPlanId: refreshedWorkOrder.missionPlanId ? String(refreshedWorkOrder.missionPlanId) : undefined,
           missionPlanVersion: missionPlanForDispatch?.revisionNumber,
+          planningRepositorySha: refreshedWorkOrder.planningRepositorySha,
           qualityContractDigest: refreshedWorkOrder.qualityContractDigest,
           workOrderId: String(refreshedWorkOrder._id),
           workOrderRevisionNumber: refreshedWorkOrder.currentRevisionNumber ?? 1,
           workOrderRevisionId: refreshedWorkOrder.currentRevisionId ? String(refreshedWorkOrder.currentRevisionId) : undefined,
           taskId: selectedTask ? String(selectedTask._id) : undefined,
+          task: selectedTask ? {
+            title: selectedTask.title,
+            description: selectedTask.description,
+          } : undefined,
           factoryDefinitionVersionId: String(factoryBinding.version._id),
           factoryConfigurationDigest: factoryBinding.version.configurationDigest,
           factoryPurpose: factoryBinding.version.purpose ?? "SOFTWARE",
@@ -2671,6 +3124,56 @@ async function dispatchWorkOrder(
           },
         })
       : null;
+    const routingBudgetAuthorization = (routing?.executionRoutingSnapshot as any)?.budgetAuthorization;
+    const routeCostPolicy = factoryBinding?.modelRoute.costPolicySnapshot as Record<string, any> | undefined;
+    const estimatedCostUsd = routingBudgetAuthorization?.estimatedReservationUsd;
+    const remainingBeforeReservationUsd = routingBudgetAuthorization?.remainingBeforeReservationUsd;
+    const hardLimitUsd = factoryBinding && typeof estimatedCostUsd === "number"
+      ? Math.min(
+          factoryBinding.version.budget.maxCostUsd,
+          typeof remainingBeforeReservationUsd === "number"
+            ? remainingBeforeReservationUsd
+            : factoryBinding.version.budget.maxCostUsd,
+        )
+      : undefined;
+    const executionCostAuthorization = factoryBinding
+      && typeof estimatedCostUsd === "number"
+      && typeof hardLimitUsd === "number"
+      && hardLimitUsd >= estimatedCostUsd
+      && routeCostPolicy
+      && factoryBinding.modelRoute.costPolicyDigest
+      ? {
+          schema: "work-order-cost-authorization/v1" as const,
+          estimatedCostUsd,
+          reservedCostUsd: estimatedCostUsd,
+          hardLimitUsd,
+          priorCommittedUsd: routingBudgetAuthorization.priorCommittedUsd ?? 0,
+          remainingBeforeReservationUsd: hardLimitUsd,
+          budgetSource: routingBudgetAuthorization.budgetSource,
+          estimationInputs: {
+            plannedEstimateUsd: routingBudgetAuthorization.plannedEstimateUsd,
+            approvedWorkOrderCapUsd: routingBudgetAuthorization.approvedWorkOrderCapUsd,
+            missionBudgetRemainingUsd: routingBudgetAuthorization.missionBudgetRemainingUsd,
+            explicitRoutingBudgetRemainingUsd: routingBudgetAuthorization.explicitRoutingBudgetRemainingUsd,
+            routingPolicyBudgetLimitUsd: routingBudgetAuthorization.routingPolicyBudgetLimitUsd,
+            factoryVersionMaxCostUsd: factoryBinding.version.budget.maxCostUsd,
+            factoryVersionMaxAttempts: factoryBinding.version.budget.maxAttempts,
+            factoryVersionMaxRuntimeMinutes: factoryBinding.version.budget.maxRuntimeMinutes,
+            routeCostPolicy,
+          },
+          routeCostPolicyDigest: factoryBinding.modelRoute.costPolicyDigest,
+          actualCost: routeCostPolicy.actualCostTelemetry === "UNAVAILABLE"
+            ? {
+                status: "UNAVAILABLE" as const,
+                reason: routeCostPolicy.unknownActualCostReason,
+              }
+            : {
+                status: "UNAVAILABLE" as const,
+                reason: "Measured actual-cost telemetry has not been reported for this Attempt.",
+              },
+          authorizedAt: now,
+        }
+      : undefined;
     const runDocId = await ctx.db.insert("workflowRuns", {
       tenantId: refreshedWorkOrder.tenantId,
       runId,
@@ -2689,6 +3192,7 @@ async function dispatchWorkOrder(
       factoryPurpose: factoryBinding?.version.purpose ?? "SOFTWARE",
       attemptPurpose: refreshedWorkOrder.kind === "AUTOMATION" ? "AUTOMATION" : "IMPLEMENTATION",
       qualityContractDigest: refreshedWorkOrder.qualityContractDigest,
+      planningRepositorySha: refreshedWorkOrder.planningRepositorySha,
       repositoryId: factoryBinding?.repository._id,
       hostBindingId: factoryBinding?.host._id,
       policyEnvelopeId: factoryBinding?.version.policyEnvelopeId,
@@ -2722,6 +3226,8 @@ async function dispatchWorkOrder(
           ? {
               retryOfRunId: retryOfRun.runId,
               retryReason: retryRequest?.reason,
+              tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+              taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
             }
           : {}),
       },
@@ -2730,6 +3236,10 @@ async function dispatchWorkOrder(
       initialInput: taskInput,
       runtime: args.runtime,
       model: routedModel,
+      budgetUsd: executionCostAuthorization?.hardLimitUsd,
+      spentUsd: executionCostAuthorization ? 0 : undefined,
+      reservedCostUsd: executionCostAuthorization?.reservedCostUsd,
+      executionCostAuthorization,
       routingDecisionId: routing?.decisionId,
       routingDecisionDigest: routing?.decisionDigest,
       executionRoutingSnapshot: routing?.executionRoutingSnapshot,
@@ -2756,6 +3266,8 @@ async function dispatchWorkOrder(
         retryOfWorkflowRunId: args.retryOfWorkflowRunId,
         retryOfRunId: retryOfRun?.runId,
         retryReason: retryRequest?.reason,
+        tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+        taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
         routingMode: routing?.mode,
         routingSource: routing?.result.source,
         routingPolicyVersion: routing?.policyVersion,
@@ -2802,6 +3314,8 @@ async function dispatchWorkOrder(
         retryOfWorkflowRunId: args.retryOfWorkflowRunId,
         retryOfRunId: retryOfRun?.runId,
         retryReason: retryRequest?.reason,
+        tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+        taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
         ...options.metadata,
       },
     });
@@ -2883,6 +3397,8 @@ async function dispatchWorkOrder(
         retryOfWorkflowRunId: args.retryOfWorkflowRunId,
         retryOfRunId: retryOfRun?.runId,
         retryReason: retryRequest?.reason,
+        tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+        taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
       },
     });
 
@@ -2907,6 +3423,8 @@ async function dispatchWorkOrder(
           retryOfRunId: retryOfRun.runId,
           retryReason: retryRequest?.reason,
           recoveryRunId: runId,
+          tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+          taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
         },
       });
     }
@@ -2919,7 +3437,7 @@ async function dispatchWorkOrder(
         actorType: args.actorType,
         actorId,
         relatedId: runDocId,
-        beforeState: retryOfRun
+        beforeState: retryOfRun && !tasklessPreExecutionRecovery
           ? {
               workflowRunId: retryOfRun._id,
               status: retryOfRun.status,
@@ -3260,6 +3778,13 @@ async function resolveFactoryDispatchBinding(
   const host = repository
     ? selectCurrentFactoryHost(eligibleBindings, repository.repository, now, args.executorHostId)
     : null;
+  if (host && workOrder.planningRepositorySha
+    && host.baseCommit !== workOrder.planningRepositorySha) {
+    throw new Error(
+      `Factory dispatch blocked (planning-revision-drift): the approved Plan researched ${workOrder.planningRepositorySha}, `
+      + `but the canonical worker now reports ${host.baseCommit ?? "no immutable base SHA"}. Generate and approve a new Plan revision.`,
+    );
+  }
   const sandboxProfileReady = selectedExecutionBackend !== "remote-sandbox" || Boolean(
     sandboxProfile
     && sandboxProfile.projectId === version.projectId
@@ -3362,7 +3887,7 @@ async function resolveFactoryDispatchBinding(
     repository,
     repositoryDataClassification,
     host,
-    baseSha: host.baseCommit,
+    baseSha: workOrder.planningRepositorySha ?? host.baseCommit,
     executionBackend: selectedExecutionBackend,
     requiredSandboxCapabilities,
     sandboxProfile,
@@ -3643,6 +4168,7 @@ export const approvalQueue = query({
       const acceptance = workOrder ? evaluateAcceptance({
         riskLevel: workOrder.riskLevel as any,
         requiredApprovals: workOrder.requiredApprovals,
+        isMutating: workOrder.isMutating,
         approvalDecisions,
         acceptanceCriteria: workOrder.acceptanceCriteria as any,
         verificationReceipts: receipts,
@@ -4227,15 +4753,19 @@ export const accept = mutation({
       workOrder.projectId,
       FACTORY_PERMISSIONS.APPROVE,
     );
-    if (factoryAccess.membership.mode === "DEMO") {
+    const localDemoAcceptance = factoryAccess.membership.mode === "DEMO"
+      && localDemoOperatorAcceptanceEnabled();
+    if (factoryAccess.membership.mode === "DEMO" && !localDemoAcceptance) {
       throw new Error("Anonymous demo authority cannot accept governed work.");
     }
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
-    if (!deliveryAccess) {
+    if (!deliveryAccess && !localDemoAcceptance) {
       throw new Error("WorkOrder acceptance is unavailable until an authenticated operator is provisioned.");
     }
-    assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
-    const acceptActorId = factoryAccess.actorId;
+    if (deliveryAccess) assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
+    const acceptActorId = localDemoAcceptance
+      ? "development:local-operator"
+      : factoryAccess.actorId;
     const existingEvent = await ctx.db
       .query("workOrderEvents")
       .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", `${args.idempotencyKey}:accepted`))
@@ -4345,6 +4875,7 @@ export const accept = mutation({
       const approvalStatus = deriveApprovalStatus({
         riskLevel: workOrder.riskLevel as any,
         requiredApprovals: workOrder.requiredApprovals,
+        isMutating: workOrder.isMutating,
         approvals: approvalDecisions,
         now,
       });
@@ -4355,6 +4886,7 @@ export const accept = mutation({
       const acceptance = evaluateAcceptance({
         riskLevel: workOrder.riskLevel as any,
         requiredApprovals: workOrder.requiredApprovals,
+        isMutating: workOrder.isMutating,
         approvalDecisions,
         acceptanceCriteria: workOrder.acceptanceCriteria as any,
         verificationReceipts,
@@ -4565,8 +5097,14 @@ export const requestWorkOrderRevision = mutation({
       : [];
 
     const revisions = await listRevisionsForWorkOrder(ctx, workOrder._id);
+    for (const pendingRevision of revisions.filter((revision: any) => revision.status === "PENDING_APPROVAL")) {
+      await ctx.db.patch(pendingRevision._id, { status: "SUPERSEDED" });
+    }
     const previousRevisionId = revisions[0]?._id;
-    const revisionNumber = (workOrder.currentRevisionNumber ?? 1) + 1;
+    const revisionNumber = Math.max(
+      workOrder.currentRevisionNumber ?? 1,
+      ...revisions.map((revision: any) => revision.revisionNumber ?? 0),
+    ) + 1;
     const revisionId = await ctx.db.insert("workOrderRevisions", {
       tenantId: workOrder.tenantId,
       projectId: workOrder.projectId,
@@ -4634,6 +5172,11 @@ export const approveWorkOrderRevision = mutation({
     }
     const workOrder = await ctx.db.get(revision.workOrderId);
     if (!workOrder) throw new Error("WorkOrder not found");
+    const revisions = await listRevisionsForWorkOrder(ctx, workOrder._id);
+    const newestPendingRevision = revisions.find((candidate: any) => candidate.status === "PENDING_APPROVAL");
+    if (newestPendingRevision?._id !== revision._id) {
+      throw new Error("Only the latest pending WorkOrderRevision can be approved");
+    }
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
     assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
 
@@ -4841,6 +5384,7 @@ export const supersedeWorkOrder = mutation({
     const acceptance = evaluateAcceptance({
       riskLevel: original.riskLevel as any,
       requiredApprovals: original.requiredApprovals,
+      isMutating: original.isMutating,
       approvalDecisions: approvals,
       acceptanceCriteria: original.acceptanceCriteria as any,
       verificationReceipts: receipts,
@@ -4916,9 +5460,11 @@ export const expireGovernanceRecords = mutation({
       const result = await expireGovernanceRecordsForWorkOrder(ctx, workOrder);
       expiredApprovals += result.expiredApprovals;
       staleReceipts += result.staleReceipts;
-      if (result.expiredApprovals > 0 || result.staleReceipts > 0) {
-        await refreshWorkOrderGovernance(ctx, workOrder._id);
-      }
+      // This mutation backs the operator's explicit "Refresh governance"
+      // action. Reconcile current authority even when no record expired so
+      // newly approved Mission Plans and other durable decisions project
+      // into the WorkOrder immediately.
+      await refreshWorkOrderGovernance(ctx, workOrder._id);
     }
 
     return { expiredApprovals, staleReceipts, workOrdersTouched: workOrders.length };

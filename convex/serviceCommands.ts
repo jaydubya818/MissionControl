@@ -104,6 +104,38 @@ export const resolveRepositoryBindingScope = internalQuery({
   },
 });
 
+export const resolveExactModelRouteHealthScope = internalQuery({
+  args: {
+    factoryDefinitionVersionId: v.id("factoryDefinitionVersions"),
+    expectedRouteDigest: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const version = await ctx.db.get(args.factoryDefinitionVersionId);
+    if (!version?.modelCatalogId
+      || !version.modelRouteDigest
+      || version.modelRouteDigest !== args.expectedRouteDigest) {
+      throw new Error("Factory version does not match the exact model route health claim.");
+    }
+    const [definition, repository, modelRoute] = await Promise.all([
+      ctx.db.get(version.factoryDefinitionId),
+      ctx.db.get(version.repositoryId),
+      ctx.db.get(version.modelCatalogId),
+    ]);
+    if (!definition || definition.projectId !== version.projectId
+      || !repository || repository.projectId !== version.projectId || repository.status !== "READY"
+      || !modelRoute || modelRoute.projectId !== version.projectId
+      || modelRoute.routeDigest !== version.modelRouteDigest) {
+      throw new Error("Exact model route health claim exceeds the Factory repository scope.");
+    }
+    return {
+      projectId: String(version.projectId),
+      repositoryId: String(repository._id),
+      modelCatalogId: modelRoute._id,
+      expectedRouteDigest: version.modelRouteDigest,
+    };
+  },
+});
+
 export const resolvePrEvidenceScope = internalQuery({
   args: {
     projectId: v.id("projects"),
@@ -705,6 +737,53 @@ export const reportFactorySandboxReconcile = action({
   },
 });
 
+export const reportExactModelRouteHealth = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(
+      ctx,
+      args.envelope,
+      args.payloadJson,
+      "models.report-exact-route-health",
+    );
+    if (![
+      "HEALTHY",
+      "DEGRADED",
+      "RATE_LIMITED",
+      "UNAVAILABLE",
+    ].includes(payload.availability)) {
+      throw new Error("Exact model route health claim has an invalid availability state.");
+    }
+    const scope = await ctx.runQuery(
+      internal.serviceCommands.resolveExactModelRouteHealthScope,
+      {
+        factoryDefinitionVersionId: payload.factoryDefinitionVersionId,
+        expectedRouteDigest: payload.expectedRouteDigest,
+      },
+    );
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(
+        internal.modelCatalog.reportExactRouteHealth,
+        {
+          modelCatalogId: scope.modelCatalogId,
+          expectedRouteDigest: scope.expectedRouteDigest,
+          availability: payload.availability,
+        },
+      );
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: "SUCCEEDED",
+        resultReference: String(result),
+      });
+      return { modelCatalogId: result, availability: payload.availability };
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
 export const claimExecution = action({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {
@@ -783,6 +862,99 @@ export const finalizeExecution = action({
       const result = await ctx.runMutation(internal.executionWorker.finalizeInternal, payload);
       await ctx.runMutation(internal.serviceCommands.complete, {
         receiptId: receipt.receiptId, status: "SUCCEEDED", resultReference: result?.pullRequestUrl ?? String(payload.workflowRunId),
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const claimMissionPlanningRun = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "planning.claim");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveRepositoryScope, {
+      projectId: payload.projectId,
+      repositoryId: payload.repositoryId,
+    });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(internal.missionPlanning.claimInternal, {
+        projectId: payload.projectId,
+        repositoryId: payload.repositoryId,
+        leaseId: payload.leaseId,
+        ownerId: args.envelope.serviceId,
+        workerId: payload.workerId,
+        workerSessionId: payload.workerSessionId,
+        leaseDurationMs: payload.leaseDurationMs,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: "SUCCEEDED",
+        resultReference: result?.run?._id ? String(result.run._id) : result?.reason,
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const renewMissionPlanningRun = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "planning.renew");
+    const scope = await ctx.runQuery(internal.missionPlanning.resolveScope, {
+      planningRunId: payload.planningRunId,
+    });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(internal.missionPlanning.renewInternal, {
+        planningRunId: payload.planningRunId,
+        leaseId: payload.leaseId,
+        ownerId: args.envelope.serviceId,
+        workerId: payload.workerId,
+        workerSessionId: payload.workerSessionId,
+        leaseDurationMs: payload.leaseDurationMs,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: result.renewed ? "SUCCEEDED" : "FAILED",
+        reason: result.renewed ? undefined : result.reason,
+        resultReference: String(payload.planningRunId),
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const reportMissionPlanningRun = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "planning.report");
+    const scope = await ctx.runQuery(internal.missionPlanning.resolveScope, {
+      planningRunId: payload.planningRunId,
+    });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(internal.missionPlanning.reportInternal, {
+        planningRunId: payload.planningRunId,
+        leaseId: payload.leaseId,
+        ownerId: args.envelope.serviceId,
+        workerId: payload.workerId,
+        workerSessionId: payload.workerSessionId,
+        report: payload.report,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: "SUCCEEDED",
+        resultReference: String(payload.planningRunId),
       });
       return result;
     } catch (error) {

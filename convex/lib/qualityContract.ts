@@ -12,6 +12,7 @@ export interface ApprovedPlanQualityContractInput {
   sourceOfTruthRefs?: Array<{ kind: string; label: string; location: string }>;
   repository: string;
   repositoryBranch: string;
+  planningRepositorySha?: string;
   summary: string;
   rollbackApproach?: string;
   assertions: Array<{
@@ -82,7 +83,7 @@ export function compileApprovedPlanQualityContract(
   input: ApprovedPlanQualityContractInput,
 ) {
   const projection = {
-    schemaVersion: input.specLineage ? QUALITY_CONTRACT_SCHEMA_VERSION : 1,
+    schemaVersion: input.planningRepositorySha ? 3 : input.specLineage ? QUALITY_CONTRACT_SCHEMA_VERSION : 1,
     source: {
       missionId: input.missionId,
       missionPlanId: input.missionPlanId,
@@ -108,6 +109,7 @@ export function compileApprovedPlanQualityContract(
     repository: {
       repository: input.repository,
       branch: input.repositoryBranch,
+      planningRepositorySha: input.planningRepositorySha,
     },
     plan: {
       summary: input.summary,

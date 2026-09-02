@@ -1230,6 +1230,7 @@ export const create = mutation({
       identifier,
       goalId: args.goalId,
       workOrderId: args.workOrderId,
+      planningRepositorySha: workOrder?.planningRepositorySha,
       title,
       description,
       type: args.type as TaskType,
@@ -1346,9 +1347,17 @@ export const linkToWorkOrder = mutation({
         "This Task is already governed by another Work Order. Unlinking requires a separate reviewed change."
       );
     }
+    if (task.planningRepositorySha
+      && workOrder.planningRepositorySha
+      && task.planningRepositorySha !== workOrder.planningRepositorySha) {
+      throw new Error("Task planning revision does not match the selected Work Order.");
+    }
     if (task.workOrderId === args.workOrderId) {
+      if (task.planningRepositorySha !== workOrder.planningRepositorySha) {
+        await ctx.db.patch(task._id, { planningRepositorySha: workOrder.planningRepositorySha });
+      }
       return {
-        task: (await loadTaskProjections(ctx, [task], args.projectId))[0],
+        task: (await loadTaskProjections(ctx, [await ctx.db.get(task._id) ?? task], args.projectId))[0],
         linked: false,
         idempotencyHit: true,
       };
@@ -1362,6 +1371,7 @@ export const linkToWorkOrder = mutation({
     };
     await ctx.db.patch(task._id, {
       workOrderId: workOrder._id,
+      planningRepositorySha: workOrder.planningRepositorySha,
       metadata: {
         ...(typeof task.metadata === "object" && task.metadata !== null
           ? task.metadata

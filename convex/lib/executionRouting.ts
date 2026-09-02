@@ -14,7 +14,7 @@ import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } fro
 import { loadModelCatalogForProject } from "./modelCatalogScope";
 import { getCurrentVerificationRoutingOutcome } from "./currentVerification";
 import { sandboxProfileProductionEligible } from "./sandboxProfileAdmission";
-import { modelRouteProductionEligible } from "./modelRouteAdmission";
+import { modelRouteProductionEligible, modelRouteQualifiedFor } from "./modelRouteAdmission";
 import {
   harnessCapabilityRequirementsSatisfied,
   harnessSupportsModel,
@@ -60,6 +60,40 @@ function tupleKey(version: Doc<"factoryDefinitionVersions">) {
 
 function finiteNonNegative(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+export function workOrderCostBudget(input: {
+  approvedWorkOrderCapUsd?: number;
+  missionBudgetRemainingUsd?: number;
+  explicitRoutingBudgetRemainingUsd?: number;
+  routingPolicyBudgetLimitUsd?: number;
+  priorCommittedUsd: number;
+}) {
+  const approvedRemaining = input.approvedWorkOrderCapUsd === undefined
+    ? undefined
+    : Math.max(0, input.approvedWorkOrderCapUsd - input.priorCommittedUsd);
+  const limits = [
+    approvedRemaining,
+    input.missionBudgetRemainingUsd,
+    input.explicitRoutingBudgetRemainingUsd,
+    input.routingPolicyBudgetLimitUsd,
+  ].filter((value): value is number => value !== undefined && Number.isFinite(value) && value >= 0);
+  return {
+    approvedRemainingUsd: approvedRemaining,
+    maximumEstimatedCostUsd: limits.length ? Math.min(...limits) : undefined,
+  };
+}
+
+const RESERVATION_HOLDING_RUN_STATUSES = new Set(["PENDING", "RUNNING", "PAUSED"]);
+
+export function committedWorkOrderRunCostUsd(run: {
+  status: string;
+  spentUsd?: unknown;
+  reservedCostUsd?: unknown;
+}) {
+  const spentUsd = finiteNonNegative(run.spentUsd) ?? 0;
+  if (!RESERVATION_HOLDING_RUN_STATUSES.has(run.status)) return spentUsd;
+  return Math.max(spentUsd, finiteNonNegative(run.reservedCostUsd) ?? 0);
 }
 
 function rate(numerator: number, denominator: number) {
@@ -266,6 +300,20 @@ function workerReasonPriority(reason: string) {
   return priorities[reason] ?? 100;
 }
 
+/**
+ * Exact route qualifications for GREEN and YELLOW work may intentionally omit
+ * a route-wide cost policy. In that case the estimate approved with the
+ * WorkOrder's Mission Plan is the conservative reservation for routing. A
+ * missing route estimate must stay unknown when the approved Plan also omitted
+ * an estimate; callers must not invent a price.
+ */
+export function executionRoutingEstimatedCost(
+  routeEstimatedCostUsd: number | undefined,
+  approvedPlanEstimateUsd: number | undefined,
+) {
+  return routeEstimatedCostUsd ?? approvedPlanEstimateUsd;
+}
+
 export async function buildExecutionRoutingPreview(
   ctx: RoutingCtx,
   input: {
@@ -278,7 +326,7 @@ export async function buildExecutionRoutingPreview(
   const { workOrder, workflow } = input;
   if (!workOrder.projectId || !workOrder.repositoryId) return null;
   const cutoffAt = input.cutoffAt ?? Date.now();
-  const [definitions, activePolicy, flagRows, bindings, catalog, activeRuns] = await Promise.all([
+  const [definitions, activePolicy, flagRows, bindings, catalog, activeRuns, workOrderRuns, mission] = await Promise.all([
     ctx.db.query("factoryDefinitions")
       .withIndex("by_repository", (query) => query.eq("repositoryId", workOrder.repositoryId!))
       .collect(),
@@ -294,6 +342,10 @@ export async function buildExecutionRoutingPreview(
     ctx.db.query("workflowRuns")
       .withIndex("by_status", (query) => query.eq("status", "RUNNING"))
       .collect(),
+    ctx.db.query("workflowRuns")
+      .withIndex("by_work_order", (query) => query.eq("workOrderId", workOrder._id))
+      .collect(),
+    workOrder.missionId ? ctx.db.get(workOrder.missionId) : Promise.resolve(null),
   ]);
   const config = activePolicy?.executionRouting ?? DEFAULT_EXECUTION_ROUTING_POLICY;
   const guardedAutoEnabled = resolveFlag(
@@ -410,14 +462,24 @@ export async function buildExecutionRoutingPreview(
       primaryAgent?.status === "APPROVED"
       && catalogModel
       && catalogModel.routeDigest === version.modelRouteDigest
-      && modelRouteProductionEligible(catalogModel)
+      && modelRouteQualifiedFor(catalogModel, {
+        workloadClass: workOrder.kind ?? "SOFTWARE_CHANGE",
+        riskClass: workOrderRiskToExecutionTier(workOrder.riskLevel),
+        repositoryId: String(workOrder.repositoryId),
+      })
       && !catalogModel.deprecated
       && (
         !(workOrder.riskLevel === "HIGH" || workOrder.riskLevel === "CRITICAL")
         || catalogModel.riskApproved
       )
     );
-    const estimatedCost = catalogModel?.estimatedCostPerRunUsd;
+    const approvedPlanEstimateUsd = finiteNonNegative(
+      (workOrder.metadata as { estimatedCostUsd?: unknown } | undefined)?.estimatedCostUsd,
+    );
+    const estimatedCost = executionRoutingEstimatedCost(
+      catalogModel?.estimatedCostPerRunUsd,
+      approvedPlanEstimateUsd,
+    );
     const contextWindow = catalogModel?.contextWindow
       ?? manifest?.models.supported.find((model) =>
         model.provider === primaryModel?.provider
@@ -493,10 +555,26 @@ export async function buildExecutionRoutingPreview(
 
   const pin = workOrder.executionRoutingPin;
   const requestedMode: ExecutionRoutingMode = pin ? "PINNED" : (config.mode ?? "ADVISORY");
-  const maximumEstimatedCostUsd = Math.min(
-    finiteNonNegative((workOrder.metadata as { modelBudgetRemainingUsd?: unknown } | undefined)?.modelBudgetRemainingUsd) ?? Number.POSITIVE_INFINITY,
-    activePolicy?.budgetLimitUsd ?? Number.POSITIVE_INFINITY,
-  );
+  const metadata = workOrder.metadata as {
+    estimatedCostUsd?: unknown;
+    modelBudgetRemainingUsd?: unknown;
+    implementationPolicy?: { maxCostUsd?: unknown; maxAttempts?: unknown; timeoutMinutes?: unknown };
+  } | undefined;
+  const approvedWorkOrderCapUsd = finiteNonNegative(metadata?.implementationPolicy?.maxCostUsd);
+  const plannedEstimateUsd = finiteNonNegative(metadata?.estimatedCostUsd);
+  const priorCommittedUsd = workOrderRuns
+    .filter((run) => (run.attemptPurpose ?? "IMPLEMENTATION") === "IMPLEMENTATION")
+    .reduce((sum, run) => sum + committedWorkOrderRunCostUsd(run), 0);
+  const missionBudgetRemainingUsd = mission?.budgetUsd === undefined
+    ? undefined
+    : Math.max(0, mission.budgetUsd - mission.spentUsd);
+  const budget = workOrderCostBudget({
+    approvedWorkOrderCapUsd,
+    missionBudgetRemainingUsd,
+    explicitRoutingBudgetRemainingUsd: finiteNonNegative(metadata?.modelBudgetRemainingUsd),
+    routingPolicyBudgetLimitUsd: finiteNonNegative(activePolicy?.budgetLimitUsd),
+    priorCommittedUsd,
+  });
   const policy: ExecutionRoutingPolicy = {
     mode: requestedMode,
     policyVersion: activePolicy?.version ?? 0,
@@ -506,7 +584,7 @@ export async function buildExecutionRoutingPreview(
     minimumEvidenceCoverage: config.minimumEvidenceCoverage,
     minimumScoreMargin: config.minimumScoreMargin,
     evidenceWindowDays: config.evidenceWindowDays,
-    maximumEstimatedCostUsd: Number.isFinite(maximumEstimatedCostUsd) ? maximumEstimatedCostUsd : undefined,
+    maximumEstimatedCostUsd: budget.maximumEstimatedCostUsd,
     minimumContextWindow: config.minimumContextWindow
       ?? finiteNonNegative((workOrder.metadata as { requiredContextTokens?: unknown } | undefined)?.requiredContextTokens),
   };
@@ -537,6 +615,22 @@ export async function buildExecutionRoutingPreview(
     cutoffAt,
     selectedFactoryDefinitionVersionId: selectedCandidate?.tuple.factoryDefinitionVersionId as Id<"factoryDefinitionVersions"> | undefined,
     selectedModel: selectedCandidate?.tuple.model,
+    budgetAuthorization: {
+      schema: "work-order-cost-authorization/v1" as const,
+      approvedWorkOrderCapUsd,
+      plannedEstimateUsd,
+      missionBudgetRemainingUsd,
+      explicitRoutingBudgetRemainingUsd: finiteNonNegative(metadata?.modelBudgetRemainingUsd),
+      routingPolicyBudgetLimitUsd: finiteNonNegative(activePolicy?.budgetLimitUsd),
+      priorCommittedUsd,
+      remainingBeforeReservationUsd: budget.maximumEstimatedCostUsd,
+      estimatedReservationUsd: selectedCandidate?.tuple.model.estimatedCostPerRunUsd,
+      budgetSource: approvedWorkOrderCapUsd !== undefined
+        ? "WORK_ORDER_IMPLEMENTATION_POLICY" as const
+        : missionBudgetRemainingUsd !== undefined
+          ? "MISSION" as const
+          : "FACTORY_VERSION" as const,
+    },
   };
 }
 

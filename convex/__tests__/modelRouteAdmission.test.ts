@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { computeCanonicalHash } from "../lib/genomeHash";
 import {
+  MODEL_ROUTE_COST_POLICY_SCHEMA,
   MODEL_ROUTE_QUALIFICATION_SCHEMA,
   exactModelRouteDigest,
   exactModelRouteSnapshot,
+  modelRouteCostPolicyDigest,
   modelRouteProductionEligible,
+  modelRouteQualifiedFor,
 } from "../lib/modelRouteAdmission";
 
 const routeSnapshot = exactModelRouteSnapshot({
@@ -81,5 +84,68 @@ describe("exact model route admission", () => {
         authority: { ...qualificationSnapshot.authority, routing: true },
       },
     })).toBe(false);
+  });
+
+  it("requires exact repository, workload, RED scope, and auditable cost identity", () => {
+    const costPolicy = {
+      schema: MODEL_ROUTE_COST_POLICY_SCHEMA,
+      method: "FULL_APPROVED_WORK_ORDER_CAP_RESERVATION",
+      currency: "USD",
+      estimatedCostPerRunUsd: 24,
+      reservationMode: "FULL_ESTIMATE",
+      actualCostTelemetry: "UNAVAILABLE",
+      unknownActualCostReason: "Saved ChatGPT authentication does not expose authoritative USD telemetry.",
+      evidence: { reference: "docs/red-route.md", digest: `sha256:${"5".repeat(64)}` },
+      source: {
+        kind: "APPROVED_WORK_ORDER",
+        workOrderId: "work-order-1",
+        workOrderRevisionNumber: 1,
+        missionPlanId: "plan-1",
+        missionPlanRevision: 1,
+        planEstimatedCostUsd: 32,
+        workOrderEstimatedCostUsd: 24,
+        hardLimitUsd: 24,
+        maxRuntimeMinutes: 60,
+        maxAttempts: 3,
+      },
+    };
+    const redQualification = {
+      ...qualificationSnapshot,
+      scope: {
+        workloadClasses: ["SOFTWARE_CHANGE"],
+        riskClasses: ["RED", "YELLOW"],
+        repositoryIds: ["repository-1"],
+      },
+      costPolicy,
+    };
+    const redRoute = {
+      routeSnapshot,
+      routeDigest,
+      enabled: true,
+      qualificationStatus: "EVIDENCE_QUALIFIED",
+      admissionStatus: "PRODUCTION_PILOT_ELIGIBLE",
+      qualificationSnapshot: redQualification,
+      qualificationDigest: `sha256:${computeCanonicalHash({ namespace: MODEL_ROUTE_QUALIFICATION_SCHEMA, value: redQualification })}`,
+      riskApproved: true,
+      estimatedCostPerRunUsd: 24,
+      costPolicySnapshot: costPolicy,
+      costPolicyDigest: modelRouteCostPolicyDigest(costPolicy),
+    };
+    expect(modelRouteQualifiedFor(redRoute, {
+      workloadClass: "SOFTWARE_CHANGE",
+      riskClass: "RED",
+      repositoryId: "repository-1",
+    })).toBe(true);
+    expect(modelRouteQualifiedFor(redRoute, {
+      workloadClass: "SOFTWARE_CHANGE",
+      riskClass: "RED",
+      repositoryId: "repository-2",
+    })).toBe(false);
+    expect(modelRouteQualifiedFor(redRoute, {
+      workloadClass: "MISSION_PLANNING",
+      riskClass: "YELLOW",
+      repositoryId: "repository-1",
+    })).toBe(false);
+    expect(modelRouteProductionEligible({ ...redRoute, estimatedCostPerRunUsd: 0 })).toBe(false);
   });
 });
