@@ -5,7 +5,7 @@
  * ARM = system of record (registry, governance, audit, identity, deployments)
  * MC  = control plane (execution, coordination, communication, runtime, ops telemetry)
  *
- * Reference: UNIFIED_SCHEMA_MAPPING.md v0.2
+ * Reference: docs/history/UNIFIED_SCHEMA_MAPPING.md v0.2
  */
 
 import { defineSchema, defineTable } from "convex/server";

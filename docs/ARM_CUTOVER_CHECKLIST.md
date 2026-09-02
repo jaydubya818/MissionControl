@@ -32,7 +32,7 @@ git add tests/e2e/arm-ui.e2e.spec.ts
 git add playwright.config.ts
 git add package.json
 git add README.md
-git add MIGRATION_PLAN.md
+git add docs/history/MIGRATION_PLAN.md
 git add .env.example
 ```
 
