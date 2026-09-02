@@ -14,7 +14,11 @@
 export type ToolRisk = "GREEN" | "YELLOW" | "RED";
 
 // ============================================================================
-// TOOL RISK MAP (source of truth, synced with packages/policy-engine/src/rules.ts)
+// TOOL RISK MAP
+//
+// Not the same vocabulary as packages/policy-engine/src/rules.ts. The parity
+// test in convex/__tests__/riskClassifier.test.ts only enforces that nothing
+// the policy engine rates RED is rated lower here.
 // ============================================================================
 
 export const TOOL_RISK_MAP: Record<string, ToolRisk> = {
@@ -56,6 +60,21 @@ export const TOOL_RISK_MAP: Record<string, ToolRisk> = {
   send_message: "RED",
   payment: "RED",
   spawn_agent: "RED",
+
+  // RED — packages/policy-engine vocabulary (the names personas under
+  // agents/ and roles/ actually declare). Anything RED there must be RED
+  // here too; an unknown tool falls back to YELLOW, which SPECIALIST and
+  // LEAD agents may run without approval.
+  post_social: "RED",
+  tweet: "RED",
+  post_linkedin: "RED",
+  deploy_prod: "RED",
+  modify_prod_config: "RED",
+  access_secrets: "RED",
+  read_env: "RED",
+  destructive_shell: "RED",
+  drop_table: "RED",
+  external_api_write: "RED",
 };
 
 // ============================================================================

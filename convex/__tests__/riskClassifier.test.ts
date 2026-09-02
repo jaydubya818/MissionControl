@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   AUTONOMY_RULES,
+  TOOL_RISK_MAP,
   affectsProduction,
   classifyRisk,
   containsSecrets,
   requiresApproval,
 } from "../lib/riskClassifier";
+import { TOOL_RISK_MAP as POLICY_ENGINE_TOOL_RISK_MAP } from "../../packages/policy-engine/src/rules";
 
 describe("classifyRisk", () => {
   it("returns the mapped risk for known tools", () => {
@@ -118,5 +120,32 @@ describe("requiresApproval", () => {
   it("checks the budget only after the role gate passes", () => {
     const result = requiresApproval("YELLOW", "INTERN", 100, 1);
     expect(result.reason).toBe("INTERN agents require approval for YELLOW actions");
+  });
+});
+
+describe("parity with packages/policy-engine TOOL_RISK_MAP", () => {
+  // The file header claims this map is "synced with packages/policy-engine/src/rules.ts".
+  // The two vocabularies differ, which is tolerable for GREEN/YELLOW because an unknown
+  // tool defaults to YELLOW here. It is not tolerable for RED: a tool the policy engine
+  // treats as RED must not fall through to the YELLOW default, because YELLOW is
+  // auto-approved for SPECIALIST and LEAD agents.
+  it("classifies every policy-engine RED tool as RED", () => {
+    const policyEngineRed = Object.entries(POLICY_ENGINE_TOOL_RISK_MAP)
+      .filter(([, risk]) => risk === "red")
+      .map(([tool]) => tool);
+    expect(policyEngineRed.length).toBeGreaterThan(0);
+    const misclassified = policyEngineRed.filter((tool) => classifyRisk(tool) !== "RED");
+    expect(misclassified).toEqual([]);
+  });
+
+  it("never rates a tool lower than the policy engine does", () => {
+    const rank = { GREEN: 0, YELLOW: 1, RED: 2 } as const;
+    const weaker = Object.entries(POLICY_ENGINE_TOOL_RISK_MAP)
+      .filter(([tool, risk]) => {
+        const here = TOOL_RISK_MAP[tool];
+        return here !== undefined && rank[here] < rank[risk.toUpperCase() as keyof typeof rank];
+      })
+      .map(([tool]) => tool);
+    expect(weaker).toEqual([]);
   });
 });
