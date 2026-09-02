@@ -88,7 +88,8 @@ export function classifyRisk(
   toolName: string,
   params?: Record<string, unknown>
 ): ToolRisk {
-  let risk: ToolRisk = TOOL_RISK_MAP[toolName] ?? "YELLOW";
+  const normalizedToolName = toolName.trim().toLowerCase();
+  let risk: ToolRisk = TOOL_RISK_MAP[normalizedToolName] ?? "YELLOW";
 
   // Upgrade risk if params contain secrets or affect production
   if (params) {

@@ -17,7 +17,7 @@ export interface GatewayProxyOptions {
    * completes. Defaults to admitting everything (tests and embedded use);
    * the server wires this to the same bearer check as its HTTP routes.
    */
-  authorizeUpgrade?: (req: IncomingMessage) => { status: number; error: string } | null;
+  authorizeUpgrade: (req: IncomingMessage) => { status: number; error: string } | null;
   log?: (msg: string) => void;
   logError?: (msg: string, err?: unknown) => void;
 }
@@ -108,7 +108,7 @@ export function createGatewayProxy(options: GatewayProxyOptions): {
   const {
     loadUpstreamSettings,
     allowWs = (req) => resolvePathname(req.url) === "/gateway/ws",
-    authorizeUpgrade = () => null,
+    authorizeUpgrade,
     log = () => {},
     logError = (msg: string, err?: unknown) => console.error(msg, err),
   } = options;

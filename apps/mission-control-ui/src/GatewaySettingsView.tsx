@@ -134,7 +134,7 @@ export function GatewaySettingsView() {
             <div className="space-y-3 text-[13.5px] text-warn">
               <div className="flex items-center gap-2">
                 <AlertCircle size={15} strokeWidth={1.7} className="shrink-0" aria-hidden />
-                Cannot reach orchestration server. Ensure it is running at {getOrchestrationBaseUrl() || "same origin (proxied)"}.
+                Cannot reach the authenticated orchestration proxy at {getOrchestrationBaseUrl() || "this origin"}.
               </div>
               <div className="rounded-lg border border-warn/20 bg-warn-soft/40 px-3 py-3 text-[12.5px] leading-relaxed text-ink-secondary">
                 What still works: Mission Control can render the shell and demo-backed live chat fallback. What does not work until the server is up: live Gateway status, WebSocket chat, and server-side token injection.
@@ -146,7 +146,7 @@ export function GatewaySettingsView() {
         <Card className="p-5 border-dashed">
           <h3 className="text-[15px] font-semibold text-ink mb-2">WebSocket proxy</h3>
           <p className="text-[12.5px] text-ink-secondary">
-            When configured, the browser connects to <code className="bg-surface-2 px-1 rounded font-mono">ws://localhost:4100/gateway/ws</code> (or your orchestration server). The server forwards frames to the upstream Gateway and injects the token so credentials stay server-side.
+            The browser connects through <code className="bg-surface-2 px-1 rounded font-mono">/gateway/ws</code>. In development, Vite adds the orchestration bearer. Production must route this path through a trusted reverse proxy that adds the bearer; do not expose the token to browser code or connect the browser directly to the orchestration server. The server forwards frames upstream and injects the Gateway token.
           </p>
         </Card>
       </div>

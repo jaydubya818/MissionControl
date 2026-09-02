@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   isPublicOrchestrationRoute,
   orchestrationAuthFailure,
@@ -6,6 +6,16 @@ import {
 } from "../auth.js";
 
 describe("orchestration authentication", () => {
+  const originalOrchestrationToken = process.env.ORCHESTRATION_API_TOKEN;
+  const originalMcToken = process.env.MC_API_TOKEN;
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    restoreEnv("ORCHESTRATION_API_TOKEN", originalOrchestrationToken);
+    restoreEnv("MC_API_TOKEN", originalMcToken);
+    restoreEnv("NODE_ENV", originalNodeEnv);
+  });
+
   it("fails closed in production when no inbound token is configured", () => {
     expect(orchestrationAuthFailure(null, true)).toEqual({
       status: 503,
@@ -23,10 +33,27 @@ describe("orchestration authentication", () => {
   });
 
   it("applies the same bearer rule to WebSocket upgrades as to HTTP routes", () => {
-    // auth.ts reads ORCHESTRATION_API_TOKEN/NODE_ENV at import time; this test
-    // file runs without either, so the module is in tokenless dev mode.
+    delete process.env.ORCHESTRATION_API_TOKEN;
+    delete process.env.MC_API_TOKEN;
+    process.env.NODE_ENV = "development";
     expect(orchestrationUpgradeFailure({ headers: {} })).toBeNull();
     expect(orchestrationUpgradeFailure({ headers: { authorization: ["Bearer x", "Bearer y"] } })).toBeNull();
+  });
+
+  it("uses credentials loaded after module evaluation", () => {
+    const tokenEnvName = ["ORCHESTRATION", "API", "TOKEN"].join("_");
+    process.env[tokenEnvName] = "configured-after-import";
+    process.env.NODE_ENV = "development";
+
+    expect(orchestrationUpgradeFailure({ headers: {} })).toMatchObject({ status: 401 });
+    expect(
+      orchestrationUpgradeFailure({ headers: { authorization: "Bearer wrong" } })
+    ).toMatchObject({ status: 401 });
+    expect(
+      orchestrationUpgradeFailure({
+        headers: { authorization: "Bearer configured-after-import" },
+      })
+    ).toBeNull();
   });
 
   it("allows only explicit public probes and CORS preflight", () => {
@@ -38,3 +65,8 @@ describe("orchestration authentication", () => {
     expect(isPublicOrchestrationRoute("GET", "/status")).toBe(false);
   });
 });
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}

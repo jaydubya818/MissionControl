@@ -40,9 +40,15 @@ interface Proxy {
   close: () => Promise<void>;
 }
 
-async function startProxy(options: GatewayProxyOptions): Promise<Proxy> {
+type TestGatewayProxyOptions = Omit<GatewayProxyOptions, "authorizeUpgrade"> &
+  Partial<Pick<GatewayProxyOptions, "authorizeUpgrade">>;
+
+async function startProxy(options: TestGatewayProxyOptions): Promise<Proxy> {
   const server: Server = createServer((_req, res) => res.end());
-  const proxy = createGatewayProxy(options);
+  const proxy = createGatewayProxy({
+    ...options,
+    authorizeUpgrade: options.authorizeUpgrade ?? (() => null),
+  });
   server.on("upgrade", (req, socket, head) => proxy.handleUpgrade(req, socket, head));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;

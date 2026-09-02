@@ -21,9 +21,10 @@ describe("classifyRisk", () => {
     expect(classifyRisk("")).toBe("YELLOW");
   });
 
-  it("is case-sensitive on tool names, so a differently cased known tool falls back to YELLOW", () => {
-    expect(classifyRisk("Read_File")).toBe("YELLOW");
-    expect(classifyRisk("RM_RF")).toBe("YELLOW");
+  it("normalizes tool-name casing and surrounding whitespace before lookup", () => {
+    expect(classifyRisk("Read_File")).toBe("GREEN");
+    expect(classifyRisk(" RM_RF ")).toBe("RED");
+    expect(classifyRisk("DePlOy_PrOd")).toBe("RED");
   });
 
   it("escalates any tool to RED when params mention a secret", () => {
