@@ -8,6 +8,9 @@ export type CompanyAccessMode = "AUTHENTICATED" | "DEMO";
 export const COMPANY_PERMISSIONS = {
   MANAGE_COMPANY: "company.manage",
   MANAGE_MEMBERS: "members.manage",
+  READ_ACCESS_PROFILES: "accessProfiles.read",
+  MANAGE_ACCESS_PROFILES: "accessProfiles.manage",
+  READ_SETTINGS: "settings.read",
   CREATE_WORKSPACES: "workspaces.create",
   MANAGE_WORKSPACES: "workspaces.manage",
   MANAGE_REPOSITORIES: "repositories.manage",
@@ -46,6 +49,7 @@ function anonymousDemoEnabled(): boolean {
 }
 
 export function isCompanyAdminRole(role: Doc<"roles">): boolean {
+  if (role.systemKey === "ADMIN") return true;
   const name = role.name.trim().toLowerCase();
   return (
     name === "owner" ||
@@ -78,6 +82,7 @@ export function roleGrantsPermission(
   permission: CompanyPermission
 ): boolean {
   if (role.permissions.includes(permission)) return true;
+  if (isCompanyAdminRole(role)) return true;
   if (
     permission === COMPANY_PERMISSIONS.MANAGE_COMPANY ||
     permission === COMPANY_PERMISSIONS.MANAGE_MEMBERS ||

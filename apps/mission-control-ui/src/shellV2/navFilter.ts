@@ -1,6 +1,11 @@
 import type { MainView } from "../TopNav";
 import type { NavGroup } from "./navConfig";
-import { isRouteVisible, routeBadge } from "./routeCapabilities";
+import {
+  isRouteAuthorized,
+  isRouteVisible,
+  routeBadge,
+  type RouteAccessContext,
+} from "./routeCapabilities";
 
 /** Control plane views that are preview-only until Convex-backed. */
 const STUB_CONTROL_VIEWS = new Set<MainView>(["control-portfolio", "control-fleet"]);
@@ -14,6 +19,8 @@ export interface NavFilterOptions {
   showPreviewRoutes?: boolean;
   /** Show routes explicitly classified as demo-only. */
   showDemoRoutes?: boolean;
+  /** Server-derived access context. Applied only when tenant mode is ENFORCED. */
+  access?: RouteAccessContext;
 }
 
 /** Apply runtime nav visibility rules without mutating the canonical config. */
@@ -26,6 +33,7 @@ export function filterNavGroups(
     enforceRouteCapabilities = false,
     showPreviewRoutes = false,
     showDemoRoutes = false,
+    access,
   } = options;
   return groups
     .map((group) => ({
@@ -41,6 +49,7 @@ export function filterNavGroups(
           ) {
             return false;
           }
+          if (!isRouteAuthorized(item.view, access)) return false;
           return true;
         })
         .map((item) => ({

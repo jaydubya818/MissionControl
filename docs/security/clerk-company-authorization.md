@@ -69,7 +69,9 @@ pnpm exec convex env remove MC_BOOTSTRAP_TENANT_SLUG
 
 The owner can then open **Settings → Workspaces & Repositories → Company
 access**, initialize standard roles, and provision each member with their exact
-Clerk user ID. Provisioning by email alone is deliberately unsupported.
+Clerk user ID. Initialize **Settings → Access Profiles** first and assign one
+primary persona plus an allowed scope during provisioning. Provisioning by
+email alone is deliberately unsupported.
 
 ## Rollout
 

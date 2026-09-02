@@ -13,3 +13,4 @@ export * from "./serviceCommandEnvelope.js";
 export * from "./canonicalDigest.js";
 export * from "./factoryMemorySecurity.js";
 export * from "./execution-routing.js";
+export * from "./accessControl.js";

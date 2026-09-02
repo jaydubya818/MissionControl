@@ -25,6 +25,9 @@ import { selectAccessibleCompany } from "./workspace/companySelection";
 import { useAuthRuntime } from "./auth/AuthRuntimeContext";
 import { BootstrapOwner } from "./auth/BootstrapOwner";
 import { shouldBypassRuntimeCompatibility } from "./lib/runtimeCompatibility";
+import { isRouteAuthorized } from "./shellV2/routeCapabilities";
+import { AccessDeniedState } from "./access/AccessDeniedState";
+import { isPersonaKey, type PersonaKey } from "@mission-control/shared";
 
 const DashboardOverview = lazy(() =>
   import("./DashboardOverview").then((module) => ({ default: module.DashboardOverview }))
@@ -67,6 +70,9 @@ const HarnessSection = lazy(() =>
 );
 const ControlSection = lazy(() =>
   import("./sections/ControlSection").then((module) => ({ default: module.ControlSection }))
+);
+const AccessProfilesView = lazy(() =>
+  import("./access/AccessProfilesView").then((module) => ({ default: module.AccessProfilesView }))
 );
 
 type ShellAiTone = "active" | "thinking" | "idle" | "offline";
@@ -265,7 +271,7 @@ function ScopeRecoveryNotice({
 
 const VALID_MAIN_VIEWS: MainView[] = [
   "home", "atc", "tasks", "agents", "directory", "policies", "deployments", "audit", "telemetry", "automations", "automation-runs",
-  "dag", "chat", "council", "calendar", "projects", "model-routing", "memory", "captures", "docs", "skills", "people", "org",
+  "dag", "chat", "council", "calendar", "projects", "model-routing", "access-profiles", "memory", "captures", "docs", "skills", "people", "org",
   "design-system",
   "office", "live-office", "search", "identity", "telegraph", "meetings", "voice", "content-pipeline",
   "crm", "command", "code", "recorder", "test-generation", "api-import", "execution", "flaky-steps",
@@ -469,7 +475,7 @@ function viewToSection(view: MainView): CommandSection {
     ].includes(view)
   )
     return "knowledge";
-  if (["system", "radar", "factory", "pipeline", "feedback", "analytics", "model-routing", "command-center", "missions", "mission-detail", "trace-inspector", "effectiveness", "operator-evals", "factory-health", "readiness", "friction", "agent-catalog", "dossier", "recommendations"].includes(view)) return "platform";
+  if (["system", "radar", "factory", "pipeline", "feedback", "analytics", "model-routing", "access-profiles", "command-center", "missions", "mission-detail", "trace-inspector", "effectiveness", "operator-evals", "factory-health", "readiness", "friction", "agent-catalog", "dossier", "recommendations"].includes(view)) return "platform";
   if ([
     "code", "recorder", "test-generation", "api-import", "execution",
     "flaky-steps", "hybrid-workflows", "schedule", "codegen", "gherkin", "metrics",
@@ -481,9 +487,12 @@ function viewToSection(view: MainView): CommandSection {
 // HEADER METRICS
 // ============================================================================
 
-function useHeaderMetrics(projectId: Id<"projects"> | null) {
-  const agents = useQuery(api.agents.listAll, projectId ? { projectId } : "skip");
-  const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : "skip");
+function useHeaderMetrics(
+  projectId: Id<"projects"> | null,
+  access: { agents: boolean; tasks: boolean },
+) {
+  const agents = useQuery(api.agents.listAll, projectId && access.agents ? { projectId } : "skip");
+  const tasks = useQuery(api.tasks.listAll, projectId && access.tasks ? { projectId } : "skip");
   const [statusTick, setStatusTick] = useState(() => Date.now());
   const activeCount = agents?.filter((a) => a.status === "ACTIVE").length ?? 0;
   const taskCount = tasks?.length ?? 0;
@@ -776,9 +785,31 @@ export default function App() {
     },
     [availableProjects, requestedProjectId]
   );
+  const requestedDemoPersona = searchParams.get("personaPreview");
+  const accessContext = useQuery(
+    api.accessProfiles.getMyAccessContext,
+    companyContextEnabled && tenantId
+      ? {
+          tenantId,
+          ...(projectId ? { projectId } : {}),
+          ...(requestedDemoPersona && isPersonaKey(requestedDemoPersona)
+            ? { demoPersona: requestedDemoPersona }
+            : {}),
+        }
+      : "skip"
+  );
+  const canAccessView = useCallback(
+    (view: MainView) => {
+      if (companyContextEnabled && tenantId && !accessContext) return false;
+      return isRouteAuthorized(view, accessContext);
+    },
+    [accessContext, companyContextEnabled, tenantId],
+  );
   const pendingApprovals = useQuery(
     api.approvals.listPending,
-    projectId ? { projectId, limit: 10 } : "skip"
+    projectId && canAccessView("control-approvals")
+      ? { projectId, limit: 10 }
+      : "skip"
   );
 
   // ── Effects ──────────────────────────────────────────────────────────────
@@ -930,14 +961,14 @@ export default function App() {
 
   // ── Keyboard shortcuts ───────────────────────────────────────────────────
   useKeyboardShortcuts({
-    onNewTask: () => open("createTask"),
+    onNewTask: () => { if (canAccessView("tasks")) open("createTask"); },
     onSearch: () => open("commandPalette"),
-    onApprovals: () => open("approvals"),
-    onAgents: () => { setSidebarSelectedAgentId(null); open("agentsFlyout"); },
-    onCostAnalytics: () => open("costAnalytics"),
-    onGoToBoard: () => setCurrentView("tasks"),
+    onApprovals: () => { if (canAccessView("control-approvals")) open("approvals"); },
+    onAgents: () => { if (canAccessView("agents")) { setSidebarSelectedAgentId(null); open("agentsFlyout"); } },
+    onCostAnalytics: () => { if (canAccessView("analytics")) open("costAnalytics"); },
+    onGoToBoard: () => { if (canAccessView("tasks")) setCurrentView("tasks"); },
     onShowHelp: () => open("keyboardHelp"),
-    onMission: () => open("missionModal"),
+    onMission: () => { if (canAccessView("missions")) open("missionModal"); },
   });
 
   // ── Callbacks ────────────────────────────────────────────────────────────
@@ -1011,7 +1042,10 @@ export default function App() {
   const now = new Date();
   const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const dateStr = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
-  const { activeCount, taskCount, aiStatus } = useHeaderMetrics(projectId);
+  const { activeCount, taskCount, aiStatus } = useHeaderMetrics(projectId, {
+    agents: canAccessView("agents"),
+    tasks: canAccessView("tasks"),
+  });
 
   // ── Section renderer ─────────────────────────────────────────────────────
   function renderSection() {
@@ -1022,6 +1056,29 @@ export default function App() {
     const sectionProjectId =
       projectId ??
       (shellOnlyE2E ? ("e2e-shell-project" as Id<"projects">) : null);
+
+    if (accessContext && !isRouteAuthorized(currentView, accessContext)) {
+      const landing = (accessContext.profile?.defaultLandingView ?? "command-center") as MainView;
+      return (
+        <AccessDeniedState
+          requestedView={currentView}
+          persona={accessContext.persona}
+          reason={accessContext.denialReason}
+          landingView={landing}
+          onReturn={(view) => {
+            setCurrentView(view);
+            navigate({
+              pathname: `/v2/${view}`,
+              search: `?${searchParams.toString()}`,
+            });
+          }}
+        />
+      );
+    }
+
+    if (currentView === "access-profiles") {
+      return tenantId ? <AccessProfilesView tenantId={tenantId} /> : <SectionLoadingState />;
+    }
 
     if (!shellOnlyE2E && currentView !== "projects") {
       if (!projects || (projectId && project === undefined)) {
@@ -1246,6 +1303,9 @@ export default function App() {
   if (companyContext.loading || (companyContextEnabled && companySession === undefined)) {
     return <SectionLoadingState />;
   }
+  if (companyContextEnabled && tenantId && accessContext === undefined) {
+    return <SectionLoadingState />;
+  }
   if (
     companyContextEnabled &&
     companySession &&
@@ -1302,7 +1362,17 @@ export default function App() {
             onOpenSearch={() => open("commandPalette")}
             pendingApprovals={pendingApprovals?.length ?? 0}
             onOpenApprovals={() => open("approvals")}
+            canOpenApprovals={canAccessView("control-approvals")}
             projectId={projectId}
+            access={accessContext}
+            onDemoPersonaChange={(persona?: PersonaKey) => {
+              setSearchParams((current) => {
+                const next = new URLSearchParams(current);
+                if (persona) next.set("personaPreview", persona);
+                else next.delete("personaPreview");
+                return next;
+              }, { replace: true });
+            }}
           >
             <Suspense fallback={<SectionLoadingState />}>{renderSection()}</Suspense>
           </AppShellV2>
@@ -1351,6 +1421,7 @@ export default function App() {
                 handleSectionChange("agents");
                 handleTabChange("gateway");
               }}
+              canAccessView={canAccessView}
             />
           </Suspense>
         </PrivacyProvider>
@@ -1479,6 +1550,7 @@ export default function App() {
               handleSectionChange("agents");
               handleTabChange("gateway");
             }}
+            canAccessView={canAccessView}
           />
         </Suspense>
       </div>

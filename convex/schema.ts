@@ -116,6 +116,26 @@ const actorType = v.union(
   v.literal("SYSTEM")
 );
 
+const personaSystemKey = v.union(
+  v.literal("EXECUTIVE"),
+  v.literal("ARCHITECT"),
+  v.literal("BUILDER"),
+  v.literal("ADMIN")
+);
+
+const accessScopeLens = v.union(
+  v.literal("MY_WORK"),
+  v.literal("TEAM"),
+  v.literal("WORKSPACE"),
+  v.literal("COMPANY")
+);
+
+const accessControlMode = v.union(
+  v.literal("LEGACY"),
+  v.literal("SHADOW"),
+  v.literal("ENFORCED")
+);
+
 const messageType = v.union(
   v.literal("COMMENT"),
   v.literal("WORK_PLAN"),
@@ -480,6 +500,8 @@ export default defineSchema({
     
     // Status
     active: v.boolean(),
+    accessControlMode: v.optional(accessControlMode),
+    accessControlVersion: v.optional(v.number()),
     
     // Metadata
     metadata: v.optional(v.any()),
@@ -544,6 +566,14 @@ export default defineSchema({
     tenantId: v.id("tenants"),
     name: v.string(),
     description: v.optional(v.string()),
+    systemKey: v.optional(personaSystemKey),
+    kind: v.optional(v.union(v.literal("SYSTEM_PROFILE"), v.literal("CUSTOM"))),
+    profileVersion: v.optional(v.number()),
+    defaultLandingView: v.optional(v.string()),
+    defaultScopeLens: v.optional(accessScopeLens),
+    visibleViews: v.optional(v.array(v.string())),
+    updatedAt: v.optional(v.number()),
+    updatedBy: v.optional(v.id("operators")),
     
     // Permissions array (references permissions table)
     permissions: v.array(v.string()),
@@ -553,7 +583,31 @@ export default defineSchema({
   })
     .index("by_tenant", ["tenantId"])
     .index("by_name", ["name"])
-    .index("by_tenant_name", ["tenantId", "name"]),
+    .index("by_tenant_name", ["tenantId", "name"])
+    .index("by_tenant_system_key", ["tenantId", "systemKey"]),
+
+  // -------------------------------------------------------------------------
+  // HUMAN ACCESS PROFILE REVISIONS (Immutable RBAC history)
+  // -------------------------------------------------------------------------
+  accessProfileRevisions: defineTable({
+    tenantId: v.id("tenants"),
+    roleId: v.id("roles"),
+    systemKey: personaSystemKey,
+    version: v.number(),
+    permissions: v.array(v.string()),
+    defaultLandingView: v.string(),
+    defaultScopeLens: accessScopeLens,
+    visibleViews: v.array(v.string()),
+    reason: v.string(),
+    createdBy: v.optional(v.id("operators")),
+    actorId: v.string(),
+    createdAt: v.number(),
+    restoredFromRevisionId: v.optional(v.id("accessProfileRevisions")),
+    digest: v.string(),
+  })
+    .index("by_tenant_system_key_version", ["tenantId", "systemKey", "version"])
+    .index("by_role_version", ["roleId", "version"])
+    .index("by_tenant_created_at", ["tenantId", "createdAt"]),
 
   // -------------------------------------------------------------------------
   // ARM: PERMISSIONS (Permission Registry)

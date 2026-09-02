@@ -1,4 +1,10 @@
 import type { MainView } from "../TopNav";
+import {
+  ACCESS_PERMISSIONS,
+  ACCESS_VIEW_REQUIREMENTS,
+  isAccessViewKey,
+  type AccessPermission,
+} from "@mission-control/shared";
 
 export type RouteScope = "workspace" | "global";
 export type RouteMaturity = "live" | "preview" | "demo" | "hidden";
@@ -6,7 +12,10 @@ export type RouteMaturity = "live" | "preview" | "demo" | "hidden";
 export interface RouteCapability {
   scope: RouteScope;
   maturity: RouteMaturity;
+  requiredPermission: AccessPermission;
 }
+
+type RoutePresentation = Omit<RouteCapability, "requiredPermission">;
 
 /**
  * Product contract for the EOS operator shell.
@@ -15,7 +24,7 @@ export interface RouteCapability {
  * enabled. This makes adding a component insufficient to promote it into the
  * production navigation.
  */
-export const ROUTE_CAPABILITIES: Partial<Record<MainView, RouteCapability>> = {
+const ROUTE_PRESENTATION: Partial<Record<MainView, RoutePresentation>> = {
   "command-center": { scope: "workspace", maturity: "live" },
   "control-work-orders": { scope: "workspace", maturity: "live" },
   "control-approvals": { scope: "workspace", maturity: "live" },
@@ -35,6 +44,7 @@ export const ROUTE_CAPABILITIES: Partial<Record<MainView, RouteCapability>> = {
   deployments: { scope: "workspace", maturity: "live" },
   projects: { scope: "workspace", maturity: "live" },
   "model-routing": { scope: "workspace", maturity: "live" },
+  "access-profiles": { scope: "global", maturity: "live" },
   "operator-evals": { scope: "workspace", maturity: "live" },
 
   goals: { scope: "workspace", maturity: "preview" },
@@ -76,9 +86,22 @@ export const ROUTE_CAPABILITIES: Partial<Record<MainView, RouteCapability>> = {
   dossier: { scope: "workspace", maturity: "demo" },
 };
 
+export const ROUTE_CAPABILITIES = Object.fromEntries(
+  Object.entries(ROUTE_PRESENTATION).map(([view, presentation]) => {
+    if (!isAccessViewKey(view)) {
+      throw new Error(`EOS route ${view} is missing from the access-control registry.`);
+    }
+    return [view, {
+      ...presentation,
+      requiredPermission: ACCESS_VIEW_REQUIREMENTS[view],
+    }];
+  }),
+) as Partial<Record<MainView, RouteCapability>>;
+
 const HIDDEN_CAPABILITY: RouteCapability = {
   scope: "workspace",
   maturity: "hidden",
+  requiredPermission: ACCESS_PERMISSIONS.SYSTEM_READ,
 };
 
 export function routeCapability(view: MainView): RouteCapability {
@@ -92,6 +115,36 @@ export function hasDeclaredRouteCapability(view: MainView): boolean {
 export interface RouteVisibilityOptions {
   showPreviewRoutes?: boolean;
   showDemoRoutes?: boolean;
+}
+
+export interface RouteAccessContext {
+  status: "READY" | "NO_PROFILE" | "CONFLICT";
+  enforced: boolean;
+  effectivePermissions: readonly string[];
+  profile?: { visibleViews: readonly string[] };
+  canManageAccessProfiles?: boolean;
+  persona?: string;
+  identityMode?: "AUTHENTICATED" | "DEMO";
+  demoPreview?: boolean;
+}
+
+/**
+ * Shared predicate for sidebar, deep links, commands, and cross-navigation.
+ * Legacy and shadow modes observe the decision without changing behavior.
+ */
+export function isRouteAuthorized(
+  view: MainView,
+  access?: RouteAccessContext,
+): boolean {
+  if (view === "access-profiles" && access && !access.canManageAccessProfiles) return false;
+  if (!access?.enforced) return true;
+  if (access.status !== "READY" || !access.profile) return false;
+  if (!hasDeclaredRouteCapability(view)) return false;
+  const capability = routeCapability(view);
+  return (
+    access.profile.visibleViews.includes(view) &&
+    access.effectivePermissions.includes(capability.requiredPermission)
+  );
 }
 
 export function isRouteVisible(

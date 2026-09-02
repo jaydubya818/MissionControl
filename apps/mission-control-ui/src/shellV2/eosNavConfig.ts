@@ -4,6 +4,7 @@ import {
   ClipboardList, Cog, FileSearch, FlaskConical, Gauge, GitBranch, Landmark,
   LayoutDashboard, ListChecks, Radar, ScrollText, Shield, Sparkles, Target,
   TrendingUp, Wrench, Scale, Route,
+  KeyRound,
 } from "lucide-react";
 import type { MainView } from "../TopNav";
 import type { NavGroup } from "./navConfig";
@@ -72,6 +73,7 @@ export const EOS_NAV_GROUPS: NavGroup[] = [
   { id: "administration", label: "Settings", icon: Building2, items: [
     { view: "projects" as MainView, label: "Workspaces & Repositories", icon: Building2 },
     { view: "model-routing" as MainView, label: "Execution Routing", icon: Route },
+    { view: "access-profiles" as MainView, label: "Access Profiles", icon: KeyRound },
     { view: "gateway" as MainView, label: "Gateway", icon: Cog },
     { view: "system" as MainView, label: "Database", icon: Cog },
   ]},

@@ -19,6 +19,7 @@ export type MainView =
   | "calendar"
   | "projects"
   | "model-routing"
+  | "access-profiles"
   | "memory"
   | "captures"
   | "docs"

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import type { PersonaKey } from "@mission-control/shared";
 import {
   COMPANY_PERMISSIONS,
   requireCompanyAccess,
@@ -11,6 +12,19 @@ import {
   validateMembershipInput,
   wouldRemoveLastOwner,
 } from "./lib/companyMemberPolicy";
+import { isScopeAllowedForPersona } from "./lib/accessControl";
+
+const personaKeyValidator = v.union(
+  v.literal("EXECUTIVE"),
+  v.literal("ARCHITECT"),
+  v.literal("BUILDER"),
+  v.literal("ADMIN"),
+);
+
+const personaScopeValidator = v.object({
+  type: v.union(v.literal("tenant"), v.literal("project"), v.literal("team")),
+  id: v.string(),
+});
 
 const DEFAULT_ROLES = [
   {
@@ -156,7 +170,79 @@ async function validateRoles(
   if (roles.some((role) => !role || role.tenantId !== tenantId)) {
     return { ok: false as const, error: "Every role must belong to the selected company." };
   }
+  if (roles.some((role) => role?.systemKey)) {
+    return {
+      ok: false as const,
+      error: "Primary personas must be changed with the access-profile assignment control.",
+    };
+  }
   return { ok: true as const, roles: roles as Doc<"roles">[] };
+}
+
+async function validatePersonaAssignment(
+  ctx: MutationCtx,
+  tenantId: Id<"tenants">,
+  systemKey: PersonaKey,
+  scope: { type: "tenant" | "project" | "team"; id: string },
+) {
+  if (!isScopeAllowedForPersona(systemKey, scope.type)) {
+    return { ok: false as const, error: `${systemKey.toLowerCase()} cannot be assigned at ${scope.type} scope.` };
+  }
+  if (scope.type === "tenant") {
+    if (scope.id !== tenantId) return { ok: false as const, error: "Tenant scope must match the selected company." };
+  } else if (scope.type === "project") {
+    const projectId = ctx.db.normalizeId("projects", scope.id);
+    const project = projectId ? await ctx.db.get(projectId) : null;
+    if (!project || project.tenantId !== tenantId) {
+      return { ok: false as const, error: "Workspace scope must belong to the selected company." };
+    }
+  } else {
+    const teamId = ctx.db.normalizeId("scrumTeams", scope.id);
+    const team = teamId ? await ctx.db.get(teamId) : null;
+    if (!team || team.tenantId !== tenantId) {
+      return { ok: false as const, error: "Team scope must belong to the selected company." };
+    }
+  }
+  const role = await ctx.db
+    .query("roles")
+    .withIndex("by_tenant_system_key", (q) =>
+      q.eq("tenantId", tenantId).eq("systemKey", systemKey)
+    )
+    .first();
+  if (!role) return { ok: false as const, error: "Access profiles must be initialized before assigning a persona." };
+  return { ok: true as const, role };
+}
+
+async function getPrimaryPersonaAssignment(
+  ctx: MutationCtx,
+  tenantId: Id<"tenants">,
+  operatorId: Id<"operators">,
+) {
+  const assignments = await ctx.db
+    .query("roleAssignments")
+    .withIndex("by_operator", (q) => q.eq("operatorId", operatorId))
+    .collect();
+  for (const assignment of assignments) {
+    const role = await ctx.db.get(assignment.roleId);
+    if (role?.tenantId === tenantId && role.systemKey) return { assignment, role };
+  }
+  return null;
+}
+
+async function activeAdminPersonaCount(ctx: MutationCtx, tenantId: Id<"tenants">) {
+  const adminRole = await ctx.db
+    .query("roles")
+    .withIndex("by_tenant_system_key", (q) =>
+      q.eq("tenantId", tenantId).eq("systemKey", "ADMIN")
+    )
+    .first();
+  if (!adminRole) return 0;
+  const assignments = await ctx.db
+    .query("roleAssignments")
+    .withIndex("by_role", (q) => q.eq("roleId", adminRole._id))
+    .collect();
+  const operators = await Promise.all(assignments.map((assignment) => ctx.db.get(assignment.operatorId)));
+  return operators.filter((operator) => operator?.active && operator.tenantId === tenantId).length;
 }
 
 async function auditMembershipChange(
@@ -199,18 +285,33 @@ export const list = query({
         .collect(),
     ]);
     const roleById = new Map(roles.map((role) => [role._id, role]));
+    const assignableRoles = roles.filter((role) => !role.systemKey);
     const members = await Promise.all(
       operators.map(async (operator) => {
         const assignments = await ctx.db
           .query("roleAssignments")
           .withIndex("by_operator", (q) => q.eq("operatorId", operator._id))
           .collect();
+        const resolvedAssignments = assignments
+          .map((assignment) => ({ assignment, role: roleById.get(assignment.roleId) }))
+          .filter((item): item is { assignment: Doc<"roleAssignments">; role: Doc<"roles"> } =>
+            Boolean(item.role?.tenantId === args.tenantId)
+          );
+        const personaAssignments = resolvedAssignments.filter((item) => Boolean(item.role.systemKey));
         return {
           ...operator,
-          roles: assignments
-            .filter((assignment) => !assignment.scope || assignment.scope.type === "tenant")
-            .map((assignment) => roleById.get(assignment.roleId))
-            .filter((role): role is Doc<"roles"> => Boolean(role)),
+          roles: resolvedAssignments
+            .filter((item) => !item.role.systemKey)
+            .filter((item) => !item.assignment.scope || item.assignment.scope.type === "tenant")
+            .map((item) => item.role),
+          primaryPersona: personaAssignments.length === 1
+            ? {
+                systemKey: personaAssignments[0].role.systemKey,
+                name: personaAssignments[0].role.name,
+                scope: personaAssignments[0].assignment.scope,
+              }
+            : undefined,
+          personaConflict: personaAssignments.length > 1,
         };
       })
     );
@@ -218,6 +319,22 @@ export const list = query({
       membership.mode === "DEMO" ||
       membership.permissions.includes(COMPANY_PERMISSIONS.MANAGE_MEMBERS) ||
       membership.canManageCompany;
+    const canManageAccessProfiles =
+      membership.mode === "DEMO" ||
+      membership.permissions.includes(COMPANY_PERMISSIONS.MANAGE_ACCESS_PROFILES) ||
+      membership.canManageCompany;
+    const [workspaces, teams] = canManageMembers
+      ? await Promise.all([
+          ctx.db
+            .query("projects")
+            .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+            .collect(),
+          ctx.db
+            .query("scrumTeams")
+            .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+            .collect(),
+        ])
+      : [[], []];
     return {
       members: (canManageMembers
         ? members
@@ -227,8 +344,22 @@ export const list = query({
         email: canManageMembers || member._id === membership.operatorId ? member.email : undefined,
         authId: canManageMembers || member._id === membership.operatorId ? member.authId : undefined,
       })),
-      roles: canManageMembers ? roles : [],
+      roles: canManageMembers ? assignableRoles : [],
+      accessProfiles: canManageMembers
+        ? roles.filter((role) => Boolean(role.systemKey))
+        : [],
       canManageMembers,
+      canManageAccessProfiles,
+      assignmentScopes: canManageMembers
+        ? {
+            workspaces: workspaces
+              .filter((workspace) => workspace.status !== "ARCHIVED")
+              .map((workspace) => ({ id: workspace._id, name: workspace.name })),
+            teams: teams
+              .filter((team) => team.status !== "ARCHIVED")
+              .map((team) => ({ id: team._id, projectId: team.projectId, name: team.name })),
+          }
+        : { workspaces: [], teams: [] },
     };
   },
 });
@@ -366,12 +497,21 @@ export const create = mutation({
     email: v.string(),
     authId: v.string(),
     roleIds: v.array(v.id("roles")),
+    primaryPersona: v.object({
+      systemKey: personaKeyValidator,
+      scope: personaScopeValidator,
+    }),
   },
   handler: async (ctx, args) => {
     const actor = await requireCompanyPermission(
       ctx,
       args.tenantId,
       COMPANY_PERMISSIONS.MANAGE_MEMBERS
+    );
+    await requireCompanyPermission(
+      ctx,
+      args.tenantId,
+      COMPANY_PERMISSIONS.MANAGE_ACCESS_PROFILES,
     );
     const name = args.name.trim();
     const email = args.email.trim().toLowerCase();
@@ -380,11 +520,20 @@ export const create = mutation({
       name,
       email,
       authId,
-      roleCount: args.roleIds.length,
+      // A primary persona is the required authority bundle. Legacy/custom
+      // roles are optional supplemental grants.
+      roleCount: Math.max(args.roleIds.length, 1),
     });
     if (inputError) return { success: false, error: inputError };
     const roles = await validateRoles(ctx, args.tenantId, [...new Set(args.roleIds)]);
     if (!roles.ok) return { success: false, error: roles.error };
+    const persona = await validatePersonaAssignment(
+      ctx,
+      args.tenantId,
+      args.primaryPersona.systemKey,
+      args.primaryPersona.scope,
+    );
+    if (!persona.ok) return { success: false, error: persona.error };
     const [duplicateAuth, duplicateEmail] = await Promise.all([
       ctx.db
         .query("operators")
@@ -414,13 +563,30 @@ export const create = mutation({
         assignedAt: Date.now(),
       });
     }
+    await ctx.db.insert("roleAssignments", {
+      operatorId,
+      roleId: persona.role._id,
+      scope: args.primaryPersona.scope,
+      assignedBy: actor.operatorId,
+      assignedAt: Date.now(),
+      metadata: {
+        primaryPersona: true,
+        accessProfileVersion: persona.role.profileVersion ?? 1,
+      },
+    });
     await auditMembershipChange(ctx, {
       tenantId: args.tenantId,
       actorId: actor.operatorId,
       action: "COMPANY_MEMBER_CREATED",
       description: `Company member "${name}" provisioned`,
       targetId: operatorId,
-      afterState: { name, email, authId, roleIds: args.roleIds },
+      afterState: {
+        name,
+        email,
+        authId,
+        roleIds: args.roleIds,
+        primaryPersona: args.primaryPersona,
+      },
     });
     return { success: true, operatorId };
   },
@@ -440,6 +606,12 @@ export const setRoles = mutation({
     const validated = await validateRoles(ctx, args.tenantId, [...new Set(args.roleIds)]);
     if (!validated.ok) return { success: false, error: validated.error };
     const assignments = await getTenantAssignments(ctx, args.operatorId, args.tenantId);
+    const resolvedAssignments = await Promise.all(
+      assignments.map(async (assignment) => ({ assignment, role: await ctx.db.get(assignment.roleId) }))
+    );
+    const legacyAssignments = resolvedAssignments
+      .filter((item) => !item.role?.systemKey)
+      .map((item) => item.assignment);
     const wasOwner = await operatorHasOwnerRole(ctx, args.tenantId, args.operatorId);
     const remainsOwner = validated.roles.some(isOwnerRole);
     if (wouldRemoveLastOwner({
@@ -450,7 +622,7 @@ export const setRoles = mutation({
     })) {
       return { success: false, error: "Assign another active company owner before removing the final owner role." };
     }
-    for (const assignment of assignments) await ctx.db.delete(assignment._id);
+    for (const assignment of legacyAssignments) await ctx.db.delete(assignment._id);
     for (const roleId of new Set(args.roleIds)) {
       await ctx.db.insert("roleAssignments", {
         operatorId: args.operatorId,
@@ -466,10 +638,133 @@ export const setRoles = mutation({
       action: "COMPANY_MEMBER_ROLES_UPDATED",
       description: `Roles updated for "${operator.name}"`,
       targetId: operator._id,
-      beforeState: { roleIds: assignments.map((assignment) => assignment.roleId) },
+      beforeState: { roleIds: legacyAssignments.map((assignment) => assignment.roleId) },
       afterState: { roleIds: args.roleIds },
     });
     return { success: true };
+  },
+});
+
+/** Atomically updates the primary persona and tenant-wide supplemental roles. */
+export const updateMemberAccess = mutation({
+  args: {
+    tenantId: v.id("tenants"),
+    operatorId: v.id("operators"),
+    roleIds: v.array(v.id("roles")),
+    primaryPersona: v.object({
+      systemKey: personaKeyValidator,
+      scope: personaScopeValidator,
+    }),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireCompanyPermission(
+      ctx,
+      args.tenantId,
+      COMPANY_PERMISSIONS.MANAGE_MEMBERS,
+    );
+    await requireCompanyPermission(
+      ctx,
+      args.tenantId,
+      COMPANY_PERMISSIONS.MANAGE_ACCESS_PROFILES,
+    );
+    const operator = await ctx.db.get(args.operatorId);
+    if (!operator || operator.tenantId !== args.tenantId) {
+      return { success: false as const, error: "Company member is unavailable." };
+    }
+    const validated = await validateRoles(ctx, args.tenantId, [...new Set(args.roleIds)]);
+    if (!validated.ok) return { success: false as const, error: validated.error };
+    const persona = await validatePersonaAssignment(
+      ctx,
+      args.tenantId,
+      args.primaryPersona.systemKey,
+      args.primaryPersona.scope,
+    );
+    if (!persona.ok) return { success: false as const, error: persona.error };
+
+    const allAssignments = await ctx.db
+      .query("roleAssignments")
+      .withIndex("by_operator", (q) => q.eq("operatorId", args.operatorId))
+      .collect();
+    const resolved = await Promise.all(
+      allAssignments.map(async (assignment) => ({ assignment, role: await ctx.db.get(assignment.roleId) }))
+    );
+    const personaAssignments = resolved
+      .filter((item) => item.role?.tenantId === args.tenantId && item.role.systemKey)
+      .map((item) => item.assignment);
+    const legacyTenantAssignments = resolved
+      .filter((item) =>
+        item.role?.tenantId === args.tenantId &&
+        !item.role.systemKey &&
+        (!item.assignment.scope || item.assignment.scope.type === "tenant")
+      )
+      .map((item) => item.assignment);
+    const priorPersonaKeys = resolved
+      .map((item) => item.role?.systemKey)
+      .filter((value): value is PersonaKey => Boolean(value));
+
+    if (
+      operator.active &&
+      priorPersonaKeys.includes("ADMIN") &&
+      args.primaryPersona.systemKey !== "ADMIN" &&
+      await activeAdminPersonaCount(ctx, args.tenantId) <= 1
+    ) {
+      return { success: false as const, error: "Assign another active Admin before changing the final Admin persona." };
+    }
+
+    const wasOwner = await operatorHasOwnerRole(ctx, args.tenantId, args.operatorId);
+    const remainsOwner = validated.roles.some(isOwnerRole);
+    if (
+      args.primaryPersona.systemKey !== "ADMIN" &&
+      wouldRemoveLastOwner({
+        memberActive: operator.active,
+        memberIsOwner: wasOwner,
+        memberWillRemainOwner: remainsOwner,
+        activeOwnerCount: await activeOwnerCount(ctx, args.tenantId),
+      })
+    ) {
+      return { success: false as const, error: "Assign another active company owner before removing the final owner role." };
+    }
+
+    for (const assignment of [...personaAssignments, ...legacyTenantAssignments]) {
+      await ctx.db.delete(assignment._id);
+    }
+    for (const roleId of new Set(args.roleIds)) {
+      await ctx.db.insert("roleAssignments", {
+        operatorId: args.operatorId,
+        roleId,
+        scope: { type: "tenant", id: args.tenantId },
+        assignedBy: actor.operatorId,
+        assignedAt: Date.now(),
+      });
+    }
+    const personaAssignmentId = await ctx.db.insert("roleAssignments", {
+      operatorId: args.operatorId,
+      roleId: persona.role._id,
+      scope: args.primaryPersona.scope,
+      assignedBy: actor.operatorId,
+      assignedAt: Date.now(),
+      metadata: {
+        primaryPersona: true,
+        accessProfileVersion: persona.role.profileVersion ?? 1,
+      },
+    });
+    await auditMembershipChange(ctx, {
+      tenantId: args.tenantId,
+      actorId: actor.operatorId,
+      action: "COMPANY_MEMBER_ACCESS_UPDATED",
+      description: `Access updated for "${operator.name}"`,
+      targetId: operator._id,
+      beforeState: {
+        roleIds: legacyTenantAssignments.map((assignment) => assignment.roleId),
+        personas: priorPersonaKeys,
+      },
+      afterState: {
+        roleIds: args.roleIds,
+        primaryPersona: args.primaryPersona,
+        personaAssignmentId,
+      },
+    });
+    return { success: true as const, personaAssignmentId };
   },
 });
 
@@ -483,6 +778,15 @@ export const setActive = mutation({
     const actor = await requireCompanyPermission(ctx, args.tenantId, COMPANY_PERMISSIONS.MANAGE_MEMBERS);
     const operator = await ctx.db.get(args.operatorId);
     if (!operator || operator.tenantId !== args.tenantId) return { success: false, error: "Company member is unavailable." };
+    const primaryPersona = await getPrimaryPersonaAssignment(ctx, args.tenantId, args.operatorId);
+    if (
+      !args.active &&
+      operator.active &&
+      primaryPersona?.role.systemKey === "ADMIN" &&
+      await activeAdminPersonaCount(ctx, args.tenantId) <= 1
+    ) {
+      return { success: false, error: "Assign another active Admin before deactivating the final Admin." };
+    }
     if (!args.active && wouldRemoveLastOwner({
       memberActive: operator.active,
       memberIsOwner: await operatorHasOwnerRole(ctx, args.tenantId, args.operatorId),

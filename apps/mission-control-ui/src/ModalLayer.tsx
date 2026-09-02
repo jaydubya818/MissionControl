@@ -57,6 +57,7 @@ interface ModalLayerProps {
   onResumeSquad: () => void;
   onToast: (msg: string, error?: boolean) => void;
   onNavigateToGateway?: () => void;
+  canAccessView?: (view: MainView) => boolean;
 }
 
 export function ModalLayer({
@@ -74,6 +75,7 @@ export function ModalLayer({
   onResumeSquad,
   onToast,
   onNavigateToGateway,
+  canAccessView,
 }: ModalLayerProps) {
   const registerAgent = useMutation(api.agents.register);
 
@@ -278,6 +280,7 @@ export function ModalLayer({
             close("commandPalette");
             onNavigate(view);
           }}
+          canAccessView={canAccessView}
         />
       )}
 

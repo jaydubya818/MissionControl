@@ -9,7 +9,11 @@ import { useResizableColumns } from "./useResizableColumns";
 import { groupForView, itemForView, allNavViews, NAV_GROUPS } from "./navConfig";
 import { EOS_NAV_GROUPS } from "./eosNavConfig";
 import { filterNavGroups } from "./navFilter";
-import { isRouteVisible, routeBadge } from "./routeCapabilities";
+import {
+  isRouteVisible,
+  routeBadge,
+  type RouteAccessContext,
+} from "./routeCapabilities";
 import { useNavGroupsWithCounts } from "./useNavGroupsWithCounts";
 import { useFlag } from "../hooks/useFlag";
 import { Breadcrumbs } from "../components/factory/Breadcrumbs";
@@ -68,9 +72,12 @@ interface AppShellV2Props {
   onOpenSearch: () => void;
   pendingApprovals: number;
   onOpenApprovals: () => void;
+  canOpenApprovals?: boolean;
   headerActions?: ReactNode;
   footer?: ReactNode;
   projectId?: Id<"projects"> | null;
+  access?: RouteAccessContext;
+  onDemoPersonaChange?: (persona?: "EXECUTIVE" | "ARCHITECT" | "BUILDER" | "ADMIN") => void;
   children: ReactNode;
 }
 
@@ -85,9 +92,12 @@ export function AppShellV2({
   onOpenSearch,
   pendingApprovals,
   onOpenApprovals,
+  canOpenApprovals = true,
   headerActions,
   footer,
   projectId,
+  access,
+  onDemoPersonaChange,
   children,
 }: AppShellV2Props): JSX.Element {
   const navigate = useNavigate();
@@ -112,6 +122,7 @@ export function AppShellV2({
     enforceRouteCapabilities: eosPreview,
     showPreviewRoutes,
     showDemoRoutes,
+    access,
   });
   const navGroups = useNavGroupsWithCounts(filteredGroups, projectId);
   const validViews = [
@@ -313,6 +324,36 @@ export function AppShellV2({
                 {activeRouteBadge}
               </span>
             ) : null}
+            {access?.persona ? (
+              <span className="hidden shrink-0 rounded border border-line bg-surface-1 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-ink-secondary sm:inline-flex">
+                {access.persona}
+              </span>
+            ) : null}
+            {access?.identityMode === "DEMO" ? (
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-warning">
+                  Local demo · non-production
+                </span>
+                {onDemoPersonaChange ? (
+                  <select
+                    aria-label="Preview persona"
+                    value={access.demoPreview ? access.persona ?? "" : ""}
+                    onChange={(event) => onDemoPersonaChange(
+                      event.target.value
+                        ? event.target.value as "EXECUTIVE" | "ARCHITECT" | "BUILDER" | "ADMIN"
+                        : undefined
+                    )}
+                    className="hidden h-7 rounded border border-line bg-surface-1 px-2 text-[10px] font-medium text-ink-secondary outline-none focus-visible:ring-2 focus-visible:ring-ring md:block"
+                  >
+                    <option value="">Normal demo (Admin)</option>
+                    <option value="EXECUTIVE">Preview Executive</option>
+                    <option value="ARCHITECT">Preview Architect</option>
+                    <option value="BUILDER">Preview Builder</option>
+                    <option value="ADMIN">Preview Admin</option>
+                  </select>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {headerActions}
@@ -327,7 +368,7 @@ export function AppShellV2({
                 <MessageSquare size={14} aria-hidden />
               </button>
             ) : null}
-            <button
+            {canOpenApprovals ? <button
               type="button"
               onClick={onOpenApprovals}
               className={cn(
@@ -348,7 +389,7 @@ export function AppShellV2({
                 : pendingApprovals > 0
                   ? `${pendingApprovals} approval${pendingApprovals === 1 ? "" : "s"}`
                   : "Approvals"}
-            </button>
+            </button> : null}
           </div>
         </header>
         <main className="flex min-h-0 flex-1 overflow-hidden bg-app">

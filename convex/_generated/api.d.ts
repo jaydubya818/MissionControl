@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as accessProfiles from "../accessProfiles.js";
 import type * as activities from "../activities.js";
 import type * as agentDocuments from "../agentDocuments.js";
 import type * as agentHiring from "../agentHiring.js";
@@ -86,6 +87,7 @@ import type * as hybridWorkflows from "../hybridWorkflows.js";
 import type * as identity from "../identity.js";
 import type * as knowledge from "../knowledge.js";
 import type * as knowledgeGraph from "../knowledgeGraph.js";
+import type * as lib_accessControl from "../lib/accessControl.js";
 import type * as lib_agentResolver from "../lib/agentResolver.js";
 import type * as lib_armAudit from "../lib/armAudit.js";
 import type * as lib_armCompat from "../lib/armCompat.js";
@@ -220,6 +222,7 @@ import type * as meetings from "../meetings.js";
 import type * as memoryLifecycle from "../memoryLifecycle.js";
 import type * as messages from "../messages.js";
 import type * as metrics from "../metrics.js";
+import type * as migrations_backfillAccessProfiles from "../migrations/backfillAccessProfiles.js";
 import type * as migrations_backfillInstanceRefs from "../migrations/backfillInstanceRefs.js";
 import type * as mission from "../mission.js";
 import type * as missionChat from "../missionChat.js";
@@ -308,6 +311,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accessProfiles: typeof accessProfiles;
   activities: typeof activities;
   agentDocuments: typeof agentDocuments;
   agentHiring: typeof agentHiring;
@@ -386,6 +390,7 @@ declare const fullApi: ApiFromModules<{
   identity: typeof identity;
   knowledge: typeof knowledge;
   knowledgeGraph: typeof knowledgeGraph;
+  "lib/accessControl": typeof lib_accessControl;
   "lib/agentResolver": typeof lib_agentResolver;
   "lib/armAudit": typeof lib_armAudit;
   "lib/armCompat": typeof lib_armCompat;
@@ -520,6 +525,7 @@ declare const fullApi: ApiFromModules<{
   memoryLifecycle: typeof memoryLifecycle;
   messages: typeof messages;
   metrics: typeof metrics;
+  "migrations/backfillAccessProfiles": typeof migrations_backfillAccessProfiles;
   "migrations/backfillInstanceRefs": typeof migrations_backfillInstanceRefs;
   mission: typeof mission;
   missionChat: typeof missionChat;

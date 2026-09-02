@@ -268,8 +268,6 @@
     "governance/deployments:listShadowGates",
     "governance/deployments:recordShadowGate",
     "governance/deployments:rollbackDeployment",
-    "governance/permissions:createPermission",
-    "governance/permissions:listPermissions",
     "governance/policyEnvelopes:attachPolicy",
     "governance/policyEnvelopes:evaluate",
     "governance/policyEnvelopes:listPolicyEnvelopes",

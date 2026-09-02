@@ -1,7 +1,16 @@
-import { mutation, query } from "../_generated/server";
+import { internalMutation, query } from "../_generated/server";
 import { v } from "convex/values";
+import {
+  COMPANY_PERMISSIONS,
+  requireCompanyPermission,
+} from "../lib/companyAccess";
 
-export const createPermission = mutation({
+/**
+ * Permission keys are a code-reviewed platform contract. Runtime creation is
+ * reserved for trusted seed and migration callers; browser clients cannot
+ * mutate the catalog.
+ */
+export const createPermission = internalMutation({
   args: {
     resource: v.string(),
     action: v.string(),
@@ -22,9 +31,15 @@ export const createPermission = mutation({
 
 export const listPermissions = query({
   args: {
+    tenantId: v.id("tenants"),
     resource: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireCompanyPermission(
+      ctx,
+      args.tenantId,
+      COMPANY_PERMISSIONS.MANAGE_ACCESS_PROFILES,
+    );
     const resource = args.resource;
     if (resource) {
       return await ctx.db

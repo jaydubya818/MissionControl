@@ -54,7 +54,23 @@ describe("filterNavGroups", () => {
       "deployments",
       "projects",
       "model-routing",
+      "access-profiles",
     ]);
+  });
+
+  it("applies profile visibility and read permissions when enforcement is active", () => {
+    const filtered = filterNavGroups(EOS_NAV_GROUPS, {
+      enforceRouteCapabilities: true,
+      access: {
+        status: "READY",
+        enforced: true,
+        effectivePermissions: ["workorders.read", "tasks.read"],
+        profile: { visibleViews: ["control-work-orders", "tasks", "agents"] },
+      },
+    });
+    const views = filtered.flatMap((group) => group.items.map((item) => item.view));
+
+    expect(views).toEqual(["control-work-orders", "tasks"]);
   });
 
   it("exposes preview and demo routes only through their explicit flags", () => {

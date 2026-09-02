@@ -46,6 +46,7 @@ interface CommandPaletteProps {
   onNavigateToGateway?: () => void;
   /** Jump to a main view and close the palette */
   onNavigateView?: (view: MainView) => void;
+  canAccessView?: (view: MainView) => boolean;
 }
 
 export function CommandPalette({
@@ -60,29 +61,31 @@ export function CommandPalette({
   onOpenCreateAgent,
   onNavigateToGateway,
   onNavigateView,
+  canAccessView = () => true,
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
 
   const searchResults = useQuery(
     api.search.searchAll,
-    projectId && search.trim().length >= 2
+    projectId && search.trim().length >= 2 &&
+      (canAccessView("tasks") || canAccessView("control-approvals") || canAccessView("agents"))
       ? { projectId, query: search.trim(), limit: 8 }
       : "skip"
   );
 
   const commands = useMemo(
     () => [
-      { id: "new-task", label: "Create New Task", icon: <Plus className="h-4 w-4" />, shortcut: "Cmd+N", action: onCreateTask },
-      { id: "open-approvals", label: "Open Approvals Center", icon: <Shield className="h-4 w-4" />, shortcut: "Cmd+Shift+A", action: onOpenApprovals },
-      { id: "open-agents", label: "Open Agent Registry", icon: <Bot className="h-4 w-4" />, shortcut: "Cmd+2", action: onOpenAgents },
-      ...(onOpenCostAnalytics ? [{ id: "cost-analytics", label: "Cost Analytics", icon: <DollarSign className="h-4 w-4" />, shortcut: "Cmd+Shift+I", action: onOpenCostAnalytics }] : []),
-      ...(onOpenCreateAgent ? [{ id: "create-agent", label: "Create Agent", icon: <Bot className="h-4 w-4" />, shortcut: "", action: onOpenCreateAgent }] : []),
-      ...(onNavigateToGateway ? [{ id: "connect-gateway", label: "Connect Gateway", icon: <Radio className="h-4 w-4" />, shortcut: "", action: onNavigateToGateway }] : []),
-      ...(onOpenControls
+      ...(canAccessView("tasks") ? [{ id: "new-task", label: "Create New Task", icon: <Plus className="h-4 w-4" />, shortcut: "Cmd+N", action: onCreateTask }] : []),
+      ...(canAccessView("control-approvals") ? [{ id: "open-approvals", label: "Open Approvals Center", icon: <Shield className="h-4 w-4" />, shortcut: "Cmd+Shift+A", action: onOpenApprovals }] : []),
+      ...(canAccessView("agents") ? [{ id: "open-agents", label: "Open Agent Registry", icon: <Bot className="h-4 w-4" />, shortcut: "Cmd+2", action: onOpenAgents }] : []),
+      ...(onOpenCostAnalytics && canAccessView("analytics") ? [{ id: "cost-analytics", label: "Cost Analytics", icon: <DollarSign className="h-4 w-4" />, shortcut: "Cmd+Shift+I", action: onOpenCostAnalytics }] : []),
+      ...(onOpenCreateAgent && canAccessView("agents") ? [{ id: "create-agent", label: "Create Agent", icon: <Bot className="h-4 w-4" />, shortcut: "", action: onOpenCreateAgent }] : []),
+      ...(onNavigateToGateway && canAccessView("gateway") ? [{ id: "connect-gateway", label: "Connect Gateway", icon: <Radio className="h-4 w-4" />, shortcut: "", action: onNavigateToGateway }] : []),
+      ...(onOpenControls && canAccessView("system")
         ? [{ id: "open-controls", label: "Open Operator Controls", icon: <AlertTriangle className="h-4 w-4" />, shortcut: "Cmd+Shift+C", action: onOpenControls }]
         : []),
     ],
-    [onCreateTask, onOpenApprovals, onOpenAgents, onOpenControls, onOpenCostAnalytics, onOpenCreateAgent, onNavigateToGateway]
+    [canAccessView, onCreateTask, onOpenApprovals, onOpenAgents, onOpenControls, onOpenCostAnalytics, onOpenCreateAgent, onNavigateToGateway]
   );
 
   const filteredCommands = commands.filter((command) =>
@@ -171,9 +174,10 @@ export function CommandPalette({
         value: "Go to Memory journal knowledge",
       },
     ];
-    if (!q) return all;
-    return all.filter((item) => item.value.toLowerCase().includes(q));
-  }, [onNavigateView, search]);
+    const accessible = all.filter((item) => canAccessView(item.view));
+    if (!q) return accessible;
+    return accessible.filter((item) => item.value.toLowerCase().includes(q));
+  }, [canAccessView, onNavigateView, search]);
 
   const hasSearch = search.trim().length >= 2;
   const hasNoResults =
@@ -235,7 +239,7 @@ export function CommandPalette({
 
         {hasSearch && (
           <>
-            <CommandGroup heading="Tasks">
+            {canAccessView("tasks") ? <CommandGroup heading="Tasks">
               {(searchResults?.tasks ?? []).map((task) => (
                 <CommandItem
                   key={task._id}
@@ -254,9 +258,9 @@ export function CommandPalette({
                   </span>
                 </CommandItem>
               ))}
-            </CommandGroup>
+            </CommandGroup> : null}
 
-            <CommandGroup heading="Approvals">
+            {canAccessView("control-approvals") ? <CommandGroup heading="Approvals">
               {(searchResults?.approvals ?? []).map((approval) => (
                 <CommandItem
                   key={approval._id}
@@ -277,9 +281,9 @@ export function CommandPalette({
                   </span>
                 </CommandItem>
               ))}
-            </CommandGroup>
+            </CommandGroup> : null}
 
-            <CommandGroup heading="Agents">
+            {canAccessView("agents") ? <CommandGroup heading="Agents">
               {(searchResults?.agents ?? []).map((agent) => (
                 <CommandItem
                   key={agent._id}
@@ -298,7 +302,7 @@ export function CommandPalette({
                   </span>
                 </CommandItem>
               ))}
-            </CommandGroup>
+            </CommandGroup> : null}
           </>
         )}
 
