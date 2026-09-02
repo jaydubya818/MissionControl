@@ -45,6 +45,11 @@ function anonymousDemoEnabled(): boolean {
   return process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT === "1";
 }
 
+export function localDemoOperatorAcceptanceEnabled(): boolean {
+  return anonymousDemoEnabled()
+    && process.env.MC_ALLOW_LOCAL_OPERATOR_GOVERNED_ACCEPTANCE === "1";
+}
+
 export function isCompanyAdminRole(role: Doc<"roles">): boolean {
   const name = role.name.trim().toLowerCase();
   return (

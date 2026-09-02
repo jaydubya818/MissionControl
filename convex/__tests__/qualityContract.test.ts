@@ -66,6 +66,15 @@ describe("approved Plan Quality Contract projection", () => {
     expect(revised).not.toBe(first);
   });
 
+  it("freezes the Planning Agent repository SHA into the approved quality contract", () => {
+    const planningRepositorySha = "a".repeat(40);
+    const bound = compileApprovedPlanQualityContract({ ...input, planningRepositorySha });
+
+    expect(bound.projection.schemaVersion).toBe(3);
+    expect(bound.projection.repository.planningRepositorySha).toBe(planningRepositorySha);
+    expect(bound.digest).not.toBe(compileApprovedPlanQualityContract(input).digest);
+  });
+
   it("freezes exact Spec, Constitution, coverage, and non-authoritative checklist lineage", () => {
     const specBound = compileApprovedPlanQualityContract({
       ...input,

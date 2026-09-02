@@ -17,6 +17,14 @@ import { resolveAgentRef } from "./lib/agentResolver";
 import { appendChangeRecord } from "./lib/armAudit";
 import { preferInstanceRefs } from "./lib/armCompat";
 import {
+  evaluateRateLimit,
+  globalRateLimitKey,
+  isExternalSource,
+  originRateLimitKey,
+  rateLimitMessage,
+  RATE_LIMIT_POLICIES,
+} from "./lib/rateLimit";
+import {
   outputContractFromMetadata,
   validateForReview,
 } from "./lib/outputValidation";
@@ -1117,25 +1125,44 @@ export const create = mutation({
       }
     }
 
-    // ── Rate limit external sources (30 per key per minute)
-    const RATE_LIMIT_PER_MINUTE = 30;
-    const WINDOW_MS = 60 * 1000;
-    if (args.source === "TELEGRAM" && args.sourceRef) {
-      const key = `telegram:${args.sourceRef.split(":")[1] ?? "unknown"}`;
+    // ── Rate limit external sources ──
+    // Previously this engaged only for `source === "TELEGRAM"`, so any caller
+    // skipped it by sending `source: "API"` — `source` is a caller-supplied
+    // optional string. Every external call now increments a global ceiling that
+    // no caller-supplied value can vary, plus a per-origin bucket for fairness.
+    if (isExternalSource(args.source)) {
+      const policy = RATE_LIMIT_POLICIES.tasksCreate;
       const now = Date.now();
-      const windowStart = Math.floor(now / WINDOW_MS) * WINDOW_MS;
-      const entry = await ctx.db
-        .query("rateLimitEntries")
-        .withIndex("by_key", (q) => q.eq("key", key))
-        .first();
-      if (!entry || entry.windowStart < windowStart) {
-        if (entry) await ctx.db.delete(entry._id);
-        await ctx.db.insert("rateLimitEntries", { key, windowStart, count: 1 });
-      } else {
-        if (entry.count >= RATE_LIMIT_PER_MINUTE) {
-          throw new Error("Rate limit exceeded. Please try again in a minute.");
+      const buckets: Array<{ key: string; limit: number }> = [
+        { key: globalRateLimitKey(policy), limit: policy.globalLimit },
+        { key: originRateLimitKey(policy, args.source, args.sourceRef), limit: policy.limit },
+      ];
+      for (const bucket of buckets) {
+        const entry = await ctx.db
+          .query("rateLimitEntries")
+          .withIndex("by_key", (q) => q.eq("key", bucket.key))
+          .first();
+        const decision = evaluateRateLimit(
+          policy,
+          bucket.limit,
+          entry ? { windowStart: entry.windowStart, count: entry.count } : null,
+          now,
+        );
+        if (!decision.allowed) {
+          throw new Error(rateLimitMessage(policy, decision));
         }
-        await ctx.db.patch(entry._id, { count: entry.count + 1 });
+        if (entry) {
+          await ctx.db.patch(entry._id, {
+            windowStart: decision.nextWindowStart,
+            count: decision.nextCount,
+          });
+        } else {
+          await ctx.db.insert("rateLimitEntries", {
+            key: bucket.key,
+            windowStart: decision.nextWindowStart,
+            count: decision.nextCount,
+          });
+        }
       }
     }
 
@@ -1203,6 +1230,7 @@ export const create = mutation({
       identifier,
       goalId: args.goalId,
       workOrderId: args.workOrderId,
+      planningRepositorySha: workOrder?.planningRepositorySha,
       title,
       description,
       type: args.type as TaskType,
@@ -1319,9 +1347,17 @@ export const linkToWorkOrder = mutation({
         "This Task is already governed by another Work Order. Unlinking requires a separate reviewed change."
       );
     }
+    if (task.planningRepositorySha
+      && workOrder.planningRepositorySha
+      && task.planningRepositorySha !== workOrder.planningRepositorySha) {
+      throw new Error("Task planning revision does not match the selected Work Order.");
+    }
     if (task.workOrderId === args.workOrderId) {
+      if (task.planningRepositorySha !== workOrder.planningRepositorySha) {
+        await ctx.db.patch(task._id, { planningRepositorySha: workOrder.planningRepositorySha });
+      }
       return {
-        task: (await loadTaskProjections(ctx, [task], args.projectId))[0],
+        task: (await loadTaskProjections(ctx, [await ctx.db.get(task._id) ?? task], args.projectId))[0],
         linked: false,
         idempotencyHit: true,
       };
@@ -1335,6 +1371,7 @@ export const linkToWorkOrder = mutation({
     };
     await ctx.db.patch(task._id, {
       workOrderId: workOrder._id,
+      planningRepositorySha: workOrder.planningRepositorySha,
       metadata: {
         ...(typeof task.metadata === "object" && task.metadata !== null
           ? task.metadata

@@ -152,6 +152,9 @@ export class DeepSeekHarnessExecutorAdapter implements HarnessExecutorAdapter<De
     if (request.provider !== EXPECTED_PROVIDER || request.model !== EXPECTED_MODEL) {
       issues.push({ field: "model", message: `DeepSeek Harness V1 admits only ${EXPECTED_PROVIDER}/${EXPECTED_MODEL}.` });
     }
+    if (request.structuredOutput) {
+      issues.push({ field: "structuredOutput", message: "DeepSeek Harness V1 does not admit request-bound structured-output contracts." });
+    }
     return issues;
   }
 

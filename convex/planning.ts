@@ -7,7 +7,7 @@
 
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { resolveAgentRef } from "./lib/agentResolver";
 import { preferInstanceRefs } from "./lib/armCompat";
@@ -121,6 +121,17 @@ export const generateQuestions = action({
     type: v.string(),
   },
   handler: async (ctx, args): Promise<{ questions: string[] }> => {
+    // Authorization: this action spends the deployment's provider budget, and a
+    // Convex `action` export is callable by anyone holding the deployment URL —
+    // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
+    // before spending, and rate-limit on that server-derived identity.
+    const access = await ctx.runQuery(internal.companyContext.assertAuthenticated, {});
+    const budget = await ctx.runMutation(internal.companyContext.consumeProviderBudget, {
+      operation: "planning.generateQuestions",
+      actorId: access.actorId,
+    });
+    if (!budget.allowed) throw new Error(budget.message);
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (apiKey) {
       const prompt = `You are helping clarify a task before an AI agent works on it. Given this task, generate 3 to 5 short clarifying questions that will help create a precise work plan. One question per line. No numbering. Be concise.
@@ -185,6 +196,17 @@ export const generatePlanFromAnswers = action({
     estimatedCost?: number;
     estimatedDuration?: string;
   }> => {
+    // Authorization: this action spends the deployment's provider budget, and a
+    // Convex `action` export is callable by anyone holding the deployment URL —
+    // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
+    // before spending, and rate-limit on that server-derived identity.
+    const access = await ctx.runQuery(internal.companyContext.assertAuthenticated, {});
+    const budget = await ctx.runMutation(internal.companyContext.consumeProviderBudget, {
+      operation: "planning.generatePlanFromAnswers",
+      actorId: access.actorId,
+    });
+    if (!budget.allowed) throw new Error(budget.message);
+
     const apiKey = process.env.OPENAI_API_KEY;
     const qaBlock = args.answers
       .map((a) => `Q: ${a.question}\nA: ${a.answer}`)

@@ -19,6 +19,7 @@ import {
   finalizationForRevision,
   hydrateChecklistDispositions,
   missionSpecCompleteness,
+  missionSpecWithCurrentMissionScope,
   missionSpecValuesEqual,
   nextMissionSpecId,
   type MissionSpecValues,
@@ -1570,11 +1571,11 @@ export function MissionSpecificationWorkspace({
 
   useEffect(() => {
     if (!dirty) {
-      setValues(seedValues);
+      setValues(missionSpecWithCurrentMissionScope(seedValues, mission));
       setBaseline(seedValues);
       setRevising(false);
     }
-  }, [dirty, seedValues]);
+  }, [dirty, mission.codeScopeIds, mission.repositoryId, seedValues]);
 
   if (intake === undefined)
     return (

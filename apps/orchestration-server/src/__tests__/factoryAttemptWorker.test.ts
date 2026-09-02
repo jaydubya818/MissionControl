@@ -93,7 +93,13 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("turns governed issue intent into a verified, evidence-linked pull request", async () => {
     const fixture = await runFixture("VERIFIED");
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toEqual(expect.objectContaining({ completedCount: 1, lastError: null })));
+    await vi.waitFor(
+      () =>
+        expect(fixture.worker.status()).toEqual(
+          expect.objectContaining({ completedCount: 1, lastError: null }),
+        ),
+      { timeout: 3_000 },
+    );
 
     expect(fixture.createPullRequest).toHaveBeenCalledOnce();
     const pullRequestInput = fixture.createPullRequest.mock.calls[0][0];
@@ -116,6 +122,28 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       changedFiles: ["src/feature.ts"],
     });
     expect(fixture.reports.at(-1)?.terminal).toEqual({ status: "COMPLETED" });
+    await fixture.worker.stop();
+  });
+
+  it("completes a non-mutating candidate as durable evidence without provider publication", async () => {
+    const fixture = await runFixture("VERIFIED", {
+      isMutating: false,
+      noVerificationContract: true,
+    });
+
+    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+
+    expect(fixture.authorizePublication).not.toHaveBeenCalled();
+    expect(fixture.pushFactoryBranch).not.toHaveBeenCalled();
+    expect(fixture.createPullRequest).not.toHaveBeenCalled();
+    expect(fixture.executeVerification).not.toHaveBeenCalled();
+    expect(fixture.reports.at(-1)).toMatchObject({
+      artifacts: expect.arrayContaining([
+        expect.objectContaining({ artifactType: "STRUCTURED_OUTPUT" }),
+        expect.objectContaining({ artifactType: "CODE_DIFF" }),
+      ]),
+      terminal: { status: "COMPLETED" },
+    });
     await fixture.worker.stop();
   });
 
@@ -358,6 +386,8 @@ async function runFixture(
     attempt?: number;
     dirtyVerification?: boolean;
     durable?: boolean;
+    isMutating?: boolean;
+    noVerificationContract?: boolean;
     harness?: { adapter: string; version: string; displayName: string; provider: string };
   } = {},
 ) {
@@ -377,6 +407,9 @@ async function runFixture(
   const worktree = path.join(checkoutRoot, ".mission-control", "worktrees", `attempt-${attempt}`);
   const reports: any[] = [];
   const manifest = executionManifest({ attempt, dirtyVerification: options.dirtyVerification, baseSha });
+  if (options.noVerificationContract) {
+    delete (manifest.workOrderSpecification as { verificationContract?: unknown }).verificationContract;
+  }
   if (options.harness) {
     const capabilityManifest = fixtureHarnessManifest(options.harness);
     manifest.harness.adapter = options.harness.adapter;
@@ -397,6 +430,7 @@ async function runFixture(
     executionManifestDigest: `sha256:${canonicalHash(manifest)}`,
     executorAdapter: options.harness?.adapter ?? "codex",
     executorVersion: options.harness?.version ?? "v1",
+    isMutating: options.isMutating ?? true,
     status: "PENDING",
   };
   const claim = {

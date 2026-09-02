@@ -60,10 +60,14 @@ export const ConvexActions = {
     recordResidualReviewAnalysis: "serviceCommands:recordResidualReviewAnalysis",
     listFactorySandboxReconcileCandidates: "serviceCommands:listFactorySandboxReconcileCandidates",
     reportFactorySandboxReconcile: "serviceCommands:reportFactorySandboxReconcile",
+    reportExactModelRouteHealth: "serviceCommands:reportExactModelRouteHealth",
     claimExecution: "serviceCommands:claimExecution",
     heartbeatExecution: "serviceCommands:heartbeatExecution",
     reportExecution: "serviceCommands:reportExecution",
     finalizeExecution: "serviceCommands:finalizeExecution",
+    claimMissionPlanningRun: "serviceCommands:claimMissionPlanningRun",
+    renewMissionPlanningRun: "serviceCommands:renewMissionPlanningRun",
+    reportMissionPlanningRun: "serviceCommands:reportMissionPlanningRun",
   },
 } as const;
 

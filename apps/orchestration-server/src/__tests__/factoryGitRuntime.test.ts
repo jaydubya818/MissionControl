@@ -6,11 +6,15 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   assertFactoryCandidateUnchanged,
+  assertPlanningWorktreeUnchanged,
   commitFactoryChanges,
   ensureFactoryWorktree,
+  ensurePlanningWorktree,
   ensureVerificationWorktree,
   inspectCandidateChange,
   listChangedFiles,
+  prepareFactoryDependencies,
+  releasePlanningWorktree,
 } from "../factoryGitRuntime.js";
 
 const execFileAsync = promisify(execFile);
@@ -38,6 +42,8 @@ describe("Factory Git runtime", () => {
     await writeFile(path.join(worktree, "apps", "ui", "App.tsx"), "export const value = 2;\n");
     expect(await listChangedFiles(worktree, baseSha)).toEqual(["apps/ui/App.tsx"]);
     const firstHead = await commitFactoryChanges({ worktree, changedFiles: ["apps/ui/App.tsx"], title: "Update app" });
+    expect((await git(worktree, ["show", "-s", "--format=%an <%ae>", firstHead])).stdout.trim())
+      .toBe("Test <test@example.com>");
     const candidate = await inspectCandidateChange(worktree, baseSha);
     expect(candidate).toMatchObject({ sourceRevision: baseSha, candidateRevision: firstHead, changedFiles: ["apps/ui/App.tsx"], linesAdded: 1, linesDeleted: 1 });
     await expect(assertFactoryCandidateUnchanged(worktree, firstHead)).resolves.toBeUndefined();
@@ -79,6 +85,32 @@ describe("Factory Git runtime", () => {
     expect(await commitFactoryChanges({ worktree, changedFiles: ["apps/ui/App.tsx"], title: "Update app" })).toBe(firstHead);
   });
 
+  it("prepares frozen dependencies without changing source state", async () => {
+    const repository = await mkdtemp(path.join(tmpdir(), "mc-factory-dependencies-"));
+    cleanup.push(repository);
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.name", "Test"]);
+    await git(repository, ["config", "user.email", "test@example.com"]);
+    await writeFile(path.join(repository, ".gitignore"), "node_modules/\n");
+    await writeFile(path.join(repository, "package.json"), '{"private":true}\n');
+    await writeFile(path.join(repository, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "Initial"]);
+    const baseSha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
+    const worktree = path.join(repository, ".mission-control", "worktrees", "attempt-dependencies");
+    await ensureFactoryWorktree({ checkoutRoot: repository, worktree, branch: "mc/attempt-dependencies", baseSha });
+
+    await expect(prepareFactoryDependencies({ worktree }, async (root) => {
+      await mkdir(path.join(root, "node_modules"), { recursive: true });
+      await writeFile(path.join(root, "node_modules", ".prepared"), "offline\n");
+    })).resolves.toEqual({ status: "PREPARED", packageManager: "pnpm" });
+    expect((await git(worktree, ["status", "--porcelain=v1"])).stdout).toBe("");
+
+    await expect(prepareFactoryDependencies({ worktree }, async (root) => {
+      await writeFile(path.join(root, "package.json"), '{"private":false}\n');
+    })).rejects.toThrow(/changed repository source state/);
+  });
+
   it("rejects a worktree root symlink that escapes the canonical checkout", async () => {
     const repository = await mkdtemp(path.join(tmpdir(), "mc-factory-git-symlink-"));
     const escapedRoot = await mkdtemp(path.join(tmpdir(), "mc-factory-git-escaped-"));
@@ -99,6 +131,32 @@ describe("Factory Git runtime", () => {
       branch: "mc/attempt-escape",
       baseSha,
     })).rejects.toThrow(/symbolic link|resolve inside/);
+  });
+
+  it("binds planning to a detached exact SHA and rejects any repository change", async () => {
+    const repository = await mkdtemp(path.join(tmpdir(), "mc-planning-git-test-"));
+    cleanup.push(repository);
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.name", "Test"]);
+    await git(repository, ["config", "user.email", "test@example.com"]);
+    await writeFile(path.join(repository, "README.md"), "planning baseline\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "Planning baseline"]);
+    const planningRepositorySha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
+    const worktree = path.join(repository, ".mission-control", "worktrees", "planning-run-1");
+
+    await expect(ensurePlanningWorktree({ checkoutRoot: repository, worktree, planningRepositorySha }))
+      .resolves.toBe(worktree);
+    expect((await git(worktree, ["branch", "--show-current"])).stdout.trim()).toBe("");
+    await expect(assertPlanningWorktreeUnchanged(worktree, planningRepositorySha)).resolves.toBeUndefined();
+
+    await writeFile(path.join(worktree, "planner-output.tmp"), "unauthorized write\n");
+    await expect(assertPlanningWorktreeUnchanged(worktree, planningRepositorySha))
+      .rejects.toThrow(/Read-only planning left repository changes behind/);
+    await rm(path.join(worktree, "planner-output.tmp"));
+
+    await expect(releasePlanningWorktree({ checkoutRoot: repository, worktree, planningRepositorySha }))
+      .resolves.toBeUndefined();
   });
 });
 

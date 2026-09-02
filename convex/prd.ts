@@ -8,6 +8,7 @@ import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
+import { internal } from "./_generated/api";
 import {
   fingerprintPrdContent,
   normalizePrdContent,
@@ -234,6 +235,17 @@ export const parsePrd = action({
     maxTasks: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<{ tasks: ParsedTaskPreview[] }> => {
+    // Authorization: this action spends the deployment's provider budget, and a
+    // Convex `action` export is callable by anyone holding the deployment URL —
+    // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
+    // before spending, and rate-limit on that server-derived identity.
+    const access = await ctx.runQuery(internal.companyContext.assertAuthenticated, {});
+    const budget = await ctx.runMutation(internal.companyContext.consumeProviderBudget, {
+      operation: "prd.parsePrd",
+      actorId: access.actorId,
+    });
+    if (!budget.allowed) throw new Error(budget.message);
+
     const maxTasks = args.maxTasks ?? 20;
     const content = args.content.trim();
     if (!content) return { tasks: [] };

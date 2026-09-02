@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { ConvexHttpClient } from "convex/browser";
-import { ConvexMutations } from "./convexCalls.js";
+import { ConvexActions, ConvexMutations } from "./convexCalls.js";
+import { createSignedServiceCommand } from "./serviceCommandClient.js";
 import { canonicalGithubRepositoryFromRemote } from "./factoryRepositoryIdentity.js";
 import type { HarnessCapabilityManifest } from "@mission-control/workflow-engine";
 
@@ -59,6 +60,19 @@ export interface FactoryCheckoutObservation {
   baseBranch: string;
   baseCommit: string;
   dirty: boolean;
+}
+
+export function factorySandboxCapabilities(options: {
+  githubAppPublicationReady: boolean;
+  remoteSandboxBackendReady: boolean;
+}) {
+  return [
+    "git-worktree",
+    "workspace-write",
+    "read-only",
+    ...(options.githubAppPublicationReady ? ["github-app-publication"] : []),
+    ...(options.remoteSandboxBackendReady ? ["remote-sandbox", "sandbox-provider:exe-dev"] : []),
+  ];
 }
 
 export class FactoryHostReporter {
@@ -137,6 +151,22 @@ export class FactoryHostReporter {
         status: observation.dirty ? "DIRTY" : "READY",
         checkedAt: now,
       });
+      for (const binding of this.config.factoryVersionBindings ?? []) {
+        const command = createSignedServiceCommand({
+          capability: "models.report-exact-route-health",
+          projectId: this.config.projectId,
+          repositoryId: this.config.repositoryId,
+          payload: {
+            factoryDefinitionVersionId: binding.factoryDefinitionVersionId,
+            expectedRouteDigest: binding.modelRouteDigest,
+            availability: "HEALTHY",
+          },
+        });
+        await this.client.action(
+          ConvexActions.serviceCommands.reportExactModelRouteHealth as any,
+          command,
+        );
+      }
     } finally {
       this.reporting = false;
     }

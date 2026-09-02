@@ -7,7 +7,7 @@
 
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id, Doc } from "./_generated/dataModel";
 
 // ---------------------------------------------------------------------------
@@ -181,6 +181,17 @@ export const indexDocument = action({
     content: v.string(),
   },
   handler: async (ctx, args) => {
+    // Authorization: this action spends the deployment's provider budget, and a
+    // Convex `action` export is callable by anyone holding the deployment URL —
+    // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
+    // before spending, and rate-limit on that server-derived identity.
+    const access = await ctx.runQuery(internal.companyContext.assertAuthenticated, {});
+    const budget = await ctx.runMutation(internal.companyContext.consumeProviderBudget, {
+      operation: "knowledge.indexDocument",
+      actorId: access.actorId,
+    });
+    if (!budget.allowed) throw new Error(budget.message);
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY not set in Convex env");
 
@@ -208,6 +219,17 @@ export const indexDocument = action({
 export const indexAllDocs = action({
   args: {},
   handler: async (ctx) => {
+    // Authorization: this action spends the deployment's provider budget, and a
+    // Convex `action` export is callable by anyone holding the deployment URL —
+    // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
+    // before spending, and rate-limit on that server-derived identity.
+    const access = await ctx.runQuery(internal.companyContext.assertAuthenticated, {});
+    const budget = await ctx.runMutation(internal.companyContext.consumeProviderBudget, {
+      operation: "knowledge.indexAllDocs",
+      actorId: access.actorId,
+    });
+    if (!budget.allowed) throw new Error(budget.message);
+
     const BASE =
       "https://raw.githubusercontent.com/jaydubya818/MissionControl/main/";
 
@@ -277,6 +299,17 @@ export const semanticSearch = action({
     ctx,
     args
   ): Promise<(Doc<"knowledgeChunks"> & { score: number })[]> => {
+    // Authorization: this action spends the deployment's provider budget, and a
+    // Convex `action` export is callable by anyone holding the deployment URL —
+    // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
+    // before spending, and rate-limit on that server-derived identity.
+    const access = await ctx.runQuery(internal.companyContext.assertAuthenticated, {});
+    const budget = await ctx.runMutation(internal.companyContext.consumeProviderBudget, {
+      operation: "knowledge.semanticSearch",
+      actorId: access.actorId,
+    });
+    if (!budget.allowed) throw new Error(budget.message);
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY not set in Convex env");
 
@@ -327,6 +360,17 @@ export const chatWithRepo = action({
     ),
   },
   handler: async (ctx, args) => {
+    // Authorization: this action spends the deployment's provider budget, and a
+    // Convex `action` export is callable by anyone holding the deployment URL —
+    // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
+    // before spending, and rate-limit on that server-derived identity.
+    const access = await ctx.runQuery(internal.companyContext.assertAuthenticated, {});
+    const budget = await ctx.runMutation(internal.companyContext.consumeProviderBudget, {
+      operation: "knowledge.chatWithRepo",
+      actorId: access.actorId,
+    });
+    if (!budget.allowed) throw new Error(budget.message);
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY not set in Convex env");
 

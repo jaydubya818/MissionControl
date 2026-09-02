@@ -7,7 +7,7 @@ import { CodexV1ExecutorAdapter } from "./codexExecutorAdapter.js";
 import { HarnessAdapterRegistry, type HarnessRuntimeAdapter, type RegisteredHarnessAdapter } from "./harnessAdapterRegistry.js";
 import { ConvexActions, ConvexQueries } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
-import { assertFactoryCandidateUnchanged, commitFactoryChanges, createFactorySourceBundle, ensureFactoryWorktree, ensureVerificationWorktree, inspectCandidateChange, listChangedFiles, materializeRemoteCandidate, pushFactoryBranch } from "./factoryGitRuntime.js";
+import { assertFactoryCandidateUnchanged, commitFactoryChanges, createFactorySourceBundle, ensureFactoryWorktree, ensureVerificationWorktree, inspectCandidateChange, listChangedFiles, materializeRemoteCandidate, prepareFactoryDependencies, pushFactoryBranch } from "./factoryGitRuntime.js";
 import { validateChangedFileScope } from "./factoryPathScope.js";
 import { createOrReusePullRequest, loadGithubAppPrivateKey, mintInstallationToken } from "./githubAppRuntime.js";
 import { executeIndependentVerification } from "./factoryVerification.js";
@@ -65,6 +65,7 @@ export interface FactoryAttemptWorkerStatus {
 export interface FactoryAttemptWorkerDependencies {
   ensureFactoryWorktree: typeof ensureFactoryWorktree;
   ensureVerificationWorktree: typeof ensureVerificationWorktree;
+  prepareFactoryDependencies?: typeof prepareFactoryDependencies;
   listChangedFiles: typeof listChangedFiles;
   commitFactoryChanges: typeof commitFactoryChanges;
   inspectCandidateChange: typeof inspectCandidateChange;
@@ -102,6 +103,7 @@ export interface FactoryAttemptWorkerIdentity {
 const DEFAULT_DEPENDENCIES: FactoryAttemptWorkerDependencies = {
   ensureFactoryWorktree,
   ensureVerificationWorktree,
+  prepareFactoryDependencies,
   listChangedFiles,
   commitFactoryChanges,
   inspectCandidateChange,
@@ -150,6 +152,7 @@ export class FactoryAttemptWorker {
     private readonly dependencies: FactoryAttemptWorkerDependencies = DEFAULT_DEPENDENCIES,
     private readonly scope?: FactoryAttemptWorkerScope,
     private readonly identity?: FactoryAttemptWorkerIdentity,
+    private readonly tryAcquireSharedSlot?: () => (() => void) | null,
   ) {
     this.adapters = adapters instanceof HarnessAdapterRegistry
       ? adapters
@@ -214,6 +217,8 @@ export class FactoryAttemptWorker {
             : "Remote sandbox dispatch is blocked while orphan cleanup is unhealthy.";
           continue;
         }
+        const releaseSharedSlot = this.tryAcquireSharedSlot?.() ?? null;
+        if (this.tryAcquireSharedSlot && !releaseSharedSlot) break;
         const controller = new AbortController();
         this.active.set(String(run._id), controller);
         const task = this.execute(run, controller)
@@ -222,7 +227,10 @@ export class FactoryAttemptWorker {
             this.lastError = safeError(error);
             console.error(`[factory-worker] Attempt ${run.runId} failed: ${this.lastError}`);
           })
-          .finally(() => this.active.delete(String(run._id)));
+          .finally(() => {
+            this.active.delete(String(run._id));
+            releaseSharedSlot?.();
+          });
         this.activeTasks.add(task);
         void task.finally(() => this.activeTasks.delete(task));
       }
@@ -425,6 +433,10 @@ export class FactoryAttemptWorker {
         this.lastError = null;
         return;
       }
+
+      await (this.dependencies.prepareFactoryDependencies ?? prepareFactoryDependencies)({
+        worktree: claim.worktree,
+      });
 
       let mappedEvents: any[] = [];
       let traceObservations: any[] = [];
@@ -726,6 +738,18 @@ export class FactoryAttemptWorker {
           return;
         }
       }
+      if (run.isMutating === false) {
+        await cleanupRemote();
+        await report({
+          events: verificationResult ? [] : mappedEvents,
+          observations: verificationResult ? [] : traceObservations,
+          artifacts: verificationResult ? [] : baseArtifacts,
+          terminal: { status: "COMPLETED" },
+        });
+        this.completedCount += 1;
+        this.lastError = null;
+        return;
+      }
       await cleanupRemote();
       await this.publishCandidate({
         claim,
@@ -971,6 +995,9 @@ export class FactoryAttemptWorker {
       worktree: input.claim.worktree,
       candidateSha: subject.candidateSha,
       treeSha: subject.treeSha,
+    });
+    await (this.dependencies.prepareFactoryDependencies ?? prepareFactoryDependencies)({
+      worktree: input.claim.worktree,
     });
     const candidate = await this.dependencies.inspectCandidateChange(
       input.claim.worktree,

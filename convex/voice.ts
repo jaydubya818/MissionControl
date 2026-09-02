@@ -7,6 +7,7 @@
 
 import { v } from "convex/values";
 import { query, mutation, action } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // ============================================================================
 // QUERIES
@@ -115,6 +116,17 @@ export const synthesize = action({
     similarityBoost: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Authorization: this action spends the deployment's provider budget, and a
+    // Convex `action` export is callable by anyone holding the deployment URL —
+    // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
+    // before spending, and rate-limit on that server-derived identity.
+    const access = await ctx.runQuery(internal.companyContext.assertAuthenticated, {});
+    const budget = await ctx.runMutation(internal.companyContext.consumeProviderBudget, {
+      operation: "voice.synthesize",
+      actorId: access.actorId,
+    });
+    if (!budget.allowed) throw new Error(budget.message);
+
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) {
       throw new Error("ELEVENLABS_API_KEY environment variable is required for voice synthesis");

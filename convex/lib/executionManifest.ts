@@ -26,11 +26,16 @@ export interface FactoryExecutionManifestInput {
   missionId?: string;
   missionPlanId?: string;
   missionPlanVersion?: number;
+  planningRepositorySha?: string;
   qualityContractDigest?: string;
   workOrderId: string;
   workOrderRevisionNumber: number;
   workOrderRevisionId?: string;
   taskId?: string;
+  task?: {
+    title: string;
+    description?: string;
+  };
   factoryDefinitionVersionId: string;
   factoryConfigurationDigest: string;
   factoryPurpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGENT_AUTOMATION";
@@ -141,6 +146,11 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
   if (!/^[a-f0-9]{40,64}$/i.test(input.baseSha)) {
     throw new Error("Execution manifest requires an immutable full base SHA.");
   }
+  if (input.planningRepositorySha !== undefined
+    && (!/^[a-f0-9]{40,64}$/i.test(input.planningRepositorySha)
+      || (input.factoryPurpose === "SOFTWARE" && input.baseSha !== input.planningRepositorySha))) {
+    throw new Error("Execution manifest does not match the approved Plan planning repository SHA.");
+  }
   if (!Number.isSafeInteger(input.maxAttempts) || input.maxAttempts < 1 || input.maxAttempts > 20
     || !Number.isFinite(input.maxCostUsd) || input.maxCostUsd <= 0 || input.maxCostUsd > 1_000
     || !Number.isSafeInteger(input.maxRuntimeMinutes) || input.maxRuntimeMinutes < 1 || input.maxRuntimeMinutes > 480) {
@@ -148,6 +158,9 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
   }
   if (!input.executor.adapter.trim() || !input.executor.version.trim() || !input.executionBackend.trim()) {
     throw new Error("Execution manifest requires a provider-neutral executor and backend binding.");
+  }
+  if (Boolean(input.taskId) !== Boolean(input.task)) {
+    throw new Error("Execution manifest requires the selected Task identity and instructions together.");
   }
   if (harnessManifestIssues(input.executor.capabilityManifest).length > 0
     || input.executor.capabilityManifest.identity.adapterId !== input.executor.adapter
@@ -223,11 +236,12 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
       missionId: input.missionId,
       missionPlanId: input.missionPlanId,
       missionPlanVersion: input.missionPlanVersion,
+      planningRepositorySha: input.planningRepositorySha,
       qualityContractDigest: input.qualityContractDigest,
       workOrderId: input.workOrderId,
       workOrderRevisionNumber: input.workOrderRevisionNumber,
       workOrderRevisionId: input.workOrderRevisionId,
-      taskId: input.taskId,
+      ...(input.taskId ? { taskId: input.taskId } : {}),
       workflowRunId: input.runId,
       factoryDefinitionVersionId: input.factoryDefinitionVersionId,
       factoryConfigurationDigest: input.factoryConfigurationDigest,
@@ -239,6 +253,7 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
       dataClassification: input.repositoryDataClassification,
       defaultBranch: input.defaultBranch,
       baseSha: input.baseSha,
+      planningRepositorySha: input.planningRepositorySha,
       branch: input.branch,
       worktree: input.worktree,
       codeScopeIds: input.codeScopes.map((scope) => scope.id).sort(),
@@ -249,6 +264,7 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
       title: input.workOrder.title,
       desiredOutcome: input.workOrder.desiredOutcome,
       acceptanceCriterionIds: input.workOrder.acceptanceCriteria.map((criterion) => criterion.id),
+      ...(input.task ? { selectedTask: input.task } : {}),
     },
     workOrderSpecification: {
       schemaVersion: 1,
@@ -306,9 +322,10 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
     compiledPromptHash: `sha256:${computeCanonicalHash(compiledPrompt)}`,
     compiledPrompt,
   };
+  const persistedManifest = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
   return {
-    manifest,
-    digest: `sha256:${computeCanonicalHash(manifest)}`,
+    manifest: persistedManifest,
+    digest: `sha256:${computeCanonicalHash(persistedManifest)}`,
   };
 }
 
@@ -347,6 +364,8 @@ function compileFactoryPrompt(
     `Work Order: ${input.workOrder.title}`,
     `Desired outcome: ${input.workOrder.desiredOutcome}`,
     input.workOrder.context ? `Context: ${input.workOrder.context}` : "",
+    input.task ? `Selected Child Task: ${input.task.title}` : "",
+    input.task?.description ? `Task instructions: ${input.task.description}` : "",
     "",
     "Acceptance criteria:",
     criteria,

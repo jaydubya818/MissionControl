@@ -53,9 +53,11 @@ function timestampOf(row: { _creationTime?: number; createdAt?: number; recorded
 export function requiredApprovalTypes(args: {
   riskLevel: WorkOrderRiskLevel;
   requiredApprovals?: string[];
+  isMutating?: boolean;
 }) {
   const explicit = [...new Set((args.requiredApprovals ?? []).filter(Boolean))];
   if (explicit.length > 0) return explicit;
+  if (args.isMutating === false) return [];
   return ["HIGH", "CRITICAL"].includes(args.riskLevel) ? ["RISK_REVIEW"] : [];
 }
 
@@ -128,6 +130,7 @@ export function latestWorkOrderReceipt<T extends VerificationReceiptLike>(receip
 export function deriveApprovalStatus(args: {
   riskLevel: WorkOrderRiskLevel;
   requiredApprovals?: string[];
+  isMutating?: boolean;
   approvals: ApprovalDecisionLike[];
   now?: number;
 }): WorkOrderApprovalStatus {
@@ -167,6 +170,7 @@ export function deriveApprovalStatus(args: {
 export function evaluateAcceptance(args: {
   riskLevel: WorkOrderRiskLevel;
   requiredApprovals?: string[];
+  isMutating?: boolean;
   approvalDecisions: ApprovalDecisionLike[];
   acceptanceCriteria: Array<{ id: string; title: string; status: WorkOrderCriterionStatus }>;
   verificationReceipts: VerificationReceiptLike[];
@@ -179,6 +183,7 @@ export function evaluateAcceptance(args: {
   const approvalStatus = deriveApprovalStatus({
     riskLevel: args.riskLevel,
     requiredApprovals: args.requiredApprovals,
+    isMutating: args.isMutating,
     approvals: args.approvalDecisions,
     now: args.now,
   });

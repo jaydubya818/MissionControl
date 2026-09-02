@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, action, internalQuery } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 /**
  * GitHub Integration
@@ -260,6 +260,17 @@ export const syncGitHubIssues = action({
     accessToken: v.string(),
   },
   handler: async (ctx, args) => {
+    // Authorization: this action spends the deployment's provider budget, and a
+    // Convex `action` export is callable by anyone holding the deployment URL —
+    // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
+    // before spending, and rate-limit on that server-derived identity.
+    const access = await ctx.runQuery(internal.companyContext.assertAuthenticated, {});
+    const budget = await ctx.runMutation(internal.companyContext.consumeProviderBudget, {
+      operation: "github.syncIssues",
+      actorId: access.actorId,
+    });
+    if (!budget.allowed) throw new Error(budget.message);
+
     // Fetch issues from GitHub API (open + recently closed)
     const response = await fetch(
       `https://api.github.com/repos/${args.repoOwner}/${args.repoName}/issues?state=all&per_page=100`,
@@ -366,7 +377,18 @@ export const updateGitHubIssueStatus = action({
     state: v.union(v.literal("open"), v.literal("closed")),
     accessToken: v.string(),
   },
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
+    // Authorization: this action spends the deployment's provider budget, and a
+    // Convex `action` export is callable by anyone holding the deployment URL —
+    // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
+    // before spending, and rate-limit on that server-derived identity.
+    const access = await ctx.runQuery(internal.companyContext.assertAuthenticated, {});
+    const budget = await ctx.runMutation(internal.companyContext.consumeProviderBudget, {
+      operation: "github.updateIssueStatus",
+      actorId: access.actorId,
+    });
+    if (!budget.allowed) throw new Error(budget.message);
+
     const response = await fetch(
       `https://api.github.com/repos/${args.repoOwner}/${args.repoName}/issues/${args.issueNumber}`,
       {

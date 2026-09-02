@@ -29,6 +29,36 @@ export function repositoryDisplayName(repository: string): string {
   return segments[segments.length - 1] ?? repository.trim();
 }
 
+export function resolveMissionRepositoryBinding(input: {
+  projectId: string;
+  missionRepository?: {
+    projectId: string;
+    repository: string;
+    defaultBranch: string;
+  } | null;
+  legacyRepository?: string;
+  legacyDefaultBranch?: string;
+}): { repository: string; defaultBranch: string; source: "MISSION" | "LEGACY" } {
+  if (input.missionRepository) {
+    if (input.missionRepository.projectId !== input.projectId) {
+      throw new Error("Mission repository does not belong to the selected workspace");
+    }
+    return {
+      repository: input.missionRepository.repository,
+      defaultBranch: input.missionRepository.defaultBranch,
+      source: "MISSION",
+    };
+  }
+  if (!input.legacyRepository) {
+    throw new Error("Mission repository configuration is missing");
+  }
+  return {
+    repository: input.legacyRepository,
+    defaultBranch: input.legacyDefaultBranch ?? "main",
+    source: "LEGACY",
+  };
+}
+
 export function normalizeCodePath(path: string): string {
   const normalized = path
     .trim()

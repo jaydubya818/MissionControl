@@ -8,6 +8,7 @@ import {
   finalizationForRevision,
   hydrateChecklistDispositions,
   missionSpecCompleteness,
+  missionSpecWithCurrentMissionScope,
   nextMissionSpecId,
 } from "./missionSpecModel";
 
@@ -50,6 +51,24 @@ describe("Mission Spec UI model", () => {
       { id: "REQ-001", title: "First", description: "First", priority: "MUST", sourceStoryIds: [] },
     ];
     expect(nextMissionSpecId(values, "REQ")).toBe("REQ-003");
+  });
+
+  it("carries a changed Mission repository scope into a new immutable Spec draft", () => {
+    const values = emptyMissionSpec({
+      mission: { ...mission, repositoryId: undefined, codeScopeIds: [] },
+    });
+
+    const next = missionSpecWithCurrentMissionScope(values, mission);
+
+    expect(next.repositoryScope).toEqual({
+      repositoryId: "repository-1",
+      codeScopeIds: ["scope-1"],
+    });
+    expect(values.repositoryScope).toEqual({
+      repositoryId: undefined,
+      codeScopeIds: [],
+    });
+    expect(missionSpecWithCurrentMissionScope(next, mission)).toBe(next);
   });
 
   it("reports honest incomplete state and selects exact revision records", () => {

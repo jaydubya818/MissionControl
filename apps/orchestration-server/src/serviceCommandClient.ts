@@ -20,10 +20,14 @@ export type ServiceCapability =
   | "review.residual-analysis.record"
   | "sandboxes.list-reconcile"
   | "sandboxes.report-reconcile"
+  | "models.report-exact-route-health"
   | "executions.claim"
   | "executions.heartbeat"
   | "executions.report"
-  | "executions.finalize";
+  | "executions.finalize"
+  | "planning.claim"
+  | "planning.renew"
+  | "planning.report";
 
 export function createSignedServiceCommand(args: {
   capability: ServiceCapability;

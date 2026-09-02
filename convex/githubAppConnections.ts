@@ -1,7 +1,15 @@
 import { v } from "convex/values";
-import { action, internalMutation, internalQuery, query } from "./_generated/server";
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  query,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
-import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
+import {
+  FACTORY_PERMISSIONS,
+  requireWorkspacePermission,
+} from "./lib/companyAccess";
 import {
   evaluateGithubAppCapabilities,
   githubInstallationIsStale,
@@ -13,24 +21,34 @@ const permissionAccess = v.union(
   v.literal("none"),
   v.literal("read"),
   v.literal("write"),
-  v.literal("admin")
+  v.literal("admin"),
 );
 
-const permissions = v.array(v.object({ name: v.string(), access: permissionAccess }));
+const permissions = v.array(
+  v.object({ name: v.string(), access: permissionAccess }),
+);
 
 export const beginInstallation = action({
   args: { repositoryId: v.id("workspaceRepositories") },
-  handler: async (ctx, args): Promise<
-    | { ok: true; installUrl: string }
-    | { ok: false; code: "NOT_CONFIGURED" }
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
+    { ok: true; installUrl: string } | { ok: false; code: "NOT_CONFIGURED" }
   > => {
-    const repository = await ctx.runQuery(internal.githubAppConnections.getRepositoryForSetup, {
-      repositoryId: args.repositoryId,
-    });
-    const access = await ctx.runQuery(internal.companyContext.authorizeFactoryAction, {
-      projectId: repository.projectId,
-      permission: FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
-    });
+    const repository = await ctx.runQuery(
+      internal.githubAppConnections.getRepositoryForSetup,
+      {
+        repositoryId: args.repositoryId,
+      },
+    );
+    const access = await ctx.runQuery(
+      internal.companyContext.authorizeFactoryAction,
+      {
+        projectId: repository.projectId,
+        permission: FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
+      },
+    );
     const appSlug = process.env.GITHUB_APP_SLUG;
     if (!appSlug) return { ok: false, code: "NOT_CONFIGURED" };
     const state = crypto.randomUUID();
@@ -70,13 +88,22 @@ export const getInstallationForVerification = internalQuery({
 
 export const verifyInstallation = action({
   args: { repositoryId: v.id("workspaceRepositories") },
-  handler: async (ctx, args): Promise<
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
     | { ok: true }
-    | { ok: false; code: "MISSING_INSTALLATION" | "NOT_CONFIGURED" | "VERIFICATION_FAILED" }
+    | {
+        ok: false;
+        code: "MISSING_INSTALLATION" | "NOT_CONFIGURED" | "VERIFICATION_FAILED";
+      }
   > => {
-    const setup = await ctx.runQuery(internal.githubAppConnections.getInstallationForVerification, {
-      repositoryId: args.repositoryId,
-    });
+    const setup = await ctx.runQuery(
+      internal.githubAppConnections.getInstallationForVerification,
+      {
+        repositoryId: args.repositoryId,
+      },
+    );
     await ctx.runQuery(internal.companyContext.authorizeFactoryAction, {
       projectId: setup.repository.projectId,
       permission: FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
@@ -110,7 +137,11 @@ export const verifyInstallation = action({
         lastTokenIssuedAt: verified.lastTokenIssuedAt,
       });
       return { ok: true };
-    } catch {
+    } catch (error) {
+      console.error(
+        "GitHub App installation verification failed",
+        error instanceof Error ? error.message : "Unknown error",
+      );
       return { ok: false, code: "VERIFICATION_FAILED" };
     }
   },
@@ -121,13 +152,18 @@ export const bindExistingInstallation = action({
     repositoryId: v.id("workspaceRepositories"),
     installationId: v.string(),
   },
-  handler: async (ctx, args): Promise<
-    | { ok: true }
-    | { ok: false; code: "NOT_CONFIGURED" | "VERIFICATION_FAILED" }
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
+    { ok: true } | { ok: false; code: "NOT_CONFIGURED" | "VERIFICATION_FAILED" }
   > => {
-    const repository = await ctx.runQuery(internal.githubAppConnections.getRepositoryForSetup, {
-      repositoryId: args.repositoryId,
-    });
+    const repository = await ctx.runQuery(
+      internal.githubAppConnections.getRepositoryForSetup,
+      {
+        repositoryId: args.repositoryId,
+      },
+    );
     await ctx.runQuery(internal.companyContext.authorizeFactoryAction, {
       projectId: repository.projectId,
       permission: FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
@@ -136,7 +172,8 @@ export const bindExistingInstallation = action({
     const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
     if (!appId || !privateKey) return { ok: false, code: "NOT_CONFIGURED" };
     const installationId = args.installationId.trim();
-    if (!/^\d+$/.test(installationId)) return { ok: false, code: "VERIFICATION_FAILED" };
+    if (!/^\d+$/.test(installationId))
+      return { ok: false, code: "VERIFICATION_FAILED" };
 
     try {
       const verified = await verifyGithubInstallationAccess({
@@ -161,7 +198,11 @@ export const bindExistingInstallation = action({
         lastTokenIssuedAt: verified.lastTokenIssuedAt,
       });
       return { ok: true };
-    } catch {
+    } catch (error) {
+      console.error(
+        "GitHub App installation binding failed",
+        error instanceof Error ? error.message : "Unknown error",
+      );
       return { ok: false, code: "VERIFICATION_FAILED" };
     }
   },
@@ -197,7 +238,11 @@ export const resolveSetupSession = internalQuery({
       .query("githubAppSetupSessions")
       .withIndex("by_state_hash", (q) => q.eq("stateHash", args.stateHash))
       .first();
-    if (!session || session.status !== "PENDING" || session.expiresAt <= Date.now()) {
+    if (
+      !session ||
+      session.status !== "PENDING" ||
+      session.expiresAt <= Date.now()
+    ) {
       throw new Error("GitHub App setup session is invalid or expired");
     }
     const repository = await ctx.db.get(session.repositoryId);
@@ -209,7 +254,11 @@ export const resolveSetupSession = internalQuery({
 export const completeSetupSession = internalMutation({
   args: {
     setupSessionId: v.id("githubAppSetupSessions"),
-    status: v.union(v.literal("COMPLETED"), v.literal("FAILED"), v.literal("EXPIRED")),
+    status: v.union(
+      v.literal("COMPLETED"),
+      v.literal("FAILED"),
+      v.literal("EXPIRED"),
+    ),
     installationId: v.optional(v.string()),
     error: v.optional(v.string()),
   },
@@ -230,8 +279,13 @@ export const getRepositoryReadiness = query({
   args: { repositoryId: v.id("workspaceRepositories") },
   handler: async (ctx, args) => {
     const repository = await ctx.db.get(args.repositoryId);
-    if (!repository) throw new Error("Repository connection is unavailable or unauthorized.");
-    await requireWorkspacePermission(ctx, repository.projectId, FACTORY_PERMISSIONS.VIEW);
+    if (!repository)
+      throw new Error("Repository connection is unavailable or unauthorized.");
+    await requireWorkspacePermission(
+      ctx,
+      repository.projectId,
+      FACTORY_PERMISSIONS.VIEW,
+    );
     const installation = await ctx.db
       .query("githubAppInstallations")
       .withIndex("by_repository", (q) => q.eq("repositoryId", repository._id))
@@ -240,13 +294,16 @@ export const getRepositoryReadiness = query({
       return {
         overall: "MISSING" as const,
         installation: null,
-        checks: [{
-          id: "installation",
-          status: "MISSING" as const,
-          label: "GitHub App installation",
-          detail: "No GitHub App installation is bound to this repository.",
-          remediation: "Install the Mission Control GitHub App for this repository, then refresh verification.",
-        }],
+        checks: [
+          {
+            id: "installation",
+            status: "MISSING" as const,
+            label: "GitHub App installation",
+            detail: "No GitHub App installation is bound to this repository.",
+            remediation:
+              "Install the Mission Control GitHub App for this repository, then refresh verification.",
+          },
+        ],
       };
     }
 
@@ -255,29 +312,41 @@ export const getRepositoryReadiness = query({
     const checks = [
       {
         id: "installation",
-        status: installation.status === "CONNECTED" ? "VERIFIED" as const : "BLOCKED" as const,
+        status:
+          installation.status === "CONNECTED"
+            ? ("VERIFIED" as const)
+            : ("BLOCKED" as const),
         label: "Installation identity",
         detail: `${installation.accountLogin} installation ${installation.installationId}`,
-        remediation: installation.status === "CONNECTED" ? undefined : "Repair or reinstall the GitHub App connection.",
+        remediation:
+          installation.status === "CONNECTED"
+            ? undefined
+            : "Repair or reinstall the GitHub App connection.",
       },
       {
         id: "permissions",
-        status: capability.missingPermissions.length || capability.excessivePermissions.length
-          ? "BLOCKED" as const
-          : "VERIFIED" as const,
+        status:
+          capability.missingPermissions.length ||
+          capability.excessivePermissions.length
+            ? ("BLOCKED" as const)
+            : ("VERIFIED" as const),
         label: "Least-privilege permissions",
         detail: capability.missingPermissions.length
           ? `Missing ${capability.missingPermissions.join(", ")}`
           : capability.excessivePermissions.length
             ? `Excessive ${capability.excessivePermissions.join(", ")}`
             : "Contents and pull requests are write-scoped; checks and metadata are read-scoped.",
-        remediation: capability.missingPermissions.length || capability.excessivePermissions.length
-          ? "Update the GitHub App permission grant to the documented V1 envelope."
-          : undefined,
+        remediation:
+          capability.missingPermissions.length ||
+          capability.excessivePermissions.length
+            ? "Update the GitHub App permission grant to the documented V1 envelope."
+            : undefined,
       },
       {
         id: "events",
-        status: capability.missingEvents.length ? "BLOCKED" as const : "VERIFIED" as const,
+        status: capability.missingEvents.length
+          ? ("BLOCKED" as const)
+          : ("VERIFIED" as const),
         label: "Webhook subscriptions",
         detail: capability.missingEvents.length
           ? `Missing ${capability.missingEvents.join(", ")}`
@@ -288,19 +357,21 @@ export const getRepositoryReadiness = query({
       },
       {
         id: "freshness",
-        status: stale ? "STALE" as const : "VERIFIED" as const,
+        status: stale ? ("STALE" as const) : ("VERIFIED" as const),
         label: "Connection verification",
         detail: installation.verifiedAt
           ? `Last verified ${new Date(installation.verifiedAt).toISOString()}`
           : "The installation has not been verified.",
-        remediation: stale ? "Run installation verification again before dispatch." : undefined,
+        remediation: stale
+          ? "Run installation verification again before dispatch."
+          : undefined,
       },
     ];
     const overall = checks.some((check) => check.status === "BLOCKED")
-      ? "BLOCKED" as const
+      ? ("BLOCKED" as const)
       : checks.some((check) => check.status === "STALE")
-        ? "STALE" as const
-        : "VERIFIED" as const;
+        ? ("STALE" as const)
+        : ("VERIFIED" as const);
     return {
       overall,
       installation: {
@@ -321,8 +392,13 @@ export const listDeliveries = query({
   args: { repositoryId: v.id("workspaceRepositories"), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const repository = await ctx.db.get(args.repositoryId);
-    if (!repository) throw new Error("Repository connection is unavailable or unauthorized.");
-    await requireWorkspacePermission(ctx, repository.projectId, FACTORY_PERMISSIONS.VIEW);
+    if (!repository)
+      throw new Error("Repository connection is unavailable or unauthorized.");
+    await requireWorkspacePermission(
+      ctx,
+      repository.projectId,
+      FACTORY_PERMISSIONS.VIEW,
+    );
     return await ctx.db
       .query("githubWebhookDeliveries")
       .withIndex("by_repository", (q) => q.eq("repositoryId", repository._id))
@@ -342,7 +418,11 @@ export const upsertInstallation = internalMutation({
     repositorySelection: v.union(v.literal("ALL"), v.literal("SELECTED")),
     permissions,
     subscribedEvents: v.array(v.string()),
-    status: v.union(v.literal("CONNECTED"), v.literal("DEGRADED"), v.literal("REVOKED")),
+    status: v.union(
+      v.literal("CONNECTED"),
+      v.literal("DEGRADED"),
+      v.literal("REVOKED"),
+    ),
     installedAt: v.number(),
     verifiedAt: v.optional(v.number()),
     lastTokenIssuedAt: v.optional(v.number()),
@@ -352,20 +432,6 @@ export const upsertInstallation = internalMutation({
     const repository = await ctx.db.get(args.repositoryId);
     if (!repository) throw new Error("Repository connection not found");
     const now = Date.now();
-    const existingByInstallation = await ctx.db
-      .query("githubAppInstallations")
-      .withIndex("by_installation", (q) => q.eq("installationId", args.installationId))
-      .first();
-    if (existingByInstallation && existingByInstallation.repositoryId !== repository._id) {
-      if (existingByInstallation.status !== "REVOKED") {
-        throw new Error("GitHub App installation is already bound to another repository");
-      }
-      await ctx.db.patch(existingByInstallation._id, {
-        installationId: `revoked:${args.installationId}:${existingByInstallation._id}`,
-        lastError: "Superseded after GitHub moved the installation to a different selected repository.",
-        updatedAt: now,
-      });
-    }
     const existingByRepository = await ctx.db
       .query("githubAppInstallations")
       .withIndex("by_repository", (q) => q.eq("repositoryId", repository._id))
@@ -382,12 +448,19 @@ export const upsertInstallation = internalMutation({
       ...installationInput,
       updatedAt: now,
     };
-    const installationRecordId = existingByRepository?._id ?? await ctx.db.insert("githubAppInstallations", value);
-    if (existingByRepository) await ctx.db.patch(existingByRepository._id, value);
+    const installationRecordId =
+      existingByRepository?._id ??
+      (await ctx.db.insert("githubAppInstallations", value));
+    if (existingByRepository)
+      await ctx.db.patch(existingByRepository._id, value);
     const capability = evaluateGithubAppCapabilities(args);
-    const ready = args.status === "CONNECTED" && capability.ready && !githubInstallationIsStale(args.verifiedAt, now);
+    const ready =
+      args.status === "CONNECTED" &&
+      capability.ready &&
+      !githubInstallationIsStale(args.verifiedAt, now);
     await ctx.db.patch(repository._id, {
-      providerRepositoryId: args.providerRepositoryId ?? repository.providerRepositoryId,
+      providerRepositoryId:
+        args.providerRepositoryId ?? repository.providerRepositoryId,
       status: ready ? "READY" : "DEGRADED",
       webhookStatus: capability.missingEvents.length === 0 ? "READY" : "ERROR",
       validatedAt: args.verifiedAt,
@@ -408,7 +481,11 @@ export const beginWebhookDelivery = internalMutation({
     repository: v.optional(v.string()),
     providerRepositoryId: v.optional(v.string()),
     installationId: v.optional(v.string()),
-    signatureStatus: v.union(v.literal("VALID"), v.literal("INVALID"), v.literal("MISSING")),
+    signatureStatus: v.union(
+      v.literal("VALID"),
+      v.literal("INVALID"),
+      v.literal("MISSING"),
+    ),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -431,22 +508,41 @@ export const beginWebhookDelivery = internalMutation({
       };
     }
 
-    const installation = args.installationId
-      ? await ctx.db.query("githubAppInstallations")
-          .withIndex("by_installation", (q) => q.eq("installationId", args.installationId!))
-          .first()
-      : null;
-    const repository = installation ? await ctx.db.get(installation.repositoryId) : null;
+    const installations = args.installationId
+      ? await ctx.db
+          .query("githubAppInstallations")
+          .withIndex("by_installation", (q) =>
+            q.eq("installationId", args.installationId!),
+          )
+          .collect()
+      : [];
+    const bindings = await Promise.all(
+      installations.map(async (installation) => ({
+        installation,
+        repository: await ctx.db.get(installation.repositoryId),
+      })),
+    );
     const installationScopedEvent =
-      args.event === "installation" || args.event === "installation_repositories";
+      args.event === "installation" ||
+      args.event === "installation_repositories";
+    const binding = installationScopedEvent
+      ? (bindings.find(
+          (candidate) => candidate.installation.status === "CONNECTED",
+        ) ?? bindings[0])
+      : bindings.find(({ repository }) =>
+          Boolean(
+            repository &&
+            args.repository &&
+            canonicalRepositoryKey(repository.repository) ===
+              canonicalRepositoryKey(args.repository) &&
+            (!repository.providerRepositoryId ||
+              repository.providerRepositoryId === args.providerRepositoryId),
+          ),
+        );
+    const installation = binding?.installation ?? installations[0] ?? null;
+    const repository = binding?.repository ?? null;
     const repositoryMatches = Boolean(
-      repository && (
-        installationScopedEvent ||
-        (args.repository &&
-          canonicalRepositoryKey(repository.repository) === canonicalRepositoryKey(args.repository) &&
-          (!repository.providerRepositoryId ||
-            repository.providerRepositoryId === args.providerRepositoryId))
-      )
+      binding && (installationScopedEvent || repository),
     );
     const accepted =
       args.signatureStatus === "VALID" &&
@@ -456,7 +552,7 @@ export const beginWebhookDelivery = internalMutation({
       ? undefined
       : args.signatureStatus !== "VALID"
         ? "Webhook signature is missing or invalid."
-        : !installation
+        : installations.length === 0
           ? "Webhook installation is not registered."
           : !repositoryMatches
             ? "Webhook repository does not match the registered installation."
@@ -472,7 +568,9 @@ export const beginWebhookDelivery = internalMutation({
       receivedAt: now,
       lastAttemptAt: now,
       completedAt: accepted ? undefined : now,
-      result: accepted ? "Accepted for processing." : "Rejected before processing.",
+      result: accepted
+        ? "Accepted for processing."
+        : "Rejected before processing.",
       error,
     });
     return {
@@ -493,48 +591,66 @@ export const markInstallationChanged = internalMutation({
     removedProviderRepositoryIds: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const installation = await ctx.db
+    const installations = await ctx.db
       .query("githubAppInstallations")
-      .withIndex("by_installation", (q) => q.eq("installationId", args.installationId))
-      .first();
-    if (!installation) return { updated: false };
-    const repository = await ctx.db.get(installation.repositoryId);
-    const targetRepositoryRemoved = Boolean(
-      repository?.providerRepositoryId &&
-      args.removedProviderRepositoryIds?.includes(repository.providerRepositoryId)
-    );
-    const revoked =
-      args.action === "deleted" ||
-      args.action === "suspend" ||
-      targetRepositoryRemoved;
+      .withIndex("by_installation", (q) =>
+        q.eq("installationId", args.installationId),
+      )
+      .collect();
+    if (installations.length === 0)
+      return { updated: false, updatedCount: 0, revokedCount: 0 };
     const now = Date.now();
-    await ctx.db.patch(installation._id, {
-      status: revoked ? "REVOKED" : "DEGRADED",
-      verifiedAt: undefined,
-      lastError: revoked
-        ? `GitHub reported installation change: ${args.action}.`
-        : "GitHub installation changed and requires re-verification.",
-      updatedAt: now,
-    });
-    if (repository) {
-      await ctx.db.patch(repository._id, {
-        status: "DEGRADED",
-        webhookStatus: revoked ? "ERROR" : repository.webhookStatus,
-        validatedAt: undefined,
-        validationError: revoked
-          ? "GitHub App access was revoked or removed for this repository."
-          : "GitHub App installation changed and must be verified again.",
+    let revokedCount = 0;
+    for (const installation of installations) {
+      const repository = await ctx.db.get(installation.repositoryId);
+      const targetRepositoryRemoved = Boolean(
+        repository?.providerRepositoryId &&
+        args.removedProviderRepositoryIds?.includes(
+          repository.providerRepositoryId,
+        ),
+      );
+      const revoked =
+        args.action === "deleted" ||
+        args.action === "suspend" ||
+        targetRepositoryRemoved;
+      if (revoked) revokedCount += 1;
+      await ctx.db.patch(installation._id, {
+        status: revoked ? "REVOKED" : "DEGRADED",
+        verifiedAt: undefined,
+        lastError: revoked
+          ? `GitHub reported installation change: ${args.action}.`
+          : "GitHub installation changed and requires re-verification.",
         updatedAt: now,
       });
+      if (repository) {
+        await ctx.db.patch(repository._id, {
+          status: "DEGRADED",
+          webhookStatus: revoked ? "ERROR" : repository.webhookStatus,
+          validatedAt: undefined,
+          validationError: revoked
+            ? "GitHub App access was revoked or removed for this repository."
+            : "GitHub App installation changed and must be verified again.",
+          updatedAt: now,
+        });
+      }
     }
-    return { updated: true, revoked };
+    return {
+      updated: true,
+      updatedCount: installations.length,
+      revoked: revokedCount > 0,
+      revokedCount,
+    };
   },
 });
 
 export const completeWebhookDelivery = internalMutation({
   args: {
     deliveryRecordId: v.id("githubWebhookDeliveries"),
-    status: v.union(v.literal("PROCESSED"), v.literal("IGNORED"), v.literal("FAILED")),
+    status: v.union(
+      v.literal("PROCESSED"),
+      v.literal("IGNORED"),
+      v.literal("FAILED"),
+    ),
     result: v.optional(v.string()),
     error: v.optional(v.string()),
   },

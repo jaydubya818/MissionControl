@@ -5,7 +5,9 @@ import {
 } from "@mission-control/workflow-engine";
 import {
   aggregateExecutionRoutingEvidence,
+  committedWorkOrderRunCostUsd,
   loadExecutionRoutingEvidenceBundle,
+  workOrderCostBudget,
 } from "../lib/executionRouting";
 import { getCurrentVerificationResult } from "../lib/currentVerification";
 
@@ -348,5 +350,40 @@ describe("execution routing Policy V2 evidence", () => {
       totalCostUsd: 20,
     });
     expect(evidence.totalCostPerVerifiedSuccessUsd).toBeCloseTo(20 / 6);
+  });
+
+  it("reserves the approved cap and blocks a retry that would exceed the remainder", () => {
+    expect(workOrderCostBudget({
+      approvedWorkOrderCapUsd: 24,
+      priorCommittedUsd: 0,
+    })).toEqual({ approvedRemainingUsd: 24, maximumEstimatedCostUsd: 24 });
+    expect(workOrderCostBudget({
+      approvedWorkOrderCapUsd: 24,
+      missionBudgetRemainingUsd: 50,
+      priorCommittedUsd: 24,
+    })).toEqual({ approvedRemainingUsd: 0, maximumEstimatedCostUsd: 0 });
+    expect(workOrderCostBudget({
+      approvedWorkOrderCapUsd: 24,
+      missionBudgetRemainingUsd: 10,
+      priorCommittedUsd: 4,
+    })).toEqual({ approvedRemainingUsd: 20, maximumEstimatedCostUsd: 10 });
+  });
+
+  it("releases terminal reservations and counts actual spend", () => {
+    expect(committedWorkOrderRunCostUsd({
+      status: "FAILED",
+      spentUsd: 0,
+      reservedCostUsd: 24,
+    })).toBe(0);
+    expect(committedWorkOrderRunCostUsd({
+      status: "COMPLETED",
+      spentUsd: 6,
+      reservedCostUsd: 24,
+    })).toBe(6);
+    expect(committedWorkOrderRunCostUsd({
+      status: "RUNNING",
+      spentUsd: 6,
+      reservedCostUsd: 24,
+    })).toBe(24);
   });
 });

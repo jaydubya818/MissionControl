@@ -81,6 +81,7 @@ export async function createWorkOrderRecord(ctx: any, args: any) {
   const approvalStatus = args.approvalStatus ?? deriveApprovalStatus({
     riskLevel,
     requiredApprovals: args.requiredApprovals,
+    isMutating: args.isMutating,
     approvals: [],
     now,
   });
@@ -92,6 +93,7 @@ export async function createWorkOrderRecord(ctx: any, args: any) {
   const acceptance = evaluateAcceptance({
     riskLevel,
     requiredApprovals: args.requiredApprovals,
+    isMutating: args.isMutating,
     approvalDecisions: [],
     acceptanceCriteria: finalCriteria,
     verificationReceipts: [],
@@ -121,6 +123,8 @@ export async function createWorkOrderRecord(ctx: any, args: any) {
     missionId: args.missionId,
     missionPlanId: args.missionPlanId,
     missionPlanRevision: args.missionPlanRevision ?? missionPlan?.revisionNumber,
+    planningRunId: args.planningRunId ?? missionPlan?.planningRunId,
+    planningRepositorySha: args.planningRepositorySha ?? missionPlan?.planningRepositorySha,
     qualityContractDigest,
     missionSpecLineage: args.missionSpecLineage,
     missionSequence: missionBlueprint?.sequence,

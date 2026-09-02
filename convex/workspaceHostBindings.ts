@@ -106,7 +106,7 @@ export const report = mutation({
     const hostId = args.hostId.trim();
     const checkoutRoot = args.checkoutRoot.trim();
     const validationError = validateHostBinding({
-      expectedRepository: project.githubRepo,
+      expectedRepository: repository?.repository ?? project.githubRepo,
       repository: args.repository,
       hostId,
       checkoutRoot,

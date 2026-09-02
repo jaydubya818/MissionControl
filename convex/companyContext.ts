@@ -10,6 +10,12 @@ import {
   requireWorkspaceAccess,
   requireWorkspacePermission,
 } from "./lib/companyAccess";
+import {
+  DEFAULT_PROVIDER_BUDGET,
+  evaluateRateLimit,
+  PROVIDER_BUDGET_POLICIES,
+  rateLimitMessage,
+} from "./lib/rateLimit";
 
 const factoryPermission = v.union(
   v.literal(FACTORY_PERMISSIONS.VIEW),
@@ -17,6 +23,82 @@ const factoryPermission = v.union(
   v.literal(FACTORY_PERMISSIONS.APPROVE),
   v.literal(FACTORY_PERMISSIONS.MANAGE_AUTOMATION)
 );
+
+/**
+ * Require only that the caller is a signed-in operator of some company.
+ *
+ * Used by provider-backed actions (LLM completion, embeddings, TTS, external
+ * API sync) whose surface is not workspace-scoped, so `authorizeFactoryAction`
+ * has no `projectId` to resolve. It does not establish workspace authority — it
+ * establishes that an identifiable, rate-limitable operator is spending the
+ * deployment's provider budget rather than the open internet.
+ *
+ * `internalQuery` deliberately: this is an authorization primitive, not a
+ * product surface. Exposing "is this caller signed in" publicly would itself be
+ * an oracle.
+ */
+/**
+ * Consume one unit from a provider-budget bucket keyed on server-derived identity.
+ *
+ * A mutation because it must durably record the consumption. Actions reach it
+ * through `ctx.runMutation` *after* resolving their operator, so the bucket key
+ * can never be influenced by a client argument — which is the property the
+ * previous `tasks.create` limiter lacked when it keyed on `args.source`.
+ */
+export const consumeProviderBudget = internalMutation({
+  args: { operation: v.string(), actorId: v.string() },
+  handler: async (ctx, args) => {
+    const policy = PROVIDER_BUDGET_POLICIES[args.operation] ?? DEFAULT_PROVIDER_BUDGET;
+    const actor = args.actorId.trim();
+    if (!actor) throw new Error("Provider budgeting requires a server-resolved caller identity.");
+    const key = `${args.operation}:actor:${actor}`;
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("rateLimitEntries")
+      .withIndex("by_key", (q) => q.eq("key", key))
+      .first();
+    const decision = evaluateRateLimit(
+      policy,
+      policy.limit,
+      existing ? { windowStart: existing.windowStart, count: existing.count } : null,
+      now,
+    );
+    if (!decision.allowed) {
+      return { allowed: false as const, message: rateLimitMessage(policy, decision) };
+    }
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        windowStart: decision.nextWindowStart,
+        count: decision.nextCount,
+      });
+    } else {
+      await ctx.db.insert("rateLimitEntries", {
+        key,
+        windowStart: decision.nextWindowStart,
+        count: decision.nextCount,
+      });
+    }
+    return { allowed: true as const, message: "" };
+  },
+});
+
+export const assertAuthenticated = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const memberships = await listCompanyMemberships(ctx);
+    const membership = memberships[0];
+    if (!membership) {
+      throw new Error("Authentication is required.");
+    }
+    return {
+      actorId: membership.operatorId
+        ? String(membership.operatorId)
+        : "demo:company-administrator",
+      tenantId: String(membership.tenant._id),
+      mode: membership.mode,
+    };
+  },
+});
 
 /**
  * Actions do not have direct database access. This internal query gives them
