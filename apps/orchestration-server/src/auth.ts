@@ -49,6 +49,23 @@ export function requireAuth() {
   };
 }
 
+/**
+ * Authorization check for WebSocket upgrade requests.
+ *
+ * Hono middleware never sees `upgrade` requests — Node hands them straight to
+ * `server.on("upgrade")` — so `/gateway/ws` must apply the same bearer rule as
+ * every protected HTTP route. Same semantics as `orchestrationAuthFailure`:
+ * 401 on a missing/wrong bearer, 503 in production when no token is configured,
+ * allowed only in tokenless local development.
+ */
+export function orchestrationUpgradeFailure(
+  req: { headers: { authorization?: string | string[] } }
+): { status: 401 | 503; error: string } | null {
+  const raw = req.headers.authorization;
+  const header = Array.isArray(raw) ? raw[0] : raw;
+  return orchestrationAuthFailure(EXPECTED_TOKEN, PRODUCTION, header);
+}
+
 export function isPublicOrchestrationRoute(method: string, requestPath: string): boolean {
   const normalizedMethod = method.toUpperCase();
   return normalizedMethod === "OPTIONS"

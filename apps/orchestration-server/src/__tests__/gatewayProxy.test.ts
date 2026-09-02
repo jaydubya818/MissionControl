@@ -56,9 +56,9 @@ async function startProxy(options: GatewayProxyOptions): Promise<Proxy> {
   };
 }
 
-function open(url: string): Promise<WebSocket> {
+function open(url: string, options?: { headers?: Record<string, string> }): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(url, options);
     ws.once("open", () => resolve(ws));
     ws.once("error", reject);
   });
@@ -105,10 +105,35 @@ describe("gateway proxy", () => {
     await expect(open(proxy.wsUrl("/other"))).rejects.toThrow();
   });
 
-  it("does not require any credential on the upgrade itself", async () => {
-    // The HTTP auth middleware never sees upgrade requests; the only gate is the path.
+  it("admits the upgrade without a credential only when no authorizer is configured", async () => {
+    // The HTTP auth middleware never sees upgrade requests; without an
+    // authorizer the only gate is the path (tokenless local dev).
     const { proxy } = await setup({ url: "", token: "server-token" });
     const ws = await open(proxy.wsUrl());
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+    ws.close();
+  });
+
+  it("refuses the upgrade with an HTTP error when the authorizer rejects it", async () => {
+    const upstream = await startUpstream();
+    cleanups.push(upstream.close);
+    const seen: string[] = [];
+    const proxy = await startProxy({
+      loadUpstreamSettings: async () => ({ url: upstream.url, token: "server-token" }),
+      authorizeUpgrade: (req) =>
+        req.headers.authorization === "Bearer inbound-token" ? null : { status: 401, error: "Unauthorized" },
+      log: (msg) => seen.push(msg),
+    });
+    cleanups.push(proxy.close);
+
+    await expect(open(proxy.wsUrl())).rejects.toThrow(/401/);
+    await expect(
+      open(proxy.wsUrl(), { headers: { Authorization: "Bearer wrong" } })
+    ).rejects.toThrow(/401/);
+    expect(upstream.sockets).toHaveLength(0);
+    expect(seen).toContain("Refused /gateway/ws upgrade: 401 Unauthorized");
+
+    const ws = await open(proxy.wsUrl(), { headers: { Authorization: "Bearer inbound-token" } });
     expect(ws.readyState).toBe(WebSocket.OPEN);
     ws.close();
   });

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isPublicOrchestrationRoute, orchestrationAuthFailure } from "../auth.js";
+import {
+  isPublicOrchestrationRoute,
+  orchestrationAuthFailure,
+  orchestrationUpgradeFailure,
+} from "../auth.js";
 
 describe("orchestration authentication", () => {
   it("fails closed in production when no inbound token is configured", () => {
@@ -16,6 +20,13 @@ describe("orchestration authentication", () => {
   it("accepts only an exact bearer credential", () => {
     expect(orchestrationAuthFailure("expected", true, "Bearer expected")).toBeNull();
     expect(orchestrationAuthFailure("expected", true, "Bearer wrong")).toMatchObject({ status: 401 });
+  });
+
+  it("applies the same bearer rule to WebSocket upgrades as to HTTP routes", () => {
+    // auth.ts reads ORCHESTRATION_API_TOKEN/NODE_ENV at import time; this test
+    // file runs without either, so the module is in tokenless dev mode.
+    expect(orchestrationUpgradeFailure({ headers: {} })).toBeNull();
+    expect(orchestrationUpgradeFailure({ headers: { authorization: ["Bearer x", "Bearer y"] } })).toBeNull();
   });
 
   it("allows only explicit public probes and CORS preflight", () => {

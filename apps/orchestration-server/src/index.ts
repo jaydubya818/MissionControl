@@ -22,7 +22,7 @@ import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { ConvexHttpClient } from "convex/browser";
 import { createGatewayProxy } from "./gateway-proxy.js";
-import { requireAuth } from "./auth.js";
+import { orchestrationUpgradeFailure, requireAuth } from "./auth.js";
 import { ConvexActions, ConvexQueries, ConvexMutations } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
 import { CoordinatorLoop } from "@mission-control/coordinator";
@@ -1485,6 +1485,8 @@ const gatewayProxy = createGatewayProxy({
     const token = (process.env.GATEWAY_TOKEN ?? "").trim();
     return { url, token };
   },
+  // Upgrades bypass Hono, so apply the same bearer rule as requireAuth() here.
+  authorizeUpgrade: orchestrationUpgradeFailure,
   log: (msg) => console.log(`[gateway] ${msg}`),
   logError: (msg, err) => console.error(`[gateway] ${msg}`, err),
 });
