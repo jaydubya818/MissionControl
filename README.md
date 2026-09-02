@@ -490,18 +490,29 @@ next promotion gate.
 - A Convex development deployment
 
 ### First-time setup
+For the standard local run, the only values you need are the Convex development
+deployment values. Run `pnpm exec convex dev --once` to create or link the
+deployment, then copy `CONVEX_URL` into `VITE_CONVEX_URL`. The `.env.example`
+file is a reference for optional settings and development-safe defaults; it does
+not need to be copied before Convex setup.
+
+| Variable | Purpose | Where it comes from |
+| --- | --- | --- |
+| `CONVEX_DEPLOYMENT` | Identifies the Convex development deployment | Created by `pnpm exec convex dev --once` |
+| `CONVEX_URL` | Connects the application to the Convex backend | Written by `convex dev` |
+| `VITE_CONVEX_URL` | Connects the browser UI to Convex | Copy `CONVEX_URL` into `.env.local` |
 
 ```bash
 git clone https://github.com/jaydubya818/MissionControl.git
 cd MissionControl
 corepack enable
 pnpm install
-cp .env.example .env.local
 pnpm exec convex dev --once
 ```
 
-Convex creates or links a development deployment and writes its server URL. Set
-the same URL for the browser client in `.env.local`:
+Convex creates or links a development deployment and writes `CONVEX_URL`. If
+only `CONVEX_URL` is generated, copy that value to `VITE_CONVEX_URL` in
+`.env.local`:
 
 ```bash
 CONVEX_URL=https://your-deployment.convex.cloud
