@@ -40,6 +40,11 @@ export default defineConfig(({ mode }) => {
           target: "http://localhost:4100",
           changeOrigin: true,
           ws: true,
+          // The /gateway/ws upgrade is gated by the same bearer as HTTP routes;
+          // the browser never holds the token, the proxy presents it.
+          headers: orchestrationEnv.ORCHESTRATION_API_TOKEN
+            ? { Authorization: `Bearer ${orchestrationEnv.ORCHESTRATION_API_TOKEN}` }
+            : undefined,
         },
         "/orchestration": {
           target: "http://localhost:4100",
