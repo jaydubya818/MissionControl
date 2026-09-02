@@ -352,6 +352,36 @@ Primary V1 operator routes include:
 Preview and Demo routes are explicitly labeled and can be hidden. A component
 does not become a production feature merely because it exists in the codebase.
 
+## Eval integrity
+
+Mission Control includes a receipt-first Eval Control Plane for measuring the
+governed software-factory path without granting evals authority to approve,
+merge, release, or accept work.
+
+- **Sealed cases.** Candidate adapters receive public probes, never assertions
+  or negative controls.
+- **Fail-closed accounting.** Missing, duplicate, skipped, malformed, or
+  harness-invalid cases cannot be reported as passing.
+- **Reproducible receipts.** Every run binds its suite, baseline, revision,
+  adapter, dataset, configuration, seed, timestamps, costs, and artifact hashes.
+- **Tamper resistance.** Every golden case has a deliberately degraded negative
+  control that CI must detect.
+- **Honest status.** Blocking regressions fail the receipt; advisory evidence
+  gaps remain visible instead of being averaged away.
+
+The V1 Mission Control golden suite currently reports **6/6 blocking cases**,
+**7/7 negative controls**, and **zero baseline regressions**. Cost and token
+attribution remains an explicit advisory gap, so the receipt is truthfully
+`WARN` and publication-eligible rather than a misleading perfect score.
+
+```bash
+pnpm run eval:mission-control
+```
+
+Operators can inspect receipts under **Intelligence → Observability & Evals →
+Eval library**. See the [architecture](docs/architecture/eval-control-plane-v1.md)
+and [browser evidence](docs/testing/evidence/eval-control-plane-v1/README.md).
+
 ## System architecture
 
 ```mermaid
@@ -438,7 +468,7 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
-Current public client/backend runtime contract: **v34**.
+Current public client/backend runtime contract: **v36**.
 
 ## Current limitations
 
@@ -490,18 +520,29 @@ next promotion gate.
 - A Convex development deployment
 
 ### First-time setup
+For the standard local run, the only values you need are the Convex development
+deployment values. Run `pnpm exec convex dev --once` to create or link the
+deployment, then copy `CONVEX_URL` into `VITE_CONVEX_URL`. The `.env.example`
+file is a reference for optional settings and development-safe defaults; it does
+not need to be copied before Convex setup.
+
+| Variable | Purpose | Where it comes from |
+| --- | --- | --- |
+| `CONVEX_DEPLOYMENT` | Identifies the Convex development deployment | Created by `pnpm exec convex dev --once` |
+| `CONVEX_URL` | Connects the application to the Convex backend | Written by `convex dev` |
+| `VITE_CONVEX_URL` | Connects the browser UI to Convex | Copy `CONVEX_URL` into `.env.local` |
 
 ```bash
 git clone https://github.com/jaydubya818/MissionControl.git
 cd MissionControl
 corepack enable
 pnpm install
-cp .env.example .env.local
 pnpm exec convex dev --once
 ```
 
-Convex creates or links a development deployment and writes its server URL. Set
-the same URL for the browser client in `.env.local`:
+Convex creates or links a development deployment and writes `CONVEX_URL`. If
+only `CONVEX_URL` is generated, copy that value to `VITE_CONVEX_URL` in
+`.env.local`:
 
 ```bash
 CONVEX_URL=https://your-deployment.convex.cloud

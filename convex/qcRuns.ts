@@ -5,7 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, action, internalMutation } from "./_generated/server";
+import { mutation, query, action, internalAction, internalMutation } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { appendOpEvent, appendChangeRecord } from "./lib/armAudit";
@@ -594,7 +594,16 @@ export const complete = internalMutation({
 /**
  * Execute QC run (calls AssuranceAgents.AI)
  */
-export const execute = action({
+/**
+ * Execute a QC run.
+ *
+ * `internalAction` rather than `action`: nothing outside `convex/` invokes this
+ * — not the UI, not the orchestration server, not the CLI — and a Convex action
+ * export is callable by anyone holding the deployment URL, which ships to every
+ * browser as VITE_CONVEX_URL. A public surface with no public caller is
+ * exposure without a use.
+ */
+export const execute = internalAction({
   args: {
     id: v.id("qcRuns"),
   },

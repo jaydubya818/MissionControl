@@ -59,6 +59,7 @@ import {
   reviewActionValidator,
   reviewCorrectionCategoryValidator,
 } from "./lib/reviewIntelligenceValidators";
+import { evalControlPlaneTables } from "./lib/evalControlPlaneSchema";
 
 // ============================================================================
 // ENUMS (as union types)
@@ -6706,6 +6707,11 @@ export const schemaTablesPartTwo = {
   })
     .index("by_experiment", ["experimentId"])
     .index("by_factory_version", ["factoryDefinitionVersionId"]),
+
+  // -------------------------------------------------------------------------
+  // EVAL CONTROL PLANE (diagnostic evidence; never acceptance authority)
+  // -------------------------------------------------------------------------
+  ...evalControlPlaneTables,
 
   // -------------------------------------------------------------------------
   // FACTORY LEARNING (advisory projections; never acceptance authority)
