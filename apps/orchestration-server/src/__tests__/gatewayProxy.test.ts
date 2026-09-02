@@ -241,4 +241,19 @@ describe("gateway proxy", () => {
     expect(upstream.received.map((frame) => frame.method)).toEqual(["connect", "agents.list"]);
     expect(await done).toEqual({ code: 1012, reason: "upstream closed" });
   });
+
+  it("reports an upstream close before the connect response as studio.upstream_closed", async () => {
+    const { proxy } = await setup({ url: "", token: "server-token" }, (ws) => ws.close(4001, "rejected"));
+    const ws = await open(proxy.wsUrl());
+    const reply = nextMessage(ws);
+    const done = closed(ws);
+    ws.send(JSON.stringify(connectFrame({})));
+    expect(await reply).toMatchObject({
+      type: "res",
+      id: "connect-1",
+      ok: false,
+      error: { code: "studio.upstream_closed", message: "Upstream gateway closed (4001): rejected" },
+    });
+    expect((await done).code).toBe(1012);
+  });
 });

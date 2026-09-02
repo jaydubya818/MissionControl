@@ -240,14 +240,15 @@ export function createGatewayProxy(options: GatewayProxyOptions): {
           }
         });
 
-        upstreamWs.on("close", (ev: { code?: number; reason?: string }) => {
-          const reason = typeof ev?.reason === "string" ? ev.reason : "";
+        // `ws` emits close as (code, reason: Buffer), not a browser CloseEvent.
+        upstreamWs.on("close", (code: number, reasonRaw: Buffer | string) => {
+          const reason = reasonRaw ? reasonRaw.toString() : "";
           if (!connectResponseSent) {
             sendToBrowser(
               buildErrorResponse(
                 connectRequestId!,
                 "studio.upstream_closed",
-                `Upstream gateway closed (${ev.code}): ${reason}`
+                `Upstream gateway closed (${code}): ${reason}`
               ) as Record<string, unknown>
             );
           }
