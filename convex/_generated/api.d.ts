@@ -41,6 +41,7 @@ import type * as costEvents from "../costEvents.js";
 import type * as crons from "../crons.js";
 import type * as e2e from "../e2e.js";
 import type * as eos_projections from "../eos/projections.js";
+import type * as evalControlPlane from "../evalControlPlane.js";
 import type * as execution from "../execution.js";
 import type * as executionIntents from "../executionIntents.js";
 import type * as executionRequests from "../executionRequests.js";
@@ -106,6 +107,7 @@ import type * as lib_continuousResearchProjection from "../lib/continuousResearc
 import type * as lib_currentVerification from "../lib/currentVerification.js";
 import type * as lib_deliveryAuthorization from "../lib/deliveryAuthorization.js";
 import type * as lib_demoSeedExtensions from "../lib/demoSeedExtensions.js";
+import type * as lib_evalControlPlaneSchema from "../lib/evalControlPlaneSchema.js";
 import type * as lib_evalFrameworkGate from "../lib/evalFrameworkGate.js";
 import type * as lib_evidenceAuthority from "../lib/evidenceAuthority.js";
 import type * as lib_executionIntentShadow from "../lib/executionIntentShadow.js";
@@ -341,6 +343,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   e2e: typeof e2e;
   "eos/projections": typeof eos_projections;
+  evalControlPlane: typeof evalControlPlane;
   execution: typeof execution;
   executionIntents: typeof executionIntents;
   executionRequests: typeof executionRequests;
@@ -406,6 +409,7 @@ declare const fullApi: ApiFromModules<{
   "lib/currentVerification": typeof lib_currentVerification;
   "lib/deliveryAuthorization": typeof lib_deliveryAuthorization;
   "lib/demoSeedExtensions": typeof lib_demoSeedExtensions;
+  "lib/evalControlPlaneSchema": typeof lib_evalControlPlaneSchema;
   "lib/evalFrameworkGate": typeof lib_evalFrameworkGate;
   "lib/evidenceAuthority": typeof lib_evidenceAuthority;
   "lib/executionIntentShadow": typeof lib_executionIntentShadow;

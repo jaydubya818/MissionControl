@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "mission-control/eval-baseline/v1",
+  "baselineId": "mission-control-golden-v1-main",
+  "suiteKey": "mission-control-golden-path",
+  "suiteVersion": 1,
+  "suiteDigest": "sha256:d14e3ccd0db344a6bf6397c71380f1511f429ccbf03faecd37dcc3d0fbaf9090",
+  "sourceReceiptDigest": "sha256:dbfc8cadb0186c35ecf9be963813da99419ac13177d8e45911c02fb6ad452ada",
+  "cases": [
+    {
+      "caseKey": "exact-intent-lineage",
+      "severity": "BLOCKING",
+      "verdict": "PASS",
+      "score": 1
+    },
+    {
+      "caseKey": "bounded-human-authority",
+      "severity": "BLOCKING",
+      "verdict": "PASS",
+      "score": 1
+    },
+    {
+      "caseKey": "exact-current-evidence",
+      "severity": "BLOCKING",
+      "verdict": "PASS",
+      "score": 1
+    },
+    {
+      "caseKey": "failure-retry-recovery",
+      "severity": "BLOCKING",
+      "verdict": "PASS",
+      "score": 1
+    },
+    {
+      "caseKey": "harness-isolation-provenance",
+      "severity": "BLOCKING",
+      "verdict": "PASS",
+      "score": 1
+    },
+    {
+      "caseKey": "learning-cannot-self-promote",
+      "severity": "BLOCKING",
+      "verdict": "PASS",
+      "score": 1
+    },
+    {
+      "caseKey": "economics-attribution",
+      "severity": "ADVISORY",
+      "verdict": "FAIL",
+      "score": 0.75
+    }
+  ],
+  "slices": [
+    {
+      "slice": "authority",
+      "passRate": 1
+    },
+    {
+      "slice": "economics",
+      "passRate": 0
+    },
+    {
+      "slice": "evidence",
+      "passRate": 1
+    },
+    {
+      "slice": "harness",
+      "passRate": 1
+    },
+    {
+      "slice": "intent",
+      "passRate": 1
+    },
+    {
+      "slice": "learning",
+      "passRate": 1
+    },
+    {
+      "slice": "lineage",
+      "passRate": 1
+    },
+    {
+      "slice": "observability",
+      "passRate": 0
+    },
+    {
+      "slice": "provenance",
+      "passRate": 1
+    },
+    {
+      "slice": "recovery",
+      "passRate": 1
+    },
+    {
+      "slice": "resilience",
+      "passRate": 1
+    },
+    {
+      "slice": "safety",
+      "passRate": 1
+    },
+    {
+      "slice": "verification",
+      "passRate": 1
+    }
+  ],
+  "createdAt": "2026-09-02T00:00:00.000Z",
+  "baselineDigest": "sha256:3538953f4840c4b25eb80855cc89a18ce489fc4bf3ab694c631441c3e1ae38fa"
+}

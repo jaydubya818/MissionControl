@@ -6,7 +6,7 @@ the result before anything reaches a pull request.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Status: active V1](https://img.shields.io/badge/status-active%20V1-orange.svg)](#project-status)
-[![Runtime contract](https://img.shields.io/badge/runtime%20contract-v33-informational.svg)](docs/OVERVIEW.md)
+[![Runtime contract](https://img.shields.io/badge/runtime%20contract-v34-informational.svg)](docs/OVERVIEW.md)
 [![Built with TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
 ![Mission Control Command Center showing portfolio metrics and ranked exceptions](docs/software-factory/screenshots/readme/mission-control-command-center.png)
@@ -70,6 +70,36 @@ Each arrow is a gate, not a handoff. Nothing advances on an agent's word.
 
 ![Validated Mission with complete assertion coverage](docs/testing/evidence/real-codex-github-pr-golden-path/mission-validated-pr-61.png)
 
+## Eval integrity
+
+Mission Control includes a receipt-first Eval Control Plane for measuring the
+governed software-factory path without granting evals authority to approve,
+merge, release, or accept work.
+
+- **Sealed cases.** Candidate adapters receive public probes, never assertions
+  or negative controls.
+- **Fail-closed accounting.** Missing, duplicate, skipped, malformed, or
+  harness-invalid cases cannot be reported as passing.
+- **Reproducible receipts.** Every run binds its suite, baseline, revision,
+  adapter, dataset, configuration, seed, timestamps, costs, and artifact hashes.
+- **Tamper resistance.** Every golden case has a deliberately degraded negative
+  control that CI must detect.
+- **Honest status.** Blocking regressions fail the receipt; advisory evidence
+  gaps remain visible instead of being averaged away.
+
+The V1 Mission Control golden suite currently reports **6/6 blocking cases**,
+**7/7 negative controls**, and **zero baseline regressions**. Cost and token
+attribution remains an explicit advisory gap, so the receipt is truthfully
+`WARN` and publication-eligible rather than a misleading perfect score.
+
+```bash
+pnpm run eval:mission-control
+```
+
+Operators can inspect receipts under **Intelligence → Observability & Evals →
+Eval library**. See the [architecture](docs/architecture/eval-control-plane-v1.md)
+and [browser evidence](docs/testing/evidence/eval-control-plane-v1/README.md).
+
 ## Project status
 
 Active V1 development. The repository carries a deterministic full-system V1
@@ -80,8 +110,12 @@ canonical WorkOrder acceptance, and a human-gated learning continuation all
 compose end to end.
 
 That is implementation proof. It is **not** a claim of fleet-scale production
-operation or general Remote Sandbox certification. Current public
-client/backend runtime contract: **v33**.
+operation or general Remote Sandbox certification. Remote Sandbox remains
+**Production-pilot eligible; Preview** based on a bounded **3/3 live exe.dev cohort**.
+The current public client/backend runtime contract is **v34**.
+
+- **Builder loop:** `Intent → Plan → Configure agents, harnesses, skills, and tools → Execute → Verify and evaluate → Deliver → Observe → Improve`
+- **Governed delivery lifecycle:** `Mission → approved Plan → WorkOrder → Task → Attempt → candidate → independent evidence → pull request → human decision → release → observed outcome → governed learning`
 
 Per-capability status, evidence, and promotion gates live in the
 [Capability Maturity Ledger](docs/product/software-factory-capability-maturity.md).

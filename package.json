@@ -61,6 +61,7 @@
     "release:security": "pnpm run security:audit && pnpm run security:authorization && pnpm run security:secrets && pnpm run docs:factory-check",
     "qualify:factory": "node scripts/system-factory-e2e-qualification.mjs",
     "qualify:factory:v2": "node scripts/system-factory-e2e-qualification.mjs",
+    "eval:mission-control": "pnpm --filter @mission-control/shared build && node scripts/run-mission-control-eval.mjs --check-baseline",
     "taskmaster:plan": "taskmaster plan docs/PRD_V2.md",
     "taskmaster": "taskmaster"
   },
@@ -75,6 +76,8 @@
     "@playwright/test": "^1.50.0",
     "@taskmasterai/cli": "^1.1.4",
     "@types/node": "^20.11.5",
+    "ajv": "8.18.0",
+    "ajv-formats": "3.0.1",
     "concurrently": "^8.2.2",
     "tsx": "^4.7.0",
     "turbo": "^1.11.2",

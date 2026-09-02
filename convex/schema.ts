@@ -5,7 +5,7 @@
  * Source of truth for Mission Control data model.
  */
 
-import { defineSchema, defineTable } from "convex/server";
+import { defineSchema, defineTable, type SchemaDefinition } from "convex/server";
 import { v } from "convex/values";
 import {
   acceptanceCriterionValidator,
@@ -59,6 +59,7 @@ import {
   reviewActionValidator,
   reviewCorrectionCategoryValidator,
 } from "./lib/reviewIntelligenceValidators";
+import { evalControlPlaneTables } from "./lib/evalControlPlaneSchema";
 
 // ============================================================================
 // ENUMS (as union types)
@@ -412,7 +413,7 @@ const contextEvalRunStatus = v.union(
 // SCHEMA
 // ============================================================================
 
-export default defineSchema({
+const coreSchemaTables = {
   // -------------------------------------------------------------------------
   // AUTONOMOUS VENTURE FACTORY: EXECUTION INTENT SHADOW INTAKE
   // -------------------------------------------------------------------------
@@ -3994,6 +3995,9 @@ export default defineSchema({
     .index("by_team_member", ["teamId", "memberId"])
     .index("by_fixture", ["fixtureKey"]),
 
+};
+
+const factorySchemaTables = {
   missionAssignments: defineTable({
     tenantId: v.id("tenants"),
     projectId: v.id("projects"),
@@ -6613,6 +6617,11 @@ export default defineSchema({
     .index("by_factory_version", ["factoryDefinitionVersionId"]),
 
   // -------------------------------------------------------------------------
+  // EVAL CONTROL PLANE (diagnostic evidence; never acceptance authority)
+  // -------------------------------------------------------------------------
+  ...evalControlPlaneTables,
+
+  // -------------------------------------------------------------------------
   // FACTORY LEARNING (advisory projections; never acceptance authority)
   // -------------------------------------------------------------------------
   learningSignals: defineTable({
@@ -7976,4 +7985,14 @@ export default defineSchema({
     .index("by_project_source", ["projectId", "source"])
     .index("by_source", ["source"])
     .index("by_external", ["source", "externalId"]),
+};
+
+const schema: SchemaDefinition<
+  typeof coreSchemaTables & typeof factorySchemaTables,
+  true
+> = defineSchema({
+  ...coreSchemaTables,
+  ...factorySchemaTables,
 });
+
+export default schema;

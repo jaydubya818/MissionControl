@@ -56,6 +56,12 @@ importers:
       '@types/node':
         specifier: ^20.11.5
         version: 20.19.30
+      ajv:
+        specifier: 8.18.0
+        version: 8.18.0
+      ajv-formats:
+        specifier: 3.0.1
+        version: 3.0.1(ajv@8.18.0)
       concurrently:
         specifier: ^8.2.2
         version: 8.2.2

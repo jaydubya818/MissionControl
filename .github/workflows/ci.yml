@@ -121,6 +121,28 @@ jobs:
         run: |
           pnpm run ci:test
 
+  eval-integrity:
+    name: Eval Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Run hermetic golden suite and negative controls
+        run: pnpm run eval:mission-control
+
   build:
     name: Build (UI + workspaces)
     runs-on: ubuntu-latest

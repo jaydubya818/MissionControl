@@ -34,7 +34,7 @@ export function SidebarItem({ item, active, onNavigate }: SidebarItemProps): JSX
         </span>
       ) : null}
       {item.count != null && item.count > 0 ? (
-        <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-muted">
+        <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-secondary">
           {item.count}
         </span>
       ) : null}

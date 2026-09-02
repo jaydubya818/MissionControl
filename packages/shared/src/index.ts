@@ -13,3 +13,5 @@ export * from "./serviceCommandEnvelope.js";
 export * from "./canonicalDigest.js";
 export * from "./factoryMemorySecurity.js";
 export * from "./execution-routing.js";
+export * from "./evalControlPlane.js";
+export * from "./missionControlGoldenSuite.js";
