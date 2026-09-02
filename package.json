@@ -95,7 +95,7 @@
       "browserslist": "4.28.7",
       "decode-uri-component": "0.5.0",
       "express-rate-limit": "8.6.2",
-      "fast-uri": "3.1.5",
+      "fast-uri": "3.1.7",
       "file-type": "21.3.2",
       "form-data": "4.0.6",
       "ip-address": "10.3.1",
