@@ -34,6 +34,7 @@ export interface WorkOrderRevisionSnapshot {
   context?: string;
   workflowId?: string;
   repository?: string;
+  codeScopeIds?: string[];
   branchStrategy?: string;
   priority: 1 | 2 | 3 | 4;
   riskLevel: WorkOrderRiskLevel;
@@ -131,6 +132,7 @@ export function snapshotRevisionFields(workOrder: any): WorkOrderRevisionSnapsho
     context: workOrder.context,
     workflowId: workOrder.workflowId,
     repository: workOrder.repository,
+    codeScopeIds: sortStrings(workOrder.codeScopeIds?.map(String)),
     branchStrategy: workOrder.branchStrategy,
     priority: workOrder.priority,
     riskLevel: workOrder.riskLevel,
@@ -169,6 +171,7 @@ export function buildRevisionSnapshot(args: {
     dependencies: sortStrings(args.patch.dependencies ?? args.current.dependencies),
     requiredApprovals: sortStrings(args.patch.requiredApprovals ?? args.current.requiredApprovals),
     sourceOfTruthRefs: [...(args.patch.sourceOfTruthRefs ?? args.current.sourceOfTruthRefs ?? [])].sort((a, b) => `${a.kind}:${a.location}`.localeCompare(`${b.kind}:${b.location}`)),
+    codeScopeIds: sortStrings(args.patch.codeScopeIds ?? args.current.codeScopeIds),
   };
 }
 
@@ -180,6 +183,7 @@ export function changedFieldsBetween(current: WorkOrderRevisionSnapshot, next: W
     "context",
     "workflowId",
     "repository",
+    "codeScopeIds",
     "branchStrategy",
     "priority",
     "riskLevel",
@@ -236,11 +240,13 @@ export function evaluateRevisionImpact(args: {
       ? "DECREASED"
       : "UNCHANGED";
 
-  const scopeChanged = changedFields.some((field) => ["title", "desiredOutcome", "context", "requirements", "constraints", "positiveConstraints", "negativeConstraints", "dataBoundaries", "changeBudget", "dependencies"].includes(field));
-  const codeOrRepoChanged = changedFields.some((field) => ["repository", "branchStrategy"].includes(field));
+  const scopeChanged = changedFields.some((field) => ["title", "desiredOutcome", "context", "requirements", "constraints", "positiveConstraints", "negativeConstraints", "dataBoundaries", "changeBudget", "codeScopeIds", "dependencies"].includes(field));
+  const codeOrRepoChanged = changedFields.some((field) => ["repository", "codeScopeIds", "branchStrategy"].includes(field));
   const workflowChanged = changedFields.includes("workflowId") || changedFields.includes("verificationContract");
   const approvalsChanged = changedFields.includes("requiredApprovals") || riskReassessment === "INCREASED";
   const environmentChanged = changedFields.includes("metadata") && stableJson(args.current.metadata?.environment) !== stableJson(args.next.metadata?.environment);
+  const implementationPolicyChanged = changedFields.includes("metadata")
+    && stableJson(args.current.metadata?.implementationPolicy) !== stableJson(args.next.metadata?.implementationPolicy);
   const criteriaChanged = impactedAcceptanceCriteria.length > 0;
 
   const requiresReverification = criteriaChanged
@@ -249,7 +255,8 @@ export function evaluateRevisionImpact(args: {
     || (environmentChanged && policy.requireReverificationAfterEnvironmentChange)
     || scopeChanged;
 
-  const requiresReapproval = approvalsChanged || (policy.requireReapprovalAfterMaterialChange && (scopeChanged || workflowChanged || codeOrRepoChanged));
+  const requiresReapproval = approvalsChanged
+    || (policy.requireReapprovalAfterMaterialChange && (scopeChanged || workflowChanged || codeOrRepoChanged || implementationPolicyChanged));
 
   let materiality: RevisionMateriality = "NO_ACTION";
   if (requiresReapproval && requiresReverification) materiality = "BOTH";

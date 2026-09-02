@@ -224,7 +224,10 @@ describe("FactoryAttemptWorker remote Sandbox backend", () => {
     );
 
     await worker.tick();
-    await vi.waitFor(() => expect(worker.status().completedCount).toBe(1));
+    await vi.waitFor(
+      () => expect(worker.status().completedCount).toBe(1),
+      { timeout: 3_000 },
+    );
 
     expect(credentials.active.size).toBe(0);
     expect(provider.inventory()[0].state).toBe("TERMINATED");

@@ -16,6 +16,7 @@ import { MissionDraftForm } from "./MissionDraftForm";
 import { MissionPlanWorkspace } from "./MissionPlanWorkspace";
 import { MissionExecutionWorkspace } from "./MissionExecutionWorkspace";
 import { MissionSpecificationWorkspace } from "./MissionSpecificationWorkspace";
+import { normalizeNarrativeText } from "../../lib/displayText";
 
 export interface MissionDetailViewProps {
   projectId: Id<"projects">;
@@ -80,7 +81,7 @@ export function MissionDetailView({ projectId, onNavigate }: MissionDetailViewPr
   ]} />;
   return <div className="relative flex-1 overflow-auto bg-app"><DetailLayout
     breadcrumbs={[{ label: "Strategy" }, { label: "Missions", onClick: () => navigateSafely("missions") }, { label: mission.title, current: true }]}
-    title={mission.title} description={mission.objective}
+    title={mission.title} description={normalizeNarrativeText(mission.objective)}
     actions={<div className="flex items-center gap-2">{canReviewRelease && tab !== "execution" ? <Button onClick={() => setTab("execution")}>Open execution path</Button> : null}{canStart ? <Button onClick={() => act("start")} disabled={acting}>{acting ? "Starting…" : "Start Mission"}</Button> : null}{canAccept ? <Button onClick={() => act("accept")} disabled={acting}>{acting ? "Accepting…" : "Accept Mission"}</Button> : null}</div>}
     metrics={<MetricRow className="xl:grid-cols-4"><MetricBlock label="State" value={presentation.label} /><MetricBlock label="Work orders" value={workOrders.length} /><MetricBlock label="Assertions" value={`${assertions.filter((a) => a.status === "PASS" || a.status === "WAIVED").length}/${assertions.length}`} /><MetricBlock label="Corrective iterations" value={`${mission.correctiveIterations}/${mission.maxCorrectiveIterations}`} /></MetricRow>}
     tabs={TABS} activeTabId={tab} onTabChange={setTab} aside={aside}>

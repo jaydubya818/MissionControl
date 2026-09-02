@@ -24,6 +24,17 @@ import {
 
 const ROUTE_PREFIX = "/v2";
 const COMPACT_SHELL_QUERY = "(max-width: 899px)";
+const CONSTRAINED_DESKTOP_QUERY = "(min-width: 900px) and (max-width: 1279px)";
+const DENSE_OPERATOR_VIEWS = new Set<MainView>([
+  "mission-detail",
+  "control-work-orders",
+  "harness-code-review-wizard",
+  "harness-change-review",
+]);
+
+export function shouldAutoCollapseChat(activeView: MainView, constrainedDesktop: boolean) {
+  return constrainedDesktop && DENSE_OPERATOR_VIEWS.has(activeView);
+}
 
 export function viewFromPath(
   pathname: string,
@@ -95,6 +106,9 @@ export function AppShellV2({
   const syncingFromUrl = useRef(false);
   const [compactShell, setCompactShell] = useState(() =>
     typeof window !== "undefined" && window.matchMedia(COMPACT_SHELL_QUERY).matches
+  );
+  const [constrainedDesktop, setConstrainedDesktop] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia(CONSTRAINED_DESKTOP_QUERY).matches
   );
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileDockOpen, setMobileDockOpen] = useState(false);
@@ -213,6 +227,20 @@ export function AppShellV2({
     media.addEventListener("change", sync);
     return () => media.removeEventListener("change", sync);
   }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia(CONSTRAINED_DESKTOP_QUERY);
+    const sync = (event: MediaQueryListEvent | MediaQueryList) => setConstrainedDesktop(event.matches);
+    sync(media);
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (shouldAutoCollapseChat(activeView, constrainedDesktop)) {
+      columns.setDockClosed(true);
+    }
+  }, [activeView, constrainedDesktop, columns.setDockClosed]);
 
   const navigateFromSidebar = (view: MainView) => {
     onNavigate(view);

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "system-factory-e2e-qualification/v2",
   "result": "SYSTEM QUALIFIED V2 WITH KNOWN LIMITATIONS",
-  "baseSha": "11a51cac1e446488cddf34781cc9663b922c7684",
+  "baseSha": "470057334800c7cddfc268b3f26d5ef3fc632088",
   "runtimeContractVersion": 28,
   "hardeningV1": {
     "decision": "HARDENING V1 PASSED",
@@ -63,13 +63,13 @@
       "approvedBy": "operator-approver",
       "approvedRevision": 1
     },
-    "qualityContractDigest": "sha256:244de22b4a25143e45a8753ec7fbc291d660b5ec2e7e2c1c6baf76cc38f5151c",
+    "qualityContractDigest": "sha256:742129e4ddf06390df7c7d3967a33027097d582dd112e80713cc7cce9a85f365",
     "workOrderId": "work-order-system-factory-e2e-v2",
     "workOrderRevision": 1,
     "recipe": "progressive-software-delivery",
     "factoryVersionId": "factory-version-progressive-software-v1",
     "verificationFactoryVersionId": "factory-version-independent-verification-v1",
-    "contextPackageId": "d855eccfc7176fed31fe1ff4",
+    "contextPackageId": "cf50b66851e40c687448792c",
     "worker": {
       "workerId": "worker-system-factory-v2",
       "sessionId": "worker-session-current",
@@ -83,7 +83,7 @@
       "attempt-source-repaired",
       "attempt-source-current-head"
     ],
-    "executionManifestDigest": "sha256:0474504988f48d311e58bb6eb5c58d5f3cfacf65a90e51cf0bd91fada319dd0e",
+    "executionManifestDigest": "sha256:9881ec30549e45f520c5e91ddc1a53f944b04e98241bf74ab76d693907dda49e",
     "executionBackend": "remote-sandbox",
     "candidateShas": [
       "911cc67e464c075ddd7081ac5d72ceb2e9dc11bc",
@@ -97,9 +97,9 @@
       "attempt-verification-repaired",
       "attempt-verification-current-head"
     ],
-    "verificationSubjectId": "verification-subject:3c09429b8a87ce4b3e748d185b1b1417cf1397e7a6e178c991d2e6c2bb40f4be",
-    "verificationPlanId": "verification-plan:b821ce55b9523c9f15f6cf7be550746853da86ca755557bd2a401d379638171f",
-    "verificationPlanDigest": "sha256:b821ce55b9523c9f15f6cf7be550746853da86ca755557bd2a401d379638171f",
+    "verificationSubjectId": "verification-subject:7b1f599dc5bcc2024016153480e6a0b026de26a7b587108a531b7ae31a7aff0f",
+    "verificationPlanId": "verification-plan:dc5f1d1a9022e69a77c659a86dbc26ae940dc0cee0739f649c8cedfa2e78eb73",
+    "verificationPlanDigest": "sha256:dc5f1d1a9022e69a77c659a86dbc26ae940dc0cee0739f649c8cedfa2e78eb73",
     "verificationRunId": "verification-run:attempt-verification-current-head",
     "evidenceIds": [
       "evidence:attempt-verification-current-head:factory-negative-constraints",
@@ -232,9 +232,9 @@
     "sandboxHasGithubAuthority": false
   },
   "performance": {
-    "durationMs": 8883,
-    "sourceGateDurationMs": 3404,
-    "verificationDurationMs": 4991,
+    "durationMs": 9120,
+    "sourceGateDurationMs": 3460,
+    "verificationDurationMs": 5187,
     "sandboxProviderRuntimeMs": 1,
     "deterministicGateRuns": 7,
     "sourceAttempts": 5,

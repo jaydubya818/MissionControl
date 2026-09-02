@@ -46,7 +46,7 @@ describe("navConfig", () => {
     expect(missing).toEqual([]);
   });
 
-  it("lists every EOS preview view in eosNavConfig", async () => {
+  it("keeps the governed V2 lifecycle and selected Labs views reachable", async () => {
     const { EOS_NAV_GROUPS } = await import("./eosNavConfig");
     const eosViews = EOS_NAV_GROUPS.flatMap((g) => g.items.map((i) => i.view));
     const required = [
@@ -57,12 +57,19 @@ describe("navConfig", () => {
     expect(missing).toEqual([]);
   });
 
-  it("keeps EOS administration and labs groups within six visible items each", async () => {
+  it("keeps the EOS shell to six job-oriented domains", async () => {
     const { EOS_NAV_GROUPS } = await import("./eosNavConfig");
-    const administration = EOS_NAV_GROUPS.find((g) => g.id === "administration");
+    const delivery = EOS_NAV_GROUPS.find((g) => g.id === "delivery");
     const labs = EOS_NAV_GROUPS.find((g) => g.id === "labs");
-    expect(administration?.items.length).toBeLessThanOrEqual(6);
-    expect(labs?.items.length).toBeLessThanOrEqual(6);
+    expect(EOS_NAV_GROUPS).toHaveLength(6);
+    expect(delivery?.items.map((item) => item.view)).toEqual([
+      "control-work-orders",
+      "tasks",
+      "factory",
+      "atc",
+      "automations",
+    ]);
+    expect(labs?.items).not.toHaveLength(0);
   });
 
   it("resolves group and item lookups", () => {

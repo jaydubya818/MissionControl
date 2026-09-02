@@ -1,5 +1,6 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
+import type { Id } from "../../../../convex/_generated/dataModel";
 
 /**
  * Feature-flag hook. Resolution:
@@ -10,7 +11,10 @@ import { api } from "../../../../convex/_generated/api";
  * Key transform for the env override: dots/dashes → underscores, uppercased.
  * e.g. `ui.shell.v2` → `VITE_FLAG_UI_SHELL_V2`.
  */
-export function useFlagResolution(key: string): {
+export function useFlagResolution(
+  key: string,
+  projectId?: Id<"projects">,
+): {
   enabled: boolean;
   loading: boolean;
 } {
@@ -22,7 +26,7 @@ export function useFlagResolution(key: string): {
 
   const remote = useQuery(
     api.featureFlags.isEnabled,
-    hasEnvOverride ? "skip" : { key }
+    hasEnvOverride ? "skip" : { key, projectId },
   );
 
   if (hasEnvOverride) {
@@ -34,6 +38,6 @@ export function useFlagResolution(key: string): {
   return { enabled: remote ?? false, loading: remote === undefined };
 }
 
-export function useFlag(key: string): boolean {
-  return useFlagResolution(key).enabled;
+export function useFlag(key: string, projectId?: Id<"projects">): boolean {
+  return useFlagResolution(key, projectId).enabled;
 }

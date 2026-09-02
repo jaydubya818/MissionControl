@@ -22,7 +22,7 @@ import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { ConvexHttpClient } from "convex/browser";
 import { createGatewayProxy } from "./gateway-proxy.js";
-import { requireAuth } from "./auth.js";
+import { orchestrationUpgradeFailure, requireAuth } from "./auth.js";
 import { ConvexActions, ConvexQueries, ConvexMutations } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
 import { CoordinatorLoop } from "@mission-control/coordinator";
@@ -36,7 +36,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { executeAutomation } from "./automationAdapter.js";
 import { discoverLocalInference } from "./localInference.js";
 import { FactoryAttemptWorker } from "./factoryAttemptWorker.js";
-import { FactoryHostReporter, type FactoryHostReporterConfig } from "./factoryHostReporter.js";
+import {
+  FactoryHostReporter,
+  factorySandboxCapabilities,
+  type FactoryHostReporterConfig,
+} from "./factoryHostReporter.js";
 import {
   fetchGithubPullRequestEvidence,
   loadGithubAppPrivateKey,
@@ -45,6 +49,7 @@ import {
 import { CodexV1ExecutorAdapter } from "./codexExecutorAdapter.js";
 import { DeepSeekHarnessExecutorAdapter } from "./deepseekHarnessExecutorAdapter.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
+import { MissionPlanningWorker } from "./missionPlanningWorker.js";
 import { resolvePersonaPath, safeClientError } from "./orchestrationSecurity.js";
 import os from "node:os";
 
@@ -84,6 +89,7 @@ const FACTORY_WORKER_SCOPE = DURABLE_FACTORY_WORKER_ENABLED
 const FACTORY_WORKER_SESSION_ID = randomUUID();
 const FACTORY_WORKER_ID = process.env.CODEX_WORKER_HOST_ID?.trim() || `orchestration:${os.hostname()}`;
 const FACTORY_WORKER_MAX_CONCURRENT_RUNS = boundedPositiveInteger(process.env.CODEX_WORKER_MAX_CONCURRENT_RUNS, 1);
+const GITHUB_APP_PUBLICATION_READY = process.env.CODEX_WORKER_GITHUB_APP_PUBLICATION_ENABLED === "1";
 const REMOTE_SANDBOX_BACKEND_READY = process.env.CODEX_WORKER_REMOTE_SANDBOX_ENABLED === "1"
   && Boolean(process.env.EXEDEV_IDENTITY_FILE?.trim())
   && Boolean(process.env.OPENROUTER_MANAGEMENT_API_KEY?.trim());
@@ -112,6 +118,17 @@ const enabledFactoryHarnessAdapters = [
 const factoryHarnessRegistry = new HarnessAdapterRegistry(
   enabledFactoryHarnessAdapters.length > 0 ? enabledFactoryHarnessAdapters : [new CodexV1ExecutorAdapter()],
 );
+let occupiedFactoryWorkerSlots = 0;
+const tryAcquireFactoryWorkerSlot = () => {
+  if (occupiedFactoryWorkerSlots >= FACTORY_WORKER_MAX_CONCURRENT_RUNS) return null;
+  occupiedFactoryWorkerSlots += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    occupiedFactoryWorkerSlots = Math.max(0, occupiedFactoryWorkerSlots - 1);
+  };
+};
 const factoryAttemptWorker = new FactoryAttemptWorker(
   client,
   factoryHarnessRegistry,
@@ -124,6 +141,19 @@ const factoryAttemptWorker = new FactoryAttemptWorker(
     sessionId: FACTORY_WORKER_SESSION_ID,
     maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
   } : undefined,
+  tryAcquireFactoryWorkerSlot,
+);
+const missionPlanningWorker = new MissionPlanningWorker(
+  client,
+  factoryHarnessRegistry,
+  DURABLE_FACTORY_WORKER_ENABLED,
+  FACTORY_WORKER_SCOPE,
+  FACTORY_WORKER_SCOPE ? {
+    workerId: FACTORY_WORKER_ID,
+    sessionId: FACTORY_WORKER_SESSION_ID,
+  } : undefined,
+  undefined,
+  tryAcquireFactoryWorkerSlot,
 );
 const factoryHostReporter = FACTORY_WORKER_SCOPE
   ? new FactoryHostReporter(client, {
@@ -133,7 +163,8 @@ const factoryHostReporter = FACTORY_WORKER_SCOPE
       sessionId: FACTORY_WORKER_SESSION_ID,
       checkoutRoot: path.resolve(process.env.CODEX_WORKER_CHECKOUT_ROOT?.trim() || process.cwd()),
       maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
-      getCurrentRuns: () => factoryAttemptWorker.status().activeRunIds.length,
+      getCurrentRuns: () => factoryAttemptWorker.status().activeRunIds.length
+        + (missionPlanningWorker.status().activeRunId ? 1 : 0),
       approvedModelIds: commaSeparatedValues(process.env.CODEX_WORKER_APPROVED_MODEL_IDS),
       networkPolicyStatus: attestationStatus(process.env.CODEX_WORKER_NETWORK_POLICY_STATUS),
       secretPolicyStatus: attestationStatus(process.env.CODEX_WORKER_SECRET_POLICY_STATUS),
@@ -155,10 +186,10 @@ const factoryHostReporter = FACTORY_WORKER_SCOPE
           isolationModes: [...registration.capabilities.isolationModes],
         };
       }),
-      sandboxCapabilities: [
-        "git-worktree", "workspace-write", "read-only", "github-app-publication",
-        ...(REMOTE_SANDBOX_BACKEND_READY ? ["remote-sandbox", "sandbox-provider:exe-dev"] : []),
-      ],
+      sandboxCapabilities: factorySandboxCapabilities({
+        githubAppPublicationReady: GITHUB_APP_PUBLICATION_READY,
+        remoteSandboxBackendReady: REMOTE_SANDBOX_BACKEND_READY,
+      }),
       factoryVersionBindings: parseFactoryVersionBindings(
         process.env.CODEX_WORKER_FACTORY_VERSION_BINDINGS_JSON,
         FACTORY_WORKER_SCOPE.repositoryId,
@@ -395,6 +426,7 @@ app.get("/health", (c) => {
     lastTickAt,
     activeAgents: Array.from(activeAgents.keys()),
     factoryAttemptWorker: factoryAttemptWorker.status(),
+    missionPlanningWorker: missionPlanningWorker.status(),
     codexFactoryWorker: CODEX_FACTORY_WORKER_ENABLED ? "enabled" : "disabled",
   });
 });
@@ -421,6 +453,7 @@ app.get("/status", (c) => {
       port: PORT,
     },
     factoryAttemptWorker: factoryAttemptWorker.status(),
+    missionPlanningWorker: missionPlanningWorker.status(),
   });
 });
 
@@ -433,6 +466,11 @@ app.post("/tick", async (c) => {
 app.post("/runs/factory-worker/tick", async (c) => {
   await factoryAttemptWorker.tick();
   return c.json({ success: true, status: factoryAttemptWorker.status() });
+});
+
+app.post("/runs/planning-worker/tick", async (c) => {
+  await missionPlanningWorker.tick();
+  return c.json({ success: true, status: missionPlanningWorker.status() });
 });
 
 // Spawn an agent
@@ -1447,6 +1485,8 @@ const gatewayProxy = createGatewayProxy({
     const token = (process.env.GATEWAY_TOKEN ?? "").trim();
     return { url, token };
   },
+  // Upgrades bypass Hono, so apply the same bearer rule as requireAuth() here.
+  authorizeUpgrade: orchestrationUpgradeFailure,
   log: (msg) => console.log(`[gateway] ${msg}`),
   logError: (msg, err) => console.error(`[gateway] ${msg}`, err),
 });
@@ -1478,7 +1518,10 @@ export function startServer() {
   }
   if (factoryHostReporter) {
     void assertHarnessAdaptersReady(factoryHarnessRegistry).then(() => factoryHostReporter.start())
-      .then(() => factoryAttemptWorker.start())
+      .then(() => {
+        factoryAttemptWorker.start();
+        missionPlanningWorker.start();
+      })
       .catch((error) => console.error("[orchestration] Factory worker registration failed closed; execution did not start:", error));
   } else if (LEGACY_FACTORY_WORKER_ENABLED) {
     void assertHarnessAdaptersReady(factoryHarnessRegistry)
@@ -1497,7 +1540,7 @@ export function startServer() {
     console.log("\n[orchestration] Shutting down...");
     if (tickTimer) clearInterval(tickTimer);
     factoryHostReporter?.stop();
-    await factoryAttemptWorker.stop();
+    await Promise.all([factoryAttemptWorker.stop(), missionPlanningWorker.stop()]);
     for (const [name] of activeAgents) {
       try {
         await stopAgent(name);
@@ -1512,7 +1555,7 @@ export function startServer() {
     console.log("\n[orchestration] SIGTERM received, shutting down...");
     if (tickTimer) clearInterval(tickTimer);
     factoryHostReporter?.stop();
-    await factoryAttemptWorker.stop();
+    await Promise.all([factoryAttemptWorker.stop(), missionPlanningWorker.stop()]);
     process.exit(0);
   });
 

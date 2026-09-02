@@ -158,6 +158,14 @@ describe("execution routing V1", () => {
     expect(result.candidates[0].rejectionCodes).toContain("BUDGET_ESTIMATE_UNKNOWN");
   });
 
+  it("fails a known estimate closed when it exceeds the remaining approved budget", () => {
+    const routing = input([candidate("over-budget")]);
+    routing.policy.maximumEstimatedCostUsd = 0.1;
+    const result = resolveExecutionRoute(routing);
+    expect(result.status).toBe("EXHAUSTED");
+    expect(result.candidates[0].rejectionCodes).toContain("BUDGET_EXCEEDED");
+  });
+
   it("preserves missing telemetry as unknown and falls back conservatively", () => {
     const unknown = candidate("unknown", {
       evidence: {
