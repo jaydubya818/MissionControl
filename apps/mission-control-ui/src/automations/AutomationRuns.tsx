@@ -46,7 +46,7 @@ export function AutomationRuns({
   }
   return (
     <div className="space-y-3">
-      {message ? <p role={message.error ? "alert" : "status"} className={message.error ? "text-sm text-red-300" : "text-sm text-emerald-300"}>{message.text}</p> : null}
+      {message ? <p role={message.error ? "alert" : "status"} className={message.error ? "text-sm text-err" : "text-sm text-ok"}>{message.text}</p> : null}
     <div className="overflow-x-auto rounded-xl border border-[var(--panel-line)]">
       <table className="min-w-[1760px] w-full text-left text-sm">
         <thead className="bg-card/70 text-[11px] uppercase tracking-[0.13em] text-muted-foreground">
@@ -85,10 +85,10 @@ export function AutomationRuns({
                 <td className="px-3 py-3"><div>{formatDuration(run.durationMs)}</div><div className="mt-1 text-xs text-muted-foreground">${run.costUsd.toFixed(2)}</div></td>
                 <td className="px-3 py-3 text-muted-foreground">{run.idempotencyResult}</td>
                 <td className="max-w-[280px] px-3 py-3">
-                  <div className="text-amber-100">{run.workOrder.requiredHumanAction ?? "No action recorded"}</div>
-                  {run.workOrder.blockingIssue ? <div className="mt-2 text-xs text-red-200">{run.workOrder.blockingIssue}</div> : null}
-                  {run.workflowRun?.failureReason ? <div className="mt-2 text-xs text-red-200">{run.workflowRun.failureReason}</div> : null}
-                  {run.events?.length ? <details className="mt-2"><summary className="cursor-pointer text-xs text-cyan-200">Logs and events ({run.events.length})</summary><ul className="mt-1 space-y-1 text-xs text-muted-foreground">{run.events.slice(-8).map((event: any) => <li key={event._id}>{event.eventType}: {event.commandSummary ?? event.errorSummary ?? event.status}</li>)}</ul></details> : null}
+                  <div className="text-warn">{run.workOrder.requiredHumanAction ?? "No action recorded"}</div>
+                  {run.workOrder.blockingIssue ? <div className="mt-2 text-xs text-err">{run.workOrder.blockingIssue}</div> : null}
+                  {run.workflowRun?.failureReason ? <div className="mt-2 text-xs text-err">{run.workflowRun.failureReason}</div> : null}
+                  {run.events?.length ? <details className="mt-2"><summary className="cursor-pointer text-xs text-info-accent">Logs and events ({run.events.length})</summary><ul className="mt-1 space-y-1 text-xs text-muted-foreground">{run.events.slice(-8).map((event: any) => <li key={event._id}>{event.eventType}: {event.commandSummary ?? event.errorSummary ?? event.status}</li>)}</ul></details> : null}
                   {run.artifacts?.length ? <div className="mt-2 text-xs text-muted-foreground">Evidence: {run.artifacts.map((artifact: any) => artifact.name).join(", ")}</div> : null}
                 </td>
                 <td className="px-3 py-3">

@@ -8,6 +8,20 @@ const CRITICAL_ROUTES = [
   { route: "/v2/tasks", heading: "Tasks" },
   { route: "/v2/control-work-orders", heading: "Work Orders" },
   { route: "/v2/control-approvals", heading: "Decision Center" },
+  { route: "/v2/automations", heading: "Automations" },
+] as const;
+
+const CONTRAST_ROUTES = CRITICAL_ROUTES.filter(({ route }) => [
+  "/v2/home",
+  "/v2/control-work-orders",
+  "/v2/automations",
+].includes(route));
+
+const ACCESSIBILITY_SCENARIOS = [
+  { name: "wide-dark", width: 1440, height: 1000, theme: "dark" },
+  { name: "wide-light", width: 1440, height: 1000, theme: "light" },
+  { name: "narrow-dark", width: 760, height: 900, theme: "dark" },
+  { name: "narrow-light", width: 760, height: 900, theme: "light" },
 ] as const;
 
 function watchBrowserFailures(page: Page) {
@@ -39,7 +53,7 @@ function watchBrowserFailures(page: Page) {
   };
 }
 
-async function assertNoCriticalAccessibilityViolations(
+async function getAccessibilityViolations(
   page: Page,
   testInfo: TestInfo,
   evidenceName: string,
@@ -56,9 +70,17 @@ async function assertNoCriticalAccessibilityViolations(
     contentType: "application/json",
   });
 
-  const criticalViolations = results.violations.filter(
-    (violation) => violation.impact === "critical"
-  );
+  return results.violations;
+}
+
+async function assertNoCriticalAccessibilityViolations(
+  page: Page,
+  testInfo: TestInfo,
+  evidenceName: string,
+  include?: string
+) {
+  const criticalViolations = (await getAccessibilityViolations(page, testInfo, evidenceName, include))
+    .filter((violation) => violation.impact === "critical");
   const evidence = criticalViolations.map((violation) => ({
     id: violation.id,
     help: violation.help,
@@ -95,6 +117,37 @@ for (const entry of CRITICAL_ROUTES) {
       expect(browserFailures.requestFailures).toEqual([]);
     } finally {
       browserFailures.dispose();
+    }
+  });
+}
+
+for (const entry of CONTRAST_ROUTES) {
+  test(`${entry.heading} has no color contrast violations across supported themes and viewports`, async ({
+    page,
+  }, testInfo) => {
+    for (const scenario of ACCESSIBILITY_SCENARIOS) {
+      await page.setViewportSize({ width: scenario.width, height: scenario.height });
+      await page.goto(entry.route);
+      await expect(
+        page.getByRole("heading", { name: entry.heading, exact: true }).first()
+      ).toBeVisible({ timeout: 15_000 });
+      await page.locator("html").evaluate((element, theme) => {
+        element.setAttribute("data-theme", theme);
+      }, scenario.theme);
+
+      const contrastViolations = (await getAccessibilityViolations(
+        page,
+        testInfo,
+        `${entry.route.replaceAll("/", "-").replace(/^-/, "")}-${scenario.name}`
+      )).filter((violation) => violation.id === "color-contrast");
+      const evidence = contrastViolations.map((violation) => ({
+        id: violation.id,
+        nodes: violation.nodes.map((node) => node.target),
+      }));
+      expect(
+        contrastViolations,
+        `Color contrast violations:\n${JSON.stringify(evidence, null, 2)}`
+      ).toEqual([]);
     }
   });
 }

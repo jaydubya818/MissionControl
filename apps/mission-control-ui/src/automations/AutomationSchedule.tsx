@@ -67,7 +67,7 @@ export function AutomationSchedule({
 
   return (
     <div className="space-y-4">
-      {message ? <p role={message.error ? "alert" : "status"} className={message.error ? "text-sm text-red-300" : "text-sm text-emerald-300"}>{message.text}</p> : null}
+      {message ? <p role={message.error ? "alert" : "status"} className={message.error ? "text-sm text-err" : "text-sm text-ok"}>{message.text}</p> : null}
       <Card className="p-4">
         <div className="flex items-start gap-3">
           <CalendarClock className="mt-0.5 h-4 w-4 text-registry-accent" />
@@ -141,7 +141,7 @@ function ScheduleGroup({
                 <div className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={() => onSelect(definition._id)} className="font-medium text-foreground hover:text-registry-accent">{definition.name}</button>
                   <Badge variant="outline" className={statusTone(definition.status)}>{definition.status}</Badge>
-                  {definition.scheduleConflict ? <Badge variant="outline" className="border-amber-500/30 text-amber-200">CONFLICT</Badge> : null}
+                  {definition.scheduleConflict ? <Badge variant="outline" className="border-warn/30 text-warn">CONFLICT</Badge> : null}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{humanizeCron(definition.triggerConfig?.cron)} · {definition.triggerConfig?.timezone ?? "UTC"}</p>
                 <p className="mt-1 font-mono text-xs text-muted-foreground">{definition.triggerConfig?.cron}</p>

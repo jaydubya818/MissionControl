@@ -128,7 +128,7 @@ export function AutomationDefinitionDetail({
             <Badge variant="outline" className={statusTone(definition.status)}>{definition.status}</Badge>
             <Badge variant="outline" className={statusTone(definition.health)}>{definition.health}</Badge>
             <Badge variant="outline">{definition.reliabilityState}</Badge>
-            <Badge variant="outline" className={definition.isMutating ? "border-red-500/30 text-red-200" : "border-emerald-500/30 text-emerald-300"}>
+            <Badge variant="outline" className={definition.isMutating ? "border-err/30 text-err" : "border-ok/30 text-ok"}>
               {definition.isMutating ? "Mutating" : "Read-only"}
             </Badge>
             {definition.sourceSkillId ? <Badge variant="outline">Skill v{definition.sourceSkillVersion}</Badge> : null}
@@ -152,7 +152,7 @@ export function AutomationDefinitionDetail({
               <span className="text-xs text-muted-foreground">Validation: {definition.validationStatus ?? "PENDING"} · activation requires approval</span>
             </div>
           ) : null}
-          {governanceMessage ? <p role="status" className="mt-2 text-xs text-emerald-200">{governanceMessage}</p> : null}
+          {governanceMessage ? <p role="status" className="mt-2 text-xs text-ok">{governanceMessage}</p> : null}
         </div>
         <Button size="sm" variant="outline" onClick={onClose} aria-label="Close Automation Definition details">
           <X className="h-4 w-4" /> Close
@@ -203,7 +203,7 @@ export function AutomationDefinitionDetail({
             ["Concurrency", String(definition.concurrencyLimit)],
             ["Idempotency", definition.idempotencyStrategy],
           ]} />
-          {definition.scheduleConflict ? <p role="alert" className="mt-3 text-xs text-amber-200">Schedule conflict detected for the same scope and cadence.</p> : null}
+          {definition.scheduleConflict ? <p role="alert" className="mt-3 text-xs text-warn">Schedule conflict detected for the same scope and cadence.</p> : null}
         </DetailSection>
         <DetailSection icon={ShieldCheck} title="Governance">
           <DetailGrid items={[
@@ -258,7 +258,7 @@ export function AutomationDefinitionDetail({
                   <span className="text-xs text-muted-foreground">{formatDate(decision.decidedAt)}</span>
                 </div>
                 <p className="mt-2 text-sm text-foreground">{decision.reason}</p>
-                <p className="mt-2 text-xs text-amber-100/70">{decision.actorId} · {decision.actorIdentitySource ?? "SYSTEM"}</p>
+                <p className="mt-2 text-xs text-warn">{decision.actorId} · {decision.actorIdentitySource ?? "SYSTEM"}</p>
               </li>
             ))}
           </ol>

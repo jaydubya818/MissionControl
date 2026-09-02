@@ -51,28 +51,28 @@ export function AutomationOverview({
       <section aria-labelledby="automation-attention-title">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.17em] text-amber-200">Operator attention</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.17em] text-warn">Operator attention</div>
             <h2 id="automation-attention-title" className="mt-1 text-base font-semibold text-foreground">Highest-priority exceptions</h2>
           </div>
           <span className="text-xs text-muted-foreground">{attention.length} open</span>
         </div>
         {attention.length === 0 ? (
-          <Card className="border-emerald-500/20 bg-emerald-500/[0.03] p-4 text-sm text-emerald-200">
+          <Card className="border-ok/20 bg-ok-soft p-4 text-sm text-ok">
             No urgent Automation action. All active Definitions are inside the V1 safety boundary.
           </Card>
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
             {attention.slice(0, 8).map((item) => (
-              <Card key={item.id} className="border-amber-500/20 bg-amber-500/[0.035] p-4">
+              <Card key={item.id} className="border-warn/20 bg-warn-soft p-4">
                 <div className="flex items-start gap-3">
-                  <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
+                  <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-foreground">{item.title}</div>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.body}</p>
                     <button
                       type="button"
                       onClick={() => item.definitionId ? onSelectDefinition(item.definitionId) : onTabChange(item.tab)}
-                      className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-200 hover:text-foreground"
+                      className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-warn hover:text-foreground"
                     >
                       {item.action} <ArrowRight className="h-3.5 w-3.5" />
                     </button>
@@ -116,7 +116,7 @@ export function AutomationOverview({
           <h2 className="text-sm font-semibold text-foreground">V1 control boundary</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             {["LEVEL_1 only", "Read-only", "Approval required", "No automatic dispatch", "Independent receipt required"].map((label) => (
-              <Badge key={label} variant="outline" className="border-emerald-500/20 text-emerald-200">{label}</Badge>
+              <Badge key={label} variant="outline" className="border-ok/20 text-ok">{label}</Badge>
             ))}
           </div>
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground">

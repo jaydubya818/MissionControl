@@ -39,7 +39,7 @@ export function AutomationReceipts({ projectId, receipts }: { projectId: Id<"pro
       ) : (
         <div className="grid gap-3">
           {filtered.map((receipt) => (
-            <Card key={receipt._id} className={receipt.evidenceState === "MISSING" ? "border-amber-500/25 p-4" : "p-4"}>
+            <Card key={receipt._id} className={receipt.evidenceState === "MISSING" ? "border-warn/25 p-4" : "p-4"}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="font-medium text-foreground">{receipt.automationName ?? "Automation receipt"}</div>

@@ -112,7 +112,7 @@ export function AutomationCandidates({
       {message ? (
         <p
           role={message.error ? "alert" : "status"}
-          className={message.error ? "text-sm text-red-300" : "text-sm text-emerald-300"}
+          className={message.error ? "text-sm text-err" : "text-sm text-ok"}
         >
           {message.text}
         </p>
@@ -208,7 +208,7 @@ export function AutomationCandidates({
                 </div>
               </div>
               {!candidate.eligible ? (
-                <div className="flex items-start gap-2 border-t border-amber-500/15 bg-amber-500/[0.04] px-4 py-3 text-xs text-amber-100">
+                <div className="flex items-start gap-2 border-t border-warn/15 bg-warn-soft px-4 py-3 text-xs text-warn">
                   <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   {candidate.eligibilityReason}
                   <a href={workspacePath("/v2/harness-workshop", projectId)} className="ml-auto shrink-0 font-medium hover:text-white">

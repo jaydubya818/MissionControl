@@ -91,12 +91,12 @@ export function SkillAutomationCandidates({ projectId }: { projectId: Id<"projec
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <Code2 className="h-4 w-4 text-cyan-300" />
+                <Code2 className="h-4 w-4 text-info-accent" />
                 <h3 className="font-semibold">{candidate.skill.displayName ?? candidate.skill.name}</h3>
                 <Badge variant="outline">{candidate.version.version}</Badge>
                 <Badge variant="outline">{candidate.assessment.status}</Badge>
                 <Badge variant="outline">{candidate.assessment.recommendedAdapter ?? "Needs adapter"}</Badge>
-                {candidate.definition && <Badge className="bg-emerald-500/15 text-emerald-200">Converted</Badge>}
+                {candidate.definition && <Badge className="bg-ok-soft text-ok">Converted</Badge>}
               </div>
               <p className="mt-2 max-w-4xl text-sm text-muted-foreground">{candidate.skill.description}</p>
               <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
@@ -111,7 +111,7 @@ export function SkillAutomationCandidates({ projectId }: { projectId: Id<"projec
                 <span>Conversion: {candidate.disposition}</span>
               </div>
               {(candidate.assessment.missing.length > 0 || candidate.assessment.blockers.length > 0) && (
-                <div className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/[0.04] p-3 text-xs text-amber-100">
+                <div className="mt-3 rounded-md border border-warn/20 bg-warn-soft p-3 text-xs text-warn">
                   {[...candidate.assessment.blockers, ...candidate.assessment.missing].join(" · ")}
                 </div>
               )}
@@ -120,13 +120,13 @@ export function SkillAutomationCandidates({ projectId }: { projectId: Id<"projec
               <Button disabled={candidate.assessment.status !== "ELIGIBLE" || !!candidate.definition} onClick={() => void begin(candidate)}>
                 {candidate.definition ? "Already converted" : candidate.draft ? "Resume conversion" : candidate.assessment.status === "INELIGIBLE" ? "Review eligibility" : "Convert to Automation"} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-              <a className="text-xs font-medium text-cyan-200 hover:text-white" href={`/v2/registry?workspace=${projectId}&package=${candidate.skill._id}`}>View skill</a>
+              <a className="text-xs font-medium text-info-accent hover:text-foreground" href={`/v2/registry?workspace=${projectId}&package=${candidate.skill._id}`}>View skill</a>
               <details className="text-xs text-muted-foreground">
-                <summary className="cursor-pointer text-cyan-200">View dependencies</summary>
+                <summary className="cursor-pointer text-info-accent">View dependencies</summary>
                 <div className="mt-2">{candidate.version.dependencies?.length ? candidate.version.dependencies.map((dependency: any) => `${dependency.slug}@${dependency.range}`).join(", ") : "No package dependencies declared."}</div>
               </details>
               <details className="text-xs text-muted-foreground">
-                <summary className="cursor-pointer text-cyan-200">Preview generated artifact</summary>
+                <summary className="cursor-pointer text-info-accent">Preview generated artifact</summary>
                 <div className="mt-2">Recommended {candidate.assessment.recommendedAdapter ?? "adapter"} artifact at the repository convention for this skill. Start conversion to generate, edit, diff, and validate the exact implementation.</div>
               </details>
             </div>
@@ -203,7 +203,7 @@ function ConversionWizard({ draft: initialDraft, onClose }: { draft: any; onClos
           <Button variant="ghost" onClick={onClose}>Exit wizard</Button>
         </div>
         <ol className="mt-5 grid grid-cols-7 gap-1" aria-label="Conversion progress">
-          {STEPS.map((label, index) => <li key={label} className={`border-t-2 pt-2 text-[11px] ${index + 1 <= step ? "border-cyan-400 text-foreground" : "border-border text-muted-foreground"}`}>{index + 1}. {label}</li>)}
+          {STEPS.map((label, index) => <li key={label} className={`border-t-2 pt-2 text-[11px] ${index + 1 <= step ? "border-info-accent text-foreground" : "border-border text-muted-foreground"}`}>{index + 1}. {label}</li>)}
         </ol>
       </div>
       <div className="min-h-[360px] space-y-5 p-5">
@@ -220,12 +220,12 @@ function ConversionWizard({ draft: initialDraft, onClose }: { draft: any; onClos
           {["TYPESCRIPT", "PYTHON"].includes(draft.adapterType) && <ReadOnly label="Runtime invocation" value={draft.adapterType === "TYPESCRIPT" ? "pnpm exec tsx <approved artifact>" : "python3 <approved artifact>"} />}
           {draft.adapterType === "SKILL_PIPELINE" && <label className="block space-y-2"><Label>Ordered deterministic steps (JSON)</Label><Textarea className="min-h-36 font-mono text-xs" value={JSON.stringify(config.steps ?? [{ name: "validate", adapterType: "SHELL", command: "pnpm run typecheck", timeoutMs: 300000 }], null, 2)} onChange={event => { try { set("steps", JSON.parse(event.target.value)); setError(""); } catch { setError("Pipeline steps must be valid JSON."); } }} /></label>}
           <div className="grid gap-3 sm:grid-cols-3"><Field label="Timeout (seconds)" value={String(config.maxDurationSeconds ?? 900)} onChange={v => set("maxDurationSeconds", Number(v))} /><Field label="Retry limit" value={String(config.maxRetries ?? 0)} onChange={v => set("maxRetries", Number(v))} /><Field label="Cost limit (USD)" value={String(config.maxCostUsd ?? 1)} onChange={v => set("maxCostUsd", Number(v))} /></div>
-          <Button variant="outline" onClick={() => void generatePreview()} disabled={busy}>Generate preview and diff</Button>{preview?.content ? <><Label htmlFor="artifact-editor">Approved artifact content</Label><Textarea id="artifact-editor" className="min-h-52 font-mono text-xs" value={config.artifactContent ?? preview.content} onChange={event => set("artifactContent", event.target.value)} /><details><summary className="cursor-pointer text-sm text-cyan-200">Structured repository diff</summary><pre className="mt-2 max-h-52 overflow-auto rounded bg-black/20 p-3 text-xs">{preview.diff}</pre></details></> : null}</>}
+          <Button variant="outline" onClick={() => void generatePreview()} disabled={busy}>Generate preview and diff</Button>{preview?.content ? <><Label htmlFor="artifact-editor">Approved artifact content</Label><Textarea id="artifact-editor" className="min-h-52 font-mono text-xs" value={config.artifactContent ?? preview.content} onChange={event => set("artifactContent", event.target.value)} /><details><summary className="cursor-pointer text-sm text-info-accent">Structured repository diff</summary><pre className="mt-2 max-h-52 overflow-auto rounded bg-black/20 p-3 text-xs">{preview.diff}</pre></details></> : null}</>}
         {step === 4 && <><PanelTitle title="Define trigger" body="Manual is safest. Schedules create review gates; they never auto-dispatch." /><label className="space-y-2"><Label>Trigger type</Label><select className="h-10 w-full rounded-md border border-border bg-background px-3" value={config.triggerType} onChange={e => set("triggerType", e.target.value)}><option>MANUAL</option><option>SCHEDULE</option><option>EVENT</option><option>CONDITION</option></select></label>{config.triggerType === "SCHEDULE" && <Field label="Five-field cron" value={config.cron} onChange={v => set("cron", v)} />}</>}
-        {step === 5 && <><PanelTitle title="Review governance" body="These controls are fixed for V1 and cannot be weakened in the wizard." /><div className="grid gap-3 sm:grid-cols-2">{["LEVEL_1 / read-only", "Operator approval required", "Automatic dispatch disabled", "Independent receipt required", "Concurrency limit 1", "Overlap policy: skip"].map(item => <div key={item} className="flex items-center gap-2 rounded-md border border-emerald-500/20 p-3 text-sm"><ShieldCheck className="h-4 w-4 text-emerald-300" />{item}</div>)}</div></>}
-        {step === 6 && <><PanelTitle title="Validate artifact and policy" body="Validation is deterministic and server enforced." /><Button onClick={() => void runValidation()} disabled={busy}>Run validation</Button>{validation && <div className={`rounded-md border p-4 ${validation.status === "PASSED" ? "border-emerald-500/25" : "border-red-500/25"}`}><div className="flex items-center gap-2 font-medium">{validation.status === "PASSED" ? <CheckCircle2 className="text-emerald-300" /> : <XCircle className="text-red-300" />}{validation.status}</div>{validation.findings?.map((finding: string) => <p key={finding} className="mt-2 text-sm text-muted-foreground">{finding}</p>)}{validation.content && <pre className="mt-4 max-h-52 overflow-auto rounded bg-black/20 p-3 text-xs">{validation.content}</pre>}</div>}</>}
+        {step === 5 && <><PanelTitle title="Review governance" body="These controls are fixed for V1 and cannot be weakened in the wizard." /><div className="grid gap-3 sm:grid-cols-2">{["LEVEL_1 / read-only", "Operator approval required", "Automatic dispatch disabled", "Independent receipt required", "Concurrency limit 1", "Overlap policy: skip"].map(item => <div key={item} className="flex items-center gap-2 rounded-md border border-ok/20 p-3 text-sm"><ShieldCheck className="h-4 w-4 text-ok" />{item}</div>)}</div></>}
+        {step === 6 && <><PanelTitle title="Validate artifact and policy" body="Validation is deterministic and server enforced." /><Button onClick={() => void runValidation()} disabled={busy}>Run validation</Button>{validation && <div className={`rounded-md border p-4 ${validation.status === "PASSED" ? "border-ok/25" : "border-err/25"}`}><div className="flex items-center gap-2 font-medium">{validation.status === "PASSED" ? <CheckCircle2 className="text-ok" /> : <XCircle className="text-err" />}{validation.status}</div>{validation.findings?.map((finding: string) => <p key={finding} className="mt-2 text-sm text-muted-foreground">{finding}</p>)}{validation.content && <pre className="mt-4 max-h-52 overflow-auto rounded bg-black/20 p-3 text-xs">{validation.content}</pre>}</div>}</>}
         {step === 7 && <><PanelTitle title="Create disabled Definition" body="Creation persists the versioned artifact and audit lineage. Review, approval, and activation remain separate actions." /><Label>Creation reason</Label><Textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="Why this deterministic skill should become a governed Automation…" /><Button onClick={() => void finish()} disabled={busy || validation?.status !== "PASSED"}>Create disabled Definition</Button></>}
-        {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+        {error && <p role="alert" className="text-sm text-err">{error}</p>}
       </div>
       <div className="flex justify-between border-t border-border p-4">
         <Button variant="outline" disabled={step === 1 || busy} onClick={() => void save(step - 1)}>Back</Button>
