@@ -93,17 +93,15 @@ explicit allowlist, independent verification, and separate product approval.
 
 ## V1 authorization boundary
 
-Mission Control does not yet provide authenticated operator identity and
-workspace membership consistently across the application. V1 Automation
-controls therefore require a trusted-operator deployment boundary.
-
-The `actorId` accepted by candidate acceptance, activation, and pause is an audit
-label asserted by that trusted deployment. It is recorded with
-`CLIENT_ASSERTED_TRUSTED_OPERATOR` and must not be interpreted as an
-independently authenticated identity. `evaluateNow` does not accept an actor
-label because it cannot verify one. Workspace/entity mismatches still fail
-closed, but broad authenticated authorization is intentionally deferred to a
-[separate product slice](https://github.com/jaydubya818/MissionControl/issues/42).
+Automation reads require authenticated workspace access. Candidate decisions,
+activation, pause, retirement, and manual evaluation require
+`factory.automation.manage` (or an equivalent company-admin capability). The
+server derives the operator ID from the authenticated workspace membership and
+records `AUTHENTICATED_OPERATOR`; clients cannot choose their audit identity or
+policy version. Local demo actions are explicitly labeled
+`LOCAL_DEMO_OPERATOR`, scheduled evaluations are labeled `SYSTEM`, and older
+`CLIENT_ASSERTED_TRUSTED_OPERATOR` decisions remain unchanged as historical
+records.
 
 ## Suspension and reliability
 

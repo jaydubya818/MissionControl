@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
   AUTOMATION_POLICY_VERSION,
-  AUTOMATION_ACTOR_IDENTITY_SOURCE,
+  automationOperatorIdentitySource,
   buildDisabledAutomationDefinition,
   calculateAutomationMetrics,
   isAutomationCandidatePayload,
@@ -12,25 +12,35 @@ import {
   isCandidateEligibleForActivation,
   loadRepetitiveTaskCandidates,
 } from "./lib/repetitiveTaskCandidates";
+import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
+import { SKILL_AUTOMATION_POLICY_VERSION } from "./lib/skillAutomation";
 
-const actorArgs = {
-  // V1 runs behind a trusted operator boundary. This is an audit label supplied
-  // by that deployment, not an independently authenticated Mission Control ID.
-  actorId: v.string(),
+const decisionArgs = {
   reason: v.string(),
-  policyVersion: v.optional(v.string()),
 };
 
-async function assertProject(ctx: { db: any }, projectId: any) {
-  const project = await ctx.db.get(projectId);
-  if (!project) throw new Error("Workspace not found or access is unavailable");
-  return project;
+async function requireAutomationPermission(
+  ctx: any,
+  projectId: any,
+  permission: (typeof FACTORY_PERMISSIONS)[keyof typeof FACTORY_PERMISSIONS],
+) {
+  const access = await requireWorkspacePermission(ctx, projectId, permission);
+  return {
+    ...access,
+    actorIdentitySource: automationOperatorIdentitySource(access.membership.mode),
+  };
+}
+
+function policyVersionForDefinition(definition: { sourceSkillId?: unknown }) {
+  return definition.sourceSkillId
+    ? SKILL_AUTOMATION_POLICY_VERSION
+    : AUTOMATION_POLICY_VERSION;
 }
 
 export const getControlPlane = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    await assertProject(ctx, args.projectId);
+    await requireAutomationPermission(ctx, args.projectId, FACTORY_PERMISSIONS.VIEW);
     const [definitions, decisions, suggestions, workOrders, receipts, scheduledJobs, workflows, evaluations, workflowRuns, runEvents, runArtifacts] = await Promise.all([
       ctx.db.query("automationDefinitions").withIndex("by_project", (q: any) => q.eq("projectId", args.projectId)).collect(),
       ctx.db.query("automationDecisions").withIndex("by_project", (q: any) => q.eq("projectId", args.projectId)).collect(),
@@ -211,6 +221,7 @@ export const getDefinition = query({
     automationDefinitionId: v.id("automationDefinitions"),
   },
   handler: async (ctx, args) => {
+    await requireAutomationPermission(ctx, args.projectId, FACTORY_PERMISSIONS.VIEW);
     const definition = await ctx.db.get(args.automationDefinitionId);
     if (!definition || definition.projectId !== args.projectId) {
       throw new Error("Automation is outside the selected workspace");
@@ -227,10 +238,14 @@ export const acceptCandidate = mutation({
   args: {
     projectId: v.id("projects"),
     candidateId: v.string(),
-    ...actorArgs,
+    ...decisionArgs,
   },
   handler: async (ctx, args) => {
-    await assertProject(ctx, args.projectId);
+    const access = await requireAutomationPermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
+    );
     const candidate = (await loadRepetitiveTaskCandidates(ctx, args.projectId))
       .find((item) => item.id === args.candidateId);
     if (!candidate) throw new Error("Automation Candidate is no longer eligible");
@@ -295,7 +310,7 @@ export const acceptCandidate = mutation({
       buildDisabledAutomationDefinition({
         projectId: args.projectId,
         sourceCandidateId: suggestion._id,
-        actorId: args.actorId,
+        actorId: access.actorId,
         candidate,
         workflow,
         now,
@@ -305,10 +320,10 @@ export const acceptCandidate = mutation({
       projectId: args.projectId,
       automationDefinitionId: definitionId,
       decisionType: "CREATED",
-      actorId: args.actorId,
-      actorIdentitySource: AUTOMATION_ACTOR_IDENTITY_SOURCE,
+      actorId: access.actorId,
+      actorIdentitySource: access.actorIdentitySource,
       reason: args.reason,
-      policyVersion: args.policyVersion ?? AUTOMATION_POLICY_VERSION,
+      policyVersion: AUTOMATION_POLICY_VERSION,
       definitionVersion: 1,
       decidedAt: now,
     });
@@ -317,10 +332,10 @@ export const acceptCandidate = mutation({
       automationDefinitionId: definitionId,
       candidateId: candidate.id,
       decisionType: "ACCEPTED",
-      actorId: args.actorId,
-      actorIdentitySource: AUTOMATION_ACTOR_IDENTITY_SOURCE,
+      actorId: access.actorId,
+      actorIdentitySource: access.actorIdentitySource,
       reason: args.reason,
-      policyVersion: args.policyVersion ?? AUTOMATION_POLICY_VERSION,
+      policyVersion: AUTOMATION_POLICY_VERSION,
       definitionVersion: 1,
       decidedAt: now,
     });
@@ -332,10 +347,14 @@ export const rejectCandidate = mutation({
   args: {
     projectId: v.id("projects"),
     candidateId: v.string(),
-    ...actorArgs,
+    ...decisionArgs,
   },
   handler: async (ctx, args) => {
-    await assertProject(ctx, args.projectId);
+    const access = await requireAutomationPermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
+    );
     const candidate = (await loadRepetitiveTaskCandidates(ctx, args.projectId))
       .find((item) => item.id === args.candidateId);
     if (!candidate) throw new Error("Automation Candidate is no longer available");
@@ -383,10 +402,10 @@ export const rejectCandidate = mutation({
       projectId: args.projectId,
       candidateId: candidate.id,
       decisionType: "REJECTED",
-      actorId: args.actorId,
-      actorIdentitySource: AUTOMATION_ACTOR_IDENTITY_SOURCE,
+      actorId: access.actorId,
+      actorIdentitySource: access.actorIdentitySource,
       reason: args.reason,
-      policyVersion: args.policyVersion ?? AUTOMATION_POLICY_VERSION,
+      policyVersion: AUTOMATION_POLICY_VERSION,
       definitionVersion: 0,
       decidedAt: Date.now(),
     });
@@ -398,10 +417,14 @@ export const requestCandidateEvidence = mutation({
   args: {
     projectId: v.id("projects"),
     candidateId: v.string(),
-    ...actorArgs,
+    ...decisionArgs,
   },
   handler: async (ctx, args) => {
-    await assertProject(ctx, args.projectId);
+    const access = await requireAutomationPermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
+    );
     const candidate = (await loadRepetitiveTaskCandidates(ctx, args.projectId))
       .find((item) => item.id === args.candidateId);
     if (!candidate) throw new Error("Automation Candidate is no longer available");
@@ -409,10 +432,10 @@ export const requestCandidateEvidence = mutation({
       projectId: args.projectId,
       candidateId: candidate.id,
       decisionType: "POLICY_BLOCKED",
-      actorId: args.actorId,
-      actorIdentitySource: AUTOMATION_ACTOR_IDENTITY_SOURCE,
+      actorId: access.actorId,
+      actorIdentitySource: access.actorIdentitySource,
       reason: `More evidence requested: ${args.reason}`,
-      policyVersion: args.policyVersion ?? AUTOMATION_POLICY_VERSION,
+      policyVersion: AUTOMATION_POLICY_VERSION,
       definitionVersion: 0,
       decidedAt: Date.now(),
     });
@@ -424,9 +447,14 @@ export const activate = mutation({
   args: {
     projectId: v.id("projects"),
     automationDefinitionId: v.id("automationDefinitions"),
-    ...actorArgs,
+    ...decisionArgs,
   },
   handler: async (ctx, args) => {
+    const access = await requireAutomationPermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
+    );
     const definition = await ctx.db.get(args.automationDefinitionId);
     if (!definition || definition.projectId !== args.projectId) throw new Error("Automation is outside the selected workspace");
     if (definition.isMutating || definition.autonomyLevel !== "LEVEL_1") {
@@ -440,10 +468,10 @@ export const activate = mutation({
     const now = Date.now();
     await ctx.db.patch(definition._id, {
       status: "ACTIVE",
-      activatedBy: args.actorId,
+      activatedBy: access.actorId,
       activatedAt: now,
       activationReason: args.reason,
-      activationPolicyVersion: args.policyVersion ?? AUTOMATION_POLICY_VERSION,
+      activationPolicyVersion: policyVersionForDefinition(definition),
       pausedBy: undefined,
       pausedAt: undefined,
       pauseReason: undefined,
@@ -455,10 +483,10 @@ export const activate = mutation({
       projectId: args.projectId,
       automationDefinitionId: definition._id,
       decisionType: definition.status === "PAUSED" ? "RESUMED" : "ACTIVATED",
-      actorId: args.actorId,
-      actorIdentitySource: AUTOMATION_ACTOR_IDENTITY_SOURCE,
+      actorId: access.actorId,
+      actorIdentitySource: access.actorIdentitySource,
       reason: args.reason,
-      policyVersion: args.policyVersion ?? AUTOMATION_POLICY_VERSION,
+      policyVersion: policyVersionForDefinition(definition),
       definitionVersion: definition.definitionVersion,
       decidedAt: now,
     });
@@ -470,9 +498,14 @@ export const pause = mutation({
   args: {
     projectId: v.id("projects"),
     automationDefinitionId: v.id("automationDefinitions"),
-    ...actorArgs,
+    ...decisionArgs,
   },
   handler: async (ctx, args) => {
+    const access = await requireAutomationPermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
+    );
     const definition = await ctx.db.get(args.automationDefinitionId);
     if (!definition || definition.projectId !== args.projectId) throw new Error("Automation is outside the selected workspace");
     if (definition.status === "PAUSED") return { changed: false };
@@ -480,7 +513,7 @@ export const pause = mutation({
     const now = Date.now();
     await ctx.db.patch(definition._id, {
       status: "PAUSED",
-      pausedBy: args.actorId,
+      pausedBy: access.actorId,
       pausedAt: now,
       pauseReason: args.reason,
       nextRunAt: undefined,
@@ -491,10 +524,10 @@ export const pause = mutation({
       projectId: args.projectId,
       automationDefinitionId: definition._id,
       decisionType: "PAUSED",
-      actorId: args.actorId,
-      actorIdentitySource: AUTOMATION_ACTOR_IDENTITY_SOURCE,
+      actorId: access.actorId,
+      actorIdentitySource: access.actorIdentitySource,
       reason: args.reason,
-      policyVersion: args.policyVersion ?? AUTOMATION_POLICY_VERSION,
+      policyVersion: policyVersionForDefinition(definition),
       definitionVersion: definition.definitionVersion,
       decidedAt: now,
     });
@@ -506,9 +539,14 @@ export const retire = mutation({
   args: {
     projectId: v.id("projects"),
     automationDefinitionId: v.id("automationDefinitions"),
-    ...actorArgs,
+    ...decisionArgs,
   },
   handler: async (ctx, args) => {
+    const access = await requireAutomationPermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
+    );
     const definition = await ctx.db.get(args.automationDefinitionId);
     if (!definition || definition.projectId !== args.projectId) {
       throw new Error("Automation is outside the selected workspace");
@@ -528,10 +566,10 @@ export const retire = mutation({
       projectId: args.projectId,
       automationDefinitionId: definition._id,
       decisionType: "RETIRED",
-      actorId: args.actorId,
-      actorIdentitySource: AUTOMATION_ACTOR_IDENTITY_SOURCE,
+      actorId: access.actorId,
+      actorIdentitySource: access.actorIdentitySource,
       reason: args.reason,
-      policyVersion: args.policyVersion ?? AUTOMATION_POLICY_VERSION,
+      policyVersion: policyVersionForDefinition(definition),
       definitionVersion: definition.definitionVersion,
       decidedAt: now,
     });
@@ -542,6 +580,7 @@ export const retire = mutation({
 export const previewNextRun = query({
   args: { projectId: v.id("projects"), automationDefinitionId: v.id("automationDefinitions") },
   handler: async (ctx, args) => {
+    await requireAutomationPermission(ctx, args.projectId, FACTORY_PERMISSIONS.VIEW);
     const definition = await ctx.db.get(args.automationDefinitionId);
     if (!definition || definition.projectId !== args.projectId) throw new Error("Automation is outside the selected workspace");
     return { nextRunAt: definition.nextRunAt ?? nextScheduledAt(Date.now()) };

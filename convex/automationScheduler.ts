@@ -4,12 +4,15 @@ import { internalMutation, mutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import {
   AUTOMATION_POLICY_VERSION,
+  AUTOMATION_SYSTEM_ACTOR_IDENTITY_SOURCE,
+  automationOperatorIdentitySource,
   buildReviewGate,
   isReviewGateDue,
   nextScheduledAt,
   suspensionReason,
   reviewGateIdempotencyKey,
 } from "./lib/automationGovernance";
+import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
 
 type EvaluationResult = {
   considered: number;
@@ -25,9 +28,16 @@ async function evaluate(
     projectId?: Id<"projects">;
     automationDefinitionId?: Id<"automationDefinitions">;
     manual?: boolean;
+    initiator?: {
+      actorId: string;
+      actorIdentitySource: ReturnType<typeof automationOperatorIdentitySource>;
+    };
   }
 ): Promise<EvaluationResult> {
   const now = Date.now();
+  const actorId = args.initiator?.actorId ?? "automation-policy";
+  const actorIdentitySource = args.initiator?.actorIdentitySource
+    ?? AUTOMATION_SYSTEM_ACTOR_IDENTITY_SOURCE;
   let definitions = args.projectId
     ? await ctx.db.query("automationDefinitions").withIndex("by_project", (q: any) => q.eq("projectId", args.projectId)).collect()
     : await ctx.db.query("automationDefinitions").collect();
@@ -84,7 +94,7 @@ async function evaluate(
         checks: { idempotency: "PASS", concurrency: "BLOCKED", safety: "PASS" },
         correlationId: definition.correlationId ?? evaluationKey,
         causationId: String(activeGate._id),
-        createdBy: "automation-policy",
+        createdBy: actorId,
         createdAt: now,
         updatedAt: now,
       });
@@ -92,7 +102,8 @@ async function evaluate(
         projectId: definition.projectId,
         automationDefinitionId: definition._id,
         decisionType: "EVALUATION_SKIPPED",
-        actorId: "automation-policy",
+        actorId,
+        actorIdentitySource,
         reason: "Concurrency limit reached",
         policyVersion: AUTOMATION_POLICY_VERSION,
         definitionVersion: definition.definitionVersion,
@@ -121,7 +132,7 @@ async function evaluate(
         reliabilityState: "SUSPENDED",
         health: "DEGRADED",
         pauseReason: reason,
-        pausedBy: "automation-policy",
+        pausedBy: actorId,
         pausedAt: now,
         nextRunAt: undefined,
         updatedAt: now,
@@ -130,7 +141,8 @@ async function evaluate(
         projectId: definition.projectId,
         automationDefinitionId: definition._id,
         decisionType: "SUSPENDED",
-        actorId: "automation-policy",
+        actorId,
+        actorIdentitySource,
         reason,
         policyVersion: AUTOMATION_POLICY_VERSION,
         definitionVersion: definition.definitionVersion,
@@ -145,7 +157,7 @@ async function evaluate(
         reason,
         checks: { idempotency: "PASS", concurrency: "PASS", suspension: "BLOCKED" },
         correlationId: definition.correlationId ?? evaluationKey,
-        createdBy: "automation-policy",
+        createdBy: actorId,
         createdAt: now,
         updatedAt: now,
       });
@@ -199,7 +211,7 @@ async function evaluate(
       },
       correlationId: definition.correlationId ?? evaluationKey,
       causationId: String(definition._id),
-      createdBy: "automation-policy",
+      createdBy: actorId,
       createdAt: now,
       updatedAt: now,
     });
@@ -207,7 +219,8 @@ async function evaluate(
       projectId: definition.projectId,
       automationDefinitionId: definition._id,
       decisionType: result.created ? "EVALUATED" : "EVALUATION_SKIPPED",
-      actorId: "automation-policy",
+      actorId,
+      actorIdentitySource,
       reason: result.created ? "Evaluation passed; review gate created" : "Idempotent evaluation replay",
       policyVersion: AUTOMATION_POLICY_VERSION,
       definitionVersion: definition.definitionVersion,
@@ -243,6 +256,11 @@ export const evaluateNow = mutation({
     if (args.reason.trim().length < 5) {
       throw new Error("A reason is required for manual evaluation");
     }
+    const access = await requireWorkspacePermission(
+      ctx,
+      args.projectId,
+      FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
+    );
     const definition = await ctx.db.get(args.automationDefinitionId);
     if (!definition || definition.projectId !== args.projectId) {
       throw new Error("Automation is outside the selected workspace");
@@ -251,6 +269,10 @@ export const evaluateNow = mutation({
       projectId: args.projectId,
       automationDefinitionId: args.automationDefinitionId,
       manual: true,
+      initiator: {
+        actorId: access.actorId,
+        actorIdentitySource: automationOperatorIdentitySource(access.membership.mode),
+      },
     });
   },
 });

@@ -7803,7 +7803,12 @@ export const schemaTablesPartTwo = {
       v.literal("FINALIZED")
     ),
     actorId: v.string(),
-    actorIdentitySource: v.optional(v.literal("CLIENT_ASSERTED_TRUSTED_OPERATOR")),
+    actorIdentitySource: v.optional(v.union(
+      v.literal("CLIENT_ASSERTED_TRUSTED_OPERATOR"),
+      v.literal("AUTHENTICATED_OPERATOR"),
+      v.literal("LOCAL_DEMO_OPERATOR"),
+      v.literal("SYSTEM"),
+    )),
     reason: v.string(),
     policyVersion: v.string(),
     definitionVersion: v.number(),

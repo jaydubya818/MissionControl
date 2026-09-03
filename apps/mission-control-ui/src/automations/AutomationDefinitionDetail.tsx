@@ -98,7 +98,7 @@ export function AutomationDefinitionDetail({
     if (!reason || reason.trim().length < 5) return;
     try {
       if (action === "ACTIVATE") {
-        await activate({ projectId, automationDefinitionId: definition._id, actorId: "operator", reason: reason.trim(), policyVersion: "skill-automation-v1" });
+        await activate({ projectId, automationDefinitionId: definition._id, reason: reason.trim() });
       } else if (action === "EVALUATE") {
         await evaluateNow({ projectId, automationDefinitionId: definition._id, reason: reason.trim() });
       } else if (action === "CLONE" || action === "NEW_VERSION") {

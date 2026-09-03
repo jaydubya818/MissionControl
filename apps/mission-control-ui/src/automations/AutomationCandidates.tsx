@@ -51,9 +51,7 @@ export function AutomationCandidates({
     const args = {
       projectId,
       candidateId: selection.candidate.id,
-      actorId: "operator",
       reason: reason.trim(),
-      policyVersion: "automation-v1",
     };
     try {
       if (selection.action === "accept") {

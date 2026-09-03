@@ -67,9 +67,7 @@ export function AutomationDefinitions({
       const args = {
         projectId,
         automationDefinitionId: action.definition._id,
-        actorId: "operator",
         reason: reason.trim(),
-        policyVersion: "automation-v1",
       };
       if (action.type === "activate") await activate(args);
       else if (action.type === "pause") await pause(args);

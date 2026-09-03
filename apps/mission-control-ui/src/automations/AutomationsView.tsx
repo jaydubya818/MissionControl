@@ -110,7 +110,7 @@ export function AutomationsView({
                 ))}
               </div>
               <p className="mt-3 text-xs leading-relaxed text-ink-secondary">
-                Controls require a trusted-operator deployment. Audit actor labels are client asserted and are not independently authenticated Mission Control identities.
+                Controls require workspace Automation authority. Audit attribution is derived from the authenticated operator on the server; local demo actions are labeled separately.
               </p>
             </div>
           </div>
