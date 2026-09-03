@@ -1421,13 +1421,10 @@ app.get("/local-inference/discover", async (c) => {
 });
 
 app.post("/local-inference/sync", async (c) => {
-  const providers = await discoverLocalInference();
-  return c.json({
-    providers,
-    synced: [],
-    authorizationRequired: true,
-    message: "Use the authenticated Model Routing control plane to approve discovered models.",
-  });
+  return c.json(
+    { error: "Local model sync requires a signed, workspace-scoped service command." },
+    501,
+  );
 });
 
 // Tier 2 context classification (LLM fallback when Tier 1 confidence is low)

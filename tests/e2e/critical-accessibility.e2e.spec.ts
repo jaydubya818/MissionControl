@@ -9,6 +9,8 @@ const CRITICAL_ROUTES = [
   { route: "/v2/control-work-orders", heading: "Work Orders" },
   { route: "/v2/control-approvals", heading: "Decision Center" },
   { route: "/v2/automations", heading: "Automations" },
+  { route: "/v2/model-routing", heading: "Execution Routing" },
+  { route: "/v2/agents", heading: "Agent Registry" },
 ] as const;
 
 const CONTRAST_ROUTES = CRITICAL_ROUTES.filter(({ route }) => [

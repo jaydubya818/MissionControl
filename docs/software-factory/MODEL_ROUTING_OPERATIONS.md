@@ -18,6 +18,13 @@ risk, complexity, capability, evidence, and availability requirements.
 
 ## Monitoring and validation
 
+Local provider discovery is diagnostic only. Catalog synchronization is an
+internal Convex operation and has no browser write path. Keep it unavailable
+until the orchestration service can submit a signed, replay-resistant command
+that names the workspace and is authorized for that workspace. Internal sync
+records use the `orchestration-service` system actor; they never accept a human
+actor label from a client.
+
 Validation window: the first 25 comparable routed runs per lane and the first
 seven days after a policy activation. The workspace fleet owner is responsible.
 

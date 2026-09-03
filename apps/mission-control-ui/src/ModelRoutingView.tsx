@@ -338,7 +338,6 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
     projectId,
   });
   const initializeCatalog = useMutation(api.modelCatalog.initializeDefaults);
-  const syncLocalModels = useMutation(api.modelCatalog.syncLocalModels);
   const savePolicy = useMutation(api.modelRoutingPolicies.save);
   const promoteGuardedAuto = useMutation(api.executionRouting.promoteGuardedAuto);
   const setFlag = useMutation(api.featureFlags.setFlag);
@@ -363,7 +362,6 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
   const [lanePools, setLanePools] = useState<LanePool[]>([]);
   const [selectedLane, setSelectedLane] = useState<OperatingLane>("REVIEW");
   const [saving, setSaving] = useState(false);
-  const [discoveringLocal, setDiscoveringLocal] = useState(false);
   const [simTaskType, setSimTaskType] = useState("ENGINEERING");
   const [simLane, setSimLane] = useState<OperatingLane>("EXECUTE");
   const [simRisk, setSimRisk] = useState<Risk>("MEDIUM");
@@ -467,33 +465,6 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
       toast(cause instanceof Error ? cause.message : "Policy update failed", true);
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function discoverLocalModels() {
-    setDiscoveringLocal(true);
-    try {
-      const baseUrl = import.meta.env.VITE_ORCHESTRATION_URL ?? "http://localhost:4100";
-      const response = await fetch(`${baseUrl}/local-inference/discover`);
-      const result = await response.json() as { providers?: Array<{ provider: string; status: string; models: unknown[] }>; error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Local model discovery failed");
-      const healthy = result.providers?.filter((provider) => provider.status === "HEALTHY") ?? [];
-      await Promise.all(healthy.map((provider) => syncLocalModels({
-        projectId,
-        provider: provider.provider as "OLLAMA" | "LM_STUDIO" | "MLX" | "VLLM",
-        models: provider.models as Array<{
-          modelId: string;
-          displayName: string;
-          capabilities: string[];
-          supportsTools: boolean;
-          contextWindow: number;
-        }>,
-      })));
-      toast(healthy.length ? `Synced ${healthy.reduce((count, provider) => count + provider.models.length, 0)} local model route(s)` : "No local model servers are available");
-    } catch (cause) {
-      toast(cause instanceof Error ? cause.message : "Local model discovery failed", true);
-    } finally {
-      setDiscoveringLocal(false);
     }
   }
 
@@ -738,6 +709,7 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
                 <div>
                   <h2 className="text-sm font-semibold text-ink">Provider health</h2>
                   <p className="text-[11.5px] text-ink-muted">{healthyCount} of {catalog.length} routes healthy</p>
+                  <p className="text-[11.5px] text-ink-muted">Local sync requires a signed workspace command.</p>
                 </div>
                 {catalog.length === 0 && (
                   <Button
@@ -750,9 +722,6 @@ export function ModelRoutingView({ projectId }: { projectId: Id<"projects"> }) {
                     Initialize safe catalog
                   </Button>
                 )}
-                <Button size="sm" variant="outline" disabled={discoveringLocal} onClick={discoverLocalModels}>
-                  {discoveringLocal ? "Discovering…" : "Discover local models"}
-                </Button>
               </div>
               {catalog.length ? (
                 <div className="overflow-x-auto" tabIndex={0} aria-label="Provider health routes">

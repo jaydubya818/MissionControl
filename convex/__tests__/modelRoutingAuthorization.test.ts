@@ -252,16 +252,11 @@ describe("Model Routing authorization", () => {
     });
   });
 
-  it("keeps provider health internal and requires automation authority for local catalog sync", async () => {
+  it("keeps provider health and local catalog synchronization internal-only", async () => {
     expect((reportHealth as any).isInternal).toBe(true);
     expect((reportHealth as any).isPublic).not.toBe(true);
-    expect((syncLocalModels as any).isPublic).toBe(true);
-    const denied = createContext({ permissions: ["factory.read"] });
-    await expect(functionHandler(syncLocalModels)(denied.ctx, {
-      projectId: denied.projectId,
-      provider: "OLLAMA",
-      models: [],
-    })).rejects.toThrow("does not permit");
+    expect((syncLocalModels as any).isInternal).toBe(true);
+    expect((syncLocalModels as any).isPublic).not.toBe(true);
     const allowed = createContext();
     await functionHandler(syncLocalModels)(allowed.ctx, {
       projectId: allowed.projectId,
@@ -269,7 +264,8 @@ describe("Model Routing authorization", () => {
       models: [],
     });
     expect(allowed.tables.activities.at(-1)).toMatchObject({
-      actorId: allowed.operatorId,
+      actorType: "SYSTEM",
+      actorId: "orchestration-service",
       action: "LOCAL_MODEL_CATALOG_SYNCED",
     });
   });

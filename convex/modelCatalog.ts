@@ -520,8 +520,8 @@ export const reportExactRouteHealth = internalMutation({
   },
 });
 
-/** Registers models discovered by the trusted orchestration server. */
-export const syncLocalModels = mutation({
+/** Internal target for a future signed, workspace-scoped service command. */
+export const syncLocalModels = internalMutation({
   args: {
     projectId: v.id("projects"),
     provider: v.union(v.literal("OLLAMA"), v.literal("LM_STUDIO"), v.literal("MLX"), v.literal("VLLM")),
@@ -531,14 +531,11 @@ export const syncLocalModels = mutation({
       capabilities: v.array(v.string()),
       supportsTools: v.boolean(),
       contextWindow: v.number(),
-    })),
+  })),
   },
   handler: async (ctx, args) => {
-    const access = await requireWorkspacePermission(
-      ctx,
-      args.projectId,
-      FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
-    );
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Workspace not found");
     validateDiscoveredModels(args.models);
     const now = Date.now();
     const provider = `local:${args.provider.toLowerCase()}`;
@@ -551,7 +548,7 @@ export const syncLocalModels = mutation({
         .withIndex("by_project_model", (q) => q.eq("projectId", args.projectId).eq("modelId", modelId))
         .first();
       const record = {
-        tenantId: access.project.tenantId,
+        tenantId: project.tenantId,
         projectId: args.projectId,
         provider,
         modelId,
@@ -575,10 +572,10 @@ export const syncLocalModels = mutation({
       }
     }
     await ctx.db.insert("activities", {
-      tenantId: access.project.tenantId,
+      tenantId: project.tenantId,
       projectId: args.projectId,
-      actorType: "HUMAN",
-      actorId: access.actorId,
+      actorType: "SYSTEM",
+      actorId: "orchestration-service",
       action: "LOCAL_MODEL_CATALOG_SYNCED",
       description: `Synced ${args.models.length} local ${args.provider} model route(s)`,
       targetType: "MODEL_CATALOG",
