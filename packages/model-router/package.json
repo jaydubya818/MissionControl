@@ -13,7 +13,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.26.0",
     "@mission-control/shared": "workspace:*"
   },
   "devDependencies": {
