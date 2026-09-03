@@ -20,11 +20,16 @@ export function generateIdempotencyKey(prefix: string = ""): string {
  */
 export function redactSecrets(text: string): string {
   let redacted = text;
-  
+
   for (const pattern of SECRET_PATTERNS) {
-    redacted = redacted.replace(pattern, "[REDACTED]");
+    // Match the key AND an optional "key=value"/"key: value" value that
+    // follows it, with a global flag, so every occurrence's value is
+    // redacted too instead of surviving next to a redacted label.
+    const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+    const valuePattern = new RegExp(`${pattern.source}(?:\\s*[:=]\\s*\\S+)?`, flags);
+    redacted = redacted.replace(valuePattern, "[REDACTED]");
   }
-  
+
   return redacted;
 }
 
