@@ -1,6 +1,6 @@
 /**
  * Mission Control Shared Package
- * 
+ *
  * Shared types, constants, and utilities used across all packages.
  */
 
@@ -14,3 +14,4 @@ export * from "./canonicalDigest.js";
 export * from "./factoryMemorySecurity.js";
 export * from "./execution-routing.js";
 export * from "./missionPlannerIdentity.js";
+export * from "./factoryDeploymentPackage.js";
