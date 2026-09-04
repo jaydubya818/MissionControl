@@ -135,11 +135,24 @@ describe("secret helpers", () => {
   it("redactSecrets redacts the key and its value, for every occurrence (fixed 2026-09-03, see NIGHTLY-BACKLOG)", () => {
     // Previously SECRET_PATTERNS matched key *names*, not values, and the
     // patterns were not global, so the secret survived and only the first
-    // occurrence's label was redacted. Fixed by deriving a global,
-    // value-capturing regex per pattern inside redactSecrets (SECRET_PATTERNS
-    // itself, and its other consumers, are untouched).
+    // occurrence's label was redacted. redactSecrets now has purpose-built
+    // value patterns; SECRET_PATTERNS and its other consumers are untouched.
     expect(redactSecrets("api_key=SUPERSECRETVALUE123")).toBe("[REDACTED]");
     expect(redactSecrets("token=AAA token=BBB")).toBe("[REDACTED] [REDACTED]");
+  });
+
+  it("redacts JSON, quoted values, and bearer credentials without leaving suffixes", () => {
+    const json = redactSecrets('{"token":"AAA BBB CCC","password":"correct horse battery staple"}');
+    const shell = redactSecrets("api_key='AAA BBB CCC'");
+    const unquoted = redactSecrets("password=correct horse battery staple");
+    const bearer = redactSecrets("Authorization: Bearer abc-def_123.456");
+
+    expect(json).toBe("{[REDACTED],[REDACTED]}");
+    expect(json).not.toContain("AAA BBB CCC");
+    expect(json).not.toContain("correct horse battery staple");
+    expect(shell).toBe("[REDACTED]");
+    expect(unquoted).toBe("[REDACTED]");
+    expect(bearer).toBe("Authorization: [REDACTED]");
   });
 
   it("redactSecrets leaves non-secret text untouched", () => {

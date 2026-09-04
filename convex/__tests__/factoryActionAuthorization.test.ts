@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { requireFactoryActionWithAudit } from "../lib/factoryActionAuthorization";
+import type { Id } from "../_generated/dataModel";
+import type { FactoryPermission } from "../lib/companyAccess";
 
 /**
  * Characterization tests for requireFactoryActionWithAudit, which had zero
@@ -7,8 +9,8 @@ import { requireFactoryActionWithAudit } from "../lib/factoryActionAuthorization
  * uses it depends on the allow/deny/audit behavior pinned here.
  */
 
-const projectId = "project1" as any;
-const permission = "factory.read" as any;
+const projectId = "project1" as Id<"projects">;
+const permission: FactoryPermission = "factory.read";
 
 function fakeCtx(decision: unknown, runMutation = vi.fn().mockResolvedValue(undefined)) {
   return {
