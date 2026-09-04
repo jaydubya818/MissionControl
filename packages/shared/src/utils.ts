@@ -6,6 +6,21 @@
 
 import { SECRET_PATTERNS } from "./constants.js";
 
+const SECRET_KEY_SOURCE = String.raw`(?:api[_-]?key|token|password|secret)`;
+const BEARER_CREDENTIAL_PATTERN = /\bbearer\s+[^\s,;}"']+/gi;
+const QUOTED_SECRET_ASSIGNMENT_PATTERN = new RegExp(
+  String.raw`["']?${SECRET_KEY_SOURCE}["']?\s*[:=]\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')`,
+  "gi",
+);
+const UNQUOTED_SECRET_ASSIGNMENT_PATTERN = new RegExp(
+  String.raw`["']?${SECRET_KEY_SOURCE}["']?\s*[:=]\s*[^\r\n]*?(?=\s+["']?${SECRET_KEY_SOURCE}["']?\s*[:=]|$)`,
+  "gi",
+);
+const GLOBAL_SECRET_PATTERNS = SECRET_PATTERNS.map((pattern) => {
+  const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+  return new RegExp(pattern.source, flags);
+});
+
 /**
  * Generate idempotency key
  */
@@ -19,12 +34,19 @@ export function generateIdempotencyKey(prefix: string = ""): string {
  * Redact secrets from text
  */
 export function redactSecrets(text: string): string {
-  let redacted = text;
-  
-  for (const pattern of SECRET_PATTERNS) {
+  // Credential values need purpose-built matching. The shared patterns are
+  // intentionally broad key detectors and cannot safely be extended with a
+  // generic `\S+` suffix: JSON keys contain a closing quote before `:`, and
+  // quoted shell/JSON values may contain spaces.
+  let redacted = text
+    .replace(BEARER_CREDENTIAL_PATTERN, "[REDACTED]")
+    .replace(QUOTED_SECRET_ASSIGNMENT_PATTERN, "[REDACTED]")
+    .replace(UNQUOTED_SECRET_ASSIGNMENT_PATTERN, "[REDACTED]");
+
+  for (const pattern of GLOBAL_SECRET_PATTERNS) {
     redacted = redacted.replace(pattern, "[REDACTED]");
   }
-  
+
   return redacted;
 }
 

@@ -17,11 +17,12 @@ import {
  * Characterization tests for packages/shared/src/utils.ts.
  *
  * Every function here is re-exported from `@mission-control/shared`, so these
- * are public API. Two blocks below deliberately pin behaviour that is wrong
- * rather than merely surprising — `formatRelativeTime` on a future timestamp
- * and `redactSecrets` on any real secret. Both are recorded in
- * docs/NIGHTLY-BACKLOG.md; the assertions are here so that fixing them shows
- * up as an intentional test change instead of a silent behaviour swap.
+ * are public API. One block below deliberately pins behaviour that is wrong
+ * rather than merely surprising — `formatRelativeTime` on a future timestamp.
+ * It is recorded in docs/NIGHTLY-BACKLOG.md; the assertion is here so that
+ * fixing it shows up as an intentional test change instead of a silent
+ * behaviour swap. `redactSecrets` carried the same kind of defect and was
+ * fixed 2026-09-03; its test now pins the corrected behaviour.
  */
 
 describe("generateIdempotencyKey", () => {
@@ -131,13 +132,27 @@ describe("secret helpers", () => {
     expect(containsSecrets("auth_header")).toBe(false);
   });
 
-  it("redactSecrets removes the label and leaves the value (defect, see NIGHTLY-BACKLOG)", () => {
-    // SECRET_PATTERNS matches key *names*, not values, and the patterns are
-    // not global. The secret survives; the label does not.
-    expect(redactSecrets("api_key=SUPERSECRETVALUE123")).toBe(
-      "[REDACTED]=SUPER[REDACTED]VALUE123",
-    );
-    expect(redactSecrets("token=AAA token=BBB")).toBe("[REDACTED]=AAA token=BBB");
+  it("redactSecrets redacts the key and its value, for every occurrence (fixed 2026-09-03, see NIGHTLY-BACKLOG)", () => {
+    // Previously SECRET_PATTERNS matched key *names*, not values, and the
+    // patterns were not global, so the secret survived and only the first
+    // occurrence's label was redacted. redactSecrets now has purpose-built
+    // value patterns; SECRET_PATTERNS and its other consumers are untouched.
+    expect(redactSecrets("api_key=SUPERSECRETVALUE123")).toBe("[REDACTED]");
+    expect(redactSecrets("token=AAA token=BBB")).toBe("[REDACTED] [REDACTED]");
+  });
+
+  it("redacts JSON, quoted values, and bearer credentials without leaving suffixes", () => {
+    const json = redactSecrets('{"token":"AAA BBB CCC","password":"correct horse battery staple"}');
+    const shell = redactSecrets("api_key='AAA BBB CCC'");
+    const unquoted = redactSecrets("password=correct horse battery staple");
+    const bearer = redactSecrets("Authorization: Bearer abc-def_123.456");
+
+    expect(json).toBe("{[REDACTED],[REDACTED]}");
+    expect(json).not.toContain("AAA BBB CCC");
+    expect(json).not.toContain("correct horse battery staple");
+    expect(shell).toBe("[REDACTED]");
+    expect(unquoted).toBe("[REDACTED]");
+    expect(bearer).toBe("Authorization: [REDACTED]");
   });
 
   it("redactSecrets leaves non-secret text untouched", () => {

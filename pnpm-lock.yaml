@@ -414,9 +414,6 @@ importers:
 
   packages/model-router:
     dependencies:
-      '@anthropic-ai/sdk':
-        specifier: ^0.26.0
-        version: 0.26.1
       '@mission-control/shared':
         specifier: workspace:*
         version: link:../shared
@@ -608,9 +605,6 @@ packages:
   '@ai-sdk/provider@2.0.1':
     resolution: {integrity: sha512-KCUwswvsC5VsW2PWFqF8eJgSCu5Ysj7m1TxiHTVA6g7k360bk0RNQENT8KTMAYEs+8fWPD3Uu4dEmzGHc+jGng==}
     engines: {node: '>=18'}
-
-  '@anthropic-ai/sdk@0.26.1':
-    resolution: {integrity: sha512-HeMJP1bDFfQPQS3XTJAmfXkFBdZ88wvfkE05+vsoA9zGn5dHqEaHOPsqkazf/i0gXYg2XlLxxZrf6rUAarSqzw==}
 
   '@asamuzakjp/css-color@3.2.0':
     resolution: {integrity: sha512-K1A6z8tS3XsmCMM86xoWdn7Fkdn9m6RSVtocUrJYIwZnFVkng/PvkEoWtOWmP+Scc6saYWHWZYbndEEXxl24jw==}
@@ -4433,18 +4427,6 @@ snapshots:
   '@ai-sdk/provider@2.0.1':
     dependencies:
       json-schema: 0.4.0
-
-  '@anthropic-ai/sdk@0.26.1':
-    dependencies:
-      '@types/node': 18.19.130
-      '@types/node-fetch': 2.6.13
-      abort-controller: 3.0.0
-      agentkeepalive: 4.6.0
-      form-data-encoder: 1.7.2
-      formdata-node: 4.4.1
-      node-fetch: 2.7.0
-    transitivePeerDependencies:
-      - encoding
 
   '@asamuzakjp/css-color@3.2.0':
     dependencies:
