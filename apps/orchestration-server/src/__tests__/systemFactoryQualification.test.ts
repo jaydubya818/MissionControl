@@ -28,12 +28,21 @@ import {
 } from "@mission-control/workflow-engine";
 import {
   CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
   DEEPSEEK_V1_HARNESS_MANIFEST,
+  DEEPSEEK_V1_RUNTIME_ARTIFACT,
   harnessCapabilityManifestDigest,
+  harnessRuntimeArtifactDigest,
 } from "@mission-control/workflow-engine/harness-contract";
 import { afterAll, describe, expect, it } from "vitest";
 import { aggregateLearningSignals, deriveObservationLearningSignals, recommendImprovementPromotion } from "../../../../convex/lib/factoryLearning.js";
 import { buildFactoryExecutionManifest } from "../../../../convex/lib/executionManifest.js";
+import {
+  exactModelRouteDigest,
+  exactModelRouteQualificationSnapshot,
+  exactModelRouteSnapshot,
+  modelRouteQualificationDigest,
+} from "../../../../convex/lib/modelRouteAdmission.js";
 import {
   analyzeSpecPlanConsistency,
   evaluateMissionSpecQuality,
@@ -442,6 +451,7 @@ describe("Mission Control full-system Factory qualification V2", () => {
           version: "v1",
           capabilityManifestSha256: CODEX_CAPABILITY_MANIFEST_SHA256,
           effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+          runtimeArtifactSha256: harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT),
         },
         provider: "openai",
         model: "gpt-5.6-terra",
@@ -511,6 +521,31 @@ describe("Mission Control full-system Factory qualification V2", () => {
     })).toBe(true);
 
     const profile = fakeSandboxProfile();
+    const remoteRuntimeArtifact = remoteSandboxRuntimeArtifact(profile);
+    const remoteRuntimeArtifactDigest = harnessRuntimeArtifactDigest(remoteRuntimeArtifact);
+    const modelRouteSnapshot = exactModelRouteSnapshot({
+      provider: "openai",
+      providerRoute: "openrouter",
+      modelId: "gpt-5.6-terra",
+    });
+    const modelRouteDigest = exactModelRouteDigest(modelRouteSnapshot);
+    const modelQualificationSnapshot = exactModelRouteQualificationSnapshot({
+      routeDigest: modelRouteDigest,
+      evidenceReference: "system-factory-qualification/model-route",
+      evidenceDigest: `sha256:${"9".repeat(64)}`,
+      workloadClasses: ["SOFTWARE_CHANGE"],
+      riskClasses: ["YELLOW"],
+      promotedBy: "system-factory-qualification",
+      promotedAt: FIXED_NOW,
+      compatibility: {
+        adapter: "codex",
+        version: "v1",
+        capabilityManifestDigest: CODEX_CAPABILITY_MANIFEST_SHA256,
+        effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+        runtimeArtifactDigest: remoteRuntimeArtifactDigest,
+        executionBackend: "remote-sandbox",
+      },
+    });
     const executionManifest = buildFactoryExecutionManifest({
       runId: finalAttemptId,
       missionId: MISSION_ID,
@@ -534,8 +569,17 @@ describe("Mission Control full-system Factory qualification V2", () => {
         capabilityManifest: CODEX_V1_HARNESS_MANIFEST,
         capabilityManifestSha256: CODEX_CAPABILITY_MANIFEST_SHA256,
         effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+        runtimeArtifact: remoteRuntimeArtifact,
+        runtimeArtifactDigest: remoteRuntimeArtifactDigest,
       },
       executionBackend: "remote-sandbox",
+      modelRoute: {
+        catalogId: "model-route-system-factory-e2e-v2",
+        routeDigest: modelRouteDigest,
+        routeSnapshot: modelRouteSnapshot,
+        qualificationDigest: modelRouteQualificationDigest(modelQualificationSnapshot),
+        qualificationSnapshot: modelQualificationSnapshot,
+      },
       sandboxProfile: {
         isolation: "WORKSPACE_WRITE",
         requiredCapabilities: ["remote-sandbox", "workspace-write"],
@@ -633,6 +677,8 @@ describe("Mission Control full-system Factory qualification V2", () => {
       leaseId: currentLease.lease.leaseId,
       manifestDigest: executionManifest.digest,
       sourceSha: advancedHeadSha,
+      modelRouteDigest,
+      providerRoute: modelRouteSnapshot.providerRoute,
     });
     const sandboxProvider = new FakeSandboxProvider({
       result: encodeSandboxResultBundle(sandboxResult),
@@ -663,7 +709,10 @@ describe("Mission Control full-system Factory qualification V2", () => {
       executor: {
         command: "fixture-executor",
         args: ["run"],
+        provider: modelRouteSnapshot.provider,
         model: "gpt-5.6-terra",
+        modelRouteDigest,
+        providerRoute: modelRouteSnapshot.providerRoute,
         prompt: "Execute the frozen fixture WorkOrder.",
         allowedPaths: ["src/**", "tests/**", "scripts/**", "docs/**"],
         timeoutMs: 60_000,
@@ -860,7 +909,9 @@ describe("Mission Control full-system Factory qualification V2", () => {
         leaseId: currentLease.lease.leaseId,
         sourceAttemptIds: [...failedAttempts.map((item) => item.attemptId), repairedLineage.sourceAttempt.id, finalAttemptId],
         executionManifestDigest: executionManifest.digest,
-        executionBackend: executionManifest.manifest.harness.executionBackend,
+        executionBackend: "executionBackend" in executionManifest.manifest
+          ? executionManifest.manifest.executionBackend
+          : executionManifest.manifest.harness.executionBackend,
         candidateShas: [...failedAttempts.map((item) => item.candidateSha), repairedCandidateSha, advancedHeadSha],
         verificationAttemptIds: [failedLineage.verificationAttempt.id, repairedLineage.verificationAttempt.id, finalLineage.verificationAttempt.id],
         verificationSubjectId: finalLineage.subject.subjectId,
@@ -882,7 +933,9 @@ describe("Mission Control full-system Factory qualification V2", () => {
           version: CODEX_V1_HARNESS_MANIFEST.identity.adapterVersion,
           capabilityManifestSha256: CODEX_CAPABILITY_MANIFEST_SHA256,
           effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
-          executionBackend: executionManifest.manifest.harness.executionBackend,
+          executionBackend: "executionBackend" in executionManifest.manifest
+            ? executionManifest.manifest.executionBackend
+            : executionManifest.manifest.harness.executionBackend,
         },
         genericAdmission: {
           contractVersion: "generic-harness-contract/v1",
@@ -1597,6 +1650,8 @@ function qualifyGenericHarnessAdmission() {
         version: "0.2.0",
         capabilityManifestSha256: DEEPSEEK_CAPABILITY_MANIFEST_SHA256,
         effectiveConfigSha256: DEEPSEEK_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+        runtimeArtifact: DEEPSEEK_V1_RUNTIME_ARTIFACT,
+        runtimeArtifactSha256: harnessRuntimeArtifactDigest(DEEPSEEK_V1_RUNTIME_ARTIFACT),
         capabilityManifest: DEEPSEEK_V1_HARNESS_MANIFEST,
         supportsCancel: true,
         supportsResume: true,
@@ -1616,6 +1671,7 @@ function qualifyGenericHarnessAdmission() {
       version: "0.2.0",
       capabilityManifestSha256: DEEPSEEK_CAPABILITY_MANIFEST_SHA256,
       effectiveConfigSha256: DEEPSEEK_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+      runtimeArtifactSha256: harnessRuntimeArtifactDigest(DEEPSEEK_V1_RUNTIME_ARTIFACT),
     },
     provider: "local-ollama",
     model: "qwen3.5:35b-a3b-q8_0",
@@ -1663,6 +1719,8 @@ function eligibleWorker(): FactoryWorkerCandidate {
         version: "v1",
         capabilityManifestSha256: CODEX_CAPABILITY_MANIFEST_SHA256,
         effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+        runtimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
+        runtimeArtifactSha256: harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT),
         capabilityManifest: CODEX_V1_HARNESS_MANIFEST,
         supportsCancel: true,
         supportsResume: false,
@@ -1678,6 +1736,7 @@ function eligibleWorker(): FactoryWorkerCandidate {
 }
 
 function fakeSandboxProfile(): SandboxProfileSnapshot {
+  const imageDigest = `sha256:${"e".repeat(64)}`;
   return {
     schema: "factory-sandbox-profile/v1",
     profileKey: "fake-system-factory-v2",
@@ -1685,7 +1744,7 @@ function fakeSandboxProfile(): SandboxProfileSnapshot {
     provider: "FAKE",
     providerProfile: "deterministic",
     providerProfileVersion: "v1",
-    machine: { image: "fake:system-factory-v2", cpu: 2, memoryMb: 4_096, diskGb: 20 },
+    machine: { image: `fake:system-factory-v2@${imageDigest}`, cpu: 2, memoryMb: 4_096, diskGb: 20 },
     supervisor: { version: "mission-control-supervisor/v1", transport: "SSH" },
     runtime: { maxRuntimeMs: 60_000, resultPollIntervalMs: 250, resultRetentionMs: 86_400_000 },
     network: { egress: "UNRESTRICTED", egressAllowlist: [], publicIngress: false, exposedPorts: [] },
@@ -1707,12 +1766,27 @@ function fakeSandboxProfile(): SandboxProfileSnapshot {
   };
 }
 
+function remoteSandboxRuntimeArtifact(profile: SandboxProfileSnapshot) {
+  const imageDigest = profile.machine.image.match(/@(sha256:[a-f0-9]{64})$/i)?.[1];
+  if (!imageDigest) throw new Error("System Factory remote fixture requires an exact image digest.");
+  return {
+    schemaVersion: "harness-runtime-artifact/v1" as const,
+    kind: "CONTAINER_IMAGE" as const,
+    name: `${CODEX_V1_HARNESS_MANIFEST.identity.harnessId}-sandbox`,
+    version: profile.providerProfileVersion,
+    executableSha256: null,
+    imageDigest,
+  };
+}
+
 function sandboxBundle(input: {
   profile: SandboxProfileSnapshot;
   attemptId: string;
   leaseId: string;
   manifestDigest: string;
   sourceSha: string;
+  modelRouteDigest: string;
+  providerRoute: string;
 }) {
   return createSandboxResultBundle({
     schema: "factory-sandbox-result/v1",
@@ -1731,6 +1805,8 @@ function sandboxBundle(input: {
       harnessVersion: "0.146.0",
       provider: "openai",
       model: "gpt-5.6-terra",
+      modelRouteDigest: input.modelRouteDigest,
+      providerRoute: input.providerRoute,
     },
     environment: { provider: "FAKE", image: input.profile.machine.image },
     startedAt: FIXED_NOW,

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  CODEX_V1_RUNTIME_ARTIFACT,
   GENERIC_HARNESS_CONTRACT_VERSION,
   NO_HARNESS_AUTHORITY,
   type HarnessAuthorityProfile,
@@ -8,6 +9,25 @@ import {
 import { HarnessAdapterRegistry } from "../harnessAdapterRegistry.js";
 
 describe("HarnessAdapterRegistry", () => {
+  it("represents an intentionally empty execution-disabled runtime without fallback", () => {
+    const registry = new HarnessAdapterRegistry([]);
+    const missing = { adapter: "deepagents", version: "v1" };
+
+    expect(registry.capabilities()).toEqual([]);
+    expect(registry.registrations()).toEqual([]);
+    expect(registry.resolve(missing)).toBeUndefined();
+    expect(registry.supports(missing)).toBe(false);
+    expect(() => registry.require(missing)).toThrow(
+      "Worker does not provide harness adapter deepagents/v1.",
+    );
+    expect(() => registry.requireCapabilities(missing)).toThrow(
+      "Worker does not provide harness adapter deepagents/v1.",
+    );
+    expect(() => registry.requireRegistration(missing)).toThrow(
+      "Worker does not provide harness adapter deepagents/v1.",
+    );
+  });
+
   it("resolves independently implemented adapters only by their exact frozen identity", () => {
     const deepseek = fixtureAdapter("deepseek-harness", "v1");
     const loom = fixtureAdapter("loom", "v1");
@@ -85,6 +105,7 @@ function fixtureAdapter(
       version,
       displayName: `${adapter} fixture`,
       provider: "fixture",
+      runtimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
       executionBackends: ["persistent-worker"],
       authority: overrides.authority ?? NO_HARNESS_AUTHORITY,
       supportsCancel: true,

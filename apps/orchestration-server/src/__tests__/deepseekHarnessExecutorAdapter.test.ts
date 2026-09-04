@@ -37,6 +37,8 @@ function request(root: string) {
     isolation: "WORKSPACE_WRITE" as const,
     provider: "local-ollama",
     model: "qwen3.5:35b-a3b-q8_0",
+    modelRouteDigest: `sha256:${"a".repeat(64)}`,
+    providerRoute: "local-ollama",
   };
 }
 
@@ -114,11 +116,28 @@ describe("DeepSeekHarnessExecutorAdapter", () => {
         events: { toolCalls: 1, modelRequests: 1, retries: 0, sessionCount: 1 },
       });
       expect(result.normalizedResult?.provenance.providerMetadata).toEqual(expect.objectContaining({ experimental: true }));
+      expect(result.normalizedResult?.provenance).toMatchObject({
+        modelRouteDigest: `sha256:${"a".repeat(64)}`,
+        providerRoute: "local-ollama",
+      });
       expect(harnessNormalizedResultIssues(result.normalizedResult!)).toEqual([]);
       expect(events).toContain("EXECUTION_COMPLETED");
       await adapter.cleanup(handle);
       await adapter.cleanup(handle);
       expect(result.normalizedResult?.cleanup.status).toBe("COMPLETED");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects exact reasoning controls it cannot translate", async () => {
+    const root = await repository();
+    try {
+      const adapter = new DeepSeekHarnessExecutorAdapter({ upstreamRoot: root, enabled: true });
+      expect(adapter.validateConfiguration({
+        ...request(root),
+        reasoningConfig: { effort: "high" },
+      })).toContainEqual(expect.objectContaining({ field: "reasoningConfig" }));
     } finally {
       await rm(root, { recursive: true, force: true });
     }

@@ -1,9 +1,24 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { ConvexHttpClient } from "convex/browser";
-import type { ExecutorEvent, ExecutorRequest, HarnessExecutionBackend, HarnessExecutorCapabilities, HarnessNormalizedResult } from "@mission-control/workflow-engine";
-import { harnessCapabilityManifestDigest, harnessNormalizedResultIssues, runHarnessExecution, verificationIsolationBindingDigest } from "@mission-control/workflow-engine";
+import type {
+  ExecutorEvent,
+  ExecutorRequest,
+  HarnessCapabilityManifest,
+  HarnessExecutionBackend,
+  HarnessExecutorCapabilities,
+  HarnessNormalizedResult,
+  HarnessRuntimeArtifactIdentity,
+} from "@mission-control/workflow-engine";
+import {
+  harnessCapabilityManifestDigest,
+  harnessExecutionRequestDigest,
+  harnessNormalizedResultIssues,
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
+  runHarnessExecution,
+  verificationIsolationBindingDigest,
+} from "@mission-control/workflow-engine";
 import { canonicalHash } from "@mission-control/shared";
-import { CodexV1ExecutorAdapter } from "./codexExecutorAdapter.js";
 import { HarnessAdapterRegistry, type HarnessRuntimeAdapter, type RegisteredHarnessAdapter } from "./harnessAdapterRegistry.js";
 import { ConvexActions, ConvexQueries } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
@@ -36,18 +51,36 @@ const HEARTBEAT_INTERVAL_MS = 20_000;
 const MAX_RESULT_BYTES = 64_000;
 
 interface FrozenHarnessExecutionManifest {
+  version: "factory-execution-manifest/v1" | "factory-execution-manifest/v2";
   harness: {
     adapter: string;
     version: string;
     harnessId: string;
     harnessVersion: string;
+    harnessCommit: string;
+    capabilityManifest: HarnessCapabilityManifest;
     capabilityManifestSha256: string;
     effectiveConfigSha256: string;
-    executionBackend: string;
+    executionBackend?: string;
     provider?: string;
     model?: string;
+    modelRouteSnapshot?: unknown;
+    runtimeArtifact?: HarnessRuntimeArtifactIdentity;
+    runtimeArtifactDigest?: string;
     isolation: "READ_ONLY" | "WORKSPACE_WRITE" | "DETACHED_READ_ONLY";
+    requiredCapabilities: string[];
+    pullRequestAuthority: "CONTROL_PLANE_ONLY";
+    timeoutMs: number;
   };
+  modelRoute?: {
+    catalogId: string;
+    routeDigest: string;
+    routeSnapshot: unknown;
+    qualificationDigest: string;
+    qualificationSnapshot: unknown;
+  };
+  executionBackend?: string;
+  [key: string]: any;
 }
 
 export interface FactoryAttemptWorkerStatus {
@@ -146,7 +179,7 @@ export class FactoryAttemptWorker {
 
   constructor(
     private readonly client: ConvexHttpClient,
-    adapters: HarnessAdapterRegistry | HarnessRuntimeAdapter = new CodexV1ExecutorAdapter(),
+    adapters: HarnessAdapterRegistry | HarnessRuntimeAdapter,
     private readonly enabled = process.env.FACTORY_EXECUTION_ENABLED === "1",
     private readonly pollIntervalMs = boundedInteger(process.env.FACTORY_EXECUTION_POLL_MS, 5_000, 300_000, 15_000),
     private readonly dependencies: FactoryAttemptWorkerDependencies = DEFAULT_DEPENDENCIES,
@@ -157,6 +190,9 @@ export class FactoryAttemptWorker {
     this.adapters = adapters instanceof HarnessAdapterRegistry
       ? adapters
       : new HarnessAdapterRegistry([adapters]);
+    if (this.enabled && this.adapters.registrations().length === 0) {
+      throw new Error("Factory execution is enabled, but no harness adapters were explicitly configured.");
+    }
   }
 
   start() {
@@ -205,12 +241,12 @@ export class FactoryAttemptWorker {
       ]) as [any[], any[]];
       for (const run of [...pending, ...running]) {
         if (this.stopped || this.active.size >= (this.identity?.maxConcurrentRuns ?? 1)) break;
-        const executionBackend = run?.executionManifest?.harness?.executionBackend as HarnessExecutionBackend | undefined;
+        const executionBackend = manifestExecutionBackend(run?.executionManifest);
         if (!isBoundFactoryAttempt(run)
           || !this.adapters.supports({ adapter: run.executorAdapter, version: run.executorVersion }, executionBackend)
           || !matchesWorkerScope(run, this.scope)
           || this.active.has(String(run._id))) continue;
-        if (run.executionManifest?.harness?.executionBackend === "remote-sandbox"
+        if (executionBackend === "remote-sandbox"
           && (!this.scope || (this.cleanupHealth?.failed ?? 0) > 0)) {
           this.lastError = !this.scope
             ? "Remote sandbox dispatch requires a repository-scoped canonical worker."
@@ -442,19 +478,28 @@ export class FactoryAttemptWorker {
       let traceObservations: any[] = [];
       let structuredResult: ReturnType<typeof validateFactoryResult>;
       const executionArtifacts: any[] = [];
+      const frozenModelRoute = manifestModelRoute(manifest);
+      if (!frozenModelRoute) throw new Error("Claimed Factory execution manifest has no exact frozen provider/model route.");
       const executorRequest: ExecutorRequest = {
         executionId: `${claim.runId}:${claim.executionManifestDigest}`,
         repositoryRoot: claim.worktree,
         workingDirectory: claim.worktree,
         prompt: manifest.compiledPrompt,
-        provider: manifest.harness.provider ?? manifest.workflow.steps[0]?.modelConfiguration?.provider,
-        model: claim.model ?? manifest.workflow.steps[0]?.modelRoute,
+        provider: frozenModelRoute.provider,
+        model: frozenModelRoute.model,
+        ...(frozenModelRoute.modelRouteDigest === undefined ? {} : {
+          modelRouteDigest: frozenModelRoute.modelRouteDigest,
+          providerRoute: frozenModelRoute.providerRoute,
+          ...(frozenModelRoute.reasoningConfig === undefined
+            ? {}
+            : { reasoningConfig: structuredClone(frozenModelRoute.reasoningConfig) }),
+        }),
         allowedPaths: manifest.repository.allowedPaths,
         deniedPaths: manifest.repository.excludedPaths,
         timeoutMs: manifest.harness.timeoutMs,
         isolation: manifest.harness.isolation === "READ_ONLY" ? "READ_ONLY" : "WORKSPACE_WRITE",
       };
-      if (manifest.harness.executionBackend === "remote-sandbox") {
+      if (manifestExecutionBackend(manifest) === "remote-sandbox") {
         if (!workspaceOwner) throw new Error("Remote sandbox execution requires canonical worker ownership.");
         const profile = manifest.sandbox.profileSnapshot as SandboxProfileSnapshot;
         const providerFactory = this.dependencies.createSandboxProvider ?? DEFAULT_DEPENDENCIES.createSandboxProvider!;
@@ -560,7 +605,8 @@ export class FactoryAttemptWorker {
           runId: claim.runId,
           events: executorEvents,
           harness: adapterCapabilities,
-          model: normalizedResult.provenance.model ?? claim.model ?? manifest.workflow.steps[0]?.modelRoute,
+          provider: frozenModelRoute.provider,
+          model: normalizedResult.provenance.model ?? frozenModelRoute.model,
           usage: normalizedResult.usage,
           toolCalls: normalizedResult.events.toolCalls,
           promptDigest: `sha256:${createHash("sha256").update(manifest.compiledPrompt).digest("hex")}`,
@@ -780,7 +826,7 @@ export class FactoryAttemptWorker {
       if (leaseHealthy) {
         const remoteFailureDecision = error instanceof RemoteSandboxExecutionError
           ? error.failure
-          : claim?.executionManifest?.harness?.executionBackend === "remote-sandbox"
+          : manifestExecutionBackend(claim?.executionManifest) === "remote-sandbox"
             ? remoteFailure("UNKNOWN", "REMOTE_WORKER_UNCLASSIFIED", "UNKNOWN", reason)
             : undefined;
         await report({ terminal: {
@@ -1092,21 +1138,33 @@ function isBoundFactoryAttempt(run: any) {
 }
 
 function validateClaimManifest(claim: any) {
-  const manifest = claim?.executionManifest;
+  const manifest = claim?.executionManifest as FrozenHarnessExecutionManifest | undefined;
+  const executionBackend = manifestExecutionBackend(manifest);
+  const capabilityManifest = manifest?.harness?.capabilityManifest;
   if (
-    manifest?.version !== "factory-execution-manifest/v1"
+    !manifest
+    || !["factory-execution-manifest/v1", "factory-execution-manifest/v2"].includes(manifest.version)
     || !boundedHarnessIdentity(manifest?.harness?.adapter)
     || !boundedHarnessIdentity(manifest?.harness?.version)
     || manifest.harness.adapter !== claim.executorAdapter
     || manifest.harness.version !== claim.executorVersion
     || !boundedHarnessIdentity(manifest?.harness?.harnessId)
     || !boundedHarnessIdentity(manifest?.harness?.harnessVersion)
+    || !/^[a-f0-9]{40}$/i.test(manifest?.harness?.harnessCommit ?? "")
+    || !capabilityManifest
+    || capabilityManifest.identity?.adapterId !== manifest.harness.adapter
+    || capabilityManifest.identity?.adapterVersion !== manifest.harness.version
+    || capabilityManifest.identity?.harnessId !== manifest.harness.harnessId
+    || capabilityManifest.identity?.harnessVersion !== manifest.harness.harnessVersion
+    || capabilityManifest.identity?.harnessCommit !== manifest.harness.harnessCommit
     || !/^sha256:[a-f0-9]{64}$/i.test(manifest?.harness?.capabilityManifestSha256 ?? "")
+    || harnessCapabilityManifestDigest(capabilityManifest) !== manifest.harness.capabilityManifestSha256
     || !/^[a-f0-9]{64}$/i.test(manifest?.harness?.effectiveConfigSha256 ?? "")
+    || capabilityManifest.effectiveConfigSha256 !== manifest.harness.effectiveConfigSha256
     || !["WORKSPACE_WRITE", "READ_ONLY", "DETACHED_READ_ONLY"].includes(manifest?.harness?.isolation)
     || manifest?.harness?.pullRequestAuthority !== "CONTROL_PLANE_ONLY"
-    || typeof manifest?.harness?.executionBackend !== "string"
-    || !manifest.harness.executionBackend.trim()
+    || executionBackend === undefined
+    || !manifestModelRoute(manifest)
     || !Array.isArray(manifest?.harness?.requiredCapabilities)
     || !Number.isSafeInteger(manifest?.harness?.timeoutMs)
     || manifest.harness.timeoutMs < 1_000
@@ -1121,7 +1179,15 @@ function validateClaimManifest(claim: any) {
     || !manifest.compiledPrompt.trim()
     || claim.executionManifestDigest !== `sha256:${canonicalHash(manifest)}`
   ) throw new Error("Claimed Factory execution manifest is invalid.");
-  if (manifest.harness.executionBackend === "remote-sandbox") {
+  if (manifest.version === "factory-execution-manifest/v2" && !validV2ExecutionBindings(manifest, executionBackend)) {
+    throw new Error("Claimed Factory V2 execution bindings are invalid.");
+  }
+  const executionRuntimeArtifact = manifestExecutionRuntimeArtifact(manifest);
+  if (!executionRuntimeArtifact
+    || !runtimeArtifactMatchesBackend(executionRuntimeArtifact, executionBackend, manifest?.sandbox?.profileSnapshot)) {
+    throw new Error("Claimed Factory execution manifest does not match its exact backend runtime artifact.");
+  }
+  if (executionBackend === "remote-sandbox") {
     const profile = manifest?.sandbox?.profileSnapshot;
     const expectedResourceName = stableSandboxResourceName({
       projectId: String(claim.projectId),
@@ -1154,17 +1220,26 @@ function assertHarnessAdapterIdentity(
   registration: RegisteredHarnessAdapter,
 ) {
   const capabilityManifest = registration.manifest;
+  const executionBackend = manifestExecutionBackend(manifest);
   if (!capabilityManifest
     || capabilityManifest.identity.adapterId !== manifest.harness.adapter
     || capabilityManifest.identity.adapterVersion !== manifest.harness.version
     || capabilityManifest.identity.harnessId !== manifest.harness.harnessId
     || capabilityManifest.identity.harnessVersion !== manifest.harness.harnessVersion
+    || capabilityManifest.identity.harnessCommit !== manifest.harness.harnessCommit
     || harnessCapabilityManifestDigest(capabilityManifest) !== manifest.harness.capabilityManifestSha256
     || capabilityManifest.effectiveConfigSha256 !== manifest.harness.effectiveConfigSha256) {
     throw new Error("Registered harness adapter does not match the frozen Attempt capability/configuration identity.");
   }
-  if (!capabilityManifest.admission.executionBackends.includes(manifest.harness.executionBackend)) {
+  if (!executionBackend || !capabilityManifest.admission.executionBackends.includes(executionBackend)) {
     throw new Error("Registered harness adapter does not support the frozen execution backend.");
+  }
+  const expectedRuntimeArtifact = manifestExecutionRuntimeArtifact(manifest);
+  if (executionBackend === "persistent-worker"
+    && (!expectedRuntimeArtifact
+      || registration.runtimeArtifactSha256 !== expectedRuntimeArtifact.digest
+      || harnessRuntimeArtifactDigest(registration.runtimeArtifact) !== expectedRuntimeArtifact.digest)) {
+    throw new Error("Registered harness adapter does not match the frozen Attempt runtime-artifact identity.");
   }
 }
 
@@ -1175,19 +1250,218 @@ function assertHarnessResultIdentity(
 ): HarnessNormalizedResult {
   if (!result) throw new Error("Harness did not return the required normalized harness-result/v1 bundle.");
   const issues = harnessNormalizedResultIssues(result);
+  const expectedRuntimeArtifact = manifestExecutionRuntimeArtifact(manifest);
+  const runtimeArtifactMismatch = !expectedRuntimeArtifact
+    || !normalizedRuntimeArtifactMatches(result, expectedRuntimeArtifact.artifact, expectedRuntimeArtifact.digest);
+  const modelRouteMismatch = manifest.version === "factory-execution-manifest/v2"
+    && (result.provenance.modelRouteDigest !== request.modelRouteDigest
+      || result.provenance.providerRoute !== request.providerRoute
+      || canonicalHash(result.provenance.reasoningConfig ?? null) !== canonicalHash(request.reasoningConfig ?? null));
   if (issues.length > 0
     || result.executionId !== request.executionId
     || result.harness.adapterId !== manifest.harness.adapter
     || result.harness.adapterVersion !== manifest.harness.version
     || result.harness.harnessId !== manifest.harness.harnessId
     || result.harness.harnessVersion !== manifest.harness.harnessVersion
+    || result.harness.harnessCommit !== manifest.harness.harnessCommit
     || result.provenance.capabilityManifestSha256 !== manifest.harness.capabilityManifestSha256
     || result.provenance.effectiveConfigSha256 !== manifest.harness.effectiveConfigSha256
+    || result.provenance.requestSha256 !== harnessExecutionRequestDigest(request)
     || result.provenance.provider !== (request.provider ?? null)
-    || result.provenance.model !== (request.model ?? null)) {
+    || result.provenance.model !== (request.model ?? null)
+    || modelRouteMismatch
+    || runtimeArtifactMismatch) {
     throw new Error(`Harness normalized result does not match the frozen Attempt identity${issues.length ? ` (${issues.join(", ")})` : ""}.`);
   }
   return result;
+}
+
+function manifestExecutionBackend(manifest: any): HarnessExecutionBackend | undefined {
+  const backend = manifest?.version === "factory-execution-manifest/v2"
+    ? manifest?.executionBackend
+    : manifest?.harness?.executionBackend;
+  return backend === "persistent-worker" || backend === "remote-sandbox" ? backend : undefined;
+}
+
+function manifestModelRoute(manifest: any): {
+  provider: string;
+  model: string;
+  modelRouteDigest?: string;
+  providerRoute?: string;
+  reasoningConfig?: ExecutorRequest["reasoningConfig"];
+} | undefined {
+  const provider = manifest?.version === "factory-execution-manifest/v2"
+    ? manifest?.modelRoute?.routeSnapshot?.provider
+    : manifest?.harness?.provider;
+  const model = manifest?.version === "factory-execution-manifest/v2"
+    ? manifest?.modelRoute?.routeSnapshot?.modelId
+    : manifest?.harness?.model;
+  if (!boundedManifestIdentity(provider, 100) || !boundedManifestIdentity(model, 200)) return undefined;
+  if (manifest?.version !== "factory-execution-manifest/v2") return { provider, model };
+  const modelRouteDigest = manifest?.modelRoute?.routeDigest;
+  const providerRoute = manifest?.modelRoute?.routeSnapshot?.providerRoute;
+  if (!/^sha256:[a-f0-9]{64}$/i.test(modelRouteDigest ?? "")
+    || !boundedManifestIdentity(providerRoute, 100)) return undefined;
+  const reasoningConfig = manifest?.modelRoute?.routeSnapshot?.reasoningConfig;
+  return {
+    provider,
+    model,
+    modelRouteDigest,
+    providerRoute,
+    ...(reasoningConfig === undefined ? {} : { reasoningConfig: structuredClone(reasoningConfig) }),
+  };
+}
+
+function validV2ExecutionBindings(
+  manifest: FrozenHarnessExecutionManifest,
+  executionBackend: HarnessExecutionBackend,
+): boolean {
+  const harness = manifest.harness;
+  const modelRoute = manifest.modelRoute;
+  const route = modelRoute?.routeSnapshot as Record<string, any> | undefined;
+  const qualification = modelRoute?.qualificationSnapshot as Record<string, any> | undefined;
+  const compatibility = qualification?.compatibility as Record<string, any> | undefined;
+  if (!modelRoute
+    || !boundedManifestIdentity(modelRoute.catalogId, 200)
+    || !validV2ModelRoute(route)
+    || modelRoute.routeDigest !== `sha256:${canonicalHash({ namespace: "factory-model-route/v2", value: route })}`
+    || qualification?.schema !== "factory-model-route-qualification/v2"
+    || qualification.routeDigest !== modelRoute.routeDigest
+    || modelRoute.qualificationDigest !== `sha256:${canonicalHash({ namespace: "factory-model-route-qualification/v2", value: qualification })}`
+    || !compatibility
+    || compatibility.adapter !== harness.adapter
+    || compatibility.version !== harness.version
+    || compatibility.capabilityManifestDigest !== harness.capabilityManifestSha256
+    || compatibility.effectiveConfigSha256 !== harness.effectiveConfigSha256
+    || compatibility.runtimeArtifactDigest !== harness.runtimeArtifactDigest
+    || compatibility.executionBackend !== executionBackend
+    || qualification.authority?.executionOnly !== true
+    || qualification.authority?.routing !== false
+    || qualification.authority?.verification !== false
+    || qualification.authority?.acceptance !== false
+    || qualification.authority?.publication !== false
+    || qualification.authority?.merge !== false
+    || harness.provider !== undefined
+    || harness.model !== undefined
+    || harness.executionBackend !== undefined
+    || harnessRuntimeArtifactIssues(harness.runtimeArtifact).length > 0
+    || !harness.runtimeArtifact
+    || harnessRuntimeArtifactDigest(harness.runtimeArtifact) !== harness.runtimeArtifactDigest) {
+    return false;
+  }
+  return true;
+}
+
+function validV2ModelRoute(route: Record<string, any> | undefined): boolean {
+  if (!route || route.schema !== "factory-model-route/v2") return false;
+  const keys = Object.keys(route);
+  if (keys.some((key) => !["schema", "provider", "providerRoute", "modelId", "reasoningConfig"].includes(key))
+    || Object.hasOwn(route, "capabilityIdentity")
+    || Object.hasOwn(route, "runtimeIdentity")
+    || !boundedManifestIdentity(route.provider, 100)
+    || route.provider !== route.provider.toLowerCase()
+    || !boundedManifestIdentity(route.providerRoute, 100)
+    || route.providerRoute !== route.providerRoute.toLowerCase()
+    || !boundedManifestIdentity(route.modelId, 200)) return false;
+  if (route.reasoningConfig === undefined) return true;
+  const reasoning = route.reasoningConfig;
+  if (!reasoning || typeof reasoning !== "object" || Array.isArray(reasoning)) return false;
+  const reasoningKeys = Object.keys(reasoning);
+  if (reasoningKeys.length === 0 || reasoningKeys.some((key) => !["effort", "temperature", "maxTokens"].includes(key))) return false;
+  return (reasoning.effort === undefined
+      || (boundedManifestIdentity(reasoning.effort, 64) && reasoning.effort === reasoning.effort.toLowerCase()))
+    && (reasoning.temperature === undefined
+      || (typeof reasoning.temperature === "number" && Number.isFinite(reasoning.temperature)
+        && reasoning.temperature >= 0 && reasoning.temperature <= 2))
+    && (reasoning.maxTokens === undefined
+      || (Number.isSafeInteger(reasoning.maxTokens) && reasoning.maxTokens >= 1 && reasoning.maxTokens <= 10_000_000));
+}
+
+function normalizedRuntimeArtifactMatches(
+  result: HarnessNormalizedResult,
+  expectedArtifact: HarnessRuntimeArtifactIdentity | undefined,
+  expectedDigest: string | undefined,
+) {
+  const observedArtifact = result.provenance.runtimeArtifact;
+  if (!expectedArtifact || !expectedDigest || !observedArtifact
+    || harnessRuntimeArtifactIssues(observedArtifact).length > 0) return false;
+  return result.provenance.runtimeArtifactDigest === expectedDigest
+    && harnessRuntimeArtifactDigest(observedArtifact) === expectedDigest
+    && result.provenance.executableSha256 === expectedArtifact.executableSha256
+    && (result.provenance.imageDigest ?? null) === expectedArtifact.imageDigest;
+}
+
+function manifestExecutionRuntimeArtifact(
+  manifest: FrozenHarnessExecutionManifest,
+): { artifact: HarnessRuntimeArtifactIdentity; digest: string } | undefined {
+  if (manifest.version === "factory-execution-manifest/v2") {
+    const artifact = manifest.harness.runtimeArtifact;
+    const digest = manifest.harness.runtimeArtifactDigest;
+    if (!artifact || !digest || harnessRuntimeArtifactIssues(artifact).length > 0
+      || harnessRuntimeArtifactDigest(artifact) !== digest) return undefined;
+    return { artifact, digest };
+  }
+  const runtime = (manifest.harness.modelRouteSnapshot as any)?.runtimeIdentity;
+  const executionBackend = manifestExecutionBackend(manifest);
+  if (runtime?.kind !== "CODEX_CLI" || !boundedManifestIdentity(runtime.cliVersion, 200)) return undefined;
+  let artifact: HarnessRuntimeArtifactIdentity | undefined;
+  if (executionBackend === "persistent-worker" && /^[a-f0-9]{64}$/i.test(runtime.executableSha256 ?? "")) {
+    artifact = {
+      schemaVersion: "harness-runtime-artifact/v1",
+      kind: "EXECUTABLE",
+      name: manifest.harness.adapter,
+      version: runtime.cliVersion,
+      executableSha256: runtime.executableSha256,
+      imageDigest: null,
+    };
+  } else if (executionBackend === "remote-sandbox" && /^sha256:[a-f0-9]{64}$/i.test(runtime.imageDigest ?? "")) {
+    artifact = {
+      schemaVersion: "harness-runtime-artifact/v1",
+      kind: "CONTAINER_IMAGE",
+      name: `${manifest.harness.harnessId}-image`,
+      version: runtime.cliVersion,
+      executableSha256: null,
+      imageDigest: runtime.imageDigest.toLowerCase(),
+    };
+  }
+  return artifact ? { artifact, digest: harnessRuntimeArtifactDigest(artifact) } : undefined;
+}
+
+function runtimeArtifactMatchesBackend(
+  resolved: { artifact: HarnessRuntimeArtifactIdentity; digest: string },
+  executionBackend: HarnessExecutionBackend,
+  profileInput: unknown,
+) {
+  if (resolved.digest !== harnessRuntimeArtifactDigest(resolved.artifact)) return false;
+  if (executionBackend === "persistent-worker") {
+    return resolved.artifact.kind === "EXECUTABLE"
+      && Boolean(resolved.artifact.executableSha256)
+      && resolved.artifact.imageDigest === null;
+  }
+  const profile = profileInput as SandboxProfileSnapshot | undefined;
+  const profileImageDigest = exactSandboxProfileImageDigest(profile);
+  return resolved.artifact.kind === "CONTAINER_IMAGE"
+    && resolved.artifact.executableSha256 === null
+    && Boolean(profileImageDigest)
+    && resolved.artifact.imageDigest?.toLowerCase() === profileImageDigest;
+}
+
+function exactSandboxProfileImageDigest(profile: SandboxProfileSnapshot | undefined) {
+  const securityDigest = profile?.security?.image?.digest;
+  const referenceDigest = profile?.machine?.image.match(/@(sha256:[a-f0-9]{64})$/i)?.[1];
+  if (securityDigest && /^sha256:[a-f0-9]{64}$/i.test(securityDigest)) {
+    if (!referenceDigest || referenceDigest.toLowerCase() !== securityDigest.toLowerCase()) return undefined;
+    return securityDigest.toLowerCase();
+  }
+  return referenceDigest?.toLowerCase();
+}
+
+function boundedManifestIdentity(value: unknown, maximum: number): value is string {
+  return typeof value === "string"
+    && value === value.trim()
+    && value.length > 0
+    && value.length <= maximum
+    && !/[\0\r\n]/.test(value);
 }
 
 function mapExecutorEvent(runId: string, event: ExecutorEvent, harness: HarnessExecutorCapabilities) {
@@ -1222,7 +1496,8 @@ function mapExecutorEvent(runId: string, event: ExecutorEvent, harness: HarnessE
 export function mapExecutorObservations(input: {
   runId: string;
   events: ExecutorEvent[];
-  harness: Pick<HarnessExecutorCapabilities, "adapter" | "version" | "displayName" | "provider">;
+  harness: Pick<HarnessExecutorCapabilities, "adapter" | "version" | "displayName">;
+  provider?: string;
   model?: string;
   usage?: HarnessNormalizedResult["usage"];
   toolCalls?: number | null;
@@ -1248,7 +1523,7 @@ export function mapExecutorObservations(input: {
     endedAt: terminal?.occurredAt,
     status,
     model: input.model,
-    provider: input.harness.provider,
+    provider: input.provider,
     promptVersion: input.promptVersion,
     input: { promptDigest: input.promptDigest },
     output: terminal ? { summary: terminal.summary } : undefined,
@@ -1263,7 +1538,7 @@ export function mapExecutorObservations(input: {
     endedAt: terminal?.occurredAt,
     status,
     model: input.model,
-    provider: input.harness.provider,
+    provider: input.provider,
     promptVersion: input.promptVersion,
     input: { promptDigest: input.promptDigest },
     output: terminal ? { summary: terminal.summary } : undefined,
@@ -1543,23 +1818,16 @@ function sandboxResultArtifact(claim: any, bundle: SandboxResultBundle) {
 function requireRemoteInvocation(
   adapter: HarnessRuntimeAdapter,
   capabilities: HarnessExecutorCapabilities,
-  request: {
-    executionId: string;
-    repositoryRoot: string;
-    workingDirectory: string;
-    prompt: string;
-    model?: string;
-    allowedPaths: string[];
-    timeoutMs: number;
-    isolation: "READ_ONLY" | "WORKSPACE_WRITE";
-  },
+  request: ExecutorRequest,
 ) {
   const repositoryRoot = "/var/lib/mission-control/attempt/repository";
   const resultPath = "/var/lib/mission-control/attempt/executor-result.json";
   if (!adapter.createRemoteInvocation) {
     throw new Error(`Harness adapter ${capabilities.adapter}/${capabilities.version} does not support remote-sandbox execution.`);
   }
-  const issues = adapter.validateConfiguration(request);
+  const issues = adapter.validateRemoteConfiguration
+    ? adapter.validateRemoteConfiguration(request)
+    : adapter.validateConfiguration(request);
   if (issues.length > 0) {
     throw new Error(`Harness adapter configuration is invalid: ${issues.map((issue) => `${issue.field}: ${issue.message}`).join(" ")}`);
   }
@@ -1568,6 +1836,10 @@ function requireRemoteInvocation(
     || invocation.args.length === 0
     || invocation.resultPath !== resultPath
     || invocation.model !== request.model
+    || invocation.provider !== request.provider
+    || invocation.modelRouteDigest !== request.modelRouteDigest
+    || invocation.providerRoute !== request.providerRoute
+    || canonicalHash(invocation.reasoningConfig ?? null) !== canonicalHash(request.reasoningConfig ?? null)
     || invocation.prompt !== request.prompt
     || invocation.timeoutMs !== request.timeoutMs
     || !sameStringSet(invocation.allowedPaths, request.allowedPaths)) {

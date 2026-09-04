@@ -8,6 +8,12 @@ import { canonicalHash } from "@mission-control/shared";
 import { runSandboxSupervisor } from "../sandboxSupervisor.js";
 import { standaloneRemoteSupervisorSource } from "../standaloneRemoteSupervisorSource.js";
 import { SANDBOX_SUPERVISOR_VERSION } from "../sandboxProvider.js";
+import {
+  CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
+  harnessCapabilityManifestDigest,
+  harnessRuntimeArtifactDigest,
+} from "@mission-control/workflow-engine";
 
 const execFileAsync = promisify(execFile);
 const cleanup: string[] = [];
@@ -143,6 +149,68 @@ describe("sandbox supervisor candidate capture", () => {
     expect(bundle.changedFiles).not.toContain("outside/sneaky.ts");
   });
 
+  it("reads V2 model/backend bindings and rejects a tampered runtime artifact before execution", async () => {
+    const repository = await initRepository("mc-sandbox-supervisor-v2-");
+    await mkdir(path.join(repository, "src"), { recursive: true });
+    await writeFile(path.join(repository, "src", "a.ts"), "export const a = 1;\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "Initial"]);
+    const sourceSha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
+    const executionManifest = buildV2Manifest({ sourceSha, profileDigest: "sha256:profile" });
+    const outputPath = path.join(repository, "result.json");
+    const bundle = await runSandboxSupervisor({
+      executionManifest,
+      attemptId: "attempt-1",
+      workOrderId: "work-order-1",
+      workOrderRevisionNumber: 1,
+      workflowRunId: "run-1",
+      manifestDigest: `sha256:${canonicalHash(executionManifest)}`,
+      profileDigest: "sha256:profile",
+      sourceSha,
+      environmentDescriptor: { provider: "FAKE", image: "node:20" },
+      repositoryRoot: repository,
+      outputPath,
+      executor: {
+        command: process.execPath,
+        args: ["-e", `process.stdout.write(${JSON.stringify(JSON.stringify(successfulResult()))})`],
+        timeoutMs: 60_000,
+        ...v2ExecutorBinding(executionManifest),
+      },
+      environment: { OPENAI_BASE_URL: "https://openrouter.ai/api/v1" },
+    });
+    expect(bundle.harness).toMatchObject({
+      provider: "openai",
+      model: "gpt-5.6-terra",
+      modelRouteDigest: executionManifest.modelRoute.routeDigest,
+      providerRoute: "openrouter",
+    });
+
+    const tampered = structuredClone(executionManifest);
+    tampered.harness.runtimeArtifact.executableSha256 = "f".repeat(64);
+    const marker = path.join(repository, "executor-ran");
+    await expect(runSandboxSupervisor({
+      executionManifest: tampered,
+      attemptId: "attempt-1",
+      workOrderId: "work-order-1",
+      workOrderRevisionNumber: 1,
+      workflowRunId: "run-1",
+      manifestDigest: `sha256:${canonicalHash(tampered)}`,
+      profileDigest: "sha256:profile",
+      sourceSha,
+      environmentDescriptor: { provider: "FAKE", image: "node:20" },
+      repositoryRoot: repository,
+      outputPath,
+      executor: {
+        command: process.execPath,
+        args: ["-e", `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "ran")`],
+        timeoutMs: 60_000,
+        ...v2ExecutorBinding(tampered),
+      },
+      environment: { OPENAI_BASE_URL: "https://openrouter.ai/api/v1" },
+    })).rejects.toThrow(/invalid model, harness, or runtime bindings/);
+    await expect(readFile(marker)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("keeps the standalone remote supervisor equivalent to the in-process one", async () => {
     // The remote VM executes this generated source, not the module above. Run
     // it for real against a temp repository rather than string-matching the
@@ -154,7 +222,7 @@ describe("sandbox supervisor candidate capture", () => {
     await git(repository, ["commit", "-m", "Initial"]);
     const sourceSha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
 
-    const executionManifest = buildManifest({ sourceSha, profileDigest: "sha256:profile" });
+    const executionManifest = buildV2Manifest({ sourceSha, profileDigest: "sha256:profile" });
     const manifestDigest = `sha256:${canonicalHash(executionManifest)}`;
     const outputPath = path.join(repository, "standalone-result.json");
     const configPath = path.join(repository, "standalone-config.json");
@@ -177,13 +245,20 @@ describe("sandbox supervisor candidate capture", () => {
         command: "bash",
         args: ["-c", `cd ${JSON.stringify(repository)}; printf 'export const created = 1;\\n' > src/created.ts; printf '%s' '{"schema":"factory-result/v1","status":"COMPLETED","summary":"done","completedAcceptanceCriterionIds":[],"incompleteAcceptanceCriterionIds":[],"unknownAcceptanceCriterionIds":[],"verificationCommands":[],"knownRisks":[],"nextAction":"review"}'`],
         timeoutMs: 60_000,
+        ...v2ExecutorBinding(executionManifest),
       },
-      environment: {},
+      environment: { OPENAI_BASE_URL: "https://openrouter.ai/api/v1" },
     }), "utf8");
 
     await execFileAsync(process.execPath, [supervisorPath, configPath], { cwd: repository });
     const bundle = JSON.parse(await readFile(outputPath, "utf8"));
     expect(bundle.changedFiles).toContain("src/created.ts");
+    expect(bundle.harness).toMatchObject({
+      provider: "openai",
+      model: "gpt-5.6-terra",
+      modelRouteDigest: executionManifest.modelRoute.routeDigest,
+      providerRoute: "openrouter",
+    });
     expect(Buffer.from(bundle.patch.content, "base64").toString("utf8")).toContain("export const created = 1;");
   });
 });
@@ -213,5 +288,89 @@ function buildManifest(input: { sourceSha: string; profileDigest: string }) {
       provider: "openrouter",
       model: "test-model",
     },
+  };
+}
+
+function buildV2Manifest(input: { sourceSha: string; profileDigest: string }) {
+  const routeSnapshot = {
+    schema: "factory-model-route/v2",
+    provider: "openai",
+    providerRoute: "openrouter",
+    modelId: "gpt-5.6-terra",
+  };
+  const routeDigest = `sha256:${canonicalHash({ namespace: "factory-model-route/v2", value: routeSnapshot })}`;
+  const runtimeArtifact = structuredClone(CODEX_V1_RUNTIME_ARTIFACT);
+  const runtimeArtifactDigest = harnessRuntimeArtifactDigest(runtimeArtifact);
+  const qualificationSnapshot = {
+    schema: "factory-model-route-qualification/v2",
+    routeDigest,
+    evidence: { reference: "fixture://remote-route", digest: `sha256:${"1".repeat(64)}` },
+    scope: { workloadClasses: ["SOFTWARE_CHANGE"], riskClasses: ["GREEN"] },
+    promotedBy: "sandbox-supervisor-test",
+    promotedAt: 1,
+    compatibility: {
+      adapter: "codex",
+      version: "v1",
+      capabilityManifestDigest: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
+      effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+      runtimeArtifactDigest,
+      executionBackend: "remote-sandbox",
+    },
+    authority: { executionOnly: true, routing: false, verification: false, acceptance: false, publication: false, merge: false },
+  };
+  return {
+    version: "factory-execution-manifest/v2",
+    causation: { workOrderId: "work-order-1", workOrderRevisionNumber: 1, workflowRunId: "run-1" },
+    repository: { baseSha: input.sourceSha, allowedPaths: ["src"] },
+    intent: { acceptanceCriterionIds: [] },
+    sandbox: {
+      profileDigest: input.profileDigest,
+      supervisorVersion: SANDBOX_SUPERVISOR_VERSION,
+      credentialGrants: [],
+    },
+    harness: {
+      pullRequestAuthority: "CONTROL_PLANE_ONLY",
+      adapter: "codex",
+      version: "v1",
+      harnessId: CODEX_V1_HARNESS_MANIFEST.identity.harnessId,
+      harnessVersion: CODEX_V1_HARNESS_MANIFEST.identity.harnessVersion,
+      harnessCommit: CODEX_V1_HARNESS_MANIFEST.identity.harnessCommit,
+      capabilityManifest: CODEX_V1_HARNESS_MANIFEST,
+      capabilityManifestSha256: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
+      effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+      runtimeArtifact,
+      runtimeArtifactDigest,
+    },
+    modelRoute: {
+      catalogId: "route-codex-v2",
+      routeDigest,
+      routeSnapshot,
+      qualificationDigest: `sha256:${canonicalHash({ namespace: "factory-model-route-qualification/v2", value: qualificationSnapshot })}`,
+      qualificationSnapshot,
+    },
+    executionBackend: "remote-sandbox",
+  };
+}
+
+function v2ExecutorBinding(manifest: ReturnType<typeof buildV2Manifest>) {
+  return {
+    provider: manifest.modelRoute.routeSnapshot.provider,
+    model: manifest.modelRoute.routeSnapshot.modelId,
+    modelRouteDigest: manifest.modelRoute.routeDigest,
+    providerRoute: manifest.modelRoute.routeSnapshot.providerRoute,
+  };
+}
+
+function successfulResult() {
+  return {
+    schema: "factory-result/v1",
+    status: "COMPLETED",
+    summary: "done",
+    completedAcceptanceCriterionIds: [],
+    incompleteAcceptanceCriterionIds: [],
+    unknownAcceptanceCriterionIds: [],
+    verificationCommands: [],
+    knownRisks: [],
+    nextAction: "review",
   };
 }

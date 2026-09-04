@@ -20,14 +20,14 @@ describe("factory documentation consistency", () => {
   it("rejects runtime-version and maturity-plan drift", () => {
     const fixtureRoot = copyDocumentationFixture();
     const readmePath = path.join(fixtureRoot, "README.md");
-    writeFileSync(readmePath, readFileSync(readmePath, "utf8").replace("runtime contract: **v38**", "runtime contract: **v37**"));
+    writeFileSync(readmePath, readFileSync(readmePath, "utf8").replace("runtime contract: **v39**", "runtime contract: **v38**"));
 
     const planPath = path.join(fixtureRoot, "docs/plans/2026-08-17-feat-autonomous-execution-routing-v1-plan.md");
     writeFileSync(planPath, readFileSync(planPath, "utf8").replace("status: complete", "status: active"));
 
     const result = checkFactoryDocs({ repositoryRoot: fixtureRoot });
     expect(result.ok).toBe(false);
-    expect(result.findings).toContain("README.md: runtime contract v37 does not match source v38");
+    expect(result.findings).toContain("README.md: runtime contract v38 does not match source v39");
     expect(result.findings.some((finding) => finding.includes("qualified capability points to plan status active"))).toBe(true);
   });
 });

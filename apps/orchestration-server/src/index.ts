@@ -46,8 +46,7 @@ import {
   loadGithubAppPrivateKey,
   mintInstallationToken,
 } from "./githubAppRuntime.js";
-import { CodexV1ExecutorAdapter } from "./codexExecutorAdapter.js";
-import { DeepSeekHarnessExecutorAdapter } from "./deepseekHarnessExecutorAdapter.js";
+import { configuredFactoryHarnessAdapters } from "./factoryHarnessComposition.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
 import { MissionPlanningWorker } from "./missionPlanningWorker.js";
 import { resolvePersonaPath, safeClientError } from "./orchestrationSecurity.js";
@@ -111,12 +110,12 @@ const CONVEX_SERVICE_AUTH_TOKEN = process.env.CONVEX_SERVICE_AUTH_TOKEN?.trim();
 if (CONVEX_SERVICE_AUTH_TOKEN) {
   client.setAuth(CONVEX_SERVICE_AUTH_TOKEN);
 }
-const enabledFactoryHarnessAdapters = [
-  ...((CODEX_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED) ? [new CodexV1ExecutorAdapter()] : []),
-  ...(DEEPSEEK_HARNESS_EXECUTOR_ENABLED ? [new DeepSeekHarnessExecutorAdapter()] : []),
-];
 const factoryHarnessRegistry = new HarnessAdapterRegistry(
-  enabledFactoryHarnessAdapters.length > 0 ? enabledFactoryHarnessAdapters : [new CodexV1ExecutorAdapter()],
+  configuredFactoryHarnessAdapters({
+    codexEnabled: CODEX_FACTORY_WORKER_ENABLED,
+    deepseekEnabled: DEEPSEEK_HARNESS_EXECUTOR_ENABLED,
+    legacyFactoryWorkerEnabled: LEGACY_FACTORY_WORKER_ENABLED,
+  }),
 );
 let occupiedFactoryWorkerSlots = 0;
 const tryAcquireFactoryWorkerSlot = () => {
@@ -180,6 +179,8 @@ const factoryHostReporter = FACTORY_WORKER_SCOPE
           version: manifest.identity.adapterVersion,
           capabilityManifestSha256: registration.capabilityManifestSha256,
           effectiveConfigSha256: registration.effectiveConfigSha256,
+          runtimeArtifact: registration.runtimeArtifact,
+          runtimeArtifactSha256: registration.runtimeArtifactSha256,
           capabilityManifest: manifest,
           supportsCancel: registration.capabilities.supportsCancel,
           supportsResume: registration.capabilities.supportsResume,
@@ -1493,6 +1494,9 @@ const gatewayProxy = createGatewayProxy({
 // ============================================================================
 
 export function startServer() {
+  if (DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED) {
+    throw new Error("Configure exactly one Factory execution worker; legacy and durable workers cannot run together.");
+  }
   console.log(`[orchestration] Mission Control Orchestration Server`);
   console.log(`[orchestration] Convex URL: ${CONVEX_URL ? "configured" : "MISSING"}`);
   console.log(`[orchestration] Project: ${PROJECT_SLUG}`);
@@ -1510,9 +1514,6 @@ export function startServer() {
   runTick().then((result) => {
     console.log(`[orchestration] Initial tick complete:`, result);
   });
-  if (DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED) {
-    throw new Error("Configure exactly one Factory execution worker; legacy and durable workers cannot run together.");
-  }
   if (factoryHostReporter) {
     void assertHarnessAdaptersReady(factoryHarnessRegistry).then(() => factoryHostReporter.start())
       .then(() => {

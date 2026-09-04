@@ -9,21 +9,44 @@ date: 2026-08-17
 ## Purpose
 
 Execution Routing recommends or selects one exact production-qualified
-`Harness + Model + Execution Backend` strategy for a WorkOrder. It reduces an
-operator decision without moving any authority from Factory admission,
-independent verification, publication, merge, or acceptance.
+`Model Route + Harness + Runtime Artifact + Execution Backend` strategy for a
+WorkOrder. It reduces an operator decision without moving any authority from
+Factory admission, independent verification, publication, merge, or
+acceptance.
 
 The routed unit is an active immutable Factory Version. Mission Control never
-constructs an arbitrary Cartesian product of harness, model, and backend.
+constructs an arbitrary Cartesian product of model, harness, runtime, and
+backend components at dispatch time.
+
+## Identity and qualification
+
+The four tuple members answer different questions:
+
+| Identity | Question answered | Canonical owner |
+| --- | --- | --- |
+| Model Route | Which provider route, model, and bounded reasoning configuration supply inference? | `factory-model-route/v2` |
+| Harness | Which agent execution behavior and capabilities run the work? | `harness-capability-manifest/v1` plus its adapter-effective configuration |
+| Runtime Artifact | Which exact executable or container image implements that harness? | `harness-runtime-artifact/v1` sidecar |
+| Execution Backend | Where does execution take place? | Factory Version backend binding |
+
+Identity separation does not weaken compatibility. Qualification and the
+immutable Factory Version bind an allowed combination; the router selects that
+Factory Version as a whole. A valid model route cannot authorize a different
+harness, runtime artifact, or backend, and a valid harness advertisement cannot
+authorize an unqualified model route. The V2 qualification snapshot names the
+exact adapter/version, capability-manifest digest, effective-configuration
+digest, runtime-artifact digest, and backend that were reviewed with the route.
 
 ## Control flow
 
 1. Load at most 25 active Factory Version candidates for the WorkOrder
    repository.
-2. Reuse the exact harness manifest and canonical worker admission contract.
+2. Reuse the exact model-route, harness-manifest, runtime-artifact, and
+   canonical worker-admission contracts.
 3. Reject candidates that fail Factory/current-readiness, repository, worker,
-   harness, backend, isolation, network, credential, approved-model, risk,
-   budget, context, or production-certification constraints.
+   route, harness, runtime-artifact, backend, isolation, network, credential,
+   approved-model, risk, budget, context, or production-certification
+   constraints.
 4. Load at most 250 recent implementation Attempts, plus bounded trace and gate
    observations, inside the policy evidence window.
 5. Score only eligible candidates with `execution-routing/v1`.
@@ -46,12 +69,19 @@ dispatch remains on the existing model-only path.
 
 An ineligible candidate never receives a score. Rejection codes are stable and
 stored with the decision. Cost and latency cannot compensate for a missing
-capability, stale worker, scope mismatch, uncertified harness, risk violation,
-or other hard constraint.
+capability, stale worker, model-route digest mismatch, harness-manifest or
+effective-configuration mismatch, runtime-artifact mismatch, unsupported
+backend, scope mismatch, uncertified harness, risk violation, or other hard
+constraint.
 
 Worker freshness uses the canonical two-minute heartbeat threshold. Worker
 capacity is calculated from server-side active leases; worker-reported occupied
-slots are not trusted.
+slots are not trusted. Worker admission additionally requires the exact frozen
+adapter/version, capability-manifest digest, effective-configuration digest,
+host adapter artifact, backend, provider/model, repository scope, and Factory
+Version binding. The version binding separately attests the execution artifact:
+the harness executable for a persistent worker or the frozen Sandbox Profile
+image for remote execution.
 
 ## Evidence and unknowns
 
@@ -95,6 +125,9 @@ model/provider/token/cost attributes remain observations rather than authority.
 - policy ID/version and WorkOrder/Task identity;
 - risk and fixed evidence cutoff;
 - every candidate tuple;
+- each candidate's immutable Factory Version and configuration digest, which
+  bind its model-route, harness-manifest, runtime-artifact, and backend
+  identity;
 - every rejection code and reason;
 - observed raw metrics, weights, normalized component scores, total score, and
   evidence coverage;
@@ -104,6 +137,20 @@ model/provider/token/cost attributes remain observations rather than authority.
 The canonical digest is copied to `workflowRuns.routingDecisionDigest`, and the
 same full snapshot is copied to `workflowRuns.executionRoutingSnapshot`.
 Subsequent telemetry and verification outcomes cannot update that Attempt.
+
+## Frozen legacy routes
+
+`factory-model-route/v1` remains a read-compatible historical format. Its
+Codex-specific harness and runtime fields are interpreted only when an existing
+legacy Factory Version already froze that exact route and qualification. The
+router does not use V1 to construct a new Factory Version, infer a V2 route, or
+substitute a current harness/runtime combination. A malformed or cross-wired
+legacy tuple is ineligible.
+
+Historical route, qualification, harness-manifest, Factory Version, routing,
+and Attempt digests remain immutable. Legacy execution is possible only when a
+current worker can satisfy the exact frozen compatibility tuple; readability
+alone never grants admission.
 
 ## Authorization
 

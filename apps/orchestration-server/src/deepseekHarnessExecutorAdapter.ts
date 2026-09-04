@@ -18,11 +18,14 @@ import type {
 } from "@mission-control/workflow-engine";
 import {
   DEEPSEEK_V1_HARNESS_MANIFEST,
+  DEEPSEEK_V1_RUNTIME_ARTIFACT,
   GENERIC_HARNESS_CONTRACT_VERSION,
   NO_HARNESS_AUTHORITY,
   boundedProviderMetadata,
   harnessCapabilityManifestDigest,
   harnessExecutionRequestDigest,
+  harnessRuntimeArtifactDigest,
+  modelRouteReasoningConfigIssues,
 } from "@mission-control/workflow-engine";
 import { captureHarnessRepositoryBaseline, collectHarnessRepositoryResult } from "./harnessRepository.js";
 
@@ -113,6 +116,7 @@ export class DeepSeekHarnessExecutorAdapter implements HarnessExecutorAdapter<De
       displayName: "DeepSeek Harness",
       provider: EXPECTED_PROVIDER,
       capabilityManifest: DEEPSEEK_V1_HARNESS_MANIFEST,
+      runtimeArtifact: DEEPSEEK_V1_RUNTIME_ARTIFACT,
       executionBackends: ["persistent-worker"],
       authority: NO_HARNESS_AUTHORITY,
       supportsCancel: true,
@@ -154,6 +158,22 @@ export class DeepSeekHarnessExecutorAdapter implements HarnessExecutorAdapter<De
     }
     if (request.structuredOutput) {
       issues.push({ field: "structuredOutput", message: "DeepSeek Harness V1 does not admit request-bound structured-output contracts." });
+    }
+    const exactRoutePresent = request.modelRouteDigest !== undefined
+      || request.providerRoute !== undefined
+      || request.reasoningConfig !== undefined;
+    if (exactRoutePresent) {
+      if (!request.modelRouteDigest || !/^sha256:[a-f0-9]{64}$/i.test(request.modelRouteDigest)) {
+        issues.push({ field: "modelRouteDigest", message: "An exact sha256 model-route digest is required when route controls are present." });
+      }
+      if (request.providerRoute !== EXPECTED_PROVIDER) {
+        issues.push({ field: "providerRoute", message: `DeepSeek Harness V1 admits only the ${EXPECTED_PROVIDER} provider route.` });
+      }
+      if (modelRouteReasoningConfigIssues(request.reasoningConfig).length > 0) {
+        issues.push({ field: "reasoningConfig", message: "The exact model-route reasoning configuration is invalid." });
+      } else if (request.reasoningConfig !== undefined) {
+        issues.push({ field: "reasoningConfig", message: "DeepSeek Harness V1 cannot translate exact reasoning controls; omit them or use a qualified adapter that supports them." });
+      }
     }
     return issues;
   }
@@ -307,9 +327,21 @@ export class DeepSeekHarnessExecutorAdapter implements HarnessExecutorAdapter<De
       provenance: {
         provider: handle.prepared.request.provider ?? null,
         model: handle.prepared.request.model ?? null,
+        ...(handle.prepared.request.modelRouteDigest !== undefined
+          ? { modelRouteDigest: handle.prepared.request.modelRouteDigest }
+          : {}),
+        ...(handle.prepared.request.providerRoute !== undefined
+          ? { providerRoute: handle.prepared.request.providerRoute }
+          : {}),
+        ...(handle.prepared.request.reasoningConfig !== undefined
+          ? { reasoningConfig: structuredClone(handle.prepared.request.reasoningConfig) }
+          : {}),
         capabilityManifestSha256: harnessCapabilityManifestDigest(DEEPSEEK_V1_HARNESS_MANIFEST),
         effectiveConfigSha256: DEEPSEEK_V1_HARNESS_MANIFEST.effectiveConfigSha256,
         executableSha256: handle.prepared.installation.executableSha256,
+        runtimeArtifact: DEEPSEEK_V1_RUNTIME_ARTIFACT,
+        runtimeArtifactDigest: harnessRuntimeArtifactDigest(DEEPSEEK_V1_RUNTIME_ARTIFACT),
+        imageDigest: null,
         requestSha256: handle.prepared.requestSha256,
         providerMetadata: boundedProviderMetadata({
           routeType: "pi-ai-openai-completions-loopback",

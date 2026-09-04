@@ -184,6 +184,8 @@ export function latestRequiredRemoteRetryRun<T extends {
   parentTaskId?: string;
   attemptPurpose?: string;
   executionManifest?: {
+    version?: string;
+    executionBackend?: string;
     causation?: { workOrderRevisionNumber?: number };
     harness?: { executionBackend?: string };
   };
@@ -203,7 +205,9 @@ export function latestRequiredRemoteRetryRun<T extends {
       || String(right._id).localeCompare(String(left._id))
     )[0];
   if (!latest
-    || latest.executionManifest?.harness?.executionBackend !== "remote-sandbox"
+    || (latest.executionManifest?.version === "factory-execution-manifest/v2"
+      ? latest.executionManifest.executionBackend
+      : latest.executionManifest?.harness?.executionBackend) !== "remote-sandbox"
     || !["FAILED", "CANCELED"].includes(latest.status)) {
     return undefined;
   }

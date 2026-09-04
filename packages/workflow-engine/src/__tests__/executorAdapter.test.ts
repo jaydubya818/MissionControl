@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  DEEPSEEK_V1_RUNTIME_ARTIFACT,
   GENERIC_HARNESS_CONTRACT_VERSION,
   NO_HARNESS_AUTHORITY,
   runHarnessExecution,
@@ -43,6 +44,7 @@ describe("Generic Harness Contract V1", () => {
         version: "v1",
         displayName: "DeepSeek Harness fixture",
         provider: "fixture",
+        runtimeArtifact: DEEPSEEK_V1_RUNTIME_ARTIFACT,
         executionBackends: ["persistent-worker"],
         authority: NO_HARNESS_AUTHORITY,
         supportsCancel: true,

@@ -1,5 +1,5 @@
 import { canonicalHash } from "@mission-control/shared";
-import type { HarnessCapabilityManifest } from "./executorAdapter.js";
+import type { HarnessCapabilityManifest, HarnessRuntimeArtifactIdentity } from "./executorAdapter.js";
 
 export const CODEX_HARNESS_EFFECTIVE_CONFIG = {
   cliVersion: "0.146.0",
@@ -36,6 +36,27 @@ export const DEEPSEEK_HARNESS_EFFECTIVE_CONFIG = {
   sessionPersistence: "jsonl",
   resultContract: "factory-result/v1",
 } as const;
+
+/** Runtime artifacts are sidecars to the immutable V1 capability manifests.
+ * Keeping them separate preserves every historical manifest digest while
+ * allowing Factory composition to bind the exact executable independently. */
+export const CODEX_V1_RUNTIME_ARTIFACT: HarnessRuntimeArtifactIdentity = {
+  schemaVersion: "harness-runtime-artifact/v1",
+  kind: "EXECUTABLE",
+  name: "codex",
+  version: "0.146.0",
+  executableSha256: CODEX_HARNESS_EFFECTIVE_CONFIG.darwinArm64ExecutableSha256,
+  imageDigest: null,
+};
+
+export const DEEPSEEK_V1_RUNTIME_ARTIFACT: HarnessRuntimeArtifactIdentity = {
+  schemaVersion: "harness-runtime-artifact/v1",
+  kind: "EXECUTABLE",
+  name: "deepseek-harness",
+  version: "0.1.0-rc.5",
+  executableSha256: "c0226687bb20f45c603ec6fe50f3de16d1c3510c3a803304ec575ef9bc366c62",
+  imageDigest: null,
+};
 
 const PROHIBITED_AUTHORITIES = [
   "worker-leases",
@@ -165,11 +186,22 @@ export const KNOWN_HARNESS_MANIFESTS = [
   DEEPSEEK_V1_HARNESS_MANIFEST,
 ] as const;
 
+const KNOWN_HARNESS_RUNTIME_ARTIFACTS = [
+  { adapterId: "codex", adapterVersion: "v1", artifact: CODEX_V1_RUNTIME_ARTIFACT },
+  { adapterId: "deepseek-harness", adapterVersion: "0.2.0", artifact: DEEPSEEK_V1_RUNTIME_ARTIFACT },
+] as const;
+
 export function findKnownHarnessManifest(adapterId: string, adapterVersion: string) {
   return KNOWN_HARNESS_MANIFESTS.find((manifest) =>
     manifest.identity.adapterId === adapterId
     && manifest.identity.adapterVersion === adapterVersion
   );
+}
+
+export function findKnownHarnessRuntimeArtifact(adapterId: string, adapterVersion: string) {
+  return KNOWN_HARNESS_RUNTIME_ARTIFACTS.find((candidate) =>
+    candidate.adapterId === adapterId && candidate.adapterVersion === adapterVersion
+  )?.artifact;
 }
 
 export function harnessSupportsModel(

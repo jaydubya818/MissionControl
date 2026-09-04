@@ -11,9 +11,14 @@ import {
   codexOwnedProcessGroupExists,
   commandArguments,
 } from "../codexExecutorAdapter.js";
-import type { ExecutorRequest, HarnessExecutionContext } from "@mission-control/workflow-engine";
+import {
+  CODEX_V1_RUNTIME_ARTIFACT,
+  type ExecutorRequest,
+  type HarnessExecutionContext,
+} from "@mission-control/workflow-engine";
 
 const execFileAsync = promisify(execFile);
+const resolvePinnedExecutableDigest = async () => CODEX_V1_RUNTIME_ARTIFACT.executableSha256;
 
 const request = {
   executionId: "execution-1",
@@ -91,10 +96,52 @@ describe("CodexV1ExecutorAdapter", () => {
     ]));
   });
 
+  it("translates an exact reasoning effort and echoes the complete frozen route in provenance", async () => {
+    const repositoryRoot = await gitRepository();
+    const runner = vi.fn().mockResolvedValue(completion());
+    const adapter = new CodexV1ExecutorAdapter("/tmp/codex", runner as any, resolvePinnedExecutableDigest);
+    const exactRequest = {
+      ...request,
+      repositoryRoot,
+      workingDirectory: repositoryRoot,
+      modelRouteDigest: `sha256:${"a".repeat(64)}`,
+      providerRoute: "openai",
+      reasoningConfig: { effort: "high" },
+    };
+
+    try {
+      const result = await executeAdapter(adapter, exactRequest, { emit: () => undefined });
+      expect(runner.mock.calls[0]?.[0].argv).toEqual(expect.arrayContaining([
+        "-c",
+        'model_reasoning_effort="high"',
+      ]));
+      expect(result.normalizedResult?.provenance).toMatchObject({
+        modelRouteDigest: exactRequest.modelRouteDigest,
+        providerRoute: "openai",
+        reasoningConfig: { effort: "high" },
+      });
+    } finally {
+      await rm(repositoryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed instead of silently ignoring unsupported exact route controls", () => {
+    const adapter = new CodexV1ExecutorAdapter("/tmp/codex", vi.fn() as any);
+    expect(adapter.validateConfiguration({
+      ...request,
+      modelRouteDigest: `sha256:${"a".repeat(64)}`,
+      providerRoute: "openrouter",
+      reasoningConfig: { temperature: 0.2 },
+    })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field: "providerRoute" }),
+      expect.objectContaining({ field: "reasoningConfig.temperature" }),
+    ]));
+  });
+
   it("emits structured events without putting diagnostics or secrets in successful metadata", async () => {
     const repositoryRoot = await gitRepository();
     const runner = vi.fn().mockResolvedValue(completion());
-    const adapter = new CodexV1ExecutorAdapter("/tmp/codex", runner as any);
+    const adapter = new CodexV1ExecutorAdapter("/tmp/codex", runner as any, resolvePinnedExecutableDigest);
     const events: any[] = [];
     const result = await executeAdapter(adapter, {
       ...request,
@@ -118,7 +165,7 @@ describe("CodexV1ExecutorAdapter", () => {
     const runner = vi.fn(({ signal }) => new Promise((_resolve, reject) => {
       signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
     }));
-    const adapter = new CodexV1ExecutorAdapter("/tmp/codex", runner as any);
+    const adapter = new CodexV1ExecutorAdapter("/tmp/codex", runner as any, resolvePinnedExecutableDigest);
     const prepared = await adapter.prepare({
       ...request,
       repositoryRoot,
@@ -172,7 +219,13 @@ describe("CodexV1ExecutorAdapter", () => {
 
   it("builds a bounded remote invocation without acquiring control-plane authority", () => {
     const adapter = new CodexV1ExecutorAdapter("/opt/codex", vi.fn() as any);
-    const invocation = adapter.createRemoteInvocation(request, {
+    const exactRemoteRequest = {
+      ...request,
+      modelRouteDigest: `sha256:${"a".repeat(64)}`,
+      providerRoute: "openrouter",
+      reasoningConfig: { effort: "high" },
+    };
+    const invocation = adapter.createRemoteInvocation(exactRemoteRequest, {
       repositoryRoot: "/var/lib/mission-control/attempt/repository",
       resultPath: "/var/lib/mission-control/attempt/executor-result.json",
     });
@@ -189,6 +242,10 @@ describe("CodexV1ExecutorAdapter", () => {
       prompt: request.prompt,
       allowedPaths: request.allowedPaths,
       timeoutMs: request.timeoutMs,
+      provider: "openai",
+      modelRouteDigest: exactRemoteRequest.modelRouteDigest,
+      providerRoute: "openrouter",
+      reasoningConfig: { effort: "high" },
     });
     expect(invocation.args).toEqual(expect.arrayContaining([
       "-a",
@@ -211,6 +268,7 @@ describe("CodexV1ExecutorAdapter", () => {
         'model_providers.mission-control-openrouter.env_key="OPENAI_API_KEY"',
         'model_providers.mission-control-openrouter.wire_api="responses"',
         "model_providers.mission-control-openrouter.supports_websockets=false",
+        'model_reasoning_effort="high"',
       ]);
     expect(adapter.capabilities().authority).toEqual({
       worker: "NONE",
@@ -250,6 +308,18 @@ describe("CodexV1ExecutorAdapter", () => {
     expect(adapter.capabilities().capabilityManifest!.identity).toMatchObject({ adapterId: "codex", adapterVersion: "v1" });
   });
 
+  it("rejects a frozen non-OpenRouter route before building a remote invocation", () => {
+    const adapter = new CodexV1ExecutorAdapter("/opt/codex", vi.fn() as any);
+    expect(() => adapter.createRemoteInvocation({
+      ...request,
+      modelRouteDigest: `sha256:${"a".repeat(64)}`,
+      providerRoute: "openai",
+    }, {
+      repositoryRoot: "/var/lib/mission-control/attempt/repository",
+      resultPath: "/var/lib/mission-control/attempt/executor-result.json",
+    })).toThrow(/providerRoute.*openrouter/);
+  });
+
   it.skipIf(process.platform === "win32")("cancels the dedicated owned executor process group", async () => {
     const repositoryRoot = await gitRepository();
     const executable = path.join(repositoryRoot, "codex-tree-stub.sh");
@@ -262,7 +332,7 @@ wait
     await chmod(executable, 0o700);
 
     try {
-      const adapter = new CodexV1ExecutorAdapter(executable);
+      const adapter = new CodexV1ExecutorAdapter(executable, undefined, resolvePinnedExecutableDigest);
       const started = vi.fn();
       const terminated = vi.fn();
       const prepared = await adapter.prepare({
@@ -312,7 +382,7 @@ printf '%s\n' '{"type":"thread.started"}' '{"type":"turn.completed","usage":{"in
     await chmod(executable, 0o700);
 
     try {
-      const adapter = new CodexV1ExecutorAdapter(executable);
+      const adapter = new CodexV1ExecutorAdapter(executable, undefined, resolvePinnedExecutableDigest);
       const started = vi.fn();
       const terminated = vi.fn();
       const result = await executeAdapter(adapter, {
@@ -330,6 +400,26 @@ printf '%s\n' '{"type":"thread.started"}' '{"type":"turn.completed","usage":{"in
       expect(terminated).toHaveBeenCalledOnce();
       expect(terminated.mock.calls[0][0].pid).toBe(started.mock.calls[0][0].pid);
       expect(terminated.mock.calls[0][0].exitCode).toBe(0);
+    } finally {
+      await rm(repositoryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects executable drift before invoking the harness runner", async () => {
+    const repositoryRoot = await gitRepository();
+    const executable = path.join(repositoryRoot, "unqualified-codex-stub.sh");
+    const runner = vi.fn().mockResolvedValue(completion());
+    await writeFile(executable, "#!/bin/sh\nexit 0\n");
+    await chmod(executable, 0o700);
+
+    try {
+      const adapter = new CodexV1ExecutorAdapter(executable, runner as any);
+      await expect(executeAdapter(adapter, {
+        ...request,
+        repositoryRoot,
+        workingDirectory: repositoryRoot,
+      }, { emit: () => undefined })).rejects.toThrow(/frozen runtime-artifact identity/);
+      expect(runner).not.toHaveBeenCalled();
     } finally {
       await rm(repositoryRoot, { recursive: true, force: true });
     }

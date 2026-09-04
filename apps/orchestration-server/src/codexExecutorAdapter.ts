@@ -21,9 +21,12 @@ import {
 } from "@mission-control/workflow-engine";
 import {
   CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
   boundedProviderMetadata,
   harnessCapabilityManifestDigest,
   harnessExecutionRequestDigest,
+  harnessRuntimeArtifactDigest,
+  modelRouteReasoningConfigIssues,
 } from "@mission-control/workflow-engine";
 import { captureHarnessRepositoryBaseline, collectHarnessRepositoryResult } from "./harnessRepository.js";
 
@@ -60,6 +63,8 @@ type ProcessRunner = (args: {
   onSpawn?: (pid: number) => Promise<void> | void;
   onExit?: (pid: number, exitCode?: number) => Promise<void> | void;
 }) => Promise<ProcessCompletion>;
+
+type ExecutableDigestResolver = (executable: string) => Promise<string | null>;
 
 interface CodexPreparedExecution {
   request: ExecutorRequest;
@@ -125,6 +130,7 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
   constructor(
     private readonly executable = process.env.CODEX_EXECUTABLE ?? "codex",
     private readonly runner: ProcessRunner = runCodexProcess,
+    private readonly resolveExecutableDigest: ExecutableDigestResolver = executableDigest,
   ) {}
 
   capabilities(): ExecutorCapabilities {
@@ -135,6 +141,7 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       displayName: "Codex CLI",
       provider: "openai",
       capabilityManifest: CODEX_V1_HARNESS_MANIFEST,
+      runtimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
       executionBackends: ["persistent-worker", "remote-sandbox"],
       authority: NO_HARNESS_AUTHORITY,
       supportsCancel: true,
@@ -183,6 +190,13 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
         issues.push({ field: "structuredOutput.jsonSchema", message: "Structured-output schema must be JSON serializable." });
       }
     }
+    issues.push(...exactModelRouteIssues(request, "openai"));
+    if (request.reasoningConfig?.temperature !== undefined) {
+      issues.push({ field: "reasoningConfig.temperature", message: "codex/v1 cannot translate temperature exactly; omit it or use a qualified adapter that supports it." });
+    }
+    if (request.reasoningConfig?.maxTokens !== undefined) {
+      issues.push({ field: "reasoningConfig.maxTokens", message: "codex/v1 cannot translate maxTokens exactly; omit it or use a qualified adapter that supports it." });
+    }
     return issues;
   }
 
@@ -199,6 +213,10 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
     request: ExecutorRequest,
     context: HarnessExecutionContext,
   ): Promise<CodexPreparedExecution> {
+    const executableSha256 = await this.resolveExecutableDigest(this.executable);
+    if (executableSha256 !== CODEX_V1_RUNTIME_ARTIFACT.executableSha256) {
+      throw new Error("Codex executable does not match the frozen runtime-artifact identity.");
+    }
     const outputDirectory = await mkdtemp(path.join(tmpdir(), "mc-codex-v1-"));
     try {
       const outputSchemaPath = path.join(outputDirectory, "factory-result.schema.json");
@@ -220,7 +238,7 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
         outputSchemaPath,
         baselineCommit: await captureHarnessRepositoryBaseline(request.repositoryRoot).catch(() => null),
         requestSha256: harnessExecutionRequestDigest(request),
-        executableSha256: await executableDigest(this.executable),
+        executableSha256,
       };
     } catch (error) {
       await rm(outputDirectory, { recursive: true, force: true });
@@ -365,9 +383,21 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       provenance: {
         provider: handle.prepared.request.provider ?? null,
         model: handle.prepared.request.model ?? null,
+        ...(handle.prepared.request.modelRouteDigest !== undefined
+          ? { modelRouteDigest: handle.prepared.request.modelRouteDigest }
+          : {}),
+        ...(handle.prepared.request.providerRoute !== undefined
+          ? { providerRoute: handle.prepared.request.providerRoute }
+          : {}),
+        ...(handle.prepared.request.reasoningConfig !== undefined
+          ? { reasoningConfig: structuredClone(handle.prepared.request.reasoningConfig) }
+          : {}),
         capabilityManifestSha256: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
         effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
         executableSha256: handle.prepared.executableSha256,
+        runtimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
+        runtimeArtifactDigest: harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT),
+        imageDigest: null,
         requestSha256: handle.prepared.requestSha256,
         providerMetadata: boundedProviderMetadata({
           protocol: "codex-jsonl",
@@ -444,6 +474,10 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
   }
 
   createRemoteInvocation(request: ExecutorRequest, context: { repositoryRoot: string; resultPath: string }) {
+    const issues = this.validateRemoteConfiguration(request);
+    if (issues.length > 0) {
+      throw new Error(issues.map((issue) => `${issue.field}: ${issue.message}`).join(" "));
+    }
     const remoteRequest = { ...request, repositoryRoot: context.repositoryRoot, workingDirectory: context.repositoryRoot };
     const outputSchemaPath = path.posix.join(path.posix.dirname(context.resultPath), "factory-result.schema.json");
     return {
@@ -456,10 +490,29 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       outputSchemaPath,
       outputSchema: structuredClone(request.structuredOutput?.jsonSchema ?? FACTORY_RESULT_SCHEMA),
       model: request.model,
+      modelRouteDigest: request.modelRouteDigest,
+      provider: request.provider,
+      providerRoute: request.providerRoute,
+      reasoningConfig: request.reasoningConfig === undefined ? undefined : structuredClone(request.reasoningConfig),
       prompt: request.prompt,
       allowedPaths: request.allowedPaths,
       timeoutMs: request.timeoutMs,
     };
+  }
+
+  validateRemoteConfiguration(request: ExecutorRequest): ExecutorConfigurationIssue[] {
+    return [
+      ...exactModelRouteIssues(request, "openrouter"),
+      ...(request.provider !== undefined && request.provider !== "openai"
+        ? [{ field: "provider", message: "codex/v1 remote execution supports only OpenAI-compatible models through OpenRouter." }]
+        : []),
+      ...(request.reasoningConfig?.temperature !== undefined
+        ? [{ field: "reasoningConfig.temperature", message: "codex/v1 cannot translate temperature exactly; omit it or use a qualified adapter that supports it." }]
+        : []),
+      ...(request.reasoningConfig?.maxTokens !== undefined
+        ? [{ field: "reasoningConfig.maxTokens", message: "codex/v1 cannot translate maxTokens exactly; omit it or use a qualified adapter that supports it." }]
+        : []),
+    ];
   }
 
   async health(): Promise<ExecutorHealth> {
@@ -504,7 +557,10 @@ export function commandArguments(
   return [
     "-a",
     "never",
-    ...effectiveOverrides.flatMap((value) => ["-c", value]),
+    ...[
+      ...effectiveOverrides,
+      ...codexReasoningConfigOverrides(request),
+    ].flatMap((value) => ["-c", value]),
     "exec",
     ...(workspaceContained ? ["--strict-config"] : []),
     "--json",
@@ -568,6 +624,42 @@ export async function verifyWorkspacePermissionProfile(executable: string): Prom
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+}
+
+function codexReasoningConfigOverrides(request: ExecutorRequest): string[] {
+  return request.reasoningConfig?.effort === undefined
+    ? []
+    : [`model_reasoning_effort=${JSON.stringify(request.reasoningConfig.effort)}`];
+}
+
+function exactModelRouteIssues(
+  request: ExecutorRequest,
+  expectedProviderRoute: "openai" | "openrouter",
+): ExecutorConfigurationIssue[] {
+  const exactRoutePresent = request.modelRouteDigest !== undefined
+    || request.providerRoute !== undefined
+    || request.reasoningConfig !== undefined;
+  if (!exactRoutePresent) return [];
+  const issues: ExecutorConfigurationIssue[] = [];
+  if (!request.modelRouteDigest || !/^sha256:[a-f0-9]{64}$/i.test(request.modelRouteDigest)) {
+    issues.push({ field: "modelRouteDigest", message: "An exact sha256 model-route digest is required when route controls are present." });
+  }
+  if (!request.provider?.trim()) {
+    issues.push({ field: "provider", message: "An exact model provider is required when route controls are present." });
+  }
+  if (!request.model?.trim()) {
+    issues.push({ field: "model", message: "An exact model identifier is required when route controls are present." });
+  }
+  if (request.providerRoute !== expectedProviderRoute) {
+    issues.push({
+      field: "providerRoute",
+      message: `codex/v1 ${expectedProviderRoute === "openrouter" ? "remote" : "persistent"} execution admits only the ${expectedProviderRoute} provider route.`,
+    });
+  }
+  if (modelRouteReasoningConfigIssues(request.reasoningConfig).length > 0) {
+    issues.push({ field: "reasoningConfig", message: "The exact model-route reasoning configuration is invalid." });
+  }
+  return issues;
 }
 
 async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<ProcessCompletion> {

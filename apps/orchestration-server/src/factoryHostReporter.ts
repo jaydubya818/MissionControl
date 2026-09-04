@@ -4,7 +4,7 @@ import type { ConvexHttpClient } from "convex/browser";
 import { ConvexActions, ConvexMutations } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
 import { canonicalGithubRepositoryFromRemote } from "./factoryRepositoryIdentity.js";
-import type { HarnessCapabilityManifest } from "@mission-control/workflow-engine";
+import type { HarnessCapabilityManifest, HarnessRuntimeArtifactIdentity } from "@mission-control/workflow-engine";
 
 const execFileAsync = promisify(execFile);
 
@@ -26,6 +26,8 @@ export interface FactoryHostReporterConfig {
     version: string;
     capabilityManifestSha256: string;
     effectiveConfigSha256: string;
+    runtimeArtifact: HarnessRuntimeArtifactIdentity;
+    runtimeArtifactSha256: string;
     capabilityManifest: HarnessCapabilityManifest;
     supportsCancel: boolean;
     supportsResume: boolean;
@@ -41,6 +43,7 @@ export interface FactoryHostReporterConfig {
     model: string;
     capabilityManifestSha256: string;
     effectiveConfigSha256: string;
+    runtimeArtifactSha256?: string;
     executionBackend: string;
     modelRouteDigest: string;
     sandboxProfileDigest?: string;
@@ -134,6 +137,8 @@ export class FactoryHostReporter {
             version: executor.version,
             capabilityManifestSha256: executor.capabilityManifestSha256,
             effectiveConfigSha256: executor.effectiveConfigSha256,
+            runtimeArtifact: executor.runtimeArtifact,
+            runtimeArtifactSha256: executor.runtimeArtifactSha256,
             capabilityManifest: executor.capabilityManifest,
             supportsCancel: executor.supportsCancel,
             supportsResume: executor.supportsResume,

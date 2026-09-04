@@ -155,9 +155,10 @@ create ownership.
 
 ## Optional experimental DeepSeek Harness
 
-Codex remains the default production adapter. DeepSeek Harness is disabled by
-default and is admitted only on the persistent-worker backend when all of the
-following are set and healthy:
+No harness is a runtime default. Set `CODEX_FACTORY_WORKER_ENABLED=true` to
+register Codex. DeepSeek Harness can be the only registered adapter; it is
+disabled by default and is admitted only on the persistent-worker backend when
+all of the following are set and healthy:
 
 ```text
 DEEPSEEK_HARNESS_EXECUTOR_ENABLED=1
@@ -185,9 +186,9 @@ registration and execution.
    `workspaceHostBindings.report` change and `v26 -> v27`.
 3. Deploy workers one host at a time. Each worker reports its exact capability
    and configuration digests and waits for registration before polling.
-4. Confirm Codex readiness and admission before explicitly enabling DeepSeek on
-   any host. DeepSeek registration must fail closed if its pin, built artifact,
-   Ollama runtime, or model digest differs.
+4. Confirm readiness and admission for every adapter explicitly enabled on the
+   host. DeepSeek does not require Codex, and its registration must fail closed
+   if its pin, built artifact, Ollama runtime, or model digest differs.
 5. Drain before rollback. Stale registrations stop new claims, and workspaces
    remain preserved for inspection. Clearing
    `DEEPSEEK_HARNESS_EXECUTOR_ENABLED` removes only the experimental adapter.

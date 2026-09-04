@@ -77,6 +77,9 @@ export {
   harnessExecutionRequestDigest,
   harnessManifestIssues,
   harnessNormalizedResultIssues,
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
+  modelRouteReasoningConfigIssues,
   NO_HARNESS_AUTHORITY,
   runHarnessExecution,
 } from "./executorAdapter.js";
@@ -104,17 +107,22 @@ export type {
   HarnessExecutorCapabilities,
   HarnessModelCapability,
   HarnessNormalizedResult,
+  HarnessRuntimeArtifactIdentity,
   HarnessSupportLevel,
   IsolationMode,
+  ModelRouteReasoningConfig,
 } from "./executorAdapter.js";
 
 export {
   CODEX_HARNESS_EFFECTIVE_CONFIG,
   CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
   DEEPSEEK_HARNESS_EFFECTIVE_CONFIG,
   DEEPSEEK_V1_HARNESS_MANIFEST,
+  DEEPSEEK_V1_RUNTIME_ARTIFACT,
   KNOWN_HARNESS_MANIFESTS,
   findKnownHarnessManifest,
+  findKnownHarnessRuntimeArtifact,
   harnessSupportsModel,
 } from "./harnessManifests.js";
 

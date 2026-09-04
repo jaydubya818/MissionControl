@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { canonicalHash } from "@mission-control/shared";
 import { CODEX_V1_HARNESS_MANIFEST, harnessCapabilityManifestDigest } from "@mission-control/workflow-engine";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CodexV1ExecutorAdapter } from "../codexExecutorAdapter.js";
 import { assertRemoteCandidateIdentity, FactoryAttemptWorker, type FactoryAttemptWorkerDependencies } from "../factoryAttemptWorker.js";
 import { FakeSandboxProvider } from "../fakeSandboxProvider.js";
 import { FakeSandboxCredentialBroker } from "../sandboxCredentials.js";
@@ -26,6 +27,8 @@ import { executeIndependentVerification } from "../factoryVerification.js";
 
 const execFileAsync = promisify(execFile);
 const cleanup: string[] = [];
+const fakeImageDigest = `sha256:${"e".repeat(64)}`;
+const fakeImage = `fake:test@${fakeImageDigest}`;
 let previousServiceSecret: string | undefined;
 
 beforeEach(() => {
@@ -215,7 +218,7 @@ describe("FactoryAttemptWorker remote Sandbox backend", () => {
     };
     const worker = new FactoryAttemptWorker(
       client,
-      undefined,
+      new CodexV1ExecutorAdapter(),
       true,
       60_000,
       dependencies,
@@ -259,7 +262,7 @@ describe("FactoryAttemptWorker remote Sandbox backend", () => {
 function profile(): SandboxProfileSnapshot {
   return {
     schema: "factory-sandbox-profile/v1", profileKey: "fake-standard", version: 1, provider: "FAKE",
-    providerProfile: "deterministic", providerProfileVersion: "v1", machine: { image: "fake:test", cpu: 2, memoryMb: 4_096, diskGb: 20 },
+    providerProfile: "deterministic", providerProfileVersion: "v1", machine: { image: fakeImage, cpu: 2, memoryMb: 4_096, diskGb: 20 },
     supervisor: { version: "mission-control-supervisor/v1", transport: "SSH" },
     runtime: { maxRuntimeMs: 60_000, resultPollIntervalMs: 250, resultRetentionMs: 86_400_000 },
     network: { egress: "UNRESTRICTED", egressAllowlist: [], publicIngress: false, exposedPorts: [] },
@@ -288,6 +291,10 @@ function executionManifest(selectedProfile: SandboxProfileSnapshot, baseSha: str
       effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
       provider: "openai",
       model: "gpt-5",
+      modelRouteSnapshot: {
+        schema: "factory-model-route/v1",
+        runtimeIdentity: { kind: "CODEX_CLI", cliVersion: "0.146.0", imageDigest: fakeImageDigest },
+      },
       isolation: "WORKSPACE_WRITE",
       executionBackend: "remote-sandbox",
       requiredCapabilities: ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"],

@@ -10,7 +10,12 @@ import {
   factorySandboxCapabilities,
   inspectFactoryCheckout,
 } from "../factoryHostReporter.js";
-import { CODEX_V1_HARNESS_MANIFEST, harnessCapabilityManifestDigest } from "@mission-control/workflow-engine";
+import {
+  CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
+  harnessCapabilityManifestDigest,
+  harnessRuntimeArtifactDigest,
+} from "@mission-control/workflow-engine";
 
 const execFileAsync = promisify(execFile);
 const cleanup: string[] = [];
@@ -106,6 +111,8 @@ describe("Factory host reporting", () => {
         capabilityManifest: CODEX_V1_HARNESS_MANIFEST,
         capabilityManifestSha256: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
         effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+        runtimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
+        runtimeArtifactSha256: harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT),
         supportsCancel: true,
         supportsResume: false,
         isolationModes: ["READ_ONLY", "WORKSPACE_WRITE"],
@@ -134,6 +141,8 @@ describe("Factory host reporting", () => {
       capabilityManifest: CODEX_V1_HARNESS_MANIFEST,
       capabilityManifestSha256: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
       effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+      runtimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
+      runtimeArtifactSha256: harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT),
       supportsCancel: true,
       supportsResume: false,
       isolationModes: ["READ_ONLY", "WORKSPACE_WRITE"],

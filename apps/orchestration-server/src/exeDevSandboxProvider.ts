@@ -151,6 +151,13 @@ export class ExeDevSandboxProvider implements SandboxProvider {
         args: request.executor.args,
         resultPath: request.executor.resultPath,
         timeoutMs: request.executor.timeoutMs,
+        model: request.executor.model,
+        provider: request.executor.provider,
+        modelRouteDigest: request.executor.modelRouteDigest,
+        providerRoute: request.executor.providerRoute,
+        reasoningConfig: request.executor.reasoningConfig === undefined
+          ? undefined
+          : structuredClone(request.executor.reasoningConfig),
       },
       ...(request.security ? { executionSecurity: request.security.execution } : {}),
       environment: request.environment,

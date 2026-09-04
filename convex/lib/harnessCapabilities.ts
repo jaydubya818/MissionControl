@@ -1,8 +1,11 @@
-import type { HarnessCapabilityManifest, HarnessCapabilityRequirement } from "@mission-control/workflow-engine/harness-contract";
+import type { HarnessCapabilityManifest, HarnessCapabilityRequirement, HarnessRuntimeArtifactIdentity } from "@mission-control/workflow-engine/harness-contract";
 import {
   findKnownHarnessManifest,
+  findKnownHarnessRuntimeArtifact,
   harnessCapabilityManifestDigest,
   harnessManifestIssues,
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
 } from "@mission-control/workflow-engine/harness-contract";
 
 export function resolveFrozenHarnessBinding(input: {
@@ -10,6 +13,11 @@ export function resolveFrozenHarnessBinding(input: {
   harnessCapabilityManifest?: unknown;
   harnessCapabilityManifestDigest?: string;
   harnessEffectiveConfigSha256?: string;
+  harnessRuntimeArtifact?: unknown;
+  harnessRuntimeArtifactDigest?: string;
+  modelRouteSnapshot?: unknown;
+  executionBackend?: string;
+  sandboxProfileSnapshot?: unknown;
 }) {
   const known = findKnownHarnessManifest(input.executor.adapter, input.executor.version);
   const manifest = (input.harnessCapabilityManifest ?? known) as HarnessCapabilityManifest | undefined;
@@ -26,13 +34,145 @@ export function resolveFrozenHarnessBinding(input: {
   if (input.harnessEffectiveConfigSha256 && input.harnessEffectiveConfigSha256 !== manifest.effectiveConfigSha256) {
     throw new Error("Frozen harness effective configuration digest is invalid.");
   }
+  const routeSnapshot = input.modelRouteSnapshot as Record<string, any> | undefined;
+  const executionBackend = input.executionBackend ?? "persistent-worker";
+  const legacyArtifact = routeSnapshot?.schema === "factory-model-route/v1"
+    ? legacyRouteRuntimeArtifact(routeSnapshot, manifest, executionBackend)
+    : undefined;
+  const knownArtifact = findKnownHarnessRuntimeArtifact(input.executor.adapter, input.executor.version);
+  const backendArtifact = executionBackend === "remote-sandbox"
+    ? remoteSandboxRuntimeArtifact(input.sandboxProfileSnapshot, manifest)
+    : knownArtifact;
+  const artifact = (input.harnessRuntimeArtifact ?? legacyArtifact ?? backendArtifact) as HarnessRuntimeArtifactIdentity | undefined;
+  if (!artifact || harnessRuntimeArtifactIssues(artifact).length > 0) {
+    throw new Error(`Unknown or invalid harness runtime artifact ${input.executor.adapter}/${input.executor.version}.`);
+  }
+  if (routeSnapshot?.schema === "factory-model-route/v2" && !input.harnessRuntimeArtifact) {
+    throw new Error("Factory model-route V2 requires an explicitly frozen harness runtime artifact.");
+  }
+  const artifactDigest = harnessRuntimeArtifactDigest(artifact);
+  if (input.harnessRuntimeArtifactDigest && input.harnessRuntimeArtifactDigest !== artifactDigest) {
+    throw new Error("Frozen harness runtime artifact digest is invalid.");
+  }
+  assertRuntimeArtifactMatchesBackend(artifact, executionBackend, input.sandboxProfileSnapshot);
   return {
     adapter: input.executor.adapter,
     version: input.executor.version,
     capabilityManifest: manifest,
     capabilityManifestSha256: digest,
     effectiveConfigSha256: manifest.effectiveConfigSha256,
+    runtimeArtifact: structuredClone(artifact),
+    runtimeArtifactDigest: artifactDigest,
+    runtimeArtifactSha256: artifactDigest,
   };
+}
+
+/**
+ * The worker-host adapter is an executable loaded by the orchestration
+ * process. It is intentionally distinct from the artifact that executes in a
+ * remote backend (for example, a pinned sandbox image).
+ */
+export function resolveHarnessAdapterRuntimeArtifact(executor: { adapter: string; version: string }) {
+  const artifact = findKnownHarnessRuntimeArtifact(executor.adapter, executor.version);
+  if (!artifact || harnessRuntimeArtifactIssues(artifact).length > 0) {
+    throw new Error(`Unknown or invalid harness adapter runtime artifact ${executor.adapter}/${executor.version}.`);
+  }
+  if (artifact.kind !== "EXECUTABLE") {
+    throw new Error(`Harness adapter ${executor.adapter}/${executor.version} is not an exact worker executable.`);
+  }
+  return {
+    runtimeArtifact: structuredClone(artifact),
+    runtimeArtifactSha256: harnessRuntimeArtifactDigest(artifact),
+  };
+}
+
+function legacyRouteRuntimeArtifact(
+  route: Record<string, any>,
+  manifest: HarnessCapabilityManifest,
+  executionBackend: string,
+): HarnessRuntimeArtifactIdentity | undefined {
+  const runtime = route.runtimeIdentity;
+  if (runtime?.kind !== "CODEX_CLI" || typeof runtime.cliVersion !== "string") return undefined;
+  if (executionBackend === "persistent-worker" && typeof runtime.executableSha256 === "string") {
+    return {
+      schemaVersion: "harness-runtime-artifact/v1",
+      kind: "EXECUTABLE",
+      name: manifest.identity.adapterId,
+      version: runtime.cliVersion,
+      executableSha256: runtime.executableSha256,
+      imageDigest: null,
+    };
+  }
+  if (executionBackend === "remote-sandbox" && typeof runtime.imageDigest === "string") {
+    return {
+      schemaVersion: "harness-runtime-artifact/v1",
+      kind: "CONTAINER_IMAGE",
+      name: `${manifest.identity.harnessId}-image`,
+      version: runtime.cliVersion,
+      executableSha256: null,
+      imageDigest: runtime.imageDigest,
+    };
+  }
+  return undefined;
+}
+
+function remoteSandboxRuntimeArtifact(
+  snapshotInput: unknown,
+  manifest: HarnessCapabilityManifest,
+): HarnessRuntimeArtifactIdentity | undefined {
+  const snapshot = snapshotInput as Record<string, any> | undefined;
+  const imageDigest = exactSandboxImageDigest(snapshot);
+  if (!imageDigest) return undefined;
+  return {
+    schemaVersion: "harness-runtime-artifact/v1",
+    kind: "CONTAINER_IMAGE",
+    name: `${manifest.identity.harnessId}-sandbox`,
+    version: boundedRelease(snapshot?.providerProfileVersion)
+      ? snapshot.providerProfileVersion
+      : null,
+    executableSha256: null,
+    imageDigest,
+  };
+}
+
+function assertRuntimeArtifactMatchesBackend(
+  artifact: HarnessRuntimeArtifactIdentity,
+  executionBackend: string,
+  sandboxProfileSnapshot: unknown,
+) {
+  if (executionBackend === "persistent-worker") {
+    if (artifact.kind !== "EXECUTABLE" || !artifact.executableSha256 || artifact.imageDigest !== null) {
+      throw new Error("Persistent-worker execution requires the exact frozen harness executable artifact.");
+    }
+    return;
+  }
+  if (executionBackend === "remote-sandbox") {
+    const imageDigest = exactSandboxImageDigest(sandboxProfileSnapshot as Record<string, any> | undefined);
+    if (!imageDigest
+      || artifact.kind !== "CONTAINER_IMAGE"
+      || artifact.executableSha256 !== null
+      || artifact.imageDigest?.toLowerCase() !== imageDigest) {
+      throw new Error("Remote-sandbox execution requires the exact immutable Sandbox Profile image artifact.");
+    }
+    return;
+  }
+  throw new Error(`Unsupported Factory execution backend ${executionBackend}.`);
+}
+
+function exactSandboxImageDigest(snapshot: Record<string, any> | undefined) {
+  const securityDigest = snapshot?.security?.image?.digest;
+  const imageReferenceDigest = typeof snapshot?.machine?.image === "string"
+    ? snapshot.machine.image.match(/@(sha256:[a-f0-9]{64})$/i)?.[1]
+    : undefined;
+  if (typeof securityDigest === "string" && /^sha256:[a-f0-9]{64}$/i.test(securityDigest)) {
+    if (!imageReferenceDigest || imageReferenceDigest.toLowerCase() !== securityDigest.toLowerCase()) return undefined;
+    return securityDigest.toLowerCase();
+  }
+  return imageReferenceDigest?.toLowerCase();
+}
+
+function boundedRelease(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._+-]{0,199}$/.test(value);
 }
 
 export function factoryHarnessCapabilityRequirements(

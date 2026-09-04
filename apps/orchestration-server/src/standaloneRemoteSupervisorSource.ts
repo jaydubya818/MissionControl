@@ -21,6 +21,34 @@ const canonical = (value) => value === null || typeof value !== "object"
     ? "[" + value.map((item) => item === undefined ? "" : canonical(item)).join(",") + "]"
     : "{" + Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => JSON.stringify(key) + ":" + canonical(item)).join(",") + "}";
 const digest = (namespace, value) => "sha256:" + createHash("sha256").update(canonical({ namespace, value })).digest("hex");
+const objectDigest = (value) => "sha256:" + createHash("sha256").update(canonical(value)).digest("hex");
+const boundedIdentity = (value, maximum) => typeof value === "string" && value === value.trim()
+  && value.length > 0 && value.length <= maximum && !/[\0\r\n]/.test(value);
+const runtimeArtifactValid = (artifact) => artifact && typeof artifact === "object" && !Array.isArray(artifact)
+  && Object.keys(artifact).every((key) => ["schemaVersion", "kind", "name", "version", "executableSha256", "imageDigest"].includes(key))
+  && artifact.schemaVersion === "harness-runtime-artifact/v1"
+  && ["EXECUTABLE", "CONTAINER_IMAGE"].includes(artifact.kind)
+  && typeof artifact.name === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(artifact.name)
+  && (artifact.version === null || (typeof artifact.version === "string" && /^[A-Za-z0-9][A-Za-z0-9._+-]{0,199}$/.test(artifact.version)))
+  && (artifact.executableSha256 === null || (typeof artifact.executableSha256 === "string" && /^[a-f0-9]{64}$/.test(artifact.executableSha256)))
+  && (artifact.imageDigest === null || (typeof artifact.imageDigest === "string" && /^sha256:[a-f0-9]{64}$/.test(artifact.imageDigest)))
+  && (artifact.kind !== "EXECUTABLE" || (artifact.executableSha256 !== null && artifact.imageDigest === null))
+  && (artifact.kind !== "CONTAINER_IMAGE" || (artifact.imageDigest !== null && artifact.executableSha256 === null));
+const v2RouteValid = (route) => route && route.schema === "factory-model-route/v2"
+  && Object.keys(route).every((key) => ["schema", "provider", "providerRoute", "modelId", "reasoningConfig"].includes(key))
+  && !Object.prototype.hasOwnProperty.call(route, "capabilityIdentity")
+  && !Object.prototype.hasOwnProperty.call(route, "runtimeIdentity")
+  && boundedIdentity(route.provider, 100) && route.provider === route.provider.toLowerCase()
+  && boundedIdentity(route.providerRoute, 100) && route.providerRoute === route.providerRoute.toLowerCase()
+  && boundedIdentity(route.modelId, 200)
+  && (route.reasoningConfig === undefined || (
+    route.reasoningConfig && typeof route.reasoningConfig === "object" && !Array.isArray(route.reasoningConfig)
+    && Object.keys(route.reasoningConfig).length > 0
+    && Object.keys(route.reasoningConfig).every((key) => ["effort", "temperature", "maxTokens"].includes(key))
+    && (route.reasoningConfig.effort === undefined || (boundedIdentity(route.reasoningConfig.effort, 64) && route.reasoningConfig.effort === route.reasoningConfig.effort.toLowerCase()))
+    && (route.reasoningConfig.temperature === undefined || (typeof route.reasoningConfig.temperature === "number" && Number.isFinite(route.reasoningConfig.temperature) && route.reasoningConfig.temperature >= 0 && route.reasoningConfig.temperature <= 2))
+    && (route.reasoningConfig.maxTokens === undefined || (Number.isSafeInteger(route.reasoningConfig.maxTokens) && route.reasoningConfig.maxTokens >= 1 && route.reasoningConfig.maxTokens <= 10000000))
+  ));
 const redact = (value) => String(value)
   .replace(/\bsk-or-v1-[A-Za-z0-9_-]+/g, "[REDACTED_OPENROUTER_KEY]")
   .replace(/\bgh[pousr]_[A-Za-z0-9_]+/g, "[REDACTED_PROVIDER_TOKEN]")
@@ -219,13 +247,61 @@ trace("CONFIG_LOADED", {
 });
 const manifest = config.executionManifest;
 const manifestDigest = "sha256:" + createHash("sha256").update(canonical(manifest)).digest("hex");
-const harnessFields = ["adapter", "version", "harnessId", "harnessVersion", "provider", "model"];
-if (!manifest || manifest.version !== "factory-execution-manifest/v1" || manifestDigest !== config.manifestDigest
+const harnessFields = ["adapter", "version", "harnessId", "harnessVersion"];
+const v2 = manifest?.version === "factory-execution-manifest/v2";
+const executionBackend = v2 ? manifest.executionBackend : manifest?.harness?.executionBackend;
+const modelProvider = v2 ? manifest?.modelRoute?.routeSnapshot?.provider : manifest?.harness?.provider;
+const modelId = v2 ? manifest?.modelRoute?.routeSnapshot?.modelId : manifest?.harness?.model;
+const modelRouteDigest = v2 ? manifest?.modelRoute?.routeDigest : undefined;
+const providerRoute = v2 ? manifest?.modelRoute?.routeSnapshot?.providerRoute : undefined;
+const reasoningConfig = v2 ? manifest?.modelRoute?.routeSnapshot?.reasoningConfig : undefined;
+const capabilityManifest = manifest?.harness?.capabilityManifest;
+const qualification = manifest?.modelRoute?.qualificationSnapshot;
+const compatibility = qualification?.compatibility;
+const v2BindingsValid = !v2 || (
+  manifest.harness?.provider === undefined && manifest.harness?.model === undefined && manifest.harness?.executionBackend === undefined
+  && v2RouteValid(manifest.modelRoute?.routeSnapshot)
+  && manifest.modelRoute.routeDigest === digest("factory-model-route/v2", manifest.modelRoute.routeSnapshot)
+  && qualification?.schema === "factory-model-route-qualification/v2"
+  && qualification.routeDigest === manifest.modelRoute.routeDigest
+  && manifest.modelRoute.qualificationDigest === digest("factory-model-route-qualification/v2", qualification)
+  && /^[a-f0-9]{40}$/i.test(manifest.harness?.harnessCommit ?? "")
+  && capabilityManifest?.identity?.adapterId === manifest.harness.adapter
+  && capabilityManifest?.identity?.adapterVersion === manifest.harness.version
+  && capabilityManifest?.identity?.harnessId === manifest.harness.harnessId
+  && capabilityManifest?.identity?.harnessVersion === manifest.harness.harnessVersion
+  && capabilityManifest?.identity?.harnessCommit === manifest.harness.harnessCommit
+  && objectDigest(capabilityManifest) === manifest.harness.capabilityManifestSha256
+  && capabilityManifest?.effectiveConfigSha256 === manifest.harness.effectiveConfigSha256
+  && runtimeArtifactValid(manifest.harness.runtimeArtifact)
+  && digest("harness-runtime-artifact/v1", manifest.harness.runtimeArtifact) === manifest.harness.runtimeArtifactDigest
+  && compatibility?.adapter === manifest.harness.adapter
+  && compatibility?.version === manifest.harness.version
+  && compatibility?.capabilityManifestDigest === manifest.harness.capabilityManifestSha256
+  && compatibility?.effectiveConfigSha256 === manifest.harness.effectiveConfigSha256
+  && compatibility?.runtimeArtifactDigest === manifest.harness.runtimeArtifactDigest
+  && compatibility?.executionBackend === executionBackend
+  && config.executor?.provider === modelProvider
+  && config.executor?.model === modelId
+  && config.executor?.modelRouteDigest === modelRouteDigest
+  && config.executor?.providerRoute === providerRoute
+  && providerRoute === "openrouter"
+  && config.environment?.OPENAI_BASE_URL === "https://openrouter.ai/api/v1"
+  && canonical(config.executor?.reasoningConfig ?? null) === canonical(reasoningConfig ?? null)
+  && qualification.authority?.executionOnly === true
+  && qualification.authority?.routing === false
+  && qualification.authority?.verification === false
+  && qualification.authority?.acceptance === false
+  && qualification.authority?.publication === false
+  && qualification.authority?.merge === false
+);
+if (!manifest || !["factory-execution-manifest/v1", "factory-execution-manifest/v2"].includes(manifest.version) || manifestDigest !== config.manifestDigest
   || manifest.causation?.workOrderId !== config.workOrderId || manifest.causation?.workOrderRevisionNumber !== config.workOrderRevisionNumber
   || manifest.causation?.workflowRunId !== config.workflowRunId || manifest.repository?.baseSha !== config.sourceSha
   || manifest.sandbox?.profileDigest !== config.profileDigest || manifest.sandbox?.supervisorVersion !== "mission-control-supervisor/v1"
-  || manifest.harness?.pullRequestAuthority !== "CONTROL_PLANE_ONLY" || manifest.harness?.executionBackend !== "remote-sandbox"
+  || manifest.harness?.pullRequestAuthority !== "CONTROL_PLANE_ONLY" || executionBackend !== "remote-sandbox"
   || harnessFields.some((field) => typeof manifest.harness?.[field] !== "string" || !manifest.harness[field])
+  || !boundedIdentity(modelProvider, 100) || !boundedIdentity(modelId, 200) || !v2BindingsValid
   || !Array.isArray(manifest.intent?.acceptanceCriterionIds) || manifest.intent.acceptanceCriterionIds.some((id) => typeof id !== "string" || !id)
   || new Set(manifest.intent.acceptanceCriterionIds).size !== manifest.intent.acceptanceCriterionIds.length
   || !Array.isArray(manifest.sandbox?.credentialGrants)
@@ -425,7 +501,19 @@ const bundle = {
   profileDigest: config.profileDigest,
   sourceSha: config.sourceSha,
   supervisorVersion: "mission-control-supervisor/v1",
-  harness: { adapter: manifest.harness.adapter, version: manifest.harness.version, harnessId: manifest.harness.harnessId, harnessVersion: manifest.harness.harnessVersion, provider: manifest.harness.provider, model: manifest.harness.model },
+  harness: {
+    adapter: manifest.harness.adapter,
+    version: manifest.harness.version,
+    harnessId: manifest.harness.harnessId,
+    harnessVersion: manifest.harness.harnessVersion,
+    provider: modelProvider,
+    model: modelId,
+    ...(v2 ? {
+      modelRouteDigest,
+      providerRoute,
+      ...(reasoningConfig === undefined ? {} : { reasoningConfig }),
+    } : {}),
+  },
   environment: config.environmentDescriptor,
   startedAt,
   finishedAt,

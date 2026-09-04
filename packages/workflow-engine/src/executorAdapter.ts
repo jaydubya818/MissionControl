@@ -20,6 +20,15 @@ export const GENERIC_HARNESS_CONTRACT_VERSION = "generic-harness-contract/v1" as
 export type HarnessExecutionBackend = "persistent-worker" | "remote-sandbox";
 export type HarnessAuthorityLevel = "NONE";
 
+export interface HarnessRuntimeArtifactIdentity {
+  schemaVersion: "harness-runtime-artifact/v1";
+  kind: "EXECUTABLE" | "CONTAINER_IMAGE";
+  name: string;
+  version: string | null;
+  executableSha256: string | null;
+  imageDigest: string | null;
+}
+
 export interface HarnessAuthorityProfile {
   readonly worker: HarnessAuthorityLevel;
   readonly verification: HarnessAuthorityLevel;
@@ -47,6 +56,7 @@ export interface HarnessExecutorCapabilities {
   displayName: string;
   provider?: string;
   capabilityManifest?: HarnessCapabilityManifest;
+  runtimeArtifact: HarnessRuntimeArtifactIdentity;
   executionBackends: HarnessExecutionBackend[];
   authority: HarnessAuthorityProfile;
   supportsCancel: boolean;
@@ -67,6 +77,18 @@ export interface ExecutorEstimate {
   confidence: "LOW" | "MEDIUM" | "HIGH";
 }
 
+/**
+ * Inference controls that are part of an exact model-route identity.
+ *
+ * Adapters must either translate every supplied control into the underlying
+ * harness invocation or reject the request before execution.
+ */
+export interface ModelRouteReasoningConfig {
+  effort?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
 export interface ExecutorRequest {
   executionId: string;
   repositoryRoot: string;
@@ -74,6 +96,10 @@ export interface ExecutorRequest {
   prompt: string;
   model?: string;
   provider?: string;
+  /** Additive exact-route fields. Legacy V1 requests may omit them. */
+  modelRouteDigest?: string;
+  providerRoute?: string;
+  reasoningConfig?: ModelRouteReasoningConfig;
   allowedPaths: string[];
   deniedPaths?: string[];
   timeoutMs: number;
@@ -255,9 +281,17 @@ export interface HarnessNormalizedResult {
   provenance: {
     provider: string | null;
     model: string | null;
+    /** Additive exact-route provenance. Older persisted V1 results may omit it. */
+    modelRouteDigest?: string;
+    providerRoute?: string;
+    reasoningConfig?: ModelRouteReasoningConfig;
     capabilityManifestSha256: string;
     effectiveConfigSha256: string;
     executableSha256: string | null;
+    /** Additive V1 provenance. Older persisted results may omit these fields. */
+    runtimeArtifact?: HarnessRuntimeArtifactIdentity;
+    runtimeArtifactDigest?: string;
+    imageDigest?: string | null;
     requestSha256: string;
     providerMetadata: Record<string, string | number | boolean | null>;
   };
@@ -371,6 +405,97 @@ export function harnessCapabilityManifestDigest(manifest: HarnessCapabilityManif
 
 export function harnessExecutionRequestDigest(request: ExecutorRequest): string {
   return `sha256:${canonicalHash(request)}`;
+}
+
+export function modelRouteReasoningConfigIssues(input: unknown): string[] {
+  if (input === undefined) return [];
+  if (!input || typeof input !== "object" || Array.isArray(input)) return ["reasoning-config-shape-invalid"];
+  const reasoning = input as Record<string, unknown>;
+  const keys = Object.keys(reasoning);
+  if (keys.length === 0 || keys.some((key) => !["effort", "temperature", "maxTokens"].includes(key))) {
+    return ["reasoning-config-fields-invalid"];
+  }
+  const issues: string[] = [];
+  if (reasoning.effort !== undefined
+    && !boundedLowercaseIdentity(reasoning.effort, 64)) {
+    issues.push("reasoning-effort-invalid");
+  }
+  if (reasoning.temperature !== undefined
+    && (typeof reasoning.temperature !== "number"
+      || !Number.isFinite(reasoning.temperature)
+      || reasoning.temperature < 0
+      || reasoning.temperature > 2)) {
+    issues.push("reasoning-temperature-invalid");
+  }
+  if (reasoning.maxTokens !== undefined
+    && (!Number.isSafeInteger(reasoning.maxTokens)
+      || (reasoning.maxTokens as number) < 1
+      || (reasoning.maxTokens as number) > 10_000_000)) {
+    issues.push("reasoning-max-tokens-invalid");
+  }
+  return issues;
+}
+
+export function harnessRuntimeArtifactIssues(input: unknown): string[] {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return ["runtime-artifact-shape-invalid"];
+  const artifact = input as Record<string, unknown>;
+  const issues: string[] = [];
+  if (Object.keys(artifact).some((key) => ![
+    "schemaVersion",
+    "kind",
+    "name",
+    "version",
+    "executableSha256",
+    "imageDigest",
+  ].includes(key))) {
+    issues.push("runtime-artifact-fields-invalid");
+  }
+  if (artifact.schemaVersion !== "harness-runtime-artifact/v1") issues.push("runtime-artifact-version-invalid");
+  if (artifact.kind !== "EXECUTABLE" && artifact.kind !== "CONTAINER_IMAGE") issues.push("runtime-artifact-kind-invalid");
+  if (typeof artifact.name !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(artifact.name)) {
+    issues.push("runtime-artifact-name-invalid");
+  }
+  if (artifact.version !== null
+    && (typeof artifact.version !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._+-]{0,199}$/.test(artifact.version))) {
+    issues.push("runtime-artifact-release-invalid");
+  }
+  if (artifact.executableSha256 !== null
+    && (typeof artifact.executableSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(artifact.executableSha256))) {
+    issues.push("runtime-artifact-executable-digest-invalid");
+  }
+  if (typeof artifact.executableSha256 === "string"
+    && /^[a-f0-9]{64}$/i.test(artifact.executableSha256)
+    && artifact.executableSha256 !== artifact.executableSha256.toLowerCase()) {
+    issues.push("runtime-artifact-executable-digest-noncanonical");
+  }
+  if (artifact.imageDigest !== null
+    && (typeof artifact.imageDigest !== "string" || !/^sha256:[a-f0-9]{64}$/i.test(artifact.imageDigest))) {
+    issues.push("runtime-artifact-image-digest-invalid");
+  }
+  if (typeof artifact.imageDigest === "string"
+    && /^sha256:[a-f0-9]{64}$/i.test(artifact.imageDigest)
+    && artifact.imageDigest !== artifact.imageDigest.toLowerCase()) {
+    issues.push("runtime-artifact-image-digest-noncanonical");
+  }
+  if (artifact.kind === "EXECUTABLE" && artifact.executableSha256 === null) {
+    issues.push("runtime-artifact-executable-missing");
+  }
+  if (artifact.kind === "EXECUTABLE" && artifact.imageDigest !== null) {
+    issues.push("runtime-artifact-image-not-allowed");
+  }
+  if (artifact.kind === "CONTAINER_IMAGE" && artifact.imageDigest === null) {
+    issues.push("runtime-artifact-image-missing");
+  }
+  if (artifact.kind === "CONTAINER_IMAGE" && artifact.executableSha256 !== null) {
+    issues.push("runtime-artifact-executable-not-allowed");
+  }
+  return issues;
+}
+
+export function harnessRuntimeArtifactDigest(input: HarnessRuntimeArtifactIdentity): string {
+  const issues = harnessRuntimeArtifactIssues(input);
+  if (issues.length > 0) throw new Error(`Harness runtime artifact is invalid (${issues.join(", ")}).`);
+  return `sha256:${canonicalHash({ namespace: "harness-runtime-artifact/v1", value: input })}`;
 }
 
 export function boundedProviderMetadata(
@@ -522,9 +647,23 @@ export function harnessNormalizedResultIssues(result: HarnessNormalizedResult): 
   if (!result.provenance
     || (result.provenance.provider !== null && typeof result.provenance.provider !== "string")
     || (result.provenance.model !== null && typeof result.provenance.model !== "string")
+    || (result.provenance.modelRouteDigest !== undefined
+      && !/^sha256:[a-f0-9]{64}$/i.test(result.provenance.modelRouteDigest))
+    || (result.provenance.providerRoute !== undefined
+      && !boundedLowercaseIdentity(result.provenance.providerRoute, 100))
+    || modelRouteReasoningConfigIssues(result.provenance.reasoningConfig).length > 0
     || !/^sha256:[a-f0-9]{64}$/i.test(result.provenance.capabilityManifestSha256)
     || !/^[a-f0-9]{64}$/i.test(result.provenance.effectiveConfigSha256)
     || (result.provenance.executableSha256 !== null && !/^[a-f0-9]{64}$/i.test(result.provenance.executableSha256))
+    || (result.provenance.imageDigest !== undefined
+      && result.provenance.imageDigest !== null
+      && !/^sha256:[a-f0-9]{64}$/i.test(result.provenance.imageDigest))
+    || (result.provenance.runtimeArtifact !== undefined
+      && harnessRuntimeArtifactIssues(result.provenance.runtimeArtifact).length > 0)
+    || (result.provenance.runtimeArtifactDigest !== undefined
+      && (!result.provenance.runtimeArtifact
+        || !/^sha256:[a-f0-9]{64}$/i.test(result.provenance.runtimeArtifactDigest)
+        || harnessRuntimeArtifactDigest(result.provenance.runtimeArtifact) !== result.provenance.runtimeArtifactDigest))
     || !/^sha256:[a-f0-9]{64}$/i.test(result.provenance.requestSha256)) {
     issues.push("result-provenance-invalid");
   }
@@ -607,4 +746,13 @@ export function harnessNormalizedResultIssues(result: HarnessNormalizedResult): 
 
 function pathEscapesRepository(value: string) {
   return value.startsWith("/") || value.startsWith("\\") || value.split(/[\\/]/).includes("..");
+}
+
+function boundedLowercaseIdentity(value: unknown, maximum: number): value is string {
+  return typeof value === "string"
+    && value === value.trim()
+    && value === value.toLowerCase()
+    && value.length > 0
+    && value.length <= maximum
+    && !/[\0\r\n]/.test(value);
 }

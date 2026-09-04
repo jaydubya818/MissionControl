@@ -6,7 +6,12 @@ import {
   validFactoryExecutionBinding,
   type FactoryConfigurationInput,
 } from "../lib/factoryConfiguration";
-import { CODEX_V1_HARNESS_MANIFEST, harnessCapabilityManifestDigest } from "@mission-control/workflow-engine";
+import {
+  CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
+  harnessCapabilityManifestDigest,
+  harnessRuntimeArtifactDigest,
+} from "@mission-control/workflow-engine";
 
 const configuration: FactoryConfigurationInput = {
   purpose: "SOFTWARE",
@@ -16,6 +21,8 @@ const configuration: FactoryConfigurationInput = {
   harnessCapabilityManifest: CODEX_V1_HARNESS_MANIFEST,
   harnessCapabilityManifestDigest: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
   harnessEffectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+  harnessRuntimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
+  harnessRuntimeArtifactDigest: harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT),
   modelCatalogId: "model-route-1",
   modelRouteDigest: `sha256:${"a".repeat(64)}`,
   executionBackend: "persistent-worker",
@@ -52,6 +59,15 @@ describe("Factory configuration", () => {
       factoryConfigurationDigest({
         ...configuration,
         harnessEffectiveConfigSha256: "f".repeat(64),
+      })
+    );
+    expect(factoryConfigurationDigest(configuration)).not.toBe(
+      factoryConfigurationDigest({
+        ...configuration,
+        harnessRuntimeArtifact: {
+          ...CODEX_V1_RUNTIME_ARTIFACT,
+          executableSha256: "f".repeat(64),
+        },
       })
     );
     expect(factoryConfigurationDigest(configuration)).not.toBe(

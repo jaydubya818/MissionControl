@@ -3,6 +3,8 @@ import type { Id } from "../_generated/dataModel";
 import {
   initializeDefaults,
   list as listCatalog,
+  promoteExactRoute,
+  registerExactRoute,
   reportHealth,
   syncLocalModels,
 } from "../modelCatalog";
@@ -20,6 +22,8 @@ import {
 import { setFlag } from "../featureFlags";
 import { setAuthorizedModelOverride } from "../workOrders";
 import { promoteGuardedAuto, setPinnedTuple } from "../executionRouting";
+import { modelRouteEligibleForNewFactoryVersion } from "../lib/modelRouteAdmission";
+import { loadFactoryModelCatalogForProject } from "../lib/modelCatalogScope";
 
 const originalDemoFlag = process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
 
@@ -267,6 +271,209 @@ describe("Model Routing authorization", () => {
       actorType: "SYSTEM",
       actorId: "orchestration-service",
       action: "LOCAL_MODEL_CATALOG_SYNCED",
+    });
+  });
+
+  it("reuses only unqualified route drafts and preserves independent immutable qualifications", async () => {
+    const state = createContext({
+      permissions: ["factory.read", "factory.automation.manage", "factory.approve"],
+    });
+    const registration = {
+      projectId: state.projectId,
+      provider: "OpenAI",
+      providerRoute: "OPENROUTER",
+      modelId: "gpt-5.1-codex-mini",
+      displayName: "Codex Mini",
+      tier: "BALANCED" as const,
+      capabilities: ["code", "text"],
+      supportsTools: true,
+      contextWindow: 200_000,
+      reasoningConfig: { effort: "HIGH" },
+    };
+
+    const firstId = await functionHandler(registerExactRoute)(state.ctx, registration);
+    await expect(functionHandler(registerExactRoute)(state.ctx, registration)).resolves.toBe(firstId);
+    const firstDraft = state.tables.modelCatalog.find((model) => model._id === firstId);
+    expect(firstDraft).toMatchObject({
+      enabled: false,
+      qualificationStatus: "UNQUALIFIED",
+      admissionStatus: "DISABLED",
+      routeSnapshot: {
+        provider: "openai",
+        providerRoute: "openrouter",
+        modelId: "gpt-5.1-codex-mini",
+        reasoningConfig: { effort: "high" },
+      },
+    });
+    const firstCompatibility = {
+      adapter: "codex",
+      version: "v1",
+      capabilityManifestDigest: `sha256:${"2".repeat(64)}`,
+      effectiveConfigSha256: "3".repeat(64),
+      runtimeArtifactDigest: `sha256:${"4".repeat(64)}`,
+      executionBackend: "persistent-worker" as const,
+    };
+
+    const firstPromotion = await functionHandler(promoteExactRoute)(state.ctx, {
+      modelCatalogId: firstId,
+      expectedRouteDigest: firstDraft.routeDigest,
+      evidenceReference: "evidence://codex-persistent",
+      evidenceDigest: `sha256:${"1".repeat(64)}`,
+      workloadClasses: ["BUILD"],
+      riskClasses: ["GREEN"],
+      compatibility: firstCompatibility,
+    });
+    const frozenFirstQualification = structuredClone(
+      state.tables.modelCatalog.find((model) => model._id === firstId).qualificationSnapshot,
+    );
+
+    const secondId = await functionHandler(registerExactRoute)(state.ctx, registration);
+    expect(secondId).not.toBe(firstId);
+    const secondDraft = state.tables.modelCatalog.find((model) => model._id === secondId);
+    expect(secondDraft).toMatchObject({
+      routeDigest: firstDraft.routeDigest,
+      routeSnapshot: firstDraft.routeSnapshot,
+      enabled: false,
+      qualificationStatus: "UNQUALIFIED",
+      admissionStatus: "DISABLED",
+    });
+    const secondCompatibility = {
+      adapter: "deepagents",
+      version: "v2",
+      capabilityManifestDigest: `sha256:${"6".repeat(64)}`,
+      effectiveConfigSha256: "7".repeat(64),
+      runtimeArtifactDigest: `sha256:${"8".repeat(64)}`,
+      executionBackend: "remote-sandbox" as const,
+    };
+
+    const secondPromotion = await functionHandler(promoteExactRoute)(state.ctx, {
+      modelCatalogId: secondId,
+      expectedRouteDigest: secondDraft.routeDigest,
+      evidenceReference: "evidence://codex-remote",
+      evidenceDigest: `sha256:${"5".repeat(64)}`,
+      workloadClasses: ["BUILD"],
+      riskClasses: ["GREEN", "YELLOW"],
+      compatibility: secondCompatibility,
+    });
+
+    expect(secondPromotion.routeDigest).toBe(firstPromotion.routeDigest);
+    expect(secondPromotion.qualificationDigest).not.toBe(firstPromotion.qualificationDigest);
+    const qualifiedFirst = state.tables.modelCatalog.find((model) => model._id === firstId);
+    const qualifiedSecond = state.tables.modelCatalog.find((model) => model._id === secondId);
+    expect(qualifiedFirst.qualificationSnapshot).toEqual(frozenFirstQualification);
+    expect(modelRouteEligibleForNewFactoryVersion(qualifiedFirst, firstCompatibility)).toBe(true);
+    expect(modelRouteEligibleForNewFactoryVersion(qualifiedFirst, secondCompatibility)).toBe(false);
+    expect(modelRouteEligibleForNewFactoryVersion(qualifiedSecond, secondCompatibility)).toBe(true);
+    expect(modelRouteEligibleForNewFactoryVersion(qualifiedSecond, firstCompatibility)).toBe(false);
+    await expect(functionHandler(promoteExactRoute)(state.ctx, {
+      modelCatalogId: firstId,
+      expectedRouteDigest: firstDraft.routeDigest,
+      evidenceReference: "evidence://attempted-requalification",
+      evidenceDigest: `sha256:${"9".repeat(64)}`,
+      workloadClasses: ["BUILD"],
+      riskClasses: ["GREEN"],
+      compatibility: {
+        adapter: "deepagents",
+        version: "v2",
+        capabilityManifestDigest: `sha256:${"a".repeat(64)}`,
+        effectiveConfigSha256: "b".repeat(64),
+        runtimeArtifactDigest: `sha256:${"c".repeat(64)}`,
+        executionBackend: "remote-sandbox",
+      },
+    })).rejects.toThrow("qualification is immutable");
+  });
+
+  it("keeps legacy model health updates scoped to the first matching catalog instance", async () => {
+    const state = createContext();
+    const modelId = "shared-qualified-route";
+    const catalogRecord = {
+      provider: "openai",
+      modelId,
+      displayName: "Shared route",
+      tier: "BALANCED",
+      capabilities: ["code"],
+      supportsTools: true,
+      riskApproved: false,
+      contextWindow: 200_000,
+      availability: "HEALTHY",
+      deprecated: false,
+      updatedAt: 1,
+    };
+    state.tables.modelCatalog.push(
+      { _id: "route-oldest", _creationTime: 20, projectId: state.projectId, ...catalogRecord },
+      { _id: "route-newest", _creationTime: 21, projectId: state.projectId, ...catalogRecord },
+      { _id: "route-other-project", _creationTime: 22, projectId: state.otherProjectId, ...catalogRecord },
+      { _id: "route-shared", _creationTime: 23, ...catalogRecord },
+    );
+
+    await expect(functionHandler(reportHealth)(state.ctx, {
+      modelId,
+      projectId: state.projectId,
+      availability: "DEGRADED",
+    })).resolves.toBe("route-oldest");
+    expect(state.tables.modelCatalog.filter((model) =>
+      model.modelId === modelId && model.projectId === state.projectId
+    )).toEqual([
+      expect.objectContaining({ _id: "route-oldest", availability: "DEGRADED" }),
+      expect.objectContaining({ _id: "route-newest", availability: "HEALTHY" }),
+    ]);
+    expect(state.tables.modelCatalog.find((model) => model._id === "route-other-project")?.availability)
+      .toBe("HEALTHY");
+    expect(state.tables.modelCatalog.find((model) => model._id === "route-shared")?.availability)
+      .toBe("HEALTHY");
+  });
+
+  it("keeps generic modelId routing stable when Factory appends a disabled qualification draft", async () => {
+    const state = createContext();
+    const projectRoute = {
+      ...state.tables.modelCatalog[0],
+      _id: "project-route-oldest",
+      _creationTime: 20,
+      projectId: state.projectId,
+      provider: "project-provider",
+    };
+    const qualificationDraft = {
+      ...projectRoute,
+      _id: "project-route-new-draft",
+      _creationTime: 21,
+      displayName: "New Factory qualification draft",
+      availability: "UNAVAILABLE",
+      enabled: false,
+      qualificationStatus: "UNQUALIFIED",
+      admissionStatus: "DISABLED",
+    };
+    state.tables.modelCatalog.push(projectRoute, qualificationDraft);
+
+    const visible = await functionHandler(listCatalog)(state.ctx, { projectId: state.projectId });
+    expect(visible.filter((model: any) => model.modelId === state.modelId)).toEqual([
+      expect.objectContaining({ _id: projectRoute._id, provider: "project-provider" }),
+    ]);
+    const factoryInstances = await loadFactoryModelCatalogForProject(state.ctx, state.projectId);
+    expect(factoryInstances.filter((model: any) => model.modelId === state.modelId)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ _id: projectRoute._id }),
+      expect.objectContaining({ _id: qualificationDraft._id }),
+    ]));
+
+    await expect(functionHandler(save)(state.ctx, {
+      projectId: state.projectId,
+      name: "Stable model route",
+      defaultModelId: state.modelId,
+      fallbackChain: [],
+      rules: [],
+      lanePools: [],
+      canaryPercent: 0,
+      killSwitch: false,
+    })).resolves.toMatchObject({ defaultModelId: state.modelId });
+    await expect(functionHandler(simulate)(state.ctx, {
+      projectId: state.projectId,
+      riskLevel: "LOW",
+      requiredCapabilities: ["tools"],
+    })).resolves.toMatchObject({
+      result: {
+        status: "SELECTED",
+        selectedModelId: state.modelId,
+        selectedProvider: "project-provider",
+      },
     });
   });
 

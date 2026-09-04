@@ -7,9 +7,17 @@ import {
   type FactoryWorkerCandidate,
   type FactoryWorkerRequirements,
 } from "../lib/factoryWorkerRuntime";
-import { CODEX_V1_HARNESS_MANIFEST, DEEPSEEK_V1_HARNESS_MANIFEST, harnessCapabilityManifestDigest } from "@mission-control/workflow-engine";
+import {
+  CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
+  DEEPSEEK_V1_HARNESS_MANIFEST,
+  DEEPSEEK_V1_RUNTIME_ARTIFACT,
+  harnessCapabilityManifestDigest,
+  harnessRuntimeArtifactDigest,
+} from "@mission-control/workflow-engine";
 
 const now = 100_000;
+const codexRuntimeArtifactSha256 = harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT);
 const requirements: FactoryWorkerRequirements = {
   repositoryId: "repository-1",
   executor: {
@@ -17,6 +25,7 @@ const requirements: FactoryWorkerRequirements = {
     version: "v1",
     capabilityManifestSha256: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
     effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+    runtimeArtifactSha256: codexRuntimeArtifactSha256,
   },
   provider: "openai",
   model: "gpt-5.6-terra",
@@ -43,6 +52,8 @@ const worker: FactoryWorkerCandidate = {
       version: "v1",
       capabilityManifestSha256: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
       effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+      runtimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
+      runtimeArtifactSha256: codexRuntimeArtifactSha256,
       capabilityManifest: CODEX_V1_HARNESS_MANIFEST,
       supportsCancel: true,
       supportsResume: false,
@@ -80,12 +91,77 @@ describe("Factory worker runtime", () => {
     })).toMatchObject({ eligible: false, reason: "worker-draining" });
   });
 
+  it("requires a valid exact runtime-artifact object and matching advertised digest", () => {
+    const executor = worker.workerRuntime!.supportedExecutors[0];
+    const invalidWorkers = [
+      {
+        ...worker,
+        workerRuntime: {
+          ...worker.workerRuntime!,
+          supportedExecutors: [{ ...executor, runtimeArtifact: undefined }],
+        },
+      },
+      {
+        ...worker,
+        workerRuntime: {
+          ...worker.workerRuntime!,
+          supportedExecutors: [{
+            ...executor,
+            runtimeArtifact: { ...CODEX_V1_RUNTIME_ARTIFACT, version: "0.146.1" },
+          }],
+        },
+      },
+      {
+        ...worker,
+        workerRuntime: {
+          ...worker.workerRuntime!,
+          supportedExecutors: [{
+            ...executor,
+            runtimeArtifact: { ...CODEX_V1_RUNTIME_ARTIFACT, executableSha256: null },
+          }],
+        },
+      },
+      {
+        ...worker,
+        workerRuntime: {
+          ...worker.workerRuntime!,
+          supportedExecutors: [{ ...executor, runtimeArtifactSha256: `sha256:${"0".repeat(64)}` }],
+        },
+      },
+    ];
+
+    for (const candidate of invalidWorkers) {
+      expect(factoryWorkerEligibility({
+        worker: candidate,
+        requirements,
+        activeWorkerLeaseCount: 0,
+        now,
+      })).toMatchObject({ eligible: false, reason: "worker-runtime-artifact-invalid" });
+    }
+  });
+
+  it("rejects a runtime-artifact requirement that the worker did not advertise", () => {
+    expect(factoryWorkerEligibility({
+      worker,
+      requirements: {
+        ...requirements,
+        executor: {
+          ...requirements.executor,
+          runtimeArtifactSha256: `sha256:${"f".repeat(64)}`,
+        },
+      },
+      activeWorkerLeaseCount: 0,
+      now,
+    })).toMatchObject({ eligible: false, reason: "worker-runtime-artifact-mismatch" });
+  });
+
   it("requires one exact worker attestation for a frozen Factory Version", () => {
     const exactRequirements: FactoryWorkerRequirements = {
       ...requirements,
       factoryDefinitionVersionId: "factory-version-1",
       factoryConfigurationDigest: "factory-v1-deadbeef",
       modelRouteDigest: `sha256:${"a".repeat(64)}`,
+      executionRuntimeArtifactSha256: codexRuntimeArtifactSha256,
     };
     expect(factoryWorkerEligibility({ worker, requirements: exactRequirements, activeWorkerLeaseCount: 0, now }))
       .toMatchObject({ eligible: false, reason: "worker-factory-version-mismatch" });
@@ -102,6 +178,7 @@ describe("Factory worker runtime", () => {
           model: requirements.model!,
           capabilityManifestSha256: requirements.executor.capabilityManifestSha256,
           effectiveConfigSha256: requirements.executor.effectiveConfigSha256,
+          runtimeArtifactSha256: exactRequirements.executionRuntimeArtifactSha256,
           executionBackend: requirements.executionBackend!,
           modelRouteDigest: exactRequirements.modelRouteDigest!,
           repositoryId: requirements.repositoryId,
@@ -110,12 +187,111 @@ describe("Factory worker runtime", () => {
     };
     expect(factoryWorkerEligibility({ worker: exactWorker, requirements: exactRequirements, activeWorkerLeaseCount: 0, now }))
       .toMatchObject({ eligible: true });
+    const legacyWorkerBinding: FactoryWorkerCandidate = {
+      ...exactWorker,
+      workerRuntime: {
+        ...exactWorker.workerRuntime!,
+        factoryVersionBindings: exactWorker.workerRuntime!.factoryVersionBindings!.map((binding) => {
+          const legacyBinding = { ...binding };
+          delete legacyBinding.runtimeArtifactSha256;
+          return legacyBinding;
+        }),
+      },
+    };
+    expect(factoryWorkerEligibility({
+      worker: legacyWorkerBinding,
+      requirements: exactRequirements,
+      activeWorkerLeaseCount: 0,
+      now,
+    })).toMatchObject({ eligible: true });
+    expect(factoryWorkerEligibility({
+      worker: legacyWorkerBinding,
+      requirements: {
+        ...exactRequirements,
+        executor: {
+          ...exactRequirements.executor,
+          requireFactoryVersionRuntimeArtifactBinding: true,
+        },
+      },
+      activeWorkerLeaseCount: 0,
+      now,
+    })).toMatchObject({ eligible: false, reason: "worker-factory-version-mismatch" });
     expect(factoryWorkerEligibility({
       worker: exactWorker,
       requirements: { ...exactRequirements, modelRouteDigest: `sha256:${"b".repeat(64)}` },
       activeWorkerLeaseCount: 0,
       now,
     })).toMatchObject({ eligible: false, reason: "worker-factory-version-mismatch" });
+    expect(factoryWorkerEligibility({
+      worker: {
+        ...exactWorker,
+        workerRuntime: {
+          ...exactWorker.workerRuntime!,
+          factoryVersionBindings: exactWorker.workerRuntime!.factoryVersionBindings!.map((binding) => ({
+            ...binding,
+            runtimeArtifactSha256: `sha256:${"f".repeat(64)}`,
+          })),
+        },
+      },
+      requirements: exactRequirements,
+      activeWorkerLeaseCount: 0,
+      now,
+    })).toMatchObject({ eligible: false, reason: "worker-factory-version-mismatch" });
+  });
+
+  it("keeps the worker adapter executable separate from the remote execution artifact", () => {
+    const remoteRuntimeArtifactSha256 = `sha256:${"9".repeat(64)}`;
+    const remoteRequirements: FactoryWorkerRequirements = {
+      ...requirements,
+      executionBackend: "remote-sandbox",
+      sandboxCapabilities: ["git-worktree", "workspace-write", "remote-sandbox"],
+      factoryDefinitionVersionId: "factory-version-remote",
+      factoryConfigurationDigest: "factory-v1-cafef00d",
+      modelRouteDigest: `sha256:${"b".repeat(64)}`,
+      executionRuntimeArtifactSha256: remoteRuntimeArtifactSha256,
+      executor: {
+        ...requirements.executor,
+        requireFactoryVersionRuntimeArtifactBinding: true,
+      },
+    };
+    const remoteWorker: FactoryWorkerCandidate = {
+      ...worker,
+      workerRuntime: {
+        ...worker.workerRuntime!,
+        executionBackends: ["persistent-worker", "remote-sandbox"],
+        sandboxCapabilities: ["git-worktree", "workspace-write", "remote-sandbox"],
+        factoryVersionBindings: [{
+          factoryDefinitionVersionId: remoteRequirements.factoryDefinitionVersionId!,
+          factoryConfigurationDigest: remoteRequirements.factoryConfigurationDigest!,
+          adapter: remoteRequirements.executor.adapter,
+          version: remoteRequirements.executor.version,
+          provider: remoteRequirements.provider!,
+          model: remoteRequirements.model!,
+          capabilityManifestSha256: remoteRequirements.executor.capabilityManifestSha256,
+          effectiveConfigSha256: remoteRequirements.executor.effectiveConfigSha256,
+          runtimeArtifactSha256: remoteRuntimeArtifactSha256,
+          executionBackend: "remote-sandbox",
+          modelRouteDigest: remoteRequirements.modelRouteDigest!,
+          repositoryId: remoteRequirements.repositoryId,
+        }],
+      },
+    };
+
+    expect(factoryWorkerEligibility({
+      worker: remoteWorker,
+      requirements: remoteRequirements,
+      activeWorkerLeaseCount: 0,
+      now,
+    })).toMatchObject({ eligible: true });
+    expect(factoryWorkerEligibility({
+      worker: remoteWorker,
+      requirements: {
+        ...remoteRequirements,
+        executor: { ...remoteRequirements.executor, runtimeArtifactSha256: remoteRuntimeArtifactSha256 },
+      },
+      activeWorkerLeaseCount: 0,
+      now,
+    })).toMatchObject({ eligible: false, reason: "worker-runtime-artifact-mismatch" });
   });
 
   it("rejects capacity exhaustion using active server-side session leases", () => {
@@ -177,6 +353,39 @@ describe("Factory worker runtime", () => {
       sandboxCapabilities: ["git-worktree"],
       repositoryAccess: [{ repositoryId: "repository-1", access: "READ_WRITE" }],
     })).toContain("executor-capabilities-invalid");
+    expect(factoryWorkerRegistrationIssues({
+      sessionId: "session-1",
+      hostRuntimeType: "persistent-worker",
+      executionBackends: ["persistent-worker"],
+      supportedExecutors: [{
+        ...worker.workerRuntime!.supportedExecutors[0],
+        runtimeArtifact: { ...CODEX_V1_RUNTIME_ARTIFACT, version: "0.146.1" },
+      }],
+      sandboxCapabilities: ["git-worktree"],
+      repositoryAccess: [{ repositoryId: "repository-1", access: "READ_WRITE" }],
+    })).toContain("executor-capabilities-invalid");
+    expect(factoryWorkerRegistrationIssues({
+      sessionId: "session-1",
+      hostRuntimeType: "persistent-worker",
+      executionBackends: ["persistent-worker"],
+      supportedExecutors: [worker.workerRuntime!.supportedExecutors[0]],
+      sandboxCapabilities: ["git-worktree"],
+      repositoryAccess: [{ repositoryId: "repository-1", access: "READ_WRITE" }],
+      factoryVersionBindings: [{
+        factoryDefinitionVersionId: "factory-version-1",
+        factoryConfigurationDigest: "factory-v1-deadbeef",
+        adapter: requirements.executor.adapter,
+        version: requirements.executor.version,
+        provider: requirements.provider!,
+        model: requirements.model!,
+        capabilityManifestSha256: requirements.executor.capabilityManifestSha256,
+        effectiveConfigSha256: requirements.executor.effectiveConfigSha256,
+        runtimeArtifactSha256: "not-a-digest",
+        executionBackend: requirements.executionBackend!,
+        modelRouteDigest: `sha256:${"a".repeat(64)}`,
+        repositoryId: requirements.repositoryId,
+      }],
+    })).toContain("factory-version-bindings-invalid");
   });
 
   it("fails admission on stale capability/config identity, model, or required feature", () => {
@@ -202,6 +411,7 @@ describe("Factory worker runtime", () => {
 
   it("admits the exact experimental DeepSeek declaration only on its supported local route", () => {
     const deepSeekDigest = harnessCapabilityManifestDigest(DEEPSEEK_V1_HARNESS_MANIFEST);
+    const deepSeekRuntimeArtifactSha256 = harnessRuntimeArtifactDigest(DEEPSEEK_V1_RUNTIME_ARTIFACT);
     const deepSeekWorker: FactoryWorkerCandidate = {
       ...worker,
       workerRuntime: {
@@ -212,6 +422,8 @@ describe("Factory worker runtime", () => {
           capabilityManifest: DEEPSEEK_V1_HARNESS_MANIFEST,
           capabilityManifestSha256: deepSeekDigest,
           effectiveConfigSha256: DEEPSEEK_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+          runtimeArtifact: DEEPSEEK_V1_RUNTIME_ARTIFACT,
+          runtimeArtifactSha256: deepSeekRuntimeArtifactSha256,
           supportsCancel: true,
           supportsResume: true,
           isolationModes: ["READ_ONLY", "WORKSPACE_WRITE"],
@@ -225,6 +437,7 @@ describe("Factory worker runtime", () => {
         version: "0.2.0",
         capabilityManifestSha256: deepSeekDigest,
         effectiveConfigSha256: DEEPSEEK_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+        runtimeArtifactSha256: deepSeekRuntimeArtifactSha256,
       },
       provider: "local-ollama",
       model: "qwen3.5:35b-a3b-q8_0",
