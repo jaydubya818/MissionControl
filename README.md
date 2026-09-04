@@ -693,6 +693,7 @@ requirements.
 
 Security documentation:
 
+- [Security Policy](SECURITY.md)
 - [Human and service authorization matrix](docs/security/human-service-authorization-matrix.md)
 - [Verification plane threat model](docs/security/verification-plane-threat-model.md)
 - [Remote Sandbox threat model](docs/security/remote-sandbox-threat-model.md)
