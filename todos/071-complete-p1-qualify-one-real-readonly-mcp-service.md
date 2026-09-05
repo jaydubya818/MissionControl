@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: complete
 priority: p1
 issue_id: "071"
 tags: [software-factory, mcp, security, qualification, browser]
@@ -93,8 +93,8 @@ any consequential preflight field is not authorized or qualified.
 - [x] Retain Phase 3 fixture regression and zero reachable qualified write operations.
 - [x] Obtain independent security, data-integrity, architecture, simplicity, and documentation GO reviews.
 - [x] Pass full repository, composed qualification, runtime-contract, security, and documentation gates.
-- [ ] Merge a focused PR only after CI is green.
-- [ ] Qualify exact merged main from a clean worktree and record final identities and evidence.
+- [x] Merge a focused PR only after CI is green.
+- [x] Qualify exact merged main from a clean worktree and record final identities and evidence.
 - [x] Stop before write MCP, connector breadth, gateway expansion, or full economics work.
 
 ## Work Log
@@ -304,3 +304,20 @@ any consequential preflight field is not authorized or qualified.
 **Learnings:**
 - The Phase 4 boundary is ready for CI without another external MCP or model
   call; deterministic receipts and tests cover the final hardening delta.
+
+### 2026-09-05 - Merge and exact-main qualification
+
+**Actions:**
+- Opened PR 174 from branch revision
+  `63d202dcde29c27a068e30fdde185b95cde8a0de`; merged only after every GitHub
+  check passed.
+- Qualified merged main
+  `aa8c12b1d4907589b71cef3cb421ef2a2c380676` from a fresh detached worktree.
+- Re-ran composed Factory qualification, Phase 3 regression, Phase 4 focused
+  tests, runtime-contract, release security/docs, build, and startup gates.
+- Stopped and removed the isolated runtime and synthetic candidate/verifier
+  worktrees without using the third authorized Context7 transport.
+
+**Learnings:**
+- The merged revision reproduces the governed real-service proof without a
+  second authority path or dependence on retained qualification infrastructure.
