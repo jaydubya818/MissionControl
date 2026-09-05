@@ -3,18 +3,23 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { GovernedMcpBroker, GovernedMcpBrokerError, nodePermissionFlag, type GovernedMcpBrokerRuntime, type GovernedMcpReceipt } from "../governedMcpBroker.js";
+import { assertAdvertisedTool, assertApprovedRemoteDestination, assertApprovedRemoteDestinationWithDns, GovernedMcpBroker, GovernedMcpBrokerError, nodePermissionFlag, publicAddress, type GovernedMcpBrokerRuntime, type GovernedMcpReceipt } from "../governedMcpBroker.js";
 import {
   mcpToolGrantDigest,
   mcpToolVersionDigest,
   qualificationToolVersion,
+  context7ToolVersion,
+  CONTEXT7_ARGUMENTS,
+  CONTEXT7_DESTINATION,
+  CONTEXT7_OPERATION,
+  CONTEXT7_INPUT_SCHEMA,
   QUALIFICATION_FIXTURE_RELATIVE_PATH,
   QUALIFICATION_OPERATION,
   type GovernedMcpAuthority,
   type GovernedMcpCallRequest,
   type McpToolGrantSnapshot,
 } from "../governedMcpContracts.js";
-import { qualificationFixtureToolVersionSnapshot as controlPlaneToolVersion } from "../../../../convex/lib/governedMcp.js";
+import { context7ToolVersionSnapshot as controlPlaneContext7ToolVersion, qualificationFixtureToolVersionSnapshot as controlPlaneToolVersion } from "../../../../convex/lib/governedMcp.js";
 
 const NOW = 1_000;
 const REPO_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../../..");
@@ -103,6 +108,40 @@ async function expectDenied(
   expect(value.receipts[0]).toMatchObject({ phase: "AUTHORIZATION", status: "DENIED", reason: code });
 }
 
+async function remoteFixture(runtime?: Partial<GovernedMcpBrokerRuntime>) {
+  const value = await fixture();
+  const toolSnapshot = context7ToolVersion();
+  const toolDigest = mcpToolVersionDigest(toolSnapshot);
+  const grantSnapshot: McpToolGrantSnapshot = {
+    ...value.authority.grant.snapshot,
+    toolVersionDigest: toolDigest,
+    toolVersionSnapshot: toolSnapshot,
+    operation: CONTEXT7_OPERATION,
+    destination: CONTEXT7_DESTINATION,
+  };
+  const grantDigest = mcpToolGrantDigest(grantSnapshot);
+  value.request = { ...value.request, toolVersionDigest: toolDigest, toolGrantDigest: grantDigest, operation: CONTEXT7_OPERATION, arguments: CONTEXT7_ARGUMENTS };
+  value.authority = {
+    ...value.authority,
+    toolVersion: { ...value.authority.toolVersion, digest: toolDigest, snapshot: toolSnapshot },
+    grant: { ...value.authority.grant, digest: grantDigest, snapshot: grantSnapshot },
+    executionProfile: { ...value.authority.executionProfile, toolGrant: { id: "grant-1", digest: grantDigest, snapshot: grantSnapshot } },
+  };
+  value.receipts.length = 0;
+  value.broker = new GovernedMcpBroker({ append: async (receipt) => {
+    value.receipts.push(receipt);
+    return receipt.phase === "AUTHORIZATION" ? { created: true, permitted: true } : { created: true };
+  } }, () => NOW, {
+    implementationDigest: async () => { throw new Error("remote contract identity must not read a local implementation"); },
+    invoke: async (input) => {
+      input.recordObservedContract?.({ serverVersion: "4.0.5", inputSchemaDigest: context7ToolVersion().operation.inputSchemaDigest });
+      return { contentText: "Official React effect cleanup reference", classification: "PUBLIC", source: "CONTEXT7" };
+    },
+    ...runtime,
+  });
+  return value;
+}
+
 describe("governed read-only MCP broker", () => {
   it("uses the Node permission flag supported by the host runtime", () => {
     expect(nodePermissionFlag(new Set(["--permission"]))).toBe("--permission");
@@ -112,6 +151,79 @@ describe("governed read-only MCP broker", () => {
   it("keeps host and control-plane Tool Version bytes identical", async () => {
     const value = await fixture();
     expect(value.authority.toolVersion.snapshot).toEqual(controlPlaneToolVersion(value.implementationDigest));
+    expect(context7ToolVersion()).toEqual(controlPlaneContext7ToolVersion());
+  });
+
+  it("authorizes only the exact real-service operation, scope, and contract identity offline", async () => {
+    const value = await remoteFixture();
+    const result = await value.broker.call(brokerInput(value));
+    expect(result.output).toMatchObject({ classification: "PUBLIC", source: "CONTEXT7" });
+    expect(value.receipts.map((receipt) => [receipt.phase, receipt.status])).toEqual([["AUTHORIZATION", "ALLOWED"], ["COMPLETION", "SUCCEEDED"]]);
+    expect(value.receipts[1]).toMatchObject({
+      expectedServerVersion: "4.0.5",
+      observedServerVersion: "4.0.5",
+      expectedInputSchemaDigest: context7ToolVersion().operation.inputSchemaDigest,
+      observedInputSchemaDigest: context7ToolVersion().operation.inputSchemaDigest,
+    });
+
+    const wrongScope = await remoteFixture();
+    wrongScope.request.arguments = { libraryId: "/facebook/react", query: "another topic" };
+    await expect(wrongScope.broker.call(brokerInput(wrongScope))).rejects.toMatchObject({ code: "REQUEST_SCHEMA_INVALID" });
+    expect(wrongScope.receipts[0]).toMatchObject({ phase: "AUTHORIZATION", status: "DENIED", reason: "REQUEST_SCHEMA_INVALID" });
+
+    const wrongDestination = await remoteFixture();
+    wrongDestination.authority.grant.snapshot.destination = "LOCAL_PROCESS";
+    wrongDestination.authority.grant.digest = mcpToolGrantDigest(wrongDestination.authority.grant.snapshot);
+    wrongDestination.request.toolGrantDigest = wrongDestination.authority.grant.digest;
+    wrongDestination.authority.executionProfile.toolGrant = { id: "grant-1", digest: wrongDestination.authority.grant.digest, snapshot: wrongDestination.authority.grant.snapshot };
+    await expect(wrongDestination.broker.call(brokerInput(wrongDestination))).rejects.toMatchObject({ code: "DESTINATION_DENIED" });
+    expect(wrongDestination.receipts[0]).toMatchObject({ phase: "AUTHORIZATION", status: "DENIED", reason: "DESTINATION_DENIED" });
+  });
+
+  it("rejects remote destination and DNS substitutions without a network call", async () => {
+    for (const endpoint of [
+      "http://mcp.context7.com/mcp", "https://mcp.context7.com:444/mcp", "https://mcp.context7.com/other",
+      "https://example.com/mcp", "https://localhost/mcp", "https://127.0.0.1/mcp", "https://169.254.169.254/mcp",
+    ]) expect(() => assertApprovedRemoteDestination(endpoint)).toThrowError(GovernedMcpBrokerError);
+    await expect(assertApprovedRemoteDestinationWithDns("https://mcp.context7.com/mcp", ["127.0.0.1"])).rejects.toMatchObject({ code: "DESTINATION_DENIED" });
+    await expect(assertApprovedRemoteDestinationWithDns("https://mcp.context7.com/mcp", ["169.254.169.254"])).rejects.toMatchObject({ code: "DESTINATION_DENIED" });
+    await expect(assertApprovedRemoteDestinationWithDns("https://mcp.context7.com/mcp", ["10.0.0.1"])).rejects.toMatchObject({ code: "DESTINATION_DENIED" });
+    await expect(assertApprovedRemoteDestinationWithDns("https://mcp.context7.com/mcp", ["93.184.216.34"])).resolves.toEqual([{ address: "93.184.216.34", family: 4 }]);
+    for (const address of ["192.0.2.1", "192.88.99.1", "198.51.100.1", "203.0.113.1", "2001:db8::1", "100::1"]) {
+      expect(publicAddress(address), address).toBe(false);
+    }
+    expect(publicAddress("2606:4700:4700::1111")).toBe(true);
+  });
+
+  it("fails closed when the real server operation or schema drifts", () => {
+    expect(() => assertAdvertisedTool([], CONTEXT7_OPERATION, CONTEXT7_INPUT_SCHEMA)).toThrowError(expect.objectContaining({ code: "SERVER_SCHEMA_SUBSTITUTION" }));
+    expect(() => assertAdvertisedTool([{ name: CONTEXT7_OPERATION, inputSchema: { type: "object" } }], CONTEXT7_OPERATION, CONTEXT7_INPUT_SCHEMA)).toThrowError(expect.objectContaining({ code: "SERVER_SCHEMA_SUBSTITUTION" }));
+    expect(() => assertAdvertisedTool([
+      { name: CONTEXT7_OPERATION, inputSchema: CONTEXT7_INPUT_SCHEMA },
+      { name: CONTEXT7_OPERATION, inputSchema: CONTEXT7_INPUT_SCHEMA },
+    ], CONTEXT7_OPERATION, CONTEXT7_INPUT_SCHEMA)).toThrowError(expect.objectContaining({ code: "SERVER_SCHEMA_SUBSTITUTION" }));
+    expect(() => assertAdvertisedTool([{ name: CONTEXT7_OPERATION, inputSchema: CONTEXT7_INPUT_SCHEMA }], CONTEXT7_OPERATION, context7ToolVersion().operation.inputSchema, context7ToolVersion().operation.inputSchemaDialect)).not.toThrow();
+  });
+
+  it("durably receipts observed schema drift separately from the qualified schema", async () => {
+    const observedInputSchema = { type: "object", properties: { query: { type: "string" } }, required: ["query"] };
+    const observedInputSchemaDigest = context7ToolVersion().operation.inputSchemaDigest.replace(/^./, "0");
+    const value = await remoteFixture({
+      invoke: async () => {
+        throw new GovernedMcpBrokerError("SERVER_SCHEMA_SUBSTITUTION", "schema drift", "4.0.5", observedInputSchemaDigest);
+      },
+    });
+    expect(() => assertAdvertisedTool([{ name: CONTEXT7_OPERATION, inputSchema: observedInputSchema }], CONTEXT7_OPERATION, CONTEXT7_INPUT_SCHEMA))
+      .toThrowError(expect.objectContaining({ code: "SERVER_SCHEMA_SUBSTITUTION" }));
+    await expect(value.broker.call(brokerInput(value))).rejects.toMatchObject({ code: "SERVER_SCHEMA_SUBSTITUTION" });
+    expect(value.receipts.at(-1)).toMatchObject({
+      phase: "COMPLETION",
+      status: "FAILED",
+      reason: "SERVER_SCHEMA_SUBSTITUTION",
+      expectedInputSchemaDigest: context7ToolVersion().operation.inputSchemaDigest,
+      observedInputSchemaDigest,
+      observedServerVersion: "4.0.5",
+    });
   });
 
   it("executes the exact operation over real MCP stdio and emits attributable receipts", async () => {
@@ -142,7 +254,7 @@ describe("governed read-only MCP broker", () => {
     await expectDenied((v) => { v.authority.executionProfile.qualificationExpiresAt = NOW; }, "EXECUTION_PROFILE_STALE");
     await expectDenied((v) => { v.request.toolVersionId = "tool-other"; }, "TOOL_GRANT_MISMATCH");
     await expectDenied((v) => { v.authority.toolVersion.qualificationExpiresAt = NOW; }, "TOOL_VERSION_STALE");
-    await expectDenied((v) => { v.authority.toolVersion.snapshot.transport.entrypoint = "package.json"; }, "TOOL_GRANT_MISMATCH");
+    await expectDenied((v) => { (v.authority.toolVersion.snapshot.transport as { entrypoint: string }).entrypoint = "package.json"; }, "TOOL_GRANT_MISMATCH");
     await expectDenied((v) => { v.request.operation = "write_factory_doctrine"; }, "OPERATION_DENIED");
     await expectDenied((v) => { v.request.arguments = { section: "authority-boundary", extra: true }; }, "REQUEST_SCHEMA_INVALID");
     await expectDenied((v) => { v.request.arguments = { section: "x".repeat(400) }; }, "REQUEST_TOO_LARGE");

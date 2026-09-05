@@ -181,6 +181,8 @@ export {
   type AutomationVerificationSubject,
   type FactoryPurpose,
   type GitVerificationSubject,
+  type GithubVerificationSubject,
+  type LocalGitVerificationSubject,
   type VerificationSubject,
   type WorkOrderKind,
 } from "./verificationSubject.js";

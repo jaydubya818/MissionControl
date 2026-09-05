@@ -164,3 +164,32 @@ be inherited by such a version.
 Phase 4 must not broaden this boundary until an operator explicitly approves a
 real service, exact operation, transmitted data, credential scope, call count,
 cost, and evidence plan.
+
+## Phase 4 addendum — one exact real read-only operation
+
+The operator approved and Mission Control qualified one narrow exception to the
+Phase 3 fixture-only boundary on 2026-09-05. Context7
+`@upstash/context7-mcp@4.0.5` operation `query-docs` is admitted only through
+the host broker at `https://mcp.context7.com/mcp`, only for the frozen public
+arguments `/facebook/react` and `useEffect cleanup for external subscriptions`,
+with credential class `NONE`, one call per Attempt, zero broker retries, and a
+10-second operation timeout.
+
+The Tool Version binds the provider release commit and npm integrity, exact
+server version, protocol, expected input schema, normalized output schema,
+destination, public-only DNS policy, byte limits, and read-only authority. The
+live broker independently records the observed server and schema identities and
+fails closed unless they equal the expected identities before `tools/call`.
+The transport connects to the validated public DNS address with TLS SNI and
+certificate verification for the qualified hostname, eliminating a second
+unvalidated resolver step, and one deadline covers initialization, catalog
+validation, and invocation.
+Authorization and completion are separate durable receipts linked to the exact
+Attempt, lease, Execution Profile, Tool Grant, and Tool Version.
+
+This addendum does not change harness manifests to MCP-supported and does not
+authorize discovery, writes, acceptance, routing, policy mutation, credentials,
+private data, another operation, another service, or general MCP support. The
+Phase 3 fixture remains qualified and its historical contract above is
+unchanged. The exact selection and live evidence are in
+`docs/testing/evidence/governed-mcp-phase4-recovery/README.md`.

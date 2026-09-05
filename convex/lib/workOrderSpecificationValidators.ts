@@ -212,14 +212,18 @@ const verificationSubjectIdentityFields = {
   digest: v.string(),
 };
 
-export const gitVerificationSubjectValidator = v.object({
+const gitVerificationSubjectIdentityFields = {
   ...verificationSubjectIdentityFields,
   kind: v.literal("GIT_CANDIDATE"),
   repositoryId: v.id("workspaceRepositories"),
-  provider: v.literal("GITHUB"),
   providerRepositoryId: v.string(),
   candidateSha: v.string(),
   treeSha: v.string(),
+};
+
+const githubVerificationSubjectValidator = v.object({
+  ...gitVerificationSubjectIdentityFields,
+  provider: v.literal("GITHUB"),
   pullRequest: v.object({
     providerPullRequestId: v.string(),
     number: v.number(),
@@ -230,6 +234,21 @@ export const gitVerificationSubjectValidator = v.object({
     draftAtPublication: v.boolean(),
   }),
 });
+
+const localGitVerificationSubjectValidator = v.object({
+  ...gitVerificationSubjectIdentityFields,
+  provider: v.literal("LOCAL_GIT"),
+  localRef: v.object({
+    baseRef: v.string(),
+    headRef: v.string(),
+    headSha: v.string(),
+  }),
+});
+
+export const gitVerificationSubjectValidator = v.union(
+  githubVerificationSubjectValidator,
+  localGitVerificationSubjectValidator,
+);
 
 export const automationVerificationSubjectValidator = v.object({
   ...verificationSubjectIdentityFields,

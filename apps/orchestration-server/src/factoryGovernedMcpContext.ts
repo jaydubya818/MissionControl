@@ -2,7 +2,6 @@ import type { ConvexHttpClient } from "convex/browser";
 import { GovernedMcpBroker } from "./governedMcpBroker.js";
 import { ConvexGovernedMcpReceiptSink } from "./convexGovernedMcpReceiptSink.js";
 import {
-  QUALIFICATION_OPERATION,
   QUALIFICATION_FIXTURE_RELATIVE_PATH,
   type GovernedMcpAuthority,
   type GovernedMcpCallRequest,
@@ -31,8 +30,10 @@ export async function loadGovernedMcpContext(input: {
     throw new Error("Governed MCP context requires the exact claimed Execution Profile and worker lease.");
   }
   const now = Date.now();
+  const operation = tool.operation.name;
+  const arguments_ = tool.dataScope?.approvedArguments ?? { section: "authority-boundary" };
   const request: GovernedMcpCallRequest = {
-    callId: `mcp:${String(input.claim.workflowRunId)}:${QUALIFICATION_OPERATION}:1`,
+    callId: `mcp:${String(input.claim.workflowRunId)}:${operation}:1`,
     projectId: String(input.claim.projectId),
     workOrderId: String(input.claim.workOrderId),
     workflowRunId: String(input.claim.workflowRunId),
@@ -47,8 +48,8 @@ export async function loadGovernedMcpContext(input: {
     toolGrantDigest: String(toolGrant.grantDigest),
     toolVersionId: String(grant.toolVersionId),
     toolVersionDigest: String(grant.toolVersionDigest),
-    operation: QUALIFICATION_OPERATION,
-    arguments: { section: "authority-boundary" },
+    operation,
+    arguments: arguments_,
     requestedAt: now,
   };
   const qualificationValidUntil = Number(input.claim.executionProfile?.qualificationValidUntil);

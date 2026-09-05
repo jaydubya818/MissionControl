@@ -80,6 +80,7 @@ import {
 import { executionProfileProjectionBlockers } from "../lib/executionProfile";
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "../lib/companyAccess";
 import { assertAuthorizedDeliveryRecord } from "../lib/deliveryAuthorization";
+import { buildLocalCandidateRecoveryRows } from "../lib/localCandidateRecovery";
 
 const EVENT_TYPES = new Set([
   "RUN_STARTED", "STEP_STARTED", "STEP_COMPLETED", "TOOL_CALLED",
@@ -312,7 +313,9 @@ function executionProfileEvidence(run: any) {
         grantDigest: profile.toolGrant.grantDigest,
         operation: profile.toolGrant.grantSnapshot?.operation,
         expiresAt: profile.toolGrant.grantSnapshot?.expiresAt,
-        admission: "QUALIFICATION_FIXTURE",
+        admission: profile.toolGrant.grantSnapshot?.toolVersionSnapshot?.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE"
+          ? "QUALIFIED_REAL_READ_ONLY_SERVICE"
+          : "QUALIFICATION_FIXTURE",
       },
     } : { toolCapability: "NO_TOOL_CAPABILITY" }),
     ...(typeof selectedIsolation === "string" ? { selectedIsolation } : {}),
@@ -989,6 +992,7 @@ export const claimInternal = internalMutation({
         ? verificationSourceAttempt?.worktree
         : undefined,
       sourceRevision: verificationSourceAttempt?.executionBaseSha,
+      localCandidateRecovery: run.metadata?.localCandidateRecovery,
     };
   },
 });
@@ -1392,8 +1396,10 @@ export const reportInternal = internalMutation({
           sourceRevision: exactGateReceipt?.sourceRevision ?? run.factoryContinuation?.sourceRevision,
         });
       }
+      const localCandidate = candidateReady?.subject?.kind === "GIT_CANDIDATE"
+        && candidateReady.subject.provider === "LOCAL_GIT";
       if (terminal.status === "COMPLETED" && run.isMutating !== false) {
-        if (!pullRequestArtifact) throw new Error("A mutating Factory attempt cannot complete without a pull-request artifact.");
+        if (!pullRequestArtifact && !localCandidate) throw new Error("A mutating Factory attempt cannot complete without a pull-request artifact or an immutable local candidate.");
       }
       if (terminal.status === "COMPLETED" && run.workOrderId) {
         const workOrder = await ctx.db.get(run.workOrderId);
@@ -1457,7 +1463,7 @@ export const reportInternal = internalMutation({
           ? (await ctx.db.get(run.repositoryId))?.repository
           : undefined,
       });
-      if (terminal.status === "COMPLETED" && run.isMutating !== false
+      if (terminal.status === "COMPLETED" && run.isMutating !== false && !localCandidate
         && (!publicationLineage.patch.headSha || !publicationLineage.patch.pullRequestUrl)) {
         throw new Error("A completed mutating Factory attempt requires durable pull-request head and URL lineage.");
       }
@@ -1490,7 +1496,7 @@ export const reportInternal = internalMutation({
             : undefined,
         runtimeDispositionReason: terminal.status === "COMPLETED" ? undefined : failureReason,
         runtimeReconciledAt: terminal.status === "COMPLETED" ? undefined : completedAt,
-        ...publicationLineage.patch,
+        ...(localCandidate ? {} : publicationLineage.patch),
         factoryContinuation: run.factoryContinuation
           ? {
               ...run.factoryContinuation,
@@ -1511,7 +1517,11 @@ export const reportInternal = internalMutation({
         endedAt: completedAt,
         errorCategory: terminal.status === "COMPLETED" ? undefined : "FACTORY_ATTEMPT_FAILURE",
         errorSummary: failureReason,
-        commandSummary: terminal.status === "COMPLETED" ? "Factory attempt completed with review-ready pull request" : undefined,
+        commandSummary: terminal.status === "COMPLETED"
+          ? localCandidate
+            ? "Factory attempt completed with an immutable unpublished local candidate"
+            : "Factory attempt completed with review-ready pull request"
+          : undefined,
         metadata: {
           leaseId: args.leaseId,
           executionManifestDigest: run.executionManifestDigest,
@@ -2094,31 +2104,43 @@ async function persistPolicyV2CandidateReady(
     || run.verificationContractDigest !== workOrder.verificationContractDigest) {
     throw new Error("Candidate publication lineage is stale for the WorkOrder or repository.");
   }
+  const codeDiffArtifact = artifactResults.map((result: any) => result.artifact)
+    .find((artifact: any) => artifact?.artifactType === "CODE_DIFF")
+    ?? await ctx.db.query("runArtifacts")
+      .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", run._id).eq("artifactType", "CODE_DIFF"))
+      .first();
+  const localCandidate = candidate?.transport === "LOCAL_GIT";
   const pullRequestArtifact = artifactResults.map((result: any) => result.artifact)
     .find((artifact: any) => artifact?.artifactType === "PULL_REQUEST")
     ?? await ctx.db.query("runArtifacts")
       .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", run._id).eq("artifactType", "PULL_REQUEST"))
       .first();
-  const metadata = pullRequestArtifact?.metadata ?? {};
-  const exact = candidate
+  const metadata = (localCandidate ? codeDiffArtifact : pullRequestArtifact)?.metadata ?? {};
+  const commonExact = candidate
     && /^[0-9a-f]{40,64}$/.test(candidate.candidateSha)
     && /^[0-9a-f]{40,64}$/.test(candidate.treeSha)
+    && candidate.baseRef === repository.defaultBranch
+    && candidate.headRef === run.branch
+    && metadata.headSha === candidate.candidateSha
+    && metadata.treeSha === candidate.treeSha
+    && metadata.sourceRevision === run.executionManifest?.repository?.baseSha;
+  const exact = localCandidate
+    ? commonExact && codeDiffArtifact && !pullRequestArtifact
+    : commonExact
     && typeof candidate.providerPullRequestId === "string" && candidate.providerPullRequestId
     && Number.isSafeInteger(candidate.pullRequestNumber) && candidate.pullRequestNumber > 0
     && typeof candidate.pullRequestUrl === "string" && candidate.pullRequestUrl
-    && candidate.baseRef === repository.defaultBranch
-    && candidate.headRef === run.branch
     && candidate.draftAtPublication === true
-    && metadata.headSha === candidate.candidateSha
-    && metadata.treeSha === candidate.treeSha
     && metadata.pullRequestNumber === candidate.pullRequestNumber
     && metadata.pullRequestUrl === candidate.pullRequestUrl
     && metadata.providerPullRequestId === candidate.providerPullRequestId
     && metadata.draftAtPublication === true;
   if (!exact) {
-    throw new Error("CANDIDATE_READY requires one exact draft GitHub App pull-request artifact with matching commit and tree identity.");
+    throw new Error(localCandidate
+      ? "CANDIDATE_READY requires one exact unpublished local Git candidate with matching code-diff commit and tree identity."
+      : "CANDIDATE_READY requires one exact draft GitHub App pull-request artifact with matching commit and tree identity.");
   }
-  const subject = createGitVerificationSubject({
+  const subject: any = createGitVerificationSubject({
     version: 1,
     kind: "GIT_CANDIDATE",
     workOrderId: workOrder._id,
@@ -2126,11 +2148,15 @@ async function persistPolicyV2CandidateReady(
     verificationContractDigest: workOrder.verificationContractDigest,
     sourceAttemptId: run._id,
     repositoryId: repository._id,
-    provider: "GITHUB",
+    provider: localCandidate ? "LOCAL_GIT" : "GITHUB",
     providerRepositoryId: repository.providerRepositoryId,
     candidateSha: candidate.candidateSha,
     treeSha: candidate.treeSha,
-    pullRequest: {
+    ...(localCandidate ? { localRef: {
+      baseRef: candidate.baseRef,
+      headRef: candidate.headRef,
+      headSha: candidate.candidateSha,
+    } } : { pullRequest: {
       providerPullRequestId: candidate.providerPullRequestId,
       number: candidate.pullRequestNumber,
       url: candidate.pullRequestUrl,
@@ -2138,7 +2164,7 @@ async function persistPolicyV2CandidateReady(
       headRef: candidate.headRef,
       headSha: candidate.candidateSha,
       draftAtPublication: true,
-    },
+    } }),
   } as any);
   if (run.verificationSubject && run.verificationSubject.digest !== subject.digest) {
     throw new Error("CANDIDATE_READY cannot replace an immutable Verification Subject; create a new Attempt.");
@@ -2150,33 +2176,165 @@ async function persistPolicyV2CandidateReady(
     executionBaseSha: metadata.sourceRevision,
     headSha: candidate.candidateSha,
     treeSha: candidate.treeSha,
-    pullRequestNumber: candidate.pullRequestNumber,
-    pullRequestId: candidate.providerPullRequestId,
-    pullRequestProviderId: candidate.providerPullRequestId,
-    pullRequestUrl: candidate.pullRequestUrl,
-    pullRequestDraftAtPublication: true,
-    publishedAt: candidateReadyAt,
+    ...(localCandidate ? {} : {
+      pullRequestNumber: candidate.pullRequestNumber,
+      pullRequestId: candidate.providerPullRequestId,
+      pullRequestProviderId: candidate.providerPullRequestId,
+      pullRequestUrl: candidate.pullRequestUrl,
+      pullRequestDraftAtPublication: true,
+      publishedAt: candidateReadyAt,
+    }),
   });
   await insertEvent(ctx, run, {
     idempotencyKey: `candidate-ready:${run.runId}:${subject.digest}`,
     eventType: "CANDIDATE_READY",
-    workflowStep: "candidate-publication",
+    workflowStep: localCandidate ? "candidate-attestation" : "candidate-publication",
     actor: `service:${ownerId}`,
     status: "COMPLETED",
     startedAt: candidateReadyAt,
     endedAt: candidateReadyAt,
-    commandSummary: `Immutable draft pull-request candidate ${candidate.candidateSha.slice(0, 12)} is ready for independent verification`,
+    commandSummary: localCandidate
+      ? `Immutable unpublished local candidate ${candidate.candidateSha.slice(0, 12)} is ready for independent verification`
+      : `Immutable draft pull-request candidate ${candidate.candidateSha.slice(0, 12)} is ready for independent verification`,
     metadata: {
       leaseId,
       verificationSubjectId: subject.subjectId,
       verificationSubjectDigest: subject.digest,
       candidateSha: candidate.candidateSha,
       treeSha: candidate.treeSha,
-      pullRequestNumber: candidate.pullRequestNumber,
+      transport: localCandidate ? "LOCAL_GIT" : "DRAFT_PULL_REQUEST",
+      ...(localCandidate ? {} : { pullRequestNumber: candidate.pullRequestNumber }),
     },
   });
   return { run: await ctx.db.get(run._id), subject };
 }
+
+export const recoverLocalCandidate = mutation({
+  args: {
+    workOrderId: v.id("workOrders"),
+    failedImplementationAttemptId: v.id("workflowRuns"),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const reason = args.reason.trim();
+    if (reason.length < 10 || reason.length > 1_000) {
+      throw new Error("Local candidate recovery requires a reason between 10 and 1,000 characters.");
+    }
+    const [workOrder, failedAttempt] = await Promise.all([
+      ctx.db.get(args.workOrderId),
+      ctx.db.get(args.failedImplementationAttemptId),
+    ]);
+    if (!workOrder?.projectId || !workOrder.tenantId) throw new Error("WorkOrder is unavailable or unauthorized.");
+    const access = await requireWorkspaceAccess(ctx, workOrder.tenantId, workOrder.projectId, {
+      permission: COMPANY_PERMISSIONS.DISPATCH_WORK,
+    });
+    assertAuthorizedDeliveryRecord(access, workOrder);
+    const attempts = await ctx.db.query("workflowRuns")
+      .withIndex("by_work_order", (q) => q.eq("workOrderId", workOrder._id))
+      .collect();
+    const existingRecovery = attempts.find((attempt) =>
+      attempt.metadata?.localCandidateRecovery?.sourceAttemptId === failedAttempt?._id
+      && (attempt.attemptPurpose ?? "IMPLEMENTATION") === "IMPLEMENTATION"
+    );
+    if (existingRecovery) {
+      return { recovered: true as const, workflowRunId: existingRecovery._id };
+    }
+    const latestImplementation = attempts
+      .filter((attempt) => (attempt.attemptPurpose ?? "IMPLEMENTATION") === "IMPLEMENTATION")
+      .sort((left, right) => right.startedAt - left.startedAt || String(right._id).localeCompare(String(left._id)))[0];
+    if (!failedAttempt
+      || failedAttempt._id !== latestImplementation?._id
+      || failedAttempt.workOrderId !== workOrder._id
+      || failedAttempt.status !== "FAILED"
+      || (failedAttempt.attemptPurpose ?? "IMPLEMENTATION") !== "IMPLEMENTATION"
+      || failedAttempt.workOrderRevisionNumber !== (workOrder.currentRevisionNumber ?? 1)
+      || workOrder.verificationContract?.schemaVersion !== 2
+      || workOrder.verificationContract.enforcementMode !== "ENFORCED"
+      || !failedAttempt.worktree || !failedAttempt.branch || !failedAttempt.executionManifestDigest) {
+      throw new Error("Only the latest failed policy-v2 Implementation Attempt with a frozen workspace can be recovered.");
+    }
+    if (!failedAttempt.failureReason?.includes("GitHub App runtime credentials are not configured.")) {
+      throw new Error("Local candidate recovery is limited to the exact GitHub App credential publication failure.");
+    }
+    if (failedAttempt.verificationSubject || failedAttempt.candidateReadyAt) {
+      throw new Error("Candidate recovery cannot replace an existing immutable Verification Subject.");
+    }
+    const codeDiffArtifact = await ctx.db.query("runArtifacts")
+      .withIndex("by_run_type", (q) => q.eq("workflowRunId", failedAttempt._id).eq("artifactType", "CODE_DIFF"))
+      .first();
+    const codeDiff = codeDiffArtifact?.metadata;
+    if (!codeDiffArtifact
+      || !/^[0-9a-f]{40,64}$/.test(codeDiff?.headSha ?? "")
+      || !/^[0-9a-f]{40,64}$/.test(codeDiff?.treeSha ?? "")
+      || codeDiff?.sourceRevision !== failedAttempt.executionManifest?.repository?.baseSha
+      || codeDiff?.branch !== failedAttempt.branch) {
+      throw new Error("Local candidate recovery requires a durable exact code-diff artifact from the failed publication Attempt.");
+    }
+    const priorRecoveryRequestedAt = failedAttempt.metadata?.localCandidateRecovery?.requestedAt;
+    const leaseEvents = await ctx.db.query("runEvents")
+      .withIndex("by_run_sequence", (q) => q.eq("workflowRunId", failedAttempt._id))
+      .collect();
+    const priorClaimEvents = leaseEvents.filter((event) =>
+      event.metadata?.workerId
+      && event.metadata?.workerSessionId
+      && Number.isSafeInteger(event.metadata?.workerGeneration)
+      && event.metadata?.leaseId
+      && (!priorRecoveryRequestedAt || (event.startedAt ?? event._creationTime) < priorRecoveryRequestedAt)
+    );
+    const previousClaim = priorClaimEvents[priorClaimEvents.length - 1];
+    if (!previousClaim) throw new Error("Local candidate recovery requires durable prior workspace ownership evidence.");
+    const requestedAt = Date.now();
+    const actorId = access.membership.operatorId ? String(access.membership.operatorId) : "demo:company-administrator";
+    const recoveryRunId = Math.random().toString(36).slice(2, 10);
+    const { recoveryAttempt, sourcePatch } = buildLocalCandidateRecoveryRows({
+      failedAttempt,
+      recoveryRunId,
+      requestedAt,
+      actorId,
+      reason,
+      previousLease: {
+        leaseId: previousClaim.metadata.leaseId,
+        workerId: previousClaim.metadata.workerId,
+        workerSessionId: previousClaim.metadata.workerSessionId,
+        workerGeneration: previousClaim.metadata.workerGeneration,
+      },
+      sourceCandidate: {
+        candidateSha: codeDiff.headSha,
+        treeSha: codeDiff.treeSha,
+        sourceRevision: codeDiff.sourceRevision,
+      },
+    });
+    const recoveryAttemptId = await ctx.db.insert("workflowRuns", recoveryAttempt);
+    await ctx.db.patch(failedAttempt._id, {
+      ...sourcePatch,
+      retryDecision: {
+        ...sourcePatch.retryDecision,
+        replacementAttemptId: String(recoveryAttemptId),
+      },
+    });
+    await ctx.db.patch(workOrder._id, {
+      state: "IN_PROGRESS",
+      currentExecutionRunId: recoveryAttemptId,
+      verificationStatus: "PENDING",
+      blockingIssue: undefined,
+      requiredHumanAction: undefined,
+      updatedAt: requestedAt,
+    });
+    const insertedRecovery = await ctx.db.get(recoveryAttemptId);
+    if (!insertedRecovery) throw new Error("Local candidate recovery Attempt was not durably created.");
+    await insertEvent(ctx, insertedRecovery, {
+      idempotencyKey: `local-candidate-recovery:${String(failedAttempt._id)}:${String(recoveryAttemptId)}`,
+      eventType: "RETRY_STARTED",
+      workflowStep: "candidate-attestation",
+      actor: `human:${actorId}`,
+      status: "PENDING",
+      startedAt: requestedAt,
+      commandSummary: reason,
+      metadata: { recoveryMode: "LOCAL_GIT_NO_EXECUTOR_REPLAY", sourceAttemptId: failedAttempt._id },
+    });
+    return { recovered: true as const, workflowRunId: recoveryAttemptId };
+  },
+});
 
 export const retryVerification = mutation({
   args: {

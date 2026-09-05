@@ -77,9 +77,9 @@ export function FactoryConfigurationPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-[12px] font-medium text-ink">Governed tool grants</div>
-              <div className="mt-0.5 text-[10.5px] text-ink-muted">Read-only qualification fixtures. Discovery and tool output never create authority.</div>
+              <div className="mt-0.5 text-[10.5px] text-ink-muted">Exact read-only grants. Discovery and tool output never create authority.</div>
             </div>
-            <StatusBadge tone="warning">qualification fixture</StatusBadge>
+            <StatusBadge tone={governedTools.maturity === "QUALIFIED_ONE_REAL_READ_ONLY_SERVICE" ? "success" : "warning"}>{governedTools.maturity === "QUALIFIED_ONE_REAL_READ_ONLY_SERVICE" ? "one real service" : "qualification fixture"}</StatusBadge>
           </div>
           <ul className="mt-2 space-y-2" aria-label="Tool Grant history">
             {governedTools.grants
@@ -87,6 +87,7 @@ export function FactoryConfigurationPanel({
               .sort((left, right) => right.version - left.version)
               .map((grant) => {
                 const snapshot = grant.immutableSnapshot as Record<string, any>;
+                const tool = snapshot.toolVersionSnapshot as Record<string, any>;
                 const state = grant.current ? "qualified" : grant.state === "REVOKED" ? "revoked" : "stale";
                 return (
                   <li key={grant._id} className="rounded-md border border-line bg-surface-1 p-2.5 text-[11px] text-ink-secondary">
@@ -96,6 +97,7 @@ export function FactoryConfigurationPanel({
                     </div>
                     <div className="mt-1 break-all font-mono text-[10px] text-ink-muted">{grant.grantDigest} · tool {grant.toolVersionDigest}</div>
                     <div className="mt-1">{snapshot.operation} · read-only · {String(snapshot.destination).toLowerCase().replace(/_/g, " ")} · credential {String(snapshot.credentialClass).toLowerCase()}</div>
+                    <div className="mt-1 text-ink-muted">{tool?.server?.key} · {tool?.transport?.kind?.toLowerCase().replace(/_/g, " ")} · {tool?.dataClassification?.toLowerCase()} · {grant.current ? "service contract current" : "service contract unavailable"}</div>
                     {grant.state === "REVOKED" ? (
                       <div className="mt-1 text-warning">Revoked: {grant.revocationReason ?? "new calls are denied"}. Create a new exact grant and Execution Profile; history remains immutable.</div>
                     ) : null}
@@ -664,9 +666,9 @@ function FactoryVersionEditor({
               <span className="block font-mono text-[10.5px] text-ink-muted">{selectedExecutionProfile.profileDigest} · qualification {selectedExecutionProfile.qualificationDigest}</span>
               {selectedExecutionProfile.toolGrant ? (
                 <span className="mt-2 block text-[11.5px] leading-relaxed text-ink-secondary">
-                  <span className="font-medium text-ink">Qualified fixture tool</span> · {selectedExecutionProfile.toolGrant.key} v{selectedExecutionProfile.toolGrant.version} · <span className="font-mono">{selectedExecutionProfile.toolGrant.operation}</span><br />
+                  <span className="font-medium text-ink">{selectedExecutionProfile.toolGrant.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE" ? "Qualified real read-only service" : "Qualified fixture tool"}</span> · {selectedExecutionProfile.toolGrant.key} v{selectedExecutionProfile.toolGrant.version} · <span className="font-mono">{selectedExecutionProfile.toolGrant.operation}</span><br />
                   Host broker only · read-only · credential {selectedExecutionProfile.toolGrant.credentialClass.toLowerCase()} · expires {new Date(selectedExecutionProfile.toolGrant.expiresAt).toLocaleString()}<br />
-                  <span className="text-warning">Qualification fixture — no real MCP service is admitted. Harness MCP remains unsupported.</span>
+                  <span className={selectedExecutionProfile.toolGrant.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE" ? "text-success" : "text-warning"}>{selectedExecutionProfile.toolGrant.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE" ? "One exact real service operation is admitted. Tool output remains untrusted; harness MCP remains unsupported." : "Qualification fixture — no real MCP service is admitted. Harness MCP remains unsupported."}</span>
                 </span>
               ) : (
                 <span className="mt-2 block text-[11.5px] text-ink-muted">No tool capability. Historical profiles do not inherit MCP authority.</span>

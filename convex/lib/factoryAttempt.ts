@@ -119,9 +119,11 @@ export function factoryAttemptSourceBindingMatches(input: {
     && Number.isFinite(source.candidateReadyAt)
     && input.manifestBaseSha === subject.candidateSha
     && source.headSha === subject.candidateSha
-    && subject.pullRequest?.headSha === subject.candidateSha
+    && (subject.provider === "GITHUB"
+      ? subject.pullRequest?.headSha === subject.candidateSha
+      : subject.localRef?.headSha === subject.candidateSha)
     && input.branch === source.branch
-    && input.branch === subject.pullRequest?.headRef
+    && input.branch === (subject.provider === "GITHUB" ? subject.pullRequest?.headRef : subject.localRef?.headRef)
   );
 }
 

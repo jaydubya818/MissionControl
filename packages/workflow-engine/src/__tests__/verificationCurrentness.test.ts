@@ -4,7 +4,7 @@ import { verificationContractDigest } from "../verificationIdentity.js";
 import {
   createAutomationVerificationSubject,
   createGitVerificationSubject,
-  type GitVerificationSubject,
+  type GithubVerificationSubject,
   type VerificationSubject,
 } from "../verificationSubject.js";
 
@@ -20,7 +20,7 @@ const decisionInputDigest = `sha256:${"f".repeat(64)}`;
 function gitSubject(
   sourceAttemptId = "source-a",
   candidateSha = "a".repeat(40),
-  pullRequestOverrides: Partial<GitVerificationSubject["pullRequest"]> = {},
+  pullRequestOverrides: Partial<GithubVerificationSubject["pullRequest"]> = {},
 ) {
   return createGitVerificationSubject({
     version: 1,
@@ -44,6 +44,23 @@ function gitSubject(
       draftAtPublication: true,
       ...pullRequestOverrides,
     },
+  });
+}
+
+function localGitSubject() {
+  return createGitVerificationSubject({
+    version: 1,
+    kind: "GIT_CANDIDATE",
+    workOrderId: "wo-1",
+    workOrderRevisionNumber: 1,
+    verificationContractDigest: contractDigest,
+    sourceAttemptId: "source-a",
+    repositoryId: "repo-1",
+    provider: "LOCAL_GIT",
+    providerRepositoryId: "provider-repo-1",
+    candidateSha: "a".repeat(40),
+    treeSha: "b".repeat(40),
+    localRef: { baseRef: "main", headRef: "candidate", headSha: "a".repeat(40) },
   });
 }
 
@@ -117,7 +134,7 @@ function fixture(subject: VerificationSubject = gitSubject(), sourceReadyAt = 10
       ...tuple,
       recordedAt: 350,
     }],
-    providerHeads: subject.kind === "GIT_CANDIDATE" ? [{
+    providerHeads: subject.kind === "GIT_CANDIDATE" && subject.provider === "GITHUB" ? [{
       provider: "GITHUB" as const,
       repositoryId: subject.repositoryId,
       installationId: "installation-1",
@@ -147,6 +164,16 @@ describe("exact-current verification acceptance eligibility", () => {
       sourceAttemptId: "source-a",
       verificationAttemptId: "verify-a",
     });
+  });
+
+  it("keeps an independently verified unpublished local candidate non-accepting without a trusted projection", () => {
+    const result = evaluateCurrentVerificationEligibility(fixture(localGitSubject()));
+    expect(result, result.reasons.join(" ")).toMatchObject({
+      eligible: false,
+      current: false,
+      verifiedOutcome: "SUCCESS",
+    });
+    expect(result.reasons[0]).toContain("not acceptance-eligible");
   });
 
   it("classifies an exact independent Policy V2 failure without making it acceptance-eligible", () => {

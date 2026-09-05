@@ -8,6 +8,9 @@ import {
   mcpToolVersionDigest,
   mcpToolVersionIssues,
   qualificationFixtureToolVersionSnapshot,
+  context7ToolVersionSnapshot,
+  MCP_CONTEXT7_OPERATION,
+  MCP_CONTEXT7_DESTINATION,
 } from "../lib/governedMcp";
 
 const implementationDigest = `sha256:${"a".repeat(64)}`;
@@ -28,6 +31,22 @@ describe("governed MCP control-plane identity", () => {
     expect(mcpToolVersionIssues(snapshot)).toEqual([]);
     expect(mcpToolVersionDigest(snapshot)).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(mcpToolVersionIssues({ ...snapshot, protocolVersion: "substituted" })).toContain("tool-version-substituted");
+  });
+
+  it("constructs exactly one qualified real read-only service contract", () => {
+    const snapshot = context7ToolVersionSnapshot();
+    expect(snapshot).toMatchObject({
+      transport: { kind: "STREAMABLE_HTTP", destination: MCP_CONTEXT7_DESTINATION, endpoint: "https://mcp.context7.com/mcp", redirects: false },
+      operation: { name: MCP_CONTEXT7_OPERATION, sideEffect: "READ_ONLY", inputSchemaDialect: "https://json-schema.org/draft/2020-12/schema" },
+      credentialClass: "NONE",
+      dataClassification: "PUBLIC",
+      admission: "QUALIFIED_REAL_READ_ONLY_SERVICE",
+      authority: { discovery: false, write: false },
+    });
+    expect(mcpToolVersionIssues(snapshot)).toEqual([]);
+    expect(JSON.stringify(snapshot)).not.toContain('"$schema"');
+    expect(mcpToolVersionIssues({ ...snapshot, transport: { ...snapshot.transport, endpoint: "https://example.com/mcp" } })).toContain("tool-version-substituted");
+    expect(persistenceSource).toContain("registerContext7QueryDocs");
   });
 
   it("binds one expiring workspace Tool Grant to exact Tool Version bytes", () => {
