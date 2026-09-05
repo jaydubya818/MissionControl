@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { FabExecutorAdapter } from "../fabExecutorAdapter.js";
 import { EnvironmentCredentialProvider, HttpModelProvider, parseConfig } from "@fdlc/fab";
 import { execFile } from "node:child_process";
-import { access, mkdir, mkdtemp, rm, writeFile, readdir, readFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile, readdir, readFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -599,7 +599,7 @@ async function runFixture(
   } = {},
 ) {
   const attempt = options.attempt ?? 1;
-  const checkoutRoot = await mkdtemp(path.join(tmpdir(), "mc-verification-first-worker-"));
+  const checkoutRoot = await realpath(await mkdtemp(path.join(tmpdir(), "mc-verification-first-worker-")));
   cleanup.push(checkoutRoot);
   await git(checkoutRoot, ["init", "-b", "main"]);
   await git(checkoutRoot, ["config", "user.name", "Mission Control Test"]);
@@ -617,14 +617,14 @@ async function runFixture(
     attempt,
     dirtyVerification: options.dirtyVerification,
     baseSha,
-    version: options.manifestVersion,
+    version: options.fab ? 2 : options.manifestVersion,
   });
   let fabModelCalls = 0;
   const fabStateDirectory = path.join(checkoutRoot, "fab-state");
   const fabAdapter = options.fab ? new FabExecutorAdapter({
     config: parseConfig({ version: 1, repository: worktree, provider: "openai", model: "fixture-explicit-model",
       credential: { id: "fab-governed-fixture", owner: `local:${process.getuid?.()}`, provider: "openai", scope: { kind: "repository", root: worktree }, source: { kind: "environment", variable: "FAB_GOVERNED_TEST_KEY" } },
-      writableFiles: ["src/feature.ts"], acceptanceCriteria: manifest.workOrderSpecification.acceptanceCriteria.map(item => item.title),
+      writableFiles: ["src/feature.ts"], acceptanceCriteria: manifest.workOrderSpecification.acceptanceCriteria.map((item: { title: string }) => item.title),
       checks: [{ id: "test", argv: [process.execPath, "--input-type=module", "-e", "import {verified} from './src/feature.ts'; if(!verified) throw new Error('incorrect candidate')"] }],
       timeoutMs: 20000, checkTimeoutMs: 5000, maxTurns: 8 }),
     stateDirectory: fabStateDirectory,
@@ -649,7 +649,14 @@ async function runFixture(
     Object.assign(manifest.harness, { adapter: "fab", version: "v1", harnessId: "fab", harnessVersion: capabilityManifest.identity.harnessVersion,
       harnessCommit: capabilityManifest.identity.harnessCommit, capabilityManifest,
       capabilityManifestSha256: harnessCapabilityManifestDigest(capabilityManifest), effectiveConfigSha256: capabilityManifest.effectiveConfigSha256,
-      provider: "openai", model: "fixture-explicit-model" });
+      runtimeArtifact: fabAdapter.capabilities().runtimeArtifact,
+      runtimeArtifactDigest: harnessRuntimeArtifactDigest(fabAdapter.capabilities().runtimeArtifact) });
+    manifest.modelRoute.routeSnapshot = { schema: "factory-model-route/v2", provider: "openai", providerRoute: "openai", modelId: "fixture-explicit-model" };
+    manifest.modelRoute.routeDigest = `sha256:${canonicalHash({ namespace: "factory-model-route/v2", value: manifest.modelRoute.routeSnapshot })}`;
+    Object.assign(manifest.modelRoute.qualificationSnapshot, { routeDigest: manifest.modelRoute.routeDigest,
+      compatibility: { adapter: "fab", version: "v1", capabilityManifestDigest: manifest.harness.capabilityManifestSha256,
+        effectiveConfigSha256: manifest.harness.effectiveConfigSha256, runtimeArtifactDigest: manifest.harness.runtimeArtifactDigest, executionBackend: "persistent-worker" } });
+    manifest.modelRoute.qualificationDigest = `sha256:${canonicalHash({ namespace: "factory-model-route-qualification/v2", value: manifest.modelRoute.qualificationSnapshot })}`;
     manifest.workOrderSpecification.verificationContract.checks[0].command.args = ["-e", "if(!require('fs').readFileSync('src/feature.ts','utf8').includes('verified = true')) throw new Error('incorrect candidate')"];
   }
   if (options.noVerificationContract) {

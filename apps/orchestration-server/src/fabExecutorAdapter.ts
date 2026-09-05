@@ -8,15 +8,17 @@ import {
 } from "@fdlc/fab";
 import {
   GENERIC_HARNESS_CONTRACT_VERSION, NO_HARNESS_AUTHORITY,
-  harnessCapabilityManifestDigest, harnessExecutionRequestDigest,
+  harnessCapabilityManifestDigest, harnessExecutionRequestDigest, harnessRuntimeArtifactDigest,
   type HarnessExecutorAdapter, type HarnessCapabilityManifest, type HarnessExecutionContext,
   type HarnessExecutorCapabilities, type ExecutorRequest, type ExecutorEvent, type ExecutorResult,
 } from "@mission-control/workflow-engine";
 import { canonicalHash } from "@mission-control/shared";
 import { validateChangedFileScope } from "./factoryPathScope.js";
+import { verifyFabRuntime } from "./fabRuntimeIdentity.js";
+import { FAB_RUNTIME_PIN } from "./fabRuntimePin.js";
 
-export const FAB_RUNTIME_COMMIT = "6f27dbc8a1f4bc2891d0ef656299f9760864d108";
-const IDENTITY = { harnessId: "fab", harnessVersion: "0.1.0-experimental.1", harnessCommit: FAB_RUNTIME_COMMIT, adapterId: "fab", adapterVersion: "v1" };
+export const FAB_RUNTIME_COMMIT = FAB_RUNTIME_PIN.sourceCommit;
+const IDENTITY = { harnessId: "fab", harnessVersion: FAB_RUNTIME_PIN.version, harnessCommit: FAB_RUNTIME_COMMIT, adapterId: "fab", adapterVersion: "v1" };
 type AttemptContext = NonNullable<HarnessExecutionContext["attempt"]>;
 interface Prepared {
   request: ExecutorRequest; context: HarnessExecutionContext; attempt: AttemptContext;
@@ -46,6 +48,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
   private readonly options: FabAdapterOptions;
   private readonly manifest: HarnessCapabilityManifest;
   private readonly environment: NodeJS.ProcessEnv;
+  private readonly runtimeArtifact = verifyFabRuntime();
   constructor(options: FabAdapterOptions) {
     this.options = { ...options, config: parseConfig(structuredClone(options.config)) };
     const source = this.options.config.credential.source;
@@ -55,7 +58,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
   }
   capabilities(): HarnessExecutorCapabilities {
     return { contractVersion: GENERIC_HARNESS_CONTRACT_VERSION, adapter: "fab", version: "v1", displayName: "Fab (Experimental)",
-      provider: this.options.config.provider, capabilityManifest: structuredClone(this.manifest), executionBackends: ["persistent-worker"],
+      provider: this.options.config.provider, capabilityManifest: structuredClone(this.manifest), runtimeArtifact: structuredClone(this.runtimeArtifact), executionBackends: ["persistent-worker"],
       authority: NO_HARNESS_AUTHORITY, supportsCancel: true, supportsResume: false, supportsRepositoryMutation: true,
       isolationModes: ["WORKSPACE_WRITE"], emittedEvents: ["EXECUTION_STARTED", "TOOL_CALLED", "ARTIFACT_PRODUCED", "EXECUTION_COMPLETED", "EXECUTION_FAILED", "EXECUTION_CANCELED"] };
   }
@@ -64,6 +67,11 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     const issue = (field: string, message: string) => issues.push({ field, message });
     if (request.repositoryRoot !== config.repository || request.workingDirectory !== config.repository) issue("repositoryRoot", "Fab requires the exact operator-bound worktree root.");
     if (request.provider !== config.provider || request.model !== config.model) issue("model", "Fab requires the exact explicitly selected provider/model.");
+    if (request.modelRouteDigest !== undefined || request.providerRoute !== undefined || request.reasoningConfig !== undefined) {
+      if (!/^sha256:[a-f0-9]{64}$/.test(request.modelRouteDigest ?? "")) issue("modelRouteDigest", "Fab requires the exact frozen model-route digest.");
+      if (request.providerRoute !== config.provider) issue("providerRoute", "Fab supports only its configured native provider endpoint.");
+      if (request.reasoningConfig !== undefined) issue("reasoningConfig", "Fab cannot translate reasoning controls; use a separately qualified configuration.");
+    }
     if (request.isolation !== "WORKSPACE_WRITE" || request.filesystemReadScope) issue("isolation", "Fab has no whole-agent OS read boundary; WORKSPACE_ONLY and read-only execution are unsupported.");
     if (request.timeoutMs < config.timeoutMs || request.structuredOutput) issue("limits", "Fab requires its bounded timeout and canonical factory result schema.");
     if (!validateChangedFileScope(config.writableFiles, { allowedPaths: request.allowedPaths, excludedPaths: request.deniedPaths ?? [] }).ok) issue("allowedPaths", "Fab writable files exceed the MC frozen scope.");
@@ -75,6 +83,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     const attempt = context.attempt;
     if (!attempt || !attempt.workOrderId || !attempt.attemptId || !attempt.executorIdentity || !attempt.environmentReference) throw new Error("Fab requires canonical MC Attempt authority and linkage.");
     context.signal?.throwIfAborted(); await attempt.assertActive(); context.signal?.throwIfAborted();
+    if (harnessRuntimeArtifactDigest(verifyFabRuntime()) !== harnessRuntimeArtifactDigest(this.runtimeArtifact)) throw new Error("Fab runtime changed after worker registration.");
     const config = this.options.config;
     if (canonicalHash(attempt.acceptanceCriteria.map(item => item.title)) !== canonicalHash(config.acceptanceCriteria)) throw new Error("Fab criteria differ from the frozen WorkOrder.");
     const redactor = new Redactor();
@@ -145,8 +154,12 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     const finishedAt = Date.now();
     return { executionId: p.request.executionId, status, output, ...(completed ? {} : { error: "Fab execution blocked, failed or cancelled; inspect its redacted evidence." }), normalizedResult: {
       schemaVersion: "harness-result/v1", executionId: p.request.executionId, status, harness: this.manifest.identity,
-      provenance: { provider: p.model.provider, model: p.model.model, capabilityManifestSha256: harnessCapabilityManifestDigest(this.manifest),
-        effectiveConfigSha256: this.manifest.effectiveConfigSha256, executableSha256: null, requestSha256: harnessExecutionRequestDigest(p.request),
+      provenance: { provider: p.model.provider, model: p.model.model,
+        ...(p.request.modelRouteDigest ? { modelRouteDigest: p.request.modelRouteDigest, providerRoute: p.request.providerRoute } : {}),
+        capabilityManifestSha256: harnessCapabilityManifestDigest(this.manifest),
+        effectiveConfigSha256: this.manifest.effectiveConfigSha256, executableSha256: this.runtimeArtifact.executableSha256,
+        runtimeArtifact: structuredClone(this.runtimeArtifact), runtimeArtifactDigest: harnessRuntimeArtifactDigest(this.runtimeArtifact), imageDigest: null,
+        requestSha256: harnessExecutionRequestDigest(p.request),
         providerMetadata: { fabSessionId: p.session.id, workOrderId: p.attempt.workOrderId, attemptId: p.attempt.attemptId, credentialReference: p.session.config.credential.id, environmentReference: p.attempt.environmentReference } },
       timing: { startedAt: p.startedAt, finishedAt, wallClockMs: finishedAt - p.startedAt },
       repository: { root: p.request.repositoryRoot, workingDirectory: p.request.workingDirectory, baselineCommit: p.session.baseline, headCommit: p.session.baseline, headChanged: false,

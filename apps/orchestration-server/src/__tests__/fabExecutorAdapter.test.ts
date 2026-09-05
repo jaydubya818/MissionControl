@@ -56,13 +56,20 @@ describe("Fab canonical MC harness conformance", () => {
     const eligibility = factoryWorkerEligibility({ worker: { workerId: "worker-1", status: "READY", dirty: false,
       capacity: { maxConcurrentRuns: 1, currentRuns: 0 }, workerRuntime: { sessionId: "session-1", generation: 1, hostRuntimeType: "local-macos",
         executionBackends: ["persistent-worker"], supportedExecutors: [{ adapter: "fab", version: "v1", capabilityManifest: registration.manifest!,
-          capabilityManifestSha256: registration.capabilityManifestSha256!, effectiveConfigSha256: registration.effectiveConfigSha256!, supportsCancel: true, supportsResume: false, isolationModes: ["WORKSPACE_WRITE"] }],
+          capabilityManifestSha256: registration.capabilityManifestSha256!, effectiveConfigSha256: registration.effectiveConfigSha256!,
+          runtimeArtifact: registration.runtimeArtifact, runtimeArtifactSha256: registration.runtimeArtifactSha256,
+          supportsCancel: true, supportsResume: false, isolationModes: ["WORKSPACE_WRITE"] }],
         sandboxCapabilities: ["git-worktree", "workspace-write"], repositoryAccess: [{ repositoryId: "repo-1", access: "READ_WRITE" }], readiness: "READY", draining: false, lastHeartbeatAt: 1000 } },
-      requirements: { repositoryId: "repo-1", executor: { adapter: "fab", version: "v1", capabilityManifestSha256: registration.capabilityManifestSha256!, effectiveConfigSha256: registration.effectiveConfigSha256! },
+      requirements: { repositoryId: "repo-1", executor: { adapter: "fab", version: "v1", capabilityManifestSha256: registration.capabilityManifestSha256!, effectiveConfigSha256: registration.effectiveConfigSha256!, runtimeArtifactSha256: registration.runtimeArtifactSha256 },
         provider: f.config.provider, model: f.config.model, harnessCapabilities: [{ capability: "filesystem.write", minimumSupport: "PARTIAL" }], isolation: "WORKSPACE_WRITE", sandboxCapabilities: ["git-worktree", "workspace-write"], executionBackend: "persistent-worker" },
       activeWorkerLeaseCount: 0, now: 1000 });
     expect(eligibility.eligible).toBe(true);
     for (const changed of [{ model: "other" }, { provider: "anthropic" }, { allowedPaths: ["other/**"] }, { repositoryRoot: "/other" }, { filesystemReadScope: "WORKSPACE_ONLY" as const }, { isolation: "READ_ONLY" as const }]) expect(f.adapter.validateConfiguration({ ...f.request, ...changed }).length).toBeGreaterThan(0);
+    const routed = { ...f.request, modelRouteDigest: `sha256:${"a".repeat(64)}`, providerRoute: "openai" };
+    expect(f.adapter.validateConfiguration(routed)).toEqual([]);
+    for (const changed of [{ modelRouteDigest: "invalid" }, { providerRoute: "broker" }, { reasoningConfig: { effort: "high" } }]) {
+      expect(f.adapter.validateConfiguration({ ...routed, ...changed }).length).toBeGreaterThan(0);
+    }
   });
   it("denies missing or lost MC authority before any inference", async () => {
     const f = fixture();
