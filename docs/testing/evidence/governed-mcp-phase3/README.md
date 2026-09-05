@@ -4,13 +4,21 @@ This directory retains evidence for the one Phase 3 `QUALIFICATION_FIXTURE`.
 The authoritative admission command is:
 
 ```sh
-MC_QUALIFICATION_BASE_SHA=3ae9d86eeff1966862a6959664ec1fe2e6e7240a pnpm run qualify:factory:v2
+MC_QUALIFICATION_BASE_SHA=3ae9d86eeff1966862a6959664ec1fe2e6e7240a \
+MC_IMPLEMENTATION_SHA=045176e44deef520a88988212af202b6d4c82e19 \
+MC_QUALIFICATION_EVIDENCE_SLUG=governed-mcp-phase3-factory-045176e44dee \
+pnpm run qualify:factory:v2
 ```
 
 `qualify:mcp:phase3` is a developer convenience exercised as a stage inside
 that Factory qualification. It uses the official MCP SDK in the host broker and
-a dependency-free, single-file local stdio server. Each run writes a new
-revision-scoped file under `runs/`; previous evidence is never overwritten.
+a dependency-free, single-file local stdio server. Each broker run writes a new
+revision-scoped file under `runs/`; previous broker evidence is never
+overwritten. The complete authoritative Factory report for the qualified source
+revision is retained separately at
+`../governed-mcp-phase3-factory-045176e44dee/`, using an explicit
+`MC_QUALIFICATION_EVIDENCE_SLUG` so the repository's historical default evidence
+is not overwritten.
 
 The broker scenario records exact identity and receipt-shaped observations from
 the real stdio exchange. Those observations are not described as immutable
