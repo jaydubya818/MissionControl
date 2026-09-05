@@ -405,7 +405,7 @@ describe("Mission Control full-system Factory qualification V2", () => {
     await commit(repositoryRoot, "repair listing fee", 4);
     const repairedCandidateSha = await gitValue(repositoryRoot, ["rev-parse", "HEAD"]);
     const repairedGate = await runFixtureGate(repositoryRoot);
-    expect(repairedGate.passed).toBe(true);
+    expect(repairedGate.passed, [repairedGate.stdout, repairedGate.stderr].filter(Boolean).join("\n")).toBe(true);
 
     const repairedLineage = await buildVerificationLineage({
       repositoryRoot,

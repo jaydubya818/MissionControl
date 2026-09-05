@@ -152,9 +152,10 @@ The next promotion gate is one named product-repository pilot with at least ten
 accepted WorkOrders, an eight-stage preflight incident drill, actual or
 explicitly unknown cost attribution, observed outcomes, failure evidence, and a
 human `GO` or `NO_GO` decision. Guarded Auto, autonomous merge, autonomous
-deployment, and learning promotion remain disabled. Factory Incident Command,
-the first read-only MCP broker proof, shared QA/product/design intent, and
-outcome-aware routing follow only after that pilot evidence exists.
+deployment, and learning promotion remain disabled. One governed read-only MCP
+broker proof now exists against a local `QUALIFICATION_FIXTURE`; it does not
+admit a real service or general MCP support. Factory Incident Command, shared
+QA/product/design intent, and outcome-aware routing remain later promotion work.
 
 ### The developer becomes an operator
 
@@ -192,7 +193,7 @@ WorkOrder acceptance, and the human-gated learning continuation. This is strong
 implementation proof; it is not a claim of fleet-scale production operation or
 general Remote Sandbox certification.
 
-The current public client/backend runtime contract is **v40**.
+The current public client/backend runtime contract is **v41**.
 
 | Capability                                 | Current status                                   | Boundary                                                                                        |
 | ------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
@@ -211,6 +212,7 @@ The current public client/backend runtime contract is **v40**.
 | Real product-repository pilot gates         | **Implemented; pilot pending**                   | Deterministic preflight and exit assessment exist; the named team and ten accepted WorkOrders remain real-world evidence work |
 | Remote Sandbox N=1                         | **Production-pilot eligible; Preview**           | 3/3 live exe.dev cohort; provider-enforced egress and sustained real-work evidence remain missing |
 | Loom admission                             | **Future**                                       | Configuration discovery and fixtures exist; no pinned runtime adapter                           |
+| Governed read-only MCP capability          | **Experimental; one qualified fixture path**     | Exact profile/grant/tool/server operation only; no real service, writes, or harness-native MCP   |
 | System Qualification                       | **V1 merged; known limitations**                 | Deterministic command plus durable repository evidence; no live-provider claim                  |
 
 The canonical status, evidence, limitation, and promotion gate for each major

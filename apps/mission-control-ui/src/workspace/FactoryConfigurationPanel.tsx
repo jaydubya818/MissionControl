@@ -18,6 +18,7 @@ export function FactoryConfigurationPanel({
   repositoryDataClassification: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED" | "UNCLASSIFIED";
 }) {
   const definitions = useQuery(api["factory/configuration"].list, { projectId });
+  const governedTools = useQuery(api["factory/governedMcp"].list, { projectId });
   const createFactory = useMutation(api["factory/configuration"].create);
   const [pendingPurpose, setPendingPurpose] = useState<"SOFTWARE" | "VERIFICATION" | "">("");
   const [error, setError] = useState("");
@@ -71,6 +72,39 @@ export function FactoryConfigurationPanel({
           ) : null}
         </div>
       </div>
+      {governedTools && governedTools.grants.length > 0 ? (
+        <section className="mt-3 rounded-lg border border-line bg-surface-2 p-3" aria-label="Governed tool grants">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[12px] font-medium text-ink">Governed tool grants</div>
+              <div className="mt-0.5 text-[10.5px] text-ink-muted">Read-only qualification fixtures. Discovery and tool output never create authority.</div>
+            </div>
+            <StatusBadge tone="warning">qualification fixture</StatusBadge>
+          </div>
+          <ul className="mt-2 space-y-2" aria-label="Tool Grant history">
+            {governedTools.grants
+              .slice()
+              .sort((left, right) => right.version - left.version)
+              .map((grant) => {
+                const snapshot = grant.immutableSnapshot as Record<string, any>;
+                const state = grant.current ? "qualified" : grant.state === "REVOKED" ? "revoked" : "stale";
+                return (
+                  <li key={grant._id} className="rounded-md border border-line bg-surface-1 p-2.5 text-[11px] text-ink-secondary">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-ink">{grant.grantKey} · v{grant.version}</span>
+                      <StatusBadge tone={grant.current ? "success" : "warning"}>{state}</StatusBadge>
+                    </div>
+                    <div className="mt-1 break-all font-mono text-[10px] text-ink-muted">{grant.grantDigest} · tool {grant.toolVersionDigest}</div>
+                    <div className="mt-1">{snapshot.operation} · read-only · {String(snapshot.destination).toLowerCase().replace(/_/g, " ")} · credential {String(snapshot.credentialClass).toLowerCase()}</div>
+                    {grant.state === "REVOKED" ? (
+                      <div className="mt-1 text-warning">Revoked: {grant.revocationReason ?? "new calls are denied"}. Create a new exact grant and Execution Profile; history remains immutable.</div>
+                    ) : null}
+                  </li>
+                );
+              })}
+          </ul>
+        </section>
+      ) : null}
       {error ? <div role="alert" className="mt-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">{error}</div> : null}
       {repositoryDefinitions.length === 0 ? (
         <div className="mt-3 rounded-lg border border-dashed border-line bg-surface-2 px-4 py-4 text-[12.5px] text-ink-secondary">
@@ -626,8 +660,17 @@ function FactoryVersionEditor({
             ))}
           </select>
           {selectedExecutionProfile ? (
-            <span className="mt-1 block font-mono text-[10.5px] text-ink-muted">
-              {selectedExecutionProfile.profileDigest} · qualification {selectedExecutionProfile.qualificationDigest}
+            <span className="mt-2 block rounded-md border border-line bg-surface-1 p-3">
+              <span className="block font-mono text-[10.5px] text-ink-muted">{selectedExecutionProfile.profileDigest} · qualification {selectedExecutionProfile.qualificationDigest}</span>
+              {selectedExecutionProfile.toolGrant ? (
+                <span className="mt-2 block text-[11.5px] leading-relaxed text-ink-secondary">
+                  <span className="font-medium text-ink">Qualified fixture tool</span> · {selectedExecutionProfile.toolGrant.key} v{selectedExecutionProfile.toolGrant.version} · <span className="font-mono">{selectedExecutionProfile.toolGrant.operation}</span><br />
+                  Host broker only · read-only · credential {selectedExecutionProfile.toolGrant.credentialClass.toLowerCase()} · expires {new Date(selectedExecutionProfile.toolGrant.expiresAt).toLocaleString()}<br />
+                  <span className="text-warning">Qualification fixture — no real MCP service is admitted. Harness MCP remains unsupported.</span>
+                </span>
+              ) : (
+                <span className="mt-2 block text-[11.5px] text-ink-muted">No tool capability. Historical profiles do not inherit MCP authority.</span>
+              )}
             </span>
           ) : (
             <span className="mt-1 block text-warning">Register and qualify an exact profile for this workflow route and {requiredIsolationMode.toLowerCase().replace(/_/g, " ")} boundary.</span>

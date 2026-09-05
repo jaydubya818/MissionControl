@@ -1222,6 +1222,8 @@ export const schemaTablesPartOne = {
       minimumSupport: v.union(v.literal("PARTIAL"), v.literal("SUPPORTED")),
     })),
     requiredSandboxCapabilities: v.array(v.string()),
+    toolGrantId: v.optional(v.id("mcpToolGrants")),
+    toolGrantDigest: v.optional(v.string()),
     registrationIdempotencyKey: v.string(),
     enabled: v.boolean(),
     qualificationStatus: v.union(v.literal("UNQUALIFIED"), v.literal("EVIDENCE_QUALIFIED")),
@@ -1249,6 +1251,102 @@ export const schemaTablesPartOne = {
     .index("by_digest", ["profileDigest"])
     .index("by_registration_idempotency", ["projectId", "registrationIdempotencyKey"])
     .index("by_qualification_idempotency", ["projectId", "qualificationIdempotencyKey"]),
+
+  // Phase 3 exact Tool Versions. Registration is descriptive and disabled;
+  // qualification is the only path to admission.
+  mcpToolVersions: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    serverKey: v.string(),
+    serverVersion: v.string(),
+    toolVersionDigest: v.string(),
+    immutableSnapshot: v.any(),
+    registrationIdempotencyKey: v.string(),
+    enabled: v.boolean(),
+    qualificationStatus: v.union(v.literal("UNQUALIFIED"), v.literal("EVIDENCE_QUALIFIED")),
+    qualificationEvidence: v.optional(v.any()),
+    qualificationDigest: v.optional(v.string()),
+    qualificationExpiresAt: v.optional(v.number()),
+    qualifiedBy: v.optional(v.string()),
+    qualifiedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_digest", ["toolVersionDigest"])
+    .index("by_registration", ["projectId", "registrationIdempotencyKey"]),
+
+  // Workspace-scoped, immutable, expiring authority for exactly one operation.
+  mcpToolGrants: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    grantKey: v.string(),
+    version: v.number(),
+    grantDigest: v.string(),
+    immutableSnapshot: v.any(),
+    toolVersionId: v.id("mcpToolVersions"),
+    toolVersionDigest: v.string(),
+    state: v.union(v.literal("ACTIVE"), v.literal("REVOKED")),
+    issuedAt: v.number(),
+    expiresAt: v.number(),
+    registrationIdempotencyKey: v.string(),
+    revokedBy: v.optional(v.string()),
+    revokedAt: v.optional(v.number()),
+    revocationReason: v.optional(v.string()),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_state", ["projectId", "state"])
+    .index("by_grant_version", ["projectId", "grantKey", "version"])
+    .index("by_digest", ["grantDigest"])
+    .index("by_registration", ["projectId", "registrationIdempotencyKey"]),
+
+  // Immutable authorization/completion pairs. Payloads and credentials are
+  // excluded; run events/artifacts remain the evidence warehouse.
+  mcpToolCallReceipts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.id("workflowRuns"),
+    attemptLeaseId: v.string(),
+    workerId: v.string(),
+    workerSessionId: v.string(),
+    workerGeneration: v.number(),
+    executionProfileId: v.id("factoryExecutionProfiles"),
+    executionProfileDigest: v.string(),
+    toolGrantId: v.id("mcpToolGrants"),
+    toolGrantDigest: v.string(),
+    toolVersionId: v.id("mcpToolVersions"),
+    toolVersionDigest: v.string(),
+    callId: v.string(),
+    phase: v.union(v.literal("AUTHORIZATION"), v.literal("COMPLETION")),
+    sequence: v.number(),
+    operation: v.string(),
+    status: v.union(v.literal("ALLOWED"), v.literal("DENIED"), v.literal("SUCCEEDED"), v.literal("FAILED"), v.literal("CANCELED"), v.literal("TIMED_OUT")),
+    reason: v.string(),
+    requestDigest: v.string(),
+    requestBytes: v.number(),
+    retryCount: v.number(),
+    costStatus: v.literal("UNKNOWN"),
+    outputDigest: v.optional(v.string()),
+    outputBytes: v.optional(v.number()),
+    poisoningDetected: v.optional(v.boolean()),
+    redactionApplied: v.optional(v.boolean()),
+    serverImplementationDigest: v.string(),
+    receiptDigest: v.string(),
+    occurredAt: v.number(),
+    durationMs: v.optional(v.number()),
+    lateOrStale: v.optional(v.boolean()),
+    evidenceEventId: v.optional(v.id("runEvents")),
+    evidenceArtifactId: v.optional(v.id("runArtifacts")),
+  })
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_attempt_grant_phase", ["workflowRunId", "toolGrantId", "phase"])
+    .index("by_call_phase", ["callId", "phase"])
+    .index("by_project", ["projectId"])
+    .index("by_digest", ["receiptDigest"]),
 
   factoryDefinitionVersions: defineTable({
     tenantId: v.optional(v.id("tenants")),

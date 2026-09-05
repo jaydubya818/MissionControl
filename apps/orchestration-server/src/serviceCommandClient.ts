@@ -12,6 +12,7 @@ export type ServiceCapability =
   | "attempts.claim"
   | "attempts.renew"
   | "attempts.report"
+  | "mcp.receipts.append"
   | "attempts.authorize-publication"
   | "verification:claim"
   | "verification:renew"

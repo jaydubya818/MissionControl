@@ -1,8 +1,8 @@
 ---
 title: Software Factory Capability Maturity Ledger
 status: active
-last_verified: 2026-08-25
-baseline_commit: b3dfcee
+last_verified: 2026-09-05
+baseline_commit: 3ae9d86eeff1966862a6959664ec1fe2e6e7240a
 owners:
   - product
   - platform
@@ -68,8 +68,8 @@ scale, or general production safety.
 | Observability, traces, and evals | ML/AI + Platform | **Qualified diagnostic system** | [Observability/Evals V1 evidence](../testing/evidence/observability-evals-v1/README.md) | Diagnostic only; no acceptance authority; OpenTelemetry GenAI conventions are not canonical IDs | Add a versioned export adapter when an external telemetry consumer is selected |
 | Factory Learning | ML/AI + Product | **Qualified; advisory** | [Factory Learning plan](../plans/2026-08-16-feat-factory-learning-continuous-improvement-v1-plan.md) | Fixture and qualification signals dominate; promotion is intentionally manual | Feed real accepted outcomes, incidents, corrections, and rollbacks into proposals |
 | Remote Sandbox | Security + Platform | **Production-pilot eligible; Preview** | [Production Factory Pilot V3](../testing/evidence/production-factory-pilot-v3/README.md) | Unrestricted outbound egress, ephemeral Codex install, three live samples | Provider-enforced egress or explicit bounded-risk acceptance plus sustained real-work evidence |
-| Native tool authorization | Security + Platform | **Partial** | [Harness manifests](../../packages/workflow-engine/src/harnessManifests.ts) | Native allowlists exist, but there is no canonical versioned tool authority | Introduce exact tool identity, operation scope, short-lived credentials, and receipts |
-| Tools/MCP runtime | Security + Platform | **Missing** | [Harness manifests](../../packages/workflow-engine/src/harnessManifests.ts) | MCP is `UNSUPPORTED` for admitted Codex and DeepSeek manifests | Prove one internal read-only MCP integration through a default-deny broker |
+| Native tool authorization | Security + Platform | **Partial** | [Governed MCP ADR](../decisions/governed-mcp-tool-capability.md) | Phase 3 adds exact Tool Version/Grant identity and immutable receipts for one fixture; native harness tools still lack the same canonical authority | Reuse the proven grant/receipt boundary for one separately reviewed native capability |
+| Tools/MCP runtime | Security + Platform | **Experimental** | [Phase 3 evidence](../testing/evidence/governed-mcp-phase3/README.md) | One local stdio `QUALIFICATION_FIXTURE` operation is host-brokered; no real MCP service is admitted and Codex/DeepSeek manifests remain `UNSUPPORTED` | Independently review the boundary, then seek explicit operator approval before qualifying one real read-only service |
 | Supply-chain provenance | Security + Platform | **Strong partial** | [Production Factory Pilot V3](../testing/evidence/production-factory-pilot-v3/README.md) | Attestations are not yet normalized into every release consumption boundary | Verify immutable image, SBOM, vulnerability, provenance, tool, and candidate identities at use time |
 | Release and production feedback | Product + SRE | **Partial** | [README delivery contract](../../README.md#the-delivery-contract) | Human merge remains outside V1 authority; no full production observation/rollback proof | Observe one real release and feed rollback/customer outcome into governed learning |
 | Factory incident response | Security + SRE | **Missing canonical lifecycle** | [Production convergence plan](../plans/2026-08-25-feat-software-factory-production-convergence-plan.md) | Alerts, op events, traces, and run failures are fragmented | Implement Clarify → Contain → Observe → Isolate → Restore → Correct → Prevent → Measure with browser and drill evidence |
@@ -97,8 +97,9 @@ independently demonstrated.
    existing system on consequential but bounded work before adding breadth.
 2. **P0 — Factory Incident Command.** Add a thin incident aggregate over existing
    evidence and make containment, restoration, correction, and follow-up explicit.
-3. **P1 — Governed Tool/MCP boundary.** Start with one read-only internal proof;
-   do not build a connector catalog.
+3. **P1 — Governed Tool/MCP boundary.** Preserve the qualified fixture boundary;
+   seek explicit approval before admitting one real read-only service and do not
+   build a connector catalog.
 4. **P1 — Shared builder intent and paved paths.** Extend the same governed
    intent model to QA, product, and design rather than building persona silos.
 5. **P1 — Outcome economics and routing calibration.** Optimize for accepted,

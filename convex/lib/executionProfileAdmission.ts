@@ -12,6 +12,7 @@ import { computeCanonicalHash } from "./genomeHash";
 import { resolveFrozenHarnessBinding } from "./harnessCapabilities";
 import { modelRouteEligibleForNewFactoryVersion } from "./modelRouteAdmission";
 import { sandboxProfileProductionEligible } from "./sandboxProfileAdmission";
+import { mcpToolGrantDigest, mcpToolVersionDigest } from "./governedMcp";
 
 type DbCtx = Pick<QueryCtx, "db">;
 
@@ -19,6 +20,7 @@ export interface LoadedExecutionProfileAdmission {
   profile: Doc<"factoryExecutionProfiles"> | null;
   modelRoute: Doc<"modelCatalog"> | null;
   sandboxProfile: Doc<"factorySandboxProfiles"> | null;
+  toolGrant: Doc<"mcpToolGrants"> | null;
   eligible: boolean;
   blockers: ExecutionProfileBlockerCode[];
   validUntil?: number;
@@ -40,6 +42,7 @@ export async function loadExecutionProfileAdmission(
       profile: null,
       modelRoute: null,
       sandboxProfile: null,
+      toolGrant: null,
       eligible: false,
       blockers: ["EXECUTION_PROFILE_MISSING"],
     };
@@ -51,6 +54,7 @@ export async function loadExecutionProfileAdmission(
       profile,
       modelRoute: null,
       sandboxProfile: null,
+      toolGrant: null,
       eligible: false,
       blockers: uniqueBlockers(currentness.blocker
         ? [currentness.blocker]
@@ -59,11 +63,13 @@ export async function loadExecutionProfileAdmission(
     };
   }
 
-  const [modelRoute, sandboxProfile] = await Promise.all([
+  const [modelRoute, sandboxProfile, toolGrant] = await Promise.all([
     ctx.db.get(profile.modelCatalogId),
     profile.sandboxProfileId ? ctx.db.get(profile.sandboxProfileId) : Promise.resolve(null),
+    profile.toolGrantId ? ctx.db.get(profile.toolGrantId) : Promise.resolve(null),
   ]);
   const blockers: ExecutionProfileBlockerCode[] = [];
+  let capabilityValidUntil: number | undefined;
   blockers.push(...executionProfileCurrentnessIssues({
     profile,
     modelRoute,
@@ -162,6 +168,31 @@ export async function loadExecutionProfileAdmission(
     blockers.push("EXECUTION_PROFILE_SANDBOX_MISMATCH");
   }
 
+  if (snapshot.toolGrant) {
+    const toolVersion: any = toolGrant ? await ctx.db.get(toolGrant.toolVersionId) : null;
+    capabilityValidUntil = toolGrant && toolVersion?.qualificationExpiresAt
+      ? Math.min(toolGrant.expiresAt, toolVersion.qualificationExpiresAt)
+      : undefined;
+    if (!toolGrant || !toolVersion
+      || toolGrant.projectId !== profile.projectId
+      || toolGrant._id !== profile.toolGrantId
+      || toolGrant.grantDigest !== profile.toolGrantDigest
+      || String(toolGrant._id) !== snapshot.toolGrant.grantId
+      || toolGrant.grantDigest !== snapshot.toolGrant.grantDigest
+      || mcpToolGrantDigest(toolGrant.immutableSnapshot) !== toolGrant.grantDigest
+      || toolGrant.state !== "ACTIVE" || toolGrant.expiresAt <= now
+      || toolVersion.projectId !== profile.projectId
+      || toolVersion._id !== toolGrant.toolVersionId
+      || toolVersion.toolVersionDigest !== toolGrant.toolVersionDigest
+      || mcpToolVersionDigest(toolVersion.immutableSnapshot) !== toolVersion.toolVersionDigest
+      || !toolVersion.enabled || toolVersion.qualificationStatus !== "EVIDENCE_QUALIFIED"
+      || (toolVersion.qualificationExpiresAt ?? 0) <= now) {
+      blockers.push("EXECUTION_PROFILE_CAPABILITY_MISMATCH");
+    }
+  } else if (profile.toolGrantId || profile.toolGrantDigest || toolGrant) {
+    blockers.push("EXECUTION_PROFILE_CAPABILITY_MISMATCH");
+  }
+
   const allBlockers = uniqueBlockers([
     ...(currentness.blocker ? [currentness.blocker] : []),
     ...blockers,
@@ -170,9 +201,12 @@ export async function loadExecutionProfileAdmission(
     profile,
     modelRoute,
     sandboxProfile,
+    toolGrant,
     eligible: currentness.eligible && allBlockers.length === 0,
     blockers: allBlockers,
-    validUntil: currentness.validUntil,
+    validUntil: currentness.validUntil && capabilityValidUntil
+      ? Math.min(currentness.validUntil, capabilityValidUntil)
+      : currentness.validUntil,
   };
 }
 

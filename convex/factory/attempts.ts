@@ -306,6 +306,15 @@ function executionProfileEvidence(run: any) {
         profileDigest: profile.sandboxProfile.profileDigest,
       },
     } : {}),
+    ...(profile?.toolGrant ? {
+      toolGrant: {
+        grantId: profile.toolGrant.grantId,
+        grantDigest: profile.toolGrant.grantDigest,
+        operation: profile.toolGrant.grantSnapshot?.operation,
+        expiresAt: profile.toolGrant.grantSnapshot?.expiresAt,
+        admission: "QUALIFICATION_FIXTURE",
+      },
+    } : { toolCapability: "NO_TOOL_CAPABILITY" }),
     ...(typeof selectedIsolation === "string" ? { selectedIsolation } : {}),
   };
 }

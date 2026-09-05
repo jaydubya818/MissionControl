@@ -61,6 +61,7 @@
     "release:security": "pnpm run security:audit && pnpm run security:authorization && pnpm run security:secrets && pnpm run docs:factory-check",
     "qualify:factory": "node scripts/system-factory-e2e-qualification.mjs",
     "qualify:factory:v2": "node scripts/system-factory-e2e-qualification.mjs",
+    "qualify:mcp:phase3": "node --import tsx scripts/governed-mcp-phase3-qualification.mts",
     "qualify:planning-containment": "pnpm exec tsx scripts/planning-containment-qualification.mts",
     "eval:mission-control": "pnpm --filter @mission-control/shared build && node scripts/run-mission-control-eval.mjs --check-baseline",
     "taskmaster:plan": "taskmaster plan docs/PRD_V2.md",

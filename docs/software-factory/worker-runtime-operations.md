@@ -226,6 +226,44 @@ dynamic tools, subagent policy, or harness implementation. The earlier generic
 harness rollout remains documented below for operators maintaining those
 worker versions.
 
+## Governed read-only MCP v41 qualification fixture
+
+Phase 3 adds one profile-specific host capability; it does not enable MCP in a
+harness. Register the exact qualification Tool Version, qualify its reviewed
+digest, create one expiring Tool Grant, and register/qualify a new Execution
+Profile that freezes that grant. Never attach the grant to an existing profile
+or historical Attempt.
+
+Before enabling that profile, run the authoritative Factory qualification with
+the reviewed baseline:
+
+```sh
+MC_QUALIFICATION_BASE_SHA=<reviewed-main-sha> pnpm run qualify:factory:v2
+```
+
+The worker executes the exact `read_factory_doctrine_excerpt` fixture before
+harness startup. Convex must commit an `ALLOWED` receipt while the Attempt
+lease, fencing generation, profile, grant, Tool Version, qualification expiry,
+and one-call budget are current. Only then may the local stdio process start.
+The harness receives bounded context labeled untrusted; it receives no MCP
+endpoint or credential.
+
+Operator remediation is deliberately narrow:
+
+- missing capability: select a separately qualified profile with the exact
+  grant, or continue with `NO_TOOL_CAPABILITY` when the WorkOrder does not need it;
+- revoked/expired grant or stale qualification: register and qualify a new
+  immutable version—never mutate the old receipt/profile;
+- server/schema/implementation mismatch: stop and requalify new exact bytes;
+- unavailable/timeout/poisoned output: inspect the Attempt receipt; do not
+  widen destinations, retry budget, or tool scope;
+- stale worker/canceled Attempt: the denial or late completion remains audit
+  evidence, but a retry requires a new current Attempt lease.
+
+Rollback is grant revocation plus removal of the MCP-qualified profile from new
+Factory Version selection. Revocation denies new calls and preserves historical
+receipts. This path is `QUALIFICATION_FIXTURE`, not a real admitted MCP service.
+
 ## Original generic-harness v27 rollout
 
 1. Deploy the `v27` Convex backend before an updated orchestration worker. The
@@ -254,6 +292,8 @@ Monitor:
   capability, readiness, backend, or capacity reason;
 - execution evidence whose profile identity disagrees with the Attempt or
   Factory Version;
+- governed MCP denials, grant expiry/revocation, server/schema substitution,
+  replay, secret withholding, timeout, and `lateOrStale` completion evidence;
 - `FACTORY_WORKER_LOST` run failures;
 - runtime disposition `LOST`, `FAILED`, or `CANCELLED`;
 - lifecycle metadata `PROCESS_TERMINATED`,
