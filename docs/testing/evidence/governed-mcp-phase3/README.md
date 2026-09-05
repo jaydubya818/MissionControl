@@ -20,6 +20,9 @@ revision is retained separately at
 `MC_QUALIFICATION_EVIDENCE_SLUG` so the repository's historical default evidence
 is not overwritten. The earlier `045176e44dee` bundle remains as immutable
 pre-CI evidence; `37953e4d2879` includes the Node 20 compatibility correction.
+The mandatory clean-main qualification after PR #171 is retained at
+`../governed-mcp-phase3-postmerge-6611a03c6025/` with its corresponding broker
+run under `runs/6611a03c6025-2026-09-05T09-48-33-852Z/`.
 
 The broker scenario records exact identity and receipt-shaped observations from
 the real stdio exchange. Those observations are not described as immutable

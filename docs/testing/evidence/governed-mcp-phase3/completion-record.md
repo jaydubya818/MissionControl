@@ -1,6 +1,6 @@
 # Phase 3 governed read-only MCP completion record
 
-Status: **pre-merge qualification complete; merge fields pending**
+Status: **complete — merged and qualified from clean main**
 
 This record covers one exact, local, read-only qualification fixture. It does not claim broad MCP support, a production MCP service, or harness-native MCP support.
 
@@ -11,12 +11,12 @@ This record covers one exact, local, read-only qualification fixture. It does no
 | Required baseline main SHA | `3ae9d86eeff1966862a6959664ec1fe2e6e7240a` |
 | Qualified implementation SHA | `37953e4d287971175da2e3b2aa658f6b5da5d03b` |
 | Pull request | [#171](https://github.com/jaydubya818/MissionControl/pull/171) |
-| Final branch SHA | Pending final evidence commit |
-| Implementation merge SHA | Pending merge |
-| Qualified main SHA | Pending post-merge qualification |
+| Final reviewed branch SHA | `2034a869d3921d435fc586bb3195a0cf64eea5d3` |
+| Implementation merge SHA | `6611a03c6025e7e19548e9a742237e2e466030ee` |
+| Qualified implementation main SHA | `6611a03c6025e7e19548e9a742237e2e466030ee` |
 | Runtime contract | `v41`, exactly eight accepted public changes from `v40` |
 
-The merge and qualified-main fields are lifecycle facts that do not exist before merge. They must be appended after the implementation PR lands; no placeholder is presented as evidence.
+PR #171 was squash-merged after all required GitHub checks passed. The exact merge commit was fetched as `origin/main` before the clean-worktree qualification below.
 
 ## Exact broker qualification identity
 
@@ -90,6 +90,17 @@ Included gates:
 Broker and control-plane tests fail closed for unauthorized workspace/Attempt, wrong or revoked/expired grant, unsupported/write operation, stale lease or worker generation, cancellation, replay, schema/server substitution, redirect or local-metadata escape, unavailable credential, timeout, oversized or malformed response, and hostile output. Authorization, completion, denial, late/stale, retry, byte count, duration, sanitization, and unknown-cost facts remain attributable to the exact Attempt/Profile/Grant/Version lineage.
 
 The revision-scoped broker receipts are observations of the real local stdio exchange. Append-only persistence and transactional currentness are separately proven by the Convex and Factory integration suites; the local JSON is not misrepresented as the control-plane database.
+
+## Post-merge qualification
+
+A new detached worktree was created from fetched main at `6611a03c6025e7e19548e9a742237e2e466030ee`. The authoritative Factory command passed there with 19/19 gates and wrote a separate revision-scoped bundle:
+
+- `../governed-mcp-phase3-postmerge-6611a03c6025/automated-checks.json` — SHA-256 `0d4229ca181c3d8ef9264485842b9295b5906813c2f6d46b542e568a39794b91`;
+- `../governed-mcp-phase3-postmerge-6611a03c6025/eval-receipt.json` — SHA-256 `9e770c4db8680672e704ec8751345427495108761bbc3fbac662ea1e3ca0928d`;
+- `../governed-mcp-phase3-postmerge-6611a03c6025/scenario-evidence.json` — SHA-256 `f371b398024b283197da9550a9e3fb85ed50a5a7976f2472224f97f3e71a5013`;
+- `runs/6611a03c6025-2026-09-05T09-48-33-852Z/broker-scenario.json` — exact post-merge Tool Grant digest `sha256:78d32031712762fc0c07cb2815e948495c967d54e172ffc8d0d6827022944110`.
+
+The post-merge run reconfirmed: the exact qualified profile path remains eligible; profiles without governed MCP remain unchanged; unsupported/write operations, revoked grants, server/schema substitution, stale workers, and replay remain denied; receipts remain attributable. The explicit runtime-contract check accepted only the same eight v40→v41 changes. Release security, authorization ratchet, secret scan, documentation consistency, build, typecheck, startup smoke, and `git diff --check` all passed. The validation worktree had no tracked modifications; only these new evidence files existed before this documentation-only addendum.
 
 ## Independent reviews
 
