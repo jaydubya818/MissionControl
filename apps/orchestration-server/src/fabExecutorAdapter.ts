@@ -94,7 +94,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     session.governed = { workOrderId: attempt.workOrderId, attemptId: attempt.attemptId, executionId: request.executionId,
       executorIdentity: attempt.executorIdentity, environmentReference: attempt.environmentReference, credentialReference: config.credential.id,
       sourceRevision: session.baseline, candidateRevision: null, startedAt: session.createdAt, completedAt: null };
-    // Atomic before credentials/inference. A crash at any later point leaves an explicit uncertain invocation.
+    // Initialize credential redaction before writing private evidence; reserve before inference.
     const model = this.options.modelFactory ? await this.options.modelFactory(config, redactor) : await createModel(config, redactor, this.environment);
     store.reserve(session);
     return { request: structuredClone(request), context, attempt, session, store, redactor, model, controller: new AbortController(), events: [], startedAt: Date.now(), started: false };
@@ -102,6 +102,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
   async execute(prepared: Prepared): Promise<Handle> {
     if (prepared.started) throw new Error("Fab invocation already started; replay is denied.");
     prepared.started = true;
+    await prepared.context.invocationObserver?.started(prepared.request.executionId);
     return { prepared, result: this.perform(prepared) };
   }
   private async perform(p: Prepared): Promise<ExecutorResult> {
@@ -112,7 +113,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
       p.events.push(event); emissions = emissions.then(async () => { await p.context.emit(event); });
       void emissions.catch(() => p.controller.abort());
     };
-    const checkpoint = async () => { signal.throwIfAborted(); await p.attempt.assertActive(); signal.throwIfAborted(); };
+    const checkpoint = async () => { await emissions; signal.throwIfAborted(); await p.attempt.assertActive(); signal.throwIfAborted(); };
     try {
       await checkpoint(); emit("EXECUTION_STARTED", "MC-authorized Fab planning and bounded execution", { fabSessionId: p.session.id, ...p.session.governed });
       const agent = new FabAgent({ session: p.session, model: p.model, store: p.store, redactor: p.redactor, checkpoint,
@@ -127,6 +128,8 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
             ...(typeof data.id === "string" ? { toolCallId: data.id } : {}),
             ...(typeof data.durationMs === "number" ? { durationMs: data.durationMs } : {}),
             ...(event.kind === "model_completed" ? { usage: data.usage, finish: data.finish, returnedModel: data.returnedModel ?? null } : {}),
+            ...(event.kind === "provider_request" ? { providerRequest: data } : {}),
+            ...(typeof data.call === "number" ? { modelCall: data.call } : {}),
             ...(typeof output.status === "string" ? { observedStatus: output.status } : {}),
             ...(typeof output.candidateDigest === "string" ? { candidateDigest: output.candidateDigest } : {}),
           });
@@ -147,6 +150,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     p.session.governed!.completedAt = new Date().toISOString(); p.store.save(p.session);
     emit(status === "COMPLETED" ? "EXECUTION_COMPLETED" : status === "CANCELED" ? "EXECUTION_CANCELED" : "EXECUTION_FAILED", `Fab ${status.toLowerCase()}`, { fabSessionId: p.session.id });
     await emissions;
+    await p.context.invocationObserver?.completed(p.request.executionId);
     const output = JSON.stringify(p.redactor.value({ schema: "factory-result/v1", status: completed ? "COMPLETED" : "BLOCKED",
       summary: p.session.summary ?? "Fab did not produce a qualified candidate.", completedAcceptanceCriterionIds: [], incompleteAcceptanceCriterionIds: [],
       unknownAcceptanceCriterionIds: p.attempt.acceptanceCriteria.map(item => item.id), verificationCommands: p.session.config.checks.map(check => check.argv.join(" ")),
@@ -165,7 +169,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
       repository: { root: p.request.repositoryRoot, workingDirectory: p.request.workingDirectory, baselineCommit: p.session.baseline, headCommit: p.session.baseline, headChanged: false,
         changedFiles: p.session.filesModified.map(name => ({ path: name, status: "M", additions: null, deletions: null })), scopeViolations: [] },
       events: { items: p.events, toolCalls: p.session.events.filter(event => event.kind === "tool_started").length, modelRequests: p.session.modelCalls, retries: p.session.retries, sessionCount: 1 },
-      usage: { inputTokens: p.session.usage.inputTokens, outputTokens: p.session.usage.outputTokens, cacheReadTokens: p.session.usage.cachedTokens, cacheWriteTokens: null, costUsd: p.session.usage.costUsd },
+      usage: { inputTokens: p.session.usage.inputTokens, outputTokens: p.session.usage.outputTokens, cacheReadTokens: p.session.usage.cachedTokens, cacheWriteTokens: p.session.usage.cacheWriteTokens ?? null, costUsd: p.session.usage.costUsd },
       exitCode: null, signal: null, output, structuredOutput: { schema: "factory-result/v1", summary: p.redactor.text(p.session.summary ?? "Blocked") }, error: completed ? null : "Fab execution did not complete.",
       cancellation: { requested: signal.aborted, mode: "IN_PROCESS_AGENT" }, cleanup: { status: "COMPLETED", completedAt: finishedAt, error: null },
     } };

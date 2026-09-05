@@ -51,8 +51,8 @@ describe("Factory Git runtime", () => {
     await writeFile(path.join(repository, "README.md"), "moving default branch\n");
     await git(repository, ["add", "README.md"]);
     await git(repository, ["commit", "-m", "Advance main"]);
-    const movingBase = await inspectCandidateChange(worktree, "main");
-    expect(movingBase.sourceRevision).not.toBe(candidate.sourceRevision);
+    // A moved non-ancestor default branch cannot silently replace the frozen base.
+    await expect(inspectCandidateChange(worktree, "main")).rejects.toThrow();
     const exactBase = await inspectCandidateChange(worktree, "main", candidate.sourceRevision);
     expect(exactBase).toMatchObject({
       sourceRevision: candidate.sourceRevision,
@@ -109,6 +109,18 @@ describe("Factory Git runtime", () => {
     await expect(prepareFactoryDependencies({ worktree }, async (root) => {
       await writeFile(path.join(root, "package.json"), '{"private":false}\n');
     })).rejects.toThrow(/changed repository source state/);
+  });
+
+  it("never loads candidate pnpm hooks or lifecycle scripts during offline preparation", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "mc-dependency-hooks-")); cleanup.push(root);
+    await git(root, ["init", "-b", "main"]); await git(root, ["config", "user.name", "Test"]); await git(root, ["config", "user.email", "fixture@example.invalid"]);
+    await writeFile(path.join(root, "package.json"), JSON.stringify({ private: true, scripts: { preinstall: "node -e \"throw Error('lifecycle executed')\"" } }));
+    await writeFile(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\nimporters:\n\n  .: {}\n");
+    await writeFile(path.join(root, ".pnpmfile.cjs"), "throw new Error('candidate pnpmfile executed');\n");
+    await writeFile(path.join(root, ".npmrc"), "ignore-scripts=false\nignore-pnpmfile=false\nglobal-pnpmfile=.pnpmfile.cjs\n");
+    await writeFile(path.join(root, ".gitignore"), "node_modules/\n");
+    await git(root, ["add", "."]); await git(root, ["commit", "-m", "Synthetic preparation fixture"]);
+    await expect(prepareFactoryDependencies({ worktree: root })).resolves.toMatchObject({ status: "PREPARED" });
   });
 
   it("rejects a worktree root symlink that escapes the canonical checkout", async () => {

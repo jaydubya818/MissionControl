@@ -18,6 +18,7 @@ import {
   discoveredVerificationRiskValidator,
   evidenceCategoryValidator,
   factoryPurposeValidator,
+  gitSubjectPublicationBindingValidator,
   negativeConstraintValidator,
   requiredVerificationRiskValidator,
   requirementValidator,
@@ -4768,6 +4769,12 @@ export const schemaTablesPartTwo = {
     sandboxAllocationId: v.optional(v.id("sandboxAllocations")),
     sandboxResultDigest: v.optional(v.string()),
     sandboxTeardownVerifiedAt: v.optional(v.number()),
+    // Historical workspace owner at a pause, never an active lease or authority.
+    checkpointLease: v.optional(v.object({
+      leaseId: v.string(), ownerId: v.string(), workerId: v.optional(v.string()),
+      workerSessionId: v.optional(v.string()), workerGeneration: v.optional(v.number()),
+      claimedAt: v.number(), heartbeatAt: v.number(), expiresAt: v.number(),
+    })),
     lease: v.optional(v.object({
       leaseId: v.string(),
       ownerId: v.string(),
@@ -4937,6 +4944,7 @@ export const schemaTablesPartTwo = {
       v.literal("EXECUTING"),
       v.literal("VALIDATING"),
       v.literal("AWAITING_HUMAN_REVIEW"),
+      v.literal("AWAITING_VERIFICATION"),
       v.literal("PUBLISHING"),
       v.literal("TERMINAL"),
     )),
@@ -4966,6 +4974,7 @@ export const schemaTablesPartTwo = {
       publicationValidUntil: v.optional(v.number()),
     })),
     verificationSubject: v.optional(verificationSubjectValidator),
+    subjectPublicationBinding: v.optional(gitSubjectPublicationBindingValidator),
     candidateReadyAt: v.optional(v.number()),
     verificationAttemptBinding: v.optional(verificationAttemptBindingValidator),
     verificationIsolationAttestation: v.optional(verificationIsolationAttestationValidator),

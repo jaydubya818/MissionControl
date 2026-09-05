@@ -10,6 +10,8 @@ import {
   loadFactoryWorkspaceOwnership,
   recordFactoryExecutorStarted,
   recordFactoryExecutorTerminated,
+  recordFactoryInvocationStarted,
+  recordFactoryInvocationCompleted,
   recordFactoryPublication,
   recordFactorySandboxStarted,
   recordFactorySandboxTerminated,
@@ -25,6 +27,19 @@ afterEach(async () => {
 });
 
 describe("Factory workspace ownership", () => {
+  it("transfers a finished in-process invocation but preserves unknown execution after a crash", async () => {
+    const fixture = await createFixture();
+    await ensureFactoryWorkspaceOwnership({ owner: fixture.owner, allowCreate: true });
+    await recordFactoryInvocationStarted(fixture.owner, "invocation-1");
+    const transfer = { previousOwner: fixture.owner, nextOwner: { ...fixture.owner, leaseId: "lease-2", workerSessionId: "session-2", workerGeneration: 2 }, checkpointCandidateSha: fixture.headSha };
+    await expect(transferFactoryPublicationWorkspace(transfer)).rejects.toThrow(/terminated workspace/);
+    await expect(recordFactoryInvocationCompleted(fixture.owner, "wrong-invocation")).rejects.toThrow(/does not match/);
+    await recordFactoryInvocationCompleted(fixture.owner, "invocation-1");
+    expect(await transferFactoryPublicationWorkspace(transfer)).toMatchObject({ leaseId: "lease-2", process: { kind: "IN_PROCESS_AGENT", state: "TERMINATED", executionId: "invocation-1" } });
+    // Reconcile a committed local handoff whose acknowledgement was lost.
+    expect(await transferFactoryPublicationWorkspace(transfer)).toMatchObject({ leaseId: "lease-2" });
+    expect(await transferFactoryPublicationWorkspace({ ...transfer, nextOwner: { ...transfer.nextOwner, leaseId: "lease-3" } })).toMatchObject({ leaseId: "lease-3" });
+  });
   it("preserves a workspace when the complete ownership tuple does not match", async () => {
     const fixture = await createFixture();
     await ensureFactoryWorkspaceOwnership({ owner: fixture.owner, allowCreate: true });

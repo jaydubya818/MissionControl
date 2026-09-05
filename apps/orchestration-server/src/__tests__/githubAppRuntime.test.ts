@@ -4,11 +4,42 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createOrReusePullRequest,
+  reconcilePublishedPullRequest,
   fetchGithubPullRequestEvidence,
   loadGithubAppPrivateKey,
 } from "../githubAppRuntime.js";
 
 describe("GitHub App runtime", () => {
+  for (const reason of ["expiry", "cancellation"] as const) it(`rechecks ${reason} after GET and before creating a PR`, async () => {
+    const controller = new AbortController();
+    let expired = false;
+    const fetchImpl = vi.fn(async (_url: any, init: any) => {
+      expect(init.method).toBe("GET");
+      expired = true;
+      if (reason === "cancellation") controller.abort();
+      return Response.json([]);
+    });
+    await expect(createOrReusePullRequest({ repository: "qualification/repo", branch: "mc/candidate", base: "main",
+      headSha: "a".repeat(40), token: "synthetic", title: "candidate", body: "evidence", fetchImpl, signal: controller.signal,
+      assertWriteAllowed: async () => { if (reason === "expiry" && expired) throw new Error("Permit expired during GET"); },
+    })).rejects.toThrow();
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+  it("reconciles a lost publication response using GET only and never retries an absent or conflicting PR", async () => {
+    const input = { repository: "qualification/repo", providerRepositoryId: "101", branch: "mc/candidate", base: "main", headSha: "a".repeat(40), token: "synthetic" };
+    const pull = { number: 42, html_url: "https://github.com/qualification/repo/pull/42", node_id: "PR_42", state: "open", draft: true,
+      head: { ref: input.branch, sha: input.headSha, repo: { id: 101 } }, base: { ref: input.base, repo: { id: 101 } } };
+    for (const remotePulls of [[pull], [], [pull, pull], [{ ...pull, state: "closed" }], [{ ...pull, head: { ...pull.head, sha: "b".repeat(40) } }]]) {
+      const fetchImpl = vi.fn(async (url: any, init: any) => {
+        expect(init.method).toBe("GET");
+        return Response.json(String(url).includes("/git/ref/") ? { object: { type: "commit", sha: input.headSha } } : remotePulls);
+      });
+      const result = reconcilePublishedPullRequest({ ...input, fetchImpl });
+      if (remotePulls.length === 1 && remotePulls[0] === pull) await expect(result).resolves.toMatchObject({ nodeId: "PR_42", reused: true });
+      else await expect(result).rejects.toThrow();
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    }
+  });
   it("loads the private key from an inline value or an owner-controlled file", () => {
     expect(loadGithubAppPrivateKey({ GITHUB_APP_PRIVATE_KEY: " inline-key " })).toBe("inline-key");
 

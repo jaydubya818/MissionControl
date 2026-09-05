@@ -358,6 +358,11 @@ export interface HarnessExecutionContext {
   emit: (event: ExecutorEvent) => Promise<void> | void;
   signal?: AbortSignal;
   processObserver?: ExecutorProcessObserver;
+  /** In-process harness lifecycle, separate from OS child process ownership. */
+  invocationObserver?: {
+    started: (executionId: string) => Promise<void>;
+    completed: (executionId: string) => Promise<void>;
+  };
 }
 
 export interface HarnessExecutorAdapter<TPrepared = unknown, THandle = unknown> {

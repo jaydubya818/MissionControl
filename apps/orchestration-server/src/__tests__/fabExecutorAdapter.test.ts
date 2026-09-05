@@ -47,6 +47,23 @@ function fixture(options: { attack?: string; hangModel?: boolean; slowCheck?: bo
 }
 
 describe("Fab canonical MC harness conformance", () => {
+  it("requires durable request evidence before dispatch and records in-process lifecycle", async () => {
+    const f = fixture();
+    const started = vi.fn(async () => {});
+    const completed = vi.fn(async () => {});
+    f.context.invocationObserver = { started, completed };
+    f.context.emit = async event => {
+      if (event.summary === "provider_request") {
+        expect(f.modelCalls()).toBe(0);
+        throw new Error("Canonical evidence unavailable");
+      }
+    };
+    await expect(runHarnessExecution(f.adapter, f.request, f.context)).rejects.toThrow("Canonical evidence unavailable");
+    expect(f.modelCalls()).toBe(0);
+    expect(started).toHaveBeenCalledWith(f.request.executionId);
+    // No completion receipt is invented when the evidence channel failed.
+    expect(completed).not.toHaveBeenCalled();
+  });
   it("registers an execution-only manifest and rejects scope, model, root and containment mismatch", () => {
     const f = fixture(); const registry = new HarnessAdapterRegistry([f.adapter]);
     expect(registry.require({ adapter: "fab", version: "v1" })).toBe(f.adapter);

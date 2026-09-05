@@ -74,6 +74,7 @@ export interface FactoryExecutionManifestInput {
   factoryConfigurationDigest: string;
   factoryPurpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGENT_AUTOMATION";
   repositoryId: string;
+  providerRepositoryId?: string;
   repository: string;
   repositoryDataClassification?: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
   defaultBranch: string;
@@ -380,6 +381,7 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
   };
   const repository = {
     repositoryId: input.repositoryId,
+    ...(input.providerRepositoryId ? { providerRepositoryId: input.providerRepositoryId } : {}),
     repository: input.repository,
     dataClassification: input.repositoryDataClassification,
     defaultBranch: input.defaultBranch,
@@ -390,6 +392,8 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
     codeScopeIds: input.codeScopes.map((scope) => scope.id).sort(),
     allowedPaths,
     excludedPaths,
+    ...((input.workOrder.verificationContract as { schemaVersion?: number })?.schemaVersion === 2
+      ? { verificationPublicationOrder: "VERIFY_BEFORE_PUBLICATION" as const } : {}),
   };
   const intent = {
     title: input.workOrder.title,

@@ -249,8 +249,22 @@ export const automationVerificationSubjectValidator = v.object({
   outputArtifactContentHashes: v.array(v.string()),
 });
 
+export const prepublicationGitVerificationSubjectValidator = v.object({
+  ...verificationSubjectIdentityFields, version: v.literal(2), kind: v.literal("GIT_CANDIDATE"),
+  repositoryId: v.id("workspaceRepositories"), provider: v.literal("GITHUB"), providerRepositoryId: v.string(),
+  baseSha: v.string(), candidateSha: v.string(), treeSha: v.string(), rawDiffSha256: v.string(), baseRef: v.string(), headRef: v.string(),
+});
+
+export const gitSubjectPublicationBindingValidator = v.object({
+  version: v.literal(1), verificationSubjectDigest: v.string(), sourceAttemptId: v.id("workflowRuns"), repositoryId: v.id("workspaceRepositories"),
+  publicationPermitId: v.string(), publicationPermitLeaseId: v.string(), approvalDecisionId: v.id("approvalDecisions"),
+  verificationReceiptId: v.id("verificationReceipts"), digest: v.string(),
+  pullRequest: v.object({ providerPullRequestId: v.string(), number: v.number(), url: v.string(), baseRef: v.string(), headRef: v.string(), headSha: v.string(), draftAtPublication: v.boolean() }),
+});
+
 export const verificationSubjectValidator = v.union(
   gitVerificationSubjectValidator,
+  prepublicationGitVerificationSubjectValidator,
   automationVerificationSubjectValidator,
 );
 

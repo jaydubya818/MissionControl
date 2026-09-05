@@ -74,6 +74,7 @@ import {
 import { isAutomationSelfApproval } from "./lib/automationGovernance";
 import {
   factoryHumanReviewOutcome,
+  factoryReviewReceiptMatchesSource,
   isFactoryHumanReviewCheckpoint,
   isSourceVerificationFreshForPublication,
   validateHumanReviewApprovalContext,
@@ -107,6 +108,7 @@ import { createWorkOrderRecord } from "./lib/workOrderCreate";
 import {
   appendCurrentVerificationQualityGateDecision,
   getCurrentVerificationResult,
+  getCurrentVerificationRoutingOutcome,
 } from "./lib/currentVerification";
 import {
   nextTaskAttemptNumbers,
@@ -777,8 +779,15 @@ async function applyFactoryHumanReviewDecision(ctx: any, input: {
         missionId: input.sourceReceipt.missionId,
         workOrderId: input.workOrder._id,
         receiptScope: "WORK_ORDER",
-        workflowRunId: input.run._id,
+        workflowRunId: input.sourceReceipt.workflowRunId,
         verificationRunId: input.sourceReceipt.verificationRunId,
+        ...(input.run.verificationSubject?.version === 2 ? {
+          sourceAttemptId: input.sourceReceipt.sourceAttemptId, verificationAttemptId: input.sourceReceipt.verificationAttemptId,
+          verificationSubjectId: input.sourceReceipt.verificationSubjectId, verificationSubjectDigest: input.sourceReceipt.verificationSubjectDigest,
+          verificationContractDigest: input.sourceReceipt.verificationContractDigest, verificationPlanId: input.sourceReceipt.verificationPlanId,
+          verificationPlanDigest: input.sourceReceipt.verificationPlanDigest, independenceValid: input.sourceReceipt.independenceValid,
+          decisionInputDigest: input.sourceReceipt.decisionInputDigest,
+        } : {}),
         idempotencyKey,
         verifier: `human:${input.approver ?? "operator"}`,
         status: "PASSED",
@@ -1397,7 +1406,10 @@ function summarizeRun(run: any) {
     checkpointSummary: run.checkpointSummary,
     factoryContinuationStatus: run.factoryContinuation?.status,
     factoryApprovalDecisionId: run.factoryContinuation?.approvalDecisionId,
-    candidateRevision: run.factoryContinuation?.candidateRevision,
+    candidateRevision: run.factoryContinuation?.candidateRevision ?? (run.verificationSubject?.kind === "GIT_CANDIDATE" ? run.verificationSubject.candidateSha : undefined),
+    verificationSubjectVersion: run.verificationSubject?.version,
+    verificationSubjectDigest: run.verificationSubject?.digest,
+    publicationBindingDigest: run.subjectPublicationBinding?.digest,
     verificationSupersededAt: run.metadata?.verificationSupersededAt,
     startedAt: run.startedAt,
     completedAt: run.completedAt,
@@ -3068,6 +3080,7 @@ async function dispatchWorkOrder(
           factoryConfigurationDigest: factoryBinding.version.configurationDigest,
           factoryPurpose: factoryBinding.version.purpose ?? "SOFTWARE",
           repositoryId: String(factoryBinding.repository._id),
+          providerRepositoryId: factoryBinding.repository.providerRepositoryId,
           repository: factoryBinding.repository.repository,
           repositoryDataClassification: factoryBinding.repositoryDataClassification,
           defaultBranch: factoryBinding.repository.defaultBranch,
@@ -4504,12 +4517,18 @@ export const decideApprovalDecision = mutation({
         ? await ctx.db.get(run.factoryContinuation.verificationReceiptId)
         : null;
       if (!sourceReceipt
-        || sourceReceipt.workflowRunId !== run._id
+        || !factoryReviewReceiptMatchesSource(run as any, sourceReceipt)
         || sourceReceipt.workOrderId !== workOrder._id
-        || sourceReceipt.verdict !== "REQUIRES_HUMAN_REVIEW"
-        || sourceReceipt.status !== "PENDING"
+        || !((sourceReceipt.verdict === "REQUIRES_HUMAN_REVIEW" && sourceReceipt.status === "PENDING")
+          || (run.verificationSubject?.version === 2 && sourceReceipt.verdict === "VERIFIED" && sourceReceipt.status === "PASSED"))
         || sourceReceipt.candidateRevision !== run.factoryContinuation?.candidateRevision) {
         throw new Error("Human-review checkpoint is missing its exact verification receipt");
+      }
+      if (run.verificationSubject?.version === 2) {
+        const current = await getCurrentVerificationRoutingOutcome(ctx, workOrder, Date.now(), "PREPUBLICATION");
+        if (!current.eligible || current.sourceAttemptId !== String(run._id) || current.verificationReceiptId !== String(sourceReceipt._id)) {
+          throw new Error("Human review requires the latest exact independent pre-publication evidence.");
+        }
       }
       if (!isSourceVerificationFreshForPublication({ validUntil: sourceReceipt.validUntil })) {
         const staleReason = "Human-review evidence expired before publication could be safely authorized";

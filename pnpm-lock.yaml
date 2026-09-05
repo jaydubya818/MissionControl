@@ -200,8 +200,8 @@ importers:
   apps/orchestration-server:
     dependencies:
       '@fdlc/fab':
-        specifier: file:../../vendor/fab/fdlc-fab-0.1.0-experimental.1.tgz
-        version: file:vendor/fab/fdlc-fab-0.1.0-experimental.1.tgz
+        specifier: file:../../vendor/fab/fdlc-fab-0.1.0-experimental.2.tgz
+        version: file:vendor/fab/fdlc-fab-0.1.0-experimental.2.tgz
       '@hono/node-server':
         specifier: ^1.19.13
         version: 1.19.17(hono@4.13.1)
@@ -575,9 +575,9 @@ importers:
 
 packages:
 
-  '@fdlc/fab@file:vendor/fab/fdlc-fab-0.1.0-experimental.1.tgz':
-    resolution: {integrity: sha512-JDi8j4zekYpqIezrMwskh3+PGxCEldxWnnUhbv7BbLfLDJyV4VEMsW9xzoiro6ximNeaVfdAw2/ihJJKOo0rfw==, tarball: file:vendor/fab/fdlc-fab-0.1.0-experimental.1.tgz}
-    version: 0.1.0-experimental.1
+  '@fdlc/fab@file:vendor/fab/fdlc-fab-0.1.0-experimental.2.tgz':
+    resolution: {integrity: sha512-JqVCa4uPUUDVSXXT1+ubWYFDMRs+mFfeyghDXsQ5+uUWdrEkzxiWvpGbM9pp3N6gC/NxAo88x3CX51XmzAzd6Q==, tarball: file:vendor/fab/fdlc-fab-0.1.0-experimental.2.tgz}
+    version: 0.1.0-experimental.2
     engines: {node: '>=24.0.0'}
     hasBin: true
 
@@ -4401,7 +4401,7 @@ packages:
 
 snapshots:
 
-  '@fdlc/fab@file:vendor/fab/fdlc-fab-0.1.0-experimental.1.tgz': {}
+  '@fdlc/fab@file:vendor/fab/fdlc-fab-0.1.0-experimental.2.tgz': {}
 
   '@ai-sdk/anthropic@2.0.66(zod@3.25.76)':
     dependencies:

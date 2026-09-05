@@ -44,6 +44,7 @@ import {
   type WorkOrderQueueFilters,
   type WorkOrderQuickFilter,
 } from "./workOrdersModel";
+import { CandidateRecoveryPanel } from "./CandidateRecoveryPanel";
 import { ExecutionRunInspector } from "./ExecutionRunInspector";
 import { ReviewEvidencePackage, type ReviewEvidencePackageData } from "./ReviewEvidencePackage";
 import { splitCurrentAndHistoricalRevisions, summarizeRevisionEffects } from "./workOrderLifecycleModel";
@@ -292,6 +293,8 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   const supersedeWorkOrder = useMutation(api.workOrders.supersedeWorkOrder);
   const expireGovernanceRecords = useMutation(api.workOrders.expireGovernanceRecords);
   const retryVerificationAttempt = useMutation(api["factory/attempts"].retryVerification);
+  const retryCandidateVerification = useMutation(api["factory/attempts"].retryCandidateVerification);
+  const retryPublicationReconciliation = useMutation(api["factory/attempts"].retryPublicationReconciliation);
   const recordReviewJudgment = useMutation(api.reviewIntelligence.recordReviewJudgment);
   const seedDemo = useMutation(api.workOrders.seedDemo);
 
@@ -434,6 +437,11 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
       && ["PENDING", "RUNNING", "PAUSED"].includes(run.status)) ?? null,
     [selected]
   );
+  const pausedCandidate = selected?.executionRuns.find(run => run._id === selected.workOrder.currentExecutionRunId
+    && run.status === "PAUSED" && run.verificationSubjectVersion === 2);
+  const publicationUncertain = pausedCandidate?.factoryContinuationStatus === "PUBLICATION_AUTHORIZED";
+  const candidateDispatchBlocked = pausedCandidate?.executionPhase === "AWAITING_VERIFICATION"
+    && !activeVerificationAttempt && !failedVerificationAttempt && Boolean(selected?.workOrder.blockingIssue);
   const agentMap = useMemo(
     () =>
       new Map<Id<"agents">, Doc<"agents">>(
@@ -752,6 +760,15 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                   </div>
                 ) : null}
 
+                {pausedCandidate && (publicationUncertain || verificationDispatchBlocked) ? (
+                  <CandidateRecoveryPanel key={`${pausedCandidate._id}:${publicationUncertain}`}
+                    candidateRevision={pausedCandidate.candidateRevision} publicationUncertain={publicationUncertain}
+                    onRecover={async () => {
+                      const input = { sourceAttemptId: pausedCandidate._id };
+                      if (publicationUncertain) await retryPublicationReconciliation(input);
+                      else await retryCandidateVerification(input);
+                    }} />
+                ) : null}
                 {failedVerificationAttempt && !activeVerificationAttempt ? (
                   <div className="rounded-xl border border-danger/35 bg-danger/5 p-4" role="alert" aria-label="Independent verification recovery required">
                     <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">

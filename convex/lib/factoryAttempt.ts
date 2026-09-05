@@ -75,6 +75,7 @@ type VerificationSourceAttemptLike = {
   _id?: unknown;
   attemptPurpose?: string;
   status?: string;
+  executionPhase?: string;
   candidateReadyAt?: number;
   repositoryId?: unknown;
   workOrderId?: unknown;
@@ -132,14 +133,20 @@ export function factoryAttemptSourceBindingMatches(input: {
     && binding.verificationSubjectDigest === subject.digest
     && source.verificationSubject?.digest === subject.digest
     && source.attemptPurpose === "IMPLEMENTATION"
-    && source.status === "COMPLETED"
+    && candidateSourceCanBeVerified(source)
     && Number.isFinite(source.candidateReadyAt)
     && input.manifestBaseSha === subject.candidateSha
     && source.headSha === subject.candidateSha
-    && subject.pullRequest?.headSha === subject.candidateSha
+    && (subject.version === 2 ? subject.baseSha === source.executionBaseSha : subject.pullRequest?.headSha === subject.candidateSha)
     && input.branch === source.branch
-    && input.branch === subject.pullRequest?.headRef
+    && input.branch === (subject.version === 2 ? subject.headRef : subject.pullRequest?.headRef)
   );
+}
+
+export function candidateSourceCanBeVerified(source: { status?: string; executionPhase?: string; verificationSubject?: any }) {
+  return source.status === "COMPLETED" || (source.status === "PAUSED" && source.executionPhase === "AWAITING_VERIFICATION"
+    && source.verificationSubject?.kind === "GIT_CANDIDATE" && source.verificationSubject.version === 2
+    && verifyVerificationSubjectIdentity(source.verificationSubject));
 }
 
 function gitRevision(value: unknown) {
