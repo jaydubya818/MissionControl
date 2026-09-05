@@ -111,6 +111,17 @@ The detailed sequence, acceptance criteria, threat drills, rollout model, and
 Product Owner decisions are in the
 [Software Factory Production Convergence plan](../plans/2026-08-25-feat-software-factory-production-convergence-plan.md).
 
+## Operating-contract integration — 2026-09-05
+
+The [operating contract evidence map](../software-factory/operating-contract-evidence-map.md)
+connects existing source and tests at `0d1a090` to FDLC and the Guide. This is a
+documentation refinement, not a new admission or maturity promotion. The local
+read-only MCP fixture remains experimental; general side-effecting tool
+reconciliation, full outcome economics and production trajectory coverage are
+not qualified by that fixture. Historical qualification identities remain
+unchanged. Future gates should reuse the existing Attempts, receipts, evals and
+learning records rather than introduce parallel systems.
+
 ## Update rule
 
 Every status change must record an exact baseline, evidence link, limitation,
