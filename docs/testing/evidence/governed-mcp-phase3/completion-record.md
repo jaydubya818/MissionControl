@@ -10,7 +10,7 @@ This record covers one exact, local, read-only qualification fixture. It does no
 | --- | --- |
 | Required baseline main SHA | `3ae9d86eeff1966862a6959664ec1fe2e6e7240a` |
 | Qualified implementation SHA | `045176e44deef520a88988212af202b6d4c82e19` |
-| Pull request | Pending creation after independent review |
+| Pull request | [#171](https://github.com/jaydubya818/MissionControl/pull/171) |
 | Final branch SHA | Pending final evidence commit |
 | Implementation merge SHA | Pending merge |
 | Qualified main SHA | Pending post-merge qualification |
