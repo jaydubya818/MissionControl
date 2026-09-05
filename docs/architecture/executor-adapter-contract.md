@@ -11,6 +11,13 @@ The exact adapter/version is selected by the immutable Factory version,
 advertised by a current canonical worker, frozen in the Attempt manifest, and
 resolved without fallback from the worker's adapter registry.
 
+New Factory Versions select that adapter through an exact immutable Execution
+Profile and profile-qualification receipt. The profile is subordinate
+control-plane configuration: it does not load adapter code, modify registry
+composition, or provide a fallback. The worker verifies the profile and all of
+its component projections before calling `prepare`. See the [Execution Profile
+identity decision](../decisions/execution-profile-identity.md).
+
 An adapter executes an already-approved, already-dispatched WorkOrder Attempt.
 Its declared worker, verification, publication, acceptance, memory,
 observability, and learning authority must all be `NONE`. The registry rejects
@@ -64,13 +71,23 @@ PR creation.
 ## Frozen execution manifest
 
 Every new Factory version binds active repository code scopes and one approved
-agent version for each workflow agent. Dispatch compiles one immutable
-`factory-execution-manifest/v1` containing causation IDs, WorkOrder revision,
-Factory digest, repository/branch/worktree authority, prompt and context hashes,
-per-step agent genome/prompt/tool/model identities, timeout, isolation, and the
-`factory-result/v1` completion contract. The full compiled prompt is available
-only through the signed claim boundary; public run queries and the inspector
-return its hash but redact its content.
+agent version for each workflow agent. Historical Factory Versions retain their
+immutable execution-manifest V1/V2 bytes. A profile-bound Factory Version
+compiles `factory-execution-manifest/v3`, adding the exact profile row ID, key,
+version, canonical snapshot and digest, and qualification receipt to the
+existing causation IDs, WorkOrder revision, Factory digest,
+repository/branch/worktree authority, prompt and context hashes, per-step agent
+genome/prompt/tool/model identities, timeout, isolation, component identities,
+and `factory-result/v1` completion contract. The full compiled prompt is
+available only through the signed claim boundary; public run queries and the
+inspector return its hash but redact its content.
+
+The host, not the adapter, owns profile evidence. It reconciles the frozen
+profile, qualification, model-route, harness-manifest, effective-configuration,
+runtime-artifact, backend, and optional Sandbox Profile identities before start
+and before persisting results. Missing, revoked, stale, unsupported, or
+substituted identity fails closed; adapter output cannot authorize a different
+profile.
 
 ## Event and secret rules
 
@@ -93,7 +110,8 @@ The control plane does support crash reconciliation: an expired durable lease
 can be reclaimed against the same immutable manifest, branch, and worktree, and
 branch push / PR creation are idempotent. Once an attempt reaches a terminal
 state, recovery creates a new bounded WorkOrder attempt referencing the prior
-failed/canceled attempt.
+failed/canceled attempt. That retry must pass current Execution Profile
+admission and never inherits eligibility merely from the prior Attempt.
 
 Set `CODEX_FACTORY_WORKER_ENABLED=true` to register `codex/v1`, or set
 `DEEPSEEK_HARNESS_EXECUTOR_ENABLED=1` to register the pinned DeepSeek adapter.

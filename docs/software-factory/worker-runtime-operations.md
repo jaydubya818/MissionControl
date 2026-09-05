@@ -41,6 +41,12 @@ configuration digest, backend, sandbox capabilities, slots, readiness, and
 session before polling.
 Registration failure is fail-closed: Attempt execution does not start.
 
+An Execution Profile is a control-plane identity, not a worker plugin or
+advertisement. The worker continues to advertise exact installed components and
+its exact Factory Version binding. For a profile-bound version, admission
+reconciles that binding with the frozen profile and qualification identity; the
+worker does not discover, install, or select a profile independently.
+
 Keep one stable `CODEX_WORKER_HOST_ID` per real worker installation. Do not
 reuse one ID concurrently on two machines. Each process restart deliberately
 creates a new session and server-derived generation.
@@ -49,11 +55,14 @@ creates a new session and server-derived generation.
 
 1. Dispatch freezes the exact base SHA, executor/version, backend, sandbox
    requirements, repository scope, model route, timeout, context, Factory
-   Version, quality contract, and verification contract.
+   Version, quality contract, verification contract, and, for new Factory
+   Versions, the exact Execution Profile version, digest, and qualification
+   receipt in `factory-execution-manifest/v3`.
 2. `attempts.claim` atomically checks the current registration, heartbeat,
    readiness/draining state, repository access, executor, isolation, required
    harness capabilities, exact capability/configuration digests, provider/model,
-   sandbox capabilities, backend, and server-counted active leases. Capacity is
+   sandbox capabilities, backend, current profile qualification and exact
+   Factory Version/profile binding, and server-counted active leases. Capacity is
    counted across all repositories and sessions for the stable worker ID; the
    reported `currentRuns` value is observational only.
 3. A successful claim writes a unique lease ID plus worker ID, session, and
@@ -64,6 +73,12 @@ creates a new session and server-derived generation.
    re-checks the current server registration in the same transaction.
 5. Heartbeats update current lease/registration state. They are not emitted as
    high-volume durable events.
+
+A revoked or expired profile blocks dispatch and first claim. If revocation
+occurs after a valid lease is issued, the Attempt continues under that exact
+frozen identity until the bounded lease completes or normal cancellation and
+recovery policy intervenes. Profile state is not re-resolved inside adapter
+execution, and a retry must pass current admission as a new Attempt.
 
 ## Local ownership files
 
@@ -186,7 +201,32 @@ Mission Control does not clone, build, install, download, start, or authenticate
 these prerequisites. A failed pin or provider probe prevents worker
 registration and execution.
 
-## Backend-first rollout
+## Execution Profile v40 rollout
+
+1. Deploy the `v40` Convex backend and authoritative generated API types before
+   any caller requires profile-bound Factory Version creation.
+2. Register and qualify an immutable `factory-execution-profile/v1` version;
+   confirm its exact route, route qualification, harness manifest, effective
+   configuration, runtime artifact, backend, optional Sandbox Profile,
+   isolation, capability, lifecycle, and all-denied authority bindings.
+3. Create a new Factory Version from that exact profile and verify its
+   compatibility projections and configuration digest. Do not backfill or
+   rewrite historical execution-manifest V1/V2 records.
+4. Confirm readiness, dispatch, first claim, and host evidence all expose the
+   same profile row ID, key, version, profile digest, qualification digest, and
+   exact component identities. Wrong, missing, stale, revoked, unsupported, or
+   substituted identities must fail before harness execution.
+5. Roll back by stopping new profile-bound Factory Version creation and
+   admission. Drain before worker rollback; already leased Attempts retain their
+   frozen identity, while retries require current admission. Do not infer or
+   substitute a profile.
+
+Phase 2 does not change adapter installation, worker registry composition,
+dynamic tools, subagent policy, or harness implementation. The earlier generic
+harness rollout remains documented below for operators maintaining those
+worker versions.
+
+## Original generic-harness v27 rollout
 
 1. Deploy the `v27` Convex backend before an updated orchestration worker. The
    stored manifest fields are optional, so existing Factory versions and host
@@ -209,7 +249,11 @@ registration and execution.
 Monitor:
 
 - registration failures or stale host heartbeats;
-- claim rejections by capability, readiness, backend, or capacity reason;
+- profile qualification expiry/revocation and readiness blockers;
+- claim rejections by profile/qualification digest, component identity,
+  capability, readiness, backend, or capacity reason;
+- execution evidence whose profile identity disagrees with the Attempt or
+  Factory Version;
 - `FACTORY_WORKER_LOST` run failures;
 - runtime disposition `LOST`, `FAILED`, or `CANCELLED`;
 - lifecycle metadata `PROCESS_TERMINATED`,

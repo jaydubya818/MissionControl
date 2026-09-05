@@ -2,7 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import type { ConvexHttpClient } from "convex/browser";
 import {
+  GENERIC_HARNESS_CONTRACT_VERSION,
+  harnessCapabilityManifestDigest,
+  harnessCapabilityRequirementsSatisfied,
   harnessExecutionRequestDigest,
+  harnessManifestIssues,
   harnessNormalizedResultIssues,
   harnessRuntimeArtifactDigest,
   modelRouteReasoningConfigIssues,
@@ -152,6 +156,7 @@ export class MissionPlanningWorker {
     let worktreeReleased = false;
     const heartbeat = setInterval(() => void this.renew(run, leaseId, controller), HEARTBEAT_MS);
     try {
+      assertMissionPlanningExecutionProfile(run);
       await ensurePlanningWorktree({
         checkoutRoot: host.checkoutRoot,
         worktree,
@@ -176,7 +181,7 @@ export class MissionPlanningWorker {
           signal: controller.signal,
           emit: () => undefined,
         });
-        const researchExecution = executionProvenance(researchResult.normalizedResult, "RESEARCH", prompt);
+        const researchExecution = executionProvenance(researchResult.normalizedResult, "RESEARCH", prompt, run);
         await this.report(run, leaseId, {
           kind: "PHASE_EXECUTION_RECORDED",
           harnessExecution: researchExecution,
@@ -215,7 +220,7 @@ export class MissionPlanningWorker {
       });
       await this.report(run, leaseId, {
         kind: "PHASE_EXECUTION_RECORDED",
-        harnessExecution: executionProvenance(generationResult.normalizedResult, "GENERATION", prompt),
+        harnessExecution: executionProvenance(generationResult.normalizedResult, "GENERATION", prompt, run),
       });
       assertMissionPlanningHarnessResult(
         generationResult.normalizedResult,
@@ -327,6 +332,7 @@ export function buildMissionPlanningExecutorRequest(input: {
   schemaId: string;
   jsonSchema: Record<string, unknown>;
 }): ExecutorRequest {
+  assertMissionPlanningExecutionProfile(input.run);
   const exactRoute = missionPlanningRouteRequestFields(input.run);
   return {
     executionId: `${String(input.run._id)}:${input.run.attemptCount}:${input.phase}`,
@@ -349,6 +355,7 @@ export function assertMissionPlanningHarnessRegistration(
   run: any,
   registration: RegisteredHarnessAdapter,
 ) {
+  const executionProfile = assertMissionPlanningExecutionProfile(run);
   const expectedRuntimeDigest = run.executor?.runtimeArtifactSha256;
   if (!run.executor?.runtimeArtifact
     || typeof expectedRuntimeDigest !== "string"
@@ -357,6 +364,8 @@ export function assertMissionPlanningHarnessRegistration(
     || registration.capabilities.version !== run.executor?.version
     || registration.capabilityManifestSha256 !== run.executor?.capabilityManifestSha256
     || registration.effectiveConfigSha256 !== run.executor?.effectiveConfigSha256
+    || (executionProfile !== null
+      && canonicalHash(registration.manifest) !== canonicalHash(executionProfile.profileSnapshot.harness.capabilityManifest))
     || !runtimeArtifactMatches(
       registration.runtimeArtifact,
       registration.runtimeArtifactSha256,
@@ -370,6 +379,160 @@ export function assertMissionPlanningHarnessRegistration(
     );
   }
   missionPlanningRouteRequestFields(run);
+}
+
+/** Re-hashes the frozen profile at the worker boundary before registry lookup.
+ * Live eligibility is owned by claim; a valid lease may complete after later
+ * expiry or revocation, so this intentionally verifies identity rather than
+ * re-evaluating wall-clock currentness. */
+export function assertMissionPlanningExecutionProfile(run: any) {
+  const state = workerExecutionProfileBindingState(run);
+  const inputBinding = run.inputSnapshot?.factoryAdmission?.executionProfile;
+  if (state === "NONE") {
+    if (inputBinding !== undefined || !missionPlanningFrozenCoreIdentityComplete(run)) {
+      throw planningError(
+        "EXECUTION_PROFILE_MISSING",
+        "Profileless planning execution is allowed only for a complete historical frozen identity.",
+        false,
+      );
+    }
+    return null;
+  }
+  if (state !== "COMPLETE") {
+    throw planningError(
+      "EXECUTION_PROFILE_MISSING",
+      "Planning run has a partial Execution Profile binding.",
+      false,
+    );
+  }
+  if (!missionPlanningFrozenCoreIdentityComplete(run)) {
+    throw planningError(
+      "EXECUTION_PROFILE_IDENTITY_MISMATCH",
+      "Planning run core execution identity does not match its frozen Execution Profile projection.",
+      false,
+    );
+  }
+
+  const binding = frozenWorkerExecutionProfileBinding(run)!;
+  const profile = binding.profileSnapshot as Record<string, any>;
+  const qualification = binding.qualificationSnapshot as Record<string, any>;
+  const manifest = profile?.harness?.capabilityManifest;
+  const qualificationComponents = executionProfileQualificationComponents(profile);
+  const isolationModes = profile?.isolationModes;
+  const expectedHarnessCapabilities = executionProfileHarnessRequirements(isolationModes);
+  const expectedSandboxCapabilities = executionProfileSandboxRequirements(isolationModes);
+  const profileFields = [
+    "schema", "profileKey", "version", "harness", "runtimeArtifact", "executionBackend",
+    "modelRoute", "isolationModes", "requiredHarnessCapabilities", "requiredSandboxCapabilities",
+    "lifecycle", "authority",
+  ];
+  const qualificationFields = [
+    "schema", "profile", "components", "scope", "evidence", "approvedBy", "approvedAt",
+    "validUntil", "authority",
+  ];
+  const harnessFields = ["adapter", "version", "capabilityManifest", "capabilityManifestDigest", "effectiveConfigSha256"];
+  const runtimeFields = ["snapshot", "digest"];
+  const routeFields = ["catalogId", "routeSnapshot", "routeDigest", "qualificationSnapshot", "qualificationDigest"];
+  const lifecycleFields = [
+    "contractVersion", "cancellationMode", "idempotentCleanup", "retryCreatesNewAttempt",
+    "inFlightRevocationPolicy", "componentSubstitution",
+  ];
+  const componentFields = [
+    "harness", "runtimeArtifactDigest", "executionBackend", "modelRoute", "isolationModes",
+    "requiredHarnessCapabilities", "requiredSandboxCapabilities",
+  ];
+  let manifestDigest: string | null = null;
+  let runtimeDigest: string | null = null;
+  try {
+    manifestDigest = harnessCapabilityManifestDigest(manifest);
+    runtimeDigest = harnessRuntimeArtifactDigest(profile?.runtimeArtifact?.snapshot);
+  } catch {
+    // The consolidated mismatch below produces one stable worker failure.
+  }
+  if (!onlyExecutionProfileKeys(profile, profileFields)
+    || !onlyExecutionProfileKeys(qualification, qualificationFields)
+    || !onlyExecutionProfileKeys(profile?.harness, harnessFields)
+    || !onlyExecutionProfileKeys(profile?.runtimeArtifact, runtimeFields)
+    || !onlyExecutionProfileKeys(profile?.modelRoute, routeFields)
+    || !onlyExecutionProfileKeys(profile?.lifecycle, lifecycleFields)
+    || !onlyExecutionProfileKeys(qualification?.profile, ["id", "key", "version", "digest"])
+    || !onlyExecutionProfileKeys(qualification?.components, componentFields)
+    || !onlyExecutionProfileKeys(qualification?.components?.harness, ["adapter", "version", "capabilityManifestDigest", "effectiveConfigSha256"])
+    || !onlyExecutionProfileKeys(qualification?.components?.modelRoute, ["catalogId", "routeDigest", "qualificationDigest"])
+    || !onlyExecutionProfileKeys(qualification?.scope, ["workloadClasses", "riskClasses"])
+    || !onlyExecutionProfileKeys(qualification?.evidence, ["reference", "digest"])
+    || profile.schema !== "factory-execution-profile/v1"
+    || qualification.schema !== "factory-execution-profile-qualification/v1"
+    || !boundedLowercaseIdentity(binding.profileKey, 100)
+    || !/^[a-z0-9][a-z0-9._-]*$/.test(binding.profileKey)
+    || !Number.isSafeInteger(binding.version)
+    || binding.version < 1
+    || binding.version > 1_000_000
+    || !/^sha256:[a-f0-9]{64}$/.test(binding.profileDigest)
+    || !/^sha256:[a-f0-9]{64}$/.test(binding.qualificationDigest)
+    || binding.profileDigest !== canonicalIdentityDigest(profile.schema, profile)
+    || binding.qualificationDigest !== canonicalIdentityDigest(qualification.schema, qualification)
+    || profile.profileKey !== binding.profileKey
+    || profile.version !== binding.version
+    || qualification.profile?.id !== binding.profileId
+    || qualification.profile?.key !== binding.profileKey
+    || qualification.profile?.version !== binding.version
+    || qualification.profile?.digest !== binding.profileDigest
+    || !Number.isFinite(qualification.approvedAt)
+    || !Number.isFinite(qualification.validUntil)
+    || qualification.validUntil <= qualification.approvedAt
+    || qualification.validUntil - qualification.approvedAt > 366 * 24 * 60 * 60 * 1_000
+    || !boundedWorkerIdentity(qualification.approvedBy, 200)
+    || !boundedWorkerIdentity(qualification.evidence?.reference, 1_000)
+    || !/^sha256:[a-f0-9]{64}$/.test(qualification.evidence?.digest ?? "")
+    || !canonicalSortedStringArray(qualification.scope?.workloadClasses)
+    || !qualification.scope.workloadClasses.includes("MISSION_PLANNING")
+    || qualification.scope.workloadClasses.some((value: string) => !/^[A-Z][A-Z0-9_]*$/.test(value))
+    || !canonicalSortedStringArray(qualification.scope?.riskClasses)
+    || !qualification.scope.riskClasses.includes("YELLOW")
+    || qualification.scope.riskClasses.some((value: string) => !["GREEN", "YELLOW", "RED"].includes(value))
+    || !allDeniedExecutionProfileAuthority(profile.authority)
+    || !allDeniedExecutionProfileAuthority(qualification.authority)
+    || profile.lifecycle?.contractVersion !== GENERIC_HARNESS_CONTRACT_VERSION
+    || profile.lifecycle?.cancellationMode !== manifest?.cancellation?.mode
+    || profile.lifecycle?.idempotentCleanup !== manifest?.cancellation?.idempotentCleanup
+    || profile.lifecycle?.retryCreatesNewAttempt !== true
+    || profile.lifecycle?.inFlightRevocationPolicy !== "LEASED_ATTEMPT_MAY_COMPLETE"
+    || profile.lifecycle?.componentSubstitution !== "DENIED"
+    || !canonicalSortedStringArray(isolationModes)
+    || !isolationModes.includes("READ_ONLY")
+    || isolationModes.some((mode: unknown) => mode !== "READ_ONLY" && mode !== "WORKSPACE_WRITE")
+    || !sameCanonical(profile.requiredHarnessCapabilities, expectedHarnessCapabilities)
+    || !sameStringSet(profile.requiredSandboxCapabilities, expectedSandboxCapabilities)
+    || harnessManifestIssues(manifest).length > 0
+    || manifestDigest !== profile.harness?.capabilityManifestDigest
+    || manifest?.effectiveConfigSha256 !== profile.harness?.effectiveConfigSha256
+    || !harnessCapabilityRequirementsSatisfied(manifest, profile.requiredHarnessCapabilities)
+    || profile.harness?.adapter !== run.executor?.adapter
+    || profile.harness?.version !== run.executor?.version
+    || profile.harness?.capabilityManifestDigest !== run.executor?.capabilityManifestSha256
+    || profile.harness?.effectiveConfigSha256 !== run.executor?.effectiveConfigSha256
+    || runtimeDigest !== profile.runtimeArtifact?.digest
+    || profile.runtimeArtifact?.digest !== run.executor?.runtimeArtifactSha256
+    || !sameCanonical(profile.runtimeArtifact?.snapshot, run.executor?.runtimeArtifact)
+    || profile.executionBackend !== "persistent-worker"
+    || profile.executionBackend !== run.executionBackend
+    || profile.sandboxProfile !== undefined
+    || profile.modelRoute?.catalogId !== String(run.modelCatalogId)
+    || profile.modelRoute?.routeDigest !== run.modelRouteDigest
+    || profile.modelRoute?.qualificationDigest !== run.modelQualificationDigest
+    || !sameCanonical(profile.modelRoute?.routeSnapshot, run.modelRouteSnapshot)
+    || !sameCanonical(profile.modelRoute?.qualificationSnapshot, run.modelQualificationSnapshot)
+    || !sameCanonical(qualification.components, qualificationComponents)
+    || qualification.components?.sandboxProfile !== undefined
+    || !sameCanonical(inputBinding, binding)) {
+    throw planningError(
+      "EXECUTION_PROFILE_IDENTITY_MISMATCH",
+      "Planning run Execution Profile does not match its frozen harness, runtime, route, qualification, backend, or read-only isolation identity.",
+      false,
+    );
+  }
+  return binding;
 }
 
 export function assertMissionPlanningHarnessResult(
@@ -489,6 +652,176 @@ function runtimeArtifactMatches(
   }
 }
 
+const WORKER_EXECUTION_PROFILE_FIELDS = [
+  "executionProfileId",
+  "executionProfileKey",
+  "executionProfileVersion",
+  "executionProfileDigest",
+  "executionProfileSnapshot",
+  "executionProfileQualificationDigest",
+  "executionProfileQualificationSnapshot",
+] as const;
+
+function workerExecutionProfileBindingState(run: Record<string, any>) {
+  const present = WORKER_EXECUTION_PROFILE_FIELDS.filter((field) => run[field] !== undefined).length;
+  if (present === 0) return "NONE" as const;
+  if (present === WORKER_EXECUTION_PROFILE_FIELDS.length) return "COMPLETE" as const;
+  return "PARTIAL" as const;
+}
+
+function frozenWorkerExecutionProfileBinding(run: Record<string, any>) {
+  if (workerExecutionProfileBindingState(run) !== "COMPLETE") return null;
+  return {
+    profileId: String(run.executionProfileId),
+    profileKey: run.executionProfileKey,
+    version: run.executionProfileVersion,
+    profileDigest: run.executionProfileDigest,
+    profileSnapshot: run.executionProfileSnapshot,
+    qualificationDigest: run.executionProfileQualificationDigest,
+    qualificationSnapshot: run.executionProfileQualificationSnapshot,
+  };
+}
+
+function workerExecutionProfileReceiptIdentity(run: Record<string, any>) {
+  const binding = frozenWorkerExecutionProfileBinding(run);
+  return binding ? {
+    profileId: binding.profileId,
+    profileKey: binding.profileKey,
+    version: binding.version,
+    profileDigest: binding.profileDigest,
+    qualificationDigest: binding.qualificationDigest,
+  } : null;
+}
+
+function missionPlanningFrozenCoreIdentityComplete(run: Record<string, any>) {
+  const admission = run.inputSnapshot?.factoryAdmission as Record<string, any> | undefined;
+  if (!run.inputSnapshot
+    || run.inputDigest !== `sha256:${canonicalHash(run.inputSnapshot)}`
+    || run.executionBackend !== "persistent-worker"
+    || !run.factoryDefinitionVersionId
+    || !run.factoryConfigurationDigest
+    || !run.modelCatalogId
+    || !run.executor?.runtimeArtifact
+    || typeof run.executor.runtimeArtifactSha256 !== "string"
+    || !admission
+    || admission.factoryDefinitionVersionId !== String(run.factoryDefinitionVersionId)
+    || admission.factoryConfigurationDigest !== run.factoryConfigurationDigest
+    || admission.modelCatalogId !== String(run.modelCatalogId)
+    || admission.modelRouteDigest !== run.modelRouteDigest
+    || admission.modelQualificationDigest !== run.modelQualificationDigest
+    || admission.executionBackend !== run.executionBackend
+    || admission.harnessRuntimeArtifactSha256 !== run.executor.runtimeArtifactSha256) {
+    return false;
+  }
+  try {
+    missionPlanningRouteRequestFields(run);
+    return harnessRuntimeArtifactDigest(run.executor.runtimeArtifact) === run.executor.runtimeArtifactSha256;
+  } catch {
+    return false;
+  }
+}
+
+function executionProfileQualificationComponents(profile: Record<string, any> | undefined) {
+  if (!profile) return null;
+  return {
+    harness: {
+      adapter: profile.harness?.adapter,
+      version: profile.harness?.version,
+      capabilityManifestDigest: profile.harness?.capabilityManifestDigest,
+      effectiveConfigSha256: profile.harness?.effectiveConfigSha256,
+    },
+    runtimeArtifactDigest: profile.runtimeArtifact?.digest,
+    executionBackend: profile.executionBackend,
+    modelRoute: {
+      catalogId: profile.modelRoute?.catalogId,
+      routeDigest: profile.modelRoute?.routeDigest,
+      qualificationDigest: profile.modelRoute?.qualificationDigest,
+    },
+    isolationModes: structuredClone(profile.isolationModes),
+    requiredHarnessCapabilities: structuredClone(profile.requiredHarnessCapabilities),
+    requiredSandboxCapabilities: structuredClone(profile.requiredSandboxCapabilities),
+  };
+}
+
+function executionProfileHarnessRequirements(isolationModes: unknown) {
+  if (!Array.isArray(isolationModes)) return [];
+  const requirements = new Map<string, "PARTIAL" | "SUPPORTED">();
+  for (const mode of isolationModes) {
+    const candidates = [
+      { capability: "filesystem.read", minimumSupport: "SUPPORTED" as const },
+      ...(mode === "WORKSPACE_WRITE"
+        ? [{ capability: "filesystem.write", minimumSupport: "SUPPORTED" as const }]
+        : []),
+      { capability: "filesystem.pathAllowlist", minimumSupport: "PARTIAL" as const },
+      { capability: "shell.available", minimumSupport: "PARTIAL" as const },
+      { capability: "shell.processTreeCancellation", minimumSupport: "PARTIAL" as const },
+      { capability: "git.status", minimumSupport: "SUPPORTED" as const },
+      { capability: "git.diff", minimumSupport: "SUPPORTED" as const },
+      { capability: "tools.structuredOutput", minimumSupport: "PARTIAL" as const },
+      { capability: "headless.support", minimumSupport: "PARTIAL" as const },
+      { capability: "cancellation.support", minimumSupport: "PARTIAL" as const },
+    ];
+    for (const requirement of candidates) {
+      const current = requirements.get(requirement.capability);
+      if (current !== "SUPPORTED") requirements.set(requirement.capability, requirement.minimumSupport);
+    }
+  }
+  return [...requirements.entries()]
+    .map(([capability, minimumSupport]) => ({ capability, minimumSupport }))
+    .sort((left, right) => left.capability.localeCompare(right.capability));
+}
+
+function executionProfileSandboxRequirements(isolationModes: unknown) {
+  if (!Array.isArray(isolationModes)) return [];
+  const requirements = new Set(["git-worktree"]);
+  if (isolationModes.includes("READ_ONLY")) requirements.add("read-only");
+  if (isolationModes.includes("WORKSPACE_WRITE")) requirements.add("workspace-write");
+  return [...requirements].sort();
+}
+
+function allDeniedExecutionProfileAuthority(authority: unknown) {
+  const keys = ["routing", "verification", "publication", "acceptance", "merge", "policyMutation", "workerLeases"];
+  if (!authority || typeof authority !== "object" || Array.isArray(authority)) return false;
+  return Object.keys(authority).length === keys.length
+    && keys.every((key) => (authority as Record<string, unknown>)[key] === false);
+}
+
+function onlyExecutionProfileKeys(value: unknown, keys: string[]) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.keys(value).length === keys.length
+    && Object.keys(value).every((key) => keys.includes(key));
+}
+
+function sameCanonical(left: unknown, right: unknown) {
+  return canonicalHash(left) === canonicalHash(right);
+}
+
+function sameStringSet(left: unknown, right: unknown) {
+  if (!Array.isArray(left) || !Array.isArray(right)
+    || left.some((value) => typeof value !== "string")
+    || right.some((value) => typeof value !== "string")) return false;
+  return left.length === right.length
+    && new Set(left).size === left.length
+    && new Set(right).size === right.length
+    && JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+}
+
+function canonicalSortedStringArray(value: unknown) {
+  return Array.isArray(value)
+    && value.length > 0
+    && value.every((item) => boundedWorkerIdentity(item, 100))
+    && new Set(value).size === value.length
+    && JSON.stringify(value) === JSON.stringify([...value].sort());
+}
+
+function boundedWorkerIdentity(value: unknown, maximum: number): value is string {
+  return typeof value === "string"
+    && value === value.trim()
+    && value.length > 0
+    && value.length <= maximum
+    && !/[\0\r\n]/.test(value);
+}
+
 function boundedLowercaseIdentity(value: unknown, maximum: number): value is string {
   return typeof value === "string"
     && value === value.trim()
@@ -501,14 +834,17 @@ function executionProvenance(
   result: HarnessNormalizedResult | undefined,
   phase: "RESEARCH" | "GENERATION",
   prompt: string,
+  run: Record<string, any>,
 ) {
   if (!result) return null;
+  const executionProfile = workerExecutionProfileReceiptIdentity(run);
   return {
     phase,
     executionId: result.executionId,
     status: result.status,
     harness: result.harness,
     provenance: result.provenance,
+    ...(executionProfile ? { executionProfile } : {}),
     promptIdentity: {
       version: phase === "RESEARCH"
         ? BUILT_IN_MISSION_PLANNER_IDENTITY.researchPromptVersion

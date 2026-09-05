@@ -73,6 +73,11 @@ import {
   evaluateRepositoryRemoteExecutionPolicy,
   normalizeRepositoryDataClassification,
 } from "../lib/repositoryExecutionPolicy";
+import {
+  loadExecutionProfileAdmission,
+  executionProfileScopeBlockers,
+} from "../lib/executionProfileAdmission";
+import { executionProfileProjectionBlockers } from "../lib/executionProfile";
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "../lib/companyAccess";
 import { assertAuthorizedDeliveryRecord } from "../lib/deliveryAuthorization";
 
@@ -101,13 +106,13 @@ const ARTIFACT_TYPES = new Set([
 ]);
 
 function factoryExecutionManifestBackend(manifest: any): string | undefined {
-  return manifest?.version === "factory-execution-manifest/v2"
+  return isDecomposedExecutionManifest(manifest)
     ? manifest.executionBackend
     : manifest?.harness?.executionBackend;
 }
 
 function factoryExecutionManifestModelRoute(manifest: any) {
-  return manifest?.version === "factory-execution-manifest/v2"
+  return isDecomposedExecutionManifest(manifest)
     ? manifest.modelRoute
     : manifest?.version === "factory-execution-manifest/v1"
       ? {
@@ -117,6 +122,200 @@ function factoryExecutionManifestModelRoute(manifest: any) {
           qualificationDigest: manifest.harness?.modelQualificationDigest,
         }
       : undefined;
+}
+
+function isDecomposedExecutionManifest(manifest: any) {
+  return manifest?.version === "factory-execution-manifest/v2"
+    || manifest?.version === "factory-execution-manifest/v3";
+}
+
+const EXECUTION_PROFILE_BINDING_FIELDS = [
+  "executionProfileId",
+  "executionProfileKey",
+  "executionProfileVersion",
+  "executionProfileDigest",
+  "executionProfileSnapshot",
+  "executionProfileQualificationDigest",
+  "executionProfileQualificationSnapshot",
+] as const;
+
+function hasAnyExecutionProfileBinding(record: Record<string, any> | null | undefined) {
+  return Boolean(record)
+    && EXECUTION_PROFILE_BINDING_FIELDS.some((field) => record![field] !== undefined);
+}
+
+async function resolveCurrentAttemptExecutionProfile(
+  ctx: any,
+  version: any,
+  run: any,
+  manifest: any,
+  now: number,
+) {
+  const profileFieldsPresent = [version, run].some(hasAnyExecutionProfileBinding)
+    || manifest?.version === "factory-execution-manifest/v3"
+    || manifest?.executionProfile !== undefined;
+  if (!profileFieldsPresent) return null;
+  if (!version.executionProfileId
+    || !run.executionProfileId
+    || manifest?.version !== "factory-execution-manifest/v3"
+    || !manifest.executionProfile) {
+    throw new Error("Factory Attempt is missing its exact Execution Profile binding.");
+  }
+  const admission = await loadExecutionProfileAdmission(ctx, version.executionProfileId, now);
+  const profile = admission.profile;
+  if (!profile || !admission.eligible || profile.projectId !== run.projectId
+    || !profile.qualificationSnapshot || !profile.qualificationDigest) {
+    throw new Error(`Factory Attempt Execution Profile is not current (${admission.blockers.join(",") || "missing"}).`);
+  }
+  const snapshot = profile.immutableSnapshot as Record<string, any>;
+  const versionBlockers = executionProfileProjectionBlockers({
+    profileId: String(profile._id),
+    profileSnapshot: profile.immutableSnapshot,
+    profileDigest: profile.profileDigest,
+    qualificationSnapshot: profile.qualificationSnapshot,
+    qualificationDigest: profile.qualificationDigest,
+    projection: executionProfileProjectionFromFactoryVersion(version),
+  });
+  const runBlockers = executionProfileProjectionBlockers({
+    profileId: String(profile._id),
+    profileSnapshot: profile.immutableSnapshot,
+    profileDigest: profile.profileDigest,
+    qualificationSnapshot: profile.qualificationSnapshot,
+    qualificationDigest: profile.qualificationDigest,
+    projection: executionProfileProjectionFromAttempt(run, manifest),
+  });
+  const workloadClass = (version.purpose ?? "SOFTWARE") === "VERIFICATION"
+    ? "VERIFICATION"
+    : (version.purpose ?? "SOFTWARE") === "INTELLIGENT_AUTOMATION"
+      ? "AUTOMATION"
+      : "SOFTWARE_CHANGE";
+  const scopeBlockers = executionProfileScopeBlockers(profile, {
+    workloadClass,
+    riskClass: version.riskBoundary,
+    isolation: manifest.harness?.isolation,
+  });
+  const frozen = manifest.executionProfile;
+  const manifestIdentityMatches = frozen.profileId === String(profile._id)
+    && frozen.profileKey === profile.profileKey
+    && frozen.version === profile.version
+    && frozen.profileDigest === profile.profileDigest
+    && frozen.qualificationDigest === profile.qualificationDigest;
+  const blockers = [...new Set([...versionBlockers, ...runBlockers, ...scopeBlockers])];
+  if (!manifestIdentityMatches || blockers.length > 0
+    || snapshot.profileKey !== profile.profileKey || snapshot.version !== profile.version) {
+    throw new Error(`Factory Attempt substituted its frozen Execution Profile (${blockers.join(",") || "identity-mismatch"}).`);
+  }
+  return profile;
+}
+
+function executionProfileProjectionFromFactoryVersion(version: any) {
+  const snapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+  return {
+    profileId: String(version.executionProfileId ?? ""),
+    profileKey: version.executionProfileKey ?? "",
+    profileVersion: version.executionProfileVersion ?? 0,
+    profileDigest: version.executionProfileDigest ?? "",
+    profileSnapshot: version.executionProfileSnapshot,
+    qualificationDigest: version.executionProfileQualificationDigest ?? "",
+    qualificationSnapshot: version.executionProfileQualificationSnapshot,
+    executor: version.executor,
+    harnessCapabilityManifest: version.harnessCapabilityManifest,
+    harnessCapabilityManifestDigest: version.harnessCapabilityManifestDigest ?? "",
+    harnessEffectiveConfigSha256: version.harnessEffectiveConfigSha256 ?? "",
+    harnessRuntimeArtifact: version.harnessRuntimeArtifact,
+    harnessRuntimeArtifactDigest: version.harnessRuntimeArtifactDigest ?? "",
+    executionBackend: version.executionBackend ?? "persistent-worker",
+    modelCatalogId: String(version.modelCatalogId ?? ""),
+    modelRouteSnapshot: version.modelRouteSnapshot,
+    modelRouteDigest: version.modelRouteDigest ?? "",
+    modelQualificationSnapshot: version.modelQualificationSnapshot,
+    modelQualificationDigest: version.modelQualificationDigest ?? "",
+    sandboxProfileId: version.sandboxProfileId ? String(version.sandboxProfileId) : undefined,
+    sandboxProfileSnapshot: version.sandboxProfileSnapshot,
+    sandboxProfileDigest: version.sandboxProfileDigest,
+    isolationModes: snapshot?.isolationModes ?? [],
+    requiredHarnessCapabilities: snapshot?.requiredHarnessCapabilities ?? [],
+    requiredSandboxCapabilities: snapshot?.requiredSandboxCapabilities ?? [],
+  };
+}
+
+function executionProfileProjectionFromAttempt(run: any, manifest: any) {
+  const snapshot = run.executionProfileSnapshot as Record<string, any> | undefined;
+  return {
+    profileId: String(run.executionProfileId ?? ""),
+    profileKey: run.executionProfileKey ?? "",
+    profileVersion: run.executionProfileVersion ?? 0,
+    profileDigest: run.executionProfileDigest ?? "",
+    profileSnapshot: run.executionProfileSnapshot,
+    qualificationDigest: run.executionProfileQualificationDigest ?? "",
+    qualificationSnapshot: run.executionProfileQualificationSnapshot,
+    executor: { adapter: run.executorAdapter ?? "", version: run.executorVersion ?? "" },
+    harnessCapabilityManifest: manifest.harness?.capabilityManifest,
+    harnessCapabilityManifestDigest: manifest.harness?.capabilityManifestSha256 ?? "",
+    harnessEffectiveConfigSha256: manifest.harness?.effectiveConfigSha256 ?? "",
+    harnessRuntimeArtifact: manifest.harness?.runtimeArtifact,
+    harnessRuntimeArtifactDigest: manifest.harness?.runtimeArtifactDigest ?? "",
+    executionBackend: manifest.executionBackend ?? manifest.harness?.executionBackend ?? "",
+    modelCatalogId: manifest.modelRoute?.catalogId ?? manifest.harness?.modelCatalogId ?? "",
+    modelRouteSnapshot: manifest.modelRoute?.routeSnapshot ?? manifest.harness?.modelRouteSnapshot,
+    modelRouteDigest: manifest.modelRoute?.routeDigest ?? manifest.harness?.modelRouteDigest ?? "",
+    modelQualificationSnapshot: manifest.modelRoute?.qualificationSnapshot,
+    modelQualificationDigest: manifest.modelRoute?.qualificationDigest ?? manifest.harness?.modelQualificationDigest ?? "",
+    sandboxProfileId: manifest.sandbox?.profileId,
+    sandboxProfileSnapshot: manifest.sandbox?.profileSnapshot,
+    sandboxProfileDigest: manifest.sandbox?.profileDigest,
+    isolationModes: snapshot?.isolationModes ?? [],
+    requiredHarnessCapabilities: snapshot?.requiredHarnessCapabilities ?? [],
+    requiredSandboxCapabilities: snapshot?.requiredSandboxCapabilities ?? [],
+  };
+}
+
+function executionProfileEvidence(run: any) {
+  if (!run?.executionProfileId) return undefined;
+  const profile = run.executionProfileSnapshot as Record<string, any> | undefined;
+  const qualification = run.executionProfileQualificationSnapshot as Record<string, any> | undefined;
+  const selectedIsolation = (run.executionManifest as Record<string, any> | undefined)?.harness?.isolation;
+  return {
+    profileId: String(run.executionProfileId),
+    profileKey: run.executionProfileKey,
+    version: run.executionProfileVersion,
+    profileDigest: run.executionProfileDigest,
+    qualificationDigest: run.executionProfileQualificationDigest,
+    qualificationEvidence: qualification?.evidence,
+    qualificationValidUntil: qualification?.validUntil,
+    ...(profile?.harness ? {
+      harness: {
+        adapter: profile.harness.adapter,
+        version: profile.harness.version,
+        capabilityManifestDigest: profile.harness.capabilityManifestDigest,
+        effectiveConfigSha256: profile.harness.effectiveConfigSha256,
+      },
+    } : {}),
+    ...(profile?.runtimeArtifact?.digest ? { runtimeArtifactDigest: profile.runtimeArtifact.digest } : {}),
+    ...(profile?.executionBackend ? { executionBackend: profile.executionBackend } : {}),
+    ...(profile?.modelRoute ? {
+      modelRoute: {
+        catalogId: profile.modelRoute.catalogId,
+        routeDigest: profile.modelRoute.routeDigest,
+        qualificationDigest: profile.modelRoute.qualificationDigest,
+      },
+    } : {}),
+    ...(profile?.sandboxProfile ? {
+      sandboxProfile: {
+        profileId: profile.sandboxProfile.profileId,
+        profileDigest: profile.sandboxProfile.profileDigest,
+      },
+    } : {}),
+    ...(typeof selectedIsolation === "string" ? { selectedIsolation } : {}),
+  };
+}
+
+function assertReportedExecutionProfileEvidence(metadata: any, expected: ReturnType<typeof executionProfileEvidence>) {
+  if (metadata?.executionProfile === undefined) return;
+  if (!expected
+    || computeCanonicalHash(metadata.executionProfile) !== computeCanonicalHash(expected)) {
+    throw new Error("Factory evidence Execution Profile identity does not match the frozen Attempt.");
+  }
 }
 
 function factoryExecutionStepMatchesModelRoute(step: any, routeSnapshot: Record<string, any> | undefined) {
@@ -315,6 +514,7 @@ export const claimInternal = internalMutation({
     workerSessionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const now = Date.now();
     const run = await ctx.db.get(args.workflowRunId);
     if (!run) throw new Error("Factory attempt not found.");
     if (args.requiredAttemptPurpose && (run.attemptPurpose ?? "IMPLEMENTATION") !== args.requiredAttemptPurpose) {
@@ -356,15 +556,15 @@ export const claimInternal = internalMutation({
     const modelRoute = version.modelCatalogId ? await ctx.db.get(version.modelCatalogId) : null;
     const routeSnapshot = manifestModelRoute?.routeSnapshot as Record<string, any> | undefined;
     const executableSteps = (frozenManifest?.workflow?.steps ?? []).filter((step: any) => step?.kind !== "GATE");
-    const v2Manifest = frozenManifest?.version === "factory-execution-manifest/v2";
+    const decomposedManifest = isDecomposedExecutionManifest(frozenManifest);
     let manifestRouteDigestValid = false;
-    let manifestQualificationDigestValid = !v2Manifest;
+    let manifestQualificationDigestValid = !decomposedManifest;
     try {
       manifestRouteDigestValid = Boolean(
         routeSnapshot
         && exactModelRouteDigest(routeSnapshot) === manifestModelRoute?.routeDigest,
       );
-      manifestQualificationDigestValid = !v2Manifest || Boolean(
+      manifestQualificationDigestValid = !decomposedManifest || Boolean(
         manifestModelRoute?.qualificationSnapshot
         && modelRouteQualificationDigest(manifestModelRoute.qualificationSnapshot)
           === manifestModelRoute.qualificationDigest,
@@ -373,12 +573,12 @@ export const claimInternal = internalMutation({
       manifestRouteDigestValid = false;
       manifestQualificationDigestValid = false;
     }
-    if ((!v2Manifest && frozenManifest?.version !== "factory-execution-manifest/v1")
+    if ((!decomposedManifest && frozenManifest?.version !== "factory-execution-manifest/v1")
       || frozenManifest?.harness?.adapter !== run.executorAdapter
       || frozenManifest?.harness?.version !== run.executorVersion
       || frozenManifest?.harness?.capabilityManifestSha256 !== frozenHarness.capabilityManifestSha256
       || frozenManifest?.harness?.effectiveConfigSha256 !== frozenHarness.effectiveConfigSha256
-      || (v2Manifest && (
+      || (decomposedManifest && (
         frozenManifest?.harness?.runtimeArtifactDigest !== frozenHarness.runtimeArtifactSha256
         || harnessRuntimeArtifactIssues(frozenManifest?.harness?.runtimeArtifact).length > 0
         || harnessRuntimeArtifactDigest(frozenManifest.harness.runtimeArtifact)
@@ -418,6 +618,13 @@ export const claimInternal = internalMutation({
       })) {
       throw new Error("Factory Attempt does not match its frozen backend and source binding.");
     }
+    const executionProfile = await resolveCurrentAttemptExecutionProfile(
+      ctx,
+      version,
+      run,
+      frozenManifest,
+      now,
+    );
     if (executionBackend === "remote-sandbox") {
       if (!version.sandboxProfileId
         || !version.sandboxProfileDigest
@@ -470,7 +677,6 @@ export const claimInternal = internalMutation({
       throw new Error("Factory attempt GitHub App installation is not connected.");
     }
 
-    const now = Date.now();
     if (factoryAttemptRequiresReplacementOnClaim({
       status: run.status,
       lease: run.lease,
@@ -657,7 +863,7 @@ export const claimInternal = internalMutation({
     const continuationPatch = run.factoryContinuation?.status === "PUBLICATION_AUTHORIZED"
       ? { ...run.factoryContinuation, publicationPermitLeaseId: decision.lease.leaseId }
       : run.factoryContinuation;
-    const claimedAt = Date.now();
+    const claimedAt = now;
     await ctx.db.patch(run._id, {
       status: "RUNNING",
       lease: decision.lease,
@@ -708,6 +914,7 @@ export const claimInternal = internalMutation({
         workerSessionId: decision.lease.workerSessionId,
         workerGeneration: decision.lease.workerGeneration,
         executionManifestDigest: run.executionManifestDigest,
+        executionProfile: executionProfileEvidence(run),
       },
     });
     const trace = await ensureAttemptTrace(ctx, run);
@@ -726,6 +933,7 @@ export const claimInternal = internalMutation({
         environment: run.executionEnvironment,
         allowedTools: run.allowedTools,
         executionManifestDigest: run.executionManifestDigest,
+        executionProfile: executionProfileEvidence(run),
       },
       output: {
         ownerId: args.ownerId,
@@ -761,6 +969,7 @@ export const claimInternal = internalMutation({
       executorVersion: run.executorVersion,
       executionManifest: run.executionManifest,
       executionManifestDigest: run.executionManifestDigest,
+      executionProfile: executionProfile ? executionProfileEvidence(run) : undefined,
       publicationCheckpoint,
       attemptPurpose: run.attemptPurpose ?? "IMPLEMENTATION",
       verificationSubject: run.verificationAttemptBinding?.verificationSubject,
@@ -1001,6 +1210,10 @@ export const reportInternal = internalMutation({
     if (events.length > 100 || artifacts.length > 20 || observations.length > 200) {
       throw new Error("Factory attempt report exceeds packet limits.");
     }
+    const profileEvidence = executionProfileEvidence(run);
+    for (const item of [...events, ...artifacts, ...observations]) {
+      assertReportedExecutionProfileEvidence(item?.metadata, profileEvidence);
+    }
     if (containsCredentialSecret(packet.sandbox) || containsCredentialSecret(packet.credential)) {
       throw new Error("Factory attempt reports must never contain plaintext sandbox credentials.");
     }
@@ -1037,7 +1250,13 @@ export const reportInternal = internalMutation({
       if (!observation?.idempotencyKey || !observation?.type || !observation?.name) {
         throw new Error("Factory trace observation is invalid.");
       }
-      observationResults.push(await recordTraceObservation(ctx, trace, observation));
+      observationResults.push(await recordTraceObservation(ctx, trace, {
+        ...observation,
+        metadata: {
+          ...(observation.metadata ?? {}),
+          ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
+        },
+      }));
     }
 
     const artifactResults = [];
@@ -1078,6 +1297,7 @@ export const reportInternal = internalMutation({
           ...(artifact.metadata ?? {}),
           leaseId: args.leaseId,
           executionManifestDigest: run.executionManifestDigest,
+          ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
         },
       });
       const artifactRow = await ctx.db.get(artifactId);
@@ -1390,6 +1610,7 @@ export const reportVerificationInternal = internalMutation({
       || !sourceAttempt || !verificationRun?.verificationPlan || !factoryVersion) {
       throw new Error("Verification report is not bound to a complete enforced policy-v2 contract.");
     }
+    const profileEvidence = executionProfileEvidence(run);
     const terminal = args.packet?.terminal;
     if (!terminal || !["COMPLETED", "FAILED", "CANCELED"].includes(terminal.status)) {
       throw new Error("Verification report requires a terminal lifecycle status.");
@@ -1444,7 +1665,11 @@ export const reportVerificationInternal = internalMutation({
         candidateRevision,
         provenance: "LIVE",
         recordedAt: now,
-        metadata: { serverPersistedFailure: true, terminalStatus: terminal.status },
+        metadata: {
+          serverPersistedFailure: true,
+          terminalStatus: terminal.status,
+          ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
+        },
       });
       await ctx.db.patch(verificationRun._id, {
         status: terminal.status,
@@ -1582,6 +1807,7 @@ export const reportVerificationInternal = internalMutation({
         ? check.evidence
         : [{ evidenceKey: `${check.checkId}:missing`, category: evidenceCategory, result: check.status, summary: check.summary }];
       for (const draft of drafts) {
+        assertReportedExecutionProfileEvidence(draft.metadata, profileEvidence);
         if (typeof draft.evidenceKey !== "string" || !draft.evidenceKey
           || reportedEvidenceKeys.has(draft.evidenceKey)) {
           throw new Error(`Verifier reported a missing or duplicate evidence identity for ${check.checkId}.`);
@@ -1647,7 +1873,11 @@ export const reportVerificationInternal = internalMutation({
           contentHash: draft.contentHash,
           provenance: "LIVE",
           recordedAt: now,
-          metadata: { serverDerivedIndependence: true, verifierMetadata: draft.metadata },
+          metadata: {
+            serverDerivedIndependence: true,
+            verifierMetadata: draft.metadata,
+            ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
+          },
         });
         evidenceEnvelopeIds.push(evidenceId);
         evidenceIdsByCheck.set(check.checkId, [...(evidenceIdsByCheck.get(check.checkId) ?? []), evidenceId]);
@@ -1735,7 +1965,11 @@ export const reportVerificationInternal = internalMutation({
       candidateRevision: packet.candidateRevision,
       validUntil,
       recordedAt: now,
-      metadata: { policyVersion: 2, serverDerivedIndependence: true },
+      metadata: {
+        policyVersion: 2,
+        serverDerivedIndependence: true,
+        ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
+      },
     });
     for (const criterion of workOrder.acceptanceCriteria) {
       const criterionEvidence = normalizedResults.checks.filter((check: any) => check.acceptanceCriterionIds.includes(criterion.id));
@@ -1772,7 +2006,11 @@ export const reportVerificationInternal = internalMutation({
         candidateRevision: packet.candidateRevision,
         validUntil,
         recordedAt: now,
-        metadata: { policyVersion: 2, workOrderReceiptId: receiptId },
+        metadata: {
+          policyVersion: 2,
+          workOrderReceiptId: receiptId,
+          ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
+        },
       });
     }
     await ctx.db.patch(run._id, {
@@ -2048,6 +2286,29 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     version.sandboxProfileId ? ctx.db.get(version.sandboxProfileId) : null,
   ]);
   const now = Date.now();
+  const verificationProfileFieldsPresent = hasAnyExecutionProfileBinding(version);
+  const profileAdmission = version.executionProfileId
+    ? await loadExecutionProfileAdmission(ctx, version.executionProfileId, now)
+    : null;
+  const executionProfile = profileAdmission?.profile ?? null;
+  const executionProfileReady = !verificationProfileFieldsPresent || Boolean(
+    executionProfile
+    && profileAdmission?.eligible
+    && executionProfile.projectId === version.projectId
+    && executionProfileProjectionBlockers({
+      profileId: String(executionProfile._id),
+      profileSnapshot: executionProfile.immutableSnapshot,
+      profileDigest: executionProfile.profileDigest,
+      qualificationSnapshot: executionProfile.qualificationSnapshot,
+      qualificationDigest: executionProfile.qualificationDigest!,
+      projection: executionProfileProjectionFromFactoryVersion(version),
+    }).length === 0
+    && executionProfileScopeBlockers(executionProfile, {
+      workloadClass: "VERIFICATION",
+      riskClass: version.riskBoundary,
+      isolation: "READ_ONLY",
+    }).length === 0
+  );
   const assessment = assessments.sort((left: any, right: any) => right.assessedAt - left.assessedAt)[0];
   const frozenHarness = resolveFrozenHarnessBinding(version);
   const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
@@ -2124,6 +2385,7 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     || agentVersions.some((agentVersion: any) => !agentVersion)
     || !workflowModelRoute
     || !modelRoute
+    || !executionProfileReady
     || !factoryWorkflowModelRouteMatches({
       workflow,
       agentBindings: version.agentBindings ?? [],
@@ -2175,6 +2437,15 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
       qualificationDigest: modelRoute.qualificationDigest,
       qualificationSnapshot: modelRoute.qualificationSnapshot,
     },
+    executionProfile: executionProfile ? {
+      profileId: String(version.executionProfileId),
+      profileKey: version.executionProfileKey!,
+      version: version.executionProfileVersion!,
+      profileDigest: version.executionProfileDigest!,
+      profileSnapshot: version.executionProfileSnapshot!,
+      qualificationDigest: version.executionProfileQualificationDigest!,
+      qualificationSnapshot: version.executionProfileQualificationSnapshot!,
+    } : undefined,
     sandboxProfile: {
       isolation: "READ_ONLY",
       requiredCapabilities: requiredSandboxCapabilities,
@@ -2276,6 +2547,13 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     verificationContractDigest: workOrder.verificationContractDigest,
     factoryDefinitionVersionId: version._id,
     factoryConfigurationDigest: version.configurationDigest,
+    executionProfileId: version.executionProfileId,
+    executionProfileKey: version.executionProfileKey,
+    executionProfileVersion: version.executionProfileVersion,
+    executionProfileDigest: version.executionProfileDigest,
+    executionProfileSnapshot: version.executionProfileSnapshot,
+    executionProfileQualificationDigest: version.executionProfileQualificationDigest,
+    executionProfileQualificationSnapshot: version.executionProfileQualificationSnapshot,
     factoryPurpose: "VERIFICATION",
     attemptPurpose: "VERIFICATION",
     executorInvocationId,
@@ -2793,7 +3071,10 @@ async function insertEvent(ctx: any, run: any, event: any) {
     errorCategory: optionalText(event.errorCategory, 200),
     errorSummary: optionalText(event.errorSummary, 2_000),
     traceContext: event.traceContext,
-    metadata: event.metadata,
+    metadata: {
+      ...(event.metadata ?? {}),
+      ...(executionProfileEvidence(run) ? { executionProfile: executionProfileEvidence(run) } : {}),
+    },
   });
   const inserted = await ctx.db.get(eventId);
   if (inserted && run.projectId) await recordRunEventObservation(ctx, run, inserted);
@@ -2811,6 +3092,7 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
     throw new Error("Verification packet is stale because the WorkOrder revision changed.");
   }
   const receiptRecordedAt = Date.now();
+  const profileEvidence = executionProfileEvidence(run);
   const governancePolicy = await resolveGovernancePolicy(ctx, workOrder);
   const result = recomputeVerificationPacket(workOrder, packet);
   const idempotencyKey = `factory-verification:${run.runId}:${result.candidateRevision}`;
@@ -2893,7 +3175,12 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
       contentHash: evidence.contentHash,
       provenance: "LIVE",
       recordedAt: Date.now(),
-      metadata: { ...(evidence.metadata ?? {}), leaseId, reportedBy: ownerId },
+      metadata: {
+        ...(evidence.metadata ?? {}),
+        leaseId,
+        reportedBy: ownerId,
+        ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
+      },
     });
     evidenceIdByKey.set(evidence.evidenceKey, evidenceEnvelopeId);
   }
@@ -2958,7 +3245,12 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
     workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
     validUntil: receiptValidUntil,
     recordedAt: receiptRecordedAt,
-    metadata: { engineVersion: result.engineVersion, serverRecomputed: true, leaseId },
+    metadata: {
+      engineVersion: result.engineVersion,
+      serverRecomputed: true,
+      leaseId,
+      ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
+    },
   });
 
   const qualityGateDecisionId = await ctx.db.insert("qualityGateDecisions", {
@@ -3002,6 +3294,7 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
       serverRecomputed: true,
       verificationVerdict: result.verdict,
       subjectIdentityMode: run.verificationSubject?.digest ? "POLICY_V2" : "LEGACY_V1",
+      ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
     },
   });
 
@@ -3025,7 +3318,12 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
       workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
       validUntil: receiptValidUntil,
       recordedAt: Date.now(),
-      metadata: { engineVersion: result.engineVersion, serverRecomputed: true, leaseId },
+      metadata: {
+        engineVersion: result.engineVersion,
+        serverRecomputed: true,
+        leaseId,
+        ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
+      },
     });
   }
 
@@ -3052,7 +3350,11 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
     },
     verificationRunId,
     evidenceEnvelopeIds: allEvidenceIds,
-    metadata: { engineVersion: result.engineVersion, acceptanceAuthority: false },
+    metadata: {
+      engineVersion: result.engineVersion,
+      acceptanceAuthority: false,
+      ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
+    },
   });
   for (const check of checks) {
     await recordTraceObservation(ctx, trace, {
@@ -3069,7 +3371,12 @@ async function persistVerificationPacket(ctx: any, run: any, packet: any, ownerI
       error: check.status === "PASS" ? undefined : { message: check.summary },
       verificationRunId,
       evidenceEnvelopeIds: check.evidenceIds,
-      metadata: { category: check.category, mandatory: check.mandatory, acceptanceAuthority: false },
+      metadata: {
+        category: check.category,
+        mandatory: check.mandatory,
+        acceptanceAuthority: false,
+        ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
+      },
     });
   }
 

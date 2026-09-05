@@ -25,6 +25,7 @@ import {
   harnessRuntimeArtifactDigest,
   harnessRuntimeArtifactIssues,
 } from "@mission-control/workflow-engine";
+import { validV3ExecutionProfileBinding } from "./sandboxSupervisor.js";
 
 export type SandboxLifecycleEventType =
   | "SANDBOX_REQUESTED"
@@ -69,6 +70,8 @@ export interface RemoteSandboxExecutionRequest {
   attemptLeaseId: string;
   executionManifest: Record<string, unknown>;
   manifestDigest: string;
+  /** Authoritative server lease heartbeat time returned by claim/reclaim. */
+  profileAdmittedAt?: number;
   sourceSha: string;
   profile: SandboxProfileSnapshot;
   repositoryBundle: Buffer;
@@ -115,6 +118,7 @@ export class RemoteSandboxRuntime {
   ): Promise<RemoteSandboxExecutionResult | RemoteSandboxCandidateSession> {
     validateRemoteExecutionRuntimeArtifact(request);
     validateV2RemoteExecutionRequest(request);
+    validateV3RemoteExecutionProfile(request);
     const profileValidation = await this.provider.validateProfile(request.profile);
     if (!profileValidation.dispatchable) {
       throw new RemoteSandboxExecutionError(remoteFailure(
@@ -219,6 +223,7 @@ export class RemoteSandboxRuntime {
       const start = await this.provider.start({
         allocation,
         executionManifest: request.executionManifest,
+        profileAdmittedAt: request.profileAdmittedAt,
         workOrderId: request.workOrderId,
         workOrderRevisionNumber: request.workOrderRevisionNumber,
         workflowRunId: executionWorkflowRunId,
@@ -478,14 +483,14 @@ function remoteManifestRoute(manifest: Record<string, unknown>): {
   reasoningConfig?: SandboxResultBundle["harness"]["reasoningConfig"];
 } | undefined {
   const value = manifest as any;
-  const provider = value?.version === "factory-execution-manifest/v2"
+  const provider = decomposedManifest(value)
     ? value?.modelRoute?.routeSnapshot?.provider
     : value?.harness?.provider;
-  const model = value?.version === "factory-execution-manifest/v2"
+  const model = decomposedManifest(value)
     ? value?.modelRoute?.routeSnapshot?.modelId
     : value?.harness?.model;
   if (!boundedIdentity(provider, 100) || !boundedIdentity(model, 200)) return undefined;
-  if (value?.version !== "factory-execution-manifest/v2") return { provider, model };
+  if (!decomposedManifest(value)) return { provider, model };
   const modelRouteDigest = value?.modelRoute?.routeDigest;
   const providerRoute = value?.modelRoute?.routeSnapshot?.providerRoute;
   if (!/^sha256:[a-f0-9]{64}$/i.test(modelRouteDigest ?? "") || !boundedIdentity(providerRoute, 100)) return undefined;
@@ -503,7 +508,7 @@ function validateRemoteExecutionRuntimeArtifact(request: RemoteSandboxExecutionR
   const manifest = request.executionManifest as any;
   const profileImageDigest = exactSandboxProfileImageDigest(request.profile);
   let artifact: { kind: string; executableSha256: string | null; imageDigest: string | null } | undefined;
-  if (manifest?.version === "factory-execution-manifest/v2") {
+  if (decomposedManifest(manifest)) {
     const candidate = manifest?.harness?.runtimeArtifact;
     if (candidate
       && harnessRuntimeArtifactIssues(candidate).length === 0
@@ -546,7 +551,7 @@ function exactSandboxProfileImageDigest(profile: SandboxProfileSnapshot) {
 
 function validateV2RemoteExecutionRequest(request: RemoteSandboxExecutionRequest) {
   const manifest = request.executionManifest as any;
-  if (manifest?.version !== "factory-execution-manifest/v2") return;
+  if (!decomposedManifest(manifest)) return;
   const harness = manifest.harness;
   const route = remoteManifestRoute(request.executionManifest);
   const capabilityManifest = harness?.capabilityManifest;
@@ -602,9 +607,27 @@ function validateV2RemoteExecutionRequest(request: RemoteSandboxExecutionRequest
       "NON_RETRYABLE_RESULT",
       "MANIFEST_EXECUTION_BINDING_INVALID",
       "PROFILE",
-      "Remote execution request does not match its frozen V2 model, harness, runtime artifact, and backend bindings.",
+      "Remote execution request does not match its frozen decomposed model, harness, runtime artifact, and backend bindings.",
     ));
   }
+}
+
+function validateV3RemoteExecutionProfile(request: RemoteSandboxExecutionRequest) {
+  const manifest = request.executionManifest as any;
+  if (manifest?.version !== "factory-execution-manifest/v3") return;
+  if (!validV3ExecutionProfileBinding(manifest, request.profileAdmittedAt)) {
+    throw new RemoteSandboxExecutionError(remoteFailure(
+      "NON_RETRYABLE_RESULT",
+      "EXECUTION_PROFILE_BINDING_INVALID",
+      "PROFILE",
+      "Remote execution requires a current exact Execution Profile and qualification receipt.",
+    ));
+  }
+}
+
+function decomposedManifest(manifest: any) {
+  return manifest?.version === "factory-execution-manifest/v2"
+    || manifest?.version === "factory-execution-manifest/v3";
 }
 
 function validV2RemoteModelRoute(route: any) {

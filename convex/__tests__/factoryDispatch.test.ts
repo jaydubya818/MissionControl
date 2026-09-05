@@ -22,6 +22,7 @@ const ready: FactoryDispatchPreflightInput = {
   workflowMatches: true,
   workflowContractReady: true,
   executorReady: true,
+  executionProfileReady: true,
   codeScopesReady: true,
   agentManifestsReady: true,
   policyReady: true,
@@ -62,6 +63,14 @@ describe("Factory dispatch preflight", () => {
       ok: false,
       blocker: "provider-egress-required",
       remediation: "Use Local execution or a remote profile with provider-enforced egress evidence.",
+    });
+  });
+
+  it("reports an exact profile-currentness blocker before worker selection", () => {
+    expect(evaluateFactoryDispatchPreflight({ ...ready, executionProfileReady: false })).toEqual({
+      ok: false,
+      blocker: "execution-profile-not-current",
+      remediation: "Select or requalify the exact Execution Profile frozen by this Factory version.",
     });
   });
 

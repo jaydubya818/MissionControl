@@ -17,6 +17,12 @@ import {
   harnessCapabilityManifestDigest,
   harnessRuntimeArtifactDigest,
 } from "@mission-control/workflow-engine";
+import {
+  executionProfileDigest,
+  executionProfileQualificationDigest,
+  executionProfileQualificationSnapshot,
+  executionProfileSnapshot,
+} from "../../../../convex/lib/executionProfile.js";
 
 const execFileAsync = promisify(execFile);
 const sourceSha = "0123456789abcdef0123456789abcdef01234567";
@@ -129,6 +135,68 @@ describe("remote sandbox contracts", () => {
 });
 
 describe("RemoteSandboxRuntime", () => {
+  it("admits V3 only with a current exact Execution Profile before allocation", async () => {
+    const selectedProfile: SandboxProfileSnapshot = {
+      ...restrictedCandidateProfile(),
+      profileKey: "fake-restricted-runtime",
+      provider: "FAKE",
+    };
+    const v3 = v3RuntimeFixture(selectedProfile);
+    const provider = new FakeSandboxProvider({ result: encodeSandboxResultBundle(v3.bundle) });
+    const result = await new RemoteSandboxRuntime(
+      provider,
+      new FakeSandboxCredentialBroker(),
+      new InMemoryRemoteSandboxJournal(),
+    ).execute(v3.request);
+    expect(result.bundle.manifestDigest).toBe(v3.request.manifestDigest);
+    expect(provider.calls.some((call) => call.startsWith("allocate:"))).toBe(true);
+
+    const qualification = v3.request.executionManifest.executionProfile.qualificationSnapshot;
+    let postExpiryNow = qualification.validUntil + 1;
+    const postExpiryProvider = new FakeSandboxProvider({
+      result: encodeSandboxResultBundle(v3.bundle),
+      now: () => postExpiryNow,
+    });
+    await expect(new RemoteSandboxRuntime(
+      postExpiryProvider,
+      new FakeSandboxCredentialBroker(() => postExpiryNow),
+      new InMemoryRemoteSandboxJournal(),
+      () => postExpiryNow,
+      async (durationMs) => { postExpiryNow += durationMs; },
+    ).execute(v3.request)).resolves.toMatchObject({ bundle: { manifestDigest: v3.request.manifestDigest } });
+
+    const rejectBeforeAllocation = async (
+      executionManifest: Record<string, any>,
+      profileAdmittedAt: number | undefined,
+    ) => {
+      const rejectingProvider = new FakeSandboxProvider();
+      const failure = await new RemoteSandboxRuntime(
+        rejectingProvider,
+        new FakeSandboxCredentialBroker(),
+        new InMemoryRemoteSandboxJournal(),
+      ).execute({
+        ...v3.request,
+        executionManifest,
+        manifestDigest: `sha256:${canonicalHash(executionManifest)}`,
+        profileAdmittedAt,
+      }).catch((error) => error);
+      expect(failure).toBeInstanceOf(RemoteSandboxExecutionError);
+      expect(failure.failure).toMatchObject({ code: "EXECUTION_PROFILE_BINDING_INVALID", retryable: false });
+      expect(rejectingProvider.calls).toEqual([]);
+    };
+
+    const missing = structuredClone(v3.request.executionManifest) as Record<string, any>;
+    delete missing.executionProfile;
+    await rejectBeforeAllocation(missing, v3.request.profileAdmittedAt);
+    await rejectBeforeAllocation(v3.request.executionManifest, undefined);
+
+    const capabilitySubstitution = structuredClone(v3.request.executionManifest) as Record<string, any>;
+    capabilitySubstitution.harness.requiredCapabilities.push("undeclared-capability");
+    await rejectBeforeAllocation(capabilitySubstitution, v3.request.profileAdmittedAt);
+
+    await rejectBeforeAllocation(v3.request.executionManifest, qualification.validUntil);
+  });
+
   it("derives V2 result identity from the frozen route and rejects a model override before allocation", async () => {
     const selectedProfile = profile();
     const v2 = v2RuntimeFixture(selectedProfile);
@@ -796,6 +864,21 @@ function restrictedCandidateProfile(): SandboxProfileSnapshot {
       egressEnforcementProven: true,
       liveCertified: true,
     },
+    qualification: {
+      evidencePacketReference: "fixture://restricted-sandbox",
+      evidencePacketDigest: `sha256:${"2".repeat(64)}`,
+      egressPolicyDigest: `sha256:${"3".repeat(64)}`,
+      credentialRevocationBoundMs: 30_000,
+      supportedWorkloadClasses: ["SOFTWARE_CHANGE"],
+      supportedRiskClasses: ["GREEN"],
+      workloadTimeouts: [{ workloadClass: "SOFTWARE_CHANGE", maxRuntimeMs: 300_000 }],
+      providerEgress: {
+        providerEnforced: false,
+        guestEnforced: true,
+        enforcement: "GUEST_NFTABLES",
+        limitation: "PROVIDER_ENFORCEMENT_UNAVAILABLE",
+      },
+    },
     security: {
       schema: "factory-sandbox-security/v1",
       profile: "remote-sandbox/exe-dev/restricted-candidate-v1",
@@ -1054,6 +1137,97 @@ function v2RuntimeFixture(selectedProfile: SandboxProfileSnapshot) {
         providerRoute: routeSnapshot.providerRoute,
         reasoningConfig: routeSnapshot.reasoningConfig,
       },
+    },
+  };
+}
+
+function v3RuntimeFixture(selectedProfile: SandboxProfileSnapshot) {
+  const v2 = v2RuntimeFixture(selectedProfile);
+  const v2Manifest = v2.request.executionManifest as ReturnType<typeof v2RuntimeFixture>["request"]["executionManifest"] & Record<string, any>;
+  const sandboxProfileId = "sandbox-profile-1";
+  const profileSnapshot = executionProfileSnapshot({
+    profileKey: "remote-software-change",
+    version: 1,
+    harness: {
+      adapter: v2Manifest.harness.adapter,
+      version: v2Manifest.harness.version,
+      capabilityManifest: v2Manifest.harness.capabilityManifest,
+      capabilityManifestDigest: v2Manifest.harness.capabilityManifestSha256,
+      effectiveConfigSha256: v2Manifest.harness.effectiveConfigSha256,
+    },
+    runtimeArtifact: {
+      snapshot: v2Manifest.harness.runtimeArtifact,
+      digest: v2Manifest.harness.runtimeArtifactDigest,
+    },
+    executionBackend: "remote-sandbox",
+    modelRoute: {
+      catalogId: v2Manifest.modelRoute.catalogId,
+      routeSnapshot: v2Manifest.modelRoute.routeSnapshot,
+      routeDigest: v2Manifest.modelRoute.routeDigest,
+      qualificationSnapshot: v2Manifest.modelRoute.qualificationSnapshot,
+      qualificationDigest: v2Manifest.modelRoute.qualificationDigest,
+    },
+    sandboxProfile: {
+      profileId: sandboxProfileId,
+      profileSnapshot: selectedProfile,
+      profileDigest: sandboxProfileDigest(selectedProfile),
+    },
+    isolationModes: ["WORKSPACE_WRITE"],
+  });
+  const profileDigest = executionProfileDigest(profileSnapshot);
+  const approvedAt = Date.now();
+  const qualificationSnapshot = executionProfileQualificationSnapshot({
+    profileId: "execution-profile-1",
+    profileSnapshot,
+    profileDigest,
+    workloadClasses: ["SOFTWARE_CHANGE"],
+    riskClasses: ["GREEN"],
+    evidenceReference: "fixture://remote-execution-profile",
+    evidenceDigest: `sha256:${"2".repeat(64)}`,
+    approvedBy: "remote-runtime-test",
+    approvedAt,
+    validUntil: approvedAt + 60_000,
+  });
+  const executionManifest = {
+    ...v2Manifest,
+    version: "factory-execution-manifest/v3" as const,
+    harness: {
+      ...v2Manifest.harness,
+      isolation: "WORKSPACE_WRITE" as const,
+      requiredHarnessCapabilities: profileSnapshot.requiredHarnessCapabilities,
+      requiredCapabilities: profileSnapshot.requiredSandboxCapabilities,
+    },
+    sandbox: {
+      profileId: sandboxProfileId,
+      profileSnapshot: selectedProfile,
+      profileDigest: sandboxProfileDigest(selectedProfile),
+    },
+    executionProfile: {
+      profileId: "execution-profile-1",
+      profileKey: profileSnapshot.profileKey,
+      version: profileSnapshot.version,
+      profileSnapshot,
+      profileDigest,
+      qualificationSnapshot,
+      qualificationDigest: executionProfileQualificationDigest(qualificationSnapshot),
+    },
+  };
+  const manifestDigest = `sha256:${canonicalHash(executionManifest)}`;
+  const bundle = createSandboxResultBundle({
+    ...withoutDigest(v2.bundle),
+    manifestDigest,
+    resultProvenance: {
+      ...v2.bundle.resultProvenance,
+      context: { attemptId: "attempt-1", manifestDigest, sourceSha },
+    },
+  });
+  return {
+    bundle,
+    request: {
+      ...v2.request,
+      executionManifest,
+      manifestDigest,
+      profileAdmittedAt: approvedAt + 1,
     },
   };
 }

@@ -10,6 +10,7 @@ import {
   type HarnessNormalizedResult,
 } from "@mission-control/workflow-engine";
 import {
+  assertMissionPlanningExecutionProfile,
   assertMissionPlanningHarnessRegistration,
   assertMissionPlanningHarnessResult,
   buildMissionPlanningExecutorRequest,
@@ -43,7 +44,7 @@ describe("MissionPlanningWorker exact execution identity", () => {
     expect(() => planningRequest({
       ...run,
       modelRouteDigest: `sha256:${"f".repeat(64)}`,
-    }, "research")).toThrow(/model route is invalid/i);
+    }, "research")).toThrow(/core execution identity/i);
 
     expect(() => planningRequest({
       ...run,
@@ -54,7 +55,23 @@ describe("MissionPlanningWorker exact execution identity", () => {
           runtimeArtifactDigest: `sha256:${"e".repeat(64)}`,
         },
       },
-    }, "research")).toThrow(/qualification does not match/i);
+    }, "research")).toThrow(/core execution identity/i);
+  });
+
+  it("rejects missing, partial, or substituted profile bindings before adapter resolution", () => {
+    const run = v2Run();
+    expect(() => assertMissionPlanningExecutionProfile({
+      ...run,
+      executionProfileQualificationSnapshot: undefined,
+    })).toThrow(/partial Execution Profile/i);
+    expect(() => assertMissionPlanningExecutionProfile({
+      ...run,
+      executor: { ...run.executor, adapter: "deepagents" },
+    })).toThrow(/core execution identity/i);
+    expect(() => assertMissionPlanningExecutionProfile({
+      ...run,
+      executionProfileDigest: `sha256:${"d".repeat(64)}`,
+    })).toThrow(/does not match its frozen harness/i);
   });
 
   it("rejects a registered adapter whose executable differs from the frozen runtime artifact", () => {
@@ -69,15 +86,15 @@ describe("MissionPlanningWorker exact execution identity", () => {
     expect(() => assertMissionPlanningHarnessRegistration({
       ...run,
       modelRouteSnapshot: undefined,
-    }, registration())).toThrow(/model route is invalid/i);
+    }, registration())).toThrow(/core execution identity/i);
     expect(() => assertMissionPlanningHarnessRegistration({
       ...run,
       executionBackend: undefined,
-    }, registration())).toThrow(/frozen Factory execution identity/i);
+    }, registration())).toThrow(/core execution identity/i);
     expect(() => assertMissionPlanningHarnessRegistration({
       ...run,
       executor: { ...run.executor, runtimeArtifactSha256: undefined },
-    }, registration())).toThrow(/frozen Factory execution identity/i);
+    }, registration())).toThrow(/core execution identity/i);
   });
 
   it("accepts exact normalized provenance and rejects route or runtime tampering", () => {
@@ -151,6 +168,12 @@ describe("MissionPlanningWorker exact execution identity", () => {
     expect(request).not.toHaveProperty("providerRoute");
     expect(request).not.toHaveProperty("reasoningConfig");
   });
+
+  it("rejects an incomplete profileless run instead of treating it as historical", () => {
+    const run = legacyRun();
+    expect(() => planningRequest({ ...run, inputDigest: undefined }, "research"))
+      .toThrow(/complete historical frozen identity/i);
+  });
 });
 
 function planningRequest(run: any, phase: "research" | "generation") {
@@ -203,11 +226,124 @@ function v2Run() {
       merge: false,
     },
   };
+  const profileSnapshot = {
+    schema: "factory-execution-profile/v1",
+    profileKey: "software-change",
+    version: 1,
+    harness: {
+      adapter: "codex",
+      version: "v1",
+      capabilityManifest: CODEX_V1_HARNESS_MANIFEST,
+      capabilityManifestDigest: capabilityManifestSha256,
+      effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+    },
+    runtimeArtifact: {
+      snapshot: CODEX_V1_RUNTIME_ARTIFACT,
+      digest: runtimeArtifactSha256,
+    },
+    executionBackend: "persistent-worker",
+    modelRoute: {
+      catalogId: "model-route-1",
+      routeSnapshot,
+      routeDigest,
+      qualificationSnapshot,
+      qualificationDigest: identityDigest(qualificationSnapshot.schema, qualificationSnapshot),
+    },
+    isolationModes: ["READ_ONLY", "WORKSPACE_WRITE"],
+    requiredHarnessCapabilities: [
+      { capability: "cancellation.support", minimumSupport: "PARTIAL" },
+      { capability: "filesystem.pathAllowlist", minimumSupport: "PARTIAL" },
+      { capability: "filesystem.read", minimumSupport: "SUPPORTED" },
+      { capability: "filesystem.write", minimumSupport: "SUPPORTED" },
+      { capability: "git.diff", minimumSupport: "SUPPORTED" },
+      { capability: "git.status", minimumSupport: "SUPPORTED" },
+      { capability: "headless.support", minimumSupport: "PARTIAL" },
+      { capability: "shell.available", minimumSupport: "PARTIAL" },
+      { capability: "shell.processTreeCancellation", minimumSupport: "PARTIAL" },
+      { capability: "tools.structuredOutput", minimumSupport: "PARTIAL" },
+    ],
+    requiredSandboxCapabilities: ["git-worktree", "read-only", "workspace-write"],
+    lifecycle: {
+      contractVersion: "generic-harness-contract/v1",
+      cancellationMode: CODEX_V1_HARNESS_MANIFEST.cancellation.mode,
+      idempotentCleanup: CODEX_V1_HARNESS_MANIFEST.cancellation.idempotentCleanup,
+      retryCreatesNewAttempt: true,
+      inFlightRevocationPolicy: "LEASED_ATTEMPT_MAY_COMPLETE",
+      componentSubstitution: "DENIED",
+    },
+    authority: deniedProfileAuthority(),
+  };
+  const profileDigest = identityDigest(profileSnapshot.schema, profileSnapshot);
+  const profileQualificationSnapshot = {
+    schema: "factory-execution-profile-qualification/v1",
+    profile: {
+      id: "execution-profile-1",
+      key: profileSnapshot.profileKey,
+      version: profileSnapshot.version,
+      digest: profileDigest,
+    },
+    components: {
+      harness: {
+        adapter: profileSnapshot.harness.adapter,
+        version: profileSnapshot.harness.version,
+        capabilityManifestDigest: profileSnapshot.harness.capabilityManifestDigest,
+        effectiveConfigSha256: profileSnapshot.harness.effectiveConfigSha256,
+      },
+      runtimeArtifactDigest: profileSnapshot.runtimeArtifact.digest,
+      executionBackend: profileSnapshot.executionBackend,
+      modelRoute: {
+        catalogId: profileSnapshot.modelRoute.catalogId,
+        routeDigest: profileSnapshot.modelRoute.routeDigest,
+        qualificationDigest: profileSnapshot.modelRoute.qualificationDigest,
+      },
+      isolationModes: profileSnapshot.isolationModes,
+      requiredHarnessCapabilities: profileSnapshot.requiredHarnessCapabilities,
+      requiredSandboxCapabilities: profileSnapshot.requiredSandboxCapabilities,
+    },
+    scope: {
+      workloadClasses: ["MISSION_PLANNING", "SOFTWARE_CHANGE"],
+      riskClasses: ["YELLOW"],
+    },
+    evidence: {
+      reference: "evidence://planning-execution-profile",
+      digest: `sha256:${"b".repeat(64)}`,
+    },
+    approvedBy: "operator",
+    approvedAt: 1,
+    validUntil: 10_000_000,
+    authority: deniedProfileAuthority(),
+  };
+  const executionProfile = {
+    profileId: profileQualificationSnapshot.profile.id,
+    profileKey: profileSnapshot.profileKey,
+    version: profileSnapshot.version,
+    profileDigest,
+    profileSnapshot,
+    qualificationDigest: identityDigest(profileQualificationSnapshot.schema, profileQualificationSnapshot),
+    qualificationSnapshot: profileQualificationSnapshot,
+  };
+  const factoryConfigurationDigest = `sha256:${"c".repeat(64)}`;
+  const inputSnapshot = {
+    planner: { maxRuntimeMinutes: 10 },
+    factoryAdmission: {
+      factoryDefinitionVersionId: "factory-version-1",
+      factoryConfigurationDigest,
+      modelCatalogId: profileSnapshot.modelRoute.catalogId,
+      modelRouteDigest: routeDigest,
+      modelQualificationDigest: profileSnapshot.modelRoute.qualificationDigest,
+      executionBackend: "persistent-worker",
+      harnessRuntimeArtifactSha256: runtimeArtifactSha256,
+      executionProfile,
+    },
+  };
   return {
     _id: "planning-run-1",
     attemptCount: 1,
     planningRepositorySha: "a".repeat(40),
-    inputSnapshot: { planner: { maxRuntimeMinutes: 10 } },
+    factoryDefinitionVersionId: "factory-version-1",
+    factoryConfigurationDigest,
+    inputSnapshot,
+    inputDigest: `sha256:${canonicalHash(inputSnapshot)}`,
     executor: {
       adapter: "codex",
       version: "v1",
@@ -219,10 +355,18 @@ function v2Run() {
     executionBackend: "persistent-worker",
     modelProvider: routeSnapshot.provider,
     modelId: routeSnapshot.modelId,
+    modelCatalogId: profileSnapshot.modelRoute.catalogId,
     modelRouteDigest: routeDigest,
     modelRouteSnapshot: routeSnapshot,
     modelQualificationDigest: identityDigest(qualificationSnapshot.schema, qualificationSnapshot),
     modelQualificationSnapshot: qualificationSnapshot,
+    executionProfileId: executionProfile.profileId,
+    executionProfileKey: executionProfile.profileKey,
+    executionProfileVersion: executionProfile.version,
+    executionProfileDigest: executionProfile.profileDigest,
+    executionProfileSnapshot: executionProfile.profileSnapshot,
+    executionProfileQualificationDigest: executionProfile.qualificationDigest,
+    executionProfileQualificationSnapshot: executionProfile.qualificationSnapshot,
   };
 }
 
@@ -244,14 +388,45 @@ function legacyRun() {
       executableSha256: CODEX_V1_RUNTIME_ARTIFACT.executableSha256,
     },
   };
+  const current = v2Run();
+  const { executionProfile: _profile, ...factoryAdmission } = current.inputSnapshot.factoryAdmission;
+  const inputSnapshot = {
+    ...current.inputSnapshot,
+    factoryAdmission: {
+      ...factoryAdmission,
+      modelRouteDigest: identityDigest(routeSnapshot.schema, routeSnapshot),
+      modelQualificationDigest: undefined,
+    },
+  };
   return {
-    ...v2Run(),
+    ...current,
     modelProvider: routeSnapshot.provider,
     modelId: routeSnapshot.modelId,
     modelRouteDigest: identityDigest(routeSnapshot.schema, routeSnapshot),
     modelRouteSnapshot: routeSnapshot,
     modelQualificationDigest: undefined,
     modelQualificationSnapshot: undefined,
+    executionProfileId: undefined,
+    executionProfileKey: undefined,
+    executionProfileVersion: undefined,
+    executionProfileDigest: undefined,
+    executionProfileSnapshot: undefined,
+    executionProfileQualificationDigest: undefined,
+    executionProfileQualificationSnapshot: undefined,
+    inputSnapshot,
+    inputDigest: `sha256:${canonicalHash(inputSnapshot)}`,
+  };
+}
+
+function deniedProfileAuthority() {
+  return {
+    routing: false,
+    verification: false,
+    publication: false,
+    acceptance: false,
+    merge: false,
+    policyMutation: false,
+    workerLeases: false,
   };
 }
 

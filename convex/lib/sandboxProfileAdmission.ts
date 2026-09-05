@@ -1,4 +1,4 @@
-import { computeCanonicalHash } from "./genomeHash";
+import { computeCanonicalHash } from "./genomeHash.js";
 
 export const SANDBOX_PROFILE_ADMISSION_SCHEMA = "factory-sandbox-profile-admission/v1" as const;
 

@@ -13,6 +13,7 @@ export interface FactoryDispatchPreflightInput {
   workflowMatches: boolean;
   workflowContractReady: boolean;
   executorReady: boolean;
+  executionProfileReady: boolean;
   codeScopesReady: boolean;
   agentManifestsReady: boolean;
   policyReady: boolean;
@@ -99,6 +100,7 @@ const checks: Array<{
   { key: "workflowMatches", blocker: "workflow-version-mismatch", remediation: "Use the workflow frozen in the Factory version." },
   { key: "workflowContractReady", blocker: "workflow-contract-unsafe", remediation: "Replace heuristic completion and provider authority with structured handoffs." },
   { key: "executorReady", blocker: "executor-not-ready", remediation: "Use an exact harness adapter/version advertised by the canonical worker." },
+  { key: "executionProfileReady", blocker: "execution-profile-not-current", remediation: "Select or requalify the exact Execution Profile frozen by this Factory version." },
   { key: "codeScopesReady", blocker: "code-scopes-not-ready", remediation: "Create a Factory version with active repository code scopes." },
   { key: "agentManifestsReady", blocker: "agent-manifests-not-ready", remediation: "Bind every workflow agent to an approved agent version." },
   { key: "policyReady", blocker: "policy-not-ready", remediation: "Activate the Factory policy envelope." },

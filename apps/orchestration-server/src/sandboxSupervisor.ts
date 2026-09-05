@@ -14,6 +14,15 @@ import { SANDBOX_SUPERVISOR_VERSION, redactSandboxTail, redactSandboxText } from
 import { factoryResultContextIssues, resolveRemoteStructuredResult, type RemoteOutputFileObservation } from "./remoteStructuredResult.js";
 import { remoteFailure } from "./remoteExecutionPolicy.js";
 import { standaloneRemoteSupervisorSource } from "./standaloneRemoteSupervisorSource.js";
+import {
+  executionProfileDigest,
+  executionProfileIssues,
+  executionProfileProjectionBlockers,
+  executionProfileQualificationDigest,
+  executionProfileQualificationIssues,
+  executionProfileQualificationMatches,
+  type ExecutionProfileProjection,
+} from "../../../convex/lib/executionProfile.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -24,6 +33,8 @@ export interface SandboxSupervisorInput {
   workOrderRevisionNumber: number;
   workflowRunId: string;
   manifestDigest: string;
+  /** Server-issued lease heartbeat time at claim/reclaim admission. */
+  profileAdmittedAt?: number;
   profileDigest: string;
   sourceSha: string;
   environmentDescriptor: {
@@ -224,7 +235,7 @@ function validateSupervisorInput(input: SandboxSupervisorInput) {
   const manifest: any = input.executionManifest;
   const credentialGrants = manifest?.sandbox?.credentialGrants;
   const route = supervisorModelRoute(manifest);
-  if (!["factory-execution-manifest/v1", "factory-execution-manifest/v2"].includes(manifest?.version)
+  if (!["factory-execution-manifest/v1", "factory-execution-manifest/v2", "factory-execution-manifest/v3"].includes(manifest?.version)
     || input.manifestDigest !== `sha256:${canonicalHash(manifest)}`
     || manifest?.causation?.workOrderId !== input.workOrderId
     || manifest?.causation?.workOrderRevisionNumber !== input.workOrderRevisionNumber
@@ -244,8 +255,12 @@ function validateSupervisorInput(input: SandboxSupervisorInput) {
     || credentialGrants.some((grant: any) => grant?.secretValueIncluded !== false || grant?.githubAuthority !== "NONE" || grant?.providerAuthority !== "NONE")) {
     throw new Error("Frozen execution manifest is invalid or exceeds sandbox authority.");
   }
-  if (manifest.version === "factory-execution-manifest/v2" && !validV2SupervisorBindings(manifest, input.executor, input.environment)) {
-    throw new Error("Frozen V2 execution manifest has invalid model, harness, or runtime bindings.");
+  if (decomposedManifest(manifest) && !validV2SupervisorBindings(manifest, input.executor, input.environment)) {
+    throw new Error("Frozen decomposed execution manifest has invalid model, harness, or runtime bindings.");
+  }
+  if (manifest.version === "factory-execution-manifest/v3"
+    && !validV3ExecutionProfileBinding(manifest, input.profileAdmittedAt)) {
+    throw new Error("Frozen V3 execution manifest has an invalid, expired, or substituted Execution Profile binding.");
   }
   if (!["EXE_DEV", "FAKE"].includes(input.environmentDescriptor?.provider) || !input.environmentDescriptor?.image) throw new Error("Supervisor environment identity is invalid.");
   if (!path.isAbsolute(input.repositoryRoot) || !path.isAbsolute(input.outputPath)
@@ -340,7 +355,7 @@ function harnessIdentity(manifest: any): SandboxResultBundle["harness"] {
 }
 
 function supervisorExecutionBackend(manifest: any) {
-  return manifest?.version === "factory-execution-manifest/v2"
+  return decomposedManifest(manifest)
     ? manifest?.executionBackend
     : manifest?.harness?.executionBackend;
 }
@@ -352,14 +367,14 @@ function supervisorModelRoute(manifest: any): {
   providerRoute?: string;
   reasoningConfig?: SandboxResultBundle["harness"]["reasoningConfig"];
 } | undefined {
-  const provider = manifest?.version === "factory-execution-manifest/v2"
+  const provider = decomposedManifest(manifest)
     ? manifest?.modelRoute?.routeSnapshot?.provider
     : manifest?.harness?.provider;
-  const model = manifest?.version === "factory-execution-manifest/v2"
+  const model = decomposedManifest(manifest)
     ? manifest?.modelRoute?.routeSnapshot?.modelId
     : manifest?.harness?.model;
   if (!boundedIdentity(provider, 100) || !boundedIdentity(model, 200)) return undefined;
-  if (manifest?.version !== "factory-execution-manifest/v2") return { provider, model };
+  if (!decomposedManifest(manifest)) return { provider, model };
   const modelRouteDigest = manifest?.modelRoute?.routeDigest;
   const providerRoute = manifest?.modelRoute?.routeSnapshot?.providerRoute;
   if (!/^sha256:[a-f0-9]{64}$/i.test(modelRouteDigest ?? "") || !boundedIdentity(providerRoute, 100)) return undefined;
@@ -422,6 +437,186 @@ function validV2SupervisorBindings(
     && qualification.authority?.acceptance === false
     && qualification.authority?.publication === false
     && qualification.authority?.merge === false;
+}
+
+/** V3 is the V2 decomposed execution tuple plus one exact, qualified profile
+ * receipt. This is pure so the host runtime can apply the same pre-allocation
+ * guard before uploading the standalone supervisor. */
+export function validV3ExecutionProfileBinding(manifest: any, profileAdmittedAt: unknown) {
+  if (manifest?.version !== "factory-execution-manifest/v3") return false;
+  if (!Number.isSafeInteger(profileAdmittedAt) || (profileAdmittedAt as number) < 0) return false;
+  const binding = manifest.executionProfile;
+  if (!binding || typeof binding !== "object" || Array.isArray(binding)
+    || Object.keys(binding).some((key) => ![
+      "profileId",
+      "profileKey",
+      "version",
+      "profileDigest",
+      "profileSnapshot",
+      "qualificationDigest",
+      "qualificationSnapshot",
+    ].includes(key))
+    || !boundedIdentity(binding.profileId, 200)
+    || !boundedIdentity(binding.profileKey, 100)
+    || !Number.isSafeInteger(binding.version)
+    || binding.version < 1
+    || !/^sha256:[a-f0-9]{64}$/.test(binding.profileDigest ?? "")
+    || !/^sha256:[a-f0-9]{64}$/.test(binding.qualificationDigest ?? "")
+    || executionProfileIssues(binding.profileSnapshot).length > 0
+    || executionProfileQualificationIssues(binding.qualificationSnapshot).length > 0) return false;
+
+  let profileDigest: string;
+  let qualificationDigest: string;
+  try {
+    profileDigest = executionProfileDigest(binding.profileSnapshot);
+    qualificationDigest = executionProfileQualificationDigest(binding.qualificationSnapshot);
+  } catch {
+    return false;
+  }
+  const profile = binding.profileSnapshot as Record<string, any>;
+  const qualification = binding.qualificationSnapshot as Record<string, any>;
+  if (profileDigest !== binding.profileDigest
+    || qualificationDigest !== binding.qualificationDigest
+    || binding.profileKey !== profile.profileKey
+    || binding.version !== profile.version
+    || !Number.isFinite(qualification.approvedAt)
+    || qualification.approvedAt > (profileAdmittedAt as number)
+    || !Number.isFinite(qualification.validUntil)
+    || qualification.validUntil <= (profileAdmittedAt as number)
+    || !executionProfileQualificationMatches({
+      profileId: binding.profileId,
+      profileSnapshot: profile,
+      profileDigest: binding.profileDigest,
+      qualificationSnapshot: qualification,
+    })) return false;
+
+  const harness = manifest.harness;
+  const sandbox = manifest.sandbox;
+  const selectedIsolation = harness?.isolation;
+  const expectedHarnessRequirements = selectedExecutionHarnessRequirements(selectedIsolation);
+  const expectedSandboxCapabilities = selectedExecutionSandboxCapabilities(
+    manifest.executionBackend,
+    selectedIsolation,
+    profile.sandboxProfile?.profileSnapshot,
+  );
+  const projection: ExecutionProfileProjection = {
+    profileId: binding.profileId,
+    profileKey: binding.profileKey,
+    profileVersion: binding.version,
+    profileDigest: binding.profileDigest,
+    profileSnapshot: profile,
+    qualificationDigest: binding.qualificationDigest,
+    qualificationSnapshot: qualification,
+    executor: { adapter: harness?.adapter, version: harness?.version },
+    harnessCapabilityManifest: harness?.capabilityManifest,
+    harnessCapabilityManifestDigest: harness?.capabilityManifestSha256,
+    harnessEffectiveConfigSha256: harness?.effectiveConfigSha256,
+    harnessRuntimeArtifact: harness?.runtimeArtifact,
+    harnessRuntimeArtifactDigest: harness?.runtimeArtifactDigest,
+    executionBackend: manifest.executionBackend,
+    modelCatalogId: manifest.modelRoute?.catalogId,
+    modelRouteSnapshot: manifest.modelRoute?.routeSnapshot,
+    modelRouteDigest: manifest.modelRoute?.routeDigest,
+    modelQualificationSnapshot: manifest.modelRoute?.qualificationSnapshot,
+    modelQualificationDigest: manifest.modelRoute?.qualificationDigest,
+    ...(sandbox?.profileId ? { sandboxProfileId: sandbox.profileId } : {}),
+    ...(sandbox?.profileSnapshot !== undefined ? { sandboxProfileSnapshot: sandbox.profileSnapshot } : {}),
+    ...(sandbox?.profileDigest ? { sandboxProfileDigest: sandbox.profileDigest } : {}),
+    isolationModes: profile.isolationModes,
+    requiredHarnessCapabilities: profile.requiredHarnessCapabilities,
+    requiredSandboxCapabilities: profile.requiredSandboxCapabilities,
+  };
+  return executionProfileProjectionBlockers({
+    profileId: binding.profileId,
+    profileSnapshot: profile,
+    profileDigest: binding.profileDigest,
+    qualificationSnapshot: qualification,
+    qualificationDigest: binding.qualificationDigest,
+    projection,
+  }).length === 0
+    && profile.executionBackend === "remote-sandbox"
+    && profile.sandboxProfile !== undefined
+    && profile.isolationModes.includes(selectedIsolation)
+    && sameHarnessRequirements(harness?.requiredHarnessCapabilities, expectedHarnessRequirements)
+    && selectedHarnessRequirementsAllowed(
+      profile.requiredHarnessCapabilities,
+      expectedHarnessRequirements,
+    )
+    && sameStringSet(harness?.requiredCapabilities, expectedSandboxCapabilities)
+    && selectedSandboxCapabilitiesAllowed(
+      profile.requiredSandboxCapabilities,
+      expectedSandboxCapabilities,
+    );
+}
+
+function decomposedManifest(manifest: any) {
+  return manifest?.version === "factory-execution-manifest/v2"
+    || manifest?.version === "factory-execution-manifest/v3";
+}
+
+function selectedHarnessRequirementsAllowed(allowed: unknown, selected: unknown) {
+  return Array.isArray(allowed)
+    && Array.isArray(selected)
+    && selected.length > 0
+    && selected.every((requirement) => allowed.some((candidate) =>
+      candidate?.capability === requirement?.capability
+      && candidate?.minimumSupport === requirement?.minimumSupport
+    ));
+}
+
+function selectedExecutionHarnessRequirements(isolation: unknown) {
+  if (isolation !== "READ_ONLY" && isolation !== "WORKSPACE_WRITE") return [];
+  return [
+    { capability: "filesystem.read", minimumSupport: "SUPPORTED" },
+    ...(isolation === "WORKSPACE_WRITE"
+      ? [{ capability: "filesystem.write", minimumSupport: "SUPPORTED" }]
+      : []),
+    { capability: "filesystem.pathAllowlist", minimumSupport: "PARTIAL" },
+    { capability: "shell.available", minimumSupport: "PARTIAL" },
+    { capability: "shell.processTreeCancellation", minimumSupport: "PARTIAL" },
+    { capability: "git.status", minimumSupport: "SUPPORTED" },
+    { capability: "git.diff", minimumSupport: "SUPPORTED" },
+    { capability: "tools.structuredOutput", minimumSupport: "PARTIAL" },
+    { capability: "headless.support", minimumSupport: "PARTIAL" },
+    { capability: "cancellation.support", minimumSupport: "PARTIAL" },
+  ];
+}
+
+function selectedExecutionSandboxCapabilities(
+  executionBackend: unknown,
+  isolation: unknown,
+  sandboxProfileSnapshot: unknown,
+) {
+  if (isolation !== "READ_ONLY" && isolation !== "WORKSPACE_WRITE") return [];
+  const capabilities = ["git-worktree", isolation === "READ_ONLY" ? "read-only" : "workspace-write"];
+  if (executionBackend === "remote-sandbox") {
+    const provider = (sandboxProfileSnapshot as Record<string, any> | undefined)?.provider;
+    capabilities.push("remote-sandbox", `sandbox-provider:${String(provider ?? "").toLowerCase().replace(/_/g, "-")}`);
+  }
+  return capabilities.sort();
+}
+
+function sameHarnessRequirements(left: unknown, right: unknown) {
+  if (!Array.isArray(left) || !Array.isArray(right)) return false;
+  const normalize = (requirements: any[]) => requirements
+    .map((requirement) => `${requirement?.capability}:${requirement?.minimumSupport}`)
+    .sort();
+  return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+}
+
+function sameStringSet(left: unknown, right: unknown) {
+  return Array.isArray(left)
+    && Array.isArray(right)
+    && left.every((item) => typeof item === "string")
+    && right.every((item) => typeof item === "string")
+    && JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+}
+
+function selectedSandboxCapabilitiesAllowed(allowed: unknown, selected: unknown) {
+  return Array.isArray(allowed)
+    && Array.isArray(selected)
+    && selected.length > 0
+    && selected.every((capability) => typeof capability === "string" && allowed.includes(capability));
 }
 
 function validV2SupervisorRoute(route: any) {

@@ -25,6 +25,13 @@ Model, harness, runtime, and placement identity are deliberately separate:
 Qualification may bind those identities into an allowed combination. It does
 not make any component semantically own another component.
 
+An immutable `factory-execution-profile/v1` now gives one exact qualified
+combination a reusable identity. The profile remains subordinate to the
+Factory Version: it has no active pointer, routing authority, worker registry,
+lease, verification, publication, merge, or acceptance authority. It references
+the existing identities rather than replacing them. See the
+[Execution Profile identity decision](../decisions/execution-profile-identity.md).
+
 The implementation started from `origin/main`
 `3de80b97c7272f64586e5d08bc7c73fcd2114faa` and was later reconciled onto
 `6800ab39b09691c3b64b3f621d6d00be293e87c9`, which already contained the
@@ -40,7 +47,8 @@ the standalone Harness Lab into Mission Control.
 | `HarnessAdapterRegistry` | Exact adapter/version runtime selection | Keep and extend with validated adapter-effective manifests |
 | `CodexV1ExecutorAdapter` | Concrete real harness adapter | Consolidate behind the shared result and capability contracts |
 | `FactoryAttemptWorker` | Governed host around the adapter | Keep worker lease, candidate checks, verification, and publication outside adapters |
-| `factory-execution-manifest/v1` | Frozen model route, harness, runtime artifact, backend, and requirements snapshot | Preserve one Attempt manifest and add exact sidecar provenance rather than creating a parallel manifest |
+| `factory-execution-manifest/v1`, `/v2`, and `/v3` | Frozen model route, harness, runtime artifact, backend, profile, and requirements snapshots | Preserve one versioned Attempt-manifest lineage; V3 adds exact profile identity without rewriting V1/V2 bytes |
+| `factoryExecutionProfiles` | Reusable exact execution composition | Keep subordinate to Factory Version and outside the adapter registry and worker lifecycle |
 | `workspaceHostBindings.workerRuntime` | #102-style capability advertisement | Extend exact executor admission with manifest/config/runtime/model/capability matching |
 | `RemoteSandboxRuntime` | Execution backend and external sandbox | Keep unchanged; only Codex advertises the existing remote invocation builder |
 | canonical traces and trace observations | Harness lifecycle/usage diagnostics | Reuse; do not add a telemetry store |
@@ -53,10 +61,10 @@ manifest admission path.
 
 ## Reconciliation with merged PR #112
 
-PR #112 remains the lifecycle authority. Phase 2 keeps its one
+PR #112 remains the lifecycle authority. The generic-harness implementation keeps its one
 `HarnessExecutorAdapter`, one `runHarnessExecution` runner, and one
 `HarnessAdapterRegistry`. The existing `capabilities()` return is extended with
-the optional adapter-effective manifest; Phase 2 does not add a second
+the optional adapter-effective manifest; the current Execution Profile phase does not add a second
 capability-discovery method or adapter framework. Real governed adapters require
 that manifest, while the optional field keeps deterministic and external test
 adapters compatible with the merged contract.
@@ -124,6 +132,14 @@ claim, and result reconciliation must all agree on the same frozen tuple.
 explicitly alongside evidence and workload/risk scope; it does not move harness
 or runtime identity into the V2 route snapshot.
 
+For new Factory Versions, one immutable `factory-execution-profile/v1`
+snapshot and `factory-execution-profile-qualification/v1` receipt bind that
+same tuple, including the exact model-route qualification and any Sandbox
+Profile. The Factory Version freezes the profile row ID, key, version, snapshot,
+digest, and qualification digest. Existing component fields remain
+server-derived compatibility projections. Profiles do not discover, install,
+register, advertise, select, or dynamically configure harness code.
+
 ## Capability manifest
 
 `harness-capability-manifest/v1` describes effective adapter behavior, not all
@@ -152,11 +168,13 @@ as `null`, for artifacts without closure attestation so their existing
 canonical digests remain unchanged. DeepSeek uses this field for its complete
 installation-tree digest in addition to its preserved CLI-file digest.
 
-The Factory Version stores the full manifest plus its canonical digest and the
-effective configuration digest, execution runtime artifact and digest, inference-only
-model-route snapshot and digest, and backend. The Attempt execution manifest
-repeats that exact composition plus isolation and required generic
-capabilities. A canonical worker must advertise the same adapter/version,
+The Execution Profile stores the full manifest plus its canonical digest and
+the effective configuration digest, execution runtime artifact and digest,
+inference-only model-route snapshot and digest, backend, and bounded isolation
+and capability constraints. A profile-bound Factory Version freezes that
+snapshot and its exact qualification receipt. Its V3 Attempt execution manifest
+repeats the same composition plus Factory-owned repository and scoped authority.
+A canonical worker must advertise the same adapter/version,
 manifest digest, effective config digest, host adapter artifact, model route,
 isolation, backend, and minimum capability levels before server-owned admission
 succeeds. Its exact Factory Version binding separately attests the execution
@@ -177,6 +195,12 @@ ineligible for new exact admission.
 This static legacy resolution interprets compatibility metadata for an exact
 stored identity only. It does not install, enable, register, advertise, or
 select adapter code.
+
+Phase 1 profileless model-route V2 Factory Versions and execution-manifest V2
+Attempts likewise retain their frozen read and execution path. They are not
+backfilled with inferred profiles. New profile-bound Factory Versions use
+execution-manifest V3, and missing, stale, revoked, expired, or mismatched
+profile identity fails closed before a first worker claim.
 
 ## Normalized result
 
@@ -200,6 +224,9 @@ provider route and reasoning controls), runtime-artifact digest, and all other
 identity fields against the frozen Attempt before storing a redacted, bounded
 diagnostic artifact. Repository state is still recomputed by Mission Control,
 and harness `COMPLETED` status never counts as verification evidence.
+For V3 Attempts, Mission Control also records and reconciles the frozen profile
+and qualification identity at the host boundary; adapter output cannot create
+or substitute that authority.
 An adapter must translate every supplied provider-route and reasoning control
 into its invocation or reject before starting the harness. It may not silently
 drop a frozen inference control and then echo it as observed provenance.
@@ -246,18 +273,22 @@ or advertise Loom and does not destabilize its external path to claim parity.
   runtime artifact, backend, cancellation mode, telemetry availability, and
   limitations.
 - Existing run inspection shows frozen model, harness, runtime/configuration,
-  and backend provenance. No top-level navigation area is added.
+  backend, and, for V3 Attempts, profile provenance. No top-level navigation
+  area is added.
 - Factory Learning receives bounded harness identity as advisory metadata only;
   it cannot change routing or configuration.
 
 Factory Version schema additions are optional for stored-record compatibility.
 The canonical worker report adds exact manifest/config fields, so the public
 `workspaceHostBindings.report` contract advances the dynamically extracted
-runtime contract from `v26` to `v27`.
+runtime contract from `v26` to `v27`. The later authenticated Execution Profile
+API and required new-Factory-version binding advance the current public runtime
+contract from `v39` to `v40`; they do not change adapter registration.
 
 ## Failure behavior and rollback
 
-- Unsupported or stale exact identities never fall back to Codex.
+- Unsupported or stale exact identities, including the profile and its
+  qualification receipt, never fall back to Codex or another profile.
 - Experimental DeepSeek selection requires a current eligible worker at version
   creation and again at readiness, dispatch, and claim.
 - Invalid configuration, spawn failure, timeout, cancellation, malformed output,
@@ -281,7 +312,10 @@ rollback trigger.
   executable. Remote Codex execution instead binds the exact Sandbox Profile
   image and its separately frozen guest-toolchain evidence.
 - Autonomous harness routing is not introduced. Factory Version selection keeps
-  harness routing separate from model routing.
+  harness routing separate from model routing; an Execution Profile is a frozen
+  subordinate binding, not another routed object.
 - `factory-model-route/v1` is a frozen legacy contract, not an input for new
   Factory Version composition.
+- Profiles do not add harness discovery, installation, dynamic tool loading,
+  unrestricted subagents, or self-modifying execution configuration.
 - No live Loom conformance claim is made.

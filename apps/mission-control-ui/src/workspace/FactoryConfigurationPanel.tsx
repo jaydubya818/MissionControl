@@ -55,7 +55,7 @@ export function FactoryConfigurationPanel({
             <Factory size={14} aria-hidden /> Factory configuration
           </div>
           <div className="mt-1 text-[12px] text-ink-muted">
-            Freeze the repository, workflow, executor, policy, budget, verifiers, and recovery boundary before activation.
+            Freeze the repository, workflow, qualified execution profile, policy, budget, verifiers, and recovery boundary before activation.
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -144,6 +144,7 @@ function FactoryVersionEditor({
   const [harnessKey, setHarnessKey] = useState("codex\0v1");
   const [modelCatalogId, setModelCatalogId] = useState("");
   const [sandboxProfileId, setSandboxProfileId] = useState("");
+  const [executionProfileId, setExecutionProfileId] = useState("");
   const [pending, setPending] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -348,6 +349,13 @@ function FactoryVersionEditor({
     && route.modelId === primaryAgentVersion?.modelConfig?.modelId
   );
   const compatibleModelRouteKey = compatibleModelRoutes.map((route) => route._id).join(":");
+  const requiredIsolationMode = detail?.definition.purpose === "VERIFICATION" ? "READ_ONLY" : "WORKSPACE_WRITE";
+  const compatibleExecutionProfiles = (versionOptions?.executionProfiles ?? []).filter((profile) =>
+    profile.isolationModes.includes(requiredIsolationMode)
+    && compatibleModelRoutes.some((route) => route._id === profile.modelCatalogId)
+  );
+  const compatibleExecutionProfileKey = compatibleExecutionProfiles.map((profile) => profile._id).join(":");
+  const selectedExecutionProfile = compatibleExecutionProfiles.find((profile) => profile._id === executionProfileId);
 
   useEffect(() => {
     if (!selectedWorkflow || !defaultAgentVersionId || selectedWorkflow.agents.length === 0) return;
@@ -368,6 +376,19 @@ function FactoryVersionEditor({
     if (compatibleModelRoutes.some((route) => route._id === modelCatalogId)) return;
     setModelCatalogId(compatibleModelRoutes[0]?._id ?? "");
   }, [compatibleModelRouteKey, modelCatalogId]);
+
+  useEffect(() => {
+    if (compatibleExecutionProfiles.some((profile) => profile._id === executionProfileId)) return;
+    setExecutionProfileId(compatibleExecutionProfiles[0]?._id ?? "");
+  }, [compatibleExecutionProfileKey, executionProfileId]);
+
+  useEffect(() => {
+    if (!selectedExecutionProfile) return;
+    setHarnessKey(`${selectedExecutionProfile.executor.adapter}\0${selectedExecutionProfile.executor.version}`);
+    setModelCatalogId(selectedExecutionProfile.modelCatalogId);
+    setExecutionBackend(selectedExecutionProfile.executionBackend);
+    setSandboxProfileId(selectedExecutionProfile.sandboxProfileId ?? "");
+  }, [selectedExecutionProfile?._id]);
 
   useEffect(() => {
     if (!workflowId && workflows?.[0]?._id) setWorkflowId(workflows[0]._id);
@@ -487,8 +508,8 @@ function FactoryVersionEditor({
     setError("");
     setMessage("");
     const workflow = workflows.find((item) => item._id === workflowId);
-    if (!workflowId || !policyId || verifierIds.length === 0 || codeScopeIds.length === 0 || !modelCatalogId) {
-      setError("Select an active workflow, qualified model route, policy, code scope, and at least one independent verifier.");
+    if (!workflowId || !policyId || verifierIds.length === 0 || codeScopeIds.length === 0 || !executionProfileId) {
+      setError("Select an active workflow, qualified Execution Profile, policy, code scope, and at least one independent verifier.");
       return;
     }
     if (!workflow || workflow.agents.some((agent) => !agentBindings[agent.id])) {
@@ -520,13 +541,7 @@ function FactoryVersionEditor({
       await createVersion({
         factoryDefinitionId,
         workflowId: workflowId as Id<"workflows">,
-        modelCatalogId: modelCatalogId as Id<"modelCatalog">,
-        executor: {
-          adapter: selectedHarness.manifest.identity.adapterId,
-          version: selectedHarness.manifest.identity.adapterVersion,
-        },
-        executionBackend,
-        sandboxProfileId: executionBackend === "remote-sandbox" ? sandboxProfileId as Id<"factorySandboxProfiles"> : undefined,
+        executionProfileId: executionProfileId as Id<"factoryExecutionProfiles">,
         codeScopeIds: codeScopeIds as Id<"repositoryCodeScopes">[],
         agentBindings: workflow.agents.map((agent) => ({
           workflowAgentId: agent.id,
@@ -579,7 +594,7 @@ function FactoryVersionEditor({
   };
 
   const selectedSandboxProfile = (versionOptions.sandboxProfiles ?? []).find((profile) => profile._id === sandboxProfileId);
-  const saveButton = <Button size="sm" disabled={Boolean(pending)} onClick={save}>{pending === "save" ? "Saving…" : "Create configuration version"}</Button>;
+  const saveButton = <Button size="sm" disabled={Boolean(pending) || !selectedExecutionProfile} onClick={save}>{pending === "save" ? "Saving…" : "Create configuration version"}</Button>;
 
   return (
     <div className="mt-3 space-y-3">
@@ -595,6 +610,29 @@ function FactoryVersionEditor({
             <div className="mt-1 text-[11.5px] leading-relaxed text-ink-muted">The Factory experience level selected in the operator shell controls disclosure here. Acceptance, independent verification, publication, and merge authority stay outside the execution backend.</div>
           </div>
         </div>
+        <label className="mt-3 block text-[11.5px] text-ink-muted">Qualified Execution Profile
+          <select
+            aria-label="Qualified Execution Profile"
+            className="mt-1 w-full rounded-md border border-line bg-surface-1 px-2 py-2 text-[12px] text-ink"
+            value={executionProfileId}
+            onChange={(event) => setExecutionProfileId(event.target.value)}
+            disabled={compatibleExecutionProfiles.length === 0}
+          >
+            <option value="">{compatibleExecutionProfiles.length === 0 ? "No compatible qualified profile" : "Select exact profile"}</option>
+            {compatibleExecutionProfiles.map((profile) => (
+              <option key={profile._id} value={profile._id}>
+                {profile.profileKey} · v{profile.version} · {profile.executor.adapter}/{profile.executor.version} · {profile.executionBackend}
+              </option>
+            ))}
+          </select>
+          {selectedExecutionProfile ? (
+            <span className="mt-1 block font-mono text-[10.5px] text-ink-muted">
+              {selectedExecutionProfile.profileDigest} · qualification {selectedExecutionProfile.qualificationDigest}
+            </span>
+          ) : (
+            <span className="mt-1 block text-warning">Register and qualify an exact profile for this workflow route and {requiredIsolationMode.toLowerCase().replace(/_/g, " ")} boundary.</span>
+          )}
+        </label>
         <ExecutionBackendSelector
           backend={executionBackend}
           onBackendChange={setExecutionBackend}
@@ -606,6 +644,7 @@ function FactoryVersionEditor({
           remoteBlockReason={remoteSandboxEligible
             ? undefined
             : `${repositoryDataClassification.toLowerCase()} repository: no eligible profile proves provider-enforced egress.`}
+          locked
         />
         {experienceLevel === "basic" ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
@@ -669,6 +708,7 @@ function FactoryVersionEditor({
               const next = versionOptions.harnesses.find((item) => `${item.manifest.identity.adapterId}\0${item.manifest.identity.adapterVersion}` === event.target.value);
               if (next && !next.manifest.admission.executionBackends.includes("remote-sandbox")) setExecutionBackend("persistent-worker");
             }}
+            disabled
           >
             {versionOptions.harnesses.map((item) => {
               const identity = item.manifest.identity;
@@ -695,7 +735,7 @@ function FactoryVersionEditor({
           </Button>
         </label>
         <label className="text-[11.5px] text-ink-muted">Qualified model route
-          <select className="mt-1 w-full rounded-md border border-line bg-surface-1 px-2 py-2 text-[12px] text-ink" value={modelCatalogId} onChange={(event) => setModelCatalogId(event.target.value)} disabled={compatibleModelRoutes.length === 0}>
+          <select className="mt-1 w-full rounded-md border border-line bg-surface-1 px-2 py-2 text-[12px] text-ink" value={modelCatalogId} onChange={(event) => setModelCatalogId(event.target.value)} disabled>
             <option value="">{compatibleModelRoutes.length === 0 ? "No compatible promoted route" : "Select qualified route"}</option>
             {compatibleModelRoutes.map((route) => <option key={route._id} value={route._id}>{route.displayName} · {route.provider}/{route.modelId}</option>)}
           </select>
@@ -822,6 +862,7 @@ function ExecutionBackendSelector({
   showProfileDetails,
   remoteEligible,
   remoteBlockReason,
+  locked = false,
 }: {
   backend: "persistent-worker" | "remote-sandbox";
   onBackendChange: (backend: "persistent-worker" | "remote-sandbox") => void;
@@ -831,6 +872,7 @@ function ExecutionBackendSelector({
   showProfileDetails: boolean;
   remoteEligible: boolean;
   remoteBlockReason?: string;
+  locked?: boolean;
 }) {
   const selected = profiles.find((profile) => profile._id === profileId);
   return (
@@ -838,11 +880,11 @@ function ExecutionBackendSelector({
       <legend className="sr-only">Execution boundary</legend>
       <div className="mt-3 grid gap-2 @md:grid-cols-2">
         <label className={`flex min-h-16 cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${backend === "persistent-worker" ? "border-[var(--focus-ring)] bg-surface-1" : "border-line bg-surface-1/50"}`}>
-          <input aria-label="Local" className="mt-1" type="radio" name="factory-execution-backend" checked={backend === "persistent-worker"} onChange={() => onBackendChange("persistent-worker")} />
+          <input aria-label="Local" className="mt-1" type="radio" name="factory-execution-backend" checked={backend === "persistent-worker"} disabled={locked} onChange={() => onBackendChange("persistent-worker")} />
           <span><span className="block text-[12.5px] font-medium text-ink">Local</span><span className="mt-0.5 block text-[11.5px] text-ink-muted">Execute in the canonical worker's owned host worktree. No provider spend.</span></span>
         </label>
         <label className={`flex min-h-16 items-start gap-3 rounded-md border p-3 transition-colors ${remoteEligible ? "cursor-pointer" : "cursor-not-allowed opacity-70"} ${backend === "remote-sandbox" ? "border-[var(--focus-ring)] bg-surface-1" : "border-line bg-surface-1/50"}`}>
-          <input aria-label="Isolated Sandbox" className="mt-1" type="radio" name="factory-execution-backend" checked={backend === "remote-sandbox"} disabled={!remoteEligible} onChange={() => onBackendChange("remote-sandbox")} />
+          <input aria-label="Isolated Sandbox" className="mt-1" type="radio" name="factory-execution-backend" checked={backend === "remote-sandbox"} disabled={locked || !remoteEligible} onChange={() => onBackendChange("remote-sandbox")} />
           <span>
             <span className="block text-[12.5px] font-medium text-ink">Isolated Sandbox</span>
             <span className="mt-0.5 block text-[11.5px] text-ink-muted">
@@ -854,7 +896,7 @@ function ExecutionBackendSelector({
       {backend === "remote-sandbox" ? (
         <div className="mt-3 rounded-md border border-line bg-surface-1 p-3">
           {showProfileDetails ? <label className="text-[11.5px] text-ink-muted">Sandbox Profile
-            <select className="mt-1 w-full rounded-md border border-line bg-surface-1 px-2 py-2 text-[12px] text-ink" value={profileId} onChange={(event) => onProfileChange(event.target.value)}>
+            <select className="mt-1 w-full rounded-md border border-line bg-surface-1 px-2 py-2 text-[12px] text-ink" value={profileId} onChange={(event) => onProfileChange(event.target.value)} disabled={locked}>
               <option value="">Select immutable profile</option>
               {profiles.map((profile) => <option key={profile._id} value={profile._id} disabled={profile.readinessState === "BLOCKED"}>{profile.profileKey} · v{profile.version} · {profile.readinessState.toLowerCase()}</option>)}
             </select>

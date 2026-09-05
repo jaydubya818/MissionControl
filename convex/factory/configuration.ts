@@ -1,11 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "../lib/companyAccess";
 import {
   factoryConfigurationDigest,
   validFactoryBudget,
+  validFactoryExecutionProfileBinding,
   validFactoryExecutorBinding,
   validFactoryExecutionBinding,
   type FactoryConfigurationInput,
@@ -13,15 +14,22 @@ import {
 import { evaluateGithubAppCapabilities, githubInstallationIsStale } from "../lib/githubAppReadiness";
 import { canonicalRepositoryKey } from "../lib/workspaceRepositories";
 import { genericHarnessV1RecoveryReady, selectCurrentFactoryHost } from "../lib/factoryDispatch";
+import {
+  executionProfileCurrentness,
+  executionProfileProjectionBlockers,
+  type ExecutionProfileProjection,
+} from "../lib/executionProfile";
+import {
+  executionProfileScopeBlockers,
+  loadExecutionProfileAdmission,
+} from "../lib/executionProfileAdmission";
 import { factoryWorkflowContractIssues } from "../lib/factoryWorkflowContract";
 import { computeCanonicalHash } from "../lib/genomeHash";
 import { factoryWorkerEligibility } from "../lib/factoryWorkerRuntime";
 import {
-  factoryModelRouteCompatibility,
   factoryVersionModelRouteOptions,
   factoryWorkflowModelRouteMatches,
   frozenFactoryModelRouteEligible,
-  matchingFactoryModelRouteQualifications,
   resolveFactoryWorkflowModelRoute,
 } from "../lib/factoryModelRoute";
 import {
@@ -35,6 +43,7 @@ import {
   qualifiedSandboxSnapshotIssues,
   sandboxProfileProductionEligible,
 } from "../lib/sandboxProfileAdmission";
+import { modelRouteQualifiedFor } from "../lib/modelRouteAdmission";
 import { loadFactoryModelCatalogForProject } from "../lib/modelCatalogScope";
 import {
   evaluateRepositoryRemoteExecutionPolicy,
@@ -54,8 +63,127 @@ const recovery = v.object({
 });
 const riskBoundary = v.union(v.literal("GREEN"), v.literal("YELLOW"), v.literal("RED"));
 const factoryPurpose = v.union(v.literal("SOFTWARE"), v.literal("VERIFICATION"), v.literal("INTELLIGENT_AUTOMATION"));
-const executionBackend = v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"));
 const sandboxRiskClass = v.union(v.literal("GREEN"), v.literal("YELLOW"));
+
+function factoryWorkloadClass(purpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGENT_AUTOMATION" | undefined) {
+  return purpose === "VERIFICATION"
+    ? "VERIFICATION"
+    : purpose === "INTELLIGENT_AUTOMATION"
+      ? "AUTOMATION"
+      : "SOFTWARE_CHANGE";
+}
+
+function factoryIsolationMode(purpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGENT_AUTOMATION" | undefined) {
+  return purpose === "VERIFICATION" ? "READ_ONLY" as const : "WORKSPACE_WRITE" as const;
+}
+
+function hasAnyExecutionProfileBinding(version: Doc<"factoryDefinitionVersions">) {
+  return [
+    version.executionProfileId,
+    version.executionProfileKey,
+    version.executionProfileVersion,
+    version.executionProfileDigest,
+    version.executionProfileSnapshot,
+    version.executionProfileQualificationDigest,
+    version.executionProfileQualificationSnapshot,
+  ].some((value) => value !== undefined);
+}
+
+function factoryVersionExecutionProfileProjection(version: Doc<"factoryDefinitionVersions">): ExecutionProfileProjection | null {
+  if (!version.executionProfileId) return null;
+  const profileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+  return {
+    profileId: String(version.executionProfileId),
+    profileKey: version.executionProfileKey ?? "",
+    profileVersion: version.executionProfileVersion ?? 0,
+    profileDigest: version.executionProfileDigest ?? "",
+    profileSnapshot: version.executionProfileSnapshot,
+    qualificationDigest: version.executionProfileQualificationDigest ?? "",
+    qualificationSnapshot: version.executionProfileQualificationSnapshot,
+    executor: version.executor,
+    harnessCapabilityManifest: version.harnessCapabilityManifest,
+    harnessCapabilityManifestDigest: version.harnessCapabilityManifestDigest ?? "",
+    harnessEffectiveConfigSha256: version.harnessEffectiveConfigSha256 ?? "",
+    harnessRuntimeArtifact: version.harnessRuntimeArtifact,
+    harnessRuntimeArtifactDigest: version.harnessRuntimeArtifactDigest ?? "",
+    executionBackend: version.executionBackend ?? "persistent-worker",
+    modelCatalogId: String(version.modelCatalogId ?? ""),
+    modelRouteSnapshot: version.modelRouteSnapshot,
+    modelRouteDigest: version.modelRouteDigest ?? "",
+    modelQualificationSnapshot: version.modelQualificationSnapshot,
+    modelQualificationDigest: version.modelQualificationDigest ?? "",
+    ...(version.sandboxProfileId ? { sandboxProfileId: String(version.sandboxProfileId) } : {}),
+    ...(version.sandboxProfileSnapshot !== undefined ? { sandboxProfileSnapshot: version.sandboxProfileSnapshot } : {}),
+    ...(version.sandboxProfileDigest ? { sandboxProfileDigest: version.sandboxProfileDigest } : {}),
+    isolationModes: profileSnapshot?.isolationModes ?? [],
+    requiredHarnessCapabilities: profileSnapshot?.requiredHarnessCapabilities ?? [],
+    requiredSandboxCapabilities: profileSnapshot?.requiredSandboxCapabilities ?? [],
+  };
+}
+
+function evaluateFactoryVersionExecutionProfile(input: {
+  version: Doc<"factoryDefinitionVersions">;
+  profile: Doc<"factoryExecutionProfiles"> | null;
+  admissionBlockers: string[];
+  now: number;
+}) {
+  const { version, profile, admissionBlockers, now } = input;
+  if (!version.executionProfileId) {
+    const malformed = hasAnyExecutionProfileBinding(version);
+    return {
+      eligible: !malformed,
+      legacy: !malformed,
+      blockers: malformed ? ["EXECUTION_PROFILE_MISSING"] : [],
+      profileDigest: undefined,
+      qualificationDigest: undefined,
+      validUntil: undefined,
+    };
+  }
+  const blockers = [
+    ...((!profile
+      || String(profile._id) !== String(version.executionProfileId)
+      || String(profile.projectId) !== String(version.projectId)
+      || (version.tenantId && String(profile.tenantId) !== String(version.tenantId)))
+      ? ["EXECUTION_PROFILE_IDENTITY_MISMATCH"]
+      : []),
+    ...admissionBlockers,
+  ];
+  const currentness = executionProfileCurrentness(profile, now);
+  if (profile) {
+    blockers.push(...executionProfileScopeBlockers(profile, {
+      workloadClass: factoryWorkloadClass(version.purpose),
+      riskClass: version.riskBoundary,
+      isolation: factoryIsolationMode(version.purpose),
+    }));
+  }
+  if (profile && currentness.eligible) {
+    blockers.push(...executionProfileProjectionBlockers({
+      profileId: String(profile._id),
+      profileSnapshot: profile.immutableSnapshot,
+      profileDigest: profile.profileDigest,
+      qualificationSnapshot: profile.qualificationSnapshot!,
+      qualificationDigest: profile.qualificationDigest!,
+      projection: factoryVersionExecutionProfileProjection(version),
+    }));
+  }
+  if (!validFactoryExecutionProfileBinding({
+    executionProfileId: String(version.executionProfileId),
+    executionProfileVersion: version.executionProfileVersion,
+    executionProfileDigest: version.executionProfileDigest,
+    executionProfileQualificationDigest: version.executionProfileQualificationDigest,
+  })) {
+    blockers.push("EXECUTION_PROFILE_IDENTITY_MISMATCH");
+  }
+  const stableBlockers = [...new Set(blockers)];
+  return {
+    eligible: stableBlockers.length === 0,
+    legacy: false,
+    blockers: stableBlockers,
+    profileDigest: currentness.profileDigest,
+    qualificationDigest: currentness.qualificationDigest,
+    validUntil: currentness.validUntil,
+  };
+}
 
 export const list = query({
   args: { projectId: v.id("projects") },
@@ -98,7 +226,7 @@ export const getVersionOptions = query({
     if (!repository || repository.projectId !== args.projectId) {
       throw new Error("Factory repository is outside the workspace.");
     }
-    const [codeScopes, approvedVersions, sandboxProfiles, hostBindings, modelCatalog] = await Promise.all([
+    const [codeScopes, approvedVersions, sandboxProfiles, hostBindings, modelCatalog, executionProfileRows] = await Promise.all([
       ctx.db.query("repositoryCodeScopes")
         .withIndex("by_repository", (q) => q.eq("repositoryId", repository._id))
         .collect(),
@@ -112,6 +240,11 @@ export const getVersionOptions = query({
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect(),
       loadFactoryModelCatalogForProject(ctx, args.projectId),
+      ctx.db.query("factoryExecutionProfiles")
+        .withIndex("by_project_admission", (q) => q
+          .eq("projectId", args.projectId)
+          .eq("admissionStatus", "PRODUCTION_PILOT_ELIGIBLE"))
+        .take(100),
     ]);
     const agentVersions = (await Promise.all(approvedVersions
       .filter((version) => !version.projectId || version.projectId === args.projectId)
@@ -129,9 +262,34 @@ export const getVersionOptions = query({
         };
       })))
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
+    const now = Date.now();
+    const executionProfiles = (await Promise.all(executionProfileRows.map(async (profileRow) => {
+      const admission = await loadExecutionProfileAdmission(ctx, profileRow._id, now);
+      const profile = admission.profile;
+      if (!profile || !admission.eligible || profile.projectId !== args.projectId) return null;
+      const snapshot = profile.immutableSnapshot as Record<string, any>;
+      return {
+        _id: profile._id,
+        profileKey: profile.profileKey,
+        version: profile.version,
+        profileDigest: profile.profileDigest,
+        qualificationDigest: profile.qualificationDigest!,
+        qualificationExpiresAt: profile.qualificationExpiresAt!,
+        executor: profile.executor,
+        executionBackend: profile.executionBackend,
+        modelCatalogId: profile.modelCatalogId,
+        modelRouteDigest: profile.modelRouteDigest,
+        sandboxProfileId: profile.sandboxProfileId,
+        sandboxProfileDigest: profile.sandboxProfileDigest,
+        isolationModes: snapshot.isolationModes,
+      };
+    }))).filter((profile): profile is NonNullable<typeof profile> => Boolean(profile));
     return {
       codeScopes: codeScopes.filter((scope) => scope.active),
       agentVersions,
+      executionProfiles: executionProfiles.sort((left, right) =>
+        left.profileKey.localeCompare(right.profileKey) || right.version - left.version
+      ),
       modelRoutes: factoryVersionModelRouteOptions(modelCatalog).map((route) => ({
         _id: route._id,
         provider: route.provider,
@@ -198,8 +356,17 @@ async function loadActiveFactoryContext(
       .collect(),
   ]);
   const now = Date.now();
+  const executionProfileAdmission = version.executionProfileId
+    ? await loadExecutionProfileAdmission(ctx, version.executionProfileId, now)
+    : null;
   const latestAssessment = assessments.sort((left, right) => right.assessedAt - left.assessedAt)[0] ?? null;
   const host = selectCurrentFactoryHost(bindings, repository.repository, now);
+  const executionProfileReadiness = evaluateFactoryVersionExecutionProfile({
+    version,
+    profile: executionProfileAdmission?.profile ?? null,
+    admissionBlockers: executionProfileAdmission?.blockers ?? [],
+    now,
+  });
   return {
     definition,
     version,
@@ -215,12 +382,14 @@ async function loadActiveFactoryContext(
       observedBranch: host.observedBranch,
       checkedAt: host.checkedAt,
     } : null,
+    executionProfileReadiness,
     readyForBrowserDispatch: Boolean(
       repository.status === "READY"
       && workflow?.active
       && latestAssessment?.status === "PASS"
       && latestAssessment.expiresAt > now
       && latestAssessment.configurationDigest === version.configurationDigest
+      && executionProfileReadiness.eligible
       && host
     ),
   };
@@ -541,10 +710,7 @@ export const createVersion = mutation({
   args: {
     factoryDefinitionId: v.id("factoryDefinitions"),
     workflowId: v.id("workflows"),
-    modelCatalogId: v.optional(v.id("modelCatalog")),
-    executor: v.object({ adapter: v.string(), version: v.string() }),
-    executionBackend: v.optional(executionBackend),
-    sandboxProfileId: v.optional(v.id("factorySandboxProfiles")),
+    executionProfileId: v.id("factoryExecutionProfiles"),
     codeScopeIds: v.array(v.id("repositoryCodeScopes")),
     agentBindings: v.array(v.object({
       workflowAgentId: v.string(),
@@ -561,18 +727,27 @@ export const createVersion = mutation({
     const definition = await ctx.db.get(args.factoryDefinitionId);
     if (!definition || definition.status === "ARCHIVED") throw new Error("Factory is unavailable or archived.");
     const access = await requireWorkspacePermission(ctx, definition.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    const now = Date.now();
     const repository = await ctx.db.get(definition.repositoryId);
     const workflow = await ctx.db.get(args.workflowId);
     const policy = args.policyEnvelopeId ? await ctx.db.get(args.policyEnvelopeId) : null;
     const environment = args.environmentId ? await ctx.db.get(args.environmentId) : null;
-    const [verifiers, codeScopes, agentVersions, sandboxProfile, modelCatalog] = await Promise.all([
+    const executionProfileAdmission = await loadExecutionProfileAdmission(ctx, args.executionProfileId, now);
+    const { profile: executionProfile, sandboxProfile, modelRoute } = executionProfileAdmission;
+    const [verifiers, codeScopes, agentVersions] = await Promise.all([
       Promise.all(args.verifierIds.map((id) => ctx.db.get(id))),
       Promise.all(args.codeScopeIds.map((id) => ctx.db.get(id))),
       Promise.all(args.agentBindings.map((binding) => ctx.db.get(binding.agentVersionId))),
-      args.sandboxProfileId ? ctx.db.get(args.sandboxProfileId) : null,
-      loadFactoryModelCatalogForProject(ctx, definition.projectId),
     ]);
     if (!repository || repository.projectId !== definition.projectId) throw new Error("Factory repository scope is invalid.");
+    if (!executionProfile
+      || executionProfile.projectId !== definition.projectId
+      || (definition.tenantId && executionProfile.tenantId !== definition.tenantId)) {
+      throw new Error("Execution Profile is unavailable or outside the Factory workspace.");
+    }
+    if (!executionProfileAdmission.eligible || !modelRoute) {
+      throw new Error(`Execution Profile is not current (${executionProfileAdmission.blockers.join(", ")}).`);
+    }
     const repositoryDataClassification = normalizeRepositoryDataClassification(repository.dataClassification);
     if (repositoryDataClassification === "UNCLASSIFIED") {
       throw new Error("Classify the Factory repository before creating an executable version.");
@@ -616,53 +791,57 @@ export const createVersion = mutation({
         throw new Error("Approved agent versions require prompt, tool, and model manifests.");
       }
     }
-    const selectedExecutionBackend = args.executionBackend ?? "persistent-worker";
+    const frozenProfileSnapshot = executionProfile.immutableSnapshot as Record<string, any>;
+    const selectedExecutionBackend = frozenProfileSnapshot.executionBackend as "persistent-worker" | "remote-sandbox";
+    const selectedExecutor = {
+      adapter: String(frozenProfileSnapshot.harness.adapter),
+      version: String(frozenProfileSnapshot.harness.version),
+    };
     const harness = resolveFrozenHarnessBinding({
-      executor: args.executor,
+      executor: selectedExecutor,
+      harnessCapabilityManifest: frozenProfileSnapshot.harness.capabilityManifest,
+      harnessCapabilityManifestDigest: frozenProfileSnapshot.harness.capabilityManifestDigest,
+      harnessEffectiveConfigSha256: frozenProfileSnapshot.harness.effectiveConfigSha256,
+      harnessRuntimeArtifact: frozenProfileSnapshot.runtimeArtifact.snapshot,
+      harnessRuntimeArtifactDigest: frozenProfileSnapshot.runtimeArtifact.digest,
       executionBackend: selectedExecutionBackend,
-      sandboxProfileSnapshot: sandboxProfile?.immutableSnapshot,
+      modelRouteSnapshot: modelRoute.routeSnapshot,
+      sandboxProfileSnapshot: frozenProfileSnapshot.sandboxProfile?.profileSnapshot,
     });
-    const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(args.executor);
+    const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(selectedExecutor);
     const primaryModel = resolveFactoryWorkflowModelRoute({
       workflow,
       agentBindings: args.agentBindings,
       agentVersions,
     });
-    if (!primaryModel || !harnessSupportsModel(harness.capabilityManifest, primaryModel.provider, primaryModel.modelId)) {
-      throw new Error(`${args.executor.adapter}/${args.executor.version} does not admit the selected workflow model route.`);
+    if (!primaryModel
+      || !factoryWorkflowModelRouteMatches({ workflow, agentBindings: args.agentBindings, agentVersions }, modelRoute.routeSnapshot as any)
+      || !harnessSupportsModel(harness.capabilityManifest, primaryModel.provider, primaryModel.modelId)) {
+      throw new Error(`${selectedExecutor.adapter}/${selectedExecutor.version} does not admit the selected workflow model route.`);
     }
-    const workloadClass = definition.purpose === "VERIFICATION"
-      ? "VERIFICATION"
-      : definition.purpose === "INTELLIGENT_AUTOMATION"
-        ? "AUTOMATION"
-        : "SOFTWARE_CHANGE";
-    const exactCompatibility = factoryModelRouteCompatibility({
-      harness,
-      executionBackend: selectedExecutionBackend,
-    });
-    const matchingModelRoutes = matchingFactoryModelRouteQualifications({
-      routes: modelCatalog,
-      selectedCatalogId: args.modelCatalogId ? String(args.modelCatalogId) : undefined,
-      workflow: {
-        workflow,
-        agentBindings: args.agentBindings,
-        agentVersions,
-      },
-      compatibility: exactCompatibility,
-      riskClass: args.riskBoundary,
+    const workloadClass = factoryWorkloadClass(definition.purpose);
+    const selectedIsolation = factoryIsolationMode(definition.purpose);
+    const profileScopeBlockers = executionProfileScopeBlockers(executionProfile, {
       workloadClass,
-      repositoryId: String(repository._id),
+      riskClass: args.riskBoundary,
+      isolation: selectedIsolation,
     });
-    if (matchingModelRoutes.length === 0) {
-      throw new Error("Factory versions require a V2 model route qualified for the exact harness, runtime artifact, backend, risk, and workload.");
+    if (profileScopeBlockers.length > 0) {
+      throw new Error(`Execution Profile qualification does not cover this Factory workload, risk, and isolation scope (${profileScopeBlockers.join(", ")}).`);
     }
-    if (matchingModelRoutes.length > 1) {
-      throw new Error("Multiple exact model-route qualifications are eligible; select one modelCatalogId explicitly.");
+    if (!modelRouteQualifiedFor(modelRoute, {
+      workloadClass,
+      riskClass: args.riskBoundary,
+      repositoryId: String(repository._id),
+    })) {
+      throw new Error("The Execution Profile model-route qualification does not cover this Factory repository, workload, and risk scope.");
     }
-    const modelRoute = matchingModelRoutes[0];
     const routeSnapshot = modelRoute.routeSnapshot as Record<string, any> | undefined;
     if (!routeSnapshot) throw new Error("The selected exact model route is missing its immutable snapshot.");
-    if (!validFactoryExecutorBinding(args.executor)) {
+    if (!executionProfile.qualificationSnapshot || !executionProfile.qualificationDigest) {
+      throw new Error("Execution Profile qualification identity is incomplete.");
+    }
+    if (!validFactoryExecutorBinding(selectedExecutor)) {
       throw new Error("Factory executor requires a bounded exact harness adapter/version binding.");
     }
     if (!genericHarnessV1RecoveryReady(args.recovery)) {
@@ -672,15 +851,15 @@ export const createVersion = mutation({
       throw new Error("Factory budget must use positive V1 limits: cost <= $1,000, runtime <= 480 minutes, attempts <= 3.");
     }
     if (!harness.capabilityManifest.admission.executionBackends.includes(selectedExecutionBackend)) {
-      throw new Error(`${args.executor.adapter}/${args.executor.version} does not support ${selectedExecutionBackend}.`);
+      throw new Error(`${selectedExecutor.adapter}/${selectedExecutor.version} does not support ${selectedExecutionBackend}.`);
     }
     if (harness.capabilityManifest.admission.maturity === "EXPERIMENTAL") {
       const bindings = await ctx.db.query("workspaceHostBindings")
         .withIndex("by_project", (q) => q.eq("projectId", definition.projectId))
         .collect();
       const requiredSandboxCapabilities = selectedExecutionBackend === "remote-sandbox"
-        ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
-        : ["git-worktree", "workspace-write"];
+        ? ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
+        : ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write"];
       const eligible = bindings.some((binding) => factoryWorkerEligibility({
         worker: {
           workerId: binding.hostId,
@@ -703,13 +882,13 @@ export const createVersion = mutation({
           },
           provider: primaryModel.provider,
           model: primaryModel.modelId,
-          harnessCapabilities: factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
-          isolation: "WORKSPACE_WRITE",
+          harnessCapabilities: factoryHarnessCapabilityRequirements(selectedIsolation),
+          isolation: selectedIsolation,
           sandboxCapabilities: requiredSandboxCapabilities,
           executionBackend: selectedExecutionBackend,
         },
         activeWorkerLeaseCount: 0,
-        now: Date.now(),
+        now,
       }).eligible);
       if (!eligible) {
         throw new Error("Experimental harness selection requires a current eligible canonical worker advertising the exact manifest and configuration.");
@@ -720,7 +899,7 @@ export const createVersion = mutation({
         || sandboxProfile.projectId !== definition.projectId
         || sandboxProfile.status !== "ACTIVE"
         || sandboxProfile.readinessState === "BLOCKED"
-        || sandboxProfile.readinessExpiresAt <= Date.now()
+        || sandboxProfile.readinessExpiresAt <= now
         || !sandboxProfileProductionEligible(sandboxProfile)) {
         throw new Error("Remote sandbox execution requires a current dispatchable Sandbox Profile in this workspace.");
       }
@@ -735,13 +914,12 @@ export const createVersion = mutation({
       if (!repositoryExecutionPolicy.allowed) {
         throw new Error("Sensitive repository remote execution requires provider-enforced egress evidence.");
       }
-    } else if (args.sandboxProfileId) {
-      throw new Error("A Sandbox Profile can only be attached to the remote-sandbox execution backend.");
     }
     const sandboxProfileDigest = selectedExecutionBackend === "remote-sandbox" ? sandboxProfile!.profileDigest : undefined;
+    const sandboxProfileId = selectedExecutionBackend === "remote-sandbox" ? executionProfile.sandboxProfileId : undefined;
     if (!validFactoryExecutionBinding({
       executionBackend: selectedExecutionBackend,
-      sandboxProfileId: args.sandboxProfileId ? String(args.sandboxProfileId) : undefined,
+      sandboxProfileId: sandboxProfileId ? String(sandboxProfileId) : undefined,
       sandboxProfileDigest,
       riskBoundary: args.riskBoundary,
       recovery: args.recovery,
@@ -754,16 +932,20 @@ export const createVersion = mutation({
       repositoryId: String(repository._id),
       repositoryDataClassification,
       workflowId: String(workflow._id),
-      executor: args.executor,
+      executor: selectedExecutor,
       harnessCapabilityManifest: harness.capabilityManifest,
       harnessCapabilityManifestDigest: harness.capabilityManifestSha256,
       harnessEffectiveConfigSha256: harness.effectiveConfigSha256,
       harnessRuntimeArtifact: harness.runtimeArtifact,
       harnessRuntimeArtifactDigest: harness.runtimeArtifactSha256,
-      modelCatalogId: String(modelRoute._id),
-      modelRouteDigest: modelRoute.routeDigest!,
+      executionProfileId: String(executionProfile._id),
+      executionProfileVersion: executionProfile.version,
+      executionProfileDigest: executionProfile.profileDigest,
+      executionProfileQualificationDigest: executionProfile.qualificationDigest,
+      modelCatalogId: frozenProfileSnapshot.modelRoute.catalogId,
+      modelRouteDigest: frozenProfileSnapshot.modelRoute.routeDigest,
       executionBackend: selectedExecutionBackend,
-      sandboxProfileId: args.sandboxProfileId ? String(args.sandboxProfileId) : undefined,
+      sandboxProfileId: sandboxProfileId ? String(sandboxProfileId) : undefined,
       sandboxProfileDigest,
       codeScopeIds: args.codeScopeIds.map(String),
       agentBindings: args.agentBindings.map((binding) => ({
@@ -777,6 +959,9 @@ export const createVersion = mutation({
       riskBoundary: args.riskBoundary,
       recovery: args.recovery,
     };
+    if (!validFactoryExecutionProfileBinding(configuration)) {
+      throw new Error("Factory version requires a complete exact Execution Profile identity.");
+    }
     const configurationDigest = factoryConfigurationDigest(configuration);
     const duplicate = await ctx.db.query("factoryDefinitionVersions")
       .withIndex("by_digest", (q) => q.eq("configurationDigest", configurationDigest))
@@ -794,21 +979,30 @@ export const createVersion = mutation({
       repositoryDataClassification,
       purpose: definition.purpose ?? "SOFTWARE",
       workflowId: workflow._id,
-      executor: args.executor,
+      executor: selectedExecutor,
       harnessCapabilityManifest: harness.capabilityManifest,
       harnessCapabilityManifestDigest: harness.capabilityManifestSha256,
       harnessEffectiveConfigSha256: harness.effectiveConfigSha256,
       harnessRuntimeArtifact: harness.runtimeArtifact,
       harnessRuntimeArtifactDigest: harness.runtimeArtifactSha256,
-      modelCatalogId: modelRoute._id,
-      modelRouteDigest: modelRoute.routeDigest,
-      modelRouteSnapshot: modelRoute.routeSnapshot,
-      modelQualificationDigest: modelRoute.qualificationDigest,
-      modelQualificationSnapshot: modelRoute.qualificationSnapshot,
+      executionProfileId: executionProfile._id,
+      executionProfileKey: executionProfile.profileKey,
+      executionProfileVersion: executionProfile.version,
+      executionProfileDigest: executionProfile.profileDigest,
+      executionProfileSnapshot: executionProfile.immutableSnapshot,
+      executionProfileQualificationDigest: executionProfile.qualificationDigest,
+      executionProfileQualificationSnapshot: executionProfile.qualificationSnapshot,
+      modelCatalogId: executionProfile.modelCatalogId,
+      modelRouteDigest: frozenProfileSnapshot.modelRoute.routeDigest,
+      modelRouteSnapshot: frozenProfileSnapshot.modelRoute.routeSnapshot,
+      modelQualificationDigest: frozenProfileSnapshot.modelRoute.qualificationDigest,
+      modelQualificationSnapshot: frozenProfileSnapshot.modelRoute.qualificationSnapshot,
       executionBackend: selectedExecutionBackend,
-      sandboxProfileId: args.sandboxProfileId,
+      sandboxProfileId,
       sandboxProfileDigest,
-      sandboxProfileSnapshot: selectedExecutionBackend === "remote-sandbox" ? sandboxProfile!.immutableSnapshot : undefined,
+      sandboxProfileSnapshot: selectedExecutionBackend === "remote-sandbox"
+        ? frozenProfileSnapshot.sandboxProfile.profileSnapshot
+        : undefined,
       codeScopeIds: args.codeScopeIds,
       agentBindings: args.agentBindings,
       policyEnvelopeId: args.policyEnvelopeId,
@@ -818,9 +1012,9 @@ export const createVersion = mutation({
       riskBoundary: args.riskBoundary,
       recovery: args.recovery,
       createdBy: access.actorId,
-      createdAt: Date.now(),
+      createdAt: now,
     });
-    await ctx.db.patch(definition._id, { latestVersion: version, updatedAt: Date.now() });
+    await ctx.db.patch(definition._id, { latestVersion: version, updatedAt: now });
     return versionId;
   },
 });
@@ -833,7 +1027,7 @@ export const assessReadiness = mutation({
     const access = await requireWorkspacePermission(ctx, version.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
     const now = Date.now();
     const expiry = now + 24 * 60 * 60 * 1_000;
-    const [repository, workflow, policy, installation, bindings, verifiers, codeScopes, agentVersions, sandboxProfile, modelRoute] = await Promise.all([
+    const [repository, workflow, policy, installation, bindings, verifiers, codeScopes, agentVersions, sandboxProfile, modelRoute, executionProfileAdmission] = await Promise.all([
       ctx.db.get(version.repositoryId),
       ctx.db.get(version.workflowId),
       version.policyEnvelopeId ? ctx.db.get(version.policyEnvelopeId) : null,
@@ -844,6 +1038,9 @@ export const assessReadiness = mutation({
       Promise.all((version.agentBindings ?? []).map((binding) => ctx.db.get(binding.agentVersionId))),
       version.sandboxProfileId ? ctx.db.get(version.sandboxProfileId) : null,
       version.modelCatalogId ? ctx.db.get(version.modelCatalogId) : null,
+      version.executionProfileId
+        ? loadExecutionProfileAdmission(ctx, version.executionProfileId, now)
+        : Promise.resolve(null),
     ]);
     const github = installation ? evaluateGithubAppCapabilities(installation) : null;
     const agentTemplates = await Promise.all(agentVersions.map((agentVersion) =>
@@ -854,6 +1051,7 @@ export const assessReadiness = mutation({
       !githubInstallationIsStale(installation.verifiedAt, now)
     );
     const selectedExecutionBackend = version.executionBackend ?? "persistent-worker";
+    const selectedIsolation = factoryIsolationMode(version.purpose);
     const frozenHarness = resolveFrozenHarnessBinding(version);
     const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
     const primaryModel = (() => {
@@ -864,8 +1062,8 @@ export const assessReadiness = mutation({
       }
     })();
     const requiredSandboxCapabilities = selectedExecutionBackend === "remote-sandbox"
-      ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
-      : ["git-worktree", "workspace-write"];
+      ? ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
+      : ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write"];
     const host = repository
       ? bindings.find((binding) => factoryWorkerEligibility({
           worker: {
@@ -896,8 +1094,8 @@ export const assessReadiness = mutation({
             executionRuntimeArtifactSha256: frozenHarness.runtimeArtifactSha256,
             provider: primaryModel?.provider ?? null,
             model: primaryModel?.modelId ?? null,
-            harnessCapabilities: factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
-            isolation: "WORKSPACE_WRITE",
+            harnessCapabilities: factoryHarnessCapabilityRequirements(selectedIsolation),
+            isolation: selectedIsolation,
             sandboxCapabilities: requiredSandboxCapabilities,
             executionBackend: selectedExecutionBackend,
             factoryDefinitionVersionId: String(version._id),
@@ -929,6 +1127,7 @@ export const assessReadiness = mutation({
     const modelRouteReady = Boolean(
       modelRoute
       && primaryModel
+      && repository
       && modelRoute._id === version.modelCatalogId
       && factoryWorkflowModelRouteMatches({
         workflow,
@@ -941,7 +1140,21 @@ export const assessReadiness = mutation({
         harness: frozenHarness,
         executionBackend: selectedExecutionBackend,
       })
+      && modelRouteQualifiedFor(modelRoute, {
+        workloadClass: factoryWorkloadClass(version.purpose),
+        riskClass: version.riskBoundary,
+        repositoryId: String(repository._id),
+      })
     );
+    const executionProfileReadiness = evaluateFactoryVersionExecutionProfile({
+      version,
+      profile: executionProfileAdmission?.profile ?? null,
+      admissionBlockers: executionProfileAdmission?.blockers ?? [],
+      now,
+    });
+    const assessmentExpiry = executionProfileReadiness.validUntil
+      ? Math.min(expiry, executionProfileReadiness.validUntil)
+      : expiry;
     const checks = [
       check("github", "GitHub App connection", githubReady, now, expiry, "Install or repair the exact least-privilege GitHub App connection."),
       check("repository", "Repository access", repository?.status === "READY", now, expiry, "Validate repository access before activation."),
@@ -950,6 +1163,7 @@ export const assessReadiness = mutation({
       check("workflow", "Workflow version", workflow?.active === true, now, undefined, "Select an active versioned workflow."),
       check("workflow-contract", "Structured workflow contract", factoryWorkflowContractIssues(workflow).length === 0, now, undefined, "Replace heuristic completion and provider authority with schema-validated handoffs."),
       check("executor", "Generic harness adapter", validFactoryExecutorBinding(version.executor), now, undefined, "Select an exact adapter/version advertised by the canonical worker."),
+      check("execution-profile", "Exact qualified Execution Profile", executionProfileReadiness.eligible, now, executionProfileReadiness.validUntil, "Select a current exact qualified Execution Profile and create a new immutable Factory version."),
       check("model-route", "Exact qualified model route", modelRouteReady, now, undefined, "Create a new Factory version bound to an enabled, evidence-qualified exact model route."),
       check("code-scopes", "Frozen code scopes", Boolean(
         version.codeScopeIds?.length
@@ -986,7 +1200,7 @@ export const assessReadiness = mutation({
       checks,
       assessedBy: access.actorId,
       assessedAt: now,
-      expiresAt: expiry,
+      expiresAt: assessmentExpiry,
     });
   },
 });
@@ -997,16 +1211,28 @@ export const activate = mutation({
     const version = await ctx.db.get(args.factoryDefinitionVersionId);
     if (!version) throw new Error("Factory version not found.");
     const access = await requireWorkspacePermission(ctx, version.projectId, FACTORY_PERMISSIONS.APPROVE);
+    const now = Date.now();
+    const executionProfileAdmission = version.executionProfileId
+      ? await loadExecutionProfileAdmission(ctx, version.executionProfileId, now)
+      : null;
+    const executionProfileReadiness = evaluateFactoryVersionExecutionProfile({
+      version,
+      profile: executionProfileAdmission?.profile ?? null,
+      admissionBlockers: executionProfileAdmission?.blockers ?? [],
+      now,
+    });
+    if (!executionProfileReadiness.eligible) {
+      throw new Error(`The exact Execution Profile is not current (${executionProfileReadiness.blockers.join(", ")}).`);
+    }
     const assessments = await ctx.db.query("factoryReadinessAssessments")
       .withIndex("by_version", (q) => q.eq("factoryDefinitionVersionId", version._id))
       .collect();
     const latest = assessments.sort((left, right) => right.assessedAt - left.assessedAt)[0];
-    if (!latest || latest.status !== "PASS" || latest.expiresAt <= Date.now() || latest.configurationDigest !== version.configurationDigest) {
+    if (!latest || latest.status !== "PASS" || latest.expiresAt <= now || latest.configurationDigest !== version.configurationDigest) {
       throw new Error("A current passing readiness assessment for this exact Factory version is required.");
     }
     const definition = await ctx.db.get(version.factoryDefinitionId);
     if (!definition) throw new Error("Factory not found.");
-    const now = Date.now();
     await ctx.db.patch(definition._id, { status: "ACTIVE", activeVersionId: version._id, updatedAt: now });
     await ctx.db.insert("activities", {
       tenantId: definition.tenantId,

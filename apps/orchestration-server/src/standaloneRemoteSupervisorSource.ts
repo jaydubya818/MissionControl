@@ -50,6 +50,229 @@ const v2RouteValid = (route) => route && route.schema === "factory-model-route/v
     && (route.reasoningConfig.temperature === undefined || (typeof route.reasoningConfig.temperature === "number" && Number.isFinite(route.reasoningConfig.temperature) && route.reasoningConfig.temperature >= 0 && route.reasoningConfig.temperature <= 2))
     && (route.reasoningConfig.maxTokens === undefined || (Number.isSafeInteger(route.reasoningConfig.maxTokens) && route.reasoningConfig.maxTokens >= 1 && route.reasoningConfig.maxTokens <= 10000000))
   ));
+const plainObject = (value) => value && typeof value === "object" && !Array.isArray(value);
+const onlyKeys = (value, keys) => plainObject(value) && Object.keys(value).every((key) => keys.includes(key));
+const sha256 = (value) => typeof value === "string" && /^sha256:[a-f0-9]{64}$/.test(value);
+const bareSha256 = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+const sameCanonical = (left, right) => canonical(left) === canonical(right);
+const sortedUnique = (values) => Array.isArray(values) && new Set(values).size === values.length
+  && values.every((value, index) => index === 0 || String(values[index - 1]).localeCompare(String(value)) < 0);
+const boundedList = (values, maximumItems, maximumLength) => Array.isArray(values) && values.length <= maximumItems
+  && new Set(values).size === values.length && values.every((value) => boundedIdentity(value, maximumLength));
+const supportRank = { UNKNOWN: 0, UNSUPPORTED: 0, PARTIAL: 1, SUPPORTED: 2 };
+const capabilitySupport = (manifest, capability) => {
+  const parts = capability.split(".");
+  if (parts.length !== 2) return undefined;
+  const value = manifest?.[parts[0]]?.[parts[1]];
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(supportRank, value) ? value : undefined;
+};
+const requirementsSatisfied = (manifest, requirements) => Array.isArray(requirements) && requirements.every((requirement) => {
+  const support = capabilitySupport(manifest, requirement.capability);
+  return support !== undefined && supportRank[support] >= supportRank[requirement.minimumSupport];
+});
+const harnessManifestValid = (manifest) => {
+  const identity = manifest?.identity;
+  const boundedId = (value, maximum = 100) => typeof value === "string" && value === value.trim()
+    && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) && value.length <= maximum;
+  const capabilityPaths = [
+    "models.providerSelection", "models.modelSelection", "models.reasoningControls",
+    "filesystem.read", "filesystem.write", "filesystem.pathAllowlist", "filesystem.changedFileCapture",
+    "shell.available", "shell.commandTimeout", "shell.processTreeCancellation", "shell.credentialEnvironmentScrub",
+    "git.status", "git.diff", "git.commit", "git.branch", "git.remotePublication",
+    "browser.webSearch", "browser.webFetch", "browser.interactiveBrowser",
+    "tools.native", "tools.mcp", "tools.structuredOutput", "tools.telemetry",
+    "subagents.available", "subagents.parallel", "subagents.background", "subagents.eventVisibility",
+    "streaming.events", "streaming.modelDeltas", "streaming.durableReplay",
+    "context.persistentSessions", "context.resume", "context.fork", "context.compaction", "context.instructionFiles",
+    "headless.support", "cancellation.support", "network.runtimeEgressControl", "credentials.redaction",
+    "telemetry.tokens", "telemetry.cost", "telemetry.toolCalls", "telemetry.modelRequests", "telemetry.retries",
+  ];
+  const prohibited = ["worker-leases", "verification-subjects", "verification-plans", "evidence-authority", "github-publication", "acceptance"];
+  return plainObject(manifest) && plainObject(identity) && manifest.schemaVersion === "harness-capability-manifest/v1"
+    && manifest.scope === "ADAPTER_EFFECTIVE"
+    && [identity.harnessId, identity.harnessVersion, identity.adapterId, identity.adapterVersion].every((value) => boundedId(value))
+    && typeof identity.harnessCommit === "string" && /^[a-f0-9]{40}$/i.test(identity.harnessCommit)
+    && bareSha256(manifest.effectiveConfigSha256)
+    && Array.isArray(manifest.models?.supported) && manifest.models.supported.length >= 1 && manifest.models.supported.length <= 100
+    && manifest.models.supported.every((model) => boundedIdentity(model?.provider, 100) && boundedIdentity(model?.modelId, 200)
+      && ["ADVERTISED", "PASSTHROUGH", "DYNAMIC"].includes(model.selection)
+      && (model.contextWindowTokens === null || (Number.isSafeInteger(model.contextWindowTokens) && model.contextWindowTokens >= 1))
+      && boundedList(model.modalities, 20, 50))
+    && capabilityPaths.every((capability) => capabilitySupport(manifest, capability) !== undefined)
+    && Array.isArray(manifest.sandbox?.isolationModes) && manifest.sandbox.isolationModes.length >= 1
+    && new Set(manifest.sandbox.isolationModes).size === manifest.sandbox.isolationModes.length
+    && Array.isArray(manifest.admission?.executionBackends) && manifest.admission.executionBackends.length >= 1 && manifest.admission.executionBackends.length <= 16
+    && boundedList(manifest.sandbox.requirements, 100, 500)
+    && boundedList(manifest.network?.destinations, 100, 500)
+    && boundedList(manifest.credentials?.classes, 100, 200)
+    && boundedList(manifest.admission.requiredExternalControls, 100, 200)
+    && boundedList(manifest.admission.prohibitedAuthorities, 100, 200)
+    && prohibited.every((authority) => manifest.admission.prohibitedAuthorities.includes(authority))
+    && Array.isArray(manifest.limitations) && manifest.limitations.length <= 100
+    && manifest.limitations.every((item) => boundedIdentity(item, 1000));
+};
+const harnessSupportsModel = (manifest, route) => Array.isArray(manifest?.models?.supported)
+  && manifest.models.supported.some((candidate) => candidate?.provider === route?.provider
+    && (candidate.modelId === route?.modelId || candidate.modelId === "*"));
+const deniedProfileAuthority = (authority) => onlyKeys(authority, ["routing", "verification", "publication", "acceptance", "merge", "policyMutation", "workerLeases"])
+  && Object.values(authority).length === 7 && Object.values(authority).every((value) => value === false);
+const harnessRequirementsValid = (requirements) => Array.isArray(requirements) && requirements.length > 0 && requirements.length <= 50
+  && requirements.every((item) => onlyKeys(item, ["capability", "minimumSupport"])
+    && boundedIdentity(item.capability, 100) && ["PARTIAL", "SUPPORTED"].includes(item.minimumSupport))
+  && sortedUnique(requirements.map((item) => item.capability));
+const sandboxRequirementsValid = (requirements) => Array.isArray(requirements) && requirements.length > 0 && requirements.length <= 16
+  && requirements.every((item) => boundedIdentity(item, 100)) && sortedUnique(requirements);
+const requirementsAllowed = (allowed, selected) => Array.isArray(allowed) && Array.isArray(selected) && selected.length > 0
+  && selected.every((item) => allowed.some((candidate) => sameCanonical(candidate, item)));
+const selectedHarnessRequirements = (isolation) => !["READ_ONLY", "WORKSPACE_WRITE"].includes(isolation) ? [] : [
+  { capability: "filesystem.read", minimumSupport: "SUPPORTED" },
+  ...(isolation === "WORKSPACE_WRITE" ? [{ capability: "filesystem.write", minimumSupport: "SUPPORTED" }] : []),
+  { capability: "filesystem.pathAllowlist", minimumSupport: "PARTIAL" },
+  { capability: "shell.available", minimumSupport: "PARTIAL" },
+  { capability: "shell.processTreeCancellation", minimumSupport: "PARTIAL" },
+  { capability: "git.status", minimumSupport: "SUPPORTED" },
+  { capability: "git.diff", minimumSupport: "SUPPORTED" },
+  { capability: "tools.structuredOutput", minimumSupport: "PARTIAL" },
+  { capability: "headless.support", minimumSupport: "PARTIAL" },
+  { capability: "cancellation.support", minimumSupport: "PARTIAL" },
+];
+const profileHarnessRequirements = (isolationModes) => {
+  const requirements = new Map();
+  for (const isolation of isolationModes) {
+    for (const requirement of selectedHarnessRequirements(isolation)) {
+      if (requirements.get(requirement.capability) !== "SUPPORTED") requirements.set(requirement.capability, requirement.minimumSupport);
+    }
+  }
+  return [...requirements.entries()].map(([capability, minimumSupport]) => ({ capability, minimumSupport }))
+    .sort((left, right) => left.capability.localeCompare(right.capability));
+};
+const selectedSandboxCapabilities = (backend, isolation, sandboxSnapshot) => {
+  if (!["READ_ONLY", "WORKSPACE_WRITE"].includes(isolation)) return [];
+  const values = ["git-worktree", isolation === "READ_ONLY" ? "read-only" : "workspace-write"];
+  if (backend === "remote-sandbox") {
+    values.push("remote-sandbox", "sandbox-provider:" + String(sandboxSnapshot?.provider ?? "").toLowerCase().replace(/_/g, "-"));
+  }
+  return values.sort();
+};
+const profileSandboxCapabilities = (isolationModes, backend, sandboxSnapshot) => {
+  const values = new Set(["git-worktree"]);
+  if (isolationModes.includes("READ_ONLY")) values.add("read-only");
+  if (isolationModes.includes("WORKSPACE_WRITE")) values.add("workspace-write");
+  if (backend === "remote-sandbox") {
+    values.add("remote-sandbox");
+    if (boundedIdentity(sandboxSnapshot?.provider, 100)) {
+      values.add("sandbox-provider:" + sandboxSnapshot.provider.toLowerCase().replace(/_/g, "-"));
+    }
+  }
+  return [...values].sort();
+};
+const sameRequirements = (left, right) => Array.isArray(left) && Array.isArray(right)
+  && sameCanonical(left.map((item) => String(item?.capability) + ":" + String(item?.minimumSupport)).sort(), right.map((item) => String(item?.capability) + ":" + String(item?.minimumSupport)).sort());
+const sameStringSet = (left, right) => Array.isArray(left) && Array.isArray(right)
+  && left.every((item) => typeof item === "string") && right.every((item) => typeof item === "string")
+  && sameCanonical([...left].sort(), [...right].sort());
+const v3ExecutionProfileValid = (manifest, profileAdmittedAt) => {
+  if (manifest?.version !== "factory-execution-manifest/v3") return false;
+  if (!Number.isSafeInteger(profileAdmittedAt) || profileAdmittedAt < 0) return false;
+  const binding = manifest.executionProfile;
+  if (!onlyKeys(binding, ["profileId", "profileKey", "version", "profileDigest", "profileSnapshot", "qualificationDigest", "qualificationSnapshot"])
+    || !boundedIdentity(binding.profileId, 200) || !boundedIdentity(binding.profileKey, 100)
+    || !Number.isSafeInteger(binding.version) || binding.version < 1 || !sha256(binding.profileDigest) || !sha256(binding.qualificationDigest)) return false;
+  const profile = binding.profileSnapshot;
+  const qualification = binding.qualificationSnapshot;
+  if (!onlyKeys(profile, ["schema", "profileKey", "version", "harness", "runtimeArtifact", "executionBackend", "modelRoute", "sandboxProfile", "isolationModes", "requiredHarnessCapabilities", "requiredSandboxCapabilities", "lifecycle", "authority"])
+    || profile.schema !== "factory-execution-profile/v1" || profile.profileKey !== binding.profileKey || profile.version !== binding.version
+    || binding.profileDigest !== digest("factory-execution-profile/v1", profile)
+    || !onlyKeys(profile.harness, ["adapter", "version", "capabilityManifest", "capabilityManifestDigest", "effectiveConfigSha256"])
+    || !onlyKeys(profile.runtimeArtifact, ["snapshot", "digest"])
+    || !onlyKeys(profile.modelRoute, ["catalogId", "routeSnapshot", "routeDigest", "qualificationSnapshot", "qualificationDigest"])
+    || profile.executionBackend !== "remote-sandbox"
+    || !onlyKeys(profile.sandboxProfile, ["profileId", "profileSnapshot", "profileDigest"])
+    || !boundedIdentity(profile.sandboxProfile.profileId, 200) || !sha256(profile.sandboxProfile.profileDigest)
+    || profile.sandboxProfile.profileDigest !== digest("factory-sandbox-profile/v1", profile.sandboxProfile.profileSnapshot)
+    || profile.sandboxProfile.profileSnapshot?.schema !== "factory-sandbox-profile/v1"
+    || !boundedIdentity(profile.sandboxProfile.profileSnapshot?.profileKey, 100)
+    || !Number.isSafeInteger(profile.sandboxProfile.profileSnapshot?.version) || profile.sandboxProfile.profileSnapshot.version < 1
+    || !Array.isArray(profile.isolationModes) || profile.isolationModes.length < 1 || profile.isolationModes.length > 2
+    || !sortedUnique(profile.isolationModes) || profile.isolationModes.some((mode) => !["READ_ONLY", "WORKSPACE_WRITE"].includes(mode))
+    || !harnessRequirementsValid(profile.requiredHarnessCapabilities) || !sandboxRequirementsValid(profile.requiredSandboxCapabilities)
+    || !onlyKeys(profile.lifecycle, ["contractVersion", "cancellationMode", "idempotentCleanup", "retryCreatesNewAttempt", "inFlightRevocationPolicy", "componentSubstitution"])
+    || profile.lifecycle.contractVersion !== "generic-harness-contract/v1"
+    || profile.lifecycle.cancellationMode !== profile.harness?.capabilityManifest?.cancellation?.mode
+    || profile.lifecycle.idempotentCleanup !== profile.harness?.capabilityManifest?.cancellation?.idempotentCleanup
+    || profile.lifecycle.retryCreatesNewAttempt !== true || profile.lifecycle.inFlightRevocationPolicy !== "LEASED_ATTEMPT_MAY_COMPLETE"
+    || profile.lifecycle.componentSubstitution !== "DENIED" || !deniedProfileAuthority(profile.authority)) return false;
+  if (!harnessManifestValid(profile.harness.capabilityManifest)
+    || profile.isolationModes.some((mode) => !profile.harness.capabilityManifest.sandbox.isolationModes.includes(mode))
+    || !profile.harness.capabilityManifest.admission.executionBackends.includes(profile.executionBackend)
+    || !requirementsSatisfied(profile.harness.capabilityManifest, profile.requiredHarnessCapabilities)
+    || !harnessSupportsModel(profile.harness.capabilityManifest, profile.modelRoute.routeSnapshot)
+    || !sameCanonical(profile.requiredHarnessCapabilities, profileHarnessRequirements(profile.isolationModes))
+    || !sameCanonical(profile.requiredSandboxCapabilities, profileSandboxCapabilities(
+      profile.isolationModes,
+      profile.executionBackend,
+      profile.sandboxProfile.profileSnapshot,
+    ))) return false;
+  const sandboxImageDigest = profile.sandboxProfile.profileSnapshot?.security?.image?.digest;
+  const sandboxReferenceDigest = typeof profile.sandboxProfile.profileSnapshot?.machine?.image === "string"
+    ? profile.sandboxProfile.profileSnapshot.machine.image.match(/@(sha256:[a-f0-9]{64})$/)?.[1] : undefined;
+  if (!sha256(sandboxImageDigest) || sandboxImageDigest !== sandboxReferenceDigest
+    || profile.runtimeArtifact.snapshot?.kind !== "CONTAINER_IMAGE"
+    || profile.runtimeArtifact.snapshot?.executableSha256 !== null
+    || profile.runtimeArtifact.snapshot?.imageDigest !== sandboxImageDigest) return false;
+  if (!onlyKeys(qualification, ["schema", "profile", "components", "scope", "evidence", "approvedBy", "approvedAt", "validUntil", "authority"])
+    || qualification.schema !== "factory-execution-profile-qualification/v1"
+    || binding.qualificationDigest !== digest("factory-execution-profile-qualification/v1", qualification)
+    || !onlyKeys(qualification.profile, ["id", "key", "version", "digest"])
+    || qualification.profile.id !== binding.profileId || qualification.profile.key !== binding.profileKey
+    || qualification.profile.version !== binding.version || qualification.profile.digest !== binding.profileDigest
+    || !onlyKeys(qualification.scope, ["workloadClasses", "riskClasses"])
+    || !sortedUnique(qualification.scope.workloadClasses) || qualification.scope.workloadClasses.length < 1 || qualification.scope.workloadClasses.length > 50
+    || qualification.scope.workloadClasses.some((value) => !boundedIdentity(value, 64) || !/^[A-Z][A-Z0-9_]{1,63}$/.test(value))
+    || !sortedUnique(qualification.scope.riskClasses) || qualification.scope.riskClasses.length < 1 || qualification.scope.riskClasses.length > 3
+    || qualification.scope.riskClasses.some((risk) => !["GREEN", "YELLOW", "RED"].includes(risk))
+    || !onlyKeys(qualification.evidence, ["reference", "digest"]) || !boundedIdentity(qualification.evidence.reference, 1000)
+    || !sha256(qualification.evidence.digest) || !boundedIdentity(qualification.approvedBy, 200)
+    || !Number.isFinite(qualification.approvedAt) || qualification.approvedAt < 0 || qualification.approvedAt > profileAdmittedAt
+    || !Number.isFinite(qualification.validUntil) || qualification.validUntil <= profileAdmittedAt
+    || qualification.validUntil <= qualification.approvedAt || qualification.validUntil - qualification.approvedAt > 31622400000
+    || !deniedProfileAuthority(qualification.authority)) return false;
+  const expectedComponents = {
+    harness: { adapter: profile.harness.adapter, version: profile.harness.version, capabilityManifestDigest: profile.harness.capabilityManifestDigest, effectiveConfigSha256: profile.harness.effectiveConfigSha256 },
+    runtimeArtifactDigest: profile.runtimeArtifact.digest,
+    executionBackend: profile.executionBackend,
+    modelRoute: { catalogId: profile.modelRoute.catalogId, routeDigest: profile.modelRoute.routeDigest, qualificationDigest: profile.modelRoute.qualificationDigest },
+    sandboxProfile: { profileId: profile.sandboxProfile.profileId, profileDigest: profile.sandboxProfile.profileDigest },
+    isolationModes: profile.isolationModes,
+    requiredHarnessCapabilities: profile.requiredHarnessCapabilities,
+    requiredSandboxCapabilities: profile.requiredSandboxCapabilities,
+  };
+  const expectedHarnessRequirements = selectedHarnessRequirements(manifest.harness?.isolation);
+  const expectedSandboxCapabilities = selectedSandboxCapabilities(
+    manifest.executionBackend,
+    manifest.harness?.isolation,
+    profile.sandboxProfile.profileSnapshot,
+  );
+  return sameCanonical(qualification.components, expectedComponents)
+    && profile.harness.adapter === manifest.harness?.adapter && profile.harness.version === manifest.harness?.version
+    && profile.harness.capabilityManifestDigest === manifest.harness?.capabilityManifestSha256
+    && profile.harness.effectiveConfigSha256 === manifest.harness?.effectiveConfigSha256
+    && sameCanonical(profile.harness.capabilityManifest, manifest.harness?.capabilityManifest)
+    && profile.runtimeArtifact.digest === manifest.harness?.runtimeArtifactDigest
+    && sameCanonical(profile.runtimeArtifact.snapshot, manifest.harness?.runtimeArtifact)
+    && profile.executionBackend === manifest.executionBackend
+    && profile.modelRoute.catalogId === manifest.modelRoute?.catalogId && profile.modelRoute.routeDigest === manifest.modelRoute?.routeDigest
+    && profile.modelRoute.qualificationDigest === manifest.modelRoute?.qualificationDigest
+    && sameCanonical(profile.modelRoute.routeSnapshot, manifest.modelRoute?.routeSnapshot)
+    && sameCanonical(profile.modelRoute.qualificationSnapshot, manifest.modelRoute?.qualificationSnapshot)
+    && profile.sandboxProfile.profileId === manifest.sandbox?.profileId && profile.sandboxProfile.profileDigest === manifest.sandbox?.profileDigest
+    && sameCanonical(profile.sandboxProfile.profileSnapshot, manifest.sandbox?.profileSnapshot)
+    && profile.isolationModes.includes(manifest.harness?.isolation)
+    && sameRequirements(manifest.harness?.requiredHarnessCapabilities, expectedHarnessRequirements)
+    && requirementsAllowed(profile.requiredHarnessCapabilities, expectedHarnessRequirements)
+    && sameStringSet(manifest.harness?.requiredCapabilities, expectedSandboxCapabilities)
+    && requirementsAllowed(profile.requiredSandboxCapabilities, expectedSandboxCapabilities);
+};
 const redact = (value) => String(value)
   .replace(/\bsk-or-v1-[A-Za-z0-9_-]+/g, "[REDACTED_OPENROUTER_KEY]")
   .replace(/\bgh[pousr]_[A-Za-z0-9_]+/g, "[REDACTED_PROVIDER_TOKEN]")
@@ -249,17 +472,18 @@ trace("CONFIG_LOADED", {
 const manifest = config.executionManifest;
 const manifestDigest = "sha256:" + createHash("sha256").update(canonical(manifest)).digest("hex");
 const harnessFields = ["adapter", "version", "harnessId", "harnessVersion"];
-const v2 = manifest?.version === "factory-execution-manifest/v2";
-const executionBackend = v2 ? manifest.executionBackend : manifest?.harness?.executionBackend;
-const modelProvider = v2 ? manifest?.modelRoute?.routeSnapshot?.provider : manifest?.harness?.provider;
-const modelId = v2 ? manifest?.modelRoute?.routeSnapshot?.modelId : manifest?.harness?.model;
-const modelRouteDigest = v2 ? manifest?.modelRoute?.routeDigest : undefined;
-const providerRoute = v2 ? manifest?.modelRoute?.routeSnapshot?.providerRoute : undefined;
-const reasoningConfig = v2 ? manifest?.modelRoute?.routeSnapshot?.reasoningConfig : undefined;
+const v3 = manifest?.version === "factory-execution-manifest/v3";
+const decomposed = manifest?.version === "factory-execution-manifest/v2" || v3;
+const executionBackend = decomposed ? manifest.executionBackend : manifest?.harness?.executionBackend;
+const modelProvider = decomposed ? manifest?.modelRoute?.routeSnapshot?.provider : manifest?.harness?.provider;
+const modelId = decomposed ? manifest?.modelRoute?.routeSnapshot?.modelId : manifest?.harness?.model;
+const modelRouteDigest = decomposed ? manifest?.modelRoute?.routeDigest : undefined;
+const providerRoute = decomposed ? manifest?.modelRoute?.routeSnapshot?.providerRoute : undefined;
+const reasoningConfig = decomposed ? manifest?.modelRoute?.routeSnapshot?.reasoningConfig : undefined;
 const capabilityManifest = manifest?.harness?.capabilityManifest;
 const qualification = manifest?.modelRoute?.qualificationSnapshot;
 const compatibility = qualification?.compatibility;
-const v2BindingsValid = !v2 || (
+const decomposedBindingsValid = !decomposed || (
   manifest.harness?.provider === undefined && manifest.harness?.model === undefined && manifest.harness?.executionBackend === undefined
   && v2RouteValid(manifest.modelRoute?.routeSnapshot)
   && manifest.modelRoute.routeDigest === digest("factory-model-route/v2", manifest.modelRoute.routeSnapshot)
@@ -296,13 +520,14 @@ const v2BindingsValid = !v2 || (
   && qualification.authority?.publication === false
   && qualification.authority?.merge === false
 );
-if (!manifest || !["factory-execution-manifest/v1", "factory-execution-manifest/v2"].includes(manifest.version) || manifestDigest !== config.manifestDigest
+if (!manifest || !["factory-execution-manifest/v1", "factory-execution-manifest/v2", "factory-execution-manifest/v3"].includes(manifest.version) || manifestDigest !== config.manifestDigest
   || manifest.causation?.workOrderId !== config.workOrderId || manifest.causation?.workOrderRevisionNumber !== config.workOrderRevisionNumber
   || manifest.causation?.workflowRunId !== config.workflowRunId || manifest.repository?.baseSha !== config.sourceSha
   || manifest.sandbox?.profileDigest !== config.profileDigest || manifest.sandbox?.supervisorVersion !== "mission-control-supervisor/v1"
   || manifest.harness?.pullRequestAuthority !== "CONTROL_PLANE_ONLY" || executionBackend !== "remote-sandbox"
   || harnessFields.some((field) => typeof manifest.harness?.[field] !== "string" || !manifest.harness[field])
-  || !boundedIdentity(modelProvider, 100) || !boundedIdentity(modelId, 200) || !v2BindingsValid
+  || !boundedIdentity(modelProvider, 100) || !boundedIdentity(modelId, 200) || !decomposedBindingsValid
+  || (v3 && !v3ExecutionProfileValid(manifest, config.profileAdmittedAt))
   || !Array.isArray(manifest.intent?.acceptanceCriterionIds) || manifest.intent.acceptanceCriterionIds.some((id) => typeof id !== "string" || !id)
   || new Set(manifest.intent.acceptanceCriterionIds).size !== manifest.intent.acceptanceCriterionIds.length
   || !Array.isArray(manifest.sandbox?.credentialGrants)
@@ -509,7 +734,7 @@ const bundle = {
     harnessVersion: manifest.harness.harnessVersion,
     provider: modelProvider,
     model: modelId,
-    ...(v2 ? {
+    ...(decomposed ? {
       modelRouteDigest,
       providerRoute,
       ...(reasoningConfig === undefined ? {} : { reasoningConfig }),

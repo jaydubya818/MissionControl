@@ -174,6 +174,8 @@ export interface SandboxStartRequest {
   allocation: SandboxAllocation;
   executionManifest: Record<string, unknown>;
   manifestDigest: string;
+  /** Server-issued lease heartbeat time at the claim/reclaim admission boundary. */
+  profileAdmittedAt?: number;
   workOrderId: string;
   workOrderRevisionNumber: number;
   workflowRunId: string;
