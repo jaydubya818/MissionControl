@@ -282,6 +282,28 @@ describe("FactoryConfigurationPanel", () => {
     expect(screen.getByRole("button", { name: "Create configuration version" })).toBeDisabled();
   });
 
+  it("labels the exact governed tool as a qualification fixture without claiming harness support", () => {
+    mocks.definitions = [{ _id: "factory-1", repositoryId: "repository-1", status: "DRAFT" }];
+    mocks.detail = { definition: { _id: "factory-1", status: "DRAFT" }, versions: [], assessments: [] };
+    mocks.versionOptions = {
+      ...mocks.versionOptions,
+      executionProfiles: [{
+        ...localExecutionProfile,
+        toolGrant: {
+          id: "grant-1", digest: "sha256:grant", key: "doctrine-read", version: 1,
+          operation: "read_factory_doctrine_excerpt", expiresAt: Date.now() + 60_000,
+          credentialClass: "NONE", destination: "LOCAL_PROCESS", admission: "QUALIFICATION_FIXTURE",
+        },
+      }],
+    };
+    renderPanel();
+
+    expect(screen.getByText(/Qualified fixture tool/i)).toBeInTheDocument();
+    expect(screen.getByText(/read_factory_doctrine_excerpt/i)).toBeInTheDocument();
+    expect(screen.getByText(/no real MCP service is admitted/i)).toBeInTheDocument();
+    expect(screen.getByText(/Harness MCP remains unsupported/i)).toBeInTheDocument();
+  });
+
   it("shows experimental harness capability detail only in Advanced and disables selection until a worker advertises the exact pin", () => {
     mocks.definitions = [{ _id: "factory-1", repositoryId: "repository-1", status: "DRAFT" }];
     mocks.detail = { definition: { _id: "factory-1", status: "DRAFT" }, versions: [], assessments: [] };

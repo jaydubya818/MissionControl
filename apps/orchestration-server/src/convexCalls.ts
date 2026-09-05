@@ -52,6 +52,7 @@ export const ConvexActions = {
     claimFactoryAttempt: "serviceCommands:claimFactoryAttempt",
     renewFactoryAttempt: "serviceCommands:renewFactoryAttempt",
     reportFactoryAttempt: "serviceCommands:reportFactoryAttempt",
+    recordGovernedMcpReceipt: "serviceCommands:recordGovernedMcpReceipt",
     authorizeFactoryPublication: "serviceCommands:authorizeFactoryPublication",
     claimVerificationAttempt: "serviceCommands:claimVerificationAttempt",
     renewVerificationAttempt: "serviceCommands:renewVerificationAttempt",

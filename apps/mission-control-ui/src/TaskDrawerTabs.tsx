@@ -703,20 +703,13 @@ function TaskAttemptSection({
               return (
                 <li
                   key={attempt._id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface-1 px-3 py-2 text-xs"
+                  className="rounded-md border border-line bg-surface-1 px-3 py-2 text-xs"
                 >
-                  <div>
-                    <span className="font-medium text-ink">Attempt {attemptNumber}</span>
-                    <span className="ml-2 font-mono text-ink-muted">{attempt.runId}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div><span className="font-medium text-ink">Attempt {attemptNumber}</span><span className="ml-2 font-mono text-ink-muted">{attempt.runId}</span></div>
+                    <div className="flex items-center gap-2"><StatusBadge tone={attempt.status === "FAILED" ? "error" : attempt.status === "COMPLETED" ? "success" : "info"}>{attempt.status.replace(/_/g, " ")}</StatusBadge><span className="text-ink-muted">{new Date(attempt.startedAt).toLocaleString()}</span></div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge tone={attempt.status === "FAILED" ? "error" : attempt.status === "COMPLETED" ? "success" : "info"}>
-                      {attempt.status.replace(/_/g, " ")}
-                    </StatusBadge>
-                    <span className="text-ink-muted">
-                      {new Date(attempt.startedAt).toLocaleString()}
-                    </span>
-                  </div>
+                  <AttemptToolCapability attempt={attempt} />
                 </li>
               );
             })}
@@ -759,6 +752,29 @@ function TaskAttemptSection({
         ) : null}
       </div>
     </Section>
+  );
+}
+
+function AttemptToolCapability({ attempt }: { attempt: Doc<"workflowRuns"> }) {
+  const receipts = useQuery(api["factory/governedMcp"].listReceiptsForAttempt, { workflowRunId: attempt._id });
+  const profile = attempt.executionProfileSnapshot as Record<string, any> | undefined;
+  const grant = profile?.toolGrant;
+  if (!grant) return <p className="mt-2 text-[11px] text-ink-muted">MCP: no tool capability</p>;
+  if (receipts === undefined) return <div className="mt-2 h-7 animate-pulse rounded bg-surface-2" aria-label="Loading governed tool receipts" />;
+  return (
+    <details className="mt-2 rounded border border-line bg-surface-2 p-2">
+      <summary className="cursor-pointer font-medium text-ink">Governed MCP · qualification fixture · {receipts.length} receipt{receipts.length === 1 ? "" : "s"}</summary>
+      <p className="mt-1 break-all font-mono text-[10px] text-ink-muted">{grant.grantSnapshot?.operation} · {grant.grantDigest}</p>
+      {receipts.length === 0 ? <p className="mt-1 text-[11px] text-ink-muted">No governed MCP call was recorded for this Attempt.</p> : (
+        <ol className="mt-2 space-y-1" aria-label="Governed MCP receipt history">{receipts.map((receipt) => (
+          <li key={receipt._id} className="flex flex-wrap items-center justify-between gap-2 rounded bg-surface-1 px-2 py-1">
+            <span>{receipt.phase.toLowerCase()} · {receipt.reason.toLowerCase().replaceAll("_", " ")}{receipt.lateOrStale ? " · late/stale evidence" : ""}</span>
+            <StatusBadge tone={receipt.lateOrStale ? "warning" : receipt.status === "SUCCEEDED" || receipt.status === "ALLOWED" ? "success" : receipt.status === "DENIED" || receipt.status === "FAILED" ? "error" : "warning"}>{receipt.status.toLowerCase()}</StatusBadge>
+          </li>
+        ))}</ol>
+      )}
+      <p className="mt-2 text-[10.5px] text-warning">Tool output is untrusted evidence and cannot change policy, intent, acceptance, or tool scope.</p>
+    </details>
   );
 }
 

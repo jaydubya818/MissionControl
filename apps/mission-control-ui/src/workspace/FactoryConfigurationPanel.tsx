@@ -626,8 +626,17 @@ function FactoryVersionEditor({
             ))}
           </select>
           {selectedExecutionProfile ? (
-            <span className="mt-1 block font-mono text-[10.5px] text-ink-muted">
-              {selectedExecutionProfile.profileDigest} · qualification {selectedExecutionProfile.qualificationDigest}
+            <span className="mt-2 block rounded-md border border-line bg-surface-1 p-3">
+              <span className="block font-mono text-[10.5px] text-ink-muted">{selectedExecutionProfile.profileDigest} · qualification {selectedExecutionProfile.qualificationDigest}</span>
+              {selectedExecutionProfile.toolGrant ? (
+                <span className="mt-2 block text-[11.5px] leading-relaxed text-ink-secondary">
+                  <span className="font-medium text-ink">Qualified fixture tool</span> · {selectedExecutionProfile.toolGrant.key} v{selectedExecutionProfile.toolGrant.version} · <span className="font-mono">{selectedExecutionProfile.toolGrant.operation}</span><br />
+                  Host broker only · read-only · credential {selectedExecutionProfile.toolGrant.credentialClass.toLowerCase()} · expires {new Date(selectedExecutionProfile.toolGrant.expiresAt).toLocaleString()}<br />
+                  <span className="text-warning">Qualification fixture — no real MCP service is admitted. Harness MCP remains unsupported.</span>
+                </span>
+              ) : (
+                <span className="mt-2 block text-[11.5px] text-ink-muted">No tool capability. Historical profiles do not inherit MCP authority.</span>
+              )}
             </span>
           ) : (
             <span className="mt-1 block text-warning">Register and qualify an exact profile for this workflow route and {requiredIsolationMode.toLowerCase().replace(/_/g, " ")} boundary.</span>

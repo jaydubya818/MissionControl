@@ -281,6 +281,18 @@ export const getVersionOptions = query({
         modelRouteDigest: profile.modelRouteDigest,
         sandboxProfileId: profile.sandboxProfileId,
         sandboxProfileDigest: profile.sandboxProfileDigest,
+        toolGrant: snapshot.toolGrant ? {
+          id: snapshot.toolGrant.grantId,
+          digest: snapshot.toolGrant.grantDigest,
+          key: snapshot.toolGrant.grantSnapshot?.grantKey,
+          version: snapshot.toolGrant.grantSnapshot?.version,
+          operation: snapshot.toolGrant.grantSnapshot?.operation,
+          expiresAt: snapshot.toolGrant.grantSnapshot?.expiresAt,
+          credentialClass: snapshot.toolGrant.grantSnapshot?.credentialClass,
+          destination: snapshot.toolGrant.grantSnapshot?.destination,
+          admission: "QUALIFICATION_FIXTURE" as const,
+        } : null,
+        mcpSupport: snapshot.toolGrant ? "EXACT_HOST_BROKER_ONLY" as const : "NO_TOOL_CAPABILITY" as const,
         isolationModes: snapshot.isolationModes,
       };
     }))).filter((profile): profile is NonNullable<typeof profile> => Boolean(profile));
@@ -1164,6 +1176,9 @@ export const assessReadiness = mutation({
       check("workflow-contract", "Structured workflow contract", factoryWorkflowContractIssues(workflow).length === 0, now, undefined, "Replace heuristic completion and provider authority with schema-validated handoffs."),
       check("executor", "Generic harness adapter", validFactoryExecutorBinding(version.executor), now, undefined, "Select an exact adapter/version advertised by the canonical worker."),
       check("execution-profile", "Exact qualified Execution Profile", executionProfileReadiness.eligible, now, executionProfileReadiness.validUntil, "Select a current exact qualified Execution Profile and create a new immutable Factory version."),
+      ...((version.executionProfileSnapshot as Record<string, any> | undefined)?.toolGrant
+        ? [check("governed-mcp", "Exact governed read-only MCP fixture", executionProfileReadiness.eligible, now, executionProfileReadiness.validUntil, "Replace the stale or revoked Tool Grant and create a new immutable Execution Profile and Factory version.")]
+        : [{ id: "governed-mcp", label: "Governed MCP capability", status: "NOT_APPLICABLE" as const, checkedAt: now, evidence: { maturity: "NO_TOOL_CAPABILITY", harnessMcpSupport: "UNSUPPORTED" } }]),
       check("model-route", "Exact qualified model route", modelRouteReady, now, undefined, "Create a new Factory version bound to an enabled, evidence-qualified exact model route."),
       check("code-scopes", "Frozen code scopes", Boolean(
         version.codeScopeIds?.length

@@ -45,6 +45,7 @@ import { sandboxProfileDigest, stableSandboxResourceName, type SandboxProvider, 
 import type { SandboxResultBundle } from "./sandboxResultBundle.js";
 import { standaloneSandboxSupervisorSource } from "./sandboxSupervisor.js";
 import { reconcileSandboxOrphans, type SandboxCleanupHealth } from "./sandboxReconciler.js";
+import { loadGovernedMcpContext } from "./factoryGovernedMcpContext.js";
 
 export const FACTORY_ATTEMPT_LEASE_DURATION_MS = 120_000;
 const HEARTBEAT_INTERVAL_MS = 20_000;
@@ -130,6 +131,7 @@ export interface FactoryAttemptWorkerDependencies {
   recordFactorySandboxTerminated?: typeof recordFactorySandboxTerminated;
   createSandboxProvider?: (profile: SandboxProfileSnapshot) => SandboxProvider;
   createSandboxCredentialBroker?: () => SandboxCredentialBroker;
+  loadGovernedMcpContext?: typeof loadGovernedMcpContext;
 }
 
 export interface FactoryAttemptWorkerScope {
@@ -171,6 +173,7 @@ const DEFAULT_DEPENDENCIES: FactoryAttemptWorkerDependencies = {
     return new ExeDevSandboxProvider();
   },
   createSandboxCredentialBroker: () => new OpenRouterSandboxCredentialBroker(),
+  loadGovernedMcpContext,
 };
 
 export class FactoryAttemptWorker {
@@ -490,11 +493,19 @@ export class FactoryAttemptWorker {
       const executionArtifacts: any[] = [];
       const frozenModelRoute = manifestModelRoute(manifest);
       if (!frozenModelRoute) throw new Error("Claimed Factory execution manifest has no exact frozen provider/model route.");
+      const governedMcpContext = await (this.dependencies.loadGovernedMcpContext ?? loadGovernedMcpContext)({
+        client: this.client,
+        claim,
+        manifest,
+        signal: controller.signal,
+      });
       const executorRequest: ExecutorRequest = {
         executionId: `${claim.runId}:${claim.executionManifestDigest}`,
         repositoryRoot: claim.worktree,
         workingDirectory: claim.worktree,
-        prompt: manifest.compiledPrompt,
+        prompt: governedMcpContext
+          ? `${manifest.compiledPrompt}\n\n${governedMcpContext.text}`
+          : manifest.compiledPrompt,
         provider: frozenModelRoute.provider,
         model: frozenModelRoute.model,
         ...(frozenModelRoute.modelRouteDigest === undefined ? {} : {

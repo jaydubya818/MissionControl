@@ -1,9 +1,9 @@
 ---
-status: ready
+status: in_progress
 priority: p1
 issue_id: "061"
 tags: [software-factory, mcp, tools, security, supply-chain]
-dependencies: ["060"]
+dependencies: ["070"]
 ---
 
 # Prove One Governed Read-Only MCP Integration
@@ -58,6 +58,26 @@ Attempt credentials, strict schemas, redaction, revocation, and call receipts.
 - [ ] MCP stays unsupported for every harness except the exactly qualified proof path.
 
 ## Work Log
+
+### 2026-09-05 - Phase 3 implementation resumed from exact Phase 2 baseline
+
+**By:** Codex
+
+**Actions:**
+- Rebased the work item on completed Execution Profile todo `070` and exact
+  merged baseline `3ae9d86eeff1966862a6959664ec1fe2e6e7240a`.
+- Chose one isolated, credential-free, read-only stdio MCP qualification
+  fixture so the broker and transport can be proven without external data,
+  cost, or network authority.
+- Kept incident command todo `060` outside this capability's dependency chain;
+  the Product Owner's explicit Phase 2 → Phase 3 sequence supersedes the older
+  backlog ordering, and governed MCP does not technically depend on incident
+  command.
+
+**Learnings:**
+- The legacy analytics `toolCalls` record is not an authorization boundary.
+  Governed receipts must bind the Attempt lease, Execution Profile, Tool Grant,
+  exact MCP server version, operation, request, result, and policy decision.
 
 ### 2026-08-25 - Approved implementation kickoff
 

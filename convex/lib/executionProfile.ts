@@ -30,6 +30,7 @@ import {
   type ModelRouteRiskClass,
 } from "./modelRouteAdmission.js";
 import { sandboxProfileProductionEligible } from "./sandboxProfileAdmission.js";
+import { mcpToolGrantDigest, mcpToolGrantIssues } from "./governedMcp.js";
 
 export const EXECUTION_PROFILE_SCHEMA = "factory-execution-profile/v1" as const;
 export const EXECUTION_PROFILE_QUALIFICATION_SCHEMA = "factory-execution-profile-qualification/v1" as const;
@@ -97,6 +98,11 @@ export interface ExecutionProfileSnapshotInput {
     profileSnapshot: unknown;
     profileDigest: string;
   };
+  toolGrant?: {
+    grantId: string;
+    grantSnapshot: unknown;
+    grantDigest: string;
+  };
   isolationModes: IsolationMode[];
 }
 
@@ -150,6 +156,8 @@ export interface ExecutionProfilePersistedRecord extends ExecutionProfileAdmissi
   isolationModes?: unknown;
   requiredHarnessCapabilities?: unknown;
   requiredSandboxCapabilities?: unknown;
+  toolGrantId?: unknown;
+  toolGrantDigest?: string;
 }
 
 /** Flat compatibility projection used by Factory Versions, Attempts, manifests,
@@ -236,6 +244,15 @@ export function executionProfileSnapshot(input: ExecutionProfileSnapshotInput) {
           },
         }
       : {}),
+    ...(input.toolGrant
+      ? {
+          toolGrant: {
+            grantId: input.toolGrant.grantId.trim(),
+            grantSnapshot: persistedClone(input.toolGrant.grantSnapshot),
+            grantDigest: input.toolGrant.grantDigest.trim().toLowerCase(),
+          },
+        }
+      : {}),
     isolationModes,
     requiredHarnessCapabilities,
     requiredSandboxCapabilities,
@@ -270,6 +287,7 @@ export function executionProfileIssues(input: unknown): string[] {
     "executionBackend",
     "modelRoute",
     "sandboxProfile",
+    "toolGrant",
     "isolationModes",
     "requiredHarnessCapabilities",
     "requiredSandboxCapabilities",
@@ -287,6 +305,7 @@ export function executionProfileIssues(input: unknown): string[] {
   }
   issues.push(...modelRouteBindingIssues(profile.modelRoute, profile));
   issues.push(...sandboxBindingIssues(profile.sandboxProfile, profile));
+  issues.push(...toolGrantBindingIssues(profile.toolGrant));
   if (!canonicalIsolationModes(profile.isolationModes)) issues.push("isolation-modes-invalid");
 
   const derivedHarness = canonicalIsolationModes(profile.isolationModes)
@@ -693,6 +712,12 @@ export function executionProfilePersistedRecordBlockers(
   if (sandboxMismatch) {
     blockers.push("EXECUTION_PROFILE_SANDBOX_MISMATCH");
   }
+  const expectedToolGrant = profile.toolGrant as Record<string, any> | undefined;
+  const toolGrantMismatch = expectedToolGrant
+    ? (String(record.toolGrantId ?? "") !== expectedToolGrant.grantId
+      || record.toolGrantDigest !== expectedToolGrant.grantDigest)
+    : (record.toolGrantId !== undefined || record.toolGrantDigest !== undefined);
+  if (toolGrantMismatch) blockers.push("EXECUTION_PROFILE_CAPABILITY_MISMATCH");
   if (!sameCanonical(record.isolationModes, profile.isolationModes)) {
     blockers.push("EXECUTION_PROFILE_ISOLATION_MISMATCH");
   }
@@ -977,6 +1002,22 @@ function sandboxBindingIssues(input: unknown, profile: Record<string, any>): str
   return issues;
 }
 
+function toolGrantBindingIssues(input: unknown): string[] {
+  if (input === undefined) return [];
+  if (!plainObject(input)) return ["tool-grant-binding-invalid"];
+  const grant = input as Record<string, any>;
+  if (!onlyKeys(grant, ["grantId", "grantSnapshot", "grantDigest"])
+    || !boundedIdentity(grant.grantId, 200)
+    || !sha256(grant.grantDigest)
+    || mcpToolGrantIssues(grant.grantSnapshot).length > 0) return ["tool-grant-binding-invalid"];
+  try {
+    return mcpToolGrantDigest(grant.grantSnapshot) === grant.grantDigest
+      ? [] : ["tool-grant-digest-mismatch"];
+  } catch {
+    return ["tool-grant-binding-invalid"];
+  }
+}
+
 function lifecycleIssues(input: unknown, manifestInput: unknown): string[] {
   if (!plainObject(input)) return ["profile-lifecycle-invalid"];
   const lifecycle = input as Record<string, any>;
@@ -1022,6 +1063,12 @@ function qualificationComponents(profile: Record<string, any>) {
           },
         }
       : {}),
+    ...(profile.toolGrant ? {
+      toolGrant: {
+        grantId: profile.toolGrant.grantId,
+        grantDigest: profile.toolGrant.grantDigest,
+      },
+    } : {}),
     isolationModes: persistedClone(profile.isolationModes),
     requiredHarnessCapabilities: persistedClone(profile.requiredHarnessCapabilities),
     requiredSandboxCapabilities: persistedClone(profile.requiredSandboxCapabilities),
@@ -1061,6 +1108,7 @@ function qualificationComponentIssues(input: unknown): string[] {
     "executionBackend",
     "modelRoute",
     "sandboxProfile",
+    "toolGrant",
     "isolationModes",
     "requiredHarnessCapabilities",
     "requiredSandboxCapabilities",
@@ -1093,6 +1141,13 @@ function qualificationComponentIssues(input: unknown): string[] {
     }
   } else if (components.sandboxProfile !== undefined) {
     issues.push("qualification-sandbox-profile-invalid");
+  }
+  if (components.toolGrant !== undefined
+    && (!plainObject(components.toolGrant)
+      || !onlyKeys(components.toolGrant, ["grantId", "grantDigest"])
+      || !boundedIdentity(components.toolGrant.grantId, 200)
+      || !sha256(components.toolGrant.grantDigest))) {
+    issues.push("qualification-tool-grant-invalid");
   }
   if (!canonicalIsolationModes(components.isolationModes)) issues.push("qualification-isolation-invalid");
   if (!harnessCapabilityRequirements(components.requiredHarnessCapabilities)) {

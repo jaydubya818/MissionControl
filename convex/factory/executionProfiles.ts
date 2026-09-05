@@ -13,6 +13,7 @@ import { loadExecutionProfileAdmission } from "../lib/executionProfileAdmission"
 import { resolveFrozenHarnessBinding } from "../lib/harnessCapabilities";
 import { modelRouteEligibleForNewFactoryVersion } from "../lib/modelRouteAdmission";
 import { sandboxProfileProductionEligible } from "../lib/sandboxProfileAdmission";
+import { executionProfileToolGrantBinding, mcpToolGrantDigest } from "../lib/governedMcp";
 
 const executionBackend = v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"));
 const isolationMode = v.union(v.literal("READ_ONLY"), v.literal("WORKSPACE_WRITE"));
@@ -66,6 +67,7 @@ export const registerVersion = mutation({
     executionBackend,
     modelCatalogId: v.id("modelCatalog"),
     sandboxProfileId: v.optional(v.id("factorySandboxProfiles")),
+    toolGrantId: v.optional(v.id("mcpToolGrants")),
     isolationModes: v.array(isolationMode),
   },
   handler: async (ctx, args) => {
@@ -104,9 +106,10 @@ export const registerVersion = mutation({
     }
 
     const now = Date.now();
-    const [modelRoute, sandboxProfile] = await Promise.all([
+    const [modelRoute, sandboxProfile, toolGrant] = await Promise.all([
       ctx.db.get(args.modelCatalogId),
       args.sandboxProfileId ? ctx.db.get(args.sandboxProfileId) : Promise.resolve(null),
+      args.toolGrantId ? ctx.db.get(args.toolGrantId) : Promise.resolve(null),
     ]);
     if (!modelRoute?.projectId || modelRoute.projectId !== args.projectId
       || !modelRoute.routeSnapshot || !modelRoute.routeDigest
@@ -120,6 +123,11 @@ export const registerVersion = mutation({
       || sandboxProfile.readinessExpiresAt <= now
       || !sandboxProfileProductionEligible(sandboxProfile))) {
       throw new Error("Execution Profile requires a current production-pilot-eligible Sandbox Profile.");
+    }
+    if (args.toolGrantId && (!toolGrant || toolGrant.projectId !== args.projectId
+      || toolGrant.state !== "ACTIVE" || toolGrant.expiresAt <= now
+      || mcpToolGrantDigest(toolGrant.immutableSnapshot) !== toolGrant.grantDigest)) {
+      throw new Error("Execution Profile requires one current exact Tool Grant.");
     }
 
     const harness = resolveFrozenHarnessBinding({
@@ -167,6 +175,7 @@ export const registerVersion = mutation({
         profileSnapshot: sandboxProfile.immutableSnapshot,
         profileDigest: sandboxProfile.profileDigest,
       } : undefined,
+      toolGrant: toolGrant ? executionProfileToolGrantBinding(toolGrant) : undefined,
       isolationModes,
     });
 
@@ -199,6 +208,8 @@ export const registerVersion = mutation({
       isolationModes: immutableSnapshot.isolationModes,
       requiredHarnessCapabilities: immutableSnapshot.requiredHarnessCapabilities,
       requiredSandboxCapabilities: immutableSnapshot.requiredSandboxCapabilities,
+      toolGrantId: toolGrant?._id,
+      toolGrantDigest: toolGrant?.grantDigest,
       registrationIdempotencyKey: idempotencyKey,
       enabled: false,
       qualificationStatus: "UNQUALIFIED",
@@ -395,6 +406,7 @@ function registrationRequestMatches(
   args: {
     modelCatalogId: unknown;
     sandboxProfileId?: unknown;
+    toolGrantId?: unknown;
     executor: { adapter: string; version: string };
     executionBackend: string;
   },
@@ -407,5 +419,6 @@ function registrationRequestMatches(
     && profile.executionBackend === args.executionBackend
     && String(profile.modelCatalogId) === String(args.modelCatalogId)
     && String(profile.sandboxProfileId ?? "") === String(args.sandboxProfileId ?? "")
+    && String(profile.toolGrantId ?? "") === String(args.toolGrantId ?? "")
     && JSON.stringify(profile.isolationModes) === JSON.stringify(isolationModes);
 }

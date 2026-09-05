@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { action, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { makeFunctionReference } from "convex/server";
 import type { Id } from "./_generated/dataModel";
 import { canonicalRepositoryKey } from "./lib/workspaceRepositories";
 import {
@@ -484,6 +485,34 @@ export const reportFactoryAttempt = action({
       return result;
     } catch (error) {
       await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const recordGovernedMcpReceipt = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "mcp.receipts.append");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveExecutionScope, {
+      workflowRunId: payload.receipt.workflowRunId,
+    });
+    const commandReceipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(
+        makeFunctionReference<"mutation">("factory/governedMcp:recordReceiptInternal"),
+        {
+        receipt: payload.receipt,
+        },
+      );
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: commandReceipt.receiptId,
+        status: "SUCCEEDED",
+        resultReference: String(result.receiptId),
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, commandReceipt.receiptId, error);
       throw error;
     }
   },

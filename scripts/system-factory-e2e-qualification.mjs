@@ -25,6 +25,12 @@ mkdirSync(evidenceDirectory, { recursive: true });
 
 const steps = [
   {
+    name: "profile-bound governed read-only MCP transport and negative controls",
+    command: "node",
+    args: ["--import", "tsx", "scripts/governed-mcp-phase3-qualification.mts"],
+    env: { MC_QUALIFICATION_BASE_SHA: baseSha },
+  },
+  {
     name: "frozen dependency, advisory, credential, and release configuration gates",
     command: "pnpm",
     args: ["run", "release:security"],
@@ -64,6 +70,7 @@ const steps = [
     args: [
       "--filter", "@mission-control/orchestration-server", "exec", "vitest", "run",
       "src/__tests__/systemFactoryQualification.test.ts",
+      "src/__tests__/governedMcpBroker.test.ts",
       "src/__tests__/factoryAttemptWorker.test.ts",
       "src/__tests__/factoryAttemptWorkerRemote.test.ts",
       "src/__tests__/factoryVerification.test.ts",
@@ -98,6 +105,7 @@ const steps = [
     args: [
       "exec", "vitest", "run",
       "convex/__tests__/missionPlan.test.ts",
+      "convex/__tests__/governedMcp.test.ts",
       "convex/__tests__/missionSpec.test.ts",
       "convex/__tests__/missionSpecAuthority.test.ts",
       "convex/__tests__/missionWorkOrderContract.test.ts",
