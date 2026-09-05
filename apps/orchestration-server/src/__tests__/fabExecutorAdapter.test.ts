@@ -72,6 +72,7 @@ describe("Fab canonical MC harness conformance", () => {
   it("produces real checked edits, canonical evidence and candidate linkage without acceptance authority", async () => {
     const f = fixture(); const result = await runHarnessExecution(f.adapter, f.request, f.context);
     expect(result.status).toBe("COMPLETED"); expect(harnessNormalizedResultIssues(result.normalizedResult!)).toEqual([]);
+    expect(JSON.stringify(result.normalizedResult?.events)).not.toContain("export const");
     expect(JSON.parse(result.output!).completedAcceptanceCriterionIds).toEqual([]);
     const candidateRevision = await commitFactoryChanges({ worktree: f.root, changedFiles: ["src/value.mjs"], title: "Fab fixture" });
     await f.adapter.recordCandidate(f.request.executionId, { sourceRevision: f.baseline, candidateRevision });

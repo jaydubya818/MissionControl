@@ -17,7 +17,6 @@
     "baseUrl": "../..",
     "types": ["node"],
     "paths": {
-      "@fdlc/fab": ["vendor/fab/runtime/dist/index.d.ts"],
       "@mission-control/coordinator": ["packages/coordinator/src/index.ts"],
       "@mission-control/agent-runtime": ["packages/agent-runtime/src/index.ts"],
       "@mission-control/memory": ["packages/memory/src/index.ts"],

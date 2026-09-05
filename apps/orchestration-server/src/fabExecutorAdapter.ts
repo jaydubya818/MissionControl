@@ -15,7 +15,7 @@ import {
 import { canonicalHash } from "@mission-control/shared";
 import { validateChangedFileScope } from "./factoryPathScope.js";
 
-export const FAB_RUNTIME_COMMIT = "f2f21b5d2aa74b1e21698c5ad35d8c7933328684";
+export const FAB_RUNTIME_COMMIT = "026d0fba1838466f06417313a28216306efcbca7";
 const IDENTITY = { harnessId: "fab", harnessVersion: "0.1.0-experimental.1", harnessCommit: FAB_RUNTIME_COMMIT, adapterId: "fab", adapterVersion: "v1" };
 type AttemptContext = NonNullable<HarnessExecutionContext["attempt"]>;
 interface Prepared {
@@ -107,7 +107,21 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     try {
       await checkpoint(); emit("EXECUTION_STARTED", "MC-authorized Fab planning and bounded execution", { fabSessionId: p.session.id, ...p.session.governed });
       const agent = new FabAgent({ session: p.session, model: p.model, store: p.store, redactor: p.redactor, checkpoint,
-        observe: event => emit(event.kind === "tool_started" ? "TOOL_CALLED" : "ARTIFACT_PRODUCED", event.kind, { fabSessionId: p.session.id, event }) });
+        observe: event => {
+          const data = event.data && typeof event.data === "object" ? event.data as Record<string, unknown> : {};
+          const output = data.output && typeof data.output === "object" ? data.output as Record<string, unknown> : {};
+          // Source text and full transcripts stay in the private Fab session. MC gets
+          // bounded observations and content identity, not repeated file/tool buffers.
+          emit(event.kind === "tool_started" ? "TOOL_CALLED" : "ARTIFACT_PRODUCED", event.kind, {
+            fabSessionId: p.session.id, fabSequence: event.sequence, producerOnly: true,
+            ...(typeof data.name === "string" ? { tool: data.name } : {}),
+            ...(typeof data.id === "string" ? { toolCallId: data.id } : {}),
+            ...(typeof data.durationMs === "number" ? { durationMs: data.durationMs } : {}),
+            ...(event.kind === "model_completed" ? { usage: data.usage, finish: data.finish } : {}),
+            ...(typeof output.status === "string" ? { observedStatus: output.status } : {}),
+            ...(typeof output.candidateDigest === "string" ? { candidateDigest: output.candidateDigest } : {}),
+          });
+        } });
       await agent.plan(signal);
       if (p.session.status === "awaiting_approval" && p.session.approvalDigest) {
         await checkpoint();
