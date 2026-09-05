@@ -35,6 +35,8 @@ Current offline evidence:
 - exact merged-main qualification and cleanup record:
   `post-merge-qualification.md`
 - immutable completion closure: `completion-record.md`
+- final cross-repository source-integration closure:
+  `ecosystem-closure-record.md`
 
 Permanent deterministic regression coverage is invoked with
 `pnpm run test:mcp:phase4`. It does not contact Context7. Live service
