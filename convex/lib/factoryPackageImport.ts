@@ -5,8 +5,23 @@ import {
   type FactoryPackageRetrieval,
 } from "@mission-control/shared";
 import type { MissionPlanInput } from "./missionPlan";
+import type { FlagRow } from "./flags";
 
 export const FACTORY_PACKAGE_MAPPING_REVISION = 1;
+export const FACTORY_PACKAGE_QUALIFICATION_FLAG =
+  "factory-engineer.package-import-v1";
+
+export function factoryPackageQualificationEnabled(
+  rows: FlagRow[],
+  projectId: string,
+): boolean {
+  const projectRows = rows.filter(
+    (row) =>
+      row.key === FACTORY_PACKAGE_QUALIFICATION_FLAG &&
+      row.projectId === projectId,
+  );
+  return projectRows.length === 1 && projectRows[0].enabled;
+}
 
 export interface FactoryPackageCodeScopeMapping {
   requestedCodeScope: string;

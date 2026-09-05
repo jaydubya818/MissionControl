@@ -5,13 +5,17 @@ const implementation = readFileSync(
   new URL("../factoryPackageImports.ts", import.meta.url),
   "utf8",
 );
+const importBoundary = readFileSync(
+  new URL("../lib/factoryPackageImport.ts", import.meta.url),
+  "utf8",
+);
 const schema = readFileSync(new URL("../schema.ts", import.meta.url), "utf8");
 
 describe("Factory package import authority boundary", () => {
   it("authenticates both public actions and reauthorizes the atomic write", () => {
     expect(
       implementation.match(/ctx\.auth\.getUserIdentity\(\)/g),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(implementation).toContain("COMPANY_PERMISSIONS.UPDATE_DELIVERY");
     expect(implementation).toContain("COMPANY_PERMISSIONS.ASSIGN_DELIVERY");
     expect(implementation).toContain(
@@ -24,7 +28,7 @@ describe("Factory package import authority boundary", () => {
     expect(implementation).toContain('project.status !== "ACTIVE"');
     expect(
       implementation.match(/assertFactoryPackageLocalProjectBinding\(/g),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     const atomicMutation =
       implementation.match(
         /export const createDraftsAtomic = internalMutation\([\s\S]*?\n\}\);/,
@@ -33,23 +37,67 @@ describe("Factory package import authority boundary", () => {
     expect(atomicMutation).toContain("String(target.projectId)");
   });
 
-  it("creates only one Mission and one Plan and has no execution authority", () => {
-    expect(implementation.match(/ctx\.db\.insert\("missions"/g)).toHaveLength(
-      1,
+  it("can write only draft lineage, never approval, Attempt, dispatch, publication, PR, merge, release, or deployment authority", () => {
+    const atomicMutation =
+      implementation.match(
+        /export const createDraftsAtomic = internalMutation\([\s\S]*?\n\}\);/,
+      )?.[0] ?? "";
+    const insertedTables = [
+      ...atomicMutation.matchAll(/ctx\.db\.insert\("([^"]+)"/g),
+    ]
+      .map((match) => match[1])
+      .sort();
+    expect(insertedTables).toEqual([
+      "activities",
+      "factoryPackageImports",
+      "missionAssignments",
+      "missionEvents",
+      "missionEvents",
+      "missionEvents",
+      "missionPlans",
+      "missions",
+    ]);
+    expect(atomicMutation.match(/ctx\.db\.patch\(/g)).toHaveLength(1);
+    expect(atomicMutation).toContain(
+      'ctx.db.patch(missionId, { state: "PLANNING"',
     );
-    expect(
-      implementation.match(/ctx\.db\.insert\("missionPlans"/g),
-    ).toHaveLength(1);
-    for (const forbidden of [
-      'ctx.db.insert("workOrders"',
-      'ctx.db.insert("tasks"',
-      "submitPlan",
-      "approvePlan",
-      "dispatch",
-      "acceptMission",
+    expect(atomicMutation).not.toMatch(/ctx\.db\.(?:delete|replace)\(/);
+    expect(atomicMutation).toContain('state: "PLANNING"');
+    expect(atomicMutation).toContain('status: "DRAFT"');
+    expect(atomicMutation).not.toMatch(/ctx\.run(?:Mutation|Action)\(/);
+    for (const forbiddenTable of [
+      "approvalDecisions",
+      "approvalRecords",
+      "approvals",
+      "deployments",
+      "factoryReleaseEvidence",
+      "factoryReleases",
+      "harnessPrChecks",
+      "prEvidenceReconciliations",
+      "releaseGateEvaluations",
+      "tasks",
+      "contextWorkflowRuns",
+      "workflowRuns",
+      "workOrderEvents",
+      "workOrderRevisions",
+      "workOrderSupersessions",
+      "workOrders",
     ]) {
-      expect(implementation).not.toContain(forbidden);
+      expect(insertedTables).not.toContain(forbiddenTable);
     }
+    expect(implementation.match(/ctx\.runMutation\(/g)).toHaveLength(1);
+    expect(implementation).toContain(
+      "internal.factoryPackageImports.createDraftsAtomic",
+    );
+  });
+
+  it("enforces a project-only qualification switch before retrieval and again before atomic writes", () => {
+    expect(importBoundary).toContain('"factory-engineer.package-import-v1"');
+    expect(importBoundary).toContain("projectRows.length === 1");
+    expect(
+      implementation.match(/if \(!target\.qualificationModeEnabled\)/g),
+    ).toHaveLength(3);
+    expect(implementation).toContain("factoryPackageQualificationEnabled");
   });
 
   it("persists issuer-scoped identity and unique lookup indexes atomically", () => {

@@ -55,6 +55,13 @@ The target resolver checks an active local project, ready repository, active
 owner and team membership, active code scopes in that repository, and an active
 local workflow. Confirm re-runs the same checks inside the write transaction.
 
+The receiver also requires the default-off
+`factory-engineer.package-import-v1` feature flag to be enabled on the exact
+target project. A global flag row, frontend environment override, or known-flag
+default cannot enable this path. Disabling the project row blocks preview and
+confirm before Factory Engineer retrieval; confirm checks the row again inside
+the atomic mutation.
+
 Factory Engineer location and authority are deployment configuration, not
 caller input:
 
@@ -92,6 +99,14 @@ it in the attestation so the preview, receipt, and both audit trails share one
 cross-system correlation value.
 
 ## Preview and confirmation
+
+The human entry point is the existing Mission portfolio. A configured Factory
+Engineer link may open it with only `factoryPackageId` and
+`factoryPackageVersion` query parameters. It may also repeat the non-secret
+`factoryCodeScope` parameter to prefill the exact upstream scope references.
+Those values are not credentials: the operator must still choose the authorized
+local repository, team, owner, code-scope mapping, workflow, and execution
+environment. Opening a link never retrieves or writes automatically.
 
 Preview accepts only a package UUID/version and local IDs:
 
@@ -160,10 +175,11 @@ retried by Convex against the indexed receipt. The same package digest and
 target fingerprint return the original receipt; another digest or target fails
 with `IDEMPOTENCY_CONFLICT` and creates nothing.
 
-An identical retry is a read-only receipt return after current authentication
-and target validation, so a later feature-flag change does not hide an import
-that already completed. Governance blockers are rechecked immediately before
-the first write for a new external identity.
+An identical retry is a read-only receipt return after current authentication,
+target validation, and qualification-gate validation. Disabling the gate blocks
+later import calls but does not remove the already-created Mission, Plan, or
+receipt from their normal Mission Control views. Other governance blockers are
+rechecked immediately before the first write for a new external identity.
 
 ## Stable failures
 
@@ -175,6 +191,16 @@ governance blockers, idempotency conflicts, and bounded temporary failures.
 Responses and logs never include the bearer token, response body, or package
 content.
 
+Each preview and confirm action emits one structured
+`fdlc.mission-control-ingestion-telemetry/v1` record. The event is
+`mission_control.ingestion_succeeded` or `mission_control.ingestion_failed`,
+with an explicit `PREVIEW` or `CONFIRM` stage. The allowlisted fields are the
+bounded project ID, UUID package/correlation IDs, positive package version,
+12-hex package/mapping digest prefixes, failure code, and whether the confirm
+created new draft records. Invalid identifiers become `invalid` or `null`;
+telemetry never includes credentials, package content, Mission/Plan text,
+upstream messages, or other user-authored data.
+
 For Factory Engineer's shared HTTP `410` withdrawal response, the adapter reads
 the already size-bounded JSON and accepts only `PACKAGE_STALE` or
 `PACKAGE_REVOKED` from `error.code`; it ignores upstream message text and
@@ -183,12 +209,15 @@ correlation data. Unknown withdrawal bodies fail as `INVALID_PACKAGE`.
 ## Rollout verification
 
 1. Configure the eight server-only values and a dedicated scoped retrieval grant.
-2. Keep the UI entry point disabled until a synthetic preview succeeds.
+2. Enable `factory-engineer.package-import-v1` only on the single qualified
+   project after a synthetic preview succeeds. Never use a global row.
 3. Confirm a synthetic package and verify one `factoryPackageImports` row, one
    Mission in `PLANNING`, one Plan in `DRAFT`, and zero WorkOrders.
 4. Retry with the same two preview digests and confirm the same Mission/Plan IDs
    return with `created: false`.
 5. Change a digest/target, revoke/stale the package, and test another workspace,
    repository, and scope; every case must fail without writes.
-6. Monitor `FACTORY_PACKAGE_IMPORTED` Mission events/activities and
-   `IDEMPOTENCY_CONFLICT` action results for 24 hours before widening access.
+6. Monitor `FACTORY_PACKAGE_IMPORTED` Mission events/activities plus
+   `mission_control.ingestion_succeeded` and
+   `mission_control.ingestion_failed` by stage/failure code for 24 hours before
+   widening access.
