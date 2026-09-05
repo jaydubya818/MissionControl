@@ -9,6 +9,7 @@ export default defineConfig({
   root: configDir,
   resolve: {
     alias: {
+      "@fdlc/fab": path.resolve(repoRoot, "vendor/fab/runtime/dist/index.js"),
       "@mission-control/coordinator": path.resolve(repoRoot, "packages/coordinator/src/index.ts"),
       "@mission-control/agent-runtime": path.resolve(repoRoot, "packages/agent-runtime/src/index.ts"),
       "@mission-control/memory": path.resolve(repoRoot, "packages/memory/src/index.ts"),

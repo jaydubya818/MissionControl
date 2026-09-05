@@ -67,3 +67,9 @@ backups/
 
 # Durable worker state is local and must never be committed.
 /.mission-control/
+
+# Extracted private Fab package for local contract tests
+vendor/fab/runtime/
+
+# Also ignore linked workspace dependency directories used by isolated worktrees.
+**/node_modules

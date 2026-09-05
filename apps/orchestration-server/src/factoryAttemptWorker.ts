@@ -375,7 +375,7 @@ export class FactoryAttemptWorker {
             leaseDurationMs: FACTORY_ATTEMPT_LEASE_DURATION_MS,
             ...workerLeaseIdentity,
           });
-          if (!result?.renewed) throw new Error(`Attempt lease renewal rejected (${result?.reason ?? "unknown"}).`);
+          if (!result?.renewed || result.cancellationRequested) throw new Error(`Attempt lease renewal rejected or cancellation requested (${result?.reason ?? "unknown"}).`);
         } catch (error) {
           leaseHealthy = false;
           this.lastError = safeError(error);
@@ -598,6 +598,22 @@ export class FactoryAttemptWorker {
         const executorEvents: ExecutorEvent[] = [];
         const runtimeEvents: any[] = [];
         const result = await runHarnessExecution(adapter, executorRequest, {
+          attempt: workspaceOwner ? {
+            workOrderId: String(claim.workOrderId), attemptId: String(claim.runId),
+            executorIdentity: `${workerLeaseIdentity.workerId}:${workerLeaseIdentity.workerSessionId}:${workerLeaseIdentity.workerGeneration}`,
+            environmentReference: `local-worktree:${claim.runId}`, sourceRevision: manifest.repository.baseSha,
+            acceptanceCriteria: manifest.workOrderSpecification?.acceptanceCriteria ?? [],
+            assertActive: async () => {
+              controller.signal.throwIfAborted();
+              if (!leaseHealthy) throw new Error("Attempt authority was lost.");
+              if (heartbeatTask) await heartbeatTask;
+              const result = await this.command("renewFactoryAttempt", "attempts.renew", run, {
+                workflowRunId: run._id, leaseId, leaseDurationMs: FACTORY_ATTEMPT_LEASE_DURATION_MS, ...workerLeaseIdentity,
+              });
+              if (!result?.renewed || result.cancellationRequested) { leaseHealthy = false; controller.abort(); throw new Error("Attempt authority was lost or cancelled."); }
+              controller.signal.throwIfAborted();
+            },
+          } : undefined,
           emit: (event) => { executorEvents.push(event); },
           signal: controller.signal,
           processObserver: workspaceOwner ? {
@@ -728,6 +744,10 @@ export class FactoryAttemptWorker {
       } else if (candidate.candidateRevision !== headSha) {
         throw new Error("Committed candidate revision changed before verification.");
       }
+      controller.signal.throwIfAborted();
+      await adapter.recordCandidate?.(executorRequest.executionId, {
+        sourceRevision: candidate.sourceRevision, candidateRevision: candidate.candidateRevision,
+      });
       const baseArtifacts = [
         structuredResultArtifact(claim, structuredResult),
         ...executionArtifacts,

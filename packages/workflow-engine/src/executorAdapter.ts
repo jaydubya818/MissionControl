@@ -345,12 +345,24 @@ export interface HarnessNormalizedResult {
 }
 
 export interface HarnessExecutionContext {
+  /** MC-owned invocation linkage and authority check. It never grants authority to the harness. */
+  attempt?: {
+    workOrderId: string;
+    attemptId: string;
+    executorIdentity: string;
+    environmentReference: string;
+    sourceRevision: string;
+    acceptanceCriteria: Array<{ id: string; title: string }>;
+    assertActive: () => Promise<void>;
+  };
   emit: (event: ExecutorEvent) => Promise<void> | void;
   signal?: AbortSignal;
   processObserver?: ExecutorProcessObserver;
 }
 
 export interface HarnessExecutorAdapter<TPrepared = unknown, THandle = unknown> {
+  /** Called by MC after its own candidate capture, before verification/publication. */
+  recordCandidate?(executionId: string, candidate: { sourceRevision: string; candidateRevision: string }): Promise<void>;
   capabilities(): HarnessExecutorCapabilities;
   validateConfiguration(request: ExecutorRequest): ExecutorConfigurationIssue[];
   estimate(request: ExecutorRequest): Promise<ExecutorEstimate>;
