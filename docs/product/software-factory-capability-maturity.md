@@ -2,7 +2,7 @@
 title: Software Factory Capability Maturity Ledger
 status: active
 last_verified: 2026-09-05
-baseline_commit: 3ae9d86eeff1966862a6959664ec1fe2e6e7240a
+baseline_commit: ed77c46c9d975a2ed0c666cdaf0a3f0e12e77d4d
 owners:
   - product
   - platform

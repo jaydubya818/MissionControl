@@ -3,7 +3,7 @@ status: ready
 priority: p1
 issue_id: "063"
 tags: [software-factory, outcomes, economics, routing, metrics]
-dependencies: ["062"]
+dependencies: []
 ---
 
 # Connect Outcome Economics to Routing
@@ -47,6 +47,19 @@ coverage is missing. Tokens or estimated prices are insufficient optimization ta
 Implement Option 1. Keep raw facts immutable, version formulas, retain sample,
 coverage, freshness, and confidence, and feed only accepted compatible outcomes.
 
+The bounded implementation plan is
+`docs/plans/2026-09-05-feat-inference-gateway-outcome-economics-qualification-plan.md`.
+
+## Sequencing Decision
+
+**Approved 2026-09-05:** the bounded first slice may proceed ahead of todo
+`062`, limited to the governed inference boundary, exact route identity,
+pricing, provider receipts, hard reservations, accounting, settlement, cost
+coverage, and verified-outcome economics primitives. Todo `062` remains open
+and required for shared builder intent, product/QA/design contribution
+semantics, and broader outcome-workflow semantics. This decision does not mark
+either todo complete and does not authorize implementation by itself.
+
 ## Acceptance Criteria
 
 - [ ] Outcome stages and cost components have one versioned measurement dictionary.
@@ -57,6 +70,19 @@ coverage, freshness, and confidence, and feed only accepted compatible outcomes.
 - [ ] Guarded Auto, RED auto-routing, merge, and deployment remain disabled.
 
 ## Work Log
+
+### 2026-09-05 - Bounded first-slice resequencing approved
+
+**By:** Product Owner
+
+**Actions:**
+- Allowed the governed inference/economics primitives listed above to proceed
+  ahead of todo `062` under a separate implementation authorization.
+- Kept todo `062` open for shared builder intent and broader outcome semantics.
+
+**Learnings:**
+- Infrastructure accounting can be qualified independently without inventing
+  product, QA, or design workflow semantics.
 
 ### 2026-08-25 - Approved implementation kickoff
 
