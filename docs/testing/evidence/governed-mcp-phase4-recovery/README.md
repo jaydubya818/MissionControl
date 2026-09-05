@@ -28,6 +28,8 @@ Current offline evidence:
 - deterministic browser validation: `browser-validation.json`
 - final pre-merge qualification and independent review record:
   `pre-merge-qualification.md`
+- exact merged-main qualification and cleanup record:
+  `post-merge-qualification.md`
 
 External-call accounting for this recovery is two Context7 `query-docs`
 operations total: one direct transport diagnostic and one canonical
