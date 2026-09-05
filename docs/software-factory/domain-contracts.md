@@ -595,7 +595,8 @@ They have distinct ownership:
   describe what the execution implementation can do.
 - **Runtime Artifact** is the exact executable environment. The
   `harness-runtime-artifact/v1` sidecar identifies a pinned executable or
-  container image and has its own canonical digest.
+  container image and has its own canonical digest. Multi-file executable
+  installations may additionally bind a complete dependency-closure digest.
 - **Execution Backend** is placement. It identifies where the harness executes,
   such as a persistent worker or admitted remote sandbox; it is not a model or
   harness property.

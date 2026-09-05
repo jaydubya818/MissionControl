@@ -44,6 +44,10 @@ identity and behavior. Exact executable/image identity is represented by a
 separate, canonically hashed `harness-runtime-artifact/v1` sidecar in harness
 composition. The sidecar prevents runtime changes from mutating model identity
 and avoids changing historical V1 capability-manifest bytes and digests.
+When an executable loads a mutable multi-file installation, the sidecar also
+freezes an optional closure digest. Artifacts that do not require closure
+attestation omit that field so their historical canonical digests remain
+unchanged.
 
 The execution backend remains an explicit Factory Version binding. Backend
 support advertised by a harness is compatibility evidence, not ownership of
@@ -144,6 +148,15 @@ not execution eligibility.
 - This decision does not add Execution Profiles, dynamic plugins, automatic
   harness routing, Deep Agents, Open SWE, MCP, a new sandbox provider, or a
   multi-model workflow contract.
+
+## Deferred model health identity
+
+The legacy public health reporter retains its existing `(projectId, modelId)`
+first-match behavior for compatibility. Exact worker-attested health may target
+the immutable catalog row and expected route digest, but broader V2 health
+semantics remain deferred. A future contract should key route health by exact
+qualification identity such as `routeDigest` so independently qualified routes
+that share a model ID cannot affect one another.
 
 ## Rejected alternatives
 

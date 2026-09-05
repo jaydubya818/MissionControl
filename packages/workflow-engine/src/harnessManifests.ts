@@ -55,6 +55,7 @@ export const DEEPSEEK_V1_RUNTIME_ARTIFACT: HarnessRuntimeArtifactIdentity = {
   name: "deepseek-harness",
   version: "0.1.0-rc.5",
   executableSha256: "c0226687bb20f45c603ec6fe50f3de16d1c3510c3a803304ec575ef9bc366c62",
+  closureSha256: "f340dda4710952d53ea3611ace0d04959c1410aeeb9f6464254c644e4aedfa83",
   imageDigest: null,
 };
 

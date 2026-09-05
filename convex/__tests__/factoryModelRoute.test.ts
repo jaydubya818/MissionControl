@@ -14,6 +14,7 @@ import {
   frozenFactoryModelRouteEligible,
   matchingFactoryModelRouteQualifications,
   resolveFactoryWorkflowModelRoute,
+  selectFrozenFactoryPlanningModelRoute,
 } from "../lib/factoryModelRoute";
 import {
   LEGACY_EXACT_MODEL_ROUTE_SCHEMA,
@@ -32,6 +33,7 @@ const deepSeekHarness = {
   effectiveConfigSha256: DEEPSEEK_V1_HARNESS_MANIFEST.effectiveConfigSha256,
   runtimeArtifact: DEEPSEEK_V1_RUNTIME_ARTIFACT,
   runtimeArtifactSha256: harnessRuntimeArtifactDigest(DEEPSEEK_V1_RUNTIME_ARTIFACT),
+  capabilityManifest: DEEPSEEK_V1_HARNESS_MANIFEST,
 };
 
 const codexHarness = {
@@ -41,6 +43,7 @@ const codexHarness = {
   effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
   runtimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
   runtimeArtifactSha256: harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT),
+  capabilityManifest: CODEX_V1_HARNESS_MANIFEST,
 };
 
 const v2RouteSnapshot = exactModelRouteSnapshot({
@@ -135,6 +138,164 @@ const legacyVersion = {
 };
 
 describe("Factory model-route composition", () => {
+  it("admits a V2 planning route without legacy capability identity", () => {
+    const routeSnapshot = exactModelRouteSnapshot({
+      provider: "openai",
+      providerRoute: "openai",
+      modelId: "gpt-5.6-terra",
+      reasoningConfig: { effort: "high" },
+    });
+    const routeDigest = exactModelRouteDigest(routeSnapshot);
+    const qualificationSnapshot = exactModelRouteQualificationSnapshot({
+      routeDigest,
+      evidenceReference: "docs/evidence/planning.json",
+      evidenceDigest: `sha256:${"3".repeat(64)}`,
+      workloadClasses: ["MISSION_PLANNING"],
+      riskClasses: ["YELLOW"],
+      promotedBy: "operator-1",
+      promotedAt: 2,
+      compatibility: factoryModelRouteCompatibility({
+        harness: codexHarness,
+        executionBackend: "persistent-worker",
+      }),
+    });
+    const qualificationDigest = modelRouteQualificationDigest(qualificationSnapshot);
+    const route = {
+      _id: "planning-v2",
+      projectId: "project-1",
+      provider: routeSnapshot.provider,
+      modelId: routeSnapshot.modelId,
+      displayName: "Planning V2",
+      routeSnapshot,
+      routeDigest,
+      enabled: true,
+      qualificationStatus: "EVIDENCE_QUALIFIED",
+      admissionStatus: "PRODUCTION_PILOT_ELIGIBLE",
+      qualificationSnapshot,
+      qualificationDigest,
+    };
+    const version = {
+      modelRouteSnapshot: routeSnapshot,
+      modelRouteDigest: routeDigest,
+      modelQualificationSnapshot: qualificationSnapshot,
+      modelQualificationDigest: qualificationDigest,
+    };
+
+    expect(routeSnapshot).not.toHaveProperty("capabilityIdentity");
+    expect(selectFrozenFactoryPlanningModelRoute({
+      routes: [route],
+      selectedCatalogId: route._id,
+      projectId: "project-1",
+      version,
+      harness: codexHarness,
+      executionBackend: "persistent-worker",
+      repositoryId: "repository-1",
+    })).toBe(route);
+    expect(selectFrozenFactoryPlanningModelRoute({
+      routes: [route],
+      selectedCatalogId: route._id,
+      projectId: "project-1",
+      version,
+      harness: codexHarness,
+      executionBackend: "remote-sandbox",
+      repositoryId: "repository-1",
+    })).toBeNull();
+  });
+
+  it("never substitutes an eligible V1 sibling for the Factory Version's frozen route", () => {
+    const routeSnapshot = exactModelRouteSnapshot({
+      provider: "openai",
+      providerRoute: "openai",
+      modelId: "gpt-5.6-terra",
+    });
+    const routeDigest = exactModelRouteDigest(routeSnapshot);
+    const qualificationSnapshot = exactModelRouteQualificationSnapshot({
+      routeDigest,
+      evidenceReference: "docs/evidence/planning-v2.json",
+      evidenceDigest: `sha256:${"4".repeat(64)}`,
+      workloadClasses: ["MISSION_PLANNING"],
+      riskClasses: ["YELLOW"],
+      promotedBy: "operator-1",
+      promotedAt: 3,
+      compatibility: factoryModelRouteCompatibility({
+        harness: codexHarness,
+        executionBackend: "persistent-worker",
+      }),
+    });
+    const qualificationDigest = modelRouteQualificationDigest(qualificationSnapshot);
+    const frozenV2 = {
+      _id: "frozen-v2",
+      provider: "openai",
+      modelId: "gpt-5.6-terra",
+      routeSnapshot,
+      routeDigest,
+      enabled: false,
+      qualificationStatus: "UNQUALIFIED",
+      admissionStatus: "DISABLED",
+      qualificationSnapshot,
+      qualificationDigest,
+    };
+    const legacyPlanningQualification = {
+      ...legacyQualificationSnapshot,
+      scope: { workloadClasses: ["MISSION_PLANNING"], riskClasses: ["YELLOW"] },
+    };
+    const legacyPlanningDigest = modelRouteQualificationDigest(legacyPlanningQualification);
+    const legacySibling = {
+      _id: "legacy-sibling",
+      provider: "openai",
+      modelId: "gpt-5.6-terra",
+      ...legacyRoute,
+      qualificationSnapshot: legacyPlanningQualification,
+      qualificationDigest: legacyPlanningDigest,
+    };
+    const version = {
+      modelRouteSnapshot: routeSnapshot,
+      modelRouteDigest: routeDigest,
+      modelQualificationSnapshot: qualificationSnapshot,
+      modelQualificationDigest: qualificationDigest,
+    };
+
+    expect(selectFrozenFactoryPlanningModelRoute({
+      routes: [legacySibling, frozenV2],
+      selectedCatalogId: frozenV2._id,
+      projectId: "project-1",
+      version,
+      harness: codexHarness,
+      executionBackend: "persistent-worker",
+      repositoryId: "repository-1",
+    })).toBeNull();
+  });
+
+  it("keeps an exact frozen V1 route planning-compatible without synthesizing V2 identity", () => {
+    const qualificationSnapshot = {
+      ...legacyQualificationSnapshot,
+      scope: { workloadClasses: ["MISSION_PLANNING"], riskClasses: ["YELLOW"] },
+    };
+    const qualificationDigest = modelRouteQualificationDigest(qualificationSnapshot);
+    const route = {
+      _id: "planning-v1",
+      provider: legacyRouteSnapshot.provider,
+      modelId: legacyRouteSnapshot.modelId,
+      ...legacyRoute,
+      qualificationSnapshot,
+      qualificationDigest,
+    };
+
+    expect(selectFrozenFactoryPlanningModelRoute({
+      routes: [route],
+      selectedCatalogId: route._id,
+      projectId: "project-1",
+      version: {
+        ...legacyVersion,
+        modelQualificationSnapshot: qualificationSnapshot,
+        modelQualificationDigest: qualificationDigest,
+      },
+      harness: codexHarness,
+      executionBackend: "persistent-worker",
+      repositoryId: "repository-1",
+    })).toBe(route);
+  });
+
   it("offers every promoted V2 qualification instance and excludes a legacy sibling", () => {
     const currentRouteSnapshot = exactModelRouteSnapshot({
       provider: "openai",

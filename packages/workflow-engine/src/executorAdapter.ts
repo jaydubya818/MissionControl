@@ -26,6 +26,8 @@ export interface HarnessRuntimeArtifactIdentity {
   name: string;
   version: string | null;
   executableSha256: string | null;
+  /** Optional digest of the executable's complete installed dependency tree. */
+  closureSha256?: string;
   imageDigest: string | null;
 }
 
@@ -446,6 +448,7 @@ export function harnessRuntimeArtifactIssues(input: unknown): string[] {
     "name",
     "version",
     "executableSha256",
+    "closureSha256",
     "imageDigest",
   ].includes(key))) {
     issues.push("runtime-artifact-fields-invalid");
@@ -467,6 +470,15 @@ export function harnessRuntimeArtifactIssues(input: unknown): string[] {
     && /^[a-f0-9]{64}$/i.test(artifact.executableSha256)
     && artifact.executableSha256 !== artifact.executableSha256.toLowerCase()) {
     issues.push("runtime-artifact-executable-digest-noncanonical");
+  }
+  if (artifact.closureSha256 !== undefined
+    && (typeof artifact.closureSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(artifact.closureSha256))) {
+    issues.push("runtime-artifact-closure-digest-invalid");
+  }
+  if (typeof artifact.closureSha256 === "string"
+    && /^[a-f0-9]{64}$/i.test(artifact.closureSha256)
+    && artifact.closureSha256 !== artifact.closureSha256.toLowerCase()) {
+    issues.push("runtime-artifact-closure-digest-noncanonical");
   }
   if (artifact.imageDigest !== null
     && (typeof artifact.imageDigest !== "string" || !/^sha256:[a-f0-9]{64}$/i.test(artifact.imageDigest))) {

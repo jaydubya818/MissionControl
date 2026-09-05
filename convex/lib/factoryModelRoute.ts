@@ -1,4 +1,8 @@
-import type { HarnessRuntimeArtifactIdentity } from "@mission-control/workflow-engine/harness-contract";
+import type {
+  HarnessCapabilityManifest,
+  HarnessRuntimeArtifactIdentity,
+} from "@mission-control/workflow-engine/harness-contract";
+import { harnessSupportsModel } from "@mission-control/workflow-engine/harness-contract";
 import {
   EXACT_MODEL_ROUTE_SCHEMA,
   LEGACY_EXACT_MODEL_ROUTE_SCHEMA,
@@ -190,6 +194,43 @@ export function matchingFactoryModelRouteQualifications<T extends ModelRouteAdmi
   );
 }
 
+/** Mission planning is execution by the active Factory Version, not a second
+ * composition point. Resolve only the catalog row frozen by that version and
+ * then prove its exact route, qualification, harness, runtime, backend, and
+ * planning scope. A sibling row can never act as a fallback. */
+export function selectFrozenFactoryPlanningModelRoute<T extends PlanningModelRouteCandidate>(input: {
+  routes: T[];
+  selectedCatalogId: string;
+  projectId: string;
+  version: Parameters<typeof frozenFactoryModelRouteEligible>[0]["version"];
+  harness: FrozenFactoryHarnessIdentity & { capabilityManifest: HarnessCapabilityManifest };
+  executionBackend: ModelRouteExecutionBackend;
+  repositoryId: string;
+}): T | null {
+  if (input.executionBackend !== "persistent-worker") return null;
+  const route = input.routes.find((candidate) => String(candidate._id) === input.selectedCatalogId);
+  const routeSnapshot = route?.routeSnapshot as Record<string, unknown> | undefined;
+  if (!route
+    || (route.projectId !== undefined && String(route.projectId) !== input.projectId)
+    || routeSnapshot?.provider !== route.provider
+    || routeSnapshot?.modelId !== route.modelId
+    || !harnessSupportsModel(input.harness.capabilityManifest, route.provider, route.modelId)
+    || !modelRouteQualifiedFor(route, {
+      workloadClass: "MISSION_PLANNING",
+      riskClass: "YELLOW",
+      repositoryId: input.repositoryId,
+    })
+    || !frozenFactoryModelRouteEligible({
+      route,
+      version: input.version,
+      harness: input.harness,
+      executionBackend: input.executionBackend,
+    })) {
+    return null;
+  }
+  return route;
+}
+
 /** Version composition must expose every promoted V2 qualification instance.
  * Generic model routing deliberately collapses sibling rows by modelId, while
  * Factory creation disambiguates immutable qualifications by modelCatalogId. */
@@ -213,6 +254,12 @@ interface ModelRouteAdmissionCandidate {
   admissionStatus?: string;
   qualificationSnapshot?: unknown;
   qualificationDigest?: string;
+}
+
+interface PlanningModelRouteCandidate extends ModelRouteAdmissionCandidate {
+  provider: string;
+  modelId: string;
+  projectId?: unknown;
 }
 
 function executableWorkflowModelRoutes(

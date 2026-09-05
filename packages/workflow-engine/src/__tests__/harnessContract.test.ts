@@ -3,6 +3,7 @@ import {
   CODEX_V1_RUNTIME_ARTIFACT,
   CODEX_V1_HARNESS_MANIFEST,
   DEEPSEEK_V1_HARNESS_MANIFEST,
+  DEEPSEEK_V1_RUNTIME_ARTIFACT,
   boundedProviderMetadata,
   harnessCapabilityManifestDigest,
   harnessCapabilityRequirementsSatisfied,
@@ -77,6 +78,10 @@ describe("generic harness contract", () => {
 
   it("requires canonical, kind-specific runtime artifact digests", () => {
     expect(harnessRuntimeArtifactIssues(CODEX_V1_RUNTIME_ARTIFACT)).toEqual([]);
+    expect(CODEX_V1_RUNTIME_ARTIFACT).not.toHaveProperty("closureSha256");
+    expect(harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT)).toBe("sha256:dbd2a09c812ba8b2a5b5425f5386b0c65b2a399e40813374597d20bcfcd855fc");
+    expect(harnessRuntimeArtifactIssues(DEEPSEEK_V1_RUNTIME_ARTIFACT)).toEqual([]);
+    expect(DEEPSEEK_V1_RUNTIME_ARTIFACT.closureSha256).toBe("f340dda4710952d53ea3611ace0d04959c1410aeeb9f6464254c644e4aedfa83");
 
     const executableWithImage = {
       ...CODEX_V1_RUNTIME_ARTIFACT,
@@ -102,6 +107,14 @@ describe("generic harness contract", () => {
       executableSha256: null,
       imageDigest: `sha256:${"A".repeat(64)}`,
     })).toContain("runtime-artifact-image-digest-noncanonical");
+    expect(harnessRuntimeArtifactIssues({
+      ...CODEX_V1_RUNTIME_ARTIFACT,
+      closureSha256: "A".repeat(64),
+    })).toContain("runtime-artifact-closure-digest-noncanonical");
+    expect(harnessRuntimeArtifactIssues({
+      ...CODEX_V1_RUNTIME_ARTIFACT,
+      closureSha256: "not-a-digest",
+    })).toContain("runtime-artifact-closure-digest-invalid");
     expect(harnessRuntimeArtifactIssues({
       ...CODEX_V1_RUNTIME_ARTIFACT,
       provider: "openai",

@@ -25,12 +25,13 @@ const objectDigest = (value) => "sha256:" + createHash("sha256").update(canonica
 const boundedIdentity = (value, maximum) => typeof value === "string" && value === value.trim()
   && value.length > 0 && value.length <= maximum && !/[\0\r\n]/.test(value);
 const runtimeArtifactValid = (artifact) => artifact && typeof artifact === "object" && !Array.isArray(artifact)
-  && Object.keys(artifact).every((key) => ["schemaVersion", "kind", "name", "version", "executableSha256", "imageDigest"].includes(key))
+  && Object.keys(artifact).every((key) => ["schemaVersion", "kind", "name", "version", "executableSha256", "closureSha256", "imageDigest"].includes(key))
   && artifact.schemaVersion === "harness-runtime-artifact/v1"
   && ["EXECUTABLE", "CONTAINER_IMAGE"].includes(artifact.kind)
   && typeof artifact.name === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(artifact.name)
   && (artifact.version === null || (typeof artifact.version === "string" && /^[A-Za-z0-9][A-Za-z0-9._+-]{0,199}$/.test(artifact.version)))
   && (artifact.executableSha256 === null || (typeof artifact.executableSha256 === "string" && /^[a-f0-9]{64}$/.test(artifact.executableSha256)))
+  && (artifact.closureSha256 === undefined || (typeof artifact.closureSha256 === "string" && /^[a-f0-9]{64}$/.test(artifact.closureSha256)))
   && (artifact.imageDigest === null || (typeof artifact.imageDigest === "string" && /^sha256:[a-f0-9]{64}$/.test(artifact.imageDigest)))
   && (artifact.kind !== "EXECUTABLE" || (artifact.executableSha256 !== null && artifact.imageDigest === null))
   && (artifact.kind !== "CONTAINER_IMAGE" || (artifact.imageDigest !== null && artifact.executableSha256 === null));

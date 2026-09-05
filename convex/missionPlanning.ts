@@ -3,7 +3,6 @@ import { internalMutation, internalQuery, mutation, query, type MutationCtx } fr
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   harnessCapabilityRequirementsSatisfied,
-  harnessSupportsModel,
 } from "@mission-control/workflow-engine/harness-contract";
 import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
 import {
@@ -16,14 +15,14 @@ import {
   factoryHarnessCapabilityRequirements,
   resolveFrozenHarnessBinding,
 } from "./lib/harnessCapabilities";
+import { selectFrozenFactoryPlanningModelRoute } from "./lib/factoryModelRoute";
+import { factoryWorkerVersionBindingMatches } from "./lib/factoryWorkerRuntime";
 import {
   fallbackRoutingPolicy,
   resolveModelRoute,
   type CatalogModel,
   type RoutingPolicyInput,
 } from "./lib/modelRouting";
-import { loadModelCatalogForProject } from "./lib/modelCatalogScope";
-import { modelRouteQualifiedFor } from "./lib/modelRouteAdmission";
 import { MISSION_PLAN_RELEASE_FLAG, validateMissionPlan } from "./lib/missionPlan";
 import {
   MISSION_SPEC_INTAKE_FLAG,
@@ -107,10 +106,15 @@ export const request = mutation({
       throw new Error("Activate a SOFTWARE Factory for this repository before generating a Plan candidate.");
     }
     const version = await ctx.db.get(definition.activeVersionId);
-    if (!version || version.factoryDefinitionId !== definition._id || version.repositoryId !== repository._id) {
+    if (!version || version.projectId !== args.projectId
+      || version.factoryDefinitionId !== definition._id || version.repositoryId !== repository._id) {
       throw new Error("The active Factory version is unavailable or repository-scoped incorrectly.");
     }
-    const [workflow, assessments, agentVersions, activeWorkflows, hostBindings] = await Promise.all([
+    const executionBackend = version.executionBackend ?? "persistent-worker";
+    if (executionBackend !== "persistent-worker") {
+      throw new Error("Mission planning currently requires a persistent-worker Factory backend.");
+    }
+    const [workflow, assessments, agentVersions, activeWorkflows, hostBindings, modelRoute] = await Promise.all([
       ctx.db.get(version.workflowId),
       ctx.db.query("factoryReadinessAssessments")
         .withIndex("by_version", (q) => q.eq("factoryDefinitionVersionId", version._id))
@@ -118,6 +122,7 @@ export const request = mutation({
       Promise.all((version.agentBindings ?? []).map((binding) => ctx.db.get(binding.agentVersionId))),
       ctx.db.query("workflows").withIndex("by_active", (q) => q.eq("active", true)).collect(),
       ctx.db.query("workspaceHostBindings").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).collect(),
+      version.modelCatalogId ? ctx.db.get(version.modelCatalogId) : null,
     ]);
     if (!workflow?.active || workflow.version < 1 || !workflow.steps[0]) {
       throw new Error("The active Factory version does not bind an active planning-capable workflow.");
@@ -153,13 +158,22 @@ export const request = mutation({
       projectId: args.projectId,
       mission,
       harness,
+      version,
+      modelRoute,
+      executionBackend,
     });
     const host = selectPlanningHost(hostBindings, {
       repositoryId: repository._id,
       repository: repository.repository,
       defaultBranch: repository.defaultBranch,
       executor: harness,
+      factoryDefinitionVersionId: version._id,
+      factoryConfigurationDigest: version.configurationDigest,
+      executionBackend,
+      requireRuntimeArtifactBinding: Boolean(version.harnessRuntimeArtifactDigest),
+      provider: route.model.provider,
       modelId: route.model.modelId,
+      modelRouteDigest: route.model.routeDigest!,
       now: Date.now(),
     });
     if (!host?.baseCommit || !/^[a-f0-9]{40,64}$/i.test(host.baseCommit)) {
@@ -218,6 +232,11 @@ export const request = mutation({
         genomeHash: plannerAgent.genomeHash,
         promptBundleHash: plannerAgent.genome.promptBundleHash,
         toolManifestHash: plannerAgent.genome.toolManifestHash,
+        modelCatalogId: String(route.model._id),
+        modelRouteDigest: route.model.routeDigest,
+        modelQualificationDigest: route.model.qualificationDigest,
+        executionBackend,
+        harnessRuntimeArtifactSha256: harness.runtimeArtifactSha256,
       },
     };
     const inputDigest = digest(inputSnapshot);
@@ -260,12 +279,19 @@ export const request = mutation({
         version: harness.version,
         capabilityManifestSha256: harness.capabilityManifestSha256,
         effectiveConfigSha256: harness.effectiveConfigSha256,
+        runtimeArtifact: harness.runtimeArtifact,
+        runtimeArtifactSha256: harness.runtimeArtifactSha256,
+        requireFactoryVersionRuntimeArtifactBinding: Boolean(version.harnessRuntimeArtifactDigest),
       },
+      executionBackend,
       modelRoutingDecisionId: route.decisionId,
       modelCatalogId: route.model._id,
       modelProvider: route.model.provider,
       modelId: route.model.modelId,
       modelRouteDigest: route.model.routeDigest!,
+      modelRouteSnapshot: route.model.routeSnapshot,
+      modelQualificationDigest: route.model.qualificationDigest,
+      modelQualificationSnapshot: route.model.qualificationSnapshot,
       inputSnapshot,
       inputDigest,
       requestedBy: operator.actorId,
@@ -383,14 +409,41 @@ export const claimInternal = internalMutation({
       .sort((left, right) => left.createdAt - right.createdAt);
     const run = candidates[0];
     if (!run) return { claimed: false as const, reason: "NO_CLAIMABLE_PLANNING_RUN" };
-    const host = await ctx.db.get(run.hostBindingId);
+    const [host, repository] = await Promise.all([
+      ctx.db.get(run.hostBindingId),
+      ctx.db.get(run.repositoryId),
+    ]);
+    const frozenIdentityComplete = run.executionBackend === "persistent-worker"
+      && Boolean(run.executor.runtimeArtifact)
+      && Boolean(run.executor.runtimeArtifactSha256)
+      && Boolean(run.modelRouteSnapshot)
+      && Boolean(run.modelQualificationSnapshot)
+      && Boolean(run.modelQualificationDigest);
+    const exactHost = host && repository && frozenIdentityComplete
+      ? selectPlanningHost([host], {
+        repositoryId: run.repositoryId,
+        repository: repository.repository,
+        defaultBranch: repository.defaultBranch,
+        executor: {
+          ...run.executor,
+          runtimeArtifactSha256: run.executor.runtimeArtifactSha256!,
+        },
+        factoryDefinitionVersionId: run.factoryDefinitionVersionId,
+        factoryConfigurationDigest: run.factoryConfigurationDigest,
+        executionBackend: "persistent-worker",
+        requireRuntimeArtifactBinding: run.executor.requireFactoryVersionRuntimeArtifactBinding === true,
+        provider: run.modelProvider,
+        modelId: run.modelId,
+        modelRouteDigest: run.modelRouteDigest,
+        now,
+      })
+      : null;
     if (!host
       || host.projectId !== args.projectId
       || host.repositoryId !== args.repositoryId
       || host.hostId !== args.workerId
       || host.workerRuntime?.sessionId !== args.workerSessionId
-      || host.workerRuntime.readiness !== "READY"
-      || host.workerRuntime.draining) {
+      || exactHost?._id !== host._id) {
       return { claimed: false as const, reason: "PLANNING_HOST_BINDING_STALE" };
     }
     const lease = {
@@ -560,8 +613,17 @@ export const reportInternal = internalMutation({
         },
         factoryAdmissionAgent: run.factoryAdmissionAgentSnapshot ?? run.plannerAgentSnapshot,
         harness: run.executor,
+        executionBackend: run.executionBackend,
         modelRoutingDecisionId: String(run.modelRoutingDecisionId),
-        model: { provider: run.modelProvider, modelId: run.modelId, routeDigest: run.modelRouteDigest },
+        model: {
+          catalogId: String(run.modelCatalogId),
+          provider: run.modelProvider,
+          modelId: run.modelId,
+          routeDigest: run.modelRouteDigest,
+          routeSnapshot: run.modelRouteSnapshot,
+          qualificationDigest: run.modelQualificationDigest,
+          qualificationSnapshot: run.modelQualificationSnapshot,
+        },
         executions: harnessExecutions,
         authority: {
           submission: false,
@@ -658,27 +720,30 @@ async function resolvePlanningModelRoute(
     projectId: Id<"projects">;
     mission: Doc<"missions">;
     harness: ReturnType<typeof resolveFrozenHarnessBinding>;
+    version: Doc<"factoryDefinitionVersions">;
+    modelRoute: Doc<"modelCatalog"> | null;
+    executionBackend: "persistent-worker";
   },
 ) {
-  const [activePolicy, catalogRows] = await Promise.all([
-    ctx.db.query("modelRoutingPolicies")
-      .withIndex("by_project_status", (q) => q.eq("projectId", input.projectId).eq("status", "ACTIVE"))
-      .order("desc")
-      .first(),
-    loadModelCatalogForProject(ctx, input.projectId),
-  ]);
-  const catalog = catalogRows.filter((model) =>
-    modelRouteQualifiedFor(model, {
-      workloadClass: "MISSION_PLANNING",
-      riskClass: "YELLOW",
+  const activePolicy = await ctx.db.query("modelRoutingPolicies")
+    .withIndex("by_project_status", (q) => q.eq("projectId", input.projectId).eq("status", "ACTIVE"))
+    .order("desc")
+    .first();
+  const model = input.version.modelCatalogId
+    ? selectFrozenFactoryPlanningModelRoute({
+      routes: input.modelRoute ? [input.modelRoute] : [],
+      selectedCatalogId: String(input.version.modelCatalogId),
+      projectId: String(input.projectId),
+      version: input.version,
+      harness: input.harness,
+      executionBackend: input.executionBackend,
       repositoryId: String(input.mission.repositoryId),
     })
-    && harnessSupportsModel(input.harness.capabilityManifest, model.provider, model.modelId)
-    && (model.routeSnapshot as any)?.capabilityIdentity?.adapter === input.harness.adapter
-    && (model.routeSnapshot as any)?.capabilityIdentity?.version === input.harness.version
-    && (model.routeSnapshot as any)?.capabilityIdentity?.capabilityManifestDigest === input.harness.capabilityManifestSha256
-    && (model.routeSnapshot as any)?.capabilityIdentity?.effectiveConfigSha256 === input.harness.effectiveConfigSha256
-  ) as Array<Doc<"modelCatalog"> & CatalogModel>;
+    : null;
+  if (!model) {
+    throw new Error("The active Factory version does not have an exact qualified model route for Mission planning.");
+  }
+  const catalog = [model] as Array<Doc<"modelCatalog"> & CatalogModel>;
   const policy: RoutingPolicyInput = activePolicy ? {
     id: String(activePolicy._id),
     version: activePolicy.version,
@@ -721,8 +786,9 @@ async function resolvePlanningModelRoute(
   if (result.status !== "SELECTED" || !result.selectedModelId) {
     throw new Error(`PLAN model routing failed closed: ${result.explanation}`);
   }
-  const model = catalog.find((candidate) => candidate.modelId === result.selectedModelId);
-  if (!model?.routeDigest) throw new Error("PLAN model routing did not select an exact qualified route.");
+  if (result.selectedModelId !== model.modelId || !model.routeDigest) {
+    throw new Error("PLAN model routing did not select the active Factory version's exact qualified route.");
+  }
   const decisionId = await ctx.db.insert("modelRoutingDecisions", {
     projectId: input.projectId,
     policyId: activePolicy?._id,
@@ -740,13 +806,15 @@ async function resolvePlanningModelRoute(
     explanation: result.explanation,
     alternativesConsidered: result.alternativesConsidered,
     mode: "ENFORCED",
-    algorithmVersion: "mission-planning-route/v1",
+    algorithmVersion: "mission-planning-route/v2",
     decisionDigest: digest({
       lane: "PLAN",
       policyVersion: policy.version,
       missionId: String(input.mission._id),
+      modelCatalogId: String(model._id),
       modelId: result.selectedModelId,
       routeDigest: model.routeDigest,
+      qualificationDigest: model.qualificationDigest,
       alternatives: result.alternativesConsidered,
     }),
     createdAt: Date.now(),
@@ -760,8 +828,20 @@ function selectPlanningHost(
     repositoryId: Id<"workspaceRepositories">;
     repository: string;
     defaultBranch: string;
-    executor: ReturnType<typeof resolveFrozenHarnessBinding>;
+    executor: {
+      adapter: string;
+      version: string;
+      capabilityManifestSha256: string;
+      effectiveConfigSha256: string;
+      runtimeArtifactSha256: string;
+    };
+    factoryDefinitionVersionId: Id<"factoryDefinitionVersions">;
+    factoryConfigurationDigest: string;
+    executionBackend: "persistent-worker";
+    requireRuntimeArtifactBinding: boolean;
+    provider: string;
     modelId: string;
+    modelRouteDigest: string;
     now: number;
   },
 ) {
@@ -772,7 +852,32 @@ function selectPlanningHost(
       && candidate.version === input.executor.version
       && candidate.capabilityManifestSha256 === input.executor.capabilityManifestSha256
       && candidate.effectiveConfigSha256 === input.executor.effectiveConfigSha256
+      && candidate.runtimeArtifactSha256 === input.executor.runtimeArtifactSha256
       && candidate.isolationModes.includes("READ_ONLY"));
+    const exactVersionBinding = runtime?.factoryVersionBindings?.some((binding) =>
+      factoryWorkerVersionBindingMatches({
+        binding: {
+          ...binding,
+          factoryDefinitionVersionId: String(binding.factoryDefinitionVersionId),
+          repositoryId: String(binding.repositoryId),
+        },
+        requirements: {
+          factoryDefinitionVersionId: String(input.factoryDefinitionVersionId),
+          factoryConfigurationDigest: input.factoryConfigurationDigest,
+          adapter: input.executor.adapter,
+          version: input.executor.version,
+          provider: input.provider,
+          model: input.modelId,
+          capabilityManifestSha256: input.executor.capabilityManifestSha256,
+          effectiveConfigSha256: input.executor.effectiveConfigSha256,
+          runtimeArtifactSha256: input.executor.runtimeArtifactSha256,
+          requireRuntimeArtifactBinding: input.requireRuntimeArtifactBinding,
+          executionBackend: input.executionBackend,
+          modelRouteDigest: input.modelRouteDigest,
+          repositoryId: String(input.repositoryId),
+        },
+      })
+    );
     return host.repositoryId === input.repositoryId
       && canonicalRepositoryKey(host.repository) === canonicalRepositoryKey(input.repository)
       && host.status === "READY"
@@ -785,6 +890,7 @@ function selectPlanningHost(
       && !runtime.draining
       && runtime.executionBackends.includes("persistent-worker")
       && Boolean(executor)
+      && exactVersionBinding === true
       && runtime.repositoryAccess.some((entry) => entry.repositoryId === input.repositoryId && ["READ", "READ_WRITE"].includes(entry.access))
       && (!host.approvedModelIds?.length || host.approvedModelIds.includes(input.modelId));
   }).sort((left, right) => right.checkedAt - left.checkedAt || left.hostId.localeCompare(right.hostId))[0] ?? null;

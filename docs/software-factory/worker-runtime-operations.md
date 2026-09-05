@@ -169,7 +169,17 @@ CODEX_WORKER_REPOSITORY_ID=<workspaceRepositories ID>
 
 The checkout must be version `0.1.0-rc.5` at commit
 `47f943859bef60e4160492346772ded9b24f765a`, clean for tracked files, and contain
-the evaluated built CLI digest. The provider prerequisite is the existing
+the evaluated built CLI digest. Its runtime artifact also freezes the canonical
+digest of the complete installed tree (all paths, object types, regular-file
+bytes, and internal symlink targets except root Git metadata). The worker
+recomputes that closure during health and again during prepare before spawn;
+an added or modified dependency, an escaping/dangling symlink, a symlink into
+excluded `.git` metadata, or a special file makes the adapter unavailable.
+POSIX mode bits are intentionally excluded because the CLI is launched through
+`process.execPath` rather than by its executable bit; unreadable files still
+fail verification. On the qualified 1.5 GB installation this full check takes
+several seconds per prepare, an accepted fail-closed cost for the experimental
+adapter. The provider prerequisite is the existing
 loopback Ollama `0.32.6` model `qwen3.5:35b-a3b-q8_0` at digest
 `655d273ede3adc056594f511c120d616d92bf4c4d5bcfe580f3cfa29abe8109d`.
 Mission Control does not clone, build, install, download, start, or authenticate
@@ -188,7 +198,8 @@ registration and execution.
    and configuration digests and waits for registration before polling.
 4. Confirm readiness and admission for every adapter explicitly enabled on the
    host. DeepSeek does not require Codex, and its registration must fail closed
-   if its pin, built artifact, Ollama runtime, or model digest differs.
+   if its pin, built artifact, complete installation closure, Ollama runtime,
+   or model digest differs.
 5. Drain before rollback. Stale registrations stop new claims, and workspaces
    remain preserved for inspection. Clearing
    `DEEPSEEK_HARNESS_EXECUTOR_ENABLED` removes only the experimental adapter.

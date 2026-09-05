@@ -3,6 +3,7 @@ import {
   countActiveFactoryWorkerLeases,
   factoryWorkerEligibility,
   factoryWorkerRegistrationIssues,
+  factoryWorkerVersionBindingMatches,
   nextFactoryWorkerGeneration,
   type FactoryWorkerCandidate,
   type FactoryWorkerRequirements,
@@ -68,6 +69,38 @@ const worker: FactoryWorkerCandidate = {
 };
 
 describe("Factory worker runtime", () => {
+  it("matches every frozen Factory Version host-binding field exactly", () => {
+    const binding = {
+      factoryDefinitionVersionId: "factory-version-1",
+      factoryConfigurationDigest: "factory-v1-deadbeef",
+      adapter: requirements.executor.adapter,
+      version: requirements.executor.version,
+      provider: requirements.provider!,
+      model: requirements.model!,
+      capabilityManifestSha256: requirements.executor.capabilityManifestSha256,
+      effectiveConfigSha256: requirements.executor.effectiveConfigSha256,
+      runtimeArtifactSha256: codexRuntimeArtifactSha256,
+      executionBackend: "persistent-worker",
+      modelRouteDigest: `sha256:${"a".repeat(64)}`,
+      repositoryId: requirements.repositoryId,
+    };
+    const expected = {
+      ...binding,
+      runtimeArtifactSha256: codexRuntimeArtifactSha256,
+      requireRuntimeArtifactBinding: true,
+    };
+
+    expect(factoryWorkerVersionBindingMatches({ binding, requirements: expected })).toBe(true);
+    for (const mismatch of [
+      { ...binding, factoryDefinitionVersionId: "factory-version-2" },
+      { ...binding, modelRouteDigest: `sha256:${"b".repeat(64)}` },
+      { ...binding, runtimeArtifactSha256: `sha256:${"f".repeat(64)}` },
+      { ...binding, executionBackend: "remote-sandbox" },
+    ]) {
+      expect(factoryWorkerVersionBindingMatches({ binding: mismatch, requirements: expected })).toBe(false);
+    }
+  });
+
   it("keeps a generation for one session and increments it on restart", () => {
     expect(nextFactoryWorkerGeneration(undefined, "session-1")).toBe(1);
     expect(nextFactoryWorkerGeneration({ sessionId: "session-1", generation: 3 }, "session-1")).toBe(3);

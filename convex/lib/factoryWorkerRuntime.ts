@@ -98,6 +98,42 @@ export interface FactoryWorkerRequirements {
   sandboxProfileDigest?: string;
 }
 
+export function factoryWorkerVersionBindingMatches(input: {
+  binding: FactoryWorkerVersionBinding;
+  requirements: {
+    factoryDefinitionVersionId: string;
+    factoryConfigurationDigest: string;
+    adapter: string;
+    version: string;
+    provider: string;
+    model: string;
+    capabilityManifestSha256: string;
+    effectiveConfigSha256: string;
+    runtimeArtifactSha256: string;
+    requireRuntimeArtifactBinding: boolean;
+    executionBackend: string;
+    modelRouteDigest: string;
+    sandboxProfileDigest?: string;
+    repositoryId: string;
+  };
+}) {
+  const { binding, requirements } = input;
+  return binding.factoryDefinitionVersionId === requirements.factoryDefinitionVersionId
+    && binding.factoryConfigurationDigest === requirements.factoryConfigurationDigest
+    && binding.adapter === requirements.adapter
+    && binding.version === requirements.version
+    && binding.provider === requirements.provider
+    && binding.model === requirements.model
+    && binding.capabilityManifestSha256 === requirements.capabilityManifestSha256
+    && binding.effectiveConfigSha256 === requirements.effectiveConfigSha256
+    && (binding.runtimeArtifactSha256 === requirements.runtimeArtifactSha256
+      || (!requirements.requireRuntimeArtifactBinding && binding.runtimeArtifactSha256 === undefined))
+    && binding.executionBackend === requirements.executionBackend
+    && binding.modelRouteDigest === requirements.modelRouteDigest
+    && binding.sandboxProfileDigest === requirements.sandboxProfileDigest
+    && binding.repositoryId === requirements.repositoryId;
+}
+
 export function nextFactoryWorkerGeneration(
   current: Pick<FactoryWorkerRuntimeSnapshot, "sessionId" | "generation"> | undefined,
   sessionId: string,
@@ -195,21 +231,25 @@ export function factoryWorkerEligibility(input: {
   }
   if (requirements.factoryDefinitionVersionId) {
     const exactBinding = runtime.factoryVersionBindings?.find((binding) =>
-      binding.factoryDefinitionVersionId === requirements.factoryDefinitionVersionId
-      && binding.factoryConfigurationDigest === requirements.factoryConfigurationDigest
-      && binding.adapter === requirements.executor.adapter
-      && binding.version === requirements.executor.version
-      && binding.provider === requirements.provider
-      && binding.model === requirements.model
-      && binding.capabilityManifestSha256 === requirements.executor.capabilityManifestSha256
-      && binding.effectiveConfigSha256 === requirements.executor.effectiveConfigSha256
-      && (binding.runtimeArtifactSha256 === requirements.executionRuntimeArtifactSha256
-        || (!requirements.executor.requireFactoryVersionRuntimeArtifactBinding
-          && binding.runtimeArtifactSha256 === undefined))
-      && binding.executionBackend === requirements.executionBackend
-      && binding.modelRouteDigest === requirements.modelRouteDigest
-      && binding.sandboxProfileDigest === requirements.sandboxProfileDigest
-      && binding.repositoryId === requirements.repositoryId
+      factoryWorkerVersionBindingMatches({
+        binding,
+        requirements: {
+          factoryDefinitionVersionId: requirements.factoryDefinitionVersionId!,
+          factoryConfigurationDigest: requirements.factoryConfigurationDigest!,
+          adapter: requirements.executor.adapter,
+          version: requirements.executor.version,
+          provider: requirements.provider!,
+          model: requirements.model!,
+          capabilityManifestSha256: requirements.executor.capabilityManifestSha256,
+          effectiveConfigSha256: requirements.executor.effectiveConfigSha256,
+          runtimeArtifactSha256: requirements.executionRuntimeArtifactSha256!,
+          requireRuntimeArtifactBinding: requirements.executor.requireFactoryVersionRuntimeArtifactBinding === true,
+          executionBackend: requirements.executionBackend!,
+          modelRouteDigest: requirements.modelRouteDigest!,
+          sandboxProfileDigest: requirements.sandboxProfileDigest,
+          repositoryId: requirements.repositoryId,
+        },
+      })
     );
     if (!exactBinding) return { eligible: false as const, reason: "worker-factory-version-mismatch" };
   }

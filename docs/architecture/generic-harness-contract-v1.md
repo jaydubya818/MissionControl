@@ -146,6 +146,12 @@ digest and silently invalidate historical Factory Versions. The sidecar keeps
 the existing manifest bytes and digests immutable while allowing executable or
 image identity to change independently and explicitly.
 
+An executable sidecar may include `closureSha256` when the entry point loads an
+installed dependency tree. The optional field is omitted, rather than encoded
+as `null`, for artifacts without closure attestation so their existing
+canonical digests remain unchanged. DeepSeek uses this field for its complete
+installation-tree digest in addition to its preserved CLI-file digest.
+
 The Factory Version stores the full manifest plus its canonical digest and the
 effective configuration digest, execution runtime artifact and digest, inference-only
 model-route snapshot and digest, and backend. The Attempt execution manifest
@@ -203,7 +209,7 @@ drop a frozen inference control and then echo it as observed provenance.
 | Adapter | Exact runtime | Effective route | Backend and limitations |
 | --- | --- | --- | --- |
 | `codex/v1` | Codex CLI `0.146.0`, source `e363b08c9175ac1cbe5893615dd2cb9ddf95043b`, evaluated Darwin arm64 binary digest | `openai/gpt-5.6-terra`; controlled existing model pass-through remains explicit | Persistent worker and existing remote sandbox; cost/model-request/retry telemetry unavailable; cancellation is process-signal based |
-| `deepseek-harness/0.2.0` | DeepSeek Harness `0.1.0-rc.5`, source `47f943859bef60e4160492346772ded9b24f765a`, exact built CLI digest | Ollama `0.32.6`, `local-ollama/qwen3.5:35b-a3b-q8_0`, exact model digest | Experimental persistent worker only; disabled unless explicitly enabled; weaker headless streaming, no cost, process-signal cancellation, host-enforced scope |
+| `deepseek-harness/0.2.0` | DeepSeek Harness `0.1.0-rc.5`, source `47f943859bef60e4160492346772ded9b24f765a`, exact built CLI and complete installed-tree digests | Ollama `0.32.6`, `local-ollama/qwen3.5:35b-a3b-q8_0`, exact model digest | Experimental persistent worker only; disabled unless explicitly enabled; full-tree integrity is recomputed during health and before spawn; weaker headless streaming, no cost, process-signal cancellation, host-enforced scope |
 
 Both adapters use allowlisted child environments, owned process groups,
 SIGTERM-to-SIGKILL escalation, canonical cancellation results, and idempotent
