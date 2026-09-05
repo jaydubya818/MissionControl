@@ -50,6 +50,7 @@ export const KNOWN_FLAGS: FlagDefinition[] = [
   { key: "delivery.workorders", description: "Work order delivery control plane (PR 2a, 21)", defaultEnabled: false },
   { key: "missions.plan-release-v1", description: "Versioned Mission plans, decisions, and atomic WorkOrder release", defaultEnabled: false },
   { key: "missions.spec-intake-v1", description: "Immutable Constitution and Mission Spec intake before Plan release", defaultEnabled: false },
+  { key: "factory-engineer.package-import-v1", description: "Qualified Factory Engineer package preview and draft-only import for one project", defaultEnabled: false },
   { key: "executor.pi-bridge", description: "Pi runtime receipt packet ingestion and dispatch envelope", defaultEnabled: false },
   { key: "eos.command-center-preview", description: "Engineering OS demo experience — Command Center, missions, lineage, intelligence views", defaultEnabled: false },
   { key: "ui.control.stubs", description: "Show preview-only Control plane stubs (Portfolio, Fleet) in navigation", defaultEnabled: false },

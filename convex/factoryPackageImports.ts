@@ -11,6 +11,7 @@ import {
   action,
   internalMutation,
   internalQuery,
+  query,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
@@ -25,7 +26,9 @@ import {
   assertFactoryPackageTargetBinding,
   factoryPackageGovernanceBlockers,
   factoryPackageMappingDigest,
+  factoryPackageQualificationEnabled,
   factoryPackageTargetFingerprint,
+  FACTORY_PACKAGE_QUALIFICATION_FLAG,
   mapFactoryPackageToDrafts,
   resolveFactoryPackageImportRetry,
   type FactoryPackageLocalTarget,
@@ -42,6 +45,10 @@ import {
   FACTORY_PACKAGE_MAX_TIMEOUT_MS,
   retrieveFactoryPackage,
 } from "./lib/factoryPackageRetrieval";
+import {
+  factoryPackageIngestionTelemetry,
+  type FactoryPackageIngestionTelemetryInput,
+} from "./lib/factoryPackageImportTelemetry";
 
 const executionEnvironment = v.union(
   v.literal("LOCAL"),
@@ -54,6 +61,7 @@ const codeScopeMapping = v.object({
   requestedCodeScope: v.string(),
   codeScopeId: v.id("repositoryCodeScopes"),
 });
+const sha256Digest = /^sha256:[0-9a-f]{64}$/;
 
 const targetSelectionFields = {
   projectId: v.id("projects"),
@@ -181,6 +189,7 @@ interface TargetResolutionSuccess {
   actorSubject: string;
   planReleaseEnabled: boolean;
   specIntakeEnabled: boolean;
+  qualificationModeEnabled: boolean;
 }
 
 type TargetResolution =
@@ -264,6 +273,49 @@ interface ImportSuccess {
 type PreviewResult = PreviewSuccess | ImportFailure;
 type ImportResult = ImportSuccess | ImportFailure;
 
+export const qualificationStatus = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args): Promise<{ enabled: boolean }> => {
+    if (!(await ctx.auth.getUserIdentity())) return { enabled: false };
+    const project = await ctx.db.get(args.projectId);
+    if (!project?.tenantId || project.status !== "ACTIVE") {
+      return { enabled: false };
+    }
+    try {
+      const [deliveryAccess, assignmentAccess, rows] = await Promise.all([
+        requireWorkspaceAccess(ctx, project.tenantId, project._id, {
+          permission: COMPANY_PERMISSIONS.UPDATE_DELIVERY,
+        }),
+        requireWorkspaceAccess(ctx, project.tenantId, project._id, {
+          permission: COMPANY_PERMISSIONS.ASSIGN_DELIVERY,
+        }),
+        ctx.db
+          .query("featureFlags")
+          .withIndex("by_key", (q) =>
+            q.eq("key", FACTORY_PACKAGE_QUALIFICATION_FLAG),
+          )
+          .collect(),
+      ]);
+      if (
+        deliveryAccess.membership.mode !== "AUTHENTICATED" ||
+        assignmentAccess.membership.mode !== "AUTHENTICATED"
+      ) {
+        return { enabled: false };
+      }
+      assertFactoryPackageLocalProjectBinding(
+        configuredFactoryProjectId(),
+        String(project._id),
+      );
+      loadRetrievalConfig();
+      return {
+        enabled: factoryPackageQualificationEnabled(rows, String(project._id)),
+      };
+    } catch {
+      return { enabled: false };
+    }
+  },
+});
+
 export const preview = action({
   args: {
     packageId: v.string(),
@@ -273,17 +325,32 @@ export const preview = action({
   handler: async (ctx, args): Promise<PreviewResult> => {
     const localCorrelationId = crypto.randomUUID();
     if (!(await ctx.auth.getUserIdentity())) {
-      return failure(
-        "AUTHENTICATION_REQUIRED",
-        "A Clerk-authenticated Mission Control operator is required.",
-        localCorrelationId,
+      return reportPreview(
+        args,
+        failure(
+          "AUTHENTICATION_REQUIRED",
+          "A Clerk-authenticated Mission Control operator is required.",
+          localCorrelationId,
+        ),
       );
     }
     const target = (await ctx.runQuery(
       internal.factoryPackageImports.resolveTarget,
       targetArgs(args),
     )) as TargetResolution;
-    if (target.ok === false) return targetFailure(target, localCorrelationId);
+    if (target.ok === false) {
+      return reportPreview(args, targetFailure(target, localCorrelationId));
+    }
+    if (!target.qualificationModeEnabled) {
+      return reportPreview(
+        args,
+        failure(
+          "QUALIFICATION_MODE_DISABLED",
+          "Factory Engineer package import is not enabled for this Mission Control workspace.",
+          localCorrelationId,
+        ),
+      );
+    }
     try {
       const config = loadRetrievalConfig();
       assertFactoryPackageLocalProjectBinding(
@@ -309,7 +376,7 @@ export const preview = action({
       const blockers = factoryPackageGovernanceBlockers(target);
       const packageDocument = retrieved.retrieval.package;
       const attestation = retrieved.retrieval.attestation;
-      return {
+      return reportPreview(args, {
         ok: true,
         preview: {
           schemaVersion: FACTORY_DEPLOYMENT_PACKAGE_SCHEMA,
@@ -347,9 +414,9 @@ export const preview = action({
           mappingDigest: mapped.mappingDigest,
           warnings: mapped.warnings,
         },
-      };
+      });
     } catch (error) {
-      return importFailure(error, localCorrelationId);
+      return reportPreview(args, importFailure(error, localCorrelationId));
     }
   },
 });
@@ -365,17 +432,52 @@ export const importDrafts = action({
   handler: async (ctx, args): Promise<ImportResult> => {
     const localCorrelationId = crypto.randomUUID();
     if (!(await ctx.auth.getUserIdentity())) {
-      return failure(
-        "AUTHENTICATION_REQUIRED",
-        "A Clerk-authenticated Mission Control operator is required.",
+      return reportImport(
+        args,
         localCorrelationId,
+        failure(
+          "AUTHENTICATION_REQUIRED",
+          "A Clerk-authenticated Mission Control operator is required.",
+          localCorrelationId,
+        ),
       );
     }
     const target = (await ctx.runQuery(
       internal.factoryPackageImports.resolveTarget,
       targetArgs(args),
     )) as TargetResolution;
-    if (target.ok === false) return targetFailure(target, localCorrelationId);
+    if (target.ok === false) {
+      return reportImport(
+        args,
+        localCorrelationId,
+        targetFailure(target, localCorrelationId),
+      );
+    }
+    if (!target.qualificationModeEnabled) {
+      return reportImport(
+        args,
+        localCorrelationId,
+        failure(
+          "QUALIFICATION_MODE_DISABLED",
+          "Factory Engineer package import is not enabled for this Mission Control workspace.",
+          localCorrelationId,
+        ),
+      );
+    }
+    if (
+      !sha256Digest.test(args.expectedPackageDigest) ||
+      !sha256Digest.test(args.expectedMappingDigest)
+    ) {
+      return reportImport(
+        args,
+        localCorrelationId,
+        failure(
+          "IDEMPOTENCY_CONFLICT",
+          "The confirmed package or mapping digest is invalid.",
+          localCorrelationId,
+        ),
+      );
+    }
     try {
       const config = loadRetrievalConfig();
       assertFactoryPackageLocalProjectBinding(
@@ -403,14 +505,18 @@ export const importDrafts = action({
           args.expectedPackageDigest ||
         mapped.mappingDigest !== args.expectedMappingDigest
       ) {
-        return failure(
-          "IDEMPOTENCY_CONFLICT",
-          "Factory package content or its confirmed local mapping changed after preview.",
-          retrieved.retrieval.attestation.correlation_id,
+        return reportImport(
+          args,
+          localCorrelationId,
+          failure(
+            "IDEMPOTENCY_CONFLICT",
+            "Factory package content or its confirmed local mapping changed after preview.",
+            retrieved.retrieval.attestation.correlation_id,
+          ),
         );
       }
       const approval = retrieved.retrieval.attestation.approval;
-      return (await ctx.runMutation(
+      const result = (await ctx.runMutation(
         internal.factoryPackageImports.createDraftsAtomic,
         {
           ...targetArgs(args),
@@ -454,8 +560,13 @@ export const importDrafts = action({
           warnings: mapped.warnings,
         },
       )) as ImportResult;
+      return reportImport(args, localCorrelationId, result);
     } catch (error) {
-      return importFailure(error, localCorrelationId);
+      return reportImport(
+        args,
+        localCorrelationId,
+        importFailure(error, localCorrelationId),
+      );
     }
   },
 });
@@ -492,6 +603,13 @@ export const createDraftsAtomic = internalMutation({
     const target = await resolveTargetForAuthenticatedOperator(ctx, args);
     if (target.ok === false)
       return targetFailure(target, args.upstreamCorrelationId);
+    if (!target.qualificationModeEnabled) {
+      return failure(
+        "QUALIFICATION_MODE_DISABLED",
+        "Factory Engineer package import is not enabled for this Mission Control workspace.",
+        args.upstreamCorrelationId,
+      );
+    }
     try {
       assertFactoryPackageLocalProjectBinding(
         configuredFactoryProjectId(),
@@ -867,6 +985,12 @@ async function resolveTargetForAuthenticatedOperator(
           .query("featureFlags")
           .withIndex("by_key", (q) => q.eq("key", MISSION_SPEC_INTAKE_FLAG))
           .collect(),
+        ctx.db
+          .query("featureFlags")
+          .withIndex("by_key", (q) =>
+            q.eq("key", FACTORY_PACKAGE_QUALIFICATION_FLAG),
+          )
+          .collect(),
       ]),
     ]);
   if (
@@ -936,6 +1060,10 @@ async function resolveTargetForAuthenticatedOperator(
     ).enabled,
     specIntakeEnabled: resolveFlag(rows, MISSION_SPEC_INTAKE_FLAG, project._id)
       .enabled,
+    qualificationModeEnabled: factoryPackageQualificationEnabled(
+      rows,
+      String(project._id),
+    ),
   };
 }
 
@@ -1180,6 +1308,89 @@ function governanceMessage(
     : "This workspace requires a finalized Mission Spec before a Plan draft can be created.";
 }
 
+function reportPreview(
+  args: {
+    projectId: Id<"projects">;
+    packageId: string;
+    packageVersion: number;
+  },
+  result: PreviewResult,
+): PreviewResult {
+  if (result.ok === true) {
+    emitIngestionTelemetry({
+      outcome: "SUCCEEDED",
+      stage: "PREVIEW",
+      projectId: String(args.projectId),
+      packageId: result.preview.packageId,
+      packageVersion: result.preview.packageVersion,
+      correlationId: result.preview.correlationId,
+      packageDigest: result.preview.packageDigest,
+      mappingDigest: result.preview.mappingDigest,
+    });
+  } else {
+    emitIngestionTelemetry({
+      outcome: "FAILED",
+      stage: "PREVIEW",
+      projectId: String(args.projectId),
+      packageId: args.packageId,
+      packageVersion: args.packageVersion,
+      correlationId: result.error.correlationId,
+      failureCode: result.error.code,
+    });
+  }
+  return result;
+}
+
+function reportImport(
+  args: {
+    projectId: Id<"projects">;
+    packageId: string;
+    packageVersion: number;
+    expectedPackageDigest: string;
+    expectedMappingDigest: string;
+  },
+  correlationId: string,
+  result: ImportResult,
+): ImportResult {
+  if (result.ok === true) {
+    emitIngestionTelemetry({
+      outcome: "SUCCEEDED",
+      stage: "CONFIRM",
+      projectId: String(args.projectId),
+      packageId: result.receipt.packageId,
+      packageVersion: result.receipt.packageVersion,
+      correlationId,
+      packageDigest: result.receipt.packageDigest,
+      mappingDigest: result.receipt.mappingDigest,
+      draftRecordsCreated: result.receipt.created,
+    });
+  } else {
+    emitIngestionTelemetry({
+      outcome: "FAILED",
+      stage: "CONFIRM",
+      projectId: String(args.projectId),
+      packageId: args.packageId,
+      packageVersion: args.packageVersion,
+      correlationId: result.error.correlationId,
+      packageDigest: args.expectedPackageDigest,
+      mappingDigest: args.expectedMappingDigest,
+      failureCode: result.error.code,
+    });
+  }
+  return result;
+}
+
+function emitIngestionTelemetry(
+  input: FactoryPackageIngestionTelemetryInput,
+): void {
+  const serialized = JSON.stringify(factoryPackageIngestionTelemetry(input));
+  if (input.outcome === "FAILED") {
+    console.warn(serialized);
+  } else {
+    console.info(serialized);
+  }
+}
+
 function importFailure(error: unknown, correlationId: string): ImportFailure {
   if (error instanceof FactoryPackageContractError) {
     return failure(error.code, error.message, correlationId);
@@ -1192,7 +1403,6 @@ function importFailure(error: unknown, correlationId: string): ImportFailure {
       correlationId,
     );
   }
-  console.error(`Factory package import failed correlation=${correlationId}`);
   return failure(
     "TEMPORARY_UNAVAILABLE",
     "Factory package import is temporarily unavailable.",

@@ -35,7 +35,8 @@ async function loadRowsForKey(
 }
 
 function isFactoryControlFlag(key: string) {
-  return key.startsWith("factory-memory.")
+  return key.startsWith("factory-engineer.")
+    || key.startsWith("factory-memory.")
     || key.startsWith("model-routing.")
     || key.startsWith("execution-routing.");
 }

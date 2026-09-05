@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   assertFactoryPackageLocalProjectBinding,
   assertFactoryPackageTargetBinding,
+  FACTORY_PACKAGE_QUALIFICATION_FLAG,
   factoryPackageImportKey,
   factoryPackageGovernanceBlockers,
+  factoryPackageQualificationEnabled,
   mapFactoryPackageToDrafts,
   resolveFactoryPackageImportRetry,
 } from "../lib/factoryPackageImport";
@@ -361,5 +363,79 @@ describe("Factory package Mission/Plan mapping", () => {
         specIntakeEnabled: false,
       }),
     ).toEqual([]);
+  });
+
+  it("enables qualification only from the exact project-scoped rollout row", () => {
+    expect(FACTORY_PACKAGE_QUALIFICATION_FLAG).toBe(
+      "factory-engineer.package-import-v1",
+    );
+    expect(
+      factoryPackageQualificationEnabled(
+        [
+          {
+            key: FACTORY_PACKAGE_QUALIFICATION_FLAG,
+            enabled: true,
+          },
+        ],
+        "project-1",
+      ),
+    ).toBe(false);
+    expect(
+      factoryPackageQualificationEnabled(
+        [
+          {
+            key: FACTORY_PACKAGE_QUALIFICATION_FLAG,
+            enabled: true,
+            projectId: "project-2",
+          },
+        ],
+        "project-1",
+      ),
+    ).toBe(false);
+    expect(
+      factoryPackageQualificationEnabled(
+        [
+          {
+            key: FACTORY_PACKAGE_QUALIFICATION_FLAG,
+            enabled: true,
+          },
+          {
+            key: FACTORY_PACKAGE_QUALIFICATION_FLAG,
+            enabled: false,
+            projectId: "project-1",
+          },
+        ],
+        "project-1",
+      ),
+    ).toBe(false);
+    expect(
+      factoryPackageQualificationEnabled(
+        [
+          {
+            key: FACTORY_PACKAGE_QUALIFICATION_FLAG,
+            enabled: true,
+            projectId: "project-1",
+          },
+        ],
+        "project-1",
+      ),
+    ).toBe(true);
+    expect(
+      factoryPackageQualificationEnabled(
+        [
+          {
+            key: FACTORY_PACKAGE_QUALIFICATION_FLAG,
+            enabled: true,
+            projectId: "project-1",
+          },
+          {
+            key: FACTORY_PACKAGE_QUALIFICATION_FLAG,
+            enabled: true,
+            projectId: "project-1",
+          },
+        ],
+        "project-1",
+      ),
+    ).toBe(false);
   });
 });
