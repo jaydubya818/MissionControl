@@ -290,7 +290,9 @@ export const getVersionOptions = query({
           expiresAt: snapshot.toolGrant.grantSnapshot?.expiresAt,
           credentialClass: snapshot.toolGrant.grantSnapshot?.credentialClass,
           destination: snapshot.toolGrant.grantSnapshot?.destination,
-          admission: "QUALIFICATION_FIXTURE" as const,
+          admission: snapshot.toolGrant.grantSnapshot?.toolVersionSnapshot?.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE"
+            ? "QUALIFIED_REAL_READ_ONLY_SERVICE" as const
+            : "QUALIFICATION_FIXTURE" as const,
         } : null,
         mcpSupport: snapshot.toolGrant ? "EXACT_HOST_BROKER_ONLY" as const : "NO_TOOL_CAPABILITY" as const,
         isolationModes: snapshot.isolationModes,
@@ -1204,7 +1206,9 @@ export const assessReadiness = mutation({
       check("host", "Canonical worker admission", Boolean(host), now, expiry, `Report a clean current worker offering ${selectedExecutionBackend} and its required capabilities.`),
       check("recovery", "Executor-compatible recovery", genericHarnessV1RecoveryReady(version.recovery), now, undefined, "Enable cancel and bounded retry; Generic Harness Contract V1 does not add pause or in-process resume authority."),
     ];
-    const status = checks.every((item) => item.status === "VERIFIED") ? "PASS" as const : "BLOCKED" as const;
+    const status = checks.every((item) => item.status === "VERIFIED" || item.status === "NOT_APPLICABLE")
+      ? "PASS" as const
+      : "BLOCKED" as const;
     return await ctx.db.insert("factoryReadinessAssessments", {
       tenantId: version.tenantId,
       projectId: version.projectId,

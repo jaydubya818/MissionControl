@@ -71,7 +71,30 @@ describe("Verification Subject identity", () => {
   it("rejects mutable or mismatched GitHub PR lineage", () => {
     expect(gitSubject({ pullRequest: { ...gitSubject().pullRequest, draftAtPublication: false } }).digest)
       .toBe(gitSubject().digest);
-    expect(() => gitSubject({ pullRequest: { ...gitSubject().pullRequest, headSha: SHA_B } })).toThrow(/matching pull-request head/);
+    expect(() => gitSubject({ pullRequest: { ...gitSubject().pullRequest, headSha: SHA_B } })).toThrow(/matching bound head/);
+  });
+
+  it("binds an unpublished local candidate without inventing pull-request identity", () => {
+    const subject = createGitVerificationSubject({
+      version: 1,
+      kind: "GIT_CANDIDATE",
+      workOrderId: "work-order-1",
+      workOrderRevisionNumber: 2,
+      verificationContractDigest: contractDigest,
+      sourceAttemptId: "attempt-implementation-1",
+      repositoryId: "repository-1",
+      provider: "LOCAL_GIT",
+      providerRepositoryId: "github-repository-1",
+      candidateSha: SHA_A,
+      treeSha: SHA_B,
+      localRef: { baseRef: "main", headRef: "mc/candidate", headSha: SHA_A },
+    });
+    expect(subject.digest).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(subject.provider).toBe("LOCAL_GIT");
+    expect(() => createGitVerificationSubject({
+      ...subject,
+      localRef: { ...subject.localRef, headSha: SHA_B },
+    })).toThrow(/matching bound head/);
   });
 
   it("binds every reproducibility-critical automation identity and ordered output hash", () => {

@@ -468,7 +468,7 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
-Current public client/backend runtime contract: **v41**.
+Current public client/backend runtime contract: **v42**.
 
 ## Current limitations
 
@@ -494,10 +494,10 @@ Current boundaries include:
   evidence-backed acceptance and review-ready pull requests.
 - **Cost attribution is incomplete.** Token and latency data exist, but complete
   model, provider, sandbox, and cost-per-accepted-outcome coverage does not.
-- **Tool and MCP authority remains narrow.** Mission Control supports one
-  qualified governed read-only MCP capability path against a local
-  `QUALIFICATION_FIXTURE`. No real service, write operation, dynamic discovery
-  authority, or general harness MCP runtime is admitted.
+- **Tool and MCP authority remains narrow.** Mission Control retains the local
+  Phase 3 fixture and qualifies one real Context7 `query-docs` operation for a
+  fixed public React documentation query. No write operation, dynamic discovery
+  authority, connector breadth, or general harness MCP runtime is admitted.
 - **Incident response is fragmented.** Alerts, traces, run failures, and operator
   controls exist, but the canonical browser-operable Factory Incident lifecycle
   is not complete.
