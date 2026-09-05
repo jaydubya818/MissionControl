@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
+import { FabExecutorAdapter } from "../fabExecutorAdapter.js";
+import { EnvironmentCredentialProvider, HttpModelProvider, parseConfig } from "@fdlc/fab";
 import { execFile } from "node:child_process";
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile, readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -29,6 +32,7 @@ import {
   CODEX_V1_RUNTIME_ARTIFACT,
   harnessCapabilityManifestDigest,
   harnessRuntimeArtifactDigest,
+  createGitVerificationSubject, freezeVerificationPlan, deriveVerificationIndependence,
 } from "@mission-control/workflow-engine";
 
 const execFileAsync = promisify(execFile);
@@ -575,6 +579,9 @@ function verifiedSha() {
 async function runFixture(
   serverVerdict: "VERIFIED" | "NOT_VERIFIED" | "REQUIRES_HUMAN_REVIEW",
   options: {
+    fab?: boolean;
+    loseLeaseBeforePublication?: boolean;
+    uncertainPublication?: boolean;
     attempt?: number;
     dirtyVerification?: boolean;
     durable?: boolean;
@@ -612,6 +619,39 @@ async function runFixture(
     baseSha,
     version: options.manifestVersion,
   });
+  let fabModelCalls = 0;
+  const fabStateDirectory = path.join(checkoutRoot, "fab-state");
+  const fabAdapter = options.fab ? new FabExecutorAdapter({
+    config: parseConfig({ version: 1, repository: worktree, provider: "openai", model: "fixture-explicit-model",
+      credential: { id: "fab-governed-fixture", owner: `local:${process.getuid?.()}`, provider: "openai", scope: { kind: "repository", root: worktree }, source: { kind: "environment", variable: "FAB_GOVERNED_TEST_KEY" } },
+      writableFiles: ["src/feature.ts"], acceptanceCriteria: manifest.workOrderSpecification.acceptanceCriteria.map(item => item.title),
+      checks: [{ id: "test", argv: [process.execPath, "--input-type=module", "-e", "import {verified} from './src/feature.ts'; if(!verified) throw new Error('incorrect candidate')"] }],
+      timeoutMs: 20000, checkTimeoutMs: 5000, maxTurns: 8 }),
+    stateDirectory: fabStateDirectory,
+    modelFactory: async (config, redactor) => {
+      const key = "fab-non-secret-factory-fixture-012345";
+      const credentials = new EnvironmentCredentialProvider(config.credential, redactor, { FAB_GOVERNED_TEST_KEY: key });
+      return new HttpModelProvider({ provider: config.provider, model: config.model, credentials, reference: config.credential, redactor, fetchImpl: async () => {
+        fabModelCalls++;
+        const calls = [
+          { name: "submit_plan", arguments: { summary: "Correct the bounded feature", steps: ["Edit", "Check"] } },
+          { name: "write_file", arguments: { path: "src/feature.ts", content: "export const verified = true;\n", expectedHash: createHash("sha256").update("export const verified = false;\n").digest("hex") } },
+          { name: "run_check", arguments: { id: "test" } },
+          { name: "finish_candidate", arguments: { summary: "Feature corrected", unresolved: [] } },
+        ];
+        const call = calls[fabModelCalls - 1]; if (!call) throw new Error("Unexpected model replay");
+        return Response.json({ model: config.model, choices: [{ message: { content: key, tool_calls: [{ id: `call_${fabModelCalls}`, type: "function", function: { name: call.name, arguments: JSON.stringify(call.arguments) } }] }, finish_reason: "tool_calls" }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
+      } });
+    },
+  }) : undefined;
+  if (fabAdapter) {
+    const capabilityManifest = fabAdapter.capabilities().capabilityManifest!;
+    Object.assign(manifest.harness, { adapter: "fab", version: "v1", harnessId: "fab", harnessVersion: capabilityManifest.identity.harnessVersion,
+      harnessCommit: capabilityManifest.identity.harnessCommit, capabilityManifest,
+      capabilityManifestSha256: harnessCapabilityManifestDigest(capabilityManifest), effectiveConfigSha256: capabilityManifest.effectiveConfigSha256,
+      provider: "openai", model: "fixture-explicit-model" });
+    manifest.workOrderSpecification.verificationContract.checks[0].command.args = ["-e", "if(!require('fs').readFileSync('src/feature.ts','utf8').includes('verified = true')) throw new Error('incorrect candidate')"];
+  }
   if (options.noVerificationContract) {
     delete (manifest.workOrderSpecification as { verificationContract?: unknown }).verificationContract;
   }
@@ -634,7 +674,7 @@ async function runFixture(
     repositoryId: "repository-1",
     factoryDefinitionVersionId: "factory-version-1",
     executionManifestDigest: `sha256:${canonicalHash(manifest)}`,
-    executorAdapter: options.harness?.adapter ?? "codex",
+    executorAdapter: fabAdapter ? "fab" : options.harness?.adapter ?? "codex",
     executorVersion: options.harness?.version ?? "v1",
     isMutating: options.isMutating ?? true,
     status: "PENDING",
@@ -660,8 +700,9 @@ async function runFixture(
   options.mutateClaim?.(claim);
   let lifecycle: "INITIAL" | "PAUSED" | "RESUME" | "COMPLETED" = "INITIAL";
   let verifiedCandidate: { sourceRevision: string; candidateRevision: string } | null = null;
+  let persistedFactoryResult: any = null;
   const authorizePublication = vi.fn(async (payload: any) => ({
-    authorized: true,
+    authorized: !options.loseLeaseBeforePublication,
     publicationPermitId: `permit:${payload.leaseId}`,
     candidateRevision: payload.candidateRevision,
     validUntil: Date.now() + 10 * 60_000,
@@ -690,7 +731,7 @@ async function runFixture(
                 verdictReasons: ["Human review approved the exact candidate."],
                 verificationReceiptId: "receipt-approved",
               },
-              structuredResult: completedFactoryResult(),
+              structuredResult: persistedFactoryResult ?? completedFactoryResult(),
             },
           };
         }
@@ -720,6 +761,7 @@ async function runFixture(
         } : leasedClaim;
       }
       reports.push(payload.packet);
+      persistedFactoryResult = payload.packet.artifacts?.find((artifact: any) => artifact.metadata?.schema === "factory-result/v1")?.metadata?.result ?? persistedFactoryResult;
       if (payload.packet.verification) {
         verifiedCandidate = {
           sourceRevision: payload.packet.verification.sourceRevision,
@@ -773,20 +815,23 @@ async function runFixture(
     async () => CODEX_V1_RUNTIME_ARTIFACT.executableSha256,
   );
   const identifiedAdapter = options.harness ? withHarnessIdentity(codexAdapter, options.harness) : codexAdapter;
-  const adapter = withV2RuntimeProvenance(
+  const adapter = fabAdapter ?? withV2RuntimeProvenance(
     identifiedAdapter,
     options.resultExecutableSha256,
     options.resultProviderRoute,
   );
-  const createPullRequest = vi.fn(async (input: Parameters<FactoryAttemptWorkerDependencies["createOrReusePullRequest"]>[0]) => ({
+  const createPullRequest = vi.fn(async (input: Parameters<FactoryAttemptWorkerDependencies["createOrReusePullRequest"]>[0]) => {
+    if (options.uncertainPublication) throw new Error("Fixture provider outcome uncertain after request");
+    return ({
     number: 42,
     url: "https://github.com/sellerfi/mission-control-fixture/pull/42",
     nodeId: "PR_fixture",
     headSha: input.headSha,
     draft: input.draft === true,
     reused: false,
-  }));
-  const executeVerification = vi.fn(executeIndependentVerification);
+  }); });
+  const verifierPackets: any[] = [];
+  const executeVerification = vi.fn(options.fab ? async (input: Parameters<typeof executeIndependentVerification>[0]) => runSeparateFabVerifier(input, verifierPackets) : executeIndependentVerification);
   const pushFactoryBranchMock = vi.fn(async (input) => {
     expect(input.branch).toBe(`mc/verification-first-fixture-${attempt}`);
   });
@@ -829,6 +874,9 @@ async function runFixture(
     worker,
     claim,
     reports,
+    verifierPackets,
+    fabStateDirectory,
+    fabModelCalls: () => fabModelCalls,
     createPullRequest,
     executeCodex,
     executeVerification,
@@ -1207,3 +1255,105 @@ function executionProfileEvidence(manifest: any) {
 async function git(cwd: string, args: string[]) {
   return await execFileAsync("git", args, { cwd });
 }
+
+async function runSeparateFabVerifier(input: Parameters<typeof executeIndependentVerification>[0], packets: any[]) {
+  const checkoutRoot = path.resolve(input.repositoryRoot, "../../..");
+  const worktree = path.join(checkoutRoot, ".mission-control/worktrees/fab-independent-verifier");
+  const sourceAttemptId = "factory-run-1", attemptId = "fab-verification-attempt-1";
+  const contractDigest = `sha256:${canonicalHash(input.specification.verificationContract)}`;
+  // MC currently requires a PR identity in Git subjects. This identity belongs only
+  // to the deterministic provider fixture; no GitHub request creates it.
+  const subject = createGitVerificationSubject({ version: 1, kind: "GIT_CANDIDATE", workOrderId: input.workOrderId,
+    workOrderRevisionNumber: input.workOrderRevisionNumber, verificationContractDigest: contractDigest, sourceAttemptId,
+    repositoryId: "repository-1", provider: "GITHUB", providerRepositoryId: "101", candidateSha: input.candidate.candidateRevision,
+    treeSha: (await git(input.repositoryRoot, ["rev-parse", input.candidate.candidateRevision + "^{tree}"])).stdout.trim(), pullRequest: { providerPullRequestId: "PR_controlled_fixture", number: 42,
+      url: "https://github.com/sellerfi/mission-control-fixture/pull/42", baseRef: "main", headRef: "mc/fixture",
+      headSha: input.candidate.candidateRevision, draftAtPublication: true } });
+  const tuple = { workOrderId: input.workOrderId, workOrderRevisionNumber: input.workOrderRevisionNumber,
+    verificationContractDigest: contractDigest, sourceAttemptId, verificationSubjectDigest: subject.digest };
+  const requirements = [{ id: "ac-1", description: "Candidate feature is true", source: "ACCEPTANCE_CRITERION" as const, criticality: "REQUIRED" as const }];
+  const plan = freezeVerificationPlan({ planVersion: 1, ...tuple, verificationAttemptId: attemptId, verificationSubject: subject,
+    generatedBy: { factoryDefinitionId: "verifier", factoryDefinitionVersionId: "verifier-v1", attemptId, executorInvocationId: "verifier-invocation-1" },
+    requirements, requiredRisks: [], discoveredRisks: [], requiredEvidence: [{ id: "test-proof", requirementIds: ["ac-1"], requiredRiskIds: [], description: "Read and assert candidate feature", evidenceType: "UNIT_TEST", required: true }], createdAt: Date.now(),
+  }, { ...tuple, verificationAttemptId: attemptId, requiredRequirements: requirements, requiredRisks: [], requiredEvidenceIds: ["test-proof"] });
+  const manifest = { ...executionManifest({ baseSha: input.candidate.sourceRevision }),
+    causation: { workflowRunId: attemptId, workOrderRevisionNumber: input.workOrderRevisionNumber },
+    workOrderSpecification: { ...input.specification, verificationContract: { ...input.specification.verificationContract, schemaVersion: 2, requiredRisks: [], independence: { required: true, minimumBoundary: "SEPARATE_ATTEMPT" } } },
+  };
+  manifest.harness.isolation = "READ_ONLY";
+  const run = { _id: attemptId, runId: attemptId, projectId: "project-1", repositoryId: "repository-1", factoryDefinitionVersionId: "verifier-v1",
+    executionManifestDigest: `sha256:${canonicalHash(manifest)}`, executorAdapter: "codex", executorVersion: "v1", attemptPurpose: "VERIFICATION", status: "PENDING" };
+  const claim = { claimed: true, ...run, workflowRunId: attemptId, workOrderId: input.workOrderId, checkoutRoot, worktree,
+    sourceWorktree: input.repositoryRoot, sourceRevision: input.candidate.sourceRevision, branch: "mc/fixture", defaultBranch: "main",
+    repository: "sellerfi/mission-control-fixture", providerRepositoryId: "101", installation: { appId: "202", installationId: "303" },
+    verificationSubject: subject, verificationPlan: plan, executionManifest: manifest };
+  let pending = true; let verification: Awaited<ReturnType<typeof executeIndependentVerification>> | undefined;
+  const client = { query: vi.fn(async (_query: unknown, args: any) => args.status === "PENDING" && pending ? [run] : []),
+    action: vi.fn(async (_action: unknown, command: any) => {
+      const payload = JSON.parse(command.payloadJson);
+      if (!payload.packet) return claim;
+      pending = false;
+      const packet = payload.packet;
+      if (!packet.verification) throw new Error(`Separate verifier failed: ${packet.terminal?.failureReason}`);
+      const isolation = packet.isolation;
+      const independence = deriveVerificationIndependence({ expected: { ...tuple, verificationAttemptId: attemptId, verificationRunId: "verification-run-1", verificationSubjectId: subject.subjectId, verificationPlanId: plan.planId, verificationPlanDigest: plan.planDigest },
+        subject, sourceAttempt: { id: sourceAttemptId, attemptPurpose: "IMPLEMENTATION", executorInvocationId: "fab-invocation", leaseId: "builder-lease", worktree: input.repositoryRoot },
+        verificationAttempt: { id: attemptId, attemptPurpose: "VERIFICATION", factoryPurpose: "VERIFICATION", factoryDefinitionVersionId: "verifier-v1", executorInvocationId: "verifier-invocation-1", leaseId: "verifier-lease", worktree, binding: tuple },
+        factoryVersion: { id: "verifier-v1", purpose: "VERIFICATION" }, verificationRun: { ...tuple, id: "verification-run-1", workflowRunId: attemptId, verificationSubjectId: subject.subjectId, verificationPlanId: plan.planId, verificationPlanDigest: plan.planDigest },
+        isolation, reportCapability: command.envelope.capability, authorityStatus: packet.verification.checks.find((check: any) => check.verifierId === "factory-verification-authority")?.status,
+      });
+      expect(independence.passed, JSON.stringify(independence.reasons)).toBe(true);
+      packets.push({ capability: command.envelope.capability, packet, independence, plan });
+      verification = packet.verification;
+      return { accepted: true, verdict: packet.verification.verdict };
+    }),
+  } as any;
+  const noImplementation = vi.fn(async () => { throw new Error("Builder context cannot run in verifier"); });
+  const adapter = new CodexV1ExecutorAdapter("unused-fixture", noImplementation as any);
+  const worker = new FactoryAttemptWorker(client, adapter, true, 60000, { ensureFactoryWorktree, ensureVerificationWorktree,
+    listChangedFiles, commitFactoryChanges, inspectCandidateChange, assertFactoryCandidateUnchanged, executeIndependentVerification,
+    loadGithubAppPrivateKey: () => undefined, getGithubAppId: () => undefined, mintInstallationToken: vi.fn() as any,
+    pushFactoryBranch: vi.fn() as any, createOrReusePullRequest: vi.fn() as any });
+  try { await worker.tick(); await vi.waitFor(() => expect(worker.status().completedCount).toBe(1), { timeout: 5000 }); }
+  finally { await worker.stop(); }
+  expect(noImplementation).not.toHaveBeenCalled();
+  if (!verification) throw new Error("Separate verifier did not produce evidence");
+  return verification;
+}
+
+describe("Fab governed golden path using the canonical MC worker", () => {
+  it("links a real Fab candidate to a separate exact-subject verifier, approval and fixture publication", async () => {
+    const f = await runFixture("REQUIRES_HUMAN_REVIEW", { fab: true, durable: true });
+    await vi.waitFor(() => expect(f.verifierPackets).toHaveLength(1), { timeout: 10000 });
+    await vi.waitFor(() => expect(f.worker.status().activeRunIds).toEqual([]));
+    expect(f.createPullRequest).not.toHaveBeenCalled(); expect(f.fabModelCalls()).toBe(4);
+    const sessionFiles = await readdir(f.fabStateDirectory); const session = JSON.parse(await readFile(path.join(f.fabStateDirectory, sessionFiles[0]), "utf8")).session;
+    expect(session.governed).toMatchObject({ workOrderId: "work-order-1", attemptId: "factory-run-1", candidateRevision: expect.stringMatching(/^[a-f0-9]{40}$/) });
+    expect(f.verifierPackets[0].packet.isolation).toMatchObject({ sourceRoot: session.config.repository, headSha: session.candidateRevision, finalSubjectMatch: true });
+    expect(f.verifierPackets[0].packet.isolation.verifierRoot).not.toBe(session.config.repository);
+    expect(f.verifierPackets[0].independence.passed).toBe(true);
+    await f.worker.stop(); f.resumeAfterApproval(); const restarted = f.createRestartedWorker(); await restarted.tick();
+    await vi.waitFor(() => expect(restarted.status().completedCount).toBe(1));
+    expect(f.createPullRequest).toHaveBeenCalledOnce(); expect(f.fabModelCalls()).toBe(4); expect(f.verifierPackets).toHaveLength(1);
+    expect(f.authorizePublication.mock.invocationCallOrder[0]).toBeLessThan(f.pushFactoryBranch.mock.invocationCallOrder[0]);
+    if (process.env.FAB_MC_QUALIFICATION_OUTPUT) {
+      const record = JSON.stringify({ kind: "DETERMINISTIC_FIXTURE_ONLY", session, reports: f.reports, verifierAttempts: f.verifierPackets, modelCalls: f.fabModelCalls(), externalPublication: "MOCK ONLY" }, null, 2);
+      expect(record).not.toContain("fab-non-secret-factory-fixture-012345");
+      await writeFile(path.join(process.env.FAB_MC_QUALIFICATION_OUTPUT, "governed-golden-path.json"), record + "\n", { mode: 0o600 });
+    }
+    await restarted.stop();
+  });
+  it("denies publication when MC's final authority check rejects the lease", async () => {
+    const f = await runFixture("VERIFIED", { fab: true, durable: true, loseLeaseBeforePublication: true });
+    await vi.waitFor(() => expect(f.worker.status().failedCount).toBe(1), { timeout: 10000 });
+    expect(f.authorizePublication).toHaveBeenCalledOnce(); expect(f.pushFactoryBranch).not.toHaveBeenCalled(); expect(f.createPullRequest).not.toHaveBeenCalled(); await f.worker.stop();
+  });
+  it("preserves uncertain publication and refuses duplicate build/publication on reconnect", async () => {
+    const f = await runFixture("VERIFIED", { fab: true, durable: true, uncertainPublication: true });
+    await vi.waitFor(() => expect(f.worker.status().failedCount).toBe(1), { timeout: 10000 }); await f.worker.stop();
+    expect(f.createPullRequest).toHaveBeenCalledOnce(); const calls = f.fabModelCalls();
+    const restarted = f.createRestartedWorker(); await restarted.tick();
+    await vi.waitFor(() => expect(restarted.status().failedCount).toBe(1));
+    expect(f.createPullRequest).toHaveBeenCalledOnce(); expect(f.fabModelCalls()).toBe(calls); await restarted.stop();
+  });
+});
