@@ -10,6 +10,7 @@ import {
   factoryAttemptRequiresReplacementOnClaim,
   factoryAttemptSourceBindingMatches,
   factoryLeaseMatchesCurrentRegistration,
+  frozenFactorySourceRevision,
   lostFactoryAttemptFailure,
   renewAttemptLease,
   validateFactoryPullRequestLineage,
@@ -20,6 +21,15 @@ const workerB = { workerId: "worker-b", sessionId: "session-b", generation: 3 };
 const verificationContractDigest = `sha256:${"d".repeat(64)}`;
 
 describe("Factory attempt leases", () => {
+  it("rejects an intermediate worker-selected base that could hide verification authority changes", () => {
+    const base = "a".repeat(40); const intermediate = "b".repeat(40);
+    const run = { executionManifest: { repository: { baseSha: base } } };
+    expect(frozenFactorySourceRevision(run, base)).toBe(base);
+    expect(() => frozenFactorySourceRevision(run, intermediate)).toThrow("frozen");
+    expect(() => frozenFactorySourceRevision({ ...run, executionBaseSha: intermediate }, base)).toThrow("frozen");
+    expect(() => frozenFactorySourceRevision({}, base)).toThrow("frozen");
+    expect(() => frozenFactorySourceRevision(run, undefined)).toThrow("frozen");
+  });
   it("binds implementation claims to the host base and verification claims to the immutable candidate", () => {
     const baseSha = "a".repeat(40);
     const candidateSha = "b".repeat(40);
@@ -65,6 +75,8 @@ describe("Factory attempt leases", () => {
       branch: "mc/work-order-1",
       headSha: candidateSha,
       verificationSubject: verifiedSubject,
+      executionManifest: { repository: { baseSha } },
+      executionBaseSha: baseSha,
     };
 
     expect(factoryAttemptSourceBindingMatches({
@@ -130,6 +142,8 @@ describe("Factory attempt leases", () => {
       branch: "mc/work-order-1",
       headSha: candidateSha,
       verificationSubject: subject,
+      executionManifest: { repository: { baseSha: "a".repeat(40) } },
+      executionBaseSha: "a".repeat(40),
     };
     const exact = {
       attemptPurpose: "VERIFICATION",
@@ -145,6 +159,10 @@ describe("Factory attempt leases", () => {
     };
 
     expect(factoryAttemptSourceBindingMatches({ ...exact, manifestBaseSha: "d".repeat(40) })).toBe(false);
+    expect(factoryAttemptSourceBindingMatches({
+      ...exact,
+      verificationSourceAttempt: { ...source, executionBaseSha: "e".repeat(40) },
+    })).toBe(false);
     expect(factoryAttemptSourceBindingMatches({
       ...exact,
       verificationAttemptBinding: { ...binding, verificationSubjectDigest: "sha256:tampered" },

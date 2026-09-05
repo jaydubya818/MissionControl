@@ -11,6 +11,7 @@ import {
   factoryAttemptSourceBindingMatches,
   factoryExecutorIdentity,
   factoryLeaseMatchesCurrentRegistration,
+  frozenFactorySourceRevision,
   lostFactoryAttemptFailure,
   renewAttemptLease,
   validateFactoryPullRequestLineage,
@@ -1457,6 +1458,9 @@ export const reportInternal = internalMutation({
           ? (await ctx.db.get(run.repositoryId))?.repository
           : undefined,
       });
+      if (publicationLineage.patch.executionBaseSha !== undefined) {
+        publicationLineage.patch.executionBaseSha = frozenFactorySourceRevision(run, publicationLineage.patch.executionBaseSha);
+      }
       if (terminal.status === "COMPLETED" && run.isMutating !== false
         && (!publicationLineage.patch.headSha || !publicationLineage.patch.pullRequestUrl)) {
         throw new Error("A completed mutating Factory attempt requires durable pull-request head and URL lineage.");
@@ -2100,6 +2104,7 @@ async function persistPolicyV2CandidateReady(
       .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", run._id).eq("artifactType", "PULL_REQUEST"))
       .first();
   const metadata = pullRequestArtifact?.metadata ?? {};
+  const sourceRevision = frozenFactorySourceRevision(run, metadata.sourceRevision);
   const exact = candidate
     && /^[0-9a-f]{40,64}$/.test(candidate.candidateSha)
     && /^[0-9a-f]{40,64}$/.test(candidate.treeSha)
@@ -2147,7 +2152,7 @@ async function persistPolicyV2CandidateReady(
   await ctx.db.patch(run._id, {
     verificationSubject: subject,
     candidateReadyAt,
-    executionBaseSha: metadata.sourceRevision,
+    executionBaseSha: sourceRevision,
     headSha: candidate.candidateSha,
     treeSha: candidate.treeSha,
     pullRequestNumber: candidate.pullRequestNumber,
@@ -2892,6 +2897,19 @@ async function assertFactoryPullRequestArtifact(
   if (!run.repositoryId || !run.branch || !run.executionManifestDigest || !revisions.headSha) {
     throw new Error("Factory pull-request artifact is missing its frozen Attempt lineage.");
   }
+  const sourceRevision = frozenFactorySourceRevision(run, artifact?.metadata?.sourceRevision);
+  if (revisions.sourceRevision !== undefined && revisions.sourceRevision !== sourceRevision) {
+    throw new Error("Publication receipt source differs from the frozen execution manifest.");
+  }
+  const subject = run.verificationSubject;
+  if (subject?.kind === "GIT_CANDIDATE"
+    && (artifact?.metadata?.headSha !== subject.candidateSha
+      || artifact?.metadata?.treeSha !== subject.treeSha
+      || artifact?.metadata?.providerPullRequestId !== subject.pullRequest.providerPullRequestId
+      || artifact?.metadata?.pullRequestNumber !== subject.pullRequest.number
+      || artifact?.metadata?.pullRequestUrl !== subject.pullRequest.url)) {
+    throw new Error("Publication artifact differs from the immutable candidate subject.");
+  }
   const [repository, installation] = await Promise.all([
     ctx.db.get(run.repositoryId),
     ctx.db.query("githubAppInstallations")
@@ -2910,7 +2928,7 @@ async function assertFactoryPullRequestArtifact(
       installationId: installation.installationId,
       branch: run.branch,
       headSha: revisions.headSha,
-      sourceRevision: revisions.sourceRevision,
+      sourceRevision,
       executionManifestDigest: run.executionManifestDigest,
       publicationPermitId: run.factoryContinuation?.status === "PUBLICATION_AUTHORIZED"
         ? run.factoryContinuation.publicationPermitId

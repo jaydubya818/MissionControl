@@ -3,6 +3,20 @@ import { verifyVerificationSubjectIdentity } from "@mission-control/workflow-eng
 export const MIN_FACTORY_LEASE_MS = 15_000;
 export const MAX_FACTORY_LEASE_MS = 120_000;
 
+/** Candidate evidence cannot choose an intermediate base that hides changes. */
+export function frozenFactorySourceRevision(run: {
+  executionManifest?: { repository?: { baseSha?: unknown } };
+  executionBaseSha?: unknown;
+}, reportedSourceRevision: unknown): string {
+  const frozen = run.executionManifest?.repository?.baseSha;
+  if (typeof frozen !== "string" || !/^[a-f0-9]{40,64}$/.test(frozen)
+    || reportedSourceRevision !== frozen
+    || (run.executionBaseSha !== undefined && run.executionBaseSha !== frozen)) {
+    throw new Error("Candidate source revision must match the frozen execution manifest base.");
+  }
+  return frozen;
+}
+
 export interface AttemptLease {
   leaseId: string;
   ownerId: string;
@@ -56,6 +70,8 @@ type VerificationAttemptBindingLike = {
 };
 
 type VerificationSourceAttemptLike = {
+  executionManifest?: { repository?: { baseSha?: unknown } };
+  executionBaseSha?: unknown;
   _id?: unknown;
   attemptPurpose?: string;
   status?: string;
@@ -89,6 +105,7 @@ export function factoryAttemptSourceBindingMatches(input: {
   const subject = binding?.verificationSubject;
   const source = input.verificationSourceAttempt;
   if (!binding || !subject || !source || subject.kind !== "GIT_CANDIDATE") return false;
+  try { frozenFactorySourceRevision(source, source.executionBaseSha); } catch { return false; }
 
   const sourceAttemptId = String(binding.sourceAttemptId ?? "");
   const workOrderId = String(input.workOrderId ?? "");
