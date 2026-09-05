@@ -5,8 +5,8 @@ The authoritative admission command is:
 
 ```sh
 MC_QUALIFICATION_BASE_SHA=3ae9d86eeff1966862a6959664ec1fe2e6e7240a \
-MC_IMPLEMENTATION_SHA=045176e44deef520a88988212af202b6d4c82e19 \
-MC_QUALIFICATION_EVIDENCE_SLUG=governed-mcp-phase3-factory-045176e44dee \
+MC_IMPLEMENTATION_SHA=37953e4d287971175da2e3b2aa658f6b5da5d03b \
+MC_QUALIFICATION_EVIDENCE_SLUG=governed-mcp-phase3-factory-37953e4d2879 \
 pnpm run qualify:factory:v2
 ```
 
@@ -16,9 +16,10 @@ a dependency-free, single-file local stdio server. Each broker run writes a new
 revision-scoped file under `runs/`; previous broker evidence is never
 overwritten. The complete authoritative Factory report for the qualified source
 revision is retained separately at
-`../governed-mcp-phase3-factory-045176e44dee/`, using an explicit
+`../governed-mcp-phase3-factory-37953e4d2879/`, using an explicit
 `MC_QUALIFICATION_EVIDENCE_SLUG` so the repository's historical default evidence
-is not overwritten.
+is not overwritten. The earlier `045176e44dee` bundle remains as immutable
+pre-CI evidence; `37953e4d2879` includes the Node 20 compatibility correction.
 
 The broker scenario records exact identity and receipt-shaped observations from
 the real stdio exchange. Those observations are not described as immutable

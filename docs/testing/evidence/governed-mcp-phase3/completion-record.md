@@ -9,7 +9,7 @@ This record covers one exact, local, read-only qualification fixture. It does no
 | Field | Value |
 | --- | --- |
 | Required baseline main SHA | `3ae9d86eeff1966862a6959664ec1fe2e6e7240a` |
-| Qualified implementation SHA | `045176e44deef520a88988212af202b6d4c82e19` |
+| Qualified implementation SHA | `37953e4d287971175da2e3b2aa658f6b5da5d03b` |
 | Pull request | [#171](https://github.com/jaydubya818/MissionControl/pull/171) |
 | Final branch SHA | Pending final evidence commit |
 | Implementation merge SHA | Pending merge |
@@ -31,7 +31,7 @@ The merge and qualified-main fields are lifecycle facts that do not exist before
 | Input schema digest | `c1d92d6f44abf63ac23a9732b13e968091a91bcc05f5777044ae7c200c50b409` |
 | Output schema digest | `db88401b958bd7196825c053ed5c9c5e0ef70b0232f1143fbc167715f6a455e1` |
 | Tool Grant | `qualification-grant` |
-| Tool Grant digest for retained qualified run | `sha256:19741c36d5c170279199b311f79b73cdd06921555f410b19405858bc602f1a60` |
+| Tool Grant digest for retained qualified run | `sha256:22eb40bc1dbaa592140b889bd74594d82681ccc8df05c54039106ed05fc5f3fc` |
 | Execution Profile | `qualification-profile` |
 | Execution Profile digest | `sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` |
 | Factory Version | Not applicable to the local broker sub-scenario; the authoritative Factory V2 qualification binds the committed revision and existing Factory contracts |
@@ -39,7 +39,7 @@ The merge and qualified-main fields are lifecycle facts that do not exist before
 | Credential class | `NONE` |
 | Destination | `LOCAL_PROCESS` only |
 
-The deliberately synthetic `qualification-*` identifiers and profile digest above belong only to the broker sub-scenario at `runs/045176e44dee-2026-09-05T09-29-51-052Z/`. The timestamp-bound grant digest is not a durable Convex identity.
+The deliberately synthetic `qualification-*` identifiers and profile digest above belong only to the broker sub-scenario at `runs/37953e4d2879-2026-09-05T09-38-13-078Z/`. The timestamp-bound grant digest is not a durable Convex identity.
 
 ## Exact durable local-demo identity
 
@@ -64,16 +64,16 @@ The authoritative command passed against the exact implementation SHA:
 
 ```sh
 MC_QUALIFICATION_BASE_SHA=3ae9d86eeff1966862a6959664ec1fe2e6e7240a \
-MC_IMPLEMENTATION_SHA=045176e44deef520a88988212af202b6d4c82e19 \
-MC_QUALIFICATION_EVIDENCE_SLUG=governed-mcp-phase3-factory-045176e44dee \
+MC_IMPLEMENTATION_SHA=37953e4d287971175da2e3b2aa658f6b5da5d03b \
+MC_QUALIFICATION_EVIDENCE_SLUG=governed-mcp-phase3-factory-37953e4d2879 \
 pnpm run qualify:factory:v2
 ```
 
 The revision-scoped files are:
 
-- `../governed-mcp-phase3-factory-045176e44dee/automated-checks.json` — SHA-256 `2cde5799d657a2bd5e3873aaca48ea936a8060cb9722b72394fbf81bc7d3afe6`;
-- `../governed-mcp-phase3-factory-045176e44dee/eval-receipt.json` — SHA-256 `ac24eadf897d74f13f50d82a8141c52560edb93776a48496bb225c552dec0acc`;
-- `../governed-mcp-phase3-factory-045176e44dee/scenario-evidence.json` — SHA-256 `4e2230b51ffa9e3e162ebaaf454257ff0bc0c1e33ec6253817db2d02b27f6416`.
+- `../governed-mcp-phase3-factory-37953e4d2879/automated-checks.json` — SHA-256 `6307744a540225e597d507f35abb953c5d0e17f14ad4574375b57dabd31ec20e`;
+- `../governed-mcp-phase3-factory-37953e4d2879/eval-receipt.json` — SHA-256 `9aa02feeff1ea9a12efa23744ec52dd48d96726735ba9a34797b6b82b35828a5`;
+- `../governed-mcp-phase3-factory-37953e4d2879/scenario-evidence.json` — SHA-256 `b5e2504f5baeb83710384094d3b9adff28e94f03494bf5e7a4e22ea3e3281f80`.
 
 The generated Factory report records `PASS`, 19/19 gates, and the exact started head. Its receipt-first eval is publishable with all 6/6 blocking cases passing. Its `WARN` is one pre-existing advisory economics case, which fails advisory evaluation but is explicitly non-blocking. Separately, the scenario evidence records 15/15 named failure-injection controls as `PASS`; MCP-specific negatives are covered by the governed broker/control-plane test suites referenced below.
 
@@ -93,14 +93,14 @@ The revision-scoped broker receipts are observations of the real local stdio exc
 
 ## Independent reviews
 
-- Security: GO after the broker authority and credential-boundary fixes; no unresolved high-severity trust-boundary defect.
+- Security: GO after the broker authority and credential-boundary fixes, and GO again after the Node 20 permission-flag compatibility change; no unresolved high-severity trust-boundary defect and no unpermissioned fallback.
 - Data integrity: GO after atomic call-budget/currentness and immutable receipt fixes.
 - Architecture and simplicity: GO; no second capability registry, evidence store, authorization system, Execution Profile, Factory Version, MCP-specific workflow engine, or general connector framework.
 - Documentation: GO after independent rerun against this corrected record and revision-scoped Factory bundle; artifact hashes, counts, identity classification, and scope claims reconciled.
 
 ## Browser evidence
 
-Actual integrated-application checks cover the exact Execution Profile capability view, Tool Grant history, revoked currentness/readiness remediation, refresh persistence, and 390px no-overflow behavior. Attempt receipt/denial/unavailable-server presentation is covered by integrated read-model and component tests rather than a browser-dispatched live Attempt. See `browser/browser-evidence.json` for exact classifications and screenshot digests.
+Actual integrated-application checks cover the exact Execution Profile capability view, Tool Grant history, revoked currentness/readiness remediation, refresh persistence, and 390px no-overflow behavior. They were captured at source revision `045176e44deef520a88988212af202b6d4c82e19`; the later `37953e4d2879` change affects only Node child-process permission-flag selection and its unit test, not the UI or browser data. Attempt receipt/denial/unavailable-server presentation is covered by integrated read-model and component tests rather than a browser-dispatched live Attempt. See `browser/browser-evidence.json` for exact classifications and screenshot digests.
 
 ## Real versus fixture evidence
 
