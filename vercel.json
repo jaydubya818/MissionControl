@@ -20,5 +20,10 @@
   "rewrites": [
     { "source": "/v2", "destination": "/index.html" },
     { "source": "/v2/:path*", "destination": "/index.html" }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  }
 }
