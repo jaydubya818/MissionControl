@@ -24,6 +24,29 @@ const deepSeekHarness = {
   available: false,
   advertised: false,
 };
+const localExecutionProfile = {
+  _id: "execution-profile-local-1",
+  profileKey: "codex-local",
+  version: 1,
+  profileDigest: "sha256:profile-local",
+  qualificationDigest: "sha256:qualification-local",
+  qualificationExpiresAt: Date.now() + 60_000,
+  executor: { adapter: "codex", version: "v1" },
+  executionBackend: "persistent-worker",
+  modelCatalogId: "model-route-1",
+  modelRouteDigest: "sha256:route-1",
+  isolationModes: ["READ_ONLY", "WORKSPACE_WRITE"],
+};
+const remoteExecutionProfile = {
+  ...localExecutionProfile,
+  _id: "execution-profile-remote-1",
+  profileKey: "codex-exe",
+  profileDigest: "sha256:profile-remote",
+  qualificationDigest: "sha256:qualification-remote",
+  executionBackend: "remote-sandbox",
+  sandboxProfileId: "sandbox-profile-1",
+  sandboxProfileDigest: "sha256:sandbox-profile-1",
+};
 
 const mocks = vi.hoisted(() => ({
   definitions: [] as any[],
@@ -35,6 +58,7 @@ const mocks = vi.hoisted(() => ({
     codeScopes: [{ _id: "scope-1", name: "Application", includePaths: ["apps/example/**"] }],
     agentVersions: [{ _id: "agent-version-1", version: 2, template: { name: "Implementer" }, modelConfig: { provider: "openai", modelId: "gpt-5" } }],
     modelRoutes: [{ _id: "model-route-1", provider: "openai", modelId: "gpt-5", displayName: "GPT-5" }],
+    executionProfiles: [] as any[],
     sandboxProfiles: [] as any[],
     harnesses: [] as any[],
   },
@@ -137,6 +161,7 @@ describe("FactoryConfigurationPanel", () => {
       codeScopes: [{ _id: "scope-1", name: "Application", includePaths: ["apps/example/**"] }],
       agentVersions: [{ _id: "agent-version-1", version: 2, template: { name: "Implementer" }, modelConfig: { provider: "openai", modelId: "gpt-5" } }],
       modelRoutes: [{ _id: "model-route-1", provider: "openai", modelId: "gpt-5", displayName: "GPT-5" }],
+      executionProfiles: [localExecutionProfile],
       sandboxProfiles: [],
       harnesses: [codexHarness],
     };
@@ -217,8 +242,7 @@ describe("FactoryConfigurationPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create configuration version" }));
 
     await waitFor(() => expect(mocks.createVersion).toHaveBeenCalledWith(expect.objectContaining({
-      executor: { adapter: "codex", version: "v1" },
-      executionBackend: "persistent-worker",
+      executionProfileId: "execution-profile-local-1",
       codeScopeIds: ["scope-1"],
       agentBindings: [{ workflowAgentId: "implementer", agentVersionId: "agent-version-1" }],
       recovery: { pause: false, cancel: true, retry: true, resume: false },
@@ -245,6 +269,17 @@ describe("FactoryConfigurationPanel", () => {
 
     expect(screen.getByLabelText("Isolated Sandbox")).toBeDisabled();
     expect(screen.getByText(/internal repository: no eligible profile proves provider-enforced egress/i)).toBeInTheDocument();
+  });
+
+  it("blocks Factory version creation until a compatible qualified Execution Profile exists", () => {
+    mocks.definitions = [{ _id: "factory-1", repositoryId: "repository-1", status: "DRAFT" }];
+    mocks.detail = { definition: { _id: "factory-1", status: "DRAFT" }, versions: [], assessments: [] };
+    mocks.versionOptions = { ...mocks.versionOptions, executionProfiles: [] };
+    renderPanel();
+
+    expect(screen.getByLabelText("Qualified Execution Profile")).toBeDisabled();
+    expect(screen.getByText(/Register and qualify an exact profile/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create configuration version" })).toBeDisabled();
   });
 
   it("shows experimental harness capability detail only in Advanced and disables selection until a worker advertises the exact pin", () => {
@@ -276,6 +311,7 @@ describe("FactoryConfigurationPanel", () => {
     mocks.detail = { definition: { _id: "factory-1", status: "DRAFT" }, versions: [], assessments: [] };
     mocks.versionOptions = {
       ...mocks.versionOptions,
+      executionProfiles: [localExecutionProfile, remoteExecutionProfile],
       sandboxProfiles: [{
         _id: "sandbox-profile-1", profileKey: "exe-standard", version: 1, provider: "EXE_DEV",
         readinessState: "DEGRADED", previewMode: "DISABLED",
@@ -283,14 +319,12 @@ describe("FactoryConfigurationPanel", () => {
     };
     renderPanel();
 
-    fireEvent.click(screen.getByLabelText("Isolated Sandbox"));
+    fireEvent.change(screen.getByLabelText("Qualified Execution Profile"), { target: { value: "execution-profile-remote-1" } });
     await waitFor(() => expect(screen.getByLabelText("Sandbox Profile")).toHaveValue("sandbox-profile-1"));
     fireEvent.click(screen.getByRole("button", { name: "Create configuration version" }));
 
     await waitFor(() => expect(mocks.createVersion).toHaveBeenCalledWith(expect.objectContaining({
-      executionBackend: "remote-sandbox",
-      sandboxProfileId: "sandbox-profile-1",
-      modelCatalogId: "model-route-1",
+      executionProfileId: "execution-profile-remote-1",
       riskBoundary: "YELLOW",
     })));
     expect(screen.getByText(/Preview · Not Live Certified/i)).toBeInTheDocument();

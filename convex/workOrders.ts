@@ -98,6 +98,11 @@ import {
   evaluateRepositoryRemoteExecutionPolicy,
   normalizeRepositoryDataClassification,
 } from "./lib/repositoryExecutionPolicy";
+import {
+  loadExecutionProfileAdmission,
+  executionProfileScopeBlockers,
+} from "./lib/executionProfileAdmission";
+import { executionProfileProjectionBlockers } from "./lib/executionProfile";
 import { createWorkOrderRecord } from "./lib/workOrderCreate";
 import {
   appendCurrentVerificationQualityGateDecision,
@@ -146,8 +151,24 @@ import { findModelCatalogEntry, loadModelCatalogForProject } from "./lib/modelCa
 
 function factoryExecutionBackend(manifest: any): string | undefined {
   return manifest?.version === "factory-execution-manifest/v2"
+    || manifest?.version === "factory-execution-manifest/v3"
     ? manifest.executionBackend
     : manifest?.harness?.executionBackend;
+}
+
+const EXECUTION_PROFILE_BINDING_FIELDS = [
+  "executionProfileId",
+  "executionProfileKey",
+  "executionProfileVersion",
+  "executionProfileDigest",
+  "executionProfileSnapshot",
+  "executionProfileQualificationDigest",
+  "executionProfileQualificationSnapshot",
+] as const;
+
+function hasAnyExecutionProfileBinding(record: Record<string, any> | null | undefined) {
+  return Boolean(record)
+    && EXECUTION_PROFILE_BINDING_FIELDS.some((field) => record![field] !== undefined);
 }
 
 function generateRunId(): string {
@@ -3062,6 +3083,15 @@ async function dispatchWorkOrder(
             qualificationDigest: factoryBinding.modelRoute.qualificationDigest,
             qualificationSnapshot: factoryBinding.modelRoute.qualificationSnapshot,
           },
+          executionProfile: factoryBinding.executionProfile ? {
+            profileId: String(factoryBinding.version.executionProfileId),
+            profileKey: factoryBinding.version.executionProfileKey,
+            version: factoryBinding.version.executionProfileVersion,
+            profileDigest: factoryBinding.version.executionProfileDigest,
+            profileSnapshot: factoryBinding.version.executionProfileSnapshot,
+            qualificationDigest: factoryBinding.version.executionProfileQualificationDigest,
+            qualificationSnapshot: factoryBinding.version.executionProfileQualificationSnapshot,
+          } : undefined,
           sandboxProfile: {
             isolation: "WORKSPACE_WRITE",
             requiredCapabilities: factoryBinding.requiredSandboxCapabilities,
@@ -3204,6 +3234,13 @@ async function dispatchWorkOrder(
       verificationContractDigest: refreshedWorkOrder.verificationContractDigest,
       factoryDefinitionVersionId: factoryBinding?.version._id,
       factoryConfigurationDigest: factoryBinding?.version.configurationDigest,
+      executionProfileId: factoryBinding?.version.executionProfileId,
+      executionProfileKey: factoryBinding?.version.executionProfileKey,
+      executionProfileVersion: factoryBinding?.version.executionProfileVersion,
+      executionProfileDigest: factoryBinding?.version.executionProfileDigest,
+      executionProfileSnapshot: factoryBinding?.version.executionProfileSnapshot,
+      executionProfileQualificationDigest: factoryBinding?.version.executionProfileQualificationDigest,
+      executionProfileQualificationSnapshot: factoryBinding?.version.executionProfileQualificationSnapshot,
       factoryPurpose: factoryBinding?.version.purpose ?? "SOFTWARE",
       attemptPurpose: refreshedWorkOrder.kind === "AUTOMATION" ? "AUTOMATION" : "IMPLEMENTATION",
       qualityContractDigest: refreshedWorkOrder.qualityContractDigest,
@@ -3295,6 +3332,11 @@ async function dispatchWorkOrder(
         scopeReceiptId,
         factoryDefinitionVersionId: factoryBinding?.version._id,
         factoryConfigurationDigest: factoryBinding?.version.configurationDigest,
+        executionProfileId: factoryBinding?.version.executionProfileId,
+        executionProfileKey: factoryBinding?.version.executionProfileKey,
+        executionProfileVersion: factoryBinding?.version.executionProfileVersion,
+        executionProfileDigest: factoryBinding?.version.executionProfileDigest,
+        executionProfileQualificationDigest: factoryBinding?.version.executionProfileQualificationDigest,
         repositoryId: factoryBinding?.repository._id,
         hostBindingId: factoryBinding?.host._id,
         branch: factoryBinding?.branch,
@@ -3711,6 +3753,7 @@ async function resolveFactoryDispatchBinding(
       assessmentCurrent: false, digestMatches: false, repositoryReady: false,
       repositoryPolicyReady: false, remoteEgressPolicyReady: false,
       githubReady: false, workflowMatches: false, executorReady: false,
+      executionProfileReady: false,
       workflowContractReady: false,
       codeScopesReady: false, agentManifestsReady: false,
       policyReady: false, verifiersReady: false, hostReady: false,
@@ -3847,6 +3890,61 @@ async function resolveFactoryDispatchBinding(
       executionBackend: selectedExecutionBackend,
     })
   );
+  const profileFieldsPresent = hasAnyExecutionProfileBinding(version);
+  const executionProfileAdmission = version.executionProfileId
+    ? await loadExecutionProfileAdmission(ctx, version.executionProfileId, now)
+    : null;
+  const executionProfile = executionProfileAdmission?.profile ?? null;
+  const profileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+  const workloadClass = (version.purpose ?? "SOFTWARE") === "VERIFICATION"
+    ? "VERIFICATION"
+    : (version.purpose ?? "SOFTWARE") === "INTELLIGENT_AUTOMATION"
+      ? "AUTOMATION"
+      : "SOFTWARE_CHANGE";
+  const executionProfileReady = !profileFieldsPresent || Boolean(
+    executionProfile
+    && executionProfileAdmission?.eligible
+    && executionProfile.projectId === version.projectId
+    && executionProfileProjectionBlockers({
+      profileId: String(executionProfile._id),
+      profileSnapshot: executionProfile.immutableSnapshot,
+      profileDigest: executionProfile.profileDigest,
+      qualificationSnapshot: executionProfile.qualificationSnapshot,
+      qualificationDigest: executionProfile.qualificationDigest!,
+      projection: {
+        profileId: String(version.executionProfileId),
+        profileKey: version.executionProfileKey ?? "",
+        profileVersion: version.executionProfileVersion ?? 0,
+        profileDigest: version.executionProfileDigest ?? "",
+        profileSnapshot: version.executionProfileSnapshot,
+        qualificationDigest: version.executionProfileQualificationDigest ?? "",
+        qualificationSnapshot: version.executionProfileQualificationSnapshot,
+        executor: version.executor,
+        harnessCapabilityManifest: version.harnessCapabilityManifest,
+        harnessCapabilityManifestDigest: version.harnessCapabilityManifestDigest ?? "",
+        harnessEffectiveConfigSha256: version.harnessEffectiveConfigSha256 ?? "",
+        harnessRuntimeArtifact: version.harnessRuntimeArtifact,
+        harnessRuntimeArtifactDigest: version.harnessRuntimeArtifactDigest ?? "",
+        executionBackend: selectedExecutionBackend,
+        modelCatalogId: version.modelCatalogId ? String(version.modelCatalogId) : "",
+        modelRouteSnapshot: version.modelRouteSnapshot,
+        modelRouteDigest: version.modelRouteDigest ?? "",
+        modelQualificationSnapshot: version.modelQualificationSnapshot,
+        modelQualificationDigest: version.modelQualificationDigest ?? "",
+        sandboxProfileId: version.sandboxProfileId ? String(version.sandboxProfileId) : undefined,
+        sandboxProfileSnapshot: version.sandboxProfileSnapshot,
+        sandboxProfileDigest: version.sandboxProfileDigest,
+        isolationModes: profileSnapshot?.isolationModes ?? [],
+        requiredHarnessCapabilities: profileSnapshot?.requiredHarnessCapabilities ?? [],
+        requiredSandboxCapabilities: profileSnapshot?.requiredSandboxCapabilities ?? [],
+      },
+    }).length === 0
+    && executionProfileScopeBlockers(executionProfile, {
+      workloadClass,
+      riskClass: version.riskBoundary,
+      isolation: "WORKSPACE_WRITE",
+    }).length === 0
+  );
   const activeStatuses = ["PENDING", "RUNNING", "PAUSED"] as const;
   const activeRuns = repository
     ? (await Promise.all(activeStatuses.map((status) => ctx.db.query("workflowRuns")
@@ -3868,6 +3966,7 @@ async function resolveFactoryDispatchBinding(
     workflowMatches: version.workflowId === workflow._id,
     workflowContractReady: factoryWorkflowContractIssues(workflow).length === 0,
     executorReady: validFactoryExecutorBinding(version.executor),
+    executionProfileReady,
     codeScopesReady: Boolean(
       version.codeScopeIds?.length
       && repository
@@ -3927,6 +4026,7 @@ async function resolveFactoryDispatchBinding(
     requiredSandboxCapabilities,
     sandboxProfile,
     modelRoute,
+    executionProfile,
     branch: args.branch?.trim() || `mc/${String(workOrder._id).slice(-12)}-${args.attemptRunId}`,
     worktree: args.worktree?.trim() || `${host.checkoutRoot.replace(/\/+$/, "")}/.mission-control/worktrees/${String(workOrder._id).slice(-12)}-${args.attemptRunId}`,
     allowedTools: Array.isArray(workflow.metadata?.allowedTools) ? workflow.metadata.allowedTools.filter((item: unknown): item is string => typeof item === "string") : [],

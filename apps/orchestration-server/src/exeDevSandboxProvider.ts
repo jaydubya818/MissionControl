@@ -107,6 +107,10 @@ export class ExeDevSandboxProvider implements SandboxProvider {
     assertSafeSandboxResourceName(request.allocation.resourceName);
     if (request.allocation.provider !== this.kind) throw new Error("Sandbox allocation belongs to a different provider.");
     if (!/^[a-f0-9]{40,64}$/i.test(request.sourceSha)) throw new Error("Sandbox start requires an immutable source SHA.");
+    if ((request.executionManifest as any)?.version === "factory-execution-manifest/v3"
+      && (!Number.isSafeInteger(request.profileAdmittedAt) || (request.profileAdmittedAt ?? -1) < 0)) {
+      throw new Error("V3 sandbox start requires the authoritative Execution Profile admission timestamp.");
+    }
     const outputSchemaPath = `${REMOTE_ROOT}/factory-result.schema.json`;
     if (request.executor.outputSchemaPath !== undefined || request.executor.outputSchema !== undefined) {
       if (request.executor.outputSchemaPath !== outputSchemaPath || !request.executor.outputSchema) {
@@ -139,6 +143,7 @@ export class ExeDevSandboxProvider implements SandboxProvider {
       workOrderRevisionNumber: request.workOrderRevisionNumber,
       workflowRunId: request.workflowRunId,
       manifestDigest: request.manifestDigest,
+      profileAdmittedAt: request.profileAdmittedAt,
       profileDigest: request.profileDigest,
       sourceSha: request.sourceSha,
       environmentDescriptor: request.environmentDescriptor,

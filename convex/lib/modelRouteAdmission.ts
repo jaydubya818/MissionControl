@@ -1,4 +1,4 @@
-import { computeCanonicalHash } from "./genomeHash";
+import { computeCanonicalHash } from "./genomeHash.js";
 
 /** Historical schema. It is readable only for frozen legacy Factory Versions. */
 export const LEGACY_EXACT_MODEL_ROUTE_SCHEMA = "factory-model-route/v1" as const;

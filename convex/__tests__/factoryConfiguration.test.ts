@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   factoryConfigurationDigest,
   validFactoryBudget,
+  validFactoryExecutionProfileBinding,
   validFactoryExecutorBinding,
   validFactoryExecutionBinding,
   type FactoryConfigurationInput,
@@ -157,5 +158,31 @@ describe("Factory configuration", () => {
     };
     expect(factoryConfigurationDigest(remote)).not.toBe(factoryConfigurationDigest(configuration));
     expect(factoryConfigurationDigest({ ...remote, sandboxProfileDigest: "sha256:profile-2" })).not.toBe(factoryConfigurationDigest(remote));
+  });
+
+  it("binds an all-or-nothing exact Execution Profile identity into the Factory digest", () => {
+    const profile = {
+      executionProfileId: "execution-profile-1",
+      executionProfileVersion: 1,
+      executionProfileDigest: `sha256:${"c".repeat(64)}`,
+      executionProfileQualificationDigest: `sha256:${"d".repeat(64)}`,
+    };
+    expect(validFactoryExecutionProfileBinding(profile)).toBe(true);
+    expect(factoryConfigurationDigest({ ...configuration, ...profile })).not.toBe(
+      factoryConfigurationDigest(configuration),
+    );
+    expect(factoryConfigurationDigest({ ...configuration, ...profile })).not.toBe(
+      factoryConfigurationDigest({
+        ...configuration,
+        ...profile,
+        executionProfileQualificationDigest: `sha256:${"e".repeat(64)}`,
+      }),
+    );
+    expect(validFactoryExecutionProfileBinding({})).toBe(true);
+    expect(validFactoryExecutionProfileBinding({
+      executionProfileId: profile.executionProfileId,
+      executionProfileVersion: profile.executionProfileVersion,
+      executionProfileDigest: profile.executionProfileDigest,
+    })).toBe(false);
   });
 });

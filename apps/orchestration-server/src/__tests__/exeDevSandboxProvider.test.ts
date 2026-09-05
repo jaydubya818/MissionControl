@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { canonicalHash } from "@mission-control/shared";
 import { ExeDevSandboxProvider, exeDevCommandErrorDetail, type ExeDevTransport } from "../exeDevSandboxProvider.js";
-import type { SandboxProfileSnapshot, SandboxSecurityProof } from "../sandboxProvider.js";
+import type { SandboxProfileSnapshot, SandboxSecurityProof, SandboxStartRequest } from "../sandboxProvider.js";
 import { standaloneRemoteSupervisorSource } from "../standaloneRemoteSupervisorSource.js";
 import { standaloneRestrictedSandboxBootstrapSource } from "../standaloneRestrictedSandboxBootstrapSource.js";
 
@@ -101,7 +101,8 @@ describe("ExeDevSandboxProvider", () => {
     const executionManifest = manifest();
     await provider.start({
       allocation, executionManifest, workOrderId: "w1", workOrderRevisionNumber: 1, workflowRunId: "r1", attemptId: "a1",
-      manifestDigest: `sha256:${canonicalHash(executionManifest)}`, sourceSha: "a".repeat(40), profileDigest: "sha256:profile",
+      manifestDigest: `sha256:${canonicalHash(executionManifest)}`, profileAdmittedAt: 123,
+      sourceSha: "a".repeat(40), profileDigest: "sha256:profile",
       environmentDescriptor: { provider: "EXE_DEV", image: "debian:bookworm" }, repositoryArchive: Buffer.from("bundle"), supervisorSource: "// supervisor",
       executor: {
         command: "codex",
@@ -121,6 +122,7 @@ describe("ExeDevSandboxProvider", () => {
     expect(JSON.parse(Buffer.from(vmText.mock.calls[3][2], "base64").toString("utf8"))).toEqual({ type: "object", required: ["status"] });
     const uploadedConfig = JSON.parse(Buffer.from(vmText.mock.calls[5][2], "base64").toString("utf8"));
     expect(uploadedConfig.executionManifest).toEqual(executionManifest);
+    expect(uploadedConfig.profileAdmittedAt).toBe(123);
     const preparation = vmText.mock.calls[4][1];
     expect(preparation).toContain("git clone --quiet");
     expect(preparation).toContain("rm -f /var/lib/mission-control/attempt/result.json");
@@ -231,6 +233,21 @@ describe("ExeDevSandboxProvider", () => {
     startRequest.environmentDescriptor.image = `ghcr.io/jaydubya818/mission-control-remote-sandbox@sha256:${"e".repeat(64)}`;
 
     await expect(provider.start(startRequest)).rejects.toThrow(/exact digest-qualified image/);
+    expect(vmText).not.toHaveBeenCalled();
+  });
+
+  it("requires a finite authoritative profile admission timestamp for V3", async () => {
+    const selectedProfile = restrictedProfile();
+    const vmText = vi.fn();
+    const provider = new ExeDevSandboxProvider({ lobbyJson: vi.fn(), vmText } as ExeDevTransport);
+    const startRequest = restrictedStartRequest(selectedProfile);
+    startRequest.executionManifest = {
+      ...startRequest.executionManifest,
+      version: "factory-execution-manifest/v3",
+    };
+    startRequest.profileAdmittedAt = Number.NaN;
+
+    await expect(provider.start(startRequest)).rejects.toThrow(/authoritative Execution Profile admission timestamp/);
     expect(vmText).not.toHaveBeenCalled();
   });
 
@@ -387,7 +404,10 @@ function restrictedProof(providerReportedReference: string | null = restrictedPr
   };
 }
 
-function restrictedStartRequest(selectedProfile: SandboxProfileSnapshot, allocationOverrides: Record<string, unknown> = {}) {
+function restrictedStartRequest(
+  selectedProfile: SandboxProfileSnapshot,
+  allocationOverrides: Record<string, unknown> = {},
+): SandboxStartRequest {
   const executionManifest = manifest();
   return {
     allocation: {

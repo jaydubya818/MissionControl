@@ -24,6 +24,14 @@ import {
   modelRouteQualificationDigest,
   modelRouteQualificationIssues,
 } from "./modelRouteAdmission";
+import {
+  executionProfileDigest,
+  executionProfileIssues,
+  executionProfileProjectionBlockers,
+  executionProfileQualificationDigest,
+  executionProfileQualificationIssues,
+  executionProfileQualificationMatches,
+} from "./executionProfile";
 
 export function factorySandboxResourceName(input: {
   projectId: string;
@@ -35,6 +43,16 @@ export function factorySandboxResourceName(input: {
     value: input,
   }).slice(0, 16);
   return `mc-attempt-${identity}`;
+}
+
+export interface FactoryExecutionProfileManifestBinding {
+  profileId: string;
+  profileKey: string;
+  version: number;
+  profileDigest: string;
+  profileSnapshot: unknown;
+  qualificationDigest: string;
+  qualificationSnapshot: unknown;
 }
 
 export interface FactoryExecutionManifestInput {
@@ -79,6 +97,11 @@ export interface FactoryExecutionManifestInput {
     qualificationDigest: string;
     qualificationSnapshot: unknown;
   };
+  /**
+   * Additive exact execution-composition authority. Historical profileless
+   * inputs deliberately continue to emit their frozen V1/V2 manifests.
+   */
+  executionProfile?: FactoryExecutionProfileManifestBinding;
   sandboxProfile: {
     isolation: "READ_ONLY" | "WORKSPACE_WRITE";
     requiredCapabilities: string[];
@@ -162,6 +185,10 @@ export interface FactoryExecutionManifestInput {
 }
 
 export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInput) {
+  if ((input as { executionProfile?: unknown }).executionProfile !== undefined
+    && !input.executionProfile) {
+    throw new Error("Execution manifest requires a complete exact Execution Profile and qualification binding.");
+  }
   if (!/^[a-f0-9]{40,64}$/i.test(input.baseSha)) {
     throw new Error("Execution manifest requires an immutable full base SHA.");
   }
@@ -329,6 +356,12 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
   if (!harnessCapabilityRequirementsSatisfied(input.executor.capabilityManifest, requiredHarnessCapabilities)) {
     throw new Error("Selected harness does not satisfy the frozen Attempt capability requirements.");
   }
+  if (input.executionProfile) {
+    if (routeSnapshot.schema !== EXACT_MODEL_ROUTE_SCHEMA) {
+      throw new Error("Execution Profile binding requires a decomposed V2 model route.");
+    }
+    assertExecutionProfileBinding(input, requiredHarnessCapabilities);
+  }
   const compiledPrompt = compileFactoryPrompt(input, allowedPaths, excludedPaths);
   const causation = {
     missionId: input.missionId,
@@ -479,11 +512,166 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
     compiledPromptHash,
     compiledPrompt,
   };
+  if (input.executionProfile) {
+    const profileManifest = {
+      ...manifest,
+      version: "factory-execution-manifest/v3" as const,
+      executionProfile: input.executionProfile,
+    };
+    const persistedProfileManifest = JSON.parse(JSON.stringify(profileManifest)) as typeof profileManifest;
+    return {
+      manifest: persistedProfileManifest,
+      digest: `sha256:${computeCanonicalHash(persistedProfileManifest)}`,
+    };
+  }
   const persistedManifest = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
   return {
     manifest: persistedManifest,
     digest: `sha256:${computeCanonicalHash(persistedManifest)}`,
   };
+}
+
+function assertExecutionProfileBinding(
+  input: FactoryExecutionManifestInput,
+  selectedHarnessRequirements: ReturnType<typeof factoryHarnessCapabilityRequirements>,
+) {
+  const binding = input.executionProfile;
+  if (!binding
+    || Object.keys(binding).some((key) => ![
+      "profileId",
+      "profileKey",
+      "version",
+      "profileDigest",
+      "profileSnapshot",
+      "qualificationDigest",
+      "qualificationSnapshot",
+    ].includes(key))
+    || !boundedIdentity(binding.profileId, 200)
+    || !/^[a-z0-9][a-z0-9-]{2,63}$/.test(binding.profileKey)
+    || !Number.isSafeInteger(binding.version)
+    || binding.version < 1
+    || !sha256(binding.profileDigest)
+    || !sha256(binding.qualificationDigest)
+    || executionProfileIssues(binding.profileSnapshot).length > 0
+    || executionProfileDigest(binding.profileSnapshot) !== binding.profileDigest
+    || executionProfileQualificationIssues(binding.qualificationSnapshot).length > 0
+    || executionProfileQualificationDigest(binding.qualificationSnapshot) !== binding.qualificationDigest) {
+    throw new Error("Execution manifest requires a complete exact Execution Profile and qualification binding.");
+  }
+
+  const profile = binding.profileSnapshot as Record<string, any>;
+  const qualification = binding.qualificationSnapshot as Record<string, any>;
+  const profileSandbox = profile.sandboxProfile as Record<string, any> | undefined;
+  const attemptSandbox = input.sandbox;
+  const expectedSandboxCapabilities = selectedSandboxCapabilities(
+    input.executionBackend,
+    input.sandboxProfile.isolation,
+    profileSandbox?.profileSnapshot,
+  );
+  const selectedRequirements = [...selectedHarnessRequirements]
+    .sort((left, right) => left.capability.localeCompare(right.capability));
+  const profileRequirements = [...(profile.requiredHarnessCapabilities ?? [])]
+    .sort((left: any, right: any) => String(left.capability).localeCompare(String(right.capability)));
+
+  if (!executionProfileQualificationMatches({
+    profileId: binding.profileId,
+    profileSnapshot: profile,
+    profileDigest: binding.profileDigest,
+    qualificationSnapshot: qualification,
+  })) {
+    throw new Error("Execution Profile qualification does not authorize the frozen component tuple.");
+  }
+
+  const projectionBlockers = executionProfileProjectionBlockers({
+    profileId: binding.profileId,
+    profileSnapshot: profile,
+    profileDigest: binding.profileDigest,
+    qualificationSnapshot: qualification,
+    qualificationDigest: binding.qualificationDigest,
+    projection: {
+      profileId: binding.profileId,
+      profileKey: binding.profileKey,
+      profileVersion: binding.version,
+      profileDigest: binding.profileDigest,
+      profileSnapshot: profile,
+      qualificationDigest: binding.qualificationDigest,
+      qualificationSnapshot: qualification,
+      executor: { adapter: input.executor.adapter, version: input.executor.version },
+      harnessCapabilityManifest: input.executor.capabilityManifest,
+      harnessCapabilityManifestDigest: input.executor.capabilityManifestSha256,
+      harnessEffectiveConfigSha256: input.executor.effectiveConfigSha256,
+      harnessRuntimeArtifact: input.executor.runtimeArtifact,
+      harnessRuntimeArtifactDigest: input.executor.runtimeArtifactDigest,
+      executionBackend: input.executionBackend,
+      modelCatalogId: input.modelRoute.catalogId,
+      modelRouteSnapshot: input.modelRoute.routeSnapshot,
+      modelRouteDigest: input.modelRoute.routeDigest,
+      modelQualificationSnapshot: input.modelRoute.qualificationSnapshot,
+      modelQualificationDigest: input.modelRoute.qualificationDigest,
+      ...(attemptSandbox
+        ? {
+            sandboxProfileId: attemptSandbox.profileId,
+            sandboxProfileSnapshot: attemptSandbox.profileSnapshot,
+            sandboxProfileDigest: attemptSandbox.profileDigest,
+          }
+        : {}),
+      isolationModes: profile.isolationModes,
+      requiredHarnessCapabilities: profile.requiredHarnessCapabilities,
+      requiredSandboxCapabilities: profile.requiredSandboxCapabilities,
+    },
+  });
+  if (projectionBlockers.length > 0
+    || !Array.isArray(profile.isolationModes)
+    || !profile.isolationModes.includes(input.sandboxProfile.isolation)
+    || !requirementsContain(profileRequirements, selectedRequirements)
+    || !sameStringSet(input.sandboxProfile.requiredCapabilities, expectedSandboxCapabilities)
+    || !expectedSandboxCapabilities.every((capability) => profile.requiredSandboxCapabilities?.includes(capability))) {
+    const suffix = projectionBlockers.length > 0 ? ` (${projectionBlockers.join(", ")})` : "";
+    throw new Error(`Execution Profile does not match the frozen harness, runtime, backend, model route, isolation, or capabilities${suffix}.`);
+  }
+}
+
+function selectedSandboxCapabilities(
+  executionBackend: string,
+  isolation: "READ_ONLY" | "WORKSPACE_WRITE",
+  sandboxProfileSnapshot: unknown,
+) {
+  const capabilities = ["git-worktree", isolation === "READ_ONLY" ? "read-only" : "workspace-write"];
+  if (executionBackend === "remote-sandbox") {
+    const provider = (sandboxProfileSnapshot as Record<string, any> | undefined)?.provider;
+    capabilities.push("remote-sandbox", `sandbox-provider:${String(provider ?? "").toLowerCase().replace(/_/g, "-")}`);
+  }
+  return capabilities.sort();
+}
+
+function requirementsContain(
+  available: Array<{ capability: string; minimumSupport: string }>,
+  selected: Array<{ capability: string; minimumSupport: string }>,
+) {
+  return selected.every((requirement) => available.some((candidate) =>
+    candidate.capability === requirement.capability
+    && candidate.minimumSupport === requirement.minimumSupport
+  ));
+}
+
+function sameStringSet(left: unknown, right: unknown) {
+  return Array.isArray(left)
+    && Array.isArray(right)
+    && left.every((item) => typeof item === "string")
+    && right.every((item) => typeof item === "string")
+    && JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+}
+
+function boundedIdentity(value: unknown, maximum: number): value is string {
+  return typeof value === "string"
+    && value === value.trim()
+    && value.length > 0
+    && value.length <= maximum
+    && !/[\0\r\n]/.test(value);
+}
+
+function sha256(value: unknown): value is string {
+  return typeof value === "string" && /^sha256:[a-f0-9]{64}$/.test(value);
 }
 
 function legacyRuntimeArtifactMatches(

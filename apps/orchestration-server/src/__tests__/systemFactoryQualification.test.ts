@@ -43,6 +43,7 @@ import {
   exactModelRouteSnapshot,
   modelRouteQualificationDigest,
 } from "../../../../convex/lib/modelRouteAdmission.js";
+import { RUNTIME_CONTRACT_VERSION } from "../../../../convex/lib/runtimeContract.js";
 import {
   analyzeSpecPlanConsistency,
   evaluateMissionSpecQuality,
@@ -115,6 +116,29 @@ afterAll(async () => {
 });
 
 describe("Mission Control full-system Factory qualification V2", () => {
+  it("binds qualification evidence to the canonical runtime contract identity", () => {
+    expect(RUNTIME_CONTRACT_VERSION).toBeGreaterThan(0);
+    expect(() => requireQualificationRuntimeContractIdentity({
+      canonicalRuntimeContractVersion: RUNTIME_CONTRACT_VERSION + 1,
+      evidenceRuntimeContractVersion: RUNTIME_CONTRACT_VERSION,
+    })).toThrow("Qualification runtime contract identity mismatch");
+  });
+
+  it.each([
+    {
+      canonicalRuntimeContractVersion: undefined,
+      evidenceRuntimeContractVersion: RUNTIME_CONTRACT_VERSION,
+    },
+    {
+      canonicalRuntimeContractVersion: RUNTIME_CONTRACT_VERSION,
+      evidenceRuntimeContractVersion: undefined,
+    },
+  ])("fails closed when a qualification runtime identity is unavailable", (identity) => {
+    expect(() => requireQualificationRuntimeContractIdentity(identity)).toThrow(
+      "Qualification runtime contract identity is unavailable",
+    );
+  });
+
   it("proves exact governed lineage, failures, recovery, authority, and learning on an isolated fixture", async () => {
     const qualificationStartedAt = Date.now();
     const repositoryRoot = await createFixtureRepository();
@@ -861,7 +885,7 @@ describe("Mission Control full-system Factory qualification V2", () => {
       schemaVersion: "system-factory-e2e-qualification/v2",
       result: "SYSTEM QUALIFIED V2 WITH KNOWN LIMITATIONS",
       baseSha: process.env.MC_QUALIFICATION_BASE_SHA ?? "resolved-by-top-level-command",
-      runtimeContractVersion: 28,
+      runtimeContractVersion: RUNTIME_CONTRACT_VERSION,
       hardeningV1: {
         decision: "HARDENING V1 PASSED",
         productionAdvisories: { before: { moderate: 4, high: 0, critical: 0 }, after: { moderate: 3, high: 0, critical: 0 } },
@@ -1026,9 +1050,37 @@ describe("Mission Control full-system Factory qualification V2", () => {
         "The provider pull-request identity is deterministic fixture lineage; no external product repository is mutated.",
       ],
     };
+    requireQualificationRuntimeContractIdentity({
+      canonicalRuntimeContractVersion: RUNTIME_CONTRACT_VERSION,
+      evidenceRuntimeContractVersion: evidencePacket.runtimeContractVersion,
+    });
     await writeEvidencePacket(evidencePacket);
   }, 60_000);
 });
+
+function requireQualificationRuntimeContractIdentity({
+  canonicalRuntimeContractVersion,
+  evidenceRuntimeContractVersion,
+}: {
+  canonicalRuntimeContractVersion: unknown;
+  evidenceRuntimeContractVersion: unknown;
+}) {
+  if (
+    typeof canonicalRuntimeContractVersion !== "number"
+    || !Number.isSafeInteger(canonicalRuntimeContractVersion)
+    || canonicalRuntimeContractVersion <= 0
+    || typeof evidenceRuntimeContractVersion !== "number"
+    || !Number.isSafeInteger(evidenceRuntimeContractVersion)
+    || evidenceRuntimeContractVersion <= 0
+  ) {
+    throw new Error("Qualification runtime contract identity is unavailable.");
+  }
+  if (canonicalRuntimeContractVersion !== evidenceRuntimeContractVersion) {
+    throw new Error(
+      `Qualification runtime contract identity mismatch: canonical v${canonicalRuntimeContractVersion}, evidence v${evidenceRuntimeContractVersion}.`,
+    );
+  }
+}
 
 async function createFixtureRepository() {
   const repositoryRoot = await mkdtemp(path.join(tmpdir(), "mc-system-factory-e2e-v2-"));

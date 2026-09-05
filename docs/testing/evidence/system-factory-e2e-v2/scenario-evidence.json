@@ -1,8 +1,8 @@
 {
   "schemaVersion": "system-factory-e2e-qualification/v2",
   "result": "SYSTEM QUALIFIED V2 WITH KNOWN LIMITATIONS",
-  "baseSha": "470057334800c7cddfc268b3f26d5ef3fc632088",
-  "runtimeContractVersion": 28,
+  "baseSha": "9a80cf3c5cc229bb4a552a9f08ddda5841e70a38",
+  "runtimeContractVersion": 40,
   "hardeningV1": {
     "decision": "HARDENING V1 PASSED",
     "productionAdvisories": {
@@ -83,7 +83,7 @@
       "attempt-source-repaired",
       "attempt-source-current-head"
     ],
-    "executionManifestDigest": "sha256:9881ec30549e45f520c5e91ddc1a53f944b04e98241bf74ab76d693907dda49e",
+    "executionManifestDigest": "sha256:4d0cfe87381ed17c75956242bb3bf8cff8f8db367f5c083eb91e4ceebf975e2c",
     "executionBackend": "remote-sandbox",
     "candidateShas": [
       "911cc67e464c075ddd7081ac5d72ceb2e9dc11bc",
@@ -98,12 +98,13 @@
       "attempt-verification-current-head"
     ],
     "verificationSubjectId": "verification-subject:7b1f599dc5bcc2024016153480e6a0b026de26a7b587108a531b7ae31a7aff0f",
-    "verificationPlanId": "verification-plan:dc5f1d1a9022e69a77c659a86dbc26ae940dc0cee0739f649c8cedfa2e78eb73",
-    "verificationPlanDigest": "sha256:dc5f1d1a9022e69a77c659a86dbc26ae940dc0cee0739f649c8cedfa2e78eb73",
+    "verificationPlanId": "verification-plan:20999e4f203fcd9598d3239958fe422a8b32a256287b1cd578006cb311127214",
+    "verificationPlanDigest": "sha256:20999e4f203fcd9598d3239958fe422a8b32a256287b1cd578006cb311127214",
     "verificationRunId": "verification-run:attempt-verification-current-head",
     "evidenceIds": [
       "evidence:attempt-verification-current-head:factory-negative-constraints",
       "evidence:attempt-verification-current-head:factory-change-budget",
+      "evidence:attempt-verification-current-head:factory-verification-authority",
       "evidence:attempt-verification-current-head:mission:independent-verification",
       "evidence:attempt-verification-current-head:spec:VERIFY-001"
     ],
@@ -232,9 +233,9 @@
     "sandboxHasGithubAuthority": false
   },
   "performance": {
-    "durationMs": 9120,
-    "sourceGateDurationMs": 3460,
-    "verificationDurationMs": 5187,
+    "durationMs": 9117,
+    "sourceGateDurationMs": 3476,
+    "verificationDurationMs": 5176,
     "sandboxProviderRuntimeMs": 1,
     "deterministicGateRuns": 7,
     "sourceAttempts": 5,

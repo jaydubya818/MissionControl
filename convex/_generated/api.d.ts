@@ -54,6 +54,7 @@ import type * as factory_automationDefinitions from "../factory/automationDefini
 import type * as factory_automationDispatch from "../factory/automationDispatch.js";
 import type * as factory_codeReviewWizard from "../factory/codeReviewWizard.js";
 import type * as factory_configuration from "../factory/configuration.js";
+import type * as factory_executionProfiles from "../factory/executionProfiles.js";
 import type * as factory_githubCi from "../factory/githubCi.js";
 import type * as factory_health from "../factory/health.js";
 import type * as factory_learning from "../factory/learning.js";
@@ -111,6 +112,8 @@ import type * as lib_evalFrameworkGate from "../lib/evalFrameworkGate.js";
 import type * as lib_evidenceAuthority from "../lib/evidenceAuthority.js";
 import type * as lib_executionManifest from "../lib/executionManifest.js";
 import type * as lib_executionPolicy from "../lib/executionPolicy.js";
+import type * as lib_executionProfile from "../lib/executionProfile.js";
+import type * as lib_executionProfileAdmission from "../lib/executionProfileAdmission.js";
 import type * as lib_executionRecovery from "../lib/executionRecovery.js";
 import type * as lib_executionRouting from "../lib/executionRouting.js";
 import type * as lib_factoryActionAuthorization from "../lib/factoryActionAuthorization.js";
@@ -358,6 +361,7 @@ declare const fullApi: ApiFromModules<{
   "factory/automationDispatch": typeof factory_automationDispatch;
   "factory/codeReviewWizard": typeof factory_codeReviewWizard;
   "factory/configuration": typeof factory_configuration;
+  "factory/executionProfiles": typeof factory_executionProfiles;
   "factory/githubCi": typeof factory_githubCi;
   "factory/health": typeof factory_health;
   "factory/learning": typeof factory_learning;
@@ -415,6 +419,8 @@ declare const fullApi: ApiFromModules<{
   "lib/evidenceAuthority": typeof lib_evidenceAuthority;
   "lib/executionManifest": typeof lib_executionManifest;
   "lib/executionPolicy": typeof lib_executionPolicy;
+  "lib/executionProfile": typeof lib_executionProfile;
+  "lib/executionProfileAdmission": typeof lib_executionProfileAdmission;
   "lib/executionRecovery": typeof lib_executionRecovery;
   "lib/executionRouting": typeof lib_executionRouting;
   "lib/factoryActionAuthorization": typeof lib_factoryActionAuthorization;

@@ -19,6 +19,7 @@ import {
   exactModelRouteSnapshot,
   modelRouteQualificationDigest,
 } from "../lib/modelRouteAdmission";
+import { factoryHarnessCapabilityRequirements } from "../lib/harnessCapabilities";
 
 function legacyQualificationSnapshot(routeDigest: string) {
   return {
@@ -170,6 +171,111 @@ const v2Input: FactoryExecutionManifestInput = {
   },
 };
 
+function qualifiedExecutionProfileBinding(overrides?: {
+  profileSnapshot?: Record<string, any>;
+  qualificationSnapshot?: Record<string, any>;
+}) {
+  const profileId = "execution-profile-1";
+  const profileKey = "software-codex-local";
+  const version = 1;
+  const authority = {
+    routing: false,
+    verification: false,
+    publication: false,
+    acceptance: false,
+    merge: false,
+    policyMutation: false,
+    workerLeases: false,
+  };
+  const profileSnapshot = overrides?.profileSnapshot ?? {
+    schema: "factory-execution-profile/v1",
+    profileKey,
+    version,
+    harness: {
+      adapter: v2Input.executor.adapter,
+      version: v2Input.executor.version,
+      capabilityManifest: v2Input.executor.capabilityManifest,
+      capabilityManifestDigest: v2Input.executor.capabilityManifestSha256,
+      effectiveConfigSha256: v2Input.executor.effectiveConfigSha256,
+    },
+    runtimeArtifact: {
+      snapshot: v2Input.executor.runtimeArtifact,
+      digest: v2Input.executor.runtimeArtifactDigest,
+    },
+    executionBackend: v2Input.executionBackend,
+    modelRoute: {
+      catalogId: v2Input.modelRoute.catalogId,
+      routeSnapshot: v2Input.modelRoute.routeSnapshot,
+      routeDigest: v2Input.modelRoute.routeDigest,
+      qualificationSnapshot: v2Input.modelRoute.qualificationSnapshot,
+      qualificationDigest: v2Input.modelRoute.qualificationDigest,
+    },
+    isolationModes: ["READ_ONLY", "WORKSPACE_WRITE"],
+    requiredHarnessCapabilities: factoryHarnessCapabilityRequirements("WORKSPACE_WRITE")
+      .sort((left, right) => left.capability.localeCompare(right.capability)),
+    requiredSandboxCapabilities: ["git-worktree", "read-only", "workspace-write"],
+    lifecycle: {
+      contractVersion: "generic-harness-contract/v1",
+      cancellationMode: v2Input.executor.capabilityManifest.cancellation.mode,
+      idempotentCleanup: v2Input.executor.capabilityManifest.cancellation.idempotentCleanup,
+      retryCreatesNewAttempt: true,
+      inFlightRevocationPolicy: "LEASED_ATTEMPT_MAY_COMPLETE",
+      componentSubstitution: "DENIED",
+    },
+    authority,
+  };
+  const profileDigest = `sha256:${computeCanonicalHash({
+    namespace: "factory-execution-profile/v1",
+    value: profileSnapshot,
+  })}`;
+  const qualificationSnapshot = overrides?.qualificationSnapshot ?? {
+    schema: "factory-execution-profile-qualification/v1",
+    profile: { id: profileId, key: profileKey, version, digest: profileDigest },
+    components: {
+      harness: {
+        adapter: profileSnapshot.harness.adapter,
+        version: profileSnapshot.harness.version,
+        capabilityManifestDigest: profileSnapshot.harness.capabilityManifestDigest,
+        effectiveConfigSha256: profileSnapshot.harness.effectiveConfigSha256,
+      },
+      runtimeArtifactDigest: profileSnapshot.runtimeArtifact.digest,
+      executionBackend: profileSnapshot.executionBackend,
+      modelRoute: {
+        catalogId: profileSnapshot.modelRoute.catalogId,
+        routeDigest: profileSnapshot.modelRoute.routeDigest,
+        qualificationDigest: profileSnapshot.modelRoute.qualificationDigest,
+      },
+      isolationModes: profileSnapshot.isolationModes,
+      requiredHarnessCapabilities: profileSnapshot.requiredHarnessCapabilities,
+      requiredSandboxCapabilities: profileSnapshot.requiredSandboxCapabilities,
+    },
+    scope: { workloadClasses: ["SOFTWARE_CHANGE"], riskClasses: ["YELLOW"] },
+    evidence: { reference: "docs/evidence/execution-profile.json", digest: `sha256:${"b".repeat(64)}` },
+    approvedBy: "operator-1",
+    approvedAt: 10,
+    validUntil: 20,
+    authority,
+  };
+  const qualificationDigest = `sha256:${computeCanonicalHash({
+    namespace: "factory-execution-profile-qualification/v1",
+    value: qualificationSnapshot,
+  })}`;
+  return {
+    profileId,
+    profileKey,
+    version,
+    profileDigest,
+    profileSnapshot,
+    qualificationDigest,
+    qualificationSnapshot,
+  };
+}
+
+const v3Input: FactoryExecutionManifestInput = {
+  ...v2Input,
+  executionProfile: qualifiedExecutionProfileBinding(),
+};
+
 describe("Factory execution manifest", () => {
   it("preserves the exact historical V1 manifest projection for a frozen legacy route", () => {
     const result = buildFactoryExecutionManifest(input);
@@ -249,6 +355,105 @@ describe("Factory execution manifest", () => {
     ]) {
       expect(result.manifest.harness).not.toHaveProperty(legacyField);
     }
+  });
+
+  it("emits V3 only for a complete exact Execution Profile binding", () => {
+    const result = buildFactoryExecutionManifest(v3Input);
+    expect(result.manifest.version).toBe("factory-execution-manifest/v3");
+    if (result.manifest.version !== "factory-execution-manifest/v3") throw new Error("expected V3 manifest");
+    expect(result.manifest.executionProfile).toEqual(v3Input.executionProfile);
+    expect(result.manifest.harness).toEqual(buildFactoryExecutionManifest(v2Input).manifest.harness);
+    expect(result.manifest.modelRoute).toEqual(v2Input.modelRoute);
+    expect(result.manifest.executionBackend).toBe("persistent-worker");
+    expect(result.digest).toBe(`sha256:${computeCanonicalHash(result.manifest)}`);
+  });
+
+  it("keeps profileless V1 and V2 manifests on their exact historical schemas", () => {
+    expect(buildFactoryExecutionManifest(input).manifest.version).toBe("factory-execution-manifest/v1");
+    expect(buildFactoryExecutionManifest(v2Input).manifest.version).toBe("factory-execution-manifest/v2");
+    expect(buildFactoryExecutionManifest({ ...v2Input, executionProfile: undefined }).digest)
+      .toBe(buildFactoryExecutionManifest(v2Input).digest);
+  });
+
+  it("rejects partial, changed, or substituted Execution Profile identity", () => {
+    expect(() => buildFactoryExecutionManifest({
+      ...v2Input,
+      executionProfile: { profileId: "execution-profile-1" } as never,
+    })).toThrow(/complete exact Execution Profile/);
+
+    const binding = qualifiedExecutionProfileBinding();
+    expect(() => buildFactoryExecutionManifest({
+      ...v2Input,
+      executionProfile: { ...binding, version: 2 },
+    })).toThrow(/does not match the frozen harness, runtime, backend, model route, isolation, or capabilities/);
+    expect(() => buildFactoryExecutionManifest({
+      ...v2Input,
+      executionProfile: {
+        ...binding,
+        profileSnapshot: { ...binding.profileSnapshot, executionBackend: "remote-sandbox" },
+      },
+    })).toThrow(/complete exact Execution Profile/);
+    expect(() => buildFactoryExecutionManifest({
+      ...v2Input,
+      executionProfile: {
+        ...binding,
+        profileSnapshot: {
+          ...binding.profileSnapshot,
+          harness: { ...binding.profileSnapshot.harness, adapter: "deepseek-harness" },
+        },
+      },
+    })).toThrow(/complete exact Execution Profile/);
+  });
+
+  it("rejects model, isolation, capability, and qualification cross-wiring", () => {
+    const binding = qualifiedExecutionProfileBinding();
+    expect(() => buildFactoryExecutionManifest({
+      ...v2Input,
+      modelRoute: { ...v2Input.modelRoute, catalogId: "sibling-same-model-qualification" },
+      executionProfile: binding,
+    })).toThrow(/does not match the frozen harness, runtime, backend, model route, isolation, or capabilities/);
+    expect(() => buildFactoryExecutionManifest({
+      ...v2Input,
+      sandboxProfile: { ...v2Input.sandboxProfile, isolation: "READ_ONLY" },
+      executionProfile: {
+        ...binding,
+        profileSnapshot: {
+          ...binding.profileSnapshot,
+          isolationModes: ["WORKSPACE_WRITE"],
+        },
+      },
+    })).toThrow(/complete exact Execution Profile/);
+    expect(() => buildFactoryExecutionManifest({
+      ...v3Input,
+      sandboxProfile: { ...v2Input.sandboxProfile, requiredCapabilities: ["git-worktree"] },
+    })).toThrow(/does not match the frozen harness, runtime, backend, model route, isolation, or capabilities/);
+
+    const qualification = binding.qualificationSnapshot as Record<string, any>;
+    const crossWiredQualification = {
+      ...qualification,
+      components: {
+        ...qualification.components,
+        runtimeArtifactDigest: `sha256:${"c".repeat(64)}`,
+      },
+    };
+    expect(() => buildFactoryExecutionManifest({
+      ...v2Input,
+      executionProfile: {
+        ...binding,
+        qualificationSnapshot: crossWiredQualification,
+        qualificationDigest: `sha256:${computeCanonicalHash({
+          namespace: "factory-execution-profile-qualification/v1",
+          value: crossWiredQualification,
+        })}`,
+      },
+    })).toThrow(/qualification does not authorize/);
+  });
+
+  it("rejects an Execution Profile on the legacy embedded-identity route", () => {
+    expect(() => buildFactoryExecutionManifest({
+      ...input,
+      executionProfile: qualifiedExecutionProfileBinding(),
+    })).toThrow(/requires a decomposed V2 model route/);
   });
 
   it("is deterministic and changes its digest when execution authority changes", () => {

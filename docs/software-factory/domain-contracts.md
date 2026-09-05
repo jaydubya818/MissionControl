@@ -582,6 +582,10 @@ Runtime Artifact
     +
 Execution Backend
     =
+qualified immutable Execution Profile
+    +
+Factory-owned workflow, policy, scope, budget, and verification
+    =
 qualified immutable Factory Version
 ```
 
@@ -609,6 +613,23 @@ single abstraction and does not make any component authoritative for routing.
 capability-manifest digest, effective-configuration digest, runtime-artifact
 digest, and backend next to the route digest and evidence scope.
 
+`factory-execution-profile/v1` gives that exact composition a reusable,
+workspace-scoped identity. It references the existing model-route and route
+qualification, harness, runtime-artifact, backend, optional Sandbox Profile,
+isolation, capability, lifecycle, and all-denied authority identities; it does
+not duplicate or weaken them. A profile is subordinate configuration: it owns
+no WorkOrder, active-version pointer, routing decision, worker registration,
+lease, verifier, publication, merge, or acceptance authority. See the
+[Execution Profile identity decision](../decisions/execution-profile-identity.md).
+
+Each profile version is a closed canonical snapshot with its own SHA-256
+digest. Once qualified, its composition and qualification bytes are immutable.
+Any semantic change requires a new version and identity. Qualification binds
+the exact profile and component digests, model-route qualification, evidence,
+workload/risk scope, approver, approval time, and bounded expiry. Duplicate,
+replayed, conflicting, revoked, expired, malformed, or stale qualification is
+rejected rather than repaired in place.
+
 One inference route may therefore have multiple immutable catalog
 qualification instances. Re-registering a route may reuse an unqualified
 draft, but it never mutates an already-qualified instance. Factory creation
@@ -621,6 +642,8 @@ require an explicit catalog ID.
 Only an immutable Factory Version is routable. A newly created executable
 Factory Version freezes at least:
 
+- the exact Execution Profile row ID, key, version, canonical snapshot and
+  digest, plus its exact current qualification snapshot and receipt digest;
 - the model-catalog record, `factory-model-route/v2` snapshot, canonical route
   digest, and exact qualification evidence;
 - the harness adapter/version, complete capability manifest and digest, and
@@ -630,6 +653,13 @@ Factory Version freezes at least:
   snapshot and digest;
 - the repository, workflow, all workflow-agent bindings, code scopes, policy,
   budget, risk boundary, recovery contract, and independent verifiers.
+
+The component fields remain compatibility projections while profile-bound and
+historical Factory Versions coexist. For a new profile-bound version, the
+server derives those projections from the profile and rejects caller-supplied
+disagreement. The Factory configuration digest covers both the profile and
+qualification identity and the Factory-owned configuration. Only the
+containing Factory Version can be activated, selected, retried, or rolled back.
 
 Every executable workflow role must resolve to the one model route frozen by
 the V1 Factory configuration. Validating only the first workflow step is not
@@ -646,12 +676,21 @@ swap one component inside an existing Factory Version.
 
 ### Attempt and worker admission
 
-An Attempt copies a V2 Factory Version's exact execution composition into
-`factory-execution-manifest/v2`; frozen legacy routes retain the byte-compatible
-`factory-execution-manifest/v1` projection. The manifest proves which model
-route, harness, runtime artifact, backend, configuration, sandbox, repository
-source, and scoped authority were requested. It remains immutable after
+A profile-bound Factory Version copies its exact execution composition into
+`factory-execution-manifest/v3`; Phase 1 profileless versions retain
+`factory-execution-manifest/v2`, and frozen legacy routes retain the
+byte-compatible `factory-execution-manifest/v1` projection. V3 freezes the
+profile row ID, key, version, snapshot, digest, and exact qualification receipt
+alongside the model route, harness, runtime artifact, backend, configuration,
+sandbox, repository source, and scoped authority. It remains immutable after
 dispatch.
+
+Dispatch and first claim both require the exact profile qualification to remain
+current. A revoked or expired profile cannot admit a new Attempt or receive a
+first lease. An Attempt that already holds a valid worker lease continues with
+its frozen identity until that bounded lease completes or normal cancellation
+and recovery intervenes; every retry is a new Attempt and must pass current
+admission again.
 
 A worker is eligible only when its current advertisement and exact Factory
 Version binding agree with the frozen request. Admission compares:
@@ -664,6 +703,7 @@ Version binding agree with the frozen request. Admission compares:
 - provider and model;
 - isolation and sandbox capabilities;
 - repository authority; and
+- Execution Profile and qualification identity; and
 - Factory Version, configuration, model-route, and Sandbox Profile digests.
 
 The Factory Version binding also carries the exact execution-artifact digest.
@@ -676,18 +716,25 @@ Missing, stale, malformed, or mismatched values fail closed. A worker never
 substitutes another installed harness or runtime artifact. The normalized
 `harness-result/v1` provenance is reconciled against the same frozen Attempt,
 including the exact model-route digest, provider route, and reasoning controls.
-Unavailable telemetry remains `null`, and harness completion cannot satisfy
-verification or publication gates.
+The worker resolves only the frozen adapter/version from its explicitly
+configured `HarnessAdapterRegistry`; profiles neither load code nor provide a
+fallback adapter. Mission Control adds and reconciles profile identity at the
+host boundary so harness output cannot grant profile authority. Unavailable
+telemetry remains `null`, and harness completion cannot satisfy verification or
+publication gates.
 
-### Frozen V1 compatibility
+### Frozen V1/V2 compatibility
 
 `factory-model-route/v1` embedded Codex harness and runtime identity in the
 model snapshot. It remains readable for historical evidence and executable
 only through a legacy Factory Version that already froze the exact V1 route,
 qualification, harness, runtime, and backend combination.
 
-New model registrations and new Factory Versions use
-`factory-model-route/v2`. Mission Control does not silently migrate malformed
-V1 data, infer missing identity, recalculate historical digests under the V2
-namespace, or use a V1 catalog record to create a new executable Factory
-Version. Historical examples and canonical digests remain unchanged.
+New model registrations use `factory-model-route/v2`; new Factory Versions also
+require an exact qualified Execution Profile and use execution manifest V3.
+Existing Phase 1 profileless Factory Versions and Attempts remain readable and
+executable under their frozen V2 rules. Mission Control does not silently
+migrate malformed V1/V2 data, infer missing profile identity, recalculate
+historical digests under a newer namespace, or use a V1 catalog record to
+create a new executable Factory Version. Historical examples and canonical
+digests remain unchanged.

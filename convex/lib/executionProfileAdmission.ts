@@ -1,0 +1,206 @@
+import type { Doc, Id } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
+import {
+  executionProfileCurrentness,
+  executionProfileCurrentnessIssues,
+  executionProfilePersistedRecordBlockers,
+  executionProfileProjectionBlockers,
+  type ExecutionProfileBlockerCode,
+  type ExecutionProfileProjection,
+} from "./executionProfile";
+import { computeCanonicalHash } from "./genomeHash";
+import { resolveFrozenHarnessBinding } from "./harnessCapabilities";
+import { modelRouteEligibleForNewFactoryVersion } from "./modelRouteAdmission";
+import { sandboxProfileProductionEligible } from "./sandboxProfileAdmission";
+
+type DbCtx = Pick<QueryCtx, "db">;
+
+export interface LoadedExecutionProfileAdmission {
+  profile: Doc<"factoryExecutionProfiles"> | null;
+  modelRoute: Doc<"modelCatalog"> | null;
+  sandboxProfile: Doc<"factorySandboxProfiles"> | null;
+  eligible: boolean;
+  blockers: ExecutionProfileBlockerCode[];
+  validUntil?: number;
+}
+
+/**
+ * Reconciles an immutable profile row with every independently governed live
+ * component. This never selects a substitute component and grants no routing
+ * authority; callers still enforce Factory/workload scope separately.
+ */
+export async function loadExecutionProfileAdmission(
+  ctx: DbCtx,
+  executionProfileId: Id<"factoryExecutionProfiles">,
+  now: number,
+): Promise<LoadedExecutionProfileAdmission> {
+  const profile = await ctx.db.get(executionProfileId);
+  if (!profile) {
+    return {
+      profile: null,
+      modelRoute: null,
+      sandboxProfile: null,
+      eligible: false,
+      blockers: ["EXECUTION_PROFILE_MISSING"],
+    };
+  }
+  const currentness = executionProfileCurrentness(profile, now);
+  const snapshot = profile.immutableSnapshot as Record<string, any> | undefined;
+  if (!snapshot) {
+    return {
+      profile,
+      modelRoute: null,
+      sandboxProfile: null,
+      eligible: false,
+      blockers: uniqueBlockers(currentness.blocker
+        ? [currentness.blocker]
+        : ["EXECUTION_PROFILE_SNAPSHOT_INVALID"]),
+      validUntil: currentness.validUntil,
+    };
+  }
+
+  const [modelRoute, sandboxProfile] = await Promise.all([
+    ctx.db.get(profile.modelCatalogId),
+    profile.sandboxProfileId ? ctx.db.get(profile.sandboxProfileId) : Promise.resolve(null),
+  ]);
+  const blockers: ExecutionProfileBlockerCode[] = [];
+  blockers.push(...executionProfileCurrentnessIssues({
+    profile,
+    modelRoute,
+    sandboxProfile,
+    now,
+  }));
+  blockers.push(...executionProfilePersistedRecordBlockers(profile));
+  if (profile.qualificationSnapshot && profile.qualificationDigest) {
+    const projection: ExecutionProfileProjection = {
+      profileId: String(profile._id),
+      profileKey: profile.profileKey,
+      profileVersion: profile.version,
+      profileDigest: profile.profileDigest,
+      profileSnapshot: profile.immutableSnapshot,
+      qualificationDigest: profile.qualificationDigest,
+      qualificationSnapshot: profile.qualificationSnapshot,
+      executor: profile.executor,
+      harnessCapabilityManifest: profile.harnessCapabilityManifest,
+      harnessCapabilityManifestDigest: profile.harnessCapabilityManifestDigest,
+      harnessEffectiveConfigSha256: profile.harnessEffectiveConfigSha256,
+      harnessRuntimeArtifact: profile.harnessRuntimeArtifact,
+      harnessRuntimeArtifactDigest: profile.harnessRuntimeArtifactDigest,
+      executionBackend: profile.executionBackend,
+      modelCatalogId: String(profile.modelCatalogId),
+      modelRouteSnapshot: snapshot.modelRoute?.routeSnapshot,
+      modelRouteDigest: profile.modelRouteDigest,
+      modelQualificationSnapshot: snapshot.modelRoute?.qualificationSnapshot,
+      modelQualificationDigest: profile.modelQualificationDigest,
+      sandboxProfileId: profile.sandboxProfileId ? String(profile.sandboxProfileId) : undefined,
+      sandboxProfileSnapshot: snapshot.sandboxProfile?.profileSnapshot,
+      sandboxProfileDigest: profile.sandboxProfileDigest,
+      isolationModes: profile.isolationModes,
+      requiredHarnessCapabilities: profile.requiredHarnessCapabilities as any,
+      requiredSandboxCapabilities: profile.requiredSandboxCapabilities,
+    };
+    blockers.push(...executionProfileProjectionBlockers({
+      profileId: String(profile._id),
+      profileSnapshot: profile.immutableSnapshot,
+      profileDigest: profile.profileDigest,
+      qualificationSnapshot: profile.qualificationSnapshot,
+      qualificationDigest: profile.qualificationDigest,
+      projection,
+    }));
+  } else {
+    blockers.push("EXECUTION_PROFILE_QUALIFICATION_MISSING");
+  }
+
+  let frozenHarness: ReturnType<typeof resolveFrozenHarnessBinding> | null = null;
+  try {
+    frozenHarness = resolveFrozenHarnessBinding({
+      executor: profile.executor,
+      harnessCapabilityManifest: profile.harnessCapabilityManifest,
+      harnessCapabilityManifestDigest: profile.harnessCapabilityManifestDigest,
+      harnessEffectiveConfigSha256: profile.harnessEffectiveConfigSha256,
+      harnessRuntimeArtifact: profile.harnessRuntimeArtifact,
+      harnessRuntimeArtifactDigest: profile.harnessRuntimeArtifactDigest,
+      executionBackend: profile.executionBackend,
+      sandboxProfileSnapshot: snapshot.sandboxProfile?.profileSnapshot,
+    });
+  } catch {
+    blockers.push("EXECUTION_PROFILE_HARNESS_MISMATCH");
+  }
+
+  if (!modelRoute
+    || modelRoute.projectId !== profile.projectId
+    || String(modelRoute._id) !== snapshot.modelRoute?.catalogId
+    || modelRoute.routeDigest !== profile.modelRouteDigest
+    || modelRoute.qualificationDigest !== profile.modelQualificationDigest
+    || !sameCanonical(modelRoute.routeSnapshot, snapshot.modelRoute?.routeSnapshot)
+    || !sameCanonical(modelRoute.qualificationSnapshot, snapshot.modelRoute?.qualificationSnapshot)
+    || !frozenHarness
+    || !modelRouteEligibleForNewFactoryVersion(modelRoute, {
+      adapter: frozenHarness.adapter,
+      version: frozenHarness.version,
+      capabilityManifestDigest: frozenHarness.capabilityManifestSha256,
+      effectiveConfigSha256: frozenHarness.effectiveConfigSha256,
+      runtimeArtifactDigest: frozenHarness.runtimeArtifactSha256,
+      executionBackend: profile.executionBackend,
+    })) {
+    blockers.push("EXECUTION_PROFILE_MODEL_ROUTE_MISMATCH");
+  }
+
+  if (profile.executionBackend === "remote-sandbox") {
+    if (!sandboxProfile
+      || sandboxProfile.projectId !== profile.projectId
+      || sandboxProfile._id !== profile.sandboxProfileId
+      || sandboxProfile.profileDigest !== profile.sandboxProfileDigest
+      || !sameCanonical(sandboxProfile.immutableSnapshot, snapshot.sandboxProfile?.profileSnapshot)
+      || sandboxProfile.status !== "ACTIVE"
+      || sandboxProfile.readinessState === "BLOCKED"
+      || sandboxProfile.readinessExpiresAt <= now
+      || !sandboxProfileProductionEligible(sandboxProfile)) {
+      blockers.push("EXECUTION_PROFILE_SANDBOX_MISMATCH");
+    }
+  } else if (profile.sandboxProfileId || profile.sandboxProfileDigest || snapshot.sandboxProfile) {
+    blockers.push("EXECUTION_PROFILE_SANDBOX_MISMATCH");
+  }
+
+  const allBlockers = uniqueBlockers([
+    ...(currentness.blocker ? [currentness.blocker] : []),
+    ...blockers,
+  ]);
+  return {
+    profile,
+    modelRoute,
+    sandboxProfile,
+    eligible: currentness.eligible && allBlockers.length === 0,
+    blockers: allBlockers,
+    validUntil: currentness.validUntil,
+  };
+}
+
+export function executionProfileScopeBlockers(
+  profile: Doc<"factoryExecutionProfiles">,
+  input: {
+    workloadClass: string;
+    riskClass: "GREEN" | "YELLOW" | "RED";
+    isolation: "READ_ONLY" | "WORKSPACE_WRITE";
+  },
+): ExecutionProfileBlockerCode[] {
+  const qualification = profile.qualificationSnapshot as Record<string, any> | undefined;
+  const snapshot = profile.immutableSnapshot as Record<string, any> | undefined;
+  const blockers: ExecutionProfileBlockerCode[] = [];
+  if (!qualification?.scope?.workloadClasses?.includes(input.workloadClass)
+    || !qualification?.scope?.riskClasses?.includes(input.riskClass)) {
+    blockers.push("EXECUTION_PROFILE_QUALIFICATION_MISMATCH");
+  }
+  if (!snapshot?.isolationModes?.includes(input.isolation)) {
+    blockers.push("EXECUTION_PROFILE_ISOLATION_MISMATCH");
+  }
+  return blockers;
+}
+
+function sameCanonical(left: unknown, right: unknown) {
+  return computeCanonicalHash(left) === computeCanonicalHash(right);
+}
+
+function uniqueBlockers(blockers: ExecutionProfileBlockerCode[]) {
+  return [...new Set(blockers)];
+}

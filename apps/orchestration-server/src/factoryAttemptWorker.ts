@@ -51,7 +51,7 @@ const HEARTBEAT_INTERVAL_MS = 20_000;
 const MAX_RESULT_BYTES = 64_000;
 
 interface FrozenHarnessExecutionManifest {
-  version: "factory-execution-manifest/v1" | "factory-execution-manifest/v2";
+  version: "factory-execution-manifest/v1" | "factory-execution-manifest/v2" | "factory-execution-manifest/v3";
   harness: {
     adapter: string;
     version: string;
@@ -69,6 +69,7 @@ interface FrozenHarnessExecutionManifest {
     runtimeArtifactDigest?: string;
     isolation: "READ_ONLY" | "WORKSPACE_WRITE" | "DETACHED_READ_ONLY";
     requiredCapabilities: string[];
+    requiredHarnessCapabilities?: Array<{ capability: string; minimumSupport: string }>;
     pullRequestAuthority: "CONTROL_PLANE_ONLY";
     timeoutMs: number;
   };
@@ -80,6 +81,15 @@ interface FrozenHarnessExecutionManifest {
     qualificationSnapshot: unknown;
   };
   executionBackend?: string;
+  executionProfile?: {
+    profileId: string;
+    profileKey: string;
+    version: number;
+    profileDigest: string;
+    profileSnapshot: unknown;
+    qualificationDigest: string;
+    qualificationSnapshot: unknown;
+  };
   [key: string]: any;
 }
 
@@ -399,7 +409,7 @@ export class FactoryAttemptWorker {
     };
 
     try {
-      const manifest = validateClaimManifest(claim);
+      const manifest = validateClaimManifest(claim, leaseId);
       const adapter = this.adapters.require({
         adapter: manifest.harness.adapter,
         version: manifest.harness.version,
@@ -533,6 +543,7 @@ export class FactoryAttemptWorker {
           attemptLeaseId: leaseId,
           executionManifest: manifest,
           manifestDigest: claim.executionManifestDigest,
+          profileAdmittedAt: claim.lease.heartbeatAt,
           sourceSha: manifest.repository.baseSha,
           profile,
           repositoryBundle: sourceBundle,
@@ -1137,13 +1148,13 @@ function isBoundFactoryAttempt(run: any) {
   );
 }
 
-function validateClaimManifest(claim: any) {
+function validateClaimManifest(claim: any, expectedLeaseId: string) {
   const manifest = claim?.executionManifest as FrozenHarnessExecutionManifest | undefined;
   const executionBackend = manifestExecutionBackend(manifest);
   const capabilityManifest = manifest?.harness?.capabilityManifest;
   if (
     !manifest
-    || !["factory-execution-manifest/v1", "factory-execution-manifest/v2"].includes(manifest.version)
+    || !["factory-execution-manifest/v1", "factory-execution-manifest/v2", "factory-execution-manifest/v3"].includes(manifest.version)
     || !boundedHarnessIdentity(manifest?.harness?.adapter)
     || !boundedHarnessIdentity(manifest?.harness?.version)
     || manifest.harness.adapter !== claim.executorAdapter
@@ -1179,8 +1190,22 @@ function validateClaimManifest(claim: any) {
     || !manifest.compiledPrompt.trim()
     || claim.executionManifestDigest !== `sha256:${canonicalHash(manifest)}`
   ) throw new Error("Claimed Factory execution manifest is invalid.");
-  if (manifest.version === "factory-execution-manifest/v2" && !validV2ExecutionBindings(manifest, executionBackend)) {
+  if (hasDecomposedExecutionIdentity(manifest) && !validV2ExecutionBindings(manifest, executionBackend)) {
     throw new Error("Claimed Factory V2 execution bindings are invalid.");
+  }
+  if (manifest.version === "factory-execution-manifest/v3"
+    && (!claim?.lease
+      || claim.lease.leaseId !== expectedLeaseId
+      || !boundedManifestIdentity(claim.lease.ownerId, 200)
+      || !Number.isFinite(claim.lease.heartbeatAt)
+      || !Number.isFinite(claim.lease.expiresAt)
+      || claim.lease.expiresAt <= claim.lease.heartbeatAt
+      || !validV3ExecutionProfileBinding(manifest, executionBackend, claim.lease.heartbeatAt)
+      || !claimExecutionProfileEvidenceMatches(claim, manifest))) {
+    throw new Error("Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).");
+  }
+  if (manifest.version !== "factory-execution-manifest/v3" && claim.executionProfile !== undefined) {
+    throw new Error("Claimed profileless Factory manifest contains Execution Profile evidence.");
   }
   const executionRuntimeArtifact = manifestExecutionRuntimeArtifact(manifest);
   if (!executionRuntimeArtifact
@@ -1253,7 +1278,7 @@ function assertHarnessResultIdentity(
   const expectedRuntimeArtifact = manifestExecutionRuntimeArtifact(manifest);
   const runtimeArtifactMismatch = !expectedRuntimeArtifact
     || !normalizedRuntimeArtifactMatches(result, expectedRuntimeArtifact.artifact, expectedRuntimeArtifact.digest);
-  const modelRouteMismatch = manifest.version === "factory-execution-manifest/v2"
+  const modelRouteMismatch = hasDecomposedExecutionIdentity(manifest)
     && (result.provenance.modelRouteDigest !== request.modelRouteDigest
       || result.provenance.providerRoute !== request.providerRoute
       || canonicalHash(result.provenance.reasoningConfig ?? null) !== canonicalHash(request.reasoningConfig ?? null));
@@ -1277,7 +1302,7 @@ function assertHarnessResultIdentity(
 }
 
 function manifestExecutionBackend(manifest: any): HarnessExecutionBackend | undefined {
-  const backend = manifest?.version === "factory-execution-manifest/v2"
+  const backend = hasDecomposedExecutionIdentity(manifest)
     ? manifest?.executionBackend
     : manifest?.harness?.executionBackend;
   return backend === "persistent-worker" || backend === "remote-sandbox" ? backend : undefined;
@@ -1290,14 +1315,14 @@ function manifestModelRoute(manifest: any): {
   providerRoute?: string;
   reasoningConfig?: ExecutorRequest["reasoningConfig"];
 } | undefined {
-  const provider = manifest?.version === "factory-execution-manifest/v2"
+  const provider = hasDecomposedExecutionIdentity(manifest)
     ? manifest?.modelRoute?.routeSnapshot?.provider
     : manifest?.harness?.provider;
-  const model = manifest?.version === "factory-execution-manifest/v2"
+  const model = hasDecomposedExecutionIdentity(manifest)
     ? manifest?.modelRoute?.routeSnapshot?.modelId
     : manifest?.harness?.model;
   if (!boundedManifestIdentity(provider, 100) || !boundedManifestIdentity(model, 200)) return undefined;
-  if (manifest?.version !== "factory-execution-manifest/v2") return { provider, model };
+  if (!hasDecomposedExecutionIdentity(manifest)) return { provider, model };
   const modelRouteDigest = manifest?.modelRoute?.routeDigest;
   const providerRoute = manifest?.modelRoute?.routeSnapshot?.providerRoute;
   if (!/^sha256:[a-f0-9]{64}$/i.test(modelRouteDigest ?? "")
@@ -1352,6 +1377,249 @@ function validV2ExecutionBindings(
   return true;
 }
 
+function validV3ExecutionProfileBinding(
+  manifest: FrozenHarnessExecutionManifest,
+  executionBackend: HarnessExecutionBackend,
+  profileAdmittedAt: number,
+): boolean {
+  const binding = manifest.executionProfile;
+  const profile = binding?.profileSnapshot as Record<string, any> | undefined;
+  const qualification = binding?.qualificationSnapshot as Record<string, any> | undefined;
+  const components = qualification?.components as Record<string, any> | undefined;
+  const profileSandbox = profile?.sandboxProfile as Record<string, any> | undefined;
+  const manifestRoute = manifest.modelRoute;
+  const expectedWorkloadClass = manifest?.causation?.factoryPurpose === "VERIFICATION"
+    ? "VERIFICATION"
+    : manifest?.causation?.factoryPurpose === "INTELLIGENT_AUTOMATION"
+      ? "AUTOMATION"
+      : manifest?.causation?.factoryPurpose === "SOFTWARE"
+        ? "SOFTWARE_CHANGE"
+        : undefined;
+  const selectedSandboxCapabilities = [
+    "git-worktree",
+    manifest.harness.isolation === "READ_ONLY" ? "read-only" : "workspace-write",
+    ...(executionBackend === "remote-sandbox"
+      ? ["remote-sandbox", `sandbox-provider:${String(profileSandbox?.profileSnapshot?.provider ?? "").toLowerCase().replace(/_/g, "-")}`]
+      : []),
+  ].sort();
+  if (!binding
+    || !exactObjectKeys(binding, [
+      "profileId", "profileKey", "version", "profileDigest", "profileSnapshot",
+      "qualificationDigest", "qualificationSnapshot",
+    ])
+    || !boundedManifestIdentity(binding.profileId, 200)
+    || !boundedManifestIdentity(binding.profileKey, 64)
+    || !/^[a-z0-9][a-z0-9-]{2,63}$/.test(binding.profileKey)
+    || !Number.isSafeInteger(binding.version)
+    || binding.version < 1
+    || binding.version > 1_000_000
+    || !/^sha256:[a-f0-9]{64}$/.test(binding.profileDigest)
+    || !/^sha256:[a-f0-9]{64}$/.test(binding.qualificationDigest)
+    || !exactObjectKeys(profile, [
+      "schema", "profileKey", "version", "harness", "runtimeArtifact", "executionBackend",
+      "modelRoute", ...(executionBackend === "remote-sandbox" ? ["sandboxProfile"] : []),
+      "isolationModes", "requiredHarnessCapabilities", "requiredSandboxCapabilities", "lifecycle", "authority",
+    ])
+    || !exactObjectKeys(qualification, [
+      "schema", "profile", "components", "scope", "evidence", "approvedBy", "approvedAt", "validUntil", "authority",
+    ])
+    || !exactObjectKeys(profile?.harness, ["adapter", "version", "capabilityManifest", "capabilityManifestDigest", "effectiveConfigSha256"])
+    || !exactObjectKeys(profile?.runtimeArtifact, ["snapshot", "digest"])
+    || !exactObjectKeys(profile?.modelRoute, ["catalogId", "routeSnapshot", "routeDigest", "qualificationSnapshot", "qualificationDigest"])
+    || !exactObjectKeys(profile?.lifecycle, [
+      "contractVersion", "cancellationMode", "idempotentCleanup", "retryCreatesNewAttempt",
+      "inFlightRevocationPolicy", "componentSubstitution",
+    ])
+    || !exactObjectKeys(qualification?.profile, ["id", "key", "version", "digest"])
+    || !exactObjectKeys(qualification?.components, [
+      "harness", "runtimeArtifactDigest", "executionBackend", "modelRoute",
+      ...(executionBackend === "remote-sandbox" ? ["sandboxProfile"] : []),
+      "isolationModes", "requiredHarnessCapabilities", "requiredSandboxCapabilities",
+    ])
+    || !exactObjectKeys(components?.harness, ["adapter", "version", "capabilityManifestDigest", "effectiveConfigSha256"])
+    || !exactObjectKeys(components?.modelRoute, ["catalogId", "routeDigest", "qualificationDigest"])
+    || !exactObjectKeys(qualification?.scope, ["workloadClasses", "riskClasses"])
+    || !exactObjectKeys(qualification?.evidence, ["reference", "digest"])
+    || profile?.schema !== "factory-execution-profile/v1"
+    || qualification?.schema !== "factory-execution-profile-qualification/v1"
+    || binding.profileDigest !== `sha256:${canonicalHash({ namespace: "factory-execution-profile/v1", value: profile })}`
+    || binding.qualificationDigest !== `sha256:${canonicalHash({ namespace: "factory-execution-profile-qualification/v1", value: qualification })}`
+    || profile.profileKey !== binding.profileKey
+    || profile.version !== binding.version
+    || qualification.profile?.id !== binding.profileId
+    || qualification.profile?.key !== binding.profileKey
+    || qualification.profile?.version !== binding.version
+    || qualification.profile?.digest !== binding.profileDigest
+    || !Number.isFinite(profileAdmittedAt)
+    || !Number.isFinite(qualification.approvedAt)
+    || !Number.isFinite(qualification.validUntil)
+    || qualification.approvedAt > profileAdmittedAt
+    || qualification.validUntil <= qualification.approvedAt
+    || qualification.validUntil - qualification.approvedAt > 366 * 24 * 60 * 60 * 1_000
+    || qualification.validUntil <= profileAdmittedAt
+    || !boundedManifestIdentity(qualification.approvedBy, 200)
+    || !boundedManifestIdentity(qualification.evidence?.reference, 1_000)
+    || !/^sha256:[a-f0-9]{64}$/.test(qualification.evidence?.digest ?? "")
+    || !expectedWorkloadClass
+    || !canonicalSortedStrings(qualification.scope?.workloadClasses)
+    || !qualification.scope.workloadClasses.includes(expectedWorkloadClass)
+    || qualification.scope.workloadClasses.some((value: string) => !/^[A-Z][A-Z0-9_]*$/.test(value))
+    || !canonicalSortedStrings(qualification.scope?.riskClasses)
+    || qualification.scope.riskClasses.some((value: string) => !["GREEN", "YELLOW", "RED"].includes(value))
+    || !allDeniedExecutionProfileAuthority(profile.authority)
+    || !allDeniedExecutionProfileAuthority(qualification.authority)
+    || profile.lifecycle?.contractVersion !== "generic-harness-contract/v1"
+    || profile.lifecycle?.cancellationMode !== manifest.harness.capabilityManifest.cancellation.mode
+    || profile.lifecycle?.idempotentCleanup !== manifest.harness.capabilityManifest.cancellation.idempotentCleanup
+    || profile.lifecycle?.componentSubstitution !== "DENIED"
+    || profile.lifecycle?.retryCreatesNewAttempt !== true
+    || profile.lifecycle?.inFlightRevocationPolicy !== "LEASED_ATTEMPT_MAY_COMPLETE"
+    || profile.harness?.adapter !== manifest.harness.adapter
+    || profile.harness?.version !== manifest.harness.version
+    || profile.harness?.capabilityManifestDigest !== manifest.harness.capabilityManifestSha256
+    || profile.harness?.effectiveConfigSha256 !== manifest.harness.effectiveConfigSha256
+    || canonicalHash(profile.harness?.capabilityManifest) !== canonicalHash(manifest.harness.capabilityManifest)
+    || profile.runtimeArtifact?.digest !== manifest.harness.runtimeArtifactDigest
+    || canonicalHash(profile.runtimeArtifact?.snapshot) !== canonicalHash(manifest.harness.runtimeArtifact)
+    || profile.executionBackend !== executionBackend
+    || profile.modelRoute?.catalogId !== manifestRoute?.catalogId
+    || profile.modelRoute?.routeDigest !== manifestRoute?.routeDigest
+    || profile.modelRoute?.qualificationDigest !== manifestRoute?.qualificationDigest
+    || canonicalHash(profile.modelRoute?.routeSnapshot) !== canonicalHash(manifestRoute?.routeSnapshot)
+    || canonicalHash(profile.modelRoute?.qualificationSnapshot) !== canonicalHash(manifestRoute?.qualificationSnapshot)
+    || !canonicalSortedStrings(profile.isolationModes)
+    || !profile.isolationModes.includes(manifest.harness.isolation)
+    || !canonicalHarnessRequirements(profile.requiredHarnessCapabilities)
+    || !containsHarnessRequirements(profile.requiredHarnessCapabilities, manifest.harness.requiredHarnessCapabilities)
+    || !canonicalSortedStrings(profile.requiredSandboxCapabilities)
+    || !selectedSandboxCapabilities.every((capability) => profile.requiredSandboxCapabilities.includes(capability))
+    || !sameStringSet(selectedSandboxCapabilities, manifest.harness.requiredCapabilities)
+    || components?.harness?.adapter !== profile.harness.adapter
+    || components?.harness?.version !== profile.harness.version
+    || components?.harness?.capabilityManifestDigest !== profile.harness.capabilityManifestDigest
+    || components?.harness?.effectiveConfigSha256 !== profile.harness.effectiveConfigSha256
+    || components?.runtimeArtifactDigest !== profile.runtimeArtifact.digest
+    || components?.executionBackend !== profile.executionBackend
+    || components?.modelRoute?.catalogId !== profile.modelRoute.catalogId
+    || components?.modelRoute?.routeDigest !== profile.modelRoute.routeDigest
+    || components?.modelRoute?.qualificationDigest !== profile.modelRoute.qualificationDigest
+    || !sameStringSet(components?.isolationModes ?? [], profile.isolationModes)
+    || !sameHarnessRequirements(components?.requiredHarnessCapabilities, profile.requiredHarnessCapabilities)
+    || !sameStringSet(components?.requiredSandboxCapabilities ?? [], profile.requiredSandboxCapabilities)) {
+    return false;
+  }
+  if (executionBackend === "remote-sandbox") {
+    return Boolean(profileSandbox
+      && manifest.sandbox
+      && exactObjectKeys(profileSandbox, ["profileId", "profileSnapshot", "profileDigest"])
+      && exactObjectKeys(components?.sandboxProfile, ["profileId", "profileDigest"])
+      && profileSandbox.profileId === manifest.sandbox.profileId
+      && profileSandbox.profileDigest === manifest.sandbox.profileDigest
+      && canonicalHash(profileSandbox.profileSnapshot) === canonicalHash(manifest.sandbox.profileSnapshot)
+      && components?.sandboxProfile?.profileId === profileSandbox.profileId
+      && components?.sandboxProfile?.profileDigest === profileSandbox.profileDigest);
+  }
+  return profileSandbox === undefined
+    && components?.sandboxProfile === undefined
+    && manifest.sandbox === undefined;
+}
+
+function claimExecutionProfileEvidenceMatches(
+  claim: Record<string, any>,
+  manifest: FrozenHarnessExecutionManifest,
+) {
+  const expected = executionProfileEvidenceFromManifest(manifest);
+  return expected !== undefined
+    && claim.executionProfile !== undefined
+    && canonicalHash(claim.executionProfile) === canonicalHash(expected);
+}
+
+function executionProfileEvidenceFromManifest(manifest: FrozenHarnessExecutionManifest) {
+  const binding = manifest.executionProfile;
+  const profile = binding?.profileSnapshot as Record<string, any> | undefined;
+  const qualification = binding?.qualificationSnapshot as Record<string, any> | undefined;
+  if (!binding || !profile || !qualification) return undefined;
+  return {
+    profileId: binding.profileId,
+    profileKey: binding.profileKey,
+    version: binding.version,
+    profileDigest: binding.profileDigest,
+    qualificationDigest: binding.qualificationDigest,
+    qualificationEvidence: qualification.evidence,
+    qualificationValidUntil: qualification.validUntil,
+    harness: {
+      adapter: profile.harness?.adapter,
+      version: profile.harness?.version,
+      capabilityManifestDigest: profile.harness?.capabilityManifestDigest,
+      effectiveConfigSha256: profile.harness?.effectiveConfigSha256,
+    },
+    runtimeArtifactDigest: profile.runtimeArtifact?.digest,
+    executionBackend: profile.executionBackend,
+    modelRoute: {
+      catalogId: profile.modelRoute?.catalogId,
+      routeDigest: profile.modelRoute?.routeDigest,
+      qualificationDigest: profile.modelRoute?.qualificationDigest,
+    },
+    ...(profile.sandboxProfile ? {
+      sandboxProfile: {
+        profileId: profile.sandboxProfile.profileId,
+        profileDigest: profile.sandboxProfile.profileDigest,
+      },
+    } : {}),
+    selectedIsolation: manifest.harness.isolation,
+  };
+}
+
+function hasDecomposedExecutionIdentity(manifest: any): boolean {
+  return manifest?.version === "factory-execution-manifest/v2"
+    || manifest?.version === "factory-execution-manifest/v3";
+}
+
+function allDeniedExecutionProfileAuthority(authority: any) {
+  const keys = ["routing", "verification", "publication", "acceptance", "merge", "policyMutation", "workerLeases"];
+  return authority && typeof authority === "object" && !Array.isArray(authority)
+    && Object.keys(authority).length === keys.length
+    && keys.every((key) => authority[key] === false);
+}
+
+function sameHarnessRequirements(left: unknown, right: unknown) {
+  if (!Array.isArray(left) || !Array.isArray(right)) return false;
+  const normalize = (items: any[]) => items
+    .map((item) => `${item?.capability}:${item?.minimumSupport}`)
+    .sort();
+  return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+}
+
+function containsHarnessRequirements(available: unknown, required: unknown) {
+  if (!Array.isArray(available) || !Array.isArray(required)) return false;
+  return required.every((requirement: any) => available.some((candidate: any) =>
+    candidate?.capability === requirement?.capability
+    && candidate?.minimumSupport === requirement?.minimumSupport));
+}
+
+function canonicalHarnessRequirements(value: unknown) {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const normalized = value.map((item: any) => `${item?.capability}:${item?.minimumSupport}`);
+  return value.every((item: any) => boundedManifestIdentity(item?.capability, 100)
+      && ["PARTIAL", "SUPPORTED"].includes(item.minimumSupport))
+    && new Set(normalized).size === normalized.length
+    && JSON.stringify(normalized) === JSON.stringify([...normalized].sort());
+}
+
+function canonicalSortedStrings(value: unknown) {
+  return Array.isArray(value)
+    && value.length > 0
+    && value.every((item) => boundedManifestIdentity(item, 100))
+    && new Set(value).size === value.length
+    && JSON.stringify(value) === JSON.stringify([...value].sort());
+}
+
+function exactObjectKeys(value: unknown, expected: string[]) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  return keys.length === expected.length && keys.every((key) => expected.includes(key));
+}
+
 function validV2ModelRoute(route: Record<string, any> | undefined): boolean {
   if (!route || route.schema !== "factory-model-route/v2") return false;
   const keys = Object.keys(route);
@@ -1394,7 +1662,7 @@ function normalizedRuntimeArtifactMatches(
 function manifestExecutionRuntimeArtifact(
   manifest: FrozenHarnessExecutionManifest,
 ): { artifact: HarnessRuntimeArtifactIdentity; digest: string } | undefined {
-  if (manifest.version === "factory-execution-manifest/v2") {
+  if (hasDecomposedExecutionIdentity(manifest)) {
     const artifact = manifest.harness.runtimeArtifact;
     const digest = manifest.harness.runtimeArtifactDigest;
     if (!artifact || !digest || harnessRuntimeArtifactIssues(artifact).length > 0

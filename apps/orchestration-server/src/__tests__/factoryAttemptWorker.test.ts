@@ -213,6 +213,94 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     await fixture.worker.stop();
   });
 
+  it("constructs the worker from the exact frozen V3 Execution Profile", async () => {
+    const fixture = await runFixture("VERIFIED", { manifestVersion: 3 });
+
+    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+
+    expect(fixture.executeCodex).toHaveBeenCalledOnce();
+    expect(fixture.claim.executionManifest).toMatchObject({
+      version: "factory-execution-manifest/v3",
+      executionProfile: {
+        profileId: "execution-profile-codex-local",
+        profileKey: "codex-local",
+        version: 1,
+      },
+    });
+    await fixture.worker.stop();
+  });
+
+  it("fails before adapter construction when V3 profile bytes are substituted after admission", async () => {
+    const fixture = await runFixture("VERIFIED", {
+      manifestVersion: 3,
+      mutateManifest: (manifest) => {
+        manifest.executionProfile.profileSnapshot.harness.effectiveConfigSha256 = "f".repeat(64);
+      },
+    });
+
+    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
+
+    expect(fixture.executeCodex).not.toHaveBeenCalled();
+    expect(fixture.worker.status().lastError).toMatch(/V3 Execution Profile binding is invalid/i);
+    await fixture.worker.stop();
+  });
+
+  it("fails before adapter construction when V3 claim evidence is missing or substituted", async () => {
+    const fixture = await runFixture("VERIFIED", {
+      manifestVersion: 3,
+      mutateClaim: (claim) => {
+        claim.executionProfile.modelRoute.catalogId = "sibling-same-model-route";
+      },
+    });
+
+    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
+
+    expect(fixture.executeCodex).not.toHaveBeenCalled();
+    expect(fixture.worker.status().lastError).toMatch(/V3 Execution Profile binding is invalid/i);
+    await fixture.worker.stop();
+  });
+
+  it("uses the server claim instant for V3 expiry so an admitted lease may finish", async () => {
+    const profileAdmittedAt = Date.now() - 20_000;
+    const fixture = await runFixture("VERIFIED", {
+      manifestVersion: 3,
+      profileAdmittedAt,
+      mutateManifest: (manifest) => {
+        manifest.executionProfile.qualificationSnapshot.approvedAt = profileAdmittedAt - 1_000;
+        manifest.executionProfile.qualificationSnapshot.validUntil = profileAdmittedAt + 10_000;
+        manifest.executionProfile.qualificationDigest = `sha256:${canonicalHash({
+          namespace: "factory-execution-profile-qualification/v1",
+          value: manifest.executionProfile.qualificationSnapshot,
+        })}`;
+      },
+    });
+
+    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    expect(fixture.executeCodex).toHaveBeenCalledOnce();
+    await fixture.worker.stop();
+  });
+
+  it("rejects a V3 qualification already stale at the server claim instant", async () => {
+    const profileAdmittedAt = Date.now() - 20_000;
+    const fixture = await runFixture("VERIFIED", {
+      manifestVersion: 3,
+      profileAdmittedAt,
+      mutateManifest: (manifest) => {
+        manifest.executionProfile.qualificationSnapshot.approvedAt = profileAdmittedAt - 1_000;
+        manifest.executionProfile.qualificationSnapshot.validUntil = profileAdmittedAt;
+        manifest.executionProfile.qualificationDigest = `sha256:${canonicalHash({
+          namespace: "factory-execution-profile-qualification/v1",
+          value: manifest.executionProfile.qualificationSnapshot,
+        })}`;
+      },
+    });
+
+    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
+    expect(fixture.executeCodex).not.toHaveBeenCalled();
+    expect(fixture.worker.status().lastError).toMatch(/V3 Execution Profile binding is invalid/i);
+    await fixture.worker.stop();
+  });
+
   it("fails closed when V2 normalized provenance reports a different runtime executable", async () => {
     const fixture = await runFixture("VERIFIED", {
       manifestVersion: 2,
@@ -484,10 +572,13 @@ async function runFixture(
     isMutating?: boolean;
     noVerificationContract?: boolean;
     harness?: { adapter: string; version: string; displayName: string; provider: string };
-    manifestVersion?: 1 | 2;
+    manifestVersion?: 1 | 2 | 3;
     claimModel?: string;
     resultExecutableSha256?: string;
     resultProviderRoute?: string;
+    mutateManifest?: (manifest: any) => void;
+    mutateClaim?: (claim: any) => void;
+    profileAdmittedAt?: number;
   } = {},
 ) {
   const attempt = options.attempt ?? 1;
@@ -525,6 +616,7 @@ async function runFixture(
     manifest.harness.effectiveConfigSha256 = capabilityManifest.effectiveConfigSha256;
     manifest.harness.provider = options.harness.provider;
   }
+  options.mutateManifest?.(manifest);
   const run = {
     _id: `workflow-run-${attempt}`,
     runId: `factory-run-${attempt}`,
@@ -551,7 +643,11 @@ async function runFixture(
     installation: { appId: "202", installationId: "303" },
     model: options.claimModel,
     executionManifest: manifest,
+    ...(manifest.version === "factory-execution-manifest/v3"
+      ? { executionProfile: executionProfileEvidence(manifest) }
+      : {}),
   };
+  options.mutateClaim?.(claim);
   let lifecycle: "INITIAL" | "PAUSED" | "RESUME" | "COMPLETED" = "INITIAL";
   let verifiedCandidate: { sourceRevision: string; candidateRevision: string } | null = null;
   const authorizePublication = vi.fn(async (payload: any) => ({
@@ -588,19 +684,30 @@ async function runFixture(
             },
           };
         }
-        return options.durable ? {
+        const profileAdmittedAt = options.profileAdmittedAt ?? Date.now();
+        const leasedClaim = options.manifestVersion === 3 ? {
           ...claim,
+          lease: {
+            leaseId: payload.leaseId,
+            ownerId: "factory-service",
+            claimedAt: profileAdmittedAt,
+            heartbeatAt: profileAdmittedAt,
+            expiresAt: profileAdmittedAt + 120_000,
+          },
+        } : claim;
+        return options.durable ? {
+          ...leasedClaim,
           lease: {
             leaseId: payload.leaseId,
             ownerId: "factory-service",
             workerId: "worker-1",
             workerSessionId: "session-1",
             workerGeneration: 1,
-            claimedAt: Date.now(),
-            heartbeatAt: Date.now(),
-            expiresAt: Date.now() + 60_000,
+            claimedAt: profileAdmittedAt,
+            heartbeatAt: profileAdmittedAt,
+            expiresAt: profileAdmittedAt + 120_000,
           },
-        } : claim;
+        } : leasedClaim;
       }
       reports.push(payload.packet);
       if (payload.packet.verification) {
@@ -700,6 +807,7 @@ async function runFixture(
   await worker.tick();
   return {
     worker,
+    claim,
     reports,
     createPullRequest,
     executeCodex,
@@ -803,10 +911,15 @@ function completedFactoryResult() {
   };
 }
 
-function executionManifest(options: { attempt?: number; dirtyVerification?: boolean; baseSha?: string; version?: 1 | 2 } = {}): any {
+function executionManifest(options: { attempt?: number; dirtyVerification?: boolean; baseSha?: string; version?: 1 | 2 | 3 } = {}): any {
   const legacyManifest = {
     version: "factory-execution-manifest/v1",
-    causation: { workflowRunId: `workflow-run-${options.attempt ?? 1}`, workOrderRevisionNumber: 1, sourceIssue: "sellerfi/mission-control-fixture#17" },
+    causation: {
+      workflowRunId: `workflow-run-${options.attempt ?? 1}`,
+      workOrderRevisionNumber: 1,
+      factoryPurpose: "SOFTWARE",
+      sourceIssue: "sellerfi/mission-control-fixture#17",
+    },
     harness: {
       adapter: "codex",
       version: "v1",
@@ -883,7 +996,7 @@ function executionManifest(options: { attempt?: number; dirtyVerification?: bool
       },
     },
   };
-  if (options.version !== 2) return legacyManifest;
+  if (options.version !== 2 && options.version !== 3) return legacyManifest;
   const runtimeArtifact = structuredClone(CODEX_V1_RUNTIME_ARTIFACT);
   const runtimeArtifactDigest = harnessRuntimeArtifactDigest(runtimeArtifact);
   const routeSnapshot = {
@@ -919,7 +1032,7 @@ function executionManifest(options: { attempt?: number; dirtyVerification?: bool
     },
   };
   const { provider: _provider, model: _model, executionBackend: _executionBackend, ...v2Harness } = legacyManifest.harness;
-  return {
+  const decomposedManifest = {
     ...legacyManifest,
     version: "factory-execution-manifest/v2",
     harness: { ...v2Harness, runtimeArtifact, runtimeArtifactDigest },
@@ -931,6 +1044,143 @@ function executionManifest(options: { attempt?: number; dirtyVerification?: bool
       qualificationSnapshot,
     },
     executionBackend: "persistent-worker",
+  };
+  if (options.version !== 3) return decomposedManifest;
+  const selectedHarnessRequirements = [
+    { capability: "filesystem.read", minimumSupport: "SUPPORTED" },
+    { capability: "filesystem.write", minimumSupport: "SUPPORTED" },
+    { capability: "filesystem.pathAllowlist", minimumSupport: "PARTIAL" },
+    { capability: "shell.available", minimumSupport: "PARTIAL" },
+    { capability: "shell.processTreeCancellation", minimumSupport: "PARTIAL" },
+    { capability: "git.status", minimumSupport: "SUPPORTED" },
+    { capability: "git.diff", minimumSupport: "SUPPORTED" },
+    { capability: "tools.structuredOutput", minimumSupport: "PARTIAL" },
+    { capability: "headless.support", minimumSupport: "PARTIAL" },
+    { capability: "cancellation.support", minimumSupport: "PARTIAL" },
+  ];
+  (decomposedManifest.harness as any).requiredHarnessCapabilities = selectedHarnessRequirements;
+  const authority = {
+    routing: false,
+    verification: false,
+    publication: false,
+    acceptance: false,
+    merge: false,
+    policyMutation: false,
+    workerLeases: false,
+  };
+  const profileSnapshot = {
+    schema: "factory-execution-profile/v1",
+    profileKey: "codex-local",
+    version: 1,
+    harness: {
+      adapter: decomposedManifest.harness.adapter,
+      version: decomposedManifest.harness.version,
+      capabilityManifest: decomposedManifest.harness.capabilityManifest,
+      capabilityManifestDigest: decomposedManifest.harness.capabilityManifestSha256,
+      effectiveConfigSha256: decomposedManifest.harness.effectiveConfigSha256,
+    },
+    runtimeArtifact: {
+      snapshot: decomposedManifest.harness.runtimeArtifact,
+      digest: decomposedManifest.harness.runtimeArtifactDigest,
+    },
+    executionBackend: decomposedManifest.executionBackend,
+    modelRoute: {
+      catalogId: decomposedManifest.modelRoute.catalogId,
+      routeSnapshot: decomposedManifest.modelRoute.routeSnapshot,
+      routeDigest: decomposedManifest.modelRoute.routeDigest,
+      qualificationSnapshot: decomposedManifest.modelRoute.qualificationSnapshot,
+      qualificationDigest: decomposedManifest.modelRoute.qualificationDigest,
+    },
+    isolationModes: ["READ_ONLY", "WORKSPACE_WRITE"],
+    requiredHarnessCapabilities: [...selectedHarnessRequirements]
+      .sort((left, right) => left.capability.localeCompare(right.capability)),
+    requiredSandboxCapabilities: ["git-worktree", "read-only", "workspace-write"],
+    lifecycle: {
+      contractVersion: "generic-harness-contract/v1",
+      cancellationMode: decomposedManifest.harness.capabilityManifest.cancellation.mode,
+      idempotentCleanup: decomposedManifest.harness.capabilityManifest.cancellation.idempotentCleanup,
+      retryCreatesNewAttempt: true,
+      inFlightRevocationPolicy: "LEASED_ATTEMPT_MAY_COMPLETE",
+      componentSubstitution: "DENIED",
+    },
+    authority,
+  };
+  const profileDigest = `sha256:${canonicalHash({ namespace: "factory-execution-profile/v1", value: profileSnapshot })}`;
+  const profileQualificationSnapshot = {
+    schema: "factory-execution-profile-qualification/v1",
+    profile: { id: "execution-profile-codex-local", key: "codex-local", version: 1, digest: profileDigest },
+    components: {
+      harness: {
+        adapter: profileSnapshot.harness.adapter,
+        version: profileSnapshot.harness.version,
+        capabilityManifestDigest: profileSnapshot.harness.capabilityManifestDigest,
+        effectiveConfigSha256: profileSnapshot.harness.effectiveConfigSha256,
+      },
+      runtimeArtifactDigest: profileSnapshot.runtimeArtifact.digest,
+      executionBackend: profileSnapshot.executionBackend,
+      modelRoute: {
+        catalogId: profileSnapshot.modelRoute.catalogId,
+        routeDigest: profileSnapshot.modelRoute.routeDigest,
+        qualificationDigest: profileSnapshot.modelRoute.qualificationDigest,
+      },
+      isolationModes: profileSnapshot.isolationModes,
+      requiredHarnessCapabilities: profileSnapshot.requiredHarnessCapabilities,
+      requiredSandboxCapabilities: profileSnapshot.requiredSandboxCapabilities,
+    },
+    scope: { workloadClasses: ["SOFTWARE_CHANGE"], riskClasses: ["GREEN"] },
+    evidence: { reference: "fixture://execution-profile", digest: `sha256:${"2".repeat(64)}` },
+    approvedBy: "factory-test",
+    approvedAt: Date.now() - 1_000,
+    validUntil: Date.now() + 60_000,
+    authority,
+  };
+  return {
+    ...decomposedManifest,
+    version: "factory-execution-manifest/v3",
+    executionProfile: {
+      profileId: "execution-profile-codex-local",
+      profileKey: "codex-local",
+      version: 1,
+      profileDigest,
+      profileSnapshot,
+      qualificationDigest: `sha256:${canonicalHash({ namespace: "factory-execution-profile-qualification/v1", value: profileQualificationSnapshot })}`,
+      qualificationSnapshot: profileQualificationSnapshot,
+    },
+  };
+}
+
+function executionProfileEvidence(manifest: any) {
+  const binding = manifest.executionProfile;
+  const profile = binding.profileSnapshot;
+  const qualification = binding.qualificationSnapshot;
+  return {
+    profileId: binding.profileId,
+    profileKey: binding.profileKey,
+    version: binding.version,
+    profileDigest: binding.profileDigest,
+    qualificationDigest: binding.qualificationDigest,
+    qualificationEvidence: qualification.evidence,
+    qualificationValidUntil: qualification.validUntil,
+    harness: {
+      adapter: profile.harness.adapter,
+      version: profile.harness.version,
+      capabilityManifestDigest: profile.harness.capabilityManifestDigest,
+      effectiveConfigSha256: profile.harness.effectiveConfigSha256,
+    },
+    runtimeArtifactDigest: profile.runtimeArtifact.digest,
+    executionBackend: profile.executionBackend,
+    modelRoute: {
+      catalogId: profile.modelRoute.catalogId,
+      routeDigest: profile.modelRoute.routeDigest,
+      qualificationDigest: profile.modelRoute.qualificationDigest,
+    },
+    ...(profile.sandboxProfile ? {
+      sandboxProfile: {
+        profileId: profile.sandboxProfile.profileId,
+        profileDigest: profile.sandboxProfile.profileDigest,
+      },
+    } : {}),
+    selectedIsolation: manifest.harness.isolation,
   };
 }
 

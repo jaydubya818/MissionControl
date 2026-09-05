@@ -8,15 +8,21 @@ date: 2026-08-17
 
 ## Purpose
 
-Execution Routing recommends or selects one exact production-qualified
-`Model Route + Harness + Runtime Artifact + Execution Backend` strategy for a
-WorkOrder. It reduces an operator decision without moving any authority from
-Factory admission, independent verification, publication, merge, or
-acceptance.
+Execution Routing recommends or selects one exact production-qualified Factory
+Version for a WorkOrder. New Factory Versions reference an immutable qualified
+Execution Profile that binds the exact
+`Model Route + Harness + Runtime Artifact + Execution Backend` composition. It
+reduces an operator decision without moving any authority from Factory
+admission, independent verification, publication, merge, or acceptance.
 
 The routed unit is an active immutable Factory Version. Mission Control never
 constructs an arbitrary Cartesian product of model, harness, runtime, and
 backend components at dispatch time.
+
+The Execution Profile is subordinate configuration, not a fifth independently
+routed component and not a second Factory system. It has no active pointer or
+routing authority. See the [Execution Profile identity
+decision](../decisions/execution-profile-identity.md).
 
 ## Identity and qualification
 
@@ -37,12 +43,18 @@ authorize an unqualified model route. The V2 qualification snapshot names the
 exact adapter/version, capability-manifest digest, effective-configuration
 digest, runtime-artifact digest, and backend that were reviewed with the route.
 
+For a profile-bound candidate, `factory-execution-profile/v1` and its exact
+qualification receipt bind those identities, the route qualification, any
+Sandbox Profile, allowed isolation modes, and required capabilities. The
+Factory Version freezes the profile row ID, key, version, snapshot, digest, and
+qualification digest. No alias is resolved after selection.
+
 ## Control flow
 
 1. Load at most 25 active Factory Version candidates for the WorkOrder
    repository.
-2. Reuse the exact model-route, harness-manifest, runtime-artifact, and
-   canonical worker-admission contracts.
+2. Reuse the exact Execution Profile, model-route, harness-manifest,
+   runtime-artifact, and canonical worker-admission contracts.
 3. Reject candidates that fail Factory/current-readiness, repository, worker,
    route, harness, runtime-artifact, backend, isolation, network, credential,
    approved-model, risk, budget, context, or production-certification
@@ -58,7 +70,9 @@ digest, runtime-artifact digest, and backend that were reviewed with the route.
 7. Run the selected Factory Version through the unchanged canonical dispatch
    preflight.
 8. Freeze the decision snapshot and SHA-256 digest onto the Attempt before the
-   worker can claim it.
+   worker can claim it. Profile-bound Attempts also freeze
+   `factory-execution-manifest/v3` with the exact profile and qualification
+   identity.
 
 V1 is additive and default-off for existing execution paths. A dispatch enters
 the tuple router only when it already supplies an exact Factory Version
@@ -71,7 +85,8 @@ An ineligible candidate never receives a score. Rejection codes are stable and
 stored with the decision. Cost and latency cannot compensate for a missing
 capability, stale worker, model-route digest mismatch, harness-manifest or
 effective-configuration mismatch, runtime-artifact mismatch, unsupported
-backend, scope mismatch, uncertified harness, risk violation, or other hard
+backend, missing/revoked/expired profile, profile or qualification digest
+mismatch, scope mismatch, uncertified harness, risk violation, or other hard
 constraint.
 
 Worker freshness uses the canonical two-minute heartbeat threshold. Worker
@@ -82,6 +97,14 @@ host adapter artifact, backend, provider/model, repository scope, and Factory
 Version binding. The version binding separately attests the execution artifact:
 the harness executable for a persistent worker or the frozen Sandbox Profile
 image for remote execution.
+
+Profile currentness is evaluated before scoring, again in canonical dispatch
+preflight, and again before the first worker claim. The worker resolves only the
+frozen adapter/version from its explicitly configured registry. Neither the
+router nor the profile can substitute another profile, model route, harness,
+runtime artifact, backend, or adapter. A profile revoked after a valid lease is
+issued does not rewrite that in-flight Attempt; a retry is a new Attempt and
+must pass current admission.
 
 ## Evidence and unknowns
 
@@ -126,8 +149,8 @@ model/provider/token/cost attributes remain observations rather than authority.
 - risk and fixed evidence cutoff;
 - every candidate tuple;
 - each candidate's immutable Factory Version and configuration digest, which
-  bind its model-route, harness-manifest, runtime-artifact, and backend
-  identity;
+  bind its Execution Profile and qualification, model-route,
+  harness-manifest, runtime-artifact, and backend identity;
 - every rejection code and reason;
 - observed raw metrics, weights, normalized component scores, total score, and
   evidence coverage;
@@ -151,6 +174,11 @@ Historical route, qualification, harness-manifest, Factory Version, routing,
 and Attempt digests remain immutable. Legacy execution is possible only when a
 current worker can satisfy the exact frozen compatibility tuple; readability
 alone never grants admission.
+
+Phase 1 profileless model-route V2 Factory Versions and execution-manifest V2
+Attempts remain readable and executable under their exact frozen rules. The
+router never infers a profile for them. New Factory Versions require a current
+qualified profile and emit execution-manifest V3.
 
 ## Authorization
 

@@ -9,6 +9,10 @@ export interface FactoryConfigurationInput {
   harnessEffectiveConfigSha256: string;
   harnessRuntimeArtifact: unknown;
   harnessRuntimeArtifactDigest: string;
+  executionProfileId?: string;
+  executionProfileVersion?: number;
+  executionProfileDigest?: string;
+  executionProfileQualificationDigest?: string;
   modelCatalogId: string;
   modelRouteDigest: string;
   executionBackend: "persistent-worker" | "remote-sandbox";
@@ -63,6 +67,23 @@ export function validFactoryBudget(input: FactoryConfigurationInput["budget"]): 
 
 export function validFactoryExecutorBinding(input: FactoryConfigurationInput["executor"]): boolean {
   return boundedIdentity(input.adapter) && boundedIdentity(input.version);
+}
+
+export function validFactoryExecutionProfileBinding(input: Pick<FactoryConfigurationInput,
+  "executionProfileId" | "executionProfileVersion" | "executionProfileDigest" | "executionProfileQualificationDigest"
+>): boolean {
+  const values = [
+    input.executionProfileId,
+    input.executionProfileVersion,
+    input.executionProfileDigest,
+    input.executionProfileQualificationDigest,
+  ];
+  if (values.every((value) => value === undefined)) return true;
+  return boundedIdentity(input.executionProfileId ?? "")
+    && Number.isSafeInteger(input.executionProfileVersion)
+    && input.executionProfileVersion! > 0
+    && /^sha256:[a-f0-9]{64}$/i.test(input.executionProfileDigest ?? "")
+    && /^sha256:[a-f0-9]{64}$/i.test(input.executionProfileQualificationDigest ?? "");
 }
 
 export function validFactoryExecutionBinding(input: Pick<FactoryConfigurationInput,
