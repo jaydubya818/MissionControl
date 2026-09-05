@@ -3,6 +3,8 @@ title: Software Factory Capability Maturity Ledger
 status: active
 last_verified: 2026-08-25
 baseline_commit: b3dfcee
+source_reviewed: 2026-09-04
+source_revision: 9a80cf3c5cc229bb4a552a9f08ddda5841e70a38
 owners:
   - product
   - platform
@@ -34,7 +36,48 @@ Agent definitions, skills, tools, and harnesses are versioned configuration and
 execution inputs. They are not separate lifecycle states and do not gain
 approval, verification, acceptance, merge, release, or promotion authority.
 
-## Status vocabulary
+## Current eight-family evidence matrix — 2026-09-04
+
+Source revision **R = `9a80cf3c5cc229bb4a552a9f08ddda5841e70a38`** was freshly
+fetched from origin/main. This is a source reconciliation, not production
+qualification. Runtime environment **P = the real pilot, not yet selected or
+configured; active flags, Factory bindings and runtime availability UNKNOWN**.
+R and P in each row are exact scope references, not shorthand for a successful
+deployment. The `last_verified`/`baseline_commit` frontmatter above retains the
+older qualification baseline; it does not describe a new pilot run.
+
+Current status vocabulary:
+
+- **AVAILABLE**: demonstrated in the named current environment/configuration.
+- **EXPERIMENTAL**: explicitly bounded trial; no production claim.
+- **PARTIALLY_PROVEN**: scoped retained evidence exists; current operating proof incomplete.
+- **PLANNED**: intended capability without an admitted implementation.
+- **UNSUPPORTED**: exact admitted contract explicitly does not support it.
+- **BLOCKED**: a named prerequisite prevents current qualification/execution.
+
+No family is labeled AVAILABLE merely because current main contains code.
+
+| Family | Status | Revision / environment / configuration | Latest relevant retained evidence | Limitation | Owner | Next qualification gate |
+| --- | --- | --- | --- | --- | --- | --- |
+| Agentic loops | PARTIALLY_PROVEN | R / P; production tuple selection pending | [Planning live NO-GO, superseding 2026-08-30 entry](../testing/evidence/governed-planning-agent-v1/go-no-go.md); [identity integration](../../todos/067-complete-p1-integrate-phase1-current-main.md) | Real Attempt failed before candidate; later dependency fix does not prove a new success. Workflow recovery is not model session resume. | Platform + QA | Named real pilot; preserved failure and authorized changed-hypothesis recovery with exact tuple, lease and stop-condition evidence |
+| MCP | UNSUPPORTED | R / P; both admitted [manifests](../../packages/workflow-engine/src/harnessManifests.ts) declare MCP unsupported | Exact manifest declarations at R; no admitted live MCP receipt | Registry/broker proof remains planned, not part of this Phase 0/1 task | Security + Platform | Todo 061 after its existing dependencies; one read-only proof |
+| Multi-agent systems | PARTIALLY_PROVEN | R / P; canonical DAG available in source, target workflow unconfigured | [System V2](../testing/evidence/system-factory-e2e-v2/README.md), historical fixture scope | No general nested-subagent or fleet-scale proof; real parent/child budget and recovery qualification incomplete | Platform + QA | Pilot's existing bounded graph, failure/lease/cancel evidence; no broad collaboration expansion |
+| AI gateway | PARTIALLY_PROVEN | R / P; routing mode/active tuple UNKNOWN; Guarded Auto remains gated | [Exact identity ADR](../decisions/model-route-runtime-identity-separation.md), [integration tests](../../todos/067-complete-p1-integrate-phase1-current-main.md) | Router/proxy is not a fully qualified common inference gateway; new four-part identity model is implemented, not a live route claim | Platform + ML/AI | Exact approved route/harness/runtime/backend on the real pilot; no generalized gateway build |
+| Inference economics | PARTIALLY_PROVEN | R / P; provider price/usage availability UNKNOWN | [V3 metrics](../testing/evidence/production-factory-pilot-v3/README.md): actual model/provider cost null | Historical tokens do not establish current actual cost; generic cache multipliers are not billed cost | Product + ML/AI | MEASURED / ESTIMATED / UNKNOWN report for each pilot Attempt and accepted outcome |
+| Evals | PARTIALLY_PROVEN | R / P; Eval Control Plane committed; live pilot suite binding pending | [Eval Control Plane browser evidence, 2026-09-02](../testing/evidence/eval-control-plane-v1/README.md) | Seven-case deterministic receipt suite and negative controls proven at retained scope; does not grant dispatch, acceptance or release authority | ML/AI + QA | Freeze existing suite/version and full pilot tuple; complete-case accounting, negative controls and exact receipt |
+| Guardrails | PARTIALLY_PROVEN | R / P; service identity, policy and tuple gates in source; real pilot credentials not configured | [Identity integration](../../todos/067-complete-p1-integrate-phase1-current-main.md), [V3 failure injections](../testing/evidence/production-factory-pilot-v3/README.md) | Current environment not tested; full incident aggregate and tool/DLP governance remain later scope | Security + SRE | Named incident commander and bounded stop/revoke/quarantine preflight before execution; preserve sensitive-repository egress boundary |
+| Observability | PARTIALLY_PROVEN | R / P; traces/observations implemented; no new real lineage captured | [Observability/Evals evidence](../testing/evidence/observability-evals-v1/README.md), [planning run evidence](../testing/evidence/governed-planning-agent-v1/go-no-go.md) | Missing complete real candidate → verifier → PR → observed outcome chain; cost coverage incomplete | Platform + SRE | One queryable pilot lineage using existing stores, with unknowns explicit |
+
+**Pilot status: BLOCKED / NO-GO to start.** Required owning team, champion,
+human FDE/operator and incident commander have been requested. No identities,
+real accepted outcomes or active configuration are inferred from demo records.
+The ten-outcome threshold remains a pilot gate, not statistical reliability.
+
+## Historical status vocabulary
+
+The labels and capability detail below retain the older qualification record.
+They describe its cited scope only and are superseded by the current matrix for
+current availability claims. Historical artifacts have not been rewritten.
 
 - **Qualified:** implemented and backed by deterministic system or browser
   evidence at a cited revision.
@@ -52,7 +95,7 @@ These labels are not interchangeable. A deterministic fixture proves a
 contract; it does not prove real-team adoption, provider economics, fleet
 scale, or general production safety.
 
-## Current capability ledger
+## Retained capability qualification detail
 
 | Capability | Owner | Status | Evidence | Current limitation | Next promotion gate |
 | --- | --- | --- | --- | --- | --- |
