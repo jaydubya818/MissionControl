@@ -246,6 +246,7 @@ describe("governed read-only MCP broker", () => {
     await expectDenied((v) => { v.request.toolGrantId = "grant-other"; }, "TOOL_GRANT_MISMATCH");
     await expectDenied((v) => { v.authority.grant.state = "REVOKED"; }, "TOOL_GRANT_REVOKED");
     await expectDenied((v) => { v.authority.grant.snapshot.expiresAt = NOW; v.authority.grant.digest = mcpToolGrantDigest(v.authority.grant.snapshot); v.request.toolGrantDigest = v.authority.grant.digest; v.authority.executionProfile.toolGrant = { id: "grant-1", digest: v.authority.grant.digest, snapshot: v.authority.grant.snapshot }; }, "TOOL_GRANT_EXPIRED");
+    await expectDenied((v) => { v.request.projectId = "project-other"; }, "ATTEMPT_SCOPE_MISMATCH");
     await expectDenied((v) => { v.request.attemptId = "attempt-other"; }, "ATTEMPT_SCOPE_MISMATCH");
     await expectDenied((v) => { v.request.attemptLeaseId = "lease-stale"; }, "LEASE_STALE");
     await expectDenied((v) => { v.request.workerGeneration = 0; }, "LEASE_STALE");

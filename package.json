@@ -65,6 +65,7 @@
     "qualify:factory": "node scripts/system-factory-e2e-qualification.mjs",
     "qualify:factory:v2": "node scripts/system-factory-e2e-qualification.mjs",
     "qualify:mcp:phase3": "node --import tsx scripts/governed-mcp-phase3-qualification.mts",
+    "test:mcp:phase4": "pnpm run ci:prepare && pnpm exec vitest run convex/__tests__/governedMcp.test.ts convex/__tests__/governedHardeningAuthority.test.ts scripts/lib/phase4-qualification-runtime.test.mjs && pnpm --filter @mission-control/orchestration-server exec vitest run src/__tests__/governedMcpBroker.test.ts src/__tests__/factoryGovernedMcpContext.test.ts && pnpm --filter @mission-control/workflow-engine exec vitest run src/__tests__/verificationCurrentness.test.ts",
     "qualify:planning-containment": "pnpm exec tsx scripts/planning-containment-qualification.mts",
     "eval:mission-control": "pnpm --filter @mission-control/shared build && node scripts/run-mission-control-eval.mjs --check-baseline",
     "taskmaster:plan": "taskmaster plan docs/PRD_V2.md",

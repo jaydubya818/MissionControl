@@ -2,6 +2,10 @@
 
 Status: canonical real-service qualification complete in the isolated runtime.
 
+The immutable Phase 4 closure record is `completion-record.md`. It freezes the
+exact qualified identities, review disposition, delivery revisions, and
+limitations without broadening the claim.
+
 The immutable OpenAI Docs NO_GO remains in
 `../governed-mcp-phase4-real-service/no-go-record.md`. This directory records
 only the replacement-service recovery proof.
@@ -30,6 +34,13 @@ Current offline evidence:
   `pre-merge-qualification.md`
 - exact merged-main qualification and cleanup record:
   `post-merge-qualification.md`
+- immutable completion closure: `completion-record.md`
+
+Permanent deterministic regression coverage is invoked with
+`pnpm run test:mcp:phase4`. It does not contact Context7. Live service
+recertification is a separate, explicitly authorized and evidence-producing
+procedure governed by
+`../../../software-factory/governed-mcp-recertification-policy.md`.
 
 External-call accounting for this recovery is two Context7 `query-docs`
 operations total: one direct transport diagnostic and one canonical
