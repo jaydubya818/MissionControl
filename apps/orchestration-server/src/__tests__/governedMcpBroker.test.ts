@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { GovernedMcpBroker, GovernedMcpBrokerError, type GovernedMcpBrokerRuntime, type GovernedMcpReceipt } from "../governedMcpBroker.js";
+import { GovernedMcpBroker, GovernedMcpBrokerError, nodePermissionFlag, type GovernedMcpBrokerRuntime, type GovernedMcpReceipt } from "../governedMcpBroker.js";
 import {
   mcpToolGrantDigest,
   mcpToolVersionDigest,
@@ -104,6 +104,11 @@ async function expectDenied(
 }
 
 describe("governed read-only MCP broker", () => {
+  it("uses the Node permission flag supported by the host runtime", () => {
+    expect(nodePermissionFlag(new Set(["--permission"]))).toBe("--permission");
+    expect(nodePermissionFlag(new Set(["--experimental-permission"]))).toBe("--experimental-permission");
+  });
+
   it("keeps host and control-plane Tool Version bytes identical", async () => {
     const value = await fixture();
     expect(value.authority.toolVersion.snapshot).toEqual(controlPlaneToolVersion(value.implementationDigest));

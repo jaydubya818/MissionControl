@@ -247,7 +247,7 @@ const defaultRuntime: GovernedMcpBrokerRuntime = {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [
-        "--permission",
+        nodePermissionFlag(),
         `--allow-fs-read=${executionArtifactPath}`,
         executionArtifactPath,
       ],
@@ -275,3 +275,9 @@ const defaultRuntime: GovernedMcpBrokerRuntime = {
     }
   },
 };
+
+export function nodePermissionFlag(
+  allowedFlags: ReadonlySet<string> = process.allowedNodeEnvironmentFlags,
+) {
+  return allowedFlags.has("--permission") ? "--permission" : "--experimental-permission";
+}
