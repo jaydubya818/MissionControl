@@ -760,7 +760,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                   </div>
                 ) : null}
 
-                {pausedCandidate && (publicationUncertain || verificationDispatchBlocked) ? (
+                {pausedCandidate && (publicationUncertain || candidateDispatchBlocked) ? (
                   <CandidateRecoveryPanel key={`${pausedCandidate._id}:${publicationUncertain}`}
                     candidateRevision={pausedCandidate.candidateRevision} publicationUncertain={publicationUncertain}
                     onRecover={async () => {
