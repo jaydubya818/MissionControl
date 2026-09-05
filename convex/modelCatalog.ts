@@ -2,29 +2,19 @@ import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
 import { loadModelCatalogForProject } from "./lib/modelCatalogScope";
-import { computeCanonicalHash } from "./lib/genomeHash";
 import {
   MODEL_ROUTE_COST_POLICY_SCHEMA,
-  MODEL_ROUTE_QUALIFICATION_SCHEMA,
+  EXACT_MODEL_ROUTE_SCHEMA,
   exactModelRouteDigest,
+  exactModelRouteQualificationSnapshot,
   exactModelRouteSnapshot,
   modelRouteCostPolicyDigest,
   modelRouteCostPolicyIssues,
+  modelRouteQualificationDigest,
 } from "./lib/modelRouteAdmission";
 
 const tier = v.union(v.literal("FAST"), v.literal("BALANCED"), v.literal("POWERFUL"));
-const exactCapabilityIdentity = v.object({
-  adapter: v.string(),
-  version: v.string(),
-  capabilityManifestDigest: v.string(),
-  effectiveConfigSha256: v.string(),
-});
-const exactRuntimeIdentity = v.object({
-  kind: v.literal("CODEX_CLI"),
-  cliVersion: v.string(),
-  executableSha256: v.optional(v.string()),
-  imageDigest: v.optional(v.string()),
-});
+const executionBackend = v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"));
 const exactRouteCostPolicy = v.object({
   schema: v.literal(MODEL_ROUTE_COST_POLICY_SCHEMA),
   method: v.literal("FULL_APPROVED_WORK_ORDER_CAP_RESERVATION"),
@@ -138,8 +128,11 @@ export const registerExactRoute = mutation({
     capabilities: v.array(v.string()),
     supportsTools: v.boolean(),
     contextWindow: v.number(),
-    capabilityIdentity: exactCapabilityIdentity,
-    runtimeIdentity: exactRuntimeIdentity,
+    reasoningConfig: v.optional(v.object({
+      effort: v.optional(v.string()),
+      temperature: v.optional(v.number()),
+      maxTokens: v.optional(v.number()),
+    })),
   },
   handler: async (ctx, args) => {
     const access = await requireWorkspacePermission(
@@ -153,18 +146,28 @@ export const registerExactRoute = mutation({
       capabilities: args.capabilities,
       contextWindow: args.contextWindow,
     }]);
-    const routeSnapshot = exactModelRouteSnapshot(args);
+    const routeSnapshot = exactModelRouteSnapshot({
+      provider: args.provider,
+      providerRoute: args.providerRoute,
+      modelId: args.modelId,
+      reasoningConfig: args.reasoningConfig,
+    });
     const routeDigest = exactModelRouteDigest(routeSnapshot);
     const matches = await ctx.db.query("modelCatalog")
       .withIndex("by_project_model", (q) => q.eq("projectId", args.projectId).eq("modelId", routeSnapshot.modelId))
       .collect();
-    const existing = matches.find((candidate) => candidate.provider === routeSnapshot.provider);
-    if (existing) {
-      if (existing.routeDigest !== routeDigest) {
-        throw new Error("The exact model route is already registered with a different immutable identity.");
-      }
-      return existing._id;
-    }
+    // A catalog row is an immutable qualification instance, not the route
+    // identity itself. Reuse an in-flight draft for idempotent registration,
+    // but never reuse or mutate a row that already carries qualification.
+    const existingDraft = matches.find((candidate) =>
+      candidate.routeDigest === routeDigest
+      && candidate.enabled !== true
+      && candidate.qualificationStatus === "UNQUALIFIED"
+      && candidate.admissionStatus === "DISABLED"
+      && !candidate.qualificationSnapshot
+      && !candidate.qualificationDigest
+    );
+    if (existingDraft) return existingDraft._id;
     const now = Date.now();
     const id = await ctx.db.insert("modelCatalog", {
       tenantId: access.project.tenantId,
@@ -182,9 +185,6 @@ export const registerExactRoute = mutation({
       deprecated: false,
       routeSnapshot,
       routeDigest,
-      capabilityManifestDigest: routeSnapshot.capabilityIdentity.capabilityManifestDigest,
-      effectiveConfigSha256: routeSnapshot.capabilityIdentity.effectiveConfigSha256,
-      runtimeIdentity: routeSnapshot.runtimeIdentity,
       enabled: false,
       qualificationStatus: "UNQUALIFIED",
       admissionStatus: "DISABLED",
@@ -208,7 +208,7 @@ export const registerExactRoute = mutation({
 });
 
 /** Start a new immutable qualification revision without mutating an already
- * promoted exact route. The provider/model/runtime identity remains exact;
+ * promoted exact route. The inference identity remains exact;
  * only the later human-reviewed qualification scope may differ. */
 export const registerQualificationRevision = mutation({
   args: {
@@ -219,6 +219,7 @@ export const registerQualificationRevision = mutation({
   handler: async (ctx, args) => {
     const source = await ctx.db.get(args.sourceModelCatalogId);
     if (!source?.projectId || !source.routeSnapshot || !source.routeDigest
+      || (source.routeSnapshot as Record<string, unknown>).schema !== EXACT_MODEL_ROUTE_SCHEMA
       || source.routeDigest !== args.expectedRouteDigest
       || exactModelRouteDigest(source.routeSnapshot) !== args.expectedRouteDigest
       || source.admissionStatus !== "PRODUCTION_PILOT_ELIGIBLE"
@@ -260,9 +261,6 @@ export const registerQualificationRevision = mutation({
       deprecated: false,
       routeSnapshot: source.routeSnapshot,
       routeDigest: source.routeDigest,
-      capabilityManifestDigest: source.capabilityManifestDigest,
-      effectiveConfigSha256: source.effectiveConfigSha256,
-      runtimeIdentity: source.runtimeIdentity,
       enabled: false,
       qualificationStatus: "UNQUALIFIED",
       admissionStatus: "DISABLED",
@@ -296,11 +294,22 @@ export const promoteExactRoute = mutation({
     riskClasses: v.array(v.union(v.literal("GREEN"), v.literal("YELLOW"), v.literal("RED"))),
     repositoryIds: v.optional(v.array(v.id("workspaceRepositories"))),
     costPolicy: v.optional(exactRouteCostPolicy),
+    compatibility: v.object({
+      adapter: v.string(),
+      version: v.string(),
+      capabilityManifestDigest: v.string(),
+      effectiveConfigSha256: v.string(),
+      runtimeArtifactDigest: v.string(),
+      executionBackend,
+    }),
   },
   handler: async (ctx, args) => {
     const route = await ctx.db.get(args.modelCatalogId);
     if (!route?.projectId || !route.routeSnapshot || !route.routeDigest) {
       throw new Error("Exact model route is unavailable or is a legacy catalog alias.");
+    }
+    if ((route.routeSnapshot as Record<string, unknown>).schema !== EXACT_MODEL_ROUTE_SCHEMA) {
+      throw new Error("Legacy V1 model routes are read-only and cannot receive new qualification.");
     }
     const access = await requireWorkspacePermission(ctx, route.projectId, FACTORY_PERMISSIONS.APPROVE);
     if (route.admissionStatus === "PRODUCTION_PILOT_ELIGIBLE" || route.qualificationDigest) {
@@ -376,31 +385,19 @@ export const promoteExactRoute = mutation({
       }
     }
     const promotedAt = Date.now();
-    const qualificationSnapshot = {
-      schema: MODEL_ROUTE_QUALIFICATION_SCHEMA,
+    const qualificationSnapshot = exactModelRouteQualificationSnapshot({
       routeDigest: route.routeDigest,
-      evidence: { reference: args.evidenceReference.trim(), digest: args.evidenceDigest.toLowerCase() },
-      scope: {
-        workloadClasses: [...args.workloadClasses].sort(),
-        riskClasses: [...new Set(args.riskClasses)].sort(),
-        ...(repositoryIds.length ? { repositoryIds } : {}),
-      },
-      ...(costPolicy ? { costPolicy } : {}),
+      evidenceReference: args.evidenceReference,
+      evidenceDigest: args.evidenceDigest,
+      workloadClasses: args.workloadClasses,
+      riskClasses: args.riskClasses,
+      repositoryIds,
+      costPolicy,
       promotedBy: access.actorId,
       promotedAt,
-      authority: {
-        executionOnly: true,
-        routing: false,
-        verification: false,
-        acceptance: false,
-        publication: false,
-        merge: false,
-      },
-    };
-    const qualificationDigest = `sha256:${computeCanonicalHash({
-      namespace: MODEL_ROUTE_QUALIFICATION_SCHEMA,
-      value: qualificationSnapshot,
-    })}`;
+      compatibility: args.compatibility,
+    });
+    const qualificationDigest = modelRouteQualificationDigest(qualificationSnapshot);
     await ctx.db.patch(route._id, {
       enabled: true,
       riskApproved: args.riskClasses.includes("RED"),
@@ -490,7 +487,7 @@ export const reportHealth = internalMutation({
 });
 
 /** Records health for one immutable exact-route qualification revision.
- * Model IDs are not unique once the same runtime identity has independently
+ * Model IDs are not unique once the same inference route has independently
  * reviewed qualification scopes, so worker attestation must name the catalog
  * row and re-prove its frozen route digest. */
 export const reportExactRouteHealth = internalMutation({

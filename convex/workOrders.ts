@@ -48,7 +48,11 @@ import {
 } from "./lib/factoryDispatch";
 import { validFactoryBudget, validFactoryExecutionBinding, validFactoryExecutorBinding } from "./lib/factoryConfiguration";
 import { factoryWorkerEligibility } from "./lib/factoryWorkerRuntime";
-import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } from "./lib/harnessCapabilities";
+import {
+  factoryHarnessCapabilityRequirements,
+  resolveFrozenHarnessBinding,
+  resolveHarnessAdapterRuntimeArtifact,
+} from "./lib/harnessCapabilities";
 import { computeCanonicalHash } from "./lib/genomeHash";
 import { evaluateGithubAppCapabilities, githubInstallationIsStale } from "./lib/githubAppReadiness";
 import { canonicalRepositoryKey } from "./lib/workspaceRepositories";
@@ -84,7 +88,11 @@ import {
 import { buildFactoryExecutionManifest, factorySandboxResourceName } from "./lib/executionManifest";
 import { loadFactoryAttemptReviewReadModel } from "./lib/factoryReviewReadModel";
 import { factoryWorkflowContractIssues } from "./lib/factoryWorkflowContract";
-import { modelRouteProductionEligible } from "./lib/modelRouteAdmission";
+import {
+  factoryWorkflowModelRouteMatches,
+  frozenFactoryModelRouteEligible,
+  resolveFactoryWorkflowModelRoute,
+} from "./lib/factoryModelRoute";
 import { sandboxProfileProductionEligible } from "./lib/sandboxProfileAdmission";
 import {
   evaluateRepositoryRemoteExecutionPolicy,
@@ -135,6 +143,12 @@ import {
 } from "./lib/continuousResearchEvidence";
 import { buildExecutionRoutingPreview, executionRoutingRequested } from "./lib/executionRouting";
 import { findModelCatalogEntry, loadModelCatalogForProject } from "./lib/modelCatalogScope";
+
+function factoryExecutionBackend(manifest: any): string | undefined {
+  return manifest?.version === "factory-execution-manifest/v2"
+    ? manifest.executionBackend
+    : manifest?.harness?.executionBackend;
+}
 
 function generateRunId(): string {
   return Math.random().toString(36).substring(2, 10);
@@ -2091,7 +2105,7 @@ type DispatchContextOptions = {
 
 async function remoteRetryEvaluationState(ctx: MutationCtx, priorRun: any, existingRuns: any[]) {
   const lineage = existingRuns.filter((run) =>
-    (run.executionManifest as any)?.harness?.executionBackend === "remote-sandbox"
+    factoryExecutionBackend(run.executionManifest) === "remote-sandbox"
     && run.factoryDefinitionVersionId === priorRun.factoryDefinitionVersionId
     && (priorRun.parentTaskId ? run.parentTaskId === priorRun.parentTaskId : !run.parentTaskId)
     && (run.attemptPurpose ?? "IMPLEMENTATION") === (priorRun.attemptPurpose ?? "IMPLEMENTATION")
@@ -2554,7 +2568,7 @@ async function dispatchWorkOrder(
     }
 
     const remoteRetryState = retryOfRun?.executionManifest
-      && (retryOfRun.executionManifest as any)?.harness?.executionBackend === "remote-sandbox"
+      && factoryExecutionBackend(retryOfRun.executionManifest) === "remote-sandbox"
       ? await remoteRetryEvaluationState(ctx, retryOfRun, existingRuns)
       : undefined;
     if (remoteRetryState
@@ -3046,6 +3060,7 @@ async function dispatchWorkOrder(
             routeDigest: factoryBinding.modelRoute.routeDigest,
             routeSnapshot: factoryBinding.modelRoute.routeSnapshot,
             qualificationDigest: factoryBinding.modelRoute.qualificationDigest,
+            qualificationSnapshot: factoryBinding.modelRoute.qualificationSnapshot,
           },
           sandboxProfile: {
             isolation: "WORKSPACE_WRITE",
@@ -3729,8 +3744,18 @@ async function resolveFactoryDispatchBinding(
   ));
   const selectedExecutionBackend = version.executionBackend ?? "persistent-worker";
   const frozenHarness = resolveFrozenHarnessBinding(version);
-  const primaryAgentIndex = (version.agentBindings ?? []).findIndex((binding) => binding.workflowAgentId === workflow.steps?.[0]?.agent);
-  const primaryModel = agentVersions[primaryAgentIndex >= 0 ? primaryAgentIndex : 0]?.genome.modelConfig;
+  const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
+  const primaryModel = (() => {
+    try {
+      return resolveFactoryWorkflowModelRoute({
+        workflow,
+        agentBindings: version.agentBindings ?? [],
+        agentVersions,
+      });
+    } catch {
+      return null;
+    }
+  })();
   const requiredSandboxCapabilities = selectedExecutionBackend === "remote-sandbox"
     ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
     : ["git-worktree", "workspace-write"];
@@ -3759,7 +3784,10 @@ async function resolveFactoryDispatchBinding(
           version: frozenHarness.version,
           capabilityManifestSha256: frozenHarness.capabilityManifestSha256,
           effectiveConfigSha256: frozenHarness.effectiveConfigSha256,
+          runtimeArtifactSha256: adapterRuntimeArtifact.runtimeArtifactSha256,
+          requireFactoryVersionRuntimeArtifactBinding: Boolean(version.harnessRuntimeArtifactDigest),
         },
+        executionRuntimeArtifactSha256: frozenHarness.runtimeArtifactSha256,
         provider: primaryModel?.provider ?? null,
         model: primaryModel?.modelId ?? null,
         harnessCapabilities: factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
@@ -3805,12 +3833,19 @@ async function resolveFactoryDispatchBinding(
   });
   const modelRouteReady = Boolean(
     modelRoute
+    && primaryModel
     && modelRoute._id === version.modelCatalogId
-    && modelRoute.routeDigest === version.modelRouteDigest
-    && modelRoute.qualificationDigest === version.modelQualificationDigest
-    && JSON.stringify(modelRoute.routeSnapshot) === JSON.stringify(version.modelRouteSnapshot)
-    && JSON.stringify(modelRoute.qualificationSnapshot) === JSON.stringify(version.modelQualificationSnapshot)
-    && modelRouteProductionEligible(modelRoute)
+    && factoryWorkflowModelRouteMatches({
+      workflow,
+      agentBindings: version.agentBindings ?? [],
+      agentVersions,
+    }, version.modelRouteSnapshot as any)
+    && frozenFactoryModelRouteEligible({
+      route: modelRoute,
+      version,
+      harness: frozenHarness,
+      executionBackend: selectedExecutionBackend,
+    })
   );
   const activeStatuses = ["PENDING", "RUNNING", "PAUSED"] as const;
   const activeRuns = repository

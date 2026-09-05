@@ -194,6 +194,14 @@ export interface SandboxStartRequest {
     outputSchemaPath?: string;
     outputSchema?: Record<string, unknown>;
     model?: string;
+    provider?: string;
+    modelRouteDigest?: string;
+    providerRoute?: string;
+    reasoningConfig?: {
+      effort?: string;
+      temperature?: number;
+      maxTokens?: number;
+    };
     prompt: string;
     allowedPaths: string[];
     timeoutMs: number;

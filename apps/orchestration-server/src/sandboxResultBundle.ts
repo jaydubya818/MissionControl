@@ -28,6 +28,14 @@ export interface SandboxResultBundle {
     harnessVersion: string;
     provider: string;
     model: string;
+    /** Additive exact-route provenance. Legacy V1 bundles omit these fields. */
+    modelRouteDigest?: string;
+    providerRoute?: string;
+    reasoningConfig?: {
+      effort?: string;
+      temperature?: number;
+      maxTokens?: number;
+    };
   };
   environment: {
     provider: "EXE_DEV" | "FAKE";
@@ -144,6 +152,10 @@ export function parseAndValidateSandboxResultBundle(
     || bundle.harness.harnessVersion !== expected.harness.harnessVersion
     || bundle.harness.provider !== expected.harness.provider
     || bundle.harness.model !== expected.harness.model
+    || bundle.harness.modelRouteDigest !== expected.harness.modelRouteDigest
+    || bundle.harness.providerRoute !== expected.harness.providerRoute
+    || canonicalDigest("factory-model-route-reasoning/v1", bundle.harness.reasoningConfig ?? null)
+      !== canonicalDigest("factory-model-route-reasoning/v1", expected.harness.reasoningConfig ?? null)
     || bundle.environment.provider !== expected.environment.provider
     || bundle.environment.image !== expected.environment.image) {
     throw new Error("Sandbox result environment does not match the frozen supervisor and profile.");
@@ -197,6 +209,9 @@ function assertBundleShape(candidate: any): SandboxResultBundle {
     "completedAcceptanceCriterionIds", "incompleteAcceptanceCriterionIds", "unknownAcceptanceCriterionIds",
     "verificationCommands", "knownRisks",
   ];
+  const exactRoutePresent = candidate?.harness?.modelRouteDigest !== undefined
+    || candidate?.harness?.providerRoute !== undefined
+    || candidate?.harness?.reasoningConfig !== undefined;
   if (!candidate || typeof candidate !== "object"
     || candidate.schema !== SANDBOX_RESULT_SCHEMA
     || typeof candidate.digest !== "string" || !candidate.digest.startsWith("sha256:")
@@ -204,6 +219,10 @@ function assertBundleShape(candidate: any): SandboxResultBundle {
     || !Number.isSafeInteger(candidate.workOrderRevisionNumber) || candidate.workOrderRevisionNumber < 1
     || (candidate.candidateSha !== undefined && (typeof candidate.candidateSha !== "string" || !/^[a-f0-9]{40,64}$/i.test(candidate.candidateSha)))
     || ["adapter", "version", "harnessId", "harnessVersion", "provider", "model"].some((field) => typeof candidate.harness?.[field] !== "string" || !candidate.harness[field])
+    || (exactRoutePresent && (!/^sha256:[a-f0-9]{64}$/i.test(candidate.harness?.modelRouteDigest ?? "")
+      || typeof candidate.harness?.providerRoute !== "string"
+      || !boundedLowercaseIdentity(candidate.harness.providerRoute, 100)
+      || !validReasoningConfig(candidate.harness?.reasoningConfig)))
     || !["EXE_DEV", "FAKE"].includes(candidate.environment?.provider) || typeof candidate.environment?.image !== "string" || !candidate.environment.image
     || !Number.isFinite(candidate.startedAt) || !Number.isFinite(candidate.finishedAt) || candidate.finishedAt < candidate.startedAt
     || !["COMPLETED", "FAILED", "CANCELED", "TIMED_OUT"].includes(candidate.status)
@@ -266,4 +285,25 @@ function assertBundleShape(candidate: any): SandboxResultBundle {
     throw new Error("Failed sandbox result is missing its typed failure decision.");
   }
   return candidate as SandboxResultBundle;
+}
+
+function validReasoningConfig(reasoning: unknown) {
+  if (reasoning === undefined) return true;
+  if (!reasoning || typeof reasoning !== "object" || Array.isArray(reasoning)) return false;
+  const value = reasoning as Record<string, unknown>;
+  const keys = Object.keys(value);
+  return keys.length > 0
+    && keys.every((key) => ["effort", "temperature", "maxTokens"].includes(key))
+    && (value.effort === undefined || boundedLowercaseIdentity(value.effort, 64))
+    && (value.temperature === undefined || (typeof value.temperature === "number" && Number.isFinite(value.temperature) && value.temperature >= 0 && value.temperature <= 2))
+    && (value.maxTokens === undefined || (Number.isSafeInteger(value.maxTokens) && (value.maxTokens as number) >= 1 && (value.maxTokens as number) <= 10_000_000));
+}
+
+function boundedLowercaseIdentity(value: unknown, maximum: number): value is string {
+  return typeof value === "string"
+    && value === value.trim()
+    && value === value.toLowerCase()
+    && value.length > 0
+    && value.length <= maximum
+    && !/[\0\r\n]/.test(value);
 }

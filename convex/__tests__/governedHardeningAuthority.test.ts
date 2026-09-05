@@ -59,7 +59,7 @@ describe("Governed Hardening authority invariants", () => {
     expect(read("convex/factory/learning.ts")).toContain("acceptanceAuthority: false");
     const routing = read("convex/lib/executionRouting.ts");
     expect(routing).toContain("resolveExecutionRoute");
-    expect(routing).toContain("modelRouteProductionEligible");
+    expect(routing).toContain("frozenFactoryModelRouteEligible");
     expect(routing).toContain("sandboxProfileProductionEligible");
     expect(routing).toContain("factoryWorkerEligibility");
   });

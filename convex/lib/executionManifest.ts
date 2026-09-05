@@ -1,13 +1,29 @@
 import { computeCanonicalHash } from "./genomeHash";
-import type { HarnessCapabilityManifest } from "@mission-control/workflow-engine/harness-contract";
+import type {
+  HarnessCapabilityManifest,
+  HarnessRuntimeArtifactIdentity,
+} from "@mission-control/workflow-engine/harness-contract";
 import {
   harnessCapabilityManifestDigest,
   harnessCapabilityRequirementsSatisfied,
   harnessManifestIssues,
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
   harnessSupportsModel,
 } from "@mission-control/workflow-engine/harness-contract";
 import { factoryHarnessCapabilityRequirements } from "./harnessCapabilities";
-import { exactModelRouteDigest, exactModelRouteIssues } from "./modelRouteAdmission";
+import {
+  EXACT_MODEL_ROUTE_SCHEMA,
+  LEGACY_EXACT_MODEL_ROUTE_SCHEMA,
+  LEGACY_MODEL_ROUTE_QUALIFICATION_SCHEMA,
+  MODEL_ROUTE_QUALIFICATION_SCHEMA,
+  exactModelRouteDigest,
+  exactModelRouteIssues,
+  legacyModelRouteMatchesExecution,
+  modelRouteExecutionCompatibilityMatches,
+  modelRouteQualificationDigest,
+  modelRouteQualificationIssues,
+} from "./modelRouteAdmission";
 
 export function factorySandboxResourceName(input: {
   projectId: string;
@@ -52,13 +68,16 @@ export interface FactoryExecutionManifestInput {
     capabilityManifest: HarnessCapabilityManifest;
     capabilityManifestSha256: string;
     effectiveConfigSha256: string;
+    runtimeArtifact: HarnessRuntimeArtifactIdentity;
+    runtimeArtifactDigest: string;
   };
   executionBackend: string;
-  modelRoute?: {
+  modelRoute: {
     catalogId: string;
     routeDigest: string;
     routeSnapshot: unknown;
     qualificationDigest: string;
+    qualificationSnapshot: unknown;
   };
   sandboxProfile: {
     isolation: "READ_ONLY" | "WORKSPACE_WRITE";
@@ -169,6 +188,11 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
     || input.executor.effectiveConfigSha256 !== input.executor.capabilityManifest.effectiveConfigSha256) {
     throw new Error("Execution manifest requires an exact valid harness capability and effective-configuration binding.");
   }
+  if (harnessRuntimeArtifactIssues(input.executor.runtimeArtifact).length > 0
+    || !/^sha256:[a-f0-9]{64}$/i.test(input.executor.runtimeArtifactDigest)
+    || harnessRuntimeArtifactDigest(input.executor.runtimeArtifact) !== input.executor.runtimeArtifactDigest) {
+    throw new Error("Execution manifest requires an exact valid harness runtime-artifact binding.");
+  }
   if (!input.executor.capabilityManifest.admission.executionBackends.includes(input.executionBackend)) {
     throw new Error("Selected harness does not support the execution backend.");
   }
@@ -178,23 +202,69 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
   if (input.executionBackend !== "remote-sandbox" && input.sandbox) {
     throw new Error("A Sandbox Profile cannot be attached to a non-sandbox execution backend.");
   }
-  if (input.modelRoute && (
+  if (!executionRuntimeArtifactMatchesBackend(
+    input.executor.runtimeArtifact,
+    input.executionBackend,
+    input.sandbox?.profileSnapshot,
+  )) {
+    throw new Error("Execution manifest runtime artifact does not match the exact frozen backend environment.");
+  }
+  if (!input.modelRoute || (
     exactModelRouteIssues(input.modelRoute.routeSnapshot).length > 0
     || exactModelRouteDigest(input.modelRoute.routeSnapshot) !== input.modelRoute.routeDigest
-    || !/^sha256:[a-f0-9]{64}$/i.test(input.modelRoute.qualificationDigest)
+    || modelRouteQualificationIssues(input.modelRoute.qualificationSnapshot).length > 0
+    || modelRouteQualificationDigest(input.modelRoute.qualificationSnapshot) !== input.modelRoute.qualificationDigest
   )) {
     throw new Error("Execution manifest requires an exact qualified model-route binding.");
+  }
+  const routeSnapshot = input.modelRoute.routeSnapshot as Record<string, any>;
+  const qualificationSnapshot = input.modelRoute.qualificationSnapshot as Record<string, any>;
+  if (qualificationSnapshot.routeDigest !== input.modelRoute.routeDigest
+    || (routeSnapshot.schema === EXACT_MODEL_ROUTE_SCHEMA
+      && qualificationSnapshot.schema !== MODEL_ROUTE_QUALIFICATION_SCHEMA)
+    || (routeSnapshot.schema === LEGACY_EXACT_MODEL_ROUTE_SCHEMA
+      && qualificationSnapshot.schema !== LEGACY_MODEL_ROUTE_QUALIFICATION_SCHEMA)) {
+    throw new Error("Execution manifest requires matching model-route and qualification schema bindings.");
+  }
+  if (routeSnapshot.schema === EXACT_MODEL_ROUTE_SCHEMA
+    && !modelRouteExecutionCompatibilityMatches(input.modelRoute.qualificationSnapshot, {
+      adapter: input.executor.adapter,
+      version: input.executor.version,
+      capabilityManifestDigest: input.executor.capabilityManifestSha256,
+      effectiveConfigSha256: input.executor.effectiveConfigSha256,
+      runtimeArtifactDigest: input.executor.runtimeArtifactDigest,
+      executionBackend: input.executionBackend as "persistent-worker" | "remote-sandbox",
+    })) {
+    throw new Error("Execution manifest model-route qualification does not admit the frozen harness, runtime artifact, and backend.");
   }
   const allowedPaths = Array.from(new Set(input.codeScopes.flatMap((scope) => scope.includePaths))).sort();
   const excludedPaths = Array.from(new Set(input.codeScopes.flatMap((scope) => scope.excludePaths))).sort();
   const contextHash = `sha256:${computeCanonicalHash(input.initialContext)}`;
   const bindings = new Map(input.agentBindings.map((binding) => [binding.workflowAgentId, binding]));
+  const executableRoutes: Array<{
+    stepId: string;
+    provider: string;
+    modelId: string;
+    temperature?: number;
+    maxTokens?: number;
+  }> = [];
   const steps = input.workflow.steps.map((step) => {
     const binding = bindings.get(step.agent);
     if (!binding) throw new Error(`Execution manifest is missing agent binding ${step.agent}.`);
+    const kind = step.kind ?? "AGENT";
+    const resolvedModel = input.routedModel ?? binding.model.modelId;
+    if (kind !== "GATE") {
+      executableRoutes.push({
+        stepId: step.id,
+        provider: binding.model.provider,
+        modelId: resolvedModel,
+        ...(binding.model.temperature !== undefined ? { temperature: binding.model.temperature } : {}),
+        ...(binding.model.maxTokens !== undefined ? { maxTokens: binding.model.maxTokens } : {}),
+      });
+    }
     return {
       stepId: step.id,
-      kind: step.kind ?? "AGENT",
+      kind,
       workflowAgentId: step.agent,
       agentVersionId: binding.agentVersionId,
       agentVersion: binding.agentVersion,
@@ -203,83 +273,180 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
       promptTemplate: step.input,
       toolManifestHash: binding.toolManifestHash,
       allowedTools: [...input.allowedTools].sort(),
-      modelRoute: input.routedModel ?? binding.model.modelId,
+      modelRoute: resolvedModel,
       modelConfiguration: binding.model,
       timeoutMs: Math.min(step.timeoutMinutes, input.maxRuntimeMinutes) * 60_000,
       outputSchema: step.outputSchema,
       contextHash,
     };
   });
-  const firstStep = steps[0];
-  if (!firstStep || !harnessSupportsModel(input.executor.capabilityManifest, firstStep.modelConfiguration.provider, firstStep.modelRoute)) {
-    throw new Error("Selected harness capability manifest does not admit the frozen provider/model route.");
+  const executionRoute = executableRoutes[0];
+  if (!executionRoute) {
+    throw new Error("Execution manifest requires at least one executable workflow model role.");
   }
-  const routeSnapshot = input.modelRoute?.routeSnapshot as Record<string, any> | undefined;
-  if (routeSnapshot && (
-    routeSnapshot.provider !== firstStep.modelConfiguration.provider
-    || routeSnapshot.modelId !== firstStep.modelRoute
-    || routeSnapshot.capabilityIdentity?.adapter !== input.executor.adapter
-    || routeSnapshot.capabilityIdentity?.version !== input.executor.version
-    || routeSnapshot.capabilityIdentity?.capabilityManifestDigest !== input.executor.capabilityManifestSha256
-    || routeSnapshot.capabilityIdentity?.effectiveConfigSha256 !== input.executor.effectiveConfigSha256
-  )) {
-    throw new Error("Execution manifest model route does not match the frozen harness and agent identity.");
+  if (executableRoutes.some((route) => (
+    route.provider !== executionRoute.provider
+    || route.modelId !== executionRoute.modelId
+    || (routeSnapshot.schema === EXACT_MODEL_ROUTE_SCHEMA && (
+      route.temperature !== executionRoute.temperature
+      || route.maxTokens !== executionRoute.maxTokens
+    ))
+  ))) {
+    throw new Error("Every executable workflow role must resolve to the same exact inference route.");
+  }
+  if (routeSnapshot.provider !== executionRoute.provider || routeSnapshot.modelId !== executionRoute.modelId) {
+    throw new Error("Execution manifest model route does not match the frozen executable workflow identity.");
+  }
+  if (routeSnapshot.schema === EXACT_MODEL_ROUTE_SCHEMA
+    && (routeSnapshot.reasoningConfig?.temperature !== executionRoute.temperature
+      || routeSnapshot.reasoningConfig?.maxTokens !== executionRoute.maxTokens)) {
+    throw new Error("Execution manifest reasoning controls do not match the frozen executable workflow identity.");
+  }
+  if (executableRoutes.some((route) => !harnessSupportsModel(
+    input.executor.capabilityManifest,
+    route.provider,
+    route.modelId,
+  ))) {
+    throw new Error("Selected harness capability manifest does not admit every frozen executable provider/model route.");
+  }
+  if (routeSnapshot.schema === LEGACY_EXACT_MODEL_ROUTE_SCHEMA
+    && (!legacyModelRouteMatchesExecution(routeSnapshot, {
+      adapter: input.executor.adapter,
+      version: input.executor.version,
+      capabilityManifestDigest: input.executor.capabilityManifestSha256,
+      effectiveConfigSha256: input.executor.effectiveConfigSha256,
+      executionBackend: input.executionBackend as "persistent-worker" | "remote-sandbox",
+      executableSha256: input.executor.runtimeArtifact.executableSha256 ?? undefined,
+      imageDigest: input.executor.runtimeArtifact.imageDigest ?? undefined,
+    }) || !legacyRuntimeArtifactMatches(
+      routeSnapshot,
+      input.executor.runtimeArtifact,
+      input.executionBackend,
+    ))) {
+    throw new Error("Legacy execution manifest route does not match the frozen harness and runtime artifact.");
   }
   const requiredHarnessCapabilities = factoryHarnessCapabilityRequirements(input.sandboxProfile.isolation);
   if (!harnessCapabilityRequirementsSatisfied(input.executor.capabilityManifest, requiredHarnessCapabilities)) {
     throw new Error("Selected harness does not satisfy the frozen Attempt capability requirements.");
   }
   const compiledPrompt = compileFactoryPrompt(input, allowedPaths, excludedPaths);
+  const causation = {
+    missionId: input.missionId,
+    missionPlanId: input.missionPlanId,
+    missionPlanVersion: input.missionPlanVersion,
+    planningRepositorySha: input.planningRepositorySha,
+    qualityContractDigest: input.qualityContractDigest,
+    workOrderId: input.workOrderId,
+    workOrderRevisionNumber: input.workOrderRevisionNumber,
+    workOrderRevisionId: input.workOrderRevisionId,
+    ...(input.taskId ? { taskId: input.taskId } : {}),
+    workflowRunId: input.runId,
+    factoryDefinitionVersionId: input.factoryDefinitionVersionId,
+    factoryConfigurationDigest: input.factoryConfigurationDigest,
+    factoryPurpose: input.factoryPurpose,
+  };
+  const repository = {
+    repositoryId: input.repositoryId,
+    repository: input.repository,
+    dataClassification: input.repositoryDataClassification,
+    defaultBranch: input.defaultBranch,
+    baseSha: input.baseSha,
+    planningRepositorySha: input.planningRepositorySha,
+    branch: input.branch,
+    worktree: input.worktree,
+    codeScopeIds: input.codeScopes.map((scope) => scope.id).sort(),
+    allowedPaths,
+    excludedPaths,
+  };
+  const intent = {
+    title: input.workOrder.title,
+    desiredOutcome: input.workOrder.desiredOutcome,
+    acceptanceCriterionIds: input.workOrder.acceptanceCriteria.map((criterion) => criterion.id),
+    ...(input.task ? { selectedTask: input.task } : {}),
+  };
+  const workOrderSpecification = {
+    schemaVersion: 1,
+    requirements: input.workOrder.requirements ?? [],
+    acceptanceCriteria: input.workOrder.acceptanceCriteria,
+    positiveConstraints: input.workOrder.positiveConstraints ?? [],
+    negativeConstraints: input.workOrder.negativeConstraints ?? [],
+    dataBoundaries: input.workOrder.dataBoundaries ?? [],
+    changeBudget: input.workOrder.changeBudget,
+    verificationContract: input.workOrder.verificationContract,
+    autonomyLevel: input.workOrder.autonomyLevel,
+    riskLevel: input.workOrder.riskLevel,
+    riskReasons: input.workOrder.riskReasons ?? [],
+    requiredApprovals: input.workOrder.requiredApprovals ?? [],
+  };
+  const retryPolicy = {
+    schema: "factory-remote-retry-policy/v1",
+    maxAttempts: input.maxAttempts,
+    maxTotalWallClockMs: input.maxRuntimeMinutes * 60_000,
+    maxModelSpendUsd: input.maxCostUsd,
+    maxProviderResources: 1,
+    retryableFailureClasses: ["RETRYABLE_INFRA", "RETRYABLE_EXECUTION"] as const,
+    failClosedFailureClasses: ["NON_RETRYABLE_RESULT", "UNKNOWN"] as const,
+  };
+  const workflow = {
+    workflowId: input.workflow.workflowId,
+    workflowVersion: input.workflow.version,
+    contextHash,
+    steps,
+  };
+  const compiledPromptHash = `sha256:${computeCanonicalHash(compiledPrompt)}`;
+
+  if (routeSnapshot.schema === LEGACY_EXACT_MODEL_ROUTE_SCHEMA) {
+    const manifest = {
+      version: "factory-execution-manifest/v1" as const,
+      causation,
+      repository,
+      intent,
+      workOrderSpecification,
+      harness: {
+        adapter: input.executor.adapter,
+        version: input.executor.version,
+        harnessId: input.executor.capabilityManifest.identity.harnessId,
+        harnessVersion: input.executor.capabilityManifest.identity.harnessVersion,
+        harnessCommit: input.executor.capabilityManifest.identity.harnessCommit,
+        capabilityManifest: input.executor.capabilityManifest,
+        capabilityManifestSha256: input.executor.capabilityManifestSha256,
+        effectiveConfigSha256: input.executor.effectiveConfigSha256,
+        provider: executionRoute.provider,
+        model: executionRoute.modelId,
+        modelCatalogId: input.modelRoute.catalogId,
+        modelRouteDigest: input.modelRoute.routeDigest,
+        modelRouteSnapshot: input.modelRoute.routeSnapshot,
+        modelQualificationDigest: input.modelRoute.qualificationDigest,
+        isolation: input.sandboxProfile.isolation,
+        executionBackend: input.executionBackend,
+        requiredCapabilities: [...new Set(input.sandboxProfile.requiredCapabilities)].sort(),
+        requiredHarnessCapabilities,
+        timeoutMs: input.maxRuntimeMinutes * 60_000,
+        completionContract: "factory-result/v1",
+        pullRequestAuthority: "CONTROL_PLANE_ONLY",
+      },
+      retryPolicy,
+      sandbox: input.sandbox,
+      workflow,
+      compiledPromptHash,
+      compiledPrompt,
+    };
+    const persistedManifest = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
+    return {
+      manifest: persistedManifest,
+      digest: `sha256:${computeCanonicalHash(persistedManifest)}`,
+    };
+  }
+
+  if (routeSnapshot.schema !== EXACT_MODEL_ROUTE_SCHEMA) {
+    throw new Error("Execution manifest requires a supported exact model-route schema.");
+  }
   const manifest = {
-    version: "factory-execution-manifest/v1",
-    causation: {
-      missionId: input.missionId,
-      missionPlanId: input.missionPlanId,
-      missionPlanVersion: input.missionPlanVersion,
-      planningRepositorySha: input.planningRepositorySha,
-      qualityContractDigest: input.qualityContractDigest,
-      workOrderId: input.workOrderId,
-      workOrderRevisionNumber: input.workOrderRevisionNumber,
-      workOrderRevisionId: input.workOrderRevisionId,
-      ...(input.taskId ? { taskId: input.taskId } : {}),
-      workflowRunId: input.runId,
-      factoryDefinitionVersionId: input.factoryDefinitionVersionId,
-      factoryConfigurationDigest: input.factoryConfigurationDigest,
-      factoryPurpose: input.factoryPurpose,
-    },
-    repository: {
-      repositoryId: input.repositoryId,
-      repository: input.repository,
-      dataClassification: input.repositoryDataClassification,
-      defaultBranch: input.defaultBranch,
-      baseSha: input.baseSha,
-      planningRepositorySha: input.planningRepositorySha,
-      branch: input.branch,
-      worktree: input.worktree,
-      codeScopeIds: input.codeScopes.map((scope) => scope.id).sort(),
-      allowedPaths,
-      excludedPaths,
-    },
-    intent: {
-      title: input.workOrder.title,
-      desiredOutcome: input.workOrder.desiredOutcome,
-      acceptanceCriterionIds: input.workOrder.acceptanceCriteria.map((criterion) => criterion.id),
-      ...(input.task ? { selectedTask: input.task } : {}),
-    },
-    workOrderSpecification: {
-      schemaVersion: 1,
-      requirements: input.workOrder.requirements ?? [],
-      acceptanceCriteria: input.workOrder.acceptanceCriteria,
-      positiveConstraints: input.workOrder.positiveConstraints ?? [],
-      negativeConstraints: input.workOrder.negativeConstraints ?? [],
-      dataBoundaries: input.workOrder.dataBoundaries ?? [],
-      changeBudget: input.workOrder.changeBudget,
-      verificationContract: input.workOrder.verificationContract,
-      autonomyLevel: input.workOrder.autonomyLevel,
-      riskLevel: input.workOrder.riskLevel,
-      riskReasons: input.workOrder.riskReasons ?? [],
-      requiredApprovals: input.workOrder.requiredApprovals ?? [],
-    },
+    version: "factory-execution-manifest/v2" as const,
+    causation,
+    repository,
+    intent,
+    workOrderSpecification,
     harness: {
       adapter: input.executor.adapter,
       version: input.executor.version,
@@ -289,37 +456,27 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
       capabilityManifest: input.executor.capabilityManifest,
       capabilityManifestSha256: input.executor.capabilityManifestSha256,
       effectiveConfigSha256: input.executor.effectiveConfigSha256,
-      provider: firstStep.modelConfiguration.provider,
-      model: firstStep.modelRoute,
-      modelCatalogId: input.modelRoute?.catalogId,
-      modelRouteDigest: input.modelRoute?.routeDigest,
-      modelRouteSnapshot: input.modelRoute?.routeSnapshot,
-      modelQualificationDigest: input.modelRoute?.qualificationDigest,
+      runtimeArtifact: input.executor.runtimeArtifact,
+      runtimeArtifactDigest: input.executor.runtimeArtifactDigest,
       isolation: input.sandboxProfile.isolation,
-      executionBackend: input.executionBackend,
       requiredCapabilities: [...new Set(input.sandboxProfile.requiredCapabilities)].sort(),
       requiredHarnessCapabilities,
       timeoutMs: input.maxRuntimeMinutes * 60_000,
       completionContract: "factory-result/v1",
       pullRequestAuthority: "CONTROL_PLANE_ONLY",
     },
-    retryPolicy: {
-      schema: "factory-remote-retry-policy/v1",
-      maxAttempts: input.maxAttempts,
-      maxTotalWallClockMs: input.maxRuntimeMinutes * 60_000,
-      maxModelSpendUsd: input.maxCostUsd,
-      maxProviderResources: 1,
-      retryableFailureClasses: ["RETRYABLE_INFRA", "RETRYABLE_EXECUTION"] as const,
-      failClosedFailureClasses: ["NON_RETRYABLE_RESULT", "UNKNOWN"] as const,
+    modelRoute: {
+      catalogId: input.modelRoute.catalogId,
+      routeDigest: input.modelRoute.routeDigest,
+      routeSnapshot: input.modelRoute.routeSnapshot,
+      qualificationDigest: input.modelRoute.qualificationDigest,
+      qualificationSnapshot: input.modelRoute.qualificationSnapshot,
     },
+    executionBackend: input.executionBackend,
+    retryPolicy,
     sandbox: input.sandbox,
-    workflow: {
-      workflowId: input.workflow.workflowId,
-      workflowVersion: input.workflow.version,
-      contextHash,
-      steps,
-    },
-    compiledPromptHash: `sha256:${computeCanonicalHash(compiledPrompt)}`,
+    workflow,
+    compiledPromptHash,
     compiledPrompt,
   };
   const persistedManifest = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
@@ -327,6 +484,51 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
     manifest: persistedManifest,
     digest: `sha256:${computeCanonicalHash(persistedManifest)}`,
   };
+}
+
+function legacyRuntimeArtifactMatches(
+  routeSnapshot: Record<string, any>,
+  artifact: HarnessRuntimeArtifactIdentity,
+  executionBackend: string,
+) {
+  const runtime = routeSnapshot.runtimeIdentity;
+  if (artifact.version !== runtime.cliVersion) return false;
+  if (executionBackend === "persistent-worker") {
+    return artifact.kind === "EXECUTABLE"
+      && artifact.executableSha256 === runtime.executableSha256;
+  }
+  if (executionBackend === "remote-sandbox") {
+    return artifact.kind === "CONTAINER_IMAGE"
+      && artifact.imageDigest === runtime.imageDigest;
+  }
+  return false;
+}
+
+function executionRuntimeArtifactMatchesBackend(
+  artifact: HarnessRuntimeArtifactIdentity,
+  executionBackend: string,
+  sandboxProfileSnapshot: unknown,
+) {
+  if (executionBackend === "persistent-worker") {
+    return artifact.kind === "EXECUTABLE"
+      && Boolean(artifact.executableSha256)
+      && artifact.imageDigest === null;
+  }
+  if (executionBackend !== "remote-sandbox") return false;
+  const snapshot = sandboxProfileSnapshot as Record<string, any> | undefined;
+  const securityDigest = snapshot?.security?.image?.digest;
+  const referenceDigest = typeof snapshot?.machine?.image === "string"
+    ? snapshot.machine.image.match(/@(sha256:[a-f0-9]{64})$/i)?.[1]
+    : undefined;
+  const exactImageDigest = typeof securityDigest === "string" && /^sha256:[a-f0-9]{64}$/i.test(securityDigest)
+    ? (referenceDigest && referenceDigest.toLowerCase() === securityDigest.toLowerCase()
+        ? securityDigest.toLowerCase()
+        : undefined)
+    : referenceDigest?.toLowerCase();
+  return artifact.kind === "CONTAINER_IMAGE"
+    && artifact.executableSha256 === null
+    && Boolean(exactImageDigest)
+    && artifact.imageDigest?.toLowerCase() === exactImageDigest;
 }
 
 function compileFactoryPrompt(

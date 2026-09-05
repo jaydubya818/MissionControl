@@ -12,6 +12,7 @@ import {
   matchesWorkerScope,
   type FactoryAttemptWorkerDependencies,
 } from "../factoryAttemptWorker.js";
+import { HarnessAdapterRegistry } from "../harnessAdapterRegistry.js";
 import {
   assertFactoryCandidateUnchanged,
   commitFactoryChanges,
@@ -23,7 +24,12 @@ import {
 } from "../factoryGitRuntime.js";
 import { executeIndependentVerification } from "../factoryVerification.js";
 import { canonicalHash } from "@mission-control/shared";
-import { CODEX_V1_HARNESS_MANIFEST, harnessCapabilityManifestDigest } from "@mission-control/workflow-engine";
+import {
+  CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
+  harnessCapabilityManifestDigest,
+  harnessRuntimeArtifactDigest,
+} from "@mission-control/workflow-engine";
 
 const execFileAsync = promisify(execFile);
 const cleanup: string[] = [];
@@ -59,6 +65,32 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     });
   });
 
+  it("remains inert with an empty registry when Factory execution is disabled", async () => {
+    const client = { query: vi.fn(), action: vi.fn() } as any;
+    const worker = new FactoryAttemptWorker(
+      client,
+      new HarnessAdapterRegistry([]),
+      false,
+      60_000,
+    );
+
+    await worker.tick();
+
+    expect(client.query).not.toHaveBeenCalled();
+    expect(client.action).not.toHaveBeenCalled();
+    expect(worker.status()).toMatchObject({ enabled: false, activeRunIds: [] });
+    await worker.stop();
+  });
+
+  it("rejects an enabled Factory worker with no explicitly configured adapter", () => {
+    expect(() => new FactoryAttemptWorker(
+      {} as any,
+      new HarnessAdapterRegistry([]),
+      true,
+      60_000,
+    )).toThrow("Factory execution is enabled, but no harness adapters were explicitly configured.");
+  });
+
   it("does not claim or fall back when the frozen harness identity is unsupported", async () => {
     const unsupported = {
       _id: "workflow-run-unsupported",
@@ -67,18 +99,19 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       repositoryId: "repository-1",
       factoryDefinitionVersionId: "factory-version-1",
       executionManifestDigest: "sha256:manifest",
-      executorAdapter: "loom",
+      executorAdapter: "deepagents",
       executorVersion: "v1",
-      executionManifest: { harness: { adapter: "loom", version: "v1", executionBackend: "persistent-worker" } },
+      executionManifest: { harness: { adapter: "deepagents", version: "v1", executionBackend: "persistent-worker" } },
       status: "PENDING",
     };
     const client = {
       query: vi.fn(async (_query: unknown, args: any) => args.status === "PENDING" ? [unsupported] : []),
       action: vi.fn(),
     } as any;
+    const codexRunner = vi.fn();
     const worker = new FactoryAttemptWorker(
       client,
-      new CodexV1ExecutorAdapter("codex-fixture", vi.fn() as any),
+      new CodexV1ExecutorAdapter("codex-fixture", codexRunner as any),
       true,
       60_000,
     );
@@ -86,6 +119,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     await worker.tick();
 
     expect(client.action).not.toHaveBeenCalled();
+    expect(codexRunner).not.toHaveBeenCalled();
     expect(worker.status().activeRunIds).toEqual([]);
     await worker.stop();
   });
@@ -162,6 +196,67 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       }),
     ]));
     expect(fixture.reports.at(-1)?.terminal).toEqual({ status: "COMPLETED" });
+    await fixture.worker.stop();
+  });
+
+  it("uses only the frozen V2 provider/model route and ignores a mutable claim model override", async () => {
+    const fixture = await runFixture("VERIFIED", {
+      manifestVersion: 2,
+      claimModel: "claim-controlled-model-must-not-execute",
+    });
+
+    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    const invocation = fixture.executeCodex.mock.calls[0]?.[0] as { argv?: string[] } | undefined;
+    expect(invocation?.argv).toContain("gpt-5.6-terra");
+    expect(invocation?.argv).toContain('model_reasoning_effort="high"');
+    expect(invocation?.argv).not.toContain("claim-controlled-model-must-not-execute");
+    await fixture.worker.stop();
+  });
+
+  it("fails closed when V2 normalized provenance reports a different runtime executable", async () => {
+    const fixture = await runFixture("VERIFIED", {
+      manifestVersion: 2,
+      resultExecutableSha256: "f".repeat(64),
+    });
+
+    await vi.waitFor(() => expect(fixture.worker.status().failedCount).toBe(1));
+    expect(fixture.executeCodex).toHaveBeenCalledOnce();
+    expect(fixture.createPullRequest).not.toHaveBeenCalled();
+    expect(fixture.reports.at(-1)?.terminal).toMatchObject({
+      status: "FAILED",
+      failureReason: expect.stringContaining("normalized result does not match the frozen Attempt identity"),
+    });
+    await fixture.worker.stop();
+  });
+
+  it("fails closed when legacy V1 normalized provenance reports a different runtime executable", async () => {
+    const fixture = await runFixture("VERIFIED", {
+      resultExecutableSha256: "f".repeat(64),
+    });
+
+    await vi.waitFor(() => expect(fixture.worker.status().failedCount).toBe(1));
+    expect(fixture.executeCodex).toHaveBeenCalledOnce();
+    expect(fixture.createPullRequest).not.toHaveBeenCalled();
+    expect(fixture.reports.at(-1)?.terminal).toMatchObject({
+      status: "FAILED",
+      failureReason: expect.stringContaining("normalized result does not match the frozen Attempt identity"),
+    });
+    await fixture.worker.stop();
+  });
+
+  it("fails closed when V2 normalized provenance reports a different provider route", async () => {
+    const fixture = await runFixture("VERIFIED", {
+      manifestVersion: 2,
+      resultProviderRoute: "openrouter",
+    });
+
+    await vi.waitFor(() => expect(fixture.worker.status().failedCount).toBe(1));
+    expect(fixture.executeCodex).toHaveBeenCalledOnce();
+    expect(fixture.createPullRequest).not.toHaveBeenCalled();
+    expect(fixture.reports.at(-1)?.terminal).toMatchObject({
+      status: "FAILED",
+      failureReason: expect.stringContaining("normalized result does not match the frozen Attempt identity"),
+    });
     await fixture.worker.stop();
   });
 
@@ -389,6 +484,10 @@ async function runFixture(
     isMutating?: boolean;
     noVerificationContract?: boolean;
     harness?: { adapter: string; version: string; displayName: string; provider: string };
+    manifestVersion?: 1 | 2;
+    claimModel?: string;
+    resultExecutableSha256?: string;
+    resultProviderRoute?: string;
   } = {},
 ) {
   const attempt = options.attempt ?? 1;
@@ -406,7 +505,12 @@ async function runFixture(
 
   const worktree = path.join(checkoutRoot, ".mission-control", "worktrees", `attempt-${attempt}`);
   const reports: any[] = [];
-  const manifest = executionManifest({ attempt, dirtyVerification: options.dirtyVerification, baseSha });
+  const manifest = executionManifest({
+    attempt,
+    dirtyVerification: options.dirtyVerification,
+    baseSha,
+    version: options.manifestVersion,
+  });
   if (options.noVerificationContract) {
     delete (manifest.workOrderSpecification as { verificationContract?: unknown }).verificationContract;
   }
@@ -445,6 +549,7 @@ async function runFixture(
     repository: "sellerfi/mission-control-fixture",
     providerRepositoryId: "101",
     installation: { appId: "202", installationId: "303" },
+    model: options.claimModel,
     executionManifest: manifest,
   };
   let lifecycle: "INITIAL" | "PAUSED" | "RESUME" | "COMPLETED" = "INITIAL";
@@ -544,8 +649,17 @@ async function runFixture(
       timedOut: false,
     };
   });
-  const codexAdapter = new CodexV1ExecutorAdapter("codex-fixture", executeCodex);
-  const adapter = options.harness ? withHarnessIdentity(codexAdapter, options.harness) : codexAdapter;
+  const codexAdapter = new CodexV1ExecutorAdapter(
+    "codex-fixture",
+    executeCodex,
+    async () => CODEX_V1_RUNTIME_ARTIFACT.executableSha256,
+  );
+  const identifiedAdapter = options.harness ? withHarnessIdentity(codexAdapter, options.harness) : codexAdapter;
+  const adapter = withV2RuntimeProvenance(
+    identifiedAdapter,
+    options.resultExecutableSha256,
+    options.resultProviderRoute,
+  );
   const createPullRequest = vi.fn(async (input: Parameters<FactoryAttemptWorkerDependencies["createOrReusePullRequest"]>[0]) => ({
     number: 42,
     url: "https://github.com/sellerfi/mission-control-fixture/pull/42",
@@ -603,11 +717,15 @@ function withHarnessIdentity(
   identity: { adapter: string; version: string; displayName: string; provider: string },
 ) {
   const manifest = fixtureHarnessManifest(identity);
+  const runtimeArtifact = { ...CODEX_V1_RUNTIME_ARTIFACT, name: identity.adapter };
   return {
-    capabilities: () => ({ ...adapter.capabilities(), ...identity, capabilityManifest: manifest }),
+    capabilities: () => ({ ...adapter.capabilities(), ...identity, capabilityManifest: manifest, runtimeArtifact }),
     validateConfiguration: () => [],
     estimate: adapter.estimate.bind(adapter),
-    prepare: (request: any, context: any) => adapter.prepare({ ...request, provider: "openai" }, context),
+    prepare: async (request: any, context: any) => ({
+      ...await adapter.prepare(request, context),
+      configurationIssues: [],
+    }),
     execute: adapter.execute.bind(adapter),
     collectResult: async (handle: Parameters<typeof adapter.collectResult>[0]) => {
       const result = await adapter.collectResult(handle);
@@ -616,6 +734,32 @@ function withHarnessIdentity(
         result.normalizedResult.provenance.capabilityManifestSha256 = harnessCapabilityManifestDigest(manifest);
         result.normalizedResult.provenance.effectiveConfigSha256 = manifest.effectiveConfigSha256;
         result.normalizedResult.provenance.provider = identity.provider;
+        result.normalizedResult.provenance.runtimeArtifact = runtimeArtifact;
+        result.normalizedResult.provenance.runtimeArtifactDigest = harnessRuntimeArtifactDigest(runtimeArtifact);
+      }
+      return result;
+    },
+    cancel: adapter.cancel.bind(adapter),
+    cleanup: adapter.cleanup.bind(adapter),
+    health: adapter.health.bind(adapter),
+    createRemoteInvocation: adapter.createRemoteInvocation.bind(adapter),
+  } as any;
+}
+
+function withV2RuntimeProvenance(adapter: any, executableSha256?: string, providerRoute?: string) {
+  return {
+    capabilities: adapter.capabilities.bind(adapter),
+    validateConfiguration: adapter.validateConfiguration.bind(adapter),
+    estimate: adapter.estimate.bind(adapter),
+    prepare: adapter.prepare.bind(adapter),
+    execute: adapter.execute.bind(adapter),
+    collectResult: async (handle: any) => {
+      const result = await adapter.collectResult(handle);
+      if (result.normalizedResult) {
+        result.normalizedResult.provenance.executableSha256 = executableSha256
+          ?? CODEX_V1_RUNTIME_ARTIFACT.executableSha256;
+        result.normalizedResult.provenance.providerRoute = providerRoute
+          ?? result.normalizedResult.provenance.providerRoute;
       }
       return result;
     },
@@ -659,8 +803,8 @@ function completedFactoryResult() {
   };
 }
 
-function executionManifest(options: { attempt?: number; dirtyVerification?: boolean; baseSha?: string } = {}) {
-  return {
+function executionManifest(options: { attempt?: number; dirtyVerification?: boolean; baseSha?: string; version?: 1 | 2 } = {}): any {
+  const legacyManifest = {
     version: "factory-execution-manifest/v1",
     causation: { workflowRunId: `workflow-run-${options.attempt ?? 1}`, workOrderRevisionNumber: 1, sourceIssue: "sellerfi/mission-control-fixture#17" },
     harness: {
@@ -674,6 +818,14 @@ function executionManifest(options: { attempt?: number; dirtyVerification?: bool
       effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
       provider: "openai",
       model: "gpt-5.6-terra",
+      modelRouteSnapshot: {
+        schema: "factory-model-route/v1",
+        runtimeIdentity: {
+          kind: "CODEX_CLI",
+          cliVersion: CODEX_V1_RUNTIME_ARTIFACT.version,
+          executableSha256: CODEX_V1_RUNTIME_ARTIFACT.executableSha256,
+        },
+      },
       isolation: "WORKSPACE_WRITE",
       executionBackend: "persistent-worker",
       requiredCapabilities: ["git-worktree", "workspace-write"],
@@ -730,6 +882,55 @@ function executionManifest(options: { attempt?: number; dirtyVerification?: bool
         }],
       },
     },
+  };
+  if (options.version !== 2) return legacyManifest;
+  const runtimeArtifact = structuredClone(CODEX_V1_RUNTIME_ARTIFACT);
+  const runtimeArtifactDigest = harnessRuntimeArtifactDigest(runtimeArtifact);
+  const routeSnapshot = {
+    schema: "factory-model-route/v2",
+    provider: "openai",
+    providerRoute: "openai",
+    modelId: "gpt-5.6-terra",
+    reasoningConfig: { effort: "high" },
+  };
+  const routeDigest = `sha256:${canonicalHash({ namespace: "factory-model-route/v2", value: routeSnapshot })}`;
+  const qualificationSnapshot = {
+    schema: "factory-model-route-qualification/v2",
+    routeDigest,
+    evidence: { reference: "fixture://qualified-route", digest: `sha256:${"1".repeat(64)}` },
+    scope: { workloadClasses: ["SOFTWARE_CHANGE"], riskClasses: ["GREEN"] },
+    promotedBy: "factory-test",
+    promotedAt: 1,
+    compatibility: {
+      adapter: "codex",
+      version: "v1",
+      capabilityManifestDigest: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
+      effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+      runtimeArtifactDigest,
+      executionBackend: "persistent-worker",
+    },
+    authority: {
+      executionOnly: true,
+      routing: false,
+      verification: false,
+      acceptance: false,
+      publication: false,
+      merge: false,
+    },
+  };
+  const { provider: _provider, model: _model, executionBackend: _executionBackend, ...v2Harness } = legacyManifest.harness;
+  return {
+    ...legacyManifest,
+    version: "factory-execution-manifest/v2",
+    harness: { ...v2Harness, runtimeArtifact, runtimeArtifactDigest },
+    modelRoute: {
+      catalogId: "model-route-codex-test",
+      routeDigest,
+      routeSnapshot,
+      qualificationDigest: `sha256:${canonicalHash({ namespace: "factory-model-route-qualification/v2", value: qualificationSnapshot })}`,
+      qualificationSnapshot,
+    },
+    executionBackend: "persistent-worker",
   };
 }
 

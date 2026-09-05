@@ -2,10 +2,11 @@
 
 ## V1 identity
 
-Production executors implement `generic-harness-contract/v1`. `codex/v1` remains
-the default adapter. Exact `deepseek-harness/0.2.0` can be registered only when
-its experimental feature flag is enabled; Loom identities remain contract
-fixtures because no real pinned Loom adapter is installed.
+Production executors implement `generic-harness-contract/v1`. No harness is a
+runtime default: `codex/v1` is registered only when its worker flag is enabled,
+and exact `deepseek-harness/0.2.0` is registered only when its experimental
+feature flag is enabled. Loom identities remain contract fixtures because no
+real pinned Loom adapter is installed.
 The exact adapter/version is selected by the immutable Factory version,
 advertised by a current canonical worker, frozen in the Attempt manifest, and
 resolved without fallback from the worker's adapter registry.
@@ -38,9 +39,21 @@ remote-sandbox invocation builder; it does not own control-plane policy.
 
 Each request carries an absolute repository root, an absolute working directory
 inside that root, repository-relative allowed paths, timeout, model, and explicit
-`READ_ONLY` or `WORKSPACE_WRITE` isolation. Validation rejects path traversal,
-work outside the repository root, empty scope, missing prompts, and unbounded
-timeouts. Codex runs ephemerally with the matching CLI sandbox mode.
+`READ_ONLY` or `WORKSPACE_WRITE` isolation. V2 requests additionally carry the
+frozen model-route digest, provider route, and any reasoning controls. These
+fields are part of the request digest and normalized result provenance; the
+worker rejects a result that does not echo the exact route identity. Validation
+rejects path traversal, work outside the repository root, empty scope, missing
+prompts, and unbounded timeouts.
+
+An adapter must translate every supplied route control into its underlying
+invocation or reject the request before process start. `codex/v1` admits the
+`openai` route on a persistent worker and `openrouter` in a remote sandbox,
+translates an exact reasoning effort, and rejects unsupported temperature or
+maximum-token controls. The pinned DeepSeek adapter admits only its exact local
+Ollama route and currently rejects explicit reasoning controls. Legacy V1
+requests and persisted results remain readable when the additive route fields
+are absent.
 
 The Factory worker creates or reconciles the exact server-owned `mc/` branch in
 the frozen attempt worktree. After Codex returns, it compares both committed and
@@ -82,7 +95,9 @@ branch push / PR creation are idempotent. Once an attempt reaches a terminal
 state, recovery creates a new bounded WorkOrder attempt referencing the prior
 failed/canceled attempt.
 
-Set `FACTORY_EXECUTION_ENABLED=1` on the orchestration server to enable the
-polling worker. `FACTORY_EXECUTION_POLL_MS` may be set between 5 seconds and 5
+Set `CODEX_FACTORY_WORKER_ENABLED=true` to register `codex/v1`, or set
+`DEEPSEEK_HARNESS_EXECUTOR_ENABLED=1` to register the pinned DeepSeek adapter.
+The legacy `FACTORY_EXECUTION_ENABLED` flag does not select an adapter and must
+remain disabled. `FACTORY_EXECUTION_POLL_MS` may be set between 5 seconds and 5
 minutes; the default is 15 seconds. Startup polls both pending and running bound
 attempts, while the durable lease prevents duplicate execution across workers.

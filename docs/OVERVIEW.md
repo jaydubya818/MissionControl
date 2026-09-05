@@ -192,7 +192,7 @@ WorkOrder acceptance, and the human-gated learning continuation. This is strong
 implementation proof; it is not a claim of fleet-scale production operation or
 general Remote Sandbox certification.
 
-The current public client/backend runtime contract is **v38**.
+The current public client/backend runtime contract is **v39**.
 
 | Capability                                 | Current status                                   | Boundary                                                                                        |
 | ------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |

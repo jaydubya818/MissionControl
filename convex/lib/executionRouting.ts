@@ -10,11 +10,20 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { resolveFlag, type FlagRow } from "./flags";
 import { countActiveFactoryWorkerLeases, factoryWorkerEligibility } from "./factoryWorkerRuntime";
-import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } from "./harnessCapabilities";
-import { loadModelCatalogForProject } from "./modelCatalogScope";
+import {
+  factoryWorkflowModelRouteMatches,
+  frozenFactoryModelRouteEligible,
+  resolveFactoryWorkflowModelRoute,
+} from "./factoryModelRoute";
+import {
+  factoryHarnessCapabilityRequirements,
+  resolveFrozenHarnessBinding,
+  resolveHarnessAdapterRuntimeArtifact,
+} from "./harnessCapabilities";
+import { loadFactoryModelCatalogForProject } from "./modelCatalogScope";
 import { getCurrentVerificationRoutingOutcome } from "./currentVerification";
 import { sandboxProfileProductionEligible } from "./sandboxProfileAdmission";
-import { modelRouteProductionEligible, modelRouteQualifiedFor } from "./modelRouteAdmission";
+import { modelRouteQualifiedFor } from "./modelRouteAdmission";
 import {
   harnessCapabilityRequirementsSatisfied,
   harnessSupportsModel,
@@ -98,17 +107,6 @@ export function committedWorkOrderRunCostUsd(run: {
 
 function rate(numerator: number, denominator: number) {
   return denominator > 0 ? numerator / denominator : undefined;
-}
-
-function primaryAgentVersion(
-  workflow: Doc<"workflows">,
-  version: Doc<"factoryDefinitionVersions">,
-  agentVersions: Array<Doc<"agentVersions"> | null>,
-) {
-  const primaryIndex = (version.agentBindings ?? []).findIndex(
-    (binding) => binding.workflowAgentId === workflow.steps?.[0]?.agent,
-  );
-  return agentVersions[primaryIndex >= 0 ? primaryIndex : 0] ?? null;
 }
 
 export async function loadExecutionRoutingEvidenceBundle(
@@ -338,7 +336,7 @@ export async function buildExecutionRoutingPreview(
     ctx.db.query("workspaceHostBindings")
       .withIndex("by_project", (query) => query.eq("projectId", workOrder.projectId!))
       .collect(),
-    loadModelCatalogForProject(ctx, workOrder.projectId),
+    loadFactoryModelCatalogForProject(ctx, workOrder.projectId),
     ctx.db.query("workflowRuns")
       .withIndex("by_status", (query) => query.eq("status", "RUNNING"))
       .collect(),
@@ -377,13 +375,22 @@ export async function buildExecutionRoutingPreview(
     ]);
     const assessment = assessments.sort((left, right) => right.assessedAt - left.assessedAt)[0];
     let frozenHarness: ReturnType<typeof resolveFrozenHarnessBinding> | null = null;
+    let adapterRuntimeArtifact: ReturnType<typeof resolveHarnessAdapterRuntimeArtifact> | null = null;
     try {
       frozenHarness = resolveFrozenHarnessBinding(version);
+      adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
     } catch {
-      // Invalid frozen manifests remain visible as ineligible candidates.
+      // Invalid frozen manifests or adapter artifacts remain visible as ineligible candidates.
     }
-    const primaryAgent = primaryAgentVersion(workflow, version, agentVersions);
-    const primaryModel = primaryAgent?.genome.modelConfig;
+    const primaryModel = (() => {
+      try {
+        return resolveFactoryWorkflowModelRoute({ workflow, agentBindings: version.agentBindings ?? [], agentVersions });
+      } catch {
+        return null;
+      }
+    })();
+    const workflowAgentsApproved = agentVersions.length > 0
+      && agentVersions.every((agentVersion) => agentVersion?.status === "APPROVED");
     const catalogModel = version.modelCatalogId
       ? catalog.find((model) => model._id === version.modelCatalogId)
       : undefined;
@@ -391,7 +398,7 @@ export async function buildExecutionRoutingPreview(
     const requiredSandboxCapabilities = backend === "remote-sandbox"
       ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
       : ["git-worktree", "workspace-write"];
-    const workerResults = frozenHarness ? bindings.map((binding) => factoryWorkerEligibility({
+    const workerResults = frozenHarness && adapterRuntimeArtifact ? bindings.map((binding) => factoryWorkerEligibility({
       worker: {
         workerId: binding.hostId,
         status: binding.status,
@@ -417,7 +424,10 @@ export async function buildExecutionRoutingPreview(
           version: frozenHarness.version,
           capabilityManifestSha256: frozenHarness.capabilityManifestSha256,
           effectiveConfigSha256: frozenHarness.effectiveConfigSha256,
+          runtimeArtifactSha256: adapterRuntimeArtifact.runtimeArtifactSha256,
+          requireFactoryVersionRuntimeArtifactBinding: Boolean(version.harnessRuntimeArtifactDigest),
         },
+        executionRuntimeArtifactSha256: frozenHarness.runtimeArtifactSha256,
         provider: primaryModel?.provider ?? null,
         model: primaryModel?.modelId ?? null,
         harnessCapabilities: factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
@@ -458,15 +468,31 @@ export async function buildExecutionRoutingPreview(
       && sandboxProfile.egressEnforcementProven
       && sandboxProfileProductionEligible(sandboxProfile)
     );
-    const modelApproved = Boolean(
-      primaryAgent?.status === "APPROVED"
-      && catalogModel
-      && catalogModel.routeDigest === version.modelRouteDigest
+    const modelRouteReady = Boolean(
+      catalogModel
+      && frozenHarness
+      && primaryModel
+      && factoryWorkflowModelRouteMatches({
+        workflow,
+        agentBindings: version.agentBindings ?? [],
+        agentVersions,
+      }, version.modelRouteSnapshot as any)
+      && frozenFactoryModelRouteEligible({
+        route: catalogModel,
+        version,
+        harness: frozenHarness,
+        executionBackend: backend,
+      })
       && modelRouteQualifiedFor(catalogModel, {
         workloadClass: workOrder.kind ?? "SOFTWARE_CHANGE",
         riskClass: workOrderRiskToExecutionTier(workOrder.riskLevel),
         repositoryId: String(workOrder.repositoryId),
       })
+    );
+    const modelApproved = Boolean(
+      workflowAgentsApproved
+      && modelRouteReady
+      && catalogModel
       && !catalogModel.deprecated
       && (
         !(workOrder.riskLevel === "HIGH" || workOrder.riskLevel === "CRITICAL")
@@ -547,7 +573,7 @@ export async function buildExecutionRoutingPreview(
         modelAvailable: Boolean(catalogModel && ["HEALTHY", "DEGRADED"].includes(catalogModel.availability)),
         productionCertified: assessment?.status === "PASS"
           && manifest?.admission.maturity === "PRODUCTION"
-          && modelRouteProductionEligible(catalogModel),
+          && modelRouteReady,
       },
       evidence: aggregateExecutionRoutingEvidence(version._id, workOrder.repositoryId, evidenceBundle),
     });

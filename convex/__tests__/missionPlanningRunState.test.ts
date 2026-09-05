@@ -59,6 +59,19 @@ describe("Mission planning run invariants", () => {
     expect(source).toContain('duplicateReason: "ACTIVE_RUN_EXISTS"');
   });
 
+  it("freezes the active Factory route, qualification, runtime, and exact host binding", () => {
+    const source = readFileSync(path.resolve(process.cwd(), "convex/missionPlanning.ts"), "utf8");
+    expect(source).not.toContain("loadModelCatalogForProject");
+    expect(source).toContain("selectFrozenFactoryPlanningModelRoute");
+    expect(source).toContain("version.modelCatalogId ? ctx.db.get(version.modelCatalogId) : null");
+    expect(source).toContain('executionBackend !== "persistent-worker"');
+    expect(source).toContain("factoryWorkerVersionBindingMatches");
+    expect(source).toContain("runtimeArtifactSha256: harness.runtimeArtifactSha256");
+    expect(source).toContain("modelRouteSnapshot: route.model.routeSnapshot");
+    expect(source).toContain("modelQualificationDigest: route.model.qualificationDigest");
+    expect(source).toContain("modelQualificationSnapshot: route.model.qualificationSnapshot");
+  });
+
   it("persists idempotent research and generation receipts across retries", () => {
     const research = receipt("RESEARCH");
     const generation = receipt("GENERATION");

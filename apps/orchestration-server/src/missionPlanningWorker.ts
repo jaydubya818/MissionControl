@@ -1,14 +1,22 @@
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import type { ConvexHttpClient } from "convex/browser";
-import { runHarnessExecution, type ExecutorRequest, type HarnessNormalizedResult } from "@mission-control/workflow-engine";
+import {
+  harnessExecutionRequestDigest,
+  harnessNormalizedResultIssues,
+  harnessRuntimeArtifactDigest,
+  modelRouteReasoningConfigIssues,
+  runHarnessExecution,
+  type ExecutorRequest,
+  type HarnessNormalizedResult,
+} from "@mission-control/workflow-engine";
 import { ConvexActions } from "./convexCalls.js";
 import {
   assertPlanningWorktreeUnchanged,
   ensurePlanningWorktree,
   releasePlanningWorktree,
 } from "./factoryGitRuntime.js";
-import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
+import { HarnessAdapterRegistry, type RegisteredHarnessAdapter } from "./harnessAdapterRegistry.js";
 import {
   generationPrompt,
   PLAN_CANDIDATE_OUTPUT_SCHEMA,
@@ -21,7 +29,7 @@ import {
   type PlanningResearchPacket,
 } from "./missionPlanningContract.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
-import { BUILT_IN_MISSION_PLANNER_IDENTITY } from "@mission-control/shared";
+import { BUILT_IN_MISSION_PLANNER_IDENTITY, canonicalHash } from "@mission-control/shared";
 
 const PLANNING_LEASE_MS = 120_000;
 const HEARTBEAT_MS = 20_000;
@@ -150,24 +158,36 @@ export class MissionPlanningWorker {
         planningRepositorySha: run.planningRepositorySha,
       });
       worktreeReady = true;
-      const adapter = this.adapters.require(run.executor);
+      const registration = this.adapters.requireRegistration(run.executor);
+      assertMissionPlanningHarnessRegistration(run, registration);
+      const adapter = registration.adapter;
       let researchPacket = run.researchPacket as PlanningResearchPacket | undefined;
       if (!researchPacket) {
         const prompt = researchPrompt(run.inputSnapshot);
-        const researchResult = await runHarnessExecution(adapter, this.request({
+        const researchRequest = this.request({
           run,
           worktree,
           phase: "research",
           prompt,
           schemaId: RESEARCH_PACKET_SCHEMA_ID,
           jsonSchema: RESEARCH_PACKET_OUTPUT_SCHEMA,
-        }), { signal: controller.signal, emit: () => undefined });
+        });
+        const researchResult = await runHarnessExecution(adapter, researchRequest, {
+          signal: controller.signal,
+          emit: () => undefined,
+        });
         const researchExecution = executionProvenance(researchResult.normalizedResult, "RESEARCH", prompt);
         await this.report(run, leaseId, {
           kind: "PHASE_EXECUTION_RECORDED",
           harnessExecution: researchExecution,
         });
-        assertReadOnlyHarnessResult(researchResult.normalizedResult, run.planningRepositorySha, RESEARCH_PACKET_SCHEMA_ID);
+        assertMissionPlanningHarnessResult(
+          researchResult.normalizedResult,
+          researchRequest,
+          run,
+          registration,
+          RESEARCH_PACKET_SCHEMA_ID,
+        );
         researchPacket = await validateResearchOutput({
           output: researchResult.output ?? "",
           worktree,
@@ -181,19 +201,29 @@ export class MissionPlanningWorker {
       }
 
       const prompt = generationPrompt(run.inputSnapshot, researchPacket);
-      const generationResult = await runHarnessExecution(adapter, this.request({
+      const generationRequest = this.request({
         run,
         worktree,
         phase: "generation",
         prompt,
         schemaId: PLAN_CANDIDATE_SCHEMA_ID,
         jsonSchema: PLAN_CANDIDATE_OUTPUT_SCHEMA,
-      }), { signal: controller.signal, emit: () => undefined });
+      });
+      const generationResult = await runHarnessExecution(adapter, generationRequest, {
+        signal: controller.signal,
+        emit: () => undefined,
+      });
       await this.report(run, leaseId, {
         kind: "PHASE_EXECUTION_RECORDED",
         harnessExecution: executionProvenance(generationResult.normalizedResult, "GENERATION", prompt),
       });
-      assertReadOnlyHarnessResult(generationResult.normalizedResult, run.planningRepositorySha, PLAN_CANDIDATE_SCHEMA_ID);
+      assertMissionPlanningHarnessResult(
+        generationResult.normalizedResult,
+        generationRequest,
+        run,
+        registration,
+        PLAN_CANDIDATE_SCHEMA_ID,
+      );
       await this.report(run, leaseId, { kind: "VALIDATION_STARTED" });
       const candidate = validateCandidateOutput({
         output: generationResult.output ?? "",
@@ -247,20 +277,7 @@ export class MissionPlanningWorker {
     schemaId: string;
     jsonSchema: Record<string, unknown>;
   }): ExecutorRequest {
-    return {
-      executionId: `${String(input.run._id)}:${input.run.attemptCount}:${input.phase}`,
-      repositoryRoot: input.worktree,
-      workingDirectory: input.worktree,
-      prompt: input.prompt,
-      model: input.run.modelId,
-      provider: input.run.modelProvider,
-      allowedPaths: ["."],
-      deniedPaths: [".env", ".env.*"],
-      timeoutMs: Math.min(45, Math.max(1, input.run.inputSnapshot?.planner?.maxRuntimeMinutes ?? 45)) * 60_000,
-      isolation: "READ_ONLY",
-      filesystemReadScope: "WORKSPACE_ONLY",
-      structuredOutput: { schemaId: input.schemaId, jsonSchema: input.jsonSchema },
-    };
+    return buildMissionPlanningExecutorRequest(input);
   }
 
   private async renew(run: any, leaseId: string, controller: AbortController) {
@@ -302,16 +319,103 @@ export class MissionPlanningWorker {
   }
 }
 
-function assertReadOnlyHarnessResult(
+export function buildMissionPlanningExecutorRequest(input: {
+  run: any;
+  worktree: string;
+  phase: "research" | "generation";
+  prompt: string;
+  schemaId: string;
+  jsonSchema: Record<string, unknown>;
+}): ExecutorRequest {
+  const exactRoute = missionPlanningRouteRequestFields(input.run);
+  return {
+    executionId: `${String(input.run._id)}:${input.run.attemptCount}:${input.phase}`,
+    repositoryRoot: input.worktree,
+    workingDirectory: input.worktree,
+    prompt: input.prompt,
+    model: input.run.modelId,
+    provider: input.run.modelProvider,
+    ...exactRoute,
+    allowedPaths: ["."],
+    deniedPaths: [".env", ".env.*"],
+    timeoutMs: Math.min(45, Math.max(1, input.run.inputSnapshot?.planner?.maxRuntimeMinutes ?? 45)) * 60_000,
+    isolation: "READ_ONLY",
+    filesystemReadScope: "WORKSPACE_ONLY",
+    structuredOutput: { schemaId: input.schemaId, jsonSchema: input.jsonSchema },
+  };
+}
+
+export function assertMissionPlanningHarnessRegistration(
+  run: any,
+  registration: RegisteredHarnessAdapter,
+) {
+  const expectedRuntimeDigest = run.executor?.runtimeArtifactSha256;
+  if (!run.executor?.runtimeArtifact
+    || typeof expectedRuntimeDigest !== "string"
+    || run.executionBackend !== "persistent-worker"
+    || registration.capabilities.adapter !== run.executor?.adapter
+    || registration.capabilities.version !== run.executor?.version
+    || registration.capabilityManifestSha256 !== run.executor?.capabilityManifestSha256
+    || registration.effectiveConfigSha256 !== run.executor?.effectiveConfigSha256
+    || !runtimeArtifactMatches(
+      registration.runtimeArtifact,
+      registration.runtimeArtifactSha256,
+      run.executor.runtimeArtifact,
+      expectedRuntimeDigest,
+    )) {
+    throw planningError(
+      "HARNESS_IDENTITY_MISMATCH",
+      "Registered planning harness does not match the frozen Factory execution identity.",
+      false,
+    );
+  }
+  missionPlanningRouteRequestFields(run);
+}
+
+export function assertMissionPlanningHarnessResult(
   result: HarnessNormalizedResult | undefined,
-  expectedSha: string,
+  request: ExecutorRequest,
+  run: any,
+  registration: RegisteredHarnessAdapter,
   expectedSchema: string,
 ) {
   if (!result || result.status !== "COMPLETED") {
     throw planningError("HARNESS_EXECUTION_FAILED", result?.error ?? "Planning harness execution did not complete.", true);
   }
-  if (result.repository.baselineCommit !== expectedSha
-    || result.repository.headCommit !== expectedSha
+  const resultIssues = harnessNormalizedResultIssues(result);
+  const expectedRuntimeDigest = run.executor?.runtimeArtifactSha256;
+  const exactRouteMismatch = request.modelRouteDigest !== undefined && (
+    result.provenance.modelRouteDigest !== request.modelRouteDigest
+    || result.provenance.providerRoute !== request.providerRoute
+    || canonicalHash(result.provenance.reasoningConfig ?? null) !== canonicalHash(request.reasoningConfig ?? null)
+  );
+  const runtimeMismatch = expectedRuntimeDigest !== undefined
+    && !runtimeArtifactMatches(
+      result.provenance.runtimeArtifact,
+      result.provenance.runtimeArtifactDigest,
+      run.executor?.runtimeArtifact,
+      expectedRuntimeDigest,
+    );
+  if (resultIssues.length > 0
+    || result.executionId !== request.executionId
+    || result.harness.adapterId !== run.executor?.adapter
+    || result.harness.adapterVersion !== run.executor?.version
+    || canonicalHash(result.harness) !== canonicalHash(registration.manifest?.identity)
+    || result.provenance.capabilityManifestSha256 !== run.executor?.capabilityManifestSha256
+    || result.provenance.effectiveConfigSha256 !== run.executor?.effectiveConfigSha256
+    || result.provenance.requestSha256 !== harnessExecutionRequestDigest(request)
+    || result.provenance.provider !== (request.provider ?? null)
+    || result.provenance.model !== (request.model ?? null)
+    || exactRouteMismatch
+    || runtimeMismatch) {
+    throw planningError(
+      "HARNESS_IDENTITY_MISMATCH",
+      `Planning harness result does not match the frozen execution identity${resultIssues.length ? ` (${resultIssues.join(", ")})` : ""}.`,
+      false,
+    );
+  }
+  if (result.repository.baselineCommit !== run.planningRepositorySha
+    || result.repository.headCommit !== run.planningRepositorySha
     || result.repository.headChanged
     || result.repository.changedFiles.length > 0
     || result.repository.scopeViolations.length > 0) {
@@ -320,6 +424,77 @@ function assertReadOnlyHarnessResult(
   if (result.structuredOutput.schema !== expectedSchema || !result.output.trim()) {
     throw planningError("STRUCTURED_OUTPUT_INVALID", `Planning harness did not return ${expectedSchema}.`, false);
   }
+}
+
+function missionPlanningRouteRequestFields(run: any): Pick<
+  ExecutorRequest,
+  "modelRouteDigest" | "providerRoute" | "reasoningConfig"
+> {
+  const route = run.modelRouteSnapshot as Record<string, any> | undefined;
+  if (!route
+    || !["factory-model-route/v1", "factory-model-route/v2"].includes(route.schema)
+    || run.modelRouteDigest !== canonicalIdentityDigest(route.schema, route)
+    || route.provider !== run.modelProvider
+    || route.modelId !== run.modelId) {
+    throw planningError("MODEL_ROUTE_IDENTITY_MISMATCH", "Planning run model route is invalid or no longer exact.", false);
+  }
+  if (route.schema === "factory-model-route/v1") {
+    if (route.capabilityIdentity?.adapter !== run.executor?.adapter
+      || route.capabilityIdentity?.version !== run.executor?.version
+      || route.capabilityIdentity?.capabilityManifestDigest !== run.executor?.capabilityManifestSha256
+      || route.capabilityIdentity?.effectiveConfigSha256 !== run.executor?.effectiveConfigSha256) {
+      throw planningError("MODEL_ROUTE_IDENTITY_MISMATCH", "Legacy planning route does not match its frozen harness identity.", false);
+    }
+    return {};
+  }
+  const qualification = run.modelQualificationSnapshot as Record<string, any> | undefined;
+  const compatibility = qualification?.compatibility as Record<string, any> | undefined;
+  if (!boundedLowercaseIdentity(route.providerRoute, 100)
+    || modelRouteReasoningConfigIssues(route.reasoningConfig).length > 0
+    || qualification?.schema !== "factory-model-route-qualification/v2"
+    || qualification.routeDigest !== run.modelRouteDigest
+    || run.modelQualificationDigest !== canonicalIdentityDigest(qualification.schema, qualification)
+    || run.executionBackend !== "persistent-worker"
+    || compatibility?.adapter !== run.executor?.adapter
+    || compatibility?.version !== run.executor?.version
+    || compatibility?.capabilityManifestDigest !== run.executor?.capabilityManifestSha256
+    || compatibility?.effectiveConfigSha256 !== run.executor?.effectiveConfigSha256
+    || compatibility?.runtimeArtifactDigest !== run.executor?.runtimeArtifactSha256
+    || compatibility?.executionBackend !== run.executionBackend) {
+    throw planningError("MODEL_ROUTE_IDENTITY_MISMATCH", "Planning run V2 route qualification does not match its frozen execution identity.", false);
+  }
+  return {
+    modelRouteDigest: run.modelRouteDigest,
+    providerRoute: route.providerRoute,
+    ...(route.reasoningConfig === undefined ? {} : { reasoningConfig: structuredClone(route.reasoningConfig) }),
+  };
+}
+
+function canonicalIdentityDigest(schema: string, snapshot: unknown) {
+  return `sha256:${canonicalHash({ namespace: schema, value: snapshot })}`;
+}
+
+function runtimeArtifactMatches(
+  candidate: unknown,
+  candidateDigest: unknown,
+  expected: unknown,
+  expectedDigest: string,
+) {
+  try {
+    return candidateDigest === expectedDigest
+      && harnessRuntimeArtifactDigest(candidate as any) === expectedDigest
+      && canonicalHash(candidate) === canonicalHash(expected);
+  } catch {
+    return false;
+  }
+}
+
+function boundedLowercaseIdentity(value: unknown, maximum: number): value is string {
+  return typeof value === "string"
+    && value === value.trim()
+    && value === value.toLowerCase()
+    && value.length > 0
+    && value.length <= maximum;
 }
 
 function executionProvenance(

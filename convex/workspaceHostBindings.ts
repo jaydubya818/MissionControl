@@ -56,6 +56,8 @@ export const report = mutation({
         version: v.string(),
         capabilityManifestSha256: v.string(),
         effectiveConfigSha256: v.string(),
+        runtimeArtifact: v.any(),
+        runtimeArtifactSha256: v.string(),
         capabilityManifest: v.any(),
         supportsCancel: v.boolean(),
         supportsResume: v.boolean(),
@@ -75,6 +77,7 @@ export const report = mutation({
         model: v.string(),
         capabilityManifestSha256: v.string(),
         effectiveConfigSha256: v.string(),
+        runtimeArtifactSha256: v.optional(v.string()),
         executionBackend: v.string(),
         modelRouteDigest: v.string(),
         sandboxProfileDigest: v.optional(v.string()),
@@ -159,6 +162,7 @@ export const report = mutation({
           || version.executor.version !== binding.version
           || version.harnessCapabilityManifestDigest !== binding.capabilityManifestSha256
           || version.harnessEffectiveConfigSha256 !== binding.effectiveConfigSha256
+          || version.harnessRuntimeArtifactDigest !== binding.runtimeArtifactSha256
           || (version.executionBackend ?? "persistent-worker") !== binding.executionBackend
           || version.modelRouteDigest !== binding.modelRouteDigest
           || (version.modelRouteSnapshot as any)?.provider !== binding.provider

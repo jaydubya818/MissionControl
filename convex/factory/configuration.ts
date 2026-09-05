@@ -16,15 +16,26 @@ import { genericHarnessV1RecoveryReady, selectCurrentFactoryHost } from "../lib/
 import { factoryWorkflowContractIssues } from "../lib/factoryWorkflowContract";
 import { computeCanonicalHash } from "../lib/genomeHash";
 import { factoryWorkerEligibility } from "../lib/factoryWorkerRuntime";
-import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } from "../lib/harnessCapabilities";
-import { KNOWN_HARNESS_MANIFESTS, harnessCapabilityManifestDigest, harnessSupportsModel } from "@mission-control/workflow-engine/harness-contract";
+import {
+  factoryModelRouteCompatibility,
+  factoryVersionModelRouteOptions,
+  factoryWorkflowModelRouteMatches,
+  frozenFactoryModelRouteEligible,
+  matchingFactoryModelRouteQualifications,
+  resolveFactoryWorkflowModelRoute,
+} from "../lib/factoryModelRoute";
+import {
+  factoryHarnessCapabilityRequirements,
+  resolveFrozenHarnessBinding,
+  resolveHarnessAdapterRuntimeArtifact,
+} from "../lib/harnessCapabilities";
+import { KNOWN_HARNESS_MANIFESTS, harnessSupportsModel } from "@mission-control/workflow-engine/harness-contract";
 import {
   SANDBOX_PROFILE_ADMISSION_SCHEMA,
   qualifiedSandboxSnapshotIssues,
   sandboxProfileProductionEligible,
 } from "../lib/sandboxProfileAdmission";
-import { loadModelCatalogForProject } from "../lib/modelCatalogScope";
-import { exactModelRouteDigest, modelRouteProductionEligible, modelRouteQualifiedFor } from "../lib/modelRouteAdmission";
+import { loadFactoryModelCatalogForProject } from "../lib/modelCatalogScope";
 import {
   evaluateRepositoryRemoteExecutionPolicy,
   normalizeRepositoryDataClassification,
@@ -100,7 +111,7 @@ export const getVersionOptions = query({
       ctx.db.query("workspaceHostBindings")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect(),
-      loadModelCatalogForProject(ctx, args.projectId),
+      loadFactoryModelCatalogForProject(ctx, args.projectId),
     ]);
     const agentVersions = (await Promise.all(approvedVersions
       .filter((version) => !version.projectId || version.projectId === args.projectId)
@@ -121,7 +132,7 @@ export const getVersionOptions = query({
     return {
       codeScopes: codeScopes.filter((scope) => scope.active),
       agentVersions,
-      modelRoutes: modelCatalog.filter(modelRouteProductionEligible).map((route) => ({
+      modelRoutes: factoryVersionModelRouteOptions(modelCatalog).map((route) => ({
         _id: route._id,
         provider: route.provider,
         modelId: route.modelId,
@@ -132,17 +143,26 @@ export const getVersionOptions = query({
       })),
       sandboxProfiles: sandboxProfiles.sort((left, right) => left.profileKey.localeCompare(right.profileKey) || right.version - left.version),
       harnesses: KNOWN_HARNESS_MANIFESTS.map((manifest) => {
-        const capabilityManifestSha256 = harnessCapabilityManifestDigest(manifest);
+        const harness = resolveFrozenHarnessBinding({
+          executor: {
+            adapter: manifest.identity.adapterId,
+            version: manifest.identity.adapterVersion,
+          },
+        });
+        const capabilityManifestSha256 = harness.capabilityManifestSha256;
         const advertised = hostBindings.some((binding) => binding.status === "READY" && !binding.dirty
           && binding.workerRuntime?.supportedExecutors.some((executor) =>
             executor.adapter === manifest.identity.adapterId
             && executor.version === manifest.identity.adapterVersion
             && executor.capabilityManifestSha256 === capabilityManifestSha256
             && executor.effectiveConfigSha256 === manifest.effectiveConfigSha256
+            && executor.runtimeArtifactSha256 === harness.runtimeArtifactSha256
           ));
         return {
           manifest,
           capabilityManifestSha256,
+          runtimeArtifact: harness.runtimeArtifact,
+          runtimeArtifactDigest: harness.runtimeArtifactSha256,
           available: manifest.admission.maturity === "PRODUCTION" || advertised,
           advertised,
         };
@@ -550,7 +570,7 @@ export const createVersion = mutation({
       Promise.all(args.codeScopeIds.map((id) => ctx.db.get(id))),
       Promise.all(args.agentBindings.map((binding) => ctx.db.get(binding.agentVersionId))),
       args.sandboxProfileId ? ctx.db.get(args.sandboxProfileId) : null,
-      loadModelCatalogForProject(ctx, definition.projectId),
+      loadFactoryModelCatalogForProject(ctx, definition.projectId),
     ]);
     if (!repository || repository.projectId !== definition.projectId) throw new Error("Factory repository scope is invalid.");
     const repositoryDataClassification = normalizeRepositoryDataClassification(repository.dataClassification);
@@ -596,32 +616,52 @@ export const createVersion = mutation({
         throw new Error("Approved agent versions require prompt, tool, and model manifests.");
       }
     }
-    const harness = resolveFrozenHarnessBinding({ executor: args.executor });
-    const firstStepAgent = workflow.steps[0]?.agent;
-    const primaryAgentIndex = args.agentBindings.findIndex((binding) => binding.workflowAgentId === firstStepAgent);
-    const primaryModel = agentVersions[primaryAgentIndex >= 0 ? primaryAgentIndex : 0]?.genome.modelConfig;
+    const selectedExecutionBackend = args.executionBackend ?? "persistent-worker";
+    const harness = resolveFrozenHarnessBinding({
+      executor: args.executor,
+      executionBackend: selectedExecutionBackend,
+      sandboxProfileSnapshot: sandboxProfile?.immutableSnapshot,
+    });
+    const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(args.executor);
+    const primaryModel = resolveFactoryWorkflowModelRoute({
+      workflow,
+      agentBindings: args.agentBindings,
+      agentVersions,
+    });
     if (!primaryModel || !harnessSupportsModel(harness.capabilityManifest, primaryModel.provider, primaryModel.modelId)) {
       throw new Error(`${args.executor.adapter}/${args.executor.version} does not admit the selected workflow model route.`);
     }
-    const matchingModelRoutes = modelCatalog.filter((route) =>
-      (!args.modelCatalogId || route._id === args.modelCatalogId)
-      && route.provider === primaryModel.provider.trim().toLowerCase()
-      && route.modelId === primaryModel.modelId
-    );
-    if (matchingModelRoutes.length !== 1) {
-      throw new Error("Factory versions require exactly one explicitly qualified model-catalog route.");
+    const workloadClass = definition.purpose === "VERIFICATION"
+      ? "VERIFICATION"
+      : definition.purpose === "INTELLIGENT_AUTOMATION"
+        ? "AUTOMATION"
+        : "SOFTWARE_CHANGE";
+    const exactCompatibility = factoryModelRouteCompatibility({
+      harness,
+      executionBackend: selectedExecutionBackend,
+    });
+    const matchingModelRoutes = matchingFactoryModelRouteQualifications({
+      routes: modelCatalog,
+      selectedCatalogId: args.modelCatalogId ? String(args.modelCatalogId) : undefined,
+      workflow: {
+        workflow,
+        agentBindings: args.agentBindings,
+        agentVersions,
+      },
+      compatibility: exactCompatibility,
+      riskClass: args.riskBoundary,
+      workloadClass,
+      repositoryId: String(repository._id),
+    });
+    if (matchingModelRoutes.length === 0) {
+      throw new Error("Factory versions require a V2 model route qualified for the exact harness, runtime artifact, backend, risk, and workload.");
+    }
+    if (matchingModelRoutes.length > 1) {
+      throw new Error("Multiple exact model-route qualifications are eligible; select one modelCatalogId explicitly.");
     }
     const modelRoute = matchingModelRoutes[0];
     const routeSnapshot = modelRoute.routeSnapshot as Record<string, any> | undefined;
-    if (!modelRouteProductionEligible(modelRoute)
-      || !routeSnapshot
-      || exactModelRouteDigest(routeSnapshot) !== modelRoute.routeDigest
-      || routeSnapshot.capabilityIdentity?.adapter !== harness.adapter
-      || routeSnapshot.capabilityIdentity?.version !== harness.version
-      || routeSnapshot.capabilityIdentity?.capabilityManifestDigest !== harness.capabilityManifestSha256
-      || routeSnapshot.capabilityIdentity?.effectiveConfigSha256 !== harness.effectiveConfigSha256) {
-      throw new Error("Factory versions require the exact promoted model route for the frozen harness identity.");
-    }
+    if (!routeSnapshot) throw new Error("The selected exact model route is missing its immutable snapshot.");
     if (!validFactoryExecutorBinding(args.executor)) {
       throw new Error("Factory executor requires a bounded exact harness adapter/version binding.");
     }
@@ -631,7 +671,6 @@ export const createVersion = mutation({
     if (!validFactoryBudget(args.budget)) {
       throw new Error("Factory budget must use positive V1 limits: cost <= $1,000, runtime <= 480 minutes, attempts <= 3.");
     }
-    const selectedExecutionBackend = args.executionBackend ?? "persistent-worker";
     if (!harness.capabilityManifest.admission.executionBackends.includes(selectedExecutionBackend)) {
       throw new Error(`${args.executor.adapter}/${args.executor.version} does not support ${selectedExecutionBackend}.`);
     }
@@ -660,6 +699,7 @@ export const createVersion = mutation({
             version: harness.version,
             capabilityManifestSha256: harness.capabilityManifestSha256,
             effectiveConfigSha256: harness.effectiveConfigSha256,
+            runtimeArtifactSha256: adapterRuntimeArtifact.runtimeArtifactSha256,
           },
           provider: primaryModel.provider,
           model: primaryModel.modelId,
@@ -684,9 +724,6 @@ export const createVersion = mutation({
         || !sandboxProfileProductionEligible(sandboxProfile)) {
         throw new Error("Remote sandbox execution requires a current dispatchable Sandbox Profile in this workspace.");
       }
-      if (routeSnapshot.runtimeIdentity?.imageDigest !== (sandboxProfile!.immutableSnapshot as any)?.security?.image?.digest) {
-        throw new Error("Remote model route image identity does not match the promoted Sandbox Profile.");
-      }
       if (!(sandboxProfile!.admissionSnapshot as any)?.scope?.riskClasses?.includes(args.riskBoundary)) {
         throw new Error("The promoted Sandbox Profile is not eligible for this Factory risk boundary.");
       }
@@ -700,22 +737,7 @@ export const createVersion = mutation({
       }
     } else if (args.sandboxProfileId) {
       throw new Error("A Sandbox Profile can only be attached to the remote-sandbox execution backend.");
-    } else if (!routeSnapshot.runtimeIdentity?.executableSha256) {
-      throw new Error("Local model routes require an exact executable digest.");
     }
-    const requiredWorkloadClass = (definition.purpose ?? "SOFTWARE") === "SOFTWARE"
-      ? "SOFTWARE_CHANGE"
-      : (definition.purpose ?? "SOFTWARE") === "VERIFICATION"
-        ? "VERIFICATION"
-        : "AUTOMATION";
-    if (!modelRouteQualifiedFor(modelRoute, {
-      workloadClass: requiredWorkloadClass,
-      riskClass: args.riskBoundary,
-      repositoryId: String(repository._id),
-    })) {
-      throw new Error("The exact model route is not qualified for this Factory workload, repository, and risk boundary.");
-    }
-
     const sandboxProfileDigest = selectedExecutionBackend === "remote-sandbox" ? sandboxProfile!.profileDigest : undefined;
     if (!validFactoryExecutionBinding({
       executionBackend: selectedExecutionBackend,
@@ -736,6 +758,8 @@ export const createVersion = mutation({
       harnessCapabilityManifest: harness.capabilityManifest,
       harnessCapabilityManifestDigest: harness.capabilityManifestSha256,
       harnessEffectiveConfigSha256: harness.effectiveConfigSha256,
+      harnessRuntimeArtifact: harness.runtimeArtifact,
+      harnessRuntimeArtifactDigest: harness.runtimeArtifactSha256,
       modelCatalogId: String(modelRoute._id),
       modelRouteDigest: modelRoute.routeDigest!,
       executionBackend: selectedExecutionBackend,
@@ -774,6 +798,8 @@ export const createVersion = mutation({
       harnessCapabilityManifest: harness.capabilityManifest,
       harnessCapabilityManifestDigest: harness.capabilityManifestSha256,
       harnessEffectiveConfigSha256: harness.effectiveConfigSha256,
+      harnessRuntimeArtifact: harness.runtimeArtifact,
+      harnessRuntimeArtifactDigest: harness.runtimeArtifactSha256,
       modelCatalogId: modelRoute._id,
       modelRouteDigest: modelRoute.routeDigest,
       modelRouteSnapshot: modelRoute.routeSnapshot,
@@ -829,8 +855,14 @@ export const assessReadiness = mutation({
     );
     const selectedExecutionBackend = version.executionBackend ?? "persistent-worker";
     const frozenHarness = resolveFrozenHarnessBinding(version);
-    const primaryAgentIndex = (version.agentBindings ?? []).findIndex((binding) => binding.workflowAgentId === workflow?.steps?.[0]?.agent);
-    const primaryModel = agentVersions[primaryAgentIndex >= 0 ? primaryAgentIndex : 0]?.genome.modelConfig;
+    const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
+    const primaryModel = (() => {
+      try {
+        return resolveFactoryWorkflowModelRoute({ workflow, agentBindings: version.agentBindings ?? [], agentVersions });
+      } catch {
+        return null;
+      }
+    })();
     const requiredSandboxCapabilities = selectedExecutionBackend === "remote-sandbox"
       ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
       : ["git-worktree", "workspace-write"];
@@ -858,7 +890,10 @@ export const assessReadiness = mutation({
               version: frozenHarness.version,
               capabilityManifestSha256: frozenHarness.capabilityManifestSha256,
               effectiveConfigSha256: frozenHarness.effectiveConfigSha256,
+              runtimeArtifactSha256: adapterRuntimeArtifact.runtimeArtifactSha256,
+              requireFactoryVersionRuntimeArtifactBinding: Boolean(version.harnessRuntimeArtifactDigest),
             },
+            executionRuntimeArtifactSha256: frozenHarness.runtimeArtifactSha256,
             provider: primaryModel?.provider ?? null,
             model: primaryModel?.modelId ?? null,
             harnessCapabilities: factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
@@ -893,14 +928,19 @@ export const assessReadiness = mutation({
     );
     const modelRouteReady = Boolean(
       modelRoute
+      && primaryModel
       && modelRoute._id === version.modelCatalogId
-      && modelRoute.routeSnapshot
-      && modelRoute.routeDigest === version.modelRouteDigest
-      && exactModelRouteDigest(modelRoute.routeSnapshot) === version.modelRouteDigest
-      && JSON.stringify(modelRoute.routeSnapshot) === JSON.stringify(version.modelRouteSnapshot)
-      && modelRoute.qualificationDigest === version.modelQualificationDigest
-      && JSON.stringify(modelRoute.qualificationSnapshot) === JSON.stringify(version.modelQualificationSnapshot)
-      && modelRouteProductionEligible(modelRoute)
+      && factoryWorkflowModelRouteMatches({
+        workflow,
+        agentBindings: version.agentBindings ?? [],
+        agentVersions,
+      }, version.modelRouteSnapshot as any)
+      && frozenFactoryModelRouteEligible({
+        route: modelRoute,
+        version,
+        harness: frozenHarness,
+        executionBackend: selectedExecutionBackend,
+      })
     );
     const checks = [
       check("github", "GitHub App connection", githubReady, now, expiry, "Install or repair the exact least-privilege GitHub App connection."),

@@ -38,6 +38,10 @@ import {
   legacyQualityGateSubjectDigest,
 } from "../lib/qualityGateDecision";
 import { createGitVerificationSubject } from "@mission-control/workflow-engine/verification-subject";
+import {
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
+} from "@mission-control/workflow-engine/harness-contract";
 import { deriveVerificationIndependence } from "@mission-control/workflow-engine/verification-independence";
 import { evaluateVerificationDecision } from "@mission-control/workflow-engine/verification-decision";
 import {
@@ -53,8 +57,17 @@ import {
   getCurrentVerificationResult,
 } from "../lib/currentVerification";
 import { computeCanonicalHash } from "../lib/genomeHash";
-import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } from "../lib/harnessCapabilities";
-import { modelRouteProductionEligible } from "../lib/modelRouteAdmission";
+import {
+  factoryHarnessCapabilityRequirements,
+  resolveFrozenHarnessBinding,
+  resolveHarnessAdapterRuntimeArtifact,
+} from "../lib/harnessCapabilities";
+import {
+  factoryWorkflowModelRouteMatches,
+  frozenFactoryModelRouteEligible,
+  resolveFactoryWorkflowModelRoute,
+} from "../lib/factoryModelRoute";
+import { exactModelRouteDigest, modelRouteQualificationDigest } from "../lib/modelRouteAdmission";
 import { sandboxProfileProductionEligible } from "../lib/sandboxProfileAdmission";
 import {
   evaluateRepositoryRemoteExecutionPolicy,
@@ -86,6 +99,36 @@ const ARTIFACT_TYPES = new Set([
   "GENERATED_DOCUMENT", "VERIFICATION_EVIDENCE", "PULL_REQUEST", "CHECKPOINT",
   "STRUCTURED_OUTPUT", "AUTOMATION_DESIGN", "AUTOMATION_OUTPUT_SNAPSHOT", "OTHER",
 ]);
+
+function factoryExecutionManifestBackend(manifest: any): string | undefined {
+  return manifest?.version === "factory-execution-manifest/v2"
+    ? manifest.executionBackend
+    : manifest?.harness?.executionBackend;
+}
+
+function factoryExecutionManifestModelRoute(manifest: any) {
+  return manifest?.version === "factory-execution-manifest/v2"
+    ? manifest.modelRoute
+    : manifest?.version === "factory-execution-manifest/v1"
+      ? {
+          catalogId: manifest.harness?.modelCatalogId,
+          routeDigest: manifest.harness?.modelRouteDigest,
+          routeSnapshot: manifest.harness?.modelRouteSnapshot,
+          qualificationDigest: manifest.harness?.modelQualificationDigest,
+        }
+      : undefined;
+}
+
+function factoryExecutionStepMatchesModelRoute(step: any, routeSnapshot: Record<string, any> | undefined) {
+  if (!routeSnapshot
+    || step?.modelConfiguration?.provider !== routeSnapshot.provider
+    || step?.modelRoute !== routeSnapshot.modelId) {
+    return false;
+  }
+  if (routeSnapshot.schema !== "factory-model-route/v2") return true;
+  return step.modelConfiguration?.temperature === routeSnapshot.reasoningConfig?.temperature
+    && step.modelConfiguration?.maxTokens === routeSnapshot.reasoningConfig?.maxTokens;
+}
 export const resolveScope = internalQuery({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
@@ -201,7 +244,7 @@ export const reportSandboxReconcileInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
-    if (!run || (run.executionManifest as any)?.harness?.executionBackend !== "remote-sandbox") {
+    if (!run || factoryExecutionManifestBackend(run.executionManifest) !== "remote-sandbox") {
       throw new Error("Remote Factory Attempt is unavailable for reconciliation.");
     }
     const host = run.hostBindingId ? await ctx.db.get(run.hostBindingId) : null;
@@ -307,16 +350,60 @@ export const claimInternal = internalMutation({
       && run.verificationAttemptBinding?.sourceAttemptId
       ? await ctx.db.get(run.verificationAttemptBinding.sourceAttemptId)
       : null;
-    if (frozenManifest?.version !== "factory-execution-manifest/v1"
+    const frozenHarness = resolveFrozenHarnessBinding(version);
+    const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
+    const manifestModelRoute = factoryExecutionManifestModelRoute(frozenManifest);
+    const modelRoute = version.modelCatalogId ? await ctx.db.get(version.modelCatalogId) : null;
+    const routeSnapshot = manifestModelRoute?.routeSnapshot as Record<string, any> | undefined;
+    const executableSteps = (frozenManifest?.workflow?.steps ?? []).filter((step: any) => step?.kind !== "GATE");
+    const v2Manifest = frozenManifest?.version === "factory-execution-manifest/v2";
+    let manifestRouteDigestValid = false;
+    let manifestQualificationDigestValid = !v2Manifest;
+    try {
+      manifestRouteDigestValid = Boolean(
+        routeSnapshot
+        && exactModelRouteDigest(routeSnapshot) === manifestModelRoute?.routeDigest,
+      );
+      manifestQualificationDigestValid = !v2Manifest || Boolean(
+        manifestModelRoute?.qualificationSnapshot
+        && modelRouteQualificationDigest(manifestModelRoute.qualificationSnapshot)
+          === manifestModelRoute.qualificationDigest,
+      );
+    } catch {
+      manifestRouteDigestValid = false;
+      manifestQualificationDigestValid = false;
+    }
+    if ((!v2Manifest && frozenManifest?.version !== "factory-execution-manifest/v1")
       || frozenManifest?.harness?.adapter !== run.executorAdapter
       || frozenManifest?.harness?.version !== run.executorVersion
+      || frozenManifest?.harness?.capabilityManifestSha256 !== frozenHarness.capabilityManifestSha256
+      || frozenManifest?.harness?.effectiveConfigSha256 !== frozenHarness.effectiveConfigSha256
+      || (v2Manifest && (
+        frozenManifest?.harness?.runtimeArtifactDigest !== frozenHarness.runtimeArtifactSha256
+        || harnessRuntimeArtifactIssues(frozenManifest?.harness?.runtimeArtifact).length > 0
+        || harnessRuntimeArtifactDigest(frozenManifest.harness.runtimeArtifact)
+          !== frozenManifest.harness.runtimeArtifactDigest
+      ))
       || version.executor.adapter !== run.executorAdapter
       || version.executor.version !== run.executorVersion
       || !version.modelCatalogId
-      || frozenManifest?.harness?.modelCatalogId !== String(version.modelCatalogId)
-      || frozenManifest?.harness?.modelRouteDigest !== version.modelRouteDigest
-      || frozenManifest?.harness?.modelQualificationDigest !== version.modelQualificationDigest
-      || frozenManifest?.harness?.executionBackend !== executionBackend
+      || !modelRoute
+      || manifestModelRoute?.catalogId !== String(version.modelCatalogId)
+      || manifestModelRoute?.routeDigest !== version.modelRouteDigest
+      || manifestModelRoute?.qualificationDigest !== version.modelQualificationDigest
+      || !manifestRouteDigestValid
+      || !manifestQualificationDigestValid
+      || routeSnapshot?.provider !== (version.modelRouteSnapshot as any)?.provider
+      || routeSnapshot?.modelId !== (version.modelRouteSnapshot as any)?.modelId
+      || executableSteps.length < 1
+      || executableSteps.some((step: any) => !factoryExecutionStepMatchesModelRoute(step, routeSnapshot))
+      || !frozenFactoryModelRouteEligible({
+        route: modelRoute,
+        version,
+        harness: frozenHarness,
+        executionBackend,
+      })
+      || factoryExecutionManifestBackend(frozenManifest) !== executionBackend
       || !factoryAttemptSourceBindingMatches({
         attemptPurpose: run.attemptPurpose,
         manifestBaseSha: frozenManifest?.repository?.baseSha,
@@ -442,18 +529,21 @@ export const claimInternal = internalMutation({
           executor: {
             adapter: run.executorAdapter,
             version: run.executorVersion,
-            capabilityManifestSha256: manifest.harness?.capabilityManifestSha256,
-            effectiveConfigSha256: manifest.harness?.effectiveConfigSha256,
+            capabilityManifestSha256: frozenHarness.capabilityManifestSha256,
+            effectiveConfigSha256: frozenHarness.effectiveConfigSha256,
+            runtimeArtifactSha256: adapterRuntimeArtifact.runtimeArtifactSha256,
+            requireFactoryVersionRuntimeArtifactBinding: Boolean(version.harnessRuntimeArtifactDigest),
           },
-          provider: manifest.harness?.provider ?? null,
-          model: manifest.harness?.model ?? null,
+          executionRuntimeArtifactSha256: frozenHarness.runtimeArtifactSha256,
+          provider: routeSnapshot?.provider ?? null,
+          model: routeSnapshot?.modelId ?? null,
           harnessCapabilities: manifest.harness?.requiredHarnessCapabilities ?? [],
           isolation: manifest.harness?.isolation,
           sandboxCapabilities: manifest.harness?.requiredCapabilities ?? [],
-          executionBackend: manifest.harness?.executionBackend,
+          executionBackend,
           factoryDefinitionVersionId: manifest.causation?.factoryDefinitionVersionId,
           factoryConfigurationDigest: manifest.causation?.factoryConfigurationDigest,
-          modelRouteDigest: manifest.harness?.modelRouteDigest,
+          modelRouteDigest: manifestModelRoute?.routeDigest,
           sandboxProfileDigest: manifest.sandbox?.profileDigest,
         },
         activeWorkerLeaseCount,
@@ -631,7 +721,8 @@ export const claimInternal = internalMutation({
       input: {
         adapter: run.executorAdapter,
         version: run.executorVersion,
-        model: run.model,
+        provider: routeSnapshot?.provider,
+        model: routeSnapshot?.modelId,
         environment: run.executionEnvironment,
         allowedTools: run.allowedTools,
         executionManifestDigest: run.executionManifestDigest,
@@ -665,7 +756,7 @@ export const claimInternal = internalMutation({
         installationId: installation.installationId,
         appId: installation.appId,
       },
-      model: run.model,
+      model: routeSnapshot?.modelId,
       executorAdapter: run.executorAdapter,
       executorVersion: run.executorVersion,
       executionManifest: run.executionManifest,
@@ -1020,7 +1111,7 @@ export const reportInternal = internalMutation({
       if (!["COMPLETED", "FAILED", "CANCELED"].includes(terminal.status)) {
         throw new Error("Factory attempt terminal status is invalid.");
       }
-      if ((run.executionManifest as any)?.harness?.executionBackend === "remote-sandbox") {
+      if (factoryExecutionManifestBackend(run.executionManifest) === "remote-sandbox") {
         const remoteFailure = terminal.status === "COMPLETED"
           ? undefined
           : normalizeRemoteFailure(terminal.remoteFailure);
@@ -1959,7 +2050,19 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   const now = Date.now();
   const assessment = assessments.sort((left: any, right: any) => right.assessedAt - left.assessedAt)[0];
   const frozenHarness = resolveFrozenHarnessBinding(version);
+  const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
   const executionBackend = version.executionBackend ?? "persistent-worker";
+  const workflowModelRoute = (() => {
+    try {
+      return resolveFactoryWorkflowModelRoute({
+        workflow,
+        agentBindings: version.agentBindings ?? [],
+        agentVersions,
+      });
+    } catch {
+      return null;
+    }
+  })();
   const repositoryDataClassification = normalizeRepositoryDataClassification(repository?.dataClassification);
   const remoteExecutionPolicy = evaluateRepositoryRemoteExecutionPolicy({
     executionBackend,
@@ -1993,9 +2096,12 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
         version: frozenHarness.version,
         capabilityManifestSha256: frozenHarness.capabilityManifestSha256,
         effectiveConfigSha256: frozenHarness.effectiveConfigSha256,
+        runtimeArtifactSha256: adapterRuntimeArtifact.runtimeArtifactSha256,
+        requireFactoryVersionRuntimeArtifactBinding: Boolean(version.harnessRuntimeArtifactDigest),
       },
-      provider: (version.modelRouteSnapshot as any)?.provider ?? null,
-      model: (version.modelRouteSnapshot as any)?.modelId ?? null,
+      executionRuntimeArtifactSha256: frozenHarness.runtimeArtifactSha256,
+      provider: workflowModelRoute?.provider ?? null,
+      model: workflowModelRoute?.modelId ?? null,
       harnessCapabilities: factoryHarnessCapabilityRequirements("READ_ONLY"),
       isolation: "READ_ONLY",
       sandboxCapabilities: requiredSandboxCapabilities,
@@ -2016,10 +2122,19 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     || !workflow?.active || !assessment || assessment.status !== "PASS" || assessment.expiresAt <= now
     || assessment.configurationDigest !== version.configurationDigest || !host || host.dirty
     || agentVersions.some((agentVersion: any) => !agentVersion)
+    || !workflowModelRoute
     || !modelRoute
-    || modelRoute.routeDigest !== version.modelRouteDigest
-    || modelRoute.qualificationDigest !== version.modelQualificationDigest
-    || !modelRouteProductionEligible(modelRoute)
+    || !factoryWorkflowModelRouteMatches({
+      workflow,
+      agentBindings: version.agentBindings ?? [],
+      agentVersions,
+    }, version.modelRouteSnapshot as any)
+    || !frozenFactoryModelRouteEligible({
+      route: modelRoute,
+      version,
+      harness: frozenHarness,
+      executionBackend,
+    })
     || (executionBackend === "remote-sandbox" && (
       !sandboxProfile
       || sandboxProfile.profileDigest !== version.sandboxProfileDigest
@@ -2058,6 +2173,7 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
       routeDigest: modelRoute.routeDigest,
       routeSnapshot: modelRoute.routeSnapshot,
       qualificationDigest: modelRoute.qualificationDigest,
+      qualificationSnapshot: modelRoute.qualificationSnapshot,
     },
     sandboxProfile: {
       isolation: "READ_ONLY",
@@ -2266,7 +2382,7 @@ async function persistSandboxPacket(ctx: any, run: any, packet: any, leaseId: st
   const credential = packet.credential;
   if (!sandbox && !credential) return undefined;
   const manifest = run.executionManifest as any;
-  if (manifest?.harness?.executionBackend !== "remote-sandbox"
+  if (factoryExecutionManifestBackend(manifest) !== "remote-sandbox"
     || !manifest.sandbox?.profileId
     || !manifest.sandbox?.profileDigest) {
     throw new Error("Sandbox lifecycle reports require a remote Factory Attempt binding.");
@@ -2538,7 +2654,7 @@ function mutationWorkerIdentity(args: {
 async function failLostAttempt(ctx: any, run: any, reason: string) {
   const now = Date.now();
   const remoteFailure = lostFactoryAttemptFailure({
-    executionBackend: run.executionManifest?.harness?.executionBackend,
+    executionBackend: factoryExecutionManifestBackend(run.executionManifest),
   });
   await ctx.db.patch(run._id, {
     status: "FAILED",
