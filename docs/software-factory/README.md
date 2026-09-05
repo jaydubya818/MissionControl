@@ -29,6 +29,7 @@ below and open a reconciliation change; do not silently choose the newest prose.
 | V1 scope | [Mission Control V1 Product Strategy](../product/mission-control-v1-product-strategy.md) | Active | Golden path, users, priorities, and non-goals |
 | Capability maturity | [Software Factory Capability Maturity Ledger](../product/software-factory-capability-maturity.md) | Active | Current status, evidence, limitations, and promotion gates |
 | Operating contract evidence | [Operating Contract Evidence Map](./operating-contract-evidence-map.md) | Supporting implementation guide | FDLC/Guide concepts mapped to current source, negative controls and remaining qualification gaps |
+| Source/release policy | [Source Integration and Production Release](./source-release-policy.md) | Approved | Main-branch Git deployment guard; Preview qualification and separate Production release authority |
 | Real product pilot | [Real Product-Repository Pilot Operations](./production-pilot-operations.md) | Active | Named entry gate, incident drill, portfolio, measures, failure drills, and exit decision |
 | Pilot gates | `pnpm run pilot:preflight -- <manifest>` and `pnpm run pilot:assess -- <manifest>` | Implemented | Deterministic admission and evidence-completeness checks without granting production authority |
 | Core decisions | [AI Software Factory V1 Decisions](../decisions/ai-software-factory-v1-decisions.md) | Accepted | Existing product decisions |
