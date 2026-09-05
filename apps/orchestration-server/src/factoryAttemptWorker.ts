@@ -38,6 +38,7 @@ import {
   recordFactorySandboxStarted,
   recordFactorySandboxTerminated,
   transferFactoryPublicationWorkspace,
+  transferFactoryRecoveryWorkspace,
   type FactoryWorkspaceOwner,
 } from "./factoryWorkspaceOwnership.js";
 import { ConvexRemoteSandboxJournal } from "./convexRemoteSandboxJournal.js";
@@ -132,6 +133,7 @@ export interface FactoryAttemptWorkerDependencies {
   recordFactoryPublication?: typeof recordFactoryPublication;
   cleanupOwnedFactoryWorkspace?: typeof cleanupOwnedFactoryWorkspace;
   transferFactoryPublicationWorkspace?: typeof transferFactoryPublicationWorkspace;
+  transferFactoryRecoveryWorkspace?: typeof transferFactoryRecoveryWorkspace;
   createFactorySourceBundle?: typeof createFactorySourceBundle;
   materializeRemoteCandidate?: typeof materializeRemoteCandidate;
   recordFactorySandboxStarted?: typeof recordFactorySandboxStarted;
@@ -174,6 +176,7 @@ const DEFAULT_DEPENDENCIES: FactoryAttemptWorkerDependencies = {
   recordFactoryPublication,
   cleanupOwnedFactoryWorkspace,
   transferFactoryPublicationWorkspace,
+  transferFactoryRecoveryWorkspace,
   createFactorySourceBundle,
   materializeRemoteCandidate,
   recordFactorySandboxStarted,
@@ -483,6 +486,23 @@ export class FactoryAttemptWorker {
         this.lastError = null;
         return;
       }
+      if (claim.localCandidateRecovery?.previousLease && workspaceOwner) {
+        const candidate = await this.dependencies.inspectCandidateChange(claim.worktree, manifest.repository.baseSha);
+        if (candidate.candidateRevision !== claim.localCandidateRecovery.sourceCandidateSha
+          || candidate.treeRevision !== claim.localCandidateRecovery.sourceTreeSha
+          || candidate.sourceRevision !== claim.localCandidateRecovery.sourceRevision
+          || candidate.sourceRevision !== manifest.repository.baseSha) {
+          throw new Error("Local candidate recovery workspace does not match the durable source Attempt checkpoint.");
+        }
+        await (this.dependencies.transferFactoryRecoveryWorkspace ?? transferFactoryRecoveryWorkspace)({
+          previousOwner: workspaceOwnerFromLease(claim, manifest, claim.localCandidateRecovery.previousLease, {
+            workflowRunId: String(claim.localCandidateRecovery.sourceAttemptId),
+            executionManifestDigest: claim.localCandidateRecovery.sourceExecutionManifestDigest,
+          }),
+          nextOwner: workspaceOwner,
+          checkpointCandidateSha: claim.localCandidateRecovery.sourceCandidateSha,
+        });
+      }
       if (claim.publicationCheckpoint && workspaceOwner && claim.previousLease?.workerId) {
         await (this.dependencies.transferFactoryPublicationWorkspace ?? transferFactoryPublicationWorkspace)({
           previousOwner: workspaceOwnerFromLease(claim, manifest, claim.previousLease),
@@ -497,6 +517,59 @@ export class FactoryAttemptWorker {
         baseSha: manifest.repository.baseSha,
         ownership: workspaceOwner,
       });
+
+      if (claim.localCandidateRecovery) {
+        const candidate = await this.dependencies.inspectCandidateChange(claim.worktree, manifest.repository.baseSha);
+        const scopeResult = validateChangedFileScope(candidate.changedFiles, {
+          allowedPaths: manifest.repository.allowedPaths,
+          excludedPaths: manifest.repository.excludedPaths,
+        });
+        if (!scopeResult.ok || scopeResult.changedFiles.length === 0) {
+          throw new Error(scopeResult.ok
+            ? "Local candidate recovery found no reviewable code change."
+            : `Local candidate recovery is outside the frozen code scope: ${scopeResult.outsideScope.join(", ")}`);
+        }
+        await this.dependencies.assertFactoryCandidateUnchanged(claim.worktree, candidate.candidateRevision);
+        await report({
+          events: [{
+            idempotencyKey: `factory:${claim.runId}:local-candidate-recovery`,
+            eventType: "CHECKPOINT_CREATED",
+            workflowStep: "candidate-attestation",
+            status: "COMPLETED",
+            startedAt: Date.now(),
+            commandSummary: "Existing candidate commit was attested without rerunning the model or external tools",
+            metadata: { recoveryRequestedAt: claim.localCandidateRecovery.requestedAt },
+          }],
+          artifacts: [{
+            idempotencyKey: `factory:${claim.runId}:code-diff:${candidate.candidateRevision}`,
+            artifactType: "CODE_DIFF",
+            name: `Recovered code change ${candidate.candidateRevision.slice(0, 12)}`,
+            contentHash: `git:${candidate.candidateRevision}`,
+            metadata: {
+              changedFiles: scopeResult.changedFiles,
+              deletedFiles: candidate.deletedFiles,
+              linesAdded: candidate.linesAdded,
+              linesDeleted: candidate.linesDeleted,
+              branch: claim.branch,
+              sourceRevision: candidate.sourceRevision,
+              headSha: candidate.candidateRevision,
+              treeSha: candidate.treeRevision,
+              recovery: true,
+            },
+          }],
+          candidateReady: {
+            transport: "LOCAL_GIT",
+            candidateSha: candidate.candidateRevision,
+            treeSha: candidate.treeRevision,
+            baseRef: claim.defaultBranch,
+            headRef: claim.branch,
+          },
+          terminal: { status: "COMPLETED" },
+        });
+        this.completedCount += 1;
+        this.lastError = null;
+        return;
+      }
 
       if (claim.publicationCheckpoint) {
         const checkpoint = validatePublicationCheckpoint(claim.publicationCheckpoint);
@@ -918,6 +991,16 @@ export class FactoryAttemptWorker {
         this.lastError = null;
         return;
       }
+      if (policyV2) {
+        // Persist the exact immutable candidate checkpoint before provider
+        // publication. A later credential/provider failure can then recover
+        // without replaying the harness or any external tool.
+        await report({
+          events: verificationResult ? [] : mappedEvents,
+          observations: verificationResult ? [] : traceObservations,
+          artifacts: verificationResult ? [] : baseArtifacts,
+        });
+      }
       await cleanupRemote();
       await this.publishCandidate({
         claim,
@@ -934,9 +1017,9 @@ export class FactoryAttemptWorker {
         requirePublicationPermit: true,
         assertActive,
         signal: controller.signal,
-        events: verificationResult ? [] : mappedEvents,
-        observations: verificationResult ? [] : traceObservations,
-        artifacts: verificationResult ? [] : baseArtifacts,
+        events: policyV2 || verificationResult ? [] : mappedEvents,
+        observations: policyV2 || verificationResult ? [] : traceObservations,
+        artifacts: policyV2 || verificationResult ? [] : baseArtifacts,
       });
       this.completedCount += 1;
       this.lastError = null;
@@ -1259,13 +1342,18 @@ function workspaceOwnerFromClaim(claim: any, manifest: any): FactoryWorkspaceOwn
   return workspaceOwnerFromLease(claim, manifest, lease);
 }
 
-function workspaceOwnerFromLease(claim: any, manifest: any, lease: any): FactoryWorkspaceOwner {
+function workspaceOwnerFromLease(
+  claim: any,
+  manifest: any,
+  lease: any,
+  identity?: { workflowRunId: string; executionManifestDigest: string },
+): FactoryWorkspaceOwner {
   if (!lease?.leaseId || !lease.workerId || !lease.workerSessionId || !Number.isSafeInteger(lease.workerGeneration)) {
     throw new Error("Durable Factory claim is missing its complete workspace ownership identity.");
   }
   return {
     repositoryIdentity: claim.repository,
-    workflowRunId: String(claim.workflowRunId),
+    workflowRunId: identity?.workflowRunId ?? String(claim.workflowRunId),
     workerId: lease.workerId,
     workerSessionId: lease.workerSessionId,
     workerGeneration: lease.workerGeneration,
@@ -1273,7 +1361,7 @@ function workspaceOwnerFromLease(claim: any, manifest: any, lease: any): Factory
     branch: claim.branch,
     worktree: claim.worktree,
     checkoutRoot: claim.checkoutRoot,
-    executionManifestDigest: claim.executionManifestDigest,
+    executionManifestDigest: identity?.executionManifestDigest ?? claim.executionManifestDigest,
     baseSha: manifest.repository.baseSha,
     sandboxId: manifest.sandbox?.resourceName,
   };
@@ -1572,6 +1660,7 @@ function validV3ExecutionProfileBinding(
     || !exactObjectKeys(profile, [
       "schema", "profileKey", "version", "harness", "runtimeArtifact", "executionBackend",
       "modelRoute", ...(executionBackend === "remote-sandbox" ? ["sandboxProfile"] : []),
+      ...(profile?.toolGrant ? ["toolGrant"] : []),
       "isolationModes", "requiredHarnessCapabilities", "requiredSandboxCapabilities", "lifecycle", "authority",
     ])
     || !exactObjectKeys(qualification, [
@@ -1588,10 +1677,17 @@ function validV3ExecutionProfileBinding(
     || !exactObjectKeys(qualification?.components, [
       "harness", "runtimeArtifactDigest", "executionBackend", "modelRoute",
       ...(executionBackend === "remote-sandbox" ? ["sandboxProfile"] : []),
+      ...(profile?.toolGrant ? ["toolGrant"] : []),
       "isolationModes", "requiredHarnessCapabilities", "requiredSandboxCapabilities",
     ])
     || !exactObjectKeys(components?.harness, ["adapter", "version", "capabilityManifestDigest", "effectiveConfigSha256"])
     || !exactObjectKeys(components?.modelRoute, ["catalogId", "routeDigest", "qualificationDigest"])
+    || (profile?.toolGrant !== undefined && (
+      !exactObjectKeys(profile.toolGrant, ["grantId", "grantSnapshot", "grantDigest"])
+      || !boundedManifestIdentity(profile.toolGrant.grantId, 200)
+      || !/^sha256:[a-f0-9]{64}$/.test(profile.toolGrant.grantDigest ?? "")
+      || !exactObjectKeys(components?.toolGrant, ["grantId", "grantDigest"])
+    ))
     || !exactObjectKeys(qualification?.scope, ["workloadClasses", "riskClasses"])
     || !exactObjectKeys(qualification?.evidence, ["reference", "digest"])
     || profile?.schema !== "factory-execution-profile/v1"
@@ -1657,6 +1753,8 @@ function validV3ExecutionProfileBinding(
     || components?.modelRoute?.catalogId !== profile.modelRoute.catalogId
     || components?.modelRoute?.routeDigest !== profile.modelRoute.routeDigest
     || components?.modelRoute?.qualificationDigest !== profile.modelRoute.qualificationDigest
+    || components?.toolGrant?.grantId !== profile.toolGrant?.grantId
+    || components?.toolGrant?.grantDigest !== profile.toolGrant?.grantDigest
     || !sameStringSet(components?.isolationModes ?? [], profile.isolationModes)
     || !sameHarnessRequirements(components?.requiredHarnessCapabilities, profile.requiredHarnessCapabilities)
     || !sameStringSet(components?.requiredSandboxCapabilities ?? [], profile.requiredSandboxCapabilities)) {
@@ -1720,6 +1818,17 @@ function executionProfileEvidenceFromManifest(manifest: FrozenHarnessExecutionMa
         profileDigest: profile.sandboxProfile.profileDigest,
       },
     } : {}),
+    ...(profile.toolGrant ? {
+      toolGrant: {
+        grantId: profile.toolGrant.grantId,
+        grantDigest: profile.toolGrant.grantDigest,
+        operation: profile.toolGrant.grantSnapshot?.operation,
+        expiresAt: profile.toolGrant.grantSnapshot?.expiresAt,
+        admission: profile.toolGrant.grantSnapshot?.toolVersionSnapshot?.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE"
+          ? "QUALIFIED_REAL_READ_ONLY_SERVICE"
+          : "QUALIFICATION_FIXTURE",
+      },
+    } : { toolCapability: "NO_TOOL_CAPABILITY" }),
     selectedIsolation: manifest.harness.isolation,
   };
 }

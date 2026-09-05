@@ -186,6 +186,8 @@ export {
   type GitVerificationSubject,
   type PrepublicationGitVerificationSubject,
   type GitSubjectPublicationBinding,
+  type GithubVerificationSubject,
+  type LocalGitVerificationSubject,
   type VerificationSubject,
   type WorkOrderKind,
 } from "./verificationSubject.js";

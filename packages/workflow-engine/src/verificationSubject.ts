@@ -18,16 +18,17 @@ type SubjectIdentity = {
   digest: string;
 };
 
-type GitSubjectRepository = {
+type GitVerificationSubjectIdentity = SubjectIdentity & {
+  version: 1;
   kind: "GIT_CANDIDATE";
   repositoryId: string;
-  provider: "GITHUB";
   providerRepositoryId: string;
   candidateSha: string;
   treeSha: string;
 };
-export type PublishedGitVerificationSubject = SubjectIdentity & GitSubjectRepository & {
-  version: 1;
+
+export type GithubVerificationSubject = GitVerificationSubjectIdentity & {
+  provider: "GITHUB";
   pullRequest: {
     providerPullRequestId: string;
     number: number;
@@ -38,15 +39,17 @@ export type PublishedGitVerificationSubject = SubjectIdentity & GitSubjectReposi
     draftAtPublication: boolean;
   };
 };
-export type PrepublicationGitVerificationSubject = SubjectIdentity & GitSubjectRepository & {
-  version: 2;
-  baseSha: string;
-  rawDiffSha256: string;
-  baseRef: string;
-  headRef: string;
+
+export type LocalGitVerificationSubject = GitVerificationSubjectIdentity & {
+  provider: "LOCAL_GIT";
+  localRef: {
+    baseRef: string;
+    headRef: string;
+    headSha: string;
+  };
 };
-/** Preserve the published v1 API for existing callers. */
-export type GitVerificationSubject = PublishedGitVerificationSubject;
+
+export type GitVerificationSubject = GithubVerificationSubject | LocalGitVerificationSubject;
 
 export type AutomationVerificationSubject = SubjectIdentity & {
   version: 1;
@@ -66,26 +69,45 @@ export type AutomationVerificationSubject = SubjectIdentity & {
   outputArtifactContentHashes: string[];
 };
 
+export type PublishedGitVerificationSubject = GithubVerificationSubject;
+export type PrepublicationGitVerificationSubject = Omit<GithubVerificationSubject, "version" | "pullRequest"> & {
+  version: 2;
+  baseSha: string;
+  rawDiffSha256: string;
+  baseRef: string;
+  headRef: string;
+};
 export type VerificationSubject = GitVerificationSubject | PrepublicationGitVerificationSubject | AutomationVerificationSubject;
 
-type GitSubjectInput = Omit<PublishedGitVerificationSubject, "subjectId" | "digest">;
+type GithubSubjectInput = Omit<GithubVerificationSubject, "subjectId" | "digest">;
+type LocalGitSubjectInput = Omit<LocalGitVerificationSubject, "subjectId" | "digest">;
+type GitSubjectInput = GithubSubjectInput | LocalGitSubjectInput;
 type PrepublicationSubjectInput = Omit<PrepublicationGitVerificationSubject, "subjectId" | "digest">;
 type AutomationSubjectInput = Omit<AutomationVerificationSubject, "subjectId" | "digest">;
 
 const SHA = /^[0-9a-f]{40,64}$/;
 const CONTENT_HASH = /^sha256:[0-9a-f]{64}$/;
 
-export function createGitVerificationSubject(input: GitSubjectInput): PublishedGitVerificationSubject {
+export function createGitVerificationSubject(input: GithubSubjectInput): GithubVerificationSubject;
+export function createGitVerificationSubject(input: LocalGitSubjectInput): LocalGitVerificationSubject;
+export function createGitVerificationSubject(input: GitSubjectInput): GitVerificationSubject {
   assertCommonIdentity(input);
-  if (input.version !== 1) throw new Error("Published Git subject requires version 1.");
-  if (!input.repositoryId || !input.providerRepositoryId || !input.pullRequest.providerPullRequestId) {
-    throw new Error("Git verification subject requires internal repository, provider repository, and provider pull-request identity.");
+  if (input.version !== 1) throw new Error("Legacy Git subject requires version 1.");
+  if (!input.repositoryId || !input.providerRepositoryId) {
+    throw new Error("Git verification subject requires internal and provider repository identity.");
   }
-  if (!SHA.test(input.candidateSha) || !SHA.test(input.treeSha) || input.pullRequest.headSha !== input.candidateSha) {
-    throw new Error("Git verification subject requires exact lowercase commit/tree SHA lineage and a matching pull-request head.");
+  const boundHeadSha = input.provider === "GITHUB" ? input.pullRequest.headSha : input.localRef.headSha;
+  if (!SHA.test(input.candidateSha) || !SHA.test(input.treeSha) || boundHeadSha !== input.candidateSha) {
+    throw new Error("Git verification subject requires exact lowercase commit/tree SHA lineage and a matching bound head.");
   }
-  if (!Number.isSafeInteger(input.pullRequest.number) || input.pullRequest.number < 1) {
-    throw new Error("Git verification subject requires an exact pull request identity.");
+  if (input.provider === "GITHUB"
+    && (!input.pullRequest.providerPullRequestId
+      || !Number.isSafeInteger(input.pullRequest.number)
+      || input.pullRequest.number < 1)) {
+    throw new Error("GitHub verification subject requires an exact pull request identity.");
+  }
+  if (input.provider === "LOCAL_GIT" && (!input.localRef.baseRef || !input.localRef.headRef)) {
+    throw new Error("Local Git verification subject requires exact base and head refs.");
   }
   const digest = verificationDigest("verification-subject/git/v1", {
     version: input.version,
@@ -97,12 +119,17 @@ export function createGitVerificationSubject(input: GitSubjectInput): PublishedG
     repositoryId: input.repositoryId,
     provider: input.provider,
     providerRepositoryId: input.providerRepositoryId,
-    providerPullRequestId: input.pullRequest.providerPullRequestId,
-    providerPullRequestNumber: input.pullRequest.number,
+    ...(input.provider === "GITHUB" ? {
+      providerPullRequestId: input.pullRequest.providerPullRequestId,
+      providerPullRequestNumber: input.pullRequest.number,
+    } : {
+      baseRef: input.localRef.baseRef,
+      headRef: input.localRef.headRef,
+    }),
     candidateSha: input.candidateSha,
     treeSha: input.treeSha,
   });
-  return { ...input, subjectId: `verification-subject:${digest.slice("sha256:".length)}`, digest };
+  return { ...input, subjectId: `verification-subject:${digest.slice("sha256:".length)}`, digest } as GitVerificationSubject;
 }
 
 export function createPrepublicationGitVerificationSubject(input: PrepublicationSubjectInput): PrepublicationGitVerificationSubject {
@@ -169,7 +196,9 @@ export function verifyVerificationSubjectIdentity(subject: VerificationSubject):
   const { subjectId, digest, ...input } = subject;
   try {
     const rebuilt = input.kind === "GIT_CANDIDATE"
-      ? input.version === 2 ? createPrepublicationGitVerificationSubject(input) : createGitVerificationSubject(input)
+      ? input.version === 2 ? createPrepublicationGitVerificationSubject(input) : input.provider === "GITHUB"
+        ? createGitVerificationSubject(input as GithubSubjectInput)
+        : createGitVerificationSubject(input as LocalGitSubjectInput)
       : createAutomationVerificationSubject(input);
     return rebuilt.subjectId === subjectId && rebuilt.digest === digest;
   } catch {

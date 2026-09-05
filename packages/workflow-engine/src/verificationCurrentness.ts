@@ -292,7 +292,15 @@ function evaluateVerification(input: CurrentVerificationInput, purpose: "ACCEPTA
   });
   const evidenceContext = { ...receiptContext, evidenceSetDigest };
 
-  if (subject.kind === "GIT_CANDIDATE" && purpose === "ACCEPTANCE") {
+  if (subject.kind === "GIT_CANDIDATE" && subject.provider === "LOCAL_GIT") {
+    return denied("Verified local candidate has no trusted current publication projection and is not acceptance-eligible.", {
+      ...evidenceContext,
+      verifiedOutcome,
+      verificationRecordedAt: receipt.recordedAt,
+    });
+  }
+
+  if (subject.kind === "GIT_CANDIDATE" && subject.provider === "GITHUB" && purpose === "ACCEPTANCE") {
     const binding = source.subjectPublicationBinding;
     if (subject.version === 2 && (!binding || !verifyGitSubjectPublicationBinding(subject, binding)
       || binding.verificationReceiptId !== receipt.id || receipt.humanReviewValid !== true)) {

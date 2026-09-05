@@ -226,7 +226,7 @@ dynamic tools, subagent policy, or harness implementation. The earlier generic
 harness rollout remains documented below for operators maintaining those
 worker versions.
 
-## Governed read-only MCP v41 qualification fixture
+## Governed read-only MCP v42
 
 Phase 3 adds one profile-specific host capability; it does not enable MCP in a
 harness. Register the exact qualification Tool Version, qualify its reviewed
@@ -263,6 +263,33 @@ Operator remediation is deliberately narrow:
 Rollback is grant revocation plus removal of the MCP-qualified profile from new
 Factory Version selection. Revocation denies new calls and preserves historical
 receipts. This path is `QUALIFICATION_FIXTURE`, not a real admitted MCP service.
+
+Phase 4 admits one additional exact path: Context7 `query-docs` at
+`mcp.context7.com:443`, release `@upstash/context7-mcp@4.0.5`, with no
+credential and one fixed public React documentation query. The broker requires
+the observed server version and input-schema digest to equal the frozen Tool
+Version before the request is sent. It records separate authorization and
+completion receipts and supplies only a bounded, untrusted normalized text
+envelope to the harness. Every HTTPS connection is pinned to an address from
+the broker's validated public-DNS result, and initialize, catalog validation,
+and the tool call share one end-to-end deadline. Redirects, private or reserved
+address results, duplicate advertised operations, retries, dynamic discovery
+authority, writes, acceptance, routing, and policy mutation remain denied.
+
+If publication credentials are unavailable after the candidate commit exists,
+an operator may recover only the exact failed policy-v2 publication Attempt
+when its durable code-diff and prior workspace-ownership evidence match. The
+failed Attempt remains terminal and unchanged. Recovery creates a new linked,
+fenced Attempt that transfers the already-owned workspace, attests the existing
+commit and allowed-path diff, and emits `LOCAL_GIT` candidate evidence without
+rerunning the harness or MCP call. It cannot publish, and even independently
+verified `LOCAL_GIT` evidence is not acceptance-current without a trusted
+publication projection.
+
+The isolated Phase 4 launcher permits raw SQLite snapshot copying only after
+the source backend's configured ports are confirmed stopped and no WAL/SHM
+sidecars exist. It fails closed rather than copying a potentially torn live
+database.
 
 ## Original generic-harness v27 rollout
 

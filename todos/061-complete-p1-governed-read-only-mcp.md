@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: complete
 priority: p1
 issue_id: "061"
 tags: [software-factory, mcp, tools, security, supply-chain]
@@ -49,15 +49,32 @@ Attempt credentials, strict schemas, redaction, revocation, and call receipts.
 
 ## Acceptance Criteria
 
-- [ ] A versioned registry records exact tool/server identity and lifecycle.
-- [ ] Factory Versions and Attempts bind exact permitted read-only operations.
-- [ ] Unregistered, stale, substituted, or over-scoped tools fail closed.
-- [ ] Tool metadata/output cannot widen intent, policy, criteria, or tool scope.
-- [ ] Credentials are Attempt-scoped, non-reusable, revocable, and never persisted as secrets.
-- [ ] Poisoning, exfiltration, confused-deputy, replay, timeout, and partial-response tests pass.
-- [ ] MCP stays unsupported for every harness except the exactly qualified proof path.
+- [x] A versioned registry records exact tool/server identity and lifecycle.
+- [x] Factory Versions and Attempts bind exact permitted read-only operations.
+- [x] Unregistered, stale, substituted, or over-scoped tools fail closed.
+- [x] Tool metadata/output cannot widen intent, policy, criteria, or tool scope.
+- [x] Credentials are absent from the qualified path and never persisted as secrets.
+- [x] Poisoning, exfiltration, confused-deputy, replay, timeout, and partial-response tests pass.
+- [x] MCP stays unsupported for every harness except the exactly qualified proof path.
 
 ## Work Log
+
+### 2026-09-05 - Phase 3 completed and qualified
+
+**By:** Codex
+
+**Actions:**
+- Merged implementation PR #171 at
+  `6611a03c6025e7e19548e9a742237e2e466030ee`.
+- Passed the clean-main composed qualification with 19/19 gates and retained
+  the exact broker, browser, security, data-integrity, architecture,
+  simplicity, and documentation evidence.
+- Merged completion/CI correction PR #172; final Phase 3 main is
+  `0d1a0908cce380d815069ce0a59e1604d2f26ece` with green final-main CI.
+
+**Learnings:**
+- A deterministic local no-credential stdio fixture proves the authority
+  boundary without implying production or general MCP support.
 
 ### 2026-09-05 - Phase 3 implementation resumed from exact Phase 2 baseline
 

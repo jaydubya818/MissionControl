@@ -1,0 +1,41 @@
+{
+  "schema": "phase4-browser-validation/v1",
+  "recordedAt": "2026-09-05T20:42:19Z",
+  "applicationUrl": "http://localhost:5204",
+  "workspaceId": "sn7b1vs0eda93we4qe76rpcmm18dtnjn",
+  "workOrderId": "yh7201gkt7cqwgqv085n95nxbs8dt7s2",
+  "sourceAttemptId": "ys7cw2kv8qv0prn2vz0m5etpvn8dvqmg",
+  "verificationAttemptId": "ys726g569gsxcb65f1nxhzdjwd8dt39h",
+  "scope": "HISTORICAL_ISOLATED_RUNTIME_UI_PROOF",
+  "releaseSemantics": {
+    "inPlaceRecovery": "SUPERSEDED",
+    "localGitVerificationOutcome": "VERIFIED",
+    "localGitAcceptanceCurrent": false,
+    "localGitAcceptanceEligible": false,
+    "note": "The release implementation preserves the failed Attempt and creates a linked recovery Attempt. LOCAL_GIT has no trusted publication projection and carries no acceptance authority."
+  },
+  "checks": [
+    {
+      "surface": "desktop-attempt-inspector",
+      "viewport": { "width": 1280, "height": 720 },
+      "actions": ["open Work Orders", "select qualification WorkOrder", "open Tasks & runs", "inspect implementation Attempt"],
+      "assertions": ["source Attempt COMPLETED", "authorization receipt ALLOWED", "completion receipt SUCCEEDED", "duration 905ms", "failed publication visible", "candidate-attestation recovery visible", "candidate 9111c11f00b85690a4bcf160e0fd32a6800208db visible", "two broker receipt artifacts visible"]
+    },
+    {
+      "surface": "mobile-work-orders",
+      "viewport": { "width": 390, "height": 844 },
+      "actions": ["load Work Orders", "Tab", "Enter", "Escape", "reload"],
+      "assertions": ["no horizontal overflow observed", "mobile navigation opened by keyboard", "navigation closed by Escape", "WorkOrder remained after refresh", "historical isolated runtime displayed Verification PASS", "Run COMPLETED"]
+    },
+    {
+      "surface": "accessibility",
+      "command": "pnpm run test:e2e:critical",
+      "assertions": ["15 tests passed", "Work Orders has no critical WCAG violations", "Work Orders has no color-contrast violations across supported themes and viewports", "mobile shell smoke passed", "keyboard-reachable dialog test passed"]
+    }
+  ],
+  "artifacts": [
+    "canonical-browser-attempt.md",
+    "independent-verification.md"
+  ],
+  "result": "PASS_HISTORICAL_UI_ONLY_NOT_ACCEPTANCE_EVIDENCE"
+}

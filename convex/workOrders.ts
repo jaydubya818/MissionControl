@@ -2945,10 +2945,17 @@ async function dispatchWorkOrder(
       missionForDispatch = mission;
     }
 
+    const dispatchApprovalStatus = deriveApprovalStatus({
+      riskLevel: refreshedWorkOrder.riskLevel,
+      requiredApprovals: effectiveRequiredApprovals,
+      isMutating: refreshedWorkOrder.isMutating,
+      approvals: await listApprovalDecisionsForWorkOrder(ctx, refreshedWorkOrder._id),
+      now: Date.now(),
+    });
     const dispatchable = validateDispatchable({
       state: refreshedWorkOrder.state,
       riskLevel: refreshedWorkOrder.riskLevel,
-      approvalStatus: refreshedWorkOrder.approvalStatus,
+      approvalStatus: dispatchApprovalStatus,
       requiredApprovals: effectiveRequiredApprovals,
       isMutating: refreshedWorkOrder.isMutating,
       hasWorkflowId: !!resolvedWorkflowId,

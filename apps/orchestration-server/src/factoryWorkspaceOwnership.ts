@@ -255,6 +255,66 @@ export async function transferFactoryPublicationWorkspace(input: {
   return transferred;
 }
 
+/**
+ * Rekeys a clean, terminated workspace from one failed Attempt to one explicit
+ * linked recovery Attempt. Generic publication recovery remains same-Attempt.
+ */
+export async function transferFactoryRecoveryWorkspace(input: {
+  previousOwner: FactoryWorkspaceOwner;
+  nextOwner: FactoryWorkspaceOwner;
+  checkpointCandidateSha: string;
+}) {
+  validateOwner(input.previousOwner);
+  validateOwner(input.nextOwner);
+  const previousPath = await ownershipManifestPath(input.previousOwner);
+  const nextPath = await ownershipManifestPath(input.nextOwner);
+  if (previousPath === nextPath) throw new Error("Cross-Attempt recovery requires a new protected manifest identity.");
+  if (await readManifest(nextPath)) throw new Error("Recovery Attempt already has a protected ownership manifest.");
+  const manifest = await requireOwnedManifest(input.previousOwner);
+  if (manifest.process.state !== "TERMINATED" || !gitSha(input.checkpointCandidateSha)) {
+    throw new Error("Only a terminated workspace with an exact candidate checkpoint can transfer to a recovery Attempt.");
+  }
+  assertRecoveryWorkspaceIdentity(input.previousOwner, input.nextOwner);
+  if (input.previousOwner.workerId !== input.nextOwner.workerId
+    || input.previousOwner.leaseId === input.nextOwner.leaseId
+    || input.nextOwner.workerGeneration < input.previousOwner.workerGeneration
+    || (input.previousOwner.workerSessionId !== input.nextOwner.workerSessionId
+      && input.nextOwner.workerGeneration <= input.previousOwner.workerGeneration)) {
+    throw new Error("Recovery workspace transfer requires the same stable worker, a new lease, and monotonic generation.");
+  }
+  const boundary = await assertCanonicalWorktreeBoundary(
+    input.previousOwner.checkoutRoot,
+    input.previousOwner.worktree,
+    { requireWorktree: true },
+  );
+  const [branch, head, status] = await Promise.all([
+    git(boundary.worktree, ["branch", "--show-current"]),
+    git(boundary.worktree, ["rev-parse", "HEAD"]),
+    git(boundary.worktree, ["status", "--porcelain=v1", "--untracked-files=all"]),
+  ]);
+  if (branch !== input.previousOwner.branch || head !== input.checkpointCandidateSha || status) {
+    throw new Error("Recovery workspace transfer proof does not match the clean checkpoint candidate.");
+  }
+  const transferred: FactoryWorkspaceOwnershipManifest = {
+    ...manifest,
+    workflowRunId: input.nextOwner.workflowRunId,
+    executionManifestDigest: input.nextOwner.executionManifestDigest,
+    workerId: input.nextOwner.workerId,
+    workerSessionId: input.nextOwner.workerSessionId,
+    workerGeneration: input.nextOwner.workerGeneration,
+    leaseId: input.nextOwner.leaseId,
+    updatedAt: Date.now(),
+  };
+  await rename(previousPath, nextPath);
+  try {
+    await writeManifest(nextPath, transferred);
+  } catch (error) {
+    await rename(nextPath, previousPath).catch(() => undefined);
+    throw error;
+  }
+  return transferred;
+}
+
 export async function cleanupOwnedFactoryWorkspace(input: {
   owner: FactoryWorkspaceOwner;
   expectedHeadSha: string;
@@ -421,6 +481,17 @@ function assertStaticWorkspaceIdentity(previous: FactoryWorkspaceOwner, next: Fa
   ];
   if (staticFields.some((field) => previous[field] !== next[field])) {
     throw new Error("Workspace transfer cannot change immutable Attempt ownership.");
+  }
+}
+
+function assertRecoveryWorkspaceIdentity(previous: FactoryWorkspaceOwner, next: FactoryWorkspaceOwner) {
+  const staticFields: Array<keyof FactoryWorkspaceOwner> = [
+    "repositoryIdentity", "branch", "worktree", "checkoutRoot", "baseSha", "sandboxId",
+  ];
+  if (staticFields.some((field) => previous[field] !== next[field])
+    || previous.workflowRunId === next.workflowRunId
+    || previous.executionManifestDigest === next.executionManifestDigest) {
+    throw new Error("Recovery workspace transfer requires one new Attempt identity and an otherwise exact workspace binding.");
   }
 }
 
