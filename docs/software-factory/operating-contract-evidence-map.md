@@ -2,12 +2,12 @@
 title: Software Factory Operating Contract Evidence Map
 status: ACTIVE
 last_verified: 2026-09-05
-baseline_commit: 0d1a090
+baseline_commit: aa8c12b
 ---
 
 # Software Factory operating contract evidence map
 
-This map connects [FDLC's six architecture areas](https://fdlc.ai/architecture) to existing Mission Control implementation and tests. It is an implementation guide, not a replacement schema, admission decision, or maturity ledger. Source paths below were reviewed at `0d1a090`; retained qualification proves only its cited revisions and scope.
+This map connects [FDLC's six architecture areas](https://fdlc.ai/architecture) to existing Mission Control implementation and tests. It is an implementation guide, not a replacement schema, admission decision, or maturity ledger. Source paths below were reconciled at `aa8c12b` after the separately qualified read-only service landed; retained qualification proves only its cited revisions and scope.
 
 The governed Mission is the unit of intent. Plans, WorkOrders, Tasks and Attempts preserve the delivery contract while models, skills and tools can change through existing configuration gates. Execution, verification, acceptance, release and Factory promotion retain separate authority.
 
@@ -19,24 +19,26 @@ The governed Mission is the unit of intent. Plans, WorkOrders, Tasks and Attempt
 | Durable execution, fencing and reconciliation | Harness | [Recovery](../../convex/lib/executionRecovery.ts), [recovery tests](../../convex/__tests__/executionRecovery.test.ts), [worker operations](./worker-runtime-operations.md) | Qualified within existing Attempt/repository contracts; generic side-effecting tool reconciliation is PLANNED |
 | Capability qualification precedes economical routing | Capability, Model, Trust | [Execution routing](../../convex/lib/executionRouting.ts), [routing evidence tests](../../convex/__tests__/executionRoutingEvidence.test.ts), [routing cost tests](../../convex/__tests__/executionRoutingCost.test.ts) | Model/harness/backend routing is implemented and gated; a universal tool/skill/human router is PLANNED |
 | Context is current, attributable and scoped | Capability, Trust | [Factory Memory](../../convex/factoryMemory.ts), [memory tests](../../convex/__tests__/factoryMemory.test.ts) | Qualified advisory records and frozen packages; production retrieval relevance and general source-conflict resolution remain partial |
-| Tool output is validated data, never authority | Capability, Trust | [Broker](../../apps/orchestration-server/src/governedMcpBroker.ts), [contract validation](../../apps/orchestration-server/src/governedMcpContracts.ts), [broker tests](../../apps/orchestration-server/src/__tests__/governedMcpBroker.test.ts), [Convex tests](../../convex/__tests__/governedMcp.test.ts) | EXPERIMENTAL: one local read-only qualification fixture; no real service or side-effecting tool admission |
+| Tool output is validated data, never authority | Capability, Trust | [Broker](../../apps/orchestration-server/src/governedMcpBroker.ts), [contract validation](../../apps/orchestration-server/src/governedMcpContracts.ts), [broker tests](../../apps/orchestration-server/src/__tests__/governedMcpBroker.test.ts), [Convex tests](../../convex/__tests__/governedMcp.test.ts) | EXPERIMENTAL: local fixture plus exact Context7 `query-docs` for one fixed public React query; no write or general connector authority |
 | Independent verification binds exact criterion and subject | Trust | [Verification Subject](../../packages/workflow-engine/src/verificationSubject.ts), [Quality Gate tests](../../convex/__tests__/qualityGateDecision.test.ts), [verification contracts](./verification-first-domain-contracts.md) | Qualified contracts; neither diagnostic scores nor a producing worker can accept its own result |
 | Traces diagnose path and outcome separately | Harness, Trust, Learning | [Observability persistence](../../convex/lib/observabilityPersistence.ts), [observability tests](../../convex/__tests__/observabilityGoldenPath.test.ts) | Qualified diagnostic system; complete production trajectory evaluation is not claimed |
 | Outcomes propose changes without promoting them | Learning | [Factory Learning](../../convex/factory/learning.ts), [learning tests](../../convex/__tests__/factoryLearning.test.ts) | Qualified advisory behavior; production learning coverage and promotion remain separately governed |
 
 The [capability maturity ledger](../product/software-factory-capability-maturity.md) owns status. This map adds no runtime, schema, API, permission, navigation surface or new status enum.
 
-## Tool boundary: what the local fixture actually demonstrates
+## Tool boundary: historical fixture and current read-only qualification
 
 The [Phase 3 completion record](../testing/evidence/governed-mcp-phase3/completion-record.md) cites implementation qualification at `37953e4d2879` and clean-main qualification at `6611a03c6025`. Keep those historical identities unchanged.
 
 - The control plane binds project, WorkOrder, Attempt, live lease/generation, Execution Profile, Tool Grant, Tool Version and exact operation. The host requires an affirmative durable reservation before transport.
-- The grant is limited to one public, read-only local stdio operation with no credentials, network destination or write authority. General harness-native MCP remains unsupported.
+- The Phase 3 fixture grant is limited to one public, read-only local stdio operation with no credentials, network destination or write authority. General harness-native MCP remains unsupported.
 - The broker checks implementation identity, output shape, required fields, bounded size and selected secret patterns. Hostile content remains untrusted data. Pattern matching is not a general proof that arbitrary output is safe.
 - Output is withheld if completion is not newly committed or the live authority became stale. Cancellation, timeout, replay, grant revocation, schema substitution and malformed output have negative controls.
 - Receipts identify the attempted operation and its result; they do not establish that a WorkOrder meets its business acceptance criteria. Cost is recorded as UNKNOWN where no accounting evidence exists.
 
-The runtime does not need a new tool platform to express these principles. Its next service must qualify against the existing boundary and its own failure modes before broader claims become valid.
+The separately landed [Phase 4 recovery evidence](../testing/evidence/governed-mcp-phase4-recovery/README.md) adds one fixed public React query through Context7 `query-docs`. The canonical browser-dispatched Attempt received host-brokered durable receipts and separate verification; the earlier direct transport was diagnostic only. Verified `LOCAL_GIT` subjects remain non-accepting without trusted publication evidence. The two recorded external service operations belong to that prior qualification; this documentation integration makes no new service or model call. This remains experimental and does not admit another operation, write authority or general connector support.
+
+The runtime reuses the existing tool boundary. Broader operation or service claims require separate authority and evidence; this integration does not expand them.
 
 ## Operator decisions under uncertainty
 

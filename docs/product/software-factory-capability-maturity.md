@@ -114,11 +114,12 @@ Product Owner decisions are in the
 ## Operating-contract integration — 2026-09-05
 
 The [operating contract evidence map](../software-factory/operating-contract-evidence-map.md)
-connects existing source and tests at `0d1a090` to FDLC and the Guide. This is a
+connects existing source and tests at `aa8c12b` to FDLC and the Guide. This is a
 documentation refinement, not a new admission or maturity promotion. The local
-read-only MCP fixture remains experimental; general side-effecting tool
+read-only MCP fixture and separately qualified fixed Context7 operation remain
+experimental; general side-effecting tool
 reconciliation, full outcome economics and production trajectory coverage are
-not qualified by that fixture. Historical qualification identities remain
+not qualified by those bounded operations. Historical qualification identities remain
 unchanged. Future gates should reuse the existing Attempts, receipts, evals and
 learning records rather than introduce parallel systems.
 
