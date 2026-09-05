@@ -576,7 +576,7 @@ importers:
 packages:
 
   '@fdlc/fab@file:vendor/fab/fdlc-fab-0.1.0-experimental.1.tgz':
-    resolution: {integrity: sha512-mrmPbMUcWNOQ5U5r/fleL5roRzsbBQyQAn1kEQHeApT4aliTabVJT1+vFBo8x7YF74rQVQqzOAZLQbPb+lFDgA==, tarball: file:vendor/fab/fdlc-fab-0.1.0-experimental.1.tgz}
+    resolution: {integrity: sha512-JDi8j4zekYpqIezrMwskh3+PGxCEldxWnnUhbv7BbLfLDJyV4VEMsW9xzoiro6ximNeaVfdAw2/ihJJKOo0rfw==, tarball: file:vendor/fab/fdlc-fab-0.1.0-experimental.1.tgz}
     version: 0.1.0-experimental.1
     engines: {node: '>=24.0.0'}
     hasBin: true

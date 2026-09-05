@@ -1,4 +1,5 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -73,6 +74,7 @@ describe("Fab canonical MC harness conformance", () => {
     const f = fixture(); const result = await runHarnessExecution(f.adapter, f.request, f.context);
     expect(result.status).toBe("COMPLETED"); expect(harnessNormalizedResultIssues(result.normalizedResult!)).toEqual([]);
     expect(JSON.stringify(result.normalizedResult?.events)).not.toContain("export const");
+    expect(result.normalizedResult?.events.items.find(event => event.summary === "model_completed")?.metadata?.returnedModel).toBe(f.config.model);
     expect(JSON.parse(result.output!).completedAcceptanceCriterionIds).toEqual([]);
     const candidateRevision = await commitFactoryChanges({ worktree: f.root, changedFiles: ["src/value.mjs"], title: "Fab fixture" });
     await f.adapter.recordCandidate(f.request.executionId, { sourceRevision: f.baseline, candidateRevision });
@@ -92,6 +94,36 @@ describe("Fab canonical MC harness conformance", () => {
     await expect(f.adapter.prepare(f.request, f.context)).rejects.toThrow("already has a session"); expect(f.modelCalls()).toBe(0);
     const redactor = new Redactor();
     expect(() => new FabAgent({ session: prepared.session, model: prepared.model, store: new SessionStore(path.join(f.directory, "state"), f.root, redactor), redactor })).toThrow("checkpoint");
+  });
+  it("preserves an actual killed worker's uncertain model request and refuses its replay", async () => {
+    const f = fixture();
+    const entry = path.join(f.directory, "crash-fixture.mjs");
+    const adapterModule = new URL("../fabExecutorAdapter.ts", import.meta.url).href;
+    writeFileSync(entry, `import {FabExecutorAdapter} from ${JSON.stringify(adapterModule)};
+      const config = ${JSON.stringify(f.config)};
+      const adapter = new FabExecutorAdapter({config,stateDirectory:${JSON.stringify(path.join(f.directory, "state"))},modelFactory:async()=>({
+        provider:config.provider,model:config.model,capabilities:{tools:true,streaming:false,reasoningControls:false,contextWindow:null},
+        invoke:async()=>{process.stdout.write('MODEL_PENDING\\n');return new Promise(()=>{});}
+      })});
+      const context={emit:()=>{},attempt:{...${JSON.stringify(f.context.attempt)},assertActive:async()=>{}}};
+      setInterval(()=>{},1000);
+      const prepared=await adapter.prepare(${JSON.stringify(f.request)},context);
+      await adapter.collectResult(await adapter.execute(prepared));
+    `);
+    const loader = createRequire(import.meta.url).resolve("tsx");
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(process.execPath, ["--import", loader, entry], { env: { PATH: "/opt/homebrew/bin:/usr/bin:/bin", HOME: f.directory, TMPDIR: "/private/tmp", GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" }, stdio: ["ignore", "pipe", "pipe"] });
+      let output = ""; let killed = false;
+      const timer = setTimeout(() => { child.kill("SIGKILL"); reject(new Error("Crash fixture did not reach the model checkpoint.")); }, 10000);
+      child.on("error", reject);
+      child.stdout.on("data", chunk => { output += String(chunk); if (!killed && output.includes("MODEL_PENDING")) { killed = true; child.kill("SIGKILL"); } });
+      child.on("close", (_code, signal) => { clearTimeout(timer); if (killed && signal === "SIGKILL") resolve(); else reject(new Error("Crash fixture failed before its checkpoint.")); });
+    });
+    const stateDirectory = path.join(f.directory, "state");
+    const state = JSON.parse(readFileSync(path.join(stateDirectory, readdirSync(stateDirectory).find(name => name.endsWith(".json"))!), "utf8")).session;
+    expect(state.status).toBe("planning"); expect(state.events.at(-1).kind).toBe("model_started");
+    expect(readdirSync(stateDirectory).some(name => name.endsWith(".lock"))).toBe(true);
+    await expect(f.adapter.prepare(f.request, f.context)).rejects.toThrow("already has a session"); expect(f.modelCalls()).toBe(0);
   });
   for (const stage of ["model", "check"] as const) it(`cancels during ${stage} execution and prevents successful handoff`, async () => {
     const f = fixture({ hangModel: stage === "model", slowCheck: stage === "check" }); const controller = new AbortController(); f.context.signal = controller.signal;

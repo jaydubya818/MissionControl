@@ -15,7 +15,7 @@ import {
 import { canonicalHash } from "@mission-control/shared";
 import { validateChangedFileScope } from "./factoryPathScope.js";
 
-export const FAB_RUNTIME_COMMIT = "026d0fba1838466f06417313a28216306efcbca7";
+export const FAB_RUNTIME_COMMIT = "6f27dbc8a1f4bc2891d0ef656299f9760864d108";
 const IDENTITY = { harnessId: "fab", harnessVersion: "0.1.0-experimental.1", harnessCommit: FAB_RUNTIME_COMMIT, adapterId: "fab", adapterVersion: "v1" };
 type AttemptContext = NonNullable<HarnessExecutionContext["attempt"]>;
 interface Prepared {
@@ -117,7 +117,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
             ...(typeof data.name === "string" ? { tool: data.name } : {}),
             ...(typeof data.id === "string" ? { toolCallId: data.id } : {}),
             ...(typeof data.durationMs === "number" ? { durationMs: data.durationMs } : {}),
-            ...(event.kind === "model_completed" ? { usage: data.usage, finish: data.finish } : {}),
+            ...(event.kind === "model_completed" ? { usage: data.usage, finish: data.finish, returnedModel: data.returnedModel ?? null } : {}),
             ...(typeof output.status === "string" ? { observedStatus: output.status } : {}),
             ...(typeof output.candidateDigest === "string" ? { candidateDigest: output.candidateDigest } : {}),
           });
