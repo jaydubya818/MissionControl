@@ -14,9 +14,10 @@ const baseline = process.env.MC_QUALIFICATION_BASE_SHA;
 if (baseline !== "3ae9d86eeff1966862a6959664ec1fe2e6e7240a") {
   throw new Error("Phase 3 qualification requires MC_QUALIFICATION_BASE_SHA=3ae9d86eeff1966862a6959664ec1fe2e6e7240a.");
 }
-const implementationSha = process.env.MC_IMPLEMENTATION_SHA?.trim()
-  || execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+const currentHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+const implementationSha = process.env.MC_IMPLEMENTATION_SHA?.trim() || currentHead;
 if (!/^[a-f0-9]{40}$/.test(implementationSha)) throw new Error("Phase 3 implementation SHA must be an exact Git commit.");
+if (implementationSha !== currentHead) throw new Error("Phase 3 implementation SHA must equal the checked-out source revision.");
 const entrypoint = resolve(root, QUALIFICATION_FIXTURE_RELATIVE_PATH);
 const implementationDigest = `sha256:${createHash("sha256").update(await readFile(entrypoint)).digest("hex")}`;
 const tool = qualificationToolVersion(implementationDigest);

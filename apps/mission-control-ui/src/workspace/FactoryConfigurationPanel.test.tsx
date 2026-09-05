@@ -70,6 +70,7 @@ const mocks = vi.hoisted(() => ({
   createPolicy: vi.fn(),
   createVerifier: vi.fn(),
   agentTemplates: [] as any[],
+  governedTools: { grants: [] as any[], versions: [], maturity: "QUALIFICATION_FIXTURE", limitations: [] },
   createAgentTemplate: vi.fn(),
   createAgentVersion: vi.fn(),
   registerProductionWorkflow: vi.fn(),
@@ -87,6 +88,7 @@ vi.mock("../../../../convex/_generated/api", () => ({
       assessReadiness: "factory.assessReadiness",
       activate: "factory.activate",
     },
+    "factory/governedMcp": { list: "governedMcp.list" },
     workflows: { list: "workflows.list", registerProduction: "workflows.registerProduction" },
     "governance/policyEnvelopes": { listPolicyEnvelopes: "policies.list", createPolicyEnvelope: "policies.create" },
     "context/verifiers": { list: "verifiers.list", create: "verifiers.create" },
@@ -104,6 +106,7 @@ vi.mock("convex/react", () => ({
     if (query === "policies.list") return mocks.policies;
     if (query === "verifiers.list") return mocks.verifiers;
     if (query === "agentTemplates.list") return mocks.agentTemplates;
+    if (query === "governedMcp.list") return mocks.governedTools;
     return undefined;
   },
   useMutation: (mutation: string) => {
@@ -157,6 +160,7 @@ describe("FactoryConfigurationPanel", () => {
     mocks.policies = [{ _id: "policy-1", name: "Default governance" }];
     mocks.verifiers = [{ _id: "verifier-1", label: "Independent review" }];
     mocks.agentTemplates = [];
+    mocks.governedTools = { grants: [], versions: [], maturity: "QUALIFICATION_FIXTURE", limitations: [] };
     mocks.versionOptions = {
       codeScopes: [{ _id: "scope-1", name: "Application", includePaths: ["apps/example/**"] }],
       agentVersions: [{ _id: "agent-version-1", version: 2, template: { name: "Implementer" }, modelConfig: { provider: "openai", modelId: "gpt-5" } }],
@@ -189,6 +193,35 @@ describe("FactoryConfigurationPanel", () => {
       name: "Software Factory",
       purpose: "SOFTWARE",
     }));
+  });
+
+  it("keeps revoked Tool Grants visible with safe remediation", () => {
+    mocks.governedTools = {
+      maturity: "QUALIFICATION_FIXTURE",
+      limitations: ["No real admitted MCP service"],
+      versions: [],
+      grants: [{
+        _id: "grant-1",
+        grantKey: "phase3-doctrine-read",
+        version: 1,
+        grantDigest: "sha256:grant",
+        toolVersionDigest: "sha256:tool",
+        state: "REVOKED",
+        current: false,
+        revocationReason: "qualification proof",
+        immutableSnapshot: {
+          operation: "read_factory_doctrine_excerpt",
+          destination: "LOCAL_PROCESS",
+          credentialClass: "NONE",
+        },
+      }],
+    };
+
+    renderPanel();
+
+    expect(screen.getByRole("region", { name: "Governed tool grants" })).toBeInTheDocument();
+    expect(screen.getByText("revoked")).toBeInTheDocument();
+    expect(screen.getByText(/Create a new exact grant and Execution Profile/i)).toBeInTheDocument();
   });
 
   it("creates a separate Verification Factory for the same repository", async () => {
