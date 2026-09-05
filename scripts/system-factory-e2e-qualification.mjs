@@ -7,6 +7,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const phase3QualificationBaseSha = "3ae9d86eeff1966862a6959664ec1fe2e6e7240a";
 const evidenceSlug = process.env.MC_QUALIFICATION_EVIDENCE_SLUG ?? "system-factory-e2e-v2";
 if (!/^[a-z0-9][a-z0-9-]*$/.test(evidenceSlug)) {
   throw new Error("MC_QUALIFICATION_EVIDENCE_SLUG must be a simple lowercase evidence directory name.");
@@ -28,7 +29,7 @@ const steps = [
     name: "profile-bound governed read-only MCP transport and negative controls",
     command: "node",
     args: ["--import", "tsx", "scripts/governed-mcp-phase3-qualification.mts"],
-    env: { MC_QUALIFICATION_BASE_SHA: baseSha },
+    env: { MC_QUALIFICATION_BASE_SHA: phase3QualificationBaseSha },
   },
   {
     name: "frozen dependency, advisory, credential, and release configuration gates",
