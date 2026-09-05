@@ -92,6 +92,9 @@ export function createGitVerificationSubject(input: GithubSubjectInput): GithubV
 export function createGitVerificationSubject(input: LocalGitSubjectInput): LocalGitVerificationSubject;
 export function createGitVerificationSubject(input: GitSubjectInput): GitVerificationSubject {
   assertCommonIdentity(input);
+  if (input.kind !== "GIT_CANDIDATE" || !["GITHUB", "LOCAL_GIT"].includes(input.provider)) {
+    throw new Error("Git verification subject requires a supported kind and provider.");
+  }
   if (input.version !== 1) throw new Error("Legacy Git subject requires version 1.");
   if (!input.repositoryId || !input.providerRepositoryId) {
     throw new Error("Git verification subject requires internal and provider repository identity.");

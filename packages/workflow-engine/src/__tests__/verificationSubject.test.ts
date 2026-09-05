@@ -43,6 +43,12 @@ function gitSubject(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Verification Subject identity", () => {
+  it("rejects unrecognized legacy providers and kinds before digest creation", () => {
+    for (const override of [{ provider: "OTHER", localRef: { baseRef: "main", headRef: "mc/candidate", headSha: SHA_A } }, { kind: "OTHER" }]) {
+      expect(() => gitSubject(override)).toThrow(/supported kind and provider/);
+      expect(verifyVerificationSubjectIdentity({ ...gitSubject(), ...override } as any)).toBe(false);
+    }
+  });
   it("binds every pre-publication identity field while preserving the historical v1 route", () => {
     const { subjectId: _id, digest: _digest, pullRequest, ...identity } = gitSubject();
     const subject = createPrepublicationGitVerificationSubject({ ...identity, version: 2, baseSha: "c".repeat(40), rawDiffSha256: HASH_B,

@@ -292,7 +292,7 @@ function evaluateVerification(input: CurrentVerificationInput, purpose: "ACCEPTA
   });
   const evidenceContext = { ...receiptContext, evidenceSetDigest };
 
-  if (subject.kind === "GIT_CANDIDATE" && subject.provider === "LOCAL_GIT") {
+  if (subject.kind === "GIT_CANDIDATE" && subject.provider !== "GITHUB") {
     return denied("Verified local candidate has no trusted current publication projection and is not acceptance-eligible.", {
       ...evidenceContext,
       verifiedOutcome,
