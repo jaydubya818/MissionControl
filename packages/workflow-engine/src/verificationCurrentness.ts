@@ -273,7 +273,15 @@ export function evaluateCurrentVerificationEligibility(input: {
   });
   const evidenceContext = { ...receiptContext, evidenceSetDigest };
 
-  if (subject.kind === "GIT_CANDIDATE") {
+  if (subject.kind === "GIT_CANDIDATE" && subject.provider === "LOCAL_GIT") {
+    return denied("Verified local candidate has no trusted current publication projection and is not acceptance-eligible.", {
+      ...evidenceContext,
+      verifiedOutcome,
+      verificationRecordedAt: receipt.recordedAt,
+    });
+  }
+
+  if (subject.kind === "GIT_CANDIDATE" && subject.provider === "GITHUB") {
     const providerHead = [...(input.providerHeads ?? [])]
       .filter((candidate) => candidate.provider === subject.provider
         && candidate.repositoryId === subject.repositoryId

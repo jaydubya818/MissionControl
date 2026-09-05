@@ -763,12 +763,15 @@ function AttemptToolCapability({ attempt }: { attempt: Doc<"workflowRuns"> }) {
   if (receipts === undefined) return <div className="mt-2 h-7 animate-pulse rounded bg-surface-2" aria-label="Loading governed tool receipts" />;
   return (
     <details className="mt-2 rounded border border-line bg-surface-2 p-2">
-      <summary className="cursor-pointer font-medium text-ink">Governed MCP · qualification fixture · {receipts.length} receipt{receipts.length === 1 ? "" : "s"}</summary>
-      <p className="mt-1 break-all font-mono text-[10px] text-ink-muted">{grant.grantSnapshot?.operation} · {grant.grantDigest}</p>
+      <summary className="cursor-pointer font-medium text-ink">Governed MCP · {grant.grantSnapshot?.toolVersionSnapshot?.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE" ? "one real read-only service" : "qualification fixture"} · {receipts.length} receipt{receipts.length === 1 ? "" : "s"}</summary>
+      <p className="mt-1 break-all font-mono text-[10px] text-ink-muted">{grant.grantSnapshot?.toolVersionSnapshot?.server?.key} · {grant.grantSnapshot?.operation} · {grant.grantDigest}</p>
       {receipts.length === 0 ? <p className="mt-1 text-[11px] text-ink-muted">No governed MCP call was recorded for this Attempt.</p> : (
         <ol className="mt-2 space-y-1" aria-label="Governed MCP receipt history">{receipts.map((receipt) => (
           <li key={receipt._id} className="flex flex-wrap items-center justify-between gap-2 rounded bg-surface-1 px-2 py-1">
-            <span>{receipt.phase.toLowerCase()} · {receipt.reason.toLowerCase().replaceAll("_", " ")}{receipt.lateOrStale ? " · late/stale evidence" : ""}</span>
+            <span>
+              {receipt.phase.toLowerCase()} · {receipt.reason.toLowerCase().replaceAll("_", " ")}{receipt.durationMs !== undefined ? ` · ${receipt.durationMs}ms` : ""}{receipt.retryCount ? ` · ${receipt.retryCount} retries` : ""}{receipt.lateOrStale ? " · late/stale evidence" : ""}
+              {receipt.expectedInputSchemaDigest ? <span className="mt-0.5 block break-all font-mono text-[9px] text-ink-muted">schema expected {receipt.expectedInputSchemaDigest.slice(0, 12)} · observed {receipt.observedInputSchemaDigest?.slice(0, 12) ?? "not observed"} · server {receipt.observedServerVersion ?? "not observed"}/{receipt.expectedServerVersion}</span> : null}
+            </span>
             <StatusBadge tone={receipt.lateOrStale ? "warning" : receipt.status === "SUCCEEDED" || receipt.status === "ALLOWED" ? "success" : receipt.status === "DENIED" || receipt.status === "FAILED" ? "error" : "warning"}>{receipt.status.toLowerCase()}</StatusBadge>
           </li>
         ))}</ol>

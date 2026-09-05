@@ -14,6 +14,7 @@ import {
   recordFactorySandboxStarted,
   recordFactorySandboxTerminated,
   transferFactoryPublicationWorkspace,
+  transferFactoryRecoveryWorkspace,
   type FactoryWorkspaceOwner,
 } from "../factoryWorkspaceOwnership.js";
 
@@ -176,6 +177,32 @@ describe("Factory workspace ownership", () => {
       nextOwner: { ...fixture.owner, workerSessionId: "session-2", workerGeneration: 2 },
       checkpointCandidateSha: fixture.headSha,
     })).rejects.toThrow(/new lease/);
+  });
+
+  it("rekeys one clean terminated workspace to an exact linked recovery Attempt", async () => {
+    const fixture = await createFixture();
+    await ensureFactoryWorkspaceOwnership({ owner: fixture.owner, allowCreate: true });
+    await recordFactoryExecutorStarted(fixture.owner, 34567);
+    await recordFactoryExecutorTerminated(fixture.owner, { pid: 34567, exitCode: 1 });
+    const nextOwner = {
+      ...fixture.owner,
+      workflowRunId: "workflow-run-recovery",
+      executionManifestDigest: `sha256:${"a".repeat(64)}`,
+      workerSessionId: "session-2",
+      workerGeneration: 2,
+      leaseId: "lease-2",
+    };
+    expect(await transferFactoryRecoveryWorkspace({
+      previousOwner: fixture.owner,
+      nextOwner,
+      checkpointCandidateSha: fixture.headSha,
+    })).toMatchObject({
+      workflowRunId: "workflow-run-recovery",
+      executionManifestDigest: `sha256:${"a".repeat(64)}`,
+      workerSessionId: "session-2",
+    });
+    expect(await loadFactoryWorkspaceOwnership(fixture.owner)).toBeUndefined();
+    expect(await loadFactoryWorkspaceOwnership(nextOwner)).toMatchObject({ workflowRunId: "workflow-run-recovery" });
   });
 });
 

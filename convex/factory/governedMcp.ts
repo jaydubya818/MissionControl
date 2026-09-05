@@ -6,6 +6,7 @@ import {
   MCP_MAX_QUALIFICATION_LIFETIME_MS,
   MCP_QUALIFICATION_OPERATION,
   MCP_QUALIFICATION_SERVER,
+  MCP_CONTEXT7_SERVER,
   executionProfileToolGrantBinding,
   mcpToolGrantDigest,
   mcpToolGrantIssues,
@@ -13,6 +14,7 @@ import {
   mcpToolVersionDigest,
   mcpToolVersionIssues,
   qualificationFixtureToolVersionSnapshot,
+  context7ToolVersionSnapshot,
 } from "../lib/governedMcp";
 
 const governedMcpReceiptValidator = v.object({
@@ -46,6 +48,10 @@ const governedMcpReceiptValidator = v.object({
   poisoningDetected: v.optional(v.boolean()),
   redactionApplied: v.optional(v.boolean()),
   serverImplementationDigest: v.string(),
+  expectedServerVersion: v.optional(v.string()),
+  observedServerVersion: v.optional(v.string()),
+  expectedInputSchemaDigest: v.optional(v.string()),
+  observedInputSchemaDigest: v.optional(v.string()),
   occurredAt: v.number(),
   durationMs: v.optional(v.number()),
   authority: v.literal("HOST_BROKER"),
@@ -61,10 +67,12 @@ export const list = query({
     ]);
     const now = Date.now();
     return {
-      maturity: "QUALIFICATION_FIXTURE" as const,
+      maturity: versions.some((item) => item.serverKey === MCP_CONTEXT7_SERVER && item.enabled)
+        ? "QUALIFIED_ONE_REAL_READ_ONLY_SERVICE" as const
+        : "QUALIFICATION_FIXTURE" as const,
       versions: versions.map((item) => ({ ...item, current: item.enabled && item.qualificationStatus === "EVIDENCE_QUALIFIED" && (item.qualificationExpiresAt ?? 0) > now })),
       grants: grants.map((item) => ({ ...item, current: item.state === "ACTIVE" && item.expiresAt > now })),
-      limitations: ["No real admitted MCP service", "No write operations", "No dynamic discovery authority", "No agent-visible credentials"],
+      limitations: ["Exactly one admitted real service operation", "No write operations", "No dynamic discovery authority", "No agent-visible credentials"],
     };
   },
 });
@@ -93,6 +101,30 @@ export const registerQualificationFixture = mutation({
   },
 });
 
+export const registerContext7QueryDocs = mutation({
+  args: { projectId: v.id("projects"), registrationIdempotencyKey: v.string() },
+  handler: async (ctx, args) => {
+    const access = await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    const key = bounded(args.registrationIdempotencyKey, 200, "Tool Version registration key");
+    const snapshot = context7ToolVersionSnapshot();
+    const digest = mcpToolVersionDigest(snapshot);
+    const existing = await ctx.db.query("mcpToolVersions").withIndex("by_registration", (q) => q.eq("projectId", args.projectId).eq("registrationIdempotencyKey", key)).first();
+    if (existing) {
+      if (existing.toolVersionDigest !== digest || computeCanonicalHash(existing.immutableSnapshot) !== computeCanonicalHash(snapshot)) throw new Error("Tool Version idempotency key is bound to another identity.");
+      return { toolVersionId: existing._id, toolVersionDigest: digest, created: false as const };
+    }
+    const now = Date.now();
+    const id = await ctx.db.insert("mcpToolVersions", {
+      tenantId: access.project.tenantId, projectId: args.projectId,
+      serverKey: MCP_CONTEXT7_SERVER, serverVersion: snapshot.server.version,
+      toolVersionDigest: digest, immutableSnapshot: snapshot,
+      registrationIdempotencyKey: key, enabled: false, qualificationStatus: "UNQUALIFIED",
+      createdBy: access.actorId, createdAt: now,
+    });
+    return { toolVersionId: id, toolVersionDigest: digest, created: true as const };
+  },
+});
+
 export const qualifyVersion = mutation({
   args: {
     toolVersionId: v.id("mcpToolVersions"), expectedDigest: v.string(),
@@ -111,7 +143,8 @@ export const qualifyVersion = mutation({
       schema: "governed-mcp-qualification/v1", toolVersionDigest: args.expectedDigest,
       reference: bounded(args.evidenceReference, 1_000, "Tool Version evidence reference"),
       digest: args.evidenceDigest, approvedBy: access.actorId, approvedAt: now, validUntil: args.validUntil,
-      admission: "QUALIFICATION_FIXTURE", realServiceAdmitted: false,
+      admission: version.serverKey === MCP_CONTEXT7_SERVER ? "QUALIFIED_REAL_READ_ONLY_SERVICE" : "QUALIFICATION_FIXTURE",
+      realServiceAdmitted: version.serverKey === MCP_CONTEXT7_SERVER,
     };
     const qualificationDigest = `sha256:${computeCanonicalHash(evidence)}`;
     await ctx.db.patch(version._id, { enabled: true, qualificationStatus: "EVIDENCE_QUALIFIED", qualificationEvidence: evidence, qualificationDigest, qualificationExpiresAt: args.validUntil, qualifiedBy: access.actorId, qualifiedAt: now });
@@ -194,7 +227,9 @@ export const recordReceiptInternal = internalMutation({
       || grant.toolVersionDigest !== receipt.toolVersionDigest || tool.toolVersionDigest !== receipt.toolVersionDigest
       || mcpToolVersionIssues(tool.immutableSnapshot).length > 0
       || mcpToolVersionDigest(tool.immutableSnapshot) !== receipt.toolVersionDigest
-      || receipt.serverImplementationDigest !== tool.immutableSnapshot.server.implementationDigest) {
+      || receipt.serverImplementationDigest !== tool.immutableSnapshot.server.implementationDigest
+      || receipt.expectedServerVersion !== tool.immutableSnapshot.server.version
+      || receipt.expectedInputSchemaDigest !== tool.immutableSnapshot.operation.inputSchemaDigest) {
       throw new Error("MCP receipt authority chain is substituted.");
     }
     validateReceiptSemantics(receipt, tool.immutableSnapshot.operation, Date.now());
@@ -263,15 +298,15 @@ export const recordReceiptInternal = internalMutation({
       toolName: receipt.operation, commandSummary: `Governed MCP ${String(receipt.phase).toLowerCase()} ${String(receipt.status).toLowerCase()}`,
       status: receipt.status, startedAt: receipt.occurredAt, durationMs: receipt.durationMs,
       errorCategory: ["DENIED", "FAILED", "CANCELED", "TIMED_OUT"].includes(receipt.status) ? receipt.reason : undefined,
-      metadata: { receiptDigest, callId: receipt.callId, executionProfileDigest: receipt.executionProfileDigest, toolGrantDigest: receipt.toolGrantDigest, toolVersionDigest: receipt.toolVersionDigest, poisoningDetected: receipt.poisoningDetected, redactionApplied: receipt.redactionApplied, requestBytes: receipt.requestBytes, retryCount: receipt.retryCount, costStatus: receipt.costStatus, lateOrStale },
+      metadata: { receiptDigest, callId: receipt.callId, executionProfileDigest: receipt.executionProfileDigest, toolGrantDigest: receipt.toolGrantDigest, toolVersionDigest: receipt.toolVersionDigest, poisoningDetected: receipt.poisoningDetected, redactionApplied: receipt.redactionApplied, requestBytes: receipt.requestBytes, retryCount: receipt.retryCount, costStatus: receipt.costStatus, expectedServerVersion: receipt.expectedServerVersion, observedServerVersion: receipt.observedServerVersion, expectedInputSchemaDigest: receipt.expectedInputSchemaDigest, observedInputSchemaDigest: receipt.observedInputSchemaDigest, lateOrStale },
     });
     const artifactId = await ctx.db.insert("runArtifacts", {
       tenantId: run.tenantId, projectId: run.projectId, workOrderId: run.workOrderId, workflowRunId: run._id,
       idempotencyKey: `mcp:${receipt.callId}:${receipt.phase}:${receiptDigest}:receipt`, artifactType: "VERIFICATION_EVIDENCE",
       name: `Governed MCP ${receipt.phase} receipt`, description: `${receipt.status}: ${receipt.reason}`,
       contentHash: receiptDigest, producer: "HOST_BROKER", producingEventId: eventId,
-      retentionPolicy: "AUDIT", sensitivity: "PUBLIC_FIXTURE", createdAt: receipt.occurredAt,
-      metadata: { callId: receipt.callId, phase: receipt.phase, sequence: receipt.sequence, requestDigest: receipt.requestDigest, requestBytes: receipt.requestBytes, retryCount: receipt.retryCount, costStatus: receipt.costStatus, outputDigest: receipt.outputDigest, outputBytes: receipt.outputBytes, lateOrStale },
+      retentionPolicy: "AUDIT", sensitivity: tool.immutableSnapshot.dataClassification, createdAt: receipt.occurredAt,
+      metadata: { callId: receipt.callId, phase: receipt.phase, sequence: receipt.sequence, requestDigest: receipt.requestDigest, requestBytes: receipt.requestBytes, retryCount: receipt.retryCount, costStatus: receipt.costStatus, outputDigest: receipt.outputDigest, outputBytes: receipt.outputBytes, expectedServerVersion: receipt.expectedServerVersion, observedServerVersion: receipt.observedServerVersion, expectedInputSchemaDigest: receipt.expectedInputSchemaDigest, observedInputSchemaDigest: receipt.observedInputSchemaDigest, lateOrStale },
     });
     const id = await ctx.db.insert("mcpToolCallReceipts", {
       tenantId: run.tenantId, projectId: run.projectId, workOrderId: run.workOrderId, workflowRunId: run._id,
@@ -283,6 +318,8 @@ export const recordReceiptInternal = internalMutation({
       requestBytes: receipt.requestBytes, retryCount: receipt.retryCount, costStatus: receipt.costStatus,
       outputBytes: receipt.outputBytes, poisoningDetected: receipt.poisoningDetected, redactionApplied: receipt.redactionApplied,
       serverImplementationDigest: receipt.serverImplementationDigest, receiptDigest, occurredAt: receipt.occurredAt,
+      expectedServerVersion: receipt.expectedServerVersion, observedServerVersion: receipt.observedServerVersion,
+      expectedInputSchemaDigest: receipt.expectedInputSchemaDigest, observedInputSchemaDigest: receipt.observedInputSchemaDigest,
       durationMs: receipt.durationMs, lateOrStale, evidenceEventId: eventId, evidenceArtifactId: artifactId,
     });
     return {
@@ -313,7 +350,8 @@ function authorizationDenialReason(input: {
   receipt: any; run: any; profile: any; grant: any; tool: any; now: number;
 }) {
   const { receipt, run, profile, grant, tool, now } = input;
-  if (receipt.operation !== MCP_QUALIFICATION_OPERATION) return "OPERATION_DENIED";
+  if (receipt.operation !== tool.immutableSnapshot.operation.name
+    || receipt.operation !== grant.immutableSnapshot.operation) return "OPERATION_DENIED";
   if (run.status !== "RUNNING" || run.cancellationRequestedAt) return "ATTEMPT_CANCELLED";
   if (!run.lease || run.lease.leaseId !== receipt.attemptLeaseId
     || run.lease.workerId !== receipt.workerId || run.lease.workerSessionId !== receipt.workerSessionId
@@ -337,6 +375,8 @@ function validateReceiptEnvelope(receipt: {
   operation: string; requestDigest: string; outputDigest?: string; outputBytes?: number;
   requestBytes: number; retryCount: 0; costStatus: "UNKNOWN";
   serverImplementationDigest: string; occurredAt: number; durationMs?: number;
+  expectedServerVersion?: string; observedServerVersion?: string;
+  expectedInputSchemaDigest?: string; observedInputSchemaDigest?: string;
 }) {
   const authorizationStatus = receipt.status === "ALLOWED" || receipt.status === "DENIED";
   if ((receipt.phase === "AUTHORIZATION") !== authorizationStatus
@@ -359,6 +399,9 @@ function validateReceiptEnvelope(receipt: {
   for (const [label, value] of [["request", receipt.requestDigest], ...(receipt.outputDigest ? [["output", receipt.outputDigest]] : [])]) {
     if (!/^[a-f0-9]{64}$/.test(value)) throw new Error(`MCP receipt ${label} digest is invalid.`);
   }
+  for (const [label, value] of [["expected input schema", receipt.expectedInputSchemaDigest], ["observed input schema", receipt.observedInputSchemaDigest]] as const) {
+    if (value !== undefined && !/^[a-f0-9]{64}$/.test(value)) throw new Error(`MCP receipt ${label} digest is invalid.`);
+  }
   if (!Number.isSafeInteger(receipt.workerGeneration) || receipt.workerGeneration < 1
     || !Number.isFinite(receipt.occurredAt) || receipt.occurredAt <= 0
     || (receipt.durationMs !== undefined && (!Number.isFinite(receipt.durationMs) || receipt.durationMs < 0))
@@ -372,6 +415,7 @@ function validateReceiptEnvelope(receipt: {
 function validateReceiptSemantics(
   receipt: {
     phase: "AUTHORIZATION" | "COMPLETION";
+    operation: string;
     status: "ALLOWED" | "DENIED" | "SUCCEEDED" | "FAILED" | "CANCELED" | "TIMED_OUT";
     reason: string;
     requestBytes: number;
@@ -379,6 +423,10 @@ function validateReceiptSemantics(
     outputBytes?: number;
     poisoningDetected?: boolean;
     redactionApplied?: boolean;
+    expectedServerVersion?: string;
+    observedServerVersion?: string;
+    expectedInputSchemaDigest?: string;
+    observedInputSchemaDigest?: string;
     occurredAt: number;
     durationMs?: number;
   },
@@ -415,7 +463,10 @@ function validateReceiptSemantics(
   if (receipt.status === "SUCCEEDED") {
     if (receipt.reason !== "BOUNDED_READ_COMPLETED" || receipt.outputDigest === undefined
       || receipt.outputBytes === undefined || receipt.outputBytes > operation.maxResponseBytes
-      || receipt.poisoningDetected === undefined || receipt.redactionApplied !== false) {
+      || receipt.poisoningDetected === undefined || receipt.redactionApplied !== false
+      || (receipt.operation !== MCP_QUALIFICATION_OPERATION
+        && (receipt.observedServerVersion !== receipt.expectedServerVersion
+          || receipt.observedInputSchemaDigest !== receipt.expectedInputSchemaDigest))) {
       throw new Error("MCP success receipt semantics are invalid.");
     }
     return;
@@ -427,7 +478,8 @@ function validateReceiptSemantics(
       : new Set([
         "RESPONSE_SCHEMA_INVALID", "RESPONSE_TOO_LARGE", "OUTPUT_SECRET_DETECTED",
         "SERVER_UNAVAILABLE", "TOOL_CALL_FAILED", "DESTINATION_DENIED",
-        "IMPLEMENTATION_SUBSTITUTION", "SERVER_SUBSTITUTION",
+        "IMPLEMENTATION_SUBSTITUTION", "SERVER_SUBSTITUTION", "SERVER_SCHEMA_SUBSTITUTION",
+        "REDIRECT_DENIED",
       ]);
   if (!expectedReason.has(receipt.reason) || receipt.outputDigest !== undefined
     || receipt.outputBytes !== undefined || receipt.poisoningDetected !== undefined
