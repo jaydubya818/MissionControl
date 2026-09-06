@@ -37,6 +37,9 @@ import {
 
 const execFileAsync = promisify(execFile);
 const cleanup: string[] = [];
+const fixtureWorkers = new Set<FactoryAttemptWorker>();
+// These assertions await real Git/native work on loaded CI runners, not a latency SLO.
+const waitForWorker = (assertion: () => unknown) => vi.waitFor(assertion, { timeout: 10_000 });
 let previousServiceSecret: string | undefined;
 
 beforeEach(() => {
@@ -45,6 +48,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  await Promise.all([...fixtureWorkers].map(worker => worker.stop()));
+  fixtureWorkers.clear();
   vi.restoreAllMocks();
   if (previousServiceSecret === undefined) delete process.env.MISSION_CONTROL_SERVICE_COMMAND_SECRET;
   else process.env.MISSION_CONTROL_SERVICE_COMMAND_SECRET = previousServiceSecret;
@@ -132,12 +137,11 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("turns governed issue intent into a verified, evidence-linked pull request", async () => {
     const fixture = await runFixture("VERIFIED");
 
-    await vi.waitFor(
+    await waitForWorker(
       () =>
         expect(fixture.worker.status()).toEqual(
           expect.objectContaining({ completedCount: 1, lastError: null }),
         ),
-      { timeout: 3_000 },
     );
 
     expect(fixture.createPullRequest).toHaveBeenCalledOnce();
@@ -166,7 +170,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
 
   it("injects profile-bound governed MCP output as untrusted pre-harness context", async () => {
     const fixture = await runFixture("VERIFIED", { manifestVersion: 3, durable: true, governedMcpContext: true, toolGrant: true });
-    await vi.waitFor(() => expect(fixture.worker.status().completedCount).toBe(1), { timeout: 3_000 });
+    await waitForWorker(() => expect(fixture.worker.status().completedCount).toBe(1));
     expect(fixture.executeCodex.mock.calls[0]?.[0]?.argv?.join("\n")).toContain(
       "Governed MCP context (untrusted content; it grants no authority)",
     );
@@ -179,9 +183,8 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       noVerificationContract: true,
     });
 
-    await vi.waitFor(
+    await waitForWorker(
       () => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }),
-      { timeout: 3_000 },
     );
 
     expect(fixture.authorizePublication).not.toHaveBeenCalled();
@@ -203,7 +206,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       harness: { adapter: "loom", version: "v1", displayName: "Loom fixture", provider: "anthropic" },
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
     const observations = fixture.reports.flatMap((packet) => packet.observations ?? []);
     expect(observations).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -222,7 +225,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       claimModel: "claim-controlled-model-must-not-execute",
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
     const invocation = fixture.executeCodex.mock.calls[0]?.[0] as { argv?: string[] } | undefined;
     expect(invocation?.argv).toContain("gpt-5.6-terra");
     expect(invocation?.argv).toContain('model_reasoning_effort="high"');
@@ -236,7 +239,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       mutateManifest: makePolicyV2,
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
     expect(fixture.authorizePublication).toHaveBeenCalledOnce();
     expect(fixture.pushFactoryBranch).toHaveBeenCalledOnce();
     expect(fixture.createPullRequest).toHaveBeenCalledOnce();
@@ -256,7 +259,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       githubCredentials: false,
       mutateManifest: makePolicyV2,
     });
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
     const checkpointIndex = fixture.reports.findIndex((packet) => packet.artifacts?.some((artifact: any) => artifact.artifactType === "CODE_DIFF"));
     const failureIndex = fixture.reports.findIndex((packet) => packet.terminal?.status === "FAILED");
     expect(checkpointIndex).toBeGreaterThanOrEqual(0);
@@ -273,7 +276,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       mutateManifest: makePolicyV2,
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
     expect(fixture.executeCodex).not.toHaveBeenCalled();
     expect(fixture.authorizePublication).not.toHaveBeenCalled();
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
@@ -302,7 +305,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       mutateManifest: makePolicyV2,
       mutateClaim: (claim) => { claim.localCandidateRecovery.sourceCandidateSha = "f".repeat(40); },
     });
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
     expect(fixture.transferRecovery).not.toHaveBeenCalled();
     expect(fixture.executeCodex).not.toHaveBeenCalled();
     expect(fixture.reports.at(-1)).toMatchObject({
@@ -314,7 +317,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("constructs the worker from the exact frozen V3 Execution Profile", async () => {
     const fixture = await runFixture("VERIFIED", { manifestVersion: 3 });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
 
     expect(fixture.executeCodex).toHaveBeenCalledOnce();
     expect(fixture.claim.executionManifest).toMatchObject({
@@ -336,7 +339,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       },
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
 
     expect(fixture.executeCodex).not.toHaveBeenCalled();
     expect(fixture.worker.status().lastError).toMatch(/V3 Execution Profile binding is invalid/i);
@@ -351,7 +354,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       },
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
 
     expect(fixture.executeCodex).not.toHaveBeenCalled();
     expect(fixture.worker.status().lastError).toMatch(/V3 Execution Profile binding is invalid/i);
@@ -373,7 +376,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       },
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
     expect(fixture.executeCodex).toHaveBeenCalledOnce();
     await fixture.worker.stop();
   });
@@ -393,7 +396,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       },
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 0, failedCount: 1 }));
     expect(fixture.executeCodex).not.toHaveBeenCalled();
     expect(fixture.worker.status().lastError).toMatch(/V3 Execution Profile binding is invalid/i);
     await fixture.worker.stop();
@@ -405,7 +408,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       resultExecutableSha256: "f".repeat(64),
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status().failedCount).toBe(1));
+    await waitForWorker(() => expect(fixture.worker.status().failedCount).toBe(1));
     expect(fixture.executeCodex).toHaveBeenCalledOnce();
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
     expect(fixture.reports.at(-1)?.terminal).toMatchObject({
@@ -420,7 +423,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       resultExecutableSha256: "f".repeat(64),
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status().failedCount).toBe(1));
+    await waitForWorker(() => expect(fixture.worker.status().failedCount).toBe(1));
     expect(fixture.executeCodex).toHaveBeenCalledOnce();
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
     expect(fixture.reports.at(-1)?.terminal).toMatchObject({
@@ -436,7 +439,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       resultProviderRoute: "openrouter",
     });
 
-    await vi.waitFor(() => expect(fixture.worker.status().failedCount).toBe(1));
+    await waitForWorker(() => expect(fixture.worker.status().failedCount).toBe(1));
     expect(fixture.executeCodex).toHaveBeenCalledOnce();
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
     expect(fixture.reports.at(-1)?.terminal).toMatchObject({
@@ -449,7 +452,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("completes the durable worker golden path and cleans only its proven worktree", async () => {
     const fixture = await runFixture("VERIFIED", { durable: true });
 
-    await vi.waitFor(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
     expect(fixture.reports.find((packet) => packet.artifacts?.some((artifact: any) => artifact.artifactType === "PULL_REQUEST")))
       .toBeTruthy();
     expect(fixture.reports.at(-1)?.events).toEqual([
@@ -465,7 +468,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("does not create a pull request when the control plane rejects the verification packet", async () => {
     const fixture = await runFixture("NOT_VERIFIED");
 
-    await vi.waitFor(() => expect(fixture.worker.status().failedCount).toBe(1));
+    await waitForWorker(() => expect(fixture.worker.status().failedCount).toBe(1));
 
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
     expect(fixture.reports.at(-1)?.terminal).toMatchObject({
@@ -478,8 +481,8 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("pauses for human review and resumes publication without rerunning Codex or verification", async () => {
     const fixture = await runFixture("REQUIRES_HUMAN_REVIEW");
 
-    await vi.waitFor(() => expect(fixture.reports.some((packet) => packet.verification)).toBe(true));
-    await vi.waitFor(() => expect(fixture.worker.status().activeRunIds).toEqual([]));
+    await waitForWorker(() => expect(fixture.reports.some((packet) => packet.verification)).toBe(true));
+    await waitForWorker(() => expect(fixture.worker.status().activeRunIds).toEqual([]));
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
     expect(fixture.reports.some((packet) => packet.terminal)).toBe(false);
     expect(fixture.executeCodex).toHaveBeenCalledOnce();
@@ -489,7 +492,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     fixture.resumeAfterApproval();
     const restartedWorker = fixture.createRestartedWorker();
     await restartedWorker.tick();
-    await vi.waitFor(() => expect(restartedWorker.status().completedCount).toBe(1));
+    await waitForWorker(() => expect(restartedWorker.status().completedCount).toBe(1));
 
     expect(fixture.createPullRequest).toHaveBeenCalledOnce();
     expect(fixture.authorizePublication).toHaveBeenCalledOnce();
@@ -506,7 +509,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
 
   it("persists a verification mismatch, blocks publication, and recovers with a new immutable Attempt", async () => {
     const mismatched = await runFixture("VERIFIED", { attempt: 1, dirtyVerification: true });
-    await vi.waitFor(() => expect(mismatched.worker.status().failedCount).toBe(1));
+    await waitForWorker(() => expect(mismatched.worker.status().failedCount).toBe(1));
 
     const failurePacket = mismatched.reports.at(-1);
     const failureEvidence = failurePacket?.artifacts?.find((artifact: any) => artifact.artifactType === "VERIFICATION_EVIDENCE");
@@ -528,7 +531,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     await mismatched.worker.stop();
 
     const recovered = await runFixture("VERIFIED", { attempt: 2 });
-    await vi.waitFor(() => expect(recovered.worker.status().completedCount).toBe(1), { timeout: 3_000 });
+    await waitForWorker(() => expect(recovered.worker.status().completedCount).toBe(1));
     const recoveredArtifact = recovered.reports.at(-1)?.artifacts?.find((artifact: any) => artifact.artifactType === "PULL_REQUEST");
 
     expect(recovered.createPullRequest).toHaveBeenCalledOnce();
@@ -635,7 +638,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     };
     const worker = new FactoryAttemptWorker(client, adapter, true, 60_000, dependencies);
     await worker.tick();
-    await vi.waitFor(() => expect(worker.status().completedCount).toBe(1));
+    await waitForWorker(() => expect(worker.status().completedCount).toBe(1));
 
     expect(executeImplementation).not.toHaveBeenCalled();
     expect(reports).toHaveLength(1);
@@ -1053,15 +1056,19 @@ async function runFixture(
       })),
     } : {}),
   };
-  const createRestartedWorker = () => new FactoryAttemptWorker(
-    client,
-    adapter,
-    true,
-    60_000,
-    dependencies,
-    undefined,
-    options.durable ? { workerId: "worker-1", sessionId: "session-1", maxConcurrentRuns: 1 } : undefined,
-  );
+  const createRestartedWorker = () => {
+    const restartedWorker = new FactoryAttemptWorker(
+      client,
+      adapter,
+      true,
+      60_000,
+      dependencies,
+      undefined,
+      options.durable ? { workerId: "worker-1", sessionId: "session-1", maxConcurrentRuns: 1 } : undefined,
+    );
+    fixtureWorkers.add(restartedWorker);
+    return restartedWorker;
+  };
   const worker = createRestartedWorker();
 
   await worker.tick();
@@ -1554,7 +1561,7 @@ async function runSeparateFabVerifier(input: Parameters<typeof executeIndependen
     listChangedFiles, commitFactoryChanges, inspectCandidateChange, assertFactoryCandidateUnchanged, executeIndependentVerification,
     loadGithubAppPrivateKey: () => undefined, getGithubAppId: () => undefined, mintInstallationToken: vi.fn() as any,
     pushFactoryBranch: vi.fn() as any, createOrReusePullRequest: vi.fn() as any });
-  try { await worker.tick(); await vi.waitFor(() => expect(worker.status().completedCount).toBe(1), { timeout: 5000 }); }
+  try { await worker.tick(); await waitForWorker(() => expect(worker.status().completedCount).toBe(1)); }
   finally { await worker.stop(); }
   expect(noImplementation).not.toHaveBeenCalled();
   if (!verification) throw new Error("Separate verifier did not produce evidence");
@@ -1565,11 +1572,11 @@ describe("Fab governed golden path using the canonical MC worker", () => {
   for (const boundary of ["intent-expiry", "lease-loss-after-push"] as const) it(`fences publication at ${boundary}`, async () => {
     const f = await runFixture("REQUIRES_HUMAN_REVIEW", { fab: true, durable: true, prepublication: true,
       expireDuringPublicationIntent: boundary === "intent-expiry", loseLeaseAfterPush: boundary === "lease-loss-after-push" });
-    await vi.waitFor(() => expect(f.reports.some(packet => packet.candidateReady?.version === 2)).toBe(true), { timeout: 10000 });
-    await vi.waitFor(() => expect(f.worker.status().activeRunIds).toEqual([]));
+    await waitForWorker(() => expect(f.reports.some(packet => packet.candidateReady?.version === 2)).toBe(true));
+    await waitForWorker(() => expect(f.worker.status().activeRunIds).toEqual([]));
     await f.verifyPausedCandidate(); await f.worker.stop(); f.resumeAfterApproval();
     const publisher = f.createRestartedWorker(); await publisher.tick();
-    await vi.waitFor(() => expect(publisher.status().failedCount).toBe(1)); await publisher.stop();
+    await waitForWorker(() => expect(publisher.status().failedCount).toBe(1)); await publisher.stop();
     expect(f.createPullRequest).not.toHaveBeenCalled();
     expect(f.pushFactoryBranch).toHaveBeenCalledTimes(boundary === "intent-expiry" ? 0 : 1);
     expect(publisher.status().lastError).toMatch(boundary === "intent-expiry" ? /permit.*expired/ : /authority was lost/);
@@ -1577,22 +1584,22 @@ describe("Fab governed golden path using the canonical MC worker", () => {
   for (const failure of ["lost-provider-response", "lost-terminal-response"] as const) it(`reconciles ${failure} after permit expiry without provider writes or model replay`, async () => {
     const f = await runFixture("REQUIRES_HUMAN_REVIEW", { fab: true, durable: true, prepublication: true,
       uncertainPublication: failure === "lost-provider-response", uncertainAfterCleanup: failure === "lost-terminal-response" });
-    await vi.waitFor(() => expect(f.reports.some(packet => packet.candidateReady?.version === 2)).toBe(true), { timeout: 10000 });
-    await vi.waitFor(() => expect(f.worker.status().activeRunIds).toEqual([]));
+    await waitForWorker(() => expect(f.reports.some(packet => packet.candidateReady?.version === 2)).toBe(true));
+    await waitForWorker(() => expect(f.worker.status().activeRunIds).toEqual([]));
     await f.verifyPausedCandidate(); await f.worker.stop(); f.resumeAfterApproval();
     const publisher = f.createRestartedWorker(); await publisher.tick();
-    await vi.waitFor(() => expect(publisher.status().failedCount).toBe(1)); await publisher.stop();
+    await waitForWorker(() => expect(publisher.status().failedCount).toBe(1)); await publisher.stop();
     if (failure === "lost-terminal-response") await expect(access(f.worktree)).rejects.toThrow();
     f.queueReconciliation(); const recovery = f.createRestartedWorker(); await recovery.tick();
-    await vi.waitFor(() => expect(recovery.status().completedCount).toBe(1)); await recovery.stop();
+    await waitForWorker(() => expect(recovery.status().completedCount).toBe(1)); await recovery.stop();
     expect(f.reconcilePublication).toHaveBeenCalledOnce();
     expect(f.createPullRequest).toHaveBeenCalledOnce(); expect(f.pushFactoryBranch).toHaveBeenCalledOnce();
     expect(f.authorizePublication).toHaveBeenCalledOnce(); expect(f.fabModelCalls()).toBe(4);
   });
   it("pauses without a PR, verifies a v2 subject separately, then transfers the owned workspace for approved draft publication", async () => {
     const f = await runFixture("REQUIRES_HUMAN_REVIEW", { fab: true, durable: true, prepublication: true });
-    await vi.waitFor(() => expect(f.reports.some(packet => packet.candidateReady?.version === 2)).toBe(true), { timeout: 10000 });
-    await vi.waitFor(() => expect(f.worker.status().activeRunIds).toEqual([]));
+    await waitForWorker(() => expect(f.reports.some(packet => packet.candidateReady?.version === 2)).toBe(true));
+    await waitForWorker(() => expect(f.worker.status().activeRunIds).toEqual([]));
     expect(f.createPullRequest).not.toHaveBeenCalled();
     expect(f.pushFactoryBranch).not.toHaveBeenCalled();
     expect(f.authorizePublication).not.toHaveBeenCalled();
@@ -1608,7 +1615,7 @@ describe("Fab governed golden path using the canonical MC worker", () => {
     f.resumeAfterApproval();
     const restarted = f.createRestartedWorker();
     await restarted.tick();
-    await vi.waitFor(() => expect(restarted.status().completedCount).toBe(1));
+    await waitForWorker(() => expect(restarted.status().completedCount).toBe(1));
     expect(f.createPullRequest).toHaveBeenCalledOnce();
     expect(f.createPullRequest.mock.calls[0][0]).toMatchObject({ draft: true, headSha: candidate.candidateSha });
     expect(f.fabModelCalls()).toBe(4);
@@ -1619,8 +1626,8 @@ describe("Fab governed golden path using the canonical MC worker", () => {
   });
   it("links a real Fab candidate to a separate exact-subject verifier, approval and fixture publication", async () => {
     const f = await runFixture("REQUIRES_HUMAN_REVIEW", { fab: true, durable: true });
-    await vi.waitFor(() => expect(f.verifierPackets).toHaveLength(1), { timeout: 10000 });
-    await vi.waitFor(() => expect(f.worker.status().activeRunIds).toEqual([]));
+    await waitForWorker(() => expect(f.verifierPackets).toHaveLength(1));
+    await waitForWorker(() => expect(f.worker.status().activeRunIds).toEqual([]));
     expect(f.createPullRequest).not.toHaveBeenCalled(); expect(f.fabModelCalls()).toBe(4);
     const sessionFiles = await readdir(f.fabStateDirectory); const session = JSON.parse(await readFile(path.join(f.fabStateDirectory, sessionFiles[0]), "utf8")).session;
     expect(session.governed).toMatchObject({ workOrderId: "work-order-1", attemptId: "factory-run-1", candidateRevision: expect.stringMatching(/^[a-f0-9]{40}$/) });
@@ -1628,7 +1635,7 @@ describe("Fab governed golden path using the canonical MC worker", () => {
     expect(f.verifierPackets[0].packet.isolation.verifierRoot).not.toBe(session.config.repository);
     expect(f.verifierPackets[0].independence.passed).toBe(true);
     await f.worker.stop(); f.resumeAfterApproval(); const restarted = f.createRestartedWorker(); await restarted.tick();
-    await vi.waitFor(() => expect(restarted.status().completedCount).toBe(1));
+    await waitForWorker(() => expect(restarted.status().completedCount).toBe(1));
     expect(f.createPullRequest).toHaveBeenCalledOnce(); expect(f.fabModelCalls()).toBe(4); expect(f.verifierPackets).toHaveLength(1);
     expect(f.authorizePublication.mock.invocationCallOrder[0]).toBeLessThan(f.pushFactoryBranch.mock.invocationCallOrder[0]);
     if (process.env.FAB_MC_QUALIFICATION_OUTPUT) {
@@ -1640,15 +1647,15 @@ describe("Fab governed golden path using the canonical MC worker", () => {
   });
   it("denies publication when MC's final authority check rejects the lease", async () => {
     const f = await runFixture("VERIFIED", { fab: true, durable: true, loseLeaseBeforePublication: true });
-    await vi.waitFor(() => expect(f.worker.status().failedCount).toBe(1), { timeout: 10000 });
+    await waitForWorker(() => expect(f.worker.status().failedCount).toBe(1));
     expect(f.authorizePublication).toHaveBeenCalledOnce(); expect(f.pushFactoryBranch).not.toHaveBeenCalled(); expect(f.createPullRequest).not.toHaveBeenCalled(); await f.worker.stop();
   });
   it("preserves uncertain publication and refuses duplicate build/publication on reconnect", async () => {
     const f = await runFixture("VERIFIED", { fab: true, durable: true, uncertainPublication: true });
-    await vi.waitFor(() => expect(f.worker.status().failedCount).toBe(1), { timeout: 10000 }); await f.worker.stop();
+    await waitForWorker(() => expect(f.worker.status().failedCount).toBe(1)); await f.worker.stop();
     expect(f.createPullRequest).toHaveBeenCalledOnce(); const calls = f.fabModelCalls();
     const restarted = f.createRestartedWorker(); await restarted.tick();
-    await vi.waitFor(() => expect(restarted.status().failedCount).toBe(1));
+    await waitForWorker(() => expect(restarted.status().failedCount).toBe(1));
     expect(f.createPullRequest).toHaveBeenCalledOnce(); expect(f.fabModelCalls()).toBe(calls); await restarted.stop();
   });
 });

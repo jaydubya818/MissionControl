@@ -115,6 +115,15 @@ jobs:
           echo /opt/homebrew/opt/node@24/bin >> "$GITHUB_PATH"
           /opt/homebrew/opt/node@24/bin/node -e 'const fs = require("node:fs"); const p = fs.realpathSync(process.execPath); if (process.platform !== "darwin" || process.arch !== "arm64" || !process.version.startsWith("v24.") || !p.startsWith("/opt/homebrew/Cellar/")) process.exit(1); console.log(JSON.stringify({version:process.version, path:p, sha256:require("node:crypto").createHash("sha256").update(fs.readFileSync(p)).digest("hex")}));'
 
+      # The worker deliberately scrubs PATH; expose only the action-provisioned pnpm there.
+      - name: Provision pnpm for frozen offline worker checks
+        run: |
+          pnpm_entry="$(command -v pnpm)"
+          if [[ "$pnpm_entry" != /opt/homebrew/bin/pnpm ]]; then
+            ln -sf "$pnpm_entry" /opt/homebrew/bin/pnpm
+          fi
+          /opt/homebrew/bin/pnpm --version
+
       - name: Install dependencies
         run: |
           pnpm install --frozen-lockfile
@@ -280,6 +289,15 @@ jobs:
           brew install node@24
           echo /opt/homebrew/opt/node@24/bin >> "$GITHUB_PATH"
           /opt/homebrew/opt/node@24/bin/node -e 'const fs = require("node:fs"); const p = fs.realpathSync(process.execPath); if (process.platform !== "darwin" || process.arch !== "arm64" || !process.version.startsWith("v24.") || !p.startsWith("/opt/homebrew/Cellar/")) process.exit(1); console.log(JSON.stringify({version:process.version, path:p, sha256:require("node:crypto").createHash("sha256").update(fs.readFileSync(p)).digest("hex")}));'
+
+      # The worker deliberately scrubs PATH; expose only the action-provisioned pnpm there.
+      - name: Provision pnpm for frozen offline worker checks
+        run: |
+          pnpm_entry="$(command -v pnpm)"
+          if [[ "$pnpm_entry" != /opt/homebrew/bin/pnpm ]]; then
+            ln -sf "$pnpm_entry" /opt/homebrew/bin/pnpm
+          fi
+          /opt/homebrew/bin/pnpm --version
 
       - name: Install frozen dependency graph
         run: pnpm install --frozen-lockfile
