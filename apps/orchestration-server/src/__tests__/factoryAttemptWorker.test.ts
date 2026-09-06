@@ -303,6 +303,43 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     await fixture.worker.stop();
   });
 
+  it("reconciles an uncertain recovered GitHub candidate without repeating provider writes", async () => {
+    const fixture = await runFixture("VERIFIED", {
+      manifestVersion: 2,
+      durable: true,
+      localCandidateRecovery: true,
+      mutateManifest: makePolicyV2,
+      mutateClaim: (claim) => {
+        claim.publicationCheckpoint = {
+          reconciliationOnly: true,
+          recoveryPublication: true,
+          sourceRevision: claim.localCandidateRecovery.sourceRevision,
+          candidateRevision: claim.localCandidateRecovery.sourceCandidateSha,
+          authorizationValidUntil: Date.now() - 1,
+          changedFiles: ["src/feature.ts"],
+          structuredResult: completedFactoryResult(),
+          publicationPermit: { id: "recovery-permit", leaseId: "prior-recovery-lease", validUntil: Date.now() - 1 },
+        };
+      },
+    });
+
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    expect(fixture.executeCodex).not.toHaveBeenCalled();
+    expect(fixture.authorizePublication).not.toHaveBeenCalled();
+    expect(fixture.pushFactoryBranch).not.toHaveBeenCalled();
+    expect(fixture.createPullRequest).not.toHaveBeenCalled();
+    expect(fixture.reconcilePublication).toHaveBeenCalledOnce();
+    expect(fixture.reports.at(-1)).toMatchObject({
+      candidateReady: {
+        providerPullRequestId: "PR_fixture",
+        pullRequestNumber: 42,
+        draftAtPublication: true,
+      },
+      terminal: { status: "COMPLETED" },
+    });
+    await fixture.worker.stop();
+  });
+
   it("denies local recovery when the clean worktree no longer matches the durable source checkpoint", async () => {
     const fixture = await runFixture("VERIFIED", {
       manifestVersion: 2,

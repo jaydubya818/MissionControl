@@ -30,6 +30,10 @@ export function buildLocalCandidateRecoveryRows(input: {
   structuredResult: unknown;
   structuredResultArtifactId: string;
   structuredResultContentHash: string;
+  structuredResultClaimLeaseId: string;
+  structuredResultClaimWorkerId: string;
+  structuredResultClaimWorkerSessionId: string;
+  structuredResultClaimWorkerGeneration: number;
 }) {
   const recoveryManifest = {
     ...input.failedAttempt.executionManifest,
@@ -73,6 +77,10 @@ export function buildLocalCandidateRecoveryRows(input: {
         structuredResult: input.structuredResult,
         structuredResultArtifactId: input.structuredResultArtifactId,
         structuredResultContentHash: input.structuredResultContentHash,
+        structuredResultClaimLeaseId: input.structuredResultClaimLeaseId,
+        structuredResultClaimWorkerId: input.structuredResultClaimWorkerId,
+        structuredResultClaimWorkerSessionId: input.structuredResultClaimWorkerSessionId,
+        structuredResultClaimWorkerGeneration: input.structuredResultClaimWorkerGeneration,
         requestedAt: input.requestedAt,
         requestedBy: input.actorId,
         reason: input.reason,

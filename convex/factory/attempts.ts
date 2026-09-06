@@ -43,6 +43,7 @@ import {
   legacyQualityGateSubjectDigest,
 } from "../lib/qualityGateDecision";
 import { createGitVerificationSubject, createPrepublicationGitVerificationSubject, createGitSubjectPublicationBinding } from "@mission-control/workflow-engine/verification-subject";
+import { sha256Hex } from "@mission-control/shared";
 import {
   harnessRuntimeArtifactDigest,
   harnessRuntimeArtifactIssues,
@@ -463,6 +464,8 @@ async function validateReadOnlyCandidateRecovery(ctx: any, run: any): Promise<bo
     .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", source._id).eq("artifactType", "CODE_DIFF")).first() : null;
   const sourceResultArtifact = source ? await ctx.db.query("runArtifacts")
     .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", `factory:${source.runId}:structured-result`)).first() : null;
+  const sourceResultClaim = source && recovery.structuredResultClaimLeaseId ? await ctx.db.query("runEvents")
+    .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", `factory-lease:${source.runId}:${recovery.structuredResultClaimLeaseId}:claimed`)).first() : null;
   const sourcePublication = source ? await ctx.db.query("runArtifacts")
     .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", source._id).eq("artifactType", "PULL_REQUEST")).first() : null;
   const expectedManifest = source?.executionManifest ? { ...source.executionManifest,
@@ -501,6 +504,20 @@ async function validateReadOnlyCandidateRecovery(ctx: any, run: any): Promise<bo
     || String(sourceResultArtifact?._id) !== recovery.structuredResultArtifactId
     || !/^sha256:[a-f0-9]{64}$/.test(sourceResultArtifact?.contentHash ?? "")
     || sourceResultArtifact?.contentHash !== recovery.structuredResultContentHash
+    || sourceResultArtifact?.contentHash !== `sha256:${sha256Hex(JSON.stringify(sourceResultArtifact?.metadata?.result))}`
+    || sourceResultArtifact?.producer !== sourceResultClaim?.actor
+    || sourceResultArtifact?.metadata?.leaseId !== recovery.structuredResultClaimLeaseId
+    || sourceResultArtifact?.metadata?.executionManifestDigest !== source.executionManifestDigest
+    || sourceResultClaim?.workflowRunId !== source._id
+    || sourceResultClaim?.tenantId !== source.tenantId
+    || sourceResultClaim?.projectId !== source.projectId
+    || sourceResultClaim?.actor !== sourceResultArtifact?.producer
+    || !["CHECKPOINT_CREATED", "RUN_RESUMED"].includes(sourceResultClaim?.eventType ?? "")
+    || sourceResultClaim?.metadata?.leaseId !== recovery.structuredResultClaimLeaseId
+    || sourceResultClaim?.metadata?.executionManifestDigest !== source.executionManifestDigest
+    || sourceResultClaim?.metadata?.workerId !== recovery.structuredResultClaimWorkerId
+    || sourceResultClaim?.metadata?.workerSessionId !== recovery.structuredResultClaimWorkerSessionId
+    || sourceResultClaim?.metadata?.workerGeneration !== recovery.structuredResultClaimWorkerGeneration
     || recovery.structuredResult?.schema !== "factory-result/v1"
     || computeCanonicalHash(sourceResultArtifact.metadata.result) !== computeCanonicalHash(recovery.structuredResult)
     || !previous?.leaseId || !previous.workerId || !previous.workerSessionId
@@ -933,6 +950,39 @@ export const claimInternal = internalMutation({
               validUntil: continuation.publicationValidUntil,
             }
           : undefined,
+      };
+    }
+
+    const recovery = run.metadata?.localCandidateRecovery;
+    if (!publicationCheckpoint && readOnlyCandidateRecovery && recovery?.reconciliationOnly === true) {
+      const recoverySource: any = await ctx.db.get(recovery.sourceAttemptId);
+      const sourceCodeDiff = await ctx.db.query("runArtifacts")
+        .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey",
+          `factory:${recoverySource?.runId}:code-diff:${recovery.sourceCandidateSha}`))
+        .first();
+      if (!recovery.publicationPermitId || !recovery.publicationPermitLeaseId
+        || !Number.isFinite(recovery.publicationValidUntil)
+        || sourceCodeDiff?.workflowRunId !== recovery.sourceAttemptId
+        || sourceCodeDiff?.metadata?.headSha !== recovery.sourceCandidateSha
+        || sourceCodeDiff?.metadata?.treeSha !== recovery.sourceTreeSha
+        || sourceCodeDiff?.metadata?.sourceRevision !== recovery.sourceRevision
+        || !Array.isArray(sourceCodeDiff?.metadata?.changedFiles)) {
+        throw new Error("Recovery publication reconciliation is missing its exact immutable checkpoint.");
+      }
+      publicationCheckpoint = {
+        reconciliationOnly: true,
+        recoveryPublication: true,
+        candidateRevision: recovery.sourceCandidateSha,
+        sourceRevision: recovery.sourceRevision,
+        authorizationValidUntil: recovery.publicationValidUntil,
+        changedFiles: sourceCodeDiff.metadata.changedFiles,
+        verification: undefined,
+        structuredResult: recovery.structuredResult,
+        publicationPermit: {
+          id: recovery.publicationPermitId,
+          leaseId: recovery.publicationPermitLeaseId,
+          validUntil: recovery.publicationValidUntil,
+        },
       };
     }
 
@@ -1463,9 +1513,10 @@ export const reportInternal = internalMutation({
     }
     for (const artifact of artifacts) {
       if (artifact?.artifactType === "PULL_REQUEST") {
+        const recovery = run.metadata?.localCandidateRecovery;
         await assertFactoryPullRequestArtifact(ctx, run, artifact, {
-          headSha: run.factoryContinuation?.candidateRevision ?? artifact?.metadata?.headSha,
-          sourceRevision: run.factoryContinuation?.sourceRevision,
+          headSha: run.factoryContinuation?.candidateRevision ?? recovery?.sourceCandidateSha ?? artifact?.metadata?.headSha,
+          sourceRevision: run.factoryContinuation?.sourceRevision ?? recovery?.sourceRevision,
         });
       }
     }
@@ -1588,17 +1639,23 @@ export const reportInternal = internalMutation({
       if (!["COMPLETED", "FAILED", "CANCELED"].includes(terminal.status)) {
         throw new Error("Factory attempt terminal status is invalid.");
       }
-      if (terminal.status !== "COMPLETED" && run.verificationSubject?.version === 2
-        && run.factoryContinuation?.status === "PUBLICATION_AUTHORIZED") {
+      const recoveryPermit = run.metadata?.localCandidateRecovery?.publicationPermitId
+        ? run.metadata.localCandidateRecovery
+        : undefined;
+      if (terminal.status !== "COMPLETED" && ((run.verificationSubject?.version === 2
+        && run.factoryContinuation?.status === "PUBLICATION_AUTHORIZED") || recoveryPermit)) {
         const reason = optionalText(terminal.failureReason, 2000) ?? "Publication outcome is uncertain.";
-        await ctx.db.patch(run._id, { status: "PAUSED", checkpointLease: run.checkpointLease ?? run.lease, lease: undefined,
+        await ctx.db.patch(run._id, { status: recoveryPermit ? "PENDING" : "PAUSED", checkpointLease: run.checkpointLease ?? run.lease, lease: undefined,
           executionPhase: "PUBLISHING", runtimeDisposition: "RECOVERABLE", runtimeDispositionReason: reason,
-          runtimeReconciledAt: Date.now(), checkpointAt: Date.now(), checkpointSummary: "Publication outcome uncertain; read-only reconciliation required." });
+          runtimeReconciledAt: Date.now(), checkpointAt: Date.now(), checkpointSummary: "Publication outcome uncertain; read-only reconciliation required.",
+          ...(recoveryPermit ? { metadata: { ...run.metadata, localCandidateRecovery: { ...recoveryPermit,
+            reconciliationOnly: true, publicationOutcomeUnknownAt: Date.now() } } } : {}) });
         await ctx.db.patch(run.workOrderId!, { currentExecutionRunId: run._id, state: "AWAITING_VERIFICATION",
           blockingIssue: reason, requiredHumanAction: "Reconcile the exact published candidate. Recovery can inspect GitHub but cannot repeat publication.", updatedAt: Date.now() });
         await insertEvent(ctx, run, { idempotencyKey: `publication-uncertain:${run.runId}:${args.leaseId}`, eventType: "PUBLICATION_OUTCOME_UNCERTAIN",
           workflowStep: "publication", actor: `service:${args.ownerId}`, status: "FAILED", startedAt: Date.now(), errorSummary: reason,
-          metadata: { publicationPermitId: run.factoryContinuation.publicationPermitId, reconciliationOnly: true } });
+          metadata: { publicationPermitId: run.factoryContinuation?.publicationPermitId ?? recoveryPermit?.publicationPermitId,
+            recoveryPublication: Boolean(recoveryPermit), reconciliationOnly: true } });
         return { accepted: true, paused: true, publicationOutcome: "UNKNOWN" };
       }
       if (factoryExecutionManifestBackend(run.executionManifest) === "remote-sandbox") {
@@ -2819,7 +2876,7 @@ export const recoverLocalCandidate = mutation({
     const structuredResult = resultArtifact?.metadata?.schema === "factory-result/v1"
       ? resultArtifact.metadata.result
       : undefined;
-    if (!structuredResult || structuredResult.schema !== "factory-result/v1"
+    if (!resultArtifact || !structuredResult || structuredResult.schema !== "factory-result/v1"
       || resultArtifact.workflowRunId !== failedAttempt._id
       || resultArtifact.tenantId !== failedAttempt.tenantId
       || resultArtifact.projectId !== failedAttempt.projectId
@@ -2840,6 +2897,12 @@ export const recoverLocalCandidate = mutation({
     );
     const previousClaim = priorClaimEvents[priorClaimEvents.length - 1];
     if (!previousClaim) throw new Error("Local candidate recovery requires durable prior workspace ownership evidence.");
+    if (resultArtifact.producer !== previousClaim.actor
+      || resultArtifact.metadata?.leaseId !== previousClaim.metadata?.leaseId
+      || resultArtifact.metadata?.executionManifestDigest !== failedAttempt.executionManifestDigest
+      || resultArtifact.contentHash !== `sha256:${sha256Hex(JSON.stringify(structuredResult))}`) {
+      throw new Error("Local candidate recovery requires the canonical structured result from the exact historical workspace claim.");
+    }
     const requestedAt = Date.now();
     const actorId = access.membership.operatorId ? String(access.membership.operatorId) : "demo:company-administrator";
     const recoveryRunId = Math.random().toString(36).slice(2, 10);
@@ -2863,6 +2926,10 @@ export const recoverLocalCandidate = mutation({
       structuredResult,
       structuredResultArtifactId: String(resultArtifact._id),
       structuredResultContentHash: resultArtifact.contentHash,
+      structuredResultClaimLeaseId: previousClaim.metadata.leaseId,
+      structuredResultClaimWorkerId: previousClaim.metadata.workerId,
+      structuredResultClaimWorkerSessionId: previousClaim.metadata.workerSessionId,
+      structuredResultClaimWorkerGeneration: previousClaim.metadata.workerGeneration,
     });
     const recoveryAttemptId = await ctx.db.insert("workflowRuns", recoveryAttempt);
     await ctx.db.patch(failedAttempt._id, {
@@ -3808,6 +3875,16 @@ async function assertFactoryPullRequestArtifact(
         || artifact?.metadata?.pullRequestNumber !== subject.pullRequest.number
         || artifact?.metadata?.pullRequestUrl !== subject.pullRequest.url)))) {
     throw new Error("Publication artifact differs from the immutable candidate subject.");
+  }
+  const recovery = run.metadata?.localCandidateRecovery;
+  if (recovery?.publicationPermitId
+    && (artifact?.metadata?.headSha !== recovery.sourceCandidateSha
+      || artifact?.metadata?.treeSha !== recovery.sourceTreeSha
+      || sourceRevision !== recovery.sourceRevision
+      || revisions.headSha !== recovery.sourceCandidateSha
+      || artifact?.metadata?.publicationPermitId !== recovery.publicationPermitId
+      || (!recovery.reconciliationOnly && recovery.publicationPermitLeaseId !== run.lease?.leaseId))) {
+    throw new Error("Recovery publication artifact differs from its exact candidate, tree, source or consumed permit.");
   }
   const [repository, installation] = await Promise.all([
     ctx.db.get(run.repositoryId),

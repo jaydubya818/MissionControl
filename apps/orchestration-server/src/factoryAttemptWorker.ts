@@ -559,7 +559,7 @@ export class FactoryAttemptWorker {
         this.lastError = null;
         return;
       }
-      if (claim.localCandidateRecovery?.previousLease && workspaceOwner) {
+      if (claim.localCandidateRecovery?.previousLease && !claim.publicationCheckpoint && workspaceOwner) {
         const candidate = await this.dependencies.inspectCandidateChange(claim.worktree, manifest.repository.baseSha);
         if (candidate.candidateRevision !== claim.localCandidateRecovery.sourceCandidateSha
           || candidate.treeRevision !== claim.localCandidateRecovery.sourceTreeSha
@@ -591,7 +591,7 @@ export class FactoryAttemptWorker {
         ownership: workspaceOwner,
       });
 
-      if (claim.localCandidateRecovery) {
+      if (claim.localCandidateRecovery && !claim.publicationCheckpoint) {
         const structuredResult = validateFactoryResult(claim.localCandidateRecovery.structuredResult);
         const candidate = await this.dependencies.inspectCandidateChange(claim.worktree, manifest.repository.baseSha);
         const scopeResult = validateChangedFileScope(candidate.changedFiles, {
@@ -692,7 +692,7 @@ export class FactoryAttemptWorker {
           signal: controller.signal,
           requirePublicationPermit: true,
           treeSha: candidate.treeRevision,
-          policyV2: subject?.version === 2,
+          policyV2: checkpoint.recoveryPublication === true || subject?.version === 2,
         });
         this.completedCount += 1;
         this.lastError = null;
@@ -2492,8 +2492,8 @@ function validatePublicationCheckpoint(checkpoint: any) {
     || !Number.isFinite(checkpoint.authorizationValidUntil)
     || (checkpoint.reconciliationOnly !== true && checkpoint.authorizationValidUntil <= Date.now() + 60_000)
     || !Array.isArray(checkpoint.changedFiles) || checkpoint.changedFiles.some((file: unknown) => typeof file !== "string")
-    || checkpoint.verification?.verdict !== "VERIFIED"
-    || !checkpoint.verification?.verificationReceiptId) {
+    || (checkpoint.recoveryPublication !== true && (checkpoint.verification?.verdict !== "VERIFIED"
+      || !checkpoint.verification?.verificationReceiptId))) {
     throw new Error("Claimed Factory publication checkpoint is invalid.");
   }
   return checkpoint as {
@@ -2504,6 +2504,7 @@ function validatePublicationCheckpoint(checkpoint: any) {
     verification: any;
     structuredResult: any;
     publicationPermit?: { id: string; leaseId: string; validUntil: number };
+    recoveryPublication?: boolean;
   };
 }
 
