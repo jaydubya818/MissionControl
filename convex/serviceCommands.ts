@@ -542,7 +542,9 @@ export const recordProviderUsage = action({
           "Service command denied (signature-invalid).": "SERVICE_SIGNATURE_INVALID",
           "Service command denied (service-command-secret-not-configured).": "SERVICE_SECRET_UNCONFIGURED",
         };
-        const reason = Object.hasOwn(authenticationReasons, error.message) ? authenticationReasons[error.message] : undefined;
+        const reason = Object.prototype.hasOwnProperty.call(authenticationReasons, error.message)
+          ? authenticationReasons[error.message]
+          : undefined;
         if (reason) throw new ConvexError({ code: "ACCOUNTING_AUTHENTICATION_REQUIRED", reason });
         if (error.message === "Service command denied (command-scope-mismatch).") {
           throw new ConvexError({ code: "ACCOUNTING_SCOPE_REJECTED", reason: "SERVICE_SCOPE_MISMATCH" });
