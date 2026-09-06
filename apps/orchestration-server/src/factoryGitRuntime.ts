@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { assertCanonicalWorktreeBoundary, assertWorktreeBoundary } from "./factoryPathScope.js";
@@ -90,6 +90,8 @@ async function installFrozenPnpmDependencies(worktree: string) {
     const configuredStore = process.env.MISSION_CONTROL_FACTORY_PNPM_STORE_DIR;
     if (configuredStore && !path.isAbsolute(configuredStore)) throw new Error("MISSION_CONTROL_FACTORY_PNPM_STORE_DIR must be absolute.");
     const storeDirectory = configuredStore ? await realpath(configuredStore) : path.join(scratchHome, "store");
+    const corepackHome = process.env.COREPACK_HOME
+      ?? path.join(process.env.XDG_CACHE_HOME ?? path.join(homedir(), ".cache"), "node", "corepack");
     const candidateRoot = await realpath(worktree);
     if (storeDirectory === candidateRoot || storeDirectory.startsWith(`${candidateRoot}${path.sep}`)) {
       throw new Error("The offline dependency store must be outside the candidate worktree.");
@@ -115,7 +117,8 @@ async function installFrozenPnpmDependencies(worktree: string) {
         COREPACK_ENABLE_NETWORK: "0",
         COREPACK_ENABLE_PROJECT_SPEC: "0",
         COREPACK_ENABLE_AUTO_PIN: "0",
-        ...(process.env.COREPACK_HOME ? { COREPACK_HOME: process.env.COREPACK_HOME } : {}),
+        COREPACK_DEFAULT_TO_LATEST: "0",
+        COREPACK_HOME: corepackHome,
         CI: "1",
         npm_config_ignore_scripts: "true",
         NPM_CONFIG_IGNORE_SCRIPTS: "true",

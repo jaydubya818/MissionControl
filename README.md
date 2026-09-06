@@ -468,7 +468,7 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
-Current public client/backend runtime contract: **v45**.
+Current public client/backend runtime contract: **v46**.
 
 ## Current limitations
 

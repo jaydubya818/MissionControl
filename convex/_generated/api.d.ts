@@ -215,6 +215,7 @@ import type * as lib_workOrderCreate from "../lib/workOrderCreate.js";
 import type * as lib_workOrderDispatch from "../lib/workOrderDispatch.js";
 import type * as lib_workOrderGovernance from "../lib/workOrderGovernance.js";
 import type * as lib_workOrderParentSync from "../lib/workOrderParentSync.js";
+import type * as lib_workOrderReadiness from "../lib/workOrderReadiness.js";
 import type * as lib_workOrderRevision from "../lib/workOrderRevision.js";
 import type * as lib_workOrderSpecification from "../lib/workOrderSpecification.js";
 import type * as lib_workOrderSpecificationValidators from "../lib/workOrderSpecificationValidators.js";
@@ -529,6 +530,7 @@ declare const fullApi: ApiFromModules<{
   "lib/workOrderDispatch": typeof lib_workOrderDispatch;
   "lib/workOrderGovernance": typeof lib_workOrderGovernance;
   "lib/workOrderParentSync": typeof lib_workOrderParentSync;
+  "lib/workOrderReadiness": typeof lib_workOrderReadiness;
   "lib/workOrderRevision": typeof lib_workOrderRevision;
   "lib/workOrderSpecification": typeof lib_workOrderSpecification;
   "lib/workOrderSpecificationValidators": typeof lib_workOrderSpecificationValidators;

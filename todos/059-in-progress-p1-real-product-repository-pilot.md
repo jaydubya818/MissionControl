@@ -97,3 +97,23 @@ qualify a separate provider later rather than weakening the policy.
 **Learnings:**
 - Admission must be re-evaluated at every authority boundary; freezing the value only at Factory-version creation is insufficient when a repository can be reclassified later.
 - The pilot cannot start until the Product Owner supplies the exact repository, design-partner team, pilot champion, FDE, and incident commander. Those identities are deliberately not inferred from demo fixtures.
+
+### 2026-09-04 - Capability convergence Phase 0/1 kickoff
+
+**Actions:**
+- Fetched origin/main at `9a80cf3c5cc229bb4a552a9f08ddda5841e70a38` and started `codex/fdlc-pilot-readiness` from that revision.
+- Reusing merged independent model/harness/runtime/backend identities and Eval Control Plane.
+- Requested owning team, champion, human FDE/operator and incident commander; no identity inferred from demo data.
+- Added the WorkOrder readiness contract before implementation.
+- Phase 2+ and todo 060–063 dependency changes remain outside this task.
+
+**Current checklist:**
+- [x] Fetch and record current main; inspect recent execution-identity changes.
+- [x] Reconcile eight capability families with exact scope and evidence.
+- [x] Implement and verify WorkOrder-specific readiness (local regression and scoped browser evidence; real-pilot acceptance remains open).
+- [ ] Select and baseline a justified real workflow after identities are supplied.
+- [ ] Record incident preflight and run a bounded drill before real execution.
+- [ ] Run one complete governed lineage and then the existing ten-outcome gate.
+- [x] Record required test/browser outcomes and explicit pilot decision (18 local qualifier gates PASS; real pilot NO-GO to start).
+
+**2026-09-04 qualification:** Fresh local evidence is in `docs/testing/evidence/fdlc-phase0-readiness-2026-09-04-final/`; 18/18 gates passed. Earlier sandbox IPC, stale documentation and negative-control failures are retained separately. Pilot record: `docs/software-factory/fdlc-phase1-pilot-record.md`. Named humans remain unknown; 0/10 real accepted WorkOrders. This todo stays in_progress; downstream dependencies and historical evidence are unchanged.
