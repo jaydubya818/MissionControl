@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import { liabilityDigest } from "../../../../convex/lib/providerLiability.js";
 import { bedrockModelRouteBinding } from "../bedrockModelRouteBinding.js";
 import { createFabBedrockBrokerFactory } from "../fabBedrockBroker.js";
@@ -78,7 +79,7 @@ function fixture() {
   } };
   const request = {
     requestId: "request-1",
-    requestDigest: "e".repeat(64),
+    requestDigest: "",
     route: {
       accountId: route.awsAccountId, region: route.region, modelId: route.modelId,
       inferenceProfileId: route.inferenceProfileId, inferenceProfileArn: route.inferenceProfileArn,
@@ -87,6 +88,11 @@ function fixture() {
     body: JSON.stringify({ anthropic_version: "bedrock-2023-05-31", max_tokens: 16, messages: [{ role: "user", content: "x" }], tools: [] }),
     maximumOutputTokens: 16,
   };
+  request.requestDigest = createHash("sha256").update(JSON.stringify({
+    route: request.route,
+    credentialReference: request.credentialReference,
+    body: request.body,
+  })).digest("hex");
   return { brokerFactory, context, request, transport, accounting, client, order };
 }
 
@@ -110,6 +116,31 @@ describe("Fab Bedrock broker", () => {
     const f = fixture();
     const broker = await f.brokerFactory({ context: f.context as any });
     await expect(broker.invoke({ ...f.request, maximumOutputTokens: 0 }, new AbortController().signal))
+      .rejects.toThrow("FAB_BEDROCK_REQUEST_BINDING_INVALID");
+    expect(f.transport.countInputTokens).not.toHaveBeenCalled();
+    expect(f.transport.send).not.toHaveBeenCalled();
+  });
+
+  it("rejects a body output limit that differs from the reserved limit", async () => {
+    const f = fixture();
+    const broker = await f.brokerFactory({ context: f.context as any });
+    const body = JSON.stringify({ anthropic_version: "bedrock-2023-05-31", max_tokens: 4096, messages: [{ role: "user", content: "x" }], tools: [] });
+    const request = { ...f.request, body };
+    request.requestDigest = createHash("sha256").update(JSON.stringify({
+      route: request.route,
+      credentialReference: request.credentialReference,
+      body: request.body,
+    })).digest("hex");
+    await expect(broker.invoke(request, new AbortController().signal))
+      .rejects.toThrow("FAB_BEDROCK_REQUEST_BINDING_INVALID");
+    expect(f.transport.countInputTokens).not.toHaveBeenCalled();
+    expect(f.transport.send).not.toHaveBeenCalled();
+  });
+
+  it("rejects a request digest that does not bind the exact body", async () => {
+    const f = fixture();
+    const broker = await f.brokerFactory({ context: f.context as any });
+    await expect(broker.invoke({ ...f.request, body: f.request.body.replace('"x"', '"tampered"') }, new AbortController().signal))
       .rejects.toThrow("FAB_BEDROCK_REQUEST_BINDING_INVALID");
     expect(f.transport.countInputTokens).not.toHaveBeenCalled();
     expect(f.transport.send).not.toHaveBeenCalled();

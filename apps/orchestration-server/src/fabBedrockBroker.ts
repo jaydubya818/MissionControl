@@ -11,6 +11,7 @@ import {
   type BedrockSettlementPayload,
 } from "./bedrockInferenceBridge.js";
 import { parseBedrock, type BedrockTransport, type BedrockWire } from "./bedrockAdapter.js";
+import { bedrockModelRouteBinding } from "./bedrockModelRouteBinding.js";
 import { bedrockRouteSchema, type BedrockRoute } from "./bedrockRoute.js";
 
 export interface FabBedrockBrokerConfiguration {
@@ -53,6 +54,8 @@ export function createFabBedrockBrokerFactory(
     if (!attempt.executionProfileId || !attempt.executionProfileDigest
       || !attempt.harnessDigest || !attempt.runtimeDigest || !attempt.modelRouteDigest)
       throw new Error("FAB_BEDROCK_EXECUTION_PROFILE_AUTHORITY_REQUIRED");
+    if (attempt.modelRouteDigest !== bedrockModelRouteBinding(config.route).routeDigest)
+      throw new Error("FAB_BEDROCK_EXECUTION_PROFILE_AUTHORITY_REQUIRED");
     const route = fabRoute(config.route);
     const credentialReference = "aws:fdlc-qualification:bedrock-sonnet-4-6";
     const identity: BedrockBridgeIdentity = {
@@ -90,11 +93,28 @@ export function createFabBedrockBrokerFactory(
           || request.credentialReference !== credentialReference
           || request.maximumOutputTokens > config.maximumOutputTokens)
           throw new Error("FAB_BEDROCK_REQUEST_BINDING_INVALID");
+        let body: Record<string, unknown>;
+        try {
+          const parsed = JSON.parse(request.body);
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
+          body = parsed;
+        } catch {
+          throw new Error("FAB_BEDROCK_REQUEST_BINDING_INVALID");
+        }
+        const expectedRequestDigest = createHash("sha256").update(JSON.stringify({
+          route: request.route,
+          credentialReference: request.credentialReference,
+          body: request.body,
+        })).digest("hex");
+        if (request.requestDigest !== expectedRequestDigest
+          || body.anthropic_version !== "bedrock-2023-05-31"
+          || body.max_tokens !== request.maximumOutputTokens)
+          throw new Error("FAB_BEDROCK_REQUEST_BINDING_INVALID");
         const wire: BedrockWire = {
           api: "INVOKE_MODEL",
           region: config.route.region,
           modelId: config.route.inferenceProfileArn,
-          body: JSON.parse(request.body),
+          body,
           maxAttempts: 1,
         };
         const canonicalRequestDigest = `sha256:${request.requestDigest}`;
