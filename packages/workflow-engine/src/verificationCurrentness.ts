@@ -1,6 +1,6 @@
 import { tupleMatches, type VerificationIdentityTuple } from "./verificationIndependence.js";
 import { qualityGateEvidenceSetDigest } from "./verificationIdentity.js";
-import { verifyVerificationSubjectIdentity, type VerificationSubject } from "./verificationSubject.js";
+import { verifyVerificationSubjectIdentity, verifyGitSubjectPublicationBinding, type GitSubjectPublicationBinding, type VerificationSubject } from "./verificationSubject.js";
 
 export type CurrentVerificationSourceAttempt = {
   id: string;
@@ -10,6 +10,7 @@ export type CurrentVerificationSourceAttempt = {
   candidateReadyAt?: number;
   qualityContractDigest?: string;
   verificationSubject?: VerificationSubject;
+  subjectPublicationBinding?: GitSubjectPublicationBinding;
 };
 
 export type CurrentVerificationAttempt = {
@@ -37,6 +38,7 @@ export type StoredVerificationResult = VerificationIdentityTuple & {
 };
 
 export type StoredVerificationReceipt = VerificationIdentityTuple & {
+  humanReviewValid?: boolean;
   id: string;
   verificationRunId: string;
   verificationAttemptId: string;
@@ -104,7 +106,7 @@ export type CurrentVerificationEligibility = {
  * Verification Attempt before it looks at a verdict. It never falls back to an
  * older pass.
  */
-export function evaluateCurrentVerificationEligibility(input: {
+export type CurrentVerificationInput = {
   workOrderId: string;
   workOrderRevisionNumber: number;
   qualityContractDigest?: string;
@@ -116,7 +118,18 @@ export function evaluateCurrentVerificationEligibility(input: {
   verificationEvidence: StoredVerificationEvidence[];
   providerHeads?: GitProviderHeadProjection[];
   now: number;
-}): CurrentVerificationEligibility {
+};
+
+export function evaluateCurrentVerificationEligibility(input: CurrentVerificationInput): CurrentVerificationEligibility {
+  return evaluateVerification(input, "ACCEPTANCE");
+}
+
+/** Independent evidence suitable for human publication review; never acceptance or a publication permit. */
+export function evaluatePrepublicationVerification(input: CurrentVerificationInput): CurrentVerificationEligibility {
+  return evaluateVerification(input, "PREPUBLICATION");
+}
+
+function evaluateVerification(input: CurrentVerificationInput, purpose: "ACCEPTANCE" | "PREPUBLICATION"): CurrentVerificationEligibility {
   if (!input.qualityContractDigest) return denied("Current WorkOrder has no approved Plan Quality Contract digest.");
   if (!input.verificationContractDigest) return denied("Current WorkOrder has no persisted verification contract digest.");
   const source = [...input.sourceAttempts]
@@ -124,7 +137,9 @@ export function evaluateCurrentVerificationEligibility(input: {
       && (attempt.attemptPurpose === "IMPLEMENTATION" || attempt.attemptPurpose === "AUTOMATION"))
     .sort((left, right) => (right.candidateReadyAt ?? 0) - (left.candidateReadyAt ?? 0))[0];
   if (!source) return denied("No current source Attempt has published a candidate-ready Verification Subject.");
-  if (source.status !== "COMPLETED") {
+  const prepublication = source.verificationSubject?.kind === "GIT_CANDIDATE" && source.verificationSubject.version === 2;
+  if (purpose === "PREPUBLICATION" && !prepublication) return denied("Publication evidence requires an immutable pre-publication Git subject.");
+  if (source.status !== "COMPLETED" && !(purpose === "PREPUBLICATION" && prepublication && ["PAUSED", "PENDING", "RUNNING"].includes(source.status))) {
     return denied(`Newest candidate-ready source Attempt is ${source.status}; older passing candidates cannot be reused.`, {
       sourceAttemptId: source.id,
     });
@@ -214,7 +229,8 @@ export function evaluateCurrentVerificationEligibility(input: {
   if (result.independenceValid !== true) return denied("Exact Verification Result lacks server-derived independence.", context);
   if (!result.verificationPlanId || !result.verificationPlanDigest) return denied("Exact Verification Result lacks frozen Verification Plan identity.", context);
   if (!result.decisionInputDigest) return denied("Exact Verification Result lacks a canonical decision-input digest.", context);
-  const verifiedOutcome = result.verdict === "VERIFIED"
+  const requiresHumanReview = prepublication && result.verdict === "REQUIRES_HUMAN_REVIEW";
+  const verifiedOutcome = result.verdict === "VERIFIED" || requiresHumanReview
     ? "SUCCESS" as const
     : result.verdict === "NOT_VERIFIED" || result.verdict === "BLOCKED"
       ? "FAILURE" as const
@@ -234,12 +250,15 @@ export function evaluateCurrentVerificationEligibility(input: {
   if (!receipt) return denied("Exact Verification Result has no matching WorkOrder verification receipt.", context);
   const receiptContext = { ...context, verificationReceiptId: receipt.id };
   const receiptMatchesOutcome = verifiedOutcome === "SUCCESS"
-    ? receipt.status === "PASSED" && receipt.verdict === "VERIFIED"
+    ? requiresHumanReview
+      ? (receipt.status === "PASSED" && receipt.verdict === "VERIFIED" && receipt.humanReviewValid === true)
+        || (purpose === "PREPUBLICATION" && receipt.status === "PENDING" && receipt.verdict === "REQUIRES_HUMAN_REVIEW")
+      : receipt.status === "PASSED" && receipt.verdict === "VERIFIED"
     : receipt.status === "FAILED" && receipt.verdict === result.verdict;
   if (!receiptMatchesOutcome || receipt.independenceValid !== true) {
     return denied("Exact WorkOrder verification receipt does not match the independent verification outcome.", receiptContext);
   }
-  if (receipt.invalidatedAt || (receipt.validUntil && receipt.validUntil <= input.now)) {
+  if (receipt.invalidatedAt || (prepublication && !receipt.validUntil) || (receipt.validUntil && receipt.validUntil <= input.now)) {
     return denied("Exact WorkOrder verification receipt is stale or expired.", receiptContext);
   }
   if (!receipt.decisionInputDigest || receipt.decisionInputDigest !== result.decisionInputDigest) {
@@ -273,7 +292,7 @@ export function evaluateCurrentVerificationEligibility(input: {
   });
   const evidenceContext = { ...receiptContext, evidenceSetDigest };
 
-  if (subject.kind === "GIT_CANDIDATE" && subject.provider === "LOCAL_GIT") {
+  if (subject.kind === "GIT_CANDIDATE" && subject.provider !== "GITHUB") {
     return denied("Verified local candidate has no trusted current publication projection and is not acceptance-eligible.", {
       ...evidenceContext,
       verifiedOutcome,
@@ -281,18 +300,24 @@ export function evaluateCurrentVerificationEligibility(input: {
     });
   }
 
-  if (subject.kind === "GIT_CANDIDATE" && subject.provider === "GITHUB") {
+  if (subject.kind === "GIT_CANDIDATE" && subject.provider === "GITHUB" && purpose === "ACCEPTANCE") {
+    const binding = source.subjectPublicationBinding;
+    if (subject.version === 2 && (!binding || !verifyGitSubjectPublicationBinding(subject, binding)
+      || binding.verificationReceiptId !== receipt.id || receipt.humanReviewValid !== true)) {
+      return denied("Verified candidate lacks an exact human-authorized publication binding.", evidenceContext);
+    }
+    const pullRequest = subject.version === 1 ? subject.pullRequest : binding!.pullRequest;
     const providerHead = [...(input.providerHeads ?? [])]
       .filter((candidate) => candidate.provider === subject.provider
         && candidate.repositoryId === subject.repositoryId
         && candidate.sourceAttemptId === source.id
         && candidate.providerRepositoryId === subject.providerRepositoryId
-        && candidate.providerPullRequestId === subject.pullRequest.providerPullRequestId)
+        && candidate.providerPullRequestId === pullRequest.providerPullRequestId)
       .sort((left, right) => right.syncedAt - left.syncedAt)[0];
     if (!providerHead) return denied("No trusted GitHub App projection exists for the exact pull request.", evidenceContext);
     if (!providerHead.installationId || providerHead.state !== "OPEN"
-      || providerHead.pullRequestNumber !== subject.pullRequest.number
-      || providerHead.pullRequestUrl !== subject.pullRequest.url || providerHead.headSha !== subject.candidateSha
+      || providerHead.pullRequestNumber !== pullRequest.number
+      || providerHead.pullRequestUrl !== pullRequest.url || providerHead.headSha !== subject.candidateSha
       || !providerHead.expiresAt || providerHead.expiresAt <= input.now) {
       return denied("GitHub pull-request identity or head is stale for the verified subject.", evidenceContext);
     }
@@ -312,7 +337,9 @@ export function evaluateCurrentVerificationEligibility(input: {
     verifiedOutcome,
     verificationRecordedAt: receipt.recordedAt,
     ...evidenceContext,
-    reasons: ["Exact current Verification Result is completed, verified, independent, Quality-Contract-bound, evidence-bound, plan-bound, and provider-current."],
+    reasons: [purpose === "PREPUBLICATION"
+      ? "Exact independent pre-publication evidence is current; separate human approval and a publication permit remain required."
+      : "Exact current Verification Result is completed, verified, independent, Quality-Contract-bound, evidence-bound, plan-bound, and provider-current."],
   };
 }
 

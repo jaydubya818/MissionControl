@@ -3,6 +3,20 @@ import { verifyVerificationSubjectIdentity } from "@mission-control/workflow-eng
 export const MIN_FACTORY_LEASE_MS = 15_000;
 export const MAX_FACTORY_LEASE_MS = 120_000;
 
+/** Candidate evidence cannot choose an intermediate base that hides changes. */
+export function frozenFactorySourceRevision(run: {
+  executionManifest?: { repository?: { baseSha?: unknown } };
+  executionBaseSha?: unknown;
+}, reportedSourceRevision: unknown): string {
+  const frozen = run.executionManifest?.repository?.baseSha;
+  if (typeof frozen !== "string" || !/^[a-f0-9]{40,64}$/.test(frozen)
+    || reportedSourceRevision !== frozen
+    || (run.executionBaseSha !== undefined && run.executionBaseSha !== frozen)) {
+    throw new Error("Candidate source revision must match the frozen execution manifest base.");
+  }
+  return frozen;
+}
+
 export interface AttemptLease {
   leaseId: string;
   ownerId: string;
@@ -56,9 +70,12 @@ type VerificationAttemptBindingLike = {
 };
 
 type VerificationSourceAttemptLike = {
+  executionManifest?: { repository?: { baseSha?: unknown } };
+  executionBaseSha?: unknown;
   _id?: unknown;
   attemptPurpose?: string;
   status?: string;
+  executionPhase?: string;
   candidateReadyAt?: number;
   repositoryId?: unknown;
   workOrderId?: unknown;
@@ -89,6 +106,7 @@ export function factoryAttemptSourceBindingMatches(input: {
   const subject = binding?.verificationSubject;
   const source = input.verificationSourceAttempt;
   if (!binding || !subject || !source || subject.kind !== "GIT_CANDIDATE") return false;
+  try { frozenFactorySourceRevision(source, source.executionBaseSha); } catch { return false; }
 
   const sourceAttemptId = String(binding.sourceAttemptId ?? "");
   const workOrderId = String(input.workOrderId ?? "");
@@ -115,16 +133,23 @@ export function factoryAttemptSourceBindingMatches(input: {
     && binding.verificationSubjectDigest === subject.digest
     && source.verificationSubject?.digest === subject.digest
     && source.attemptPurpose === "IMPLEMENTATION"
-    && source.status === "COMPLETED"
+    && candidateSourceCanBeVerified(source)
     && Number.isFinite(source.candidateReadyAt)
     && input.manifestBaseSha === subject.candidateSha
     && source.headSha === subject.candidateSha
-    && (subject.provider === "GITHUB"
-      ? subject.pullRequest?.headSha === subject.candidateSha
+    && (subject.version === 2 ? subject.baseSha === source.executionBaseSha
+      : subject.provider === "GITHUB" ? subject.pullRequest?.headSha === subject.candidateSha
       : subject.localRef?.headSha === subject.candidateSha)
     && input.branch === source.branch
-    && input.branch === (subject.provider === "GITHUB" ? subject.pullRequest?.headRef : subject.localRef?.headRef)
+    && input.branch === (subject.version === 2 ? subject.headRef
+      : subject.provider === "GITHUB" ? subject.pullRequest?.headRef : subject.localRef?.headRef)
   );
+}
+
+export function candidateSourceCanBeVerified(source: { status?: string; executionPhase?: string; verificationSubject?: any }) {
+  return source.status === "COMPLETED" || (source.status === "PAUSED" && source.executionPhase === "AWAITING_VERIFICATION"
+    && source.verificationSubject?.kind === "GIT_CANDIDATE" && source.verificationSubject.version === 2
+    && verifyVerificationSubjectIdentity(source.verificationSubject));
 }
 
 function gitRevision(value: unknown) {
@@ -207,13 +232,15 @@ export function factoryAttemptRequiresReplacementOnClaim(input: {
   status: string;
   lease?: AttemptLease;
   continuationStatus?: string;
+  validatedReadOnlyCandidateRecovery?: boolean;
   now: number;
 }) {
   const hadExecutionOwnership = input.status === "RUNNING" || Boolean(input.lease);
   const leaseIsInactive = !input.lease || input.lease.expiresAt <= input.now;
   const hasRecoverablePublicationCheckpoint = ["AWAITING_HUMAN_REVIEW", "READY_TO_PUBLISH", "PUBLICATION_AUTHORIZED"]
     .includes(input.continuationStatus ?? "");
-  return hadExecutionOwnership && leaseIsInactive && !hasRecoverablePublicationCheckpoint;
+  return hadExecutionOwnership && leaseIsInactive && !hasRecoverablePublicationCheckpoint
+    && input.validatedReadOnlyCandidateRecovery !== true;
 }
 
 export function lostFactoryAttemptFailure(input: { executionBackend?: string }) {

@@ -17,19 +17,23 @@ import {
   harnessRuntimeArtifactIssues,
   runHarnessExecution,
   verificationIsolationBindingDigest,
+  verifyGitSubjectPublicationBinding,
 } from "@mission-control/workflow-engine";
 import { canonicalHash } from "@mission-control/shared";
+import { evaluateVerificationAuthority } from "@mission-control/workflow-engine/verification-authority";
 import { HarnessAdapterRegistry, type HarnessRuntimeAdapter, type RegisteredHarnessAdapter } from "./harnessAdapterRegistry.js";
 import { ConvexActions, ConvexQueries } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
 import { assertFactoryCandidateUnchanged, commitFactoryChanges, createFactorySourceBundle, ensureFactoryWorktree, ensureVerificationWorktree, inspectCandidateChange, listChangedFiles, materializeRemoteCandidate, prepareFactoryDependencies, pushFactoryBranch } from "./factoryGitRuntime.js";
 import { validateChangedFileScope } from "./factoryPathScope.js";
-import { createOrReusePullRequest, loadGithubAppPrivateKey, mintInstallationToken } from "./githubAppRuntime.js";
-import { executeIndependentVerification } from "./factoryVerification.js";
+import { createOrReusePullRequest, reconcilePublishedPullRequest, loadGithubAppPrivateKey, mintInstallationToken } from "./githubAppRuntime.js";
+import { executeIndependentVerification, evaluateVerificationPolicyRejection } from "./factoryVerification.js";
 import {
   cleanupOwnedFactoryWorkspace,
   recordFactoryExecutorStarted,
   recordFactoryExecutorTerminated,
+  recordFactoryInvocationStarted,
+  recordFactoryInvocationCompleted,
   recordFactoryPublication,
   recordFactorySandboxStarted,
   recordFactorySandboxTerminated,
@@ -121,8 +125,11 @@ export interface FactoryAttemptWorkerDependencies {
   mintInstallationToken: typeof mintInstallationToken;
   pushFactoryBranch: typeof pushFactoryBranch;
   createOrReusePullRequest: typeof createOrReusePullRequest;
+  reconcilePublishedPullRequest?: typeof reconcilePublishedPullRequest;
   recordFactoryExecutorStarted?: typeof recordFactoryExecutorStarted;
   recordFactoryExecutorTerminated?: typeof recordFactoryExecutorTerminated;
+  recordFactoryInvocationStarted?: typeof recordFactoryInvocationStarted;
+  recordFactoryInvocationCompleted?: typeof recordFactoryInvocationCompleted;
   recordFactoryPublication?: typeof recordFactoryPublication;
   cleanupOwnedFactoryWorkspace?: typeof cleanupOwnedFactoryWorkspace;
   transferFactoryPublicationWorkspace?: typeof transferFactoryPublicationWorkspace;
@@ -161,8 +168,11 @@ const DEFAULT_DEPENDENCIES: FactoryAttemptWorkerDependencies = {
   mintInstallationToken,
   pushFactoryBranch,
   createOrReusePullRequest,
+  reconcilePublishedPullRequest,
   recordFactoryExecutorStarted,
   recordFactoryExecutorTerminated,
+  recordFactoryInvocationStarted,
+  recordFactoryInvocationCompleted,
   recordFactoryPublication,
   cleanupOwnedFactoryWorkspace,
   transferFactoryPublicationWorkspace,
@@ -378,7 +388,7 @@ export class FactoryAttemptWorker {
             leaseDurationMs: FACTORY_ATTEMPT_LEASE_DURATION_MS,
             ...workerLeaseIdentity,
           });
-          if (!result?.renewed) throw new Error(`Attempt lease renewal rejected (${result?.reason ?? "unknown"}).`);
+          if (!result?.renewed || result.cancellationRequested) throw new Error(`Attempt lease renewal rejected or cancellation requested (${result?.reason ?? "unknown"}).`);
         } catch (error) {
           leaseHealthy = false;
           this.lastError = safeError(error);
@@ -405,6 +415,24 @@ export class FactoryAttemptWorker {
         packet,
         ...workerLeaseIdentity,
       });
+    };
+    const assertActive = async () => {
+      controller.signal.throwIfAborted();
+      if (heartbeatTask) await heartbeatTask;
+      if (!leaseHealthy) throw new Error("Attempt authority was lost.");
+      try {
+        const result = await this.command(
+          verificationAttempt ? "renewVerificationAttempt" : "renewFactoryAttempt",
+          verificationAttempt ? "verification:renew" : "attempts.renew", run,
+          { workflowRunId: run._id, leaseId, leaseDurationMs: FACTORY_ATTEMPT_LEASE_DURATION_MS, ...workerLeaseIdentity },
+        );
+        if (!result?.renewed || result.cancellationRequested) throw new Error("Attempt authority was lost or cancelled.");
+        controller.signal.throwIfAborted();
+      } catch (error) {
+        leaseHealthy = false;
+        controller.abort();
+        throw error;
+      }
     };
     let remoteSession: RemoteSandboxCandidateSession | undefined;
     let remoteCleanupComplete = false;
@@ -436,6 +464,28 @@ export class FactoryAttemptWorker {
         return;
       }
       const workspaceOwner = workspaceOwnerFromClaim(claim, manifest);
+      if (claim.publicationCheckpoint?.reconciliationOnly === true && claim.publicationCheckpoint.publicationBinding) {
+        const checkpoint = validatePublicationCheckpoint(claim.publicationCheckpoint);
+        const subject = claim.publicationCheckpoint.verificationSubject;
+        const binding = claim.publicationCheckpoint.publicationBinding;
+        if (subject?.version !== 2 || !verifyGitSubjectPublicationBinding(subject, binding)
+          || subject.candidateSha !== checkpoint.candidateRevision || subject.baseSha !== checkpoint.sourceRevision) {
+          throw new Error("Durable publication recovery does not match its immutable candidate binding.");
+        }
+        const token = await this.publicationInstallationToken(claim);
+        const observed = await (this.dependencies.reconcilePublishedPullRequest ?? reconcilePublishedPullRequest)({ repository: claim.repository,
+          providerRepositoryId: subject.providerRepositoryId, branch: subject.headRef, base: subject.baseRef, headSha: subject.candidateSha, token: token.token });
+        if (observed.nodeId !== binding.pullRequest.providerPullRequestId || observed.number !== binding.pullRequest.number || observed.url !== binding.pullRequest.url) {
+          throw new Error("Remote publication identity differs from the durable binding.");
+        }
+        const recorded = await report({ events: [{ idempotencyKey: `publication-reconciled:${claim.runId}:${binding.digest}`,
+          eventType: "PUBLICATION_RECONCILED", workflowStep: "publication", status: "COMPLETED", startedAt: Date.now(),
+          metadata: { reconciliationOnly: true, bindingDigest: binding.digest, providerWrites: 0 } }], terminal: { status: "COMPLETED" } });
+        if (recorded?.accepted !== true) throw new Error("Publication reconciliation was not durably recorded.");
+        this.completedCount += 1;
+        this.lastError = null;
+        return;
+      }
       if (claim.localCandidateRecovery?.previousLease && workspaceOwner) {
         const candidate = await this.dependencies.inspectCandidateChange(claim.worktree, manifest.repository.baseSha);
         if (candidate.candidateRevision !== claim.localCandidateRecovery.sourceCandidateSha
@@ -529,6 +579,13 @@ export class FactoryAttemptWorker {
           || candidate.candidateRevision !== checkpoint.candidateRevision) {
           throw new Error("Approved publication checkpoint no longer matches the attempt worktree.");
         }
+        const subject = claim.publicationCheckpoint.verificationSubject;
+        if (subject?.version === 2 && (candidate.sourceRevision !== subject.baseSha || candidate.candidateRevision !== subject.candidateSha
+          || candidate.treeRevision !== subject.treeSha || candidate.rawDiffSha256 !== subject.rawDiffSha256
+          || claim.defaultBranch !== subject.baseRef || claim.branch !== subject.headRef
+          || claim.providerRepositoryId !== subject.providerRepositoryId || claim.repository !== manifest.repository.repository)) {
+          throw new Error("Publication checkpoint no longer matches the exact pre-publication subject.");
+        }
         if (!sameStringSet(candidate.changedFiles, checkpoint.changedFiles)) {
           throw new Error("Approved publication checkpoint changed-file set no longer matches the verified candidate.");
         }
@@ -549,7 +606,11 @@ export class FactoryAttemptWorker {
           report,
           leaseId,
           publicationPermit: checkpoint.publicationPermit,
+          assertActive,
+          signal: controller.signal,
           requirePublicationPermit: true,
+          treeSha: candidate.treeRevision,
+          policyV2: subject?.version === 2,
         });
         this.completedCount += 1;
         this.lastError = null;
@@ -670,9 +731,29 @@ export class FactoryAttemptWorker {
       } else {
         const executorEvents: ExecutorEvent[] = [];
         const runtimeEvents: any[] = [];
+        let eventPersistence = Promise.resolve();
         const result = await runHarnessExecution(adapter, executorRequest, {
-          emit: (event) => { executorEvents.push(event); },
+          attempt: workspaceOwner ? {
+            workOrderId: String(claim.workOrderId), attemptId: String(claim.runId),
+            executorIdentity: `${workerLeaseIdentity.workerId}:${workerLeaseIdentity.workerSessionId}:${workerLeaseIdentity.workerGeneration}`,
+            environmentReference: `local-worktree:${claim.runId}`, sourceRevision: manifest.repository.baseSha,
+            acceptanceCriteria: manifest.workOrderSpecification?.acceptanceCriteria ?? [],
+            assertActive,
+          } : undefined,
+          emit: (event) => {
+            executorEvents.push(event);
+            eventPersistence = eventPersistence.then(async () => {
+              const recorded = await report({ events: [mapExecutorEvent(claim.runId, event, adapterCapabilities)] });
+              if (recorded?.accepted !== true) throw new Error("Canonical Attempt rejected executor evidence.");
+            });
+            void eventPersistence.catch(() => controller.abort());
+            return eventPersistence;
+          },
           signal: controller.signal,
+          invocationObserver: workspaceOwner ? {
+            started: async (executionId) => { await (this.dependencies.recordFactoryInvocationStarted ?? recordFactoryInvocationStarted)(workspaceOwner, executionId); },
+            completed: async (executionId) => { await (this.dependencies.recordFactoryInvocationCompleted ?? recordFactoryInvocationCompleted)(workspaceOwner, executionId); },
+          } : undefined,
           processObserver: workspaceOwner ? {
             started: async (process) => {
               await (this.dependencies.recordFactoryExecutorStarted ?? recordFactoryExecutorStarted)(workspaceOwner, process.pid);
@@ -691,6 +772,7 @@ export class FactoryAttemptWorker {
             },
           } : undefined,
         });
+        await eventPersistence;
         const normalizedResult = assertHarnessResultIdentity(executorRequest, manifest, result.normalizedResult);
         mappedEvents = [
           ...executorEvents.map((event) => mapExecutorEvent(claim.runId, event, adapterCapabilities)),
@@ -801,6 +883,10 @@ export class FactoryAttemptWorker {
       } else if (candidate.candidateRevision !== headSha) {
         throw new Error("Committed candidate revision changed before verification.");
       }
+      controller.signal.throwIfAborted();
+      await adapter.recordCandidate?.(executorRequest.executionId, {
+        sourceRevision: candidate.sourceRevision, candidateRevision: candidate.candidateRevision,
+      });
       const baseArtifacts = [
         structuredResultArtifact(claim, structuredResult),
         ...executionArtifacts,
@@ -818,12 +904,26 @@ export class FactoryAttemptWorker {
             sourceRevision: candidate.sourceRevision,
             headSha,
             treeSha: candidate.treeRevision,
+            rawDiffSha256: candidate.rawDiffSha256,
           },
         },
       ];
       let verificationRecord: any;
       let verificationResult: any;
       const policyV2 = manifest.workOrderSpecification?.verificationContract?.schemaVersion === 2;
+      if (policyV2 && manifest.repository.verificationPublicationOrder === "VERIFY_BEFORE_PUBLICATION") {
+        await this.dependencies.assertFactoryCandidateUnchanged(claim.worktree, headSha);
+        await cleanupRemote();
+        clearInterval(heartbeat);
+        if (heartbeatTask) await heartbeatTask;
+        const ready = await report({ events: mappedEvents, observations: traceObservations, artifacts: baseArtifacts,
+          candidateReady: { version: 2, candidateSha: headSha, treeSha: candidate.treeRevision, rawDiffSha256: candidate.rawDiffSha256,
+            sourceRevision: candidate.sourceRevision, baseRef: manifest.repository.defaultBranch, headRef: manifest.repository.branch } });
+        if (ready?.accepted !== true || ready.paused !== true) throw new Error("Canonical pre-publication candidate was not durably paused.");
+        clearInterval(heartbeat);
+        this.lastError = null;
+        return;
+      }
       if (manifest.workOrderSpecification?.verificationContract && !policyV2) {
         verificationResult = await this.dependencies.executeIndependentVerification({
           workflowRunId: String(claim.workflowRunId),
@@ -915,6 +1015,8 @@ export class FactoryAttemptWorker {
         report,
         leaseId,
         requirePublicationPermit: true,
+        assertActive,
+        signal: controller.signal,
         events: policyV2 || verificationResult ? [] : mappedEvents,
         observations: policyV2 || verificationResult ? [] : traceObservations,
         artifacts: policyV2 || verificationResult ? [] : baseArtifacts,
@@ -965,6 +1067,16 @@ export class FactoryAttemptWorker {
     return await this.client.action(ConvexActions.serviceCommands[action] as any, command) as any;
   }
 
+  private async publicationInstallationToken(claim: any) {
+    const privateKey = this.dependencies.loadGithubAppPrivateKey();
+    const configuredAppId = this.dependencies.getGithubAppId();
+    if (!privateKey || !configuredAppId) throw new Error("GitHub App runtime credentials are not configured.");
+    if (configuredAppId !== claim.installation.appId) throw new Error("GitHub App runtime identity does not match the frozen installation.");
+    if (!claim.providerRepositoryId) throw new Error("GitHub provider repository identity is not frozen.");
+    return await this.dependencies.mintInstallationToken({ appId: configuredAppId, installationId: claim.installation.installationId,
+      providerRepositoryId: claim.providerRepositoryId, privateKey });
+  }
+
   private async publishCandidate(input: {
     claim: any;
     manifest: any;
@@ -978,18 +1090,23 @@ export class FactoryAttemptWorker {
     report: (packet: any) => Promise<any>;
     leaseId: string;
     publicationPermit?: { id: string; leaseId: string; validUntil: number };
+    assertActive: () => Promise<void>;
+    signal: AbortSignal;
+    reconciliationOnly?: boolean;
     requirePublicationPermit?: boolean;
     events?: any[];
     observations?: any[];
     artifacts?: any[];
   }) {
-    const privateKey = this.dependencies.loadGithubAppPrivateKey();
-    const configuredAppId = this.dependencies.getGithubAppId();
-    if (!privateKey || !configuredAppId) throw new Error("GitHub App runtime credentials are not configured.");
-    if (configuredAppId !== input.claim.installation.appId) throw new Error("GitHub App runtime identity does not match the frozen installation.");
-    if (!input.claim.providerRepositoryId) throw new Error("GitHub provider repository identity is not frozen.");
     let publicationPermit = input.publicationPermit;
-    if (input.requirePublicationPermit && !publicationPermit) {
+    const reconciliationOnly = input.claim.publicationCheckpoint?.reconciliationOnly === true;
+    const assertWriteAllowed = async () => {
+      await input.assertActive();
+      input.signal.throwIfAborted();
+      if (input.requirePublicationPermit) assertPublicationPermitCurrent(publicationPermit, input.leaseId, input.headSha);
+    };
+    if (reconciliationOnly && (!input.policyV2 || !publicationPermit)) throw new Error("Read-only publication recovery requires a consumed v2 permit.");
+    if (input.requirePublicationPermit && !publicationPermit && !reconciliationOnly) {
       const authorization = await this.command(
         "authorizeFactoryPublication",
         "attempts.authorize-publication",
@@ -1012,24 +1129,34 @@ export class FactoryAttemptWorker {
         validUntil: authorization.validUntil,
       };
     }
-    if (input.requirePublicationPermit) assertPublicationPermitCurrent(publicationPermit, input.leaseId, input.headSha);
-    const installationToken = await this.dependencies.mintInstallationToken({
-      appId: configuredAppId,
-      installationId: input.claim.installation.installationId,
-      providerRepositoryId: input.claim.providerRepositoryId,
-      privateKey,
-    });
+    if (input.requirePublicationPermit && !reconciliationOnly) assertPublicationPermitCurrent(publicationPermit, input.leaseId, input.headSha);
+    const installationToken = await this.publicationInstallationToken(input.claim);
     if (installationToken.expiresAt <= Date.now() + 60_000) throw new Error("GitHub installation token expires too soon for a safe push.");
+    let pullRequest: Awaited<ReturnType<typeof createOrReusePullRequest>>;
+    if (reconciliationOnly) {
+      pullRequest = await (this.dependencies.reconcilePublishedPullRequest ?? reconcilePublishedPullRequest)({ repository: input.claim.repository,
+        providerRepositoryId: input.claim.providerRepositoryId, branch: input.claim.branch, base: input.claim.defaultBranch,
+        headSha: input.headSha, token: installationToken.token });
+    } else {
     if (input.requirePublicationPermit) assertPublicationPermitCurrent(publicationPermit, input.leaseId, input.headSha);
+    if (input.policyV2) {
+      const intent = await input.report({ events: [{ idempotencyKey: `publication-request:${input.claim.runId}:${publicationPermit?.id}`,
+        eventType: "PUBLICATION_REQUESTED", workflowStep: "publication", status: "PENDING", startedAt: Date.now(),
+        metadata: { candidateSha: input.headSha, publicationPermitId: publicationPermit?.id, outcome: "UNKNOWN" } }] });
+      if (intent?.accepted !== true) throw new Error("Publication intent was not durably acknowledged.");
+    }
     await this.dependencies.assertFactoryCandidateUnchanged(input.claim.worktree, input.headSha);
+    await assertWriteAllowed();
     await this.dependencies.pushFactoryBranch({
       worktree: input.claim.worktree,
       repository: input.claim.repository,
       branch: input.claim.branch,
       installationToken: installationToken.token,
+      assertWriteAllowed,
+      signal: input.signal,
     });
-    if (input.requirePublicationPermit) assertPublicationPermitCurrent(publicationPermit, input.leaseId, input.headSha);
-    const pullRequest = await this.dependencies.createOrReusePullRequest({
+    await assertWriteAllowed();
+    pullRequest = await this.dependencies.createOrReusePullRequest({
       repository: input.claim.repository,
       branch: input.claim.branch,
       base: input.claim.defaultBranch,
@@ -1038,7 +1165,10 @@ export class FactoryAttemptWorker {
       token: installationToken.token,
       headSha: input.headSha,
       draft: input.policyV2 === true,
+      assertWriteAllowed,
+      signal: input.signal,
     });
+    }
     const pullRequestLineage = {
       ...input.manifest.causation,
       repositoryId: String(input.claim.repositoryId),
@@ -1048,6 +1178,8 @@ export class FactoryAttemptWorker {
       sourceRevision: input.sourceRevision,
       headSha: input.headSha,
       treeSha: input.treeSha,
+      baseRef: input.claim.defaultBranch,
+      providerRepositoryId: input.claim.providerRepositoryId,
       pullRequestNumber: pullRequest.number,
       pullRequestUrl: pullRequest.url,
       providerPullRequestId: pullRequest.nodeId,
@@ -1072,7 +1204,7 @@ export class FactoryAttemptWorker {
         observations: input.observations ?? [],
         artifacts: [...(input.artifacts ?? []), pullRequestArtifact],
         terminal: { status: "COMPLETED" },
-        ...(input.policyV2 ? {
+        ...(input.policyV2 && input.manifest.repository.verificationPublicationOrder !== "VERIFY_BEFORE_PUBLICATION" ? {
           candidateReady: {
             candidateSha: input.headSha,
             treeSha: input.treeSha,
@@ -1115,7 +1247,7 @@ export class FactoryAttemptWorker {
         metadata: { lifecycleType: `WORKSPACE_CLEANUP_${cleanup.outcome}`, reason: cleanup.reason },
       }],
       terminal: { status: "COMPLETED" },
-      ...(input.policyV2 ? {
+      ...(input.policyV2 && input.manifest.repository.verificationPublicationOrder !== "VERIFY_BEFORE_PUBLICATION" ? {
         candidateReady: {
           candidateSha: input.headSha,
           treeSha: input.treeSha,
@@ -1147,18 +1279,22 @@ export class FactoryAttemptWorker {
       candidateSha: subject.candidateSha,
       treeSha: subject.treeSha,
     });
-    await (this.dependencies.prepareFactoryDependencies ?? prepareFactoryDependencies)({
-      worktree: input.claim.worktree,
-    });
     const candidate = await this.dependencies.inspectCandidateChange(
       input.claim.worktree,
       input.claim.defaultBranch,
       input.claim.sourceRevision,
     );
-    if (candidate.candidateRevision !== subject.candidateSha || candidate.treeRevision !== subject.treeSha) {
+    if (candidate.candidateRevision !== subject.candidateSha || candidate.treeRevision !== subject.treeSha
+      || (subject.version === 2 && (candidate.sourceRevision !== subject.baseSha || candidate.rawDiffSha256 !== subject.rawDiffSha256))) {
       throw new Error("Detached verification checkout does not match the immutable Verification Subject.");
     }
-    const verification = await this.dependencies.executeIndependentVerification({
+    const contract = input.manifest.workOrderSpecification.verificationContract;
+    const authority = evaluateVerificationAuthority({ candidate, checks: contract.checks, policy: contract.authorityPolicy });
+    if (authority.status === "PASS") {
+      await (this.dependencies.prepareFactoryDependencies ?? prepareFactoryDependencies)({ worktree: input.claim.worktree });
+    }
+    const verification = await (authority.status === "PASS"
+      ? this.dependencies.executeIndependentVerification : evaluateVerificationPolicyRejection)({
       workflowRunId: String(input.claim.workflowRunId),
       workOrderId: String(input.claim.workOrderId),
       workOrderRevisionNumber: input.manifest.causation.workOrderRevisionNumber,
@@ -1169,6 +1305,13 @@ export class FactoryAttemptWorker {
       signal: input.controller.signal,
     });
     await this.dependencies.assertFactoryCandidateUnchanged(input.claim.worktree, subject.candidateSha);
+    if (subject.version === 2) {
+      const after = await this.dependencies.inspectCandidateChange(input.claim.worktree, subject.baseSha);
+      if (after.sourceRevision !== subject.baseSha || after.candidateRevision !== subject.candidateSha
+        || after.treeRevision !== subject.treeSha || after.rawDiffSha256 !== subject.rawDiffSha256) {
+        throw new Error("Verification changed the immutable candidate's base, tree or raw diff identity.");
+      }
+    }
     const isolationWithoutDigest = {
       mode: "DETACHED_GIT_WORKTREE" as const,
       sandboxId: `local-worktree:${input.claim.runId}`,
@@ -2005,7 +2148,7 @@ function validatePublicationCheckpoint(checkpoint: any) {
     || typeof checkpoint.sourceRevision !== "string" || !checkpoint.sourceRevision
     || typeof checkpoint.candidateRevision !== "string" || !checkpoint.candidateRevision
     || !Number.isFinite(checkpoint.authorizationValidUntil)
-    || checkpoint.authorizationValidUntil <= Date.now() + 60_000
+    || (checkpoint.reconciliationOnly !== true && checkpoint.authorizationValidUntil <= Date.now() + 60_000)
     || !Array.isArray(checkpoint.changedFiles) || checkpoint.changedFiles.some((file: unknown) => typeof file !== "string")
     || checkpoint.verification?.verdict !== "VERIFIED"
     || !checkpoint.verification?.verificationReceiptId) {

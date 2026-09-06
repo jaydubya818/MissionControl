@@ -1,0 +1,9 @@
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mission-control/apps/mission-control-ui
+
+ ✓ src/controlPlane/CandidateRecoveryPanel.test.tsx (3 tests) 56ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  15:55:31
+   Duration  1.08s (transform 34ms, setup 256ms, collect 170ms, tests 56ms, environment 375ms, prepare 50ms)

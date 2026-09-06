@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { evaluateCurrentVerificationEligibility } from "../verificationCurrentness.js";
+import { evaluateCurrentVerificationEligibility, evaluatePrepublicationVerification, type CurrentVerificationInput } from "../verificationCurrentness.js";
 import { verificationContractDigest } from "../verificationIdentity.js";
 import {
   createAutomationVerificationSubject,
   createGitVerificationSubject,
+  createPrepublicationGitVerificationSubject,
+  createGitSubjectPublicationBinding,
   type GithubVerificationSubject,
   type VerificationSubject,
 } from "../verificationSubject.js";
@@ -134,7 +136,7 @@ function fixture(subject: VerificationSubject = gitSubject(), sourceReadyAt = 10
       ...tuple,
       recordedAt: 350,
     }],
-    providerHeads: subject.kind === "GIT_CANDIDATE" && subject.provider === "GITHUB" ? [{
+    providerHeads: subject.kind === "GIT_CANDIDATE" && subject.version === 1 && subject.provider === "GITHUB" ? [{
       provider: "GITHUB" as const,
       repositoryId: subject.repositoryId,
       installationId: "installation-1",
@@ -154,6 +156,45 @@ function fixture(subject: VerificationSubject = gitSubject(), sourceReadyAt = 10
 }
 
 describe("exact-current verification acceptance eligibility", () => {
+  it("verifies a pre-publication subject without making it acceptance eligible, then requires exact publication and provider currentness", () => {
+    const legacy = gitSubject();
+    const { subjectId: _id, digest: _digest, pullRequest, ...identity } = legacy;
+    const subject = createPrepublicationGitVerificationSubject({ ...identity, version: 2, baseSha: "c".repeat(40),
+      rawDiffSha256: `sha256:${"4".repeat(64)}`, baseRef: pullRequest.baseRef, headRef: pullRequest.headRef });
+    const data: CurrentVerificationInput = fixture(subject);
+    data.sourceAttempts[0].status = "PAUSED";
+    expect(evaluatePrepublicationVerification(data).eligible).toBe(true);
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
+    data.sourceAttempts[0].status = "COMPLETED";
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
+    data.sourceAttempts[0].subjectPublicationBinding = createGitSubjectPublicationBinding(subject, {
+      publicationPermitId: "permit", publicationPermitLeaseId: "lease", approvalDecisionId: "approval", verificationReceiptId: "receipt-a", pullRequest,
+    });
+    data.verificationReceipts[0].humanReviewValid = true;
+    data.providerHeads = fixture(legacy).providerHeads;
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(true);
+    for (const changed of [{ headSha: "f".repeat(40) }, { state: "CLOSED" as const }, { expiresAt: now }, { providerPullRequestId: "another-pr" }]) {
+      expect(evaluateCurrentVerificationEligibility({ ...data, providerHeads: [{ ...data.providerHeads[0], ...changed }] }).eligible).toBe(false);
+    }
+    expect(evaluateCurrentVerificationEligibility({ ...data, verificationReceipts: [{ ...data.verificationReceipts[0], humanReviewValid: false }] }).eligible).toBe(false);
+    expect(evaluatePrepublicationVerification({ ...data, verificationAttempts: [...data.verificationAttempts,
+      { ...data.verificationAttempts[0], id: "new-verifier", createdAt: 900, status: "FAILED" }] }).eligible).toBe(false);
+  });
+
+  it("allows pending human review only as pre-publication evidence, never as acceptance", () => {
+    const { subjectId: _id, digest: _digest, pullRequest, ...identity } = gitSubject();
+    const subject = createPrepublicationGitVerificationSubject({ ...identity, version: 2, baseSha: "c".repeat(40), rawDiffSha256: `sha256:${"4".repeat(64)}`,
+      baseRef: pullRequest.baseRef, headRef: pullRequest.headRef });
+    const data: CurrentVerificationInput = fixture(subject);
+    data.sourceAttempts[0].status = "PAUSED";
+    data.verificationResults[0].verdict = "REQUIRES_HUMAN_REVIEW";
+    data.verificationReceipts[0].status = "PENDING";
+    data.verificationReceipts[0].verdict = "REQUIRES_HUMAN_REVIEW";
+    expect(evaluatePrepublicationVerification(data).eligible).toBe(true);
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
+    data.verificationReceipts[0].validUntil = now;
+    expect(evaluatePrepublicationVerification(data).eligible).toBe(false);
+  });
   it("allows only the exact current software tuple with GitHub PR lineage", () => {
     const result = evaluateCurrentVerificationEligibility(fixture());
     expect(result, result.reasons.join(" ")).toMatchObject({

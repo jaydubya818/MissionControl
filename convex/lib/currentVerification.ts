@@ -1,5 +1,6 @@
 import {
   evaluateCurrentVerificationEligibility,
+  evaluatePrepublicationVerification,
 } from "@mission-control/workflow-engine/verification-currentness";
 import type { VerificationIdentityTuple } from "@mission-control/workflow-engine";
 import {
@@ -41,8 +42,9 @@ export async function getCurrentVerificationRoutingOutcome(
   ctx: any,
   workOrder: any,
   now = Date.now(),
+  purpose: "ACCEPTANCE" | "PREPUBLICATION" = "ACCEPTANCE",
 ): Promise<CurrentVerificationRoutingOutcome> {
-  const [attempts, results, receipts, evidence, providerHeads, repository, installations] = await Promise.all([
+  const [attempts, results, receipts, evidence, providerHeads, repository, installations, approvals] = await Promise.all([
     ctx.db.query("workflowRuns").withIndex("by_work_order", (q: any) => q.eq("workOrderId", workOrder._id)).collect(),
     ctx.db.query("verificationRuns").withIndex("by_work_order", (q: any) => q.eq("workOrderId", workOrder._id)).collect(),
     ctx.db.query("verificationReceipts").withIndex("by_work_order", (q: any) => q.eq("workOrderId", workOrder._id)).collect(),
@@ -52,13 +54,27 @@ export async function getCurrentVerificationRoutingOutcome(
     workOrder.repositoryId
       ? ctx.db.query("githubAppInstallations").withIndex("by_repository", (q: any) => q.eq("repositoryId", workOrder.repositoryId)).collect()
       : Promise.resolve([]),
+    ctx.db.query("approvalDecisions").withIndex("by_work_order", (q: any) => q.eq("workOrderId", workOrder._id)).collect(),
   ]);
   const connectedInstallationIds = new Set(
     installations.filter((installation: any) => installation.status === "CONNECTED")
       .map((installation: any) => installation.installationId),
   );
 
-  return evaluateCurrentVerificationEligibility({
+  const humanReviewValid = (receipt: any) => {
+    const source = attempts.find((attempt: any) => String(attempt._id) === String(receipt.sourceAttemptId));
+    const approval = approvals.find((item: any) => item._id === receipt.metadata?.humanReviewApprovalDecisionId);
+    return Boolean(source?.verificationSubject?.version === 2 && source.verificationSubject.digest === receipt.verificationSubjectDigest
+      && source.factoryContinuation?.approvalDecisionId === approval?._id
+      && source.factoryContinuation?.resolvedVerificationReceiptId === receipt._id
+      && source.factoryContinuation?.verificationReceiptId === receipt.metadata?.supersedesVerificationReceiptId
+      && source.factoryContinuation?.candidateRevision === receipt.candidateRevision
+      && approval?.approvalType === "HUMAN_REVIEW" && approval.status === "APPROVED"
+      && approval.workflowRunId === source._id && approval.workOrderRevisionNumber === workOrder.currentRevisionNumber
+      && typeof approval.expiresAt === "number" && approval.expiresAt > now);
+  };
+  const evaluate = purpose === "PREPUBLICATION" ? evaluatePrepublicationVerification : evaluateCurrentVerificationEligibility;
+  return evaluate({
     workOrderId: String(workOrder._id),
     workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
     qualityContractDigest: workOrder.qualityContractDigest,
@@ -71,6 +87,7 @@ export async function getCurrentVerificationRoutingOutcome(
       candidateReadyAt: attempt.candidateReadyAt,
       qualityContractDigest: attempt.qualityContractDigest,
       verificationSubject: normalizeSubject(attempt.verificationSubject),
+      subjectPublicationBinding: attempt.subjectPublicationBinding,
     })),
     verificationAttempts: attempts.map((attempt: any) => ({
       id: String(attempt._id),
@@ -121,6 +138,7 @@ export async function getCurrentVerificationRoutingOutcome(
         recordedAt: receipt.recordedAt,
         validUntil: receipt.validUntil,
         invalidatedAt: receipt.invalidatedAt,
+        humanReviewValid: humanReviewValid(receipt),
       })),
     verificationEvidence: evidence.map((envelope: any) => ({
       id: String(envelope._id),

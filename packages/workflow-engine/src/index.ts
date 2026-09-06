@@ -173,6 +173,9 @@ export {
 export {
   createAutomationVerificationSubject,
   createGitVerificationSubject,
+  createPrepublicationGitVerificationSubject,
+  createGitSubjectPublicationBinding,
+  verifyGitSubjectPublicationBinding,
   normalizeAttemptPurpose,
   normalizeFactoryPurpose,
   normalizeWorkOrderKind,
@@ -181,6 +184,8 @@ export {
   type AutomationVerificationSubject,
   type FactoryPurpose,
   type GitVerificationSubject,
+  type PrepublicationGitVerificationSubject,
+  type GitSubjectPublicationBinding,
   type GithubVerificationSubject,
   type LocalGitVerificationSubject,
   type VerificationSubject,

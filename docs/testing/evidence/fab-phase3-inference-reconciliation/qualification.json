@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "fab-phase3-current-main-qualification/v1",
+  "sourceCommit": "4efffbb035859b824ddb64cc8943b1e8f49f5f4c",
+  "mergedMain": "cc1c530fad2cd46adeb43443013734a2900f7a06",
+  "systemComparisonBase": "e76796f76f92577dab9f073bf1007a29285cbe03",
+  "systemGates": 19,
+  "systemResult": "PASS",
+  "browserTests": 15,
+  "browserResult": "PASS",
+  "inferenceAccountingCheck": "PASS",
+  "runtimeContract": 44,
+  "runtimeGuardAgainstMergedMain": "PASS: two added public mutations, v43 to v44",
+  "independentSecurityReview": "GO for inspected offline reconciliation; no concrete merge regressions",
+  "classification": "OFFLINE_SYNTHETIC_AND_LOCAL_BUILD",
+  "liveProviderRequests": 0,
+  "deployedMissionControl": "NOT_RUN",
+  "controlledRuntimePublication": "NOT_RUN",
+  "maturity": "EXPERIMENTAL",
+  "recordedAt": "2026-09-06T03:58:30.124522+00:00"
+}

@@ -55,6 +55,18 @@ export async function executeIndependentVerification(input: {
   });
 }
 
+/** Produce canonical policy evidence without loading or running candidate code. */
+export async function evaluateVerificationPolicyRejection(input: Parameters<typeof executeIndependentVerification>[0]) {
+  const workOrder = normalizeSpecification(input);
+  const engine = new VerificationEngine([
+    new VerificationAuthorityVerifier(),
+    new ChangeBudgetVerifier(),
+    new NegativeConstraintVerifier(),
+  ]);
+  // Command verifiers are deliberately absent: their proof remains NOT_CONFIGURED.
+  return await engine.execute({ workflowRunId: input.workflowRunId, workOrder, candidate: input.candidate, signal: input.signal });
+}
+
 class FactoryCommandVerifier implements Verifier {
   readonly id = "factory-command/v1";
   readonly name = "Independent Factory command verifier";

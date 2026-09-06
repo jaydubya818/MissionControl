@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { lstat, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { assertCanonicalWorktreeBoundary, assertWorktreeBoundary } from "./factoryPathScope.js";
@@ -25,10 +25,14 @@ export interface FactoryWorkspaceOwner {
 
 export interface FactoryWorkspaceOwnershipManifest extends FactoryWorkspaceOwner {
   version: "factory-workspace-ownership/v1";
+  /** Protected transfer receipts reconcile interrupted handoffs; never active lease authority. */
+  priorOwners?: Array<Pick<FactoryWorkspaceOwner, "workerId" | "workerSessionId" | "workerGeneration" | "leaseId">>;
+  recoverySource?: { owner: FactoryWorkspaceOwner; candidateSha: string };
   process: {
-    kind?: "LOCAL_PROCESS" | "REMOTE_SANDBOX";
+    kind?: "LOCAL_PROCESS" | "REMOTE_SANDBOX" | "IN_PROCESS_AGENT";
     state: "NOT_STARTED" | "RUNNING" | "TERMINATED" | "UNKNOWN";
     pid?: number;
+    executionId?: string;
     externalProcessId?: string;
     providerResourceId?: string;
     resourceAbsentAt?: number;
@@ -87,6 +91,23 @@ export async function recordFactoryExecutorStarted(owner: FactoryWorkspaceOwner,
       ...manifest,
       process: { kind: "LOCAL_PROCESS", state: "RUNNING", pid, startedAt: Date.now() },
     };
+  });
+}
+
+export async function recordFactoryInvocationStarted(owner: FactoryWorkspaceOwner, executionId: string) {
+  if (!executionId.trim()) throw new Error("In-process invocation requires an execution identity.");
+  return await updateOwnedManifest(owner, (manifest) => {
+    if (manifest.process.state !== "NOT_STARTED") throw new Error("Invocation ownership was already established; workspace was preserved.");
+    return { ...manifest, process: { kind: "IN_PROCESS_AGENT", state: "RUNNING", executionId, startedAt: Date.now() } };
+  });
+}
+
+export async function recordFactoryInvocationCompleted(owner: FactoryWorkspaceOwner, executionId: string) {
+  return await updateOwnedManifest(owner, (manifest) => {
+    if (manifest.process.kind !== "IN_PROCESS_AGENT" || manifest.process.state !== "RUNNING" || manifest.process.executionId !== executionId) {
+      throw new Error("Invocation completion does not match owned execution; workspace was preserved.");
+    }
+    return { ...manifest, process: { ...manifest.process, state: "TERMINATED", terminatedAt: Date.now() } };
   });
 }
 
@@ -186,16 +207,25 @@ export async function transferFactoryPublicationWorkspace(input: {
   const previousPath = await ownershipManifestPath(input.previousOwner);
   const nextPath = await ownershipManifestPath(input.nextOwner);
   if (previousPath !== nextPath) throw new Error("Workspace transfer cannot change Attempt identity or protected manifest path.");
-  const manifest = await requireOwnedManifest(input.previousOwner);
+  const manifest = await readManifest(previousPath);
+  if (!manifest) throw new Error("Publication workspace has no protected ownership proof.");
+  assertStaticWorkspaceIdentity(manifest, input.previousOwner);
+  const sameLeaseOwner = (owner: Pick<FactoryWorkspaceOwner, "workerId" | "workerSessionId" | "workerGeneration" | "leaseId">, expected: FactoryWorkspaceOwner) =>
+    owner.workerId === expected.workerId && owner.workerSessionId === expected.workerSessionId
+      && owner.workerGeneration === expected.workerGeneration && owner.leaseId === expected.leaseId;
+  if (!sameLeaseOwner(manifest, input.previousOwner)
+    && !manifest.priorOwners?.some(owner => sameLeaseOwner(owner, input.previousOwner))) {
+    throw new Error("Publication transfer has no protected receipt for the canonical checkpoint owner.");
+  }
   if (manifest.process.state !== "TERMINATED" || !gitSha(input.checkpointCandidateSha)) {
     throw new Error("Only a terminated workspace with an exact publication checkpoint can transfer sessions.");
   }
   assertStaticWorkspaceIdentity(input.previousOwner, input.nextOwner);
-  if (input.previousOwner.workerId !== input.nextOwner.workerId
+  if (manifest.workerId !== input.nextOwner.workerId
     || input.previousOwner.leaseId === input.nextOwner.leaseId
-    || input.nextOwner.workerGeneration < input.previousOwner.workerGeneration
-    || (input.previousOwner.workerSessionId !== input.nextOwner.workerSessionId
-      && input.nextOwner.workerGeneration <= input.previousOwner.workerGeneration)) {
+    || input.nextOwner.workerGeneration < manifest.workerGeneration
+    || (manifest.workerSessionId !== input.nextOwner.workerSessionId
+      && input.nextOwner.workerGeneration <= manifest.workerGeneration)) {
     throw new Error("Publication workspace transfer requires the same stable worker, a new lease, and monotonic generation.");
   }
   const boundary = await assertCanonicalWorktreeBoundary(
@@ -211,8 +241,11 @@ export async function transferFactoryPublicationWorkspace(input: {
   if (branch !== input.previousOwner.branch || head !== input.checkpointCandidateSha || status) {
     throw new Error("Publication workspace transfer proof does not match the clean checkpoint candidate.");
   }
+  if (sameLeaseOwner(manifest, input.nextOwner)) return manifest;
+  if ((manifest.priorOwners?.length ?? 0) >= 32) throw new Error("Publication workspace exceeded its bounded transfer history; operator reconciliation is required.");
   const transferred: FactoryWorkspaceOwnershipManifest = {
     ...manifest,
+    priorOwners: [...(manifest.priorOwners ?? []), { workerId: manifest.workerId, workerSessionId: manifest.workerSessionId, workerGeneration: manifest.workerGeneration, leaseId: manifest.leaseId }],
     workerId: input.nextOwner.workerId,
     workerSessionId: input.nextOwner.workerSessionId,
     workerGeneration: input.nextOwner.workerGeneration,
@@ -237,17 +270,36 @@ export async function transferFactoryRecoveryWorkspace(input: {
   const previousPath = await ownershipManifestPath(input.previousOwner);
   const nextPath = await ownershipManifestPath(input.nextOwner);
   if (previousPath === nextPath) throw new Error("Cross-Attempt recovery requires a new protected manifest identity.");
-  if (await readManifest(nextPath)) throw new Error("Recovery Attempt already has a protected ownership manifest.");
-  const manifest = await requireOwnedManifest(input.previousOwner);
+  const destination = await readManifest(nextPath);
+  const source = await readManifest(previousPath);
+  // A receipt identifies the original failed Attempt even after a lost ack or
+  // another lease for the same recovery Attempt. It is not active authority.
+  if (source) assertExactOwner(source, input.previousOwner);
+  let manifest = source;
+  if (destination?.recoverySource) {
+    assertExactOwner(destination.recoverySource.owner, input.previousOwner);
+    assertStaticWorkspaceIdentity(destination, input.nextOwner);
+    if (destination.recoverySource.candidateSha !== input.checkpointCandidateSha) {
+      throw new Error("Recovery transfer receipt does not match the exact candidate checkpoint.");
+    }
+    manifest = destination;
+  } else if (destination) {
+    // Reconcile the legacy rename-before-write crash window, but only when
+    // the protected destination still contains the exact original owner.
+    if (source) throw new Error("Recovery workspace has conflicting protected ownership manifests.");
+    assertExactOwner(destination, input.previousOwner);
+    manifest = destination;
+  }
+  if (!manifest) throw new Error("Protected recovery workspace ownership manifest is missing.");
   if (manifest.process.state !== "TERMINATED" || !gitSha(input.checkpointCandidateSha)) {
     throw new Error("Only a terminated workspace with an exact candidate checkpoint can transfer to a recovery Attempt.");
   }
   assertRecoveryWorkspaceIdentity(input.previousOwner, input.nextOwner);
-  if (input.previousOwner.workerId !== input.nextOwner.workerId
+  if (manifest.workerId !== input.nextOwner.workerId
     || input.previousOwner.leaseId === input.nextOwner.leaseId
-    || input.nextOwner.workerGeneration < input.previousOwner.workerGeneration
-    || (input.previousOwner.workerSessionId !== input.nextOwner.workerSessionId
-      && input.nextOwner.workerGeneration <= input.previousOwner.workerGeneration)) {
+    || input.nextOwner.workerGeneration < manifest.workerGeneration
+    || (manifest.workerSessionId !== input.nextOwner.workerSessionId
+      && input.nextOwner.workerGeneration <= manifest.workerGeneration)) {
     throw new Error("Recovery workspace transfer requires the same stable worker, a new lease, and monotonic generation.");
   }
   const boundary = await assertCanonicalWorktreeBoundary(
@@ -265,6 +317,8 @@ export async function transferFactoryRecoveryWorkspace(input: {
   }
   const transferred: FactoryWorkspaceOwnershipManifest = {
     ...manifest,
+    recoverySource: { owner: input.previousOwner, candidateSha: input.checkpointCandidateSha },
+    priorOwners: undefined,
     workflowRunId: input.nextOwner.workflowRunId,
     executionManifestDigest: input.nextOwner.executionManifestDigest,
     workerId: input.nextOwner.workerId,
@@ -273,13 +327,10 @@ export async function transferFactoryRecoveryWorkspace(input: {
     leaseId: input.nextOwner.leaseId,
     updatedAt: Date.now(),
   };
-  await rename(previousPath, nextPath);
-  try {
-    await writeManifest(nextPath, transferred);
-  } catch (error) {
-    await rename(nextPath, previousPath).catch(() => undefined);
-    throw error;
-  }
+  // Commit the complete new identity atomically before removing the terminated
+  // source proof. Any interruption leaves at least one exact recoverable record.
+  await writeManifest(nextPath, transferred);
+  if (source) await unlink(previousPath);
   return transferred;
 }
 
@@ -432,7 +483,7 @@ function validateOwner(owner: FactoryWorkspaceOwner) {
   assertWorktreeBoundary(owner.checkoutRoot, owner.worktree);
 }
 
-function assertExactOwner(manifest: FactoryWorkspaceOwnershipManifest, owner: FactoryWorkspaceOwner) {
+function assertExactOwner(manifest: FactoryWorkspaceOwner, owner: FactoryWorkspaceOwner) {
   const fields: Array<keyof FactoryWorkspaceOwner> = [
     "repositoryIdentity", "workflowRunId", "workerId", "workerSessionId", "workerGeneration",
     "leaseId", "branch", "worktree", "checkoutRoot", "executionManifestDigest", "baseSha", "sandboxId",

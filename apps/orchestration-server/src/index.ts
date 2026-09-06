@@ -47,6 +47,7 @@ import {
   mintInstallationToken,
 } from "./githubAppRuntime.js";
 import { configuredFactoryHarnessAdapters } from "./factoryHarnessComposition.js";
+import { loadFabExecutorAdapter } from "./fabExecutorAdapter.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
 import { MissionPlanningWorker } from "./missionPlanningWorker.js";
 import {
@@ -57,6 +58,11 @@ import {
 import { resolvePersonaPath, safeClientError } from "./orchestrationSecurity.js";
 import os from "node:os";
 
+// Fab enrollment/configuration is explicit startup input. Capture its selected source
+// before MC's legacy dotenv loading so repository dotenv cannot enroll or override it.
+const configuredFabAdapter = process.env.FAB_EXECUTOR_ENABLED === "1"
+  ? loadFabExecutorAdapter(requiredRuntimeSetting("FAB_EXECUTOR_CONFIG"), requiredRuntimeSetting("FAB_EXECUTOR_STATE_DIR"))
+  : undefined;
 const envSearchPaths = [
   path.resolve(process.cwd(), ".env.local"),
   path.resolve(process.cwd(), ".env"),
@@ -83,7 +89,7 @@ const AUTOMATION_REPOSITORY_ROOT = path.resolve(process.env.AUTOMATION_REPOSITOR
 const CODEX_FACTORY_WORKER_ENABLED = process.env.CODEX_FACTORY_WORKER_ENABLED === "true";
 const DEEPSEEK_HARNESS_EXECUTOR_ENABLED = process.env.DEEPSEEK_HARNESS_EXECUTOR_ENABLED === "1";
 const LEGACY_FACTORY_WORKER_ENABLED = process.env.FACTORY_EXECUTION_ENABLED === "1";
-const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED;
+const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED || Boolean(configuredFabAdapter);
 const FACTORY_WORKER_SCOPE = DURABLE_FACTORY_WORKER_ENABLED
   ? {
       projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"),
@@ -116,11 +122,11 @@ if (CONVEX_SERVICE_AUTH_TOKEN) {
   client.setAuth(CONVEX_SERVICE_AUTH_TOKEN);
 }
 const factoryHarnessRegistry = new HarnessAdapterRegistry(
-  configuredFactoryHarnessAdapters({
+  [...configuredFactoryHarnessAdapters({
     codexEnabled: CODEX_FACTORY_WORKER_ENABLED,
     deepseekEnabled: DEEPSEEK_HARNESS_EXECUTOR_ENABLED,
     legacyFactoryWorkerEnabled: LEGACY_FACTORY_WORKER_ENABLED,
-  }),
+  }), ...(configuredFabAdapter ? [configuredFabAdapter] : [])],
 );
 let occupiedFactoryWorkerSlots = 0;
 const tryAcquireFactoryWorkerSlot = () => {

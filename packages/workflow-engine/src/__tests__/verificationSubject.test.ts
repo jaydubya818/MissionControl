@@ -3,6 +3,8 @@ import { canonicalVerificationJson, verificationContractDigest, verificationSha2
 import {
   createAutomationVerificationSubject,
   createGitVerificationSubject,
+  createPrepublicationGitVerificationSubject,
+  verifyVerificationSubjectIdentity,
   normalizeAttemptPurpose,
   normalizeFactoryPurpose,
   normalizeWorkOrderKind,
@@ -41,6 +43,26 @@ function gitSubject(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Verification Subject identity", () => {
+  it("rejects unrecognized legacy providers and kinds before digest creation", () => {
+    for (const override of [{ provider: "OTHER", localRef: { baseRef: "main", headRef: "mc/candidate", headSha: SHA_A } }, { kind: "OTHER" }]) {
+      expect(() => gitSubject(override)).toThrow(/supported kind and provider/);
+      expect(verifyVerificationSubjectIdentity({ ...gitSubject(), ...override } as any)).toBe(false);
+    }
+  });
+  it("binds every pre-publication identity field while preserving the historical v1 route", () => {
+    const { subjectId: _id, digest: _digest, pullRequest, ...identity } = gitSubject();
+    const subject = createPrepublicationGitVerificationSubject({ ...identity, version: 2, baseSha: "c".repeat(40), rawDiffSha256: HASH_B,
+      baseRef: pullRequest.baseRef, headRef: pullRequest.headRef });
+    expect(verifyVerificationSubjectIdentity(subject)).toBe(true);
+    expect(verifyVerificationSubjectIdentity(gitSubject())).toBe(true);
+    for (const changed of [{ workOrderId: "other" }, { workOrderRevisionNumber: 3 }, { verificationContractDigest: HASH_A },
+      { sourceAttemptId: "other" }, { repositoryId: "other" }, { providerRepositoryId: "other" }, { provider: "OTHER" },
+      { candidateSha: "e".repeat(40) }, { treeSha: "e".repeat(40) }, { baseSha: "e".repeat(40) },
+      { rawDiffSha256: HASH_A }, { baseRef: "release" }, { headRef: "mc/other" }]) {
+      expect(verifyVerificationSubjectIdentity({ ...subject, ...changed } as any)).toBe(false);
+    }
+    expect(() => createPrepublicationGitVerificationSubject({ ...subject, pullRequest } as any)).toThrow("without a pull request");
+  });
   it("uses canonical JSON and standards-compatible SHA-256", () => {
     expect(canonicalVerificationJson({ z: 1, a: { y: 2, x: 3 } })).toBe('{"a":{"x":3,"y":2},"z":1}');
     expect(verificationSha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");

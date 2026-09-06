@@ -93,17 +93,36 @@ jobs:
 
   unit-tests:
     name: Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      # Fab permits Cellar/system check executables; setup-node's tool cache is outside that boundary.
+      - name: Select Homebrew Node 24 for contained checks
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: |
+          brew install node@24
+          echo /opt/homebrew/opt/node@24/bin >> "$GITHUB_PATH"
+          /opt/homebrew/opt/node@24/bin/node -e 'const fs = require("node:fs"); const p = fs.realpathSync(process.execPath); if (process.platform !== "darwin" || process.arch !== "arm64" || !process.version.startsWith("v24.") || !p.startsWith("/opt/homebrew/Cellar/")) process.exit(1); console.log(JSON.stringify({version:process.version, path:p, sha256:require("node:crypto").createHash("sha256").update(fs.readFileSync(p)).digest("hex")}));'
+
+      # The worker deliberately scrubs PATH; expose only the action-provisioned pnpm there.
+      - name: Provision pnpm for frozen offline worker checks
+        run: |
+          # Link the package entrypoint: the .bin shell shim resolves paths relative to $0.
+          pnpm_entry="$PNPM_HOME/../pnpm/bin/pnpm.cjs"
+          test -f "$pnpm_entry"
+          ln -sf "$pnpm_entry" /opt/homebrew/bin/pnpm
+          /opt/homebrew/bin/pnpm --version
 
       - name: Install dependencies
         run: |
@@ -247,7 +266,7 @@ jobs:
 
   system-qualification-v2:
     name: System Qualification V2
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -256,10 +275,29 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      # Fab permits Cellar/system check executables; setup-node's tool cache is outside that boundary.
+      - name: Select Homebrew Node 24 for contained checks
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: |
+          brew install node@24
+          echo /opt/homebrew/opt/node@24/bin >> "$GITHUB_PATH"
+          /opt/homebrew/opt/node@24/bin/node -e 'const fs = require("node:fs"); const p = fs.realpathSync(process.execPath); if (process.platform !== "darwin" || process.arch !== "arm64" || !process.version.startsWith("v24.") || !p.startsWith("/opt/homebrew/Cellar/")) process.exit(1); console.log(JSON.stringify({version:process.version, path:p, sha256:require("node:crypto").createHash("sha256").update(fs.readFileSync(p)).digest("hex")}));'
+
+      # The worker deliberately scrubs PATH; expose only the action-provisioned pnpm there.
+      - name: Provision pnpm for frozen offline worker checks
+        run: |
+          # Link the package entrypoint: the .bin shell shim resolves paths relative to $0.
+          pnpm_entry="$PNPM_HOME/../pnpm/bin/pnpm.cjs"
+          test -f "$pnpm_entry"
+          ln -sf "$pnpm_entry" /opt/homebrew/bin/pnpm
+          /opt/homebrew/bin/pnpm --version
 
       - name: Install frozen dependency graph
         run: pnpm install --frozen-lockfile
@@ -268,3 +306,4 @@ jobs:
         run: pnpm run qualify:factory:v2
         env:
           CI: true
+          MC_QUALIFICATION_EVIDENCE_SLUG: fab-phase3-ci

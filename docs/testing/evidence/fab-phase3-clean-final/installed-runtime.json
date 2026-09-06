@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "fab-clean-installed-runtime/v1",
+  "result": "PASS",
+  "sourceCommit": "f5ed5d10ac58ba4472eddd882a06406fd96d9830",
+  "archiveSha256": "b3a1af223e246208c01745678cbe48a91786070b016b9a1ad7bdb0ad274d8a8d",
+  "runtime": {
+    "schemaVersion": "harness-runtime-artifact/v1",
+    "kind": "EXECUTABLE",
+    "name": "fab-node-runtime",
+    "version": "0.1.0-experimental.2+node.24.18.1.darwin.arm64",
+    "executableSha256": "c737851f0133bee398fa36d3a1b06e99eb4d27bd3ff877cbd5ca611a67d5a768",
+    "closureSha256": "121ef8e14b085f6dba6e7f5598070ad80e79f5c1bfa5c71b890871bf83214999",
+    "imageDigest": null
+  }
+}

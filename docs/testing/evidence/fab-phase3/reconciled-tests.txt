@@ -1,0 +1,115 @@
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mission-control
+
+ ✓ apps/orchestration-server/src/__tests__/factoryPathScope.test.ts (3 tests) 2ms
+ ✓ packages/workflow-engine/src/__tests__/verificationAuthority.test.ts (27 tests) 13ms
+ ✓ apps/orchestration-server/src/__tests__/githubAppRuntime.test.ts (10 tests) 12ms
+ ✓ apps/orchestration-server/src/__tests__/fabRuntimeIdentity.test.ts (2 tests) 31ms
+ ✓ apps/orchestration-server/src/__tests__/factoryVerification.test.ts (2 tests) 78ms
+ ✓ apps/orchestration-server/src/__tests__/githubAppPublisher.test.ts (6 tests) 228ms
+ ✓ packages/workflow-engine/src/__tests__/verificationSubject.test.ts (8 tests) 9ms
+ ✓ packages/workflow-engine/src/__tests__/verificationCurrentness.test.ts (16 tests) 9ms
+ ✓ apps/orchestration-server/src/__tests__/sandboxCredentials.test.ts (3 tests) 12ms
+ ✓ packages/workflow-engine/src/__tests__/verificationIndependence.test.ts (9 tests) 10ms
+ ✓ convex/__tests__/factoryWorkerRuntime.test.ts (13 tests) 16ms
+ ✓ convex/__tests__/executionWorkerAuthority.test.ts (4 tests) 4ms
+ ✓ apps/orchestration-server/src/__tests__/harnessAdapterRegistry.test.ts (7 tests) 5ms
+ ✓ convex/__tests__/workOrderGovernance.test.ts (12 tests) 3ms
+ ✓ convex/__tests__/verificationPersistence.test.ts (5 tests) 3ms
+ ✓ convex/__tests__/factoryHumanReview.test.ts (11 tests) 2ms
+ ✓ apps/orchestration-server/src/__tests__/factoryVerificationAuthority.test.ts (8 tests) 673ms
+ ✓ apps/orchestration-server/src/__tests__/auth.test.ts (6 tests) 2ms
+ ✓ convex/__tests__/executionRecovery.test.ts (3 tests) 6ms
+ ✓ apps/orchestration-server/src/__tests__/sandboxReconciler.test.ts (3 tests) 8ms
+ ✓ convex/__tests__/factoryRuntimeGoldenPath.test.ts (2 tests) 14ms
+ ✓ convex/__tests__/serviceCommandAuth.test.ts (7 tests) 2ms
+ ✓ convex/__tests__/factoryCandidateBaseAuthority.test.ts (11 tests) 30ms
+ ✓ apps/orchestration-server/src/__tests__/factoryAttemptWorkerRemote.test.ts (2 tests) 550ms
+   ✓ FactoryAttemptWorker remote Sandbox backend > runs beneath the canonical worker lease, verifies on the host, cleans up, and only then publishes one PR  548ms
+ ✓ apps/orchestration-server/src/__tests__/factoryWorkspaceOwnership.test.ts (10 tests) 1912ms
+   ✓ Factory workspace ownership > transfers a finished in-process invocation but preserves unknown execution after a crash  417ms
+ ✓ apps/orchestration-server/src/__tests__/factoryGitRuntime.test.ts (5 tests) 1900ms
+   ✓ Factory Git runtime > creates and reconciles the exact worktree branch across retries  1004ms
+   ✓ Factory Git runtime > never loads candidate pnpm hooks or lifecycle scripts during offline preparation  423ms
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > persists the policy-v2 candidate checkpoint before a GitHub credential publication failure
+[factory-worker] Attempt factory-run-1 failed: GitHub App runtime credentials are not configured.
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > denies local recovery when the clean worktree no longer matches the durable source checkpoint
+[factory-worker] Attempt factory-run-1 failed: Local candidate recovery workspace does not match the durable source Attempt checkpoint.
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 profile bytes are substituted after admission
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 claim evidence is missing or substituted
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > rejects a V3 qualification already stale at the server claim instant
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different runtime executable
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when legacy V1 normalized provenance reports a different runtime executable
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different provider route
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+ ✓ apps/orchestration-server/src/__tests__/fabExecutorAdapter.test.ts (13 tests) 7393ms
+   ✓ Fab canonical MC harness conformance > requires durable request evidence before dispatch and records in-process lifecycle  664ms
+   ✓ Fab canonical MC harness conformance > produces real checked edits, canonical evidence and candidate linkage without acceptance authority  1084ms
+   ✓ Fab canonical MC harness conformance > rejects injected path or authority ../escape.mjs  762ms
+   ✓ Fab canonical MC harness conformance > rejects injected path or authority .env  786ms
+   ✓ Fab canonical MC harness conformance > rejects injected path or authority src/credentials.json  749ms
+   ✓ Fab canonical MC harness conformance > rejects injected path or authority self-approval  736ms
+   ✓ Fab canonical MC harness conformance > preserves an actual killed worker's uncertain model request and refuses its replay  619ms
+   ✓ Fab canonical MC harness conformance > cancels during model execution and prevents successful handoff  304ms
+   ✓ Fab canonical MC harness conformance > cancels during check execution and prevents successful handoff  600ms
+   ✓ Fab canonical MC harness conformance > fails closed when lease authority is lost after an observed tool  458ms
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > fences publication at intent-expiry
+[factory-worker] Attempt factory-run-1 failed: Publication permit is missing or expired for candidate ce1d8552745d.
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > fences publication at lease-loss-after-push
+[factory-worker] Attempt factory-run-1 failed: Attempt authority was lost or cancelled.
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > reconciles lost-provider-response after permit expiry without provider writes or model replay
+[factory-worker] Attempt factory-run-1 failed: Fixture provider outcome uncertain after request
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > reconciles lost-terminal-response after permit expiry without provider writes or model replay
+[factory-worker] Attempt factory-run-1 failed: Controlled terminal response loss after workspace cleanup
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > denies publication when MC's final authority check rejects the lease
+[factory-worker] Attempt factory-run-1 failed: Control plane did not authorize pull-request publication.
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect
+[factory-worker] Attempt factory-run-1 failed: Fixture provider outcome uncertain after request
+
+stderr | apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect
+[factory-worker] Attempt factory-run-1 failed: Workspace ownership tuple mismatch; workspace was preserved.
+
+ ✓ apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts (36 tests) 18208ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > turns governed issue intent into a verified, evidence-linked pull request  472ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > injects profile-bound governed MCP output as untrusted pre-harness context  464ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > completes a non-mutating candidate as durable evidence without provider publication  335ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > executes an independently registered harness identity through the unchanged governed lifecycle  392ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > uses only the frozen V2 provider/model route and ignores a mutable claim model override  376ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > publishes an ordinary policy-v2 candidate through the governed provider path  334ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > constructs the worker from the exact frozen V3 Execution Profile  380ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > uses the server claim instant for V3 expiry so an admitted lease may finish  331ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > completes the durable worker golden path and cleans only its proven worktree  375ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > does not create a pull request when the control plane rejects the verification packet  336ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > pauses for human review and resumes publication without rerunning Codex or verification  428ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > persists a verification mismatch, blocks publication, and recovers with a new immutable Attempt  648ms
+   ✓ Fab governed golden path using the canonical MC worker > fences publication at intent-expiry  1432ms
+   ✓ Fab governed golden path using the canonical MC worker > fences publication at lease-loss-after-push  1435ms
+   ✓ Fab governed golden path using the canonical MC worker > reconciles lost-provider-response after permit expiry without provider writes or model replay  1608ms
+   ✓ Fab governed golden path using the canonical MC worker > reconciles lost-terminal-response after permit expiry without provider writes or model replay  1480ms
+   ✓ Fab governed golden path using the canonical MC worker > pauses without a PR, verifies a v2 subject separately, then transfers the owned workspace for approved draft publication  1442ms
+   ✓ Fab governed golden path using the canonical MC worker > links a real Fab candidate to a separate exact-subject verifier, approval and fixture publication  1340ms
+   ✓ Fab governed golden path using the canonical MC worker > denies publication when MC's final authority check rejects the lease  1177ms
+   ✓ Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect  1251ms
+
+ Test Files  28 passed (28)
+      Tests  244 passed (244)
+   Start at  16:33:30
+   Duration  19.59s (transform 1.86s, setup 0ms, collect 6.44s, tests 31.14s, environment 3ms, prepare 1.58s)

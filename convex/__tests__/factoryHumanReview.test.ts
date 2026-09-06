@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  factoryReviewReceiptMatchesSource,
   factoryHumanReviewOutcome,
   isFactoryHumanReviewCheckpoint,
   isSourceVerificationFreshForPublication,
@@ -9,6 +10,16 @@ import {
 } from "../lib/factoryHumanReview.js";
 
 describe("factory human-review continuation", () => {
+  it("binds a v2 human review to the separate verifier identity and exact source subject", () => {
+    const run = { _id: "builder", verificationSubject: { kind: "GIT_CANDIDATE", version: 2, digest: "subject", verificationContractDigest: "contract", candidateSha: "candidate" } };
+    const receipt = { workflowRunId: "verifier", verificationAttemptId: "verifier", sourceAttemptId: "builder",
+      verificationSubjectDigest: "subject", verificationContractDigest: "contract", candidateRevision: "candidate", independenceValid: true };
+    expect(factoryReviewReceiptMatchesSource(run, receipt)).toBe(true);
+    for (const replacement of [{ workflowRunId: "builder" }, { verificationAttemptId: "other" }, { sourceAttemptId: "other" },
+      { verificationSubjectDigest: "other" }, { verificationContractDigest: "other" }, { candidateRevision: "other" }, { independenceValid: false }]) {
+      expect(factoryReviewReceiptMatchesSource(run, { ...receipt, ...replacement })).toBe(false);
+    }
+  });
   it("resumes only an unconditional approval", () => {
     expect(factoryHumanReviewOutcome("APPROVE")).toBe("RESUME_PUBLISH");
     expect(factoryHumanReviewOutcome("APPROVE_WITH_CONDITIONS")).toBe("FAIL_ATTEMPT");

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -83,17 +84,38 @@ export async function prepareFactoryDependencies(
 }
 
 async function installFrozenPnpmDependencies(worktree: string) {
+  const scratchHome = await mkdtemp(path.join(tmpdir(), "mc-dependency-preparation-"));
   try {
+    // Operator configuration, never discovered from candidate npm configuration.
+    const configuredStore = process.env.MISSION_CONTROL_FACTORY_PNPM_STORE_DIR;
+    if (configuredStore && !path.isAbsolute(configuredStore)) throw new Error("MISSION_CONTROL_FACTORY_PNPM_STORE_DIR must be absolute.");
+    const storeDirectory = configuredStore ? await realpath(configuredStore) : path.join(scratchHome, "store");
+    const candidateRoot = await realpath(worktree);
+    if (storeDirectory === candidateRoot || storeDirectory.startsWith(`${candidateRoot}${path.sep}`)) {
+      throw new Error("The offline dependency store must be outside the candidate worktree.");
+    }
     await execFileAsync("pnpm", [
       "install",
       "--offline",
       "--frozen-lockfile",
       "--ignore-scripts",
+      "--ignore-pnpmfile",
+      "--config.userconfig=/dev/null",
+      "--config.globalconfig=/dev/null",
+      "--config.manage-package-manager-versions=false",
+      "--config.side-effects-cache=false",
+      `--store-dir=${storeDirectory}`,
       "--reporter=silent",
     ], {
       cwd: worktree,
       env: {
-        ...process.env,
+        PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        HOME: scratchHome,
+        TMPDIR: scratchHome,
+        COREPACK_ENABLE_NETWORK: "0",
+        COREPACK_ENABLE_PROJECT_SPEC: "0",
+        COREPACK_ENABLE_AUTO_PIN: "0",
+        ...(process.env.COREPACK_HOME ? { COREPACK_HOME: process.env.COREPACK_HOME } : {}),
         CI: "1",
         npm_config_ignore_scripts: "true",
         NPM_CONFIG_IGNORE_SCRIPTS: "true",
@@ -104,6 +126,8 @@ async function installFrozenPnpmDependencies(worktree: string) {
   } catch (error: any) {
     const detail = `${error?.stderr ?? error?.stdout ?? error?.message ?? "unknown error"}`.trim();
     throw new Error(`Factory dependency preparation failed in frozen offline mode${detail ? `: ${detail.slice(-2_000)}` : "."}`);
+  } finally {
+    await rm(scratchHome, { recursive: true, force: true });
   }
 }
 
@@ -126,14 +150,15 @@ export async function inspectCandidateChange(worktree: string, baseRevisionOrDef
     ?? (/^[0-9a-f]{40,64}$/i.test(baseRevisionOrDefaultBranch)
       ? baseRevisionOrDefaultBranch
       : await resolveBaseReference(worktree, baseRevisionOrDefaultBranch));
+  await runGit(worktree, ["merge-base", "--is-ancestor", baseReference, "HEAD"]);
   const [sourceRevision, candidateRevision, treeRevision, changed, deleted, numstat, diff] = await Promise.all([
     runGit(worktree, ["rev-parse", baseReference]),
     runGit(worktree, ["rev-parse", "HEAD"]),
     runGit(worktree, ["rev-parse", "HEAD^{tree}"]),
-    runGit(worktree, ["diff", "--name-only", "-z", `${baseReference}...HEAD`]),
-    runGit(worktree, ["diff", "--diff-filter=D", "--name-only", "-z", `${baseReference}...HEAD`]),
-    runGit(worktree, ["diff", "--numstat", `${baseReference}...HEAD`]),
-    runGit(worktree, ["diff", "--no-ext-diff", "--unified=3", `${baseReference}...HEAD`]),
+    runGit(worktree, ["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--name-only", "-z", baseReference, "HEAD", "--"]),
+    runGit(worktree, ["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--diff-filter=D", "--name-only", "-z", baseReference, "HEAD", "--"]),
+    runGit(worktree, ["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--numstat", baseReference, "HEAD", "--"]),
+    runGit(worktree, ["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--unified=3", baseReference, "HEAD", "--"]),
   ]);
   let linesAdded = 0;
   let linesDeleted = 0;
@@ -142,10 +167,15 @@ export async function inspectCandidateChange(worktree: string, baseRevisionOrDef
     if (/^\d+$/.test(added ?? "")) linesAdded += Number(added);
     if (/^\d+$/.test(removed ?? "")) linesDeleted += Number(removed);
   }
+  const raw = await execFileAsync("/usr/bin/git", ["-c", "core.fsmonitor=false", "diff", "--raw", "--no-abbrev", "-z", "--no-renames", "--no-ext-diff", "--no-textconv", sourceRevision.stdout.trim(), candidateRevision.stdout.trim(), "--"], {
+    cwd: worktree, encoding: "buffer", maxBuffer: 20 * 1024 * 1024,
+    env: { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
+  });
   return {
     sourceRevision: sourceRevision.stdout.trim(),
     candidateRevision: candidateRevision.stdout.trim(),
     treeRevision: treeRevision.stdout.trim(),
+    rawDiffSha256: `sha256:${createHash("sha256").update(raw.stdout).digest("hex")}`,
     changedFiles: splitNull(changed.stdout).sort(),
     deletedFiles: splitNull(deleted.stdout).sort(),
     linesAdded,
@@ -263,6 +293,8 @@ export async function pushFactoryBranch(input: {
   repository: string;
   branch: string;
   installationToken: string;
+  signal?: AbortSignal;
+  assertWriteAllowed?: () => Promise<void>;
 }) {
   assertFactoryBranch(input.branch);
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(input.repository)) throw new Error("GitHub repository identity is invalid.");
@@ -278,6 +310,8 @@ export async function pushFactoryBranch(input: {
       "",
     ].join("\n"), { encoding: "utf8", mode: 0o700 });
     await chmod(helperPath, 0o700);
+    await input.assertWriteAllowed?.();
+    input.signal?.throwIfAborted();
     await runGit(input.worktree, [
       "push",
       `https://github.com/${input.repository}.git`,
@@ -286,7 +320,7 @@ export async function pushFactoryBranch(input: {
       GIT_ASKPASS: helperPath,
       GIT_TERMINAL_PROMPT: "0",
       MC_GITHUB_INSTALLATION_TOKEN: input.installationToken,
-    });
+    }, input.signal);
   } finally {
     await rm(helperDirectory, { recursive: true, force: true });
   }
@@ -343,12 +377,13 @@ function assertFactoryBranch(branch: string) {
   }
 }
 
-async function runGit(cwd: string, args: string[], additionalEnv?: Record<string, string>) {
+async function runGit(cwd: string, args: string[], additionalEnv?: Record<string, string>, signal?: AbortSignal) {
   try {
     return await execFileAsync("git", args, {
       cwd,
       env: { ...process.env, ...additionalEnv },
       maxBuffer: 20 * 1024 * 1024,
+      signal,
     });
   } catch (cause: any) {
     const detail = String(cause?.stderr ?? cause?.message ?? "Git command failed")
