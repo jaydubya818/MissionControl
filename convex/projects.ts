@@ -1033,6 +1033,21 @@ export const remove = mutation({
       };
     }
 
+    // Incident Command evidence is retained and must never be orphaned by a
+    // force-delete. Archival/tombstoning is a separate governed capability.
+    const [incident, dispatchControl, controlReceipt, controlAuthorization] = await Promise.all([
+      ctx.db.query("factoryIncidents").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).first(),
+      ctx.db.query("repositoryDispatchControls").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).first(),
+      ctx.db.query("factoryIncidentControlReceipts").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).first(),
+      ctx.db.query("factoryIncidentControlAuthorizations").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).first(),
+    ]);
+    if (incident || dispatchControl || controlReceipt || controlAuthorization) {
+      return {
+        success: false,
+        error: "Project has retained Incident Command history and cannot be deleted. Governed archival is required.",
+      };
+    }
+
     // Convex does not enforce foreign keys. Delete the additive repository
     // configuration in the same mutation so workspace removal cannot leave
     // orphaned code scopes or repository connections behind.

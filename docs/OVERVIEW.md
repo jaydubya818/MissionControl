@@ -158,8 +158,9 @@ broker now qualifies the local Phase 3 fixture plus one exact Context7
 not admit writes, dynamic authority, connector breadth, or general harness MCP
 support. Shared QA/product/design intent is qualified behind its default-off
 flag, and Factory Incident Command now has an Experimental deterministic control
-plane with separate containment and restoration decisions. Real named-commander
-incident evidence and outcome-aware routing remain later promotion work.
+plane with separate containment and restoration decisions. One bounded local
+repository-dispatch canary is retained at v53; authenticated Production
+acceptance and outcome-aware routing remain later promotion work.
 
 ### The developer becomes an operator
 
@@ -203,8 +204,11 @@ reconciliation, and accepted-outcome economics contracts. Fab adds exact candida
 verification and publication bindings plus read-only candidate recovery. Todo 062
 adds default-off attributable shared-intent proposals and human decisions. Pilot
 readiness adds exact revision-bound WorkOrder inspection. Factory Incident
-Command adds the append-only lifecycle and signed detect/propose boundary; v49
-clients fail closed through the existing compatibility check.
+Command adds the append-only lifecycle and signed detect/propose boundary. v53
+adds the one narrow repository-dispatch pause/resume actuator, durable request
+and restoration authority, separate executor acknowledgment, independent
+effect observation, and shared dispatch admission gate; older clients fail
+closed through the existing compatibility check.
 
 Inference receipt v3 retains valid observed overruns and route drift with explicit
 violation codes and ESTIMATED/UNKNOWN monetary classification. A WorkOrder fence

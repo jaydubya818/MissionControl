@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FactoryIncidentBoundary,
@@ -88,6 +88,64 @@ describe("FactoryIncidentWorkspace", () => {
     expect(screen.getByLabelText("Control acknowledgment receipts")).toBeInTheDocument();
     expect(screen.getByLabelText("Observed control effects")).toBeInTheDocument();
     expect(screen.getByText(/require three distinct receipts/i)).toBeInTheDocument();
+  });
+
+  it("renders persisted pause command, acknowledgment, and observation as distinct stages", async () => {
+    const clarifyIncident = {
+      ...incident,
+      repositoryId: "repository-1",
+      phase: "CLARIFY",
+      status: "OPEN",
+      currentSequence: 1,
+    };
+    useQuery.mockImplementation((reference, args) => {
+      if (args && typeof args === "object" && "repositoryId" in args) {
+        return {
+          admission: "DENIED",
+          generation: 1,
+          activeRequestId: "request-1",
+          restorationAuthorizations: [],
+          receipts: [
+            { _id: "effect-1", receiptType: "EFFECT_OBSERVED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 4 },
+            { _id: "ack-1", receiptType: "ACKNOWLEDGED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 3 },
+            { _id: "command-1", receiptType: "COMMAND_ISSUED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 2 },
+            { _id: "requested-1", receiptType: "COMMAND_REQUESTED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 1 },
+          ],
+        };
+      }
+      return args && typeof args === "object" && "incidentId" in args
+        ? { incident: clarifyIncident, transitions: [], proposals: [] }
+        : [clarifyIncident];
+    });
+    render(<FactoryIncidentWorkspace projectId={"project-1" as any} />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Advance to Contain" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("checkbox", { name: "Pause repository dispatch" }));
+    const evidence = within(screen.getByLabelText("Repository dispatch control evidence"));
+    expect(evidence.getByText("Repository dispatch: Paused")).toBeInTheDocument();
+    expect(evidence.getByText("Command requested").parentElement).toHaveTextContent("requested-1");
+    expect(evidence.getByText("Command executed").parentElement).toHaveTextContent("command-1");
+    expect(evidence.getByText("Acknowledged").parentElement).toHaveTextContent("ack-1");
+    expect(evidence.getByText("Effect observed").parentElement).toHaveTextContent("effect-1");
+  });
+
+  it("offers a fresh request after an expired persisted lineage", async () => {
+    const clarifyIncident = { ...incident, repositoryId: "repository-1", phase: "CLARIFY", status: "OPEN", currentSequence: 1 };
+    useQuery.mockImplementation((_reference, args) => {
+      if (args && typeof args === "object" && "repositoryId" in args) return {
+        admission: "ENABLED", generation: 0, activeRequestId: "expired-request", restorationAuthorizations: [],
+        receipts: [{
+          _id: "expired", receiptType: "COMMAND_REQUESTED", operation: "PAUSE_REPOSITORY_DISPATCH",
+          requestId: "expired-request", authoritySequence: 1, authorityExpiresAt: Date.now() - 1, createdAt: 1,
+        }],
+      };
+      return args && typeof args === "object" && "incidentId" in args
+        ? { incident: clarifyIncident, transitions: [], proposals: [] }
+        : [clarifyIncident];
+    });
+    render(<FactoryIncidentWorkspace projectId={"project-1" as any} />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Advance to Contain" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("checkbox", { name: "Pause repository dispatch" }));
+    expect(screen.getByRole("button", { name: "Request pause command" })).toBeInTheDocument();
   });
 
   it("renders an explicit denied or degraded access state", () => {

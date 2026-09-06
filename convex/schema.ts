@@ -71,6 +71,11 @@ import {
   factoryIncidentProposalKindValidator,
   factoryIncidentSeverityValidator,
 } from "./lib/factoryIncident";
+import {
+  factoryIncidentControlReceiptTypeValidator,
+  repositoryDispatchAdmissionValidator,
+  repositoryDispatchOperationValidator,
+} from "./lib/factoryIncidentControl";
 
 // ============================================================================
 // ENUMS (as union types)
@@ -8745,6 +8750,73 @@ export const schemaTablesPartTwo = {
     .index("by_project_source", ["projectId", "sourceFingerprint"])
     .index("by_repository", ["repositoryId", "updatedAt"])
     .index("by_incident_key", ["incidentKey"]),
+
+  // Restart-safe repository dispatch admission. Absence means ENABLED; a row
+  // exists only after the first canonical Incident Command actuation.
+  repositoryDispatchControls: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    repositoryId: v.id("workspaceRepositories"),
+    admission: repositoryDispatchAdmissionValidator,
+    // Incident that last changed or reaffirmed this projection. Retained after
+    // resume so an expired restoration observation can be safely reissued.
+    controlledByIncidentId: v.optional(v.id("factoryIncidents")),
+    activeRequestId: v.optional(v.string()),
+    generation: v.number(),
+    updatedBy: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_repository", ["repositoryId"])
+    .index("by_project", ["projectId", "updatedAt"]),
+
+  // Durable, current, incident-scoped authority that must precede restoration.
+  factoryIncidentControlAuthorizations: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    repositoryId: v.id("workspaceRepositories"),
+    incidentId: v.id("factoryIncidents"),
+    operation: v.literal("RESUME_REPOSITORY_DISPATCH"),
+    authorityActorId: v.string(),
+    authoritySequence: v.number(),
+    authorityExpiresAt: v.number(),
+    idempotencyKey: v.string(),
+    reason: v.string(),
+    consumedByRequestId: v.optional(v.string()),
+    consumedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_incident_sequence", ["incidentId", "authoritySequence", "createdAt"])
+    .index("by_project", ["projectId", "createdAt"])
+    .index("by_incident_idempotency", ["incidentId", "idempotencyKey"]),
+
+  // Append-only command/ack/effect evidence. Only the independent observer
+  // may produce EFFECT_OBSERVED rows.
+  factoryIncidentControlReceipts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    repositoryId: v.id("workspaceRepositories"),
+    incidentId: v.id("factoryIncidents"),
+    controlKey: v.literal("PAUSE_REPOSITORY_DISPATCH"),
+    operation: repositoryDispatchOperationValidator,
+    receiptType: factoryIncidentControlReceiptTypeValidator,
+    requestId: v.string(),
+    authorityActorId: v.string(),
+    authoritySequence: v.number(),
+    authorityExpiresAt: v.number(),
+    producerId: v.string(),
+    initiatedByActorId: v.optional(v.string()),
+    restorationAuthorizationId: v.optional(v.id("factoryIncidentControlAuthorizations")),
+    expectedAdmission: repositoryDispatchAdmissionValidator,
+    observedAdmission: v.optional(repositoryDispatchAdmissionValidator),
+    predecessorReceiptId: v.optional(v.id("factoryIncidentControlReceipts")),
+    result: v.union(v.literal("PASS"), v.literal("FAIL")),
+    runtimeContractVersion: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_incident", ["incidentId", "createdAt"])
+    .index("by_project", ["projectId", "createdAt"])
+    .index("by_repository", ["repositoryId", "createdAt"])
+    .index("by_incident_request_type", ["incidentId", "requestId", "receiptType"]),
 
   factoryIncidentTransitions: defineTable({
     tenantId: v.optional(v.id("tenants")),

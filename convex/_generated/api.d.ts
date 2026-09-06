@@ -58,6 +58,8 @@ import type * as factory_executionProfiles from "../factory/executionProfiles.js
 import type * as factory_githubCi from "../factory/githubCi.js";
 import type * as factory_governedMcp from "../factory/governedMcp.js";
 import type * as factory_health from "../factory/health.js";
+import type * as factory_incidentControlObserver from "../factory/incidentControlObserver.js";
+import type * as factory_incidentControls from "../factory/incidentControls.js";
 import type * as factory_incidents from "../factory/incidents.js";
 import type * as factory_learning from "../factory/learning.js";
 import type * as factory_metaLoop from "../factory/metaLoop.js";
@@ -132,6 +134,7 @@ import type * as lib_factoryDispatch from "../lib/factoryDispatch.js";
 import type * as lib_factoryHealth from "../lib/factoryHealth.js";
 import type * as lib_factoryHumanReview from "../lib/factoryHumanReview.js";
 import type * as lib_factoryIncident from "../lib/factoryIncident.js";
+import type * as lib_factoryIncidentControl from "../lib/factoryIncidentControl.js";
 import type * as lib_factoryIncidentDrills from "../lib/factoryIncidentDrills.js";
 import type * as lib_factoryLearning from "../lib/factoryLearning.js";
 import type * as lib_factoryMemory from "../lib/factoryMemory.js";
@@ -401,6 +404,8 @@ declare const fullApi: ApiFromModules<{
   "factory/githubCi": typeof factory_githubCi;
   "factory/governedMcp": typeof factory_governedMcp;
   "factory/health": typeof factory_health;
+  "factory/incidentControlObserver": typeof factory_incidentControlObserver;
+  "factory/incidentControls": typeof factory_incidentControls;
   "factory/incidents": typeof factory_incidents;
   "factory/learning": typeof factory_learning;
   "factory/metaLoop": typeof factory_metaLoop;
@@ -475,6 +480,7 @@ declare const fullApi: ApiFromModules<{
   "lib/factoryHealth": typeof lib_factoryHealth;
   "lib/factoryHumanReview": typeof lib_factoryHumanReview;
   "lib/factoryIncident": typeof lib_factoryIncident;
+  "lib/factoryIncidentControl": typeof lib_factoryIncidentControl;
   "lib/factoryIncidentDrills": typeof lib_factoryIncidentDrills;
   "lib/factoryLearning": typeof lib_factoryLearning;
   "lib/factoryMemory": typeof lib_factoryMemory;

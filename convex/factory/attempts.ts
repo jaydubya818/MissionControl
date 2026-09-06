@@ -49,6 +49,7 @@ import {
   harnessRuntimeArtifactIssues,
 } from "@mission-control/workflow-engine/harness-contract";
 import { deriveVerificationIndependence } from "@mission-control/workflow-engine/verification-independence";
+import { requireRepositoryDispatchAdmission } from "./incidentControls";
 import { evaluateVerificationDecision } from "@mission-control/workflow-engine/verification-decision";
 import {
   compilePolicyV2VerificationPlan,
@@ -3154,6 +3155,7 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   if (!subject || !sourceAttempt.candidateReadyAt || !candidateSourceCanBeVerified(sourceAttempt)) {
     throw new Error("Verification scheduling requires a completed candidate-ready source Attempt.");
   }
+  await requireRepositoryDispatchAdmission(ctx, workOrder.projectId, sourceAttempt.repositoryId);
   const existing = (await ctx.db.query("workflowRuns")
     .withIndex("by_work_order_attempt_purpose", (q: any) => q.eq("workOrderId", workOrder._id).eq("attemptPurpose", "VERIFICATION"))
     .collect())

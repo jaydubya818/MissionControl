@@ -24,6 +24,7 @@ export const FACTORY_PERMISSIONS = {
   IMPROVE: "factory.improve",
   APPROVE: "factory.approve",
   MANAGE_AUTOMATION: "factory.automation.manage",
+  INCIDENT_CONTROL: "factory.incident.control",
 } as const;
 
 export type CompanyPermission =
@@ -222,6 +223,7 @@ function roleGrantsFactoryPermission(
       "deployments.activate",
       "settings.manage",
     ],
+    [FACTORY_PERMISSIONS.INCIDENT_CONTROL]: [],
   };
   return legacyPermissionAliases[permission].some((candidate) =>
     role.permissions.includes(candidate)
@@ -421,7 +423,8 @@ export async function listAccessibleWorkspaces(
 export async function requireWorkspacePermission(
   ctx: CompanyCtx,
   projectId: Id<"projects">,
-  permission: FactoryPermission
+  permission: FactoryPermission,
+  scope?: { repositoryId?: Id<"workspaceRepositories"> },
 ) {
   const project = await ctx.db.get(projectId);
   if (!project?.tenantId) {
@@ -453,7 +456,7 @@ export async function requireWorkspacePermission(
       permission,
     };
   }
-  const roles = await getOperatorRoles(ctx, operator, project.tenantId, { projectId });
+  const roles = await getOperatorRoles(ctx, operator, project.tenantId, { projectId, ...scope });
   const teamPermission = permission === FACTORY_PERMISSIONS.IMPROVE
     ? COMPANY_PERMISSIONS.UPDATE_DELIVERY
     : permission === FACTORY_PERMISSIONS.APPROVE
