@@ -82,8 +82,9 @@ Clarify → Contain → Observe → Isolate → Restore → Correct → Prevent 
   incident module never mutates grants, WorkOrders, or Attempts.
 - Ran authoritative Convex codegen against the isolated local deployment; the
   generated API required no manual edits.
-- Passed the 19-test focused incident suite, browser verification, and all 18
-  canonical System Factory E2E qualification gates against the v50 base.
+- Passed the 19-test focused incident suite, browser verification, and all 19
+  dedicated System Factory E2E qualification gates against the v50 base,
+  including historical V1 and V2 evidence immutability.
 
 **Learnings:**
 - An identifier-shaped string is not containment proof. The durable evidence

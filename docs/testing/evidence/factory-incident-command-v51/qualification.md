@@ -25,12 +25,15 @@ the repository to v51.
 
 ## Composed system qualification
 
-The canonical System Factory E2E runner passed all 18 gates. This included
+The dedicated System Factory E2E runner passed all 19 gates. This included
 release security and hardening, historical evidence immutability, 128
 execution-boundary tests, 204 cross-domain contracts, generic harness,
 verification-currentness, memory and UI contracts, the full repository test
 suite, TypeScript and skill lint, runtime-contract guard, production build,
 orchestration startup smoke, and whitespace integrity.
+
+The dedicated packet has one more gate than the canonical 18-gate run because
+it also proves that the historical V2 evidence directory is unchanged.
 
 The security gate accepted the repository's existing time-bounded dependency
 risks: production has zero critical, zero high, and two accepted moderate
