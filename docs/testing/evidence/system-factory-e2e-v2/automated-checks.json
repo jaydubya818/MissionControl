@@ -1,9 +1,9 @@
 {
   "schemaVersion": "system-factory-e2e-automated-checks/v2",
-  "baseSha": "ccacc5a9284e4141379c3a9b24304053749fd9f7",
-  "startedHead": "4def894fe1555cfe3e4fcc3faba87268f1f08d12",
-  "startedAt": "2026-09-06T19:17:02.219Z",
-  "completedAt": "2026-09-06T19:19:08.055Z",
+  "baseSha": "13ce5f0ef961e4e5f07dc78b43109231aa097270",
+  "startedHead": "b019d4467b6cf2015b4767cc328af16ae554e043",
+  "startedAt": "2026-09-06T20:56:54.694Z",
+  "completedAt": "2026-09-06T20:59:28.085Z",
   "result": "PASS",
   "checks": [
     {
@@ -11,126 +11,126 @@
       "command": "node --import tsx scripts/governed-mcp-phase3-qualification.mts",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 288
+      "durationMs": 297
     },
     {
       "name": "frozen dependency, advisory, credential, and release configuration gates",
       "command": "pnpm run release:security",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 4123
+      "durationMs": 4265
     },
     {
       "name": "release hardening contract tests",
       "command": "pnpm exec vitest run scripts/lib/dependency-audit-gate.test.mjs scripts/lib/factory-docs-consistency.test.mjs scripts/lib/production-pilot-preflight.test.mjs scripts/lib/production-pilot-evidence.test.mjs scripts/lib/repository-secret-scan.test.mjs scripts/lib/release-config.test.mjs",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 974
+      "durationMs": 1129
     },
     {
       "name": "historical V1 evidence immutability",
-      "command": "git diff --exit-code ccacc5a9284e4141379c3a9b24304053749fd9f7 -- docs/testing/evidence/system-factory-e2e-v1",
+      "command": "git diff --exit-code 13ce5f0ef961e4e5f07dc78b43109231aa097270 -- docs/testing/evidence/system-factory-e2e-v1",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 6
+      "durationMs": 7
     },
     {
       "name": "prepare canonical workspace packages",
       "command": "pnpm run ci:prepare",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 7655
+      "durationMs": 8564
     },
     {
       "name": "composed system qualification and execution-boundary failures",
       "command": "pnpm --filter @mission-control/orchestration-server exec vitest run src/__tests__/systemFactoryQualification.test.ts src/__tests__/governedMcpBroker.test.ts src/__tests__/factoryAttemptWorker.test.ts src/__tests__/factoryAttemptWorkerRemote.test.ts src/__tests__/factoryVerification.test.ts src/__tests__/remoteSandboxRuntime.test.ts src/__tests__/sandboxReconciler.test.ts src/__tests__/sandboxCredentials.test.ts src/__tests__/githubAppPublisher.test.ts src/__tests__/auth.test.ts src/__tests__/orchestrationSecurity.test.ts src/__tests__/harnessAdapterRegistry.test.ts src/__tests__/deepseekHarnessExecutorAdapter.test.ts",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 15583
+      "durationMs": 16961
     },
     {
       "name": "receipt-first Mission Control golden eval",
       "command": "node scripts/run-mission-control-eval.mjs --input docs/testing/evidence/system-factory-e2e-v2/scenario-evidence.json --baseline evals/mission-control-golden-v1/baselines/main.json --receipt docs/testing/evidence/system-factory-e2e-v2/eval-receipt.json --check-baseline",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 132
+      "durationMs": 144
     },
     {
       "name": "Mission, WorkOrder, Memory, Observability, GitHub, and Learning contracts",
       "command": "pnpm exec vitest run convex/__tests__/missionPlan.test.ts convex/__tests__/governedMcp.test.ts convex/__tests__/missionSpec.test.ts convex/__tests__/missionSpecAuthority.test.ts convex/__tests__/missionWorkOrderContract.test.ts convex/__tests__/factoryConfiguration.test.ts convex/__tests__/factoryWorkerRuntime.test.ts convex/__tests__/executionManifest.test.ts convex/__tests__/qualityContract.test.ts convex/__tests__/workOrderGovernance.test.ts convex/__tests__/factoryRuntimeGoldenPath.test.ts convex/__tests__/codexFactoryWorkerGuardrails.test.ts convex/__tests__/executionRecovery.test.ts convex/__tests__/factoryMemory.test.ts convex/__tests__/observabilityGoldenPath.test.ts convex/__tests__/workflowObservability.test.ts convex/__tests__/factoryLearning.test.ts convex/__tests__/reviewPackage.test.ts convex/__tests__/reviewIntelligence.test.ts convex/__tests__/reviewIntelligenceAuthority.test.ts convex/__tests__/reviewIntelligenceGoldenPath.test.ts convex/__tests__/policyV2Verification.test.ts convex/__tests__/qualityGateDecision.test.ts convex/__tests__/verificationPersistence.test.ts convex/__tests__/verificationEligibilitySchemaContract.test.ts convex/__tests__/githubAppReadiness.test.ts convex/__tests__/githubCiIngest.test.ts",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 1213
+      "durationMs": 1378
     },
     {
       "name": "generic harness contract and exact manifest admission",
       "command": "pnpm --filter @mission-control/workflow-engine exec vitest run src/__tests__/executorAdapter.test.ts src/__tests__/harnessContract.test.ts",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 808
+      "durationMs": 876
     },
     {
       "name": "Verification Factory exact-current contracts",
       "command": "pnpm --filter @mission-control/workflow-engine exec vitest run src/__tests__/verificationCurrentness.test.ts src/__tests__/verificationIndependence.test.ts src/__tests__/verificationPlan.test.ts src/__tests__/verificationSubject.test.ts src/__tests__/verificationDecision.test.ts src/__tests__/verification.test.ts",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 801
+      "durationMs": 849
     },
     {
       "name": "Factory Memory deterministic golden path",
       "command": "pnpm --filter @mission-control/memory test",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 833
+      "durationMs": 863
     },
     {
       "name": "Progressive Factory and Factory Learning UI contracts",
       "command": "pnpm --filter mission-control-ui exec vitest run src/factoryExperience/CreateFactoryMissionDialog.test.tsx src/factoryExperience/ExperienceLevelSelector.test.tsx src/factoryExperience/FactoryPhaseInspector.test.tsx src/factoryExperience/factoryLearningModel.test.ts src/factoryExperience/phaseProjection.test.ts src/factoryExperience/recipeCatalog.test.ts src/factoryExperience/useFactoryExperienceLevel.test.tsx src/controlPlane/ReviewEvidencePackage.test.tsx",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 1561
+      "durationMs": 2063
     },
     {
       "name": "full repository tests",
       "command": "pnpm test",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 39944
+      "durationMs": 43144
     },
     {
       "name": "TypeScript and skill lint",
       "command": "pnpm run lint",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 28017
+      "durationMs": 38498
     },
     {
       "name": "runtime-contract guard",
-      "command": "node scripts/check-runtime-contract.mjs --base ccacc5a9284e4141379c3a9b24304053749fd9f7",
+      "command": "node scripts/check-runtime-contract.mjs --base 13ce5f0ef961e4e5f07dc78b43109231aa097270",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 2553
+      "durationMs": 2506
     },
     {
       "name": "production build",
       "command": "pnpm run build",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 9136
+      "durationMs": 19558
     },
     {
       "name": "orchestration startup smoke",
       "command": "pnpm run smoke:orchestration-start",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 12184
+      "durationMs": 12272
     },
     {
       "name": "git whitespace integrity",
       "command": "git diff --check",
       "status": "PASS",
       "exitCode": 0,
-      "durationMs": 23
+      "durationMs": 12
     }
   ]
 }

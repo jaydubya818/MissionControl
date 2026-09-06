@@ -1,8 +1,8 @@
 {
   "schemaVersion": "system-factory-e2e-qualification/v2",
   "result": "SYSTEM QUALIFIED V2 WITH KNOWN LIMITATIONS",
-  "baseSha": "ccacc5a9284e4141379c3a9b24304053749fd9f7",
-  "runtimeContractVersion": 51,
+  "baseSha": "13ce5f0ef961e4e5f07dc78b43109231aa097270",
+  "runtimeContractVersion": 52,
   "hardeningV1": {
     "decision": "HARDENING V1 PASSED",
     "productionAdvisories": {
@@ -83,7 +83,7 @@
       "attempt-source-repaired",
       "attempt-source-current-head"
     ],
-    "executionManifestDigest": "sha256:3fb5879c18c40505a1def48dbe8f2cebf37ebdc74fac55e00bfa3f19674ae070",
+    "executionManifestDigest": "sha256:da3b84e29d101297ec978b172c9bcfa5888e05cd5bbec8fa5bc1aefd15e7ddb2",
     "executionBackend": "remote-sandbox",
     "candidateShas": [
       "911cc67e464c075ddd7081ac5d72ceb2e9dc11bc",
@@ -233,9 +233,9 @@
     "sandboxHasGithubAuthority": false
   },
   "performance": {
-    "durationMs": 8853,
-    "sourceGateDurationMs": 3332,
-    "verificationDurationMs": 5054,
+    "durationMs": 9339,
+    "sourceGateDurationMs": 3546,
+    "verificationDurationMs": 5271,
     "sandboxProviderRuntimeMs": 1,
     "deterministicGateRuns": 7,
     "sourceAttempts": 5,

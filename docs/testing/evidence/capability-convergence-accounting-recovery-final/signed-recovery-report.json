@@ -1,9 +1,9 @@
 {
   "schema": "fdlc-signed-accounting-recovery-proof/v1",
   "status": "PASS",
-  "head": "4def894fe1555cfe3e4fcc3faba87268f1f08d12",
-  "startedAt": "2026-09-06T19:14:00.809Z",
-  "completedAt": "2026-09-06T19:14:02.682Z",
+  "head": "b019d4467b6cf2015b4767cc328af16ae554e043",
+  "startedAt": "2026-09-06T20:56:48.171Z",
+  "completedAt": "2026-09-06T20:56:50.157Z",
   "scenarioCounts": { "signed": 15, "realProcessKillRestart": 2, "total": 17 },
   "tests": [
     { "name": "terminal Attempt settles through production signed action", "passed": true, "result": { "duplicate": false, "incident": false } },
@@ -42,6 +42,7 @@
     "apps/orchestration-server/src/accountingDeliveryWorker.ts": "72ef39424ff163614235a5242ecd1088bdb41e65a3ccdb22e7a38fae94d74a1a",
     "apps/orchestration-server/src/serviceCommandClient.ts": "0898843026c06488485d0ccc99fffd4c42a2104d1173029f6de5cacea76d2e3e",
     "convex/serviceCommands.ts": "e7cc8368a067ab68702410dbe44cd91717fe30fcbd5dbf1c2774c5cf214499ce",
+    "convex/schema.ts": "1d49033adb28b2d2c6174d2047dfff075600d89e28b673004c489d40e04a9a98",
     "convex/factory/providerLiability.ts": "22b622d6aca64ef906e49add28d21fb045ee5818af2e8843a9ccd6812084aa25",
     "convex/lib/providerLiability.ts": "11ba884486c8d406d4912452498ead5a4be9f3a548a9b4b5844d7806978b731d",
     "convex/lib/providerLiabilityValidators.ts": "b279a1250e7f7f9f4e77b8abc7d1440ef181fa226ac9a40a103d1242dbccaaef",

@@ -1,7 +1,7 @@
 # Accounting recovery exact-head qualification
 
 This directory records an isolated local-backend qualification of commit
-`4def894fe1555cfe3e4fcc3faba87268f1f08d12`.
+`b019d4467b6cf2015b4767cc328af16ae554e043`.
 
 The proof passed 74 scenarios: 57 retained inference observation and accounting
 scenarios, 15 signed settlement and recovery scenarios, and two real process

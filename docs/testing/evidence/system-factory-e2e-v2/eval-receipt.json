@@ -1,7 +1,7 @@
 {
   "schemaVersion": "mission-control/eval-receipt/v1",
-  "runId": "mission-control-golden:4def894fe155:1788722250940",
-  "idempotencyKey": "4def894fe1555cfe3e4fcc3faba87268f1f08d12:sha256:cb69b1573eee9b1587cc3a4003d89d106bbed590c1ad95a1146fef46119d4862:sha256:d14e3ccd0db344a6bf6397c71380f1511f429ccbf03faecd37dcc3d0fbaf9090",
+  "runId": "mission-control-golden:b019d4467b6c:1788728246018",
+  "idempotencyKey": "b019d4467b6cf2015b4767cc328af16ae554e043:sha256:1efd183c8391b6efc02661acf0400899674d2f5c8efe41895f6bb53e3ce74d77:sha256:d14e3ccd0db344a6bf6397c71380f1511f429ccbf03faecd37dcc3d0fbaf9090",
   "suite": {
     "key": "mission-control-golden-path",
     "version": 1,
@@ -18,8 +18,8 @@
   "acceptanceAuthority": false,
   "provenance": {
     "repository": "jaydubya818/MissionControl",
-    "revision": "4def894fe1555cfe3e4fcc3faba87268f1f08d12",
-    "baseRevision": "ccacc5a9284e4141379c3a9b24304053749fd9f7",
+    "revision": "b019d4467b6cf2015b4767cc328af16ae554e043",
+    "baseRevision": "13ce5f0ef961e4e5f07dc78b43109231aa097270",
     "adapter": {
       "id": "system-factory-scenario-evidence",
       "version": "1.0.0",
@@ -35,7 +35,7 @@
     "artifacts": [
       {
         "path": "docs/testing/evidence/system-factory-e2e-v2/scenario-evidence.json",
-        "digest": "sha256:cb69b1573eee9b1587cc3a4003d89d106bbed590c1ad95a1146fef46119d4862"
+        "digest": "sha256:1efd183c8391b6efc02661acf0400899674d2f5c8efe41895f6bb53e3ce74d77"
       }
     ]
   },
@@ -54,7 +54,7 @@
     "blockingPassRate": 1,
     "advisoryPassRate": 0,
     "invalidRatio": 0,
-    "totalDurationMs": 8853,
+    "totalDurationMs": 9339,
     "totalCostUsd": 0,
     "slices": [
       {
@@ -249,7 +249,7 @@
         }
       ],
       "failedAssertionCodes": [],
-      "outputDigest": "sha256:51d29b98d2a3ce4723a5c863c7f37d6fb04a993e63c69e2772903e23ef776600"
+      "outputDigest": "sha256:9b2ab7bf79f3f048a1f16f49e830e9b2f3504262349eb9dedb668fcd30b4d9f2"
     },
     {
       "caseKey": "bounded-human-authority",
@@ -327,7 +327,7 @@
         }
       ],
       "failedAssertionCodes": [],
-      "outputDigest": "sha256:51d29b98d2a3ce4723a5c863c7f37d6fb04a993e63c69e2772903e23ef776600"
+      "outputDigest": "sha256:9b2ab7bf79f3f048a1f16f49e830e9b2f3504262349eb9dedb668fcd30b4d9f2"
     },
     {
       "caseKey": "exact-current-evidence",
@@ -407,7 +407,7 @@
         }
       ],
       "failedAssertionCodes": [],
-      "outputDigest": "sha256:51d29b98d2a3ce4723a5c863c7f37d6fb04a993e63c69e2772903e23ef776600"
+      "outputDigest": "sha256:9b2ab7bf79f3f048a1f16f49e830e9b2f3504262349eb9dedb668fcd30b4d9f2"
     },
     {
       "caseKey": "failure-retry-recovery",
@@ -497,7 +497,7 @@
         }
       ],
       "failedAssertionCodes": [],
-      "outputDigest": "sha256:51d29b98d2a3ce4723a5c863c7f37d6fb04a993e63c69e2772903e23ef776600"
+      "outputDigest": "sha256:9b2ab7bf79f3f048a1f16f49e830e9b2f3504262349eb9dedb668fcd30b4d9f2"
     },
     {
       "caseKey": "harness-isolation-provenance",
@@ -588,7 +588,7 @@
         }
       ],
       "failedAssertionCodes": [],
-      "outputDigest": "sha256:51d29b98d2a3ce4723a5c863c7f37d6fb04a993e63c69e2772903e23ef776600"
+      "outputDigest": "sha256:9b2ab7bf79f3f048a1f16f49e830e9b2f3504262349eb9dedb668fcd30b4d9f2"
     },
     {
       "caseKey": "learning-cannot-self-promote",
@@ -646,7 +646,7 @@
         }
       ],
       "failedAssertionCodes": [],
-      "outputDigest": "sha256:51d29b98d2a3ce4723a5c863c7f37d6fb04a993e63c69e2772903e23ef776600"
+      "outputDigest": "sha256:9b2ab7bf79f3f048a1f16f49e830e9b2f3504262349eb9dedb668fcd30b4d9f2"
     },
     {
       "caseKey": "economics-attribution",
@@ -659,7 +659,7 @@
       "evidenceRefs": [
         "docs/testing/evidence/system-factory-e2e-v2/scenario-evidence.json"
       ],
-      "durationMs": 8853,
+      "durationMs": 9339,
       "costUsd": 0,
       "verdict": "FAIL",
       "score": 0.75,
@@ -670,7 +670,7 @@
           "path": "performance.durationMs",
           "operator": "NUMBER_GTE",
           "passed": true,
-          "observed": 8853,
+          "observed": 9339,
           "expected": ">= 1"
         },
         {
@@ -701,12 +701,12 @@
       "failedAssertionCodes": [
         "tokens-recorded"
       ],
-      "outputDigest": "sha256:51d29b98d2a3ce4723a5c863c7f37d6fb04a993e63c69e2772903e23ef776600"
+      "outputDigest": "sha256:9b2ab7bf79f3f048a1f16f49e830e9b2f3504262349eb9dedb668fcd30b4d9f2"
     }
   ],
   "regressions": [],
   "accountingErrors": [],
-  "startedAt": "2026-09-06T19:17:30.927Z",
-  "finishedAt": "2026-09-06T19:17:30.948Z",
-  "receiptDigest": "sha256:206398b76718a7232497b9b6090690a6f63a05b0106eb3b524a2f0615b00dbcf"
+  "startedAt": "2026-09-06T20:57:26.006Z",
+  "finishedAt": "2026-09-06T20:57:26.026Z",
+  "receiptDigest": "sha256:33d278de9e15ae92e8e8fefc9d87ac72e69716230cf7a90543e47657be77ac28"
 }
