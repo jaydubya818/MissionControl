@@ -134,6 +134,8 @@ export interface PhysicalInferenceReceipt {
   costCompleteness: ObservationCompleteness;
   priceBookId: string;
   priceBookDigest: string;
+  batch?: boolean;
+  serviceTier?: string;
   responseDigest?: string;
   failureCode?: string;
   startedAt: number;
@@ -147,6 +149,7 @@ export interface InferenceReconciliation {
   observedCostMicrousd?: number;
   completeness: ObservationCompleteness;
   reconciledAt: number;
+  /** Digest of immutable source evidence, not the derived projection view. */
   digest: string;
 }
 
@@ -516,6 +519,8 @@ export function physicalInferenceReceipt(input: {
     costCompleteness: cost.completeness,
     priceBookId: input.priceBook.priceBookId,
     priceBookDigest: input.priceBook.digest,
+    batch: input.batch,
+    serviceTier: input.serviceTier,
     responseDigest: input.responseDigest,
     failureCode: input.failureCode,
     startedAt: input.startedAt,

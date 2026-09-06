@@ -1,0 +1,54 @@
+[
+  {
+    "name": "install",
+    "command": [
+      "pnpm",
+      "install",
+      "--offline",
+      "--frozen-lockfile"
+    ],
+    "startedAt": "2026-09-06T05:36:23.382194+00:00",
+    "finishedAt": "2026-09-06T05:36:30.900319+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "prepare",
+    "command": [
+      "pnpm",
+      "ci:prepare"
+    ],
+    "startedAt": "2026-09-06T05:36:30.900610+00:00",
+    "finishedAt": "2026-09-06T05:36:41.029898+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "composed",
+    "command": [
+      "pnpm",
+      "qualify:factory:v2"
+    ],
+    "startedAt": "2026-09-06T05:36:41.030253+00:00",
+    "finishedAt": "2026-09-06T05:39:06.243787+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "inference",
+    "command": [
+      "pnpm",
+      "test:inference:phase5"
+    ],
+    "startedAt": "2026-09-06T05:39:06.244073+00:00",
+    "finishedAt": "2026-09-06T05:39:18.172750+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "critical-browser",
+    "command": [
+      "pnpm",
+      "test:e2e:critical"
+    ],
+    "startedAt": "2026-09-06T05:39:18.173005+00:00",
+    "finishedAt": "2026-09-06T05:39:35.856000+00:00",
+    "exitCode": 0
+  }
+]

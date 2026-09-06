@@ -8,12 +8,15 @@ import {
   inferencePriceBook,
   inferenceReservation,
   physicalInferenceIntent,
+  claimPhysicalInferenceIntent,
   physicalInferenceReceipt,
   projectFactoryOutcome,
   compareRouteEconomics,
   summarizeRouteEconomics,
 } from "@mission-control/shared";
 import { canonicalDigest } from "@mission-control/shared";
+import type { InferenceReservation, PhysicalInferenceIntent, PhysicalInferenceReceipt,
+  FactoryOutcomeProjection } from "@mission-control/shared";
 import type { Doc, Id } from "./_generated/dataModel";
 
 const sha256 = /^sha256:[a-f0-9]{64}$/;
@@ -58,6 +61,49 @@ function recordValue(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
+}
+
+function canonicalSnapshot<T>(value: unknown, schema: string, digestKey: "digest" | "receiptDigest", expectedDigest: string): T {
+  const { [digestKey]: recordedDigest, ...bytes } = recordValue(value);
+  if (bytes.schema !== schema || recordedDigest !== expectedDigest || canonicalDigest(schema, bytes) !== expectedDigest) {
+    throw new Error("Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.");
+  }
+  return value as T;
+}
+
+function reservationValue(reservation: Doc<"inferenceReservations">) {
+  const snapshot = canonicalSnapshot<InferenceReservation>(reservation.immutableSnapshot,
+    "inference-reservation/v1", "digest", reservation.reservationDigest);
+  if (snapshot.projectId !== String(reservation.projectId) || snapshot.workOrderId !== String(reservation.workOrderId)
+    || snapshot.taskId !== String(reservation.taskId) || snapshot.attemptId !== String(reservation.workflowRunId)
+    || snapshot.logicalRequestKey !== reservation.logicalRequestKey) {
+    throw new Error("Canonical reservation identity does not match its persisted scope.");
+  }
+  return snapshot;
+}
+
+function intentValue(intent: Doc<"inferencePhysicalIntents">, reservation: Doc<"inferenceReservations">) {
+  const snapshot = canonicalSnapshot<PhysicalInferenceIntent>(intent.immutableSnapshot,
+    "inference-physical-intent/v1", "digest", intent.intentDigest);
+  if (snapshot.state !== "PERSISTED" || !snapshot.intentId || intent.reservationId !== reservation._id
+    || intent.workflowRunId !== reservation.workflowRunId
+    || snapshot.reservationId !== reservationValue(reservation).reservationId
+    || snapshot.logicalRequestKey !== intent.logicalRequestKey || snapshot.physicalOrdinal !== intent.physicalOrdinal
+    || snapshot.requestDigest !== intent.requestDigest || snapshot.createdAt !== intent.createdAt
+    || canonicalDigest("inference-route-binding/v1", snapshot.route) !== canonicalDigest("inference-route-binding/v1", intent.route)) {
+    throw new Error("Canonical intent identity does not match its persisted scope.");
+  }
+  return snapshot;
+}
+
+function receiptValue(receipt: Doc<"inferencePhysicalReceipts">) {
+  const snapshot = canonicalSnapshot<PhysicalInferenceReceipt>(receipt.immutableSnapshot,
+    "inference-physical-receipt/v1", "receiptDigest", receipt.receiptDigest);
+  if (snapshot.attemptId !== String(receipt.workflowRunId) || snapshot.reservationDigest !== receipt.reservationDigest
+    || snapshot.logicalRequestKey !== receipt.logicalRequestKey || snapshot.physicalOrdinal !== receipt.physicalOrdinal) {
+    throw new Error("Canonical receipt identity does not match its persisted scope.");
+  }
+  return snapshot;
 }
 
 function requireDigest(value: string, label: string) {
@@ -292,11 +338,14 @@ export async function persistIntentInTransaction(ctx: MutationCtx, args: Infer<t
     }
     const logicalRequestKey = bounded(args.logicalRequestKey, 500, "Logical request key");
     if (reservation.logicalRequestKey !== logicalRequestKey) throw new Error("Inference reservation logical request scope is substituted.");
+    const reservationSnapshot = reservationValue(reservation);
     const logicalIntents = await ctx.db.query("inferencePhysicalIntents")
       .withIndex("by_logical_request", (q) => q.eq("projectId", reservation.projectId).eq("logicalRequestKey", logicalRequestKey)).collect();
     const duplicate = logicalIntents.find((intent) => intent.physicalOrdinal === args.physicalOrdinal);
     if (duplicate) {
+      const duplicateSnapshot = intentValue(duplicate, reservation);
       const requested = canonicalDigest("inference-intent-replay/v1", {
+        intentKey: bounded(args.intentKey, 200, "Physical intent key"),
         logicalRequestKey,
         physicalOrdinal: args.physicalOrdinal,
         retryOfIntentId: args.retryOfIntentId ? String(args.retryOfIntentId) : undefined,
@@ -304,6 +353,7 @@ export async function persistIntentInTransaction(ctx: MutationCtx, args: Infer<t
         requestDigest: requireDigest(args.requestDigest, "Inference request digest"),
       });
       const persisted = canonicalDigest("inference-intent-replay/v1", {
+        intentKey: duplicateSnapshot.intentId,
         logicalRequestKey: duplicate.logicalRequestKey,
         physicalOrdinal: duplicate.physicalOrdinal,
         retryOfIntentId: duplicate.retryOfIntentId ? String(duplicate.retryOfIntentId) : undefined,
@@ -315,6 +365,9 @@ export async function persistIntentInTransaction(ctx: MutationCtx, args: Infer<t
     }
     const intents = await ctx.db.query("inferencePhysicalIntents")
       .withIndex("by_reservation", (q) => q.eq("reservationId", reservation._id)).collect();
+    const intentSnapshots = intents.map((intent) => intentValue(intent, reservation));
+    let priorSnapshot: PhysicalInferenceIntent | undefined;
+    if (args.physicalOrdinal === 1 && args.retryOfIntentId !== undefined) throw new Error("PRIMARY_ATTEMPT_CANNOT_HAVE_RETRY_LINEAGE");
     if (args.physicalOrdinal > 1) {
       const prior = args.retryOfIntentId ? await ctx.db.get(args.retryOfIntentId) : null;
       const priorReceipt = prior
@@ -325,24 +378,29 @@ export async function persistIntentInTransaction(ctx: MutationCtx, args: Infer<t
         || priorReceipt.delivery !== "NOT_DELIVERED" || !["FAILED", "TIMED_OUT"].includes(priorReceipt.status)) {
         throw new Error("Retry/fallback requires one exact, definitive failed prior physical attempt.");
       }
+      priorSnapshot = intentValue(prior, reservation);
+      const priorReceiptSnapshot = receiptValue(priorReceipt);
+      if (priorReceiptSnapshot.intentId !== priorSnapshot.intentId
+        || priorReceiptSnapshot.delivery !== "NOT_DELIVERED"
+        || !["FAILED", "TIMED_OUT"].includes(priorReceiptSnapshot.status)) {
+        throw new Error("Canonical fallback evidence does not match its prior intent.");
+      }
     }
+    const intentKey = bounded(args.intentKey, 200, "Physical intent key");
+    if (intentSnapshots.some((intent) => intent.intentId === intentKey)) throw new Error("Canonical intent identity is already allocated.");
     const snapshot = physicalInferenceIntent({
-      intentId: bounded(args.intentKey, 200, "Physical intent key"), reservationId: String(reservation._id),
+      intentId: intentKey, reservationId: reservationSnapshot.reservationId,
       logicalRequestKey,
-      physicalOrdinal: args.physicalOrdinal, retryOfIntentId: args.retryOfIntentId ? String(args.retryOfIntentId) : undefined,
+      physicalOrdinal: args.physicalOrdinal, retryOfIntentId: priorSnapshot?.intentId,
       route: args.route,
       requestDigest: requireDigest(args.requestDigest, "Inference request digest"), createdAt: Date.now(),
-    }, reservation.immutableSnapshot, intents.map((intent) => ({
-      ...intent, schema: "inference-physical-intent/v1" as const, reservationId: String(intent.reservationId),
-      intentId: String(intent._id), retryOfIntentId: intent.retryOfIntentId ? String(intent.retryOfIntentId) : undefined,
-      digest: intent.intentDigest,
-    })), Date.now());
+    }, reservationSnapshot, intentSnapshots, Date.now());
     const id = await ctx.db.insert("inferencePhysicalIntents", {
       tenantId: reservation.tenantId, projectId: reservation.projectId, workflowRunId: reservation.workflowRunId,
       reservationId: reservation._id, logicalRequestKey: snapshot.logicalRequestKey,
       physicalOrdinal: snapshot.physicalOrdinal, retryOfIntentId: args.retryOfIntentId,
       route: snapshot.route, requestDigest: snapshot.requestDigest,
-      intentDigest: snapshot.digest, state: "PERSISTED", createdAt: snapshot.createdAt,
+      intentDigest: snapshot.digest, immutableSnapshot: snapshot, state: "PERSISTED", createdAt: snapshot.createdAt,
     });
     return { intentId: id, state: "PERSISTED" as const, created: true as const };
 }
@@ -379,7 +437,12 @@ export async function claimIntentInTransaction(ctx: MutationCtx, args: Infer<typ
     const claimId = bounded(args.claimId, 200, "Claim ID");
     const claimConflict = await ctx.db.query("inferencePhysicalIntents").withIndex("by_claim", (q) => q.eq("claimId", claimId)).first();
     if (claimConflict) throw new Error("Physical inference claim ID was replayed.");
-    await ctx.db.patch(intent._id, { state: "CLAIMED", claimId, claimedAt: Date.now() });
+    // A legacy row with lost identity cannot acquire new authority. Both the
+    // current lease above and the frozen lease must admit the committed claim.
+    const claimed = claimPhysicalInferenceIntent(intentValue(intent, reservation), reservationValue(reservation), {
+      claimId, leaseId: args.leaseId, now: Date.now(), cancelled: false,
+    });
+    await ctx.db.patch(intent._id, { state: "CLAIMED", claimId, claimedAt: claimed.claimedAt });
     return { claimed: true as const, intentId: intent._id, reservationDigest: reservation.reservationDigest };
 }
 
@@ -423,7 +486,9 @@ export async function appendReceiptInTransaction(ctx: MutationCtx, args: Infer<t
     const failureCode = optionalBounded(args.failureCode, 200, "Inference failure code");
     const existing = await ctx.db.query("inferencePhysicalReceipts").withIndex("by_intent", (q) => q.eq("intentId", intent._id)).first();
     if (existing) {
+      const existingSnapshot = receiptValue(existing);
       const replayDigest = canonicalDigest("inference-receipt-replay/v1", {
+        batch: args.batch, serviceTier: args.serviceTier,
         resolvedProvider, resolvedModelId, providerRequestId, providerBillingId,
         delivery: args.delivery,
         status: args.status,
@@ -433,17 +498,18 @@ export async function appendReceiptInTransaction(ctx: MutationCtx, args: Infer<t
         completedAt: args.completedAt,
       });
       const existingDigest = canonicalDigest("inference-receipt-replay/v1", {
-        resolvedProvider: existing.resolvedProvider,
-        resolvedModelId: existing.resolvedModelId,
-        providerRequestId: existing.providerRequestId,
-        providerBillingId: existing.providerBillingId,
-        delivery: existing.delivery,
-        status: existing.status,
-        usage: existing.usage,
-        responseDigest: existing.responseDigest,
-        failureCode: existing.failureCode,
-        startedAt: existing.startedAt,
-        completedAt: existing.completedAt,
+        batch: existingSnapshot.batch, serviceTier: existingSnapshot.serviceTier,
+        resolvedProvider: existingSnapshot.resolvedProvider,
+        resolvedModelId: existingSnapshot.resolvedModelId,
+        providerRequestId: existingSnapshot.providerRequestId,
+        providerBillingId: existingSnapshot.providerBillingId,
+        delivery: existingSnapshot.delivery,
+        status: existingSnapshot.status,
+        usage: existingSnapshot.usage,
+        responseDigest: existingSnapshot.responseDigest,
+        failureCode: existingSnapshot.failureCode,
+        startedAt: existingSnapshot.startedAt,
+        completedAt: existingSnapshot.completedAt,
       });
       if (replayDigest !== existingDigest) throw new Error("Inference receipt replay conflicts with immutable history.");
       return { receiptId: existing._id, receiptDigest: existing.receiptDigest, created: false as const };
@@ -452,15 +518,18 @@ export async function appendReceiptInTransaction(ctx: MutationCtx, args: Infer<t
     if (!reservation) throw new Error("Inference receipt reservation is unavailable.");
     const priceBook = await ctx.db.get(reservation.priceBookId);
     if (!priceBook) throw new Error("Inference receipt price book is unavailable.");
+    if (intent.state !== "CLAIMED" || !intent.claimId || intent.claimedAt === undefined) {
+      throw new Error("Receipt requires the exact committed physical claim.");
+    }
+    const reservationSnapshot = reservationValue(reservation);
+    // Reconstruct the committed transition without changing the original snapshot.
+    // Its historical claim time admits late observations after the lease expires.
+    const claimedIntent = claimPhysicalInferenceIntent(intentValue(intent, reservation), reservationSnapshot, {
+      claimId: intent.claimId, leaseId: reservationSnapshot.leaseId, now: intent.claimedAt, cancelled: false,
+    });
     const receiptKey = canonicalDigest("inference-receipt-id/v1", { intentId: String(intent._id), completedAt: args.completedAt });
     const snapshot = physicalInferenceReceipt({
-      receiptId: receiptKey, intent: {
-        schema: "inference-physical-intent/v1", intentId: String(intent._id), reservationId: String(intent.reservationId),
-        logicalRequestKey: intent.logicalRequestKey, physicalOrdinal: intent.physicalOrdinal, route: intent.route,
-        retryOfIntentId: intent.retryOfIntentId ? String(intent.retryOfIntentId) : undefined,
-        requestDigest: intent.requestDigest, state: intent.state, createdAt: intent.createdAt,
-        claimedAt: intent.claimedAt, claimId: intent.claimId, digest: intent.intentDigest,
-      }, reservation: reservation.immutableSnapshot, priceBook: priceBook.immutableSnapshot,
+      receiptId: receiptKey, intent: claimedIntent, reservation: reservationSnapshot, priceBook: priceBook.immutableSnapshot,
       resolvedProvider, resolvedModelId, providerRequestId, providerBillingId,
       delivery: args.delivery, status: args.status, usage: args.usage,
       responseDigest, failureCode,
@@ -500,7 +569,7 @@ export async function appendReceiptInTransaction(ctx: MutationCtx, args: Infer<t
       costMicrousd: snapshot.costMicrousd, costCompleteness: snapshot.costCompleteness,
       priceBookId: priceBook._id, priceBookDigest: priceBook.priceBookDigest,
       responseDigest, failureCode, startedAt: args.startedAt,
-      completedAt: args.completedAt, receiptDigest: snapshot.receiptDigest,
+      completedAt: args.completedAt, receiptDigest: snapshot.receiptDigest, immutableSnapshot: snapshot,
     });
     await ctx.db.patch(intent._id, { state: args.delivery === "UNKNOWN" ? "AMBIGUOUS" : "RECEIPTED" });
     if (intent.physicalOrdinal >= reservation.maxPhysicalCalls) await ctx.db.patch(reservation._id, { state: "EXHAUSTED" });
@@ -650,37 +719,33 @@ export const createOutcomeProjection = mutation({
       ctx.db.query("inferenceReconciliations").withIndex("by_attempt", (q) => q.eq("workflowRunId", run._id)).collect(),
     ]);
     const projectedAt = Date.now();
+    const receiptSnapshots = new Map(receipts.map((receipt) => [receipt._id, receiptValue(receipt)]));
     const projection = projectFactoryOutcome({
       projectionId: `${run._id}:v${prior.length + 1}`, cohortDigest: requireDigest(args.cohortDigest, "Outcome cohort digest"),
       projectId: String(run.projectId), workOrderId: String(run.workOrderId), attemptId: String(run._id),
       routeDigest: requireDigest(args.routeDigest, "Outcome route digest"),
-      events: events.map((event) => ({
-        schema: "factory-outcome-event/v1", eventId: String(event._id), projectId: String(event.projectId),
-        workOrderId: String(event.workOrderId), attemptId: String(event.workflowRunId), stage: event.stage,
-        sourceType: event.sourceType, sourceId: event.sourceId, sourceDigest: event.sourceDigest,
-        occurredAt: event.occurredAt, recordedAt: event.recordedAt, digest: event.eventDigest,
-      })),
-      receipts: receipts.map((receipt) => ({
-        schema: "inference-physical-receipt/v1", receiptId: String(receipt._id), intentId: String(receipt.intentId),
-        reservationId: String(receipt.reservationId), logicalRequestKey: receipt.logicalRequestKey,
-        reservationDigest: receipt.reservationDigest, attemptId: String(receipt.workflowRunId),
-        executionProfileId: String(receipt.executionProfileId), executionProfileDigest: receipt.executionProfileDigest,
-        policyDigest: receipt.policyDigest,
-        physicalOrdinal: receipt.physicalOrdinal, route: receipt.route, resolvedProvider: receipt.resolvedProvider,
-        resolvedModelId: receipt.resolvedModelId, providerRequestId: receipt.providerRequestId,
-        providerBillingId: receipt.providerBillingId, delivery: receipt.delivery, status: receipt.status,
-        usage: receipt.usage, usageCompleteness: receipt.usageCompleteness, costMicrousd: receipt.costMicrousd,
-        costCompleteness: receipt.costCompleteness, priceBookId: String(receipt.priceBookId),
-        priceBookDigest: receipt.priceBookDigest, responseDigest: receipt.responseDigest,
-        failureCode: receipt.failureCode, startedAt: receipt.startedAt, completedAt: receipt.completedAt,
-        receiptDigest: receipt.receiptDigest,
-      })),
-      reconciliations: reconciliations.map((reconciliation) => ({
-        reconciliationId: String(reconciliation._id), receiptId: String(reconciliation.receiptId),
-        observedCostMicrousd: reconciliation.observedCostMicrousd,
-        completeness: reconciliation.completeness, reconciledAt: reconciliation.reconciledAt,
-        digest: reconciliation.reconciliationDigest,
-      })),
+      events: events.map((event) => {
+        const snapshot = factoryOutcomeEvent({
+          eventId: `${event.sourceType}:${event.sourceId}`, projectId: String(event.projectId),
+          workOrderId: String(event.workOrderId), attemptId: String(event.workflowRunId), stage: event.stage,
+          sourceType: event.sourceType, sourceId: event.sourceId, sourceDigest: event.sourceDigest,
+          occurredAt: event.occurredAt, recordedAt: event.recordedAt,
+        });
+        if (snapshot.digest !== event.eventDigest) throw new Error("Canonical outcome event digest is inconsistent.");
+        return snapshot;
+      }),
+      receipts: [...receiptSnapshots.values()],
+      reconciliations: reconciliations.map((reconciliation) => {
+        const receipt = receiptSnapshots.get(reconciliation.receiptId);
+        if (!receipt) throw new Error("Outcome reconciliation references an unavailable receipt.");
+        return {
+          reconciliationId: String(reconciliation._id), receiptId: receipt.receiptId,
+          observedCostMicrousd: reconciliation.observedCostMicrousd,
+          completeness: reconciliation.completeness, reconciledAt: reconciliation.reconciledAt,
+          // This is source evidence provenance, not a digest of the derived view.
+          digest: reconciliation.reconciliationDigest,
+        };
+      }),
       projectedAt,
     });
     const id = await ctx.db.insert("factoryOutcomeProjections", {
@@ -693,7 +758,7 @@ export const createOutcomeProjection = mutation({
       knownCostMicrousd: projection.knownCostMicrousd, totalCostMicrousd: projection.totalCostMicrousd,
       costCoverage: projection.costCoverage, costCompleteness: projection.costCompleteness,
       freshnessAt: projection.freshnessAt, confidence: projection.confidence,
-      lineageDigest: projection.lineageDigest, projectionDigest: projection.digest,
+      lineageDigest: projection.lineageDigest, projectionDigest: projection.digest, immutableSnapshot: projection,
       createdBy: access.actorId, createdAt: projectedAt,
     });
     return { projectionId: id, projectionDigest: projection.digest, outcome: projection.outcome, costCompleteness: projection.costCompleteness };
@@ -745,8 +810,10 @@ export const freezeRouteComparison = mutation({
     ]);
     const now = Date.now();
     const summaryInput = { cohortDigest: requireDigest(args.cohortDigest, "Comparison cohort digest"), minimumSampleSize: args.minimumSampleSize, now, maxAgeMs: args.maximumAgeMs };
-    let left = summarizeRouteEconomics(leftProjections.map(projectionValue), { ...summaryInput, routeDigest: requireDigest(args.leftRouteDigest, "Left route digest") });
-    let right = summarizeRouteEconomics(rightProjections.map(projectionValue), { ...summaryInput, routeDigest: requireDigest(args.rightRouteDigest, "Right route digest") });
+    const inCohort = (row: Doc<"factoryOutcomeProjections">) => row.cohortDigest === summaryInput.cohortDigest
+      && row.formulaVersion === "accepted-outcome-economics/v1";
+    let left = summarizeRouteEconomics(leftProjections.filter(inCohort).map(projectionValue), { ...summaryInput, routeDigest: requireDigest(args.leftRouteDigest, "Left route digest") });
+    let right = summarizeRouteEconomics(rightProjections.filter(inCohort).map(projectionValue), { ...summaryInput, routeDigest: requireDigest(args.rightRouteDigest, "Right route digest") });
     const routeQualified = (routeDigest: string) => catalog.some((route) => route.routeDigest === routeDigest
       && route.enabled === true && route.qualificationStatus === "EVIDENCE_QUALIFIED"
       && route.admissionStatus === "PRODUCTION_PILOT_ELIGIBLE");
@@ -786,19 +853,14 @@ export const listRouteComparisons = query({
 });
 
 function projectionValue(projection: Doc<"factoryOutcomeProjections">) {
-  return {
-    schema: "factory-outcome-projection/v1" as const, projectionId: String(projection._id),
-    formulaVersion: projection.formulaVersion, cohortDigest: projection.cohortDigest,
-    projectId: String(projection.projectId), workOrderId: String(projection.workOrderId),
-    attemptId: String(projection.workflowRunId), routeDigest: projection.routeDigest,
-    outcome: projection.outcome, stages: projection.stages,
-    receiptIds: projection.receiptIds.map(String), reconciliationIds: projection.reconciliationIds.map(String),
-    physicalCallCount: projection.physicalCallCount,
-    knownCostMicrousd: projection.knownCostMicrousd, totalCostMicrousd: projection.totalCostMicrousd,
-    costCoverage: projection.costCoverage, costCompleteness: projection.costCompleteness,
-    freshnessAt: projection.freshnessAt, confidence: projection.confidence,
-    lineageDigest: projection.lineageDigest, digest: projection.projectionDigest,
-  };
+  const snapshot = canonicalSnapshot<FactoryOutcomeProjection>(projection.immutableSnapshot,
+    "factory-outcome-projection/v1", "digest", projection.projectionDigest);
+  if (snapshot.projectId !== String(projection.projectId) || snapshot.workOrderId !== String(projection.workOrderId)
+    || snapshot.attemptId !== String(projection.workflowRunId) || snapshot.routeDigest !== projection.routeDigest
+    || snapshot.cohortDigest !== projection.cohortDigest) {
+    throw new Error("Canonical projection identity does not match its persisted scope.");
+  }
+  return snapshot;
 }
 
 function disqualifySummary<T extends { blockers: string[] }>(summary: T, blocker: string): T & { eligibleForPromotion: false; costPerAcceptedOutcomeMicrousd: undefined; confidence: "LOW" | "NONE" } {

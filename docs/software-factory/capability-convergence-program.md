@@ -70,7 +70,7 @@ local backend, real provider, real accepted WorkOrder, Preview or Production.
 Calculated monetary estimates are not ACTUAL billing. Missing costs, windows,
 denominators and coverage remain explicit. Existing economics WARN remains.
 
-## Active slice: conserve WorkOrder inference reservations
+## Completed slice: conserve WorkOrder inference reservations
 
 - Objective: prevent separate logical requests or retry Attempts from each
   reserving the full approved parent WorkOrder budget.
@@ -93,16 +93,47 @@ denominators and coverage remain explicit. Existing economics WARN remains.
   passed. Independent architecture/security/data-integrity/simplicity/docs
   findings were addressed. Initial local launcher failure remains recorded.
 - PR: [#184](https://github.com/jaydubya818/MissionControl/pull/184).
-  Required CI, merge and exact-main qualification remain pending.
+  All 12 reported CI/deployment check contexts passed on
+  `c58474afbbdf5be4ca01d9735cf8ef9934854e8d`. Merged at 2026-09-06T05:35:19Z
+  as `4434cc56448075f4804787325a9586c6290b2215`.
+- [Clean-main proof](../testing/evidence/capability-convergence-reservation-postmerge/automated-checks.json)
+  passed all 19 composed gates, plus Phase 5 and 15 critical browser checks.
+  The clean checkout's reservation source hash exactly matches the real local
+  concurrency proof. The [post-merge platform check](../testing/evidence/capability-convergence-reservation-postmerge/postmerge-guard.json)
+  confirms all four Production deployments, aliases, settings and protections
+  unchanged, with no new main/Production deployment. Qualification completed at
+  2026-09-06T05:39:35Z. This closes the bounded allocation slice only.
 - Runtime contract: v46 inherited from #183; this slice changes no public signature.
 - Maturity: no promotion. This closes one parent allocation gap, not provider
   dispatch bounds, authoritative billing settlement or real-work economics.
 
-The next todo 063 integration issue is the mismatch between database reservation
-IDs and frozen logical reservation IDs in physical intent/receipt construction.
-After that, claims must enforce finite request/output exposure before transport,
-and receipt persistence must retain observed overrun evidence. These source
-findings are unresolved; the reservation fix alone does not qualify a live path.
+## Active slice: preserve canonical inference identities
+
+- Original baseline: `4434cc56448075f4804787325a9586c6290b2215`.
+  Integrated baseline and merge-base: `9e6dfd9b0110c0316b1fc085539b41e2616ebac7`
+  after #185. Retain its composed provider admission, transaction helpers,
+  provider-request ownership checks and disabled optional token dimensions.
+- Branch: `codex/inference-ledger-identities`.
+- Objective: repair the mismatch between database IDs and frozen logical IDs in
+  the complete persisted reservation → intent → claim → receipt → reconciliation
+  → outcome projection chain. Preserve canonical bytes and their digests while
+  retaining database IDs for API arguments, foreign keys and navigation.
+- Design: [inference ledger identity contract](./inference-ledger-identity-contract.md).
+  Reuse the existing tables; add optional immutable snapshots for legacy-schema
+  compatibility, require exact snapshots for new canonical processing, and fail
+  closed when an old row has lost unrecoverable identity. Do not rewrite history.
+- Runtime contract: v48 for the optional snapshot schema fields (v47 inherited
+  from #185).
+- Focused handler proof: 38 tests pass, including the full synthetic persisted
+  chain, late receipts, replay drift, corrupted snapshots and legacy cohorts.
+  Independent architecture/security/data-integrity/simplicity/docs review found
+  replay-source and cohort-isolation defects; both are fixed with regressions.
+  All 19 composed gates passed on the original branch head `d367b34b2504`;
+  that proof is historical after the main advance. Integrated qualification,
+  backend proof, PR, merge and final-main are pending.
+- Maturity: no promotion. After identity repair, claims still need finite
+  request/output exposure before transport; receipt persistence still needs to
+  retain observed overrun evidence. Live-provider qualification remains gated.
 
 ## Remaining acceptance evidence
 

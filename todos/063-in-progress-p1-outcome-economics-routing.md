@@ -71,6 +71,20 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
+### 2026-09-05 - Allocation slice merged; persisted identity repair started
+
+- PR #184 merged as `4434cc56448075f4804787325a9586c6290b2215` after every
+  check passed. Clean-main composed qualification, Phase 5 and critical browser
+  tests passed; Production remained unchanged. Evidence is linked from the
+  cumulative program record.
+- Independent next-slice audit confirmed normal intent/receipt persistence uses
+  database reservation IDs where strict constructors require frozen logical IDs.
+  Intent keys/ancestry and reconstructed projection identities also lose the
+  original canonical bytes. Fix the complete persisted chain without weakening
+  equality checks or rewriting history; follow the new identity contract.
+- This remains within todo 063. Live calls, billing authority, real acceptance
+  and Production transitions are still outside this bounded repair's proof.
+
 ### 2026-09-05 - Reservation slice independent review
 
 - Architecture/security/data-integrity review found that the stored allocation
