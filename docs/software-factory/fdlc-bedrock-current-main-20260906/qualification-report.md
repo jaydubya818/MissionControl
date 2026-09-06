@@ -1,9 +1,10 @@
 # FDLC Phase 1 Bedrock qualification report
 
 Updated: 2026-09-06. Authoritative baseline: Mission Control main
-`e0b15142a33987983526b87c2144208e40e98657`, runtime contract v52. The
-candidate is reconciled with the accounting-recovery and Factory Engineer
-package-import changes now on canonical main.
+`f01fed47ded95e9456803845211bac49ef54a1f1`, runtime contract v52. The
+candidate is reconciled with the accounting-recovery, Factory Engineer
+package-import, orchestration-readiness, and incident-evidence changes now on
+canonical main.
 
 Status: **AWS_IDENTITY_AND_ROUTE_INSPECTION_PASS**.
 
@@ -110,12 +111,12 @@ compatibility. The System evidence is in
 `docs/testing/evidence/fdlc-bedrock-live-system-20260906/`.
 
 After reconciliation, candidate commit
-`ef3147464d2334e68beab91f3b466d08003af8f5` passed all 18 current System
-Qualification V2 checks against canonical main `e0b15142a33987983526b87c2144208e40e98657`
-and runtime contract v52. This includes 1,274 Convex tests, 661 orchestration
+`bd3746b3b326da44ccba373e7134fdac53a65472` passed all 19 current System
+Qualification V2 checks against canonical main `f01fed47ded95e9456803845211bac49ef54a1f1`
+and runtime contract v52. This includes 1,274 Convex tests, 670 orchestration
 tests with 11 intended skips, the complete repository suite, lint, build,
 startup smoke, release security, and the runtime-contract guard. Current evidence
-is in `docs/testing/evidence/fdlc-bedrock-live-system-v52-20260906/`.
+is in `docs/testing/evidence/fdlc-bedrock-live-system-v52-f01fed-20260906/`.
 
 ## Blocked work
 
