@@ -134,8 +134,13 @@ denominators and coverage remain explicit. Existing economics WARN remains.
   also passed before a real backend revealed the undefined-field storage defect.
   New v2 snapshots correct it while preserving the global hash and v1 history.
   [Real local proof](../testing/evidence/capability-convergence-identity-backend/README.md)
-  now passes 13 scenarios and code generation; integrated final qualification,
-  PR, merge and final-main remain pending.
+  now passes 13 scenarios and code generation.
+  [Final qualification](../testing/evidence/capability-convergence-identity-final/README.md)
+  passes all 19 composed gates, Phase 5 and 15 critical browser checks on
+  `971d664d81259b005ab986bd2e14cc1a049b98bb`, with gateway/shared/schema hashes
+  matching the real backend proof. The economics eval remains WARN.
+- PR: [#188](https://github.com/jaydubya818/MissionControl/pull/188).
+  Exact final PR-head checks, merge and clean-main proof are pending.
 - Maturity: no promotion. After identity repair, claims still need finite
   request/output exposure before transport; receipt persistence still needs to
   retain observed overrun evidence. Live-provider qualification remains gated.
