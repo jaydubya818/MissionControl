@@ -30,3 +30,6 @@ This does not weaken the Phase 5 success criterion: the phase permits a bounded
 disabled for both `GO` and `NO_GO` results.
 
 Runtime contract: `v43`.
+
+The post-merge lineage and qualification result are frozen in
+`completion-record.md`.
