@@ -226,3 +226,26 @@ The observation slice also clarifies the earlier economics wording: every
 physical call contributes to the cohort cost numerator. Verified and human-
 accepted outcomes use separate denominators. New corrected projection formula v2
 preserves UNKNOWN monetary corrections without changing historical v1 snapshots.
+
+### 2026-09-06 — Durable accounting delivery started
+
+The observation slice passes 57 real local backend scenarios and eight browser
+checks against persisted records. Its in-memory failure payload still disappears
+through the Docker consumer and cannot survive restart. Continue in the isolated
+`codex/inference-accounting-recovery` branch under the
+[accounting delivery contract](../docs/software-factory/accounting-delivery-contract.md).
+The host journal carries immutable observations to the existing historical
+settlement path; it grants no execution, new allocation, correction or release.
+Source implementation and integrated recovery qualification remain pending.
+
+### 2026-09-06 — Recovery source approved and focused qualification passed
+
+The Product Owner approved settlement error classification, independent recovery
+startup, and acknowledgment diagnostics. The applied implementation passes 186
+focused orchestration tests with two existing conditional daemon skips, 196
+backend and authority tests with no skips, orchestration typecheck, and the
+runtime-contract v50 guard across 970 public functions. Explicitly incomplete
+provider configuration disables the complete Factory execution bootstrap while
+the configured accounting recovery runtime remains independently available.
+Actual signed backend recovery, current-main integration, complete qualification,
+CI, merge, clean-main proof, and release remain in progress.

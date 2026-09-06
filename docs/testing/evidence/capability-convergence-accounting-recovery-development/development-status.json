@@ -1,0 +1,25 @@
+{
+  "status": "IN_PROGRESS_APPROVAL_BLOCKED",
+  "recordedAt": "2026-09-06T17:20:58.044776+00:00",
+  "originalBranchBase": "c5cbf718eb73ce70154ee7650ce13c1da826234f",
+  "qualifiedParentMain": "44f240c6e22d0662107508149b888a7d71747b80",
+  "sourceIntegratedWithParent": false,
+  "independentFixedFindings": [
+    "late submission after stop",
+    "shutdown did not await direct delivery",
+    "untrusted original ancestor disappeared during normalization",
+    "temporary write retention was unbounded",
+    "FIFO read blocked before validation"
+  ],
+  "remaining": [
+    "typed signed-action classification",
+    "independent startup wiring",
+    "acknowledged-state diagnostic label",
+    "current-parent integration",
+    "final source review and backend qualification"
+  ],
+  "actualProviderCalls": 0,
+  "productionChanges": false,
+  "logs": "/private/tmp/fdlc-accounting-recovery-validation/",
+  "backendHarness": "PREPARED_NOT_RUN"
+}

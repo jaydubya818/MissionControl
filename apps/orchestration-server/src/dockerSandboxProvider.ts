@@ -4,7 +4,8 @@ import {
   harnessCapabilityManifestDigest,
 } from "@mission-control/workflow-engine";
 import { CodexBedrockExecutorAdapter } from "./codexBedrockExecutorAdapter.js";
-import type { BedrockInferenceBridge } from "./bedrockInferenceBridge.js";
+import { BedrockSettlementError, type BedrockInferenceBridge } from "./bedrockInferenceBridge.js";
+import type { AccountingReference } from "./accountingDeliveryJournal.js";
 import {
   responsesToBedrock,
   bedrockToResponses,
@@ -44,6 +45,7 @@ interface OwnedContainer {
   result?: Buffer;
   exitCode?: number | null;
   failure?: string;
+  accountingReference?: AccountingReference;
   stderrTail?: string;
   canceled: boolean;
   timer?: ReturnType<typeof setTimeout>;
@@ -249,6 +251,11 @@ export class DockerSandboxProvider implements SandboxProvider {
       pendingFrame = false,
       finalFrame = false;
     const frameFailure = (error?: unknown) => {
+      if (error instanceof BedrockSettlementError && error.accountingReference) {
+        const reference = error.accountingReference;
+        record.accountingReference = { journalId: reference.journalId, slot: reference.slot,
+          observationDigest: reference.observationDigest, state: reference.state };
+      }
       record.failure =
         error instanceof Error && /^[A-Z0-9_]{1,100}$/.test(error.message)
           ? error.message
@@ -319,7 +326,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     return { processId: request.allocation.providerResourceId, startedAt: Date.now(), state: "RUNNING" };
   }
   async fetchResult(allocation: SandboxAllocation) { const r = this.record(allocation); return r.canceled ? null :  ( r.result ?? null ) ; }
-  async fetchDiagnostics(allocation: SandboxAllocation) { const r = this.record(allocation); return { provider: this.providerId, terminalState: r.terminalState ?? null, supervisorProcessRunning: r.exitCode === undefined && !r.failure, exitCode: r.exitCode ?? null, failure: r.failure ?? null, stderrTail: r.stderrTail ?? null, policyInspection: r.policyInspection ?? null }; }
+  async fetchDiagnostics(allocation: SandboxAllocation) { const r = this.record(allocation); return { provider: this.providerId, terminalState: r.terminalState ?? null, supervisorProcessRunning: r.exitCode === undefined && !r.failure, exitCode: r.exitCode ?? null, failure: r.failure ?? null, accountingReference: r.accountingReference ?? null, stderrTail: r.stderrTail ?? null, policyInspection: r.policyInspection ?? null }; }
   async cancel(allocation: SandboxAllocation, _reason: string) {
     const r = this.record(allocation );
     r.inferenceAbort?.abort( ); r.canceled = true; r.result = undefined; r.terminalState ??= "CANCELED";

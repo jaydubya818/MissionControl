@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { action, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { makeFunctionReference } from "convex/server";
@@ -525,6 +525,7 @@ export const reserveProviderRequest = action({
 export const recordProviderUsage = action({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {
+    try {
     const payload = await authorize(ctx, args.envelope, args.payloadJson, "provider-liability.settle");
     const scope = await ctx.runQuery(internal.serviceCommands.resolveExecutionScope, { workflowRunId: payload.workflowRunId });
     const receipt = await claimScoped(ctx, args.envelope, scope);
@@ -533,6 +534,22 @@ export const recordProviderUsage = action({
       await ctx.runMutation(internal.serviceCommands.complete, { receiptId: receipt.receiptId, status: "SUCCEEDED", resultReference: String(payload.reservationId) });
       return result;
     } catch (error) { await fail(ctx, receipt.receiptId, error); throw error; }
+    } catch (error) {
+      // Settlement-only transport labels; authentication and denial order above
+      // are unchanged. Unknown failures and historical typed errors pass through.
+      if (error instanceof Error) {
+        const authenticationReasons: Record<string, string> = {
+          "Service command denied (signature-invalid).": "SERVICE_SIGNATURE_INVALID",
+          "Service command denied (service-command-secret-not-configured).": "SERVICE_SECRET_UNCONFIGURED",
+        };
+        const reason = Object.hasOwn(authenticationReasons, error.message) ? authenticationReasons[error.message] : undefined;
+        if (reason) throw new ConvexError({ code: "ACCOUNTING_AUTHENTICATION_REQUIRED", reason });
+        if (error.message === "Service command denied (command-scope-mismatch).") {
+          throw new ConvexError({ code: "ACCOUNTING_SCOPE_REJECTED", reason: "SERVICE_SCOPE_MISMATCH" });
+        }
+      }
+      throw error;
+    }
   },
 });
 
