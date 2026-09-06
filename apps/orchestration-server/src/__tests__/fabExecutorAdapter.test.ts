@@ -81,6 +81,23 @@ describe("Fab canonical MC harness conformance", () => {
     await expect(adapter.prepare(f.request, f.context)).rejects.toThrow("lease lost while enrolling broker");
     expect(invoke).not.toHaveBeenCalled();
   });
+  it("derives a Bedrock session only for a canonical MC worktree under the configured checkout", async () => {
+    const f = bedrockFixture();
+    const worktree = path.join(f.root, ".mission-control", "worktrees", "attempt-2");
+    f.git(["worktree", "add", "--detach", worktree, f.baseline]);
+    const request = { ...f.request, repositoryRoot: worktree, workingDirectory: worktree };
+    const broker = vi.fn(async ({ config }: { config: typeof f.config }) => {
+      expect(config.repository).toBe(worktree);
+      expect(config.credential.scope.root).toBe(worktree);
+      return { identity: () => ({ route: f.route, credentialReference: f.config.credential.id, maximumAttempts: 1 as const }),
+        invoke: vi.fn() };
+    });
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockBrokerFactory: broker });
+    expect(adapter.validateConfiguration(request)).toEqual([]);
+    await expect(adapter.prepare(request, f.context)).resolves.toBeTruthy();
+    expect(broker).toHaveBeenCalledOnce();
+    expect(adapter.validateConfiguration({ ...request, repositoryRoot: path.join(f.root, "other"), workingDirectory: path.join(f.root, "other") }).length).toBeGreaterThan(0);
+  });
   it("runs the real Fab loop through a synthetic Bedrock broker while preserving canonical request linkage", async () => {
     const f = bedrockFixture(); let calls = 0;
     const providerRequests: Array<{ id: string; digest: string }> = [];

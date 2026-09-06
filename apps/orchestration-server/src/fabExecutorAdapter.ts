@@ -68,7 +68,10 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
   validateConfiguration(request: ExecutorRequest) {
     const config = this.options.config; const issues: Array<{field: string; message: string}> = [];
     const issue = (field: string, message: string) => issues.push({ field, message });
-    if (request.repositoryRoot !== config.repository || request.workingDirectory !== config.repository) issue("repositoryRoot", "Fab requires the exact operator-bound worktree root.");
+    const governedWorktreePrefix = `${config.repository}${path.sep}.mission-control${path.sep}worktrees${path.sep}`;
+    const repositoryMatches = request.repositoryRoot === config.repository
+      || (config.provider === "bedrock" && request.repositoryRoot.startsWith(governedWorktreePrefix));
+    if (!repositoryMatches || request.workingDirectory !== request.repositoryRoot) issue("repositoryRoot", "Fab requires the configured repository or its canonical Mission Control Attempt worktree.");
     if (request.provider !== config.provider || request.model !== config.model) issue("model", "Fab requires the exact explicitly selected provider/model.");
     if (request.modelRouteDigest !== undefined || request.providerRoute !== undefined || request.reasoningConfig !== undefined) {
       if (!/^sha256:[a-f0-9]{64}$/.test(request.modelRouteDigest ?? "")) issue("modelRouteDigest", "Fab requires the exact frozen model-route digest.");
@@ -87,7 +90,11 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     if (!attempt || !attempt.workOrderId || !attempt.attemptId || !attempt.executorIdentity || !attempt.environmentReference) throw new Error("Fab requires canonical MC Attempt authority and linkage.");
     context.signal?.throwIfAborted(); await attempt.assertActive(); context.signal?.throwIfAborted();
     if (harnessRuntimeArtifactDigest(verifyFabRuntime()) !== harnessRuntimeArtifactDigest(this.runtimeArtifact)) throw new Error("Fab runtime changed after worker registration.");
-    const config = this.options.config;
+    const configured = this.options.config;
+    const config = configured.provider === "bedrock" && request.repositoryRoot !== configured.repository
+      ? parseConfig({ ...structuredClone(configured), repository: request.repositoryRoot,
+          credential: { ...structuredClone(configured.credential), scope: { kind: "repository", root: request.repositoryRoot } } })
+      : configured;
     if (canonicalHash(attempt.acceptanceCriteria.map(item => item.title)) !== canonicalHash(config.acceptanceCriteria)) throw new Error("Fab criteria differ from the frozen WorkOrder.");
     const redactor = new Redactor();
     const store = new SessionStore(this.options.stateDirectory, config.repository, redactor);
