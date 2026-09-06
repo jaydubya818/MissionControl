@@ -508,6 +508,34 @@ export const reportFactoryAttempt = action({
   },
 });
 
+export const reserveProviderRequest = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "provider-liability.reserve");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveExecutionScope, { workflowRunId: payload.workflowRunId });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(makeFunctionReference<"mutation">("factory/providerLiability:reserveRequestInternal"), payload);
+      await ctx.runMutation(internal.serviceCommands.complete, { receiptId: receipt.receiptId, status: "SUCCEEDED", resultReference: String(payload.reservationId) });
+      return result;
+    } catch (error) { await fail(ctx, receipt.receiptId, error); throw error; }
+  },
+});
+
+export const recordProviderUsage = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "provider-liability.settle");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveExecutionScope, { workflowRunId: payload.workflowRunId });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(makeFunctionReference<"mutation">("factory/providerLiability:recordUsageInternal"), payload);
+      await ctx.runMutation(internal.serviceCommands.complete, { receiptId: receipt.receiptId, status: "SUCCEEDED", resultReference: String(payload.reservationId) });
+      return result;
+    } catch (error) { await fail(ctx, receipt.receiptId, error); throw error; }
+  },
+});
+
 export const recordGovernedMcpReceipt = action({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {

@@ -38,7 +38,7 @@ export interface SandboxSupervisorInput {
   profileDigest: string;
   sourceSha: string;
   environmentDescriptor: {
-    provider: "EXE_DEV" | "FAKE";
+    provider: "EXE_DEV" | "FAKE" | "DOCKER";
     image: string;
   };
   repositoryRoot: string;
@@ -262,7 +262,7 @@ function validateSupervisorInput(input: SandboxSupervisorInput) {
     && !validV3ExecutionProfileBinding(manifest, input.profileAdmittedAt)) {
     throw new Error("Frozen V3 execution manifest has an invalid, expired, or substituted Execution Profile binding.");
   }
-  if (!["EXE_DEV", "FAKE"].includes(input.environmentDescriptor?.provider) || !input.environmentDescriptor?.image) throw new Error("Supervisor environment identity is invalid.");
+  if (!["EXE_DEV", "FAKE", "DOCKER"].includes(input.environmentDescriptor?.provider) || !input.environmentDescriptor?.image) throw new Error("Supervisor environment identity is invalid.");
   if (!path.isAbsolute(input.repositoryRoot) || !path.isAbsolute(input.outputPath)
     || (input.diagnosticsPath !== undefined && !path.isAbsolute(input.diagnosticsPath))) throw new Error("Supervisor paths must be absolute.");
   if (!input.executor.command || !Array.isArray(input.executor.args) || !Number.isSafeInteger(input.executor.timeoutMs) || input.executor.timeoutMs < 1_000 || input.executor.timeoutMs > 8 * 60 * 60 * 1_000) throw new Error("Supervisor executor contract is invalid.");
@@ -282,7 +282,7 @@ function summarizeNumstat(value: string) {
 }
 
 async function runExecutor(input: SandboxSupervisorInput, signal?: AbortSignal) {
-  return await new Promise<{ exitCode: number | null; stdout: string; stderr: string; timedOut: boolean; canceled: boolean }>((resolve, reject) => {
+  return await new Promise<{ exitCode: number | null; stdout: string; stderr: string; timedOut: boolean; canceled: boolean  ; }>((resolve, reject) => {
     const child = spawn(input.executor.command, input.executor.args, {
       cwd: input.repositoryRoot,
       env: { PATH: process.env.PATH, HOME: process.env.HOME, ...input.environment },
@@ -360,7 +360,7 @@ function supervisorExecutionBackend(manifest: any) {
     : manifest?.harness?.executionBackend;
 }
 
-function supervisorModelRoute(manifest: any): {
+function supervisorModelRoute(manifest: any):  | {
   provider: string;
   model: string;
   modelRouteDigest?: string;
@@ -418,10 +418,18 @@ function validV2SupervisorBindings(
     && executor.model === route.modelId
     && executor.modelRouteDigest === manifest.modelRoute.routeDigest
     && executor.providerRoute === route.providerRoute
-    && route.providerRoute === "openrouter"
+    &&  (harness.adapter === "codex" && harness.version === "bedrock-v1"
+      ? manifest.version === "factory-execution-manifest/v3" &&
+        route.provider === "aws-bedrock" &&
+        route.modelId === "anthropic.claude-sonnet-4-6" &&
+        /^bedrock-us:[a-f0-9]{64}$/.test(route.providerRoute) &&
+        Object.keys(environment).length === 0 &&
+        manifest.sandbox?.profileSnapshot?.provider === "DOCKER" &&
+        manifest.retryPolicy?.maxAttempts === 1
+      : route.providerRoute === "openrouter"
     && environment.OPENAI_BASE_URL === "https://openrouter.ai/api/v1"
-    && canonicalHash(executor.reasoningConfig ?? null) === canonicalHash(route.reasoningConfig ?? null);
-  return exactRouteMatches
+     ) && canonicalHash(executor.reasoningConfig ?? null) === canonicalHash(route.reasoningConfig ?? null);
+  return  ( exactRouteMatches
     && qualification?.schema === "factory-model-route-qualification/v2"
     && qualification.routeDigest === manifest.modelRoute.routeDigest
     && manifest.modelRoute.qualificationDigest === `sha256:${canonicalHash({ namespace: "factory-model-route-qualification/v2", value: qualification })}`
@@ -436,7 +444,7 @@ function validV2SupervisorBindings(
     && qualification.authority?.verification === false
     && qualification.authority?.acceptance === false
     && qualification.authority?.publication === false
-    && qualification.authority?.merge === false;
+    && qualification.authority?.merge === false ) ;
 }
 
 /** V3 is the V2 decomposed execution tuple plus one exact, qualified profile
@@ -526,7 +534,7 @@ export function validV3ExecutionProfileBinding(manifest: any, profileAdmittedAt:
     requiredHarnessCapabilities: profile.requiredHarnessCapabilities,
     requiredSandboxCapabilities: profile.requiredSandboxCapabilities,
   };
-  return executionProfileProjectionBlockers({
+  return  ( executionProfileProjectionBlockers({
     profileId: binding.profileId,
     profileSnapshot: profile,
     profileDigest: binding.profileDigest,
@@ -546,22 +554,22 @@ export function validV3ExecutionProfileBinding(manifest: any, profileAdmittedAt:
     && selectedSandboxCapabilitiesAllowed(
       profile.requiredSandboxCapabilities,
       expectedSandboxCapabilities,
-    );
+    ) ) ;
 }
 
 function decomposedManifest(manifest: any) {
-  return manifest?.version === "factory-execution-manifest/v2"
-    || manifest?.version === "factory-execution-manifest/v3";
+  return  ( manifest?.version === "factory-execution-manifest/v2"
+    || manifest?.version === "factory-execution-manifest/v3" ) ;
 }
 
 function selectedHarnessRequirementsAllowed(allowed: unknown, selected: unknown) {
-  return Array.isArray(allowed)
+  return  ( Array.isArray(allowed)
     && Array.isArray(selected)
     && selected.length > 0
     && selected.every((requirement) => allowed.some((candidate) =>
       candidate?.capability === requirement?.capability
       && candidate?.minimumSupport === requirement?.minimumSupport
-    ));
+     ) ));
 }
 
 function selectedExecutionHarnessRequirements(isolation: unknown) {
@@ -605,18 +613,18 @@ function sameHarnessRequirements(left: unknown, right: unknown) {
 }
 
 function sameStringSet(left: unknown, right: unknown) {
-  return Array.isArray(left)
+  return  ( Array.isArray(left)
     && Array.isArray(right)
     && left.every((item) => typeof item === "string")
     && right.every((item) => typeof item === "string")
-    && JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+    && JSON.stringify([...left].sort()) === JSON.stringify([...right].sort()) ) ;
 }
 
 function selectedSandboxCapabilitiesAllowed(allowed: unknown, selected: unknown) {
-  return Array.isArray(allowed)
+  return  ( Array.isArray(allowed)
     && Array.isArray(selected)
     && selected.length > 0
-    && selected.every((capability) => typeof capability === "string" && allowed.includes(capability));
+    && selected.every((capability) => typeof capability === "string" && allowed.includes(capability ) ));
 }
 
 function validV2SupervisorRoute(route: any) {
@@ -631,17 +639,17 @@ function validV2SupervisorRoute(route: any) {
     || !boundedIdentity(route.modelId, 200)) return false;
   if (route.reasoningConfig === undefined) return true;
   const reasoning = route.reasoningConfig;
-  return reasoning && typeof reasoning === "object" && !Array.isArray(reasoning)
+  return  ( reasoning && typeof reasoning === "object" && !Array.isArray(reasoning)
     && Object.keys(reasoning).length > 0
     && Object.keys(reasoning).every((key) => ["effort", "temperature", "maxTokens"].includes(key))
     && (reasoning.effort === undefined || (boundedIdentity(reasoning.effort, 64) && reasoning.effort === reasoning.effort.toLowerCase()))
     && (reasoning.temperature === undefined || (typeof reasoning.temperature === "number" && Number.isFinite(reasoning.temperature) && reasoning.temperature >= 0 && reasoning.temperature <= 2))
-    && (reasoning.maxTokens === undefined || (Number.isSafeInteger(reasoning.maxTokens) && reasoning.maxTokens >= 1 && reasoning.maxTokens <= 10_000_000));
+    && (reasoning.maxTokens === undefined || (Number.isSafeInteger(reasoning.maxTokens) && reasoning.maxTokens >= 1 && reasoning.maxTokens <= 10_000_000)) ) ;
 }
 
 function boundedIdentity(value: unknown, maximum: number): value is string {
-  return typeof value === "string" && value === value.trim() && value.length > 0
-    && value.length <= maximum && !/[\0\r\n]/.test(value);
+  return  ( typeof value === "string" && value === value.trim() && value.length > 0
+    && value.length <= maximum && !/[\0\r\n]/.test(value ) );
 }
 
 function codexUsage(stdout: string) {

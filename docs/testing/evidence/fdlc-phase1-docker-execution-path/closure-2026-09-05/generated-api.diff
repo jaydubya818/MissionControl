@@ -1,0 +1,38 @@
+diff --git a/convex/_generated/api.d.ts b/convex/_generated/api.d.ts
+index 30ed7a9..feb1e1f 100644
+--- a/convex/_generated/api.d.ts
++++ b/convex/_generated/api.d.ts
+@@ -62,6 +62,7 @@ import type * as factory_learning from "../factory/learning.js";
+ import type * as factory_metaLoop from "../factory/metaLoop.js";
+ import type * as factory_piBridge from "../factory/piBridge.js";
+ import type * as factory_prChecks from "../factory/prChecks.js";
++import type * as factory_providerLiability from "../factory/providerLiability.js";
+ import type * as factory_releases from "../factory/releases.js";
+ import type * as factory_repetitiveTasks from "../factory/repetitiveTasks.js";
+ import type * as factory_workflows from "../factory/workflows.js";
+@@ -178,6 +179,8 @@ import type * as lib_policyV2Verification from "../lib/policyV2Verification.js";
+ import type * as lib_prEvaluation from "../lib/prEvaluation.js";
+ import type * as lib_prdParser from "../lib/prdParser.js";
+ import type * as lib_preExecutionRecovery from "../lib/preExecutionRecovery.js";
++import type * as lib_providerLiability from "../lib/providerLiability.js";
++import type * as lib_providerLiabilityValidators from "../lib/providerLiabilityValidators.js";
+ import type * as lib_qualityContract from "../lib/qualityContract.js";
+ import type * as lib_qualityGateDecision from "../lib/qualityGateDecision.js";
+ import type * as lib_rateLimit from "../lib/rateLimit.js";
+@@ -372,6 +375,7 @@ declare const fullApi: ApiFromModules<{
+   "factory/metaLoop": typeof factory_metaLoop;
+   "factory/piBridge": typeof factory_piBridge;
+   "factory/prChecks": typeof factory_prChecks;
++  "factory/providerLiability": typeof factory_providerLiability;
+   "factory/releases": typeof factory_releases;
+   "factory/repetitiveTasks": typeof factory_repetitiveTasks;
+   "factory/workflows": typeof factory_workflows;
+@@ -488,6 +492,8 @@ declare const fullApi: ApiFromModules<{
+   "lib/prEvaluation": typeof lib_prEvaluation;
+   "lib/prdParser": typeof lib_prdParser;
+   "lib/preExecutionRecovery": typeof lib_preExecutionRecovery;
++  "lib/providerLiability": typeof lib_providerLiability;
++  "lib/providerLiabilityValidators": typeof lib_providerLiabilityValidators;
+   "lib/qualityContract": typeof lib_qualityContract;
+   "lib/qualityGateDecision": typeof lib_qualityGateDecision;
+   "lib/rateLimit": typeof lib_rateLimit;

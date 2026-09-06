@@ -1,4 +1,7 @@
-import { v } from "convex/values";
+ import {
+  dockerSandboxAdmission,
+  DOCKER_ADMISSION_SCHEMA,
+} from "../lib/dockerSandboxAdmission"; import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -74,7 +77,7 @@ function factoryWorkloadClass(purpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGEN
 }
 
 function factoryIsolationMode(purpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGENT_AUTOMATION" | undefined) {
-  return purpose === "VERIFICATION" ? "READ_ONLY" as const : "WORKSPACE_WRITE" as const;
+  return purpose === "VERIFICATION" ?  ( "READ_ONLY" as const  ) :  ( "WORKSPACE_WRITE" as const ) ;
 }
 
 function hasAnyExecutionProfileBinding(version: Doc<"factoryDefinitionVersions">) {
@@ -91,7 +94,7 @@ function hasAnyExecutionProfileBinding(version: Doc<"factoryDefinitionVersions">
 
 function factoryVersionExecutionProfileProjection(version: Doc<"factoryDefinitionVersions">): ExecutionProfileProjection | null {
   if (!version.executionProfileId) return null;
-  const profileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+  const profileSnapshot = version.executionProfileSnapshot as  | Record<string, any> | undefined;
   return {
     profileId: String(version.executionProfileId),
     profileKey: version.executionProfileKey ?? "",
@@ -140,10 +143,10 @@ function evaluateFactoryVersionExecutionProfile(input: {
     };
   }
   const blockers = [
-    ...((!profile
+    ...(!profile
       || String(profile._id) !== String(version.executionProfileId)
       || String(profile.projectId) !== String(version.projectId)
-      || (version.tenantId && String(profile.tenantId) !== String(version.tenantId)))
+      || (version.tenantId && String(profile.tenantId) !== String(version.tenantId))
       ? ["EXECUTION_PROFILE_IDENTITY_MISMATCH"]
       : []),
     ...admissionBlockers,
@@ -291,10 +294,10 @@ export const getVersionOptions = query({
           credentialClass: snapshot.toolGrant.grantSnapshot?.credentialClass,
           destination: snapshot.toolGrant.grantSnapshot?.destination,
           admission: snapshot.toolGrant.grantSnapshot?.toolVersionSnapshot?.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE"
-            ? "QUALIFIED_REAL_READ_ONLY_SERVICE" as const
-            : "QUALIFICATION_FIXTURE" as const,
-        } : null,
-        mcpSupport: snapshot.toolGrant ? "EXACT_HOST_BROKER_ONLY" as const : "NO_TOOL_CAPABILITY" as const,
+            ?  ( "QUALIFIED_REAL_READ_ONLY_SERVICE" as const
+             ) :  "QUALIFICATION_FIXTURE" as const,
+         } : null,
+        mcpSupport: snapshot.toolGrant ?  ( "EXACT_HOST_BROKER_ONLY" as const  ) :  ( "NO_TOOL_CAPABILITY" as const ) ,
         isolationModes: snapshot.isolationModes,
       };
     }))).filter((profile): profile is NonNullable<typeof profile> => Boolean(profile));
@@ -477,7 +480,8 @@ export const create = mutation({
 export const createSandboxProfile = mutation({
   args: {
     projectId: v.id("projects"),
-    profileKey: v.string(),
+     provider: v.optional(v.union(v.literal("EXE_DEV"), v.literal("DOCKER"))),
+    dockerQualification: v.optional(v.any()), profileKey: v.string(),
     providerProfile: v.string(),
     providerProfileVersion: v.string(),
     machineImage: v.string(),
@@ -515,7 +519,14 @@ export const createSandboxProfile = mutation({
   handler: async (ctx, args) => {
     const access = await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
     const project = await ctx.db.get(args.projectId);
-    if (!project) throw new Error("Sandbox Profile workspace is unavailable.");
+    if (!project) throw new Error("Sandbox Profile workspace is unavailable." );
+    const docker = args.provider === "DOCKER";
+    if (
+      docker
+        ? !args.dockerQualification || args.certification !== undefined
+        : args.dockerQualification !== undefined
+    )
+      throw new Error("Provider-specific qualification evidence required." );
     const profileKey = args.profileKey.trim();
     if (!/^[a-z0-9][a-z0-9-]{2,63}$/.test(profileKey)) throw new Error("Sandbox Profile key must be a stable lowercase identifier.");
     if (!args.providerProfile.trim() || !args.providerProfileVersion.trim() || !args.machineImage.trim()) throw new Error("Sandbox provider and image identity are required.");
@@ -539,14 +550,18 @@ export const createSandboxProfile = mutation({
       !args.readinessEvidence.providerReachable ? "Provider API is unreachable." : null,
       !args.readinessEvidence.capacityAvailable ? "Provider account has no allocation capacity." : null,
       args.readinessEvidence.automaticCredentialCount > 0 ? "Automatic provider credentials are attached." : null,
-      !args.certification ? "Live exe.dev lifecycle certification is not recorded." : null,
+      !args.certification  && !docker ? "Live exe.dev lifecycle certification is not recorded." : null,
     ].filter((reason): reason is string => Boolean(reason));
     const readinessState = blockedReasons.length > 0
-      ? "BLOCKED" as const
-      : args.networkEgress === "UNRESTRICTED" || Boolean(args.certification)
-        ? "DEGRADED" as const
-        : "READY" as const;
-    const readinessReason = blockedReasons.join(" ") || (readinessState === "DEGRADED"
+      ?  ( "BLOCKED" as const
+       ) : args.networkEgress === "UNRESTRICTED" || Boolean(args.certification)
+         ||
+            docker ?  ( "DEGRADED" as const
+         ) :  ( "READY" as const ) ;
+    const readinessReason = blockedReasons.join(" " ) ||
+      (docker
+        ? "Exact Docker lifecycle and network-none containment evidence; model route remains separately governed."
+        : undefined ) || (readinessState === "DEGRADED"
       ? args.certification
         ? "Guest-kernel nftables enforcement is proven; provider-enforced egress is unavailable."
         : "Provider egress is unrestricted and represented honestly."
@@ -555,14 +570,16 @@ export const createSandboxProfile = mutation({
       schema: "factory-sandbox-profile/v1",
       profileKey,
       version,
-      provider: "EXE_DEV",
+      provider:  docker ? ("DOCKER" as const) : ( "EXE_DEV" as const) ,
       providerProfile: args.providerProfile.trim(),
       providerProfileVersion: args.providerProfileVersion.trim(),
       machine: { image: args.machineImage.trim(), cpu: args.cpu, memoryMb: args.memoryMb, diskGb: args.diskGb },
-      supervisor: { version: "mission-control-supervisor/v1", transport: "SSH" },
+      supervisor: { version: "mission-control-supervisor/v1", transport:  docker ? ("DOCKER_STDIN" as const) : ( "SSH"  as const) },
       runtime: { maxRuntimeMs: args.maxRuntimeMs, resultPollIntervalMs: args.resultPollIntervalMs, resultRetentionMs: args.resultRetentionMs },
       network: { egress: args.networkEgress, egressAllowlist: [...new Set(args.egressAllowlist)].sort(), publicIngress: false, exposedPorts: [] },
-      credentials: { inference: "ATTEMPT_SCOPED_OPENROUTER", repositoryAccess: "CONTROL_PLANE_SNAPSHOT", githubAuthority: "NONE", providerAuthority: "NONE" },
+      credentials: { inference:  docker
+          ? ("NONE" as const)
+          : ( "ATTEMPT_SCOPED_OPENROUTER" as const) , repositoryAccess: "CONTROL_PLANE_SNAPSHOT", githubAuthority: "NONE", providerAuthority: "NONE" },
       spend: { maxUsd: args.spendLimitUsd, enforcement: args.spendEnforcement },
       teardown: { terminateOnEveryTerminalState: true, verifyResourceAbsent: true, supportsResume: false },
       preview: { mode: args.previewMode, ...(args.previewPort ? { port: args.previewPort } : {}) },
@@ -571,11 +588,12 @@ export const createSandboxProfile = mutation({
         checkedAt: now,
         reason: readinessReason,
         egressEnforcementProven: args.readinessEvidence.egressEnforcementProven,
-        liveCertified: args.certification?.liveCertified ?? false,
+        liveCertified:  docker || ( args.certification?.liveCertified ?? false ) ,
         providerEgressEnforcementProven: false,
         guestEgressEnforcementProven: Boolean(args.certification && args.readinessEvidence.egressEnforcementProven),
         evidenceReference: args.readinessEvidence.evidenceReference.trim(),
-      },
+      } ,
+      ...(docker ? { dockerQualification: args.dockerQualification } : {}) ,
       ...(args.certification ? {
         qualification: {
           evidencePacketReference: args.certification.evidencePacketReference.trim(),
@@ -597,7 +615,7 @@ export const createSandboxProfile = mutation({
         security: args.certification.security,
       } : {}),
     };
-    if (args.certification) {
+    if (args.certification || docker ) {
       const issues = qualifiedSandboxSnapshotIssues(snapshot);
       if (issues.length) throw new Error(`Certified hardened Sandbox Profile is invalid (${issues.join(", ")}).`);
     }
@@ -608,7 +626,7 @@ export const createSandboxProfile = mutation({
       profileKey,
       version,
       profileDigest,
-      provider: "EXE_DEV",
+      provider:  docker ? ("DOCKER" as const) : ( "EXE_DEV" as const) ,
       providerProfile: snapshot.providerProfile,
       providerProfileVersion: snapshot.providerProfileVersion,
       machineImage: snapshot.machine.image,
@@ -616,7 +634,7 @@ export const createSandboxProfile = mutation({
       memoryMb: args.memoryMb,
       diskGb: args.diskGb,
       supervisorVersion: "mission-control-supervisor/v1",
-      executorTransport: "SSH",
+      executorTransport:  docker ? ("DOCKER_STDIN" as const) : ( "SSH" as const) ,
       maxRuntimeMs: args.maxRuntimeMs,
       resultPollIntervalMs: args.resultPollIntervalMs,
       resultRetentionMs: args.resultRetentionMs,
@@ -624,7 +642,9 @@ export const createSandboxProfile = mutation({
       egressAllowlist: snapshot.network.egressAllowlist,
       publicIngress: false,
       exposedPorts: [],
-      inferenceCredentialMode: "ATTEMPT_SCOPED_OPENROUTER",
+      inferenceCredentialMode:  docker
+        ? ("NONE" as const)
+        : ( "ATTEMPT_SCOPED_OPENROUTER" as const) ,
       repositoryAccessMode: "CONTROL_PLANE_SNAPSHOT",
       spendLimitUsd: args.spendLimitUsd,
       spendEnforcement: args.spendEnforcement,
@@ -665,7 +685,14 @@ export const promoteSandboxProfile = mutation({
     if (issues.length) throw new Error(`Sandbox Profile does not contain qualified hardened evidence (${issues.join(", ")}).`);
     const snapshot = profile.immutableSnapshot as any;
     const promotedAt = Date.now();
-    const admissionSnapshot = {
+    const admissionSnapshot =  snapshot.provider === "DOCKER"
+        ? dockerSandboxAdmission(
+            snapshot,
+            profile.profileDigest,
+            access.actorId,
+            promotedAt,
+          )
+        : {
       schema: SANDBOX_PROFILE_ADMISSION_SCHEMA,
       state: "PRODUCTION_PILOT_ELIGIBLE",
       profileDigest: profile.profileDigest,
@@ -695,7 +722,9 @@ export const promoteSandboxProfile = mutation({
       },
     };
     const admissionDigest = `sha256:${computeCanonicalHash({
-      namespace: SANDBOX_PROFILE_ADMISSION_SCHEMA,
+      namespace :
+        snapshot.provider === "DOCKER"
+          ? DOCKER_ADMISSION_SCHEMA : SANDBOX_PROFILE_ADMISSION_SCHEMA,
       value: admissionSnapshot,
     })}`;
     await ctx.db.patch(profile._id, {
@@ -806,7 +835,7 @@ export const createVersion = mutation({
       }
     }
     const frozenProfileSnapshot = executionProfile.immutableSnapshot as Record<string, any>;
-    const selectedExecutionBackend = frozenProfileSnapshot.executionBackend as "persistent-worker" | "remote-sandbox";
+    const selectedExecutionBackend = frozenProfileSnapshot.executionBackend as  | "persistent-worker" | "remote-sandbox";
     const selectedExecutor = {
       adapter: String(frozenProfileSnapshot.harness.adapter),
       version: String(frozenProfileSnapshot.harness.version),
@@ -850,7 +879,7 @@ export const createVersion = mutation({
     })) {
       throw new Error("The Execution Profile model-route qualification does not cover this Factory repository, workload, and risk scope.");
     }
-    const routeSnapshot = modelRoute.routeSnapshot as Record<string, any> | undefined;
+    const routeSnapshot = modelRoute.routeSnapshot as  | Record<string, any> | undefined;
     if (!routeSnapshot) throw new Error("The selected exact model route is missing its immutable snapshot.");
     if (!executionProfile.qualificationSnapshot || !executionProfile.qualificationDigest) {
       throw new Error("Execution Profile qualification identity is incomplete.");
@@ -1079,7 +1108,7 @@ export const assessReadiness = mutation({
       ? ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
       : ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write"];
     const host = repository
-      ? bindings.find((binding) => factoryWorkerEligibility({
+      ?  ( bindings.find((binding) => factoryWorkerEligibility({
           worker: {
             workerId: binding.hostId,
             status: binding.status,
@@ -1120,7 +1149,7 @@ export const assessReadiness = mutation({
           activeWorkerLeaseCount: 0,
           now,
         }).eligible) ?? null
-      : null;
+       ) : null;
     const liveRepositoryDataClassification = normalizeRepositoryDataClassification(repository?.dataClassification);
     const repositoryClassificationReady = liveRepositoryDataClassification !== "UNCLASSIFIED"
       && liveRepositoryDataClassification === (version.repositoryDataClassification ?? "UNCLASSIFIED");
@@ -1207,8 +1236,8 @@ export const assessReadiness = mutation({
       check("recovery", "Executor-compatible recovery", genericHarnessV1RecoveryReady(version.recovery), now, undefined, "Enable cancel and bounded retry; Generic Harness Contract V1 does not add pause or in-process resume authority."),
     ];
     const status = checks.every((item) => item.status === "VERIFIED" || item.status === "NOT_APPLICABLE")
-      ? "PASS" as const
-      : "BLOCKED" as const;
+      ?  ( "PASS" as const
+       ) :  ( "BLOCKED" as const ) ;
     return await ctx.db.insert("factoryReadinessAssessments", {
       tenantId: version.tenantId,
       projectId: version.projectId,
@@ -1279,7 +1308,7 @@ function check(
   return {
     id,
     label,
-    status: passing ? "VERIFIED" as const : "MISSING" as const,
+    status: passing ?  ( "VERIFIED" as const  ) :  ( "MISSING" as const ) ,
     checkedAt,
     expiresAt,
     remediation: passing ? undefined : remediation,

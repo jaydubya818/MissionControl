@@ -1,0 +1,21 @@
+{
+  "observedAt": "2026-09-05T07:07:37.251253+00:00",
+  "instance": "local-jaydubya818-missioncontrol_df0fe",
+  "type": "Convex local control plane; not the persistent execution worker",
+  "endpoint": "http://127.0.0.1:3214",
+  "sitePort": 3215,
+  "backendBinaryVersion": "precompiled-2026-08-25-7cce8fb",
+  "stateDirectory": "/Users/jaywest/.convex/convex-backend-state/local-jaydubya818-missioncontrol_df0fe",
+  "priorObservation": "Connection refused; no configured listener",
+  "priorShutdownCause": "UNKNOWN; no evidence supports attributing why it had been stopped",
+  "startup": "Original configured binary/database/storage; loopback bind; no code deploy, seed or execution worker",
+  "health": {
+    "instance_name": "PASS exact instance",
+    "projects:list": "PASS",
+    "runtimeCompatibility:get": 40
+  },
+  "scope": "QUALIFIED for control-plane read access only",
+  "executionBackend": "persistent-worker NOT ADMITTED",
+  "bootstrap": "Transient index bootstrapping errors observed before queries succeeded",
+  "deploymentSourceSha": "UNKNOWN; contract version alone is not source provenance"
+}

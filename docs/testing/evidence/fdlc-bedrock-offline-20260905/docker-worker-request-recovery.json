@@ -1,0 +1,18 @@
+{
+  "fixtureOnly": true,
+  "providerCalls": 0,
+  "recovered": {
+    "providerResourceId": "0d59b3ae957eb2232bbbc57819aa8869627696aea3cecc38ece47018e311a222",
+    "resourceName": "mc-attempt-1234567890abcdef",
+    "requestedAt": 1788643644756,
+    "confirmedAbsentAt": 1788643644835,
+    "resourceAbsent": true,
+    "allocationRecoveryProof": {
+      "schema": "factory-docker-request-recovery/v1",
+      "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+      "attemptLeaseId": "lease-7",
+      "manifestDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "missingIdRemainsUnresolved": true
+}

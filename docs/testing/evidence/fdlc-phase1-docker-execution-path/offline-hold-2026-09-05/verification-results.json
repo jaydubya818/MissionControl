@@ -1,0 +1,18 @@
+{
+  "state": "QUALIFICATION_AWS_IDENTITY_REQUIRED",
+  "offlineTests": {
+    "passed": 73,
+    "failed": 0,
+    "prerequisites": 19,
+    "liability": 42,
+    "recovery": 12
+  },
+  "documentationGuard": "PASS",
+  "runtimeContractGuard": "PASS",
+  "diffWhitespaceCheck": "PASS",
+  "prerequisiteCheckerExit": 2,
+  "providerQualified": false,
+  "readinessIssued": false,
+  "executionAuthorized": false,
+  "authority": "NONE"
+}

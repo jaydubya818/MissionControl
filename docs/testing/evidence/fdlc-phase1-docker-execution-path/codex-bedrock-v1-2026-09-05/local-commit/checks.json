@@ -1,0 +1,115 @@
+{
+  "implementationCommit": "cb373ee36d1645cad4f277f59c75cb7b1cac57f5",
+  "baseMain": "6d7146d5205aef729aee2960aed2a4ed8e8ab95c",
+  "checks": [
+    {
+      "name": "runtime-current-main",
+      "command": [
+        "node",
+        "scripts/check-runtime-contract.mjs",
+        "--base",
+        "6d7146d5205aef729aee2960aed2a4ed8e8ab95c"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationSeconds": 2.6
+    },
+    {
+      "name": "runtime-pinned-default",
+      "command": [
+        "node",
+        "scripts/check-runtime-contract.mjs"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationSeconds": 2.42
+    },
+    {
+      "name": "authorization",
+      "command": [
+        "pnpm",
+        "run",
+        "security:authorization"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationSeconds": 1.87
+    },
+    {
+      "name": "mcp-receipt",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/governed-mcp-phase3-qualification.mts"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationSeconds": 0.41
+    },
+    {
+      "name": "composed-system",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@mission-control/orchestration-server",
+        "exec",
+        "vitest",
+        "run",
+        "src/__tests__/systemFactoryQualification.test.ts",
+        "src/__tests__/governedMcpBroker.test.ts",
+        "src/__tests__/factoryAttemptWorker.test.ts",
+        "src/__tests__/factoryAttemptWorkerRemote.test.ts",
+        "src/__tests__/factoryVerification.test.ts",
+        "src/__tests__/remoteSandboxRuntime.test.ts",
+        "src/__tests__/sandboxReconciler.test.ts",
+        "src/__tests__/sandboxCredentials.test.ts",
+        "src/__tests__/githubAppPublisher.test.ts",
+        "src/__tests__/auth.test.ts",
+        "src/__tests__/orchestrationSecurity.test.ts",
+        "src/__tests__/harnessAdapterRegistry.test.ts",
+        "src/__tests__/deepseekHarnessExecutorAdapter.test.ts"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationSeconds": 11.53
+    },
+    {
+      "name": "golden-eval",
+      "command": [
+        "node",
+        "scripts/run-mission-control-eval.mjs",
+        "--input",
+        "/Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/docs/testing/evidence/fdlc-phase1-docker-execution-path/codex-bedrock-v1-2026-09-05/local-commit/scenario-evidence.json",
+        "--baseline",
+        "evals/mission-control-golden-v1/baselines/main.json",
+        "--receipt",
+        "/Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/docs/testing/evidence/fdlc-phase1-docker-execution-path/codex-bedrock-v1-2026-09-05/local-commit/eval-receipt.json",
+        "--check-baseline"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationSeconds": 0.16
+    },
+    {
+      "name": "docs",
+      "command": [
+        "node",
+        "scripts/check-factory-docs.mjs"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationSeconds": 0.07
+    },
+    {
+      "name": "secrets",
+      "command": [
+        "node",
+        "scripts/check-repository-secrets.mjs"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationSeconds": 0.5
+    }
+  ]
+}

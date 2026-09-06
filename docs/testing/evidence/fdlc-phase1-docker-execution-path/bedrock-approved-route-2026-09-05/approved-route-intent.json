@@ -1,0 +1,23 @@
+{
+  "schema": "fdlc-approved-route-intent/v1",
+  "provider": "AWS Bedrock",
+  "region": "us-east-1",
+  "modelId": "anthropic.claude-sonnet-4-6",
+  "foundationModelArn": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
+  "environment": "QUALIFICATION ONLY",
+  "awsAccountId": null,
+  "principalRoleArn": null,
+  "qualificationProject": null,
+  "governedRouteId": null,
+  "governedRouteDigest": null,
+  "providerAdapter": null,
+  "pricingIdentity": null,
+  "routeSelectionResolved": true,
+  "allowProduction": false,
+  "allowInferenceProfileSubstitution": false,
+  "realModelCallsAuthorized": false,
+  "realModelCallsPerformed": 0,
+  "wo1Executed": false,
+  "boundary": "QUALIFICATION_AWS_IDENTITY_REQUIRED",
+  "requestSource": "/Users/jaywest/.codex/attachments/1de6b260-2da9-43d8-859b-cec4e64727c5/pasted-text.txt"
+}

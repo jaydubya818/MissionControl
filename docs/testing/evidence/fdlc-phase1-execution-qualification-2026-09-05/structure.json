@@ -1,0 +1,28 @@
+{
+  "status": "success",
+  "value": {
+    "assignmentCount": 0.0,
+    "canManageTeams": true,
+    "members": [],
+    "memberships": [],
+    "repositories": [
+      {
+        "_creationTime": 1786559792513.496,
+        "_id": "k17wswvrva7ky172eej2w1nj858cbzt7",
+        "createdAt": 1786559792513.0,
+        "defaultBranch": "main",
+        "displayName": "MissionControl",
+        "isDefault": true,
+        "migrationVersion": 1.0,
+        "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+        "provider": "GITHUB",
+        "repository": "jaydubya818/MissionControl",
+        "status": "CONFIGURED",
+        "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+        "updatedAt": 1786559792513.0,
+        "webhookStatus": "MISSING"
+      }
+    ],
+    "teams": []
+  }
+}

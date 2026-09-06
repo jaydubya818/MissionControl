@@ -1,0 +1,21 @@
+{
+  "observedAt": "2026-09-05T16:55:55.089067+00:00",
+  "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+  "options": {
+    "status": "success",
+    "value": {
+      "modelRoutes": [],
+      "executionProfiles": [],
+      "sandboxProfiles": [],
+      "codeScopes": []
+    }
+  },
+  "hosts": {
+    "status": "success",
+    "value": []
+  },
+  "verifiers": {
+    "status": "success",
+    "value": []
+  }
+}

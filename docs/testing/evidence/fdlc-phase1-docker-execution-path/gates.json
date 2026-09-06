@@ -1,0 +1,145 @@
+[
+  {
+    "name": "test",
+    "command": [
+      "pnpm",
+      "run",
+      "test"
+    ],
+    "exitCode": 0,
+    "seconds": 34.21
+  },
+  {
+    "name": "lint",
+    "command": [
+      "pnpm",
+      "run",
+      "lint"
+    ],
+    "exitCode": 0,
+    "seconds": 26.92
+  },
+  {
+    "name": "build",
+    "command": [
+      "pnpm",
+      "run",
+      "build"
+    ],
+    "exitCode": 0,
+    "seconds": 7.64
+  },
+  {
+    "name": "ci-typecheck",
+    "command": [
+      "pnpm",
+      "run",
+      "ci:typecheck"
+    ],
+    "exitCode": 0,
+    "seconds": 27.14
+  },
+  {
+    "name": "runtime-contract",
+    "command": [
+      "pnpm",
+      "run",
+      "ci:runtime-contract"
+    ],
+    "exitCode": 1,
+    "seconds": 2.92
+  },
+  {
+    "name": "release-security",
+    "command": [
+      "pnpm",
+      "run",
+      "release:security"
+    ],
+    "exitCode": 0,
+    "seconds": 4.8
+  },
+  {
+    "name": "docs-factory",
+    "command": [
+      "pnpm",
+      "docs:factory-check"
+    ],
+    "exitCode": 0,
+    "seconds": 0.25
+  },
+  {
+    "name": "diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exitCode": 0,
+    "seconds": 0.01
+  },
+  {
+    "name": "workflow-typecheck",
+    "command": [
+      "pnpm",
+      "--filter",
+      "@mission-control/workflow-engine",
+      "typecheck"
+    ],
+    "exitCode": 0,
+    "seconds": 0.58
+  },
+  {
+    "name": "workflow-build",
+    "command": [
+      "pnpm",
+      "--filter",
+      "@mission-control/workflow-engine",
+      "build"
+    ],
+    "exitCode": 0,
+    "seconds": 0.58
+  },
+  {
+    "name": "orchestration-typecheck",
+    "command": [
+      "pnpm",
+      "--filter",
+      "@mission-control/orchestration-server",
+      "typecheck"
+    ],
+    "exitCode": 0,
+    "seconds": 1.73
+  },
+  {
+    "name": "orchestration-build",
+    "command": [
+      "pnpm",
+      "--filter",
+      "@mission-control/orchestration-server",
+      "build"
+    ],
+    "exitCode": 0,
+    "seconds": 2.15
+  },
+  {
+    "name": "orchestration-startup",
+    "command": [
+      "pnpm",
+      "run",
+      "smoke:orchestration-start"
+    ],
+    "exitCode": 0,
+    "seconds": 10.08
+  },
+  {
+    "name": "system-qualification",
+    "command": [
+      "pnpm",
+      "run",
+      "qualify:factory:v2"
+    ],
+    "exitCode": 0,
+    "seconds": 107.88
+  }
+]

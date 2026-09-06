@@ -485,12 +485,12 @@ export function executionProfileQualificationMatches(input: {
   if (digest !== input.profileDigest) return false;
   const profile = input.profileSnapshot as Record<string, any>;
   const qualification = input.qualificationSnapshot as Record<string, any>;
-  return qualification.profile.id === input.profileId
+  return  ( qualification.profile.id === input.profileId
     && qualification.profile.key === profile.profileKey
     && qualification.profile.version === profile.version
     && qualification.profile.digest === input.profileDigest
     && sameCanonical(qualification.components, qualificationComponents(profile))
-    && qualificationScopeWithinProfile(profile, qualification);
+    && qualificationScopeWithinProfile(profile, qualification ) );
 }
 
 /** Record-only currentness. Live workers/routes/sandboxes are checked by exact
@@ -562,7 +562,7 @@ export function executionProfileCurrentness(
  * pure helper: callers own workspace authorization and database reads. */
 export function executionProfileCurrentnessIssues(input: {
   profile: ExecutionProfilePersistedRecord | null | undefined;
-  modelRoute: {
+  modelRoute:  | {
     _id?: unknown;
     routeSnapshot?: unknown;
     routeDigest?: string;
@@ -655,13 +655,13 @@ export function executionProfileCurrentnessIssues(input: {
 
 export function executionProfileQualifiedFor(
   profile: ExecutionProfileAdmissionRecord | null | undefined,
-  input: { workloadClass: string; riskClass: ModelRouteRiskClass; now?: number },
+  input: { workloadClass: string; riskClass: ModelRouteRiskClass; now?: number  ; },
 ) {
   const current = executionProfileCurrentness(profile, input.now ?? Date.now());
   if (!current.eligible) return false;
   const qualification = profile!.qualificationSnapshot as Record<string, any>;
-  return qualification.scope.workloadClasses.includes(input.workloadClass)
-    && qualification.scope.riskClasses.includes(input.riskClass);
+  return  ( qualification.scope.workloadClasses.includes(input.workloadClass)
+    && qualification.scope.riskClasses.includes(input.riskClass ) );
 }
 
 /** Verifies that every persisted compatibility field is only a projection of
@@ -704,19 +704,19 @@ export function executionProfilePersistedRecordBlockers(
     || record.modelQualificationDigest !== profile.modelRoute.qualificationDigest) {
     blockers.push("EXECUTION_PROFILE_MODEL_ROUTE_MISMATCH");
   }
-  const expectedSandbox = profile.sandboxProfile as Record<string, any> | undefined;
+  const expectedSandbox = profile.sandboxProfile as  | Record<string, any> | undefined;
   const sandboxMismatch = expectedSandbox
-    ? (String(record.sandboxProfileId ?? "") !== expectedSandbox.profileId
-      || record.sandboxProfileDigest !== expectedSandbox.profileDigest)
-    : (record.sandboxProfileId !== undefined || record.sandboxProfileDigest !== undefined);
+    ? String(record.sandboxProfileId ?? "") !== expectedSandbox.profileId
+      || record.sandboxProfileDigest !== expectedSandbox.profileDigest
+    : record.sandboxProfileId !== undefined || record.sandboxProfileDigest !== undefined;
   if (sandboxMismatch) {
     blockers.push("EXECUTION_PROFILE_SANDBOX_MISMATCH");
   }
-  const expectedToolGrant = profile.toolGrant as Record<string, any> | undefined;
+  const expectedToolGrant = profile.toolGrant as  | Record<string, any> | undefined;
   const toolGrantMismatch = expectedToolGrant
-    ? (String(record.toolGrantId ?? "") !== expectedToolGrant.grantId
-      || record.toolGrantDigest !== expectedToolGrant.grantDigest)
-    : (record.toolGrantId !== undefined || record.toolGrantDigest !== undefined);
+    ? String(record.toolGrantId ?? "") !== expectedToolGrant.grantId
+      || record.toolGrantDigest !== expectedToolGrant.grantDigest
+    : record.toolGrantId !== undefined || record.toolGrantDigest !== undefined;
   if (toolGrantMismatch) blockers.push("EXECUTION_PROFILE_CAPABILITY_MISMATCH");
   if (!sameCanonical(record.isolationModes, profile.isolationModes)) {
     blockers.push("EXECUTION_PROFILE_ISOLATION_MISMATCH");
@@ -987,10 +987,16 @@ function sandboxBindingIssues(input: unknown, profile: Record<string, any>): str
     })}`;
     if (expectedDigest !== sandbox.profileDigest) issues.push("sandbox-profile-digest-mismatch");
   }
-  const imageDigest = sandbox.profileSnapshot?.security?.image?.digest;
-  const imageReferenceDigest = typeof sandbox.profileSnapshot?.machine?.image === "string"
+  const  imageReferenceDigest = typeof sandbox.profileSnapshot?.machine?.image === "string"
     ? sandbox.profileSnapshot.machine.image.match(/@(sha256:[a-f0-9]{64})$/)?.[1]
-    : undefined;
+    : undefined ;
+  const docker = sandbox.profileSnapshot?.provider === "DOCKER";
+  const imageDigest =
+    docker && sandbox.profileSnapshot.security === undefined
+      ? imageReferenceDigest
+      : sandbox.profileSnapshot?.security?.image?.digest;
+  if (docker && sandbox.profileSnapshot.security !== undefined)
+    issues.push("docker-vm-security-not-allowed") ;
   if (!sha256(imageDigest) || imageReferenceDigest !== imageDigest) {
     issues.push("sandbox-image-identity-invalid");
   }
@@ -1091,11 +1097,12 @@ function qualificationScopeWithinProfile(
     return false;
   }
   if (profile.executionBackend !== "remote-sandbox") return true;
-  const sandboxQualification = profile.sandboxProfile?.profileSnapshot?.qualification;
-  return Array.isArray(sandboxQualification?.supportedWorkloadClasses)
+  const sandboxQualification = profile.sandboxProfile?.profileSnapshot?. dockerQualification ??
+    profile.sandboxProfile?.profileSnapshot?. qualification;
+  return  ( Array.isArray(sandboxQualification?.supportedWorkloadClasses)
     && Array.isArray(sandboxQualification?.supportedRiskClasses)
     && workloadClasses.every((value) => sandboxQualification.supportedWorkloadClasses.includes(value))
-    && riskClasses.every((value) => sandboxQualification.supportedRiskClasses.includes(value));
+    && riskClasses.every((value) => sandboxQualification.supportedRiskClasses.includes(value ) ));
 }
 
 function qualificationComponentIssues(input: unknown): string[] {
@@ -1195,13 +1202,13 @@ function sandboxProjectionMatches(
   projection: ExecutionProfileProjection,
 ) {
   if (!expected) {
-    return projection.sandboxProfileId === undefined
+    return  ( projection.sandboxProfileId === undefined
       && projection.sandboxProfileDigest === undefined
-      && projection.sandboxProfileSnapshot === undefined;
+      && projection.sandboxProfileSnapshot === undefined ) ;
   }
-  return projection.sandboxProfileId === expected.profileId
+  return  ( projection.sandboxProfileId === expected.profileId
     && projection.sandboxProfileDigest === expected.profileDigest
-    && sameCanonical(projection.sandboxProfileSnapshot, expected.profileSnapshot);
+    && sameCanonical(projection.sandboxProfileSnapshot, expected.profileSnapshot ) );
 }
 
 function currentness(blocker: ExecutionProfileBlockerCode): ExecutionProfileCurrentness {
@@ -1213,9 +1220,9 @@ function executionProfileAuthorityKeys() {
 }
 
 function allDeniedAuthority(input: unknown) {
-  return plainObject(input)
+  return  ( plainObject(input)
     && onlyKeys(input, executionProfileAuthorityKeys())
-    && executionProfileAuthorityKeys().every((key) => input[key] === false);
+    && executionProfileAuthorityKeys().every((key) => input[key] === false ) );
 }
 
 function closedHarnessManifest(input: Record<string, any>) {
@@ -1264,54 +1271,54 @@ function closedHarnessManifest(input: Record<string, any>) {
   if (Object.entries(groupKeys).some(([group, keys]) => !plainObject(input[group]) || !onlyKeys(input[group], keys))) {
     return false;
   }
-  return Array.isArray(input.models.supported)
+  return  ( Array.isArray(input.models.supported)
     && input.models.supported.every((model: unknown) => plainObject(model)
-      && onlyKeys(model, ["provider", "modelId", "selection", "contextWindowTokens", "modalities"]));
+      && onlyKeys(model, ["provider", "modelId", "selection", "contextWindowTokens", "modalities"])) ) ;
 }
 
 function validHarnessManifest(input: unknown): input is HarnessCapabilityManifest {
   if (!plainObject(input)) return false;
   try {
-    return harnessManifestIssues(input as unknown as HarnessCapabilityManifest).length === 0
-      && closedHarnessManifest(input);
+    return  ( harnessManifestIssues(input as unknown as HarnessCapabilityManifest).length === 0
+      && closedHarnessManifest(input ) );
   } catch {
     return false;
   }
 }
 
 function canonicalIsolationModes(input: unknown): input is IsolationMode[] {
-  return Array.isArray(input)
+  return  ( Array.isArray(input)
     && input.length > 0
     && input.length <= 2
     && isUniqueSorted(input)
-    && input.every((mode) => mode === "READ_ONLY" || mode === "WORKSPACE_WRITE");
+    && input.every((mode) => mode === "READ_ONLY" || mode === "WORKSPACE_WRITE") ) ;
 }
 
 function harnessCapabilityRequirements(input: unknown): input is HarnessCapabilityRequirement[] {
-  return Array.isArray(input)
+  return  ( Array.isArray(input)
     && input.length > 0
     && input.length <= 50
     && input.every((item) => plainObject(item)
       && onlyKeys(item, ["capability", "minimumSupport"])
       && boundedIdentity(item.capability, 100)
       && (item.minimumSupport === "PARTIAL" || item.minimumSupport === "SUPPORTED"))
-    && isUniqueSorted(input.map((item) => item.capability));
+    && isUniqueSorted(input.map((item) => item.capability)) ) ;
 }
 
 function boundedSortedEnums(input: unknown, maximum: number) {
-  return Array.isArray(input)
+  return  ( Array.isArray(input)
     && input.length > 0
     && input.length <= maximum
     && isUniqueSorted(input)
-    && input.every((item) => boundedIdentity(item, 64) && /^[A-Z][A-Z0-9_]{1,63}$/.test(item));
+    && input.every((item) => boundedIdentity(item, 64) && /^[A-Z][A-Z0-9_]{1,63}$/.test(item)) ) ;
 }
 
 function boundedSortedStrings(input: unknown, maximumItems: number, maximumLength: number) {
-  return Array.isArray(input)
+  return  ( Array.isArray(input)
     && input.length > 0
     && input.length <= maximumItems
     && isUniqueSorted(input)
-    && input.every((item) => boundedIdentity(item, maximumLength));
+    && input.every((item) => boundedIdentity(item, maximumLength ) ));
 }
 
 function sortedUnique<T extends string>(values: T[]) {
@@ -1319,8 +1326,8 @@ function sortedUnique<T extends string>(values: T[]) {
 }
 
 function isUniqueSorted(values: unknown[]) {
-  return new Set(values).size === values.length
-    && values.every((value, index) => index === 0 || String(values[index - 1]).localeCompare(String(value)) < 0);
+  return  ( new Set(values).size === values.length
+    && values.every((value, index) => index === 0 || String(values[index - 1]).localeCompare(String(value)) < 0 ) );
 }
 
 function sameCanonical(left: unknown, right: unknown) {
@@ -1341,20 +1348,20 @@ function plainObject(input: unknown): input is Record<string, any> {
 }
 
 function onlyKeys(input: unknown, allowed: string[]) {
-  return plainObject(input) && Object.keys(input).every((key) => allowed.includes(key));
+  return  ( plainObject(input) && Object.keys(input).every((key) => allowed.includes(key)) ) ;
 }
 
 function boundedIdentity(input: unknown, maximum: number): input is string {
-  return typeof input === "string"
+  return  ( typeof input === "string"
     && input === input.trim()
     && input.length > 0
     && input.length <= maximum
-    && !/[\0\r\n]/.test(input);
+    && !/[\0\r\n]/.test(input) ) ;
 }
 
 function boundedLowercaseKey(input: unknown, maximum: number): input is string {
-  return boundedIdentity(input, maximum)
-    && /^[a-z0-9][a-z0-9._-]*$/.test(input);
+  return  ( boundedIdentity(input, maximum)
+    && /^[a-z0-9][a-z0-9._-]*$/.test(input ) );
 }
 
 function sha256(input: unknown): input is string {

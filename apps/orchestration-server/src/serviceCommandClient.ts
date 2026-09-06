@@ -5,6 +5,8 @@ import {
 } from "@mission-control/shared";
 
 export type ServiceCapability =
+  | "provider-liability.reserve"
+  | "provider-liability.settle"
   | "github.installation.bind"
   | "github.pr-evidence.ingest"
   | "workorders.dispatch"

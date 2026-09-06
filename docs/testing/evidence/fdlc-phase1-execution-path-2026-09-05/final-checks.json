@@ -1,0 +1,41 @@
+{
+  "observedAt": "2026-09-05T17:03:54.386724+00:00",
+  "canaryName": "mc-sbx-local-20260905t165228z-a396c972",
+  "canaryAbsent": true,
+  "canaryCleanupReceipt": true,
+  "runtimePackage": [
+    {
+      "path": "README.md",
+      "unchanged": true
+    },
+    {
+      "path": "package.json",
+      "unchanged": true
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/bin/codex",
+      "unchanged": true
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/bin/codex-code-mode-host",
+      "unchanged": true
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/codex-package.json",
+      "unchanged": true
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/codex-path/rg",
+      "unchanged": true
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/codex-resources/zsh/bin/zsh",
+      "unchanged": true
+    }
+  ],
+  "pilotTargetSha256": "0672a5c2cd49b36550cdc2989ff7400ed3c6a55b81e51c46bfddda9de8fd3b88",
+  "controlPlaneInstance": "local-jaydubya818-missioncontrol_df0fe",
+  "reportLinksValid": true,
+  "providerModelCalls": 0,
+  "factoryWorkerStarted": false
+}

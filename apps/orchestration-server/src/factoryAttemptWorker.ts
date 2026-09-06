@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { DOCKER_BEDROCK_CANDIDATE_IDENTITY } from "./dockerBedrockIdentity.js";
 import type { ConvexHttpClient } from "convex/browser";
 import type {
   ExecutorEvent,
@@ -42,10 +43,11 @@ import {
   type FactoryWorkspaceOwner,
 } from "./factoryWorkspaceOwnership.js";
 import { ConvexRemoteSandboxJournal } from "./convexRemoteSandboxJournal.js";
+import { DockerSandboxProvider, DOCKER_CANDIDATE_IDENTITY } from "./dockerSandboxProvider.js";
 import { ExeDevSandboxProvider } from "./exeDevSandboxProvider.js";
 import { RemoteSandboxExecutionError, RemoteSandboxRuntime, type RemoteSandboxCandidateSession } from "./remoteSandboxRuntime.js";
 import { remoteFailure, validateRemoteRetryBudget } from "./remoteExecutionPolicy.js";
-import { OpenRouterSandboxCredentialBroker, type SandboxCredentialBroker } from "./sandboxCredentials.js";
+import { NoSandboxCredentialBroker, OpenRouterSandboxCredentialBroker, type SandboxCredentialBroker } from "./sandboxCredentials.js";
 import { sandboxProfileDigest, stableSandboxResourceName, type SandboxProvider, type SandboxProfileSnapshot } from "./sandboxProvider.js";
 import type { SandboxResultBundle } from "./sandboxResultBundle.js";
 import { standaloneSandboxSupervisorSource } from "./sandboxSupervisor.js";
@@ -56,7 +58,7 @@ export const FACTORY_ATTEMPT_LEASE_DURATION_MS = 120_000;
 const HEARTBEAT_INTERVAL_MS = 20_000;
 const MAX_RESULT_BYTES = 64_000;
 
-interface FrozenHarnessExecutionManifest {
+export interface FrozenHarnessExecutionManifest {
   version: "factory-execution-manifest/v1" | "factory-execution-manifest/v2" | "factory-execution-manifest/v3";
   harness: {
     adapter: string;
@@ -138,7 +140,18 @@ export interface FactoryAttemptWorkerDependencies {
   materializeRemoteCandidate?: typeof materializeRemoteCandidate;
   recordFactorySandboxStarted?: typeof recordFactorySandboxStarted;
   recordFactorySandboxTerminated?: typeof recordFactorySandboxTerminated;
-  createSandboxProvider?: (profile: SandboxProfileSnapshot) => SandboxProvider;
+  createSandboxProvider?: (profile: SandboxProfileSnapshot, context?: {
+    claim: {
+      projectId: string;
+      repositoryId: string;
+      workflowRunId: string;
+      workOrderId: string;
+      attemptPurpose?: string;
+      lease: { workerGeneration: number };
+    };
+    manifest: FrozenHarnessExecutionManifest;
+    leaseId: string;
+  }) => SandboxProvider;
   createSandboxCredentialBroker?: () => SandboxCredentialBroker;
   loadGovernedMcpContext?: typeof loadGovernedMcpContext;
 }
@@ -154,7 +167,7 @@ export interface FactoryAttemptWorkerIdentity {
   maxConcurrentRuns: number;
 }
 
-const DEFAULT_DEPENDENCIES: FactoryAttemptWorkerDependencies = {
+export const DEFAULT_DEPENDENCIES: FactoryAttemptWorkerDependencies = {
   ensureFactoryWorktree,
   ensureVerificationWorktree,
   prepareFactoryDependencies,
@@ -182,6 +195,14 @@ const DEFAULT_DEPENDENCIES: FactoryAttemptWorkerDependencies = {
   recordFactorySandboxStarted,
   recordFactorySandboxTerminated,
   createSandboxProvider: (profile) => {
+    if (profile.provider === "DOCKER" && profile.providerProfile === "factory/docker-bedrock/v1") {
+      return new DockerSandboxProvider(DOCKER_BEDROCK_CANDIDATE_IDENTITY, {
+        createBedrockBridge: () => {
+          throw new Error("BEDROCK_QUALIFICATION_CONFIGURATION_REQUIRED");
+        },
+      });
+    }
+    if (profile.provider === "DOCKER") return new DockerSandboxProvider(DOCKER_CANDIDATE_IDENTITY);
     if (profile.provider !== "EXE_DEV") throw new Error(`Production Factory worker does not provide ${profile.provider} sandboxes.`);
     return new ExeDevSandboxProvider();
   },
@@ -320,9 +341,10 @@ export class FactoryAttemptWorker {
     const providers = new Map<string, SandboxProvider>();
     for (const candidate of candidates) {
       const profile = candidate?.allocation?.profileSnapshot as SandboxProfileSnapshot | undefined;
-      if (!profile || providers.has(candidate.allocation.provider)) continue;
+      const providerKey = `${candidate.allocation.provider}:${candidate.allocation.providerMetadata?.image ?? ""}`;
+      if (!profile || providers.has(providerKey)) continue;
       const factory = this.dependencies.createSandboxProvider ?? DEFAULT_DEPENDENCIES.createSandboxProvider!;
-      providers.set(candidate.allocation.provider, factory(profile));
+      providers.set(providerKey, factory(profile));
     }
     const brokerFactory = this.dependencies.createSandboxCredentialBroker ?? DEFAULT_DEPENDENCIES.createSandboxCredentialBroker!;
     this.cleanupHealth = await reconcileSandboxOrphans({
@@ -662,8 +684,8 @@ export class FactoryAttemptWorker {
         const sourceBundle = await (this.dependencies.createFactorySourceBundle ?? createFactorySourceBundle)(claim.worktree, manifest.repository.baseSha);
         const journal = new ConvexRemoteSandboxJournal(report, claim.runId);
         const runtime = new RemoteSandboxRuntime(
-          providerFactory(profile),
-          brokerFactory(),
+          providerFactory(profile, { claim, manifest, leaseId }),
+          profile.credentials.inference === "NONE" ? new NoSandboxCredentialBroker() : brokerFactory(),
           journal,
           Date.now,
           undefined,
@@ -675,7 +697,8 @@ export class FactoryAttemptWorker {
               });
             },
             terminated: async (receipt) => {
-              await (this.dependencies.recordFactorySandboxTerminated ?? recordFactorySandboxTerminated)(workspaceOwner, receipt);
+              if (!receipt.providerResourceId) throw new Error("A started sandbox requires exact-ID termination evidence.");
+              await (this.dependencies.recordFactorySandboxTerminated ?? recordFactorySandboxTerminated)(workspaceOwner, { ...receipt, providerResourceId: receipt.providerResourceId });
             },
           },
         );
@@ -1979,7 +2002,7 @@ function runtimeArtifactMatchesBackend(
 
 function exactSandboxProfileImageDigest(profile: SandboxProfileSnapshot | undefined) {
   const securityDigest = profile?.security?.image?.digest;
-  const referenceDigest = profile?.machine?.image.match(/@(sha256:[a-f0-9]{64})$/i)?.[1];
+  const referenceDigest = profile?.machine?.image.match(/(?:^|@)(sha256:[a-f0-9]{64})$/i)?.[1];
   if (securityDigest && /^sha256:[a-f0-9]{64}$/i.test(securityDigest)) {
     if (!referenceDigest || referenceDigest.toLowerCase() !== securityDigest.toLowerCase()) return undefined;
     return securityDigest.toLowerCase();

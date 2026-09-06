@@ -1,0 +1,48 @@
+{
+  "observedAt": "2026-09-05T07:18:11.678770+00:00",
+  "instance": "local-jaydubya818-missioncontrol_df0fe",
+  "runtime": {
+    "status": "success",
+    "value": {
+      "contractVersion": 40.0
+    }
+  },
+  "factory": {
+    "status": "success",
+    "value": {
+      "assessments": [],
+      "definition": {
+        "_creationTime": 1786916560275.864,
+        "_id": "md7t93bxm0f2y6x9c9j7k20ted8ckfge",
+        "createdAt": 1786916560275.0,
+        "createdBy": "demo:company-administrator",
+        "latestVersion": 0.0,
+        "name": "Software Factory",
+        "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+        "purpose": "SOFTWARE",
+        "repositoryId": "k17wswvrva7ky172eej2w1nj858cbzt7",
+        "status": "DRAFT",
+        "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+        "updatedAt": 1786916560275.0
+      },
+      "versions": []
+    }
+  },
+  "options": {
+    "status": "success",
+    "value": {
+      "modelRoutes": [],
+      "executionProfiles": [],
+      "sandboxProfiles": [],
+      "codeScopes": []
+    }
+  },
+  "hosts": {
+    "status": "success",
+    "value": []
+  },
+  "verifiers": {
+    "status": "success",
+    "value": []
+  }
+}

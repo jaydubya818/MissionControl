@@ -1,10 +1,15 @@
-import { computeCanonicalHash } from "./genomeHash.js";
+ import {
+  dockerSandboxSnapshotIssues,
+  dockerSandboxProductionEligible,
+} from "./dockerSandboxAdmission.js"; import { computeCanonicalHash } from "./genomeHash.js";
 
 export const SANDBOX_PROFILE_ADMISSION_SCHEMA = "factory-sandbox-profile-admission/v1" as const;
 
 export function qualifiedSandboxSnapshotIssues(input: unknown): string[] {
   if (!input || typeof input !== "object" || Array.isArray(input)) return ["profile-snapshot-invalid"];
-  const profile = input as Record<string, any>;
+  const profile = input as Record<string, any> ;
+  if (profile.provider === "DOCKER")
+    return dockerSandboxSnapshotIssues(profile) ;
   const security = profile.security;
   const qualification = profile.qualification;
   const issues: string[] = [];
@@ -93,14 +98,16 @@ export function qualifiedSandboxSnapshotIssues(input: unknown): string[] {
   return issues;
 }
 
-export function sandboxProfileProductionEligible(profile: {
+export function sandboxProfileProductionEligible(profile:  | {
   profileDigest?: string;
   immutableSnapshot?: unknown;
   admissionState?: string;
   admissionSnapshot?: unknown;
   admissionDigest?: string;
 } | null | undefined) {
-  const snapshot = profile?.immutableSnapshot as Record<string, any> | undefined;
+  const snapshot = profile?.immutableSnapshot as  | Record<string, any> | undefined ;
+  if (snapshot?.provider === "DOCKER")
+    return dockerSandboxProductionEligible(profile) ;
   if (!snapshot?.security) return false;
   if (qualifiedSandboxSnapshotIssues(snapshot).length > 0
     || profile?.admissionState !== "PRODUCTION_PILOT_ELIGIBLE") return false;
@@ -108,7 +115,7 @@ export function sandboxProfileProductionEligible(profile: {
     namespace: "factory-sandbox-profile/v1",
     value: snapshot,
   })}`) return false;
-  const admission = profile.admissionSnapshot as Record<string, any> | undefined;
+  const admission = profile.admissionSnapshot as  | Record<string, any> | undefined;
   if (!admission || admission.schema !== SANDBOX_PROFILE_ADMISSION_SCHEMA
     || admission.state !== "PRODUCTION_PILOT_ELIGIBLE"
     || admission.profileDigest !== profile.profileDigest
@@ -130,10 +137,10 @@ export function sandboxProfileProductionEligible(profile: {
     || admission.authority?.acceptance !== false
     || admission.authority?.publication !== false
     || admission.authority?.merge !== false) return false;
-  return profile.admissionDigest === `sha256:${computeCanonicalHash({
+  return  ( profile.admissionDigest === `sha256:${computeCanonicalHash({
     namespace: SANDBOX_PROFILE_ADMISSION_SCHEMA,
     value: admission,
-  })}`;
+  })}` ) ;
 }
 
 function sha256(value: unknown): value is string {
@@ -141,12 +148,12 @@ function sha256(value: unknown): value is string {
 }
 
 function bounded(value: unknown, maximum: number): value is string {
-  return typeof value === "string" && value === value.trim()
-    && value.length > 0 && value.length <= maximum && !/[\0\r\n]/.test(value);
+  return  ( typeof value === "string" && value === value.trim()
+    && value.length > 0 && value.length <= maximum && !/[\0\r\n]/.test(value) ) ;
 }
 
 function boundedEnumArray(value: unknown, maximum: number): value is string[] {
-  return Array.isArray(value) && value.length > 0 && value.length <= maximum
+  return  ( Array.isArray(value) && value.length > 0 && value.length <= maximum
     && new Set(value).size === value.length
-    && value.every((item) => bounded(item, 64) && /^[A-Z][A-Z0-9_]{1,63}$/.test(item));
+    && value.every((item) => bounded(item, 64) && /^[A-Z][A-Z0-9_]{1,63}$/.test(item)) ) ;
 }

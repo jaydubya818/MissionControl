@@ -1,0 +1,54 @@
+{
+  "observedAt": "2026-09-05T16:53:42.895092+00:00",
+  "checks": {
+    "unconfined_true": {
+      "argv": [
+        "/usr/bin/true"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "one_seatbelt": {
+      "argv": [
+        "/usr/bin/sandbox-exec",
+        "-p",
+        "(version 1)(allow default)",
+        "/usr/bin/true"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "nested_seatbelt": {
+      "argv": [
+        "/usr/bin/sandbox-exec",
+        "-p",
+        "(version 1)(allow default)",
+        "/usr/bin/sandbox-exec",
+        "-p",
+        "(version 1)(allow default)",
+        "/usr/bin/true"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "restricted_outer_nested": {
+      "argv": [
+        "/usr/bin/sandbox-exec",
+        "-p",
+        "(version 1)(deny default)(allow file-read*)(allow process*)(allow sysctl-read)(allow mach-lookup)(allow file-map-executable)",
+        "/usr/bin/sandbox-exec",
+        "-p",
+        "(version 1)(allow default)",
+        "/usr/bin/true"
+      ],
+      "exitCode": 71,
+      "stdout": "",
+      "stderr": "sandbox-exec: sandbox_apply: Operation not permitted\n"
+    }
+  },
+  "scope": "Causal OS sandbox diagnosis only; no workload or provider",
+  "conclusion": "Permissive nested sandbox succeeds. The restricted outer profile is the distinguishing factor; blanket unsupported nesting is disproven by this control. Specific denied primitive remains unidentified. No qualification or policy relaxation."
+}

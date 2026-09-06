@@ -179,3 +179,13 @@ owner, and next promotion gate. Promotion requires relevant authorization,
 failure recovery, evidence currentness, refresh/restart durability, and
 browser-operable proof. Demotion is immediate when a security, authority,
 reliability, or evidence-currentness regression invalidates the claim.
+
+
+## Phase 1 Bedrock continuation — engineering evidence only
+
+The separately versioned codex/bedrock-v1 candidate preserves current main's Fab,
+inference accounting, readiness and recovery architecture. Its aggregate hard
+liability and canonical physical inference allocation are enforced together.
+This is offline qualification work; no AWS identity, live route, Factory Version,
+WO1 readiness, accepted pilot outcome or Production maturity is claimed.
+Current audit and contract lineage: [Phase 1 reconciliation](../software-factory/fdlc-bedrock-current-main-20260906/contract-plan.md).

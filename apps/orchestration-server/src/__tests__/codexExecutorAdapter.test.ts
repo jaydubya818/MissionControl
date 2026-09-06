@@ -138,6 +138,27 @@ describe("CodexV1ExecutorAdapter", () => {
     ]));
   });
 
+  it("rejects an unsupported hard token cap before starting the producing process", async () => {
+    const repositoryRoot = await gitRepository();
+    const runner = vi.fn().mockResolvedValue(completion());
+    const adapter = new CodexV1ExecutorAdapter("/tmp/codex", runner as any, resolvePinnedExecutableDigest);
+    try {
+      const result = await executeAdapter(adapter, {
+        ...request,
+        repositoryRoot,
+        workingDirectory: repositoryRoot,
+        allowedPaths: ["README.md"],
+        modelRouteDigest: `sha256:${"a".repeat(64)}`,
+        providerRoute: "openai",
+        reasoningConfig: { maxTokens: 100 },
+      }, { emit: () => undefined });
+      expect(result.normalizedResult?.status).toBe("FAILED");
+      expect(runner).not.toHaveBeenCalled();
+    } finally {
+      await rm(repositoryRoot, { recursive: true, force: true });
+    }
+  });
+
   it("emits structured events without putting diagnostics or secrets in successful metadata", async () => {
     const repositoryRoot = await gitRepository();
     const runner = vi.fn().mockResolvedValue(completion());

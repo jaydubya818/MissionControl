@@ -1,4 +1,46 @@
-# Phase 1 real pilot — admission record
+# Phase 1 pilot — current identity and admission record
+
+Updated 2026-09-05 UTC from the Product Owner's explicit pilot-preparation request.
+
+- Owning team: **FDLC / Mission Control**.
+- Champion: **Jarrett West**.
+- Human FDE/operator: **Jarrett West**.
+- Incident Commander: **Jarrett West**.
+
+One person intentionally holds these roles. Independent technical verification
+still requires the existing separately configured verifier; human acceptance
+is a distinct control. These identities do not approve any Plan, WorkOrder,
+Factory/route/harness/runtime/backend tuple, budget, PR, merge, release or
+rollback. This assignment does not waive or combine Plan approval, WorkOrder
+authorization, independent verification, acceptance, publication, merge,
+release, containment, cost, security or rollback gates. It authorizes
+preparation only until explicit human GO.
+
+Current recommendation: **NO_GO**, due to unavailable live configuration,
+missing exact Plan/WorkOrder approval, budget and containment evidence, and an
+installed-runtime mismatch. The four-class cohort decision is now resolved:
+documentation WO1 first, overall four-class requirement unchanged. The identity blocker is resolved.
+Accepted real WorkOrders remain 0/10; no real model call or pilot execution.
+
+Latest qualification: the original control-plane backend is reachable; retained
+Factory has zero versions, with zero admissible routes, hosts and verifiers in
+the intended Research Lab scope. Installed Codex 0.153.3 differs from proposed
+0.146.0. See [WorkOrder 1 Preflight](fdlc-workorder-01-preflight.md).
+
+The exact proposal, ten evidence-based candidate changes, baseline, independent
+verification contract, budget recommendations, incident actions and all current
+blockers are in [Pilot Execution Proposal](fdlc-phase1-execution-proposal.md).
+New rehearsal evidence lives in `docs/testing/evidence/fdlc-phase1-preexecution-2026-09-05/`.
+Phase 0 source/review evidence remains separate. No Phase 2 implementation or
+todo dependency change is authorized.
+
+## Retained preparation record — 2026-09-04, superseded above
+
+The following preserves the earlier unknown-identity/pre-drill baseline. Its
+NOT RUN statements describe that earlier preparation state, not today's local
+rehearsals. Historical execution failures are unchanged.
+
+### Original admission record
 
 Status: **BLOCKED. NO-GO to start the real pilot.**
 Source baseline: `9a80cf3c5cc229bb4a552a9f08ddda5841e70a38` plus the uncommitted
@@ -114,3 +156,53 @@ todo 059 admission and one real lineage after owners are supplied. There is no
 measured pilot basis for selecting a Phase 2 feature yet. Preserve 059→060→061
 and all existing downstream dependencies; any proposed early prerequisite needs
 an explicit sequencing decision. Stop after Phase 1; no automatic Phase 2 work.
+
+## Admission bootstrap — 2026-09-05
+
+[WorkOrder 1 Admission Report](fdlc-workorder-01-admission-report.md) records exact
+0.146.0 reproduction and startup, partial read-only containment evidence, and
+remaining mutation containment/budget blockers. Recommendation remains NO_GO.
+No Factory, host, route, verifier or readiness receipt was fabricated; WO1 remains
+unexecuted. Named FDLC / Mission Control and Jarrett West roles remain unchanged.
+
+## Admission closure — 2026-09-05
+
+See [WorkOrder 1 Admission Closure Report](fdlc-workorder-01-admission-closure-report.md).
+Three no-model candidate mutation matrices exposed unauthorized global-temp and
+runtime writable-open authority; no runtime bytes changed. The hard-token request
+is rejected before process start. Both hard gates remain blocked; dependent
+authority and readiness remain unissued. WO1 was not executed.
+
+## Final blocker decision — 2026-09-05
+
+[Final Admission Report](fdlc-workorder-01-final-admission-report.md) retains
+BLOCKED_CONTAINMENT and requests an explicit budget-policy decision. An outer OS
+write allowlist allows native startup in a diagnostic configuration but the nested
+Codex sandbox fails before tool execution. Original budget instructions specify
+token limits without separate input/output semantics or numeric caps; no global
+Factory token gate or approved equivalence was found. No gate was weakened.
+
+## Execution-path decision — 2026-09-05
+
+Human decision: retain hard provider liability control; the resource-only alternative
+is not approved. [Execution Path Qualification Report](fdlc-phase1-execution-path-qualification-report.md)
+compares available backends/providers and recommends exactly one Docker-backed Factory
+provider candidate. Existing doctor canary passed, but no integrated qualified worker
+path exists. Disposition BLOCKED_EXECUTION_ENVIRONMENT; hard budget independently
+unqualified. Original reports/evidence remain unchanged. No dependent authority or WO1 execution.
+
+### 2026-09-05 — Docker execution closure implementation
+
+Latest disposition: **NO_GO**; WO1 remains undispatched and readiness NOT_ISSUED.
+Owning team FDLC / Mission Control; Champion, Human FDE / Operator and Incident
+Commander Jarrett West. No role or gate consolidation.
+
+Internal Docker provider now uses the existing worker/sandbox lifecycle for an
+immutable, no-network, credential-free qualification probe. Actual fixture worker
+result, cancellation, restart cleanup and budget negative controls pass. No
+production provider route, authoritative reservation, full execution tuple or
+producing-runtime qualification is issued. Default runtime-contract guard also
+finds unrelated upstream v41 versus current v40; explicit starting-SHA guard
+finds no public API change. Prior reports are preserved.
+
+Current report: [Docker execution path qualification](fdlc-phase1-docker-execution-path-qualification-report.md).

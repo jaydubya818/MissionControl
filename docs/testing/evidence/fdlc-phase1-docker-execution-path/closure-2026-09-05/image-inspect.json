@@ -1,0 +1,73 @@
+[
+    {
+        "Id": "sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+        "RepoTags": [
+            "mission-control/factory-docker-qualification:closure-20260905"
+        ],
+        "RepoDigests": [
+            "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2"
+        ],
+        "Comment": "buildkit.dockerfile.v0",
+        "Created": "2026-09-05T18:38:00.098477292Z",
+        "Config": {
+            "User": "10001:10001",
+            "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "NODE_VERSION=26.7.0",
+                "HOME=/var/lib/mission-control/attempt/home",
+                "TMPDIR=/tmp"
+            ],
+            "Entrypoint": [
+                "node",
+                "/opt/factory/bridge.mjs"
+            ],
+            "WorkingDir": "/var/lib/mission-control/attempt",
+            "Labels": {
+                "exe.dev/login-user": "root",
+                "org.opencontainers.image.description": "Mission Control exe.dev restricted-profile remediation candidate",
+                "org.opencontainers.image.licenses": "UNLICENSED",
+                "org.opencontainers.image.source": "https://github.com/jaydubya818/MissionControl"
+            }
+        },
+        "Architecture": "amd64",
+        "Os": "linux",
+        "Size": 247570494,
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:31ad4a471c6852bfec14d757cc75a566c82a9769f12c3918cf6bf52cc0eeb3d0",
+                "sha256:59e68a4ddf2081c7bb38cf32b2517e638084657811a298e2abdde3fbc47708df",
+                "sha256:71d2588d49e6615d3b8f1b8e2fa2f80f277b002e0c883ba2d0d4a41f902db3a1",
+                "sha256:ac521be1266ecd03e5607d90c758c1de8b6fefe21e0a108889077607d67bc026",
+                "sha256:c5ad15403f76d532c7c9f0696fd821d13b3453847414ed0ac3d3cf420371a96b",
+                "sha256:250d919426c071966a1cbbcdfa92db3697fa80b70b4f31ccd4f398b297f404bf",
+                "sha256:9eaf63b38374e56d28e98f7b1668580cc7ebd301c98d5386da1de0e025c9967b",
+                "sha256:dbd7ca3201c0478076dc4372d3fce18e6e6e08bdd55e15cb2a60065cddffc543",
+                "sha256:d972fcc2298d79b9a9f5dbf94ef93c1796f8efe5678c6e4f3e28486ab51a5353",
+                "sha256:856b7c92db9e6b8dd25f3ff11b0114e250cbeaca8114a6eb1275b70a5cddfd54",
+                "sha256:b26c0cdf709695a15c0f856e0f143793ea04429fa12efb0399a7e69f4079efde",
+                "sha256:b337da7e1cec36d8c44421828618fe3c5517ff946dedc2bd7e5e4b25827d9554",
+                "sha256:3514883e406ab0007bab6d766e2ff844e06bcf6b2460e097ab50036f3f4bced1",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                "sha256:1a70302752b862c84174b128be5adfd6b3fdf78456e82ecdf9c5d935a112962d",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2026-09-05T18:38:00.16104975Z"
+        },
+        "Descriptor": {
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "digest": "sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "size": 856
+        },
+        "Identity": {
+            "Build": [
+                {
+                    "Ref": "dm2dingbw07omsc40np6a1kkf",
+                    "CreatedAt": "2026-09-05T18:38:00.167812542Z"
+                }
+            ]
+        }
+    }
+]

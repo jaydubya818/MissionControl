@@ -1,0 +1,60 @@
+{
+  "schema": "fdlc-local-bedrock-commit-closure/v1",
+  "status": "LOCAL_BEDROCK_HARNESS_CANDIDATE_COMMITTED",
+  "implementationCommit": "cb373ee36d1645cad4f277f59c75cb7b1cac57f5",
+  "implementationTree": "d7183aceb7c7749aeb8374ba2bd2626c5953eee9",
+  "evidenceCommitIdentity": "Resolve the latest commit touching this record; self-referential commit hashes are not embedded. Final response reports the containing commit SHA.",
+  "authorization": "Direct user chat authorizes local commits only.",
+  "reviewedChangedFileCount": 92,
+  "reviewedFileAllowlistVerified": true,
+  "qualifiedSourceFileCount": 43,
+  "qualifiedSourceHashesMatchCommit": true,
+  "qualification": {
+    "recordedMain": "6d7146d5205aef729aee2960aed2a4ed8e8ab95c",
+    "fullSystemResult": "PASS",
+    "fullSystemGatesPassed": 19,
+    "originalSystemRun": "../system-19-pass.json",
+    "postcommitChecks": "checks.json",
+    "postcommitComposedTestsPassed": 119,
+    "postcommitGoldenEval": "PASS",
+    "carryForward": "Unchanged source, tests, dependencies, configuration and runtime identities preserve the original full System and explicit Docker evidence. Commit-sensitive MCP receipts, composed system scenarios, golden eval, authorization, runtime guards, documentation and secret scan were rerun on the implementation commit. Evidence-only follow-up changes do not alter the implementation subject.",
+    "evidenceOnlyFollowupAllowedPaths": [
+      "docs/",
+      "todos/"
+    ]
+  },
+  "runtimeContractVersion": 43,
+  "harnessPreservation": "PASS: codex/v1 canonical manifest digest unchanged; original qualification identity retained.",
+  "harnessIdentities": "harness-identities.json",
+  "secretScan": "PASS",
+  "currentMainDrift": {
+    "observedOriginMain": "e9d2f52720e634b79d2c614a7fb9812a6b986fe9",
+    "observedRuntimeVersion": 45,
+    "defaultGuard": "FAIL retained in runtime-moving-origin-main.log",
+    "condition": "Newer-main integration requires separate reconciliation/requalification; no guard changes or version-only workaround applied."
+  },
+  "externalBoundary": "QUALIFICATION_AWS_IDENTITY_REQUIRED",
+  "missingApprovedInputs": [
+    "qualification AWS account ID",
+    "project/environment identifier",
+    "role ARN or authoritative configuration location",
+    "qualification profile and expected STS principal",
+    "account-specific US inference profile ARN and approval reference"
+  ],
+  "route": {
+    "provider": "AWS_BEDROCK",
+    "region": "us-east-1",
+    "model": "anthropic.claude-sonnet-4-6",
+    "profile": "us.anthropic.claude-sonnet-4-6",
+    "allowedDestinations": [
+      "us-east-1",
+      "us-east-2",
+      "us-west-2"
+    ],
+    "globalInference": "DENIED"
+  },
+  "prohibitedActionsPerformed": [],
+  "workOrder1Executed": false,
+  "readinessIssued": false,
+  "pushed": false
+}

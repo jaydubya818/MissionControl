@@ -5,7 +5,7 @@
     "rootDir": "../../",
     "composite": true
   },
-  "include": ["src/**/*", "../../convex/lib/**/*.ts"],
+  "include": ["src/**/*", "../../convex/lib/**/*.ts", "../../convex/inferenceGateway.ts"],
   "references": [
     { "path": "../shared" },
     { "path": "../model-router" },

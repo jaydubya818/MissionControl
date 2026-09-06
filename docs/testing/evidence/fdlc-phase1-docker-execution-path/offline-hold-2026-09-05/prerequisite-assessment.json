@@ -1,0 +1,18 @@
+{
+  "schema": "fdlc-bedrock-prerequisite-assessment/v1",
+  "state": "QUALIFICATION_AWS_IDENTITY_REQUIRED",
+  "blockers": [
+    "AWS_QUALIFICATION_ACCOUNT_REQUIRED",
+    "APPROVED_PROJECT_ENVIRONMENT_REQUIRED",
+    "APPROVED_ROLE_OR_CONFIGURATION_REQUIRED",
+    "AWS_IDENTITY_APPROVAL_REQUIRED",
+    "ALLOWED_TOPOLOGY_CONFIRMATION_REQUIRED",
+    "FOUNDATION_MODEL_ONLY_COMPATIBILITY_UNPROVEN"
+  ],
+  "prerequisiteDocumentComplete": false,
+  "providerQualified": false,
+  "readinessIssued": false,
+  "executionAuthorized": false,
+  "authority": "NONE",
+  "note": "Document completeness does not validate referenced evidence, select a replacement route, or grant admission."
+}

@@ -1,0 +1,14 @@
+{
+  "status": "success",
+  "value": {
+    "modelRoutes": [],
+    "codeScopes": [],
+    "executionProfiles": [],
+    "sandboxProfiles": [],
+    "approvedAgentVersionIds": [
+      "k57a2mz24xw6ywezm3t8w219118bcz0m",
+      "k57dk3gjstreysxhyhpv1c4kvh8bc6v9"
+    ],
+    "harnessCount": 2
+  }
+}

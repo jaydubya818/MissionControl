@@ -182,13 +182,109 @@ export const DEEPSEEK_V1_HARNESS_MANIFEST: HarnessCapabilityManifest = {
   ],
 };
 
-export const KNOWN_HARNESS_MANIFESTS = [
-  CODEX_V1_HARNESS_MANIFEST,
+ /** Separate composition; shared declarations describe the same pinned CLI mechanics,
+ * not inherited qualification. Provider transport and admission differ explicitly. */
+export const CODEX_BEDROCK_EFFECTIVE_CONFIG = {
+  cliVersion: "0.146.0",
+  mode: "exec",
+  ephemeral: true,
+  approval: "never",
+  ignoreUserConfig: true,
+  ignoreRules: true,
+  resultContract: "factory-result/v1",
+  localProtocol: "responses-completion-events/v1",
+  providerAdapter: "aws-bedrock/converse-v1",
+  bridge: "factory-bedrock-inference/v1",
+  transport: "docker-attach-framed/v1",
+  providerStreaming: false,
+  automaticRetries: 0,
+  providerMaxAttempts: 1,
+  resume: false,
+  credentialsInContainer: false,
+  network: "NONE",
+  maximumOutputTokens: 4096,
+  webSearch: "disabled",
+  reasoningEffort: "none",
+  reasoningSummary: "none",
+} as const;
+export const CODEX_BEDROCK_V1_HARNESS_MANIFEST: HarnessCapabilityManifest = {
+  ...CODEX_V1_HARNESS_MANIFEST,
+  identity: {
+    ...CODEX_V1_HARNESS_MANIFEST.identity,
+    adapterVersion: "bedrock-v1",
+  },
+  effectiveConfigSha256: canonicalHash(CODEX_BEDROCK_EFFECTIVE_CONFIG),
+  models: {
+    providerSelection: "UNSUPPORTED",
+    modelSelection: "UNSUPPORTED",
+    supported: [
+      {
+        provider: "aws-bedrock",
+        modelId: "anthropic.claude-sonnet-4-6",
+        selection: "ADVERTISED",
+        contextWindowTokens: null,
+        modalities: ["text"],
+      },
+    ],
+    reasoningControls: "UNSUPPORTED",
+  },
+  subagents: {
+    available: "UNSUPPORTED",
+    parallel: "UNSUPPORTED",
+    background: "UNSUPPORTED",
+    eventVisibility: "UNSUPPORTED",
+  },
+  network: {
+    providerApi: false,
+    packageInstall: false,
+    runtimeEgressControl: "SUPPORTED",
+    destinations: [
+      "Container loopback bridge; host admission over Docker attach only",
+    ],
+  },
+  credentials: {
+    classes: [],
+    passedToToolProcesses: false,
+    redaction: "SUPPORTED",
+  },
+  telemetry: {
+    tokens: "SUPPORTED",
+    cost: "PARTIAL",
+    toolCalls: "SUPPORTED",
+    modelRequests: "SUPPORTED",
+    retries: "SUPPORTED",
+  },
+  admission: {
+    ...CODEX_V1_HARNESS_MANIFEST.admission,
+    maturity: "EXPERIMENTAL",
+    executionBackends: ["remote-sandbox"],
+    requiredExternalControls: [
+      ...REQUIRED_EXTERNAL_CONTROLS,
+      "canonical-provider-liability",
+      "exact-bedrock-us-route",
+      "docker-network-none",
+      "separate-account-qualification",
+    ],
+  },
+  limitations: [
+    "Offline composition only until separately qualified against approved AWS identity; no inherited codex/v1 route qualification.",
+    "Bedrock Converse is non-streaming; local Responses completion events are translated after complete provider output.",
+    "No model fallback, hidden retries, resume, remote publication, MCP, images, caching or reasoning controls.",
+    "Function tools and text-input custom tools require bounded explicit translation; unsupported protocol fields fail closed.",
+    "AWS credentials remain outside the container; every request requires canonical current admission and retained maximum liability.",
+    "Cancellation fences new requests; in-flight provider cancellation is not asserted and unknown liability remains held.",
+  ],
+}; export const KNOWN_HARNESS_MANIFESTS = [
+   CODEX_BEDROCK_V1_HARNESS_MANIFEST, CODEX_V1_HARNESS_MANIFEST,
   DEEPSEEK_V1_HARNESS_MANIFEST,
 ] as const;
 
 const KNOWN_HARNESS_RUNTIME_ARTIFACTS = [
-  { adapterId: "codex", adapterVersion: "v1", artifact: CODEX_V1_RUNTIME_ARTIFACT },
+   {
+    adapterId: "codex",
+    adapterVersion: "bedrock-v1",
+    artifact: CODEX_V1_RUNTIME_ARTIFACT,
+  }, { adapterId: "codex", adapterVersion: "v1", artifact: CODEX_V1_RUNTIME_ARTIFACT },
   { adapterId: "deepseek-harness", adapterVersion: "0.2.0", artifact: DEEPSEEK_V1_RUNTIME_ARTIFACT },
 ] as const;
 

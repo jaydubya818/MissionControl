@@ -1,0 +1,20 @@
+{
+  "schema": "fdlc-bedrock-prerequisite-assessment/v2",
+  "state": "QUALIFICATION_AWS_IDENTITY_REQUIRED",
+  "blockers": [
+    "AWS_QUALIFICATION_ACCOUNT_REQUIRED",
+    "APPROVED_PROJECT_ENVIRONMENT_REQUIRED",
+    "APPROVED_ROLE_REQUIRED",
+    "PROFILE_ARN_REQUIRED_OR_MISMATCH",
+    "APPROVED_EXPLICIT_AWS_PROFILE_REQUIRED",
+    "AUTHORITATIVE_CONFIG_LOCATION_REQUIRED",
+    "EXPECTED_STS_PRINCIPAL_REQUIRED_OR_MISMATCH",
+    "AWS_IDENTITY_APPROVAL_REQUIRED"
+  ],
+  "prerequisiteDocumentComplete": false,
+  "providerQualified": false,
+  "readinessIssued": false,
+  "executionAuthorized": false,
+  "authority": "NONE",
+  "note": "Document completeness is not caller identity, profile verification, price qualification or permission to invoke."
+}

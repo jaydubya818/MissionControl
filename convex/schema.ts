@@ -1,6 +1,7 @@
+import { providerPriceValidator, providerReservationValidator, providerUsageValidator } from "./lib/providerLiabilityValidators";
 /**
  * Convex Database Schema — V0
- * 
+ *
  * Aligned with Bootstrap Kit (docs/openclaw-bootstrap/schema/SCHEMA.md)
  * Source of truth for Mission Control data model.
  */
@@ -1152,6 +1153,23 @@ export const schemaTablesPartOne = {
     .index("by_installation", ["installationId"])
     .index("by_received", ["receivedAt"]),
 
+  factoryProviderPrices: defineTable({
+    projectId: v.id("projects"), snapshot: providerPriceValidator, digest: v.string(),
+    registrationKey: v.string(), createdBy: v.string(), createdAt: v.number(),
+  }).index("by_project_key", ["projectId", "registrationKey"]).index("by_project_digest", ["projectId", "digest"]),
+  factoryProviderReservations: defineTable({
+    projectId: v.id("projects"), workOrderId: v.id("workOrders"), executionProfileId: v.id("factoryExecutionProfiles"), priceId: v.id("factoryProviderPrices"),
+    snapshot: providerReservationValidator, creationDigest: v.string(), idempotencyKey: v.string(), createdBy: v.string(), createdAt: v.number(), updatedAt: v.number(),
+  }).index("by_project_key", ["projectId", "idempotencyKey"]).index("by_work_order", ["workOrderId"]),
+  factoryProviderUsageEvents: defineTable({
+    projectId: v.id("projects"), reservationId: v.id("factoryProviderReservations"), usage: providerUsageValidator, digest: v.string(),
+    corrected: v.boolean(), evidenceReference: v.optional(v.string()), actorId: v.string(), createdAt: v.number(), incident: v.boolean(),
+  }).index("by_reservation", ["reservationId"]).index("by_reservation_digest", ["reservationId", "digest"]) .index("by_provider_usage", ["usage.provider", "usage.usageId"])
+    .index("by_provider_request", [
+      "usage.provider",
+      "usage.providerRequestId",
+    ]) ,
+
   factoryDefinitions: defineTable({
     tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),
@@ -1176,7 +1194,8 @@ export const schemaTablesPartOne = {
     profileKey: v.string(),
     version: v.number(),
     profileDigest: v.string(),
-    provider: v.union(v.literal("EXE_DEV"), v.literal("FAKE")),
+    provider: v.union(v.literal("EXE_DEV"), v.literal("FAKE") ,
+      v.literal("DOCKER") ),
     providerProfile: v.string(),
     providerProfileVersion: v.string(),
     machineImage: v.string(),
@@ -1184,7 +1203,7 @@ export const schemaTablesPartOne = {
     memoryMb: v.number(),
     diskGb: v.number(),
     supervisorVersion: v.string(),
-    executorTransport: v.literal("SSH"),
+    executorTransport: v. union(v. literal("SSH" ), v.literal("DOCKER_STDIN") ),
     maxRuntimeMs: v.number(),
     resultPollIntervalMs: v.number(),
     resultRetentionMs: v.number(),
@@ -1480,7 +1499,8 @@ export const schemaTablesPartOne = {
     profileDigest: v.string(),
     profileSnapshot: v.any(),
     sourceSha: v.string(),
-    provider: v.union(v.literal("EXE_DEV"), v.literal("FAKE")),
+    provider: v.union(v.literal("EXE_DEV"), v.literal("FAKE" ),
+      v.literal("DOCKER" )),
     providerResourceId: v.optional(v.string()),
     resourceName: v.string(),
     state: v.union(

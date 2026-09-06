@@ -1,8 +1,8 @@
 /**
  * Workflow Engine
- * 
+ *
  * Multi-agent workflow execution inspired by Antfarm.
- * 
+ *
  * Key patterns:
  * - Deterministic workflows (same steps, same order)
  * - Agent verification (separate verifier checks implementer's work)
@@ -114,7 +114,9 @@ export type {
 } from "./executorAdapter.js";
 
 export {
-  CODEX_HARNESS_EFFECTIVE_CONFIG,
+  CODEX_HARNESS_EFFECTIVE_CONFIG ,
+  CODEX_BEDROCK_EFFECTIVE_CONFIG,
+  CODEX_BEDROCK_V1_HARNESS_MANIFEST ,
   CODEX_V1_HARNESS_MANIFEST,
   CODEX_V1_RUNTIME_ARTIFACT,
   DEEPSEEK_HARNESS_EFFECTIVE_CONFIG,

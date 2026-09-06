@@ -1,0 +1,50 @@
+{
+  "evidenceClass": "OFFLINE / FIXTURE",
+  "awsBoundary": "QUALIFICATION_AWS_IDENTITY_REQUIRED",
+  "fullQualification": "INCOMPLETE",
+  "soleFullQualificationBlocker": false,
+  "additionalIntegrationGate": "CURRENT_MAIN_CONTRACT_RECONCILIATION_REQUIRED",
+  "adapterTests": {
+    "passed": 60,
+    "failed": 0
+  },
+  "prerequisiteBudgetCohortRecoveryTests": {
+    "passed": 92,
+    "failed": 0
+  },
+  "dockerRegression": {
+    "passed": 100,
+    "failed": 0,
+    "includes": {
+      "existingDockerAndLedger": 51,
+      "initialBedrockAdapterTests": 49
+    }
+  },
+  "systemQualification": {
+    "passed": 19,
+    "failed": 0,
+    "base": "0d1a0908cce380d815069ce0a59e1604d2f26ece",
+    "evidence": "docs/testing/evidence/fdlc-bedrock-offline-system-reviewed-20260905/automated-checks.json",
+    "currentMainProof": false
+  },
+  "defaultRuntimeContractGuard": "FAIL_CURRENT_MAIN_DRIFT",
+  "observedOriginMain": "aa8c12b1d4907589b71cef3cb421ef2a2c380676",
+  "prerequisiteExitCode": 2,
+  "awsCalls": 0,
+  "modelCalls": 0,
+  "wo1Executions": 0,
+  "readiness": "NOT_ISSUED",
+  "merge": "NOT_PERFORMED",
+  "publication": "NOT_PERFORMED",
+  "realPrice": "UNQUALIFIED",
+  "liveRoute": "NOT_ISSUED",
+  "authority": "NONE",
+  "remainingExternalInputs": [
+    "QUALIFICATION_AWS_ACCOUNT_ID",
+    "QUALIFICATION_PROJECT_OR_ENVIRONMENT_ID",
+    "QUALIFICATION_ROLE_ARN",
+    "AUTHORITATIVE_QUALIFICATION_CONFIG_LOCATION if applicable"
+  ],
+  "nextLiveBoundary": "Separately permitted read-only AWS identity and account-specific inference-profile verification",
+  "liveBindingQualification": "Not demonstrated by offline fixtures; remains gated on approved identity, exact runtime and independent evidence"
+}
