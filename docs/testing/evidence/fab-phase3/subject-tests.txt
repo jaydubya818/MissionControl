@@ -1,0 +1,39 @@
+
+> @mission-control/workflow-engine@0.9.0 test /private/tmp/fab-phase3-mission-control/packages/workflow-engine
+> vitest run
+
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mission-control/packages/workflow-engine
+
+ ✓ src/__tests__/parser.test.ts (17 tests) 2ms
+ ✓ src/__tests__/graph.test.ts (5 tests) 3ms
+ ✓ src/__tests__/implementationPolicy.test.ts (8 tests) 2ms
+ ✓ src/__tests__/verification.test.ts (8 tests) 6ms
+ ✓ src/__tests__/verificationAuthority.test.ts (27 tests) 13ms
+ ✓ src/__tests__/renderer.test.ts (18 tests) 2ms
+stdout | src/__tests__/executor.test.ts > WorkflowExecutor reliability > stores the required output fields on workflow-created tasks
+[WorkflowExecutor] Started run-123/researchArchitecture as task task-1
+
+stdout | src/__tests__/executor.test.ts > WorkflowExecutor reliability > does not re-transition a Task that creation already moved to READY
+[WorkflowExecutor] Started run-123/approval as task task-1
+
+stdout | src/__tests__/executor.test.ts > WorkflowExecutor reliability > creates a gate approval bound to the task, run, version, and evidence digest
+[WorkflowExecutor] Started run-123/approval as task task-1
+
+ ✓ src/__tests__/executor.test.ts (19 tests) 9ms
+ ✓ src/__tests__/loader.test.ts (18 tests) 19ms
+ ✓ src/__tests__/executorAdapter.test.ts (4 tests) 3ms
+ ✓ src/__tests__/verificationDecision.test.ts (8 tests) 5ms
+ ✓ src/__tests__/verificationPlan.test.ts (4 tests) 3ms
+ ✓ src/__tests__/verificationIndependence.test.ts (9 tests) 4ms
+ ✓ src/__tests__/verificationSubject.test.ts (9 tests) 7ms
+ ✓ src/__tests__/verificationCurrentness.test.ts (16 tests) 10ms
+ ✓ src/__tests__/harnessContract.test.ts (6 tests) 9ms
+ ✓ src/__tests__/repositoryScope.test.ts (3 tests) 2ms
+ ✓ src/__tests__/handoff.test.ts (3 tests) 2ms
+
+ Test Files  17 passed (17)
+      Tests  182 passed (182)
+   Start at  16:40:39
+   Duration  519ms (transform 709ms, setup 0ms, collect 2.23s, tests 102ms, environment 2ms, prepare 985ms)
+

@@ -232,13 +232,15 @@ export function factoryAttemptRequiresReplacementOnClaim(input: {
   status: string;
   lease?: AttemptLease;
   continuationStatus?: string;
+  validatedReadOnlyCandidateRecovery?: boolean;
   now: number;
 }) {
   const hadExecutionOwnership = input.status === "RUNNING" || Boolean(input.lease);
   const leaseIsInactive = !input.lease || input.lease.expiresAt <= input.now;
   const hasRecoverablePublicationCheckpoint = ["AWAITING_HUMAN_REVIEW", "READY_TO_PUBLISH", "PUBLICATION_AUTHORIZED"]
     .includes(input.continuationStatus ?? "");
-  return hadExecutionOwnership && leaseIsInactive && !hasRecoverablePublicationCheckpoint;
+  return hadExecutionOwnership && leaseIsInactive && !hasRecoverablePublicationCheckpoint
+    && input.validatedReadOnlyCandidateRecovery !== true;
 }
 
 export function lostFactoryAttemptFailure(input: { executionBackend?: string }) {

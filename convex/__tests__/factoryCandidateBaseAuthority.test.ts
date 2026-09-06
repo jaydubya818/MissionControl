@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { reportInternal, reportVerificationInternal, candidateVerificationDispatchFailedInternal } from "../factory/attempts";
+import { claimInternal, reportInternal, reportVerificationInternal, candidateVerificationDispatchFailedInternal } from "../factory/attempts";
 import { compilePolicyV2VerificationPlan, effectivePolicyV2VerificationChecks } from "../lib/policyV2Verification";
+import { computeCanonicalHash } from "../lib/genomeHash";
+import { exactModelRouteSnapshot, exactModelRouteDigest, exactModelRouteQualificationSnapshot, modelRouteQualificationDigest } from "../lib/modelRouteAdmission";
+import { CODEX_V1_HARNESS_MANIFEST, CODEX_V1_RUNTIME_ARTIFACT, harnessCapabilityManifestDigest, harnessRuntimeArtifactDigest } from "@mission-control/workflow-engine";
 import { verificationIsolationBindingDigest } from "@mission-control/workflow-engine";
 
 const BASE = "a".repeat(40);
@@ -120,6 +123,51 @@ function fixture(prepublication = false) {
   return { db, report, scheduled, invoke };
 }
 
+async function recoveryClaimFixture() {
+  const f = fixture();
+  const harnessDigest = harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST);
+  const runtimeDigest = harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT);
+  const route = exactModelRouteSnapshot({ provider: "openai", providerRoute: "openai", modelId: "fixture-explicit-model" });
+  const routeDigest = exactModelRouteDigest(route);
+  const qualification = exactModelRouteQualificationSnapshot({ routeDigest, evidenceReference: "synthetic-fixture", evidenceDigest: `sha256:${"2".repeat(64)}`,
+    workloadClasses: ["SOFTWARE_CHANGE"], riskClasses: ["GREEN"], promotedBy: "fixture-operator", promotedAt: 1,
+    compatibility: { adapter: "codex", version: "v1", capabilityManifestDigest: harnessDigest,
+      effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256, runtimeArtifactDigest: runtimeDigest, executionBackend: "persistent-worker" } });
+  const qualificationDigest = modelRouteQualificationDigest(qualification);
+  await f.db.insert("modelCatalog", { _id: "model-1", routeSnapshot: route, routeDigest, qualificationSnapshot: qualification, qualificationDigest,
+    enabled: true, qualificationStatus: "EVIDENCE_QUALIFIED", admissionStatus: "PRODUCTION_PILOT_ELIGIBLE" });
+  await f.db.insert("factoryDefinitionVersions", { _id: "version-1", factoryDefinitionId: "definition-1", configurationDigest: "config-1",
+    executor: { adapter: "codex", version: "v1" }, harnessRuntimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
+    modelCatalogId: "model-1", modelRouteSnapshot: route, modelRouteDigest: routeDigest, modelQualificationSnapshot: qualification,
+    modelQualificationDigest: qualificationDigest, repositoryDataClassification: "PUBLIC" });
+  await f.db.insert("factoryDefinitions", { _id: "definition-1", status: "ACTIVE", activeVersionId: "version-1" });
+  await f.db.patch("repository-1", { dataClassification: "PUBLIC" });
+  await f.db.patch("host-binding-1", { status: "READY", dirty: false, checkoutRoot: "/fixture", baseCommit: BASE, workerRuntime: undefined });
+  const sourceManifest = { version: "factory-execution-manifest/v1", causation: { workflowRunId: "original-run" },
+    repository: { baseSha: BASE, worktree: "/fixture/worktree", dataClassification: "PUBLIC" },
+    harness: { adapter: "codex", version: "v1", capabilityManifestSha256: harnessDigest,
+      effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256, executionBackend: "persistent-worker",
+      modelCatalogId: "model-1", modelRouteDigest: routeDigest, modelRouteSnapshot: route, modelQualificationDigest: qualificationDigest },
+    workflow: { steps: [{ kind: "EXECUTE", modelRoute: route.modelId, modelConfiguration: { provider: route.provider } }] },
+    workOrderSpecification: { verificationContract: { schemaVersion: 2, enforcementMode: "ENFORCED" } } };
+  const sourceDigest = `sha256:${computeCanonicalHash(sourceManifest)}`;
+  await f.db.patch("attempt-1", { factoryDefinitionVersionId: "version-1", factoryConfigurationDigest: "config-1",
+    executorAdapter: "codex", executorVersion: "v1", executorHostId: "worker-1", worktree: "/fixture/worktree" });
+  const original = await f.db.get("attempt-1");
+  await f.db.insert("workflowRuns", { ...original, _id: "original-attempt", runId: "original-run", status: "FAILED",
+    failureReason: "GitHub App runtime credentials are not configured.", executionManifest: sourceManifest, executionManifestDigest: sourceDigest });
+  await f.db.insert("runArtifacts", { workflowRunId: "original-attempt", artifactType: "CODE_DIFF", metadata: {
+    headSha: CANDIDATE, treeSha: TREE, sourceRevision: BASE, branch: "mc/candidate" } });
+  const manifest = { ...sourceManifest, causation: { workflowRunId: "run-1" } };
+  await f.db.patch("attempt-1", { executionManifest: manifest, executionManifestDigest: `sha256:${computeCanonicalHash(manifest)}`,
+    lease: { leaseId: "expired-recovery", ownerId: "service-1", expiresAt: 1, claimedAt: 0, heartbeatAt: 0 },
+    metadata: { localCandidateRecovery: { sourceAttemptId: "original-attempt", sourceExecutionManifestDigest: sourceDigest,
+      sourceCandidateSha: CANDIDATE, sourceTreeSha: TREE, sourceRevision: BASE,
+      previousLease: { leaseId: "original-lease", workerId: "worker-1", workerSessionId: "original-session", workerGeneration: 1 } } } });
+  const claim = () => f.invoke(claimInternal, { workflowRunId: "attempt-1", ownerId: "service-1", leaseId: "new-recovery", leaseDurationMs: 60_000 });
+  return { ...f, claim };
+}
+
 function pullRequestArtifact(sourceRevision: string, idempotencyKey: string) {
   return {
     idempotencyKey, artifactType: "PULL_REQUEST", name: "Controlled qualification PR",
@@ -141,6 +189,26 @@ const candidateReady = {
 };
 
 describe("Factory candidate source authority through the real report mutation", () => {
+  it("reclaims an expired read-only attestation through the actual claim mutation without replaying the failed source", async () => {
+    const f = await recoveryClaimFixture();
+    const result = await f.claim();
+    expect(result).toMatchObject({ claimed: true, reclaimed: true, lease: { leaseId: "new-recovery" },
+      localCandidateRecovery: { sourceAttemptId: "original-attempt", sourceCandidateSha: CANDIDATE, sourceTreeSha: TREE } });
+    expect(result.publicationCheckpoint).toBeUndefined();
+    expect(await f.db.get("original-attempt")).toMatchObject({ status: "FAILED", failureReason: "GitHub App runtime credentials are not configured." });
+    expect(await f.db.get("attempt-1")).toMatchObject({ status: "RUNNING", runtimeDispositionReason: expect.stringContaining("executor replay remains prohibited") });
+  });
+  it.each(["ordinary-executor", "substituted-candidate", "changed-source", "cancelled"])("does not reclaim an expired recovery with %s", async (fault) => {
+    const f = await recoveryClaimFixture();
+    if (fault === "ordinary-executor") await f.db.patch("attempt-1", { metadata: undefined });
+    if (fault === "cancelled") await f.db.patch("attempt-1", { cancellationRequestedAt: Date.now() });
+    if (fault === "changed-source") await f.db.patch("original-attempt", { workOrderRevisionNumber: 2 });
+    if (fault === "substituted-candidate") { const run = await f.db.get("attempt-1"); run.metadata.localCandidateRecovery.sourceCandidateSha = INTERMEDIATE; await f.db.patch("attempt-1", { metadata: run.metadata }); }
+    if (["changed-source", "substituted-candidate"].includes(fault)) await expect(f.claim()).rejects.toThrow(/immutable failed source/);
+    else expect(await f.claim()).toMatchObject({ claimed: false });
+    expect((await f.db.get("attempt-1")).lease?.leaseId).not.toBe("new-recovery");
+  });
+
   for (const checkStatus of ["PASS", "FAIL", "SKIPPED", "AUTHORITY_REJECTED"] as const) it(`handles separate verifier ${checkStatus} through the actual mutation without orphaning or waiving evidence`, async () => {
     const f = fixture(true);
     await f.db.patch("work-order-1", { riskLevel: "LOW", riskReasons: [], requiredApprovals: [],

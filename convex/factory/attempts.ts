@@ -519,6 +519,49 @@ export const reportSandboxReconcileInternal = internalMutation({
   },
 });
 
+async function validateReadOnlyCandidateRecovery(ctx: any, run: any): Promise<boolean> {
+  const recovery = run.metadata?.localCandidateRecovery;
+  if (!recovery) return false;
+  const source = recovery.sourceAttemptId ? await ctx.db.get(recovery.sourceAttemptId) : null;
+  const sourceArtifact = source ? await ctx.db.query("runArtifacts")
+    .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", source._id).eq("artifactType", "CODE_DIFF")).first() : null;
+  const sourcePublication = source ? await ctx.db.query("runArtifacts")
+    .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", source._id).eq("artifactType", "PULL_REQUEST")).first() : null;
+  const expectedManifest = source?.executionManifest ? { ...source.executionManifest,
+    causation: { ...source.executionManifest.causation, workflowRunId: run.runId } } : null;
+  const same = ["tenantId", "projectId", "workOrderId", "workOrderRevisionNumber", "repositoryId", "hostBindingId", "branch", "worktree",
+    "factoryDefinitionVersionId", "factoryConfigurationDigest", "verificationContractDigest", "qualityContractDigest"];
+  const previous = recovery.previousLease;
+  if (!source || source._id === run._id || source.status !== "FAILED"
+    || !source.failureReason?.includes("GitHub App runtime credentials are not configured.")
+    || source.verificationSubject || source.candidateReadyAt || sourcePublication
+    || same.some(field => run[field] !== source[field])
+    || (run.attemptPurpose ?? "IMPLEMENTATION") !== "IMPLEMENTATION"
+    || (source.attemptPurpose ?? "IMPLEMENTATION") !== "IMPLEMENTATION"
+    || run.verificationSubject || run.candidateReadyAt || run.factoryContinuation || run.subjectPublicationBinding
+    || !["PENDING", "RUNNING"].includes(run.status)
+    || factoryExecutionManifestBackend(run.executionManifest) !== "persistent-worker"
+    || run.executionManifest?.repository?.verificationPublicationOrder === "VERIFY_BEFORE_PUBLICATION"
+    || run.executionManifest?.workOrderSpecification?.verificationContract?.schemaVersion !== 2
+    || run.executionManifest?.workOrderSpecification?.verificationContract?.enforcementMode !== "ENFORCED"
+    || recovery.sourceExecutionManifestDigest !== source.executionManifestDigest
+    || `sha256:${computeCanonicalHash(source.executionManifest)}` !== source.executionManifestDigest
+    || `sha256:${computeCanonicalHash(expectedManifest)}` !== run.executionManifestDigest
+    || `sha256:${computeCanonicalHash(run.executionManifest)}` !== run.executionManifestDigest
+    || !/^[0-9a-f]{40,64}$/.test(recovery.sourceCandidateSha ?? "")
+    || !/^[0-9a-f]{40,64}$/.test(recovery.sourceTreeSha ?? "")
+    || recovery.sourceRevision !== source.executionManifest?.repository?.baseSha
+    || sourceArtifact?.metadata?.headSha !== recovery.sourceCandidateSha
+    || sourceArtifact?.metadata?.treeSha !== recovery.sourceTreeSha
+    || sourceArtifact?.metadata?.sourceRevision !== recovery.sourceRevision
+    || sourceArtifact?.metadata?.branch !== run.branch
+    || !previous?.leaseId || !previous.workerId || !previous.workerSessionId
+    || !Number.isSafeInteger(previous.workerGeneration) || previous.workerGeneration < 1) {
+    throw new Error("Read-only candidate recovery does not match its immutable failed source and exact unpublished checkpoint.");
+  }
+  return true;
+}
+
 export const claimInternal = internalMutation({
   args: {
     workflowRunId: v.id("workflowRuns"),
@@ -693,10 +736,12 @@ export const claimInternal = internalMutation({
       throw new Error("Factory attempt GitHub App installation is not connected.");
     }
 
+    const readOnlyCandidateRecovery = await validateReadOnlyCandidateRecovery(ctx, run);
     if (factoryAttemptRequiresReplacementOnClaim({
       status: run.status,
       lease: run.lease,
       continuationStatus: run.factoryContinuation?.status,
+      validatedReadOnlyCandidateRecovery: readOnlyCandidateRecovery,
       now,
     })) {
       return await failLostAttempt(ctx, run, "The prior execution lease is missing or expired without a recoverable publication checkpoint.");
@@ -895,7 +940,9 @@ export const claimInternal = internalMutation({
       status: "RUNNING",
       lease: decision.lease,
       runtimeDisposition: decision.reclaimed ? "RECOVERABLE" : undefined,
-      runtimeDispositionReason: decision.reclaimed ? "Immutable publication checkpoint reclaimed after lease expiry." : undefined,
+      runtimeDispositionReason: decision.reclaimed ? readOnlyCandidateRecovery
+        ? "Exact read-only local candidate attestation reclaimed after lease expiry; executor replay remains prohibited."
+        : "Immutable publication checkpoint reclaimed after lease expiry." : undefined,
       runtimeReconciledAt: decision.reclaimed ? now : undefined,
       executionPhase: publicationCheckpoint ? "PUBLISHING" : run.executionPhase,
       factoryContinuation: continuationPatch,
@@ -2420,6 +2467,9 @@ export const recoverLocalCandidate = mutation({
       && (attempt.attemptPurpose ?? "IMPLEMENTATION") === "IMPLEMENTATION"
     );
     if (existingRecovery) {
+      if (["FAILED", "CANCELED"].includes(existingRecovery.status)) {
+        throw new Error("The existing local attestation failed or was cancelled. Its terminal record is preserved; create a new governed WorkOrder Attempt after resolving its blocker.");
+      }
       return { recovered: true as const, workflowRunId: existingRecovery._id };
     }
     const latestImplementation = attempts

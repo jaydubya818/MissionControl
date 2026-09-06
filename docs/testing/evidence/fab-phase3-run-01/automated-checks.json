@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "system-factory-e2e-automated-checks/v2",
+  "baseSha": "0d1a0908cce380d815069ce0a59e1604d2f26ece",
+  "startedHead": "e8d9b45eca503ec56d29efeec87d37c9e86e5c59",
+  "startedAt": "2026-09-05T23:06:41.310Z",
+  "completedAt": "2026-09-05T23:06:46.561Z",
+  "result": "FAIL",
+  "checks": [
+    {
+      "name": "profile-bound governed read-only MCP transport and negative controls",
+      "command": "node --import tsx scripts/governed-mcp-phase3-qualification.mts",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 417
+    },
+    {
+      "name": "frozen dependency, advisory, credential, and release configuration gates",
+      "command": "pnpm run release:security",
+      "status": "FAIL",
+      "exitCode": 1,
+      "durationMs": 4833
+    }
+  ]
+}

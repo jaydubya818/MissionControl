@@ -1,0 +1,81 @@
+{
+  "name": "mc-sbx-local-20260905t225756z-43b6c8c9",
+  "image": "alpine@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4",
+  "readiness": {
+    "ready": true,
+    "engineVersion": "29.7.2",
+    "engineOs": "linux",
+    "engineArch": "arm64",
+    "image": "alpine@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4",
+    "imagePresentByDigest": true,
+    "contextName": "fab-phase3",
+    "contextEndpointType": "unix",
+    "localContextEndpoint": true,
+    "dockerHostOverridePresent": false,
+    "securityOptions": [
+      "name=seccomp,profile=builtin",
+      "name=cgroupns"
+    ],
+    "missingSecurityOptions": [],
+    "lingeringContainers": []
+  },
+  "inspection": {
+    "user": "65534:65534",
+    "networkMode": "none",
+    "readOnlyRootFilesystem": true,
+    "capabilitiesDropped": [
+      "ALL"
+    ],
+    "noNewPrivileges": true,
+    "pidsLimit": 32,
+    "memoryBytes": 134217728,
+    "nanoCpus": 500000000,
+    "writableTmpfs": [
+      "/output",
+      "/tmp"
+    ]
+  },
+  "receipt": {
+    "schema": "local-sandbox-canary/v1",
+    "uid": 65534,
+    "gid": 65534,
+    "rootFilesystemReadOnly": true,
+    "networkBlocked": true,
+    "artifactTmpfsWritable": true
+  },
+  "lifecycle": [
+    {
+      "state": "REQUESTED",
+      "at": "2026-09-05T22:57:56.126Z"
+    },
+    {
+      "state": "PROVISIONING",
+      "at": "2026-09-05T22:57:56.126Z"
+    },
+    {
+      "state": "HEALTH_CHECKING",
+      "at": "2026-09-05T22:57:56.171Z"
+    },
+    {
+      "state": "READY",
+      "at": "2026-09-05T22:57:56.184Z"
+    },
+    {
+      "state": "RUNNING",
+      "at": "2026-09-05T22:57:56.242Z"
+    },
+    {
+      "state": "RESULT_READY",
+      "at": "2026-09-05T22:58:01.354Z"
+    },
+    {
+      "state": "TEARING_DOWN",
+      "at": "2026-09-05T22:58:02.299Z"
+    },
+    {
+      "state": "TERMINATED",
+      "at": "2026-09-05T22:58:02.360Z"
+    }
+  ],
+  "cleanupVerified": true
+}

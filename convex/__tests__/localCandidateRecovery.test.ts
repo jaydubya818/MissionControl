@@ -1,7 +1,32 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildLocalCandidateRecoveryRows } from "../lib/localCandidateRecovery";
+import { recoverLocalCandidate } from "../factory/attempts";
+import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "../lib/companyAccess";
+
+// This fixture isolates terminal return behavior after authenticated access;
+// permission enforcement has separate company/delivery authorization tests.
+vi.mock("../lib/companyAccess", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../lib/companyAccess")>(),
+  requireWorkspaceAccess: vi.fn(async () => ({ membership: { canManageCompany: true }, roleNames: ["owner"] })),
+}));
 
 describe("local candidate recovery Attempt lineage", () => {
+  it.each(["FAILED", "CANCELED", "PENDING", "RUNNING", "COMPLETED"])("reports existing %s recovery without rewriting its terminal history", async (status) => {
+    const source = { _id: "source-attempt", status: "FAILED" };
+    const recovery = { _id: "recovery-attempt", status, metadata: { localCandidateRecovery: { sourceAttemptId: source._id } } };
+    const workOrder = { _id: "work-order", projectId: "project", tenantId: "tenant" };
+    const patch = vi.fn();
+    const ctx = { db: { get: async (id: string) => id === workOrder._id ? workOrder : source,
+      patch, query: () => ({ withIndex: () => ({ collect: async () => [source, recovery] }) }) } };
+    const result = (recoverLocalCandidate as unknown as { _handler: (ctx: any, args: any) => Promise<any> })._handler(ctx, {
+      workOrderId: workOrder._id, failedImplementationAttemptId: source._id, reason: "Inspect the exact synthetic candidate.",
+    });
+    if (["FAILED", "CANCELED"].includes(status)) await expect(result).rejects.toThrow(/terminal record is preserved/);
+    else await expect(result).resolves.toEqual({ recovered: true, workflowRunId: recovery._id });
+    expect(requireWorkspaceAccess).toHaveBeenCalledWith(ctx, "tenant", "project", { permission: COMPANY_PERMISSIONS.DISPATCH_WORK });
+    expect(patch).not.toHaveBeenCalled();
+    expect(recovery.status).toBe(status);
+  });
   it("preserves the terminal source and creates a fresh linked Attempt-local identity", () => {
     const failedAttempt: any = {
       _id: "source-attempt",

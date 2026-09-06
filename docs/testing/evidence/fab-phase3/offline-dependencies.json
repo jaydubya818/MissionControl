@@ -1,0 +1,17 @@
+{
+  "schema": "fab-offline-dependencies/v1",
+  "execution": "REAL_LOCAL_PNPM",
+  "prepared": {
+    "status": "PREPARED",
+    "packageManager": "pnpm"
+  },
+  "dependency": "picocolors@1.1.1",
+  "integrity": "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==",
+  "warmStorePassed": true,
+  "emptyStoreRejected": true,
+  "candidateHooksExecuted": false,
+  "lifecycleScriptsExecuted": false,
+  "sourceUnchanged": true,
+  "networkMode": "OFFLINE",
+  "wholeAgentContainment": false
+}
