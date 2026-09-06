@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "fab-phase3-clean-validation/v1",
+  "sourceCommit": "f5ed5d10ac58ba4472eddd882a06406fd96d9830",
+  "baselineMain": "f90c50f5b4191467b2117bb8762754f697b1cefd",
+  "result": "PASS",
+  "recordedAt": "2026-09-06T00:09:41.176207+00:00",
+  "environment": "fresh detached local checkout; standard pnpm 9 frozen-lockfile install using task-owned store; no other worktree node_modules links",
+  "systemQualification": {
+    "result": "PASS",
+    "gates": 19
+  },
+  "browser": {
+    "result": "PASS",
+    "tests": 15,
+    "environment": "backendless local synthetic shell fixtures"
+  },
+  "runtimeContractVersion": 43,
+  "classification": "OFFLINE_SYNTHETIC_AND_LOCAL_BUILD",
+  "liveProviderRequests": 0,
+  "liveProviderModels": [],
+  "realModelEvaluations": "NOT_RUN",
+  "deployedMissionControl": "NOT_RUN",
+  "controlledRuntimePublication": "NOT_RUN",
+  "wholeAgentContainment": "NOT_QUALIFIED",
+  "implementationPRs": "GITHUB_PUBLICATION_AUTHORIZATION_REQUIRED",
+  "CI": "NOT_RUN",
+  "merge": "NOT_RUN",
+  "postMergeMain": "NOT_RUN",
+  "terminalNormalization": "ANSI control sequences and trailing whitespace removed; raw local logs preserved"
+}

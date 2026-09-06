@@ -12,7 +12,7 @@ MC consumes private `@fdlc/fab@0.1.0-experimental.2`, built from FDLC source `1d
 
 - Exact runtime/model-route admission, frozen candidate identity, independent verifier admission, human receipt lineage, permit-bound publication and read-only uncertain-outcome reconciliation are covered by local tests with injected model/control-plane/GitHub transport.
 - Combined Fab/MC conformance passes 254 tests in 28 files. A separate final canonical mutation suite passes 22 tests, including exact read-only local recovery reclaim and all existing recovery status cases. These overlapping suites are not summed.
-- System Qualification passed at `ac8e38c`, at merge `1401a4e` and after ownership transfer repair `f698b7c`. The final clean-checkout run is recorded separately after the final recovery guard commit; the older runs do not claim to qualify later source.
+- Final clean-checkout System Qualification passes all 19 gates at `f5ed5d10ac58ba4472eddd882a06406fd96d9830`, after the canonical recovery guard and terminal-history fixes. Standard frozen pnpm install, full repository tests, security/docs checks, typecheck/lint, runtime contract v43, production build, startup smoke and historical immutability all pass. The fresh browser run also passes all 15 tests, and actual installed Fab/Node bytes match the expected identity. Older successful and failed runs remain separate.
 - Mission Control browser qualification passes 15 critical flows. The recovery component has four desktop/mobile and dark/light accessibility checks with zero axe violations or overflow. These use local browser fixtures, not a deployed backend. A missing browser-cache run failed before navigation and was rerun with the explicit installed browser path.
 - Independent security review and main-thread data-integrity, architecture and simplicity review are GO for their inspected offline scope. See [review record](reviews/offline-reviews.md).
 - A pinned Docker canary proves only its measured container restrictions and teardown. Fab remains `LOCAL_DEVELOPER_MODE`; whole-agent containment and remote Fab credential grants remain **NOT QUALIFIED**.
@@ -28,6 +28,7 @@ MC consumes private `@fdlc/fab@0.1.0-experimental.2`, built from FDLC source `1d
 | [Attempt 3](../fab-phase3-run-03/automated-checks.json) | FAIL, `e3b25f2`; UI identifier typo found by full TypeScript check |
 | [Current-main reconciliation](../fab-phase3-reconciled/automated-checks.json) | PASS, `1401a4e` |
 | [Ownership transfer repair](../fab-phase3-final/automated-checks.json) | PASS, `f698b7c`; before final canonical reclaim guard |
+| [Final clean-checkout qualification](../fab-phase3-clean-final/clean-validation.json) | PASS, `f5ed5d1`; standard install, all 19 System gates, 15 browser tests, installed runtime identity |
 | [Final focused tests](canonical-recovery-tests.txt) | PASS, 22 actual mutation tests |
 | [Combined conformance](combined-tests.txt) | PASS, 254 tests |
 | [Browser suite](browser-final.txt) | PASS, 15 tests |
