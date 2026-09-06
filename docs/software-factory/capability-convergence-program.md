@@ -250,6 +250,15 @@ retains the earlier results as history. All 87 backend source hashes still match
 and all four Production targets and guards remain unchanged. Final PR-head CI,
 merge and clean-main qualification remain pending.
 
+### Retained provider source qualification
+
+The separately versioned `codex/bedrock-v1` source landed in PR #185 and remains
+preserved at main `8bf19fc` on runtime v49. That recorded CI, Docker/orchestration
+qualification and independent architecture, security and data-integrity reviews pass. This closes
+the source-integration dependency without promoting maturity: approved AWS identity,
+account-specific route/pricing, live proof, exact Factory profiles, readiness and
+the governed pilot remain open.
+
 The complete Factory loop and ten real accepted WorkOrders are **NOT_PROVEN**.
 Live inference qualification and its two-route comparison are **NOT_RUN**.
 Real incident restoration, observed outcomes, evaluated improvement, human

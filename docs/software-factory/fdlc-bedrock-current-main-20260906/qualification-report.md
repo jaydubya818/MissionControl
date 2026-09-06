@@ -3,6 +3,15 @@
 Status: **OFFLINE_QUALIFICATION_PASS**. External dependency:
 **QUALIFICATION_AWS_IDENTITY_REQUIRED**. No readiness or Phase 1 completion claim.
 
+> **Current-tip closure — 2026-09-06:** The implementation landed through
+> [PR #185](https://github.com/jaydubya818/MissionControl/pull/185) at merge SHA
+> `9e6dfd9b0110c0316b1fc085539b41e2616ebac7`. Subsequent inference identity,
+> Fab broker and finite dispatch changes advanced authoritative main to
+> `8bf19fcb7e46f4b80a862054d22fbd7ca7ed436f`, runtime v49. Exact-tip CI passed
+> every job, and the affected local qualification passed 582 tests with one
+> separately gated shared-Convex integration skip. The AWS identity hold below
+> remains current; Production deployment and WO1 are therefore not admissible.
+
 ## Source and authority
 
 Authoritative baseline: `4434cc56448075f4804787325a9586c6290b2215`, runtime v46.
@@ -101,3 +110,45 @@ golden eval, documentation and secret scan. See
 [commit binding](../../testing/evidence/fdlc-bedrock-current-main-20260906/commit-binding/checks.json).
 The containing evidence follow-up commit changes documentation/evidence only; its
 identity is resolved from Git, avoiding a self-referential embedded commit hash.
+
+## Current-tip reconciliation and qualification
+
+The v47 Bedrock merge was followed by runtime v48 immutable inference-ledger
+snapshots and runtime v49 finite classification-dispatch authority. Those changes
+preserve the Bedrock harness manifests, Codex adapters, Bedrock Factory composition,
+Bedrock inference bridge and Docker Bedrock identity byte-for-byte. They strengthen
+the shared inference boundary without making classification dispatch an alternate
+Bedrock authority.
+
+Exact authoritative main `8bf19fcb7e46f4b80a862054d22fbd7ca7ed436f`
+passed all GitHub CI jobs: typecheck, unit, lint, build, smoke, E2E, browser security
+and accessibility, release security, eval integrity and System Qualification V2.
+Local exact-tip validation passed 582 orchestration/Docker tests with one existing
+shared-Convex integration skip. This includes the no-network bounded synthetic
+Bedrock tool cycle, cancellation, timeout, startup and budget denial, cleanup
+failure and worker-death recovery. Independent focused data-integrity validation
+passed 166 tests; independent architecture validation passed 118 tests. Runtime
+contract, repository secret scan (3,418 tracked files), documentation consistency
+and whitespace checks passed. The exact-tip worktree was clean.
+
+Independent architecture, security and data-integrity reviews returned GO. They
+confirmed that `codex/bedrock-v1` remains a separate harness composition, direct
+provider fallback is absent, dispatch requires finite current authority, aggregate
+budgets and UNKNOWN/overrun handling remain fail-closed, and producer/verifier
+separation is unchanged.
+
+The approved bootstrap and resumption files were re-read on exact current main.
+Account, profile, principal, project/environment, role, inference-profile ARN,
+authoritative configuration location and approval reference remain null. Account
+`083665737366` appears only in conversation and is not substituted for repository
+authority. No AWS profile, credential, cache or session was inspected; no AWS or
+model call occurred.
+
+Production deployment is blocked before release, not merely untested: the exact
+account route, authoritative price, liability reservation, producing and verifier
+profiles, Factory Version, live-call proof and derived readiness do not exist yet.
+Deploying now would violate the release prerequisites and could not produce a valid
+Production acceptance or rollback proof. Resume by supplying the approved safe
+handoff fields in `fdlc-aws-bootstrap-handoff.json` or an authoritative location
+named by that record. Identity verification then precedes route/topology/pricing;
+live-call authority remains a separate bounded gate.
