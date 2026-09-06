@@ -1,0 +1,9 @@
+
+ RUN  v3.2.7 <qualification-worktree>/packages/model-router
+
+ ✓ src/__tests__/governed-inference.test.ts (19 tests) 18ms
+
+ Test Files  1 passed (1)
+      Tests  19 passed (19)
+   Start at  01:20:37
+   Duration  321ms (transform 65ms, setup 0ms, collect 100ms, tests 18ms, environment 0ms, prepare 32ms)

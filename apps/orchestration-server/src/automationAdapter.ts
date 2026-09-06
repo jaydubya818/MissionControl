@@ -105,6 +105,7 @@ async function executeProcess(manifest: ExecutionManifest, artifact: string, sig
 }
 
 async function executeArgv(manifest: ExecutionManifest, argv: string[], signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const cwd = safeRepositoryPath(manifest.repositoryRoot, manifest.workingDirectory || ".");
   const secretValues = manifest.secretReferences.map(name => process.env[name] ?? "");
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) =>
@@ -124,23 +125,18 @@ async function executeArgv(manifest: ExecutionManifest, argv: string[], signal?:
     child.stderr.on("data", chunk => { stderr += String(chunk); });
     let timedOut = false;
     let forceKillTimer: ReturnType<typeof setTimeout> | null = null;
-    const terminate = () => {
-      if (child.exitCode !== null || child.signalCode !== null) return;
+    const killOwnedProcesses = (terminationSignal: "SIGTERM" | "SIGKILL") => {
       try {
-        if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGTERM");
-        else child.kill("SIGTERM");
+        // A leader can exit while its descendants still hold these pipes open.
+        if (process.platform !== "win32" && child.pid) process.kill(-child.pid, terminationSignal);
+        else if (child.exitCode === null && child.signalCode === null) child.kill(terminationSignal);
       } catch {
-        child.kill("SIGTERM");
+        if (child.exitCode === null && child.signalCode === null) child.kill(terminationSignal);
       }
-      forceKillTimer = setTimeout(() => {
-        if (child.exitCode !== null || child.signalCode !== null) return;
-        try {
-          if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGKILL");
-          else child.kill("SIGKILL");
-        } catch {
-          child.kill("SIGKILL");
-        }
-      }, 1_000);
+    };
+    const terminate = () => {
+      killOwnedProcesses("SIGTERM");
+      forceKillTimer ??= setTimeout(() => killOwnedProcesses("SIGKILL"), 1_000);
       forceKillTimer.unref?.();
     };
     const timer = setTimeout(() => { timedOut = true; terminate(); }, manifest.timeoutMs);
@@ -152,6 +148,7 @@ async function executeArgv(manifest: ExecutionManifest, argv: string[], signal?:
     };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
+    child.once("spawn", () => { if (signal?.aborted || timedOut) terminate(); });
     child.on("error", (error) => {
       cleanup();
       reject(error);
@@ -220,7 +217,9 @@ export async function executeAutomation(manifest: ExecutionManifest, signal?: Ab
   const started = Date.now();
   const startedAt = new Date(started).toISOString();
   try {
+    signal?.throwIfAborted();
     const artifact = await materializeArtifact(manifest);
+    signal?.throwIfAborted();
     const raw = manifest.adapterType === "API"
       ? await executeApi(manifest, signal)
       : manifest.adapterType === "SKILL_PIPELINE"

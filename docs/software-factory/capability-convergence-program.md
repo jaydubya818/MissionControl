@@ -214,7 +214,11 @@ denominators and coverage remain explicit. Existing economics WARN remains.
   including light/dark, desktop/mobile and keyboard operation. All 87 source
   hashes match the frozen source; root code generation passes unchanged and
   temporary backend ports close. Initial failed harness runs remain retained.
-  Full composed and final-main qualification remain pending.
+  [Committed local qualification](../testing/evidence/capability-convergence-observations-final/README.md)
+  passes all 19 composed gates, 2956 tests (11 inherited skips), Phase 5 and
+  15 critical browser checks on `c5cbf718eb73`. Economics remains WARN and all
+  four Production targets and guards are unchanged. Final-head CI, merge and
+  clean-main qualification remain pending.
 - FDLC [#17](https://github.com/jaydubya818/FDLC/pull/17) merged as `ef73e7f`;
   Guide [#16](https://github.com/jaydubya818/ai-software-factory-mastery/pull/16)
   merged as `5276509`. Both pass clean-main source qualification and browser
@@ -225,9 +229,50 @@ denominators and coverage remain explicit. Existing economics WARN remains.
 
 ## Remaining acceptance evidence
 
+### CI cancellation repair
+
+PR #190's first final-head run passed the composed system job but failed an
+existing automation cancellation check: an aborted shell ran for about five
+seconds. Two local regressions then reproduced pre-cancelled artifact writes
+and a surviving process-group child after its leader exited. Cancellation must
+be checked before materialization/dispatch, and process-group termination must
+continue until its pipes close even when the direct leader has exited. The
+repair retains the existing timeout and cancellation bounds; it adds no
+execution or publication authority. Qualification must be repeated on the
+corrected source before merge.
+
+The corrected source `ba130ce5f0f1` passes all 19 composed gates, 2958 tests
+(11 inherited skips), Phase 5 and 15 critical browser checks. Independent
+cancellation review is GO; all cancellation regressions pass, with two unrelated
+socket tests blocked only in the review sandbox and all thirteen passing in the
+permitted environment. [Corrected proof](../testing/evidence/capability-convergence-observations-final-v2/README.md)
+retains the earlier results as history. All 87 backend source hashes still match
+and all four Production targets and guards remain unchanged. Final PR-head CI,
+merge and clean-main qualification remain pending.
+
+### Retained provider source qualification
+
+The separately versioned `codex/bedrock-v1` source landed in PR #185 and remains
+preserved at main `8bf19fc` on runtime v49. That recorded CI, Docker/orchestration
+qualification and independent architecture, security and data-integrity reviews pass. This closes
+the source-integration dependency without promoting maturity: approved AWS identity,
+account-specific route/pricing, live proof, exact Factory profiles, readiness and
+the governed pilot remain open.
+
 The complete Factory loop and ten real accepted WorkOrders are **NOT_PROVEN**.
 Live inference qualification and its two-route comparison are **NOT_RUN**.
 Real incident restoration, observed outcomes, evaluated improvement, human
 promotion, controlled activation and observed rollback remain required at the
 scope specified by the master acceptance criteria. Program completion must not
 be inferred from the bounded offline records or from checklist implementation.
+
+### Current-main integration for observation retention
+
+PR #191 advanced main with documentation-only qualification records. The resolved
+program-record conflict retains both histories; application source is unchanged.
+[Integrated-main qualification](../testing/evidence/capability-convergence-observations-final-v3/README.md)
+on `8cfe354b31d2` against main `d0e3ba889df1` passes all 19 composed gates,
+2958 tests (11 inherited skips), Phase 5 and 15 critical browser checks. All 87
+backend source hashes match; economics remains WARN and all four Production
+targets and guards remain unchanged. Exact PR-head CI and clean-main proof
+remain separate requirements.

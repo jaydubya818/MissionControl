@@ -1,0 +1,226 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-observations
+
+ ❯ convex/__tests__/inferenceObservations.test.ts (9 tests | 8 failed) 27ms
+   × retains individual overruns, fences the WorkOrder and blocks a previously persisted claim and new allocation 8ms
+     → RESERVATION_INPUT_TOKEN_LIMIT_EXCEEDED
+   × sums validated canonical usage and preserves cumulative overruns despite mutable duplicated fields 4ms
+     → the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+   × retains resolved provider drift and marks requested-route pricing unknown 2ms
+     → Provider alias or resolution drift detected.
+   × retains resolved model drift and marks requested-route pricing unknown 1ms
+     → Resolved model drift detected.
+   ✓ reads an unchanged canonical v2 receipt without migrating its digest 2ms
+   × rejects structurally invalid reconciliation counters -1 3ms
+     → promise resolved "{ …(2) }" instead of rejecting
+   × rejects structurally invalid reconciliation counters 1.5 2ms
+     → promise resolved "{ …(2) }" instead of rejecting
+   × rejects structurally invalid reconciliation counters 9007199254740992 2ms
+     → promise resolved "{ …(2) }" instead of rejecting
+   × rejects structurally invalid reconciliation counters NaN 2ms
+     → promise resolved "{ …(2) }" instead of rejecting
+ ❯ convex/__tests__/providerLiabilityHandlers.test.ts (72 tests | 6 failed) 54ms
+   × settles original admitted usage after expiry without granting new spending 6ms
+     → promise rejected "Error: Attempt fenced or dependency chang…" instead of resolving
+   × settles original admitted usage after replacement without granting new spending 2ms
+     → promise rejected "Error: Attempt fenced or dependency chang…" instead of resolving
+   × settles original admitted usage after revokedProfile without granting new spending 0ms
+     → promise rejected "Error: Attempt fenced or dependency chang…" instead of resolving
+   × settles original admitted usage after cancelled without granting new spending 0ms
+     → promise rejected "Error: Attempt fenced or dependency chang…" instead of resolving
+   × settles original admitted usage after completed without granting new spending 0ms
+     → promise rejected "Error: Attempt fenced or dependency chang…" instead of resolving
+   × settles original admitted usage after worker without granting new spending 0ms
+     → promise rejected "Error: Worker registration fenced" instead of resolving
+   ✓ settles original admitted usage after retiredPrice without granting new spending 1ms
+   ✓ records one hold through the actual mutation and rejects a second full-balance request 1ms
+   ✓ fences staleRun at the mutation boundary 0ms
+   ✓ fences staleRevision at the mutation boundary 0ms
+   ✓ fences cancel at the mutation boundary 0ms
+   ✓ fences expiredLease at the mutation boundary 0ms
+   ✓ fences lease at the mutation boundary 0ms
+   ✓ fences generation at the mutation boundary 0ms
+   ✓ fences hostSession at the mutation boundary 0ms
+   ✓ fences hostGeneration at the mutation boundary 0ms
+   ✓ fences profile at the mutation boundary 0ms
+   ✓ fences profileDigest at the mutation boundary 0ms
+   ✓ fences scope at the mutation boundary 0ms
+   ✓ fences budget at the mutation boundary 0ms
+   ✓ denies another Attempt settling an existing hold 0ms
+   ✓ denies anonymous public monetary authority 0ms
+   ✓ denies anonymous public monetary authority 0ms
+   ✓ denies anonymous public monetary authority 0ms
+   ✓ denies anonymous public monetary authority 0ms
+   ✓ binds Bedrock request admission evidence through actual handler 3ms
+   ✓ rejects exact Bedrock workOrderId substitution in actual handler 0ms
+   ✓ rejects exact Bedrock workOrderRevision substitution in actual handler 0ms
+   ✓ rejects exact Bedrock executionProfileId substitution in actual handler 0ms
+   ✓ rejects exact Bedrock executionProfileDigest substitution in actual handler 0ms
+   ✓ rejects exact Bedrock harnessDigest substitution in actual handler 0ms
+   ✓ rejects exact Bedrock runtimeDigest substitution in actual handler 0ms
+   ✓ rejects exact Bedrock backend substitution in actual handler 0ms
+   ✓ rejects exact Bedrock modelRouteDigest substitution in actual handler 0ms
+   ✓ rejects exact Bedrock priceDigest substitution in actual handler 1ms
+   ✓ rejects exact Bedrock provider substitution in actual handler 0ms
+   ✓ rejects exact Bedrock model substitution in actual handler 0ms
+   ✓ rejects exact Bedrock retryGeneration substitution in actual handler 0ms
+   ✓ requires bridge binding for Bedrock even when omitted by caller 0ms
+   ✓ rejects old Codex harness despite valid-looking supplied digest 0ms
+   ✓ fences a second Bedrock request while first outcome is unresolved 1ms
+   ✓ rejects a price for another Bedrock API 0ms
+   ✓ rejects cross-reservation receipt replay through by_provider_usage index 0ms
+   ✓ rejects cross-reservation receipt replay through by_provider_request index 0ms
+   ✓ atomically composes a canonical reservation and claimed physical intent before Bedrock reserve proof 2ms
+   ✓ denies composed Bedrock accounting for disabled before any write 1ms
+   ✓ denies composed Bedrock accounting for price before any write 1ms
+   ✓ denies composed Bedrock accounting for provenance before any write 1ms
+   ✓ denies composed Bedrock accounting for inactive before any write 0ms
+   ✓ denies composed Bedrock accounting for route before any write 0ms
+   ✓ denies composed Bedrock accounting for approval before any write 1ms
+   ✓ denies composed Bedrock accounting for task before any write 0ms
+   ✓ denies composed Bedrock accounting for budget before any write 1ms
+   ✓ denies composed Bedrock accounting for parallelBudget before any write 0ms
+   ✓ settles both aggregate exposure and canonical physical receipt without claiming unknown dimensions 2ms
+   ✓ retains unknown liability and appends an unknown canonical receipt with no invented zero usage 1ms
+   ✓ clamps the returned send proof to the governed price-book expiry 1ms
+   ✓ rejects an aggregate above the WorkOrder ceiling even when this physical call fits 0ms
+   ✓ rejects aggregate allocation after existing canonical EXHAUSTED budget 0ms
+   ✓ rejects aggregate allocation after existing canonical ACTIVE budget 0ms
+   ✓ rejects public canonical reservation allocation after aggregate allocation 0ms
+   ✓ reconciles UNKNOWN through operator authority without rewriting the canonical receipt 2ms
+   ✓ retains observed overrun {"inputTokens":11,"outputTokens":1} and freezes aggregate atomically without expanding pre-send limits 2ms
+   ✓ retains observed overrun {"inputTokens":1,"outputTokens":11} and freezes aggregate atomically without expanding pre-send limits 1ms
+   ✓ retains observed overrun {"inputTokens":11,"outputTokens":11} and freezes aggregate atomically without expanding pre-send limits 1ms
+   ✓ denies actual settlement request ID already owned by a canonical receipt in another WorkOrder 1ms
+   ✓ denies actual settlement request ID already owned by a canonical reconciliation in another WorkOrder 1ms
+   ✓ denies unknown correction using another canonical receipt provider request ID 2ms
+   ✓ denies unknown correction using another canonical reconciliation provider request ID 1ms
+   ✓ retains sequential operator corrections for one provider usage ID with exact-revision idempotency 2ms
+   ✓ retains cumulative canonical allocation after settled paired requests without expanding the WorkOrder ceiling 3ms
+   ✓ rejects immutable allocation drift before composing the next physical request 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  convex/__tests__/inferenceObservations.test.ts > retains individual overruns, fences the WorkOrder and blocks a previously persisted claim and new allocation
+Error: RESERVATION_INPUT_TOKEN_LIMIT_EXCEEDED
+ ❯ physicalInferenceReceipt packages/shared/src/governedInference.ts:496:55
+ ❯ Function.appendReceiptInTransaction [as _handler] convex/inferenceGateway.ts:647:22
+    645|     });
+    646|     const receiptKey = canonicalDigest("inference-receipt-id/v1", { in…
+    647|     const snapshot = physicalInferenceReceipt({
+       |                      ^
+    648|       receiptId: receiptKey, intent: claimedIntent, reservation: reser…
+    649|       resolvedProvider, resolvedModelId, providerRequestId, providerBi…
+ ❯ convex/__tests__/inferenceObservations.test.ts:38:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯
+
+ FAIL  convex/__tests__/inferenceObservations.test.ts > sums validated canonical usage and preserves cumulative overruns despite mutable duplicated fields
+AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+ ❯ convex/__tests__/inferenceObservations.test.ts:54:89
+     52|   const second = await f.persist("retry", undefined, undefined, 2, f.f…
+     53|   const result = await f.receipt(second.intentId, { resolvedModelId: f…
+     54|   expect(((await f.db.get(result.receiptId))!.immutableSnapshot as any…
+       |                                                                                         ^
+     55|   expect(f.records.get("order")!.inferenceSpendingFence).toBeDefined();
+     56| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/14]⎯
+
+ FAIL  convex/__tests__/inferenceObservations.test.ts > retains resolved provider drift and marks requested-route pricing unknown
+Error: Provider alias or resolution drift detected.
+ ❯ physicalInferenceReceipt packages/shared/src/governedInference.ts:484:11
+ ❯ Function.appendReceiptInTransaction [as _handler] convex/inferenceGateway.ts:647:22
+    645|     });
+    646|     const receiptKey = canonicalDigest("inference-receipt-id/v1", { in…
+    647|     const snapshot = physicalInferenceReceipt({
+       |                      ^
+    648|       receiptId: receiptKey, intent: claimedIntent, reservation: reser…
+    649|       resolvedProvider, resolvedModelId, providerRequestId, providerBi…
+ ❯ convex/__tests__/inferenceObservations.test.ts:60:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/14]⎯
+
+ FAIL  convex/__tests__/inferenceObservations.test.ts > retains resolved model drift and marks requested-route pricing unknown
+Error: Resolved model drift detected.
+ ❯ physicalInferenceReceipt packages/shared/src/governedInference.ts:487:11
+ ❯ Function.appendReceiptInTransaction [as _handler] convex/inferenceGateway.ts:647:22
+    645|     });
+    646|     const receiptKey = canonicalDigest("inference-receipt-id/v1", { in…
+    647|     const snapshot = physicalInferenceReceipt({
+       |                      ^
+    648|       receiptId: receiptKey, intent: claimedIntent, reservation: reser…
+    649|       resolvedProvider, resolvedModelId, providerRequestId, providerBi…
+ ❯ convex/__tests__/inferenceObservations.test.ts:60:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/14]⎯
+
+ FAIL  convex/__tests__/inferenceObservations.test.ts > rejects structurally invalid reconciliation counters -1
+ FAIL  convex/__tests__/inferenceObservations.test.ts > rejects structurally invalid reconciliation counters 1.5
+ FAIL  convex/__tests__/inferenceObservations.test.ts > rejects structurally invalid reconciliation counters 9007199254740992
+ FAIL  convex/__tests__/inferenceObservations.test.ts > rejects structurally invalid reconciliation counters NaN
+AssertionError: promise resolved "{ …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "created": true,
++   "reconciliationId": "inferenceReconciliations-db-1",
+  }
+
+ ❯ convex/__tests__/inferenceObservations.test.ts:81:75
+     79|   await expect(f.invoke(appendReconciliationInternal, { workflowRunId:…
+     80|     providerRequestId: `provider:${f.first.intentId}`, providerEventId…
+     81|     completeness: "PARTIAL", sourceDigest: sha, reconciledBy: "fixture…
+       |                                                                           ^
+     82|   expect(f.tableRows("inferenceReconciliations")).toHaveLength(0);
+     83| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/14]⎯
+
+ FAIL  convex/__tests__/providerLiabilityHandlers.test.ts > settles original admitted usage after expiry without granting new spending
+ FAIL  convex/__tests__/providerLiabilityHandlers.test.ts > settles original admitted usage after replacement without granting new spending
+ FAIL  convex/__tests__/providerLiabilityHandlers.test.ts > settles original admitted usage after revokedProfile without granting new spending
+ FAIL  convex/__tests__/providerLiabilityHandlers.test.ts > settles original admitted usage after cancelled without granting new spending
+ FAIL  convex/__tests__/providerLiabilityHandlers.test.ts > settles original admitted usage after completed without granting new spending
+AssertionError: promise rejected "Error: Attempt fenced or dependency chang…" instead of resolving
+ ❯ convex/__tests__/providerLiabilityHandlers.test.ts:148:69
+    146|   const usage = { requestId: args.requestId, requestDigest: args.reque…
+    147|     providerRequestId: "provider-request", usageId: "usage", inputToke…
+    148|   await expect(handler(recordUsageInternal)(ctx, { ...args, usage })).…
+       |                                                                     ^
+    149|   await expect(handler(recordUsageInternal)(ctx, { ...args, usage })).…
+    150|   expect(rows.reservation.snapshot.holds[0]).toMatchObject({ state: "S…
+
+Caused by: Error: Attempt fenced or dependency changed
+ ❯ currentAuthority convex/factory/providerLiability.ts:252:11
+ ❯ handler convex/factory/providerLiability.ts:431:26
+ ❯ convex/__tests__/providerLiabilityHandlers.test.ts:148:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯
+
+ FAIL  convex/__tests__/providerLiabilityHandlers.test.ts > settles original admitted usage after worker without granting new spending
+AssertionError: promise rejected "Error: Worker registration fenced" instead of resolving
+ ❯ convex/__tests__/providerLiabilityHandlers.test.ts:148:69
+    146|   const usage = { requestId: args.requestId, requestDigest: args.reque…
+    147|     providerRequestId: "provider-request", usageId: "usage", inputToke…
+    148|   await expect(handler(recordUsageInternal)(ctx, { ...args, usage })).…
+       |                                                                     ^
+    149|   await expect(handler(recordUsageInternal)(ctx, { ...args, usage })).…
+    150|   expect(rows.reservation.snapshot.holds[0]).toMatchObject({ state: "S…
+
+Caused by: Error: Worker registration fenced
+ ❯ currentAuthority convex/factory/providerLiability.ts:255:11
+ ❯ handler convex/factory/providerLiability.ts:431:26
+ ❯ convex/__tests__/providerLiabilityHandlers.test.ts:148:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/14]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  14 failed | 67 passed (81)
+   Start at  00:38:55
+   Duration  492ms (transform 203ms, setup 0ms, collect 453ms, tests 81ms, environment 0ms, prepare 84ms)
