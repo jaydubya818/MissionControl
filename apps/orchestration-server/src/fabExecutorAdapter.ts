@@ -3,8 +3,8 @@ import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import {
   FabAgent, EnvironmentCredentialProvider, StoredCredentialProvider, KeychainCredentialStore,
-  Redactor, HttpModelProvider, Repository, SessionStore, newSession, parseConfig,
-  type FabConfig, type ModelProvider, type Session,
+  Redactor, HttpModelProvider, BedrockModelProvider, Repository, SessionStore, newSession, parseConfig,
+  type BedrockBrokerTransport, type FabConfig, type ModelProvider, type Session,
 } from "@fdlc/fab";
 import {
   GENERIC_HARNESS_CONTRACT_VERSION, NO_HARNESS_AUTHORITY,
@@ -30,9 +30,12 @@ export interface FabAdapterOptions {
   config: FabConfig; stateDirectory: string;
   /** Tests inject model transport here. Production configuration never selects a mock. */
   modelFactory?: (config: FabConfig, redactor: Redactor) => Promise<ModelProvider>;
+  /** Host-owned binding to canonical authority and durable inference liability.
+   * Configuration files cannot supply or select an arbitrary transport. */
+  bedrockBrokerFactory?: (input: { config: FabConfig; request: ExecutorRequest; context: HarnessExecutionContext }) => Promise<BedrockBrokerTransport>;
 }
 
-export function loadFabExecutorAdapter(configPath: string, stateDirectory: string): FabExecutorAdapter {
+export function loadFabExecutorAdapter(configPath: string, stateDirectory: string, bedrockBrokerFactory?: FabAdapterOptions["bedrockBrokerFactory"]): FabExecutorAdapter {
   if (!path.isAbsolute(configPath) || !path.isAbsolute(stateDirectory)) throw new Error("Fab requires explicit absolute config and state paths.");
   const text = readFileSync(configPath, "utf8");
   if (Buffer.byteLength(text) > 32000) throw new Error("Fab configuration exceeds its byte limit.");
@@ -40,7 +43,7 @@ export function loadFabExecutorAdapter(configPath: string, stateDirectory: strin
   const realConfigPath = realpathSync(configPath);
   if (realConfigPath === config.repository || realConfigPath.startsWith(config.repository + path.sep)) throw new Error("Fab operator configuration must be outside the worktree.");
   if (new Redactor().containsSecret(text)) throw new Error("Fab configuration must contain credential references only.");
-  return new FabExecutorAdapter({ config, stateDirectory });
+  return new FabExecutorAdapter({ config, stateDirectory, bedrockBrokerFactory });
 }
 
 /** Execution only: no queue, lease, verifier, approval or publication implementation. */
@@ -69,7 +72,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     if (request.provider !== config.provider || request.model !== config.model) issue("model", "Fab requires the exact explicitly selected provider/model.");
     if (request.modelRouteDigest !== undefined || request.providerRoute !== undefined || request.reasoningConfig !== undefined) {
       if (!/^sha256:[a-f0-9]{64}$/.test(request.modelRouteDigest ?? "")) issue("modelRouteDigest", "Fab requires the exact frozen model-route digest.");
-      if (request.providerRoute !== config.provider) issue("providerRoute", "Fab supports only its configured native provider endpoint.");
+      if (request.providerRoute !== config.provider) issue("providerRoute", "Fab requires its exact configured provider route.");
       if (request.reasoningConfig !== undefined) issue("reasoningConfig", "Fab cannot translate reasoning controls; use a separately qualified configuration.");
     }
     if (request.isolation !== "WORKSPACE_WRITE" || request.filesystemReadScope) issue("isolation", "Fab has no whole-agent OS read boundary; WORKSPACE_ONLY and read-only execution are unsupported.");
@@ -95,7 +98,15 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
       executorIdentity: attempt.executorIdentity, environmentReference: attempt.environmentReference, credentialReference: config.credential.id,
       sourceRevision: session.baseline, candidateRevision: null, startedAt: session.createdAt, completedAt: null };
     // Initialize credential redaction before writing private evidence; reserve before inference.
-    const model = this.options.modelFactory ? await this.options.modelFactory(config, redactor) : await createModel(config, redactor, this.environment);
+    let model: ModelProvider;
+    if (config.provider === "bedrock") {
+      if (!this.options.bedrockBrokerFactory) throw new Error("Fab Bedrock requires an enrolled canonical broker; HTTP and ambient AWS fallback are prohibited.");
+      const transport = await this.options.bedrockBrokerFactory({ config: structuredClone(config), request: structuredClone(request), context });
+      context.signal?.throwIfAborted(); await attempt.assertActive(); context.signal?.throwIfAborted();
+      model = new BedrockModelProvider({ config, transport, redactor });
+    } else {
+      model = this.options.modelFactory ? await this.options.modelFactory(config, redactor) : await createModel(config, redactor, this.environment);
+    }
     store.reserve(session);
     return { request: structuredClone(request), context, attempt, session, store, redactor, model, controller: new AbortController(), events: [], startedAt: Date.now(), started: false };
   }
@@ -195,6 +206,7 @@ function sessionId(executionId: string) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 async function createModel(config: FabConfig, redactor: Redactor, environment: NodeJS.ProcessEnv) {
+  if (config.provider === "bedrock" || config.credential.source.kind === "broker") throw new Error("Fab Bedrock requires the explicit canonical broker path.");
   const credentials = config.credential.source.kind === "environment" ? new EnvironmentCredentialProvider(config.credential, redactor, environment)
     : await StoredCredentialProvider.create(config.credential, new KeychainCredentialStore(redactor), redactor);
   await credentials.use(config.credential, async () => {});
@@ -211,7 +223,7 @@ export function fabManifest(config: FabConfig): HarnessCapabilityManifest {
     subagents: { available: no, parallel: no, background: no, eventVisibility: no }, streaming: { events: supported, modelDeltas: no, durableReplay: no },
     context: { persistentSessions: supported, resume: no, fork: no, compaction: no, instructionFiles: partial }, headless: { support: supported, mode: "API" },
     cancellation: { support: supported, mode: "IN_PROCESS_AGENT", idempotentCleanup: true }, sandbox: { isolationModes: ["WORKSPACE_WRITE"], externalSandboxRecommended: true, requirements: ["macOS Seatbelt for checks", "Operator-controlled checkout; no hostile same-UID process"] },
-    network: { providerApi: true, packageInstall: false, runtimeEgressControl: partial, destinations: [config.provider === "openai" ? "api.openai.com" : "api.anthropic.com"] },
+    network: { providerApi: true, packageInstall: false, runtimeEgressControl: partial, destinations: [config.provider === "bedrock" ? "bedrock-runtime.us-east-1.amazonaws.com" : config.provider === "openai" ? "api.openai.com" : "api.anthropic.com"] },
     credentials: { classes: ["explicit-user-BYOK-reference"], passedToToolProcesses: false, redaction: partial },
     telemetry: { tokens: partial, cost: no, toolCalls: supported, modelRequests: supported, retries: supported },
     admission: { maturity: "EXPERIMENTAL", executionBackends: ["persistent-worker"], requiredExternalControls: ["MC Attempt lease checkpoints", "Separate verification Attempt", "MC approval and publication"], prohibitedAuthorities: ["worker-leases", "verification-subjects", "verification-plans", "evidence-authority", "github-publication", "acceptance"] },

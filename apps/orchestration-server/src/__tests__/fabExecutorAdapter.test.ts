@@ -47,6 +47,62 @@ function fixture(options: { attack?: string; hangModel?: boolean; slowCheck?: bo
 }
 
 describe("Fab canonical MC harness conformance", () => {
+  function bedrockFixture() {
+    const f = fixture();
+    const route = { accountId: "123456789012", region: "us-east-1", modelId: "anthropic.claude-sonnet-4-6", inferenceProfileId: "us.anthropic.claude-sonnet-4-6", inferenceProfileArn: "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-sonnet-4-6" } as const;
+    const config = parseConfig({ ...f.config, provider: "bedrock", model: route.modelId, bedrockRoute: route,
+      credential: { ...f.config.credential, provider: "bedrock", source: { kind: "broker" } } });
+    const request = { ...f.request, provider: "bedrock", model: route.modelId };
+    return { ...f, config, request, route };
+  }
+  it("requires an explicit Bedrock broker and cannot select the test model factory or ambient credential path", async () => {
+    const f = bedrockFixture(); const modelFactory = vi.fn();
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), modelFactory });
+    await expect(adapter.prepare(f.request, f.context)).rejects.toThrow("enrolled canonical broker");
+    expect(modelFactory).not.toHaveBeenCalled();
+    expect(adapter.capabilities().capabilityManifest?.network.destinations).toEqual(["bedrock-runtime.us-east-1.amazonaws.com"]);
+    expect(Object.values(adapter.capabilities().authority).every(value => value === "NONE")).toBe(true);
+  });
+  it("rechecks canonical authority after Bedrock broker enrollment before any provider request", async () => {
+    const f = bedrockFixture(); const invoke = vi.fn();
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockBrokerFactory: async input => {
+      expect(input.request).toEqual(f.request); expect(input.context.attempt?.attemptId).toBe("attempt-1");
+      f.assertActive.mockRejectedValue(new Error("lease lost while enrolling broker"));
+      return { identity: () => ({ route: f.route, credentialReference: f.config.credential.id, maximumAttempts: 1 }), invoke };
+    } });
+    await expect(adapter.prepare(f.request, f.context)).rejects.toThrow("lease lost while enrolling broker");
+    expect(invoke).not.toHaveBeenCalled();
+  });
+  it("runs the real Fab loop through a synthetic Bedrock broker while preserving canonical request linkage", async () => {
+    const f = bedrockFixture(); let calls = 0;
+    const providerRequests: Array<{ id: string; digest: string }> = [];
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockBrokerFactory: async () => ({
+      identity: () => ({ route: f.route, credentialReference: f.config.credential.id, maximumAttempts: 1 }),
+      invoke: async request => {
+        calls++; providerRequests.push({ id: request.requestId, digest: request.requestDigest });
+        const wire = JSON.parse(request.body);
+        expect(wire.anthropic_version).toBe("bedrock-2023-05-31"); expect(wire.model).toBeUndefined();
+        expect(request.route).toEqual(f.route); expect(request.credentialReference).toBe(f.config.credential.id);
+        let name = "submit_plan"; let input: Record<string, unknown> = { summary: "Set the value", steps: ["Edit one file", "Run test"] };
+        if (calls === 2) { name = "write_file"; input = { path: "src/value.mjs", content: "export const value = 2;\n", expectedHash: createHash("sha256").update("export const value = 1;\n").digest("hex") }; }
+        if (calls === 3) { name = "run_check"; input = { id: "test" }; }
+        if (calls === 4) { name = "finish_candidate"; input = { summary: "Value corrected", unresolved: [] }; }
+        return { requestDigest: request.requestDigest, providerRequestId: `aws-fixture-${calls}`, httpStatus: 200, attempts: 1,
+          body: JSON.stringify({ model: "claude-sonnet-4-6", content: [{ type: "tool_use", id: `tool_${calls}`, name, input }], stop_reason: "tool_use", usage: { input_tokens: 10, output_tokens: 5 } }) };
+      },
+    }) });
+    const result = await runHarnessExecution(adapter, f.request, f.context);
+    expect(result.status).toBe("COMPLETED"); expect(calls).toBe(4);
+    expect(result.normalizedResult?.provenance.provider).toBe("bedrock");
+    expect(result.normalizedResult?.usage.inputTokens).toBe(40);
+    expect(result.normalizedResult?.usage.costUsd).toBeNull();
+    const observed = result.normalizedResult?.events.items.filter(event => event.summary === "provider_request").map(event => event.metadata?.providerRequest as Record<string, unknown>);
+    for (const request of providerRequests) {
+      expect(observed?.some(receipt => receipt.localRequestId === request.id && receipt.requestDigest === request.digest && receipt.phase === "SUCCEEDED")).toBe(true);
+    }
+    expect(JSON.parse(result.output!).completedAcceptanceCriterionIds).toEqual([]);
+    expect(harnessNormalizedResultIssues(result.normalizedResult!)).toEqual([]);
+  });
   it("requires durable request evidence before dispatch and records in-process lifecycle", async () => {
     const f = fixture();
     const started = vi.fn(async () => {});

@@ -4,7 +4,23 @@ Fab is an execution-only harness. Mission Control owns admission, frozen manifes
 
 The adapter consumes an explicit operator-owned Fab config, a pinned vendored package, a state directory outside the worktree, and the canonical Attempt context. No credential discovery occurs. Native model APIs use only the enrolled Fab key or explicitly selected Fab environment variable. Source-control credentials are never passed to Fab. The worker requires the exact frozen model route and installed runtime byte identity before credential use or inference.
 
-The current package is `@fdlc/fab@0.1.0-experimental.2`, built from FDLC commit `1d1240c219d9bf3c1fa5fbb0a80ded96cf13df1f`. The installed closure hash and source are recorded in `apps/orchestration-server/src/fabRuntimePin.ts`; the archive SHA-256 is `b3a1af223e246208c01745678cbe48a91786070b016b9a1ad7bdb0ad274d8a8d`, also bound by the pnpm integrity entry. Ordinary frozen pnpm installation resolves the vendored archive. The old experimental.1 archive remains historical. This Experimental tuple includes native macOS 26.0+ arm64 credential/check helpers and requires Node 24. The helpers have only linker ad-hoc signatures, no Developer ID or notarization; there is no signed or npm-registry release. This repository is public, so these vendored archives are publicly retrievable. See [package provenance](../../vendor/fab/README.md) for source and the unresolved upstream license.
+The current package is `@fdlc/fab@0.1.0-experimental.3`, built from FDLC commit `faebfc26bcca10e495a0d21c91c3e12813a3e15a`. The installed 43-file closure hash and source are recorded in `apps/orchestration-server/src/fabRuntimePin.ts`; the archive SHA-256 is `e034a74f0e6f8b39b601b474c06a3725d19630b548920fbe25b774b24a706f9a`, also bound by the pnpm integrity entry. Ordinary frozen pnpm installation resolves the vendored archive. Earlier archives remain historical. This Experimental tuple includes native macOS 26.0+ arm64 credential/check helpers and requires Node 24. The helpers have only linker ad-hoc signatures, no Developer ID or notarization; there is no signed or npm-registry release. This repository is public, so these vendored archives are publicly retrievable. See [package provenance](../../vendor/fab/README.md) for source and the unresolved upstream license.
+
+The Bedrock text/tool protocol requires an explicit host-owned broker factory.
+Configuration cannot select an AWS credential chain or an HTTP fallback. The
+factory receives the canonical Attempt context, and the adapter rechecks authority
+after broker enrollment. A missing broker fails closed; production startup does
+not register a placeholder. The host still must implement exact CountTokens,
+enrolled identity verification and durable reservation/claim/receipt handling
+before live invocation. Offline tests do not establish those deployed controls.
+
+The existing inference ledger now sums all WorkOrder reservation maxima, including
+earlier Attempts and terminal/unknown outcomes, in its insertion transaction. It
+retains exact logical snapshots separately from database foreign keys, rejects
+legacy intents without their exact snapshot, and permits zero cache/reasoning
+allowances. This enforces a WorkOrder budget only; a multi-WorkOrder qualification
+program requires fixed sub-budgets whose total fits its approved ceiling. No
+reservation refund or admission relaxation is introduced.
 
 ## Canonical lifecycle
 

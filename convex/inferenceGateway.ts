@@ -7,6 +7,7 @@ import {
   inferencePriceBook,
   inferenceReservation,
   physicalInferenceIntent,
+  claimPhysicalInferenceIntent,
   physicalInferenceReceipt,
   projectFactoryOutcome,
   compareRouteEconomics,
@@ -14,6 +15,8 @@ import {
 } from "@mission-control/shared";
 import { canonicalDigest } from "@mission-control/shared";
 import type { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
+import type { PhysicalInferenceIntent } from "@mission-control/shared";
 
 const sha256 = /^sha256:[a-f0-9]{64}$/;
 const routeValidator = v.object({
@@ -66,6 +69,42 @@ function requireDigest(value: string, label: string) {
 
 function gatewayAdmissionEnabled() {
   return process.env.MC_GOVERNED_INFERENCE_GATEWAY_ENABLED === "1";
+}
+
+function persistedIntentSnapshot(intent: Doc<"inferencePhysicalIntents">, reservation: Doc<"inferenceReservations">): PhysicalInferenceIntent {
+  const snapshot = intent.immutableSnapshot as PhysicalInferenceIntent | undefined;
+  if (!snapshot || snapshot.schema !== "inference-physical-intent/v1" || snapshot.state !== "PERSISTED"
+    || snapshot.claimId !== undefined || snapshot.claimedAt !== undefined
+    || typeof snapshot.intentId !== "string" || !snapshot.intentId.trim()
+    || snapshot.reservationId !== reservation.immutableSnapshot.reservationId
+    || snapshot.logicalRequestKey !== intent.logicalRequestKey || snapshot.physicalOrdinal !== intent.physicalOrdinal
+    || snapshot.requestDigest !== intent.requestDigest || snapshot.createdAt !== intent.createdAt
+    || canonicalDigest("inference-route-binding/v1", snapshot.route) !== canonicalDigest("inference-route-binding/v1", intent.route)) {
+    throw new Error("Inference intent immutable subject is missing or substituted; legacy intents cannot dispatch.");
+  }
+  const { digest, ...bytes } = snapshot;
+  if (digest !== intent.intentDigest || canonicalDigest("inference-physical-intent/v1", bytes) !== digest) {
+    throw new Error("Inference intent immutable digest is substituted.");
+  }
+  return snapshot;
+}
+
+async function exactIntentSnapshot(ctx: Pick<MutationCtx, "db">, intent: Doc<"inferencePhysicalIntents">, reservation: Doc<"inferenceReservations">) {
+  const snapshot = persistedIntentSnapshot(intent, reservation);
+  if (intent.physicalOrdinal === 1) {
+    if (intent.retryOfIntentId !== undefined || snapshot.retryOfIntentId !== undefined) {
+      throw new Error("Primary inference intent cannot have a retry predecessor.");
+    }
+  } else {
+    const prior = intent.retryOfIntentId ? await ctx.db.get(intent.retryOfIntentId) : null;
+    if (!prior || prior.reservationId !== reservation._id || prior.workflowRunId !== intent.workflowRunId
+      || prior.logicalRequestKey !== intent.logicalRequestKey || prior.physicalOrdinal !== intent.physicalOrdinal - 1
+      || snapshot.retryOfIntentId !== persistedIntentSnapshot(prior, reservation).intentId
+      || snapshot.retryOfIntentId === snapshot.intentId) {
+      throw new Error("Inference retry predecessor identity is missing or substituted.");
+    }
+  }
+  return snapshot;
 }
 
 export const registerPriceBookDraft = mutation({
@@ -236,6 +275,20 @@ export const createReservation = mutation({
     const logicalReservation = await ctx.db.query("inferenceReservations")
       .withIndex("by_logical_request", (q) => q.eq("projectId", args.projectId).eq("logicalRequestKey", snapshot.logicalRequestKey)).first();
     if (logicalReservation) throw new Error("Logical inference request already has an immutable reservation.");
+    // This indexed read and insert share one serializable mutation. Every prior
+    // maximum remains held: expiry, cancellation, or an unknown result is not a refund.
+    const workOrderReservations = await ctx.db.query("inferenceReservations")
+      .withIndex("by_work_order", (q) => q.eq("workOrderId", args.workOrderId)).collect();
+    let aggregateLiability = BigInt(args.maxCostMicrousd);
+    for (const prior of workOrderReservations) {
+      if (!Number.isSafeInteger(prior.maxCostMicrousd) || prior.maxCostMicrousd <= 0) {
+        throw new Error("Historical inference reservation liability is invalid.");
+      }
+      aggregateLiability += BigInt(prior.maxCostMicrousd);
+    }
+    if (aggregateLiability > BigInt(approvedMaxCostMicrousd)) {
+      throw new Error("Aggregate inference reservation liability exceeds the approved WorkOrder ceiling.");
+    }
     const id = await ctx.db.insert("inferenceReservations", {
       tenantId: access.project.tenantId, projectId: args.projectId, workOrderId: args.workOrderId,
       taskId: args.taskId, workflowRunId: args.workflowRunId, executionProfileId: args.executionProfileId,
@@ -272,12 +325,14 @@ export const persistIntentInternal = internalMutation({
       .withIndex("by_logical_request", (q) => q.eq("projectId", reservation.projectId).eq("logicalRequestKey", logicalRequestKey)).collect();
     const duplicate = logicalIntents.find((intent) => intent.physicalOrdinal === args.physicalOrdinal);
     if (duplicate) {
+      const original = await exactIntentSnapshot(ctx, duplicate, reservation);
       const requested = canonicalDigest("inference-intent-replay/v1", {
         logicalRequestKey,
         physicalOrdinal: args.physicalOrdinal,
         retryOfIntentId: args.retryOfIntentId ? String(args.retryOfIntentId) : undefined,
         route: args.route,
         requestDigest: requireDigest(args.requestDigest, "Inference request digest"),
+        intentKey: bounded(args.intentKey, 200, "Physical intent key"),
       });
       const persisted = canonicalDigest("inference-intent-replay/v1", {
         logicalRequestKey: duplicate.logicalRequestKey,
@@ -285,12 +340,18 @@ export const persistIntentInternal = internalMutation({
         retryOfIntentId: duplicate.retryOfIntentId ? String(duplicate.retryOfIntentId) : undefined,
         route: duplicate.route,
         requestDigest: duplicate.requestDigest,
+        intentKey: original.intentId,
       });
       if (requested !== persisted) throw new Error("Inference intent replay conflicts with immutable history.");
       return { intentId: duplicate._id, state: duplicate.state, created: false as const };
     }
     const intents = await ctx.db.query("inferencePhysicalIntents")
       .withIndex("by_reservation", (q) => q.eq("reservationId", reservation._id)).collect();
+    const priorSnapshots = await Promise.all(intents.map((intent) => exactIntentSnapshot(ctx, intent, reservation)));
+    const intentKey = bounded(args.intentKey, 200, "Physical intent key");
+    if (priorSnapshots.some((snapshot) => snapshot.intentId === intentKey)) throw new Error("Physical inference intent key is already bound to another ordinal.");
+    if (args.physicalOrdinal === 1 && args.retryOfIntentId !== undefined) throw new Error("Primary inference intent cannot have a retry predecessor.");
+    let retryOfLogicalIntentId: string | undefined;
     if (args.physicalOrdinal > 1) {
       const prior = args.retryOfIntentId ? await ctx.db.get(args.retryOfIntentId) : null;
       const priorReceipt = prior
@@ -301,24 +362,21 @@ export const persistIntentInternal = internalMutation({
         || priorReceipt.delivery !== "NOT_DELIVERED" || !["FAILED", "TIMED_OUT"].includes(priorReceipt.status)) {
         throw new Error("Retry/fallback requires one exact, definitive failed prior physical attempt.");
       }
+      retryOfLogicalIntentId = (await exactIntentSnapshot(ctx, prior, reservation)).intentId;
     }
     const snapshot = physicalInferenceIntent({
-      intentId: bounded(args.intentKey, 200, "Physical intent key"), reservationId: String(reservation._id),
+      intentId: intentKey, reservationId: reservation.immutableSnapshot.reservationId,
       logicalRequestKey,
-      physicalOrdinal: args.physicalOrdinal, retryOfIntentId: args.retryOfIntentId ? String(args.retryOfIntentId) : undefined,
+      physicalOrdinal: args.physicalOrdinal, retryOfIntentId: retryOfLogicalIntentId,
       route: args.route,
       requestDigest: requireDigest(args.requestDigest, "Inference request digest"), createdAt: Date.now(),
-    }, reservation.immutableSnapshot, intents.map((intent) => ({
-      ...intent, schema: "inference-physical-intent/v1" as const, reservationId: String(intent.reservationId),
-      intentId: String(intent._id), retryOfIntentId: intent.retryOfIntentId ? String(intent.retryOfIntentId) : undefined,
-      digest: intent.intentDigest,
-    })), Date.now());
+    }, reservation.immutableSnapshot, priorSnapshots, Date.now());
     const id = await ctx.db.insert("inferencePhysicalIntents", {
       tenantId: reservation.tenantId, projectId: reservation.projectId, workflowRunId: reservation.workflowRunId,
       reservationId: reservation._id, logicalRequestKey: snapshot.logicalRequestKey,
       physicalOrdinal: snapshot.physicalOrdinal, retryOfIntentId: args.retryOfIntentId,
       route: snapshot.route, requestDigest: snapshot.requestDigest,
-      intentDigest: snapshot.digest, state: "PERSISTED", createdAt: snapshot.createdAt,
+      intentDigest: snapshot.digest, immutableSnapshot: snapshot, state: "PERSISTED", createdAt: snapshot.createdAt,
     });
     return { intentId: id, state: "PERSISTED" as const, created: true as const };
   },
@@ -337,6 +395,7 @@ export const claimIntentInternal = internalMutation({
     if (!reservation || !run || reservation.workflowRunId !== args.workflowRunId || run._id !== args.workflowRunId) {
       throw new Error("Inference claim Attempt scope is unavailable or substituted.");
     }
+    const snapshot = await exactIntentSnapshot(ctx, intent, reservation);
     if ((args.cancelRequested || run.cancellationRequestedAt)
       && reservation.leaseId === args.leaseId && run.lease?.leaseId === args.leaseId) {
       await ctx.db.patch(intent._id, { state: "CANCELLED" });
@@ -351,7 +410,10 @@ export const claimIntentInternal = internalMutation({
     const claimId = bounded(args.claimId, 200, "Claim ID");
     const claimConflict = await ctx.db.query("inferencePhysicalIntents").withIndex("by_claim", (q) => q.eq("claimId", claimId)).first();
     if (claimConflict) throw new Error("Physical inference claim ID was replayed.");
-    await ctx.db.patch(intent._id, { state: "CLAIMED", claimId, claimedAt: Date.now() });
+    const claimed = claimPhysicalInferenceIntent(snapshot, reservation.immutableSnapshot, {
+      claimId, leaseId: args.leaseId, now: Date.now(), cancelled: false,
+    });
+    await ctx.db.patch(intent._id, { state: "CLAIMED", claimId, claimedAt: claimed.claimedAt });
     return { claimed: true as const, intentId: intent._id, reservationDigest: reservation.reservationDigest };
   },
 });
@@ -408,14 +470,15 @@ export const appendReceiptInternal = internalMutation({
     const priceBook = await ctx.db.get(reservation.priceBookId);
     if (!priceBook) throw new Error("Inference receipt price book is unavailable.");
     const receiptKey = canonicalDigest("inference-receipt-id/v1", { intentId: String(intent._id), completedAt: args.completedAt });
+    if (intent.state !== "CLAIMED" || !intent.claimId || !Number.isSafeInteger(intent.claimedAt)) {
+      throw new Error("Receipt requires the exact persisted transport claim.");
+    }
+    const claimedIntent = claimPhysicalInferenceIntent(await exactIntentSnapshot(ctx, intent, reservation), reservation.immutableSnapshot, {
+      claimId: intent.claimId, leaseId: reservation.leaseId, now: intent.claimedAt!, cancelled: false,
+    });
     const snapshot = physicalInferenceReceipt({
-      receiptId: receiptKey, intent: {
-        schema: "inference-physical-intent/v1", intentId: String(intent._id), reservationId: String(intent.reservationId),
-        logicalRequestKey: intent.logicalRequestKey, physicalOrdinal: intent.physicalOrdinal, route: intent.route,
-        retryOfIntentId: intent.retryOfIntentId ? String(intent.retryOfIntentId) : undefined,
-        requestDigest: intent.requestDigest, state: intent.state, createdAt: intent.createdAt,
-        claimedAt: intent.claimedAt, claimId: intent.claimId, digest: intent.intentDigest,
-      }, reservation: reservation.immutableSnapshot, priceBook: priceBook.immutableSnapshot,
+      receiptId: receiptKey, intent: claimedIntent,
+      reservation: reservation.immutableSnapshot, priceBook: priceBook.immutableSnapshot,
       resolvedProvider, resolvedModelId, providerRequestId, providerBillingId,
       delivery: args.delivery, status: args.status, usage: args.usage,
       responseDigest, failureCode,
@@ -454,7 +517,7 @@ export const appendReceiptInternal = internalMutation({
       costMicrousd: snapshot.costMicrousd, costCompleteness: snapshot.costCompleteness,
       priceBookId: priceBook._id, priceBookDigest: priceBook.priceBookDigest,
       responseDigest, failureCode, startedAt: args.startedAt,
-      completedAt: args.completedAt, receiptDigest: snapshot.receiptDigest,
+      completedAt: args.completedAt, receiptDigest: snapshot.receiptDigest, immutableSnapshot: snapshot,
     });
     await ctx.db.patch(intent._id, { state: args.delivery === "UNKNOWN" ? "AMBIGUOUS" : "RECEIPTED" });
     if (intent.physicalOrdinal >= reservation.maxPhysicalCalls) await ctx.db.patch(reservation._id, { state: "EXHAUSTED" });
