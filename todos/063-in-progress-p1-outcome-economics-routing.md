@@ -204,3 +204,11 @@ Forty-two focused tests and 13 real local backend scenarios pass. Root code
 generation passes with unchanged generated files. Main advances #185 and #186
 are being integrated before final qualification and merge. Live authority and
 complete outcome economics remain open.
+
+### 2026-09-06 — Dispatch authority continuation
+
+PR #188 merged at `9a68b56c3ee788c4f8b4132a8c7c9d14f32dee28` and passed
+clean-main qualification (19 gates, 2773 tests, 11 inherited skips, Phase 5 and
+15 browser checks). All four Production targets and guards remain unchanged.
+Finite classification dispatch is now in progress under the same approved
+program; see the cumulative program record. Todo 063 remains in progress.

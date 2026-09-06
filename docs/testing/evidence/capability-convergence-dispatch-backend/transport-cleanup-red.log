@@ -1,0 +1,72 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-dispatch/apps/orchestration-server
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts (43 tests | 1 failed) 25ms
+   ✓ OpenAIChatCompletionsTransport > makes one raw request and preserves provider/cache/reasoning observations 7ms
+   ✓ OpenAIChatCompletionsTransport > denies route substitution and retains observed resolved-model drift 1ms
+   ✓ OpenAIChatCompletionsTransport > does not invent a resolved model observation when the provider omits it 0ms
+   ✓ OpenAIChatCompletionsTransport > denies redirects and oversized provider responses 0ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes for missing proof 0ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes for mutated proof 0ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes for other request 0ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes for other bytes 0ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes for other output cap 0ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes for other temperature 0ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes for other route 0ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes for missing wire 1ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes for mutated wire 0ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes for unbounded output 0ms
+   ✓ OpenAIChatCompletionsTransport > rechecks cancellation immediately before dispatch 0ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes outside the allowance time window at 99 0ms
+   ✓ OpenAIChatCompletionsTransport > sends zero bytes outside the allowance time window at 30100 0ms
+   ✓ OpenAIChatCompletionsTransport > consumes a committed claim once even when concurrent callers send it directly 1ms
+   ✓ OpenAIChatCompletionsTransport > bounds a stalled response stream by the allowance deadline 2ms
+   ✓ OpenAIChatCompletionsTransport > bounds a stalled fetch even when the fetch implementation ignores abort 1ms
+   × OpenAIChatCompletionsTransport > cancels a response that arrives after a fetch deadline 1ms
+     → expected "spy" to be called 1 times, but got 0 times
+   ✓ OpenAIChatCompletionsTransport > cancels a stalled response on caller abort and removes deadline resources 1ms
+   ✓ GovernedInferenceGateway > does not replace an observed success when receipt persistence fails 1ms
+   ✓ GovernedInferenceGateway > persists and claims before exactly one transport call 0ms
+   ✓ GovernedInferenceGateway > uses only an approved fallback after a definitive non-delivery 0ms
+   ✓ GovernedInferenceGateway > never retries after ambiguous delivery 0ms
+   ✓ GovernedInferenceGateway > never retries a definitively delivered provider failure 0ms
+   ✓ GovernedInferenceGateway > denies concurrent duplicate logical dispatch before transport 0ms
+   ✓ GovernedInferenceGateway > durably cancels a persisted intent before claim without creating a transport receipt 0ms
+   ✓ selected classify gateway > denies a legacy boolean claim before OpenAI dispatch 0ms
+   ✓ selected classify gateway > freezes exact bytes and scope before persistence and binds their digest into the claim 1ms
+   ✓ selected classify gateway > denies a well-formed claim for another projectId 0ms
+   ✓ selected classify gateway > denies a well-formed claim for another repositoryId 0ms
+   ✓ selected classify gateway > denies a well-formed claim for another attemptId 0ms
+   ✓ selected classify gateway > denies a well-formed claim for another reservationId 0ms
+   ✓ selected classify gateway > denies a well-formed claim for another intentId 0ms
+   ✓ selected classify gateway > denies a well-formed claim for another intentLogicalId 0ms
+   ✓ selected classify gateway > denies a well-formed claim for another logicalRequestKey 0ms
+   ✓ selected classify gateway > denies a well-formed claim for another leaseId 0ms
+   ✓ selected classify gateway > denies a well-formed claim for another claimId 0ms
+   ✓ selected classify gateway > denies multiple selected routes before persisting an intent 0ms
+   ✓ selected classify gateway > propagates cancellation that occurs during the durable claim before sending 1ms
+   ✓ selected classify gateway > keeps /classify on the strict signal-aware path with no SDK bypass 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > cancels a response that arrives after a fetch deadline
+AssertionError: expected "spy" to be called 1 times, but got 0 times
+ ❯ src/__tests__/governedInferenceGateway.test.ts:184:20
+    182|     finishFetch(new Response(new ReadableStream({ start() {}, cancel }…
+    183|     await vi.advanceTimersByTimeAsync(0);
+    184|     expect(cancel).toHaveBeenCalledTimes(1);
+       |                    ^
+    185|     expect(vi.getTimerCount()).toBe(0);
+    186|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 42 passed (43)
+   Start at  00:06:03
+   Duration  338ms (transform 74ms, setup 0ms, collect 136ms, tests 25ms, environment 0ms, prepare 30ms)
+
+undefined
+/private/tmp/fdlc-program-dispatch/apps/orchestration-server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/__tests__/governedInferenceGateway.test.ts

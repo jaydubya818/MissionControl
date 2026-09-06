@@ -140,10 +140,39 @@ denominators and coverage remain explicit. Existing economics WARN remains.
   `971d664d81259b005ab986bd2e14cc1a049b98bb`, with gateway/shared/schema hashes
   matching the real backend proof. The economics eval remains WARN.
 - PR: [#188](https://github.com/jaydubya818/MissionControl/pull/188).
-  Exact final PR-head checks, merge and clean-main proof are pending.
+  All 12 final-head CI/Preview contexts passed on `c888fb020d5d` and the PR
+  merged at `9a68b56c3ee788c4f8b4132a8c7c9d14f32dee28`.
+  [Clean-main qualification](../testing/evidence/capability-convergence-identity-postmerge/README.md)
+  passes all 19 composed gates, 2773 tests (11 inherited skips), Phase 5 and
+  15 browser checks. Economics remains WARN; all four Production targets and
+  their guards remain unchanged.
 - Maturity: no promotion. After identity repair, claims still need finite
   request/output exposure before transport; receipt persistence still needs to
   retain observed overrun evidence. Live-provider qualification remains gated.
+
+## Active slice — finite classification dispatch authority
+
+- Reconciled main/merge base: `9a68b56c3ee788c4f8b4132a8c7c9d14f32dee28`
+  (qualified PR #188 merge). Branch: `codex/inference-dispatch-authority`.
+- Contract: [selected dispatch authority](./inference-dispatch-authority-contract.md).
+  Reuse retained inference reservations; issue one immutable allowance in the
+  claim transaction for exact frozen wire bytes and a maximum 30-second window.
+- Reuse the existing Attempt Execution Profile guard by moving it and its
+  projection helpers into `convex/lib/attemptExecutionProfile.ts`. This refactor
+  preserves the guard's behavior and lets both original Attempt admission and
+  inference claim enforce the same frozen profile/qualification projections.
+- Independent review found missing Factory configuration, route-parameter and
+  qualification-scope bindings plus negative controls stopped by earlier digest
+  guards. All findings are corrected and independently accepted. The
+  [real local backend proof](../testing/evidence/capability-convergence-dispatch-backend/README.md)
+  passes 23 scenarios; the actual-handler/profile suite passes 91 tests and
+  transport/wire tests pass 97. Root code generation passes.
+- Initial contract tests reproduced 24 missing checks. Five additional review
+  negatives then failed as expected. These are development results, not final
+  qualification. Runtime contract advances to v49 for the selected allowance.
+- Source remains Experimental and default off. Actual account/geography
+  enrollment, billing/settlement/overrun evidence and complete outcome metrics
+  remain todo 063 requirements; no Production or paid inference is authorized.
 
 ## Remaining acceptance evidence
 

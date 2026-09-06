@@ -1,0 +1,23 @@
+{
+  "main": "9a68b56c3ee788c4f8b4132a8c7c9d14f32dee28",
+  "mergedAt": "2026-09-06T06:47:54Z",
+  "head": "c888fb020d5d1acb8152e03eeb24fbe69b4d8949",
+  "pr": 188,
+  "sourceSha256": {
+    "convex/inferenceGateway.ts": "610201941c860aa7126dcb01916e036ba5ea8ef592e862724f3f57f2fa00e1f6",
+    "convex/schema.ts": "a638c1c608afc8e586e9292c3c313db4d1fa015119a06692c773858a5c1b4e5a",
+    "packages/shared/src/governedInference.ts": "5c07438ed08a87f5edfc3145855ff42c0e4dc1c656bf7111635b4cbfd97eb2e5"
+  },
+  "composedGates": 19,
+  "composedTotal": 19,
+  "repositoryTests": 2773,
+  "repositorySkips": 11,
+  "phase5": "PASS",
+  "criticalBrowser": {
+    "passed": 15,
+    "total": 15
+  },
+  "eval": "WARN",
+  "providerCalls": 0,
+  "productionChanges": 0
+}

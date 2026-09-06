@@ -12,6 +12,7 @@ export * from "./retry.js";
 export * from "./serviceCommandEnvelope.js";
 export * from "./canonicalDigest.js";
 export * from "./governedInference.js";
+export * from "./classifyInferenceDispatch.js";
 export * from "./factoryMemorySecurity.js";
 export * from "./execution-routing.js";
 export * from "./missionPlannerIdentity.js";

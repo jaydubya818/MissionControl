@@ -94,6 +94,7 @@ import type * as lib_agentResolver from "../lib/agentResolver.js";
 import type * as lib_armAudit from "../lib/armAudit.js";
 import type * as lib_armCompat from "../lib/armCompat.js";
 import type * as lib_armPolicy from "../lib/armPolicy.js";
+import type * as lib_attemptExecutionProfile from "../lib/attemptExecutionProfile.js";
 import type * as lib_authorizationRollout from "../lib/authorizationRollout.js";
 import type * as lib_automationDispatch from "../lib/automationDispatch.js";
 import type * as lib_automationGovernance from "../lib/automationGovernance.js";
@@ -417,6 +418,7 @@ declare const fullApi: ApiFromModules<{
   "lib/armAudit": typeof lib_armAudit;
   "lib/armCompat": typeof lib_armCompat;
   "lib/armPolicy": typeof lib_armPolicy;
+  "lib/attemptExecutionProfile": typeof lib_attemptExecutionProfile;
   "lib/authorizationRollout": typeof lib_authorizationRollout;
   "lib/automationDispatch": typeof lib_automationDispatch;
   "lib/automationGovernance": typeof lib_automationGovernance;

@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-dispatch
+
+ ✓ convex/__tests__/inferenceGateway.test.ts (24 tests) 11ms
+ ✓ convex/__tests__/inferencePersistence.test.ts (18 tests) 31ms
+ ✓ convex/__tests__/executionProfile.test.ts (14 tests) 130ms
+ ✓ convex/__tests__/inferenceDispatch.test.ts (35 tests) 769ms
+
+ Test Files  4 passed (4)
+      Tests  91 passed (91)
+   Start at  00:09:10
+   Duration  1.16s (transform 240ms, setup 0ms, collect 703ms, tests 941ms, environment 0ms, prepare 115ms)
+

@@ -1,0 +1,530 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-dispatch/apps/orchestration-server
+
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > makes one raw request and preserves provider/cache/reasoning observations 6ms
+   → expected "spy" to be called with arguments: [ …(2) ]
+
+Received: 
+
+  1st spy call:
+
+  [
+    "https://api.openai.com/v1/chat/completions",
+-   ObjectContaining {
+-     "body": "{\"model\":\"gpt-4o-mini-2024-07-18\",\"messages\":[{\"role\":\"user\",\"content\":\"synthetic\"}],\"max_completion_tokens\":1024,\"n\":1,\"stream\":false,\"service_tier\":\"default\"}",
++   {
++     "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"synthetic\"}],\"max_completion_tokens\":1024,\"model\":\"gpt-4o-mini-2024-07-18\"}",
++     "headers": {
++       "authorization": "Bearer fixture-key",
++       "content-type": "application/json",
++     },
++     "method": "POST",
++     "redirect": "error",
++     "signal": undefined,
+    },
+  ]
+
+
+Number of calls: 1
+
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > denies route substitution and retains observed resolved-model drift 1ms
+   → expected GovernedInferenceError: The OpenAI transp… { …(2) } to match object { Object (code) }
+(2 matching properties omitted from actual)
+ ✓ src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > does not invent a resolved model observation when the provider omits it 0ms
+ ✓ src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > denies redirects and oversized provider responses 0ms
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for missing proof 1ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for mutated proof 0ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for other request 0ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for other bytes 0ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for other output cap 0ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for other route 0ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for missing wire 0ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for mutated wire 0ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for unbounded output 0ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > rechecks cancellation immediately before dispatch 1ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes outside the allowance time window at 99 0ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes outside the allowance time window at 30100 0ms
+   → promise resolved "{ value: {}, …(7) }" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > consumes a committed claim once even when concurrent callers send it directly 1ms
+   → expected [ 'fulfilled', 'fulfilled' ] to deeply equal [ 'fulfilled', 'rejected' ]
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > bounds a stalled response stream by the allowance deadline 503ms
+   → Test timed out in 500ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > bounds a stalled fetch even when the fetch implementation ignores abort 504ms
+   → Test timed out in 500ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ × src/__tests__/governedInferenceGateway.test.ts > GovernedInferenceGateway > does not replace an observed success when receipt persistence fails 8ms
+   → expected "appendReceipt" to be called 1 times, but got 2 times
+ ✓ src/__tests__/governedInferenceGateway.test.ts > GovernedInferenceGateway > persists and claims before exactly one transport call 1ms
+ ✓ src/__tests__/governedInferenceGateway.test.ts > GovernedInferenceGateway > uses only an approved fallback after a definitive non-delivery 1ms
+ ✓ src/__tests__/governedInferenceGateway.test.ts > GovernedInferenceGateway > never retries after ambiguous delivery 0ms
+ ✓ src/__tests__/governedInferenceGateway.test.ts > GovernedInferenceGateway > never retries a definitively delivered provider failure 1ms
+ ✓ src/__tests__/governedInferenceGateway.test.ts > GovernedInferenceGateway > denies concurrent duplicate logical dispatch before transport 1ms
+ ✓ src/__tests__/governedInferenceGateway.test.ts > GovernedInferenceGateway > durably cancels a persisted intent before claim without creating a transport receipt 1ms
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a legacy boolean claim before OpenAI dispatch 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > freezes exact bytes and scope before persistence and binds their digest into the claim 2ms
+   → expected { workflowRunId: 'attempt', …(8) } to match object { …(2) }
+(7 matching properties omitted from actual)
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another projectId 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another repositoryId 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another attemptId 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another reservationId 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another intentId 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another intentLogicalId 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another logicalRequestKey 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another leaseId 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another claimId 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies multiple selected routes before persisting an intent 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > propagates cancellation that occurs during the durable claim before sending 1ms
+   → promise resolved "{}" instead of rejecting
+ × src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > keeps /classify on the strict signal-aware path with no SDK bypass 3ms
+   → expected 'app.post("/classify", requireAuth(), …' to contain 'max_completion_tokens: 1024'
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 32 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > makes one raw request and preserves provider/cache/reasoning observations
+AssertionError: expected "spy" to be called with arguments: [ …(2) ]
+
+Received: 
+
+  1st spy call:
+
+  [
+    "https://api.openai.com/v1/chat/completions",
+-   ObjectContaining {
+-     "body": "{\"model\":\"gpt-4o-mini-2024-07-18\",\"messages\":[{\"role\":\"user\",\"content\":\"synthetic\"}],\"max_completion_tokens\":1024,\"n\":1,\"stream\":false,\"service_tier\":\"default\"}",
++   {
++     "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"synthetic\"}],\"max_completion_tokens\":1024,\"model\":\"gpt-4o-mini-2024-07-18\"}",
++     "headers": {
++       "authorization": "Bearer fixture-key",
++       "content-type": "application/json",
++     },
++     "method": "POST",
++     "redirect": "error",
++     "signal": undefined,
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts:63:23
+     61|     const result = await transport.invoke(transportInput());
+     62|     expect(fetchImpl).toHaveBeenCalledTimes(1);
+     63|     expect(fetchImpl).toHaveBeenCalledWith(exactRoute.endpoint, expect…
+       |                       ^
+     64|     expect(result).toMatchObject({
+     65|       resolvedProvider: "openai", resolvedModelId: "gpt-4o-mini-2024-0…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > denies route substitution and retains observed resolved-model drift
+AssertionError: expected GovernedInferenceError: The OpenAI transp… { …(2) } to match object { Object (code) }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+- {
+-   "code": "CLASSIFY_DISPATCH_ALLOWANCE_INVALID",
++ GovernedInferenceError {
++   "code": "ROUTE_OR_ADAPTER_SUBSTITUTION",
+  }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for missing proof
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for mutated proof
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for other request
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for other bytes
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for other output cap
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for other route
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for missing wire
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for mutated wire
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes for unbounded output
+AssertionError: promise resolved "{ value: {}, …(7) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "providerBillingId": undefined,
++   "providerRequestId": undefined,
++   "resolvedModelId": undefined,
++   "resolvedProvider": "openai",
++   "responseDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
++   "serviceTier": undefined,
++   "usage": {},
++   "value": {},
+  }
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts:112:61
+    110|     const fetchImpl = vi.fn(async () => new Response("{}"));
+    111|     const transport = new OpenAIChatCompletionsTransport("fixture-key"…
+    112|     await expect(transport.invoke(transportInput(overrides))).rejects.…
+       |                                                             ^
+    113|     expect(fetchImpl).not.toHaveBeenCalled();
+    114|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > rechecks cancellation immediately before dispatch
+AssertionError: promise resolved "{ value: {}, …(7) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "providerBillingId": undefined,
++   "providerRequestId": undefined,
++   "resolvedModelId": undefined,
++   "resolvedProvider": "openai",
++   "responseDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
++   "serviceTier": undefined,
++   "usage": {},
++   "value": {},
+  }
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts:121:81
+    119|     const fetchImpl = vi.fn(async () => new Response("{}"));
+    120|     const transport = new OpenAIChatCompletionsTransport("fixture-key"…
+    121|     await expect(transport.invoke(transportInput({ signal: controller.…
+       |                                                                                 ^
+    122|     expect(fetchImpl).not.toHaveBeenCalled();
+    123|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes outside the allowance time window at 99
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > sends zero bytes outside the allowance time window at 30100
+AssertionError: promise resolved "{ value: {}, …(7) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "providerBillingId": undefined,
++   "providerRequestId": undefined,
++   "resolvedModelId": undefined,
++   "resolvedProvider": "openai",
++   "responseDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
++   "serviceTier": undefined,
++   "usage": {},
++   "value": {},
+  }
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts:128:52
+    126|     const fetchImpl = vi.fn(async () => new Response("{}"));
+    127|     const transport = new OpenAIChatCompletionsTransport("fixture-key"…
+    128|     await expect(transport.invoke(transportInput())).rejects.toMatchOb…
+       |                                                    ^
+    129|     expect(fetchImpl).not.toHaveBeenCalled();
+    130|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > consumes a committed claim once even when concurrent callers send it directly
+AssertionError: expected [ 'fulfilled', 'fulfilled' ] to deeply equal [ 'fulfilled', 'rejected' ]
+
+- Expected
++ Received
+
+  [
+    "fulfilled",
+-   "rejected",
++   "fulfilled",
+  ]
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts:136:60
+    134|     const transport = new OpenAIChatCompletionsTransport("fixture-key"…
+    135|     const outcomes = await Promise.allSettled([transport.invoke(transp…
+    136|     expect(outcomes.map((result) => result.status).sort()).toEqual(["f…
+       |                                                            ^
+    137|     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    138|     await expect(transport.invoke(transportInput({ dispatchAllowance: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > bounds a stalled response stream by the allowance deadline
+Error: Test timed out in 500ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/__tests__/governedInferenceGateway.test.ts:142:3
+    140|   });
+    141| 
+    142|   it("bounds a stalled response stream by the allowance deadline", asy…
+       |   ^
+    143|     vi.useFakeTimers();
+    144|     vi.setSystemTime(100);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > bounds a stalled fetch even when the fetch implementation ignores abort
+Error: Test timed out in 500ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/__tests__/governedInferenceGateway.test.ts:156:3
+    154|   });
+    155| 
+    156|   it("bounds a stalled fetch even when the fetch implementation ignore…
+       |   ^
+    157|     vi.useFakeTimers();
+    158|     vi.setSystemTime(100);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > GovernedInferenceGateway > does not replace an observed success when receipt persistence fails
+AssertionError: expected "appendReceipt" to be called 1 times, but got 2 times
+ ❯ src/__tests__/governedInferenceGateway.test.ts:202:20
+    200|     const gateway = new GovernedInferenceGateway(store, { invoke });
+    201|     await expect(gateway.execute(request())).rejects.toThrow("receipt …
+    202|     expect(append).toHaveBeenCalledTimes(1);
+       |                    ^
+    203|     expect(append).toHaveBeenCalledWith(expect.objectContaining({ deli…
+    204|     expect(invoke).toHaveBeenCalledTimes(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a legacy boolean claim before OpenAI dispatch
+AssertionError: promise resolved "{}" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
+- }
++ {}
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts:299:52
+    297|     const store = ledger();
+    298|     const gateway = new GovernedInferenceGateway(store, new OpenAIChat…
+    299|     await expect(gateway.execute(selectedRequest())).rejects.toMatchOb…
+       |                                                    ^
+    300|     expect(fetchImpl).not.toHaveBeenCalled();
+    301|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > freezes exact bytes and scope before persistence and binds their digest into the claim
+AssertionError: expected { workflowRunId: 'attempt', …(8) } to match object { …(2) }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "requestDigest": "sha256:818a4e9d5266a5ab30688f5e12a319fa11020c9cd4102dfb3efe920f8edc00d3",
++   "requestDigest": "sha256:5b052b5dd8f877b9957f8fed93a782beca4274ec2837fac32b3cde2c222066be",
+    "route": {
+      "adapter": "mission-control-openai-chat-completions",
+      "adapterVersion": "1.0.0",
+      "endpoint": "https://api.openai.com/v1/chat/completions",
+      "modelId": "gpt-4o-mini-2024-07-18",
+      "provider": "openai",
+      "providerRoute": "openai-chat-completions",
+-     "routeDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
++     "routeDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    },
+  }
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts:317:30
+    315|     const gateway = new GovernedInferenceGateway(store, new OpenAIChat…
+    316|     await expect(gateway.execute(input)).resolves.toEqual({ choices: […
+    317|     expect(store.intents[0]).toMatchObject({ requestDigest: prepared.r…
+       |                              ^
+    318|     expect(store.claimIntent).toHaveBeenCalledWith(expect.objectContai…
+    319|     expect(fetchImpl).toHaveBeenCalledWith(exactRoute.endpoint, expect…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another projectId
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another repositoryId
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another attemptId
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another reservationId
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another intentId
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another intentLogicalId
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another logicalRequestKey
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another leaseId
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies a well-formed claim for another claimId
+AssertionError: promise resolved "{}" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
+- }
++ {}
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts:334:54
+    332|       const fetchImpl = vi.fn(async () => new Response("{}"));
+    333|       const gateway = new GovernedInferenceGateway(store, new OpenAICh…
+    334|       await expect(gateway.execute(selectedRequest())).rejects.toMatch…
+       |                                                      ^
+    335|       expect(fetchImpl).not.toHaveBeenCalled();
+    336|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > denies multiple selected routes before persisting an intent
+AssertionError: promise resolved "{}" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
+- }
++ {}
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts:342:93
+    340|     const fetchImpl = vi.fn(async () => new Response("{}"));
+    341|     const gateway = new GovernedInferenceGateway(store, new OpenAIChat…
+    342|     await expect(gateway.execute({ ...selectedRequest(), routes: [exac…
+       |                                                                                             ^
+    343|     expect(store.intents).toHaveLength(0);
+    344|     expect(fetchImpl).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > propagates cancellation that occurs during the durable claim before sending
+AssertionError: promise resolved "{}" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
+- }
++ {}
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts:358:71
+    356|     const fetchImpl = vi.fn(async () => new Response("{}"));
+    357|     const gateway = new GovernedInferenceGateway(store, new OpenAIChat…
+    358|     await expect(gateway.execute(selectedRequest(), controller.signal)…
+       |                                                                       ^
+    359|     expect(fetchImpl).not.toHaveBeenCalled();
+    360|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/32]⎯
+
+ FAIL  src/__tests__/governedInferenceGateway.test.ts > selected classify gateway > keeps /classify on the strict signal-aware path with no SDK bypass
+AssertionError: expected 'app.post("/classify", requireAuth(), …' to contain 'max_completion_tokens: 1024'
+
+- Expected
++ Received
+
+- max_completion_tokens: 1024
++ app.post("/classify", requireAuth(), async (c) => {
++   try {
++     const body = await c.req.json().catch(() => ({}));
++     const input = typeof body.input === "string" ? body.input.trim() : "";
++     if (!input) return c.json({ error: "Missing or invalid 'input' field" }, 400);
++
++     const { ContextRouter } = await import("@mission-control/context-router");
++     const openaiKey = process.env.OPENAI_API_KEY?.trim();
++     let llmClient: { complete: (p: string) => Promise<string> } | undefined;
++     if (openaiKey) {
++       if (process.env.MC_GOVERNED_INFERENCE_GATEWAY_ENABLED === "1") {
++         const governed = governedInferenceScope(body.governedInference);
++         const ledger = new ConvexGovernedInferenceLedger(client, governed.projectId, governed.repositoryId);
++         const gateway = new GovernedInferenceGateway(ledger, new OpenAIChatCompletionsTransport(openaiKey));
++         const { routeDigest, ...requestAuthority } = governed;
++         llmClient = {
++           complete: async (prompt: string) => {
++             const response = await gateway.execute<{ choices?: Array<{ message?: { content?: unknown } }> }>({
++               ...requestAuthority,
++               routes: [{
++                 provider: "openai", providerRoute: "openai-chat-completions", modelId: "gpt-4o-mini-2024-07-18",
++                 routeDigest, adapter: "mission-control-openai-chat-completions",
++                 adapterVersion: "1.0.0", endpoint: "https://api.openai.com/v1/chat/completions",
++               }],
++               body: { messages: [{ role: "user", content: prompt }], max_tokens: 1024 },
++             });
++             const content = response?.choices?.[0]?.message?.content;
++             return typeof content === "string" ? content : "";
++           },
++         };
++       } else {
++         const OpenAI = (await import("openai")).default;
++         const openai = new OpenAI({ apiKey: openaiKey });
++         llmClient = {
++           complete: async (prompt: string) => {
++             const res = await openai.chat.completions.create({
++               model: "gpt-4o-mini",
++               messages: [{ role: "user", content: prompt }],
++               max_tokens: 1024,
++             });
++             return res.choices[0]?.message?.content ?? "";
++           },
++         };
++       }
++     }
++
++     const router = new ContextRouter(
++       { llmFallbackThreshold: 0.5 },
++       llmClient ?? undefined
++     );
++     const context = {
++       input,
++       source: (body.source as "HUMAN" | "AGENT" | "SYSTEM") ?? "API",
++       pendingTaskCount: typeof body.pendingTaskCount === "number" ? body.pendingTaskCount : undefined,
++       maxConcurrentTasks: typeof body.maxConcurrentTasks === "number" ? body.maxConcurrentTasks : undefined,
++       budgetRemaining: typeof body.budgetRemaining === "number" ? body.budgetRemaining : undefined,
++     };
++     const result = await router.routeAsync(context);
++     return c.json(result);
++   } catch (err: unknown) {
++     console.error("[orchestration] /classify error:", err);
++     return c.json({ error: safeClientError(err) }, 500);
++   }
++ });
++
++
+
+ ❯ src/__tests__/governedInferenceGateway.test.ts:365:22
+    363|     const source = readFileSync(new URL("../index.ts", import.meta.url…
+    364|     const classify = source.slice(source.indexOf('app.post("/classify"…
+    365|     expect(classify).toContain("max_completion_tokens: 1024");
+       |                      ^
+    366|     expect(classify).toContain("c.req.raw.signal");
+    367|     expect(classify).not.toContain('import("openai")');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/32]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  32 failed | 8 passed (40)
+   Start at  23:57:17
+   Duration  1.34s (transform 70ms, setup 0ms, collect 125ms, tests 1.05s, environment 0ms, prepare 29ms)
+
+undefined
+/private/tmp/fdlc-program-dispatch/apps/orchestration-server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/__tests__/governedInferenceGateway.test.ts --testTimeout 500 --reporter verbose

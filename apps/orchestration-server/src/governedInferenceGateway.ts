@@ -1,11 +1,16 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
-import type { ExactInferenceRoute, ProviderUsageObservation } from "@mission-control/shared";
+import {
+  assertClassifyInferenceDispatchAllowance,
+  type ClassifyInferenceDispatchAllowance,
+  type ExactInferenceRoute,
+  type ProviderUsageObservation,
+} from "@mission-control/shared";
 import { ConvexActions } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
+import { prepareClassifyInferenceRequest, type PreparedClassifyInferenceRequest } from "./governedInferenceWire.js";
 
-const MAX_PROVIDER_REQUEST_BYTES = 256_000;
 const MAX_PROVIDER_RESPONSE_BYTES = 1_048_576;
 
 export interface GovernedInferenceRequest {
@@ -31,8 +36,16 @@ export interface GovernedInferenceTransportResult {
   serviceTier?: string;
 }
 
+export interface GovernedInferenceTransportInput {
+  route: ExactInferenceRoute;
+  body: unknown;
+  signal?: AbortSignal;
+  preparedRequest?: PreparedClassifyInferenceRequest;
+  dispatchAllowance?: ClassifyInferenceDispatchAllowance;
+}
+
 export interface GovernedInferenceTransport {
-  invoke(input: { route: ExactInferenceRoute; body: unknown; signal?: AbortSignal }): Promise<GovernedInferenceTransportResult>;
+  invoke(input: GovernedInferenceTransportInput): Promise<GovernedInferenceTransportResult>;
 }
 
 export interface GovernedInferenceLedger {
@@ -46,7 +59,10 @@ export interface GovernedInferenceLedger {
     requestDigest: string;
     intentKey: string;
   }): Promise<{ intentId: string; state: string; created: boolean }>;
-  claimIntent(input: { workflowRunId: string; intentId: string; leaseId: string; claimId: string; cancelRequested?: boolean }): Promise<{ claimed: boolean; cancelled?: boolean; reason?: string }>;
+  claimIntent(input: {
+    workflowRunId: string; intentId: string; leaseId: string; claimId: string; cancelRequested?: boolean;
+    dispatch?: { contract: "classify-text/v1"; payloadBytes: number; maximumOutputTokens: number; temperature?: number };
+  }): Promise<{ claimed: boolean; cancelled?: boolean; reason?: string; dispatchAllowance?: ClassifyInferenceDispatchAllowance }>;
   appendReceipt(input: {
     workflowRunId: string;
     intentId: string;
@@ -86,8 +102,14 @@ export class GovernedInferenceGateway {
   ) {}
 
   async execute<T>(request: GovernedInferenceRequest, signal?: AbortSignal): Promise<T> {
+    request = structuredClone(request);
     if (request.routes.length === 0) throw new GovernedInferenceError("ROUTE_MISSING", "No exact inference route was authorized.");
-    const requestDigest = `sha256:${createHash("sha256").update(stableJson(request.body)).digest("hex")}`;
+    const selectedClassify = this.transport instanceof OpenAIChatCompletionsTransport;
+    if (selectedClassify && request.routes.length !== 1) {
+      throw new GovernedInferenceError("CLASSIFY_ROUTE_COUNT_INVALID", "Classification permits exactly one selected route.");
+    }
+    const preparedRequest = selectedClassify ? prepareClassifyInferenceRequest(request.routes[0], request.body) : undefined;
+    const requestDigest = preparedRequest?.requestDigest ?? `sha256:${createHash("sha256").update(stableJson(request.body)).digest("hex")}`;
     let retryOfIntentId: string | undefined;
     let lastError: GovernedInferenceError | undefined;
 
@@ -118,24 +140,37 @@ export class GovernedInferenceGateway {
         });
         throw new GovernedInferenceError("ATTEMPT_CANCELLED", "Inference was cancelled before transport claim.");
       }
+      const claimId = this.uuid();
       const claim = await this.ledger.claimIntent({
         workflowRunId: request.workflowRunId, intentId: persisted.intentId,
-        leaseId: request.leaseId, claimId: this.uuid(),
+        leaseId: request.leaseId, claimId,
+        ...(preparedRequest ? { dispatch: {
+          contract: "classify-text/v1" as const,
+          payloadBytes: preparedRequest.payloadBytes, maximumOutputTokens: preparedRequest.maximumOutputTokens,
+          ...(preparedRequest.temperature === undefined ? {} : { temperature: preparedRequest.temperature }),
+        } } : {}),
       });
       if (!claim.claimed) throw new GovernedInferenceError(claim.reason ?? "CLAIM_DENIED", "Inference transport claim was denied.");
 
+      const dispatchAllowance = selectedClassify ? validateClassifyDispatch({
+        route, body: request.body, preparedRequest, dispatchAllowance: claim.dispatchAllowance,
+      }) : undefined;
+      if (dispatchAllowance && (
+        dispatchAllowance.projectId !== request.projectId
+        || dispatchAllowance.repositoryId !== request.repositoryId
+        || dispatchAllowance.attemptId !== request.workflowRunId
+        || dispatchAllowance.reservationId !== request.reservationId
+        || dispatchAllowance.intentId !== persisted.intentId
+        || dispatchAllowance.intentLogicalId !== intentKey
+        || dispatchAllowance.logicalRequestKey !== request.logicalRequestKey
+        || dispatchAllowance.leaseId !== request.leaseId
+        || dispatchAllowance.claimId !== claimId
+      )) throw invalidClassifyDispatch();
+
       const startedAt = this.now();
+      let result: GovernedInferenceTransportResult;
       try {
-        const result = await this.transport.invoke({ route, body: request.body, signal });
-        await this.ledger.appendReceipt({
-          workflowRunId: request.workflowRunId, intentId: persisted.intentId,
-          resolvedProvider: result.resolvedProvider, resolvedModelId: result.resolvedModelId,
-          providerRequestId: result.providerRequestId, providerBillingId: result.providerBillingId,
-          delivery: "DELIVERED", status: "SUCCEEDED", usage: result.usage,
-          responseDigest: result.responseDigest, startedAt, completedAt: this.now(),
-          batch: result.batch, serviceTier: result.serviceTier,
-        });
-        return result.value as T;
+        result = await this.transport.invoke({ route, body: request.body, signal, preparedRequest, dispatchAllowance });
       } catch (error) {
         const failure = error instanceof GovernedInferenceError
           ? error
@@ -149,7 +184,19 @@ export class GovernedInferenceGateway {
         if (failure.delivery === "DELIVERED") throw failure;
         lastError = failure;
         retryOfIntentId = persisted.intentId;
+        continue;
       }
+      // Do not replace a failed receipt append with an empty receipt or replay transport.
+      // The unresolved reservation hold remains for reconciliation; this path has no durable outbox.
+      await this.ledger.appendReceipt({
+        workflowRunId: request.workflowRunId, intentId: persisted.intentId,
+        resolvedProvider: result.resolvedProvider, resolvedModelId: result.resolvedModelId,
+        providerRequestId: result.providerRequestId, providerBillingId: result.providerBillingId,
+        delivery: "DELIVERED", status: "SUCCEEDED", usage: result.usage,
+        responseDigest: result.responseDigest, startedAt, completedAt: this.now(),
+        batch: result.batch, serviceTier: result.serviceTier,
+      });
+      return result.value as T;
     }
     throw lastError ?? new GovernedInferenceError("ROUTES_EXHAUSTED", "All authorized inference routes were exhausted.");
   }
@@ -167,7 +214,7 @@ export class ConvexGovernedInferenceLedger implements GovernedInferenceLedger {
   }
 
   claimIntent(input: Parameters<GovernedInferenceLedger["claimIntent"]>[0]): ReturnType<GovernedInferenceLedger["claimIntent"]> {
-    return this.call<{ claimed: boolean; cancelled?: boolean; reason?: string }>("inference.intents.claim", ConvexActions.serviceCommands.claimInferenceIntent, input.workflowRunId, { claim: withoutWorkflowRun(input) });
+    return this.call<Awaited<ReturnType<GovernedInferenceLedger["claimIntent"]>>>("inference.intents.claim", ConvexActions.serviceCommands.claimInferenceIntent, input.workflowRunId, { claim: withoutWorkflowRun(input) });
   }
 
   appendReceipt(input: Parameters<GovernedInferenceLedger["appendReceipt"]>[0]): ReturnType<GovernedInferenceLedger["appendReceipt"]> {
@@ -185,87 +232,145 @@ export class ConvexGovernedInferenceLedger implements GovernedInferenceLedger {
 }
 
 export class OpenAIChatCompletionsTransport implements GovernedInferenceTransport {
+  private readonly consumedClaims = new Map<string, number>();
+
   constructor(
     private readonly apiKey: string,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly now: () => number = Date.now,
   ) {
     if (!apiKey.trim()) throw new Error("An isolated OpenAI API credential is required.");
   }
 
-  async invoke(input: { route: ExactInferenceRoute; body: unknown; signal?: AbortSignal }): Promise<GovernedInferenceTransportResult> {
-    if (input.route.provider !== "openai"
-      || input.route.providerRoute !== "openai-chat-completions"
-      || input.route.endpoint !== "https://api.openai.com/v1/chat/completions"
-      || input.route.adapter !== "mission-control-openai-chat-completions"
-      || input.route.adapterVersion !== "1.0.0") {
-      throw new GovernedInferenceError("ROUTE_OR_ADAPTER_SUBSTITUTION", "The OpenAI transport route does not match the selected exact adapter.");
+  async invoke(input: GovernedInferenceTransportInput): Promise<GovernedInferenceTransportResult> {
+    const allowance = validateClassifyDispatch(input);
+    const requestBody = input.preparedRequest!.serializedRequest;
+    const signal = input.signal;
+    const now = this.now();
+    assertClassifyDispatchOpen(allowance, signal, now);
+    for (const [key, expiresAt] of this.consumedClaims) {
+      if (expiresAt <= now) this.consumedClaims.delete(key);
     }
-    const body: Record<string, unknown> | null = input.body && typeof input.body === "object"
-      ? { ...(input.body as Record<string, unknown>), model: input.route.modelId }
-      : null;
-    if (!body || !Array.isArray(body.messages)) {
-      throw new GovernedInferenceError("REQUEST_SCHEMA_INVALID", "OpenAI chat-completions requires a messages array.");
+    const claimKey = JSON.stringify([allowance.intentId, allowance.claimId]);
+    if (this.consumedClaims.has(claimKey)) {
+      throw new GovernedInferenceError("CLASSIFY_DISPATCH_ALREADY_CONSUMED", "This transport has already consumed the committed claim.");
     }
-    const requestBody = JSON.stringify(body);
-    if (new TextEncoder().encode(requestBody).byteLength > MAX_PROVIDER_REQUEST_BYTES) {
-      throw new GovernedInferenceError("PROVIDER_REQUEST_TOO_LARGE", "OpenAI request exceeds the governed byte limit.");
-    }
-    let response: Response;
+    // The backend owns durable claim authority. This guard also denies direct repeats on this transport.
+    this.consumedClaims.set(claimKey, allowance.issuedAt + 30_000);
+    const controller = new AbortController();
+    const onCancel = () => controller.abort(new GovernedInferenceError("ATTEMPT_CANCELLED_AFTER_DISPATCH", "Inference was cancelled after dispatch.", "UNKNOWN"));
+    signal?.addEventListener("abort", onCancel, { once: true });
+    const timeout = setTimeout(() => controller.abort(new GovernedInferenceError(
+      "CLASSIFY_DISPATCH_DEADLINE_EXCEEDED", "Inference exceeded its committed dispatch deadline.", "UNKNOWN",
+    )), Math.max(0, allowance.validUntil - this.now()));
     try {
-      response = await this.fetchImpl(input.route.endpoint, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
-        body: requestBody,
-        signal: input.signal,
-        redirect: "error",
-      });
-    } catch (error) {
-      throw new GovernedInferenceError(
-        input.signal?.aborted ? "ATTEMPT_CANCELLED_AFTER_DISPATCH" : "TRANSPORT_RESULT_UNKNOWN",
-        error instanceof Error ? error.message : String(error),
-        "UNKNOWN",
-      );
+      assertClassifyDispatchOpen(allowance, signal, this.now());
+      let response: Response;
+      try {
+        const pendingResponse = this.fetchImpl(allowance.route.endpoint, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
+          body: requestBody,
+          signal: controller.signal,
+          redirect: "error",
+        });
+        void pendingResponse.then((lateResponse) => {
+          if (controller.signal.aborted) void lateResponse.body?.cancel().catch(() => {});
+        }, () => {});
+        response = await untilAborted(pendingResponse, controller.signal);
+      } catch (error) {
+        if (controller.signal.aborted) throw controller.signal.reason;
+        throw new GovernedInferenceError("TRANSPORT_RESULT_UNKNOWN", error instanceof Error ? error.message : String(error), "UNKNOWN");
+      }
+      const providerRequestId = response.headers.get("x-request-id") ?? undefined;
+      const text = await boundedResponseText(response, MAX_PROVIDER_RESPONSE_BYTES, controller.signal);
+      let data: unknown;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new GovernedInferenceError("PROVIDER_RESPONSE_INVALID", "OpenAI returned a non-JSON response.", "DELIVERED");
+      }
+      const responseObject = asRecord(data);
+      const providerError = asRecord(responseObject.error);
+      if (!response.ok) {
+        throw new GovernedInferenceError(
+          `PROVIDER_HTTP_${response.status}`,
+          typeof providerError.message === "string" ? providerError.message : "OpenAI request failed.",
+          "DELIVERED",
+        );
+      }
+      const resolvedModelId = typeof responseObject.model === "string" ? responseObject.model : undefined;
+      const usage = asRecord(responseObject.usage);
+      const promptDetails = asRecord(usage.prompt_tokens_details);
+      const completionDetails = asRecord(usage.completion_tokens_details);
+      const promptTokens = safeTokenCount(usage.prompt_tokens);
+      const cachedTokens = safeTokenCount(promptDetails.cached_tokens);
+      const normalizedUsage: ProviderUsageObservation = {
+        inputTokens: promptTokens !== undefined && cachedTokens !== undefined ? Math.max(0, promptTokens - cachedTokens) : promptTokens,
+        outputTokens: safeTokenCount(usage.completion_tokens),
+        cacheReadTokens: cachedTokens,
+        reasoningTokens: safeTokenCount(completionDetails.reasoning_tokens),
+      };
+      return {
+        value: data,
+        resolvedProvider: "openai",
+        resolvedModelId,
+        providerRequestId,
+        providerBillingId: undefined,
+        usage: Object.fromEntries(Object.entries(normalizedUsage).filter(([, value]) => value !== undefined)),
+        responseDigest: `sha256:${createHash("sha256").update(text).digest("hex")}`,
+        serviceTier: typeof responseObject.service_tier === "string" ? responseObject.service_tier : undefined,
+      };
+    } finally {
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", onCancel);
     }
-    const providerRequestId = response.headers.get("x-request-id") ?? undefined;
-    const text = await boundedResponseText(response, MAX_PROVIDER_RESPONSE_BYTES);
-    let data: unknown;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      throw new GovernedInferenceError("PROVIDER_RESPONSE_INVALID", "OpenAI returned a non-JSON response.", "DELIVERED");
-    }
-    const responseObject = asRecord(data);
-    const providerError = asRecord(responseObject.error);
-    if (!response.ok) {
-      throw new GovernedInferenceError(
-        `PROVIDER_HTTP_${response.status}`,
-        typeof providerError.message === "string" ? providerError.message : "OpenAI request failed.",
-        "DELIVERED",
-      );
-    }
-    const resolvedModelId = typeof responseObject.model === "string" ? responseObject.model : undefined;
-    const usage = asRecord(responseObject.usage);
-    const promptDetails = asRecord(usage.prompt_tokens_details);
-    const completionDetails = asRecord(usage.completion_tokens_details);
-    const promptTokens = safeTokenCount(usage.prompt_tokens);
-    const cachedTokens = safeTokenCount(promptDetails.cached_tokens);
-    const normalizedUsage: ProviderUsageObservation = {
-      inputTokens: promptTokens !== undefined && cachedTokens !== undefined ? Math.max(0, promptTokens - cachedTokens) : promptTokens,
-      outputTokens: safeTokenCount(usage.completion_tokens),
-      cacheReadTokens: cachedTokens,
-      reasoningTokens: safeTokenCount(completionDetails.reasoning_tokens),
-    };
-    return {
-      value: data,
-      resolvedProvider: "openai",
-      resolvedModelId,
-      providerRequestId,
-      providerBillingId: undefined,
-      usage: Object.fromEntries(Object.entries(normalizedUsage).filter(([, value]) => value !== undefined)),
-      responseDigest: `sha256:${createHash("sha256").update(text).digest("hex")}`,
-      serviceTier: typeof responseObject.service_tier === "string" ? responseObject.service_tier : undefined,
-    };
   }
+}
+
+function invalidClassifyDispatch() {
+  return new GovernedInferenceError("CLASSIFY_DISPATCH_ALLOWANCE_INVALID", "Classification requires an exact committed dispatch allowance and wire request.");
+}
+
+function validateClassifyDispatch(input: GovernedInferenceTransportInput): ClassifyInferenceDispatchAllowance {
+  try {
+    const allowance: unknown = structuredClone(input.dispatchAllowance);
+    assertClassifyInferenceDispatchAllowance(allowance);
+    const expected = prepareClassifyInferenceRequest(input.route, input.body);
+    if (!input.preparedRequest
+      || input.preparedRequest.serializedRequest !== expected.serializedRequest
+      || input.preparedRequest.requestDigest !== expected.requestDigest
+      || input.preparedRequest.payloadBytes !== expected.payloadBytes
+      || input.preparedRequest.maximumOutputTokens !== expected.maximumOutputTokens
+      || input.preparedRequest.temperature !== expected.temperature
+      || allowance.requestDigest !== expected.requestDigest
+      || allowance.payloadBytes !== expected.payloadBytes
+      || allowance.maximumOutputTokens !== expected.maximumOutputTokens
+      || allowance.temperature !== (expected.temperature ?? null)
+      || stableJson(allowance.route) !== stableJson(input.route)) throw invalidClassifyDispatch();
+    return allowance;
+  } catch {
+    throw invalidClassifyDispatch();
+  }
+}
+
+function assertClassifyDispatchOpen(allowance: ClassifyInferenceDispatchAllowance, signal: AbortSignal | undefined, now: number) {
+  if (signal?.aborted) throw new GovernedInferenceError("ATTEMPT_CANCELLED", "Inference was cancelled before dispatch.");
+  if (now < allowance.issuedAt || now >= allowance.validUntil) {
+    throw new GovernedInferenceError("CLASSIFY_DISPATCH_ALLOWANCE_EXPIRED", "The committed dispatch allowance is outside its valid time window.");
+  }
+}
+
+function untilAborted<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    operation.then(
+      (value) => { signal.removeEventListener("abort", onAbort); resolve(value); },
+      (error) => { signal.removeEventListener("abort", onAbort); reject(error); },
+    );
+    if (signal.aborted) { signal.removeEventListener("abort", onAbort); reject(signal.reason); }
+  });
 }
 
 function withoutWorkflowRun<T extends { workflowRunId: string }>(input: T) {
@@ -290,9 +395,10 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-async function boundedResponseText(response: Response, maximumBytes: number): Promise<string> {
+async function boundedResponseText(response: Response, maximumBytes: number, signal: AbortSignal): Promise<string> {
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > maximumBytes) {
+    void response.body?.cancel().catch(() => {});
     throw new GovernedInferenceError("PROVIDER_RESPONSE_TOO_LARGE", "OpenAI response exceeds the governed byte limit.", "DELIVERED");
   }
   if (!response.body) return "";
@@ -301,18 +407,20 @@ async function boundedResponseText(response: Response, maximumBytes: number): Pr
   let bytes = 0;
   try {
     while (true) {
-      const chunk = await reader.read();
+      const chunk = await untilAborted(reader.read(), signal);
       if (chunk.done) break;
       bytes += chunk.value.byteLength;
       if (bytes > maximumBytes) {
-        await reader.cancel();
         throw new GovernedInferenceError("PROVIDER_RESPONSE_TOO_LARGE", "OpenAI response exceeds the governed byte limit.", "DELIVERED");
       }
       chunks.push(chunk.value);
     }
   } catch (error) {
+    void reader.cancel().catch(() => {});
     if (error instanceof GovernedInferenceError) throw error;
     throw new GovernedInferenceError("PROVIDER_RESPONSE_STREAM_UNKNOWN", "OpenAI response stream ended ambiguously.", "UNKNOWN");
+  } finally {
+    reader.releaseLock();
   }
   const combined = new Uint8Array(bytes);
   let offset = 0;
