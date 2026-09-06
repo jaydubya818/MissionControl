@@ -16,12 +16,15 @@ import {
 } from "../lib/companyAccess";
 import {
   factoryIncidentContainmentActionValidator,
+  factoryIncidentControlExecutionValidator,
   factoryIncidentEvidenceRefValidator,
   factoryIncidentPhaseValidator,
   factoryIncidentProposalKindValidator,
   factoryIncidentSeverityValidator,
+  controlReceiptRejectionReason,
   evaluateIncidentWrite,
   incidentStatusForPhase,
+  normalizeControlExecutions,
   normalizeEvidenceRefs,
   normalizeIncidentText,
   validateFactoryIncidentTransition,
@@ -86,15 +89,66 @@ const evidenceTables: Partial<Record<string, string>> = {
   AUDIT: "activities",
 };
 
-async function requireEvidenceScope(ctx: any, projectId: Id<"projects">, refs: Array<{ kind: string; recordId: string }>) {
+async function requireEvidenceScope(
+  ctx: any,
+  projectId: Id<"projects">,
+  refs: Array<{ kind: string; recordId: string }>,
+  requireCanonical = false,
+) {
   for (const ref of refs) {
     const table = evidenceTables[ref.kind];
-    if (!table) continue;
+    if (!table) {
+      if (requireCanonical) throw new Error("Incident evidence must reference a canonical durable record.");
+      continue;
+    }
     const normalizedId = ctx.db.normalizeId(table, ref.recordId);
-    if (!normalizedId) continue; // External provider or repository reference.
+    if (!normalizedId) {
+      if (requireCanonical) throw new Error("Incident evidence must reference a canonical durable record.");
+      continue; // External provider or repository reference.
+    }
     const record = await ctx.db.get(normalizedId);
     if (!record || record.projectId !== projectId) {
       throw new Error("Incident evidence reference is unavailable or outside this workspace.");
+    }
+  }
+}
+
+async function requireCanonicalControlReceipts(
+  ctx: any,
+  projectId: Id<"projects">,
+  earliestCreatedAt: number,
+  executions: Array<{
+    controlKey: string;
+    commandReceipt: { kind: string; recordId: string };
+    observedEffectReceipt: { kind: string; recordId: string };
+    observedAt: number;
+  }>,
+) {
+  for (const execution of executions) {
+    for (const [receiptKind, receipt] of [
+      ["command", execution.commandReceipt],
+      ["effect", execution.observedEffectReceipt],
+    ] as const) {
+      const normalizedId = receipt.kind === "EVIDENCE"
+        ? ctx.db.normalizeId("evidenceEnvelopes", receipt.recordId)
+        : null;
+      if (!normalizedId) {
+        throw new Error("Control proof must reference a canonical durable receipt.");
+      }
+      const record = await ctx.db.get(normalizedId);
+      const expectedCheckId = `factory-control:${execution.controlKey}:${receiptKind}`;
+      if (!record || controlReceiptRejectionReason({
+        projectId: record.projectId ? String(record.projectId) : undefined,
+        expectedProjectId: String(projectId),
+        result: record.result,
+        checkId: record.checkId,
+        expectedCheckId,
+        createdAt: record._creationTime,
+        earliestCreatedAt,
+        observedAt: execution.observedAt,
+      })) {
+        throw new Error("Control receipt is unavailable, stale, or outside this workspace.");
+      }
     }
   }
 }
@@ -245,7 +299,7 @@ export const create = mutation({
       reason: normalizeIncidentText(args.summary, "Incident summary"),
       evidenceRefs: normalizeEvidenceRefs(args.evidenceRefs),
       containmentActions: [],
-      controlReferences: [],
+      controlExecutions: [],
       idempotencyKey,
       createdAt: now,
     });
@@ -269,7 +323,7 @@ export const advance = mutation({
     reason: v.string(),
     evidenceRefs: evidenceRefsArg,
     containmentActions: containmentActionsArg,
-    controlReferences: v.array(v.string()),
+    controlExecutions: v.array(factoryIncidentControlExecutionValidator),
     restoreAuthority: v.optional(v.boolean()),
     idempotencyKey: v.string(),
   },
@@ -301,14 +355,30 @@ export const advance = mutation({
       throw new Error("Incident changed since inspection; refresh before deciding.");
     }
     if (writeDecision.reason === "incident-resolved") throw new Error("Resolved incidents are immutable.");
-    const controlReferences = [...new Set(args.controlReferences.map((ref) => ref.trim()).filter(Boolean))].slice(0, 20);
+    const containmentActions = [...new Set(args.containmentActions)];
+    const controlExecutions = normalizeControlExecutions(args.controlExecutions, Date.now(), incident.createdAt);
     const evidenceRefs = normalizeEvidenceRefs(args.evidenceRefs);
-    await requireEvidenceScope(ctx, incident.projectId, evidenceRefs);
+    const priorTransitions = args.nextPhase === "RESTORE"
+      ? await ctx.db.query("factoryIncidentTransitions")
+          .withIndex("by_incident", (q) => q.eq("incidentId", incident._id))
+          .collect()
+      : [];
+    const restorationControlKeys = priorTransitions
+      .filter((transition) => transition.decisionKind === "CONTAINMENT")
+      .flatMap((transition) => transition.containmentActions);
+    await requireEvidenceScope(
+      ctx,
+      incident.projectId,
+      evidenceRefs,
+      args.nextPhase === "RESTORE" || args.nextPhase === "MEASURE",
+    );
+    await requireCanonicalControlReceipts(ctx, incident.projectId, incident.updatedAt, controlExecutions);
     const transitionError = validateFactoryIncidentTransition({
       currentPhase: incident.phase as FactoryIncidentPhase,
       nextPhase: args.nextPhase as FactoryIncidentPhase,
-      containmentActionCount: args.containmentActions.length,
-      controlReferenceCount: controlReferences.length,
+      containmentActions,
+      controlExecutions,
+      restorationControlKeys,
       measurementReferenceCount: args.nextPhase === "MEASURE" ? evidenceRefs.length : 0,
     });
     if (transitionError) throw new Error(`Incident transition denied (${transitionError}).`);
@@ -317,8 +387,8 @@ export const advance = mutation({
     }
     if (args.nextPhase === "RESTORE") {
       if (args.restoreAuthority !== true) throw new Error("Restoration requires an explicit authority decision.");
-      if (evidenceRefs.length === 0 || controlReferences.length === 0) {
-        throw new Error("Restoration requires known-safe evidence and exact restored-control references.");
+      if (evidenceRefs.length === 0 || controlExecutions.length === 0) {
+        throw new Error("Restoration requires known-safe evidence and observed restored-control effects.");
       }
     } else if (args.restoreAuthority) {
       throw new Error("Authority restoration is valid only in the Restore phase.");
@@ -351,8 +421,8 @@ export const advance = mutation({
       actorId: access.actorId,
       reason: normalizeIncidentText(args.reason, "Transition reason"),
       evidenceRefs,
-      containmentActions: args.containmentActions,
-      controlReferences,
+      containmentActions,
+      controlExecutions,
       idempotencyKey,
       createdAt: now,
     });
@@ -376,7 +446,12 @@ export const advance = mutation({
       actorId: access.actorId,
       action: `FACTORY_INCIDENT_${decisionKind}`,
       description: `${incident.incidentKey}: ${incident.phase} → ${args.nextPhase}`,
-      metadata: { sequence, controlReferences, authorityRestored },
+      metadata: {
+        sequence,
+        commandReceipts: controlExecutions.map((execution) => execution.commandReceipt),
+        observedEffectReceipts: controlExecutions.map((execution) => execution.observedEffectReceipt),
+        authorityRestored,
+      },
     });
     return {
       incident: await ctx.db.get(incident._id),
@@ -429,7 +504,7 @@ export const assignCommander = mutation({
       reason: normalizeIncidentText(args.reason, "Commander assignment reason"),
       evidenceRefs: [],
       containmentActions: [],
-      controlReferences: [],
+      controlExecutions: [],
       idempotencyKey,
       createdAt: now,
     });
@@ -548,7 +623,7 @@ export const fileFromService = internalMutation({
       reason: normalizeIncidentText(args.summary, "Incident summary"),
       evidenceRefs: normalizeEvidenceRefs(args.evidenceRefs),
       containmentActions: [],
-      controlReferences: [`service-command:${args.serviceCommandReceiptId}`],
+      controlExecutions: [],
       idempotencyKey: `service-command:${args.serviceCommandReceiptId}`,
       createdAt: now,
     });

@@ -1,7 +1,7 @@
 ---
 title: Factory Incident Command
 status: EXPERIMENTAL
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # Factory Incident Command
@@ -38,14 +38,24 @@ control categories are repository/workspace dispatch pause, Attempt
 cancellation and credential revocation, worker/harness/model/tool/Factory
 quarantine, Guarded Auto disablement, and publication/release holds.
 
-Each recorded containment action requires its own exact applied-control
-reference. Restoration is a later, separate human decision. It requires:
+Each recorded containment action requires two distinct, canonical PASS evidence
+envelopes: the control-command receipt and a later observed-effect receipt. The
+receipt `checkId` must bind the exact control and receipt role, the receipt must
+belong to the incident workspace, and its creation time must precede the
+recorded observation and follow the current phase entry. A command
+acknowledgement is never containment proof, and containment receipts cannot be
+replayed as restoration evidence.
+Restoration is a later, separate human decision. It requires:
 
 1. the incident has progressed through isolation;
 2. the operator explicitly selects authority restoration;
 3. known-safe evidence is attached;
-4. exact restored-control references are attached; and
+4. each restored control has its own command and observed-effect evidence envelopes;
 5. the optimistic incident sequence is still current.
+
+Restoration records the incident authority decision only. It does not recreate,
+activate, or otherwise restore an MCP grant, credential, route, worker, or
+release authority. Those systems remain authoritative for their own state.
 
 Resolution is allowed only after restoration, correction, prevention, and a
 measurement phase with retained evidence.

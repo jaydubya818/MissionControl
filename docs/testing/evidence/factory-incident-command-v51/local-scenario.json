@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "factory-incident-command-v51-qualification/v1",
+  "qualifiedAt": "2026-09-06",
+  "baseSha": "44f240c6e22d0662107508149b888a7d71747b80",
+  "runtimeContractVersion": 51,
+  "environment": {
+    "kind": "isolated-local-convex",
+    "deployment": "anonymous:anonymous-worktree",
+    "production": false,
+    "externalProviderCalls": 0,
+    "customerDataUsed": false
+  },
+  "fixture": {
+    "projectId": "ms7s0zycf96bsqzmk908w6w1pd8dw2na",
+    "incidentId": "v17bmasyx0gff71c2gd7erxaf58dwt8g",
+    "incidentKey": "INC-MTQ2ZWX0-515151",
+    "commanderActorId": "fixture-v50-final-commander",
+    "commanderIsRealPilotIdentity": false,
+    "provenance": "SYNTHETIC"
+  },
+  "lifecycle": {
+    "phases": [
+      "CLARIFY",
+      "CONTAIN",
+      "OBSERVE",
+      "ISOLATE",
+      "RESTORE",
+      "CORRECT",
+      "PREVENT",
+      "MEASURE",
+      "RESOLVED"
+    ],
+    "finalSequence": 9,
+    "finalStatus": "RESOLVED",
+    "containmentActions": [
+      "PAUSE_REPOSITORY_DISPATCH",
+      "REVOKE_ATTEMPT_CREDENTIALS"
+    ],
+    "commandReceiptCount": 4,
+    "observedEffectReceiptCount": 4,
+    "allControlReceipts": "canonical-project-scoped-pass-evidence-envelopes",
+    "commandAndEffectReceiptsDistinct": true,
+    "containmentReceiptsCreatedAfterClarify": true,
+    "restorationReceiptsCreatedAfterIsolate": true,
+    "restorationAuthorityExplicit": true,
+    "grantMutationPerformed": false,
+    "measurementEvidenceRetained": true
+  },
+  "negativeControls": {
+    "forgedContainmentEvidence": "denied-control-proof-must-reference-canonical-durable-receipt",
+    "restorationWithoutAuthority": "denied-restoration-requires-explicit-authority-decision",
+    "staleContainmentReceiptReuseForRestoration": "denied-control-receipt-stale",
+    "staleReplay": "denied-incident-changed-since-inspection",
+    "exactReplay": "returned-existing-sequence-9-transition",
+    "ackEqualsEffect": "unit-denied-control-acknowledgement-cannot-prove-observed-effect",
+    "futureObservation": "unit-denied-stale-invalid-or-future",
+    "wrongIncidentIdempotencyBinding": "unit-denied-idempotency-key-bound-elsewhere",
+    "crossWorkspaceReceipt": "source-and-unit-fail-closed-project-scope",
+    "wrongWorkspaceAccess": "existing-workspace-authorization-boundary",
+    "unrelatedWorkOrderAttemptMutation": "static-write-allowlist-pass",
+    "implicitGrantRestore": "static-write-allowlist-pass"
+  },
+  "finalReadback": {
+    "transitionCount": 9,
+    "containmentTransitionId": "tx767884q8mjdam8ce3c01zrcd8dx8bv",
+    "restorationTransitionId": "tx7dcczq6bwcedq5dt6aa8m3rn8dwt5g",
+    "resolutionTransitionId": "tx77hh8s0bazrpzsay51msz46d8dwjdj",
+    "temporarySeederRemovedBeforeFinalCodegen": true
+  },
+  "claim": "Experimental deterministic v51 control plane qualified; no real containment, restoration, production incident, or pilot identity is claimed."
+}

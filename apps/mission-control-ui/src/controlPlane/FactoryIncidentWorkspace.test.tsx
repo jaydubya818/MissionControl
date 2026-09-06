@@ -53,7 +53,14 @@ describe("FactoryIncidentWorkspace", () => {
               _id: "transition-2", sequence: 2, fromPhase: "CLARIFY", toPhase: "CONTAIN",
               decisionKind: "CONTAINMENT", actorType: "HUMAN", reason: "Revoked the exact Attempt credential.",
               evidenceRefs: [{ kind: "ATTEMPT", recordId: "run-1", relationship: "affected" }],
-              controlReferences: ["credential-revocation:receipt-1"], createdAt: Date.UTC(2026, 8, 5),
+              containmentActions: ["REVOKE_ATTEMPT_CREDENTIALS"],
+              controlExecutions: [{
+                controlKey: "REVOKE_ATTEMPT_CREDENTIALS",
+                commandReceipt: { kind: "EVIDENCE", recordId: "evidence-command-1", relationship: "control-command-issued" },
+                observedEffectReceipt: { kind: "EVIDENCE", recordId: "evidence-effect-1", relationship: "control-effect-observed" },
+                observedAt: Date.UTC(2026, 8, 5),
+              }],
+              createdAt: Date.UTC(2026, 8, 5),
             }],
             proposals: [],
           }
@@ -65,6 +72,20 @@ describe("FactoryIncidentWorkspace", () => {
     expect(screen.getByText("Not restored")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Advance to Observe" })).toBeInTheDocument();
     expect(screen.getByText(/immutable decision expects sequence 2/i)).toBeInTheDocument();
+  });
+
+  it("separates command receipts from observed-effect proof at containment", async () => {
+    const clarifyIncident = { ...incident, phase: "CLARIFY", status: "OPEN", currentSequence: 1 };
+    useQuery.mockImplementation((_reference, args) => (
+      args && typeof args === "object" && "incidentId" in args
+        ? { incident: clarifyIncident, transitions: [], proposals: [] }
+        : [clarifyIncident]
+    ));
+    render(<FactoryIncidentWorkspace projectId={"project-1" as any} />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Advance to Contain" })).toBeInTheDocument());
+    expect(screen.getByLabelText("Control command receipts")).toBeInTheDocument();
+    expect(screen.getByLabelText("Observed control effects")).toBeInTheDocument();
+    expect(screen.getByText(/acknowledgement is not proof/i)).toBeInTheDocument();
   });
 
   it("renders an explicit denied or degraded access state", () => {

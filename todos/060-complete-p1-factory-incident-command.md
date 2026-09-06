@@ -65,6 +65,33 @@ Clarify → Contain → Observe → Isolate → Restore → Correct → Prevent 
 
 ## Work Log
 
+### 2026-09-06 - Current-main v51 reconciliation
+
+**By:** Repository operator through Codex
+
+**Actions:**
+- Reconciled the additive incident-command API onto authoritative runtime v50
+  and recorded the exact eight-operation v50 → v51 public contract diff. Main
+  claimed v50 for inference observation retention while this branch was being
+  qualified, so the incident contract advanced to the next truthful version.
+- Replaced opaque control references with one-to-one canonical PASS evidence
+  envelopes for command issue and observed effect. Enforced exact workspace,
+  control key, receipt role, creation ordering, incident currentness, and a
+  distinct command/effect identity.
+- Kept restoration as a separate `factory.approve` decision and confirmed the
+  incident module never mutates grants, WorkOrders, or Attempts.
+- Ran authoritative Convex codegen against the isolated local deployment; the
+  generated API required no manual edits.
+- Passed the 19-test focused incident suite, browser verification, and all 18
+  canonical System Factory E2E qualification gates against the v50 base.
+
+**Learnings:**
+- An identifier-shaped string is not containment proof. The durable evidence
+  record must exist, be scoped, pass, identify the exact control/role, and
+  predate the observation.
+- Incident restoration is an audit decision, not a shortcut that reactivates
+  authority in another subsystem.
+
 ### 2026-09-05 - Deterministic implementation qualification complete
 
 **By:** Repository operator through Codex

@@ -14,6 +14,17 @@ export const FACTORY_INCIDENT_PHASES = [
 
 export type FactoryIncidentPhase = (typeof FACTORY_INCIDENT_PHASES)[number];
 
+export type FactoryIncidentEvidenceKind =
+  | "MISSION" | "WORK_ORDER" | "TASK" | "ATTEMPT" | "TRACE" | "TOOL_CALL"
+  | "MODEL_ROUTE" | "FACTORY_VERSION" | "SANDBOX" | "PULL_REQUEST" | "RELEASE"
+  | "ALERT" | "EVIDENCE" | "AUDIT";
+
+export type FactoryIncidentContainmentAction =
+  | "PAUSE_REPOSITORY_DISPATCH" | "PAUSE_WORKSPACE_DISPATCH" | "CANCEL_ATTEMPT"
+  | "REVOKE_ATTEMPT_CREDENTIALS" | "QUARANTINE_WORKER" | "QUARANTINE_HARNESS"
+  | "QUARANTINE_MODEL_ROUTE" | "QUARANTINE_TOOL" | "QUARANTINE_FACTORY_VERSION"
+  | "DISABLE_GUARDED_AUTO" | "HOLD_PUBLICATION" | "HOLD_RELEASE";
+
 export const factoryIncidentPhaseValidator = v.union(
   v.literal("CLARIFY"),
   v.literal("CONTAIN"),
@@ -72,6 +83,20 @@ export const factoryIncidentContainmentActionValidator = v.union(
   v.literal("HOLD_RELEASE"),
 );
 
+export const factoryIncidentControlExecutionValidator = v.object({
+  controlKey: factoryIncidentContainmentActionValidator,
+  commandReceipt: factoryIncidentEvidenceRefValidator,
+  observedEffectReceipt: factoryIncidentEvidenceRefValidator,
+  observedAt: v.number(),
+});
+
+export type FactoryIncidentControlExecution = {
+  controlKey: FactoryIncidentContainmentAction;
+  commandReceipt: { kind: FactoryIncidentEvidenceKind; recordId: string; relationship: string; subjectDigest?: string };
+  observedEffectReceipt: { kind: FactoryIncidentEvidenceKind; recordId: string; relationship: string; subjectDigest?: string };
+  observedAt: number;
+};
+
 export const factoryIncidentProposalKindValidator = v.union(
   v.literal("ENRICHMENT"),
   v.literal("CONTAINMENT"),
@@ -90,23 +115,89 @@ export function nextFactoryIncidentPhase(
 export function validateFactoryIncidentTransition(input: {
   currentPhase: FactoryIncidentPhase;
   nextPhase: FactoryIncidentPhase;
-  containmentActionCount: number;
-  controlReferenceCount: number;
+  containmentActions: readonly FactoryIncidentContainmentAction[];
+  controlExecutions: readonly FactoryIncidentControlExecution[];
+  restorationControlKeys?: readonly FactoryIncidentContainmentAction[];
   measurementReferenceCount: number;
 }): string | null {
   if (nextFactoryIncidentPhase(input.currentPhase) !== input.nextPhase) {
     return "incident-phase-transition-not-sequential";
   }
-  if (input.nextPhase === "CONTAIN" && input.containmentActionCount === 0) {
+  if (input.nextPhase === "CONTAIN" && input.containmentActions.length === 0) {
     return "containment-action-required";
   }
-  if (input.nextPhase === "CONTAIN"
-    && input.controlReferenceCount < input.containmentActionCount) {
-    return "containment-control-reference-required";
+  if (input.nextPhase === "CONTAIN") {
+    const expected = new Set(input.containmentActions);
+    const observed = new Set(input.controlExecutions.map((execution) => execution.controlKey));
+    if (expected.size !== input.containmentActions.length
+      || observed.size !== input.controlExecutions.length
+      || expected.size !== observed.size
+      || [...expected].some((controlKey) => !observed.has(controlKey))) {
+      return "containment-observed-effect-required";
+    }
+  }
+  if (input.nextPhase === "RESTORE") {
+    const expected = new Set(input.restorationControlKeys ?? []);
+    const observed = new Set(input.controlExecutions.map((execution) => execution.controlKey));
+    if (expected.size === 0
+      || observed.size !== input.controlExecutions.length
+      || expected.size !== observed.size
+      || [...expected].some((controlKey) => !observed.has(controlKey))) {
+      return "restoration-observed-effect-required";
+    }
+  }
+  if (!["CONTAIN", "RESTORE"].includes(input.nextPhase) && input.controlExecutions.length > 0) {
+    return "control-execution-not-applicable";
   }
   if (input.nextPhase === "MEASURE" && input.measurementReferenceCount === 0) {
     return "measurement-evidence-required";
   }
+  return null;
+}
+
+export function normalizeControlExecutions(
+  executions: FactoryIncidentControlExecution[],
+  now = Date.now(),
+  notBefore = 0,
+) {
+  if (executions.length > 12) throw new Error("Too many control executions.");
+  const normalized = executions.map((execution) => ({
+    controlKey: execution.controlKey,
+    commandReceipt: normalizeEvidenceRefs([execution.commandReceipt])[0],
+    observedEffectReceipt: normalizeEvidenceRefs([execution.observedEffectReceipt])[0],
+    observedAt: execution.observedAt,
+  }));
+  for (const execution of normalized) {
+    const commandKey = `${execution.commandReceipt.kind}:${execution.commandReceipt.recordId}`;
+    const effectKey = `${execution.observedEffectReceipt.kind}:${execution.observedEffectReceipt.recordId}`;
+    if (!execution.controlKey) throw new Error("Control execution requires a control key.");
+    if (commandKey === effectKey) {
+      throw new Error("A control acknowledgement cannot prove its observed effect.");
+    }
+    if (!Number.isSafeInteger(execution.observedAt)
+      || execution.observedAt < notBefore
+      || execution.observedAt > now) {
+      throw new Error("Control observed-effect time is stale, invalid, or in the future.");
+    }
+  }
+  return normalized;
+}
+
+export function controlReceiptRejectionReason(input: {
+  projectId?: string;
+  expectedProjectId: string;
+  result?: string;
+  checkId?: string;
+  expectedCheckId: string;
+  createdAt: number;
+  earliestCreatedAt: number;
+  observedAt: number;
+}) {
+  if (input.projectId !== input.expectedProjectId) return "control-receipt-outside-workspace";
+  if (input.result !== "PASS") return "control-receipt-not-passing";
+  if (input.checkId !== input.expectedCheckId) return "control-receipt-role-mismatch";
+  if (input.createdAt < input.earliestCreatedAt) return "control-receipt-stale";
+  if (input.createdAt > input.observedAt) return "control-receipt-created-after-observation";
   return null;
 }
 

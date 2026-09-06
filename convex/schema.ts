@@ -64,6 +64,7 @@ import {
 import { evalControlPlaneTables } from "./lib/evalControlPlaneSchema";
 import {
   factoryIncidentContainmentActionValidator,
+  factoryIncidentControlExecutionValidator,
   factoryIncidentEvidenceRefValidator,
   factoryIncidentPhaseValidator,
   factoryIncidentProposalKindValidator,
@@ -8655,7 +8656,9 @@ export const schemaTablesPartTwo = {
     reason: v.string(),
     evidenceRefs: v.array(factoryIncidentEvidenceRefValidator),
     containmentActions: v.array(factoryIncidentContainmentActionValidator),
-    controlReferences: v.array(v.string()),
+    controlExecutions: v.optional(v.array(factoryIncidentControlExecutionValidator)),
+    // Read-only compatibility for pre-v50 local qualification records.
+    controlReferences: v.optional(v.array(v.string())),
     idempotencyKey: v.string(),
     createdAt: v.number(),
   })

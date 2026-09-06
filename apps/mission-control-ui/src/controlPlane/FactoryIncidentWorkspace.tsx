@@ -207,7 +207,9 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
   const assignCommander = useMutation(api.factory.incidents.assignCommander);
   const decideProposal = useMutation(api.factory.incidents.decideProposal);
   const [reason, setReason] = useState("");
-  const [reference, setReference] = useState("");
+  const [evidenceReferences, setEvidenceReferences] = useState("");
+  const [commandReferences, setCommandReferences] = useState("");
+  const [observedEffectReferences, setObservedEffectReferences] = useState("");
   const [selectedActions, setSelectedActions] = useState<ContainmentAction[]>([]);
   const [restoreAuthority, setRestoreAuthority] = useState(false);
   const [commander, setCommander] = useState("");
@@ -220,6 +222,12 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
   const acceptedProposals = useMemo(
     () => detail?.proposals.filter((proposal) => proposal.status === "ACCEPTED") ?? [],
     [detail?.proposals],
+  );
+  const containedActions = useMemo(
+    () => detail?.transitions
+      .filter((transition) => transition.decisionKind === "CONTAINMENT")
+      .flatMap((transition) => transition.containmentActions) ?? [],
+    [detail?.transitions],
   );
 
   if (!detail || !incident) return <Card className="h-[520px] animate-pulse bg-surface-2" role="status" aria-label="Loading incident detail" />;
@@ -244,10 +252,23 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
     setSubmitting(true);
     setError(null);
     try {
-      const controlReferences = reference.split("\n").map((item) => item.trim()).filter(Boolean);
-      const evidenceRefs = reference.trim()
-        ? [{ kind: upcoming === "MEASURE" ? "EVIDENCE" as const : "AUDIT" as const, recordId: reference.trim(), relationship: upcoming === "RESTORE" ? "known-safe-restoration" : "phase-evidence" }]
-        : [];
+      const controlKeys = upcoming === "CONTAIN" ? selectedActions : upcoming === "RESTORE" ? containedActions : [];
+      const commands = commandReferences.split("\n").map((item) => item.trim()).filter(Boolean);
+      const effects = observedEffectReferences.split("\n").map((item) => item.trim()).filter(Boolean);
+      if (controlKeys.length !== commands.length || controlKeys.length !== effects.length) {
+        throw new Error("Each control requires one command receipt and one distinct observed-effect receipt.");
+      }
+      const controlExecutions = controlKeys.map((controlKey, index) => ({
+        controlKey,
+        commandReceipt: { kind: "EVIDENCE" as const, recordId: commands[index], relationship: "control-command-issued" },
+        observedEffectReceipt: { kind: "EVIDENCE" as const, recordId: effects[index], relationship: "control-effect-observed" },
+        observedAt: Date.now(),
+      }));
+      const evidenceRefs = evidenceReferences.split("\n").map((recordId) => recordId.trim()).filter(Boolean).map((recordId) => ({
+        kind: upcoming === "MEASURE" ? "EVIDENCE" as const : "AUDIT" as const,
+        recordId,
+        relationship: upcoming === "RESTORE" ? "known-safe-restoration" : "phase-evidence",
+      }));
       await advance({
         incidentId,
         expectedSequence: incident.currentSequence,
@@ -255,12 +276,14 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
         reason,
         evidenceRefs,
         containmentActions: upcoming === "CONTAIN" ? selectedActions : [],
-        controlReferences,
+        controlExecutions,
         restoreAuthority: upcoming === "RESTORE" ? restoreAuthority : undefined,
         idempotencyKey: `incident-ui:${incidentId}:${incident.currentSequence + 1}:${crypto.randomUUID()}`,
       });
       setReason("");
-      setReference("");
+      setEvidenceReferences("");
+      setCommandReferences("");
+      setObservedEffectReferences("");
       setSelectedActions([]);
       setRestoreAuthority(false);
     } catch (caught) {
@@ -367,13 +390,23 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
             </fieldset>
           ) : null}
           {upcoming === "RESTORE" ? (
-            <label className="mt-3 flex items-center gap-2 text-[12px] font-medium text-ink">
-              <input type="checkbox" checked={restoreAuthority} onChange={(event) => setRestoreAuthority(event.target.checked)} />
-              I explicitly authorize restoration to the known-safe state
-            </label>
+            <div className="mt-3 space-y-2">
+              <label className="flex items-center gap-2 text-[12px] font-medium text-ink">
+                <input type="checkbox" checked={restoreAuthority} onChange={(event) => setRestoreAuthority(event.target.checked)} />
+                I explicitly authorize restoration to the known-safe state
+              </label>
+              <p className="text-[11px] text-ink-muted">Restoration must independently prove the effect of {containedActions.length} contained control{containedActions.length === 1 ? "" : "s"}; it does not reactivate a revoked grant.</p>
+            </div>
           ) : null}
           <Textarea className="mt-3" aria-label="Incident transition reason" placeholder="Decision reason and current facts" value={reason} onChange={(event) => setReason(event.target.value)} />
-          <Textarea className="mt-2" aria-label="Evidence or control reference" placeholder={upcoming === "CONTAIN" ? "One exact applied-control receipt per line (required per action)" : upcoming === "MEASURE" ? "Measurement evidence reference (required)" : "Evidence or control reference"} value={reference} onChange={(event) => setReference(event.target.value)} />
+          <Textarea className="mt-2" aria-label="Incident evidence references" placeholder={upcoming === "MEASURE" ? "One measurement evidence reference per line (required)" : upcoming === "RESTORE" ? "One known-safe evidence reference per line (required)" : "One supporting evidence reference per line"} value={evidenceReferences} onChange={(event) => setEvidenceReferences(event.target.value)} />
+          {upcoming === "CONTAIN" || upcoming === "RESTORE" ? (
+            <div className="mt-2 grid gap-2 lg:grid-cols-2">
+              <Textarea aria-label="Control command receipts" placeholder="One PASS evidence-envelope ID per control, in control order" value={commandReferences} onChange={(event) => setCommandReferences(event.target.value)} />
+              <Textarea aria-label="Observed control effects" placeholder="One distinct PASS effect evidence-envelope ID per control, in control order" value={observedEffectReferences} onChange={(event) => setObservedEffectReferences(event.target.value)} />
+              <p className="text-[11px] text-ink-muted lg:col-span-2">A command acknowledgement is not proof that the control took effect.</p>
+            </div>
+          ) : null}
           {error ? <p role="alert" className="mt-2 text-[12px] text-danger">{error}</p> : null}
           <Button className="mt-3" size="sm" disabled={submitting} onClick={submit}>{submitting ? "Recording…" : `Record ${label(upcoming)} decision`}</Button>
         </div>
@@ -393,7 +426,7 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
                 <time>{new Date(transition.createdAt).toLocaleString()}</time>
               </div>
               <div className="mt-1 text-[12px] text-ink-secondary">{transition.fromPhase ? `${label(transition.fromPhase)} → ` : ""}{label(transition.toPhase)} · {transition.reason}</div>
-              <div className="mt-1 text-[11px] text-ink-muted">{transition.evidenceRefs.length} evidence ref(s) · {transition.controlReferences.length} control ref(s)</div>
+              <div className="mt-1 text-[11px] text-ink-muted">{transition.evidenceRefs.length} evidence ref(s) · {transition.controlExecutions?.length ?? 0} observed control execution(s)</div>
             </div>
           ))}
         </div>
