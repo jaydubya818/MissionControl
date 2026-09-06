@@ -1,0 +1,66 @@
+{
+  "baseline": "8bf19fcb7e46f4b80a862054d22fbd7ca7ed436f",
+  "scope": "Offline ledger observation retention and historical accounting; no provider calls or release",
+  "changedFiles": [
+    "packages/shared/src/governedInference.ts",
+    "packages/model-router/src/__tests__/governed-inference.test.ts",
+    "convex/inferenceGateway.ts",
+    "convex/schema.ts",
+    "convex/factory/providerLiability.ts",
+    "convex/lib/providerLiability.ts",
+    "convex/lib/governedInferenceAdmission.ts",
+    "convex/__tests__/inferenceObservations.test.ts",
+    "convex/__tests__/inferencePersistence.test.ts",
+    "convex/__tests__/providerLiability.test.ts",
+    "convex/__tests__/providerLiabilityHandlers.test.ts"
+  ],
+  "sourceHashes": {
+    "packages/shared/src/governedInference.ts": "c69204c1719e4883093301023de25705125f4f675d2d2097a81fae14cc7d6d34",
+    "packages/model-router/src/__tests__/governed-inference.test.ts": "602582ba97ca85545c076fe955f0263b5373fc9c2e7f1e45efbdea0572806b03",
+    "convex/inferenceGateway.ts": "144c9ba6e43ed129c0fda387ea3ebf4fc327d2e393fdea0e82e48f5f7f7a7392",
+    "convex/schema.ts": "569dfe7e465d3cab84f1d8a8aba3057ac6368f42f9b2c2cbaf592eb1b52b7d61",
+    "convex/factory/providerLiability.ts": "adc57d715c56b3f399da4b93f0b08d7e3540963adf86aba60bb41ba3b747cd1d",
+    "convex/lib/providerLiability.ts": "11ba884486c8d406d4912452498ead5a4be9f3a548a9b4b5844d7806978b731d",
+    "convex/lib/governedInferenceAdmission.ts": "b106255196b69f800e6f49af4a11daea4499b07dd09c813be717557403f93adc",
+    "convex/__tests__/inferenceObservations.test.ts": "fa0db4210182621ba6fa94fe796cdcb4a344db6403bb9fa9b295d96d44d0aff7",
+    "convex/__tests__/inferencePersistence.test.ts": "5232d93a34125db8476684507944a8c039b33d46e5d53af0493c3357784a3e46",
+    "convex/__tests__/providerLiability.test.ts": "2aecad4328ed4c68bf4590c57fe304711876b7b80bc0475bdea0baf6db73146b",
+    "convex/__tests__/providerLiabilityHandlers.test.ts": "3b8e84c0e5bf8e25e7496e6a332aa5df1d510423587ba0199e2d0dc3d09543c7"
+  },
+  "tests": {
+    "convexFocused": {
+      "status": "PASS",
+      "tests": 206,
+      "log": "ledger-green.log"
+    },
+    "sharedPricingReceipts": {
+      "status": "PASS",
+      "tests": 19,
+      "log": "shared-green.log"
+    },
+    "convexTypecheck": {
+      "status": "PASS",
+      "log": "convex-typecheck-final.log"
+    },
+    "diffCheck": "PASS"
+  },
+  "redEvidence": {
+    "red.log": "14 expected regression failures before implementation; 67 baseline controls passed",
+    "shared-red.log": "4 expected regression failures before implementation; 11 baseline controls passed",
+    "unknown-correction-red.log": "1 expected failure: superseded known cost counted after authoritative UNKNOWN",
+    "unknown-projection-red.log": "1 expected failure: corrected UNKNOWN incorrectly projected COMPLETE",
+    "usage-only-projection-red.log": "1 expected failure: later usage-only correction resurrected original priced money after UNKNOWN",
+    "overflow-canonical-red.log": "3 expected failures: reconciliation money tamper, UNKNOWN-to-COMPLETE tamper, and projection aggregate overflow",
+    "cohort-overflow-red.log": "1 expected failure: route cohort aggregate cost overflow threw instead of preserving UNKNOWN"
+  },
+  "limitations": [
+    "Issued finite dispatch allowance is not retroactively revoked; the fence prevents subsequent admission and claims, including already-persisted intents.",
+    "Fixture handler database does not qualify actual Convex concurrency or provider execution; root owns real backend qualification.",
+    "No monetary ACTUAL classification or human/release acceptance fabricated.",
+    "Generic reconciliation arrival order is not a provider revision guarantee."
+  ],
+  "commits": [],
+  "currentFormulaVersion": "accepted-outcome-economics/v2",
+  "historicalCompatibility": "Receipt v2 and schema-v2 projection formula v1 snapshots remain readable with original digests; current comparisons use only formula v2. Schema accepts v1/v2 formula metadata.",
+  "aggregateUnknownBehavior": "Unrepresentable projection and route aggregate money fields are absent; projection UNKNOWN/NONE; route AGGREGATE_COST_UNKNOWN and non-promotable. Valid component lineage and sample counts remain retained."
+}

@@ -107,7 +107,7 @@ denominators and coverage remain explicit. Existing economics WARN remains.
 - Maturity: no promotion. This closes one parent allocation gap, not provider
   dispatch bounds, authoritative billing settlement or real-work economics.
 
-## Active slice: preserve canonical inference identities
+## Completed slice: preserve canonical inference identities
 
 - Original baseline: `4434cc56448075f4804787325a9586c6290b2215`.
   Integrated baseline: `9e6dfd9b0110c0316b1fc085539b41e2616ebac7`
@@ -151,7 +151,7 @@ denominators and coverage remain explicit. Existing economics WARN remains.
   request/output exposure before transport; receipt persistence still needs to
   retain observed overrun evidence. Live-provider qualification remains gated.
 
-## Active slice — finite classification dispatch authority
+## Completed slice — finite classification dispatch authority
 
 - Reconciled main/merge base: `9a68b56c3ee788c4f8b4132a8c7c9d14f32dee28`
   (qualified PR #188 merge). Branch: `codex/inference-dispatch-authority`.
@@ -179,12 +179,82 @@ denominators and coverage remain explicit. Existing economics WARN remains.
 - Source remains Experimental and default off. Actual account/geography
   enrollment, billing/settlement/overrun evidence and complete outcome metrics
   remain todo 063 requirements; no Production or paid inference is authorized.
+- PR [#189](https://github.com/jaydubya818/MissionControl/pull/189) merged as
+  `8bf19fcb7e46f4b80a862054d22fbd7ca7ed436f` at 2026-09-06T07:31:10Z after
+  all 12 contexts passed on exact head `65439d2e6d33`.
+  [Clean-main qualification](../testing/evidence/capability-convergence-dispatch-postmerge/README.md)
+  passes 19 composed gates, 2895 tests (11 inherited skips), Phase 5 and
+  15 browser checks. Source hashes match the qualified local backend proof.
+  Economics remains WARN; all four Production targets and guards are unchanged.
+
+## Active slice — retain observations and historical accounting
+
+- Baseline: `8bf19fcb7e46f4b80a862054d22fbd7ca7ed436f`; branch
+  `codex/inference-observation-retention`.
+- Contract: [observation retention](./inference-observation-retention-contract.md).
+  Valid overrun observations must survive with explicit violations and a
+  spending fence. First settlement must bind historical authority without
+  requiring current execution. Canonical v2 history remains unchanged.
+- The Bedrock bridge's known-result persistence failure reproduced nine failing
+  regressions. Its correction passes 40 targeted tests and typecheck; it retains
+  a bounded settlement payload in memory without claiming a durable outbox.
+  Root review corrected wrong-route correction pricing, late correction fences,
+  UNKNOWN money fallback and usage-only correction resurrection. New projections
+  use formula v2; historical formula v1 remains readable and excluded from current
+  comparisons. Focused ledger proof passes 206 Convex and 19 shared tests.
+- The existing inspector exposes the scoped WorkOrder spending fence ahead of an
+  older complete projection, with source digest, violation reason and explicit
+  receipt money classification. [UI proof](../testing/evidence/capability-convergence-observations-ui/README.md)
+  passes thirteen component tests and ten desktop/mobile browser/accessibility
+  checks, including keyboard scrolling. Runtime contract advances to v50.
+- Independent review corrected aggregate money overflow and unvalidated
+  correction fields during projection. The final
+  [real local backend proof](../testing/evidence/capability-convergence-observations-backend/README.md)
+  passes 57 scenarios and eight browser checks against actual persisted records,
+  including light/dark, desktop/mobile and keyboard operation. All 87 source
+  hashes match the frozen source; root code generation passes unchanged and
+  temporary backend ports close. Initial failed harness runs remain retained.
+  [Committed local qualification](../testing/evidence/capability-convergence-observations-final/README.md)
+  passes all 19 composed gates, 2956 tests (11 inherited skips), Phase 5 and
+  15 critical browser checks on `c5cbf718eb73`. Economics remains WARN and all
+  four Production targets and guards are unchanged. Final-head CI, merge and
+  clean-main qualification remain pending.
+- FDLC [#17](https://github.com/jaydubya818/FDLC/pull/17) merged as `ef73e7f`;
+  Guide [#16](https://github.com/jaydubya818/ai-software-factory-mastery/pull/16)
+  merged as `5276509`. Both pass clean-main source qualification and browser
+  checks; [retained ecosystem proof](../testing/evidence/capability-convergence-ecosystem-docs/README.md)
+  binds their source hashes and unchanged Production guards. Claims remain
+  pinned to qualified `9a68b56`. The Guide strict release editorial audit retains
+  25 inherited failures; source, release and real-work acceptance remain distinct.
 
 ## Remaining acceptance evidence
 
+### CI cancellation repair
+
+PR #190's first final-head run passed the composed system job but failed an
+existing automation cancellation check: an aborted shell ran for about five
+seconds. Two local regressions then reproduced pre-cancelled artifact writes
+and a surviving process-group child after its leader exited. Cancellation must
+be checked before materialization/dispatch, and process-group termination must
+continue until its pipes close even when the direct leader has exited. The
+repair retains the existing timeout and cancellation bounds; it adds no
+execution or publication authority. Qualification must be repeated on the
+corrected source before merge.
+
+The corrected source `ba130ce5f0f1` passes all 19 composed gates, 2958 tests
+(11 inherited skips), Phase 5 and 15 critical browser checks. Independent
+cancellation review is GO; all cancellation regressions pass, with two unrelated
+socket tests blocked only in the review sandbox and all thirteen passing in the
+permitted environment. [Corrected proof](../testing/evidence/capability-convergence-observations-final-v2/README.md)
+retains the earlier results as history. All 87 backend source hashes still match
+and all four Production targets and guards remain unchanged. Final PR-head CI,
+merge and clean-main qualification remain pending.
+
+### Retained provider source qualification
+
 The separately versioned `codex/bedrock-v1` source landed in PR #185 and remains
-preserved on runtime v49. Exact current-main CI, Docker/orchestration qualification
-and independent architecture, security and data-integrity reviews pass. This closes
+preserved at main `8bf19fc` on runtime v49. That recorded CI, Docker/orchestration
+qualification and independent architecture, security and data-integrity reviews pass. This closes
 the source-integration dependency without promoting maturity: approved AWS identity,
 account-specific route/pricing, live proof, exact Factory profiles, readiness and
 the governed pilot remain open.
@@ -195,3 +265,14 @@ Real incident restoration, observed outcomes, evaluated improvement, human
 promotion, controlled activation and observed rollback remain required at the
 scope specified by the master acceptance criteria. Program completion must not
 be inferred from the bounded offline records or from checklist implementation.
+
+### Current-main integration for observation retention
+
+PR #191 advanced main with documentation-only qualification records. The resolved
+program-record conflict retains both histories; application source is unchanged.
+[Integrated-main qualification](../testing/evidence/capability-convergence-observations-final-v3/README.md)
+on `8cfe354b31d2` against main `d0e3ba889df1` passes all 19 composed gates,
+2958 tests (11 inherited skips), Phase 5 and 15 critical browser checks. All 87
+backend source hashes match; economics remains WARN and all four Production
+targets and guards remain unchanged. Exact PR-head CI and clean-main proof
+remain separate requirements.

@@ -3,10 +3,10 @@ import { canonicalDigest } from "./canonicalDigest.js";
 export const INFERENCE_PRICE_BOOK_SCHEMA = "inference-price-book/v1" as const;
 export const INFERENCE_RESERVATION_SCHEMA = "inference-reservation/v1" as const;
 export const INFERENCE_INTENT_SCHEMA = "inference-physical-intent/v2" as const;
-export const INFERENCE_RECEIPT_SCHEMA = "inference-physical-receipt/v2" as const;
+export const INFERENCE_RECEIPT_SCHEMA = "inference-physical-receipt/v3" as const;
 export const OUTCOME_EVENT_SCHEMA = "factory-outcome-event/v1" as const;
 export const OUTCOME_PROJECTION_SCHEMA = "factory-outcome-projection/v2" as const;
-export const OUTCOME_FORMULA_VERSION = "accepted-outcome-economics/v1" as const;
+export const OUTCOME_FORMULA_VERSION = "accepted-outcome-economics/v2" as const;
 
 export type ObservationCompleteness = "COMPLETE" | "PARTIAL" | "UNKNOWN";
 export type DeliveryState = "DELIVERED" | "NOT_DELIVERED" | "UNKNOWN";
@@ -110,7 +110,7 @@ export interface ProviderUsageObservation {
 }
 
 export interface PhysicalInferenceReceipt {
-  schema: typeof INFERENCE_RECEIPT_SCHEMA;
+  schema: typeof INFERENCE_RECEIPT_SCHEMA | "inference-physical-receipt/v2";
   receiptId: string;
   intentId: string;
   reservationId: string;
@@ -132,6 +132,9 @@ export interface PhysicalInferenceReceipt {
   usageCompleteness: ObservationCompleteness;
   costMicrousd?: number;
   costCompleteness: ObservationCompleteness;
+  /** Present on v3 receipts. Rate-derived money is never attributable billing. */
+  costClassification?: "ESTIMATED" | "UNKNOWN";
+  violationCodes?: string[];
   priceBookId: string;
   priceBookDigest: string;
   batch?: boolean;
@@ -171,7 +174,7 @@ export interface FactoryOutcomeEvent {
 export interface FactoryOutcomeProjection {
   schema: typeof OUTCOME_PROJECTION_SCHEMA;
   projectionId: string;
-  formulaVersion: typeof OUTCOME_FORMULA_VERSION;
+  formulaVersion: typeof OUTCOME_FORMULA_VERSION | "accepted-outcome-economics/v1";
   cohortDigest: string;
   projectId: string;
   workOrderId: string;
@@ -182,7 +185,7 @@ export interface FactoryOutcomeProjection {
   receiptIds: string[];
   reconciliationIds: string[];
   physicalCallCount: number;
-  knownCostMicrousd: number;
+  knownCostMicrousd?: number;
   totalCostMicrousd?: number;
   costCoverage: number;
   costCompleteness: ObservationCompleteness;
@@ -198,7 +201,7 @@ export interface RouteEconomicsSummary {
   cohortDigest: string;
   sampleSize: number;
   acceptedCount: number;
-  totalKnownCostMicrousd: number;
+  totalKnownCostMicrousd?: number;
   costPerAcceptedOutcomeMicrousd?: number;
   coverage: number;
   confidence: "HIGH" | "LOW" | "NONE";
@@ -222,13 +225,11 @@ function tokenCostMicrousd(tokens: number, rate: number): bigint {
   return (BigInt(tokens) * BigInt(rate) + 999_999n) / 1_000_000n;
 }
 
-function safeMicrousd(value: bigint, label: string): number {
-  if (value > MAX_SAFE_BIGINT) throw new Error(`${label} exceeds safe integer accounting bounds.`);
-  return Number(value);
-}
-
-function sumMicrousd(values: number[], label: string): number {
-  return safeMicrousd(values.reduce((sum, value) => sum + BigInt(value), 0n), label);
+function sumMicrousd(values: Array<number | undefined>, label: string): number | undefined {
+  for (const value of values) nonNegativeSafeInteger(value, label);
+  if (values.some(value => value === undefined)) return undefined;
+  const total = values.reduce<bigint>((sum, value) => sum + BigInt(value!), 0n);
+  return total > MAX_SAFE_BIGINT ? undefined : Number(total);
 }
 
 function digest(namespace: string, value: unknown) {
@@ -426,6 +427,7 @@ export function calculateInferenceCost(input: {
   batch?: boolean;
   serviceTier?: string;
 }): { costMicrousd?: number; completeness: ObservationCompleteness } {
+  usageCompleteness(input.usage);
   const rate = input.priceBook.rates.find((candidate) => candidate.routeDigest === input.routeDigest);
   if (!rate || (rate.serviceTier !== undefined && rate.serviceTier !== input.serviceTier)) {
     return { completeness: "UNKNOWN" };
@@ -439,13 +441,18 @@ export function calculateInferenceCost(input: {
   ];
   const supplied = Object.values(input.usage).filter((value) => value !== undefined).length;
   if (supplied === 0) return { completeness: "UNKNOWN" };
+  // Missing prices cannot be represented as zero or as a partial bill.
+  if (parts.some((part, index) => !part.known && [input.usage.inputTokens,
+    input.usage.outputTokens, input.usage.cacheReadTokens, input.usage.cacheWriteTokens,
+    input.usage.reasoningTokens][index] !== undefined)) return { completeness: "UNKNOWN" };
   const knownCost = parts.reduce((sum, part) => sum + part.cost, 0n);
   const multiplier = input.batch ? rate.batchMultiplierBps : 10_000;
   if (input.batch && multiplier === undefined) {
-    return { completeness: "PARTIAL", costMicrousd: safeMicrousd(knownCost, "Inference cost") };
+    return { completeness: "UNKNOWN" };
   }
   const scaledCost = (knownCost * BigInt(multiplier ?? 10_000) + 9_999n) / 10_000n;
-  const costMicrousd = safeMicrousd(scaledCost, "Inference cost");
+  if (scaledCost > BigInt(Number.MAX_SAFE_INTEGER)) return { completeness: "UNKNOWN" };
+  const costMicrousd = Number(scaledCost);
   const requiredKnown = parts[0].known && parts[1].known;
   return { costMicrousd, completeness: requiredKnown && parts.every((part) => part.known) ? "COMPLETE" : "PARTIAL" };
 }
@@ -468,6 +475,8 @@ export function physicalInferenceReceipt(input: {
   completedAt: number;
   batch?: boolean;
   serviceTier?: string;
+  /** Prior receipt observations, including validated accounting corrections. */
+  priorReceipts?: Pick<PhysicalInferenceReceipt, "reservationId" | "reservationDigest" | "usage" | "costMicrousd">[];
 }): PhysicalInferenceReceipt {
   if (input.intent.reservationId !== input.reservation.reservationId || input.intent.state !== "CLAIMED") {
     throw new Error("Receipt requires the exact claimed physical intent.");
@@ -476,36 +485,46 @@ export function physicalInferenceReceipt(input: {
     throw new Error("Receipt cannot begin before the durable transport claim.");
   }
   if (input.priceBook.digest !== input.reservation.priceBookDigest) throw new Error("Receipt price-book drift detected.");
-  if (input.completedAt < input.startedAt) throw new Error("Receipt timing is invalid.");
+  if (!Number.isSafeInteger(input.startedAt) || !Number.isSafeInteger(input.completedAt)
+    || input.startedAt < 0 || input.completedAt < input.startedAt) throw new Error("Receipt timing is invalid.");
   if (input.delivery === "UNKNOWN" && input.status !== "UNKNOWN" && input.status !== "TIMED_OUT") {
     throw new Error("Ambiguous delivery cannot be reported as a definitive result.");
   }
-  if (input.resolvedProvider !== undefined && input.resolvedProvider !== input.intent.route.provider) {
-    throw new Error("Provider alias or resolution drift detected.");
-  }
-  if (input.resolvedModelId !== undefined && input.resolvedModelId !== input.intent.route.modelId) {
-    throw new Error("Resolved model drift detected.");
-  }
-  for (const [value, ceiling, label] of [
-    [input.usage.inputTokens, input.reservation.maxInputTokens, "input"],
-    [input.usage.outputTokens, input.reservation.maxOutputTokens, "output"],
-    [input.usage.cacheReadTokens, input.reservation.maxCacheReadTokens, "cache-read"],
-    [input.usage.cacheWriteTokens, input.reservation.maxCacheWriteTokens, "cache-write"],
-    [input.usage.reasoningTokens, input.reservation.maxReasoningTokens, "reasoning"],
-  ] as const) {
-    if (value !== undefined && value > ceiling) throw new Error(`RESERVATION_${label.toUpperCase().replace("-", "_")}_TOKEN_LIMIT_EXCEEDED`);
-  }
   const usageState = usageCompleteness(input.usage);
-  const cost = calculateInferenceCost({
+  const violationCodes: string[] = [];
+  if (input.resolvedProvider !== undefined && input.resolvedProvider !== input.intent.route.provider) violationCodes.push("RESOLVED_PROVIDER_DRIFT");
+  if (input.resolvedModelId !== undefined && input.resolvedModelId !== input.intent.route.modelId) violationCodes.push("RESOLVED_MODEL_DRIFT");
+  const routeDrift = violationCodes.length > 0;
+  const priorReceipts = input.priorReceipts ?? [];
+  for (const prior of priorReceipts) {
+    if (prior.reservationId !== input.reservation.reservationId || prior.reservationDigest !== input.reservation.digest) {
+      throw new Error("Prior observation reservation scope is invalid.");
+    }
+    usageCompleteness(prior.usage);
+    if (prior.costMicrousd !== undefined) nonNegativeSafeInteger(prior.costMicrousd, "Prior cost");
+  }
+  for (const [key, ceiling, label] of [
+    ["inputTokens", input.reservation.maxInputTokens, "INPUT"],
+    ["outputTokens", input.reservation.maxOutputTokens, "OUTPUT"],
+    ["cacheReadTokens", input.reservation.maxCacheReadTokens, "CACHE_READ"],
+    ["cacheWriteTokens", input.reservation.maxCacheWriteTokens, "CACHE_WRITE"],
+    ["reasoningTokens", input.reservation.maxReasoningTokens, "REASONING"],
+  ] as const) {
+    const consumed = priorReceipts.reduce((sum, prior) => sum + BigInt(prior.usage[key] ?? 0), 0n);
+    if (consumed + BigInt(input.usage[key] ?? 0) > BigInt(ceiling)) violationCodes.push(`RESERVATION_${label}_TOKEN_LIMIT_EXCEEDED`);
+  }
+  const cost = routeDrift ? { completeness: "UNKNOWN" as const, costMicrousd: undefined } : calculateInferenceCost({
     usage: input.usage,
     routeDigest: input.intent.route.routeDigest,
     priceBook: input.priceBook,
     batch: input.batch,
     serviceTier: input.serviceTier,
   });
-  if (cost.costMicrousd !== undefined && cost.costMicrousd > input.reservation.maxCostMicrousd) {
-    throw new Error("RESERVATION_COST_LIMIT_EXCEEDED");
+  const knownPriorCost = priorReceipts.reduce((sum, prior) => sum + BigInt(prior.costMicrousd ?? 0), 0n);
+  if (knownPriorCost + BigInt(cost.costMicrousd ?? 0) > BigInt(input.reservation.maxCostMicrousd)) {
+    violationCodes.push("RESERVATION_COST_LIMIT_EXCEEDED");
   }
+  if (!routeDrift && usageState !== "UNKNOWN" && cost.completeness === "UNKNOWN") violationCodes.push("REQUESTED_ROUTE_COST_UNKNOWN");
   const snapshot = durableInferenceValue({
     schema: INFERENCE_RECEIPT_SCHEMA,
     receiptId: input.receiptId,
@@ -529,6 +548,8 @@ export function physicalInferenceReceipt(input: {
     usageCompleteness: usageState,
     costMicrousd: cost.costMicrousd,
     costCompleteness: cost.completeness,
+    costClassification: cost.costMicrousd === undefined ? "UNKNOWN" as const : "ESTIMATED" as const,
+    violationCodes,
     priceBookId: input.priceBook.priceBookId,
     priceBookDigest: input.priceBook.digest,
     batch: input.batch,
@@ -578,9 +599,12 @@ export function projectFactoryOutcome(input: {
   if (reconciliations.some((reconciliation) => !receiptIds.has(reconciliation.receiptId))) {
     throw new Error("Outcome reconciliation does not belong to a selected physical receipt.");
   }
-  const latestReconciliation = new Map<string, InferenceReconciliation>();
+  const latestMonetaryReconciliation = new Map<string, InferenceReconciliation>();
   for (const reconciliation of [...reconciliations].sort((left, right) => left.reconciledAt - right.reconciledAt)) {
-    latestReconciliation.set(reconciliation.receiptId, reconciliation);
+    // Usage-only evidence adds lineage without erasing a prior monetary assertion.
+    if (reconciliation.observedCostMicrousd !== undefined || reconciliation.completeness === "UNKNOWN") {
+      latestMonetaryReconciliation.set(reconciliation.receiptId, reconciliation);
+    }
   }
   const stages: FactoryOutcomeProjection["stages"] = {};
   for (const event of [...scopedEvents].sort((left, right) => left.occurredAt - right.occurredAt)) {
@@ -592,10 +616,10 @@ export function projectFactoryOutcome(input: {
   else if (stages.VERIFICATION_PASSED && stages.HUMAN_ACCEPTED
     && stages.HUMAN_ACCEPTED.occurredAt >= stages.VERIFICATION_PASSED.occurredAt) outcome = "ACCEPTED";
   const effectiveCosts = input.receipts.map((receipt) => {
-    const reconciliation = latestReconciliation.get(receipt.receiptId);
+    const reconciliation = latestMonetaryReconciliation.get(receipt.receiptId);
     return {
-      costMicrousd: reconciliation?.observedCostMicrousd ?? receipt.costMicrousd,
-      completeness: reconciliation?.observedCostMicrousd !== undefined
+      costMicrousd: reconciliation ? reconciliation.observedCostMicrousd : receipt.costMicrousd,
+      completeness: reconciliation
         ? reconciliation.completeness
         : receipt.costCompleteness,
     };
@@ -604,7 +628,7 @@ export function projectFactoryOutcome(input: {
   const complete = effectiveCosts.filter((cost) => cost.completeness === "COMPLETE" && cost.costMicrousd !== undefined);
   const knownCostMicrousd = sumMicrousd(known.map((cost) => cost.costMicrousd!), "Outcome known cost");
   const costCoverage = input.receipts.length === 0 ? 0 : complete.length / input.receipts.length;
-  const costCompleteness: ObservationCompleteness = input.receipts.length === 0
+  const costCompleteness: ObservationCompleteness = input.receipts.length === 0 || knownCostMicrousd === undefined
     ? "UNKNOWN"
     : complete.length === input.receipts.length
       ? "COMPLETE"
@@ -659,6 +683,7 @@ export function summarizeRouteEconomics(
   const accepted = matching.filter((projection) => projection.outcome === "ACCEPTED");
   if (accepted.length === 0) blockers.push("NO_ACCEPTED_OUTCOMES");
   const totalKnownCostMicrousd = sumMicrousd(matching.map((projection) => projection.knownCostMicrousd), "Route outcome cost");
+  if (totalKnownCostMicrousd === undefined) blockers.push("AGGREGATE_COST_UNKNOWN");
   const coverage = matching.length === 0 ? 0
     : matching.reduce((sum, projection) => sum + projection.costCoverage, 0) / matching.length;
   const eligibleForPromotion = blockers.length === 0;
@@ -670,10 +695,10 @@ export function summarizeRouteEconomics(
     acceptedCount: accepted.length,
     totalKnownCostMicrousd,
     costPerAcceptedOutcomeMicrousd: eligibleForPromotion
-      ? Math.ceil(totalKnownCostMicrousd / accepted.length)
+      ? Math.ceil(totalKnownCostMicrousd! / accepted.length)
       : undefined,
     coverage,
-    confidence: eligibleForPromotion ? "HIGH" : matching.length > 0 ? "LOW" : "NONE",
+    confidence: totalKnownCostMicrousd === undefined ? "NONE" : eligibleForPromotion ? "HIGH" : matching.length > 0 ? "LOW" : "NONE",
     eligibleForPromotion,
     blockers,
   };

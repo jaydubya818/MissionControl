@@ -1,0 +1,63 @@
+{
+  "baseline": "8bf19fcb7e46f4b80a862054d22fbd7ca7ed436f",
+  "scope": "Offline ledger observation retention and historical accounting; no provider calls or release",
+  "changedFiles": [
+    "packages/shared/src/governedInference.ts",
+    "packages/model-router/src/__tests__/governed-inference.test.ts",
+    "convex/inferenceGateway.ts",
+    "convex/schema.ts",
+    "convex/factory/providerLiability.ts",
+    "convex/lib/providerLiability.ts",
+    "convex/lib/governedInferenceAdmission.ts",
+    "convex/__tests__/inferenceObservations.test.ts",
+    "convex/__tests__/inferencePersistence.test.ts",
+    "convex/__tests__/providerLiability.test.ts",
+    "convex/__tests__/providerLiabilityHandlers.test.ts"
+  ],
+  "sourceHashes": {
+    "packages/shared/src/governedInference.ts": "81ceabe316941ed0c667c945db5ac2f1dd0ae9348b6e886a3f2fbabccac6f185",
+    "packages/model-router/src/__tests__/governed-inference.test.ts": "1bcf12fb31481a0cb58f0f8ea5ebd68ca4fd8e1bbd8c7123e0afa50ab7efb0d5",
+    "convex/inferenceGateway.ts": "f12d5b4c03091f4d6af54ca6497edbc9212ba4f422d0c661a36b634fd2474019",
+    "convex/schema.ts": "a920a437c5f9566dd6db2876281068b6b15d3d0dfb6c686eb44624c4a3d1118e",
+    "convex/factory/providerLiability.ts": "adc57d715c56b3f399da4b93f0b08d7e3540963adf86aba60bb41ba3b747cd1d",
+    "convex/lib/providerLiability.ts": "11ba884486c8d406d4912452498ead5a4be9f3a548a9b4b5844d7806978b731d",
+    "convex/lib/governedInferenceAdmission.ts": "b106255196b69f800e6f49af4a11daea4499b07dd09c813be717557403f93adc",
+    "convex/__tests__/inferenceObservations.test.ts": "da470a7d8acf54136285574c72bc0fd28f1e8e906e5c7e8d72ab3629d1acc8c4",
+    "convex/__tests__/inferencePersistence.test.ts": "5232d93a34125db8476684507944a8c039b33d46e5d53af0493c3357784a3e46",
+    "convex/__tests__/providerLiability.test.ts": "2aecad4328ed4c68bf4590c57fe304711876b7b80bc0475bdea0baf6db73146b",
+    "convex/__tests__/providerLiabilityHandlers.test.ts": "3b8e84c0e5bf8e25e7496e6a332aa5df1d510423587ba0199e2d0dc3d09543c7"
+  },
+  "tests": {
+    "convexFocused": {
+      "status": "PASS",
+      "tests": 203,
+      "log": "ledger-green.log"
+    },
+    "sharedPricingReceipts": {
+      "status": "PASS",
+      "tests": 18,
+      "log": "shared-green.log"
+    },
+    "convexTypecheck": {
+      "status": "PASS",
+      "log": "convex-typecheck-final.log"
+    },
+    "diffCheck": "PASS"
+  },
+  "redEvidence": {
+    "red.log": "14 expected regression failures before implementation; 67 baseline controls passed",
+    "shared-red.log": "4 expected regression failures before implementation; 11 baseline controls passed",
+    "unknown-correction-red.log": "1 expected failure: superseded known cost counted after authoritative UNKNOWN",
+    "unknown-projection-red.log": "1 expected failure: corrected UNKNOWN incorrectly projected COMPLETE",
+    "usage-only-projection-red.log": "1 expected failure: later usage-only correction resurrected original priced money after UNKNOWN"
+  },
+  "limitations": [
+    "Issued finite dispatch allowance is not retroactively revoked; the fence prevents subsequent admission and claims, including already-persisted intents.",
+    "Fixture handler database does not qualify actual Convex concurrency or provider execution; root owns real backend qualification.",
+    "No monetary ACTUAL classification or human/release acceptance fabricated.",
+    "Generic reconciliation arrival order is not a provider revision guarantee."
+  ],
+  "commits": [],
+  "currentFormulaVersion": "accepted-outcome-economics/v2",
+  "historicalCompatibility": "Receipt v2 and schema-v2 projection formula v1 snapshots remain readable with original digests; current comparisons use only formula v2. Schema accepts v1/v2 formula metadata."
+}

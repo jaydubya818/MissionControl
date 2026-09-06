@@ -149,7 +149,7 @@ describe("canonical identities through persisted inference handlers", () => {
     }
     const row = (await f.db.get(id))!;
     const { [snapshotDigest]: _digest, ...bytes } = row.immutableSnapshot as Record<string, unknown>;
-    const historical = { ...bytes, schema: String(bytes.schema).replace("/v2", "/v1") };
+    const historical = { ...bytes, schema: String(bytes.schema).replace(/\/v[23]$/, "/v1") };
     const digest = canonicalDigest(historical.schema, historical);
     await f.db.patch(id, { [rowDigest]: digest, immutableSnapshot: { ...historical, [snapshotDigest]: digest } });
     const dependent = kind === "intent" ? f.claim(id) : kind === "receipt"
