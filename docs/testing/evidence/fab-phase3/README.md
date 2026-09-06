@@ -8,6 +8,8 @@ The implementation is on `codex/fab-phase3`, reconciled with MC main `f90c50f5b4
 
 MC consumes private `@fdlc/fab@0.1.0-experimental.2`, built from FDLC source `1d1240c219d9bf3c1fa5fbb0a80ded96cf13df1f`. Archive SHA-256: `b3a1af223e246208c01745678cbe48a91786070b016b9a1ad7bdb0ad274d8a8d`. Installed 41-file closure SHA-256: `121ef8e14b085f6dba6e7f5598070ad80e79f5c1bfa5c71b890871bf83214999`. Three independent packaging runs, including a fresh detached checkout, produced that archive. Later site/docs commits do not change this immutable package pin. Its native helpers require macOS 26.0+ arm64 and are ad-hoc linker signed; Developer-ID signing/notarization and a Fab licensing decision remain external release gates.
 
+Later [upstream reconciliation](../fab-phase3-upstream/README.md) preserves main `6d7146d5205aef729aee2960aed2a4ed8e8ab95c` through local merge `4b95edd9`. Only two incoming documentation files changed. The executable tree is identical to the final clean-qualified implementation below; affected documentation and runtime-contract checks pass against the newer baseline.
+
 ## Completed local gates
 
 - Exact runtime/model-route admission, frozen candidate identity, independent verifier admission, human receipt lineage, permit-bound publication and read-only uncertain-outcome reconciliation are covered by local tests with injected model/control-plane/GitHub transport.

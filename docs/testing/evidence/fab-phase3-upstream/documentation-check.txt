@@ -1,0 +1,5 @@
+
+> mission-control@0.9.0 docs:factory-check /private/tmp/fab-phase3-mission-control
+> node scripts/check-factory-docs.mjs
+
+PASS factory documentation consistency
