@@ -229,6 +229,18 @@ denominators and coverage remain explicit. Existing economics WARN remains.
 
 ## Remaining acceptance evidence
 
+### CI cancellation repair
+
+PR #190's first final-head run passed the composed system job but failed an
+existing automation cancellation check: an aborted shell ran for about five
+seconds. Two local regressions then reproduced pre-cancelled artifact writes
+and a surviving process-group child after its leader exited. Cancellation must
+be checked before materialization/dispatch, and process-group termination must
+continue until its pipes close even when the direct leader has exited. The
+repair retains the existing timeout and cancellation bounds; it adds no
+execution or publication authority. Qualification must be repeated on the
+corrected source before merge.
+
 The complete Factory loop and ten real accepted WorkOrders are **NOT_PROVEN**.
 Live inference qualification and its two-route comparison are **NOT_RUN**.
 Real incident restoration, observed outcomes, evaluated improvement, human
