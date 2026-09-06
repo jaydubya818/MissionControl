@@ -195,7 +195,10 @@ WorkOrder acceptance, and the human-gated learning continuation. This is strong
 implementation proof; it is not a claim of fleet-scale production operation or
 general Remote Sandbox certification.
 
-The current public client/backend runtime contract is **v42**.
+The current public client/backend runtime contract is **v43**. Phase 5 adds the
+disabled-by-default governed inference price-book, reservation, receipt,
+reconciliation, and accepted-outcome economics contracts; v42 clients fail
+closed through the existing compatibility check.
 
 | Capability                                 | Current status                                   | Boundary                                                                                        |
 | ------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |

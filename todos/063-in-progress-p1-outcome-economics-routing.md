@@ -1,5 +1,5 @@
 ---
-status: ready
+status: in_progress
 priority: p1
 issue_id: "063"
 tags: [software-factory, outcomes, economics, routing, metrics]
@@ -71,6 +71,28 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
+### 2026-09-05 - Phase 5 implementation started
+
+**By:** Codex
+
+**Actions:**
+- Started the authorized bounded Phase 5 slice from exact main SHA
+  `6d7146d5205aef729aee2960aed2a4ed8e8ab95c` in the isolated
+  `codex/phase5-inference-outcome-economics` worktree.
+- Confirmed the existing provider adapters call external APIs directly and the
+  legacy `costEvents` table cannot represent reservations, dispatch ambiguity,
+  immutable price provenance, or outcome-linked coverage.
+- Chose a separate governed inference ledger and shared gateway boundary while
+  retaining existing routing and cost records as migration-safe compatibility
+  surfaces.
+
+**Learnings:**
+- Exact model-route identity is already separated from harness/runtime identity;
+  Phase 5 can build on that boundary without coupling inference to Codex or any
+  other coding harness.
+- A claimed physical request with an ambiguous transport result must remain
+  `UNKNOWN`; ordinary fallback behavior is unsafe after possible dispatch.
+
 ### 2026-09-05 - Bounded first-slice resequencing approved
 
 **By:** Product Owner
@@ -83,6 +105,33 @@ either todo complete and does not authorize implementation by itself.
 **Learnings:**
 - Infrastructure accounting can be qualified independently without inventing
   product, QA, or design workflow semantics.
+
+### 2026-09-05 - Governed inference and accounting slice qualified
+
+**By:** Codex
+
+**Actions:**
+- Implemented a harness-neutral governed inference boundary with exact immutable
+  route identity, active price books, hard per-request reservations, durable
+  physical intents and claims, immutable receipts, reconciliation, fallback
+  rules, and replay protection.
+- Added versioned accepted-outcome projections and advisory route comparisons
+  that preserve unknown cost and never authorize automatic promotion.
+- Added the exact OpenAI Chat Completions transport behind a disabled-by-default
+  gateway flag, signed Convex service commands, operator inspection, and
+  deterministic offline qualification evidence.
+- Passed the 35-test Phase 5 regression suite, all 12 negative controls, full
+  repository tests, typecheck, lint, build, release security, runtime-contract
+  v42-to-v43 guard, browser checks, and all 18 System Qualification stages.
+
+**Learnings:**
+- A useful economic denominator must include every physical receipt for the
+  logical Attempt, including failed primary spend before a permitted fallback.
+- Provider reconciliation must create a new frozen projection interpretation;
+  mutating the original receipt would destroy reproducibility.
+- This todo remains in progress: production outcomes, broader dashboards, and a
+  second independently qualified route are intentionally outside the bounded
+  Phase 5 slice.
 
 ### 2026-08-25 - Approved implementation kickoff
 

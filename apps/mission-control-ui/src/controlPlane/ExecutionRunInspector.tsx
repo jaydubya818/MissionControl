@@ -71,6 +71,10 @@ export function ExecutionRunInspector({
     api.modelRoutingDecisions.getForWorkflowRun,
     open && workflowRunId ? { workflowRunId } : "skip"
   );
+  const inferenceEconomics = useQuery(
+    api.inferenceGateway.getAttemptEconomics,
+    open && workflowRunId ? { workflowRunId } : "skip"
+  );
   const factoryContextEnabled = useQuery(
     api.featureFlags.isEnabled,
     open && inspector?.run.projectId
@@ -403,6 +407,8 @@ export function ExecutionRunInspector({
                 )}
               </Card>
 
+              <InferenceEconomicsCard data={inferenceEconomics} />
+
               {["FAILED", "CANCELED"].includes(inspector.run.status) ? (
                 <RunRecoveryPanel
                   runId={inspector.run.runId}
@@ -631,6 +637,140 @@ export function ExecutionRunInspector({
       </DialogContent>
     </Dialog>
   );
+}
+
+export type InferenceEconomicsData = {
+  gatewayAdmissionEnabled: boolean;
+  reservations: Array<{ state: string }>;
+  intents: Array<{ state: string }>;
+  receipts: Array<{
+    _id: string;
+    physicalOrdinal: number;
+    route: { provider: string; modelId: string };
+    delivery: string;
+    status: string;
+    costCompleteness: string;
+    costMicrousd?: number;
+    providerRequestId?: string;
+  }>;
+  reconciliations: Array<{ completeness: string }>;
+  latestProjection: null | {
+    outcome: string;
+    knownCostMicrousd: number;
+    totalCostMicrousd?: number;
+    costCoverage: number;
+    costCompleteness?: string;
+    confidence: string;
+    formulaVersion: string;
+  };
+  latestComparison: null | { status: string; blockers: string[] };
+  state: string;
+};
+
+export function InferenceEconomicsCard({ data }: { data: InferenceEconomicsData | undefined }) {
+  if (data === undefined) {
+    return (
+      <Card className="p-4" role="status" aria-live="polite">
+        <div className="text-sm font-medium text-foreground">Loading inference economics</div>
+        <p className="mt-2 text-xs text-muted-foreground">Resolving reservation, physical-call receipts, reconciliation, and accepted-outcome lineage.</p>
+      </Card>
+    );
+  }
+
+  const latest = data.latestProjection;
+  const receipts = data.receipts ?? [];
+  const intents = data.intents ?? [];
+  const reservations = data.reservations ?? [];
+  const reconciliations = data.reconciliations ?? [];
+  const cancelled = reservations.some((reservation) => reservation.state === "CANCELLED")
+    || intents.some((intent) => intent.state === "CANCELLED");
+  const ambiguous = intents.some((intent) => intent.state === "AMBIGUOUS")
+    || receipts.some((receipt) => receipt.delivery === "UNKNOWN");
+  const inProgress = intents.some((intent) => ["PERSISTED", "CLAIMED"].includes(intent.state));
+  const reconciliationFailed = receipts.some((receipt) => receipt.costCompleteness !== "COMPLETE")
+    && reconciliations.some((reconciliation) => reconciliation.completeness === "UNKNOWN");
+  const state = cancelled ? "CANCELLED" : ambiguous ? "UNKNOWN" : reconciliationFailed
+    ? "RECONCILIATION FAILED" : inProgress ? "IN PROGRESS" : latest?.costCompleteness ?? data.state;
+  const stateTone = state === "COMPLETE" ? "border-success/30 text-success"
+    : state === "UNKNOWN" || state === "RECONCILIATION FAILED" ? "border-danger/30 text-danger"
+      : state === "EMPTY" ? "" : "border-warning/30 text-warning";
+  const knownCost = latest?.knownCostMicrousd
+    ?? receipts.reduce((sum, receipt) => sum + (receipt.costMicrousd ?? 0), 0);
+  const coverage = latest?.costCoverage
+    ?? (receipts.length ? receipts.filter((receipt) => receipt.costCompleteness === "COMPLETE").length / receipts.length : 0);
+
+  return (
+    <Card className="p-4" aria-labelledby="inference-economics-title">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div id="inference-economics-title" className="text-sm font-medium text-foreground">Inference and accepted-outcome economics</div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Immutable physical-call spend and outcome lineage. Unknown observations remain unknown and cannot improve routing.
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline" className={stateTone}>{state}</Badge>
+          <Badge variant="outline">{data.gatewayAdmissionEnabled ? "Gateway enabled" : "Gateway disabled"}</Badge>
+          {data.latestComparison?.status === "NO_GO" ? <Badge variant="outline" className="border-warning/30 text-warning">Comparison ineligible</Badge> : null}
+        </div>
+      </div>
+
+      {reservations.length === 0 ? (
+        <div className="mt-4 rounded-lg border border-[var(--panel-line)] bg-background/30 px-3 py-3">
+          <p className="text-sm text-foreground">No governed inference reservation</p>
+          <p className="mt-1 text-xs text-muted-foreground">This Attempt used no qualified gateway call. Legacy token or cost fields are not promoted into governed economics.</p>
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <EconomicsMetric label="Terminal outcome" value={latest?.outcome ?? "Not projected"} detail="Verification and human acceptance stay separate" />
+            <EconomicsMetric label="Known inference cost" value={formatMicrousd(knownCost)} detail={latest?.totalCostMicrousd === undefined ? "Lower bound; total is unknown" : "Complete physical-call total"} />
+            <EconomicsMetric label="Cost coverage" value={`${Math.round(coverage * 100)}%`} detail={`${receipts.length} physical receipt${receipts.length === 1 ? "" : "s"}`} />
+            <EconomicsMetric label="Confidence" value={latest?.confidence ?? "NONE"} detail={latest?.formulaVersion ?? "accepted-outcome-economics/v1"} />
+          </div>
+          <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--panel-line)]">
+            <table className="w-full min-w-[720px] text-left text-xs">
+              <thead className="border-b border-[var(--panel-line)] text-muted-foreground">
+                <tr><th className="px-3 py-2 font-medium">Physical call</th><th className="px-3 py-2 font-medium">Exact route</th><th className="px-3 py-2 font-medium">Delivery</th><th className="px-3 py-2 font-medium">Usage / cost</th><th className="px-3 py-2 font-medium">Provider identity</th></tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--panel-line)]">
+                {receipts.length === 0 ? (
+                  <tr><td className="px-3 py-3 text-muted-foreground" colSpan={5}>Reservation exists; no physical receipt has been appended.</td></tr>
+                ) : receipts.map((receipt) => (
+                  <tr key={receipt._id}>
+                    <td className="px-3 py-2 font-mono text-foreground">#{receipt.physicalOrdinal}</td>
+                    <td className="px-3 py-2 text-foreground">{receipt.route.provider} / {receipt.route.modelId}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{receipt.delivery} · {receipt.status}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{receipt.costCompleteness} · {receipt.costMicrousd === undefined ? "unknown" : formatMicrousd(receipt.costMicrousd)}</td>
+                    <td className="px-3 py-2 font-mono text-muted-foreground">{receipt.providerRequestId ?? "missing request ID"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {data.latestComparison?.status === "NO_GO" ? (
+            <div role="status" className="mt-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+              Route comparison is ineligible: {data.latestComparison.blockers.join(", ")}. Automatic promotion remains disabled.
+            </div>
+          ) : null}
+        </>
+      )}
+    </Card>
+  );
+}
+
+function EconomicsMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="rounded-lg border border-[var(--panel-line)] bg-background/30 px-3 py-3">
+      <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className="mt-2 text-lg font-semibold text-foreground">{value}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
+    </div>
+  );
+}
+
+function formatMicrousd(value: number) {
+  return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(value / 1_000_000);
 }
 
 export function RemoteSandboxCard({ sandbox }: { sandbox: any }) {
