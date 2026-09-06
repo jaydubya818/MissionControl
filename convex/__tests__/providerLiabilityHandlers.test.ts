@@ -17,7 +17,7 @@ vi.mock("../lib/executionProfileAdmission", () => ({
     eligible: ctx.profileEligible,
     profile: ctx.bridgeProfile }),
 }));
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 const hash = "sha256:" + "a".repeat(64);
 function fixture() {
   const now = Date.now();
@@ -102,6 +102,7 @@ function fixture() {
     project: { _id: "project", tenantId: "tenant" },
     tenant: { _id: "tenant", active: true },
   };
+  rows.reservation.creationDigest = liabilityDigest(rows.reservation.snapshot);
   const ctx: any = {
     profileEligible: true,
     auth: { getUserIdentity: async () => null },
@@ -133,6 +134,43 @@ function fixture() {
 }
 const handler = (fn: unknown) =>
   (fn as { _handler: (ctx: any, args: any) => Promise<any> })._handler;
+it.each(["expiry", "replacement", "revokedProfile", "cancelled", "completed", "worker", "retiredPrice"])("settles original admitted usage after %s without granting new spending", async fault => {
+  const { ctx, rows, args } = fixture();
+  await handler(reserveRequestInternal)(ctx, args);
+  if (fault === "expiry") rows.run.lease.expiresAt = 1;
+  if (fault === "replacement") { rows.wo.currentExecutionRunId = "replacement"; rows.wo.currentRevisionNumber = 2; }
+  if (fault === "revokedProfile") ctx.profileEligible = false;
+  if (fault === "cancelled") rows.run.cancellationRequestedAt = 1;
+  if (fault === "completed") rows.run.status = "COMPLETED";
+  if (fault === "worker") rows.host.workerRuntime.generation = 2;
+  if (fault === "retiredPrice") { vi.useFakeTimers(); vi.setSystemTime(Date.now() + 120_000); }
+  const usage = { requestId: args.requestId, requestDigest: args.requestDigest, provider: "fixture", model: "fixture",
+    providerRequestId: "provider-request", usageId: "usage", inputTokens: 5, outputTokens: 1, classification: "ACTUAL", expectedReceiptRevision: 0 };
+  await expect(handler(recordUsageInternal)(ctx, { ...args, usage })).resolves.toMatchObject({ duplicate: false });
+  await expect(handler(recordUsageInternal)(ctx, { ...args, usage })).resolves.toMatchObject({ duplicate: true });
+  expect(rows.reservation.snapshot.holds[0]).toMatchObject({ state: "SETTLED", accountedNanoUsd: 7, costClassification: "ESTIMATED" });
+  await expect(handler(reserveRequestInternal)(ctx, { ...args, requestId: "new" })).rejects.toThrow();
+});
+
+it.each(["Attempt", "lease", "generation", "request", "profile", "repository", "scope", "priceBytes", "priceDigest"])("rejects substituted historical %s settlement binding", async fault => {
+  const { ctx, rows, args } = fixture();
+  await handler(reserveRequestInternal)(ctx, args);
+  rows.run.status = "COMPLETED";
+  const usage = { requestId: args.requestId, requestDigest: args.requestDigest, provider: "fixture", model: "fixture",
+    providerRequestId: "provider-request", usageId: "usage", inputTokens: 5, outputTokens: 1, classification: "ACTUAL", expectedReceiptRevision: 0 };
+  if (fault === "Attempt") { rows.other = { ...rows.run, _id: "other" }; args.workflowRunId = "other"; }
+  if (fault === "lease") args.leaseId = "wrong";
+  if (fault === "generation") args.generation = 2;
+  if (fault === "request") usage.requestDigest = "sha256:" + "b".repeat(64);
+  if (fault === "profile") rows.run.executionProfileDigest = "sha256:" + "b".repeat(64);
+  if (fault === "repository") rows.run.repositoryId = "other";
+  if (fault === "scope") rows.reservation.snapshot.maximumNanoUsd++;
+  if (fault === "priceBytes") rows.price.snapshot.inputNanoUsdPerToken++;
+  if (fault === "priceDigest") rows.price.digest = "sha256:" + "b".repeat(64);
+  await expect(handler(recordUsageInternal)(ctx, { ...args, usage })).rejects.toThrow(/Historical usage|Usage Attempt/);
+  expect(rows.reservation.snapshot.holds[0].state).toBe("RESERVED");
+});
+
 it("records one hold through the actual mutation and rejects a second full-balance request", async () => {
   const { ctx, rows, args } = fixture();
   await handler(reserveRequestInternal)(ctx, args);
@@ -281,6 +319,7 @@ it.each([
     const query = { withIndex: (_: string, builder: any) => { const index = { eq: (field: string, value: any) => { matches.push([field, value]); return index; } }; builder(index); return query; }, first: async () => values()[0] ?? null, unique: async () => values()[0] ?? null, collect: async () => values() };
     return query;
   };
+  f.rows.reservation.creationDigest = liabilityDigest(f.rows.reservation.snapshot);
   return f;
 }
 it("binds Bedrock request admission evidence through actual handler", async () => {
@@ -390,6 +429,21 @@ it.each(["by_provider_usage", "by_provider_request"])(
 
 const accountingRows = (f: ReturnType<typeof bedrockHandlerFixture>, table: string): any[] => Object.values(f.rows).filter((row: any) => row._table === table);
 const bedrockUsage = (f: ReturnType<typeof bedrockHandlerFixture>, classification = "ACTUAL") => ({ requestId: f.args.requestId, requestDigest: hash, provider: f.price.provider, model: f.price.model, providerRequestId: classification === "ACTUAL" ? "provider-request-1" : "", usageId: classification === "ACTUAL" ? "usage-1" : "", inputTokens: classification === "ACTUAL" ? 1 : 0, outputTokens: classification === "ACTUAL" ? 1 : 0, classification, expectedReceiptRevision: 0 });
+it.each(["provider", "model"])("retains corrected %s drift as UNKNOWN money and preserves the original receipt", async field => {
+  const f = bedrockHandlerFixture();
+  allowFixtureOperator(f);
+  await handler(reserveRequestInternal)(f.ctx, f.args);
+  await handler(recordUsageInternal)(f.ctx, { ...f.args, usage: bedrockUsage(f, "UNKNOWN") });
+  const original = structuredClone(accountingRows(f, "inferencePhysicalReceipts")[0]);
+  await handler(reconcileUsage)(f.ctx, { reservationId: "reservation", evidenceReference: "fixture://correction",
+    usage: { ...bedrockUsage(f), expectedReceiptRevision: 1, [field]: "different" } });
+  const [event] = accountingRows(f, "inferenceReconciliations");
+  expect(event.observedCostMicrousd).toBeUndefined(); expect(event.completeness).toBe("UNKNOWN");
+  expect(event.observedUsage).toEqual({ inputTokens: 1, outputTokens: 1 });
+  expect(accountingRows(f, "inferencePhysicalReceipts")[0]).toEqual(original);
+  expect(f.rows.reservation.snapshot.frozen).toBe(true);
+  expect(f.rows.wo.inferenceSpendingFence).toBeDefined();
+});
 it("atomically composes a canonical reservation and claimed physical intent before Bedrock reserve proof", async () => {
   const f = bedrockHandlerFixture();
   await handler(reserveRequestInternal)(f.ctx, f.args);
@@ -501,8 +555,11 @@ it.each([{ inputTokens: 11, outputTokens: 1 }, { inputTokens: 1, outputTokens: 1
   expect(f.rows.reservation.snapshot.frozen).toBe(true);
   expect(f.rows.reservation.snapshot.holds[0].state).toBe("OVERRUN");
   const [receipt] = accountingRows(f, "inferencePhysicalReceipts");
-  expect(receipt).toMatchObject({ delivery: "DELIVERED", status: "FAILED", failureCode: "PROVIDER_USAGE_OVERRUN", usage: {}, costCompleteness: "UNKNOWN" });
-  expect(accountingRows(f, "inferenceReconciliations")[0]).toMatchObject({ receiptId: receipt._id, observedUsage: observed });
+  expect(receipt).toMatchObject({ delivery: "DELIVERED", status: "FAILED", failureCode: "PROVIDER_USAGE_OVERRUN", usage: observed, costClassification: "ESTIMATED" });
+  expect(receipt.immutableSnapshot.schema).toBe("inference-physical-receipt/v3");
+  expect(receipt.violationCodes.length).toBeGreaterThan(0);
+  expect(accountingRows(f, "inferenceReconciliations")).toHaveLength(0);
+  expect(f.rows.wo.inferenceSpendingFence.receiptId).toBe(receipt._id);
   expect(accountingRows(f, "inferenceReservations")[0].maxOutputTokens).toBe(10);
   await expect(handler(reserveRequestInternal)(f.ctx, { ...f.args, requestId: "next" })).rejects.toThrow();
 });
@@ -542,6 +599,7 @@ it("retains cumulative canonical allocation after settled paired requests withou
   const f = bedrockHandlerFixture();
   f.rows.reservation.snapshot.maximumNanoUsd = 90;
   f.rows.reservation.snapshot.maximumRequests = 3;
+  f.rows.reservation.creationDigest = liabilityDigest(f.rows.reservation.snapshot);
   f.rows.wo.metadata.implementationPolicy.maxCostUsd = 0.000004;
   for (let ordinal = 1; ordinal <= 2; ordinal++) {
     f.args.requestId = `request-${ordinal}`;
@@ -560,6 +618,7 @@ it("retains cumulative canonical allocation after settled paired requests withou
 it("rejects immutable allocation drift before composing the next physical request", async () => {
   const f = bedrockHandlerFixture();
   f.rows.reservation.snapshot.maximumNanoUsd = 60;
+  f.rows.reservation.creationDigest = liabilityDigest(f.rows.reservation.snapshot);
   await handler(reserveRequestInternal)(f.ctx, f.args);
   await handler(recordUsageInternal)(f.ctx, { ...f.args, usage: bedrockUsage(f) });
   accountingRows(f, "inferenceReservations")[0].immutableSnapshot.maxCostMicrousd = 0;

@@ -198,17 +198,25 @@ describe("authoritative provider liability transitions", () => {
       reserveProviderRequest(request(result.reservation, "two")),
     ).toThrow();
   });
-  it("rejects request ID mismatch, wrong model and receipt revision races", () => {
+  it("rejects request ID mismatch and receipt revision races", () => {
     const held = reserveProviderRequest(request()).reservation;
     for (const mutation of [
       { requestDigest: sha("e") },
       { requestId: "other" },
-      { model: "other" },
       { expectedReceiptRevision: 2 },
     ])
       expect(() =>
         settleProviderUsage(held, price, { ...usage, ...mutation }),
       ).toThrow();
+  });
+  it.each(["provider", "model", "overflow"])("retains %s observations with UNKNOWN money and freezes spending", fault => {
+    const held = reserveProviderRequest(request()).reservation;
+    const result = settleProviderUsage(held, price, { ...usage,
+      ...(fault === "provider" ? { provider: "other" } : fault === "model" ? { model: "other" }
+        : { inputTokens: Number.MAX_SAFE_INTEGER, outputTokens: Number.MAX_SAFE_INTEGER }) });
+    expect(result.incident).toBe(true); expect(result.reservation.frozen).toBe(true);
+    expect(result.reservation.holds[0]).toMatchObject({ state: "OVERRUN", costClassification: "UNKNOWN", classification: "ACTUAL" });
+    expect(result.reservation.holds[0].accountedNanoUsd).toBeUndefined();
   });
   it("does not admit request replay", () => {
     const r = reserveProviderRequest(request()).reservation;

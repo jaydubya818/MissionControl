@@ -43,6 +43,35 @@ export interface BedrockBridgeAuthority {
   settle(payload: Record<string, unknown>): Promise<unknown>;
 }
 
+export type BedrockSettlementPayload = Readonly<{
+  reservationId: string;
+  workflowRunId: string;
+  leaseId: string;
+  generation: number;
+  usage: Readonly<ProviderUsage & { classification: "ACTUAL" }>;
+}>;
+
+/** Known accounting evidence for reconciliation, held in memory only.
+ * This contains no prompt/output content and is not a durable outbox. */
+export class BedrockSettlementError extends Error {
+  readonly code = "BEDROCK_SETTLEMENT_NOT_ACCEPTED";
+  readonly projectId: string;
+  readonly repositoryId: string;
+  readonly settlementPayload: BedrockSettlementPayload;
+
+  constructor(
+    scope: Pick<BedrockBridgeBinding, "projectId" | "repositoryId">,
+    payload: BedrockSettlementPayload,
+    cause: unknown,
+  ) {
+    super("BEDROCK_SETTLEMENT_NOT_ACCEPTED", { cause });
+    this.name = "BedrockSettlementError";
+    this.projectId = scope.projectId;
+    this.repositoryId = scope.repositoryId;
+    this.settlementPayload = Object.freeze({ ...payload, usage: Object.freeze({ ...payload.usage }) });
+  }
+}
+
 /** Uses the existing authenticated command path; neither authority nor secrets
  * cross Docker attach. No alternate balance or cached admission exists here. */
 export function canonicalBedrockBridgeAuthority(
@@ -173,7 +202,7 @@ export class BedrockInferenceBridge {
     this.active = true;
     this.requests.add(requestId);
     let admitted = false;
-    let settled = false;
+    let observedSettlement: BedrockSettlementPayload | undefined;
     const startedAt = this.now();
     try {
       // Failure/ambiguous reply here permits no send, but never permits replay.
@@ -202,7 +231,7 @@ export class BedrockInferenceBridge {
         signal,
         timeoutMs: Math.min(b.timeoutMs, proof.validUntil - this.now()),
       });
-      const usage: ProviderUsage = {
+      const usage = {
         requestId,
         requestDigest,
         provider: b.identity.provider,
@@ -221,14 +250,18 @@ export class BedrockInferenceBridge {
         outputTokens: result.usage.outputTokens,
         classification: "ACTUAL",
         expectedReceiptRevision: 0,
-      };
-      const receipt = (await this.authority.settle({ ...subject, usage })) as {
-        incident?: boolean;
-        duplicate?: boolean;
-      };
-      if (!receipt || receipt.incident || receipt.duplicate)
-        throw new Error("BEDROCK_SETTLEMENT_NOT_ACCEPTED");
-      settled = true;
+      } satisfies ProviderUsage;
+      observedSettlement = { ...subject, usage };
+      try {
+        const receipt = (await this.authority.settle(structuredClone(observedSettlement))) as {
+          incident?: boolean;
+          duplicate?: boolean;
+        } | null | undefined;
+        if (!receipt || receipt.incident !== false || receipt.duplicate !== false)
+          throw new Error("BEDROCK_SETTLEMENT_NOT_ACCEPTED");
+      } catch (error) {
+        throw new BedrockSettlementError(b, observedSettlement, error);
+      }
       return {
         ...result,
         evidence: {
@@ -247,7 +280,7 @@ export class BedrockInferenceBridge {
       };
     } catch (error) {
       this.blocked = true;
-      if (admitted && !settled) {
+      if (admitted && !observedSettlement) {
         // If the lease expired or settlement reply was lost, this may fail. The
         // canonical RESERVED/UNKNOWN maximum still remains held, including crash.
         await this.authority

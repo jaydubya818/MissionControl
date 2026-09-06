@@ -15,6 +15,8 @@ import {
   summarizeRouteEconomics,
   assertClassifyInferenceRoute,
   assertClassifyInferenceDispatchAllowance,
+  usageCompleteness,
+  OUTCOME_FORMULA_VERSION,
 } from "@mission-control/shared";
 import { canonicalDigest } from "@mission-control/shared";
 import type { InferenceReservation, PhysicalInferenceIntent, PhysicalInferenceReceipt,
@@ -103,13 +105,88 @@ function intentValue(intent: Doc<"inferencePhysicalIntents">, reservation: Doc<"
 }
 
 function receiptValue(receipt: Doc<"inferencePhysicalReceipts">) {
+  const schema = recordValue(receipt.immutableSnapshot).schema;
+  if (schema !== "inference-physical-receipt/v2" && schema !== "inference-physical-receipt/v3") {
+    throw new Error("Canonical inference receipt snapshot schema is unsupported.");
+  }
   const snapshot = canonicalSnapshot<PhysicalInferenceReceipt>(receipt.immutableSnapshot,
-    "inference-physical-receipt/v2", "receiptDigest", receipt.receiptDigest);
+    schema, "receiptDigest", receipt.receiptDigest);
   if (snapshot.attemptId !== String(receipt.workflowRunId) || snapshot.reservationDigest !== receipt.reservationDigest
     || snapshot.logicalRequestKey !== receipt.logicalRequestKey || snapshot.physicalOrdinal !== receipt.physicalOrdinal) {
     throw new Error("Canonical receipt identity does not match its persisted scope.");
   }
+  if (usageCompleteness(snapshot.usage) !== snapshot.usageCompleteness
+    || (snapshot.costMicrousd !== undefined && (!Number.isSafeInteger(snapshot.costMicrousd) || snapshot.costMicrousd < 0))
+    || (schema === "inference-physical-receipt/v3" && (!Array.isArray(snapshot.violationCodes)
+      || snapshot.violationCodes.some(code => typeof code !== "string")
+      || snapshot.costClassification !== (snapshot.costMicrousd === undefined ? "UNKNOWN" : "ESTIMATED")))) {
+    throw new Error("Canonical receipt observation fields are invalid.");
+  }
   return snapshot;
+}
+
+export function assertInferenceSpendingAllowed(workOrder: { inferenceSpendingFence?: unknown } | null) {
+  if (!workOrder) throw new Error("Inference WorkOrder is unavailable.");
+  if (workOrder.inferenceSpendingFence) throw new Error("WORK_ORDER_INFERENCE_SPENDING_FENCED");
+}
+
+/** Monotonic incident fence. Observations and corrections never release capacity. */
+export async function fenceWorkOrderInferenceSpending(ctx: MutationCtx, workOrderId: Id<"workOrders">,
+  sourceDigest: string, violationCodes: string[], receiptId?: Id<"inferencePhysicalReceipts">) {
+  const workOrder = await ctx.db.get(workOrderId);
+  if (!workOrder) throw new Error("Inference WorkOrder is unavailable.");
+  if (!workOrder.inferenceSpendingFence) await ctx.db.patch(workOrderId, {
+    inferenceSpendingFence: { fencedAt: Date.now(), sourceDigest, violationCodes, ...(receiptId ? { receiptId } : {}) },
+  });
+}
+
+function reconciliationValue(event: Doc<"inferenceReconciliations">, receipt: Doc<"inferencePhysicalReceipts">) {
+  const bytes = { schema: "inference-reconciliation/v1", receiptId: String(receipt._id),
+    providerEventId: event.providerEventId, providerRequestId: event.providerRequestId,
+    providerBillingId: event.providerBillingId, observedUsage: event.observedUsage,
+    observedCostMicrousd: event.observedCostMicrousd, completeness: event.completeness, sourceDigest: event.sourceDigest };
+  if (event.receiptId !== receipt._id || event.workflowRunId !== receipt.workflowRunId || event.projectId !== receipt.projectId
+    || canonicalDigest("inference-reconciliation/v1", bytes) !== event.reconciliationDigest) {
+    throw new Error("Canonical reconciliation history is invalid.");
+  }
+  if (event.observedUsage) usageCompleteness(event.observedUsage);
+  if (event.observedCostMicrousd !== undefined && (!Number.isSafeInteger(event.observedCostMicrousd) || event.observedCostMicrousd < 0)) {
+    throw new Error("Canonical reconciliation cost is invalid.");
+  }
+  return event;
+}
+
+async function effectiveReservationObservations(ctx: MutationCtx, reservationRow: Doc<"inferenceReservations">,
+  correction?: { receiptId: Id<"inferencePhysicalReceipts">; observedUsage?: PhysicalInferenceReceipt["usage"];
+    observedCostMicrousd?: number; completeness: "COMPLETE" | "PARTIAL" | "UNKNOWN" }) {
+  const reservation = reservationValue(reservationRow);
+  const receipts = await ctx.db.query("inferencePhysicalReceipts")
+    .withIndex("by_reservation", q => q.eq("reservationId", reservationRow._id)).collect();
+  return Promise.all(receipts.map(async row => {
+    const canonical = receiptValue(row);
+    if (canonical.reservationId !== reservation.reservationId || canonical.reservationDigest !== reservation.digest) {
+      throw new Error("Reconciliation receipt reservation scope is invalid.");
+    }
+    const usage = { ...canonical.usage };
+    let costMicrousd = canonical.costMicrousd;
+    const events = await ctx.db.query("inferenceReconciliations")
+      .withIndex("by_receipt", q => q.eq("receiptId", row._id)).collect();
+    // Arrival order is accounting history, not an asserted provider revision.
+    for (const event of events.sort((a, b) => a.reconciledAt - b.reconciledAt)) {
+      reconciliationValue(event, row);
+      if (event.observedUsage) Object.assign(usage, event.observedUsage);
+      if (event.observedCostMicrousd !== undefined || event.completeness === "UNKNOWN") costMicrousd = event.observedCostMicrousd;
+    }
+    if (row._id === correction?.receiptId) {
+      if (correction.observedUsage) Object.assign(usage, correction.observedUsage);
+      if (correction.observedCostMicrousd !== undefined || correction.completeness === "UNKNOWN") costMicrousd = correction.observedCostMicrousd;
+    }
+    usageCompleteness(usage);
+    if (costMicrousd !== undefined && (!Number.isSafeInteger(costMicrousd) || costMicrousd < 0)) {
+      throw new Error("Canonical reconciliation cost is invalid.");
+    }
+    return { reservationId: canonical.reservationId, reservationDigest: canonical.reservationDigest, usage, costMicrousd };
+  }));
 }
 
 function requireDigest(value: string, label: string) {
@@ -243,6 +320,7 @@ export const createReservation = mutation({
       ctx.db.get(args.executionProfileId), ctx.db.get(args.priceBookId),
       ctx.db.query("modelCatalog").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).collect(),
     ]);
+    assertInferenceSpendingAllowed(workOrder);
     if (!workOrder || workOrder.projectId !== args.projectId || workOrder.approvalStatus !== "APPROVED"
       || run?.workOrderRevisionNumber !== workOrder.currentRevisionNumber || task?.projectId !== args.projectId
       || task._id !== run?.parentTaskId || run.projectId !== args.projectId || run.workOrderId !== args.workOrderId
@@ -342,6 +420,7 @@ export async function persistIntentInTransaction(ctx: MutationCtx, args: Infer<t
     if (!reservation || reservation.workflowRunId !== args.workflowRunId || reservation.state !== "ACTIVE") {
       throw new Error("Inference reservation is unavailable, unscoped, or inactive.");
     }
+    assertInferenceSpendingAllowed(await ctx.db.get(reservation.workOrderId));
     const logicalRequestKey = bounded(args.logicalRequestKey, 500, "Logical request key");
     if (reservation.logicalRequestKey !== logicalRequestKey) throw new Error("Inference reservation logical request scope is substituted.");
     const reservationSnapshot = reservationValue(reservation);
@@ -534,6 +613,7 @@ export async function claimIntentInTransaction(ctx: MutationCtx, args: Infer<typ
     if (!reservation || !run || reservation.workflowRunId !== args.workflowRunId || run._id !== args.workflowRunId) {
       throw new Error("Inference claim Attempt scope is unavailable or substituted.");
     }
+    assertInferenceSpendingAllowed(await ctx.db.get(reservation.workOrderId));
     if ((args.cancelRequested || run.cancellationRequestedAt)
       && reservation.leaseId === args.leaseId && run.lease?.leaseId === args.leaseId) {
       await ctx.db.patch(intent._id, { state: "CANCELLED" });
@@ -638,41 +718,31 @@ export async function appendReceiptInTransaction(ctx: MutationCtx, args: Infer<t
       throw new Error("Receipt requires the exact committed physical claim.");
     }
     const reservationSnapshot = reservationValue(reservation);
+    const priceSnapshot = canonicalSnapshot<InferencePriceBook>(priceBook.immutableSnapshot,
+      "inference-price-book/v1", "digest", reservationSnapshot.priceBookDigest);
+    if (priceBook.projectId !== reservation.projectId || priceBook.priceBookDigest !== reservationSnapshot.priceBookDigest) {
+      throw new Error("Inference receipt frozen price identity changed.");
+    }
     // Reconstruct the committed transition without changing the original snapshot.
     // Its historical claim time admits late observations after the lease expires.
     const claimedIntent = claimPhysicalInferenceIntent(intentValue(intent, reservation), reservationSnapshot, {
       claimId: intent.claimId, leaseId: reservationSnapshot.leaseId, now: intent.claimedAt, cancelled: false,
     });
     const receiptKey = canonicalDigest("inference-receipt-id/v1", { intentId: String(intent._id), completedAt: args.completedAt });
+    const priorReceipts = await effectiveReservationObservations(ctx, reservation);
     const snapshot = physicalInferenceReceipt({
-      receiptId: receiptKey, intent: claimedIntent, reservation: reservationSnapshot, priceBook: priceBook.immutableSnapshot,
+      receiptId: receiptKey, intent: claimedIntent, reservation: reservationSnapshot, priceBook: priceSnapshot,
+      priorReceipts,
       resolvedProvider, resolvedModelId, providerRequestId, providerBillingId,
       delivery: args.delivery, status: args.status, usage: args.usage,
       responseDigest, failureCode,
       startedAt: args.startedAt, completedAt: args.completedAt, batch: args.batch, serviceTier: args.serviceTier,
     });
     if (providerRequestId) {
-      await assertCanonicalProviderRequestOwnership(ctx, reservation.projectId, intent.route.provider, providerRequestId);
+      await assertCanonicalProviderRequestOwnership(ctx, reservation.projectId, resolvedProvider ?? intent.route.provider, providerRequestId);
       const duplicateProviderRequest = await ctx.db.query("inferencePhysicalReceipts")
         .withIndex("by_provider_request", (q) => q.eq("projectId", reservation.projectId).eq("providerRequestId", providerRequestId)).first();
       if (duplicateProviderRequest) throw new Error("Provider response/request ID replay detected.");
-    }
-    const priorReceipts = await ctx.db.query("inferencePhysicalReceipts")
-      .withIndex("by_reservation", (q) => q.eq("reservationId", reservation._id)).collect();
-    for (const [key, ceiling] of [
-      ["inputTokens", reservation.maxInputTokens], ["outputTokens", reservation.maxOutputTokens],
-      ["cacheReadTokens", reservation.maxCacheReadTokens], ["cacheWriteTokens", reservation.maxCacheWriteTokens],
-      ["reasoningTokens", reservation.maxReasoningTokens],
-    ] as const) {
-      const consumed = priorReceipts.reduce((sum, receipt) => sum + BigInt(receipt.usage[key] ?? 0), 0n);
-      if (args.usage[key] !== undefined && consumed + BigInt(args.usage[key]!) > BigInt(ceiling)) {
-        throw new Error(`RESERVATION_${key.replace("Tokens", "").replace(/([A-Z])/g, "_$1").toUpperCase()}_TOKEN_LIMIT_EXCEEDED`);
-      }
-    }
-    const knownPrior = priorReceipts.reduce((sum, receipt) => sum + BigInt(receipt.costMicrousd ?? 0), 0n);
-    if (snapshot.costMicrousd !== undefined
-      && knownPrior + BigInt(snapshot.costMicrousd) > BigInt(reservation.maxCostMicrousd)) {
-      throw new Error("RESERVATION_COST_LIMIT_EXCEEDED");
     }
     const id = await ctx.db.insert("inferencePhysicalReceipts", {
       tenantId: reservation.tenantId, projectId: reservation.projectId, workflowRunId: reservation.workflowRunId,
@@ -683,10 +753,13 @@ export async function appendReceiptInTransaction(ctx: MutationCtx, args: Infer<t
       resolvedModelId, providerRequestId, providerBillingId, delivery: args.delivery, status: args.status,
       usage: args.usage, usageCompleteness: snapshot.usageCompleteness,
       costMicrousd: snapshot.costMicrousd, costCompleteness: snapshot.costCompleteness,
+      costClassification: snapshot.costClassification, violationCodes: snapshot.violationCodes,
       priceBookId: priceBook._id, priceBookDigest: priceBook.priceBookDigest,
       responseDigest, failureCode, startedAt: args.startedAt,
       completedAt: args.completedAt, receiptDigest: snapshot.receiptDigest, immutableSnapshot: snapshot,
     });
+    if (snapshot.violationCodes?.length) await fenceWorkOrderInferenceSpending(ctx, reservation.workOrderId,
+      snapshot.receiptDigest, snapshot.violationCodes, id);
     await ctx.db.patch(intent._id, { state: args.delivery === "UNKNOWN" ? "AMBIGUOUS" : "RECEIPTED" });
     if (intent.physicalOrdinal >= reservation.maxPhysicalCalls) await ctx.db.patch(reservation._id, { state: "EXHAUSTED" });
     return { receiptId: id, receiptDigest: snapshot.receiptDigest, created: true as const };
@@ -720,6 +793,7 @@ export async function appendReconciliationInTransaction(ctx: MutationCtx, args: 
     if (args.observedCostMicrousd !== undefined && (!Number.isSafeInteger(args.observedCostMicrousd) || args.observedCostMicrousd < 0)) {
       throw new Error("Reconciliation cost is invalid.");
     }
+    if (args.observedUsage !== undefined) usageCompleteness(args.observedUsage);
     const existing = await ctx.db.query("inferenceReconciliations")
       .withIndex("by_provider_event", (q) => q.eq("projectId", receipt.projectId).eq("providerEventId", providerEventId)).first();
     const snapshot = {
@@ -733,6 +807,23 @@ export async function appendReconciliationInTransaction(ctx: MutationCtx, args: 
       if (existing.reconciliationDigest !== reconciliationDigest) throw new Error("Provider billing event replay conflicts with immutable history.");
       return { reconciliationId: existing._id, created: false as const };
     }
+    const reservationRow = await ctx.db.get(receipt.reservationId);
+    if (!reservationRow) throw new Error("Reconciliation reservation is unavailable.");
+    const reservation = reservationValue(reservationRow);
+    const effective = await effectiveReservationObservations(ctx, reservationRow, args);
+    const violationCodes: string[] = [];
+    for (const [key, maximum, code] of [
+      ["inputTokens", reservation.maxInputTokens, "INPUT"], ["outputTokens", reservation.maxOutputTokens, "OUTPUT"],
+      ["cacheReadTokens", reservation.maxCacheReadTokens, "CACHE_READ"], ["cacheWriteTokens", reservation.maxCacheWriteTokens, "CACHE_WRITE"],
+      ["reasoningTokens", reservation.maxReasoningTokens, "REASONING"],
+    ] as const) {
+      if (effective.reduce((sum, entry) => sum + BigInt(entry.usage[key] ?? 0), 0n) > BigInt(maximum)) {
+        violationCodes.push(`RESERVATION_${code}_TOKEN_LIMIT_EXCEEDED`);
+      }
+    }
+    if (effective.reduce((sum, entry) => sum + BigInt(entry.costMicrousd ?? 0), 0n) > BigInt(reservation.maxCostMicrousd)) {
+      violationCodes.push("RESERVATION_COST_LIMIT_EXCEEDED");
+    }
     const id = await ctx.db.insert("inferenceReconciliations", {
       tenantId: receipt.tenantId, projectId: receipt.projectId, workflowRunId: receipt.workflowRunId,
       receiptId: receipt._id,
@@ -741,6 +832,8 @@ export async function appendReconciliationInTransaction(ctx: MutationCtx, args: 
       completeness: args.completeness, sourceDigest: args.sourceDigest, reconciliationDigest,
       reconciledBy, reconciledAt: Date.now(),
     });
+    if (violationCodes.length) await fenceWorkOrderInferenceSpending(ctx, reservationRow.workOrderId,
+      reconciliationDigest, violationCodes, receipt._id);
     return { reconciliationId: id, created: true as const };
 }
 
@@ -836,6 +929,7 @@ export const createOutcomeProjection = mutation({
     ]);
     const projectedAt = Date.now();
     const receiptSnapshots = new Map(receipts.map((receipt) => [receipt._id, receiptValue(receipt)]));
+    const receiptRows = new Map(receipts.map(receipt => [receipt._id, receipt]));
     const projection = projectFactoryOutcome({
       projectionId: `${run._id}:v${prior.length + 1}`, cohortDigest: requireDigest(args.cohortDigest, "Outcome cohort digest"),
       projectId: String(run.projectId), workOrderId: String(run.workOrderId), attemptId: String(run._id),
@@ -853,7 +947,9 @@ export const createOutcomeProjection = mutation({
       receipts: [...receiptSnapshots.values()],
       reconciliations: reconciliations.map((reconciliation) => {
         const receipt = receiptSnapshots.get(reconciliation.receiptId);
-        if (!receipt) throw new Error("Outcome reconciliation references an unavailable receipt.");
+        const receiptRow = receiptRows.get(reconciliation.receiptId);
+        if (!receipt || !receiptRow) throw new Error("Outcome reconciliation references an unavailable receipt.");
+        reconciliationValue(reconciliation, receiptRow);
         return {
           reconciliationId: String(reconciliation._id), receiptId: receipt.receiptId,
           observedCostMicrousd: reconciliation.observedCostMicrousd,
@@ -887,6 +983,10 @@ export const getAttemptEconomics = query({
     const run = await ctx.db.get(args.workflowRunId);
     if (!run?.projectId) throw new Error("Attempt is unavailable or unauthorized.");
     await requireWorkspacePermission(ctx, run.projectId, FACTORY_PERMISSIONS.VIEW);
+    const workOrder = run.workOrderId ? await ctx.db.get(run.workOrderId) : null;
+    if (run.workOrderId && (!workOrder || workOrder.projectId !== run.projectId)) {
+      throw new Error("Attempt economics WorkOrder scope is unavailable or substituted.");
+    }
     const [reservations, intents, receipts, reconciliations, outcomes, projections, comparisons] = await Promise.all([
       ctx.db.query("inferenceReservations").withIndex("by_attempt", (q) => q.eq("workflowRunId", run._id)).collect(),
       ctx.db.query("inferencePhysicalIntents").withIndex("by_attempt", (q) => q.eq("workflowRunId", run._id)).collect(),
@@ -900,6 +1000,7 @@ export const getAttemptEconomics = query({
     return {
       maturity: "EXPERIMENTAL_OFFLINE_QUALIFIED" as const,
       gatewayAdmissionEnabled: gatewayAdmissionEnabled(), reservations, intents, receipts, reconciliations, outcomes,
+      inferenceSpendingFence: workOrder?.inferenceSpendingFence ?? null,
       latestProjection: latest ?? null,
       latestComparison: comparisons.find((comparison) => receipts.some((receipt) =>
         receipt.route.routeDigest === comparison.leftRouteDigest || receipt.route.routeDigest === comparison.rightRouteDigest)) ?? null,
@@ -927,7 +1028,7 @@ export const freezeRouteComparison = mutation({
     const now = Date.now();
     const summaryInput = { cohortDigest: requireDigest(args.cohortDigest, "Comparison cohort digest"), minimumSampleSize: args.minimumSampleSize, now, maxAgeMs: args.maximumAgeMs };
     const inCohort = (row: Doc<"factoryOutcomeProjections">) => row.cohortDigest === summaryInput.cohortDigest
-      && row.formulaVersion === "accepted-outcome-economics/v1";
+      && row.formulaVersion === OUTCOME_FORMULA_VERSION;
     let left = summarizeRouteEconomics(leftProjections.filter(inCohort).map(projectionValue), { ...summaryInput, routeDigest: requireDigest(args.leftRouteDigest, "Left route digest") });
     let right = summarizeRouteEconomics(rightProjections.filter(inCohort).map(projectionValue), { ...summaryInput, routeDigest: requireDigest(args.rightRouteDigest, "Right route digest") });
     const routeQualified = (routeDigest: string) => catalog.some((route) => route.routeDigest === routeDigest
@@ -939,7 +1040,7 @@ export const freezeRouteComparison = mutation({
     const snapshot = {
       schema: "inference-route-comparison/v1", projectId: String(args.projectId),
       leftRouteDigest: args.leftRouteDigest, rightRouteDigest: args.rightRouteDigest,
-      cohortDigest: args.cohortDigest, formulaVersion: "accepted-outcome-economics/v1" as const,
+      cohortDigest: args.cohortDigest, formulaVersion: OUTCOME_FORMULA_VERSION,
       minimumSampleSize: args.minimumSampleSize, maximumAgeMs: args.maximumAgeMs,
       leftSummary: left, rightSummary: right, status: comparison.status,
       advisoryWinnerRouteDigest: comparison.status === "ADVISORY_ONLY" ? comparison.winner : undefined,
@@ -949,7 +1050,7 @@ export const freezeRouteComparison = mutation({
     const id = await ctx.db.insert("inferenceRouteComparisons", {
       tenantId: access.project.tenantId, projectId: args.projectId,
       leftRouteDigest: args.leftRouteDigest, rightRouteDigest: args.rightRouteDigest,
-      cohortDigest: args.cohortDigest, formulaVersion: "accepted-outcome-economics/v1",
+      cohortDigest: args.cohortDigest, formulaVersion: OUTCOME_FORMULA_VERSION,
       minimumSampleSize: args.minimumSampleSize, maximumAgeMs: args.maximumAgeMs,
       leftSummary: left, rightSummary: right, status: comparison.status,
       advisoryWinnerRouteDigest: comparison.status === "ADVISORY_ONLY" ? comparison.winner : undefined,

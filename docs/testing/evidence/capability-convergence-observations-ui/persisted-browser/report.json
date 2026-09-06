@@ -1,0 +1,110 @@
+{
+  "scope": "Actual local gateway query and persisted inference/provider records; synthetic qualification inputs and fixture-project permission shim; no provider or production authority",
+  "status": "PASS",
+  "checks": [
+    {
+      "name": "aggregate-cost-unknown",
+      "width": 1440,
+      "theme": "light",
+      "overflow": false,
+      "violations": [],
+      "keyboardFocus": true,
+      "keyboardScroll": false,
+      "result": "PASS"
+    },
+    {
+      "name": "aggregate-cost-unknown",
+      "width": 1440,
+      "theme": "dark",
+      "overflow": false,
+      "violations": [],
+      "keyboardFocus": true,
+      "keyboardScroll": false,
+      "result": "PASS"
+    },
+    {
+      "name": "aggregate-cost-unknown",
+      "width": 390,
+      "theme": "light",
+      "overflow": false,
+      "violations": [],
+      "keyboardFocus": true,
+      "keyboardScroll": true,
+      "result": "PASS"
+    },
+    {
+      "name": "aggregate-cost-unknown",
+      "width": 390,
+      "theme": "dark",
+      "overflow": false,
+      "violations": [],
+      "keyboardFocus": true,
+      "keyboardScroll": true,
+      "result": "PASS"
+    },
+    {
+      "name": "spending-fence-with-older-projection",
+      "width": 1440,
+      "theme": "light",
+      "overflow": false,
+      "violations": [],
+      "keyboardFocus": true,
+      "keyboardScroll": false,
+      "result": "PASS"
+    },
+    {
+      "name": "spending-fence-with-older-projection",
+      "width": 1440,
+      "theme": "dark",
+      "overflow": false,
+      "violations": [],
+      "keyboardFocus": true,
+      "keyboardScroll": false,
+      "result": "PASS"
+    },
+    {
+      "name": "spending-fence-with-older-projection",
+      "width": 390,
+      "theme": "light",
+      "overflow": false,
+      "violations": [],
+      "keyboardFocus": true,
+      "keyboardScroll": true,
+      "result": "PASS"
+    },
+    {
+      "name": "spending-fence-with-older-projection",
+      "width": 390,
+      "theme": "dark",
+      "overflow": false,
+      "violations": [],
+      "keyboardFocus": true,
+      "keyboardScroll": true,
+      "result": "PASS"
+    }
+  ],
+  "snapshots": [
+    {
+      "name": "aggregate-cost-unknown",
+      "workflowRunId": "ms715y1ctnfxr1ck35k0xd20a98dxmyy",
+      "querySha256": "907bf4348cf5e0c37ed9fba72c355c1f6fea272690bd9431256458357b9311c7",
+      "expected": {
+        "spendingStopped": true,
+        "unknownAggregate": true,
+        "historicalProjection": false
+      }
+    },
+    {
+      "name": "spending-fence-with-older-projection",
+      "workflowRunId": "ms7c11zzqfavkwent80t8vcp8s8dwdt2",
+      "querySha256": "108bdb4c139eba606c1964e92dad8faed3fc8509979901cfd3a22237735d908d",
+      "expected": {
+        "spendingStopped": true,
+        "unknownAggregate": false,
+        "historicalProjection": true
+      }
+    }
+  ],
+  "errors": [],
+  "sourceSha256": "43fd1fb80e80422f91a1bcb00916bdd92316c605edbfa7a8e9f355d4a98e512e"
+}

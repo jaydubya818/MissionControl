@@ -340,7 +340,8 @@ export async function settleBedrockAccounting(
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
     };
-    const cost = calculateInferenceCost({
+    const cost = usage.provider !== reservation.primaryRoute.provider || usage.model !== reservation.primaryRoute.modelId
+      ? { completeness: "UNKNOWN" as const, costMicrousd: undefined } : calculateInferenceCost({
       usage: observedUsage,
       routeDigest: reservation.primaryRoute.routeDigest,
       priceBook: book.immutableSnapshot,
@@ -369,7 +370,7 @@ export async function settleBedrockAccounting(
     return;
   }
   if (receipt) throw new Error("BEDROCK_ACCOUNTING_RECEIPT_ALREADY_EXISTS");
-  const appended = await appendReceiptInTransaction(ctx, {
+  await appendReceiptInTransaction(ctx, {
     workflowRunId: reservation.workflowRunId,
     intentId: intent._id,
     ...(usage.classification === "ACTUAL"
@@ -388,40 +389,10 @@ export async function settleBedrockAccounting(
         : "UNKNOWN",
     ...(overrun ? { failureCode: "PROVIDER_USAGE_OVERRUN" } : {}),
     usage:
-      usage.classification === "ACTUAL" && !overrun
+      usage.classification === "ACTUAL"
         ? { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens }
         : {},
     startedAt: intent.claimedAt,
     completedAt: Date.now(),
   });
-  if (overrun && usage.classification === "ACTUAL") {
-    const book = await ctx.db.get(reservation.priceBookId);
-    if (!book) throw new Error("BEDROCK_ACCOUNTING_PRICE_BOOK_MISSING");
-    const observedUsage = {
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-    };
-    const cost = calculateInferenceCost({
-      usage: observedUsage,
-      routeDigest: reservation.primaryRoute.routeDigest,
-      priceBook: book.immutableSnapshot,
-    });
-    await appendReconciliationInTransaction(ctx, {
-      workflowRunId: reservation.workflowRunId,
-      receiptId: appended.receiptId,
-      providerEventId: canonicalDigest("bedrock-provider-event/v1", {
-        usageId: usage.usageId,
-        receiptRevision: usage.expectedReceiptRevision + 1,
-      }),
-      providerRequestId: usage.providerRequestId,
-      observedUsage,
-      observedCostMicrousd: cost.costMicrousd,
-      completeness: cost.completeness,
-      sourceDigest: canonicalDigest("bedrock-provider-overrun/v1", {
-        usage,
-        reservationDigest: reservation.reservationDigest,
-      }),
-      reconciledBy: actor,
-    });
-  }
 }

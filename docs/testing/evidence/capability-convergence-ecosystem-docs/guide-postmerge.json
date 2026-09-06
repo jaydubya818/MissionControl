@@ -1,0 +1,30 @@
+{
+  "status": "PASS_WITH_INHERITED_RELEASE_EDITORIAL_FAILURES",
+  "head": "527650944da05be445dc1544f7b29325b875f856",
+  "checks": {
+    "lint": "PASS",
+    "localLinks": "PASS",
+    "vinextBuild": "PASS",
+    "nextBuild": "PASS",
+    "siteTests": 27,
+    "editorialOrientation": "PASS",
+    "changedDocumentsRendered": 5,
+    "sourceHashMatchesPR": true,
+    "productionGuard": "PASS"
+  },
+  "sourceSha256": {
+    "guide/02-design/08-economics-metrics-and-human-attention.md": "c8988adf8a9677b0215d77795ff987ed8fdb9a2fe8e771b8d6000488c1d7a288",
+    "guide/02-design/09-tokenomics-and-factory-economics.md": "d27b959336f352973688c8a7b5cbf14fe8482284480d0ed673cdc125f18f6576",
+    "guide/03-build/21-models-and-capability-selection.md": "08f2c1f39e7d8a8079e286cac1ccdbd19940839ba308cb3196442196fed86df0",
+    "guide/appendix/mission-control/01-implementation-maturity-and-evidence-map.md": "9c436b607fd5efa0e5f30544c4705e03c991667c469f4eadb3df2a793348844a",
+    "guide/appendix/mission-control/03-capability-workflow-and-admission-map.md": "50c2f29590438b04f4da8253d3e251297a9ca0db10c7ecd86345564c95b6e9bf"
+  },
+  "limits": [
+    "25 inherited strict release editorial failures remain",
+    "No Production release",
+    "No provider calls"
+  ],
+  "developmentFailures": [
+    "Rendered tests initially ran before a local build; corrected command order passed."
+  ]
+}

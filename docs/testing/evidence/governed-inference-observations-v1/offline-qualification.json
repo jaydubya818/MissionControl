@@ -1,0 +1,183 @@
+{
+  "schema": "governed-inference-phase5-offline-qualification/v1",
+  "status": "NO_GO",
+  "phaseDecision": "OFFLINE_GATE_GO_LIVE_COMPARISON_NO_GO",
+  "reason": "Only one exact route is selected for offline qualification; a second independently qualified route and live-spend authority are absent.",
+  "generatedAt": "2026-09-05T20:00:05.000Z",
+  "networkCalls": 0,
+  "syntheticCustomerData": false,
+  "runtimeContract": "v50",
+  "route": {
+    "provider": "openai",
+    "providerRoute": "openai-chat-completions",
+    "modelId": "gpt-4o-mini-2024-07-18",
+    "adapter": "mission-control-openai-chat-completions",
+    "adapterVersion": "1.0.0",
+    "endpoint": "https://api.openai.com/v1/chat/completions",
+    "routeDigest": "sha256:a02de12f9f149ee175c2722b97d26fe7abee3d57a4ee06a9fd9629b06fd48b6a"
+  },
+  "comparisonRoute": {
+    "provider": "fixture-provider",
+    "providerRoute": "offline-comparison-fixture",
+    "modelId": "fixture-model-v1",
+    "adapter": "mission-control-offline-fixture",
+    "adapterVersion": "1.0.0",
+    "endpoint": "https://example.invalid/v1/inference",
+    "routeDigest": "sha256:c41cdfec78b69d6ecd0b9f6288450787b3f8db9985cb5865ada24c5b92b6ced1",
+    "qualification": "NOT_INDEPENDENTLY_QUALIFIED"
+  },
+  "identities": {
+    "executionProfileDigest": "sha256:cdd5623ddb20b3e2317f421c3b743a90a4a8d7d3d0d27c59bec5251abfec6798",
+    "priceBookDigest": "sha256:16ceed5441df30a937833478d7ac7af10cefb9decea23fcd092b1894140a8b87",
+    "reservationDigest": "sha256:9160e86a3cb71780269fe2c0d6f74ea43de96acd682011d3c93c81ab91db9d35",
+    "policyDigest": "sha256:00996adf3522c3ccd96a1e7b9f559d4147fdcb878564cca8811f027e1426b8f0",
+    "logicalRequestKey": "phase5-offline-project:phase5-offline-attempt:classify:1",
+    "intentDigest": "sha256:9b3583e3de9b612d62c43a026ef186fcab053ec8e9c815fe0413ed22781f051b",
+    "receiptDigest": "sha256:346a90439de810dc38ae45ea78c338a75db2b1b6b84cfdfac2878d5a435a7dcd",
+    "projectionDigest": "sha256:6c376b20b74d11a0f1aa75d56012567b53183a787a123dfa12b4223aa7aef44f",
+    "lineageDigest": "sha256:8fed05fe8367f742c22828b711c94358ec0941e3b8c2ff7f72593eb79e9c2070",
+    "cohortDigest": "sha256:3ecea445af65f9f38e8c9c3f61f66702c2abf1349a0a3f9111c41248bfcde507"
+  },
+  "fixture": {
+    "providerApi": "OpenAI Chat Completions response-compatible offline fixture",
+    "adapterVersion": "1.0.0",
+    "physicalCalls": 1,
+    "maximumPhysicalCalls": 1,
+    "fallbackCount": 0,
+    "usageCompleteness": "COMPLETE",
+    "receiptSchema": "inference-physical-receipt/v3",
+    "costClassification": "ESTIMATED",
+    "violationCodes": [],
+    "costCompleteness": "COMPLETE",
+    "costMicrousd": 28
+  },
+  "outcome": {
+    "formulaVersion": "accepted-outcome-economics/v2",
+    "terminalOutcome": "ACCEPTED",
+    "stages": {
+      "VERIFICATION_PASSED": {
+        "eventId": "phase5-offline-verification",
+        "occurredAt": 1788638403000
+      },
+      "HUMAN_ACCEPTED": {
+        "eventId": "phase5-offline-acceptance",
+        "occurredAt": 1788638404000
+      }
+    },
+    "absentStages": [
+      "MERGED",
+      "DEPLOYED",
+      "PRODUCTION_VERIFIED",
+      "INCIDENT",
+      "ROLLED_BACK"
+    ],
+    "sampleSize": 1,
+    "acceptedCount": 1,
+    "coverage": 1,
+    "confidence": "HIGH",
+    "costPerAcceptedOutcomeMicrousd": 28
+  },
+  "comparison": {
+    "status": "NO_GO",
+    "blockers": [
+      "ROUTE_NOT_QUALIFIED_BY_ECONOMICS",
+      "ACCEPTED_OUTCOME_COST_UNKNOWN"
+    ],
+    "automaticPromotionAuthorized": false,
+    "left": {
+      "routeDigest": "sha256:a02de12f9f149ee175c2722b97d26fe7abee3d57a4ee06a9fd9629b06fd48b6a",
+      "formulaVersion": "accepted-outcome-economics/v2",
+      "cohortDigest": "sha256:3ecea445af65f9f38e8c9c3f61f66702c2abf1349a0a3f9111c41248bfcde507",
+      "sampleSize": 1,
+      "acceptedCount": 1,
+      "totalKnownCostMicrousd": 28,
+      "costPerAcceptedOutcomeMicrousd": 28,
+      "coverage": 1,
+      "confidence": "HIGH",
+      "eligibleForPromotion": true,
+      "blockers": []
+    },
+    "right": {
+      "routeDigest": "sha256:c41cdfec78b69d6ecd0b9f6288450787b3f8db9985cb5865ada24c5b92b6ced1",
+      "formulaVersion": "accepted-outcome-economics/v2",
+      "cohortDigest": "sha256:3ecea445af65f9f38e8c9c3f61f66702c2abf1349a0a3f9111c41248bfcde507",
+      "sampleSize": 0,
+      "acceptedCount": 0,
+      "totalKnownCostMicrousd": 0,
+      "coverage": 0,
+      "confidence": "NONE",
+      "eligibleForPromotion": false,
+      "blockers": [
+        "INSUFFICIENT_SAMPLE",
+        "NO_ACCEPTED_OUTCOMES"
+      ]
+    }
+  },
+  "classifiedControls": [
+    {
+      "name": "duplicate physical attempt",
+      "result": "PASS",
+      "expected": "DENIED"
+    },
+    {
+      "name": "stale lease",
+      "result": "PASS",
+      "expected": "DENIED"
+    },
+    {
+      "name": "unapproved route",
+      "result": "PASS",
+      "expected": "DENIED"
+    },
+    {
+      "name": "claim replay after ambiguity",
+      "result": "PASS",
+      "expected": "DENIED"
+    },
+    {
+      "name": "observed provider substitution",
+      "result": "PASS",
+      "expected": "OBSERVATION_RETAINED_WITH_VIOLATION"
+    },
+    {
+      "name": "observed model substitution",
+      "result": "PASS",
+      "expected": "OBSERVATION_RETAINED_WITH_VIOLATION"
+    },
+    {
+      "name": "ambiguous success",
+      "result": "PASS",
+      "expected": "DENIED"
+    },
+    {
+      "name": "reservation cost overflow",
+      "result": "PASS",
+      "expected": "DENIED"
+    },
+    {
+      "name": "cancellation before claim",
+      "result": "PASS",
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "timeout after possible delivery",
+      "result": "PASS",
+      "expected": "UNKNOWN_COST"
+    },
+    {
+      "name": "incomplete comparison route",
+      "result": "PASS",
+      "expected": "NO_GO"
+    },
+    {
+      "name": "automatic route promotion",
+      "result": "PASS",
+      "expected": "DISABLED"
+    }
+  ],
+  "cleanup": {
+    "deterministic": true,
+    "externalResourcesCreated": 0,
+    "credentialsUsed": 0
+  }
+}

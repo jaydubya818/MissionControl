@@ -212,3 +212,17 @@ clean-main qualification (19 gates, 2773 tests, 11 inherited skips, Phase 5 and
 15 browser checks). All four Production targets and guards remain unchanged.
 Finite classification dispatch is now in progress under the same approved
 program; see the cumulative program record. Todo 063 remains in progress.
+
+### 2026-09-06 — Dispatch merged; observation retention started
+
+PR #189 merged as `8bf19fcb7e46f4b80a862054d22fbd7ca7ed436f`. Fresh main
+passes 19 composed gates, 2895 tests (11 inherited skips), Phase 5 and 15 browser
+checks; all four Production targets and guards remain unchanged. Continue the
+approved accounting scope under the observation-retention contract. Overrun
+observations and historical first settlement must survive without new execution
+authority; the bounded bridge correction passes its initial regressions.
+
+The observation slice also clarifies the earlier economics wording: every
+physical call contributes to the cohort cost numerator. Verified and human-
+accepted outcomes use separate denominators. New corrected projection formula v2
+preserves UNKNOWN monetary corrections without changing historical v1 snapshots.

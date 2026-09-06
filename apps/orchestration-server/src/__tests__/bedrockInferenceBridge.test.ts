@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   responsesToBedrock,
   bedrockToResponses,
@@ -119,6 +119,82 @@ describe("governed Bedrock bridge offline", () => {
       f.create().infer("two", request, new AbortController().signal),
     ).rejects.toThrow("unresolved");
   });
+  it("preserves ACTUAL usage when settlement fails before persistence", async () => {
+    const f = bridgeFixture();
+    const cause = new Error("Accounting unavailable");
+    const settle = vi.fn().mockRejectedValueOnce(cause).mockImplementation(f.authority.settle);
+    f.authority.settle = settle;
+    const bridge = f.create();
+    const failure = await bridge.infer("one", request, new AbortController().signal).catch(error => error);
+
+    expect(settle).toHaveBeenCalledTimes(1);
+    expect(failure).toMatchObject({
+      name: "BedrockSettlementError", code: "BEDROCK_SETTLEMENT_NOT_ACCEPTED", cause,
+      projectId: "project", repositoryId: "repo",
+      settlementPayload: {
+        reservationId: "reservation", workflowRunId: "attempt", leaseId: "lease", generation: 1,
+        usage: {
+          requestId: "one", requestDigest: f.reservation.holds[0].requestDigest,
+          provider: "aws-bedrock", model: f.binding.identity.model,
+          providerRequestId: "fixture-provider-1", classification: "ACTUAL",
+          inputTokens: 10, outputTokens: 5, expectedReceiptRevision: 0,
+        },
+      },
+    });
+    expect(f.reservation.holds[0]).toMatchObject({ state: "RESERVED", maximumNanoUsd: 200020 });
+    await expect(bridge.infer("one", request, new AbortController().signal)).rejects.toThrow("REPLAY");
+    await expect(bridge.infer("two", request, new AbortController().signal)).rejects.toThrow("REPLAY");
+    expect(f.sends).toBe(1);
+  });
+  it("surfaces an exact accounting replay after the settlement commits but its reply is lost", async () => {
+    const f = bridgeFixture();
+    const persist = f.authority.settle;
+    const cause = new Error("Settlement reply lost");
+    const settle = vi.fn(async (payload: Record<string, unknown>) => {
+      await persist(payload);
+      throw cause;
+    });
+    f.authority.settle = settle;
+    const failure = await f.create().infer("one", request, new AbortController().signal).catch(error => error);
+
+    expect(settle).toHaveBeenCalledTimes(1);
+    expect(failure).toMatchObject({ code: "BEDROCK_SETTLEMENT_NOT_ACCEPTED", cause });
+    expect(f.reservation.holds[0]).toMatchObject({ state: "SETTLED", receiptRevision: 1 });
+    expect(failure.settlementPayload).toEqual(settle.mock.calls[0][0]);
+    await expect(persist(failure.settlementPayload)).resolves.toMatchObject({ duplicate: true, incident: false });
+    expect(f.reservation.holds[0].receiptRevision).toBe(1);
+    expect(f.sends).toBe(1);
+  });
+  it("retains an isolated frozen settlement payload when an accounting client mutates its input", async () => {
+    const f = bridgeFixture();
+    f.authority.settle = async (payload) => {
+      payload.generation = 999;
+      (payload.usage as { inputTokens: number }).inputTokens = 999;
+      throw new Error("Accounting client failed");
+    };
+    const failure = await f.create().infer("one", request, new AbortController().signal).catch(error => error);
+
+    expect(failure.settlementPayload).toMatchObject({ generation: 1, usage: { inputTokens: 10, classification: "ACTUAL" } });
+    expect(Object.isFrozen(failure.settlementPayload)).toBe(true);
+    expect(Object.isFrozen(failure.settlementPayload.usage)).toBe(true);
+    expect(() => { failure.settlementPayload.usage.inputTokens = 20; }).toThrow();
+    expect(JSON.stringify(failure.settlementPayload)).not.toContain("fixture complete");
+    expect(f.sends).toBe(1);
+  });
+  it.each([undefined, null, {}, "acknowledged", { incident: true, duplicate: false }, { incident: false, duplicate: true }])
+    ("preserves known usage for an unaccepted settlement response %j", async (response) => {
+      const f = bridgeFixture();
+      const settle = vi.fn(async () => response);
+      f.authority.settle = settle;
+      const bridge = f.create();
+      await expect(bridge.infer("one", request, new AbortController().signal)).rejects.toMatchObject({
+        name: "BedrockSettlementError", code: "BEDROCK_SETTLEMENT_NOT_ACCEPTED",
+        settlementPayload: { usage: { classification: "ACTUAL", providerRequestId: "fixture-provider-1" } },
+      });
+      expect(settle).toHaveBeenCalledTimes(1);
+      await expect(bridge.infer("two", request, new AbortController().signal)).rejects.toThrow("REPLAY");
+      expect(f.sends).toBe(1);
+    });
   it("timeout retains liability even for uncooperative fixture", async () => {
     const f = bridgeFixture();
     f.binding.timeoutMs = 10;

@@ -195,13 +195,18 @@ WorkOrder acceptance, and the human-gated learning continuation. This is strong
 implementation proof; it is not a claim of fleet-scale production operation or
 general Remote Sandbox certification.
 
-The current public client/backend runtime contract is **v49**. The governed
+The current public client/backend runtime contract is **v50**. The governed
 inference work adds the disabled-by-default price-book, reservation, receipt,
 reconciliation, and accepted-outcome economics contracts. Fab adds exact candidate
 verification and publication bindings plus read-only candidate recovery. Todo 062
 adds default-off attributable shared-intent proposals and human decisions. Pilot
 readiness adds exact revision-bound WorkOrder inspection; v45
 clients fail closed through the existing compatibility check.
+
+Inference receipt v3 retains valid observed overruns and route drift with explicit
+violation codes and ESTIMATED/UNKNOWN monetary classification. A WorkOrder fence
+blocks further inference admission; historical settlement grants no execution
+authority. Canonical v2 receipts retain their original identity and digest.
 
 | Capability                                 | Current status                                   | Boundary                                                                                        |
 | ------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
