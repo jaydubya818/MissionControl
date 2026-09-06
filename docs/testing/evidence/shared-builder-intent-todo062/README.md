@@ -17,3 +17,4 @@ Artifacts:
 - `screenshots/03-permission-denied-1440-dark.png` — default-off/denied write posture.
 - `screenshots/04-shared-intent-states-1440-dark.png` — accepted and attributed decision history.
 - `pre-merge-qualification.md` — implementation and gate summary.
+- `completion-record.md` — immutable merge, CI, and post-merge closure record.
