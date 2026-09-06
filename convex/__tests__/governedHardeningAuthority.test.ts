@@ -115,7 +115,7 @@ describe("Governed Hardening authority invariants", () => {
     const recoveryStart = attempts.indexOf("export const recoverLocalCandidate");
     const recoveryEnd = attempts.indexOf("export const retryVerification", recoveryStart);
     const recovery = attempts.slice(recoveryStart, recoveryEnd);
-    expect(recovery).toContain('failureReason?.includes("GitHub App runtime credentials are not configured.")');
+    expect(recovery).toContain("failedAttempt.failureCode !== LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE");
     expect(recovery).toContain('withIndex("by_run_type"');
     expect(recovery).toContain('artifactType", "CODE_DIFF"');
     expect(recovery).toContain('ctx.db.insert("workflowRuns", recoveryAttempt)');

@@ -67,8 +67,16 @@ import { validateOfflineAttemptEvidence } from "../../../convex/lib/offlineAttem
 import type { IsolatedExecutorResult } from "./isolatedInvocationAdapter.js";
 
 export const FACTORY_ATTEMPT_LEASE_DURATION_MS = 120_000;
+export const LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE = "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING";
 const HEARTBEAT_INTERVAL_MS = 20_000;
 const MAX_RESULT_BYTES = 64_000;
+
+class FactoryWorkerFailure extends Error {
+  constructor(readonly code: string, message: string) {
+    super(message);
+    this.name = "FactoryWorkerFailure";
+  }
+}
 
 export interface FrozenHarnessExecutionManifest {
   version: "factory-execution-manifest/v1" | "factory-execution-manifest/v2" | "factory-execution-manifest/v3" | "factory-execution-manifest/v4";
@@ -1148,6 +1156,7 @@ export class FactoryAttemptWorker {
       this.lastError = null;
     } catch (error) {
       let reason = safeError(error);
+      const failureCode = error instanceof FactoryWorkerFailure ? error.code : undefined;
       try {
         await cleanupRemote();
       } catch (cleanupError) {
@@ -1162,6 +1171,7 @@ export class FactoryAttemptWorker {
         await report({ terminal: {
           status: controller.signal.aborted ? "CANCELED" : "FAILED",
           failureReason: reason,
+          ...(failureCode ? { failureCode } : {}),
           remoteFailure: remoteFailureDecision,
         } })
           .catch((reportError) => {
@@ -1193,7 +1203,12 @@ export class FactoryAttemptWorker {
   private async publicationInstallationToken(claim: any) {
     const privateKey = this.dependencies.loadGithubAppPrivateKey();
     const configuredAppId = this.dependencies.getGithubAppId();
-    if (!privateKey || !configuredAppId) throw new Error("GitHub App runtime credentials are not configured.");
+    if (!privateKey || !configuredAppId) {
+      throw new FactoryWorkerFailure(
+        LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE,
+        "GitHub App runtime credentials are not configured.",
+      );
+    }
     if (configuredAppId !== claim.installation.appId) throw new Error("GitHub App runtime identity does not match the frozen installation.");
     if (!claim.providerRepositoryId) throw new Error("GitHub provider repository identity is not frozen.");
     return await this.dependencies.mintInstallationToken({ appId: configuredAppId, installationId: claim.installation.installationId,

@@ -127,6 +127,8 @@ const ARTIFACT_TYPES = new Set([
   "STRUCTURED_OUTPUT", "AUTOMATION_DESIGN", "AUTOMATION_OUTPUT_SNAPSHOT", "OTHER",
 ]);
 
+const LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE = "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING";
+
 async function offlineAttemptAuthorityIssues(ctx: any, run: any, args: any, now: number): Promise<string[]> {
   const version = run.factoryDefinitionVersionId ? await ctx.db.get(run.factoryDefinitionVersionId) : null;
   const workOrder = run.workOrderId ? await ctx.db.get(run.workOrderId) : null;
@@ -467,7 +469,7 @@ async function validateReadOnlyCandidateRecovery(ctx: any, run: any): Promise<bo
     "factoryDefinitionVersionId", "factoryConfigurationDigest", "verificationContractDigest", "qualityContractDigest"];
   const previous = recovery.previousLease;
   if (!source || source._id === run._id || source.status !== "FAILED"
-    || !source.failureReason?.includes("GitHub App runtime credentials are not configured.")
+    || source.failureCode !== LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE
     || source.verificationSubject || source.candidateReadyAt || sourcePublication
     || same.some(field => run[field] !== source[field])
     || (run.attemptPurpose ?? "IMPLEMENTATION") !== "IMPLEMENTATION"
@@ -1668,6 +1670,12 @@ export const reportInternal = internalMutation({
       const remoteFailure = terminal.status === "COMPLETED"
         ? undefined
         : normalizeRemoteFailure(terminal.remoteFailure);
+      const localFailureCode = terminal.status !== "COMPLETED"
+        && !remoteFailure
+        && terminal.failureCode === LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE
+        && factoryExecutionManifestBackend(run.executionManifest) === "persistent-worker"
+        ? LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE
+        : undefined;
       const steps = terminal.status === "COMPLETED"
         ? run.steps.map((step) => ({
             ...step,
@@ -1680,7 +1688,7 @@ export const reportInternal = internalMutation({
         completedAt,
         failureReason,
         failureClass: remoteFailure?.class,
-        failureCode: remoteFailure?.code,
+        failureCode: remoteFailure?.code ?? localFailureCode,
         failureStage: remoteFailure?.stage,
         retryable: remoteFailure?.retryable,
         steps,
@@ -2708,7 +2716,7 @@ export const recoverLocalCandidate = mutation({
       || !failedAttempt.worktree || !failedAttempt.branch || !failedAttempt.executionManifestDigest) {
       throw new Error("Only the latest failed policy-v2 Implementation Attempt with a frozen workspace can be recovered.");
     }
-    if (!failedAttempt.failureReason?.includes("GitHub App runtime credentials are not configured.")) {
+    if (failedAttempt.failureCode !== LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE) {
       throw new Error("Local candidate recovery is limited to the exact GitHub App credential publication failure.");
     }
     if (failedAttempt.verificationSubject || failedAttempt.candidateReadyAt) {

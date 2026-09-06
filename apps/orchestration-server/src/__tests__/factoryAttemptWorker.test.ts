@@ -264,6 +264,9 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     const failureIndex = fixture.reports.findIndex((packet) => packet.terminal?.status === "FAILED");
     expect(checkpointIndex).toBeGreaterThanOrEqual(0);
     expect(failureIndex).toBeGreaterThan(checkpointIndex);
+    expect(fixture.reports[failureIndex].terminal).toMatchObject({
+      failureCode: "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING",
+    });
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
     await fixture.worker.stop();
   });

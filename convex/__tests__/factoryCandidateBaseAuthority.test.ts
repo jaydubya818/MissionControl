@@ -155,7 +155,8 @@ async function recoveryClaimFixture() {
     executorAdapter: "codex", executorVersion: "v1", executorHostId: "worker-1", worktree: "/fixture/worktree" });
   const original = await f.db.get("attempt-1");
   await f.db.insert("workflowRuns", { ...original, _id: "original-attempt", runId: "original-run", status: "FAILED",
-    failureReason: "GitHub App runtime credentials are not configured.", executionManifest: sourceManifest, executionManifestDigest: sourceDigest });
+    failureReason: "Diagnostic wording may change without changing recovery authority.",
+    failureCode: "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING", executionManifest: sourceManifest, executionManifestDigest: sourceDigest });
   await f.db.insert("runArtifacts", { workflowRunId: "original-attempt", artifactType: "CODE_DIFF", metadata: {
     headSha: CANDIDATE, treeSha: TREE, sourceRevision: BASE, branch: "mc/candidate" } });
   const manifest = { ...sourceManifest, causation: { workflowRunId: "run-1" } };
@@ -195,7 +196,7 @@ describe("Factory candidate source authority through the real report mutation", 
     expect(result).toMatchObject({ claimed: true, reclaimed: true, lease: { leaseId: "new-recovery" },
       localCandidateRecovery: { sourceAttemptId: "original-attempt", sourceCandidateSha: CANDIDATE, sourceTreeSha: TREE } });
     expect(result.publicationCheckpoint).toBeUndefined();
-    expect(await f.db.get("original-attempt")).toMatchObject({ status: "FAILED", failureReason: "GitHub App runtime credentials are not configured." });
+    expect(await f.db.get("original-attempt")).toMatchObject({ status: "FAILED", failureCode: "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING" });
     expect(await f.db.get("attempt-1")).toMatchObject({ status: "RUNNING", runtimeDispositionReason: expect.stringContaining("executor replay remains prohibited") });
   });
   it.each(["ordinary-executor", "substituted-candidate", "changed-source", "cancelled"])("does not reclaim an expired recovery with %s", async (fault) => {
