@@ -107,6 +107,7 @@ import {
 } from "./lib/executionProfileAdmission";
 import { executionProfileProjectionBlockers } from "./lib/executionProfile";
 import { createWorkOrderRecord } from "./lib/workOrderCreate";
+import { requireRepositoryDispatchAdmission } from "./factory/incidentControls";
 import {
   appendCurrentVerificationQualityGateDecision,
   getCurrentVerificationResult,
@@ -2651,6 +2652,9 @@ async function dispatchWorkOrder(
       ownerMemberId: args.ownerMemberId ?? refreshedWorkOrder.ownerMemberId,
       executionEnvironment: args.executionEnvironment ?? refreshedWorkOrder.executionEnvironment ?? "POLICY_SELECTED" as const,
     };
+    if (refreshedWorkOrder.projectId) {
+      await requireRepositoryDispatchAdmission(ctx, refreshedWorkOrder.projectId, effectiveScope.repositoryId, refreshedWorkOrder.repository);
+    }
     const hasStableScope = Boolean(
       refreshedWorkOrder.scopeEnforcementVersion ||
       effectiveScope.repositoryId ||
@@ -2810,6 +2814,9 @@ async function dispatchWorkOrder(
     // receipt and binding were written.
     refreshedWorkOrder = await ctx.db.get(args.workOrderId);
     if (!refreshedWorkOrder) throw new Error("WorkOrder not found after dispatch scope binding");
+    if (refreshedWorkOrder.projectId) {
+      await requireRepositoryDispatchAdmission(ctx, refreshedWorkOrder.projectId, refreshedWorkOrder.repositoryId, refreshedWorkOrder.repository);
+    }
 
     const resolvedWorkflowId = args.workflowId ?? refreshedWorkOrder.workflowId;
     if (!resolvedWorkflowId) {

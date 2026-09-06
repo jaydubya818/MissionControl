@@ -203,9 +203,17 @@ function IncidentCreateForm({
 
 function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) {
   const detail = useQuery(api.factory.incidents.get, { incidentId });
+  const dispatchControl = useQuery(api.factory.incidentControls.getRepositoryDispatchControl, {
+    incidentId,
+    repositoryId: detail?.incident.repositoryId,
+  });
   const advance = useMutation(api.factory.incidents.advance);
   const assignCommander = useMutation(api.factory.incidents.assignCommander);
   const decideProposal = useMutation(api.factory.incidents.decideProposal);
+  const authorizeRestoration = useMutation(api.factory.incidentControls.authorizeRepositoryDispatchRestoration);
+  const requestDispatchControl = useMutation(api.factory.incidentControls.requestRepositoryDispatchControl);
+  const executeDispatchControl = useMutation(api.factory.incidentControls.executeRepositoryDispatchControl);
+  const observeDispatchControl = useMutation(api.factory.incidentControlObserver.observeRepositoryDispatchControl);
   const [reason, setReason] = useState("");
   const [evidenceReferences, setEvidenceReferences] = useState("");
   const [commandReferences, setCommandReferences] = useState("");
@@ -233,6 +241,141 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
 
   if (!detail || !incident) return <Card className="h-[520px] animate-pulse bg-surface-2" role="status" aria-label="Loading incident detail" />;
 
+  const canonicalOperation = upcoming === "CONTAIN"
+    ? "PAUSE_REPOSITORY_DISPATCH" as const
+    : upcoming === "RESTORE"
+      ? "RESUME_REPOSITORY_DISPATCH" as const
+      : null;
+  const canonicalControlSelected = canonicalOperation === "PAUSE_REPOSITORY_DISPATCH"
+    ? selectedActions.includes("PAUSE_REPOSITORY_DISPATCH")
+    : canonicalOperation === "RESUME_REPOSITORY_DISPATCH"
+      ? containedActions.includes("PAUSE_REPOSITORY_DISPATCH")
+      : false;
+  const now = Date.now();
+  const eligibleReceipts = dispatchControl?.receipts?.filter((receipt) =>
+    receipt.authoritySequence === incident.currentSequence
+    && receipt.operation === canonicalOperation
+    && receipt.authorityExpiresAt > now) ?? [];
+  const requestReceipt = eligibleReceipts.find((receipt) =>
+    receipt.receiptType === "COMMAND_REQUESTED" && receipt.requestId === dispatchControl?.activeRequestId)
+    ?? eligibleReceipts.find((receipt) => receipt.receiptType === "COMMAND_REQUESTED");
+  const currentReceipts = eligibleReceipts.filter((receipt) => receipt.requestId === requestReceipt?.requestId);
+  const commandReceipt = currentReceipts.find((receipt) => receipt.receiptType === "COMMAND_ISSUED");
+  const acknowledgmentReceipt = currentReceipts.find((receipt) =>
+    receipt.receiptType === "ACKNOWLEDGED" && receipt.requestId === commandReceipt?.requestId);
+  const effectReceipt = currentReceipts.find((receipt) =>
+    receipt.receiptType === "EFFECT_OBSERVED" && receipt.requestId === commandReceipt?.requestId);
+  const restorationAuthorization = dispatchControl?.restorationAuthorizations?.find((authorization) =>
+    authorization.authoritySequence === incident.currentSequence
+    &&
+    authorization.authorityExpiresAt > now
+    && (!authorization.consumedByRequestId || authorization.consumedByRequestId === dispatchControl?.activeRequestId));
+  const historicalChain = (operation: "PAUSE_REPOSITORY_DISPATCH" | "RESUME_REPOSITORY_DISPATCH") => {
+    const requested = dispatchControl?.receipts?.find((receipt) => receipt.operation === operation && receipt.receiptType === "COMMAND_REQUESTED");
+    if (!requested) return null;
+    const rows = dispatchControl!.receipts.filter((receipt) => receipt.requestId === requested.requestId);
+    return {
+      requested,
+      command: rows.find((receipt) => receipt.receiptType === "COMMAND_ISSUED"),
+      acknowledgment: rows.find((receipt) => receipt.receiptType === "ACKNOWLEDGED"),
+      effect: rows.find((receipt) => receipt.receiptType === "EFFECT_OBSERVED"),
+    };
+  };
+  const pauseHistory = historicalChain("PAUSE_REPOSITORY_DISPATCH");
+  const resumeHistory = historicalChain("RESUME_REPOSITORY_DISPATCH");
+  const historicalRestorationAuthorization = dispatchControl?.restorationAuthorizations?.[0];
+
+  const requestCanonicalControl = async () => {
+    if (!canonicalOperation || !canonicalControlSelected || !incident.repositoryId || !incident.commanderActorId) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await requestDispatchControl({
+        incidentId,
+        repositoryId: incident.repositoryId,
+        operation: canonicalOperation,
+        expectedSequence: incident.currentSequence,
+        expectedCommanderActorId: incident.commanderActorId,
+        authorityExpiresAt: canonicalOperation === "RESUME_REPOSITORY_DISPATCH"
+          ? restorationAuthorization!.authorityExpiresAt
+          : Date.now() + 4 * 60_000,
+        restorationAuthorizationId: canonicalOperation === "RESUME_REPOSITORY_DISPATCH"
+          ? restorationAuthorization!._id
+          : undefined,
+        requestId: `incident-ui-control:${incidentId}:${incident.currentSequence}:${crypto.randomUUID()}`,
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Repository dispatch request failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const recordRestorationAuthority = async () => {
+    if (!incident.repositoryId || !incident.commanderActorId || !restoreAuthority) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await authorizeRestoration({
+        incidentId,
+        repositoryId: incident.repositoryId,
+        expectedSequence: incident.currentSequence,
+        expectedCommanderActorId: incident.commanderActorId,
+        authorityExpiresAt: Date.now() + 4 * 60_000,
+        reason,
+        idempotencyKey: `incident-ui-restoration:${incidentId}:${incident.currentSequence}:${crypto.randomUUID()}`,
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Restoration authorization failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const executeCanonicalControl = async () => {
+    if (!canonicalOperation || !canonicalControlSelected || !incident.repositoryId || !incident.commanderActorId || !requestReceipt) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await executeDispatchControl({
+        incidentId,
+        repositoryId: incident.repositoryId,
+        operation: canonicalOperation,
+        expectedSequence: incident.currentSequence,
+        expectedCommanderActorId: incident.commanderActorId,
+        authorityExpiresAt: requestReceipt.authorityExpiresAt,
+        restorationAuthorizationId: canonicalOperation === "RESUME_REPOSITORY_DISPATCH"
+          ? restorationAuthorization!._id
+          : undefined,
+        requestReceiptId: requestReceipt._id,
+        requestId: requestReceipt.requestId,
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Repository dispatch control failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const observeCanonicalControl = async () => {
+    if (!incident.repositoryId || !commandReceipt || !acknowledgmentReceipt) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await observeDispatchControl({
+        incidentId,
+        repositoryId: incident.repositoryId,
+        commandReceiptId: commandReceipt._id,
+        acknowledgmentReceiptId: acknowledgmentReceipt._id,
+        expectedSequence: incident.currentSequence,
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Independent dispatch observation failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const recordProposalDecision = async (proposalId: Id<"factoryIncidentProposals">, decision: "ACCEPTED" | "REJECTED") => {
     setError(null);
     try {
@@ -254,24 +397,42 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
     setError(null);
     try {
       const controlKeys = upcoming === "CONTAIN" ? selectedActions : upcoming === "RESTORE" ? containedActions : [];
+      const manualControlKeys = controlKeys.filter((controlKey) => controlKey !== "PAUSE_REPOSITORY_DISPATCH");
       const commands = commandReferences.split("\n").map((item) => item.trim()).filter(Boolean);
       const acknowledgments = acknowledgmentReferences.split("\n").map((item) => item.trim()).filter(Boolean);
       const effects = observedEffectReferences.split("\n").map((item) => item.trim()).filter(Boolean);
-      if (controlKeys.length !== commands.length || controlKeys.length !== acknowledgments.length || controlKeys.length !== effects.length) {
-        throw new Error("Each control requires distinct command, acknowledgment, and observed-effect receipts.");
+      if (manualControlKeys.length !== commands.length
+        || manualControlKeys.length !== acknowledgments.length
+        || manualControlKeys.length !== effects.length) {
+        throw new Error("Each non-repository control requires distinct command, acknowledgment, and observed-effect receipts.");
       }
-      const controlExecutions = controlKeys.map((controlKey, index) => ({
+      const manualExecutions = manualControlKeys.map((controlKey, index) => ({
         controlKey,
         commandReceipt: { kind: "EVIDENCE" as const, recordId: commands[index], relationship: "control-command-issued" },
         acknowledgmentReceipt: { kind: "EVIDENCE" as const, recordId: acknowledgments[index], relationship: "control-command-acknowledged" },
         observedEffectReceipt: { kind: "EVIDENCE" as const, recordId: effects[index], relationship: "control-effect-observed" },
         observedAt: Date.now(),
       }));
-      const evidenceRefs = evidenceReferences.split("\n").map((recordId) => recordId.trim()).filter(Boolean).map((recordId) => ({
+      const controlExecutions = canonicalControlSelected && commandReceipt && acknowledgmentReceipt && effectReceipt
+        ? [{
+            controlKey: "PAUSE_REPOSITORY_DISPATCH" as const,
+            commandReceipt: { kind: "CONTROL_RECEIPT" as const, recordId: commandReceipt._id, relationship: "control-command-issued" },
+            acknowledgmentReceipt: { kind: "CONTROL_RECEIPT" as const, recordId: acknowledgmentReceipt._id, relationship: "control-command-acknowledged" },
+            observedEffectReceipt: { kind: "CONTROL_RECEIPT" as const, recordId: effectReceipt._id, relationship: "control-effect-observed" },
+            observedAt: effectReceipt.createdAt,
+          }, ...manualExecutions]
+        : manualExecutions;
+      if (canonicalControlSelected && (!commandReceipt || !acknowledgmentReceipt || !effectReceipt)) {
+        throw new Error("Execute and independently observe repository dispatch before recording this decision.");
+      }
+      const typedEvidenceRefs = evidenceReferences.split("\n").map((recordId) => recordId.trim()).filter(Boolean).map((recordId) => ({
         kind: upcoming === "MEASURE" ? "EVIDENCE" as const : "AUDIT" as const,
         recordId,
         relationship: upcoming === "RESTORE" ? "known-safe-restoration" : "phase-evidence",
       }));
+      const evidenceRefs = upcoming === "RESTORE" && canonicalControlSelected && effectReceipt
+        ? [{ kind: "CONTROL_RECEIPT" as const, recordId: effectReceipt._id, relationship: "known-safe-restoration" }, ...typedEvidenceRefs]
+        : typedEvidenceRefs;
       await advance({
         incidentId,
         expectedSequence: incident.currentSequence,
@@ -405,12 +566,34 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
           <Textarea className="mt-3" aria-label="Incident transition reason" placeholder="Decision reason and current facts" value={reason} onChange={(event) => setReason(event.target.value)} />
           <Textarea className="mt-2" aria-label="Incident evidence references" placeholder={upcoming === "MEASURE" ? "One measurement evidence reference per line (required)" : upcoming === "RESTORE" ? "One known-safe evidence reference per line (required)" : "One supporting evidence reference per line"} value={evidenceReferences} onChange={(event) => setEvidenceReferences(event.target.value)} />
           {upcoming === "CONTAIN" || upcoming === "RESTORE" ? (
-            <div className="mt-2 grid gap-2 lg:grid-cols-3">
-              <Textarea aria-label="Control command receipts" placeholder="One PASS evidence-envelope ID per control, in control order" value={commandReferences} onChange={(event) => setCommandReferences(event.target.value)} />
-              <Textarea aria-label="Control acknowledgment receipts" placeholder="One distinct PASS acknowledgment evidence-envelope ID per control, in control order" value={acknowledgmentReferences} onChange={(event) => setAcknowledgmentReferences(event.target.value)} />
-              <Textarea aria-label="Observed control effects" placeholder="One distinct PASS effect evidence-envelope ID per control, in control order" value={observedEffectReferences} onChange={(event) => setObservedEffectReferences(event.target.value)} />
-              <p className="text-[11px] text-ink-muted lg:col-span-3">Command issuance, acknowledgment, and observed effect require three distinct receipts.</p>
-            </div>
+            canonicalControlSelected ? (
+              <div className="mt-3 rounded-lg border border-line bg-surface-1 p-3" aria-label="Repository dispatch control evidence">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[12px] font-semibold text-ink">Repository dispatch: {dispatchControl?.admission === "DENIED" ? "Paused" : "Enabled"}</div>
+                    <p className="mt-1 text-[11px] text-ink-muted">Command, acknowledgment, and independent observation remain separate durable records.</p>
+                  </div>
+                  {canonicalOperation === "RESUME_REPOSITORY_DISPATCH" && !restorationAuthorization ? <Button size="sm" variant="outline" disabled={submitting || !restoreAuthority || reason.trim().length < 10} onClick={() => void recordRestorationAuthority()}>Record restoration authority</Button> : null}
+                  {!requestReceipt && (canonicalOperation !== "RESUME_REPOSITORY_DISPATCH" || restorationAuthorization) ? <Button size="sm" variant="outline" disabled={submitting} onClick={() => void requestCanonicalControl()}>{canonicalOperation === "PAUSE_REPOSITORY_DISPATCH" ? "Request pause command" : "Request authorized resume"}</Button> : null}
+                  {requestReceipt && !commandReceipt ? <Button size="sm" variant="outline" disabled={submitting} onClick={() => void executeCanonicalControl()}>{canonicalOperation === "PAUSE_REPOSITORY_DISPATCH" ? "Execute pause command" : "Execute authorized resume"}</Button> : null}
+                  {commandReceipt && acknowledgmentReceipt && !effectReceipt ? <Button size="sm" variant="outline" disabled={submitting} onClick={() => void observeCanonicalControl()}>Observe actual effect</Button> : null}
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-5">
+                  <ControlStage label="Authority recorded" complete={canonicalOperation === "PAUSE_REPOSITORY_DISPATCH" || Boolean(restorationAuthorization)} detail={restorationAuthorization?._id} />
+                  <ControlStage label="Command requested" complete={Boolean(requestReceipt)} detail={requestReceipt?._id} />
+                  <ControlStage label="Command executed" complete={Boolean(commandReceipt)} detail={commandReceipt?._id} />
+                  <ControlStage label="Acknowledged" complete={Boolean(acknowledgmentReceipt)} detail={acknowledgmentReceipt?._id} />
+                  <ControlStage label="Effect observed" complete={Boolean(effectReceipt)} detail={effectReceipt?._id} />
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 grid gap-2 lg:grid-cols-3">
+                <Textarea aria-label="Control command receipts" placeholder="One PASS evidence-envelope ID per control, in control order" value={commandReferences} onChange={(event) => setCommandReferences(event.target.value)} />
+                <Textarea aria-label="Control acknowledgment receipts" placeholder="One distinct PASS acknowledgment evidence-envelope ID per control, in control order" value={acknowledgmentReferences} onChange={(event) => setAcknowledgmentReferences(event.target.value)} />
+                <Textarea aria-label="Observed control effects" placeholder="One distinct PASS effect evidence-envelope ID per control, in control order" value={observedEffectReferences} onChange={(event) => setObservedEffectReferences(event.target.value)} />
+                <p className="text-[11px] text-ink-muted lg:col-span-3">Command issuance, acknowledgment, and observed effect require three distinct receipts.</p>
+              </div>
+            )
           ) : null}
           {error ? <p role="alert" className="mt-2 text-[12px] text-danger">{error}</p> : null}
           <Button className="mt-3" size="sm" disabled={submitting} onClick={submit}>{submitting ? "Recording…" : `Record ${label(upcoming)} decision`}</Button>
@@ -420,6 +603,25 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
           <CheckCircle2 className="h-4 w-4" /> Resolved after explicit restoration and measurement. Evidence remains immutable.
         </div>
       )}
+
+      {dispatchControl && (pauseHistory || resumeHistory) ? (
+        <div className="mt-5 rounded-lg border border-line bg-surface-2 p-4" aria-label="Persisted repository dispatch evidence">
+          <h3 className="text-[13px] font-semibold text-ink">Persisted repository dispatch evidence</h3>
+          <p className="mt-1 text-[11px] text-ink-muted">Historical request, execution, acknowledgment, and independent observation remain visible after refresh and resolution.</p>
+          {[{ label: "Pause", chain: pauseHistory }, { label: "Restoration", chain: resumeHistory }].map(({ label: operationLabel, chain }) => chain ? (
+            <div key={operationLabel} className="mt-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">{operationLabel} · {chain.effect?.observedAdmission ?? "effect pending"}</div>
+              <div className={`mt-2 grid gap-2 ${operationLabel === "Restoration" ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+                {operationLabel === "Restoration" ? <ControlStage label="Authority recorded" complete={Boolean(historicalRestorationAuthorization)} detail={historicalRestorationAuthorization?._id} /> : null}
+                <ControlStage label="Command requested" complete detail={chain.requested._id} />
+                <ControlStage label="Command executed" complete={Boolean(chain.command)} detail={chain.command?._id} />
+                <ControlStage label="Acknowledged" complete={Boolean(chain.acknowledgment)} detail={chain.acknowledgment?._id} />
+                <ControlStage label="Effect observed" complete={Boolean(chain.effect)} detail={chain.effect?._id} />
+              </div>
+            </div>
+          ) : null)}
+        </div>
+      ) : null}
 
       <div className="mt-5">
         <h3 className="text-[13px] font-semibold text-ink">Immutable command log</h3>
@@ -437,6 +639,15 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
         </div>
       </div>
     </Card>
+  );
+}
+
+function ControlStage({ label: stageLabel, complete, detail }: { label: string; complete: boolean; detail?: string }) {
+  return (
+    <div className={`rounded-md border px-2 py-2 ${complete ? "border-success/40 bg-success/5" : "border-line"}`}>
+      <div className={`text-[11px] font-medium ${complete ? "text-success" : "text-ink-muted"}`}>{stageLabel}</div>
+      <div className="mt-1 truncate font-mono text-[9px] text-ink-muted">{detail ?? "Pending"}</div>
+    </div>
   );
 }
 
