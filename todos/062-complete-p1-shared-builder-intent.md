@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: complete
 priority: p1
 issue_id: "062"
 tags: [software-factory, intent, qa, product, design, ux]
@@ -48,14 +48,33 @@ guided forms in the existing Mission flow and no new primary domain.
 
 ## Acceptance Criteria
 
-- [ ] Contributions remain in the same Mission/Spec/Plan/Quality Contract lineage.
-- [ ] Contributor role, source revision, decision state, and evidence expectation are attributable.
-- [ ] Concurrent edits use revisions or optimistic concurrency, never silent last-write-wins.
-- [ ] Agents can draft and inspect without gaining Plan approval authority.
-- [ ] Loading, empty, error, denied, conflict, stale, success, and resumption states are browser-proven.
-- [ ] The flow is reachable from the existing left navigation and works at narrow widths and keyboard-only.
+- [x] Contributions remain in the same Mission/Spec/Plan/Quality Contract lineage.
+- [x] Contributor role, source revision, decision state, and evidence expectation are attributable.
+- [x] Concurrent edits use revisions or optimistic concurrency, never silent last-write-wins.
+- [x] Agents can draft and inspect without gaining Plan approval authority.
+- [x] Loading, empty, error, denied, conflict, stale, success, and resumption states are browser-proven.
+- [x] The flow is reachable from the existing left navigation and works at narrow widths and keyboard-only.
 
 ## Work Log
+
+### 2026-09-05 - Merged and post-merge qualified
+
+**By:** Repository operator through Codex
+
+**Actions:**
+- Merged implementation PR #181 at
+  `b07be175262e7c6434c7c0d2fc33565a58b91880` after every required check passed.
+- Verified that the implementation and merge commits have the same Git tree.
+- Re-ran the focused qualification, runtime-contract guard, documentation guard,
+  Fab identity, and composed system contracts from a clean post-merge worktree.
+- Preserved the immutable closure evidence in
+  `docs/testing/evidence/shared-builder-intent-todo062/completion-record.md`.
+
+**Learnings:**
+- Exact tree identity is the clean way to bind pre-merge CI evidence to a merge
+  commit that introduces no content change.
+- Reused dependency trees are not valid provenance for pinned private runtimes;
+  post-merge qualification must start from a frozen clean install.
 
 ### 2026-09-05 - Implementation resumed from qualified Phase 5 main
 
