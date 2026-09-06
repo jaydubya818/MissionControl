@@ -64,6 +64,11 @@ export const registerVersion = mutation({
     profileKey: v.string(),
     registrationIdempotencyKey: v.string(),
     executor: v.object({ adapter: v.string(), version: v.string() }),
+    harnessCapabilityManifest: v.optional(v.any()),
+    harnessCapabilityManifestDigest: v.optional(v.string()),
+    harnessEffectiveConfigSha256: v.optional(v.string()),
+    harnessRuntimeArtifact: v.optional(v.any()),
+    harnessRuntimeArtifactDigest: v.optional(v.string()),
     executionBackend,
     modelCatalogId: v.id("modelCatalog"),
     sandboxProfileId: v.optional(v.id("factorySandboxProfiles")),
@@ -132,6 +137,11 @@ export const registerVersion = mutation({
 
     const harness = resolveFrozenHarnessBinding({
       executor: args.executor,
+      harnessCapabilityManifest: args.harnessCapabilityManifest,
+      harnessCapabilityManifestDigest: args.harnessCapabilityManifestDigest,
+      harnessEffectiveConfigSha256: args.harnessEffectiveConfigSha256,
+      harnessRuntimeArtifact: args.harnessRuntimeArtifact,
+      harnessRuntimeArtifactDigest: args.harnessRuntimeArtifactDigest,
       executionBackend: args.executionBackend,
       sandboxProfileSnapshot: sandboxProfile?.immutableSnapshot,
     });
@@ -409,6 +419,9 @@ function registrationRequestMatches(
     toolGrantId?: unknown;
     executor: { adapter: string; version: string };
     executionBackend: string;
+    harnessCapabilityManifestDigest?: string;
+    harnessEffectiveConfigSha256?: string;
+    harnessRuntimeArtifactDigest?: string;
   },
   profileKey: string,
   isolationModes: string[],
@@ -417,6 +430,9 @@ function registrationRequestMatches(
     && profile.executor?.adapter === args.executor.adapter
     && profile.executor?.version === args.executor.version
     && profile.executionBackend === args.executionBackend
+    && (!args.harnessCapabilityManifestDigest || profile.harnessCapabilityManifestDigest === args.harnessCapabilityManifestDigest)
+    && (!args.harnessEffectiveConfigSha256 || profile.harnessEffectiveConfigSha256 === args.harnessEffectiveConfigSha256)
+    && (!args.harnessRuntimeArtifactDigest || profile.harnessRuntimeArtifactDigest === args.harnessRuntimeArtifactDigest)
     && String(profile.modelCatalogId) === String(args.modelCatalogId)
     && String(profile.sandboxProfileId ?? "") === String(args.sandboxProfileId ?? "")
     && String(profile.toolGrantId ?? "") === String(args.toolGrantId ?? "")
