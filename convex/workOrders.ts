@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { appendChangeRecord } from "./lib/armAudit";
@@ -43,9 +43,11 @@ import { validateMissionWorkOrderDispatch } from "./lib/missionGovernance";
 import {
   genericHarnessV1RecoveryReady,
   evaluateFactoryDispatchPreflight,
+  factoryDispatchChecks,
   factoryVersionApprovesWorkOrderScopes,
   selectCurrentFactoryHost,
 } from "./lib/factoryDispatch";
+import { planReadiness, summarizeWorkOrderReadiness, type ReadinessCheck } from "./lib/workOrderReadiness";
 import { validFactoryBudget, validFactoryExecutionBinding, validFactoryExecutorBinding } from "./lib/factoryConfiguration";
 import { factoryWorkerEligibility } from "./lib/factoryWorkerRuntime";
 import {
@@ -3759,9 +3761,166 @@ export const dispatchResearchEvidenceInternal = internalMutation({
   },
 });
 
+/** Read-only WorkOrder projection. Dispatch/claim remain the authority. */
+export const readiness = query({
+  args: {
+    workOrderId: v.id("workOrders"),
+    factoryDefinitionVersionId: v.optional(v.id("factoryDefinitionVersions")),
+    expectedRevision: v.optional(v.number()),
+    refreshToken: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const workOrder = await ctx.db.get(args.workOrderId);
+    if (!workOrder?.projectId) throw new Error("WorkOrder is unavailable or unauthorized.");
+    const access = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId);
+    assertAuthorizedDeliveryRecord(access, workOrder);
+    await requireWorkspacePermission(ctx, workOrder.projectId, FACTORY_PERMISSIONS.VIEW);
+    const now = Date.now();
+    const [mission, plan, workflow, runs, approvals] = await Promise.all([
+      workOrder.missionId ? ctx.db.get(workOrder.missionId) : null,
+      workOrder.missionPlanId ? ctx.db.get(workOrder.missionPlanId) : null,
+      workOrder.workflowId ? ctx.db.query("workflows").withIndex("by_workflow_id", (q) => q.eq("workflowId", workOrder.workflowId!)).first() : null,
+      ctx.db.query("workflowRuns").withIndex("by_work_order", (q) => q.eq("workOrderId", workOrder._id)).collect(),
+      ctx.db.query("approvalDecisions").withIndex("by_work_order", (q) => q.eq("workOrderId", workOrder._id)).collect(),
+    ]);
+    const revision = workOrder.currentRevisionNumber ?? 1;
+    const checks: ReadinessCheck[] = planReadiness({
+      missionId: workOrder.missionId, currentPlanId: mission?.currentPlanId,
+      plan, workOrderPlanRevision: workOrder.missionPlanRevision, releasedAt: workOrder.releasedAt,
+    });
+    const check = (code: string, label: string, passed: boolean, reason: string) => {
+      checks.push({ code, label, status: passed ? "PASS" : "BLOCKED", boundary: "ADMISSION", reason });
+    };
+    check("work-order-revision", "WorkOrder revision current", args.expectedRevision !== undefined && args.expectedRevision === revision,
+      `Refresh this WorkOrder and inspect revision ${revision}; readiness is bound to that revision.`);
+    check("risk", "Risk classification", ["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(workOrder.riskLevel),
+      "Classify the WorkOrder risk before selecting an execution tuple.");
+    check("workflow", "Workflow available", Boolean(workflow?.active), "Activate the approved workflow for this WorkOrder.");
+    const currentApprovals = approvals.filter((approval) => approval.workOrderRevisionNumber === revision);
+    const scopedRecords = await Promise.all((workOrder.codeScopeIds ?? []).map((id) => ctx.db.get(id)));
+    const scopePolicies = combineCodeScopePolicies(scopedRecords.filter((scope) => scope !== null));
+    const requiredApprovals = [...new Set([...(workOrder.requiredApprovals ?? []),
+      ...codeScopeApprovalPoliciesForDispatch({ isMutating: workOrder.isMutating !== false, approvalPolicies: scopePolicies.approvalPolicies })])];
+    const approval = deriveApprovalStatus({ ...workOrder, requiredApprovals, approvals: currentApprovals, now });
+    const dispatchable = validateDispatchable({
+      ...workOrder, requiredApprovals, approvalStatus: approval, hasWorkflowId: Boolean(workflow?.active),
+      activeRunStatuses: runs.map((run) => run.status),
+    });
+    check("dispatch-state", "WorkOrder state and approvals", dispatchable.ok,
+      dispatchable.ok ? "Current state and revision-bound approvals permit admission inspection."
+        : `Dispatch blocked: ${"reason" in dispatchable ? dispatchable.reason : "unknown"}. Required revision-bound approvals: ${requiredApprovalTypes({ ...workOrder, requiredApprovals }).join(", ") || "none"}. Inspect current approvals and Attempts.`);
+    if (mission && plan) {
+      const blueprintId = (workOrder.metadata as { missionBlueprintId?: string } | undefined)?.missionBlueprintId;
+      const blueprint = plan.workOrderBlueprints.find((item) => item.id === blueprintId);
+      const siblings = await ctx.db.query("workOrders").withIndex("by_mission", (q) => q.eq("missionId", mission._id)).collect();
+      const predecessors = await Promise.all((blueprint?.dependsOnBlueprintIds ?? []).map(async (id) => {
+        const dependency = siblings.find((item) => (item.metadata as { missionBlueprintId?: string } | undefined)?.missionBlueprintId === id);
+        if (!dependency || dependency.state !== "DONE") return false;
+        const handoff = await ctx.db.query("missionHandoffs").withIndex("by_work_order", (q) => q.eq("workOrderId", dependency._id)).order("desc").first();
+        return handoff?.outcome === "COMPLETE" && !handoff.incompleteAssertionIds.length && !handoff.unknownAssertionIds.length;
+      }));
+      const gate = validateMissionWorkOrderDispatch({
+        missionState: mission.state, workOrderRole: workOrder.missionRole,
+        planApproved: plan.status === "APPROVED" && mission.currentPlanId === plan._id,
+        executionPolicy: mission.executionPolicy, workOrderReleased: Boolean(workOrder.releasedAt),
+        isMutating: workOrder.isMutating !== false,
+        hasActiveMutatingWorkOrder: siblings.some((item) => item._id !== workOrder._id && item.isMutating && ["DISPATCHED", "IN_PROGRESS"].includes(item.state)),
+        predecessorHandoffValid: Boolean(blueprint) && predecessors.every(Boolean),
+        budgetRemaining: mission.budgetUsd === undefined || mission.spentUsd < mission.budgetUsd,
+        correctiveIterationsRemaining: mission.correctiveIterations < mission.maxCorrectiveIterations,
+      });
+      check("mission-controls", "Mission dependencies, budget and recovery", gate.ok,
+        gate.ok ? "Current Mission dispatch controls pass." : `Mission dispatch blocked: ${gate.reason}.`);
+    }
+    const version = args.factoryDefinitionVersionId ? await ctx.db.get(args.factoryDefinitionVersionId) : null;
+    if (version && (version.projectId !== workOrder.projectId || version.repositoryId !== workOrder.repositoryId)) {
+      throw new Error("Factory version is unavailable or outside this WorkOrder scope.");
+    }
+    check("factory-selected", "Exact Factory Version", Boolean(version), "Select the exact Factory Version to inspect.");
+    let hostId: string | null = null;
+    if (version && workflow) {
+      try {
+        const inspection = await resolveFactoryDispatchBinding(ctx, {
+          args: { workOrderId: workOrder._id, factoryDefinitionVersionId: version._id,
+            actorType: "HUMAN", idempotencyKey: "readiness-inspection", attemptRunId: "readiness-inspection" },
+          workOrder, workflow, inspect: true,
+        });
+        for (const fact of inspection?.checks ?? []) check(fact.code, fact.label ?? fact.code.replace(/-/g, " "), fact.passed, fact.reason);
+        hostId = inspection?.hostId ?? null;
+      } catch (error) {
+        check("factory-inspection", "Factory binding inspection", false,
+          error instanceof Error ? error.message : "Factory inspection failed; dispatch is not ready.");
+      }
+      try {
+        const routing = await buildExecutionRoutingPreview(ctx, { workOrder, workflow, fallbackFactoryDefinitionVersionId: version._id, cutoffAt: now });
+        const candidate = routing?.result.candidates.find((item) => item.tuple.factoryDefinitionVersionId === String(version._id));
+        check("exact-tuple", "Model / harness / runtime / backend qualification", Boolean(candidate?.eligible),
+          candidate?.eligible ? "Exact tuple passes current WorkOrder routing eligibility."
+            : candidate?.rejectionReasons.join(" ") || "No qualified tuple matches this WorkOrder and Factory Version.");
+        for (const [index, code] of (candidate?.rejectionCodes ?? []).entries()) {
+          check(`route:${code}`, code.replace(/_/g, " ").toLowerCase(), false, candidate!.rejectionReasons[index]);
+        }
+        check("selected-route", "Applied route", routing?.selectedFactoryDefinitionVersionId === version._id,
+          "The current routing decision must apply this exact selected Factory Version; inspect any pin or fallback mismatch.");
+      } catch (error) {
+        check("routing-inspection", "Routing and cost authority", false,
+          error instanceof Error ? error.message : "Routing inspection failed; cost authority is unknown.");
+      }
+    }
+    if (workOrder.repositoryId) {
+      const [repository, team, owner, host] = await Promise.all([
+        ctx.db.get(workOrder.repositoryId),
+        workOrder.owningTeamId ? ctx.db.get(workOrder.owningTeamId) : null,
+        workOrder.ownerMemberId ? ctx.db.get(workOrder.ownerMemberId) : null,
+        hostId ? ctx.db.query("workspaceHostBindings").withIndex("by_project_host", (q) => q.eq("projectId", workOrder.projectId!).eq("hostId", hostId!)).first() : null,
+      ]);
+      const scope = validateDispatchScope({
+        projectId: workOrder.projectId,
+        repository: repository ? { ...repository, id: repository._id } : null,
+        team: team ? { ...team, id: team._id } : null,
+        owner: owner ? { ...owner, id: owner._id } : null,
+        host,
+        codeScopes: scopedRecords.filter((record) => record !== null).map((record) => ({ ...record, id: record._id })),
+        executionEnvironment: workOrder.executionEnvironment ?? "LOCAL",
+      });
+      check("delivery-scope", "Repository, team, owner and environment", scope.allowed && scopedRecords.every(Boolean),
+        `Resolve current delivery scope: ${scope.reasonCodes.join(", ") || "missing code scope"}.`);
+      try {
+        if (!workOrder.tenantId) throw new Error("Company scope is missing.");
+        const operator = await requireWorkspaceAccess(ctx, workOrder.tenantId, workOrder.projectId,
+          { permission: COMPANY_PERMISSIONS.DISPATCH_WORK });
+        const broadAccess = operator.membership.canManageCompany || operator.roleNames.some((name) => /workspace lead|product manager|company|owner|admin/i.test(name));
+        const membership = operator.teamMemberships?.find((item) => item.teamId === workOrder.owningTeamId);
+        check("operator-authority", "Current human dispatch authority", broadAccess || Boolean(membership
+          && (membership.role !== "DEVELOPER" || operator.memberProfiles?.some((profile) => profile._id === workOrder.ownerMemberId))),
+          "Current operator requires dispatch permission and the appropriate team or WorkOrder ownership.");
+      } catch {
+        check("operator-authority", "Current human dispatch authority", false, "Current operator lacks authorized company/workspace dispatch access.");
+      }
+    }
+    for (const [code, label, reason] of [
+      ["repository-preparation", "Attempt repository prepared", "The admitted worker must allocate an isolated worktree at the exact base SHA and verify source integrity before implementation."],
+      ["dependencies", "Attempt dependencies present", "No preparation receipt exists for a future Attempt. Worker dependency preparation must succeed before implementation; a prior Attempt's receipt is not current proof."],
+      ["verifier-preparation", "Independent verifier prepared", "Selected Factory verifier registration and separate exact-candidate worktree/dependency preparation must pass at their respective admission boundaries."],
+    ]) checks.push({ code, label, reason, status: "DEFERRED", boundary: code === "verifier-preparation" ? "VERIFICATION" : "PRE_EXECUTION" });
+    checks.push({ code: "candidate-evidence", label: "Exact-candidate evidence current", status: "DEFERRED", boundary: "VERIFICATION",
+      reason: "A new Attempt requires independent evidence for its exact candidate. Existing evidence cannot certify a future change; acceptance remains separately gated." });
+    return {
+      ...summarizeWorkOrderReadiness(checks), evaluatedAt: now,
+      workOrderId: workOrder._id, workOrderRevision: revision,
+      planId: plan?._id ?? null, planRevision: plan?.revisionNumber ?? null,
+      factoryVersionId: version?._id ?? null, configurationDigest: version?.configurationDigest ?? null,
+      modelRouteDigest: version?.modelRouteDigest ?? null,
+      harnessDigest: version?.harnessCapabilityManifestDigest ?? null,
+      runtimeArtifactDigest: version?.harnessRuntimeArtifactDigest ?? null,
+      executionBackend: version?.executionBackend ?? null, hostId,
+    };
+  },
+});
+
 async function resolveFactoryDispatchBinding(
-  ctx: MutationCtx,
-  input: { args: DispatchArgs & { attemptRunId: string }; workOrder: any; workflow: any }
+  ctx: MutationCtx | QueryCtx,
+  input: { args: DispatchArgs & { attemptRunId: string }; workOrder: any; workflow: any; inspect?: boolean }
 ): Promise<any | null> {
   const { args, workOrder, workflow } = input;
   if (!args.factoryDefinitionVersionId) {
@@ -3787,6 +3946,9 @@ async function resolveFactoryDispatchBinding(
   const now = Date.now();
   const version = await ctx.db.get(args.factoryDefinitionVersionId);
   if (!version) throw new Error("Factory dispatch blocked (factory-version-not-found): Select an available Factory version.");
+  if (version.projectId !== workOrder.projectId || version.repositoryId !== workOrder.repositoryId) {
+    throw new Error("Factory dispatch blocked (factory-scope-mismatch): Select a Factory version for this WorkOrder repository and workspace.");
+  }
   const [definition, repository, policy, installation, assessments, bindings, verifiers, codeScopes, agentVersions, sandboxProfile, modelRoute] = await Promise.all([
     ctx.db.get(version.factoryDefinitionId),
     ctx.db.get(version.repositoryId),
@@ -3869,7 +4031,9 @@ async function resolveFactoryDispatchBinding(
   const host = repository
     ? selectCurrentFactoryHost(eligibleBindings, repository.repository, now, args.executorHostId)
     : null;
-  if (host && workOrder.planningRepositorySha
+  const planningRevisionDrift = Boolean(host && workOrder.planningRepositorySha
+    && host.baseCommit !== workOrder.planningRepositorySha);
+  if (!input.inspect && host && workOrder.planningRepositorySha
     && host.baseCommit !== workOrder.planningRepositorySha) {
     throw new Error(
       `Factory dispatch blocked (planning-revision-drift): the approved Plan researched ${workOrder.planningRepositorySha}, `
@@ -3971,7 +4135,7 @@ async function resolveFactoryDispatchBinding(
         .withIndex("by_repository_status", (q) => q.eq("repositoryId", repository._id).eq("status", status))
         .collect()))).flat()
     : [];
-  const result = evaluateFactoryDispatchPreflight({
+  const preflightInput = {
     factoryRequired: Boolean(workOrder.missionId || workOrder.repositoryId),
     versionProvided: true,
     definitionActive: definition?.status === "ACTIVE",
@@ -4030,7 +4194,16 @@ async function resolveFactoryDispatchBinding(
     worktreeProvided: Boolean(args.worktree?.trim() || host?.checkoutRoot?.trim()),
     mutating: workOrder.isMutating !== false,
     activeRepositoryMutation: activeRuns.some((run) => run.isMutating !== false),
-  });
+  };
+  if (input.inspect) return {
+    checks: [...factoryDispatchChecks(preflightInput), {
+      code: "planning-revision-drift", passed: !planningRevisionDrift,
+      reason: "Worker base must match the approved planning SHA; drift requires a new researched and approved Plan.",
+    }],
+    hostId: host?.hostId,
+    baseSha: host?.baseCommit,
+  };
+  const result = evaluateFactoryDispatchPreflight(preflightInput);
   if (!result.ok) throw new Error(`Factory dispatch blocked (${result.blocker}): ${result.remediation}`);
   if (!repository || !host) throw new Error("Factory dispatch blocked (binding-missing): Reassess Factory readiness.");
   if (!host.baseCommit || host.baseBranch !== repository.defaultBranch) {
