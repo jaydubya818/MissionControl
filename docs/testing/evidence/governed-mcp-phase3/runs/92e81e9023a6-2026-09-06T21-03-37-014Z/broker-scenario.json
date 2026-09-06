@@ -1,8 +1,8 @@
 {
   "schema": "governed-mcp-phase3-broker-scenario/v1",
-  "generatedAt": "2026-09-06T20:56:54.986Z",
+  "generatedAt": "2026-09-06T21:03:37.077Z",
   "evidenceClassification": "LOCAL_BROKER_SCENARIO_NOT_CONTROL_PLANE_PERSISTENCE",
-  "implementationSha": "b019d4467b6cf2015b4767cc328af16ae554e043",
+  "implementationSha": "92e81e9023a69b79f709456f5b6d7936d02e51b2",
   "baseline": "3ae9d86eeff1966862a6959664ec1fe2e6e7240a",
   "historicalPhase3ContractVersion": 41,
   "runtimeContractVersion": 52,
@@ -102,7 +102,7 @@
   },
   "toolGrant": {
     "id": "qualification-grant",
-    "digest": "sha256:37499b0d2943ebf907c7dcf6f5617401a85101e9f357387bde00ef6f00459b2a",
+    "digest": "sha256:34569654ecd80373f6cae424d57faa48ccc491c6ddb14069043e0390dce17fed",
     "snapshot": {
       "schema": "governed-mcp-tool-grant/v1",
       "grantKey": "phase3-doctrine-read",
@@ -195,8 +195,8 @@
       "operation": "read_factory_doctrine_excerpt",
       "credentialClass": "NONE",
       "destination": "LOCAL_PROCESS",
-      "issuedAt": 1788728213928,
-      "expiresAt": 1788728274928,
+      "issuedAt": 1788728616014,
+      "expiresAt": 1788728677014,
       "maxCallsPerAttempt": 1,
       "revocationMode": "DENY_NEW_CALLS"
     }
@@ -243,7 +243,7 @@
   "brokerScenarioReceipts": [
     {
       "schema": "governed-mcp-tool-call-receipt/v1",
-      "callId": "qualification:1788728214928",
+      "callId": "qualification:1788728617014",
       "projectId": "qualification-project",
       "workOrderId": "qualification-work-order",
       "workflowRunId": "qualification-attempt",
@@ -255,7 +255,7 @@
       "executionProfileId": "qualification-profile",
       "executionProfileDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "toolGrantId": "qualification-grant",
-      "toolGrantDigest": "sha256:37499b0d2943ebf907c7dcf6f5617401a85101e9f357387bde00ef6f00459b2a",
+      "toolGrantDigest": "sha256:34569654ecd80373f6cae424d57faa48ccc491c6ddb14069043e0390dce17fed",
       "toolVersionId": "qualification-tool-version",
       "toolVersionDigest": "sha256:7de45ff549953aa804fb8b13e976a69c47a23e2169992284a034a1d3d0e7107b",
       "operation": "read_factory_doctrine_excerpt",
@@ -270,12 +270,12 @@
       "sequence": 1,
       "status": "ALLOWED",
       "reason": "EXACT_AUTHORITY_MATCH",
-      "requestDigest": "38cf92d973cb4b88fec5b4536d172cfa089f1d4b5dac964944311e614d93c70c",
-      "occurredAt": 1788728214929
+      "requestDigest": "254706054fe7b02ab86e24add6e1e79d742ffb2d558130bd7cfdebc3fcc3a9f4",
+      "occurredAt": 1788728617014
     },
     {
       "schema": "governed-mcp-tool-call-receipt/v1",
-      "callId": "qualification:1788728214928",
+      "callId": "qualification:1788728617014",
       "projectId": "qualification-project",
       "workOrderId": "qualification-work-order",
       "workflowRunId": "qualification-attempt",
@@ -287,7 +287,7 @@
       "executionProfileId": "qualification-profile",
       "executionProfileDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "toolGrantId": "qualification-grant",
-      "toolGrantDigest": "sha256:37499b0d2943ebf907c7dcf6f5617401a85101e9f357387bde00ef6f00459b2a",
+      "toolGrantDigest": "sha256:34569654ecd80373f6cae424d57faa48ccc491c6ddb14069043e0390dce17fed",
       "toolVersionId": "qualification-tool-version",
       "toolVersionDigest": "sha256:7de45ff549953aa804fb8b13e976a69c47a23e2169992284a034a1d3d0e7107b",
       "operation": "read_factory_doctrine_excerpt",
@@ -302,17 +302,17 @@
       "sequence": 2,
       "status": "SUCCEEDED",
       "reason": "BOUNDED_READ_COMPLETED",
-      "requestDigest": "38cf92d973cb4b88fec5b4536d172cfa089f1d4b5dac964944311e614d93c70c",
+      "requestDigest": "254706054fe7b02ab86e24add6e1e79d742ffb2d558130bd7cfdebc3fcc3a9f4",
       "outputDigest": "4537a06d6a101deb9f7f9caaa849016026d5c96129de54c88c4f2643209b1c66",
       "outputBytes": 210,
       "poisoningDetected": false,
       "redactionApplied": false,
-      "occurredAt": 1788728214985,
-      "durationMs": 56
+      "occurredAt": 1788728617076,
+      "durationMs": 62
     },
     {
       "schema": "governed-mcp-tool-call-receipt/v1",
-      "callId": "qualification:1788728214928",
+      "callId": "qualification:1788728617014",
       "projectId": "qualification-project",
       "workOrderId": "qualification-work-order",
       "workflowRunId": "qualification-attempt",
@@ -324,7 +324,7 @@
       "executionProfileId": "qualification-profile",
       "executionProfileDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "toolGrantId": "qualification-grant",
-      "toolGrantDigest": "sha256:37499b0d2943ebf907c7dcf6f5617401a85101e9f357387bde00ef6f00459b2a",
+      "toolGrantDigest": "sha256:34569654ecd80373f6cae424d57faa48ccc491c6ddb14069043e0390dce17fed",
       "toolVersionId": "qualification-tool-version",
       "toolVersionDigest": "sha256:7de45ff549953aa804fb8b13e976a69c47a23e2169992284a034a1d3d0e7107b",
       "operation": "read_factory_doctrine_excerpt",
@@ -339,8 +339,8 @@
       "sequence": 1,
       "status": "DENIED",
       "reason": "REPLAY_DENIED",
-      "requestDigest": "38cf92d973cb4b88fec5b4536d172cfa089f1d4b5dac964944311e614d93c70c",
-      "occurredAt": 1788728214985
+      "requestDigest": "254706054fe7b02ab86e24add6e1e79d742ffb2d558130bd7cfdebc3fcc3a9f4",
+      "occurredAt": 1788728617076
     }
   ],
   "negativeProof": {

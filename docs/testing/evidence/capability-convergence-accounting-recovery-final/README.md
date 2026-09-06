@@ -19,10 +19,10 @@ files remained unchanged.
 This is recovery and accounting evidence. It does not establish live provider
 qualification, real billing, or human acceptance.
 
-The composed system qualification is retained in the canonical
-[`system-factory-e2e-v2`](../system-factory-e2e-v2/automated-checks.json)
-artifacts. It binds revision `4def894fe1555cfe3e4fcc3faba87268f1f08d12`
-to main `ccacc5a9284e4141379c3a9b24304053749fd9f7` and passes every
+The composed system qualification is retained in the scoped
+[`capability-convergence-accounting-recovery-system-v52`](../capability-convergence-accounting-recovery-system-v52/automated-checks.json)
+artifacts. It binds revision `92e81e9023a69b79f709456f5b6d7936d02e51b2`
+to main `13ce5f0ef961e4e5f07dc78b43109231aa097270` and passes every
 release-blocking stage: security and documentation checks, release hardening,
 historical evidence integrity, composed system and failure behavior, full
 repository tests, typecheck and skill lint, runtime-contract guard, production
