@@ -217,6 +217,7 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
   const [reason, setReason] = useState("");
   const [evidenceReferences, setEvidenceReferences] = useState("");
   const [commandReferences, setCommandReferences] = useState("");
+  const [acknowledgmentReferences, setAcknowledgmentReferences] = useState("");
   const [observedEffectReferences, setObservedEffectReferences] = useState("");
   const [selectedActions, setSelectedActions] = useState<ContainmentAction[]>([]);
   const [restoreAuthority, setRestoreAuthority] = useState(false);
@@ -398,25 +399,30 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
       const controlKeys = upcoming === "CONTAIN" ? selectedActions : upcoming === "RESTORE" ? containedActions : [];
       const manualControlKeys = controlKeys.filter((controlKey) => controlKey !== "PAUSE_REPOSITORY_DISPATCH");
       const commands = commandReferences.split("\n").map((item) => item.trim()).filter(Boolean);
+      const acknowledgments = acknowledgmentReferences.split("\n").map((item) => item.trim()).filter(Boolean);
       const effects = observedEffectReferences.split("\n").map((item) => item.trim()).filter(Boolean);
-      if (manualControlKeys.length !== commands.length || manualControlKeys.length !== effects.length) {
-        throw new Error("Each non-repository control requires one command receipt and one distinct observed-effect receipt.");
+      if (manualControlKeys.length !== commands.length
+        || manualControlKeys.length !== acknowledgments.length
+        || manualControlKeys.length !== effects.length) {
+        throw new Error("Each non-repository control requires distinct command, acknowledgment, and observed-effect receipts.");
       }
       const manualExecutions = manualControlKeys.map((controlKey, index) => ({
         controlKey,
         commandReceipt: { kind: "EVIDENCE" as const, recordId: commands[index], relationship: "control-command-issued" },
+        acknowledgmentReceipt: { kind: "EVIDENCE" as const, recordId: acknowledgments[index], relationship: "control-command-acknowledged" },
         observedEffectReceipt: { kind: "EVIDENCE" as const, recordId: effects[index], relationship: "control-effect-observed" },
         observedAt: Date.now(),
       }));
-      const controlExecutions = canonicalControlSelected && commandReceipt && effectReceipt
+      const controlExecutions = canonicalControlSelected && commandReceipt && acknowledgmentReceipt && effectReceipt
         ? [{
             controlKey: "PAUSE_REPOSITORY_DISPATCH" as const,
             commandReceipt: { kind: "CONTROL_RECEIPT" as const, recordId: commandReceipt._id, relationship: "control-command-issued" },
+            acknowledgmentReceipt: { kind: "CONTROL_RECEIPT" as const, recordId: acknowledgmentReceipt._id, relationship: "control-command-acknowledged" },
             observedEffectReceipt: { kind: "CONTROL_RECEIPT" as const, recordId: effectReceipt._id, relationship: "control-effect-observed" },
             observedAt: effectReceipt.createdAt,
           }, ...manualExecutions]
         : manualExecutions;
-      if (canonicalControlSelected && (!commandReceipt || !effectReceipt)) {
+      if (canonicalControlSelected && (!commandReceipt || !acknowledgmentReceipt || !effectReceipt)) {
         throw new Error("Execute and independently observe repository dispatch before recording this decision.");
       }
       const typedEvidenceRefs = evidenceReferences.split("\n").map((recordId) => recordId.trim()).filter(Boolean).map((recordId) => ({
@@ -441,6 +447,7 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
       setReason("");
       setEvidenceReferences("");
       setCommandReferences("");
+      setAcknowledgmentReferences("");
       setObservedEffectReferences("");
       setSelectedActions([]);
       setRestoreAuthority(false);
@@ -580,10 +587,11 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
                 </div>
               </div>
             ) : (
-              <div className="mt-2 grid gap-2 lg:grid-cols-2">
+              <div className="mt-2 grid gap-2 lg:grid-cols-3">
                 <Textarea aria-label="Control command receipts" placeholder="One PASS evidence-envelope ID per control, in control order" value={commandReferences} onChange={(event) => setCommandReferences(event.target.value)} />
+                <Textarea aria-label="Control acknowledgment receipts" placeholder="One distinct PASS acknowledgment evidence-envelope ID per control, in control order" value={acknowledgmentReferences} onChange={(event) => setAcknowledgmentReferences(event.target.value)} />
                 <Textarea aria-label="Observed control effects" placeholder="One distinct PASS effect evidence-envelope ID per control, in control order" value={observedEffectReferences} onChange={(event) => setObservedEffectReferences(event.target.value)} />
-                <p className="text-[11px] text-ink-muted lg:col-span-2">A command acknowledgement is not proof that the control took effect.</p>
+                <p className="text-[11px] text-ink-muted lg:col-span-3">Command issuance, acknowledgment, and observed effect require three distinct receipts.</p>
               </div>
             )
           ) : null}

@@ -57,6 +57,7 @@ describe("FactoryIncidentWorkspace", () => {
               controlExecutions: [{
                 controlKey: "REVOKE_ATTEMPT_CREDENTIALS",
                 commandReceipt: { kind: "EVIDENCE", recordId: "evidence-command-1", relationship: "control-command-issued" },
+                acknowledgmentReceipt: { kind: "EVIDENCE", recordId: "evidence-acknowledgment-1", relationship: "control-command-acknowledged" },
                 observedEffectReceipt: { kind: "EVIDENCE", recordId: "evidence-effect-1", relationship: "control-effect-observed" },
                 observedAt: Date.UTC(2026, 8, 5),
               }],
@@ -74,7 +75,7 @@ describe("FactoryIncidentWorkspace", () => {
     expect(screen.getByText(/immutable decision expects sequence 2/i)).toBeInTheDocument();
   });
 
-  it("separates command receipts from observed-effect proof at containment", async () => {
+  it("separates command, acknowledgment, and observed-effect proof at containment", async () => {
     const clarifyIncident = { ...incident, phase: "CLARIFY", status: "OPEN", currentSequence: 1 };
     useQuery.mockImplementation((_reference, args) => (
       args && typeof args === "object" && "incidentId" in args
@@ -84,8 +85,9 @@ describe("FactoryIncidentWorkspace", () => {
     render(<FactoryIncidentWorkspace projectId={"project-1" as any} />);
     await waitFor(() => expect(screen.getByRole("heading", { name: "Advance to Contain" })).toBeInTheDocument());
     expect(screen.getByLabelText("Control command receipts")).toBeInTheDocument();
+    expect(screen.getByLabelText("Control acknowledgment receipts")).toBeInTheDocument();
     expect(screen.getByLabelText("Observed control effects")).toBeInTheDocument();
-    expect(screen.getByText(/acknowledgement is not proof/i)).toBeInTheDocument();
+    expect(screen.getByText(/require three distinct receipts/i)).toBeInTheDocument();
   });
 
   it("renders persisted pause command, acknowledgment, and observation as distinct stages", async () => {

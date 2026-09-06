@@ -87,6 +87,9 @@ export const factoryIncidentContainmentActionValidator = v.union(
 export const factoryIncidentControlExecutionValidator = v.object({
   controlKey: factoryIncidentContainmentActionValidator,
   commandReceipt: factoryIncidentEvidenceRefValidator,
+  // Optional only so existing incident transitions remain readable. New
+  // containment and restoration writes require this in normalizeControlExecutions.
+  acknowledgmentReceipt: v.optional(factoryIncidentEvidenceRefValidator),
   observedEffectReceipt: factoryIncidentEvidenceRefValidator,
   observedAt: v.number(),
 });
@@ -94,6 +97,7 @@ export const factoryIncidentControlExecutionValidator = v.object({
 export type FactoryIncidentControlExecution = {
   controlKey: FactoryIncidentContainmentAction;
   commandReceipt: { kind: FactoryIncidentEvidenceKind; recordId: string; relationship: string; subjectDigest?: string };
+  acknowledgmentReceipt?: { kind: FactoryIncidentEvidenceKind; recordId: string; relationship: string; subjectDigest?: string };
   observedEffectReceipt: { kind: FactoryIncidentEvidenceKind; recordId: string; relationship: string; subjectDigest?: string };
   observedAt: number;
 };
@@ -162,18 +166,25 @@ export function normalizeControlExecutions(
   notBefore = 0,
 ) {
   if (executions.length > 12) throw new Error("Too many control executions.");
-  const normalized = executions.map((execution) => ({
-    controlKey: execution.controlKey,
-    commandReceipt: normalizeEvidenceRefs([execution.commandReceipt])[0],
-    observedEffectReceipt: normalizeEvidenceRefs([execution.observedEffectReceipt])[0],
-    observedAt: execution.observedAt,
-  }));
+  const normalized = executions.map((execution) => {
+    if (!execution.acknowledgmentReceipt) {
+      throw new Error("Control execution requires a distinct acknowledgment receipt.");
+    }
+    return {
+      controlKey: execution.controlKey,
+      commandReceipt: normalizeEvidenceRefs([execution.commandReceipt])[0],
+      acknowledgmentReceipt: normalizeEvidenceRefs([execution.acknowledgmentReceipt])[0],
+      observedEffectReceipt: normalizeEvidenceRefs([execution.observedEffectReceipt])[0],
+      observedAt: execution.observedAt,
+    };
+  });
   for (const execution of normalized) {
     const commandKey = `${execution.commandReceipt.kind}:${execution.commandReceipt.recordId}`;
+    const acknowledgmentKey = `${execution.acknowledgmentReceipt.kind}:${execution.acknowledgmentReceipt.recordId}`;
     const effectKey = `${execution.observedEffectReceipt.kind}:${execution.observedEffectReceipt.recordId}`;
     if (!execution.controlKey) throw new Error("Control execution requires a control key.");
-    if (commandKey === effectKey) {
-      throw new Error("A control acknowledgement cannot prove its observed effect.");
+    if (new Set([commandKey, acknowledgmentKey, effectKey]).size !== 3) {
+      throw new Error("Command issuance, acknowledgment, and observed effect require three distinct receipts.");
     }
     if (!Number.isSafeInteger(execution.observedAt)
       || execution.observedAt < notBefore

@@ -124,6 +124,7 @@ async function requireCanonicalControlReceipts(
   executions: Array<{
     controlKey: string;
     commandReceipt: { kind: string; recordId: string };
+    acknowledgmentReceipt: { kind: string; recordId: string };
     observedEffectReceipt: { kind: string; recordId: string };
     observedAt: number;
   }>,
@@ -186,6 +187,7 @@ async function requireCanonicalControlReceipts(
     }
     for (const [receiptKind, receipt] of [
       ["command", execution.commandReceipt],
+      ["acknowledgment", execution.acknowledgmentReceipt],
       ["effect", execution.observedEffectReceipt],
     ] as const) {
       const normalizedId = receipt.kind === "EVIDENCE"
@@ -514,6 +516,7 @@ export const advance = mutation({
       metadata: {
         sequence,
         commandReceipts: controlExecutions.map((execution) => execution.commandReceipt),
+        acknowledgmentReceipts: controlExecutions.map((execution) => execution.acknowledgmentReceipt),
         observedEffectReceipts: controlExecutions.map((execution) => execution.observedEffectReceipt),
         authorityRestored,
       },
