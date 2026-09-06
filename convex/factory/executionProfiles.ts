@@ -14,6 +14,7 @@ import { resolveFrozenHarnessBinding } from "../lib/harnessCapabilities";
 import { modelRouteEligibleForNewFactoryVersion } from "../lib/modelRouteAdmission";
 import { sandboxProfileProductionEligible } from "../lib/sandboxProfileAdmission";
 import { executionProfileToolGrantBinding, mcpToolGrantDigest } from "../lib/governedMcp";
+import { findKnownHarnessManifest } from "@mission-control/workflow-engine/harness-contract";
 
 const executionBackend = v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"));
 const isolationMode = v.union(v.literal("READ_ONLY"), v.literal("WORKSPACE_WRITE"));
@@ -135,6 +136,14 @@ export const registerVersion = mutation({
       throw new Error("Execution Profile requires one current exact Tool Grant.");
     }
 
+    const externalHarness = !findKnownHarnessManifest(args.executor.adapter, args.executor.version);
+    if (externalHarness && (!args.harnessCapabilityManifest
+      || !args.harnessCapabilityManifestDigest
+      || !args.harnessEffectiveConfigSha256
+      || !args.harnessRuntimeArtifact
+      || !args.harnessRuntimeArtifactDigest)) {
+      throw new Error("External harness registration requires complete frozen manifest and runtime identity bytes.");
+    }
     const harness = resolveFrozenHarnessBinding({
       executor: args.executor,
       harnessCapabilityManifest: args.harnessCapabilityManifest,
@@ -164,6 +173,7 @@ export const registerVersion = mutation({
       harness: {
         adapter: harness.adapter,
         version: harness.version,
+        ...(externalHarness ? { source: "EXTERNAL_FROZEN" as const } : {}),
         capabilityManifest: harness.capabilityManifest,
         capabilityManifestDigest: harness.capabilityManifestSha256,
         effectiveConfigSha256: harness.effectiveConfigSha256,

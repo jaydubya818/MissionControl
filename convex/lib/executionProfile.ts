@@ -77,6 +77,7 @@ export interface ExecutionProfileSnapshotInput {
   harness: {
     adapter: string;
     version: string;
+    source?: "EXTERNAL_FROZEN";
     capabilityManifest: HarnessCapabilityManifest;
     capabilityManifestDigest: string;
     effectiveConfigSha256: string;
@@ -219,6 +220,7 @@ export function executionProfileSnapshot(input: ExecutionProfileSnapshotInput) {
     harness: {
       adapter: input.harness.adapter.trim(),
       version: input.harness.version.trim(),
+      ...(input.harness.source ? { source: input.harness.source } : {}),
       capabilityManifest: manifest,
       capabilityManifestDigest: input.harness.capabilityManifestDigest.trim().toLowerCase(),
       effectiveConfigSha256: input.harness.effectiveConfigSha256.trim().toLowerCase(),
@@ -603,17 +605,20 @@ export function executionProfileCurrentnessIssues(input: {
     : [];
   blockers.push(...executionProfilePersistedRecordBlockers(input.profile));
   const knownManifest = findKnownHarnessManifest(profile.harness.adapter, profile.harness.version);
-  if (!knownManifest
+  const externalFrozen = profile.harness.source === "EXTERNAL_FROZEN";
+  if (!externalFrozen
+    && (!knownManifest
     || harnessCapabilityManifestDigest(knownManifest) !== profile.harness.capabilityManifestDigest
     || knownManifest.effectiveConfigSha256 !== profile.harness.effectiveConfigSha256
-    || !sameCanonical(knownManifest, profile.harness.capabilityManifest)) {
+    || !sameCanonical(knownManifest, profile.harness.capabilityManifest))) {
     blockers.push("EXECUTION_PROFILE_HARNESS_MISMATCH");
   }
   if (profile.executionBackend === "persistent-worker") {
     const knownRuntime = findKnownHarnessRuntimeArtifact(profile.harness.adapter, profile.harness.version);
-    if (!knownRuntime
+    if (!externalFrozen
+      && (!knownRuntime
       || harnessRuntimeArtifactDigest(knownRuntime) !== profile.runtimeArtifact.digest
-      || !sameCanonical(knownRuntime, profile.runtimeArtifact.snapshot)) {
+      || !sameCanonical(knownRuntime, profile.runtimeArtifact.snapshot))) {
       blockers.push("EXECUTION_PROFILE_RUNTIME_ARTIFACT_MISMATCH");
     }
   }
@@ -849,12 +854,17 @@ function harnessBindingIssues(input: unknown): string[] {
   if (!onlyKeys(harness, [
     "adapter",
     "version",
+    "source",
     "capabilityManifest",
     "capabilityManifestDigest",
     "effectiveConfigSha256",
   ])) issues.push("harness-binding-fields-invalid");
   if (!boundedIdentity(harness.adapter, 100)) issues.push("harness-adapter-invalid");
   if (!boundedIdentity(harness.version, 100)) issues.push("harness-version-invalid");
+  if (harness.source !== undefined && harness.source !== "EXTERNAL_FROZEN") issues.push("harness-source-invalid");
+  if (harness.source === "EXTERNAL_FROZEN" && findKnownHarnessManifest(harness.adapter, harness.version)) {
+    issues.push("harness-source-invalid");
+  }
   if (!sha256(harness.capabilityManifestDigest)) issues.push("harness-manifest-digest-invalid");
   if (!sha256Bare(harness.effectiveConfigSha256)) issues.push("harness-config-digest-invalid");
   if (!plainObject(harness.capabilityManifest)) return [...issues, "harness-manifest-invalid"];
