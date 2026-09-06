@@ -27,3 +27,7 @@ selected dispatch controls. Transport/wire qualification passed 97 tests.
 Independent architecture/security/data review accepted all four corrected findings;
 simplicity/docs review found no blocking issue. These results qualify the bounded
 offline contract only. Full PR-head and clean-main gates are recorded separately.
+
+Committed log copies normalize trailing whitespace. Original byte-for-byte logs
+remain in `/private/tmp/fdlc-dispatch-qualification/` and the transport log paths
+listed in the program record on the qualification host.

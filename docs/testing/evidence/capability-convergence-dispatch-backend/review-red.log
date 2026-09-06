@@ -111,4 +111,3 @@ AssertionError: promise resolved "{ claimed: true, …(3) }" instead of rejectin
       Tests  5 failed | 24 passed (29)
    Start at  00:01:39
    Duration  363ms (transform 85ms, setup 0ms, collect 135ms, tests 35ms, environment 0ms, prepare 38ms)
-

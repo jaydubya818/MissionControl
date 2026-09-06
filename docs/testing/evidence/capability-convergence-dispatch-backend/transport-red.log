@@ -4,7 +4,7 @@
  × src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > makes one raw request and preserves provider/cache/reasoning observations 6ms
    → expected "spy" to be called with arguments: [ …(2) ]
 
-Received: 
+Received:
 
   1st spy call:
 
@@ -107,7 +107,7 @@ If this is a long-running test, pass a timeout value as the last argument or con
  FAIL  src/__tests__/governedInferenceGateway.test.ts > OpenAIChatCompletionsTransport > makes one raw request and preserves provider/cache/reasoning observations
 AssertionError: expected "spy" to be called with arguments: [ …(2) ]
 
-Received: 
+Received:
 
   1st spy call:
 
@@ -278,7 +278,7 @@ Error: Test timed out in 500ms.
 If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
  ❯ src/__tests__/governedInferenceGateway.test.ts:142:3
     140|   });
-    141| 
+    141|
     142|   it("bounds a stalled response stream by the allowance deadline", asy…
        |   ^
     143|     vi.useFakeTimers();
@@ -291,7 +291,7 @@ Error: Test timed out in 500ms.
 If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
  ❯ src/__tests__/governedInferenceGateway.test.ts:156:3
     154|   });
-    155| 
+    155|
     156|   it("bounds a stalled fetch even when the fetch implementation ignore…
        |   ^
     157|     vi.useFakeTimers();

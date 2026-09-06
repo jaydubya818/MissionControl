@@ -56,7 +56,7 @@
  FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > atomically persists a bounded allowance with the unique claim and exact identities
 AssertionError: expected undefined to match object { …(14) }
 
-- Expected: 
+- Expected:
 {
   "attemptId": "attempt",
   "intentId": "inferencePhysicalIntents-db-1",
@@ -74,7 +74,7 @@ AssertionError: expected undefined to match object { …(14) }
   "schema": "classify-inference-dispatch/v1",
 }
 
-+ Received: 
++ Received:
 undefined
 
  ❯ convex/__tests__/inferenceDispatch.test.ts:62:38
@@ -138,4 +138,3 @@ AssertionError: promise resolved "{ claimed: true, …(2) }" instead of rejectin
       Tests  24 failed (24)
    Start at  23:52:58
    Duration  319ms (transform 66ms, setup 0ms, collect 109ms, tests 30ms, environment 0ms, prepare 27ms)
-
