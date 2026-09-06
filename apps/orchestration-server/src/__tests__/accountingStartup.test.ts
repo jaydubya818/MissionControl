@@ -17,7 +17,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(() => { throw new Error("Unexpected network request"); }));
   for (const [key, value] of Object.entries({
     ORCHESTRATION_DISABLE_STARTUP: "1", CONVEX_URL: "https://fixture.convex.cloud",
-    CONVEX_SERVICE_AUTH_TOKEN: "", ORCHESTRATION_API_TOKEN: "offline-test-token", MC_API_TOKEN: "",
+    CONVEX_SERVICE_AUTH_TOKEN: "", ORCHESTRATION_API_TOKEN: "test-token", MC_API_TOKEN: "",
     CODEX_WORKER_PROJECT_ID: "project", CODEX_WORKER_REPOSITORY_ID: "repository",
     CODEX_FACTORY_WORKER_ENABLED: "true", DEEPSEEK_HARNESS_EXECUTOR_ENABLED: "0",
     FACTORY_EXECUTION_ENABLED: "0", FAB_EXECUTOR_ENABLED: "0",
@@ -35,7 +35,7 @@ afterEach(async () => {
 
 async function status() {
   const { app } = await import("../index.js");
-  const response = await app.request("/status", { headers: { authorization: "Bearer offline-test-token" } });
+  const response = await app.request("/status", { headers: { authorization: "Bearer test-token" } });
   expect(response.status).toBe(200);
   expect(accounting.create).toHaveBeenCalledOnce();
   expect(globalThis.fetch).not.toHaveBeenCalled();
