@@ -9,7 +9,7 @@ const positive = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 export const bedrockPriceSchema = z
   .object({
     schema: z.literal("fdlc-bedrock-price/v1"),
-    qualification: z.enum(["UNQUALIFIED", "OFFLINE_FIXTURE"]),
+    qualification: z.enum(["UNQUALIFIED", "OFFLINE_FIXTURE", "QUALIFIED"]),
     version: z.string().min(1),
     effectiveAt: positive,
     expiresAt: positive,
@@ -83,4 +83,16 @@ export function bedrockFixturePrice(
   };
   assertProviderPrice(result, now);
   return result;
+}
+
+/** Converts only a current independently captured live price contract. */
+export function bedrockQualifiedPrice(
+  input: BedrockPriceContract,
+  api: BedrockApi,
+  now: number,
+): ProviderPrice {
+  const p = bedrockPriceSchema.parse(input);
+  if (p.qualification !== "QUALIFIED") throw new Error("REAL_PRICE_UNQUALIFIED");
+  const qualified = { ...p, qualification: "OFFLINE_FIXTURE" as const };
+  return bedrockFixturePrice(qualified, api, now);
 }

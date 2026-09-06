@@ -1,0 +1,30 @@
+{
+  "schema": "fdlc-bedrock-price/v1",
+  "qualification": "QUALIFIED",
+  "version": "aws-bedrock-sonnet-4.6-us-geo-2026-09-06",
+  "effectiveAt": 1788715768000,
+  "expiresAt": 1788802168000,
+  "currency": "USD",
+  "billingUnit": "MILLION_TOKENS",
+  "provenance": {
+    "url": "https://aws.amazon.com/bedrock/pricing/",
+    "evidenceDigest": "sha256:a28e043d37a60c93accb73bd7242a13770fa08ac07b500df263cc54ac500b95f"
+  },
+  "ratesNanoUsdPerMillion": {
+    "input": 3300000000,
+    "output": 16500000000,
+    "cacheRead": 330000000,
+    "cacheWrite5m": 4125000000,
+    "cacheWrite1h": 6600000000,
+    "reasoning": 16500000000
+  },
+  "cacheMode": "DISABLED",
+  "reasoningMode": "DISABLED",
+  "reasoningBilling": "INCLUDED_IN_OUTPUT",
+  "otherBillableDimensions": "NONE",
+  "maximumInputTokens": 140000,
+  "maximumOutputTokens": 4096,
+  "maximumPayloadBytes": 131072,
+  "inputBoundEvidence": "The canonical reservation rejects request payloads over 131072 bytes under this price contract; 140000 input tokens conservatively covers the admitted UTF-8 payload and protocol overhead.",
+  "outputBoundEvidence": "The canonical Bedrock bridge rejects maxOutputTokens above 4096 and transmits the accepted value as Converse inferenceConfig.maxTokens."
+}

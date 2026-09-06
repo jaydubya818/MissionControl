@@ -29,6 +29,9 @@ export const CODEX_BEDROCK_OVERRIDES = [
 /** Shares repository/result and CLI argument mechanics, never V1 provider setup
  * or V1 qualification. Only the separately governed Docker path can start it. */
 export class CodexBedrockExecutorAdapter extends CodexV1ExecutorAdapter {
+  constructor(private readonly routeAdmitted = false) {
+    super();
+  }
   capabilities() {
     return {
       ...super.capabilities(),
@@ -78,12 +81,13 @@ export class CodexBedrockExecutorAdapter extends CodexV1ExecutorAdapter {
   }
   async health() {
     return {
-      status: "DEGRADED" as const,
+      status: this.routeAdmitted ? "READY" as const : "DEGRADED" as const,
       checkedAt: Date.now(),
       adapter: "codex",
       version: "bedrock-v1",
-      details:
-        "Offline composition; approved AWS identity and exact route qualification required.",
+      details: this.routeAdmitted
+        ? "Governed Bedrock transport and exact route authorization are configured."
+        : "Offline composition; approved AWS identity and exact route qualification required.",
     };
   }
   createRemoteInvocation(

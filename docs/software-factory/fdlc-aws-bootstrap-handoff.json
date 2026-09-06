@@ -1,12 +1,12 @@
 {
-  "AWS_PROFILE": null,
+  "AWS_PROFILE": "fdlc-qualification",
   "AWS_REGION": "us-east-1",
-  "QUALIFICATION_AWS_ACCOUNT_ID": null,
-  "EXPECTED_STS_PRINCIPAL_ARN": null,
-  "QUALIFICATION_PROJECT_OR_ENVIRONMENT_ID": null,
-  "QUALIFICATION_ROLE_ARN": null,
-  "AUTHORITATIVE_QUALIFICATION_CONFIG_LOCATION": null,
+  "QUALIFICATION_AWS_ACCOUNT_ID": "083665737366",
+  "EXPECTED_STS_PRINCIPAL_ARN": "arn:aws:sts::083665737366:assumed-role/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783/jaydubya818@gmail.com",
+  "QUALIFICATION_PROJECT_OR_ENVIRONMENT_ID": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+  "QUALIFICATION_ROLE_ARN": "arn:aws:iam::083665737366:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783",
+  "AUTHORITATIVE_QUALIFICATION_CONFIG_LOCATION": "docs/software-factory/fdlc-aws-bootstrap-handoff.json",
   "BEDROCK_INFERENCE_PROFILE_ID": "us.anthropic.claude-sonnet-4-6",
-  "BEDROCK_INFERENCE_PROFILE_ARN": null,
-  "APPROVAL_REFERENCE": null
+  "BEDROCK_INFERENCE_PROFILE_ARN": "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
+  "APPROVAL_REFERENCE": "docs/software-factory/fdlc-bedrock-qualification-approval.json"
 }

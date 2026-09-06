@@ -14,6 +14,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1127.0",
+    "@aws-sdk/credential-provider-ini": "3.973.15",
+    "@fdlc/fab": "file:../../vendor/fab/fdlc-fab-0.1.0-experimental.3.tgz",
     "@hono/node-server": "^1.19.13",
     "@mission-control/agent-runtime": "workspace:*",
     "@mission-control/context-router": "workspace:*",
@@ -28,8 +30,7 @@
     "openai": "^4.73.0",
     "ws": "^8.21.3",
     "yaml": "^2.3.4",
-    "zod": "4.3.6",
-    "@fdlc/fab": "file:../../vendor/fab/fdlc-fab-0.1.0-experimental.3.tgz"
+    "zod": "4.3.6"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",

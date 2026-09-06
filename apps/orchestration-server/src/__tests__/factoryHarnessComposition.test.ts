@@ -79,4 +79,22 @@ describe("Factory harness startup composition", () => {
     expect(createCodex).not.toHaveBeenCalled();
     expect(createDeepSeek).not.toHaveBeenCalled();
   });
+
+  it("marks the default Bedrock adapter ready only with an admitted route", async () => {
+    const [blocked] = configuredFactoryHarnessAdapters({
+      codexEnabled: false,
+      codexBedrockEnabled: true,
+      deepseekEnabled: false,
+      legacyFactoryWorkerEnabled: false,
+    });
+    const [ready] = configuredFactoryHarnessAdapters({
+      codexEnabled: false,
+      codexBedrockEnabled: true,
+      codexBedrockRouteAdmitted: true,
+      deepseekEnabled: false,
+      legacyFactoryWorkerEnabled: false,
+    });
+    await expect(blocked.health()).resolves.toMatchObject({ status: "DEGRADED" });
+    await expect(ready.health()).resolves.toMatchObject({ status: "READY" });
+  });
 });

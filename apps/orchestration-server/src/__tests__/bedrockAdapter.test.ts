@@ -1,6 +1,7 @@
 import { bedrockModelRouteBinding } from "../bedrockModelRouteBinding.js";
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import {
   bedrockRouteSchema,
   verifyBedrockProfile,
@@ -18,6 +19,7 @@ import {
 } from "../bedrockAdapter.js";
 import {
   bedrockFixturePrice,
+  bedrockQualifiedPrice,
   type BedrockPriceContract,
 } from "../bedrockPricing.js";
 import { bedrockIamSpecification } from "../bedrockIam.js";
@@ -375,6 +377,29 @@ describe("OFFLINE / FIXTURE Bedrock serialization and parsing", () => {
   });
 });
 describe("OFFLINE / FIXTURE price and hard liability", () => {
+  it("binds the live qualified price to committed evidence and conservative rates", () => {
+    const contract = JSON.parse(readFileSync(new URL(
+      "../../../../docs/software-factory/fdlc-bedrock-price-qualified.json",
+      import.meta.url,
+    ), "utf8"));
+    const evidence = readFileSync(new URL(
+      "../../../../docs/testing/evidence/fdlc-bedrock-live-20260906/pricing-evidence.json",
+      import.meta.url,
+    ));
+    expect(contract.provenance.evidenceDigest).toBe(
+      `sha256:${createHash("sha256").update(evidence).digest("hex")}`,
+    );
+    expect(bedrockQualifiedPrice(contract, "CONVERSE", contract.effectiveAt + 1)).toMatchObject({
+      inputNanoUsdPerToken: 6600,
+      outputNanoUsdPerToken: 16500,
+      maximumInputTokens: 140000,
+      maximumOutputTokens: 4096,
+    });
+  });
+  it("keeps qualified live prices separate from offline fixtures", () => {
+    expect(() => bedrockQualifiedPrice(priceContract, "CONVERSE", 100)).toThrow("REAL_PRICE_UNQUALIFIED");
+    expect(bedrockQualifiedPrice({ ...priceContract, qualification: "QUALIFIED" }, "CONVERSE", 100)).toMatchObject({ provider: "aws-bedrock", model: BEDROCK_MODEL, api: "CONVERSE" });
+  });
   it("rounds fractional nano-USD rates upward", () =>
     expect(
       bedrockFixturePrice(priceContract, "CONVERSE", 100).inputNanoUsdPerToken,

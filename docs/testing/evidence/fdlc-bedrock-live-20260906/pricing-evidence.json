@@ -1,0 +1,47 @@
+{
+  "schema": "fdlc-bedrock-pricing-evidence/v1",
+  "capturedAt": "2026-09-06T17:43:35Z",
+  "route": {
+    "provider": "aws-bedrock",
+    "model": "anthropic.claude-sonnet-4-6",
+    "inferenceProfileId": "us.anthropic.claude-sonnet-4-6",
+    "sourceRegion": "us-east-1",
+    "scope": "US-only inference"
+  },
+  "sources": [
+    {
+      "publisher": "AWS",
+      "title": "Claude Sonnet 4.6 - Amazon Bedrock",
+      "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-sonnet-4-6.html",
+      "supports": [
+        "The model is billed through AWS Marketplace.",
+        "The US geographic inference profile ID is us.anthropic.claude-sonnet-4-6.",
+        "From us-east-1 the fixed destinations are us-east-1, us-east-2, and us-west-2."
+      ]
+    },
+    {
+      "publisher": "AWS",
+      "title": "Regional availability by models - Amazon Bedrock",
+      "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/models-region-compatibility.html",
+      "supports": [
+        "Geographic cross-Region inference is priced at the source Region rate with no routing surcharge."
+      ]
+    },
+    {
+      "publisher": "Anthropic",
+      "title": "Anthropic List Prices - 2026-05-27",
+      "url": "https://www-cdn.anthropic.com/files/4zrzovbb/website/3684c2faafb97418665782cea0001f439f74b1d2.pdf",
+      "supports": [
+        "Claude Sonnet 4.6 standard US-only inference list prices per million tokens."
+      ]
+    }
+  ],
+  "ratesUsdPerMillionTokens": {
+    "input": 3.3,
+    "output": 16.5,
+    "cacheRead": 0.33,
+    "cacheWrite5m": 4.125,
+    "cacheWrite1h": 6.6
+  },
+  "qualificationDecision": "Use the current US-only standard rates for the approved AWS US geographic route. Conservatively reserve uncached input at the highest input-side rate, 6.60 USD per million tokens, while cache and reasoning remain disabled."
+}
