@@ -94,8 +94,12 @@ source evidence, preserves single-attempt transport, and makes the Bedrock adapt
 report ready only when the governed route authorization is configured. Runtime
 contract checks, type checking, focused Bedrock tests, the complete orchestration
 suite, release security, authorization, secret scanning, Factory documentation,
-and whitespace checks pass on current main. System Qualification is sealed after
-the implementation commit so its evidence binds the final source identity.
+and whitespace checks pass on current main. Implementation commit
+`3a69f9cb168c021bd543346af7d4925ce7036b7c` then passed all 19 commit-bound
+System Qualification checks, including full repository tests, lint, build,
+startup smoke, golden eval, historical evidence immutability, and runtime v51
+compatibility. The System evidence is in
+`docs/testing/evidence/fdlc-bedrock-live-system-20260906/`.
 
 ## Blocked work
 
