@@ -6,6 +6,7 @@ import {
   query,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { assertRepositoryPublicationAllowed } from "./lib/localRepositoryAdmission";
 import {
   FACTORY_PERMISSIONS,
   requireWorkspacePermission,
@@ -69,6 +70,7 @@ export const getRepositoryForSetup = internalQuery({
   handler: async (ctx, args) => {
     const repository = await ctx.db.get(args.repositoryId);
     if (!repository) throw new Error("Repository connection not found");
+    assertRepositoryPublicationAllowed(repository);
     return repository;
   },
 });
@@ -78,6 +80,7 @@ export const getInstallationForVerification = internalQuery({
   handler: async (ctx, args) => {
     const repository = await ctx.db.get(args.repositoryId);
     if (!repository) throw new Error("Repository connection not found");
+    assertRepositoryPublicationAllowed(repository);
     const installation = await ctx.db
       .query("githubAppInstallations")
       .withIndex("by_repository", (q) => q.eq("repositoryId", repository._id))
@@ -217,6 +220,7 @@ export const createSetupSession = internalMutation({
   handler: async (ctx, args) => {
     const repository = await ctx.db.get(args.repositoryId);
     if (!repository) throw new Error("Repository connection not found");
+    assertRepositoryPublicationAllowed(repository);
     const now = Date.now();
     return await ctx.db.insert("githubAppSetupSessions", {
       tenantId: repository.tenantId,
@@ -247,6 +251,7 @@ export const resolveSetupSession = internalQuery({
     }
     const repository = await ctx.db.get(session.repositoryId);
     if (!repository) throw new Error("Repository connection not found");
+    assertRepositoryPublicationAllowed(repository);
     return { session, repository };
   },
 });
@@ -431,6 +436,7 @@ export const upsertInstallation = internalMutation({
   handler: async (ctx, args) => {
     const repository = await ctx.db.get(args.repositoryId);
     if (!repository) throw new Error("Repository connection not found");
+    assertRepositoryPublicationAllowed(repository);
     const now = Date.now();
     const existingByRepository = await ctx.db
       .query("githubAppInstallations")

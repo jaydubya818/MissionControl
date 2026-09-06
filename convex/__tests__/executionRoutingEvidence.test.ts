@@ -147,6 +147,7 @@ function policyV2Records(options: {
       validUntil: options.stale ? cutoffAt : cutoffAt + 1,
     }],
     evidenceEnvelopes: options.includeResult === false ? [] : [{
+      provenance: "LIVE",
       _id: "evidence-a",
       projectId,
       workOrderId,

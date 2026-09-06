@@ -274,17 +274,97 @@ export const CODEX_BEDROCK_V1_HARNESS_MANIFEST: HarnessCapabilityManifest = {
     "AWS credentials remain outside the container; every request requires canonical current admission and retained maximum liability.",
     "Cancellation fences new requests; in-flight provider cancellation is not asserted and unknown liability remains held.",
   ],
-}; export const KNOWN_HARNESS_MANIFESTS = [
-   CODEX_BEDROCK_V1_HARNESS_MANIFEST, CODEX_V1_HARNESS_MANIFEST,
+};
+
+/** Non-inference adapter: an empty model set is intentional in manifest v2. */
+export const LEGACY_ISOLATED_INVOCATION_RUNTIME_ARTIFACT: HarnessRuntimeArtifactIdentity = {
+  schemaVersion: "harness-runtime-artifact/v1", kind: "CONTAINER_IMAGE", name: "isolated-invocation", version: "1",
+  executableSha256: null, imageDigest: "sha256:344d935793250b44e958a5b09b312656559b48468270a76446f51f7f24aac1a1",
+};
+export const LEGACY_ISOLATED_INVOCATION_EFFECTIVE_CONFIG = {
+  operations: ["render-markdown/v1", "synthetic-receipt/v1"], inference: "DENIED", egress: "DENY_ALL", maxProviderCalls: 0,
+  bridgeImplementationDigest: "sha256:c4267e0a33139a2c56d3c58db5ae28b8197942a84506e41d8f47de50d305629c",
+  backendImplementationDigest: "sha256:7058a8d87d7b7f2b9037e5ec04065b734f7225d9e135f62a6d9cbf6d7e7d90ab",
+  dockerExecutableSha256: "4357f91be750f42d984cd76f92dc7be198c57c31bc50b9a28ee88119e9d1c92e",
+  dockerHost: "unix:///var/run/docker.sock",
+  invocationSchema: "factory-isolated-invocation/v2", resultSchema: "factory-isolated-result/v2",
+};
+/** Worker-loaded backend bytes, distinct from the container runtime artifact. */
+export const LEGACY_ISOLATED_INVOCATION_ADAPTER_ARTIFACT: HarnessRuntimeArtifactIdentity = {
+  schemaVersion: "harness-runtime-artifact/v1", kind: "EXECUTABLE", name: "docker-chroot-offline", version: "1",
+  executableSha256: LEGACY_ISOLATED_INVOCATION_EFFECTIVE_CONFIG.backendImplementationDigest.slice("sha256:".length), imageDigest: null,
+};
+export const LEGACY_ISOLATED_INVOCATION_MANIFEST: HarnessCapabilityManifest = {
+  schemaVersion: "harness-capability-manifest/v2", scope: "ADAPTER_EFFECTIVE",
+  identity: { harnessId: "isolated-invocation", harnessVersion: "1", adapterId: "isolated-invocation", adapterVersion: "1",
+    harnessCommit: "0d1a0908cce380d815069ce0a59e1604d2f26ece" },
+  effectiveConfigSha256: canonicalHash(LEGACY_ISOLATED_INVOCATION_EFFECTIVE_CONFIG),
+  models: { providerSelection: "UNSUPPORTED", modelSelection: "UNSUPPORTED", supported: [], reasoningControls: "UNSUPPORTED" },
+  filesystem: { read: "UNSUPPORTED", write: "UNSUPPORTED", pathAllowlist: "UNSUPPORTED", changedFileCapture: "UNSUPPORTED" },
+  shell: { available: "UNSUPPORTED", commandTimeout: "SUPPORTED", processTreeCancellation: "SUPPORTED", credentialEnvironmentScrub: "SUPPORTED" },
+  git: { status: "UNSUPPORTED", diff: "UNSUPPORTED", commit: "UNSUPPORTED", branch: "UNSUPPORTED", remotePublication: "UNSUPPORTED" },
+  browser: { webSearch: "UNSUPPORTED", webFetch: "UNSUPPORTED", interactiveBrowser: "UNSUPPORTED" },
+  tools: { native: "UNSUPPORTED", mcp: "UNSUPPORTED", structuredOutput: "SUPPORTED", telemetry: "SUPPORTED" },
+  subagents: { available: "UNSUPPORTED", parallel: "UNSUPPORTED", background: "UNSUPPORTED", eventVisibility: "UNSUPPORTED" },
+  streaming: { events: "SUPPORTED", modelDeltas: "UNSUPPORTED", durableReplay: "UNSUPPORTED" },
+  context: { persistentSessions: "UNSUPPORTED", resume: "UNSUPPORTED", fork: "UNSUPPORTED", compaction: "UNSUPPORTED", instructionFiles: "UNSUPPORTED" },
+  headless: { support: "SUPPORTED", mode: "API" },
+  cancellation: { support: "SUPPORTED", mode: "PROCESS_SIGNAL", idempotentCleanup: true },
+  sandbox: { isolationModes: ["WORKSPACE_WRITE"], externalSandboxRecommended: true, requirements: ["isolated-container", "no-host-mounts", "deny-egress"] },
+  network: { providerApi: false, packageInstall: false, runtimeEgressControl: "SUPPORTED", destinations: [] },
+  credentials: { classes: [], passedToToolProcesses: false, redaction: "SUPPORTED" },
+  telemetry: { tokens: "UNSUPPORTED", cost: "UNSUPPORTED", toolCalls: "SUPPORTED", modelRequests: "SUPPORTED", retries: "SUPPORTED" },
+  admission: { maturity: "EXPERIMENTAL", executionBackends: ["isolated-container"], requiredExternalControls: [...REQUIRED_EXTERNAL_CONTROLS], prohibitedAuthorities: [...PROHIBITED_AUTHORITIES] },
+  limitations: ["Offline deterministic execution only; no provider transport or model selection.", "Canonical Attempt and independently qualified exact composition required."],
+};
+
+/** Version 2 adds the separately controlled byte verifier and immutable
+ * container identity evidence. Version 1 remains frozen for history. */
+export const ISOLATED_INVOCATION_RUNTIME_ARTIFACT: HarnessRuntimeArtifactIdentity = {
+  ...LEGACY_ISOLATED_INVOCATION_RUNTIME_ARTIFACT,
+  version: "2",
+  imageDigest: "sha256:cc7a1d50410a1cc12fbb2fe51695e977c581e9bafd39519110f9b7d02ae118d9",
+};
+export const ISOLATED_INVOCATION_EFFECTIVE_CONFIG = {
+  ...LEGACY_ISOLATED_INVOCATION_EFFECTIVE_CONFIG,
+  operations: ["render-markdown/v1", "synthetic-receipt/v1", "verify-document-bytes/v1"],
+  bridgeImplementationDigest: "sha256:c5b17dadca069427942c924157bd6dd3cd3f969c7541af591c8bfffbd4009ecf",
+  backendImplementationDigest: "sha256:501ce5e0d830ff20e0cb6ce040f1d0c4e6c8ea29b60bb885180be09f1af68447",
+};
+export const ISOLATED_INVOCATION_ADAPTER_ARTIFACT: HarnessRuntimeArtifactIdentity = {
+  ...LEGACY_ISOLATED_INVOCATION_ADAPTER_ARTIFACT,
+  version: "2",
+  executableSha256: ISOLATED_INVOCATION_EFFECTIVE_CONFIG.backendImplementationDigest.slice("sha256:".length),
+};
+export const ISOLATED_INVOCATION_MANIFEST: HarnessCapabilityManifest = {
+  ...LEGACY_ISOLATED_INVOCATION_MANIFEST,
+  identity: {
+    harnessId: "isolated-invocation",
+    harnessVersion: "2",
+    adapterId: "isolated-invocation",
+    adapterVersion: "2",
+    harnessCommit: "8226f8f4bcdb73d4389a33d8ba0efe05dec4fcfa",
+  },
+  effectiveConfigSha256: canonicalHash(ISOLATED_INVOCATION_EFFECTIVE_CONFIG),
+  sandbox: {
+    ...LEGACY_ISOLATED_INVOCATION_MANIFEST.sandbox,
+    isolationModes: ["READ_ONLY", "WORKSPACE_WRITE"],
+  },
+};
+
+export const KNOWN_HARNESS_MANIFESTS = [
+  CODEX_BEDROCK_V1_HARNESS_MANIFEST,
+  CODEX_V1_HARNESS_MANIFEST,
   DEEPSEEK_V1_HARNESS_MANIFEST,
+  LEGACY_ISOLATED_INVOCATION_MANIFEST,
+  ISOLATED_INVOCATION_MANIFEST,
 ] as const;
 
 const KNOWN_HARNESS_RUNTIME_ARTIFACTS = [
-   {
-    adapterId: "codex",
-    adapterVersion: "bedrock-v1",
-    artifact: CODEX_V1_RUNTIME_ARTIFACT,
-  }, { adapterId: "codex", adapterVersion: "v1", artifact: CODEX_V1_RUNTIME_ARTIFACT },
+  { adapterId: "codex", adapterVersion: "bedrock-v1", artifact: CODEX_V1_RUNTIME_ARTIFACT },
+  { adapterId: "isolated-invocation", adapterVersion: "1", artifact: LEGACY_ISOLATED_INVOCATION_RUNTIME_ARTIFACT },
+  { adapterId: "isolated-invocation", adapterVersion: "2", artifact: ISOLATED_INVOCATION_RUNTIME_ARTIFACT },
+  { adapterId: "codex", adapterVersion: "v1", artifact: CODEX_V1_RUNTIME_ARTIFACT },
   { adapterId: "deepseek-harness", adapterVersion: "0.2.0", artifact: DEEPSEEK_V1_RUNTIME_ARTIFACT },
 ] as const;
 

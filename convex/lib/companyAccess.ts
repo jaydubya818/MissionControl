@@ -172,7 +172,13 @@ function roleGrantsFactoryPermission(
   role: Doc<"roles">,
   permission: FactoryPermission
 ): boolean {
-  if (role.permissions.includes(permission) || isCompanyAdminRole(role)) return true;
+  if (role.permissions.includes(permission)) {
+    if (permission === FACTORY_PERMISSIONS.MANAGE_AUTOMATION && role.metadata?.temporaryAutomationGrant) {
+      return temporaryFactoryAutomationGrantIsCurrent(role.metadata.temporaryAutomationGrant, Date.now());
+    }
+    return true;
+  }
+  if (isCompanyAdminRole(role)) return true;
 
   const deliveryPermission: Partial<Record<FactoryPermission, CompanyPermission>> = {
     [FACTORY_PERMISSIONS.IMPROVE]: COMPANY_PERMISSIONS.UPDATE_DELIVERY,
@@ -220,6 +226,18 @@ function roleGrantsFactoryPermission(
   return legacyPermissionAliases[permission].some((candidate) =>
     role.permissions.includes(candidate)
   );
+}
+
+export function temporaryFactoryAutomationGrantIsCurrent(grant: unknown, now: number) {
+  const value = grant as Record<string, unknown> | null;
+  return Boolean(value
+    && value.authorization === "216b51ff-ab61-4b07-9cc2-391e0ec89a8d"
+    && value.masterAuthorization === "e11b3640-f44f-4e0b-bb00-82d94ae19984"
+    && Number.isSafeInteger(value.grantedAt) && Number.isSafeInteger(value.expiresAt)
+    && Number(value.grantedAt) <= now && now < Number(value.expiresAt)
+    && Number(value.expiresAt) - Number(value.grantedAt) <= 10 * 60_000
+    && Array.isArray(value.originalPermissions)
+    && !value.originalPermissions.includes(FACTORY_PERMISSIONS.MANAGE_AUTOMATION));
 }
 
 async function getAuthenticatedOperators(ctx: CompanyCtx) {

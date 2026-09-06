@@ -1,4 +1,5 @@
 import { resolveCurrentAttemptExecutionProfile, executionProfileProjectionFromFactoryVersion, hasAnyExecutionProfileBinding } from "../lib/attemptExecutionProfile";
+import { NO_INFERENCE_CONSTRAINT, isNoInferenceConstraint } from "../lib/offlineExecutionPolicy";
 import { v } from "convex/values";
 import { dockerRequestRecoveryMatches } from "../lib/dockerAllocationRecovery";
 import { internalAction, internalMutation, internalQuery, mutation } from "../_generated/server";
@@ -86,6 +87,20 @@ import { executionProfileProjectionBlockers } from "../lib/executionProfile";
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "../lib/companyAccess";
 import { assertAuthorizedDeliveryRecord } from "../lib/deliveryAuthorization";
 import { buildLocalCandidateRecoveryRows } from "../lib/localCandidateRecovery";
+import { assertQualificationActivation } from "../lib/factoryQualificationScope";
+import { offlineAttemptSourceCurrentnessIssues } from "../lib/factoryAttempt";
+import { validateOfflineAttemptEvidence } from "../lib/offlineAttemptEvidence";
+import { canonicalIsolatedInvocation } from "@mission-control/workflow-engine/harness-contract";
+import { offlineAttemptClaimWindowExpired, reserveOfflineAttemptBudget } from "../lib/offlineAttemptBudget";
+import { buildWorkOrderTaskAuthority, workOrderTaskAuthorityIssue } from "../lib/taskAuthority";
+import {
+  assertLocalRepositoryHost,
+  assertRepositoryPublicationAllowed,
+  isLocalQualificationRepository,
+  loadLocalRepositoryAdmission,
+} from "../lib/localRepositoryAdmission";
+import { deterministicFactoryOperation } from "../lib/factoryWorkflowContract";
+import { mapOfflineVerification } from "../lib/offlineVerification";
 
 const EVENT_TYPES = new Set([
   "RUN_STARTED", "STEP_STARTED", "STEP_COMPLETED", "TOOL_CALLED",
@@ -112,6 +127,61 @@ const ARTIFACT_TYPES = new Set([
   "STRUCTURED_OUTPUT", "AUTOMATION_DESIGN", "AUTOMATION_OUTPUT_SNAPSHOT", "OTHER",
 ]);
 
+async function offlineAttemptAuthorityIssues(ctx: any, run: any, args: any, now: number): Promise<string[]> {
+  const version = run.factoryDefinitionVersionId ? await ctx.db.get(run.factoryDefinitionVersionId) : null;
+  const workOrder = run.workOrderId ? await ctx.db.get(run.workOrderId) : null;
+  const [task, plan, mission, factoryDefinition, workflow, repository] = await Promise.all([
+    run.parentTaskId ? ctx.db.get(run.parentTaskId) : null,
+    workOrder?.missionPlanId ? ctx.db.get(workOrder.missionPlanId) : null,
+    workOrder?.missionId ? ctx.db.get(workOrder.missionId) : null,
+    version?.factoryDefinitionId ? ctx.db.get(version.factoryDefinitionId) : null,
+    version?.workflowId ? ctx.db.get(version.workflowId) : null,
+    run.repositoryId ? ctx.db.get(run.repositoryId) : null,
+  ]);
+  const worker = mutationWorkerIdentity(args);
+  if (!worker) return ["OFFLINE_WORKER_IDENTITY_REQUIRED"];
+  const sourceAttempt = run.attemptPurpose === "VERIFICATION" && run.verificationAttemptBinding?.sourceAttemptId
+    ? await ctx.db.get(run.verificationAttemptBinding.sourceAttemptId) : undefined;
+  const issues = offlineAttemptSourceCurrentnessIssues({ run, workOrder, task, plan, mission, factoryDefinition, sourceAttempt,
+    factoryVersion: version, workflow, repository, leaseId: args.leaseId, ownerId: args.ownerId, worker, now });
+  const manifest = run.executionManifest;
+  const budget = run.executionCostAuthorization;
+  if (!budget || budget.schema !== "work-order-offline-cost-authorization/v1"
+    || budget.reservationId !== run.runId || manifest?.budgetReservationId !== run.runId
+    || budget.factoryConfigurationDigest !== run.factoryConfigurationDigest || budget.executionProfileDigest !== run.executionProfileDigest
+    || budget.maxProviderCalls !== 0 || budget.maxProviderLiabilityUsd !== 0
+    || !Number.isFinite(budget.reservedCostUsd) || budget.reservedCostUsd <= 0
+    || !Number.isFinite(budget.hardLimitUsd) || budget.hardLimitUsd < budget.reservedCostUsd
+    || budget.hardLimitUsd > (version?.budget?.maxCostUsd ?? 0)
+    || !Number.isFinite(run.startedAt) || now - run.startedAt > (manifest?.retryPolicy?.maxTotalWallClockMs ?? 0)) issues.push("OFFLINE_BUDGET_AUTHORITY_INVALID");
+  const policy = version?.policyEnvelopeId ? await ctx.db.get(version.policyEnvelopeId) : null;
+  if (!policy?.active || policy.projectId !== run.projectId) issues.push("OFFLINE_POLICY_NOT_CURRENT");
+  if (budget) {
+    const { authorizationDigest, ...frozen } = budget;
+    if (computeCanonicalHash(frozen) !== authorizationDigest || budget.policyEnvelopeId !== policy?._id
+      || budget.policyEnvelopeDigest !== computeCanonicalHash(policy)
+      || budget.workOrderPolicyDigest !== computeCanonicalHash(workOrder?.metadata?.implementationPolicy ?? null)) issues.push("OFFLINE_BUDGET_DIGEST_INVALID");
+  }
+  if (workOrder) {
+    const approvals = await ctx.db.query("approvalDecisions").withIndex("by_work_order_revision", (q: any) => q
+      .eq("workOrderId", workOrder._id).eq("workOrderRevisionNumber", workOrder.currentRevisionNumber ?? 1)).collect();
+    const latest = latestApprovalByType(approvals);
+    if (requiredApprovalTypes({ riskLevel: workOrder.riskLevel, requiredApprovals: workOrder.requiredApprovals,
+      isMutating: workOrder.isMutating }).some(type => {
+        const decision = latest.get(type) as any;
+        return !decision || decision.workOrderRevisionNumber !== workOrder.currentRevisionNumber || !isApprovalUsable(decision, now);
+      })) issues.push("OFFLINE_HUMAN_APPROVAL_NOT_CURRENT");
+  }
+  try {
+    assertQualificationActivation({ definition: factoryDefinition, version,
+      environment: version?.environmentId ? await ctx.db.get(version.environmentId) : null,
+      configuredEnvironmentId: process.env.MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID, now });
+  } catch { issues.push("OFFLINE_QUALIFICATION_ACTIVATION_INVALID"); }
+  try { await resolveCurrentAttemptExecutionProfile(ctx, version, run, manifest, now); }
+  catch { issues.push("OFFLINE_PROFILE_NOT_CURRENT"); }
+  return [...new Set(issues)];
+}
+
 function factoryExecutionManifestBackend(manifest: any): string | undefined {
   return isDecomposedExecutionManifest(manifest)
     ? manifest.executionBackend
@@ -133,7 +203,8 @@ function factoryExecutionManifestModelRoute(manifest: any) {
 
 function isDecomposedExecutionManifest(manifest: any) {
   return manifest?.version === "factory-execution-manifest/v2"
-    || manifest?.version === "factory-execution-manifest/v3";
+    || manifest?.version === "factory-execution-manifest/v3"
+    || manifest?.version === "factory-execution-manifest/v4";
 }
 
 function executionProfileEvidence(run: any) {
@@ -160,7 +231,7 @@ function executionProfileEvidence(run: any) {
     ...(profile?.runtimeArtifact?.digest ? { runtimeArtifactDigest: profile.runtimeArtifact.digest } : {}),
     ...(profile?.executionBackend ? { executionBackend: profile.executionBackend } : {}),
     ...(profile?.modelRoute ? {
-      modelRoute: {
+      modelRoute: profile.executionBackend === "isolated-container" ? profile.modelRoute : {
         catalogId: profile.modelRoute.catalogId,
         routeDigest: profile.modelRoute.routeDigest,
         qualificationDigest: profile.modelRoute.qualificationDigest,
@@ -468,6 +539,15 @@ export const claimInternal = internalMutation({
     }
     const frozenManifest = run.executionManifest as any;
     const executionBackend = version.executionBackend ?? "persistent-worker";
+    const offline = executionBackend === "isolated-container";
+    // Fail closed until the unpublished-candidate handoff and independent
+    // verifier integration are admitted and qualified together.
+    if (offline) throw new Error("Offline canonical claim remains blocked pending independent-verifier handoff qualification.");
+    if (offline && (frozenManifest.version !== "factory-execution-manifest/v4"
+      || !isNoInferenceConstraint(frozenManifest.inferenceConstraint) || frozenManifest.modelRoute !== undefined
+      || version.modelCatalogId !== undefined || !args.workerId || !args.workerSessionId)) {
+      throw new Error("Offline claim requires the exact deterministic composition and canonical worker identity.");
+    }
     const verificationSourceAttempt = run.attemptPurpose === "VERIFICATION"
       && run.verificationAttemptBinding?.sourceAttemptId
       ? await ctx.db.get(run.verificationAttemptBinding.sourceAttemptId)
@@ -508,7 +588,7 @@ export const claimInternal = internalMutation({
       ))
       || version.executor.adapter !== run.executorAdapter
       || version.executor.version !== run.executorVersion
-      || !version.modelCatalogId
+      || (!offline && (!version.modelCatalogId
       || !modelRoute
       || manifestModelRoute?.catalogId !== String(version.modelCatalogId)
       || manifestModelRoute?.routeDigest !== version.modelRouteDigest
@@ -524,7 +604,7 @@ export const claimInternal = internalMutation({
         version,
         harness: frozenHarness,
         executionBackend,
-      })
+      })))
       || factoryExecutionManifestBackend(frozenManifest) !== executionBackend
       || !factoryAttemptSourceBindingMatches({
         attemptPurpose: run.attemptPurpose,
@@ -584,7 +664,7 @@ export const claimInternal = internalMutation({
     const remoteExecutionPolicy = evaluateRepositoryRemoteExecutionPolicy({
       executionBackend,
       repositoryDataClassification,
-      sandboxProfileSnapshot: frozenManifest.sandbox?.profileSnapshot,
+      sandboxProfileSnapshot: offline ? version.sandboxProfileSnapshot : frozenManifest.sandbox?.profileSnapshot,
       dataBoundaryCount: workOrder.dataBoundaries?.length ?? 0,
     });
     if (!remoteExecutionPolicy.allowed) {
@@ -671,10 +751,11 @@ export const claimInternal = internalMutation({
           isolation: manifest.harness?.isolation,
           sandboxCapabilities: manifest.harness?.requiredCapabilities ?? [],
           executionBackend,
+          ...(offline ? { inferenceConstraint: NO_INFERENCE_CONSTRAINT } : {}),
           factoryDefinitionVersionId: manifest.causation?.factoryDefinitionVersionId,
           factoryConfigurationDigest: manifest.causation?.factoryConfigurationDigest,
           modelRouteDigest: manifestModelRoute?.routeDigest,
-          sandboxProfileDigest: manifest.sandbox?.profileDigest,
+          sandboxProfileDigest: offline ? version.sandboxProfileDigest : manifest.sandbox?.profileDigest,
         },
         activeWorkerLeaseCount,
         now,
@@ -694,6 +775,43 @@ export const claimInternal = internalMutation({
       now,
     });
     if (!decision.ok) return { claimed: false as const, reason: decision.reason };
+    if (offline) {
+      if (run.factoryContinuation) throw new Error("Offline claims cannot carry publication continuations.");
+      if (offlineAttemptClaimWindowExpired({
+        status: run.status,
+        startedAt: run.startedAt,
+        lease: run.lease,
+        maxTotalWallClockMs: frozenManifest.retryPolicy?.maxTotalWallClockMs,
+      }, now)) {
+        return await failExpiredUnclaimedOfflineAttempt(ctx, run);
+      }
+      const task = run.parentTaskId ? await ctx.db.get(run.parentTaskId) : null;
+      if (!task || task.projectId !== run.projectId || task.tenantId !== run.tenantId
+        || task.workOrderId !== run.workOrderId || !["READY", "IN_PROGRESS"].includes(task.status)
+        || workOrderTaskAuthorityIssue({ scope: task.metadata?.authorityScope, workOrder })) {
+        throw new Error("Offline claim requires its exact governed ready or running Task.");
+      }
+      const taskAttempts = await ctx.db.query("workflowRuns")
+        .withIndex("by_parent_task", (q: any) => q.eq("parentTaskId", task._id)).collect();
+      if (taskAttempts.some((attempt: any) => attempt._id !== run._id
+        && ["PENDING", "RUNNING", "PAUSED", "WAITING_APPROVAL"].includes(attempt.status))) {
+        throw new Error("Offline Task has another active Attempt.");
+      }
+      if (task.status === "READY") {
+        // The enclosing mutation owns both Task transition and Attempt lease.
+        // All later integrity failures throw and roll back both writes.
+        await ctx.db.patch(task._id, { status: "IN_PROGRESS", stateEnteredAt: now, startedAt: task.startedAt ?? now });
+        await ctx.db.insert("taskTransitions", { tenantId: task.tenantId, projectId: task.projectId,
+          idempotencyKey: `offline-task-claim:${String(run._id)}:${args.leaseId}`, taskId: task._id,
+          fromStatus: "READY", toStatus: "IN_PROGRESS", actorType: "SYSTEM", actorUserId: `service:${args.ownerId}`,
+          reason: `Exact offline Attempt ${run.runId} claimed.`, validationResult: { valid: true },
+          artifactsSnapshot: { workflowRunId: run._id, executionManifestDigest: run.executionManifestDigest,
+            authorityScope: task.metadata?.authorityScope } });
+      }
+      const issues = await offlineAttemptAuthorityIssues(ctx, { ...run, status: "RUNNING", lease: decision.lease },
+        { ...args, workerGeneration: decision.lease.workerGeneration }, now);
+      if (issues.length) throw new Error(`Offline claim authority is invalid (${issues.join(",")}).`);
+    }
 
     let publicationCheckpoint: any;
     if (["READY_TO_PUBLISH", "PUBLICATION_AUTHORIZED"].includes(run.factoryContinuation?.status ?? "")) {
@@ -890,6 +1008,9 @@ export const claimInternal = internalMutation({
       workflowRunId: run._id,
       runId: run.runId,
       lease: decision.lease,
+      parentTaskId: run.parentTaskId,
+      executionProfileId: run.executionProfileId,
+      executionProfileDigest: run.executionProfileDigest,
       projectId: run.projectId,
       repositoryId: repository._id,
       repository: repository.repository,
@@ -948,6 +1069,8 @@ export const authorizePublicationInternal = internalMutation({
       || !await factoryLeaseRegistrationIsCurrent(ctx, run)) {
       throw new Error("Factory publication authorization requires the active matching lease.");
     }
+    const repository = run.repositoryId ? await ctx.db.get(run.repositoryId) : null;
+    assertRepositoryPublicationAllowed(repository);
     if (!run.workOrderId) throw new Error("Factory publication requires a WorkOrder-bound Attempt.");
     const workOrder = await ctx.db.get(run.workOrderId);
     if (!workOrder || workOrder.currentExecutionRunId !== run._id
@@ -1086,6 +1209,10 @@ export const renewInternal = internalMutation({
     if (!await factoryLeaseRegistrationIsCurrent(ctx, run)) {
       return { renewed: false as const, reason: "worker-registration-stale" };
     }
+    if ((run.executionManifest as any)?.version === "factory-execution-manifest/v4") {
+      const issues = await offlineAttemptAuthorityIssues(ctx, run, args, Date.now());
+      if (issues.length) return { renewed: false as const, reason: issues.join(",") };
+    }
     const result = renewAttemptLease({
       lease: run.lease,
       leaseId: args.leaseId,
@@ -1104,6 +1231,32 @@ export const renewInternal = internalMutation({
   },
 });
 
+function validateStoredOfflineResponse(
+  artifact: any,
+  request: Parameters<typeof validateOfflineAttemptEvidence>[1],
+  run: any,
+  args: any,
+) {
+  const metadata = artifact?.metadata;
+  if (!run || !artifact || artifact.workflowRunId !== run._id || artifact.projectId !== run.projectId
+    || artifact.tenantId !== run.tenantId || artifact.workOrderId !== run.workOrderId
+    || artifact.missionId !== run.missionId || artifact.artifactType !== "STRUCTURED_OUTPUT"
+    || artifact.idempotencyKey !== `factory:${run.runId}:${args.leaseId}:offline-response`
+    || artifact.producer !== `service:${args.ownerId}`
+    || metadata?.schema !== "factory-offline-attempt-evidence/v1" || metadata.evidenceOrigin !== "CONTROL_FIXTURE"
+    || metadata.authority !== "NONE" || metadata.behavioralPass !== false
+    || metadata.leaseId !== args.leaseId || metadata.workerId !== args.workerId
+    || metadata.workerSessionId !== args.workerSessionId || metadata.workerGeneration !== args.workerGeneration
+    || metadata.executionManifestDigest !== run.executionManifestDigest
+    || !["CURRENT_AT_INGESTION", "STALE_FENCED"].includes(metadata.disposition)) {
+    throw new Error("Stored offline response provenance is invalid.");
+  }
+  assertReportedExecutionProfileEvidence(metadata, executionProfileEvidence(run));
+  const parsed = validateOfflineAttemptEvidence(metadata.packet, request);
+  if (parsed.packetDigest !== artifact.contentHash) throw new Error("Stored offline response digest is invalid.");
+  return parsed;
+}
+
 export const reportInternal = internalMutation({
   args: {
     workflowRunId: v.id("workflowRuns"),
@@ -1116,6 +1269,73 @@ export const reportInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
+    // Worker-authored reports cannot impersonate server-authored lease or
+    // validated response records, including records belonging to other runs.
+    for (const artifact of Array.isArray(args.packet?.artifacts) ? args.packet.artifacts : []) {
+      if (String(artifact?.idempotencyKey ?? "").endsWith(":offline-response")
+        || artifact?.metadata?.schema === "factory-offline-attempt-evidence/v1") {
+        throw new Error("Offline response records require dedicated validated ingestion.");
+      }
+    }
+    for (const event of Array.isArray(args.packet?.events) ? args.packet.events : []) {
+      if (String(event?.idempotencyKey ?? "").startsWith("factory-lease:")) {
+        throw new Error("Factory lease events are server-authored records.");
+      }
+    }
+    if (run && (run.executionManifest as any)?.version === "factory-execution-manifest/v4"
+      && args.packet?.offlineExecution !== undefined) {
+      // This endpoint already authenticates the scoped service. An immutable
+      // claim event additionally binds its historical lease, even after expiry.
+      if ((run.attemptPurpose ?? "IMPLEMENTATION") !== "IMPLEMENTATION"
+        || run.factoryPurpose !== "SOFTWARE"
+        || run.executionManifest?.causation?.factoryPurpose !== "SOFTWARE"
+        || Object.keys(args.packet).join(",") !== "offlineExecution" || !mutationWorkerIdentity(args)) {
+        throw new Error("Offline evidence retention requires an evidence-only packet and complete worker identity.");
+      }
+      const claimEvent = await ctx.db.query("runEvents")
+        .withIndex("by_idempotency", q => q.eq("idempotencyKey", `factory-lease:${run.runId}:${args.leaseId}:claimed`)).first();
+      const claimed = claimEvent?.metadata as any;
+      if (!claimEvent || claimEvent.workflowRunId !== run._id || claimEvent.projectId !== run.projectId
+        || claimEvent.tenantId !== run.tenantId || claimEvent.actor !== `service:${args.ownerId}`
+        || !["CHECKPOINT_CREATED", "RUN_RESUMED"].includes(claimEvent.eventType)
+        || claimed?.leaseId !== args.leaseId || claimed.workerId !== args.workerId
+        || claimed.workerSessionId !== args.workerSessionId || claimed.workerGeneration !== args.workerGeneration
+        || claimed.executionManifestDigest !== run.executionManifestDigest) {
+        throw new Error("Offline evidence does not belong to an authenticated historical Attempt claim.");
+      }
+      const request = canonicalIsolatedInvocation({ ...run, executionManifest: run.executionManifest, _id: String(run._id), workOrderId: String(run.workOrderId),
+        parentTaskId: String(run.parentTaskId), executionProfileId: String(run.executionProfileId),
+        executionProfileDigest: run.executionProfileDigest!, executionManifestDigest: run.executionManifestDigest!,
+        lease: { leaseId: args.leaseId, ownerId: args.ownerId, workerId: args.workerId!,
+          workerSessionId: args.workerSessionId!, workerGeneration: args.workerGeneration! } });
+      const parsed = validateOfflineAttemptEvidence(args.packet.offlineExecution, request);
+      const idempotencyKey = `factory:${run.runId}:${args.leaseId}:offline-response`;
+      const existing = await ctx.db.query("runArtifacts").withIndex("by_idempotency", q => q.eq("idempotencyKey", idempotencyKey)).first();
+      if (existing) {
+        validateStoredOfflineResponse(existing, request, run, args);
+        if (existing.workflowRunId !== run._id || existing.contentHash !== parsed.packetDigest) {
+          throw new Error("Conflicting offline completion replay.");
+        }
+        return { retained: true, duplicate: true, authoritative: false, artifactId: existing._id };
+      }
+      const issues = await offlineAttemptAuthorityIssues(ctx, run, args, Date.now());
+      if (!await factoryLeaseRegistrationIsCurrent(ctx, run)) issues.push("WORKER_REGISTRATION_NOT_CURRENT");
+      const artifactId = await ctx.db.insert("runArtifacts", {
+        tenantId: run.tenantId, projectId: run.projectId, missionId: run.missionId,
+        workOrderId: run.workOrderId, workflowRunId: run._id, idempotencyKey,
+        artifactType: "STRUCTURED_OUTPUT", name: "Offline runtime response",
+        description: issues.length ? "Retained response from a stale or fenced Attempt; no completion authority." : "Captured deterministic runtime response; independent candidate verification required.",
+        contentHash: parsed.packetDigest, producer: `service:${args.ownerId}`, createdAt: Date.now(),
+        metadata: { schema: "factory-offline-attempt-evidence/v1", evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE",
+          behavioralPass: false, leaseId: args.leaseId, workerId: args.workerId, workerSessionId: args.workerSessionId,
+          workerGeneration: args.workerGeneration, executionManifestDigest: run.executionManifestDigest,
+          executionProfile: executionProfileEvidence(run), disposition: issues.length ? "STALE_FENCED" : "CURRENT_AT_INGESTION",
+          currentnessIssues: [...new Set(issues)], packet: args.packet.offlineExecution },
+      });
+      // Retention is deliberately separate from the existing candidate, verifier
+      // and publication mutations. No Task, Attempt or verification state changes.
+      return { retained: true, duplicate: false, authoritative: false, artifactId };
+    }
     if (!run || (run.attemptPurpose ?? "IMPLEMENTATION") !== "IMPLEMENTATION" || !factoryAttemptMutationIsAuthorized(run)
       || !activeLeaseMatches({
         lease: run.lease,
@@ -1126,6 +1346,19 @@ export const reportInternal = internalMutation({
       })
       || !await factoryLeaseRegistrationIsCurrent(ctx, run)) {
       throw new Error("Factory attempt report requires the active matching lease.");
+    }
+    if ((run.executionManifest as any)?.version === "factory-execution-manifest/v4") {
+      const issues = await offlineAttemptAuthorityIssues(ctx, run, args, Date.now());
+      if (issues.length) throw new Error(`Offline Attempt report is not current (${issues.join(",")}).`);
+      if (args.packet?.candidateReady || args.packet?.verification || args.packet?.terminal?.status === "COMPLETED") {
+        const evidence = await ctx.db.query("runArtifacts")
+          .withIndex("by_idempotency", q => q.eq("idempotencyKey", `factory:${run.runId}:${args.leaseId}:offline-response`)).first();
+        const request = canonicalIsolatedInvocation({ ...run, _id: String(run._id) } as any);
+        const retained = validateStoredOfflineResponse(evidence, request, run, args);
+        if (evidence?.metadata?.disposition !== "CURRENT_AT_INGESTION" || retained.result.status !== "SUCCESS") {
+          throw new Error("Offline candidate requires a retained current runtime success from this exact lease.");
+        }
+      }
     }
     const packet = args.packet && typeof args.packet === "object" ? args.packet : {};
     const events = Array.isArray(packet.events) ? packet.events : [];
@@ -1497,7 +1730,11 @@ export const reportInternal = internalMutation({
             && workOrder.verificationContract.enforcementMode === "ENFORCED"
             && completedRun.attemptPurpose === "IMPLEMENTATION" && completedRun.verificationSubject?.version !== 2) {
             try {
-              await schedulePolicyV2VerificationAttempt(ctx, workOrder, completedRun);
+              // A rejected schedule must not leave partial verifier records
+              // while this producer-completion transaction catches its error.
+              await ctx.runMutation(internal.factory.attempts.scheduleVerificationInternal, {
+                sourceAttemptId: completedRun._id,
+              });
             } catch (error) {
               const reason = `Independent verification dispatch is blocked: ${error instanceof Error ? error.message : String(error)}`;
               await ctx.db.patch(workOrder._id, {
@@ -1565,6 +1802,17 @@ export const reportVerificationInternal = internalMutation({
     if (!run.workOrderId || !run.verificationAttemptBinding || !run.factoryDefinitionVersionId) {
       throw new Error("Verification Attempt is missing its exact subject binding.");
     }
+    if ((run.executionManifest as any)?.version === "factory-execution-manifest/v4") {
+      const issues = await offlineAttemptAuthorityIssues(ctx, run, args, now);
+      if (issues.length) throw new Error(`Offline verifier authority is not current (${issues.join(",")}).`);
+      const completed = args.packet?.terminal?.status === "COMPLETED";
+      if (completed ? (!args.packet.offlineVerification || !args.packet.isolation
+        || Object.keys(args.packet).some(key => !["terminal", "offlineVerification", "isolation"].includes(key)))
+        : (!["FAILED", "CANCELED"].includes(args.packet?.terminal?.status)
+          || Object.keys(args.packet).some(key => key !== "terminal"))) {
+        throw new Error("Offline verifier reports require an exact typed result or terminal-only failure.");
+      }
+    }
     const [workOrder, sourceAttempt, verificationRun, factoryVersion] = await Promise.all([
       ctx.db.get(run.workOrderId),
       ctx.db.get(run.verificationAttemptBinding.sourceAttemptId),
@@ -1629,10 +1877,12 @@ export const reportVerificationInternal = internalMutation({
         artifactReferences: [],
         sourceRevision: sourceAttempt.executionBaseSha ?? "unknown",
         candidateRevision,
-        provenance: "LIVE",
+        provenance: (run.executionManifest as any)?.version === "factory-execution-manifest/v4" ? "SYNTHETIC" : "LIVE",
         recordedAt: now,
         metadata: {
           serverPersistedFailure: true,
+          ...((run.executionManifest as any)?.version === "factory-execution-manifest/v4"
+            ? { evidenceOrigin: "CONTROL_FIXTURE", behavioralPass: false, authority: "NONE" } : {}),
           terminalStatus: terminal.status,
           ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
         },
@@ -1681,8 +1931,31 @@ export const reportVerificationInternal = internalMutation({
       }
       return { accepted: true, terminalStatus: terminal.status, verdict: null };
     }
-    const packet = args.packet.verification;
+    const offlineResult = (run.executionManifest as any)?.version === "factory-execution-manifest/v4";
+    let packet = args.packet.verification;
+    let retainedOffline: ReturnType<typeof validateOfflineAttemptEvidence> | undefined;
+    let retainedOfflineArtifact: any;
+    if (offlineResult) {
+      retainedOfflineArtifact = await ctx.db.query("runArtifacts")
+        .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", `factory:${run.runId}:${args.leaseId}:offline-response`)).first();
+      retainedOffline = validateStoredOfflineResponse(retainedOfflineArtifact,
+        canonicalIsolatedInvocation({ ...run, _id: String(run._id) } as any), run, args);
+      if (retainedOfflineArtifact.metadata.disposition !== "CURRENT_AT_INGESTION"
+        || args.packet.isolation?.mode !== "ISOLATED_CONTAINER"
+        || args.packet.isolation?.sandboxId !== `docker:${retainedOffline.evidence.container?.id}`) {
+        throw new Error("Offline verifier isolation does not match its current retained resource identity.");
+      }
+      packet = await mapOfflineVerification({ retained: retainedOffline, packet: args.packet.offlineVerification,
+        workOrder, run, sourceAttempt, verificationRun, now });
+      for (const check of packet.checks) for (const draft of check.evidence ?? []) {
+        draft.metadata = { ...draft.metadata, evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE", behavioralPass: false,
+          ...(profileEvidence ? { executionProfile: profileEvidence } : {}) };
+      }
+    }
     const isolation = args.packet.isolation;
+    if (isolation?.mode === "ISOLATED_CONTAINER" && (run.executionManifest as any)?.version !== "factory-execution-manifest/v4") {
+      throw new Error("Isolated verifier evidence requires its exact admitted offline execution manifest.");
+    }
     if (!packet || !Array.isArray(packet.checks) || !isolation) {
       throw new Error("Completed Verification Attempt requires exact check evidence and an isolation attestation.");
     }
@@ -1848,10 +2121,12 @@ export const reportVerificationInternal = internalMutation({
             ? run.verificationAttemptBinding.verificationSubject.candidateSha
             : run.verificationAttemptBinding.verificationSubject.outputSnapshotContentHash,
           contentHash: draft.contentHash,
-          provenance: "LIVE",
+          provenance: offlineResult ? "SYNTHETIC" : "LIVE",
           recordedAt: now,
           metadata: {
             serverDerivedIndependence: true,
+            ...(offlineResult ? { evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE", behavioralPass: false,
+              retainedResponseArtifactId: retainedOfflineArtifact._id, retainedResponseDigest: retainedOffline!.packetDigest } : {}),
             verifierMetadata: draft.metadata,
             ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
           },
@@ -1945,6 +2220,8 @@ export const reportVerificationInternal = internalMutation({
       metadata: {
         policyVersion: 2,
         serverDerivedIndependence: true,
+        ...(offlineResult ? { qualificationOnly: true, evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE", behavioralPass: false,
+          retainedResponseArtifactId: retainedOfflineArtifact._id, retainedResponseDigest: retainedOffline!.packetDigest } : {}),
         ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
       },
     });
@@ -1986,6 +2263,7 @@ export const reportVerificationInternal = internalMutation({
         metadata: {
           policyVersion: 2,
           workOrderReceiptId: receiptId,
+          ...(offlineResult ? { qualificationOnly: true, evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE", behavioralPass: false } : {}),
           ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
         },
       });
@@ -2015,10 +2293,13 @@ export const reportVerificationInternal = internalMutation({
       metadata: { verificationPlanId: plan.planId, verificationPlanDigest: plan.planDigest, independenceValid: independence.passed },
     });
     await finishAttemptTrace(ctx, run, { status: "COMPLETED", completedAt: now, output: { verdict: decision.verdict } });
-    await ctx.runMutation(internal.workOrders.syncExecutionOutcome, {
+    // A nested mutation cannot observe this mutation's uncommitted terminal
+    // Attempt and receipts. The durable post-commit job synchronizes the
+    // WorkOrder/Mission first and then writes the exact quality-gate decision.
+    await ctx.scheduler.runAfter(0, internal.factory.attempts.syncCompletedVerificationOutcomeInternal, {
       workflowRunId: run._id,
-      eventType: "RUN_COMPLETED",
-      summary: `Independent Verification Attempt ${run.runId} completed with ${decision.verdict}`,
+      verificationRunId: verificationRun._id,
+      verdict: decision.verdict ?? "NO_VERDICT",
     });
     if (sourceAttempt.verificationSubject?.version === 2 && independence.passed
       && ["VERIFIED", "REQUIRES_HUMAN_REVIEW"].includes(decision.verdict ?? "")) {
@@ -2191,7 +2472,9 @@ async function persistPolicyV2CandidateReady(
     || !workOrder.verificationContractDigest || !workOrder.qualityContractDigest) {
     throw new Error("CANDIDATE_READY requires an enforced policy-v2 WorkOrder with frozen contract digests.");
   }
-  if (!repository?.providerRepositoryId || workOrder.currentRevisionNumber !== run.workOrderRevisionNumber
+  if (!repository?.providerRepositoryId
+    || repository.projectId !== run.projectId || workOrder.projectId !== run.projectId
+    || workOrder.currentRevisionNumber !== run.workOrderRevisionNumber
     || run.qualityContractDigest !== workOrder.qualityContractDigest
     || run.verificationContractDigest !== workOrder.verificationContractDigest) {
     throw new Error("Candidate publication lineage is stale for the WorkOrder or repository.");
@@ -2210,8 +2493,8 @@ async function persistPolicyV2CandidateReady(
   const metadata = (localCandidate ? codeDiffArtifact : pullRequestArtifact)?.metadata ?? {};
   const sourceRevision = frozenFactorySourceRevision(run, metadata.sourceRevision);
   const commonExact = candidate
-    && /^[0-9a-f]{40,64}$/.test(candidate.candidateSha)
-    && /^[0-9a-f]{40,64}$/.test(candidate.treeSha)
+    && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(candidate.candidateSha)
+    && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(candidate.treeSha)
     && candidate.baseRef === repository.defaultBranch
     && candidate.headRef === run.branch
     && metadata.headSha === candidate.candidateSha
@@ -2517,6 +2800,107 @@ export const retryVerification = mutation({
   },
 });
 
+export const resumeVerification = mutation({
+  args: {
+    workOrderId: v.id("workOrders"),
+    sourceAttemptId: v.id("workflowRuns"),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const reason = args.reason.trim();
+    if (reason.length < 10 || reason.length > 1_000) {
+      throw new Error("Verification resumption requires a reason between 10 and 1,000 characters.");
+    }
+    const [workOrder, sourceAttempt] = await Promise.all([
+      ctx.db.get(args.workOrderId),
+      ctx.db.get(args.sourceAttemptId),
+    ]);
+    if (!workOrder?.projectId || !workOrder.tenantId || sourceAttempt?.workOrderId !== workOrder._id) {
+      throw new Error("WorkOrder or source Attempt is unavailable or unauthorized.");
+    }
+    const access = await requireWorkspaceAccess(ctx, workOrder.tenantId, workOrder.projectId, {
+      permission: COMPANY_PERMISSIONS.DISPATCH_WORK,
+    });
+    assertAuthorizedDeliveryRecord(access, workOrder);
+    if (sourceAttempt.status !== "COMPLETED"
+      || sourceAttempt.attemptPurpose !== "IMPLEMENTATION"
+      || !sourceAttempt.candidateReadyAt
+      || !sourceAttempt.verificationSubject
+      || sourceAttempt.workOrderRevisionNumber !== (workOrder.currentRevisionNumber ?? 1)
+      || !workOrder.blockingIssue?.startsWith("Independent verification dispatch is blocked:")) {
+      throw new Error("Verification resumption requires the exact current candidate whose automatic dispatch was blocked.");
+    }
+    const result = await schedulePolicyV2VerificationAttempt(ctx, workOrder, sourceAttempt);
+    const actorId = access.membership.operatorId
+      ? String(access.membership.operatorId)
+      : "demo:company-administrator";
+    await ctx.db.insert("activities", {
+      tenantId: workOrder.tenantId,
+      projectId: workOrder.projectId,
+      actorType: "HUMAN",
+      actorId,
+      action: "VERIFICATION_DISPATCH_RESUMED",
+      description: `Resumed independent verification for ${workOrder.title}`,
+      targetType: "WORK_ORDER",
+      targetId: workOrder._id,
+      metadata: {
+        sourceAttemptId: sourceAttempt._id,
+        verificationAttemptId: result.workflowRun._id,
+        reason,
+      },
+    });
+    return result;
+  },
+});
+
+export const scheduleVerificationInternal = internalMutation({
+  args: { sourceAttemptId: v.id("workflowRuns") },
+  handler: async (ctx, args): Promise<any> => {
+    const sourceAttempt = await ctx.db.get(args.sourceAttemptId);
+    const workOrder = sourceAttempt?.workOrderId ? await ctx.db.get(sourceAttempt.workOrderId) : null;
+    if (!sourceAttempt || !workOrder || sourceAttempt.attemptPurpose !== "IMPLEMENTATION"
+      || workOrder.verificationContract?.schemaVersion !== 2
+      || workOrder.verificationContract.enforcementMode !== "ENFORCED"
+      || sourceAttempt.projectId !== workOrder.projectId
+      || sourceAttempt.workOrderRevisionNumber !== workOrder.currentRevisionNumber) {
+      throw new Error("Verification scheduling requires the exact current enforced producer lineage.");
+    }
+    return schedulePolicyV2VerificationAttempt(ctx, workOrder, sourceAttempt);
+  },
+});
+
+export const syncCompletedVerificationOutcomeInternal = internalMutation({
+  args: {
+    workflowRunId: v.id("workflowRuns"),
+    verificationRunId: v.id("verificationRuns"),
+    verdict: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.workflowRunId);
+    const verificationRun = await ctx.db.get(args.verificationRunId);
+    if (!run?.workOrderId || run.status !== "COMPLETED" || run.attemptPurpose !== "VERIFICATION"
+      || verificationRun?.workflowRunId !== run._id || verificationRun.status !== "COMPLETED") {
+      throw new Error("Post-commit verification synchronization requires exact completed verifier evidence.");
+    }
+    await ctx.runMutation(internal.workOrders.syncExecutionOutcome, {
+      workflowRunId: run._id,
+      eventType: "RUN_COMPLETED",
+      summary: `Independent Verification Attempt ${run.runId} completed with ${args.verdict}`,
+    });
+    const workOrder = await ctx.db.get(run.workOrderId);
+    if (!workOrder) throw new Error("Verified WorkOrder disappeared before quality-gate persistence.");
+    const current = await getCurrentVerificationResult(ctx, workOrder, Date.now());
+    await appendCurrentVerificationQualityGateDecision(
+      ctx,
+      workOrder,
+      current,
+      `verification-result:${String(verificationRun._id)}`,
+      Date.now(),
+    );
+    return { synced: true as const, current: current.current, eligible: current.eligible };
+  },
+});
+
 async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sourceAttempt: any) {
   const subject = sourceAttempt.verificationSubject;
   if (!subject || !sourceAttempt.candidateReadyAt || !candidateSourceCanBeVerified(sourceAttempt)) {
@@ -2535,7 +2919,10 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     && candidate.purpose === "VERIFICATION" && candidate.activeVersionId);
   if (!definition) throw new Error("Candidate is ready, but no active Verification Factory is configured for this repository.");
   const version = await ctx.db.get(definition.activeVersionId);
-  if (!version || version.factoryDefinitionId !== definition._id || version.purpose !== "VERIFICATION") {
+  if (!version || version.factoryDefinitionId !== definition._id || version.purpose !== "VERIFICATION"
+    || definition.projectId !== workOrder.projectId || version.projectId !== workOrder.projectId
+    || definition.tenantId !== workOrder.tenantId || version.tenantId !== workOrder.tenantId
+    || version.repositoryId !== sourceAttempt.repositoryId) {
     throw new Error("Active Verification Factory version is unavailable or has the wrong purpose.");
   }
   const [repository, workflow, assessments, bindings, codeScopes, agentVersions, modelRoute, sandboxProfile] = await Promise.all([
@@ -2554,6 +2941,20 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     ? await loadExecutionProfileAdmission(ctx, version.executionProfileId, now)
     : null;
   const executionProfile = profileAdmission?.profile ?? null;
+  const offlineVerification = version.executionBackend === "isolated-container";
+  if (offlineVerification) {
+    const environment = version.environmentId ? await ctx.db.get(version.environmentId) : null;
+    assertQualificationActivation({ definition, version, environment,
+      configuredEnvironmentId: process.env.MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID, now });
+    if (!executionProfile || !isNoInferenceConstraint(executionProfile.immutableSnapshot?.modelRoute)
+      || sourceAttempt.executionManifest?.version !== "factory-execution-manifest/v4"
+      || subject.provider !== "LOCAL_GIT" || workOrder.riskLevel !== "LOW"
+      || (workOrder.dataBoundaries?.length ?? 0) !== 0
+      || (version.agentBindings?.length ?? 0) !== 0 || version.modelCatalogId || version.modelRouteSnapshot
+      || (workflow?.metadata?.allowedTools?.length ?? 0) !== 0) {
+      throw new Error("Offline verification requires exact synthetic non-inference Factory authority.");
+    }
+  }
   const executionProfileReady = !verificationProfileFieldsPresent || Boolean(
     executionProfile
     && profileAdmission?.eligible
@@ -2597,7 +2998,7 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   const requiredSandboxCapabilities = executionBackend === "remote-sandbox"
     ? ["git-worktree", "read-only", "remote-sandbox", "sandbox-provider:exe-dev"]
     : ["git-worktree", "read-only"];
-  const eligibleBindings = repository ? bindings.filter((binding: any) => factoryWorkerEligibility({
+  const bindingEligibility = repository ? bindings.map((binding: any) => ({ binding, eligibility: factoryWorkerEligibility({
     worker: {
       workerId: binding.hostId,
       status: binding.status,
@@ -2626,7 +3027,10 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
       executionRuntimeArtifactSha256: frozenHarness.runtimeArtifactSha256,
       provider: workflowModelRoute?.provider ?? null,
       model: workflowModelRoute?.modelId ?? null,
-      harnessCapabilities: factoryHarnessCapabilityRequirements("READ_ONLY"),
+      ...(offlineVerification ? { inferenceConstraint: NO_INFERENCE_CONSTRAINT } : {}),
+      harnessCapabilities: offlineVerification
+        ? (executionProfile?.immutableSnapshot as any)?.requiredHarnessCapabilities ?? []
+        : factoryHarnessCapabilityRequirements("READ_ONLY"),
       isolation: "READ_ONLY",
       sandboxCapabilities: requiredSandboxCapabilities,
       executionBackend,
@@ -2637,7 +3041,10 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     },
     activeWorkerLeaseCount: 0,
     now,
-  }).eligible) : [];
+  }) })) : [];
+  const eligibleBindings = bindingEligibility
+    .filter(({ eligibility }: any) => eligibility.eligible)
+    .map(({ binding }: any) => binding);
   const host: any = repository ? selectCurrentFactoryHost(eligibleBindings as any[], repository.repository, now) : null;
   if (!repository || repository._id !== sourceAttempt.repositoryId || repository.status !== "READY"
     || repositoryDataClassification === "UNCLASSIFIED"
@@ -2646,10 +3053,8 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     || !workflow?.active || !assessment || assessment.status !== "PASS" || assessment.expiresAt <= now
     || assessment.configurationDigest !== version.configurationDigest || !host || host.dirty
     || agentVersions.some((agentVersion: any) => !agentVersion)
-    || !workflowModelRoute
-    || !modelRoute
     || !executionProfileReady
-    || !factoryWorkflowModelRouteMatches({
+    || (!offlineVerification && (!workflowModelRoute || !modelRoute || !factoryWorkflowModelRouteMatches({
       workflow,
       agentBindings: version.agentBindings ?? [],
       agentVersions,
@@ -2659,13 +3064,28 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
       version,
       harness: frozenHarness,
       executionBackend,
-    })
+    })))
     || (executionBackend === "remote-sandbox" && (
       !sandboxProfile
       || sandboxProfile.profileDigest !== version.sandboxProfileDigest
       || !sandboxProfileProductionEligible(sandboxProfile)
     ))) {
-    throw new Error("Candidate is ready, but the active Verification Factory no longer has current readiness for the exact repository and host.");
+    const reasons = [
+      !repository || repository._id !== sourceAttempt.repositoryId || repository.status !== "READY" ? "REPOSITORY" : null,
+      repositoryDataClassification === "UNCLASSIFIED" || repositoryDataClassification !== (version.repositoryDataClassification ?? "UNCLASSIFIED")
+        ? "CLASSIFICATION" : null,
+      !remoteExecutionPolicy.allowed ? "REMOTE_EXECUTION_POLICY" : null,
+      !workflow?.active ? "WORKFLOW" : null,
+      !assessment || assessment.status !== "PASS" || assessment.expiresAt <= now
+        || assessment.configurationDigest !== version.configurationDigest ? "ASSESSMENT" : null,
+      !host || host.dirty ? `HOST:${bindingEligibility.map(({ binding, eligibility }: any) =>
+        `${binding.hostId}=${eligibility.eligible ? "ELIGIBLE" : eligibility.reason}`).join("|") || "NONE"}` : null,
+      agentVersions.some((agentVersion: any) => !agentVersion) ? "AGENT_VERSION" : null,
+      !executionProfileReady ? "EXECUTION_PROFILE" : null,
+      !offlineVerification && !workflowModelRoute ? "MODEL_ROUTE" : null,
+      executionBackend === "remote-sandbox" && !sandboxProfile ? "SANDBOX_PROFILE" : null,
+    ].filter(Boolean);
+    throw new Error(`Candidate is ready, but the active Verification Factory no longer has current readiness for the exact repository and host (${reasons.join(",")}).`);
   }
   const runId = Math.random().toString(36).slice(2, 10);
   const executorInvocationId = `verification:${runId}`;
@@ -3130,6 +3550,24 @@ function safePrivatePreview(value: unknown) {
 
 async function factoryLeaseRegistrationIsCurrent(ctx: any, run: any) {
   if (!run.lease) return false;
+  const repository = run.repositoryId ? await ctx.db.get(run.repositoryId) : null;
+  if (isLocalQualificationRepository(repository)
+    || run.executionManifest?.repository?.mode === "LOCAL_SYNTHETIC_QUALIFICATION") {
+    try {
+      if (!run.lease.workerId || !run.lease.workerSessionId
+        || !Number.isSafeInteger(run.lease.workerGeneration) || run.lease.workerGeneration < 1
+        || !run.factoryDefinitionVersionId || !run.executionProfileId) return false;
+      const version = await ctx.db.get(run.factoryDefinitionVersionId);
+      if (!version || !repository) return false;
+      const localAdmission = await loadLocalRepositoryAdmission(ctx, repository, Date.now(), version);
+      const host = run.hostBindingId ? await ctx.db.get(run.hostBindingId) : null;
+      assertLocalRepositoryHost(localAdmission.admission, localAdmission.digest, host, Date.now());
+      const profileAdmission = await loadExecutionProfileAdmission(ctx, run.executionProfileId, Date.now());
+      if (!profileAdmission.eligible || profileAdmission.profile?.profileDigest !== run.executionProfileDigest) return false;
+    } catch {
+      return false;
+    }
+  }
   if (!run.lease.workerId && !run.lease.workerSessionId && run.lease.workerGeneration === undefined) {
     return true;
   }
@@ -3195,6 +3633,7 @@ async function assertFactoryPullRequestArtifact(
       throw new Error("Immutable subject publication binding cannot be replaced.");
     }
   }
+  assertRepositoryPublicationAllowed(repository);
   const validation = validateFactoryPullRequestLineage({
     artifact,
     expected: {
@@ -3281,6 +3720,59 @@ async function failLostAttempt(ctx: any, run: any, reason: string) {
     claimed: false as const,
     reason: "worker-lease-lost-new-attempt-required",
     disposition: "LOST" as const,
+    retryRequired: true as const,
+    terminal: true as const,
+  };
+}
+
+async function failExpiredUnclaimedOfflineAttempt(ctx: any, run: any) {
+  const now = Date.now();
+  const reason = "The offline Attempt expired before its first canonical worker lease; no executor boundary was crossed.";
+  await ctx.db.patch(run._id, {
+    status: "FAILED",
+    completedAt: now,
+    failureReason: reason,
+    failureClass: "RETRYABLE_INFRA",
+    failureCode: "OFFLINE_CLAIM_WINDOW_EXPIRED",
+    failureStage: "CLAIM",
+    retryable: true,
+    lease: undefined,
+    executionPhase: "TERMINAL",
+    runtimeDisposition: "RETRYABLE",
+    runtimeDispositionReason: reason,
+    runtimeReconciledAt: now,
+    steps: reconcileTerminalWorkflowSteps(run.steps, "FAILED", reason, now),
+  });
+  await insertEvent(ctx, run, {
+    idempotencyKey: `factory-offline-claim-expired:${run.runId}`,
+    eventType: "RUN_FAILED",
+    workflowStep: run.steps[run.currentStepIndex]?.stepId,
+    actor: "service:factory-control-plane",
+    status: "FAILED",
+    startedAt: run.startedAt,
+    endedAt: now,
+    errorCategory: "OFFLINE_CLAIM_WINDOW_EXPIRED",
+    errorSummary: reason,
+    commandSummary: "Unleased offline Attempt closed before executor admission",
+    metadata: {
+      disposition: "RETRYABLE",
+      executorBoundaryCrossed: false,
+      leaseIssued: false,
+      retryRequired: true,
+    },
+  });
+  await finishAttemptTrace(ctx, run, { status: "FAILED", completedAt: now, failureReason: reason });
+  if (run.workOrderId) {
+    await ctx.scheduler.runAfter(0, internal.workOrders.syncExecutionOutcome, {
+      workflowRunId: run._id,
+      eventType: "RUN_FAILED",
+      summary: reason,
+    });
+  }
+  return {
+    claimed: false as const,
+    reason: "offline-claim-window-expired",
+    disposition: "RETRYABLE" as const,
     retryRequired: true as const,
     terminal: true as const,
   };

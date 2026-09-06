@@ -78,6 +78,14 @@ export function isPublicOrchestrationRoute(method: string, requestPath: string):
     || PUBLIC_ROUTES.has(`${normalizedMethod} ${requestPath}`);
 }
 
+export function offlineQualificationRouteAllowed(method: string, requestPath: string) {
+  return new Set([
+    "GET /health",
+    "GET /status",
+    "POST /runs/factory-worker/tick",
+  ]).has(`${method.toUpperCase()} ${requestPath}`);
+}
+
 function tokensMatch(candidate: string, expected: string): boolean {
   const candidateBytes = Buffer.from(candidate, "utf8");
   const expectedBytes = Buffer.from(expected, "utf8");

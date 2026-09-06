@@ -11,6 +11,7 @@ import {
   type HarnessExecutorCapabilities,
   type HarnessRuntimeArtifactIdentity,
 } from "@mission-control/workflow-engine";
+import { ISOLATED_INVOCATION_MANIFEST, ISOLATED_INVOCATION_ADAPTER_ARTIFACT } from "@mission-control/workflow-engine/harness-contract";
 
 export interface HarnessAdapterBinding {
   adapter: string;
@@ -156,8 +157,16 @@ function validateCapabilities(capabilities: HarnessExecutorCapabilities) {
   }
   if (capabilities.executionBackends.length === 0
     || new Set(capabilities.executionBackends).size !== capabilities.executionBackends.length
-    || capabilities.executionBackends.some((backend) => !["persistent-worker", "remote-sandbox"].includes(backend))) {
+    || capabilities.executionBackends.some((backend) => !["persistent-worker", "remote-sandbox", "isolated-container"].includes(backend))) {
     throw new Error(`Harness adapter ${bindingKey(capabilities)} execution backends are invalid.`);
+  }
+  if (capabilities.executionBackends.includes("isolated-container")
+    && (capabilities.executionBackends.length !== 1 || capabilities.provider !== undefined
+      || capabilities.supportsRepositoryMutation || capabilities.supportsResume
+      || !capabilities.capabilityManifest
+      || harnessCapabilityManifestDigest(capabilities.capabilityManifest) !== harnessCapabilityManifestDigest(ISOLATED_INVOCATION_MANIFEST)
+      || harnessRuntimeArtifactDigest(capabilities.runtimeArtifact) !== harnessRuntimeArtifactDigest(ISOLATED_INVOCATION_ADAPTER_ARTIFACT))) {
+    throw new Error("Isolated worker registration requires the exact offline backend artifact and manifest without inference or repository authority.");
   }
   const authorityDomains = ["worker", "verification", "publication", "acceptance", "memory", "observability", "learning"] as const;
   const authorityKeys = Object.keys(capabilities.authority);

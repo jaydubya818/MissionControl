@@ -1,4 +1,96 @@
 import { verifyVerificationSubjectIdentity } from "@mission-control/workflow-engine/verification-subject";
+import { computeCanonicalHash } from "./genomeHash";
+import { deterministicFactoryVersionIssues } from "./factoryWorkflowContract";
+
+/** Pure source/currentness checks for the existing canonical Attempt. This
+ * cannot accept a result or mutate state; live profile and worker admission
+ * must additionally succeed in the same accepting mutation. */
+export function offlineAttemptSourceCurrentnessIssues(input: {
+  run: any; workOrder: any; task: any; plan: any; mission: any; factoryDefinition: any; factoryVersion: any; workflow: any; repository: any; sourceAttempt?: any;
+  leaseId: string; ownerId: string; worker: FactoryAttemptWorkerIdentity; now: number;
+}): string[] {
+  const { run, workOrder, task, plan, mission, factoryDefinition, factoryVersion, workflow, repository, now } = input;
+  const manifest = run?.executionManifest;
+  const causation = manifest?.causation;
+  const issues: string[] = [];
+  const verifier = run?.attemptPurpose === "VERIFICATION";
+  if (!run || manifest?.version !== "factory-execution-manifest/v4"
+    || !causation || manifest.executionBackend !== "isolated-container"
+    || run.executionManifestDigest !== `sha256:${computeCanonicalHash(manifest)}`
+    || causation.workflowRunId !== run.runId || causation.taskId !== run.parentTaskId
+    || causation.workOrderId !== run.workOrderId
+    || causation.factoryDefinitionVersionId !== run.factoryDefinitionVersionId
+    || causation.factoryConfigurationDigest !== run.factoryConfigurationDigest) return ["OFFLINE_ATTEMPT_IDENTITY_INVALID"];
+  if (!run.tenantId || [workOrder, task, plan, mission, factoryDefinition, factoryVersion, repository]
+    .some(record => record?.tenantId !== run.tenantId)) issues.push("TENANT_IDENTITY_MISMATCH");
+  if (run.status !== "RUNNING" || run.cancellationRequestedAt !== undefined) issues.push("ATTEMPT_NOT_RUNNING");
+  if (!activeLeaseMatches({ lease: run.lease, leaseId: input.leaseId, ownerId: input.ownerId, worker: input.worker, now })) issues.push("ATTEMPT_FENCED");
+  if (!workOrder || workOrder._id !== run.workOrderId || workOrder.projectId !== run.projectId
+    || workOrder.repositoryId !== run.repositoryId || workOrder.currentRevisionNumber !== causation.workOrderRevisionNumber
+    || workOrder.currentRevisionId !== causation.workOrderRevisionId
+    // The scheduled verifier owns the WorkOrder execution slot while it is
+    // claiming. Its immutable source binding is checked independently below;
+    // requiring the producer to remain current here would contradict both the
+    // scheduler patch and claimInternal's earlier current-Attempt fence.
+    || workOrder.currentExecutionRunId !== run._id
+    || (verifier && run.verificationAttemptBinding?.sourceAttemptId !== input.sourceAttempt?._id)
+    || !(verifier ? ["AWAITING_VERIFICATION"] : ["DISPATCHED", "IN_PROGRESS"]).includes(workOrder.state)
+    || workOrder.riskLevel !== "LOW" || (workOrder.dataBoundaries?.length ?? 0) !== 0
+    || workOrder.planningRepositorySha !== (verifier ? input.sourceAttempt?.executionBaseSha : manifest.repository?.baseSha)
+    || workOrder.qualityContractDigest !== causation.qualityContractDigest
+    || workOrder.missionId !== causation.missionId || workOrder.missionPlanId !== causation.missionPlanId) issues.push("WORK_ORDER_NOT_CURRENT");
+  if (!task || task._id !== run.parentTaskId || task.workOrderId !== run.workOrderId || task.projectId !== run.projectId
+    || task.status !== "IN_PROGRESS"
+    || task.title !== manifest.intent?.selectedTask?.title
+    || task.description !== manifest.intent?.selectedTask?.description) issues.push("TASK_NOT_CURRENT");
+  if (!mission || mission._id !== causation.missionId || mission.projectId !== run.projectId
+    || !["READY", "IN_PROGRESS"].includes(mission.state) || mission.currentPlanId !== causation.missionPlanId
+    || !plan || plan._id !== causation.missionPlanId || plan.missionId !== mission._id || plan.projectId !== run.projectId
+    || plan.status !== "APPROVED" || !plan.approvedBy || !Number.isFinite(plan.approvedAt)
+    || plan.revisionNumber !== causation.missionPlanVersion
+    || `sha256:${computeCanonicalHash(plan)}` !== causation.missionPlanDigest) issues.push("PLAN_NOT_CURRENT");
+  if (!repository || repository._id !== run.repositoryId || repository.projectId !== run.projectId
+    || repository.status !== "READY" || repository.dataClassification !== "PUBLIC"
+    || manifest.repository?.repositoryId !== run.repositoryId || manifest.repository?.repository !== repository.repository
+    || manifest.repository?.dataClassification !== "PUBLIC") issues.push("REPOSITORY_NOT_CURRENT");
+  const operation = manifest.workflow?.steps?.[0]?.operation;
+  const factoryOperation = verifier && operation?.reference === "verify-document-bytes/v1"
+    ? { reference: operation.reference, digest: operation.digest,
+      input: { path: operation.input?.path, expectedContentSha256: operation.input?.expectedContentSha256 } }
+    : operation;
+  if (verifier) {
+    const source = input.sourceAttempt;
+    const subject = run.verificationAttemptBinding?.verificationSubject;
+    if (run.factoryPurpose !== "VERIFICATION" || factoryVersion?.purpose !== "VERIFICATION"
+      || !source || source._id === run._id || source.status !== "COMPLETED" || source.attemptPurpose !== "IMPLEMENTATION"
+      || source.workOrderId !== run.workOrderId || source.repositoryId !== run.repositoryId || source.projectId !== run.projectId
+      || source.tenantId !== run.tenantId
+      || source.workOrderRevisionNumber !== causation.workOrderRevisionNumber
+      || !subject || !verifyVerificationSubjectIdentity(subject) || subject.provider !== "LOCAL_GIT"
+      || subject.sourceAttemptId !== source._id || subject.digest !== source.verificationSubject?.digest
+      || subject.candidateSha !== manifest.repository?.baseSha
+      || operation?.input?.subjectDigest !== subject.digest || operation?.input?.producerAttemptId !== source._id
+      || operation?.input?.candidateSha !== subject.candidateSha || operation?.input?.candidateTreeSha !== subject.treeSha) {
+      issues.push("VERIFICATION_SOURCE_NOT_CURRENT");
+    }
+  }
+  if (!factoryVersion || factoryVersion._id !== run.factoryDefinitionVersionId || factoryVersion.projectId !== run.projectId
+    || factoryVersion.repositoryId !== run.repositoryId || factoryVersion.configurationDigest !== run.factoryConfigurationDigest
+    || !factoryDefinition || factoryDefinition._id !== factoryVersion.factoryDefinitionId
+    || factoryDefinition.projectId !== run.projectId || factoryDefinition.activeVersionId !== factoryVersion._id
+    || factoryDefinition.status !== "ACTIVE" || deterministicFactoryVersionIssues(factoryVersion, workflow).length > 0
+    || workflow?._id !== factoryVersion.workflowId || workflow?.version !== manifest.workflow?.workflowVersion
+    || workflow?.workflowId !== manifest.workflow?.workflowId || workflow?.workflowId !== run.workflowId
+    || computeCanonicalHash(factoryOperation ?? null) !== computeCanonicalHash(factoryVersion?.deterministicOperation ?? null)) issues.push("FACTORY_NOT_CURRENT");
+  for (const record of [run, factoryVersion]) {
+    if (!record?.executionProfileId || computeCanonicalHash(manifest.executionProfile ?? null) !== computeCanonicalHash({
+      profileId: record.executionProfileId, profileKey: record.executionProfileKey, version: record.executionProfileVersion,
+      profileDigest: record.executionProfileDigest, profileSnapshot: record.executionProfileSnapshot,
+      qualificationDigest: record.executionProfileQualificationDigest, qualificationSnapshot: record.executionProfileQualificationSnapshot,
+    })) issues.push("PROFILE_BINDING_MISMATCH");
+  }
+  return issues;
+}
 
 export const MIN_FACTORY_LEASE_MS = 15_000;
 export const MAX_FACTORY_LEASE_MS = 120_000;

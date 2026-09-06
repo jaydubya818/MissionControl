@@ -11,7 +11,7 @@ export interface GraphRunLike {
   failureReason?: string;
   steps: Array<{
     status: GraphNodeStatus;
-    kind?: "AGENT" | "REDUCE" | "ROUTER" | "VERIFY" | "GATE";
+    kind?: "AGENT" | "REDUCE" | "ROUTER" | "VERIFY" | "GATE" | "DETERMINISTIC";
     error?: string;
   }>;
 }

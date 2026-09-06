@@ -69,6 +69,7 @@ function repository(id: string, name: string, providerRepositoryId: string) {
     _id: id,
     tenantId: "tenant-1",
     projectId: "project-1",
+    provider: "GITHUB",
     repository: name,
     providerRepositoryId,
     webhookStatus: "READY",

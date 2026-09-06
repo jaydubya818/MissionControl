@@ -391,7 +391,7 @@ export const verificationIndependenceValidator = v.object({
 export const verificationIsolationAttestationValidator = v.object({
   mode: v.union(
     v.literal("DETACHED_GIT_WORKTREE"), v.literal("FRESH_CLONE"), v.literal("REMOTE_SANDBOX"),
-    v.literal("AUTOMATION_SNAPSHOT"), v.literal("LOCAL_DOCKER_CANARY"),
+    v.literal("AUTOMATION_SNAPSHOT"), v.literal("LOCAL_DOCKER_CANARY"), v.literal("ISOLATED_CONTAINER"),
   ),
   sandboxId: v.string(),
   rootBindingDigest: v.string(),

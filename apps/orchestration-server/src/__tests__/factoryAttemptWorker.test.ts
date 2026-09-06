@@ -563,6 +563,9 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     await git(checkoutRoot, ["commit", "-m", "candidate"]);
     const candidateSha = (await git(checkoutRoot, ["rev-parse", "HEAD"])).stdout.trim();
     const treeSha = (await git(checkoutRoot, ["rev-parse", "HEAD^{tree}"])).stdout.trim();
+    await ensureFactoryWorktree({ checkoutRoot,
+      worktree: path.join(checkoutRoot, ".mission-control", "worktrees", "source-1"),
+      branch: "mc/source-attempt", baseSha: candidateSha });
     const run = {
       _id: "verification-attempt-1", runId: "verify-1", projectId: "project-1", repositoryId: "repository-1",
       factoryDefinitionVersionId: "verification-factory-v1", executionManifestDigest: "sha256:manifest-v2",

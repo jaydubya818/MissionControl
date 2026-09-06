@@ -1,3 +1,5 @@
+import { OFFLINE_EXECUTION_PROFILE_SCHEMA } from "./offlineExecutionPolicy";
+import { offlineSandboxEligible as isolatedSandboxEligible, assertLocalSandboxScope } from "./localQualificationSandbox";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import {
@@ -63,8 +65,9 @@ export async function loadExecutionProfileAdmission(
     };
   }
 
+  const offline = snapshot.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA;
   const [modelRoute, sandboxProfile, toolGrant] = await Promise.all([
-    ctx.db.get(profile.modelCatalogId),
+    profile.modelCatalogId ? ctx.db.get(profile.modelCatalogId) : Promise.resolve(null),
     profile.sandboxProfileId ? ctx.db.get(profile.sandboxProfileId) : Promise.resolve(null),
     profile.toolGrantId ? ctx.db.get(profile.toolGrantId) : Promise.resolve(null),
   ]);
@@ -78,7 +81,7 @@ export async function loadExecutionProfileAdmission(
   }));
   blockers.push(...executionProfilePersistedRecordBlockers(profile));
   if (profile.qualificationSnapshot && profile.qualificationDigest) {
-    const projection: ExecutionProfileProjection = {
+    const projection = {
       profileId: String(profile._id),
       profileKey: profile.profileKey,
       profileVersion: profile.version,
@@ -93,11 +96,11 @@ export async function loadExecutionProfileAdmission(
       harnessRuntimeArtifact: profile.harnessRuntimeArtifact,
       harnessRuntimeArtifactDigest: profile.harnessRuntimeArtifactDigest,
       executionBackend: profile.executionBackend,
-      modelCatalogId: String(profile.modelCatalogId),
+      modelCatalogId: profile.modelCatalogId ? String(profile.modelCatalogId) : offline ? undefined : "",
       modelRouteSnapshot: snapshot.modelRoute?.routeSnapshot,
-      modelRouteDigest: profile.modelRouteDigest,
+      modelRouteDigest: profile.modelRouteDigest ?? (offline ? undefined : ""),
       modelQualificationSnapshot: snapshot.modelRoute?.qualificationSnapshot,
-      modelQualificationDigest: profile.modelQualificationDigest,
+      modelQualificationDigest: profile.modelQualificationDigest ?? (offline ? undefined : ""),
       sandboxProfileId: profile.sandboxProfileId ? String(profile.sandboxProfileId) : undefined,
       sandboxProfileSnapshot: snapshot.sandboxProfile?.profileSnapshot,
       sandboxProfileDigest: profile.sandboxProfileDigest,
@@ -111,7 +114,8 @@ export async function loadExecutionProfileAdmission(
       profileDigest: profile.profileDigest,
       qualificationSnapshot: profile.qualificationSnapshot,
       qualificationDigest: profile.qualificationDigest,
-      projection,
+      // Preserve malformed persisted fields for the validator to reject.
+      projection: projection as ExecutionProfileProjection,
     }));
   } else {
     blockers.push("EXECUTION_PROFILE_QUALIFICATION_MISSING");
@@ -133,7 +137,16 @@ export async function loadExecutionProfileAdmission(
     blockers.push("EXECUTION_PROFILE_HARNESS_MISMATCH");
   }
 
-  if (!modelRoute
+  if (offline) {
+    try { await assertLocalSandboxScope(ctx, sandboxProfile?.immutableSnapshot, now); }
+    catch { blockers.push("EXECUTION_PROFILE_SANDBOX_MISMATCH"); }
+    const qualifiedClasses = (profile.qualificationSnapshot as any)?.scope?.workloadClasses;
+    const sandboxClasses = (sandboxProfile?.admissionSnapshot as any)?.scope?.workloadClasses;
+    if (qualifiedClasses?.some((value: string) => !sandboxClasses?.includes(value))) {
+      blockers.push("EXECUTION_PROFILE_SANDBOX_MISMATCH");
+    }
+    if (modelRoute || profile.modelCatalogId || profile.modelRouteDigest || profile.modelQualificationDigest) blockers.push("EXECUTION_PROFILE_MODEL_ROUTE_MISMATCH");
+  } else if (profile.executionBackend === "isolated-container" || !modelRoute
     || modelRoute.projectId !== profile.projectId
     || String(modelRoute._id) !== snapshot.modelRoute?.catalogId
     || modelRoute.routeDigest !== profile.modelRouteDigest
@@ -152,7 +165,12 @@ export async function loadExecutionProfileAdmission(
     blockers.push("EXECUTION_PROFILE_MODEL_ROUTE_MISMATCH");
   }
 
-  if (profile.executionBackend === "remote-sandbox") {
+  if (offline) {
+    if (!sandboxProfile || sandboxProfile.projectId !== profile.projectId || String(sandboxProfile._id) !== snapshot.sandboxProfile?.profileId
+      || sandboxProfile.profileDigest !== snapshot.sandboxProfile?.profileDigest || !sameCanonical(sandboxProfile.immutableSnapshot, snapshot.sandboxProfile?.profileSnapshot)
+      || snapshot.offlinePolicy?.isolation?.qualifiedAt !== sandboxProfile.promotedAt
+      || snapshot.offlinePolicy?.isolation?.admissionDigest !== sandboxProfile.admissionDigest || !isolatedSandboxEligible(sandboxProfile, now)) blockers.push("EXECUTION_PROFILE_SANDBOX_MISMATCH");
+  } else if (profile.executionBackend === "remote-sandbox") {
     if (!sandboxProfile
       || sandboxProfile.projectId !== profile.projectId
       || sandboxProfile._id !== profile.sandboxProfileId
@@ -237,4 +255,36 @@ function sameCanonical(left: unknown, right: unknown) {
 
 function uniqueBlockers(blockers: ExecutionProfileBlockerCode[]) {
   return [...new Set(blockers)];
+}
+
+export function factoryVersionExecutionProfileProjection(version: Doc<"factoryDefinitionVersions">): ExecutionProfileProjection | null {
+  if (!version.executionProfileId) return null;
+  const profileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+  return {
+    profileId: String(version.executionProfileId),
+    profileKey: version.executionProfileKey ?? "",
+    profileVersion: version.executionProfileVersion ?? 0,
+    profileDigest: version.executionProfileDigest ?? "",
+    profileSnapshot: version.executionProfileSnapshot,
+    qualificationDigest: version.executionProfileQualificationDigest ?? "",
+    qualificationSnapshot: version.executionProfileQualificationSnapshot,
+    executor: version.executor,
+    harnessCapabilityManifest: version.harnessCapabilityManifest,
+    harnessCapabilityManifestDigest: version.harnessCapabilityManifestDigest ?? "",
+    harnessEffectiveConfigSha256: version.harnessEffectiveConfigSha256 ?? "",
+    harnessRuntimeArtifact: version.harnessRuntimeArtifact,
+    harnessRuntimeArtifactDigest: version.harnessRuntimeArtifactDigest ?? "",
+    executionBackend: version.executionBackend ?? "persistent-worker",
+    modelCatalogId: version.modelCatalogId ? String(version.modelCatalogId) : version.executionBackend === "isolated-container" ? undefined : "",
+    modelRouteSnapshot: version.modelRouteSnapshot,
+    modelRouteDigest: version.modelRouteDigest ?? (version.executionBackend === "isolated-container" ? undefined : ""),
+    modelQualificationSnapshot: version.modelQualificationSnapshot,
+    modelQualificationDigest: version.modelQualificationDigest ?? (version.executionBackend === "isolated-container" ? undefined : ""),
+    ...(version.sandboxProfileId ? { sandboxProfileId: String(version.sandboxProfileId) } : {}),
+    ...(version.sandboxProfileSnapshot !== undefined ? { sandboxProfileSnapshot: version.sandboxProfileSnapshot } : {}),
+    ...(version.sandboxProfileDigest ? { sandboxProfileDigest: version.sandboxProfileDigest } : {}),
+    isolationModes: profileSnapshot?.isolationModes ?? [],
+    requiredHarnessCapabilities: profileSnapshot?.requiredHarnessCapabilities ?? [],
+    requiredSandboxCapabilities: profileSnapshot?.requiredSandboxCapabilities ?? [],
+  } as ExecutionProfileProjection; // Raw persisted projection; admission validates every field.
 }

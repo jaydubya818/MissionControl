@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   assertFactoryCandidateUnchanged,
+  captureVerificationDocument,
   assertPlanningWorktreeUnchanged,
   commitFactoryChanges,
   ensureFactoryWorktree,
@@ -25,6 +26,27 @@ afterEach(async () => {
 });
 
 describe("Factory Git runtime", () => {
+  it("captures immutable document bytes and rejects symlinks, invalid UTF-8 and changed trees", async () => {
+    const repository = await mkdtemp(path.join(tmpdir(), "mc-verifier-blob-")); cleanup.push(repository);
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.name", "Synthetic Test"]);
+    await git(repository, ["config", "user.email", "synthetic@example.test"]);
+    await writeFile(path.join(repository, "document.md"), "# Synthetic original\n");
+    await writeFile(path.join(repository, "invalid.md"), Buffer.from([0xff]));
+    await writeFile(path.join(repository, "bom.md"), Buffer.from("\ufeff# Synthetic BOM\n", "utf8"));
+    await symlink("document.md", path.join(repository, "link.md"));
+    await git(repository, ["add", "."]); await git(repository, ["commit", "-m", "Synthetic verification subject"]);
+    const candidateSha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
+    const treeSha = (await git(repository, ["rev-parse", "HEAD^{tree}"])).stdout.trim();
+    const input = { repositoryRoot: repository, candidateSha, treeSha, path: "document.md" };
+    await writeFile(path.join(repository, "document.md"), "Uncommitted substitution\n");
+    expect(await captureVerificationDocument(input)).toMatchObject({ content: "# Synthetic original\n", candidateSha, treeSha });
+    expect((await captureVerificationDocument({ ...input, path: "bom.md" })).content).toBe("\ufeff# Synthetic BOM\n");
+    await expect(captureVerificationDocument({ ...input, path: "invalid.md" })).rejects.toThrow();
+    await expect(captureVerificationDocument({ ...input, path: "link.md" })).rejects.toThrow("document blob");
+    await expect(captureVerificationDocument({ ...input, treeSha: "0".repeat(40) })).rejects.toThrow("tree changed");
+    await expect(captureVerificationDocument({ ...input, path: "../document.md" })).rejects.toThrow("identity");
+  });
   it("creates and reconciles the exact worktree branch across retries", async () => {
     const repository = await mkdtemp(path.join(tmpdir(), "mc-factory-git-test-"));
     cleanup.push(repository);
