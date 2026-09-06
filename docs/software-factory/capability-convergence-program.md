@@ -297,5 +297,13 @@ independently qualified route or live-spend authority is present. The system
 economics eval remains an advisory WARN for its synthetic zero-call token field.
 
 This checkpoint grants no new provider call, allocation, acceptance, promotion,
-or billing authority. Signed restart evidence, exact PR-head CI, merge,
-clean-main requalification, and guarded release remain the release sequence.
+or billing authority. Signed restart evidence passed 74/74 scenarios. PR #197
+passed exact-head CI and merged as `b17c9c5`; its fresh detached checkout passed
+19/19 composed gates, the full Phase 5 suite, and 15/15 critical browser checks.
+The [clean-main evidence](../testing/evidence/capability-convergence-accounting-recovery-postmerge-v52/README.md)
+binds those results to runtime v52 and the reviewed source hashes.
+
+The existing Production UI deployment remains unchanged. No configured
+Production target exists here for the orchestration service that owns this
+recovery path. Program completion still requires the live two-route comparison,
+ten real accepted WorkOrders, and attributable Production incident restoration.

@@ -38,10 +38,20 @@ proof remains historical evidence of the corrected defects.
 
 The applied source uses runtime contract v52 inherited from current main. The
 runtime-contract guard detects no additional public Convex validator change.
-The recovery branch contains current main `13ce5f0`; all release-blocking composed qualification stages and
-15 critical browser checks pass. Actual signed delivery and restart evidence,
-CI, guarded merge, clean-main proof, and release remain required after this
-source checkpoint.
+The recovery branch contained current main `13ce5f0`; all release-blocking
+composed qualification stages and 15 critical browser checks passed. Actual
+signed delivery and restart evidence then passed 74/74 scenarios. PR #197 passed
+all required CI and Preview contexts and merged as `b17c9c5`. A fresh detached
+checkout of that exact merge passed all 19 composed System Qualification gates,
+the full Phase 5 suite, and 15/15 critical browser checks. The
+[clean-main packet](../testing/evidence/capability-convergence-accounting-recovery-postmerge-v52/README.md)
+retains the exact identities and limits of this source qualification.
+
+The existing Production UI deployment is unchanged. This recovery belongs to
+the orchestration service, and the repository has no configured Production
+deployment target for that service. The live two-route comparison, ten real
+accepted WorkOrders, and attributable Production incident restoration remain
+separate program acceptance gates.
 
 The preceding observation slice is already merged in
 [PR #190](https://github.com/jaydubya818/MissionControl/pull/190) at `44f240c`.
