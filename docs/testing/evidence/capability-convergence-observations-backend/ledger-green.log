@@ -1,0 +1,14 @@
+
+ RUN  v3.2.7 <qualification-worktree>
+
+ ✓ convex/__tests__/providerLiability.test.ts (27 tests) 8ms
+ ✓ convex/__tests__/inferenceGateway.test.ts (24 tests) 13ms
+ ✓ convex/__tests__/inferencePersistence.test.ts (18 tests) 40ms
+ ✓ convex/__tests__/inferenceObservations.test.ts (19 tests) 55ms
+ ✓ convex/__tests__/providerLiabilityHandlers.test.ts (83 tests) 75ms
+ ✓ convex/__tests__/inferenceDispatch.test.ts (35 tests) 794ms
+
+ Test Files  6 passed (6)
+      Tests  206 passed (206)
+   Start at  01:20:37
+   Duration  1.34s (transform 613ms, setup 0ms, collect 1.75s, tests 987ms, environment 0ms, prepare 180ms)

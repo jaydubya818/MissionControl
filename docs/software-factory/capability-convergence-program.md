@@ -214,7 +214,11 @@ denominators and coverage remain explicit. Existing economics WARN remains.
   including light/dark, desktop/mobile and keyboard operation. All 87 source
   hashes match the frozen source; root code generation passes unchanged and
   temporary backend ports close. Initial failed harness runs remain retained.
-  Full composed and final-main qualification remain pending.
+  [Committed local qualification](../testing/evidence/capability-convergence-observations-final/README.md)
+  passes all 19 composed gates, 2956 tests (11 inherited skips), Phase 5 and
+  15 critical browser checks on `c5cbf718eb73`. Economics remains WARN and all
+  four Production targets and guards are unchanged. Final-head CI, merge and
+  clean-main qualification remain pending.
 - FDLC [#17](https://github.com/jaydubya818/FDLC/pull/17) merged as `ef73e7f`;
   Guide [#16](https://github.com/jaydubya818/ai-software-factory-mastery/pull/16)
   merged as `5276509`. Both pass clean-main source qualification and browser
