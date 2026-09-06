@@ -1,0 +1,13 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--exit-code",
+    "06992d8dc119986592ccfcc2d9f84c4a5e07981b",
+    "--",
+    "docs/testing/evidence/system-factory-e2e-v2"
+  ],
+  "exitCode": 0,
+  "result": "PASS",
+  "head": "9a68b56c3ee788c4f8b4132a8c7c9d14f32dee28"
+}

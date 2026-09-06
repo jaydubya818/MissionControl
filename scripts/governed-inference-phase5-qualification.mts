@@ -342,13 +342,13 @@ const record = {
 
 if (process.argv.includes("--check")) {
   const frozenRecord = JSON.parse(readFileSync(new URL(
-    "../docs/testing/evidence/governed-inference-identity-v2/offline-qualification.json",
+    "../docs/testing/evidence/governed-inference-dispatch-v1/offline-qualification.json",
     import.meta.url,
   ), "utf8"));
   assert.deepEqual(
     frozenRecord,
     JSON.parse(JSON.stringify(record)),
-    "Frozen Phase 5 identity-v2 evidence does not match the reproducible qualification output.",
+    "Frozen Phase 5 dispatch-v1 evidence does not match the reproducible qualification output.",
   );
 }
 

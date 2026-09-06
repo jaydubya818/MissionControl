@@ -4284,6 +4284,7 @@ export const schemaTablesPartOne = {
     state: v.union(v.literal("PERSISTED"), v.literal("CLAIMED"), v.literal("CANCELLED"), v.literal("RECEIPTED"), v.literal("AMBIGUOUS")),
     claimId: v.optional(v.string()),
     claimedAt: v.optional(v.number()),
+    dispatchAllowance: v.optional(v.any()),
     createdAt: v.number(),
   })
     .index("by_reservation", ["reservationId"])

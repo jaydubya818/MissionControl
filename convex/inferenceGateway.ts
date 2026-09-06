@@ -13,11 +13,17 @@ import {
   projectFactoryOutcome,
   compareRouteEconomics,
   summarizeRouteEconomics,
+  assertClassifyInferenceRoute,
+  assertClassifyInferenceDispatchAllowance,
 } from "@mission-control/shared";
 import { canonicalDigest } from "@mission-control/shared";
 import type { InferenceReservation, PhysicalInferenceIntent, PhysicalInferenceReceipt,
-  FactoryOutcomeProjection } from "@mission-control/shared";
+  FactoryOutcomeProjection, InferencePriceBook, ClassifyInferenceDispatchAllowance } from "@mission-control/shared";
 import type { Doc, Id } from "./_generated/dataModel";
+import { loadExecutionProfileAdmission } from "./lib/executionProfileAdmission";
+import { factoryLeaseMatchesCurrentRegistration } from "./lib/factoryAttempt";
+import { resolveCurrentAttemptExecutionProfile } from "./lib/attemptExecutionProfile";
+import { modelRouteQualifiedFor } from "./lib/modelRouteAdmission";
 
 const sha256 = /^sha256:[a-f0-9]{64}$/;
 const routeValidator = v.object({
@@ -413,7 +419,112 @@ export const persistIntentInternal = internalMutation({
 const claimIntentTransactionArgs = v.object({
     workflowRunId: v.id("workflowRuns"), intentId: v.id("inferencePhysicalIntents"),
     leaseId: v.string(), claimId: v.string(), cancelRequested: v.optional(v.boolean()),
+    dispatch: v.optional(v.object({ contract: v.literal("classify-text/v1"), payloadBytes: v.number(), maximumOutputTokens: v.number(), temperature: v.optional(v.number()) })),
   });
+
+async function classifyDispatchAllowance(
+  ctx: MutationCtx, args: Infer<typeof claimIntentTransactionArgs>,
+  intent: Doc<"inferencePhysicalIntents">, reservation: Doc<"inferenceReservations">,
+  run: Doc<"workflowRuns">, claimId: string, now: number,
+): Promise<ClassifyInferenceDispatchAllowance> {
+  if (!gatewayAdmissionEnabled()) throw new Error("GOVERNED_INFERENCE_GATEWAY_DISABLED");
+  const dispatch = args.dispatch!;
+  const frozen = reservationValue(reservation);
+  const frozenIntent = intentValue(intent, reservation);
+  assertClassifyInferenceRoute(frozenIntent.route);
+  if (dispatch.contract !== "classify-text/v1" || !Number.isSafeInteger(dispatch.payloadBytes)
+    || dispatch.payloadBytes <= 0 || dispatch.payloadBytes > 256_000
+    || !Number.isSafeInteger(dispatch.maximumOutputTokens) || dispatch.maximumOutputTokens <= 0 || dispatch.maximumOutputTokens > 1024
+    || frozen.maxPhysicalCalls !== 1 || frozen.allowedFallbacks.length !== 0 || frozenIntent.physicalOrdinal !== 1
+    || frozen.maxInputTokens < 128_000 || frozen.maxCacheReadTokens < 128_000
+    || frozen.maxOutputTokens < dispatch.maximumOutputTokens || frozen.maxCacheWriteTokens !== 0 || frozen.maxReasoningTokens !== 0) {
+    throw new Error("CLASSIFY_DISPATCH_LIABILITY_UNBOUNDED");
+  }
+  const [wo, task, admission, host, version, price, allocations] = await Promise.all([
+    ctx.db.get(reservation.workOrderId), ctx.db.get(reservation.taskId),
+    loadExecutionProfileAdmission(ctx, reservation.executionProfileId, now),
+    run.hostBindingId ? ctx.db.get(run.hostBindingId) : null,
+    run.factoryDefinitionVersionId ? ctx.db.get(run.factoryDefinitionVersionId) : null,
+    ctx.db.get(reservation.priceBookId),
+    ctx.db.query("inferenceReservations").withIndex("by_work_order", q => q.eq("workOrderId", reservation.workOrderId)).collect(),
+  ]);
+  if (!wo || wo.projectId !== reservation.projectId || wo.approvalStatus !== "APPROVED"
+    || wo.currentExecutionRunId !== run._id || wo.currentRevisionNumber !== run.workOrderRevisionNumber
+    || run.workOrderId !== wo._id || run.parentTaskId !== reservation.taskId || task?.projectId !== reservation.projectId
+    || run.projectId !== reservation.projectId || !wo.repositoryId || run.repositoryId !== wo.repositoryId
+    || !admission.eligible || !admission.profile || admission.profile.projectId !== reservation.projectId
+    || run.executionProfileId !== reservation.executionProfileId
+    || frozen.executionProfileId !== String(reservation.executionProfileId)
+    || admission.profile.profileDigest !== frozen.executionProfileDigest || run.executionProfileDigest !== frozen.executionProfileDigest
+    || run.executionManifestDigest !== frozen.policyDigest
+    || !admission.modelRoute || admission.modelRoute.routeDigest !== frozenIntent.route.routeDigest
+    || admission.modelRoute.provider !== frozenIntent.route.provider || admission.modelRoute.providerRoute !== frozenIntent.route.providerRoute
+    || admission.modelRoute.modelId !== frozenIntent.route.modelId) throw new Error("CLASSIFY_DISPATCH_AUTHORITY_CHANGED");
+  if (!run.lease?.workerId || !run.lease.workerSessionId || !Number.isSafeInteger(run.lease.workerGeneration)
+    || !host || host.projectId !== reservation.projectId || !factoryLeaseMatchesCurrentRegistration(run.lease, host)) {
+    throw new Error("CLASSIFY_DISPATCH_WORKER_FENCED");
+  }
+  if (!version || version.projectId !== reservation.projectId || version.repositoryId !== wo.repositoryId
+    || !run.factoryConfigurationDigest || version.configurationDigest !== run.factoryConfigurationDigest
+    || version.executionProfileId !== reservation.executionProfileId || version.executionProfileDigest !== frozen.executionProfileDigest) {
+    throw new Error("CLASSIFY_DISPATCH_FACTORY_CHANGED");
+  }
+  await resolveCurrentAttemptExecutionProfile(ctx, version, run, run.executionManifest, now);
+  const workloadClass = version.purpose === "VERIFICATION" ? "VERIFICATION"
+    : version.purpose === "INTELLIGENT_AUTOMATION" ? "AUTOMATION" : "SOFTWARE_CHANGE";
+  if (!modelRouteQualifiedFor(admission.modelRoute, { workloadClass, riskClass: version.riskBoundary, repositoryId: String(wo.repositoryId) })) {
+    throw new Error("CLASSIFY_DISPATCH_QUALIFICATION_SCOPE_MISMATCH");
+  }
+  const parameters = recordValue(recordValue(admission.modelRoute.routeSnapshot).reasoningConfig);
+  if (Object.keys(parameters).some(key => !["maxTokens", "temperature"].includes(key))
+    || parameters.maxTokens !== dispatch.maximumOutputTokens || parameters.temperature !== dispatch.temperature) {
+    throw new Error("CLASSIFY_DISPATCH_ROUTE_PARAMETERS_CHANGED");
+  }
+  const policy = recordValue(recordValue(wo.metadata).implementationPolicy);
+  const workOrderMaximum = typeof policy.maxCostUsd === "number" ? Math.floor(policy.maxCostUsd * 1_000_000) : NaN;
+  const factoryMaximum = Math.floor(version.budget.maxCostUsd * 1_000_000);
+  if (!Number.isSafeInteger(workOrderMaximum) || workOrderMaximum <= 0
+    || !Number.isSafeInteger(factoryMaximum) || factoryMaximum <= 0) throw new Error("CLASSIFY_DISPATCH_BUDGET_INVALID");
+  // Include every retained reservation, including cancelled, expired or unknown
+  // outcomes. Claiming never returns capacity to the WorkOrder.
+  for (const allocation of allocations) reservationValue(allocation);
+  const others = allocations.filter(allocation => allocation._id !== reservation._id);
+  assertCumulativeInferenceBudget(others, reservation.projectId, frozen.maxCostMicrousd, Math.min(workOrderMaximum, factoryMaximum));
+  if (!price || price.projectId !== reservation.projectId || price.state !== "ACTIVE"
+    || price.priceBookDigest !== frozen.priceBookDigest) throw new Error("CLASSIFY_DISPATCH_PRICE_CHANGED");
+  const priceSnapshot = canonicalSnapshot<InferencePriceBook>(price.immutableSnapshot,
+    "inference-price-book/v1", "digest", frozen.priceBookDigest);
+  // This selected dispatch requires a finite, explicit price interval and tier.
+  // Historical indefinite books remain inspectable but cannot issue this proof.
+  if (!Number.isSafeInteger(priceSnapshot.effectiveUntil) || priceSnapshot.effectiveUntil! <= now
+    || priceSnapshot.effectiveFrom > now || price.effectiveFrom !== priceSnapshot.effectiveFrom
+    || price.effectiveUntil !== priceSnapshot.effectiveUntil
+    || priceSnapshot.rates.find(rate => rate.routeDigest === frozenIntent.route.routeDigest)?.serviceTier !== "default") {
+    throw new Error("CLASSIFY_DISPATCH_PRICE_NOT_CURRENT");
+  }
+  const { schema: _priceSchema, digest: _priceDigest, ...priceInput } = priceSnapshot;
+  inferencePriceBook(priceInput);
+  const { schema: _schema, digest: _digest, ...reservationInput } = frozen;
+  // Re-evaluate frozen worst-case money against its exact immutable rates.
+  inferenceReservation(reservationInput, priceSnapshot);
+  const bytes: Omit<ClassifyInferenceDispatchAllowance, "digest"> = {
+    schema: "classify-inference-dispatch/v1", projectId: frozen.projectId, repositoryId: String(wo.repositoryId),
+    workOrderId: frozen.workOrderId, taskId: frozen.taskId, attemptId: frozen.attemptId,
+    reservationId: String(reservation._id), reservationLogicalId: frozen.reservationId, reservationDigest: frozen.digest,
+    intentId: String(intent._id), intentLogicalId: frozenIntent.intentId, intentDigest: frozenIntent.digest,
+    logicalRequestKey: frozen.logicalRequestKey, leaseId: args.leaseId, claimId,
+    executionProfileId: frozen.executionProfileId, executionProfileDigest: frozen.executionProfileDigest,
+    priceBookDigest: frozen.priceBookDigest, route: frozenIntent.route, requestDigest: frozenIntent.requestDigest,
+    payloadBytes: dispatch.payloadBytes, maximumInputTokens: 128_000, maximumCacheReadTokens: 128_000,
+    maximumOutputTokens: dispatch.maximumOutputTokens, maxCostMicrousd: frozen.maxCostMicrousd, maximumPhysicalCalls: 1,
+    temperature: dispatch.temperature ?? null,
+    issuedAt: now, validUntil: Math.min(now + 30_000, frozen.deadlineAt, frozen.leaseExpiresAt,
+      run.lease.expiresAt, priceSnapshot.effectiveUntil!, admission.validUntil ?? now),
+  };
+  const allowance = { ...bytes, digest: canonicalDigest("classify-inference-dispatch/v1", bytes) };
+  assertClassifyInferenceDispatchAllowance(allowance);
+  return allowance;
+}
 
 export async function claimIntentInTransaction(ctx: MutationCtx, args: Infer<typeof claimIntentTransactionArgs>) {
     const intent = await ctx.db.get(args.intentId);
@@ -439,11 +550,16 @@ export async function claimIntentInTransaction(ctx: MutationCtx, args: Infer<typ
     if (claimConflict) throw new Error("Physical inference claim ID was replayed.");
     // A legacy row with lost identity cannot acquire new authority. Both the
     // current lease above and the frozen lease must admit the committed claim.
+    const now = Date.now();
+    const dispatchAllowance = args.dispatch
+      ? await classifyDispatchAllowance(ctx, args, intent, reservation, run, claimId, now) : undefined;
     const claimed = claimPhysicalInferenceIntent(intentValue(intent, reservation), reservationValue(reservation), {
-      claimId, leaseId: args.leaseId, now: Date.now(), cancelled: false,
+      claimId, leaseId: args.leaseId, now, cancelled: false,
     });
-    await ctx.db.patch(intent._id, { state: "CLAIMED", claimId, claimedAt: claimed.claimedAt });
-    return { claimed: true as const, intentId: intent._id, reservationDigest: reservation.reservationDigest };
+    await ctx.db.patch(intent._id, { state: "CLAIMED", claimId, claimedAt: claimed.claimedAt,
+      ...(dispatchAllowance ? { dispatchAllowance } : {}) });
+    return { claimed: true as const, intentId: intent._id, reservationDigest: reservation.reservationDigest,
+      ...(dispatchAllowance ? { dispatchAllowance } : {}) };
 }
 
 export const claimIntentInternal = internalMutation({

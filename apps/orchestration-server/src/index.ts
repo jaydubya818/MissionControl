@@ -1469,41 +1469,26 @@ app.post("/classify", requireAuth(), async (c) => {
     const { ContextRouter } = await import("@mission-control/context-router");
     const openaiKey = process.env.OPENAI_API_KEY?.trim();
     let llmClient: { complete: (p: string) => Promise<string> } | undefined;
-    if (openaiKey) {
-      if (process.env.MC_GOVERNED_INFERENCE_GATEWAY_ENABLED === "1") {
-        const governed = governedInferenceScope(body.governedInference);
-        const ledger = new ConvexGovernedInferenceLedger(client, governed.projectId, governed.repositoryId);
-        const gateway = new GovernedInferenceGateway(ledger, new OpenAIChatCompletionsTransport(openaiKey));
-        const { routeDigest, ...requestAuthority } = governed;
-        llmClient = {
-          complete: async (prompt: string) => {
-            const response = await gateway.execute<{ choices?: Array<{ message?: { content?: unknown } }> }>({
-              ...requestAuthority,
-              routes: [{
-                provider: "openai", providerRoute: "openai-chat-completions", modelId: "gpt-4o-mini-2024-07-18",
-                routeDigest, adapter: "mission-control-openai-chat-completions",
-                adapterVersion: "1.0.0", endpoint: "https://api.openai.com/v1/chat/completions",
-              }],
-              body: { messages: [{ role: "user", content: prompt }], max_tokens: 1024 },
-            });
-            const content = response?.choices?.[0]?.message?.content;
-            return typeof content === "string" ? content : "";
-          },
-        };
-      } else {
-        const OpenAI = (await import("openai")).default;
-        const openai = new OpenAI({ apiKey: openaiKey });
-        llmClient = {
-          complete: async (prompt: string) => {
-            const res = await openai.chat.completions.create({
-              model: "gpt-4o-mini",
-              messages: [{ role: "user", content: prompt }],
-              max_tokens: 1024,
-            });
-            return res.choices[0]?.message?.content ?? "";
-          },
-        };
-      }
+    if (openaiKey && process.env.MC_GOVERNED_INFERENCE_GATEWAY_ENABLED === "1") {
+      const governed = governedInferenceScope(body.governedInference);
+      const ledger = new ConvexGovernedInferenceLedger(client, governed.projectId, governed.repositoryId);
+      const gateway = new GovernedInferenceGateway(ledger, new OpenAIChatCompletionsTransport(openaiKey));
+      const { routeDigest, ...requestAuthority } = governed;
+      llmClient = {
+        complete: async (prompt: string) => {
+          const response = await gateway.execute<{ choices?: Array<{ message?: { content?: unknown } }> }>({
+            ...requestAuthority,
+            routes: [{
+              provider: "openai", providerRoute: "openai-chat-completions", modelId: "gpt-4o-mini-2024-07-18",
+              routeDigest, adapter: "mission-control-openai-chat-completions",
+              adapterVersion: "1.0.0", endpoint: "https://api.openai.com/v1/chat/completions",
+            }],
+            body: { messages: [{ role: "user", content: prompt }], max_completion_tokens: 1024 },
+          }, c.req.raw.signal);
+          const content = response?.choices?.[0]?.message?.content;
+          return typeof content === "string" ? content : "";
+        },
+      };
     }
 
     const router = new ContextRouter(

@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { canonicalDigest, type ClassifyInferenceDispatchAllowance } from "@mission-control/shared";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   GovernedInferenceError,
   GovernedInferenceGateway,
@@ -6,6 +8,42 @@ import {
   type GovernedInferenceLedger,
   type GovernedInferenceRequest,
 } from "../governedInferenceGateway.js";
+import { prepareClassifyInferenceRequest } from "../governedInferenceWire.js";
+
+const exactRoute = {
+  provider: "openai", providerRoute: "openai-chat-completions", modelId: "gpt-4o-mini-2024-07-18",
+  routeDigest: `sha256:${"a".repeat(64)}`, adapter: "mission-control-openai-chat-completions",
+  adapterVersion: "1.0.0", endpoint: "https://api.openai.com/v1/chat/completions",
+};
+const classifyBody = () => ({ messages: [{ role: "user", content: "synthetic" }], max_completion_tokens: 1024 });
+const digest = `sha256:${"b".repeat(64)}`;
+
+function allowance(overrides: Record<string, unknown> = {}) {
+  const prepared = prepareClassifyInferenceRequest(exactRoute, classifyBody());
+  const value: Omit<ClassifyInferenceDispatchAllowance, "digest"> = {
+    schema: "classify-inference-dispatch/v1", projectId: "p", repositoryId: "repo",
+    workOrderId: "work-order", taskId: "task", attemptId: "attempt", reservationId: "reservation",
+    reservationLogicalId: "reservation-logical", reservationDigest: digest,
+    intentId: "intent-1", intentLogicalId: "intent-logical", intentDigest: digest,
+    logicalRequestKey: "p:attempt:step:1", leaseId: "lease", claimId: "claim",
+    executionProfileId: "profile", executionProfileDigest: digest, priceBookDigest: digest,
+    route: exactRoute, requestDigest: prepared.requestDigest, payloadBytes: prepared.payloadBytes,
+    maximumInputTokens: 128000, maximumCacheReadTokens: 128000, maximumOutputTokens: 1024, temperature: null,
+    maxCostMicrousd: 100000, maximumPhysicalCalls: 1, issuedAt: 100, validUntil: 30100,
+    ...overrides,
+  };
+  return { ...value, digest: canonicalDigest("classify-inference-dispatch/v1", value) };
+}
+
+function transportInput(overrides: Record<string, unknown> = {}) {
+  return {
+    route: exactRoute, body: classifyBody(),
+    preparedRequest: prepareClassifyInferenceRequest(exactRoute, classifyBody()),
+    dispatchAllowance: allowance(), ...overrides,
+  };
+}
+
+afterEach(() => vi.useRealTimers());
 
 const route = (suffix: string) => ({
   provider: "fixture", providerRoute: `fixture-${suffix}`, modelId: `model-${suffix}`,
@@ -14,20 +52,15 @@ const route = (suffix: string) => ({
 });
 
 describe("OpenAIChatCompletionsTransport", () => {
-  const exactRoute = {
-    provider: "openai", providerRoute: "openai-chat-completions", modelId: "gpt-4o-mini-2024-07-18",
-    routeDigest: `sha256:${"a".repeat(64)}`, adapter: "mission-control-openai-chat-completions",
-    adapterVersion: "1.0.0", endpoint: "https://api.openai.com/v1/chat/completions",
-  };
-
   it("makes one raw request and preserves provider/cache/reasoning observations", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
       id: "chatcmpl-1", model: "gpt-4o-mini-2024-07-18", choices: [], service_tier: "default",
       usage: { prompt_tokens: 20, completion_tokens: 4, prompt_tokens_details: { cached_tokens: 8 }, completion_tokens_details: { reasoning_tokens: 2 } },
     }), { status: 200, headers: { "x-request-id": "req-1", "x-openai-organization": "org-1" } }));
-    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch);
-    const result = await transport.invoke({ route: exactRoute, body: { messages: [] } });
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => 100);
+    const result = await transport.invoke(transportInput());
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledWith(exactRoute.endpoint, expect.objectContaining({ body: transportInput().preparedRequest.serializedRequest }));
     expect(result).toMatchObject({
       resolvedProvider: "openai", resolvedModelId: "gpt-4o-mini-2024-07-18", providerRequestId: "req-1",
       providerBillingId: undefined, serviceTier: "default",
@@ -35,19 +68,19 @@ describe("OpenAIChatCompletionsTransport", () => {
     });
   });
 
-  it("fails closed on endpoint, adapter, and resolved-model drift", async () => {
+  it("denies route substitution and retains observed resolved-model drift", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ model: "gpt-4o", choices: [], usage: {} }), { status: 200 }));
-    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch);
-    await expect(transport.invoke({ route: { ...exactRoute, endpoint: "https://proxy.invalid/v1/chat/completions" }, body: { messages: [] } })).rejects.toMatchObject({ code: "ROUTE_OR_ADAPTER_SUBSTITUTION" });
-    const result = await transport.invoke({ route: exactRoute, body: { messages: [] } });
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => 100);
+    await expect(transport.invoke(transportInput({ route: { ...exactRoute, endpoint: "https://proxy.invalid/v1/chat/completions" } }))).rejects.toMatchObject({ code: "CLASSIFY_DISPATCH_ALLOWANCE_INVALID" });
+    const result = await transport.invoke(transportInput());
     expect(result.resolvedModelId).toBe("gpt-4o");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it("does not invent a resolved model observation when the provider omits it", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ choices: [], usage: {} }), { status: 200 }));
-    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch);
-    await expect(transport.invoke({ route: exactRoute, body: { messages: [] } })).resolves.toMatchObject({
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => 100);
+    await expect(transport.invoke(transportInput())).resolves.toMatchObject({
       resolvedProvider: "openai",
       resolvedModelId: undefined,
     });
@@ -55,12 +88,121 @@ describe("OpenAIChatCompletionsTransport", () => {
 
   it("denies redirects and oversized provider responses", async () => {
     const oversized = vi.fn(async () => new Response("x", { status: 200, headers: { "content-length": "1048577" } }));
-    const transport = new OpenAIChatCompletionsTransport("fixture-key", oversized as typeof fetch);
-    await expect(transport.invoke({ route: exactRoute, body: { messages: [] } })).rejects.toMatchObject({
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", oversized as typeof fetch, () => 100);
+    await expect(transport.invoke(transportInput())).rejects.toMatchObject({
       code: "PROVIDER_RESPONSE_TOO_LARGE",
       delivery: "DELIVERED",
     });
     expect(oversized).toHaveBeenCalledWith(exactRoute.endpoint, expect.objectContaining({ redirect: "error" }));
+  });
+
+  it.each([
+    ["missing proof", { dispatchAllowance: undefined }],
+    ["mutated proof", { dispatchAllowance: { ...allowance(), maximumOutputTokens: 1 } }],
+    ["other request", { dispatchAllowance: allowance({ requestDigest: digest }) }],
+    ["other bytes", { dispatchAllowance: allowance({ payloadBytes: 1 }) }],
+    ["other output cap", { dispatchAllowance: allowance({ maximumOutputTokens: 1 }) }],
+    ["other temperature", { dispatchAllowance: allowance({ temperature: 0 }) }],
+    ["other route", { dispatchAllowance: allowance({ route: { ...exactRoute, routeDigest: digest } }) }],
+    ["missing wire", { preparedRequest: undefined }],
+    ["mutated wire", { preparedRequest: { ...transportInput().preparedRequest, serializedRequest: "{}" } }],
+    ["unbounded output", { preparedRequest: { ...transportInput().preparedRequest, maximumOutputTokens: 2048 } }],
+  ])("sends zero bytes for %s", async (_name, overrides) => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => 100);
+    await expect(transport.invoke(transportInput(overrides))).rejects.toMatchObject({ code: "CLASSIFY_DISPATCH_ALLOWANCE_INVALID", delivery: "NOT_DELIVERED" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("rechecks cancellation immediately before dispatch", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => 100);
+    await expect(transport.invoke(transportInput({ signal: controller.signal }))).rejects.toMatchObject({ code: "ATTEMPT_CANCELLED", delivery: "NOT_DELIVERED" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([99, 30100])("sends zero bytes outside the allowance time window at %i", async (now) => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => now);
+    await expect(transport.invoke(transportInput())).rejects.toMatchObject({ code: "CLASSIFY_DISPATCH_ALLOWANCE_EXPIRED", delivery: "NOT_DELIVERED" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("consumes a committed claim once even when concurrent callers send it directly", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => 100);
+    const outcomes = await Promise.allSettled([transport.invoke(transportInput()), transport.invoke(transportInput())]);
+    expect(outcomes.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    await expect(transport.invoke(transportInput({ dispatchAllowance: allowance({ validUntil: 30099 }) }))).rejects.toMatchObject({ code: "CLASSIFY_DISPATCH_ALREADY_CONSUMED" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds a stalled response stream by the allowance deadline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100);
+    const cancel = vi.fn();
+    const fetchImpl = vi.fn(async () => new Response(new ReadableStream({ start() {}, cancel })));
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch);
+    const pending = transport.invoke(transportInput({ dispatchAllowance: allowance({ validUntil: 110 }) }));
+    const result = expect(pending).rejects.toMatchObject({ code: "CLASSIFY_DISPATCH_DEADLINE_EXCEEDED", delivery: "UNKNOWN" });
+    await vi.advanceTimersByTimeAsync(11);
+    await result;
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("bounds a stalled fetch even when the fetch implementation ignores abort", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100);
+    const fetchImpl = vi.fn(() => new Promise<Response>(() => {}));
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch);
+    const pending = transport.invoke(transportInput({ dispatchAllowance: allowance({ validUntil: 110 }) }));
+    const result = expect(pending).rejects.toMatchObject({ code: "CLASSIFY_DISPATCH_DEADLINE_EXCEEDED", delivery: "UNKNOWN" });
+    await vi.advanceTimersByTimeAsync(11);
+    await result;
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("cancels a response that arrives after a fetch deadline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100);
+    let finishFetch!: (response: Response) => void;
+    const fetchImpl = vi.fn(() => new Promise<Response>((resolve) => { finishFetch = resolve; }));
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch);
+    const pending = transport.invoke(transportInput({ dispatchAllowance: allowance({ validUntil: 110 }) }));
+    const result = expect(pending).rejects.toMatchObject({ code: "CLASSIFY_DISPATCH_DEADLINE_EXCEEDED", delivery: "UNKNOWN" });
+    await vi.advanceTimersByTimeAsync(11);
+    await result;
+    const cancel = vi.fn();
+    finishFetch(new Response(new ReadableStream({ start() {}, cancel })));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("cancels a stalled response on caller abort and removes deadline resources", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100);
+    const controller = new AbortController();
+    const removeListener = vi.spyOn(controller.signal, "removeEventListener");
+    const cancel = vi.fn();
+    const fetchImpl = vi.fn(async () => new Response(new ReadableStream({ start() {}, cancel })));
+    const transport = new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch);
+    const pending = transport.invoke(transportInput({ signal: controller.signal }));
+    const result = expect(pending).rejects.toMatchObject({ code: "ATTEMPT_CANCELLED_AFTER_DISPATCH", delivery: "UNKNOWN" });
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort();
+    await result;
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(removeListener).toHaveBeenCalledWith("abort", expect.any(Function));
+    expect(vi.getTimerCount()).toBe(0);
+    await expect(transport.invoke(transportInput())).rejects.toMatchObject({ code: "CLASSIFY_DISPATCH_ALREADY_CONSUMED" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -91,6 +233,17 @@ function ledger(): GovernedInferenceLedger & { intents: any[]; receipts: any[] }
 }
 
 describe("GovernedInferenceGateway", () => {
+  it("does not replace an observed success when receipt persistence fails", async () => {
+    const store = ledger();
+    const append = vi.spyOn(store, "appendReceipt").mockRejectedValue(new Error("receipt unavailable"));
+    const invoke = vi.fn().mockResolvedValue({ value: "delivered", resolvedProvider: "fixture", usage: { inputTokens: 4 }, responseDigest: digest });
+    const gateway = new GovernedInferenceGateway(store, { invoke });
+    await expect(gateway.execute(request())).rejects.toThrow("receipt unavailable");
+    expect(append).toHaveBeenCalledTimes(1);
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({ delivery: "DELIVERED", status: "SUCCEEDED", usage: { inputTokens: 4 } }));
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
   it("persists and claims before exactly one transport call", async () => {
     const store = ledger();
     const invoke = vi.fn(async ({ route: exactRoute }) => ({
@@ -156,5 +309,101 @@ describe("GovernedInferenceGateway", () => {
     expect(claim).toHaveBeenCalledWith(expect.objectContaining({ cancelRequested: true }));
     expect(invoke).not.toHaveBeenCalled();
     expect(store.receipts).toHaveLength(0);
+  });
+});
+
+function selectedRequest(): GovernedInferenceRequest {
+  return { ...request(), routes: [{ ...exactRoute }], body: classifyBody() };
+}
+
+function selectedLedger() {
+  const store = ledger();
+  vi.spyOn(store, "claimIntent").mockImplementation(async (input) => {
+    const intent = store.intents.find((item) => item.intentId === input.intentId);
+    return {
+      claimed: true,
+      dispatchAllowance: allowance({
+        intentId: intent.intentId, intentLogicalId: intent.intentKey,
+        requestDigest: intent.requestDigest, claimId: input.claimId,
+      }),
+    };
+  });
+  return store;
+}
+
+describe("selected classify gateway", () => {
+  it("denies a legacy boolean claim before OpenAI dispatch", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    const store = ledger();
+    const gateway = new GovernedInferenceGateway(store, new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => 100), () => 100, () => "claim");
+    await expect(gateway.execute(selectedRequest())).rejects.toMatchObject({ code: "CLASSIFY_DISPATCH_ALLOWANCE_INVALID" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("freezes exact bytes and scope before persistence and binds their digest into the claim", async () => {
+    const input = selectedRequest();
+    const prepared = prepareClassifyInferenceRequest(exactRoute, input.body);
+    const store = selectedLedger();
+    const persist = store.persistIntent.bind(store);
+    vi.spyOn(store, "persistIntent").mockImplementation(async (intent) => {
+      (input.body as ReturnType<typeof classifyBody>).messages[0].content = "changed after await";
+      input.projectId = "other-project";
+      input.routes[0].routeDigest = digest;
+      return persist(intent);
+    });
+    const fetchImpl = vi.fn(async () => new Response('{"choices":[]}'));
+    const gateway = new GovernedInferenceGateway(store, new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => 100), () => 100, () => "claim");
+    await expect(gateway.execute(input)).resolves.toEqual({ choices: [] });
+    expect(store.intents[0]).toMatchObject({ requestDigest: prepared.requestDigest, route: exactRoute });
+    expect(store.claimIntent).toHaveBeenCalledWith(expect.objectContaining({ dispatch: { contract: "classify-text/v1", payloadBytes: prepared.payloadBytes, maximumOutputTokens: 1024 } }));
+    expect(fetchImpl).toHaveBeenCalledWith(exactRoute.endpoint, expect.objectContaining({ body: prepared.serializedRequest }));
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["projectId", "repositoryId", "attemptId", "reservationId", "intentId", "intentLogicalId", "logicalRequestKey", "leaseId", "claimId"])
+    ("denies a well-formed claim for another %s", async (field) => {
+      const store = selectedLedger();
+      const claim = vi.mocked(store.claimIntent).getMockImplementation()!;
+      vi.mocked(store.claimIntent).mockImplementation(async (input) => {
+        const result = await claim(input) as { claimed: boolean; dispatchAllowance: ReturnType<typeof allowance> };
+        const { digest: _digest, ...body } = result.dispatchAllowance;
+        return { claimed: true, dispatchAllowance: allowance({ ...body, [field]: "other" }) };
+      });
+      const fetchImpl = vi.fn(async () => new Response("{}"));
+      const gateway = new GovernedInferenceGateway(store, new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => 100), () => 100, () => "claim");
+      await expect(gateway.execute(selectedRequest())).rejects.toMatchObject({ code: "CLASSIFY_DISPATCH_ALLOWANCE_INVALID" });
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+  it("denies multiple selected routes before persisting an intent", async () => {
+    const store = selectedLedger();
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    const gateway = new GovernedInferenceGateway(store, new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => 100));
+    await expect(gateway.execute({ ...selectedRequest(), routes: [exactRoute, exactRoute] })).rejects.toMatchObject({ code: "CLASSIFY_ROUTE_COUNT_INVALID" });
+    expect(store.intents).toHaveLength(0);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("propagates cancellation that occurs during the durable claim before sending", async () => {
+    const controller = new AbortController();
+    const store = selectedLedger();
+    const claim = vi.mocked(store.claimIntent).getMockImplementation()!;
+    vi.mocked(store.claimIntent).mockImplementation(async (input) => {
+      const result = await claim(input);
+      controller.abort();
+      return result;
+    });
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    const gateway = new GovernedInferenceGateway(store, new OpenAIChatCompletionsTransport("fixture-key", fetchImpl as typeof fetch, () => 100), () => 100, () => "claim");
+    await expect(gateway.execute(selectedRequest(), controller.signal)).rejects.toMatchObject({ code: "ATTEMPT_CANCELLED" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("keeps /classify on the strict signal-aware path with no SDK bypass", () => {
+    const source = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
+    const classify = source.slice(source.indexOf('app.post("/classify"'), source.indexOf("function governedInferenceScope"));
+    expect(classify).toContain("max_completion_tokens: 1024");
+    expect(classify).toContain("c.req.raw.signal");
+    expect(classify).not.toContain('import("openai")');
   });
 });
