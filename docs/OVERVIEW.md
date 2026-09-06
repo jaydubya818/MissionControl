@@ -156,8 +156,10 @@ deployment, and learning promotion remain disabled. The governed read-only MCP
 broker now qualifies the local Phase 3 fixture plus one exact Context7
 `query-docs` operation for one fixed public React documentation query. It does
 not admit writes, dynamic authority, connector breadth, or general harness MCP
-support. Factory Incident Command, shared
-QA/product/design intent, and outcome-aware routing remain later promotion work.
+support. Shared QA/product/design intent is qualified behind its default-off
+flag, and Factory Incident Command now has an Experimental deterministic control
+plane with separate containment and restoration decisions. Real named-commander
+incident evidence and outcome-aware routing remain later promotion work.
 
 ### The developer becomes an operator
 
@@ -200,7 +202,8 @@ inference work adds the disabled-by-default price-book, reservation, receipt,
 reconciliation, and accepted-outcome economics contracts. Fab adds exact candidate
 verification and publication bindings plus read-only candidate recovery. Todo 062
 adds default-off attributable shared-intent proposals and human decisions. Pilot
-readiness adds exact revision-bound WorkOrder inspection; v45
+readiness adds exact revision-bound WorkOrder inspection. Factory Incident
+Command adds the append-only lifecycle and signed detect/propose boundary; v49
 clients fail closed through the existing compatibility check.
 
 Inference receipt v3 retains valid observed overruns and route drift with explicit

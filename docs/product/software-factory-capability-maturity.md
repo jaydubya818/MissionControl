@@ -120,7 +120,7 @@ scale, or general production safety.
 | Tools/MCP runtime | Security + Platform | **Experimental; one real read-only operation qualified** | [Phase 4 evidence](../testing/evidence/governed-mcp-phase4-recovery/README.md) | Local fixture plus exact Context7 `query-docs` for one fixed public React query; Codex/DeepSeek manifests remain `UNSUPPORTED` and no write or generalized connector authority exists | Gather operational evidence without adding another service or operation |
 | Supply-chain provenance | Security + Platform | **Strong partial** | [Production Factory Pilot V3](../testing/evidence/production-factory-pilot-v3/README.md) | Attestations are not yet normalized into every release consumption boundary | Verify immutable image, SBOM, vulnerability, provenance, tool, and candidate identities at use time |
 | Release and production feedback | Product + SRE | **Partial** | [README delivery contract](../../README.md#the-delivery-contract) | Human merge remains outside V1 authority; no full production observation/rollback proof | Observe one real release and feed rollback/customer outcome into governed learning |
-| Factory incident response | Security + SRE | **Missing canonical lifecycle** | [Production convergence plan](../plans/2026-08-25-feat-software-factory-production-convergence-plan.md) | Alerts, op events, traces, and run failures are fragmented | Implement Clarify → Contain → Observe → Isolate → Restore → Correct → Prevent → Measure with browser and drill evidence |
+| Factory incident response | Security + SRE | **Experimental; deterministic control plane implemented** | [Incident command](../software-factory/factory-incident-command.md) | Append-only incident lifecycle, separate containment/restoration authority, signed agent detect/propose capabilities, and threat-drill catalog are implemented; no real named-commander pilot incident is claimed | Complete the real pilot preflight drill with exact applied-control and restoration receipts |
 | Cost per accepted outcome | ML/AI + Product | **Partial** | [Production Factory Pilot V3](../testing/evidence/production-factory-pilot-v3/README.md) | Model/provider cost and cost per accepted workload remain `null` | Achieve attributable model, compute, sandbox, and human-attention coverage on real work |
 | Governed inference accounting | ML/AI + Platform | **Experimental; default off** | [Bounded Phase 5 completion](../testing/evidence/governed-inference-phase5/completion-record.md); [current program](../software-factory/capability-convergence-program.md) | Offline receipts and estimated economics only; aggregate reservation hardening is in progress; dispatch bounds, billing settlement and real WorkOrder economics remain incomplete | Qualify finite physical-call liability and attributable live billing before any route or cost maturity promotion |
 | Multi-tenant enterprise operation | Security + Platform | **Partial** | [System Factory E2E V2](../testing/evidence/system-factory-e2e-v2/README.md) | Company/workspace scoping exists; public cross-company operation is not qualified | Complete live cross-company denial and service-identity tests before a second organization |
@@ -137,15 +137,16 @@ or authorize Guarded Auto.
 
 Mission Control must not claim fleet-scale autonomous delivery across thousands
 of engineers until real-team operation, cross-company denial, complete outcome
-economics, incident response, tool authority, and sustained reliability are
+economics, real incident response, broader tool authority, and sustained reliability are
 independently demonstrated.
 
 ## Promotion priorities
 
 1. **P0 — Real product-repository pilot and measurement closure.** Prove the
    existing system on consequential but bounded work before adding breadth.
-2. **P0 — Factory Incident Command.** Add a thin incident aggregate over existing
-   evidence and make containment, restoration, correction, and follow-up explicit.
+2. **P0 — Factory Incident Command real drill.** Use the implemented thin
+   aggregate to retain a named-commander containment, restoration, correction,
+   and follow-up drill on the selected pilot repository.
 3. **P1 — Governed Tool/MCP operations.** Preserve the fixture and single exact
    Context7 qualification; gather operational evidence without adding another
    service, operation, write capability, or connector catalog.

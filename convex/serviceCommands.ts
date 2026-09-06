@@ -1173,6 +1173,64 @@ export const draftMissionIntentContribution = action({
   },
 });
 
+export const fileFactoryIncident = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "incidents.detect");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveRepositoryScope, {
+      projectId: payload.projectId,
+      repositoryId: payload.repositoryId,
+    });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(internal.factory.incidents.fileFromService, {
+        ...payload,
+        serviceId: args.envelope.serviceId,
+        serviceCommandReceiptId: receipt.receiptId,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: "SUCCEEDED",
+        resultReference: String(result?._id ?? payload.sourceFingerprint),
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const proposeFactoryIncidentAction = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "incidents.propose");
+    const incident = await ctx.runQuery(internal.factory.incidents.getScopeInternal, {
+      incidentId: payload.incidentId,
+    });
+    const receipt = await claimScoped(ctx, args.envelope, {
+      projectId: String(incident.projectId),
+      repositoryId: String(incident.repositoryId),
+    });
+    try {
+      const result = await ctx.runMutation(internal.factory.incidents.proposeFromService, {
+        ...payload,
+        serviceId: args.envelope.serviceId,
+        serviceCommandReceiptId: receipt.receiptId,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: "SUCCEEDED",
+        resultReference: String(result?._id ?? payload.incidentId),
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
 async function authorize(ctx: any, candidate: ServiceCommandEnvelope, payloadJson: string, capability: string): Promise<any> {
   const expectedServiceId = process.env.MISSION_CONTROL_SERVICE_ID?.trim() || "orchestration-server";
   const secret = process.env.MISSION_CONTROL_SERVICE_COMMAND_SECRET?.trim();
