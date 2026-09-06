@@ -193,3 +193,14 @@ either todo complete and does not authorize implementation by itself.
 
 **Learnings:**
 - Cost per accepted outcome is useful only when coverage and outcome identity are explicit.
+
+### 2026-09-06 - Canonical identity storage qualification
+
+The independent reviews corrected canonical receipt replay and cohort isolation.
+The real local backend then reproduced an undefined-field digest mismatch masked
+by the old in-memory fixture. New v2 intent, receipt and projection snapshots
+omit absent fields before hashing; v1 history and the global hash remain intact.
+Forty-two focused tests and 13 real local backend scenarios pass. Root code
+generation passes with unchanged generated files. Main advances #185 and #186
+are being integrated before final qualification and merge. Live authority and
+complete outcome economics remain open.

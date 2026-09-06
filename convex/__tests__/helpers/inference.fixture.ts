@@ -83,7 +83,8 @@ export function reservationFixture() {
     insert: vi.fn(async (table: string, data: Record<string, unknown>) => {
       const target = tableRows(table);
       const id = `${table}-db-${target.length + 1}`;
-      target.push({ ...data, _id: id });
+      // Convex omits undefined object properties when persisting nested values.
+      target.push({ ...JSON.parse(JSON.stringify(data)), _id: id });
       return id;
     }),
   };

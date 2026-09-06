@@ -3,7 +3,7 @@ import { canonicalDigest, canonicalOutcomeSourceDigest, type PhysicalInferenceIn
   type PhysicalInferenceReceipt, type FactoryOutcomeProjection } from "@mission-control/shared";
 import { appendReceiptInternal, appendReconciliationInternal, claimIntentInternal,
   createOutcomeProjection, freezeRouteComparison, persistIntentInternal, recordOutcomeEvent } from "../inferenceGateway";
-import { reservationFixture } from "./helpers/inferenceFixture";
+import { reservationFixture } from "./helpers/inference.fixture";
 
 vi.mock("../lib/companyAccess", async (importOriginal) => ({
   ...await importOriginal<typeof import("../lib/companyAccess")>(),
@@ -132,6 +132,31 @@ describe("canonical identities through persisted inference handlers", () => {
     await f.db.patch(first.intentId, { immutableSnapshot: undefined });
     await expect(f.claim(first.intentId)).rejects.toThrow(/snapshot|identity/i);
     expect((await f.db.get(first.intentId))!.state).toBe("PERSISTED");
+  });
+
+  it.each(["intent", "receipt", "projection"])("rejects a hash-valid historical v1 %s snapshot", async kind => {
+    const f = await persistedChain(), first = await f.persist(1);
+    let id = first.intentId, rowDigest = "intentDigest", snapshotDigest = "digest";
+    if (kind !== "intent") {
+      await f.claim(first.intentId);
+      id = (await f.receipt(first.intentId, true)).receiptId;
+      rowDigest = "receiptDigest"; snapshotDigest = "receiptDigest";
+    }
+    if (kind === "projection") {
+      id = (await f.invoke<{ projectionId: string }>(createOutcomeProjection, {
+        workflowRunId: "attempt", cohortDigest: sha("a"), routeDigest: f.route.routeDigest })).projectionId;
+      rowDigest = "projectionDigest"; snapshotDigest = "digest";
+    }
+    const row = (await f.db.get(id))!;
+    const { [snapshotDigest]: _digest, ...bytes } = row.immutableSnapshot as Record<string, unknown>;
+    const historical = { ...bytes, schema: String(bytes.schema).replace("/v2", "/v1") };
+    const digest = canonicalDigest(historical.schema, historical);
+    await f.db.patch(id, { [rowDigest]: digest, immutableSnapshot: { ...historical, [snapshotDigest]: digest } });
+    const dependent = kind === "intent" ? f.claim(id) : kind === "receipt"
+      ? f.invoke(createOutcomeProjection, { workflowRunId: "attempt", cohortDigest: sha("a"), routeDigest: f.route.routeDigest })
+      : f.invoke(freezeRouteComparison, { projectId: "project", leftRouteDigest: f.route.routeDigest,
+        rightRouteDigest: f.fallback.routeDigest, cohortDigest: sha("a"), minimumSampleSize: 1, maximumAgeMs: 1000 });
+    await expect(dependent).rejects.toThrow(/snapshot/i);
   });
 
   it("rejects changed frozen intent bytes before claim", async () => {

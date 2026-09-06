@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { reservationFixture } from "./helpers/inferenceFixture";
+import { reservationFixture } from "./helpers/inference.fixture";
 import {
   compareRouteEconomics,
   inferencePriceBook,

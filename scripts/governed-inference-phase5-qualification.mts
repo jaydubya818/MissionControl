@@ -289,7 +289,7 @@ const record = {
   generatedAt: "2026-09-05T20:00:05.000Z",
   networkCalls: 0,
   syntheticCustomerData: false,
-  runtimeContract: "v43",
+  runtimeContract: "v48",
   route: selectedRoute,
   comparisonRoute: { ...comparisonRoute, qualification: "NOT_INDEPENDENTLY_QUALIFIED" },
   identities: {
@@ -342,13 +342,13 @@ const record = {
 
 if (process.argv.includes("--check")) {
   const frozenRecord = JSON.parse(readFileSync(new URL(
-    "../docs/testing/evidence/governed-inference-phase5/offline-qualification.json",
+    "../docs/testing/evidence/governed-inference-identity-v2/offline-qualification.json",
     import.meta.url,
   ), "utf8"));
   assert.deepEqual(
     frozenRecord,
     JSON.parse(JSON.stringify(record)),
-    "Frozen Phase 5 evidence does not match the reproducible qualification output.",
+    "Frozen Phase 5 identity-v2 evidence does not match the reproducible qualification output.",
   );
 }
 

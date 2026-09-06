@@ -84,7 +84,7 @@ function reservationValue(reservation: Doc<"inferenceReservations">) {
 
 function intentValue(intent: Doc<"inferencePhysicalIntents">, reservation: Doc<"inferenceReservations">) {
   const snapshot = canonicalSnapshot<PhysicalInferenceIntent>(intent.immutableSnapshot,
-    "inference-physical-intent/v1", "digest", intent.intentDigest);
+    "inference-physical-intent/v2", "digest", intent.intentDigest);
   if (snapshot.state !== "PERSISTED" || !snapshot.intentId || intent.reservationId !== reservation._id
     || intent.workflowRunId !== reservation.workflowRunId
     || snapshot.reservationId !== reservationValue(reservation).reservationId
@@ -98,7 +98,7 @@ function intentValue(intent: Doc<"inferencePhysicalIntents">, reservation: Doc<"
 
 function receiptValue(receipt: Doc<"inferencePhysicalReceipts">) {
   const snapshot = canonicalSnapshot<PhysicalInferenceReceipt>(receipt.immutableSnapshot,
-    "inference-physical-receipt/v1", "receiptDigest", receipt.receiptDigest);
+    "inference-physical-receipt/v2", "receiptDigest", receipt.receiptDigest);
   if (snapshot.attemptId !== String(receipt.workflowRunId) || snapshot.reservationDigest !== receipt.reservationDigest
     || snapshot.logicalRequestKey !== receipt.logicalRequestKey || snapshot.physicalOrdinal !== receipt.physicalOrdinal) {
     throw new Error("Canonical receipt identity does not match its persisted scope.");
@@ -854,7 +854,7 @@ export const listRouteComparisons = query({
 
 function projectionValue(projection: Doc<"factoryOutcomeProjections">) {
   const snapshot = canonicalSnapshot<FactoryOutcomeProjection>(projection.immutableSnapshot,
-    "factory-outcome-projection/v1", "digest", projection.projectionDigest);
+    "factory-outcome-projection/v2", "digest", projection.projectionDigest);
   if (snapshot.projectId !== String(projection.projectId) || snapshot.workOrderId !== String(projection.workOrderId)
     || snapshot.attemptId !== String(projection.workflowRunId) || snapshot.routeDigest !== projection.routeDigest
     || snapshot.cohortDigest !== projection.cohortDigest) {

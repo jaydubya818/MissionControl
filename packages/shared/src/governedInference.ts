@@ -2,10 +2,10 @@ import { canonicalDigest } from "./canonicalDigest.js";
 
 export const INFERENCE_PRICE_BOOK_SCHEMA = "inference-price-book/v1" as const;
 export const INFERENCE_RESERVATION_SCHEMA = "inference-reservation/v1" as const;
-export const INFERENCE_INTENT_SCHEMA = "inference-physical-intent/v1" as const;
-export const INFERENCE_RECEIPT_SCHEMA = "inference-physical-receipt/v1" as const;
+export const INFERENCE_INTENT_SCHEMA = "inference-physical-intent/v2" as const;
+export const INFERENCE_RECEIPT_SCHEMA = "inference-physical-receipt/v2" as const;
 export const OUTCOME_EVENT_SCHEMA = "factory-outcome-event/v1" as const;
-export const OUTCOME_PROJECTION_SCHEMA = "factory-outcome-projection/v1" as const;
+export const OUTCOME_PROJECTION_SCHEMA = "factory-outcome-projection/v2" as const;
 export const OUTCOME_FORMULA_VERSION = "accepted-outcome-economics/v1" as const;
 
 export type ObservationCompleteness = "COMPLETE" | "PARTIAL" | "UNKNOWN";
@@ -332,6 +332,18 @@ export function logicalInferenceRequestKey(input: {
   return `${input.projectId}:${input.attemptId}:${input.stepId}:${input.requestOrdinal}`;
 }
 
+// V2 snapshots omit absent object fields before hashing, matching durable JSON
+// storage. Keep the shared legacy canonical hash algorithm and old records intact.
+function durableInferenceValue<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(durableInferenceValue) as T;
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .map(([key, item]) => [key, durableInferenceValue(item)])) as T;
+  }
+  return value;
+}
+
 export function physicalInferenceIntent(
   input: Omit<PhysicalInferenceIntent, "schema" | "state" | "digest">,
   reservation: InferenceReservation,
@@ -361,7 +373,7 @@ export function physicalInferenceIntent(
     || digest("inference-route-binding/v1", expected) !== digest("inference-route-binding/v1", input.route)) {
     throw new Error("UNAPPROVED_ROUTE_OR_FALLBACK");
   }
-  const snapshot = { ...input, schema: INFERENCE_INTENT_SCHEMA, state: "PERSISTED" as const };
+  const snapshot = durableInferenceValue({ ...input, schema: INFERENCE_INTENT_SCHEMA, state: "PERSISTED" as const });
   return { ...snapshot, digest: digest(INFERENCE_INTENT_SCHEMA, snapshot) };
 }
 
@@ -494,7 +506,7 @@ export function physicalInferenceReceipt(input: {
   if (cost.costMicrousd !== undefined && cost.costMicrousd > input.reservation.maxCostMicrousd) {
     throw new Error("RESERVATION_COST_LIMIT_EXCEEDED");
   }
-  const snapshot = {
+  const snapshot = durableInferenceValue({
     schema: INFERENCE_RECEIPT_SCHEMA,
     receiptId: input.receiptId,
     intentId: input.intent.intentId,
@@ -525,7 +537,7 @@ export function physicalInferenceReceipt(input: {
     failureCode: input.failureCode,
     startedAt: input.startedAt,
     completedAt: input.completedAt,
-  };
+  });
   return { ...snapshot, receiptDigest: digest(INFERENCE_RECEIPT_SCHEMA, snapshot) };
 }
 
@@ -604,7 +616,7 @@ export function projectFactoryOutcome(input: {
     receiptDigests: input.receipts.map((receipt) => receipt.receiptDigest).sort(),
     reconciliationDigests: reconciliations.map((reconciliation) => reconciliation.digest).sort(),
   };
-  const snapshot = {
+  const snapshot = durableInferenceValue({
     schema: OUTCOME_PROJECTION_SCHEMA,
     projectionId: input.projectionId,
     formulaVersion: OUTCOME_FORMULA_VERSION,
@@ -626,7 +638,7 @@ export function projectFactoryOutcome(input: {
     confidence: costCompleteness === "COMPLETE" && outcome !== "IN_PROGRESS" ? "HIGH" as const
       : costCompleteness === "PARTIAL" ? "LOW" as const : "NONE" as const,
     lineageDigest: digest(`${OUTCOME_PROJECTION_SCHEMA}/lineage`, source),
-  };
+  });
   return { ...snapshot, digest: digest(OUTCOME_PROJECTION_SCHEMA, snapshot) };
 }
 

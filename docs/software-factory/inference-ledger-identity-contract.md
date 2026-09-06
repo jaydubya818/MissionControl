@@ -46,6 +46,20 @@ by guessing. Preserve them for inspection and fail closed for new claims,
 receipts or comparisons that depend on unrecoverable identity. This change grants
 no new execution, provider, acceptance, release or promotion authority.
 
+## Storage round-trip correction
+
+A real local backend revealed that the shared legacy canonical hash includes
+explicit `undefined` properties while Convex omits those properties during
+storage. A snapshot that passed in-memory tests therefore failed its digest after
+a database round trip. New intent, receipt and projection snapshots use **v2**
+schemas and remove absent object fields before hashing. The global canonical
+hash and historical v1 evidence remain unchanged. Canonical consumers reject all v1 intent, receipt and projection snapshots,
+including hash-valid ones. They do not silently rehash old evidence or invent
+lost fields. Existing records remain inspectable; dependent new execution or
+projection requires a supported v2 snapshot.
+The Phase 5 command compares a new v2 fixture while retaining the original
+[offline record](../testing/evidence/governed-inference-phase5/offline-qualification.json).
+
 Runtime contract advances from v47 to v48 for the optional snapshot schema fields.
 
 ## Required proof
