@@ -252,8 +252,8 @@ CI, merge, clean-main proof, and release remain in progress.
 
 ### 2026-09-06 — Recovery integrated and exact-source qualification passed
 
-The recovery source now contains current main `ccacc5a9284` and runtime contract
-v51. Final review found and corrected one startup race: provider registration
+The recovery source now contains current main `13ce5f0ef961` and runtime contract
+v52. Final review found and corrected one startup race: provider registration
 and both execution workers now wait for successful durable journal readiness.
 The actual index regression proves invalid storage records a bounded diagnostic
 while both workers remain unstarted.
@@ -263,7 +263,7 @@ and six incident workspace tests. Exact-source composed qualification passes
 every release-blocking stage, including full repository tests, security, lint,
 typecheck, build, startup smoke, runtime guard, and historical evidence checks.
 All 15 critical browser checks pass. Phase 5's frozen offline evidence now binds
-to v51 and continues to deny live comparison or automatic promotion.
+to v52 and continues to deny live comparison or automatic promotion.
 
 Signed restart evidence, exact PR-head CI, merge, clean-main requalification,
 and guarded release remain in progress. The ten accepted real-work outcomes and

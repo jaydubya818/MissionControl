@@ -30,6 +30,6 @@ build, orchestration startup smoke, and whitespace integrity. The golden eval
 is publishable with all six blocking cases passed; its one synthetic economics
 case remains advisory WARN because the zero-call fixture has no token count.
 
-The v51 Phase 5 reproducibility check passes after updating its frozen runtime
+The v52 Phase 5 reproducibility check passes after updating its frozen runtime
 binding. Its expected decision remains `NO_GO` for live route comparison. The
 critical browser suite passes 15 of 15 checks.

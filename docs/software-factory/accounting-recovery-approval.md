@@ -36,10 +36,9 @@ recovery independently available. Its reviewed source hashes and the three
 approved patch hashes are retained in the final recovery evidence. Earlier red
 proof remains historical evidence of the corrected defects.
 
-The applied source uses runtime contract v51 inherited from the integrated
-incident controls. The runtime-contract guard detects no additional public
-Convex validator change across 978 functions. Exact source `4def894` contains
-current main `ccacc5a`; all release-blocking composed qualification stages and
+The applied source uses runtime contract v52 inherited from current main. The
+runtime-contract guard detects no additional public Convex validator change.
+The recovery branch contains current main `13ce5f0`; all release-blocking composed qualification stages and
 15 critical browser checks pass. Actual signed delivery and restart evidence,
 CI, guarded merge, clean-main proof, and release remain required after this
 source checkpoint.
