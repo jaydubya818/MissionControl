@@ -1,6 +1,6 @@
 // Immutable private runtime package; update only with a new qualified archive.
 export const FAB_RUNTIME_PIN = {
-  "version": "0.1.0-experimental.2",
-  "sourceCommit": "1d1240c219d9bf3c1fa5fbb0a80ded96cf13df1f",
-  "closureSha256": "121ef8e14b085f6dba6e7f5598070ad80e79f5c1bfa5c71b890871bf83214999"
+  "version": "0.1.0-experimental.3",
+  "sourceCommit": "faebfc26bcca10e495a0d21c91c3e12813a3e15a",
+  "closureSha256": "edd1d51bc444f1045859c3cd07ea3f84ddd0ca7f4be45f7c977ba4d079aef343"
 } as const;

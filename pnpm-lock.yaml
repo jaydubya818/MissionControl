@@ -203,8 +203,8 @@ importers:
         specifier: ^3.1127.0
         version: 3.1127.0
       '@fdlc/fab':
-        specifier: file:../../vendor/fab/fdlc-fab-0.1.0-experimental.2.tgz
-        version: file:vendor/fab/fdlc-fab-0.1.0-experimental.2.tgz
+        specifier: file:../../vendor/fab/fdlc-fab-0.1.0-experimental.3.tgz
+        version: file:vendor/fab/fdlc-fab-0.1.0-experimental.3.tgz
       '@hono/node-server':
         specifier: ^1.19.13
         version: 1.19.17(hono@4.13.1)
@@ -1210,9 +1210,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@fdlc/fab@file:vendor/fab/fdlc-fab-0.1.0-experimental.2.tgz':
-    resolution: {integrity: sha512-JqVCa4uPUUDVSXXT1+ubWYFDMRs+mFfeyghDXsQ5+uUWdrEkzxiWvpGbM9pp3N6gC/NxAo88x3CX51XmzAzd6Q==, tarball: file:vendor/fab/fdlc-fab-0.1.0-experimental.2.tgz}
-    version: 0.1.0-experimental.2
+  '@fdlc/fab@file:vendor/fab/fdlc-fab-0.1.0-experimental.3.tgz':
+    resolution: {integrity: sha512-GfPVB+HwlFEME4Sy1fC1F7uAcU9lyTvDRJ6IJwSwtiGTxarF2OSCLeux9GFnUZBQxMG4/R7tmCvz9b1B8Pui4A==, tarball: file:vendor/fab/fdlc-fab-0.1.0-experimental.3.tgz}
+    version: 0.1.0-experimental.3
     engines: {node: '>=24.0.0'}
     hasBin: true
 
@@ -5114,7 +5114,7 @@ snapshots:
   '@esbuild/win32-x64@0.27.0':
     optional: true
 
-  '@fdlc/fab@file:vendor/fab/fdlc-fab-0.1.0-experimental.2.tgz': {}
+  '@fdlc/fab@file:vendor/fab/fdlc-fab-0.1.0-experimental.3.tgz': {}
 
   '@floating-ui/core@1.7.4':
     dependencies:

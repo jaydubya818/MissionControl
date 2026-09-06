@@ -5,11 +5,11 @@ Mission Control repository is public; the archives are publicly retrievable when
 the source branch is published. “Private package” in historical build records
 describes the original packaging workflow, not repository access control.
 
-The active archive is `fdlc-fab-0.1.0-experimental.2.tgz`, built from FDLC source
-`1d1240c219d9bf3c1fa5fbb0a80ded96cf13df1f`. Its SHA-256 is
-`b3a1af223e246208c01745678cbe48a91786070b016b9a1ad7bdb0ad274d8a8d`.
+The active archive is `fdlc-fab-0.1.0-experimental.3.tgz`, built from FDLC source
+`faebfc26bcca10e495a0d21c91c3e12813a3e15a`. Its SHA-256 is
+`e034a74f0e6f8b39b601b474c06a3725d19630b548920fbe25b774b24a706f9a`.
 `apps/orchestration-server/src/fabRuntimePin.ts` records its exact installed
-closure. The experimental.1 archive is retained as historical evidence.
+43-file closure. Earlier archives are retained as historical evidence.
 
 The Fab source/package has no declared license. This vendoring change does not
 relicense Fab under Mission Control's root MIT license or select a new Fab

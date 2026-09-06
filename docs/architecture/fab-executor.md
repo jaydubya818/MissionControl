@@ -4,7 +4,20 @@ Fab is an execution-only harness. Mission Control owns admission, frozen manifes
 
 The adapter consumes an explicit operator-owned Fab config, a pinned vendored package, a state directory outside the worktree, and the canonical Attempt context. No credential discovery occurs. Native model APIs use only the enrolled Fab key or explicitly selected Fab environment variable. Source-control credentials are never passed to Fab. The worker requires the exact frozen model route and installed runtime byte identity before credential use or inference.
 
-The current package is `@fdlc/fab@0.1.0-experimental.2`, built from FDLC commit `1d1240c219d9bf3c1fa5fbb0a80ded96cf13df1f`. The installed closure hash and source are recorded in `apps/orchestration-server/src/fabRuntimePin.ts`; the archive SHA-256 is `b3a1af223e246208c01745678cbe48a91786070b016b9a1ad7bdb0ad274d8a8d`, also bound by the pnpm integrity entry. Ordinary frozen pnpm installation resolves the vendored archive. The old experimental.1 archive remains historical. This Experimental tuple includes native macOS 26.0+ arm64 credential/check helpers and requires Node 24. The helpers have only linker ad-hoc signatures, no Developer ID or notarization; there is no signed or npm-registry release. This repository is public, so these vendored archives are publicly retrievable. See [package provenance](../../vendor/fab/README.md) for source and the unresolved upstream license.
+The current package is `@fdlc/fab@0.1.0-experimental.3`, built from FDLC commit `faebfc26bcca10e495a0d21c91c3e12813a3e15a`. The installed 43-file closure hash and source are recorded in `apps/orchestration-server/src/fabRuntimePin.ts`; the archive SHA-256 is `e034a74f0e6f8b39b601b474c06a3725d19630b548920fbe25b774b24a706f9a`, also bound by the pnpm integrity entry. Ordinary frozen pnpm installation resolves the vendored archive. Earlier archives remain historical. This Experimental tuple includes native macOS 26.0+ arm64 credential/check helpers and requires Node 24. The helpers have only linker ad-hoc signatures, no Developer ID or notarization; there is no signed or npm-registry release. This repository is public, so these vendored archives are publicly retrievable. See [package provenance](../../vendor/fab/README.md) for source and the unresolved upstream license.
+
+The Bedrock text/tool protocol requires an explicit host-owned broker factory.
+Configuration cannot select an AWS credential chain or an HTTP fallback. The
+factory receives the canonical Attempt context, and the adapter rechecks authority
+after broker enrollment. A missing broker fails closed; production startup does
+not register a placeholder. The host still must implement exact CountTokens,
+enrolled identity verification and durable reservation/claim/receipt handling
+before live invocation. Offline tests do not establish those deployed controls.
+
+Mission Control's shared Bedrock bridge and cumulative liability ledger are a
+separate `codex/bedrock-v1` Docker tuple. They do not enroll this Fab
+persistent-worker adapter. A Fab broker must reuse canonical authority without
+duplicating the ledger or weakening either tuple's exact admission checks.
 
 ## Canonical lifecycle
 
@@ -34,6 +47,6 @@ Local tests use actual Fab code, native checks, canonical MC worker/verifier/rep
 
 Before claiming Phase 3 complete, enroll and authorize an exact live provider/model, select an authorized non-production MC deployment and controlled GitHub repository, complete live engineering evaluations, and qualify resulting persistent lineage and recovery. Release licensing/signing decisions remain operator-owned. Fab stays Experimental until those evidence gates are satisfied.
 
-Main reconciliation preserves the existing v1 `LOCAL_GIT` attestation route, which remains acceptance-ineligible. Runtime compatibility is v44. Main’s governed inference accounting remains opt-in and separate from Fab’s enrolled provider transport; no shared live gateway qualification is implied. Exact local attestation recovery may reclaim an expired lease only after the server validates the original failed Attempt, frozen manifest/configuration/WorkOrder/repository, unpublished code-diff checkpoint and prior owner. The worker only inspects that candidate; it does not rerun the executor, MCP tools or publication. Ordinary interrupted execution still requires a replacement Attempt. Failed/canceled terminal recovery is preserved and reported as a blocker rather than returned as successful recovery.
+Main reconciliation preserves the existing v1 `LOCAL_GIT` attestation route, which remains acceptance-ineligible. Runtime compatibility remains the current main contract. Main’s governed inference accounting remains opt-in and separate from Fab’s enrolled provider transport; no shared live gateway qualification is implied. Exact local attestation recovery may reclaim an expired lease only after the server validates the original failed Attempt, frozen manifest/configuration/WorkOrder/repository, unpublished code-diff checkpoint and prior owner. The worker only inspects that candidate; it does not rerun the executor, MCP tools or publication. Ordinary interrupted execution still requires a replacement Attempt. Failed/canceled terminal recovery is preserved and reported as a blocker rather than returned as successful recovery.
 
 See [Phase 3 qualification evidence](../testing/evidence/fab-phase3/README.md) for results and remaining external gates.
