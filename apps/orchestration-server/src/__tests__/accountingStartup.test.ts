@@ -11,6 +11,9 @@ vi.mock("../accountingDeliveryRuntime.js", async (original) => ({
   createAccountingDeliveryRuntime: accounting.create,
 }));
 vi.mock("dotenv", () => ({ config: vi.fn() }));
+vi.mock("../bedrockQualifiedTransport.js", () => ({
+  qualifiedBedrockTransport: vi.fn(() => ({ send: vi.fn() })),
+}));
 const roots: string[] = [];
 beforeEach(() => {
   vi.resetModules();
@@ -25,8 +28,8 @@ beforeEach(() => {
     CODEX_WORKER_FACTORY_VERSION_BINDINGS_JSON: "", CODEX_WORKER_REMOTE_SANDBOX_ENABLED: "0",
     MISSION_CONTROL_ACCOUNTING_JOURNAL_DIR: "/fixture/persistent/accounting",
   })) vi.stubEnv(key, value);
-  accounting.create.mockReset().mockReturnValue({ delivery: {}, start: accounting.start,
-    stop: accounting.stop, status: () => ({ enabled: true, lastError: null }) });
+  accounting.create.mockReset().mockReturnValue({ delivery: {}, ready: Promise.resolve({}), start: accounting.start,
+    stop: accounting.stop, status: () => ({ enabled: true, initializing: false, lastError: null }) });
 });
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -69,4 +72,37 @@ it.each(["registry", "registration"])("contains actual optional %s construction 
   expect(result.factoryAttemptWorker.enabled).toBe(false);
   expect(result.missionPlanningWorker.enabled).toBe(false);
   expect(result.accountingDelivery.enabled).toBe(true);
+});
+
+it("does not register or start provider execution when durable accounting initialization fails", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "accounting-startup-")); roots.push(root);
+  const configPath = path.join(root, "provider.json");
+  const accountId = "000000000000";
+  const model = "anthropic.claude-sonnet-4-6";
+  await writeFile(configPath, JSON.stringify({
+    route: {
+      provider: "AWS Bedrock", region: "us-east-1", modelId: model,
+      foundationModelArn: `arn:aws:bedrock:us-east-1::foundation-model/${model}`,
+      inferenceProfileId: `us.${model}`,
+      inferenceProfileArn: `arn:aws:bedrock:us-east-1:${accountId}:inference-profile/us.${model}`,
+      topology: "US_GEOGRAPHIC_CROSS_REGION", globalInference: false,
+      allowedDestinationRegions: ["us-east-1", "us-east-2", "us-west-2"],
+      awsAccountId: accountId, projectEnvironmentId: "OFFLINE-FIXTURE",
+      roleArn: `arn:aws:iam::${accountId}:role/fixture`,
+    },
+    callAuthorization: { fixture: true }, reservationId: "reservation",
+    priceDigest: `sha256:${"a".repeat(64)}`, maximumOutputTokens: 64, timeoutMs: 1_000,
+  }));
+  vi.stubEnv("CODEX_BEDROCK_APPROVED_CONFIG_FILE", configPath);
+  accounting.create.mockReturnValue({
+    delivery: {}, ready: Promise.resolve(undefined), start: accounting.start, stop: accounting.stop,
+    status: () => ({ enabled: true, initializing: false, lastError: "ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID" }),
+  });
+
+  const module = await import("../index.js");
+  expect(await module.startFactoryExecution()).toBe(false);
+  const result = await status();
+  expect(result.executionConfigurationErrors).toContain("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID");
+  expect(result.factoryAttemptWorker).toMatchObject({ enabled: true, lastPollAt: null, activeRunIds: [] });
+  expect(result.missionPlanningWorker).toMatchObject({ enabled: true, lastPollAt: null, activeRunId: null });
 });

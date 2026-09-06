@@ -1568,6 +1568,33 @@ const gatewayProxy = createGatewayProxy({
 // START
 // ============================================================================
 
+export async function startFactoryExecution(): Promise<boolean> {
+  try {
+    if (CODEX_BEDROCK_HARNESS_ENABLED && !(await accountingRuntime.ready)) {
+      if (!executionConfigurationErrors.includes("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID")) {
+        executionConfigurationErrors.push("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID");
+      }
+      return false;
+    }
+    if (!factoryConfigurationConflict && factoryHostReporter) {
+      await assertHarnessAdaptersReady(factoryHarnessRegistry);
+      await factoryHostReporter.start();
+      factoryAttemptWorker.start();
+      missionPlanningWorker.start();
+      return true;
+    }
+    if (!factoryConfigurationConflict && LEGACY_FACTORY_WORKER_ENABLED) {
+      await assertHarnessAdaptersReady(factoryHarnessRegistry);
+      factoryAttemptWorker.start();
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("[orchestration] Factory worker registration failed closed; execution did not start:", error);
+    return false;
+  }
+}
+
 export function startServer() {
   accountingRuntime.start();
   console.log(`[orchestration] Mission Control Orchestration Server`);
@@ -1587,18 +1614,7 @@ export function startServer() {
   runTick().then((result) => {
     console.log(`[orchestration] Initial tick complete:`, result);
   });
-  if (!factoryConfigurationConflict && factoryHostReporter) {
-    void assertHarnessAdaptersReady(factoryHarnessRegistry).then(() => factoryHostReporter.start())
-      .then(() => {
-        factoryAttemptWorker.start();
-        missionPlanningWorker.start();
-      })
-      .catch((error) => console.error("[orchestration] Factory worker registration failed closed; execution did not start:", error));
-  } else if (!factoryConfigurationConflict && LEGACY_FACTORY_WORKER_ENABLED) {
-    void assertHarnessAdaptersReady(factoryHarnessRegistry)
-      .then(() => factoryAttemptWorker.start())
-      .catch((error) => console.error("[orchestration] Factory adapter health check failed closed; execution did not start:", error));
-  }
+  void startFactoryExecution();
 
   if (CODEX_FACTORY_WORKER_ENABLED) {
     console.log(`[orchestration] Durable verification-first harness worker enabled for one governed repository (${factoryHarnessRegistry.capabilities().map((item) => `${item.adapter}/${item.version}`).join(", ")}).`);
