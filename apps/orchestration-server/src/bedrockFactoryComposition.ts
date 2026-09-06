@@ -3,7 +3,10 @@ import type { FactoryAttemptWorkerDependencies } from "./factoryAttemptWorker.js
 import {
   BedrockInferenceBridge,
   canonicalBedrockBridgeAuthority,
+  type BedrockAccountingDelivery,
+  type BedrockSettlementPayload,
 } from "./bedrockInferenceBridge.js";
+import { createAccountingSubmit } from "./accountingDeliveryWorker.js";
 import type { BedrockTransport } from "./bedrockAdapter.js";
 import { bedrockRouteSchema, type BedrockRoute } from "./bedrockRoute.js";
 import { DockerSandboxProvider } from "./dockerSandboxProvider.js";
@@ -23,6 +26,7 @@ export function bedrockFactoryProviderFactory(
   client: ConvexHttpClient,
   configuration: BedrockFactoryConfiguration,
   transport: BedrockTransport,
+  accounting?: BedrockAccountingDelivery,
 ): NonNullable<FactoryAttemptWorkerDependencies["createSandboxProvider"]> {
   const config = structuredClone(configuration);
   config.route = bedrockRouteSchema.parse(config.route);
@@ -58,6 +62,12 @@ export function bedrockFactoryProviderFactory(
           projectId: String(claim.projectId),
           repositoryId: String(claim.repositoryId),
         };
+        const authority = canonicalBedrockBridgeAuthority(client, scope);
+        // Keep UNKNOWN fallback and capture-failure best effort bounded too.
+        if (accounting) {
+          const submit = createAccountingSubmit({ ...scope, backendUrl: client.url });
+          authority.settle = (payload) => submit(payload as BedrockSettlementPayload, 10000, new AbortController().signal);
+        }
         return new BedrockInferenceBridge(
           {
             ...scope,
@@ -84,8 +94,10 @@ export function bedrockFactoryProviderFactory(
               retryGeneration: 0,
             },
           },
-          canonicalBedrockBridgeAuthority(client, scope),
+          authority,
           transport,
+          Date.now,
+          accounting,
         );
       },
     });

@@ -39,6 +39,7 @@ import { readFileSync } from "node:fs";
 import { FactoryAttemptWorker, DEFAULT_DEPENDENCIES } from "./factoryAttemptWorker.js";
 import { bedrockFactoryProviderFactory, selectBedrockFactoryProvider } from "./bedrockFactoryComposition.js";
 import { qualifiedBedrockTransport } from "./bedrockQualifiedTransport.js";
+import { createAccountingDeliveryRuntime, optionalExecutionConfiguration } from "./accountingDeliveryRuntime.js";
 import {
   FactoryHostReporter,
   factorySandboxCapabilities,
@@ -63,8 +64,9 @@ import os from "node:os";
 
 // Fab enrollment/configuration is explicit startup input. Capture its selected source
 // before MC's legacy dotenv loading so repository dotenv cannot enroll or override it.
+const executionConfigurationErrors: string[] = [];
 const configuredFabAdapter = process.env.FAB_EXECUTOR_ENABLED === "1"
-  ? loadFabExecutorAdapter(requiredRuntimeSetting("FAB_EXECUTOR_CONFIG"), requiredRuntimeSetting("FAB_EXECUTOR_STATE_DIR"))
+  ? optionalExecutionConfiguration("OPTIONAL_ADAPTER_CONFIGURATION_INVALID", () => loadFabExecutorAdapter(requiredRuntimeSetting("FAB_EXECUTOR_CONFIG"), requiredRuntimeSetting("FAB_EXECUTOR_STATE_DIR")), executionConfigurationErrors)
   : undefined;
 const envSearchPaths = [
   path.resolve(process.cwd(), ".env.local"),
@@ -92,26 +94,32 @@ const AUTOMATION_REPOSITORY_ROOT = path.resolve(process.env.AUTOMATION_REPOSITOR
 const CODEX_FACTORY_WORKER_ENABLED = process.env.CODEX_FACTORY_WORKER_ENABLED === "true";
 const DEEPSEEK_HARNESS_EXECUTOR_ENABLED = process.env.DEEPSEEK_HARNESS_EXECUTOR_ENABLED === "1";
 const LEGACY_FACTORY_WORKER_ENABLED = process.env.FACTORY_EXECUTION_ENABLED === "1";
-const CODEX_BEDROCK_HARNESS_ENABLED = process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1";
-const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
-  || Boolean(configuredFabAdapter) || CODEX_BEDROCK_HARNESS_ENABLED;
-const FACTORY_WORKER_SCOPE = DURABLE_FACTORY_WORKER_ENABLED
-  ? {
-      projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"),
-      repositoryId: requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ID"),
-    }
-  : undefined;
+const accountingRuntime = createAccountingDeliveryRuntime({ excludedDirectories: [AUTOMATION_REPOSITORY_ROOT,
+  process.env.CODEX_WORKER_CHECKOUT_ROOT ?? process.cwd()] });
 const FACTORY_WORKER_SESSION_ID = randomUUID();
 const FACTORY_WORKER_ID = process.env.CODEX_WORKER_HOST_ID?.trim() || `orchestration:${os.hostname()}`;
 const FACTORY_WORKER_MAX_CONCURRENT_RUNS = boundedPositiveInteger(process.env.CODEX_WORKER_MAX_CONCURRENT_RUNS, 1);
 const GITHUB_APP_PUBLICATION_READY = process.env.CODEX_WORKER_GITHUB_APP_PUBLICATION_ENABLED === "1";
-const bedrockConfigPath = CODEX_BEDROCK_HARNESS_ENABLED
+const bedrockConfigPath = process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1"
   ? process.env.CODEX_BEDROCK_APPROVED_CONFIG_FILE?.trim()
   : undefined;
-const bedrockConfig = bedrockConfigPath ? JSON.parse(readFileSync(bedrockConfigPath, "utf8")) : undefined;
-const bedrockTransport = bedrockConfig?.callAuthorization
-  ? qualifiedBedrockTransport(bedrockConfig.route, bedrockConfig.callAuthorization)
+const bedrockConfig = process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1"
+  ? optionalExecutionConfiguration("PROVIDER_CONFIGURATION_INVALID", () => {
+    if (!bedrockConfigPath) throw new Error("Explicit provider configuration is required.");
+    const config = JSON.parse(readFileSync(bedrockConfigPath, "utf8"));
+    if (!config?.callAuthorization) throw new Error("Explicit provider authorization is required.");
+    return config;
+  }, executionConfigurationErrors)
   : undefined;
+const bedrockTransport = bedrockConfig?.callAuthorization && accountingRuntime.delivery
+  ? optionalExecutionConfiguration("PROVIDER_GRANT_INVALID", () => qualifiedBedrockTransport(bedrockConfig.route, bedrockConfig.callAuthorization), executionConfigurationErrors)
+  : undefined;
+const CODEX_BEDROCK_HARNESS_ENABLED = Boolean(bedrockTransport);
+const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
+  || Boolean(configuredFabAdapter) || CODEX_BEDROCK_HARNESS_ENABLED;
+const factoryConfigurationConflict = DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED;
+if (factoryConfigurationConflict) executionConfigurationErrors.push("FACTORY_EXECUTION_CONFIGURATION_CONFLICT");
+if (process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1" && !accountingRuntime.delivery) executionConfigurationErrors.push("ACCOUNTING_JOURNAL_REQUIRED");
 const REMOTE_SANDBOX_BACKEND_READY = Boolean(bedrockTransport)
   || (process.env.CODEX_WORKER_REMOTE_SANDBOX_ENABLED === "1"
     && Boolean(process.env.EXEDEV_IDENTITY_FILE?.trim())
@@ -134,101 +142,113 @@ const CONVEX_SERVICE_AUTH_TOKEN = process.env.CONVEX_SERVICE_AUTH_TOKEN?.trim();
 if (CONVEX_SERVICE_AUTH_TOKEN) {
   client.setAuth(CONVEX_SERVICE_AUTH_TOKEN);
 }
-const factoryHarnessRegistry = new HarnessAdapterRegistry(
-  [...configuredFactoryHarnessAdapters({
-    codexEnabled: CODEX_FACTORY_WORKER_ENABLED,
-    codexBedrockEnabled: CODEX_BEDROCK_HARNESS_ENABLED,
-    deepseekEnabled: DEEPSEEK_HARNESS_EXECUTOR_ENABLED,
-    legacyFactoryWorkerEnabled: LEGACY_FACTORY_WORKER_ENABLED,
-  }), ...(configuredFabAdapter ? [configuredFabAdapter] : [])],
-);
-let occupiedFactoryWorkerSlots = 0;
-const tryAcquireFactoryWorkerSlot = () => {
-  if (occupiedFactoryWorkerSlots >= FACTORY_WORKER_MAX_CONCURRENT_RUNS) return null;
-  occupiedFactoryWorkerSlots += 1;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    occupiedFactoryWorkerSlots = Math.max(0, occupiedFactoryWorkerSlots - 1);
+const factoryBootstrap = optionalExecutionConfiguration("FACTORY_BOOTSTRAP_INVALID", () => {
+  if (executionConfigurationErrors.length) throw new Error("Execution configuration is invalid.");
+  const FACTORY_WORKER_SCOPE = DURABLE_FACTORY_WORKER_ENABLED
+    ? { projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"), repositoryId: requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ID") }
+    : undefined;
+  const factoryHarnessRegistry = new HarnessAdapterRegistry(
+    [...configuredFactoryHarnessAdapters({
+      codexEnabled: CODEX_FACTORY_WORKER_ENABLED,
+      codexBedrockEnabled: CODEX_BEDROCK_HARNESS_ENABLED,
+      deepseekEnabled: DEEPSEEK_HARNESS_EXECUTOR_ENABLED,
+      legacyFactoryWorkerEnabled: LEGACY_FACTORY_WORKER_ENABLED,
+    }), ...(configuredFabAdapter ? [configuredFabAdapter] : [])],
+  );
+  let occupiedFactoryWorkerSlots = 0;
+  const tryAcquireFactoryWorkerSlot = () => {
+    if (occupiedFactoryWorkerSlots >= FACTORY_WORKER_MAX_CONCURRENT_RUNS) return null;
+    occupiedFactoryWorkerSlots += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      occupiedFactoryWorkerSlots = Math.max(0, occupiedFactoryWorkerSlots - 1);
+    };
   };
-};
-const factoryAttemptWorker = new FactoryAttemptWorker(
-  client,
-  factoryHarnessRegistry,
-  DURABLE_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED,
-  undefined,
-  bedrockTransport ? {
-    ...DEFAULT_DEPENDENCIES,
-    createSandboxProvider: selectBedrockFactoryProvider(
-      bedrockFactoryProviderFactory(client, bedrockConfig, bedrockTransport),
-      DEFAULT_DEPENDENCIES.createSandboxProvider!,
-    ),
-  } : undefined,
-  FACTORY_WORKER_SCOPE,
-  FACTORY_WORKER_SCOPE ? {
-    workerId: FACTORY_WORKER_ID,
-    sessionId: FACTORY_WORKER_SESSION_ID,
-    maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
-  } : undefined,
-  tryAcquireFactoryWorkerSlot,
-);
-const missionPlanningWorker = new MissionPlanningWorker(
-  client,
-  factoryHarnessRegistry,
-  DURABLE_FACTORY_WORKER_ENABLED,
-  FACTORY_WORKER_SCOPE,
-  FACTORY_WORKER_SCOPE ? {
-    workerId: FACTORY_WORKER_ID,
-    sessionId: FACTORY_WORKER_SESSION_ID,
-  } : undefined,
-  undefined,
-  tryAcquireFactoryWorkerSlot,
-);
-const factoryHostReporter = FACTORY_WORKER_SCOPE
-  ? new FactoryHostReporter(client, {
-      projectId: FACTORY_WORKER_SCOPE.projectId,
-      repositoryId: FACTORY_WORKER_SCOPE.repositoryId,
-      hostId: FACTORY_WORKER_ID,
-      sessionId: FACTORY_WORKER_SESSION_ID,
-      checkoutRoot: path.resolve(process.env.CODEX_WORKER_CHECKOUT_ROOT?.trim() || process.cwd()),
-      maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
-      getCurrentRuns: () => factoryAttemptWorker.status().activeRunIds.length
-        + (missionPlanningWorker.status().activeRunId ? 1 : 0),
-      approvedModelIds: commaSeparatedValues(process.env.CODEX_WORKER_APPROVED_MODEL_IDS),
-      networkPolicyStatus: attestationStatus(process.env.CODEX_WORKER_NETWORK_POLICY_STATUS),
-      secretPolicyStatus: attestationStatus(process.env.CODEX_WORKER_SECRET_POLICY_STATUS),
-      hostRuntimeType: "persistent-worker",
-      executionBackends: [...FACTORY_WORKER_EXECUTION_BACKENDS],
-      supportedExecutors: factoryHarnessRegistry.registrations().map((registration) => {
-        const manifest = registration.manifest;
-        if (!manifest || !registration.capabilityManifestSha256 || !registration.effectiveConfigSha256) {
-          throw new Error(`Factory harness ${registration.capabilities.adapter}/${registration.capabilities.version} is missing its frozen capability manifest.`);
-        }
-        return {
-          adapter: manifest.identity.adapterId,
-          version: manifest.identity.adapterVersion,
-          capabilityManifestSha256: registration.capabilityManifestSha256,
-          effectiveConfigSha256: registration.effectiveConfigSha256,
-          runtimeArtifact: registration.runtimeArtifact,
-          runtimeArtifactSha256: registration.runtimeArtifactSha256,
-          capabilityManifest: manifest,
-          supportsCancel: registration.capabilities.supportsCancel,
-          supportsResume: registration.capabilities.supportsResume,
-          isolationModes: [...registration.capabilities.isolationModes],
-        };
-      }),
-      sandboxCapabilities: factorySandboxCapabilities({
-        githubAppPublicationReady: GITHUB_APP_PUBLICATION_READY,
-        remoteSandboxBackendReady: REMOTE_SANDBOX_BACKEND_READY,
-      }),
-      factoryVersionBindings: parseFactoryVersionBindings(
-        process.env.CODEX_WORKER_FACTORY_VERSION_BINDINGS_JSON,
-        FACTORY_WORKER_SCOPE.repositoryId,
+  const factoryAttemptWorker = new FactoryAttemptWorker(
+    client,
+    factoryHarnessRegistry,
+    !factoryConfigurationConflict && (DURABLE_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED),
+    undefined,
+    bedrockTransport ? {
+      ...DEFAULT_DEPENDENCIES,
+      createSandboxProvider: selectBedrockFactoryProvider(
+        bedrockFactoryProviderFactory(client, bedrockConfig, bedrockTransport, accountingRuntime.delivery),
+        DEFAULT_DEPENDENCIES.createSandboxProvider!,
       ),
-      onError: (error) => console.error("[orchestration] Factory host report failed:", error),
-    })
-  : null;
+    } : undefined,
+    FACTORY_WORKER_SCOPE,
+    FACTORY_WORKER_SCOPE ? {
+      workerId: FACTORY_WORKER_ID,
+      sessionId: FACTORY_WORKER_SESSION_ID,
+      maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
+    } : undefined,
+    tryAcquireFactoryWorkerSlot,
+  );
+  const missionPlanningWorker = new MissionPlanningWorker(
+    client,
+    factoryHarnessRegistry,
+    !factoryConfigurationConflict && DURABLE_FACTORY_WORKER_ENABLED,
+    FACTORY_WORKER_SCOPE,
+    FACTORY_WORKER_SCOPE ? {
+      workerId: FACTORY_WORKER_ID,
+      sessionId: FACTORY_WORKER_SESSION_ID,
+    } : undefined,
+    undefined,
+    tryAcquireFactoryWorkerSlot,
+  );
+  const factoryHostReporter = FACTORY_WORKER_SCOPE
+    ? new FactoryHostReporter(client, {
+        projectId: FACTORY_WORKER_SCOPE.projectId,
+        repositoryId: FACTORY_WORKER_SCOPE.repositoryId,
+        hostId: FACTORY_WORKER_ID,
+        sessionId: FACTORY_WORKER_SESSION_ID,
+        checkoutRoot: path.resolve(process.env.CODEX_WORKER_CHECKOUT_ROOT?.trim() || process.cwd()),
+        maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
+        getCurrentRuns: () => factoryAttemptWorker.status().activeRunIds.length
+          + (missionPlanningWorker.status().activeRunId ? 1 : 0),
+        approvedModelIds: commaSeparatedValues(process.env.CODEX_WORKER_APPROVED_MODEL_IDS),
+        networkPolicyStatus: attestationStatus(process.env.CODEX_WORKER_NETWORK_POLICY_STATUS),
+        secretPolicyStatus: attestationStatus(process.env.CODEX_WORKER_SECRET_POLICY_STATUS),
+        hostRuntimeType: "persistent-worker",
+        executionBackends: [...FACTORY_WORKER_EXECUTION_BACKENDS],
+        supportedExecutors: factoryHarnessRegistry.registrations().map((registration) => {
+          const manifest = registration.manifest;
+          if (!manifest || !registration.capabilityManifestSha256 || !registration.effectiveConfigSha256) {
+            throw new Error(`Factory harness ${registration.capabilities.adapter}/${registration.capabilities.version} is missing its frozen capability manifest.`);
+          }
+          return {
+            adapter: manifest.identity.adapterId,
+            version: manifest.identity.adapterVersion,
+            capabilityManifestSha256: registration.capabilityManifestSha256,
+            effectiveConfigSha256: registration.effectiveConfigSha256,
+            runtimeArtifact: registration.runtimeArtifact,
+            runtimeArtifactSha256: registration.runtimeArtifactSha256,
+            capabilityManifest: manifest,
+            supportsCancel: registration.capabilities.supportsCancel,
+            supportsResume: registration.capabilities.supportsResume,
+            isolationModes: [...registration.capabilities.isolationModes],
+          };
+        }),
+        sandboxCapabilities: factorySandboxCapabilities({
+          githubAppPublicationReady: GITHUB_APP_PUBLICATION_READY,
+          remoteSandboxBackendReady: REMOTE_SANDBOX_BACKEND_READY,
+        }),
+        factoryVersionBindings: parseFactoryVersionBindings(
+          process.env.CODEX_WORKER_FACTORY_VERSION_BINDINGS_JSON,
+          FACTORY_WORKER_SCOPE.repositoryId,
+        ),
+        onError: (error) => console.error("[orchestration] Factory host report failed:", error),
+      })
+    : null;
+  return { factoryHarnessRegistry, factoryAttemptWorker, missionPlanningWorker, factoryHostReporter, scope: FACTORY_WORKER_SCOPE };
+}, executionConfigurationErrors);
+const factoryHarnessRegistry = factoryBootstrap?.factoryHarnessRegistry ?? new HarnessAdapterRegistry([]);
+const factoryAttemptWorker = factoryBootstrap?.factoryAttemptWorker ?? new FactoryAttemptWorker(client, factoryHarnessRegistry, false);
+const missionPlanningWorker = factoryBootstrap?.missionPlanningWorker ?? new MissionPlanningWorker(client, factoryHarnessRegistry, false, undefined, undefined);
+const factoryHostReporter = factoryBootstrap?.factoryHostReporter ?? null;
+const FACTORY_WORKER_SCOPE = factoryBootstrap?.scope;
 const coordinator = new CoordinatorLoop({ pollIntervalMs: TICK_INTERVAL_MS });
 const activeAgents = new Map<string, AgentLifecycle>();
 const memoryManagers = new Map<string, MemoryManager>();
@@ -485,6 +505,8 @@ app.get("/status", (c) => {
       port: PORT,
     },
     factoryAttemptWorker: factoryAttemptWorker.status(),
+    accountingDelivery: accountingRuntime.status(),
+    executionConfigurationErrors,
     missionPlanningWorker: missionPlanningWorker.status(),
   });
 });
@@ -1546,10 +1568,35 @@ const gatewayProxy = createGatewayProxy({
 // START
 // ============================================================================
 
-export function startServer() {
-  if (DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED) {
-    throw new Error("Configure exactly one Factory execution worker; legacy and durable workers cannot run together.");
+export async function startFactoryExecution(): Promise<boolean> {
+  try {
+    if (CODEX_BEDROCK_HARNESS_ENABLED && !(await accountingRuntime.ready)) {
+      if (!executionConfigurationErrors.includes("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID")) {
+        executionConfigurationErrors.push("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID");
+      }
+      return false;
+    }
+    if (!factoryConfigurationConflict && factoryHostReporter) {
+      await assertHarnessAdaptersReady(factoryHarnessRegistry);
+      await factoryHostReporter.start();
+      factoryAttemptWorker.start();
+      missionPlanningWorker.start();
+      return true;
+    }
+    if (!factoryConfigurationConflict && LEGACY_FACTORY_WORKER_ENABLED) {
+      await assertHarnessAdaptersReady(factoryHarnessRegistry);
+      factoryAttemptWorker.start();
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("[orchestration] Factory worker registration failed closed; execution did not start:", error);
+    return false;
   }
+}
+
+export function startServer() {
+  accountingRuntime.start();
   console.log(`[orchestration] Mission Control Orchestration Server`);
   console.log(`[orchestration] Convex URL: ${CONVEX_URL ? "configured" : "MISSING"}`);
   console.log(`[orchestration] Project: ${PROJECT_SLUG}`);
@@ -1567,18 +1614,7 @@ export function startServer() {
   runTick().then((result) => {
     console.log(`[orchestration] Initial tick complete:`, result);
   });
-  if (factoryHostReporter) {
-    void assertHarnessAdaptersReady(factoryHarnessRegistry).then(() => factoryHostReporter.start())
-      .then(() => {
-        factoryAttemptWorker.start();
-        missionPlanningWorker.start();
-      })
-      .catch((error) => console.error("[orchestration] Factory worker registration failed closed; execution did not start:", error));
-  } else if (LEGACY_FACTORY_WORKER_ENABLED) {
-    void assertHarnessAdaptersReady(factoryHarnessRegistry)
-      .then(() => factoryAttemptWorker.start())
-      .catch((error) => console.error("[orchestration] Factory adapter health check failed closed; execution did not start:", error));
-  }
+  void startFactoryExecution();
 
   if (CODEX_FACTORY_WORKER_ENABLED) {
     console.log(`[orchestration] Durable verification-first harness worker enabled for one governed repository (${factoryHarnessRegistry.capabilities().map((item) => `${item.adapter}/${item.version}`).join(", ")}).`);
@@ -1591,7 +1627,7 @@ export function startServer() {
     console.log("\n[orchestration] Shutting down...");
     if (tickTimer) clearInterval(tickTimer);
     factoryHostReporter?.stop();
-    await Promise.all([factoryAttemptWorker.stop(), missionPlanningWorker.stop()]);
+    await Promise.all([factoryAttemptWorker.stop(), missionPlanningWorker.stop(), accountingRuntime.stop()]);
     for (const [name] of activeAgents) {
       try {
         await stopAgent(name);
@@ -1606,7 +1642,7 @@ export function startServer() {
     console.log("\n[orchestration] SIGTERM received, shutting down...");
     if (tickTimer) clearInterval(tickTimer);
     factoryHostReporter?.stop();
-    await Promise.all([factoryAttemptWorker.stop(), missionPlanningWorker.stop()]);
+    await Promise.all([factoryAttemptWorker.stop(), missionPlanningWorker.stop(), accountingRuntime.stop()]);
     process.exit(0);
   });
 

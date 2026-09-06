@@ -1,0 +1,10 @@
+*** Begin Patch
+*** Update File: /private/tmp/fdlc-program-accounting-recovery/apps/orchestration-server/src/bedrockInferenceBridge.ts
+@@
+         } | null | undefined;
++        if (this.accounting && accountingReference && typeof receipt?.incident === "boolean" && typeof receipt.duplicate === "boolean") {
++          // Accounting delivery and execution success are separate outcomes.
++          accountingReference = { ...accountingReference, state: "ACKNOWLEDGED" };
++        }
+         if (!receipt || receipt.incident !== false || receipt.duplicate !== false)
+*** End Patch

@@ -3,7 +3,7 @@ import { assertInferenceSpendingAllowed, fenceWorkOrderInferenceSpending } from 
  import {
   bedrockBridgeIdentityValidator,
   assertBedrockBridgeIdentity,
-} from "../lib/bedrockBridgeIdentity"; import { v } from "convex/values";
+} from "../lib/bedrockBridgeIdentity"; import { v, ConvexError } from "convex/values";
 import { mutation, query, internalMutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
@@ -436,6 +436,7 @@ async function applyUsage(
 export const recordUsageInternal = internalMutation({
   args: { ...requestAuthorityArgs, usage: providerUsageValidator },
   handler: async (ctx, args) => {
+    try {
     // Accounting binds the admitted historical subject. Current execution
     // authority is required only by reserveRequestInternal, never settlement.
     const [row, run] = await Promise.all([ctx.db.get(args.reservationId), ctx.db.get(args.workflowRunId)]);
@@ -468,6 +469,17 @@ export const recordUsageInternal = internalMutation({
       `attempt:${run._id}`,
       false,
     );
+    } catch (error) {
+      // Preserve rejection while carrying only exact authoritative reasons
+      // through the signed action's transport boundary.
+      const reasons = new Set(["USAGE_SUBJECT_MISMATCH", "USAGE_INVALID_OR_REPLAYED", "USAGE_IDENTITY_CHANGED",
+        "USAGE_REVISION_CONFLICT", "PROVIDER_RECEIPT_ALREADY_OWNED", "Historical usage reservation scope mismatch",
+        "Historical usage price identity mismatch", "Usage Attempt mismatch"]);
+      if (error instanceof Error && reasons.has(error.message)) {
+        throw new ConvexError({ code: "ACCOUNTING_HISTORICAL_CONFLICT", reason: error.message });
+      }
+      throw error;
+    }
   },
 });
 export const reconcileUsage = mutation({
