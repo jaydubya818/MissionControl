@@ -1,5 +1,5 @@
 ---
-status: ready
+status: in_progress
 priority: p1
 issue_id: "062"
 tags: [software-factory, intent, qa, product, design, ux]
@@ -56,6 +56,27 @@ guided forms in the existing Mission flow and no new primary domain.
 - [ ] The flow is reachable from the existing left navigation and works at narrow widths and keyboard-only.
 
 ## Work Log
+
+### 2026-09-05 - Implementation resumed from qualified Phase 5 main
+
+**By:** Repository operator through Codex
+
+**Actions:**
+- Bound the implementation to Mission Control main at Phase 5 closure merge
+  `cc1c530fad2cd46adeb43443013734a2900f7a06`.
+- Chose immutable contribution proposals and separate human decisions attached
+  to the existing exact Mission Spec revision and digest.
+- Kept agent authority proposal-only: signed agent operations may draft and
+  inspect; only an authorized human may accept or reject.
+- Rebased the qualified slice onto Fab Phase 3 main
+  `906b08f5cfb912711b90c6e2b6ca6808e120e42e`, preserved its recovery contracts,
+  and advanced the combined public runtime contract from v44 to v45.
+
+**Learnings:**
+- A separate persona workspace is unnecessary. The existing Specification
+  workspace is the correct shared surface and authoritative lineage.
+- Staleness and concurrent target conflicts should be derived from immutable
+  records so recovery survives refresh without rewriting history.
 
 ### 2026-08-25 - Approved implementation kickoff
 

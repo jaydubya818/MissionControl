@@ -25,6 +25,7 @@ import {
 } from "./missionSpecDemo";
 import { compileApprovedPlanQualityContract } from "./qualityContract";
 import { compileMissionWorkOrderContract } from "./missionWorkOrderContract";
+import { missionIntentContributionDigest } from "./missionIntentContributions";
 import { createWorkOrderRecord } from "./workOrderCreate";
 import {
   MISSION_CONTROL_GOLDEN_SUITE_V1,
@@ -46,6 +47,142 @@ export type DemoSeedContext = {
 
 const REPO_SLUG = "jaydubya818/MissionControl";
 
+async function seedSharedIntentContributions(ctx: MutationCtx, input: DemoSeedContext, missionId: Id<"missions">) {
+  const { tenantId, projectId, now } = input;
+  const mission = await ctx.db.get(missionId);
+  if (!mission?.currentSpecRevisionId) return;
+  const revisions = await ctx.db.query("missionSpecRevisions")
+    .withIndex("by_mission_revision", (q) => q.eq("missionId", missionId))
+    .order("desc").take(3);
+  const current = revisions.find((item) => item._id === mission.currentSpecRevisionId);
+  const prior = revisions.find((item) => item._id !== mission.currentSpecRevisionId);
+  if (!current || !prior) return;
+
+  const specs = [
+    {
+      idempotencyKey: "mc-demo:intent:qa-stale:r1",
+      contributionKey: "QA-AC-001",
+      revisionNumber: 1,
+      spec: prior,
+      contributorRole: "QA" as const,
+      targetSection: "ACCEPTANCE_EXPECTATIONS" as const,
+      targetItemId: "AC-001",
+      title: "Prove permission denial",
+      body: "An unauthorized builder is denied without changing the Mission Spec.",
+      evidenceExpectation: "Authorization test and browser-visible denied state.",
+      proposedBy: "qa-partner@example.com",
+      proposedActorType: "HUMAN" as const,
+      proposedActorSource: "DEVELOPMENT_FALLBACK" as const,
+      proposedAt: now - 18 * 60_000,
+    },
+    {
+      idempotencyKey: "mc-demo:intent:product-conflict:r1",
+      contributionKey: "PRODUCT-OUTCOME-001",
+      revisionNumber: 1,
+      spec: current,
+      contributorRole: "PRODUCT" as const,
+      targetSection: "OUTCOME" as const,
+      title: "Reduce governed planning time",
+      body: "A first-time builder reaches a planning-ready exact Spec in under fifteen minutes.",
+      evidenceExpectation: "Observed time from Mission creation to finalized Spec.",
+      proposedBy: "product-partner@example.com",
+      proposedActorType: "HUMAN" as const,
+      proposedActorSource: "DEVELOPMENT_FALLBACK" as const,
+      proposedAt: now - 12 * 60_000,
+    },
+    {
+      idempotencyKey: "mc-demo:intent:design-conflict:r1",
+      contributionKey: "DESIGN-OUTCOME-001",
+      revisionNumber: 1,
+      spec: current,
+      contributorRole: "DESIGN" as const,
+      targetSection: "OUTCOME" as const,
+      title: "Make decision state immediately legible",
+      body: "The current contribution state and next safe action are understandable without knowing the harness.",
+      evidenceExpectation: "Keyboard and narrow-width browser evidence with state labels.",
+      proposedBy: "design-agent",
+      proposedActorType: "AGENT" as const,
+      proposedActorSource: "SERVICE_COMMAND" as const,
+      proposedAt: now - 10 * 60_000,
+    },
+    {
+      idempotencyKey: "mc-demo:intent:engineering-accepted:r1",
+      contributionKey: "ENGINEERING-RECOVERY-001",
+      revisionNumber: 1,
+      spec: current,
+      contributorRole: "ENGINEERING" as const,
+      targetSection: "CONSTRAINTS" as const,
+      title: "Preserve recovery lineage",
+      body: "A rejected or stale contribution remains inspectable and can be revised against the current Spec.",
+      evidenceExpectation: "Refresh proves immutable history and a recoverable revise action.",
+      proposedBy: "engineering-partner@example.com",
+      proposedActorType: "HUMAN" as const,
+      proposedActorSource: "DEVELOPMENT_FALLBACK" as const,
+      proposedAt: now - 8 * 60_000,
+      accepted: true,
+    },
+  ];
+  for (const spec of specs) {
+    let contribution = await ctx.db.query("missionIntentContributions")
+      .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", spec.idempotencyKey)).first();
+    const digestInput = {
+      contributionKey: spec.contributionKey,
+      revisionNumber: spec.revisionNumber,
+      missionSpecRevisionId: String(spec.spec._id),
+      missionSpecDigest: spec.spec.digest,
+      contributorRole: spec.contributorRole,
+      targetSection: spec.targetSection,
+      targetItemId: spec.targetItemId,
+      title: spec.title,
+      body: spec.body,
+      evidenceExpectation: spec.evidenceExpectation,
+      proposedBy: spec.proposedBy,
+      proposedActorType: spec.proposedActorType,
+      proposedActorSource: spec.proposedActorSource,
+    };
+    if (!contribution) {
+      const contributionId = await ctx.db.insert("missionIntentContributions", {
+        tenantId, projectId, missionId,
+        missionSpecRevisionId: spec.spec._id,
+        missionSpecDigest: spec.spec.digest,
+        idempotencyKey: spec.idempotencyKey,
+        contributionKey: spec.contributionKey,
+        revisionNumber: spec.revisionNumber,
+        contributorRole: spec.contributorRole,
+        targetSection: spec.targetSection,
+        targetItemId: spec.targetItemId,
+        title: spec.title,
+        body: spec.body,
+        evidenceExpectation: spec.evidenceExpectation,
+        digest: missionIntentContributionDigest(digestInput),
+        proposedBy: spec.proposedBy,
+        proposedActorType: spec.proposedActorType,
+        proposedActorSource: spec.proposedActorSource,
+        proposedAt: spec.proposedAt,
+      });
+      contribution = await ctx.db.get(contributionId);
+    }
+    if (spec.accepted) {
+      if (!contribution) throw new Error("Shared intent demo contribution was not created");
+      const existingDecision = await ctx.db.query("missionIntentContributionDecisions")
+        .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", "mc-demo:intent-decision:engineering-accepted:r1")).first();
+      if (existingDecision) continue;
+      await ctx.db.insert("missionIntentContributionDecisions", {
+        tenantId, projectId, missionId, contributionId: contribution._id,
+        contributionDigest: missionIntentContributionDigest(digestInput),
+        missionSpecRevisionId: spec.spec._id,
+        missionSpecDigest: spec.spec.digest,
+        idempotencyKey: "mc-demo:intent-decision:engineering-accepted:r1",
+        decision: "ACCEPTED",
+        reason: "Recovery and preserved history are required by the shared-intent contract.",
+        decidedBy: "mission-control-operator@example.com",
+        decidedActorSource: "DEVELOPMENT_FALLBACK",
+        decidedAt: now - 6 * 60_000,
+      });
+    }
+  }
+}
+
 async function seedSpecIntakeGoldenPath(ctx: MutationCtx, input: DemoSeedContext) {
   const { tenantId, projectId, now, withSeedMeta } = input;
   const missionKey = "mc-demo:mission:spec-intake-golden-path";
@@ -53,7 +190,10 @@ async function seedSpecIntakeGoldenPath(ctx: MutationCtx, input: DemoSeedContext
     .query("missions")
     .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", missionKey))
     .first();
-  if (existingMission) return { created: false, missionId: existingMission._id };
+  if (existingMission) {
+    await seedSharedIntentContributions(ctx, input, existingMission._id);
+    return { created: false, missionId: existingMission._id };
+  }
 
   const [project, repository, codeScope, workflow] = await Promise.all([
     ctx.db.get(projectId),
@@ -367,6 +507,7 @@ async function seedSpecIntakeGoldenPath(ctx: MutationCtx, input: DemoSeedContext
   await ctx.scheduler.runAfter(0, internal.missionSpecs.indexSpecInFactoryMemory, { revisionId: revision1Id });
   await ctx.scheduler.runAfter(0, internal.missionSpecs.indexSpecInFactoryMemory, { revisionId: revision2Id });
   await ctx.scheduler.runAfter(0, internal.missionSpecs.indexSpecInFactoryMemory, { revisionId: revision3Id });
+  await seedSharedIntentContributions(ctx, input, missionId);
   return {
     created: true,
     missionId,
@@ -1506,6 +1647,7 @@ export async function seedDemoExtensions(ctx: any, input: DemoSeedContext) {
     "eval.framework",
     "missions.plan-release-v1",
     "missions.spec-intake-v1",
+    "missions.shared-builder-intent-v1",
     "factory-memory.hybrid",
     "factory-memory.relationships",
     "factory-memory.agentic-retrieval",

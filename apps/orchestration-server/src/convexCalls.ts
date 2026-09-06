@@ -73,6 +73,8 @@ export const ConvexActions = {
     claimMissionPlanningRun: "serviceCommands:claimMissionPlanningRun",
     renewMissionPlanningRun: "serviceCommands:renewMissionPlanningRun",
     reportMissionPlanningRun: "serviceCommands:reportMissionPlanningRun",
+    inspectMissionIntentContributions: "serviceCommands:inspectMissionIntentContributions",
+    draftMissionIntentContribution: "serviceCommands:draftMissionIntentContribution",
   },
 } as const;
 

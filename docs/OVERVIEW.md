@@ -195,17 +195,18 @@ WorkOrder acceptance, and the human-gated learning continuation. This is strong
 implementation proof; it is not a claim of fleet-scale production operation or
 general Remote Sandbox certification.
 
-The current public client/backend runtime contract is **v44**. The governed
-inference work adds the
-disabled-by-default governed inference price-book, reservation, receipt,
+The current public client/backend runtime contract is **v45**. The governed
+inference work adds the disabled-by-default price-book, reservation, receipt,
 reconciliation, and accepted-outcome economics contracts. Fab adds exact candidate
-verification and publication bindings plus read-only candidate recovery. The
-combined contract rejects v43 clients through the existing compatibility check.
+verification and publication bindings plus read-only candidate recovery. Todo 062
+adds default-off attributable shared-intent proposals and human decisions; v44
+clients fail closed through the existing compatibility check.
 
 | Capability                                 | Current status                                   | Boundary                                                                                        |
 | ------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
 | Governed Missions and Plan approval        | **Live; system-qualified**                       | One-repository V1 golden path; consequential execution still requires separate gates            |
 | Spec-Driven Mission Intake                 | **Merged and qualified; default off**            | Project flag `missions.spec-intake-v1`; `FINALIZED` means planning-ready only                   |
+| Shared Builder Intent                      | **Preview-qualified; default off**               | Exact Spec-bound proposals; agents draft/inspect, authorized humans decide; no Plan authority  |
 | Quality Contracts                          | **Implemented; accepted normative architecture** | Immutable projection of approved Plan intent, not a second planning system                      |
 | Verification Factory / policy-v2           | **Implemented; system-qualified**                | Exact-subject, independent, fail-closed verification before acceptance                          |
 | Factory Memory                             | **Implemented; default off by phase**            | Advisory retrieval and Attempt-bound Context Packages; no acceptance authority                  |

@@ -88,6 +88,24 @@ export const resolveRepositoryScope = internalQuery({
   },
 });
 
+export const resolveMissionIntentScope = internalQuery({
+  args: {
+    projectId: v.id("projects"),
+    missionId: v.id("missions"),
+  },
+  handler: async (ctx, args) => {
+    const mission = await ctx.db.get(args.missionId);
+    if (!mission || mission.projectId !== args.projectId || !mission.repositoryId) {
+      throw new Error("Mission contribution scope is unavailable or has no repository.");
+    }
+    const repository = await ctx.db.get(mission.repositoryId);
+    if (!repository || repository.projectId !== args.projectId || repository.status !== "READY") {
+      throw new Error("Mission contribution repository is unavailable or not ready.");
+    }
+    return { projectId: String(args.projectId), repositoryId: String(repository._id) };
+  },
+});
+
 export const resolveRepositoryBindingScope = internalQuery({
   args: {
     projectId: v.id("projects"),
@@ -1067,6 +1085,57 @@ export const reportMissionPlanningRun = action({
         receiptId: receipt.receiptId,
         status: "SUCCEEDED",
         resultReference: String(payload.planningRunId),
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const inspectMissionIntentContributions = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "intent.contributions.inspect");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveMissionIntentScope, {
+      projectId: payload.projectId,
+      missionId: payload.missionId,
+    });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runQuery(internal.missionIntentContributions.inspectInternal, {
+        projectId: payload.projectId,
+        missionId: payload.missionId,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: "SUCCEEDED",
+        resultReference: String(payload.missionId),
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const draftMissionIntentContribution = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "intent.contributions.draft");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveMissionIntentScope, {
+      projectId: payload.projectId,
+      missionId: payload.missionId,
+    });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(internal.missionIntentContributions.draftAgentInternal, payload);
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: "SUCCEEDED",
+        resultReference: String(result.contribution?._id ?? payload.missionId),
       });
       return result;
     } catch (error) {

@@ -32,7 +32,9 @@ export type ServiceCapability =
   | "executions.finalize"
   | "planning.claim"
   | "planning.renew"
-  | "planning.report";
+  | "planning.report"
+  | "intent.contributions.inspect"
+  | "intent.contributions.draft";
 
 export function createSignedServiceCommand(args: {
   capability: ServiceCapability;
