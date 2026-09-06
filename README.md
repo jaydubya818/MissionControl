@@ -473,6 +473,18 @@ when deployed clients and backend functions cannot safely interoperate.
 
 Current public client/backend runtime contract: **v52**.
 
+### Factory Deployed Engineer qualification environment
+
+The bounded FDLC Deploy / Factory Deployed Engineer qualification environment is **ready but not activated**. Its safe identifiers are:
+
+- AWS qualification account `083665737366` in `us-east-1`;
+- qualification hostname `qual.factory-engineer.fdlc.ai`;
+- dedicated Convex qualification deployment `calm-buffalo-854`;
+- workspace `mission-control://qualification/fdlc-phase-3`; and
+- Mission Control project `j17ve66cdc005ntgr6qj31b0fs8dwc62`.
+
+The environment has pinned immutable runtime images and bounded qualification identities. Runtime services remain dormant, Phase 3 live activation has not started, and no Bedrock model invocation or Factory Engineer workload has occurred. This is environment-readiness evidence, not live-qualification or production-operations evidence. See the public [FDE status page](https://fdlc.ai/deploy) for the current release and rollback summary.
+
 ### Factory Incident Command (Experimental)
 
 Runtime contract v51 adds a browser-operable incident control plane for the
