@@ -1,0 +1,44 @@
+{
+  "observedAt": "2026-09-06T07:54:15.979Z",
+  "result": "PASS",
+  "baselinePath": "/private/tmp/fdlc-program-guard-baseline.json",
+  "currentPath": "/private/tmp/fdlc-public-docs-postmerge/platform.json",
+  "projects": [
+    {
+      "project": "fdlc",
+      "productionId": "dpl_GvmTzMNUmpKt3825k69MUgL6YwTX",
+      "productionUnchanged": true,
+      "aliasesUnchanged": true,
+      "settingsUnchanged": true,
+      "protectionUnchanged": true,
+      "newProductionDeployments": []
+    },
+    {
+      "project": "ai-software-factory-mastery",
+      "productionId": "dpl_EZemFq1QbGX1YG5WG8C1BAmd8Yur",
+      "productionUnchanged": true,
+      "aliasesUnchanged": true,
+      "settingsUnchanged": true,
+      "protectionUnchanged": true,
+      "newProductionDeployments": []
+    },
+    {
+      "project": "ai-software-factory-mastery_documentation",
+      "productionId": "dpl_Dr15FrDkdktTatFmNfcWJAZVk8nF",
+      "productionUnchanged": true,
+      "aliasesUnchanged": true,
+      "settingsUnchanged": true,
+      "protectionUnchanged": true,
+      "newProductionDeployments": []
+    },
+    {
+      "project": "mission-control-ui",
+      "productionId": "dpl_AhPTJbV2zFDnWf3r3JQnHjj4tgUW",
+      "productionUnchanged": true,
+      "aliasesUnchanged": true,
+      "settingsUnchanged": true,
+      "protectionUnchanged": true,
+      "newProductionDeployments": []
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "reviewedAt": "2026-09-06T08:27:57.805081+00:00",
+  "scope": "Observation retention, historical accounting, bounded bridge failure payload, inspector disclosure; offline source only",
+  "sourceSha256": {
+    "convex/inferenceGateway.ts": "144c9ba6e43ed129c0fda387ea3ebf4fc327d2e393fdea0e82e48f5f7f7a7392",
+    "convex/schema.ts": "569dfe7e465d3cab84f1d8a8aba3057ac6368f42f9b2c2cbaf592eb1b52b7d61",
+    "packages/shared/src/governedInference.ts": "c69204c1719e4883093301023de25705125f4f675d2d2097a81fae14cc7d6d34",
+    "convex/factory/providerLiability.ts": "adc57d715c56b3f399da4b93f0b08d7e3540963adf86aba60bb41ba3b747cd1d",
+    "convex/lib/providerLiability.ts": "11ba884486c8d406d4912452498ead5a4be9f3a548a9b4b5844d7806978b731d",
+    "apps/orchestration-server/src/bedrockInferenceBridge.ts": "5ee2530984a768c8c3a8cd4a725cd815f34f65c8e6b3b2086da0f3d30149f215",
+    "apps/mission-control-ui/src/controlPlane/ExecutionRunInspector.tsx": "43fd1fb80e80422f91a1bcb00916bdd92316c605edbfa7a8e9f355d4a98e512e"
+  },
+  "reviews": [
+    {
+      "reviewer": "reservation_quality_review",
+      "independentOf": "ledger and inspector authors",
+      "areas": [
+        "architecture",
+        "security",
+        "data integrity",
+        "simplicity",
+        "documentation truth"
+      ],
+      "result": "GO after correction integrity and aggregate overflow findings were fixed"
+    },
+    {
+      "reviewer": "dispatch_authority_review",
+      "independentOf": "bridge and inspector authors",
+      "areas": [
+        "bridge failure handling",
+        "inspector historical projection disclosure"
+      ],
+      "result": "GO at direct bridge caller boundary; no integrated or durable recovery claim"
+    },
+    {
+      "reviewer": "root",
+      "independentOf": "ledger and bridge authors",
+      "areas": [
+        "canonical accounting",
+        "historical authority",
+        "monotonic fences",
+        "UNKNOWN correction semantics",
+        "aggregate overflow",
+        "bounded bridge payload"
+      ],
+      "result": "GO for bounded source scope after recorded fixes"
+    }
+  ],
+  "limitations": [
+    "No reviewer treated author self-review as independent acceptance.",
+    "Bridge payload recovery remains in memory; existing Docker consumer does not retain it.",
+    "No provider execution, actual billing, human acceptance or release proved."
+  ]
+}

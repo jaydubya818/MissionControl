@@ -1,0 +1,51 @@
+
+ RUN  v3.2.7 <qualification-worktree>/packages/model-router
+
+ ❯ src/__tests__/governed-inference.test.ts (19 tests | 1 failed | 18 skipped) 7ms
+   ↓ governed inference reservation and intent > freezes a finite exact-route reservation
+   ↓ governed inference reservation and intent > rejects fallback loops, missing rates, duplicates, stale leases, and overflow
+   ↓ governed inference reservation and intent > lets cancellation win before claim and never redispatches ambiguous claims
+   ↓ immutable provider receipts and pricing > prices cache dimensions from the frozen price book
+   ↓ immutable provider receipts and pricing > keeps missing usage and ambiguous delivery unknown
+   ↓ immutable provider receipts and pricing > retains provider and resolved-model drift with unknown pricing
+   ↓ immutable provider receipts and pricing > retains usage with UNKNOWN cost for overflow
+   ↓ immutable provider receipts and pricing > retains usage with UNKNOWN cost for missingRate
+   ↓ immutable provider receipts and pricing > retains usage with UNKNOWN cost for batchRate
+   ↓ immutable provider receipts and pricing > fails closed instead of rounding unsafe financial arithmetic
+   ↓ outcome economics > does not reprice a corrected UNKNOWN observation after a usage-only correction: false
+   ↓ outcome economics > does not reprice a corrected UNKNOWN observation after a usage-only correction: true
+   ↓ outcome economics > requires independent verification before human acceptance and preserves absent later stages
+   ↓ outcome economics > attributes failed primary and fallback spend to one selected-route outcome
+   ↓ outcome economics > never lets unknown cost improve a route
+   ↓ outcome economics > keeps historical formula snapshots separate from corrected monetary comparisons
+   × outcome economics > returns a non-promotable UNKNOWN cohort total when individually valid projection costs overflow 6ms
+     → Route outcome cost exceeds safe integer accounting bounds.
+   ↓ outcome economics > freezes newer provider reconciliation into projection cost and lineage
+   ↓ outcome economics > keeps comparisons advisory and fails closed for an unqualified route
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/governed-inference.test.ts > outcome economics > returns a non-promotable UNKNOWN cohort total when individually valid projection costs overflow
+Error: Route outcome cost exceeds safe integer accounting bounds.
+ ❯ safeMicrousd ../shared/src/governedInference.ts:229:38
+ ❯ sumMicrousd ../shared/src/governedInference.ts:234:10
+ ❯ summarizeRouteEconomics ../shared/src/governedInference.ts:687:34
+ ❯ src/__tests__/governed-inference.test.ts:352:21
+    350|     });
+    351|     const preserved = structuredClone(frozen);
+    352|     const summary = summarizeRouteEconomics(frozen, { routeDigest: rou…
+       |                     ^
+    353|       minimumSampleSize: 2, now: 900, maxAgeMs: 1000 });
+    354|     expect(summary.totalKnownCostMicrousd).toBeUndefined(); expect(sum…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  01:18:30
+   Duration  277ms (transform 55ms, setup 0ms, collect 81ms, tests 7ms, environment 0ms, prepare 29ms)
+
+undefined
+<qualification-worktree>/packages/model-router:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/__tests__/governed-inference.test.ts -t UNKNOWN cohort total

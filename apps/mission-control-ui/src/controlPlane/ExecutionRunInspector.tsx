@@ -641,6 +641,7 @@ export function ExecutionRunInspector({
 
 export type InferenceEconomicsData = {
   gatewayAdmissionEnabled: boolean;
+  inferenceSpendingFence?: null | { fencedAt: number; sourceDigest: string; violationCodes: string[] };
   reservations: Array<{ state: string }>;
   intents: Array<{ state: string }>;
   receipts: Array<{
@@ -651,12 +652,14 @@ export type InferenceEconomicsData = {
     status: string;
     costCompleteness: string;
     costMicrousd?: number;
+    costClassification?: "ESTIMATED" | "UNKNOWN";
+    violationCodes?: string[];
     providerRequestId?: string;
   }>;
   reconciliations: Array<{ completeness: string }>;
   latestProjection: null | {
     outcome: string;
-    knownCostMicrousd: number;
+    knownCostMicrousd?: number;
     totalCostMicrousd?: number;
     costCoverage: number;
     costCompleteness?: string;
@@ -682,6 +685,8 @@ export function InferenceEconomicsCard({ data }: { data: InferenceEconomicsData 
   const intents = data.intents ?? [];
   const reservations = data.reservations ?? [];
   const reconciliations = data.reconciliations ?? [];
+  const spendingFence = data.inferenceSpendingFence;
+  const showProjectionCaveat = Boolean(spendingFence && latest);
   const cancelled = reservations.some((reservation) => reservation.state === "CANCELLED")
     || intents.some((intent) => intent.state === "CANCELLED");
   const ambiguous = intents.some((intent) => intent.state === "AMBIGUOUS")
@@ -689,13 +694,13 @@ export function InferenceEconomicsCard({ data }: { data: InferenceEconomicsData 
   const inProgress = intents.some((intent) => ["PERSISTED", "CLAIMED"].includes(intent.state));
   const reconciliationFailed = receipts.some((receipt) => receipt.costCompleteness !== "COMPLETE")
     && reconciliations.some((reconciliation) => reconciliation.completeness === "UNKNOWN");
-  const state = cancelled ? "CANCELLED" : ambiguous ? "UNKNOWN" : reconciliationFailed
+  const state = spendingFence ? "SPENDING STOPPED" : cancelled ? "CANCELLED" : ambiguous ? "UNKNOWN" : reconciliationFailed
     ? "RECONCILIATION FAILED" : inProgress ? "IN PROGRESS" : latest?.costCompleteness ?? data.state;
   const stateTone = state === "COMPLETE" ? "border-success/30 text-success"
-    : state === "UNKNOWN" || state === "RECONCILIATION FAILED" ? "border-danger/30 text-danger"
+    : state === "UNKNOWN" || state === "RECONCILIATION FAILED" || state === "SPENDING STOPPED" ? "border-danger/30 text-danger"
       : state === "EMPTY" ? "" : "border-warning/30 text-warning";
-  const knownCost = latest?.knownCostMicrousd
-    ?? receipts.reduce((sum, receipt) => sum + (receipt.costMicrousd ?? 0), 0);
+  const knownCost = latest ? latest.knownCostMicrousd
+    : sumObservedMicrousd(receipts.map(receipt => receipt.costMicrousd));
   const coverage = latest?.costCoverage
     ?? (receipts.length ? receipts.filter((receipt) => receipt.costCompleteness === "COMPLETE").length / receipts.length : 0);
 
@@ -715,6 +720,16 @@ export function InferenceEconomicsCard({ data }: { data: InferenceEconomicsData 
         </div>
       </div>
 
+      {spendingFence ? (
+        <div role="alert" className="mt-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-3 text-xs text-foreground">
+          <p className="font-medium">Inference spending stopped</p>
+          <p className="mt-1">A recorded provider observation requires reconciliation. New inference claims for this WorkOrder are blocked. Existing allocations remain held.</p>
+          {showProjectionCaveat ? <p className="mt-1">Metrics below use the last stored outcome projection and may predate this observation.</p> : null}
+          <p className="mt-2 text-muted-foreground">{spendingFence.violationCodes.map(code => code.replace(/_/g, " ").toLowerCase()).join("; ")}</p>
+          <p className="mt-1 break-all font-mono text-muted-foreground">Observation: {spendingFence.sourceDigest}</p>
+        </div>
+      ) : null}
+
       {reservations.length === 0 ? (
         <div className="mt-4 rounded-lg border border-[var(--panel-line)] bg-background/30 px-3 py-3">
           <p className="text-sm text-foreground">No governed inference reservation</p>
@@ -723,12 +738,12 @@ export function InferenceEconomicsCard({ data }: { data: InferenceEconomicsData 
       ) : (
         <>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <EconomicsMetric label="Terminal outcome" value={latest?.outcome ?? "Not projected"} detail="Verification and human acceptance stay separate" />
-            <EconomicsMetric label="Known inference cost" value={formatMicrousd(knownCost)} detail={latest?.totalCostMicrousd === undefined ? "Lower bound; total is unknown" : "Complete physical-call total"} />
-            <EconomicsMetric label="Cost coverage" value={`${Math.round(coverage * 100)}%`} detail={`${receipts.length} physical receipt${receipts.length === 1 ? "" : "s"}`} />
-            <EconomicsMetric label="Confidence" value={latest?.confidence ?? "NONE"} detail={latest?.formulaVersion ?? "accepted-outcome-economics/v1"} />
+            <EconomicsMetric label={showProjectionCaveat ? "Last projected outcome" : "Terminal outcome"} value={latest?.outcome ?? "Not projected"} detail="Verification and human acceptance stay separate" />
+            <EconomicsMetric label={showProjectionCaveat ? "Last projected cost" : "Known inference cost"} value={knownCost === undefined ? "Unknown" : formatMicrousd(knownCost)} detail={showProjectionCaveat ? "Pending accounting reconciliation" : knownCost === undefined ? "Aggregate cost unavailable" : latest?.totalCostMicrousd === undefined ? "Lower bound; total is unknown" : "Complete physical-call total"} />
+            <EconomicsMetric label={showProjectionCaveat ? "Last projected coverage" : "Cost coverage"} value={`${Math.round(coverage * 100)}%`} detail={`${receipts.length} physical receipt${receipts.length === 1 ? "" : "s"}`} />
+            <EconomicsMetric label={showProjectionCaveat ? "Last projected confidence" : "Confidence"} value={latest?.confidence ?? "NONE"} detail={latest?.formulaVersion ?? "Awaiting outcome projection"} />
           </div>
-          <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--panel-line)]">
+          <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--panel-line)]" role="region" aria-label="Physical inference receipts" tabIndex={0}>
             <table className="w-full min-w-[720px] text-left text-xs">
               <thead className="border-b border-[var(--panel-line)] text-muted-foreground">
                 <tr><th className="px-3 py-2 font-medium">Physical call</th><th className="px-3 py-2 font-medium">Exact route</th><th className="px-3 py-2 font-medium">Delivery</th><th className="px-3 py-2 font-medium">Usage / cost</th><th className="px-3 py-2 font-medium">Provider identity</th></tr>
@@ -741,7 +756,11 @@ export function InferenceEconomicsCard({ data }: { data: InferenceEconomicsData 
                     <td className="px-3 py-2 font-mono text-foreground">#{receipt.physicalOrdinal}</td>
                     <td className="px-3 py-2 text-foreground">{receipt.route.provider} / {receipt.route.modelId}</td>
                     <td className="px-3 py-2 text-muted-foreground">{receipt.delivery} · {receipt.status}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{receipt.costCompleteness} · {receipt.costMicrousd === undefined ? "unknown" : formatMicrousd(receipt.costMicrousd)}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      <div>{receipt.costClassification ?? (receipt.costMicrousd === undefined ? "UNKNOWN" : "ESTIMATED")} · {receipt.costMicrousd === undefined ? "unknown" : formatMicrousd(receipt.costMicrousd)}</div>
+                      <div className="mt-1">Coverage: {receipt.costCompleteness}</div>
+                      {receipt.violationCodes?.length ? <div className="mt-1 text-danger">{receipt.violationCodes.map(code => code.replace(/_/g, " ").toLowerCase()).join("; ")}</div> : null}
+                    </td>
                     <td className="px-3 py-2 font-mono text-muted-foreground">{receipt.providerRequestId ?? "missing request ID"}</td>
                   </tr>
                 ))}
@@ -771,6 +790,17 @@ function EconomicsMetric({ label, value, detail }: { label: string; value: strin
 
 function formatMicrousd(value: number) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(value / 1_000_000);
+}
+
+function sumObservedMicrousd(costs: Array<number | undefined>): number | undefined {
+  let total: number | undefined;
+  for (const cost of costs) {
+    if (cost === undefined) continue;
+    if (!Number.isSafeInteger(cost) || cost < 0) return undefined;
+    total = (total ?? 0) + cost;
+    if (!Number.isSafeInteger(total)) return undefined;
+  }
+  return total;
 }
 
 export function RemoteSandboxCard({ sandbox }: { sandbox: any }) {

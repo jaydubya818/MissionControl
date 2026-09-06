@@ -205,6 +205,20 @@ function denied(name: string, operation: () => unknown, pattern: RegExp) {
   return { name, result: "PASS", expected: "DENIED" } as const;
 }
 
+function retainedDrift(name: string, resolution: { resolvedProvider?: string; resolvedModelId?: string }, code: string) {
+  const observed = physicalInferenceReceipt({
+    receiptId: name, intent: claimedIntent, reservation, priceBook, ...resolution,
+    delivery: "DELIVERED", status: "FAILED", usage: { inputTokens: 1, outputTokens: 1 },
+    startedAt: at.claimed, completedAt: at.completed,
+  });
+  assert.equal(observed.schema, "inference-physical-receipt/v3");
+  assert.ok(observed.violationCodes?.includes(code));
+  assert.equal(observed.costClassification, "UNKNOWN");
+  assert.equal(observed.costMicrousd, undefined);
+  assert.deepEqual(observed.usage, { inputTokens: 1, outputTokens: 1 });
+  return { name, result: "PASS", expected: "OBSERVATION_RETAINED_WITH_VIOLATION" } as const;
+}
+
 const { schema: _reservationSchema, digest: _reservationDigest, ...reservationInput } = reservation;
 const duplicateTestReservation = inferenceReservation({
   ...reservationInput,
@@ -236,16 +250,8 @@ const negativeControls = [
     markPhysicalIntentAmbiguous(claimedIntent), reservation,
     { claimId: "second", leaseId: reservation.leaseId, now: at.completed, cancelled: false },
   ), /PHYSICAL_INTENT_ALREADY_DECIDED/),
-  denied("provider substitution", () => physicalInferenceReceipt({
-    receiptId: "bad-provider", intent: claimedIntent, reservation, priceBook,
-    resolvedProvider: "provider-alias", delivery: "DELIVERED", status: "FAILED", usage: {},
-    startedAt: at.claimed, completedAt: at.completed,
-  }), /Provider alias/),
-  denied("resolved model substitution", () => physicalInferenceReceipt({
-    receiptId: "bad-model", intent: claimedIntent, reservation, priceBook,
-    resolvedModelId: "gpt-4o-mini-latest", delivery: "DELIVERED", status: "FAILED", usage: {},
-    startedAt: at.claimed, completedAt: at.completed,
-  }), /model drift/),
+  retainedDrift("observed provider substitution", { resolvedProvider: "provider-alias" }, "RESOLVED_PROVIDER_DRIFT"),
+  retainedDrift("observed model substitution", { resolvedModelId: "gpt-4o-mini-latest" }, "RESOLVED_MODEL_DRIFT"),
   denied("ambiguous success", () => physicalInferenceReceipt({
     receiptId: "bad-ambiguity", intent: claimedIntent, reservation, priceBook,
     delivery: "UNKNOWN", status: "SUCCEEDED", usage: {}, startedAt: at.claimed, completedAt: at.completed,
@@ -289,7 +295,7 @@ const record = {
   generatedAt: "2026-09-05T20:00:05.000Z",
   networkCalls: 0,
   syntheticCustomerData: false,
-  runtimeContract: "v48",
+  runtimeContract: "v50",
   route: selectedRoute,
   comparisonRoute: { ...comparisonRoute, qualification: "NOT_INDEPENDENTLY_QUALIFIED" },
   identities: {
@@ -311,6 +317,9 @@ const record = {
     maximumPhysicalCalls: reservation.maxPhysicalCalls,
     fallbackCount: reservation.allowedFallbacks.length,
     usageCompleteness: receipt.usageCompleteness,
+    receiptSchema: receipt.schema,
+    costClassification: receipt.costClassification,
+    violationCodes: receipt.violationCodes,
     costCompleteness: receipt.costCompleteness,
     costMicrousd: receipt.costMicrousd,
   },
@@ -342,13 +351,13 @@ const record = {
 
 if (process.argv.includes("--check")) {
   const frozenRecord = JSON.parse(readFileSync(new URL(
-    "../docs/testing/evidence/governed-inference-dispatch-v1/offline-qualification.json",
+    "../docs/testing/evidence/governed-inference-observations-v1/offline-qualification.json",
     import.meta.url,
   ), "utf8"));
   assert.deepEqual(
     frozenRecord,
     JSON.parse(JSON.stringify(record)),
-    "Frozen Phase 5 dispatch-v1 evidence does not match the reproducible qualification output.",
+    "Frozen Phase 5 observations-v1 evidence does not match the reproducible qualification output.",
   );
 }
 

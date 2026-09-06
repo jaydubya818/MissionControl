@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  canonicalDigest,
   claimPhysicalInferenceIntent,
+  calculateInferenceCost,
   compareRouteEconomics,
   factoryOutcomeEvent,
   inferencePriceBook,
@@ -185,16 +187,32 @@ describe("immutable provider receipts and pricing", () => {
     })).toThrow(/Ambiguous delivery/);
   });
 
-  it("rejects provider and resolved-model substitution", () => {
+  it("retains provider and resolved-model drift with unknown pricing", () => {
     const { held, intent } = claimedIntent();
-    expect(() => physicalInferenceReceipt({
+    expect(physicalInferenceReceipt({
       receiptId: "bad", intent, reservation: held, priceBook: book(), resolvedProvider: "alias",
       delivery: "DELIVERED", status: "FAILED", usage: {}, startedAt: 400, completedAt: 500,
-    })).toThrow(/Provider alias/);
-    expect(() => physicalInferenceReceipt({
+    })).toMatchObject({ costClassification: "UNKNOWN", violationCodes: ["RESOLVED_PROVIDER_DRIFT"] });
+    expect(physicalInferenceReceipt({
       receiptId: "bad", intent, reservation: held, priceBook: book(), resolvedModelId: "gpt-4o-latest",
       delivery: "DELIVERED", status: "FAILED", usage: {}, startedAt: 400, completedAt: 500,
-    })).toThrow(/model drift/);
+    })).toMatchObject({ costClassification: "UNKNOWN", violationCodes: ["RESOLVED_MODEL_DRIFT"] });
+  });
+
+  it.each(["overflow", "missingRate", "batchRate"])("retains usage with UNKNOWN cost for %s", fault => {
+    const { held, intent } = claimedIntent(), originalBook = book();
+    const { schema: _bookSchema, digest: _bookDigest, ...bookInput } = originalBook;
+    if (fault === "missingRate") delete bookInput.rates[0].cacheWriteMicrousdPerMillionTokens;
+    const priceBook = inferencePriceBook(bookInput);
+    const { schema: _reservationSchema, digest: _reservationDigest, ...reservationInput } = held;
+    const reserved = inferenceReservation({ ...reservationInput, priceBookDigest: priceBook.digest,
+      maxCacheWriteTokens: fault === "missingRate" ? 0 : held.maxCacheWriteTokens }, priceBook);
+    const usage = { inputTokens: fault === "overflow" ? Number.MAX_SAFE_INTEGER : 1,
+      outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 1, reasoningTokens: 0 };
+    expect(calculateInferenceCost({ usage, routeDigest: route.routeDigest, priceBook, batch: fault === "batchRate" })).toEqual({ completeness: "UNKNOWN" });
+    const receipt = physicalInferenceReceipt({ receiptId: "observation", intent, reservation: reserved, priceBook,
+      delivery: "DELIVERED", status: "SUCCEEDED", usage, startedAt: 400, completedAt: 500, batch: fault === "batchRate" });
+    expect(receipt.usage).toEqual(usage); expect(receipt.costClassification).toBe("UNKNOWN"); expect(receipt.costMicrousd).toBeUndefined();
   });
 
   it("fails closed instead of rounding unsafe financial arithmetic", () => {
@@ -225,6 +243,20 @@ describe("immutable provider receipts and pricing", () => {
 });
 
 describe("outcome economics", () => {
+  it.each([false, true])("does not reprice a corrected UNKNOWN observation after a usage-only correction: %s", laterUsageOnly => {
+    const { held, intent } = claimedIntent();
+    const receipt = physicalInferenceReceipt({ receiptId: "priced", intent, reservation: held, priceBook: book(),
+      delivery: "DELIVERED", status: "SUCCEEDED", usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0 },
+      startedAt: 400, completedAt: 500 });
+    expect(receipt.costCompleteness).toBe("COMPLETE");
+    const projection = projectFactoryOutcome({ projectionId: "corrected", cohortDigest: sha("a"), projectId: held.projectId,
+      workOrderId: held.workOrderId, attemptId: held.attemptId, routeDigest: route.routeDigest, receipts: [receipt], events: [],
+      reconciliations: [{ reconciliationId: "unknown", receiptId: receipt.receiptId, completeness: "UNKNOWN", reconciledAt: 600, digest: sha("b") },
+        ...(laterUsageOnly ? [{ reconciliationId: "usage-only", receiptId: receipt.receiptId, completeness: "PARTIAL" as const, reconciledAt: 650, digest: sha("c") }] : [])], projectedAt: 700 });
+    expect(projection.costCompleteness).toBe("UNKNOWN"); expect(projection.totalCostMicrousd).toBeUndefined(); expect(projection.costCoverage).toBe(0);
+    expect(receipt.costCompleteness).toBe("COMPLETE");
+    expect(projection.reconciliationIds).toHaveLength(laterUsageOnly ? 2 : 1);
+  });
   function acceptedProjection(complete = true) {
     const { held, intent } = claimedIntent();
     const receipt = physicalInferenceReceipt({
@@ -293,6 +325,36 @@ describe("outcome economics", () => {
     expect(summary.costPerAcceptedOutcomeMicrousd).toBeUndefined();
     expect(summary.eligibleForPromotion).toBe(false);
     expect(summary.blockers).toContain("INCOMPLETE_COST_COVERAGE");
+  });
+
+  it("keeps historical formula snapshots separate from corrected monetary comparisons", () => {
+    const current = acceptedProjection();
+    const historical = { ...current, formulaVersion: "accepted-outcome-economics/v1" as const };
+    const bytes = structuredClone(historical);
+    expect(current.formulaVersion).toBe("accepted-outcome-economics/v2");
+    const summary = summarizeRouteEconomics([historical, current], { routeDigest: route.routeDigest,
+      cohortDigest: sha("6"), minimumSampleSize: 2, now: 900, maxAgeMs: 1_000 });
+    expect(summary.sampleSize).toBe(1);
+    expect(summary.formulaVersion).toBe("accepted-outcome-economics/v2");
+    expect(summary.eligibleForPromotion).toBe(false);
+    expect(historical).toEqual(bytes);
+  });
+
+  it("returns a non-promotable UNKNOWN cohort total when individually valid projection costs overflow", () => {
+    const original = acceptedProjection();
+    const frozen = [Number.MAX_SAFE_INTEGER, 1].map((cost, index) => {
+      const { digest: _, ...bytes } = original;
+      const snapshot = { ...bytes, projectionId: `fixture-projection-${index}`, attemptId: `fixture-attempt-${index}`,
+        knownCostMicrousd: cost, totalCostMicrousd: cost };
+      return { ...snapshot, digest: canonicalDigest(snapshot.schema, snapshot) };
+    });
+    const preserved = structuredClone(frozen);
+    const summary = summarizeRouteEconomics(frozen, { routeDigest: route.routeDigest, cohortDigest: sha("6"),
+      minimumSampleSize: 2, now: 900, maxAgeMs: 1000 });
+    expect(summary.totalKnownCostMicrousd).toBeUndefined(); expect(summary.costPerAcceptedOutcomeMicrousd).toBeUndefined();
+    expect(summary.sampleSize).toBe(2); expect(summary.acceptedCount).toBe(2);
+    expect(summary.eligibleForPromotion).toBe(false); expect(summary.blockers).toContain("AGGREGATE_COST_UNKNOWN");
+    expect(compareRouteEconomics(summary, summary).status).toBe("NO_GO"); expect(frozen).toEqual(preserved);
   });
 
   it("freezes newer provider reconciliation into projection cost and lineage", () => {

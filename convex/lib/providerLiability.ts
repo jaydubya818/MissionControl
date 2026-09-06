@@ -226,11 +226,11 @@ export function settleProviderUsage(
   if (
     !h ||
     h.requestDigest !== usage.requestDigest ||
-    usage.provider !== price.provider ||
-    usage.model !== price.model ||
     liabilityDigest(price) !== r.scope.priceDigest
   )
     throw new Error("USAGE_SUBJECT_MISMATCH");
+  if (!integer(usage.inputTokens) || !integer(usage.outputTokens) || !integer(usage.expectedReceiptRevision)
+    || !identity(usage.provider) || !identity(usage.model)) throw new Error("USAGE_INVALID_OR_REPLAYED");
   if ((h.providerRequestId && h.providerRequestId !== usage.providerRequestId)
     || (h.usageId && h.usageId !== usage.usageId)) throw new Error("USAGE_IDENTITY_CHANGED");
   const d = liabilityDigest(usage);
@@ -264,25 +264,27 @@ export function settleProviderUsage(
     !integer(usage.outputTokens)
   )
     throw new Error("USAGE_INVALID_OR_REPLAYED");
-  const actual =
-    usage.inputTokens * price.inputNanoUsdPerToken +
-    usage.outputTokens * price.outputNanoUsdPerToken;
-  if (!integer(actual)) throw new Error("USAGE_ARITHMETIC_INVALID");
+  const routeDrift = usage.provider !== price.provider || usage.model !== price.model;
+  const priced = !routeDrift && integer(price.inputNanoUsdPerToken) && integer(price.outputNanoUsdPerToken)
+    ? BigInt(usage.inputTokens) * BigInt(price.inputNanoUsdPerToken) + BigInt(usage.outputTokens) * BigInt(price.outputNanoUsdPerToken)
+    : undefined;
+  const actual = priced !== undefined && priced <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(priced) : undefined;
   const incident =
-    actual > h.maximumNanoUsd ||
+    actual === undefined || actual > h.maximumNanoUsd ||
     usage.inputTokens > (h.inputTokens ?? price.maximumInputTokens) ||
     usage.inputTokens > price.maximumInputTokens ||
     usage.outputTokens > h.maximumOutputTokens;
   Object.assign(h, {
     state: incident ? "OVERRUN" : "SETTLED",
     classification: "ACTUAL",
-    costClassification: "ESTIMATED",
-    accountedNanoUsd: actual,
+    costClassification: actual === undefined ? "UNKNOWN" : "ESTIMATED",
+    ...(actual === undefined ? {} : { accountedNanoUsd: actual }),
     providerRequestId: usage.providerRequestId,
     usageId: usage.usageId,
     usageDigest: d,
     receiptRevision: h.receiptRevision + 1,
   });
+  // Retain prior liability on corrections; unknown pricing never invents zero.
   if (incident) r.frozen = true;
   return { reservation: r, duplicate: false, incident };
 }

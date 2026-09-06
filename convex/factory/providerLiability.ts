@@ -1,4 +1,5 @@
 import { admitBedrockAccounting, settleBedrockAccounting } from "../lib/governedInferenceAdmission";
+import { assertInferenceSpendingAllowed, fenceWorkOrderInferenceSpending } from "../inferenceGateway";
  import {
   bedrockBridgeIdentityValidator,
   assertBedrockBridgeIdentity,
@@ -100,6 +101,7 @@ export const createReservation = mutation({
       price.projectId !== args.projectId
     )
       throw new Error("Reservation scope unavailable");
+    assertInferenceSpendingAllowed(wo);
     const admission = await loadExecutionProfileAdmission(
       ctx,
       profile._id,
@@ -229,6 +231,7 @@ async function currentAuthority(
   )
     throw new Error("Attempt/reservation scope mismatch");
   const wo = await ctx.db.get(run.workOrderId);
+  assertInferenceSpendingAllowed(wo);
   const profile = await loadExecutionProfileAdmission(
     ctx,
     row.executionProfileId,
@@ -368,6 +371,9 @@ async function applyUsage(
 ) {
   const row = await ctx.db.get(reservationId);
   if (!row) throw new Error("Reservation unavailable");
+  if (row.creationDigest !== liabilityDigest({ ...row.snapshot, frozen: false, holds: [] })) {
+    throw new Error("Historical usage reservation scope mismatch");
+  }
   const price = await ctx.db.get(row.priceId);
   if (!price) throw new Error("Price unavailable");
    if (usage.classification === "ACTUAL") {
@@ -412,6 +418,8 @@ async function applyUsage(
   if (price.snapshot.provider === "aws-bedrock") {
     await settleBedrockAccounting(ctx, row, usage, actorId, correction, evidenceReference, decision.incident);
   }
+  if (decision.incident) await fenceWorkOrderInferenceSpending(ctx, row.workOrderId,
+    liabilityDigest(usage), ["PROVIDER_USAGE_ADMISSION_VIOLATION"]);
   await ctx.db.patch(row._id, {
     snapshot: decision.reservation,
     updatedAt: Date.now(),
@@ -432,7 +440,20 @@ async function applyUsage(
 export const recordUsageInternal = internalMutation({
   args: { ...requestAuthorityArgs, usage: providerUsageValidator },
   handler: async (ctx, args) => {
-    const { run, row } = await currentAuthority(ctx, args);
+    // Accounting binds the admitted historical subject. Current execution
+    // authority is required only by reserveRequestInternal, never settlement.
+    const [row, run] = await Promise.all([ctx.db.get(args.reservationId), ctx.db.get(args.workflowRunId)]);
+    if (!row || !run || !run.workOrderId || row.workOrderId !== run.workOrderId || row.projectId !== run.projectId
+      || String(row.projectId) !== row.snapshot.scope.projectId || String(row.workOrderId) !== row.snapshot.scope.workOrderId
+      || String(row.executionProfileId) !== row.snapshot.scope.executionProfileId
+      || run.executionProfileId !== row.executionProfileId || run.executionProfileDigest !== row.snapshot.scope.executionProfileDigest
+      || String(run.repositoryId) !== row.snapshot.scope.repositoryId || run.workOrderRevisionNumber !== row.snapshot.scope.workOrderRevision
+      || row.creationDigest !== liabilityDigest({ ...row.snapshot, frozen: false, holds: [] })) {
+      throw new Error("Historical usage reservation scope mismatch");
+    }
+    const price = await ctx.db.get(row.priceId);
+    if (!price || price.projectId !== row.projectId || price.digest !== row.snapshot.scope.priceDigest
+      || liabilityDigest(price.snapshot) !== price.digest) throw new Error("Historical usage price identity mismatch");
     const hold = row.snapshot.holds.find(
       (h) => h.requestId === args.usage.requestId,
     );
@@ -441,6 +462,7 @@ export const recordUsageInternal = internalMutation({
       hold.attemptId !== String(run._id) ||
       hold.leaseId !== args.leaseId ||
       hold.generation !== args.generation
+      || hold.requestDigest !== args.usage.requestDigest
     )
       throw new Error("Usage Attempt mismatch");
     return await applyUsage(

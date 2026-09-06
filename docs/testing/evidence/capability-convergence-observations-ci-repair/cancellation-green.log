@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 <qualification-worktree>/apps/orchestration-server
+
+ ✓ src/__tests__/automationAdapter.test.ts (13 tests) 1920ms
+   ✓ Automation adapter safety > kills surviving process-group children after the leader exits on cancellation  1068ms
+   ✓ Automation adapter safety > executes TypeScript and Python artifacts through fixed argv adapters  517ms
+
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+   Start at  09:42:58
+   Duration  2.79s (transform 41ms, setup 0ms, collect 56ms, tests 1.92s, environment 0ms, prepare 225ms)
