@@ -1,0 +1,16 @@
+{
+  "scope": "Pure readiness component in isolated Vite fixture; not whole-app Convex flow",
+  "result": "PASS_COMPONENT_BEHAVIOR",
+  "verified": [
+    "loading status",
+    "AWS and profile blocker reasons",
+    "expired snapshot warning",
+    "refresh callback increments count and returns blocked status",
+    "390px screenshot inspected; text wraps without clipping"
+  ],
+  "limits": [
+    "fixture CSS is not a full production layout qualification",
+    "no live readiness query or authority issued"
+  ],
+  "backendCalls": 0
+}

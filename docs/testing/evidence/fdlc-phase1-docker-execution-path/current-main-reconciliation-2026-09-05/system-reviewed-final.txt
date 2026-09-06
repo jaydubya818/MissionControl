@@ -1,0 +1,1162 @@
+
+> mission-control@0.9.0 qualify:factory /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> node scripts/system-factory-e2e-qualification.mjs
+
+
+=== profile-bound governed read-only MCP transport and negative controls ===
+Governed MCP Phase 3 broker scenario passed: sha256:7de45ff549953aa804fb8b13e976a69c47a23e2169992284a034a1d3d0e7107b
+Evidence: /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/docs/testing/evidence/governed-mcp-phase3/runs/7f7282ea2ac4-2026-09-05T22-25-39-478Z/broker-scenario.json
+
+=== frozen dependency, advisory, credential, and release configuration gates ===
+
+> mission-control@0.9.0 release:security /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm run security:audit && pnpm run security:authorization && pnpm run security:secrets && pnpm run docs:factory-check
+
+
+> mission-control@0.9.0 security:audit /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> node scripts/check-dependency-audit.mjs
+
+PASS production dependency audit: critical=0 high=0 moderate=2 low=0; accepted-moderate=1124268,1124272
+PASS all dependency audit: critical=0 high=0 moderate=3 low=2; accepted-moderate=1121861,1124268,1124272
+
+> mission-control@0.9.0 security:authorization /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm exec vitest run scripts/lib/convex-authorization-scan.test.mjs && node scripts/check-convex-authorization.mjs
+
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+
+ ✓ scripts/lib/convex-authorization-scan.test.mjs (9 tests) 14ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  15:25:42
+   Duration  518ms (transform 15ms, setup 0ms, collect 192ms, tests 14ms, environment 0ms, prepare 51ms)
+
+Convex public functions: 951 total · 327 authorized · 0 declared-public · 624 unauthorized (baseline 624).
+
+Convex authorization ratchet: PASS — no new unauthorized public functions.
+
+> mission-control@0.9.0 security:secrets /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> node scripts/check-repository-secrets.mjs
+
+PASS repository secret scan: 3063 tracked files checked; no credential material found
+
+> mission-control@0.9.0 docs:factory-check /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> node scripts/check-factory-docs.mjs
+
+PASS factory documentation consistency
+
+=== release hardening contract tests ===
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+
+ ✓ scripts/lib/release-config.test.mjs (5 tests) 2ms
+ ✓ scripts/lib/dependency-audit-gate.test.mjs (4 tests) 2ms
+ ✓ scripts/lib/production-pilot-evidence.test.mjs (5 tests) 4ms
+ ✓ scripts/lib/production-pilot-preflight.test.mjs (4 tests) 2ms
+ ✓ scripts/lib/repository-secret-scan.test.mjs (4 tests) 2ms
+ ✓ scripts/lib/factory-docs-consistency.test.mjs (2 tests) 428ms
+   ✓ factory documentation consistency > rejects runtime-version and maturity-plan drift  423ms
+
+ Test Files  6 passed (6)
+      Tests  24 passed (24)
+   Start at  15:25:44
+   Duration  692ms (transform 40ms, setup 0ms, collect 83ms, tests 441ms, environment 0ms, prepare 316ms)
+
+
+=== historical V1 evidence immutability ===
+
+=== historical V2 evidence immutability ===
+
+=== prepare canonical workspace packages ===
+
+> mission-control@0.9.0 ci:prepare /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm --filter @mission-control/shared build && pnpm --filter @mission-control/state-machine build && pnpm --filter @mission-control/policy-engine build && pnpm --filter @mission-control/workflow-engine build && pnpm --filter @mission-control/coordinator build && pnpm --filter @mission-control/context-router build && pnpm --filter @mission-control/model-router build && pnpm --filter @mission-control/memory build && pnpm --filter @mission-control/context-tools build && pnpm --filter @mission-control/agent-runtime build && pnpm --filter @mission-control/telegraph build && pnpm --filter @mission-control/meetings build && pnpm --filter @mission-control/research-adapters build
+
+
+> @mission-control/shared@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/shared
+> tsc
+
+
+> @mission-control/state-machine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/state-machine
+> tsc
+
+
+> @mission-control/policy-engine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/policy-engine
+> tsc
+
+
+> @mission-control/workflow-engine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/workflow-engine
+> tsc
+
+
+> @mission-control/coordinator@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/coordinator
+> tsc
+
+
+> @mission-control/context-router@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/context-router
+> tsc
+
+
+> @mission-control/model-router@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/model-router
+> tsc
+
+
+> @mission-control/memory@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/memory
+> tsc
+
+
+> @mission-control/context-tools@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/context-tools
+> tsc
+
+
+> @mission-control/agent-runtime@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/agent-runtime
+> tsc
+
+
+> @mission-control/telegraph@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/telegraph
+> tsc
+
+
+> @mission-control/meetings@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/meetings
+> tsc
+
+
+> @mission-control/research-adapters@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/research-adapters
+> tsc
+
+
+=== composed system qualification and execution-boundary failures ===
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/apps/orchestration-server
+
+ ✓ src/__tests__/auth.test.ts (6 tests) 2ms
+ ✓ src/__tests__/orchestrationSecurity.test.ts (9 tests) 2ms
+ ✓ src/__tests__/factoryVerification.test.ts (2 tests) 71ms
+ ✓ src/__tests__/sandboxCredentials.test.ts (3 tests) 6ms
+ ✓ src/__tests__/sandboxReconciler.test.ts (3 tests) 5ms
+ ✓ src/__tests__/githubAppPublisher.test.ts (6 tests) 226ms
+ ✓ src/__tests__/harnessAdapterRegistry.test.ts (7 tests) 4ms
+ ✓ src/__tests__/governedMcpBroker.test.ts (16 tests) 146ms
+ ✓ src/__tests__/factoryAttemptWorkerRemote.test.ts (2 tests) 439ms
+   ✓ FactoryAttemptWorker remote Sandbox backend > runs beneath the canonical worker lease, verifies on the host, cleans up, and only then publishes one PR  437ms
+ ✓ src/__tests__/deepseekHarnessExecutorAdapter.test.ts (10 tests) 623ms
+ ✓ src/__tests__/remoteSandboxRuntime.test.ts (24 tests) 1587ms
+   ✓ sandbox supervisor > bounds executor output in memory while preserving full byte counts and stream digests  356ms
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > persists the policy-v2 candidate checkpoint before a GitHub credential publication failure
+[factory-worker] Attempt factory-run-1 failed: GitHub App runtime credentials are not configured.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > denies local recovery when the clean worktree no longer matches the durable source checkpoint
+[factory-worker] Attempt factory-run-1 failed: Local candidate recovery workspace does not match the durable source Attempt checkpoint.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 profile bytes are substituted after admission
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 claim evidence is missing or substituted
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > rejects a V3 qualification already stale at the server claim instant
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different runtime executable
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when legacy V1 normalized provenance reports a different runtime executable
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different provider route
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+ ✓ src/__tests__/factoryAttemptWorker.test.ts (27 tests) 6030ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > turns governed issue intent into a verified, evidence-linked pull request  329ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > injects profile-bound governed MCP output as untrusted pre-harness context  400ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > executes an independently registered harness identity through the unchanged governed lifecycle  450ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > uses only the frozen V2 provider/model route and ignores a mutable claim model override  342ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > constructs the worker from the exact frozen V3 Execution Profile  321ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > uses the server claim instant for V3 expiry so an admitted lease may finish  315ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > completes the durable worker golden path and cleans only its proven worktree  366ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > does not create a pull request when the control plane rejects the verification packet  317ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > pauses for human review and resumes publication without rerunning Codex or verification  414ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > persists a verification mismatch, blocks publication, and recovers with a new immutable Attempt  581ms
+ ✓ src/__tests__/systemFactoryQualification.test.ts (4 tests) 10161ms
+   ✓ Mission Control full-system Factory qualification V2 > proves exact governed lineage, failures, recovery, authority, and learning on an isolated fixture  10147ms
+
+ Test Files  13 passed (13)
+      Tests  119 passed (119)
+   Start at  15:25:53
+   Duration  11.02s (transform 1.11s, setup 0ms, collect 3.81s, tests 19.30s, environment 1ms, prepare 1.04s)
+
+
+=== receipt-first Mission Control golden eval ===
+{
+  "runId": "mission-control-golden:7f7282ea2ac4:1788647164967",
+  "verdict": "WARN",
+  "publishable": true,
+  "blocking": "6/6",
+  "advisory": "0/1",
+  "regressions": 0,
+  "negativeControls": "7/7",
+  "accountingErrors": [],
+  "validationErrors": [],
+  "schemaErrors": [],
+  "receiptDigest": "sha256:f03e7b5b6dfb072eeb31ff3f6255c6bc1a793d02ecf3c7580c48ab217f64eb1f"
+}
+
+=== Mission, WorkOrder, Memory, Observability, GitHub, and Learning contracts ===
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+
+ ✓ convex/__tests__/workflowObservability.test.ts (5 tests) 2ms
+ ✓ convex/__tests__/reviewPackage.test.ts (17 tests) 4ms
+ ✓ convex/__tests__/githubCiIngest.test.ts (14 tests) 3ms
+ ✓ convex/__tests__/factoryLearning.test.ts (13 tests) 14ms
+ ✓ convex/__tests__/githubAppReadiness.test.ts (7 tests) 83ms
+ ✓ convex/__tests__/factoryMemory.test.ts (13 tests) 32ms
+ ✓ convex/__tests__/policyV2Verification.test.ts (3 tests) 8ms
+ ✓ convex/__tests__/reviewIntelligence.test.ts (6 tests) 6ms
+ ✓ convex/__tests__/governedMcp.test.ts (4 tests) 15ms
+ ✓ convex/__tests__/reviewIntelligenceGoldenPath.test.ts (1 test) 5ms
+ ✓ convex/__tests__/qualityContract.test.ts (4 tests) 5ms
+ ✓ convex/__tests__/missionSpec.test.ts (9 tests) 26ms
+ ✓ convex/__tests__/codexFactoryWorkerGuardrails.test.ts (5 tests) 4ms
+ ✓ convex/__tests__/workOrderGovernance.test.ts (12 tests) 3ms
+ ✓ convex/__tests__/observabilityGoldenPath.test.ts (6 tests) 8ms
+ ✓ convex/__tests__/missionWorkOrderContract.test.ts (7 tests) 4ms
+ ✓ convex/__tests__/missionPlan.test.ts (7 tests) 2ms
+ ✓ convex/__tests__/reviewIntelligenceAuthority.test.ts (5 tests) 3ms
+ ✓ convex/__tests__/factoryConfiguration.test.ts (10 tests) 4ms
+ ✓ convex/__tests__/factoryRuntimeGoldenPath.test.ts (2 tests) 3ms
+ ✓ convex/__tests__/factoryWorkerRuntime.test.ts (13 tests) 14ms
+ ✓ convex/__tests__/verificationEligibilitySchemaContract.test.ts (2 tests) 6ms
+ ✓ convex/__tests__/verificationPersistence.test.ts (5 tests) 5ms
+ ✓ convex/__tests__/executionManifest.test.ts (24 tests) 90ms
+ ✓ convex/__tests__/missionSpecAuthority.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/qualityGateDecision.test.ts (4 tests) 3ms
+ ✓ convex/__tests__/executionRecovery.test.ts (3 tests) 2ms
+
+ Test Files  27 passed (27)
+      Tests  204 passed (204)
+   Start at  15:26:05
+   Duration  1.21s (transform 1.66s, setup 0ms, collect 6.59s, tests 357ms, environment 2ms, prepare 1.64s)
+
+
+=== generic harness contract and exact manifest admission ===
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/workflow-engine
+
+ ✓ src/__tests__/executorAdapter.test.ts (4 tests) 3ms
+ ✓ src/__tests__/harnessContract.test.ts (6 tests) 8ms
+
+ Test Files  2 passed (2)
+      Tests  10 passed (10)
+   Start at  15:26:07
+   Duration  434ms (transform 142ms, setup 0ms, collect 279ms, tests 11ms, environment 0ms, prepare 90ms)
+
+
+=== Verification Factory exact-current contracts ===
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/workflow-engine
+
+ ✓ src/__tests__/verification.test.ts (8 tests) 8ms
+ ✓ src/__tests__/verificationDecision.test.ts (8 tests) 5ms
+ ✓ src/__tests__/verificationSubject.test.ts (7 tests) 5ms
+ ✓ src/__tests__/verificationIndependence.test.ts (9 tests) 4ms
+ ✓ src/__tests__/verificationPlan.test.ts (4 tests) 3ms
+ ✓ src/__tests__/verificationCurrentness.test.ts (14 tests) 8ms
+
+ Test Files  6 passed (6)
+      Tests  50 passed (50)
+   Start at  15:26:08
+   Duration  426ms (transform 171ms, setup 0ms, collect 686ms, tests 32ms, environment 0ms, prepare 418ms)
+
+
+=== Factory Memory deterministic golden path ===
+
+> @mission-control/memory@0.9.0 test /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/memory
+> vitest run
+
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/memory
+
+ ✓ src/__tests__/session.test.ts (9 tests) 3ms
+ ✓ src/__tests__/global.test.ts (5 tests) 2ms
+ ✓ src/__tests__/manager.test.ts (4 tests) 12ms
+ ✓ src/__tests__/factory.test.ts (9 tests) 15ms
+
+ Test Files  4 passed (4)
+      Tests  27 passed (27)
+   Start at  15:26:09
+   Duration  466ms (transform 153ms, setup 0ms, collect 234ms, tests 32ms, environment 0ms, prepare 207ms)
+
+
+=== Progressive Factory and Factory Learning UI contracts ===
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/apps/mission-control-ui
+
+ ✓ src/factoryExperience/factoryLearningModel.test.ts (4 tests) 2ms
+ ✓ src/factoryExperience/phaseProjection.test.ts (3 tests) 3ms
+ ✓ src/factoryExperience/recipeCatalog.test.ts (11 tests) 4ms
+ ✓ src/factoryExperience/useFactoryExperienceLevel.test.tsx (3 tests) 9ms
+ ✓ src/factoryExperience/FactoryPhaseInspector.test.tsx (2 tests) 46ms
+ ✓ src/factoryExperience/ExperienceLevelSelector.test.tsx (1 test) 42ms
+ ✓ src/factoryExperience/CreateFactoryMissionDialog.test.tsx (1 test) 77ms
+ ✓ src/controlPlane/ReviewEvidencePackage.test.tsx (8 tests) 152ms
+
+ Test Files  8 passed (8)
+      Tests  33 passed (33)
+   Start at  15:26:10
+   Duration  1.59s (transform 264ms, setup 2.57s, collect 1.53s, tests 334ms, environment 4.01s, prepare 583ms)
+
+
+=== full repository tests ===
+
+> mission-control@0.9.0 test /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm run ci:prepare && pnpm -r --if-present run test && pnpm exec vitest run convex/__tests__
+
+
+> mission-control@0.9.0 ci:prepare /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm --filter @mission-control/shared build && pnpm --filter @mission-control/state-machine build && pnpm --filter @mission-control/policy-engine build && pnpm --filter @mission-control/workflow-engine build && pnpm --filter @mission-control/coordinator build && pnpm --filter @mission-control/context-router build && pnpm --filter @mission-control/model-router build && pnpm --filter @mission-control/memory build && pnpm --filter @mission-control/context-tools build && pnpm --filter @mission-control/agent-runtime build && pnpm --filter @mission-control/telegraph build && pnpm --filter @mission-control/meetings build && pnpm --filter @mission-control/research-adapters build
+
+
+> @mission-control/shared@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/shared
+> tsc
+
+
+> @mission-control/state-machine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/state-machine
+> tsc
+
+
+> @mission-control/policy-engine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/policy-engine
+> tsc
+
+
+> @mission-control/workflow-engine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/workflow-engine
+> tsc
+
+
+> @mission-control/coordinator@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/coordinator
+> tsc
+
+
+> @mission-control/context-router@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/context-router
+> tsc
+
+
+> @mission-control/model-router@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/model-router
+> tsc
+
+
+> @mission-control/memory@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/memory
+> tsc
+
+
+> @mission-control/context-tools@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/context-tools
+> tsc
+
+
+> @mission-control/agent-runtime@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/agent-runtime
+> tsc
+
+
+> @mission-control/telegraph@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/telegraph
+> tsc
+
+
+> @mission-control/meetings@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/meetings
+> tsc
+
+
+> @mission-control/research-adapters@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/research-adapters
+> tsc
+
+Scope: 19 of 20 workspace projects
+apps/mission-control-ui test$ vitest run
+packages/context-tools test$ vitest run
+packages/research-adapters test$ vitest run
+packages/shared test$ vitest run
+packages/context-tools test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/context-tools
+packages/research-adapters test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/research-adapters
+packages/shared test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/shared
+apps/mission-control-ui test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/apps/mission-control-ui
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retries a retryable error code and returns the eventual success
+packages/shared test: [retry] Attempt 1/5 failed, retrying in 1ms... { errorCode: 'ECONNRESET' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > stops at maxAttempts and rethrows the last error
+packages/shared test: [retry] Attempt 1/3 failed, retrying in 1ms... { errorCode: 'ETIMEDOUT' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > stops at maxAttempts and rethrows the last error
+packages/shared test: [retry] Attempt 2/3 failed, retrying in 2ms... { errorCode: 'ETIMEDOUT' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > falls back to error.name when no code is present
+packages/shared test: [retry] Attempt 1/5 failed, retrying in 1ms... { errorCode: 'RATE_LIMITED' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > retries everything when retryableErrors is explicitly undefined
+packages/shared test: [retry] Attempt 1/5 failed, retrying in 1ms... { errorCode: 'Error' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > wraps a non-Error rejection value before rethrowing
+packages/shared test: [retry] Attempt 1/5 failed, retrying in 1ms... { errorCode: 'Error' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > wraps a non-Error rejection value before rethrowing
+packages/shared test: [retry] Attempt 2/5 failed, retrying in 2ms... { errorCode: 'Error' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > wraps a non-Error rejection value before rethrowing
+packages/shared test: [retry] Attempt 3/5 failed, retrying in 4ms... { errorCode: 'Error' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > wraps a non-Error rejection value before rethrowing
+packages/shared test: [retry] Attempt 4/5 failed, retrying in 4ms... { errorCode: 'Error' }
+packages/context-tools test:  ✓ src/__tests__/resolver.test.ts (19 tests) 4ms
+packages/shared test:  ✓ src/__tests__/canonicalDigest.test.ts (2 tests) 8ms
+packages/shared test: stderr | src/__tests__/retry.test.ts > createHeartbeat > keeps beating after a failure instead of tearing the loop down
+packages/shared test: [heartbeat] Beat failed (1 consecutive), retrying in 10ms...
+packages/shared test:  ✓ src/__tests__/retry.test.ts (17 tests) 37ms
+packages/shared test:  ✓ src/__tests__/utils.test.ts (19 tests) 38ms
+packages/context-tools test:  ✓ src/__tests__/skillFrontmatter.test.ts (50 tests) 9ms
+packages/context-tools test:  ✓ src/__tests__/semver.test.ts (47 tests) 8ms
+packages/context-tools test:  ✓ src/__tests__/lock.test.ts (17 tests) 3ms
+packages/shared test:  ✓ src/__tests__/identity.test.ts (10 tests) 2ms
+packages/context-tools test:  ✓ src/__tests__/skillLint.test.ts (38 tests) 12ms
+packages/context-tools test:  ✓ src/__tests__/manifest.test.ts (26 tests) 3ms
+packages/context-tools test:  Test Files  6 passed (6)
+packages/context-tools test:       Tests  197 passed (197)
+packages/context-tools test:    Start at  15:26:20
+packages/context-tools test:    Duration  1.10s (transform 236ms, setup 0ms, collect 579ms, tests 39ms, environment 1ms, prepare 1.53s)
+packages/shared test:  ✓ src/__tests__/factoryMemorySecurity.test.ts (15 tests) 3ms
+packages/research-adapters test:  ✓ src/__tests__/webRssAdapter.test.ts (17 tests) 27ms
+packages/research-adapters test:  Test Files  1 passed (1)
+packages/research-adapters test:       Tests  17 passed (17)
+packages/research-adapters test:    Start at  15:26:20
+packages/research-adapters test:    Duration  1.26s (transform 89ms, setup 0ms, collect 181ms, tests 27ms, environment 0ms, prepare 212ms)
+packages/shared test:  ✓ src/__tests__/evalControlPlane.test.ts (6 tests) 105ms
+packages/shared test:  Test Files  6 passed (6)
+packages/shared test:       Tests  69 passed (69)
+packages/shared test:    Start at  15:26:20
+packages/shared test:    Duration  1.31s (transform 149ms, setup 0ms, collect 619ms, tests 193ms, environment 1ms, prepare 792ms)
+packages/context-tools test: Done
+packages/research-adapters test: Done
+packages/shared test: Done
+apps/mission-control-ui test:  ✓ src/controlPlane/FactoryContextRunCard.test.tsx (2 tests) 39ms
+apps/mission-control-ui test:  ✓ src/components/AttentionQueuePanel.test.tsx (5 tests) 93ms
+apps/mission-control-ui test:  ✓ src/controlPlane/EvidenceLineagePanel.test.tsx (2 tests) 77ms
+apps/mission-control-ui test:  ✓ src/controlPlane/RunRecoveryPanel.test.tsx (3 tests) 100ms
+apps/mission-control-ui test:  ✓ src/eos/views/MissionDraftForm.test.tsx (2 tests) 162ms
+apps/mission-control-ui test: stderr | src/eos/components/OperatingControlPlane.test.tsx > OperatingControlPlane > renders truthful role lenses, attention, ownership, fleet boundaries, and deep-link state
+apps/mission-control-ui test: ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+apps/mission-control-ui test: ⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+apps/mission-control-ui test:  ✓ src/shellV2/Sidebar.test.tsx (5 tests) 229ms
+apps/mission-control-ui test:  ✓ src/eos/components/OperatingControlPlane.test.tsx (4 tests) 279ms
+apps/mission-control-ui test:  ✓ src/controlPlane/ExecutionRunInspector.test.tsx (5 tests) 179ms
+apps/mission-control-ui test:  ✓ src/controlPlane/ReviewEvidencePackage.test.tsx (8 tests) 314ms
+apps/mission-control-ui test:  ✓ src/controlPlane/WorkOrderApprovalsView.test.tsx (6 tests) 338ms
+apps/mission-control-ui test:  ✓ src/workspace/WorkspaceRepositoriesPanel.test.tsx (9 tests) 362ms
+apps/mission-control-ui test:  ✓ src/workspace/FactoryConfigurationPanel.test.tsx (17 tests) 488ms
+apps/mission-control-ui test:  ✓ src/harness/components/ResearchWatchlistPanel.test.tsx (9 tests) 496ms
+apps/mission-control-ui test:  ✓ src/eos/views/CommandCenterView.test.tsx (3 tests) 244ms
+apps/mission-control-ui test:  ✓ src/RegistryView.test.tsx (10 tests) 212ms
+apps/mission-control-ui test:  ✓ src/lib/gatewayStatus.test.ts (2 tests) 40ms
+apps/mission-control-ui test:  ✓ src/shellV2/navConfig.test.ts (6 tests) 12ms
+apps/mission-control-ui test:  ✓ src/components/factory/badges.test.tsx (13 tests) 67ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/CreateFactoryMissionDialog.test.tsx (1 test) 82ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/FactoryPhaseInspector.test.tsx (2 tests) 67ms
+apps/mission-control-ui test:  ✓ src/controlPlane/ExecutionRecoveryCard.test.tsx (1 test) 29ms
+apps/mission-control-ui test:  ✓ src/KnowledgeGraphPanel.test.tsx (4 tests) 63ms
+apps/mission-control-ui test:  ✓ src/eos/views/MissionExecutionWorkspace.test.tsx (2 tests) 69ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/useFactoryExperienceLevel.test.tsx (3 tests) 11ms
+apps/mission-control-ui test:  ✓ src/shellV2/navFilter.test.ts (5 tests) 3ms
+apps/mission-control-ui test:  ✓ src/hooks/useFlag.test.tsx (2 tests) 13ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/ExperienceLevelSelector.test.tsx (1 test) 126ms
+apps/mission-control-ui test:  ✓ src/CostAnalytics.test.tsx (2 tests) 11ms
+apps/mission-control-ui test:  ✓ src/auth/authMode.test.ts (4 tests) 19ms
+apps/mission-control-ui test:  ✓ src/shellV2/AppShellV2.test.ts (4 tests) 1ms
+apps/mission-control-ui test:  ✓ src/eos/missionSpecModel.test.ts (5 tests) 2ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/recipeCatalog.test.ts (11 tests) 4ms
+apps/mission-control-ui test:  ✓ src/lib/harnessPatterns.test.ts (4 tests) 2ms
+apps/mission-control-ui test:  ✓ src/auth/clerkConvexDiagnostic.test.ts (4 tests) 8ms
+apps/mission-control-ui test:  ✓ src/controlPlane/runInspectorModel.test.ts (3 tests) 8ms
+apps/mission-control-ui test:  ✓ src/automations/automationModel.test.ts (2 tests) 1ms
+apps/mission-control-ui test:  ✓ src/lib/runtimeCompatibility.test.ts (12 tests) 2ms
+apps/mission-control-ui test:  ✓ src/eos/traceViewModel.test.ts (3 tests) 2ms
+apps/mission-control-ui test:  ✓ src/eos/missionPlanModel.test.ts (8 tests) 5ms
+apps/mission-control-ui test:  ✓ src/auth/clerkConvexAuth.test.ts (2 tests) 29ms
+apps/mission-control-ui test:  ✓ src/controlPlane/workOrdersModel.test.ts (12 tests) 2ms
+apps/mission-control-ui test:  ✓ src/shellV2/navCounts.test.ts (6 tests) 6ms
+apps/mission-control-ui test:  ✓ src/controlPlane/operatorDecisionModel.test.ts (6 tests) 3ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/phaseProjection.test.ts (3 tests) 2ms
+apps/mission-control-ui test:  ✓ src/components/docs/MarkdownDoc.test.ts (4 tests) 2ms
+apps/mission-control-ui test:  ✓ src/lib/graphEngineering.test.ts (5 tests) 2ms
+apps/mission-control-ui test:  ✓ src/lib/skillPitfalls.test.ts (3 tests) 3ms
+apps/mission-control-ui test:  ✓ src/components/taskboardStatsModel.test.ts (2 tests) 3ms
+apps/mission-control-ui test:  ✓ src/eos/missionRoutes.test.ts (5 tests) 4ms
+apps/mission-control-ui test:  ✓ src/workspace/workspaceSelection.test.ts (8 tests) 3ms
+apps/mission-control-ui test:  ✓ src/eos/evalControlPlaneViewModel.test.ts (3 tests) 1ms
+apps/mission-control-ui test:  ✓ src/radarModel.test.ts (4 tests) 2ms
+apps/mission-control-ui test:  ✓ src/lib/registryEvalComparison.test.ts (2 tests) 2ms
+apps/mission-control-ui test:  ✓ src/harness/lib/loopSemantics.test.ts (2 tests) 5ms
+apps/mission-control-ui test:  ✓ src/eos/missionDraftModel.test.ts (3 tests) 2ms
+apps/mission-control-ui test:  ✓ src/workspace/companySelection.test.ts (4 tests) 2ms
+apps/mission-control-ui test:  ✓ src/eos/missionPresentation.test.ts (12 tests) 2ms
+apps/mission-control-ui test:  ✓ src/lib/harnessWorkshop.test.ts (4 tests) 19ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/factoryLearningModel.test.ts (4 tests) 2ms
+apps/mission-control-ui test:  ✓ src/releases/factoryReleaseModel.test.ts (4 tests) 2ms
+apps/mission-control-ui test:  ✓ src/eos/views/missionPlanningPresentation.test.ts (3 tests) 4ms
+apps/mission-control-ui test:  ✓ src/lib/harnessArchitect.test.ts (3 tests) 1ms
+apps/mission-control-ui test:  ✓ src/lib/displayText.test.ts (2 tests) 1ms
+apps/mission-control-ui test:  ✓ src/harness/HarnessSection.test.ts (1 test) 2ms
+apps/mission-control-ui test:  ✓ src/eos/missionExecutionModel.test.ts (4 tests) 1ms
+apps/mission-control-ui test:  ✓ src/lib/harnessAdw.test.ts (3 tests) 3ms
+apps/mission-control-ui test:  ✓ src/controlPlane/workOrderLifecycleModel.test.ts (2 tests) 9ms
+apps/mission-control-ui test:  ✓ src/lib/docsSiteConfig.test.ts (8 tests) 2ms
+apps/mission-control-ui test:  ✓ src/controlPlane/factoryOverviewModel.test.ts (2 tests) 1ms
+apps/mission-control-ui test:  ✓ src/lib/registryViews.test.ts (2 tests) 1ms
+apps/mission-control-ui test:  ✓ src/eos/views/MissionDetailView.test.ts (1 test) 1ms
+apps/mission-control-ui test:  Test Files  71 passed (71)
+apps/mission-control-ui test:       Tests  323 passed (323)
+apps/mission-control-ui test:    Start at  15:26:20
+apps/mission-control-ui test:    Duration  6.84s (transform 2.54s, setup 18.04s, collect 11.59s, tests 4.38s, environment 30.60s, prepare 4.82s)
+apps/mission-control-ui test: Done
+packages/meetings test$ vitest run
+packages/policy-engine test$ vitest run
+packages/model-router test$ vitest run
+packages/state-machine test$ vitest run
+packages/meetings test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/meetings
+packages/model-router test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/model-router
+packages/policy-engine test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/policy-engine
+packages/state-machine test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/state-machine
+packages/policy-engine test:  ✓ src/__tests__/safety.test.ts (21 tests) 5ms
+packages/policy-engine test:  ✓ src/__tests__/rules.test.ts (20 tests) 11ms
+packages/meetings test:  ✓ src/__tests__/manual.test.ts (7 tests) 40ms
+packages/meetings test:  Test Files  1 passed (1)
+packages/meetings test:       Tests  7 passed (7)
+packages/meetings test:    Start at  15:26:27
+packages/meetings test:    Duration  1.00s (transform 44ms, setup 0ms, collect 50ms, tests 40ms, environment 0ms, prepare 245ms)
+packages/model-router test:  ✓ src/__tests__/cost-estimator.test.ts (6 tests) 2ms
+packages/state-machine test:  ✓ src/__tests__/validator.test.ts (23 tests) 5ms
+packages/model-router test:  ✓ src/__tests__/router.test.ts (15 tests) 4ms
+packages/state-machine test:  ✓ src/__tests__/states.test.ts (12 tests) 3ms
+packages/state-machine test:  ✓ src/__tests__/transitions.test.ts (17 tests) 4ms
+packages/state-machine test:  Test Files  3 passed (3)
+packages/state-machine test:       Tests  52 passed (52)
+packages/state-machine test:    Start at  15:26:27
+packages/state-machine test:    Duration  1.09s (transform 77ms, setup 0ms, collect 115ms, tests 13ms, environment 0ms, prepare 331ms)
+packages/meetings test: Done
+packages/model-router test:  ✓ src/__tests__/execution-routing.test.ts (18 tests) 4ms
+packages/telegraph test$ vitest run
+packages/model-router test:  Test Files  3 passed (3)
+packages/model-router test:       Tests  39 passed (39)
+packages/model-router test:    Start at  15:26:27
+packages/model-router test:    Duration  1.20s (transform 262ms, setup 0ms, collect 587ms, tests 11ms, environment 0ms, prepare 608ms)
+packages/policy-engine test:  ✓ src/__tests__/evaluator.test.ts (23 tests) 5ms
+packages/policy-engine test:  ✓ src/__tests__/allowlists.test.ts (28 tests) 6ms
+packages/policy-engine test:  Test Files  4 passed (4)
+packages/policy-engine test:       Tests  92 passed (92)
+packages/policy-engine test:    Start at  15:26:27
+packages/policy-engine test:    Duration  1.23s (transform 207ms, setup 0ms, collect 593ms, tests 27ms, environment 0ms, prepare 730ms)
+packages/state-machine test: Done
+packages/model-router test: Done
+packages/policy-engine test: Done
+packages/telegraph test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/telegraph
+packages/telegraph test:  ✓ src/__tests__/telegram.test.ts (10 tests) 6ms
+packages/telegraph test:  ✓ src/__tests__/internal.test.ts (7 tests) 6ms
+packages/telegraph test:  Test Files  2 passed (2)
+packages/telegraph test:       Tests  17 passed (17)
+packages/telegraph test:    Start at  15:26:29
+packages/telegraph test:    Duration  294ms (transform 30ms, setup 0ms, collect 37ms, tests 12ms, environment 0ms, prepare 98ms)
+packages/telegraph test: Done
+packages/coordinator test$ vitest run
+packages/workflow-engine test$ vitest run
+packages/workflow-engine test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/workflow-engine
+packages/coordinator test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/coordinator
+packages/coordinator test:  ✓ src/__tests__/dependency-graph.test.ts (11 tests) 7ms
+packages/coordinator test:  ✓ src/__tests__/loop.test.ts (2 tests) 2ms
+packages/coordinator test:  ✓ src/__tests__/delegator.test.ts (8 tests) 2ms
+packages/coordinator test:  ✓ src/__tests__/workflowTrigger.test.ts (18 tests) 2ms
+packages/coordinator test:  ✓ src/__tests__/decomposer.test.ts (7 tests) 2ms
+packages/coordinator test:  Test Files  5 passed (5)
+packages/coordinator test:       Tests  46 passed (46)
+packages/coordinator test:    Start at  15:26:29
+packages/coordinator test:    Duration  622ms (transform 117ms, setup 0ms, collect 308ms, tests 16ms, environment 0ms, prepare 636ms)
+packages/workflow-engine test:  ✓ src/__tests__/repositoryScope.test.ts (3 tests) 2ms
+packages/workflow-engine test:  ✓ src/__tests__/graph.test.ts (5 tests) 2ms
+packages/workflow-engine test:  ✓ src/__tests__/loader.test.ts (18 tests) 20ms
+packages/workflow-engine test:  ✓ src/__tests__/verification.test.ts (8 tests) 8ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationAuthority.test.ts (27 tests) 17ms
+packages/workflow-engine test:  ✓ src/__tests__/renderer.test.ts (18 tests) 2ms
+packages/workflow-engine test: stdout | src/__tests__/executor.test.ts > WorkflowExecutor reliability > stores the required output fields on workflow-created tasks
+packages/workflow-engine test: [WorkflowExecutor] Started run-123/researchArchitecture as task task-1
+packages/workflow-engine test: stdout | src/__tests__/executor.test.ts > WorkflowExecutor reliability > does not re-transition a Task that creation already moved to READY
+packages/workflow-engine test: [WorkflowExecutor] Started run-123/approval as task task-1
+packages/workflow-engine test: stdout | src/__tests__/executor.test.ts > WorkflowExecutor reliability > creates a gate approval bound to the task, run, version, and evidence digest
+packages/workflow-engine test: [WorkflowExecutor] Started run-123/approval as task task-1
+packages/workflow-engine test:  ✓ src/__tests__/implementationPolicy.test.ts (8 tests) 3ms
+packages/workflow-engine test:  ✓ src/__tests__/executor.test.ts (19 tests) 22ms
+packages/coordinator test: Done
+packages/workflow-engine test:  ✓ src/__tests__/parser.test.ts (17 tests) 3ms
+packages/workflow-engine test:  ✓ src/__tests__/handoff.test.ts (3 tests) 2ms
+packages/workflow-engine test:  ✓ src/__tests__/executorAdapter.test.ts (4 tests) 3ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationDecision.test.ts (8 tests) 5ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationIndependence.test.ts (9 tests) 4ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationSubject.test.ts (7 tests) 5ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationPlan.test.ts (4 tests) 4ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationCurrentness.test.ts (14 tests) 9ms
+packages/workflow-engine test:  ✓ src/__tests__/harnessContract.test.ts (6 tests) 8ms
+packages/workflow-engine test:  Test Files  17 passed (17)
+packages/workflow-engine test:       Tests  178 passed (178)
+packages/workflow-engine test:    Start at  15:26:29
+packages/workflow-engine test:    Duration  911ms (transform 693ms, setup 0ms, collect 2.98s, tests 119ms, environment 1ms, prepare 1.75s)
+packages/workflow-engine test: Done
+packages/memory test$ vitest run
+packages/context-router test$ vitest run
+packages/context-router test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/context-router
+packages/memory test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/memory
+packages/context-router test:  ✓ src/__tests__/classifier.test.ts (22 tests) 6ms
+packages/context-router test:  ✓ src/__tests__/router.test.ts (16 tests) 13ms
+packages/context-router test:  Test Files  2 passed (2)
+packages/context-router test:       Tests  38 passed (38)
+packages/context-router test:    Start at  15:26:31
+packages/context-router test:    Duration  510ms (transform 55ms, setup 0ms, collect 144ms, tests 19ms, environment 0ms, prepare 186ms)
+packages/memory test:  ✓ src/__tests__/session.test.ts (9 tests) 3ms
+packages/memory test:  ✓ src/__tests__/global.test.ts (5 tests) 2ms
+packages/memory test:  ✓ src/__tests__/manager.test.ts (4 tests) 12ms
+packages/context-router test: Done
+packages/memory test:  ✓ src/__tests__/factory.test.ts (9 tests) 15ms
+packages/memory test:  Test Files  4 passed (4)
+packages/memory test:       Tests  27 passed (27)
+packages/memory test:    Start at  15:26:31
+packages/memory test:    Duration  684ms (transform 175ms, setup 0ms, collect 273ms, tests 32ms, environment 0ms, prepare 249ms)
+packages/memory test: Done
+packages/agent-runtime test$ vitest run
+packages/agent-runtime test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/agent-runtime
+packages/agent-runtime test:  ✓ src/__tests__/heartbeat.test.ts (5 tests) 1ms
+packages/agent-runtime test:  ✓ src/__tests__/persona.test.ts (14 tests) 2ms
+packages/agent-runtime test:  Test Files  2 passed (2)
+packages/agent-runtime test:       Tests  19 passed (19)
+packages/agent-runtime test:    Start at  15:26:32
+packages/agent-runtime test:    Duration  304ms (transform 35ms, setup 0ms, collect 57ms, tests 3ms, environment 0ms, prepare 77ms)
+packages/agent-runtime test: Done
+apps/orchestration-server test$ vitest run
+apps/orchestration-server test:  RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/apps/orchestration-server
+apps/orchestration-server test:  ✓ src/__tests__/factoryHostReporter.test.ts (9 tests) 233ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryVerificationAuthority.test.ts (8 tests) 613ms
+apps/orchestration-server test:  ✓ src/__tests__/localInferenceBoundary.test.ts (1 test) 910ms
+apps/orchestration-server test:    ✓ local inference catalog boundary > rejects legacy HTTP synchronization until a signed workspace command exists  910ms
+apps/orchestration-server test:  ✓ src/__tests__/hardLiabilityLedger.test.ts (23 tests) 671ms
+apps/orchestration-server test:  ✓ src/__tests__/automationAdapter.test.ts (11 tests) 1135ms
+apps/orchestration-server test:    ✓ Automation adapter safety > executes TypeScript and Python artifacts through fixed argv adapters  663ms
+apps/orchestration-server test:    ✓ Automation adapter safety > executes skill pipelines sequentially and stops on failure  366ms
+apps/orchestration-server test:  ✓ src/__tests__/missionPlanningContract.test.ts (8 tests) 130ms
+apps/orchestration-server test:  ✓ src/__tests__/githubAppPublisher.test.ts (6 tests) 758ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryAttemptWorkerRemote.test.ts (2 tests) 988ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker remote Sandbox backend > runs beneath the canonical worker lease, verifies on the host, cleans up, and only then publishes one PR  986ms
+apps/orchestration-server test:  ✓ src/__tests__/deepseekHarnessExecutorAdapter.test.ts (10 tests) 1320ms
+apps/orchestration-server test:    ✓ DeepSeekHarnessExecutorAdapter > cancels the dedicated owned executor process group  349ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryGitRuntime.test.ts (4 tests) 1619ms
+apps/orchestration-server test:    ✓ Factory Git runtime > creates and reconciles the exact worktree branch across retries  752ms
+apps/orchestration-server test:    ✓ Factory Git runtime > prepares frozen dependencies without changing source state  336ms
+apps/orchestration-server test:    ✓ Factory Git runtime > binds planning to a detached exact SHA and rejects any repository change  372ms
+apps/orchestration-server test:  ✓ src/__tests__/gatewayProxy.test.ts (15 tests) 228ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryGovernedMcpContext.test.ts (2 tests) 120ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryVerification.test.ts (2 tests) 133ms
+apps/orchestration-server test:  ✓ src/__tests__/governedMcpBroker.test.ts (16 tests) 288ms
+apps/orchestration-server test:  ✓ src/__tests__/githubAppRuntime.test.ts (7 tests) 9ms
+apps/orchestration-server test:  ✓ src/__tests__/exeDevSandboxProvider.test.ts (14 tests) 15ms
+apps/orchestration-server test:  ✓ src/__tests__/missionPlanningWorker.test.ts (9 tests) 47ms
+apps/orchestration-server test:  ✓ src/__tests__/bedrockAdapter.test.ts (61 tests) 102ms
+apps/orchestration-server test:  ✓ src/__tests__/localInference.test.ts (1 test) 7ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryWorkspaceOwnership.test.ts (9 tests) 2230ms
+apps/orchestration-server test:    ✓ Factory workspace ownership > preserves cleanup when the checkout origin host is not the frozen GitHub repository  302ms
+apps/orchestration-server test:  ✓ src/__tests__/sandboxCredentials.test.ts (3 tests) 12ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryHarnessComposition.test.ts (5 tests) 11ms
+apps/orchestration-server test:  ✓ src/__tests__/bedrockReconciliation.test.ts (16 tests) 12ms
+apps/orchestration-server test:  ✓ src/__tests__/codexExecutorAdapter.test.ts (15 tests) 2116ms
+apps/orchestration-server test:    ✓ CodexV1ExecutorAdapter > cancels the dedicated owned executor process group  547ms
+apps/orchestration-server test:    ✓ CodexV1ExecutorAdapter > closes the Codex CLI stdin pipe so an explicit prompt can start  491ms
+apps/orchestration-server test:  ✓ src/__tests__/remoteStructuredResult.test.ts (17 tests) 4ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryObservability.test.ts (2 tests) 4ms
+apps/orchestration-server test:  ✓ src/__tests__/sandboxReconciler.test.ts (3 tests) 4ms
+apps/orchestration-server test:  ✓ src/__tests__/sandboxSupervisor.test.ts (5 tests) 2086ms
+apps/orchestration-server test:    ✓ sandbox supervisor candidate capture > includes staged, unstaged, and newly created files, and excludes ignored ones  362ms
+apps/orchestration-server test:    ✓ sandbox supervisor candidate capture > represents deletions and refuses paths outside the frozen scope  334ms
+apps/orchestration-server test:    ✓ sandbox supervisor candidate capture > reads V2 model/backend bindings and rejects a tampered runtime artifact before execution  359ms
+apps/orchestration-server test:    ✓ sandbox supervisor candidate capture > admits V3 only with a current exact Execution Profile before running the executor  368ms
+apps/orchestration-server test:    ✓ sandbox supervisor candidate capture > keeps the standalone remote supervisor equivalent to the in-process one  663ms
+apps/orchestration-server test:  ✓ src/__tests__/serviceCommandClient.test.ts (3 tests) 3ms
+apps/orchestration-server test:  ✓ src/__tests__/orchestrationSecurity.test.ts (9 tests) 3ms
+apps/orchestration-server test:  ✓ src/__tests__/auth.test.ts (6 tests) 2ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryPathScope.test.ts (3 tests) 2ms
+apps/orchestration-server test:  ✓ src/__tests__/harnessAdapterRegistry.test.ts (7 tests) 5ms
+apps/orchestration-server test:  ✓ src/__tests__/dockerSandboxProvider.test.ts (21 tests | 2 skipped) 4ms
+apps/orchestration-server test:  ↓ src/__tests__/governedContextBridge.integration.test.ts (1 test | 1 skipped)
+apps/orchestration-server test: stderr | src/__tests__/durableCodexWorker.test.ts > durable Codex worker Git boundary > retains a non-terminal lease when the worker shuts down
+apps/orchestration-server test: [codex-worker] Worker stopped for run-restart; durable worktree and non-terminal lease retained for recovery.
+apps/orchestration-server test:  ✓ src/__tests__/durableCodexWorker.test.ts (7 tests) 2636ms
+apps/orchestration-server test:    ✓ durable Codex worker Git boundary > creates and recovers the exact linked worktree without resetting partial changes  585ms
+apps/orchestration-server test:    ✓ durable Codex worker Git boundary > blocks verification commands that change Git history  571ms
+apps/orchestration-server test:    ✓ durable Codex worker Git boundary > rechecks approved file scope after verification commands mutate the worktree  854ms
+apps/orchestration-server test:    ✓ durable Codex worker Git boundary > retains a non-terminal lease when the worker shuts down  384ms
+apps/orchestration-server test:  ↓ src/__tests__/dockerFactoryWorker.test.ts (7 tests | 7 skipped)
+apps/orchestration-server test:  ✓ src/__tests__/remoteSandboxRuntime.test.ts (24 tests) 2592ms
+apps/orchestration-server test:    ✓ sandbox supervisor > pins the source, runs a bounded executor, and writes a content-addressed binary patch  372ms
+apps/orchestration-server test:    ✓ sandbox supervisor > reconstructs one terminal Codex JSONL result with exact context and atomic persistence  601ms
+apps/orchestration-server test:    ✓ sandbox supervisor > preserves diagnostics but no final result when the supervisor crashes after execution  440ms
+apps/orchestration-server test:    ✓ sandbox supervisor > redacts an Attempt credential before truncating crash diagnostics  315ms
+apps/orchestration-server test:    ✓ sandbox supervisor > bounds executor output in memory while preserving full byte counts and stream digests  411ms
+apps/orchestration-server test:    ✓ sandbox supervisor > terminates the executor process group and preserves a typed cancellation bundle  307ms
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > persists the policy-v2 candidate checkpoint before a GitHub credential publication failure
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: GitHub App runtime credentials are not configured.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > denies local recovery when the clean worktree no longer matches the durable source checkpoint
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Local candidate recovery workspace does not match the durable source Attempt checkpoint.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 profile bytes are substituted after admission
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 claim evidence is missing or substituted
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > rejects a V3 qualification already stale at the server claim instant
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different runtime executable
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when legacy V1 normalized provenance reports a different runtime executable
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different provider route
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+apps/orchestration-server test:  ✓ src/__tests__/factoryAttemptWorker.test.ts (27 tests) 7060ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > turns governed issue intent into a verified, evidence-linked pull request  852ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > injects profile-bound governed MCP output as untrusted pre-harness context  886ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > completes a non-mutating candidate as durable evidence without provider publication  510ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > executes an independently registered harness identity through the unchanged governed lifecycle  368ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > uses only the frozen V2 provider/model route and ignores a mutable claim model override  331ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > constructs the worker from the exact frozen V3 Execution Profile  316ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > uses the server claim instant for V3 expiry so an admitted lease may finish  313ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > completes the durable worker golden path and cleans only its proven worktree  310ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > pauses for human review and resumes publication without rerunning Codex or verification  365ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > persists a verification mismatch, blocks publication, and recovers with a new immutable Attempt  630ms
+apps/orchestration-server test:  ✓ src/__tests__/systemFactoryQualification.test.ts (4 tests) 11009ms
+apps/orchestration-server test:    ✓ Mission Control full-system Factory qualification V2 > proves exact governed lineage, failures, recovery, authority, and learning on an isolated fixture  10990ms
+apps/orchestration-server test:  Test Files  38 passed | 2 skipped (40)
+apps/orchestration-server test:       Tests  393 passed | 10 skipped (403)
+apps/orchestration-server test:    Start at  15:26:33
+apps/orchestration-server test:    Duration  12.05s (transform 1.82s, setup 0ms, collect 8.62s, tests 39.12s, environment 4ms, prepare 2.78s)
+apps/orchestration-server test: Done
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+
+ ✓ convex/__tests__/governedHardeningAuthority.test.ts (6 tests) 19ms
+ ✓ convex/__tests__/researchIngestionPolicy.test.ts (5 tests) 10ms
+ ✓ convex/__tests__/contextActivation.test.ts (2 tests) 3ms
+ ✓ convex/__tests__/githubAppReadiness.test.ts (7 tests) 72ms
+ ✓ convex/__tests__/factoryMemory.test.ts (13 tests) 36ms
+ ✓ convex/__tests__/providerLiability.test.ts (24 tests) 9ms
+ ✓ convex/__tests__/governedMcp.test.ts (4 tests) 12ms
+ ✓ convex/__tests__/missionSpec.test.ts (9 tests) 14ms
+ ✓ convex/__tests__/providerLiabilityHandlers.test.ts (18 tests) 9ms
+ ✓ convex/__tests__/factoryModelRoute.test.ts (13 tests) 14ms
+ ✓ convex/__tests__/evalControlPlaneGoldenPath.test.ts (2 tests) 27ms
+ ✓ convex/__tests__/factoryActionAuthorization.test.ts (3 tests) 4ms
+ ✓ convex/__tests__/workOrderRevision.test.ts (8 tests) 10ms
+ ✓ convex/__tests__/factoryLearning.test.ts (13 tests) 22ms
+ ✓ convex/__tests__/actionAuthorization.test.ts (23 tests) 25ms
+ ✓ convex/__tests__/metaLoopSignals.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/missionPlanningRunState.test.ts (6 tests) 3ms
+ ✓ convex/__tests__/softwareFactoryControlPlane.test.ts (9 tests) 5ms
+ ✓ convex/__tests__/missionPlanningExecutionProfile.test.ts (5 tests) 38ms
+ ✓ convex/__tests__/executionProfile.test.ts (14 tests) 175ms
+ ✓ convex/__tests__/automationAuthorization.test.ts (4 tests) 6ms
+ ✓ convex/__tests__/modelRouteAdmission.test.ts (12 tests) 9ms
+ ✓ convex/__tests__/policyV2Verification.test.ts (3 tests) 4ms
+ ✓ convex/__tests__/integration.test.ts (12 tests) 8ms
+ ✓ convex/__tests__/factoryWorkerRuntime.test.ts (13 tests) 16ms
+ ✓ convex/__tests__/featureFlags.test.ts (14 tests) 4ms
+ ✓ convex/__tests__/verificationEligibilitySchemaContract.test.ts (2 tests) 3ms
+ ✓ convex/__tests__/executionManifest.test.ts (24 tests) 72ms
+ ✓ convex/__tests__/localCandidateRecovery.test.ts (1 test) 3ms
+ ✓ convex/__tests__/executionRoutingEvidence.test.ts (7 tests) 7ms
+ ✓ convex/__tests__/observabilityGoldenPath.test.ts (6 tests) 8ms
+ ✓ convex/__tests__/taskProjection.test.ts (10 tests) 3ms
+ ✓ convex/__tests__/loopEngineering.test.ts (6 tests) 3ms
+ ✓ convex/__tests__/reviewIntelligence.test.ts (6 tests) 5ms
+ ✓ convex/__tests__/executionPolicy.test.ts (3 tests) 1ms
+ ✓ convex/__tests__/harnessCapabilities.test.ts (4 tests) 7ms
+ ✓ convex/__tests__/sanitize.test.ts (7 tests) 2ms
+ ✓ convex/__tests__/researchSourcePolicy.test.ts (5 tests) 4ms
+ ✓ convex/__tests__/contextEvals.test.ts (11 tests) 3ms
+ ✓ convex/__tests__/automationGovernance.test.ts (7 tests) 3ms
+ ✓ convex/__tests__/harnessPrChecks.test.ts (10 tests) 4ms
+ ✓ convex/__tests__/reviewIntelligenceGoldenPath.test.ts (1 test) 5ms
+ ✓ convex/__tests__/modelRoutingAuthorization.test.ts (16 tests) 13ms
+ ✓ convex/__tests__/qualityContract.test.ts (4 tests) 5ms
+ ✓ convex/__tests__/factoryAttempt.test.ts (16 tests) 7ms
+ ✓ convex/__tests__/verificationPersistence.test.ts (5 tests) 9ms
+ ✓ convex/__tests__/taskAttemptScheduler.test.ts (23 tests) 3ms
+ ✓ convex/__tests__/reviewPackage.test.ts (17 tests) 4ms
+ ✓ convex/__tests__/companyAccess.test.ts (10 tests) 6ms
+ ✓ convex/__tests__/knowledgeGraph.test.ts (7 tests) 5ms
+ ✓ convex/__tests__/contextPackages.test.ts (22 tests) 4ms
+ ✓ convex/__tests__/missionGovernance.test.ts (11 tests) 2ms
+ ✓ convex/__tests__/armPolicy.test.ts (5 tests) 2ms
+ ✓ convex/__tests__/tasks.test.ts (31 tests) 4ms
+ ✓ convex/__tests__/missionWorkOrderContract.test.ts (7 tests) 4ms
+ ✓ convex/__tests__/factoryConfiguration.test.ts (10 tests) 4ms
+ ✓ convex/__tests__/codexFactoryWorkerGuardrails.test.ts (5 tests) 1ms
+ ✓ convex/__tests__/workOrderDispatch.test.ts (37 tests) 4ms
+ ✓ convex/__tests__/factoryDispatch.test.ts (10 tests) 4ms
+ ✓ convex/__tests__/taskAuthority.test.ts (5 tests) 2ms
+ ✓ convex/__tests__/factoryOverview.test.ts (3 tests) 2ms
+ ✓ convex/__tests__/workOrderSpecification.test.ts (8 tests) 3ms
+ ✓ convex/__tests__/loopWorkflowProjection.test.ts (3 tests) 4ms
+ ✓ convex/__tests__/missionPromptScheduling.test.ts (6 tests) 15ms
+ ✓ convex/__tests__/contextManifests.test.ts (24 tests) 4ms
+ ✓ convex/__tests__/loopResearchEvidence.test.ts (3 tests) 2ms
+ ✓ convex/__tests__/workOrderGovernance.test.ts (12 tests) 5ms
+ ✓ convex/__tests__/missionSpecAuthority.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/githubCiIngest.test.ts (14 tests) 6ms
+ ✓ convex/__tests__/operatorControls.test.ts (5 tests) 2ms
+ ✓ convex/__tests__/operatorEvals.test.ts (3 tests) 2ms
+ ✓ convex/__tests__/workspaceRepositories.test.ts (8 tests) 11ms
+ ✓ convex/__tests__/workflowTaskGuards.test.ts (2 tests) 1ms
+ ✓ convex/__tests__/riskClassifier.test.ts (20 tests) 6ms
+ ✓ convex/__tests__/githubAppConnections.test.ts (3 tests) 4ms
+ ✓ convex/__tests__/factoryRelease.test.ts (12 tests) 5ms
+ ✓ convex/__tests__/pilotLiabilityAllocation.test.ts (9 tests) 3ms
+ ✓ convex/__tests__/continuousResearchProjection.test.ts (4 tests) 3ms
+ ✓ convex/__tests__/continuousEvidenceLineage.test.ts (3 tests) 18ms
+ ✓ convex/__tests__/workflowSnapshot.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/factoryProjectSeed.test.ts (2 tests) 5ms
+ ✓ convex/__tests__/missionDraft.test.ts (4 tests) 4ms
+ ✓ convex/__tests__/reviewIntelligenceAuthority.test.ts (5 tests) 4ms
+ ✓ convex/__tests__/evidenceAuthorityClasses.test.ts (19 tests) 3ms
+ ✓ convex/__tests__/factoryRuntimeGoldenPath.test.ts (2 tests) 3ms
+ ✓ convex/__tests__/sandboxProfileAdmission.test.ts (3 tests) 37ms
+ ✓ convex/__tests__/prdParser.test.ts (5 tests) 3ms
+ ✓ convex/__tests__/skillAutomation.test.ts (11 tests) 3ms
+ ✓ convex/__tests__/workOrderParentSync.test.ts (13 tests) 2ms
+ ✓ convex/__tests__/readOnlyRunControl.test.ts (10 tests) 4ms
+ ✓ convex/__tests__/qualityGateDecision.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/runInspector.test.ts (5 tests) 2ms
+ ✓ convex/__tests__/workOrderReadiness.test.ts (10 tests) 2ms
+ ✓ convex/__tests__/workflowObservability.test.ts (5 tests) 3ms
+ ✓ convex/__tests__/repetitiveTaskCandidates.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/getActiveTenant.test.ts (11 tests) 2ms
+ ✓ convex/__tests__/piBridge.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/continuousResearchEvidence.test.ts (5 tests) 3ms
+ ✓ convex/__tests__/missionPlan.test.ts (7 tests) 15ms
+ ✓ convex/__tests__/executionRoutingCost.test.ts (3 tests) 1ms
+ ✓ convex/__tests__/factoryReviewReadModel.test.ts (1 test) 5ms
+ ✓ convex/__tests__/factoryWorkflowContract.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/workflowRunState.test.ts (3 tests) 2ms
+ ✓ convex/__tests__/factoryHumanReview.test.ts (10 tests) 2ms
+ ✓ convex/__tests__/dockerAllocationRecovery.test.ts (12 tests) 2ms
+ ✓ convex/__tests__/runEventSchemaContract.test.ts (1 test) 1ms
+ ✓ convex/__tests__/preExecutionRecovery.test.ts (16 tests) 3ms
+ ✓ convex/__tests__/mergeGates.test.ts (2 tests) 1ms
+ ✓ convex/__tests__/workflowExecutionControl.test.ts (5 tests) 2ms
+ ✓ convex/__tests__/outputValidation.test.ts (6 tests) 3ms
+ ✓ convex/__tests__/publicActionSurface.test.ts (3 tests) 2ms
+ ✓ convex/__tests__/automationDispatch.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/rateLimit.test.ts (9 tests) 2ms
+ ✓ convex/__tests__/repetitiveTasks.test.ts (3 tests) 4ms
+ ✓ convex/__tests__/workOrders.test.ts (8 tests) 2ms
+ ✓ convex/__tests__/repositoryExecutionPolicy.test.ts (8 tests) 2ms
+ ✓ convex/__tests__/authorizationRollout.test.ts (5 tests) 2ms
+ ✓ convex/__tests__/deliveryPermissionLadder.test.ts (8 tests) 2ms
+ ✓ convex/__tests__/prEvaluation.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/taskWorkflowState.test.ts (5 tests) 3ms
+ ✓ convex/__tests__/companyMemberPolicy.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/executionRecovery.test.ts (3 tests) 2ms
+ ✓ convex/__tests__/serviceCommandAuth.test.ts (7 tests) 2ms
+ ✓ convex/__tests__/executionRoutingRollout.test.ts (2 tests) 2ms
+ ✓ convex/__tests__/missionEvidencePolicy.test.ts (3 tests) 2ms
+ ✓ convex/__tests__/graphEngineering.test.ts (1 test) 3ms
+ ✓ convex/__tests__/factoryHealth.test.ts (3 tests) 1ms
+ ✓ convex/__tests__/workspaceBindings.test.ts (3 tests) 3ms
+
+ Test Files  128 passed (128)
+      Tests  1018 passed (1018)
+   Start at  15:26:45
+   Duration  3.35s (transform 3.59s, setup 0ms, collect 12.94s, tests 1.04s, environment 22ms, prepare 6.80s)
+
+
+=== TypeScript and skill lint ===
+
+> mission-control@0.9.0 lint /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm run typecheck && node scripts/skill-lint.mjs
+
+
+> mission-control@0.9.0 typecheck /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm run ci:prepare && pnpm -r --if-present run typecheck
+
+
+> mission-control@0.9.0 ci:prepare /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm --filter @mission-control/shared build && pnpm --filter @mission-control/state-machine build && pnpm --filter @mission-control/policy-engine build && pnpm --filter @mission-control/workflow-engine build && pnpm --filter @mission-control/coordinator build && pnpm --filter @mission-control/context-router build && pnpm --filter @mission-control/model-router build && pnpm --filter @mission-control/memory build && pnpm --filter @mission-control/context-tools build && pnpm --filter @mission-control/agent-runtime build && pnpm --filter @mission-control/telegraph build && pnpm --filter @mission-control/meetings build && pnpm --filter @mission-control/research-adapters build
+
+
+> @mission-control/shared@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/shared
+> tsc
+
+
+> @mission-control/state-machine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/state-machine
+> tsc
+
+
+> @mission-control/policy-engine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/policy-engine
+> tsc
+
+
+> @mission-control/workflow-engine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/workflow-engine
+> tsc
+
+
+> @mission-control/coordinator@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/coordinator
+> tsc
+
+
+> @mission-control/context-router@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/context-router
+> tsc
+
+
+> @mission-control/model-router@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/model-router
+> tsc
+
+
+> @mission-control/memory@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/memory
+> tsc
+
+
+> @mission-control/context-tools@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/context-tools
+> tsc
+
+
+> @mission-control/agent-runtime@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/agent-runtime
+> tsc
+
+
+> @mission-control/telegraph@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/telegraph
+> tsc
+
+
+> @mission-control/meetings@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/meetings
+> tsc
+
+
+> @mission-control/research-adapters@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/research-adapters
+> tsc
+
+Scope: 19 of 20 workspace projects
+apps/mission-control-ui typecheck$ tsc --noEmit
+packages/context-tools typecheck$ tsc --noEmit
+packages/research-adapters typecheck$ tsc --noEmit
+packages/shared typecheck$ tsc --noEmit
+packages/research-adapters typecheck: Done
+packages/context-tools typecheck: Done
+packages/shared typecheck: Done
+apps/mission-control-ui typecheck: Done
+packages/model-router typecheck$ tsc --noEmit
+packages/state-machine typecheck$ tsc --noEmit
+packages/policy-engine typecheck$ tsc --noEmit
+packages/state-machine typecheck: Done
+packages/policy-engine typecheck: Done
+packages/model-router typecheck: Done
+packages/coordinator typecheck$ tsc --noEmit
+packages/telegram-bot typecheck$ tsc --noEmit
+packages/workflow-engine typecheck$ tsc --noEmit
+packages/coordinator typecheck: Done
+packages/workflow-engine typecheck: Done
+packages/telegram-bot typecheck: Done
+packages/cli typecheck$ tsc --noEmit
+packages/context-router typecheck$ tsc --noEmit
+apps/workflow-executor typecheck$ tsc --noEmit
+packages/memory typecheck$ tsc --noEmit
+packages/cli typecheck: Done
+apps/workflow-executor typecheck: Done
+packages/memory typecheck: Done
+packages/context-router typecheck: Done
+packages/agent-runtime typecheck$ tsc --noEmit
+packages/agent-runtime typecheck: Done
+apps/orchestration-server typecheck$ tsc --noEmit
+apps/orchestration-server typecheck: Done
+SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-budget-control/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-heartbeat/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-record-memory/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-register-agent/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-request-approval/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-run-logging/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-submit-deliverable/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-task-lifecycle/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/workspace-handoff-checklist/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+
+10 skill(s) linted — 0 error(s), 0 warning(s), average score 100/100
+
+=== runtime-contract guard ===
+Runtime contract guard: PASS
+Accepted 7 public Convex contract change(s) with version v42 → v43.
+- factory/providerLiability:createReservation: added
+- factory/providerLiability:getReservation: added
+- factory/providerLiability:reconcileUsage: added
+- factory/providerLiability:registerPriceVersion: added
+- serviceCommands:recordProviderUsage: added
+- serviceCommands:reserveProviderRequest: added
+- workOrders:readiness: added
+
+=== production build ===
+
+> mission-control@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm -r --if-present run build
+
+Scope: 19 of 20 workspace projects
+apps/mission-control-ui build$ vite build
+packages/context-tools build$ tsc
+packages/openclaw-sdk build$ tsc
+packages/research-adapters build$ tsc
+packages/research-adapters build: Done
+packages/shared build$ tsc
+apps/mission-control-ui build: vite v6.4.3 building for production...
+packages/context-tools build: Done
+packages/openclaw-sdk build: Done
+apps/mission-control-ui build: transforming...
+packages/shared build: Done
+apps/mission-control-ui build: ✓ 3411 modules transformed.
+apps/mission-control-ui build: rendering chunks...
+apps/mission-control-ui build: computing gzip size...
+apps/mission-control-ui build: dist/index.html                                      0.71 kB │ gzip:   0.36 kB
+apps/mission-control-ui build: dist/assets/index-BLE-y8lx.css                     161.43 kB │ gzip:  26.35 kB
+apps/mission-control-ui build: dist/assets/vendor-motion-DMof9TtM.js                0.03 kB │ gzip:   0.05 kB
+apps/mission-control-ui build: dist/assets/displayText-ByTDteOn.js                  0.06 kB │ gzip:   0.08 kB
+apps/mission-control-ui build: dist/assets/dateInput-BcNRYiFV.js                    0.32 kB │ gzip:   0.24 kB
+apps/mission-control-ui build: dist/assets/schematicFormatters-CrdMyzN6.js          0.35 kB │ gzip:   0.24 kB
+apps/mission-control-ui build: dist/assets/orchestrationUrl-2AWO-j4K.js             0.36 kB │ gzip:   0.27 kB
+apps/mission-control-ui build: dist/assets/textarea-Bka4KbRt.js                     0.52 kB │ gzip:   0.34 kB
+apps/mission-control-ui build: dist/assets/useFactoryExperienceLevel-BSjOeOHd.js    0.69 kB │ gzip:   0.39 kB
+apps/mission-control-ui build: dist/assets/empty-state-DyvAVvof.js                  0.73 kB │ gzip:   0.39 kB
+apps/mission-control-ui build: dist/assets/MetricBlock-bwjpxOOz.js                  0.84 kB │ gzip:   0.44 kB
+apps/mission-control-ui build: dist/assets/HarnessFirstReviewModal-EnT_AjKR.js      1.07 kB │ gzip:   0.60 kB
+apps/mission-control-ui build: dist/assets/card-D6yVfFBV.js                         1.08 kB │ gzip:   0.42 kB
+apps/mission-control-ui build: dist/assets/tabs-C_KoKwN5.js                         1.14 kB │ gzip:   0.48 kB
+apps/mission-control-ui build: dist/assets/SchematicKpiStrip-zMbjfPjC.js            1.14 kB │ gzip:   0.60 kB
+apps/mission-control-ui build: dist/assets/SchematicPageHead-wRZwZUW_.js            1.33 kB │ gzip:   0.74 kB
+apps/mission-control-ui build: dist/assets/badge-DzmfjvDW.js                        1.34 kB │ gzip:   0.60 kB
+apps/mission-control-ui build: dist/assets/PageHeader-sGFxDGIN.js                   1.40 kB │ gzip:   0.61 kB
+apps/mission-control-ui build: dist/assets/gatewayStatus-DlVkqWLH.js                1.45 kB │ gzip:   0.75 kB
+apps/mission-control-ui build: dist/assets/automationModel-BSdJ-_aP.js              1.62 kB │ gzip:   0.81 kB
+apps/mission-control-ui build: dist/assets/badges-CDNUe1mr.js                       1.73 kB │ gzip:   0.78 kB
+apps/mission-control-ui build: dist/assets/DataTable-Chkrxv4q.js                    1.85 kB │ gzip:   0.86 kB
+apps/mission-control-ui build: dist/assets/MutationTestingPanel-hBzIg6Lg.js         2.32 kB │ gzip:   0.95 kB
+apps/mission-control-ui build: dist/assets/sheet-PNodJzJK.js                        2.38 kB │ gzip:   0.95 kB
+apps/mission-control-ui build: dist/assets/table-CEcVmveV.js                        2.41 kB │ gzip:   0.91 kB
+apps/mission-control-ui build: dist/assets/UsageTrendCharts-CI4RZ4qo.js             3.43 kB │ gzip:   1.25 kB
+apps/mission-control-ui build: dist/assets/chartTheme-CCS4eF9N.js                   4.01 kB │ gzip:   1.52 kB
+apps/mission-control-ui build: dist/assets/ScheduleView-DVw00V6o.js                 5.36 kB │ gzip:   1.78 kB
+apps/mission-control-ui build: dist/assets/CreateTaskModal-Chp3T2EJ.js              7.13 kB │ gzip:   2.56 kB
+apps/mission-control-ui build: dist/assets/CreateAgentModal-DafqEKoh.js             7.33 kB │ gzip:   2.33 kB
+apps/mission-control-ui build: dist/assets/vendor-convex-BYrEwiOd.js               12.34 kB │ gzip:   4.48 kB
+apps/mission-control-ui build: dist/assets/DashboardOverview-BtJ9gxPC.js           16.30 kB │ gzip:   5.25 kB
+apps/mission-control-ui build: dist/assets/attentionQueue-Db0-f8V-.js              23.24 kB │ gzip:   7.50 kB
+apps/mission-control-ui build: dist/assets/index-jgbjEe3n.js                       24.82 kB │ gzip:   7.40 kB
+apps/mission-control-ui build: dist/assets/CodeSection-DqwNbCgI.js                 31.79 kB │ gzip:   6.40 kB
+apps/mission-control-ui build: dist/assets/QualitySection-CEjDDX9c.js              39.01 kB │ gzip:   8.84 kB
+apps/mission-control-ui build: dist/assets/ChatSection-DnBc3aqM.js                 53.94 kB │ gzip:  13.73 kB
+apps/mission-control-ui build: dist/assets/ExecutionRunInspector-GoMRheuf.js       67.78 kB │ gzip:  15.78 kB
+apps/mission-control-ui build: dist/assets/TaskDrawerTabs-DA2egXlC.js              73.15 kB │ gzip:  19.09 kB
+apps/mission-control-ui build: dist/assets/vendor-icons-DN9gQWQV.js                83.88 kB │ gzip:  16.62 kB
+apps/mission-control-ui build: dist/assets/AgentsSection-D2Bg0fU4.js              106.18 kB │ gzip:  25.33 kB
+apps/mission-control-ui build: dist/assets/ModalLayer-CHVlDsM1.js                 108.52 kB │ gzip:  27.20 kB
+apps/mission-control-ui build: dist/assets/CommsSection-CZb0_me3.js               137.79 kB │ gzip:  29.90 kB
+apps/mission-control-ui build: dist/assets/ContentSection-B05bINvG.js             140.08 kB │ gzip:  31.83 kB
+apps/mission-control-ui build: dist/assets/ControlSection-ECkY5slx.js             143.19 kB │ gzip:  33.96 kB
+apps/mission-control-ui build: dist/assets/OpsSection-D6BMqvNA.js                 166.42 kB │ gzip:  41.36 kB
+apps/mission-control-ui build: dist/assets/HarnessSection-C00taMVd.js             222.90 kB │ gzip:  55.96 kB
+apps/mission-control-ui build: dist/assets/vendor-charts-D21FeXyo.js              321.47 kB │ gzip:  81.33 kB
+apps/mission-control-ui build: dist/assets/KnowledgeSection-Db53MhjR.js           402.46 kB │ gzip: 114.16 kB
+apps/mission-control-ui build: dist/assets/PlatformSection-BEOuT0s9.js            464.71 kB │ gzip: 110.13 kB
+apps/mission-control-ui build: dist/assets/vendor-usaifpO0.js                     491.50 kB │ gzip: 156.81 kB
+apps/mission-control-ui build: ✓ built in 3.75s
+apps/mission-control-ui build: Done
+packages/policy-engine build$ tsc
+packages/model-router build$ tsc
+packages/meetings build$ tsc
+packages/state-machine build$ tsc
+packages/state-machine build: Done
+packages/telegraph build$ tsc
+packages/policy-engine build: Done
+packages/meetings build: Done
+packages/model-router build: Done
+packages/telegraph build: Done
+packages/coordinator build$ tsc
+packages/telegram-bot build$ tsc
+packages/workflow-engine build$ tsc
+packages/coordinator build: Done
+packages/workflow-engine build: Done
+packages/telegram-bot build: Done
+apps/workflow-executor build$ tsc
+packages/cli build$ tsc
+packages/context-router build$ tsc
+packages/memory build$ tsc
+apps/workflow-executor build: Done
+packages/cli build: Done
+packages/memory build: Done
+packages/context-router build: Done
+packages/agent-runtime build$ tsc
+packages/agent-runtime build: Done
+apps/orchestration-server build$ tsc
+apps/orchestration-server build: Done
+
+=== orchestration startup smoke ===
+
+> mission-control@0.9.0 smoke:orchestration-start /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm run ci:prepare && pnpm --filter @mission-control/orchestration-server build && pnpm --filter @mission-control/orchestration-server smoke:start
+
+
+> mission-control@0.9.0 ci:prepare /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm --filter @mission-control/shared build && pnpm --filter @mission-control/state-machine build && pnpm --filter @mission-control/policy-engine build && pnpm --filter @mission-control/workflow-engine build && pnpm --filter @mission-control/coordinator build && pnpm --filter @mission-control/context-router build && pnpm --filter @mission-control/model-router build && pnpm --filter @mission-control/memory build && pnpm --filter @mission-control/context-tools build && pnpm --filter @mission-control/agent-runtime build && pnpm --filter @mission-control/telegraph build && pnpm --filter @mission-control/meetings build && pnpm --filter @mission-control/research-adapters build
+
+
+> @mission-control/shared@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/shared
+> tsc
+
+
+> @mission-control/state-machine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/state-machine
+> tsc
+
+
+> @mission-control/policy-engine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/policy-engine
+> tsc
+
+
+> @mission-control/workflow-engine@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/workflow-engine
+> tsc
+
+
+> @mission-control/coordinator@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/coordinator
+> tsc
+
+
+> @mission-control/context-router@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/context-router
+> tsc
+
+
+> @mission-control/model-router@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/model-router
+> tsc
+
+
+> @mission-control/memory@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/memory
+> tsc
+
+
+> @mission-control/context-tools@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/context-tools
+> tsc
+
+
+> @mission-control/agent-runtime@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/agent-runtime
+> tsc
+
+
+> @mission-control/telegraph@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/telegraph
+> tsc
+
+
+> @mission-control/meetings@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/meetings
+> tsc
+
+
+> @mission-control/research-adapters@0.1.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/packages/research-adapters
+> tsc
+
+
+> @mission-control/orchestration-server@0.9.0 build /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/apps/orchestration-server
+> tsc
+
+
+> @mission-control/orchestration-server@0.9.0 smoke:start /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/apps/orchestration-server
+> node ../../scripts/smoke-orchestration-start.mjs
+
+Built orchestration artifact loaded successfully under Node ESM.
+
+=== git whitespace integrity ===

@@ -38,7 +38,7 @@ export interface SandboxResultBundle {
     };
   };
   environment: {
-    provider: "EXE_DEV" | "FAKE";
+    provider: "EXE_DEV" | "FAKE" | "DOCKER";
     image: string;
   };
   startedAt: number;
@@ -223,7 +223,7 @@ function assertBundleShape(candidate: any): SandboxResultBundle {
       || typeof candidate.harness?.providerRoute !== "string"
       || !boundedLowercaseIdentity(candidate.harness.providerRoute, 100)
       || !validReasoningConfig(candidate.harness?.reasoningConfig)))
-    || !["EXE_DEV", "FAKE"].includes(candidate.environment?.provider) || typeof candidate.environment?.image !== "string" || !candidate.environment.image
+    || !["EXE_DEV", "FAKE", "DOCKER"].includes(candidate.environment?.provider) || typeof candidate.environment?.image !== "string" || !candidate.environment.image
     || !Number.isFinite(candidate.startedAt) || !Number.isFinite(candidate.finishedAt) || candidate.finishedAt < candidate.startedAt
     || !["COMPLETED", "FAILED", "CANCELED", "TIMED_OUT"].includes(candidate.status)
     || !["OUTPUT_FILE", "EXECUTOR_STDOUT", "CODEX_JSONL_RECONSTRUCTION", "NONE"].includes(candidate.resultProvenance?.source)

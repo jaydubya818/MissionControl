@@ -1,0 +1,144 @@
+[
+  {
+    "role": "implementation",
+    "base": "9a80cf3c5cc229bb4a552a9f08ddda5841e70a38",
+    "path": "/tmp/fdlc-pilot-preflight-20260905/implementation",
+    "steps": [
+      {
+        "command": [
+          "git",
+          "worktree",
+          "add",
+          "--detach",
+          "/tmp/fdlc-pilot-preflight-20260905/implementation",
+          "9a80cf3c5cc229bb4a552a9f08ddda5841e70a38"
+        ],
+        "exitCode": 0,
+        "seconds": 1.61
+      },
+      {
+        "command": [
+          "pnpm",
+          "install",
+          "--frozen-lockfile",
+          "--offline",
+          "--ignore-scripts"
+        ],
+        "exitCode": 0,
+        "seconds": 7.2
+      },
+      {
+        "command": [
+          "pnpm",
+          "run",
+          "ci:prepare"
+        ],
+        "exitCode": 0,
+        "seconds": 11.08
+      },
+      {
+        "command": [
+          "pnpm",
+          "exec",
+          "tsc",
+          "--noEmit",
+          "-p",
+          "convex/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "seconds": 8.28
+      },
+      {
+        "command": [
+          "git",
+          "status",
+          "--porcelain"
+        ],
+        "exitCode": 0,
+        "seconds": 0.44
+      },
+      {
+        "command": [
+          "git",
+          "worktree",
+          "remove",
+          "--force",
+          "/tmp/fdlc-pilot-preflight-20260905/implementation"
+        ],
+        "exitCode": 0
+      }
+    ],
+    "removed": true
+  },
+  {
+    "role": "verifier",
+    "base": "9a80cf3c5cc229bb4a552a9f08ddda5841e70a38",
+    "path": "/tmp/fdlc-pilot-preflight-20260905/verifier",
+    "steps": [
+      {
+        "command": [
+          "git",
+          "worktree",
+          "add",
+          "--detach",
+          "/tmp/fdlc-pilot-preflight-20260905/verifier",
+          "9a80cf3c5cc229bb4a552a9f08ddda5841e70a38"
+        ],
+        "exitCode": 0,
+        "seconds": 1.29
+      },
+      {
+        "command": [
+          "pnpm",
+          "install",
+          "--frozen-lockfile",
+          "--offline",
+          "--ignore-scripts"
+        ],
+        "exitCode": 0,
+        "seconds": 7.71
+      },
+      {
+        "command": [
+          "pnpm",
+          "run",
+          "ci:prepare"
+        ],
+        "exitCode": 0,
+        "seconds": 10.69
+      },
+      {
+        "command": [
+          "pnpm",
+          "exec",
+          "tsc",
+          "--noEmit",
+          "-p",
+          "convex/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "seconds": 8.4
+      },
+      {
+        "command": [
+          "git",
+          "status",
+          "--porcelain"
+        ],
+        "exitCode": 0,
+        "seconds": 0.49
+      },
+      {
+        "command": [
+          "git",
+          "worktree",
+          "remove",
+          "--force",
+          "/tmp/fdlc-pilot-preflight-20260905/verifier"
+        ],
+        "exitCode": 0
+      }
+    ],
+    "removed": true
+  }
+]

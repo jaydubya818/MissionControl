@@ -109,7 +109,7 @@ const REMOTE_OPENROUTER_CONFIG_OVERRIDES = [
   'model_providers.mission-control-openrouter.wire_api="responses"',
   "model_providers.mission-control-openrouter.supports_websockets=false",
 ] as const;
-const FACTORY_RESULT_SCHEMA = {
+export const FACTORY_RESULT_SCHEMA = {
   type: "object",
   additionalProperties: false,
   required: ["schema", "status", "summary", "completedAcceptanceCriterionIds", "incompleteAcceptanceCriterionIds", "unknownAcceptanceCriterionIds", "verificationCommands", "knownRisks", "nextAction"],
@@ -789,7 +789,7 @@ async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<Proc
 export function codexChildEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const allowed = ["PATH", "HOME", "TMPDIR", "USER", "SHELL", "TERM", "LANG", "LC_ALL", "CODEX_HOME"];
   return {
-    ...Object.fromEntries(allowed.flatMap((name) => env[name] ? [[name, env[name]]] : [])),
+    ...Object.fromEntries(allowed.flatMap((name) =>  ( env[name] ? [[name, env[name]]] : [] ) )),
     CI: "true",
     GIT_TERMINAL_PROMPT: "0",
     GCM_INTERACTIVE: "never",

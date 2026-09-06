@@ -213,9 +213,11 @@ const v3ExecutionProfileValid = (manifest, profileAdmittedAt) => {
       profile.executionBackend,
       profile.sandboxProfile.profileSnapshot,
     ))) return false;
-  const sandboxImageDigest = profile.sandboxProfile.profileSnapshot?.security?.image?.digest;
   const sandboxReferenceDigest = typeof profile.sandboxProfile.profileSnapshot?.machine?.image === "string"
     ? profile.sandboxProfile.profileSnapshot.machine.image.match(/@(sha256:[a-f0-9]{64})$/)?.[1] : undefined;
+  const dockerProfile = profile.sandboxProfile.profileSnapshot?.provider === "DOCKER";
+  if (dockerProfile && profile.sandboxProfile.profileSnapshot.security !== undefined) return false;
+  const sandboxImageDigest = dockerProfile ? sandboxReferenceDigest : profile.sandboxProfile.profileSnapshot?.security?.image?.digest;
   if (!sha256(sandboxImageDigest) || sandboxImageDigest !== sandboxReferenceDigest
     || profile.runtimeArtifact.snapshot?.kind !== "CONTAINER_IMAGE"
     || profile.runtimeArtifact.snapshot?.executableSha256 !== null
@@ -510,8 +512,11 @@ const decomposedBindingsValid = !decomposed || (
   && config.executor?.model === modelId
   && config.executor?.modelRouteDigest === modelRouteDigest
   && config.executor?.providerRoute === providerRoute
-  && providerRoute === "openrouter"
-  && config.environment?.OPENAI_BASE_URL === "https://openrouter.ai/api/v1"
+  && (manifest.harness.adapter === "codex" && manifest.harness.version === "bedrock-v1"
+    ? v3 && modelProvider === "aws-bedrock" && modelId === "anthropic.claude-sonnet-4-6"
+      && /^bedrock-us:[a-f0-9]{64}$/.test(providerRoute) && Object.keys(config.environment ?? {}).length === 0
+      && manifest.sandbox?.profileSnapshot?.provider === "DOCKER" && manifest.retryPolicy?.maxAttempts === 1
+    : providerRoute === "openrouter" && config.environment?.OPENAI_BASE_URL === "https://openrouter.ai/api/v1")
   && canonical(config.executor?.reasoningConfig ?? null) === canonical(reasoningConfig ?? null)
   && qualification.authority?.executionOnly === true
   && qualification.authority?.routing === false

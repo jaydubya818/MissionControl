@@ -66,7 +66,7 @@ function reservationFixture() {
     get: async (id: string) => records.get(id) ?? null,
     query: (table: string) => {
       const predicates: Array<[string, unknown]> = [];
-      const selected = () => (table === "modelCatalog" ? catalog : rows)
+      const selected = () => (table === "modelCatalog" ? catalog : table === "factoryProviderReservations" ? [] : rows)
         .filter(row => predicates.every(([key, value]) => row[key] === value));
       const index = { eq: (key: string, value: unknown) => { predicates.push([key, value]); return index; } };
       const query = {
@@ -236,4 +236,12 @@ describe("worst-case reservation and comparison controls", () => {
       blockers: expect.arrayContaining(["ROUTE_NOT_QUALIFIED_BY_ECONOMICS", "ACCEPTED_OUTCOME_COST_UNKNOWN"]),
     });
   });
+});
+
+it("allows disabled optional token dimensions without weakening positive dispatch ceilings", () => {
+  const priceBook = inferencePriceBook({ priceBookId: "pb", version: 1, currency: "USD", source: { kind: "OPERATOR_APPROVED", reference: "fixture", digest: sha("a") }, effectiveFrom: 1, rates: [{ routeDigest: sha("b"), inputMicrousdPerMillionTokens: 1000, outputMicrousdPerMillionTokens: 1000 }] });
+  const input = { reservationId: "r", projectId: "p", workOrderId: "w", taskId: "t", attemptId: "a", logicalRequestKey: "p:a:s:1", executionProfileId: "ep", executionProfileDigest: sha("c"), primaryRoute: { provider: "fixture", providerRoute: "fixture", modelId: "m", routeDigest: sha("b"), adapter: "fixture", adapterVersion: "1", endpoint: "https://example.invalid" }, allowedFallbacks: [], maxPhysicalCalls: 1, maxInputTokens: 10, maxOutputTokens: 10, maxCacheReadTokens: 0, maxCacheWriteTokens: 0, maxReasoningTokens: 0, maxCostMicrousd: 2, currency: "USD" as const, deadlineAt: 3, priceBookId: "pb", priceBookDigest: priceBook.digest, policyDigest: sha("d"), leaseId: "l", leaseExpiresAt: 2, createdAt: 1 };
+  expect(inferenceReservation(input, priceBook).maxReasoningTokens).toBe(0);
+  for (const field of ["maxCacheReadTokens", "maxCacheWriteTokens", "maxReasoningTokens"]) expect(() => inferenceReservation({ ...input, [field]: -1 }, priceBook)).toThrow(/non-negative/);
+  for (const field of ["maxPhysicalCalls", "maxInputTokens", "maxOutputTokens", "maxCostMicrousd"]) expect(() => inferenceReservation({ ...input, [field]: 0 }, priceBook)).toThrow(/positive/);
 });

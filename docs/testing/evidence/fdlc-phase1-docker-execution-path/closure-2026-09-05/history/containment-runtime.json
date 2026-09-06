@@ -1,0 +1,122 @@
+{
+  "schema": "factory-docker-probes/v1",
+  "runtime": {
+    "platform": "linux",
+    "architecture": "x64",
+    "node": "v26.7.0",
+    "codexSha256": "2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04",
+    "deterministicSandbox": {
+      "status": 1,
+      "signal": null,
+      "markerObserved": false,
+      "stderr": "bwrap: No permissions to create a new namespace, likely because the kernel does not allow non-privileged user namespaces. On e.g. debian this can be enabled with 'sysctl kernel.unprivileged_userns_clone=1'.\n",
+      "errorCode": null
+    }
+  },
+  "checks": [
+    {
+      "name": "workspace_write_read",
+      "passed": true
+    },
+    {
+      "name": "private_temp",
+      "passed": true
+    },
+    {
+      "name": "nonroot",
+      "passed": true
+    },
+    {
+      "name": "runtime_available",
+      "passed": true
+    },
+    {
+      "name": "native_runtime_readonly",
+      "passed": true
+    },
+    {
+      "name": "privilege_escalation_denied",
+      "passed": true
+    },
+    {
+      "name": "runtime_readonly",
+      "passed": true
+    },
+    {
+      "name": "root_readonly",
+      "passed": true
+    },
+    {
+      "name": "absent:/Users/jaywest",
+      "passed": true
+    },
+    {
+      "name": "absent:/host",
+      "passed": true
+    },
+    {
+      "name": "absent:/host/etc",
+      "passed": true
+    },
+    {
+      "name": "absent:/var/run/docker.sock",
+      "passed": true
+    },
+    {
+      "name": "absent:/run/docker.sock",
+      "passed": true
+    },
+    {
+      "name": "absent:/Users/jaywest/.codex/auth.json",
+      "passed": true
+    },
+    {
+      "name": "absent:/Users/jaywest/MissionControl",
+      "passed": true
+    },
+    {
+      "name": "absent:/private/tmp",
+      "passed": true
+    },
+    {
+      "name": "no_credentials_env",
+      "passed": true
+    },
+    {
+      "name": "no_new_privileges",
+      "passed": true
+    },
+    {
+      "name": "capabilities_dropped",
+      "passed": true
+    },
+    {
+      "name": "seccomp_filter",
+      "passed": true
+    },
+    {
+      "name": "network_denied:public",
+      "passed": true
+    },
+    {
+      "name": "network_denied:localhost",
+      "passed": true
+    },
+    {
+      "name": "network_denied:metadata",
+      "passed": true
+    },
+    {
+      "name": "network_denied:private",
+      "passed": true
+    },
+    {
+      "name": "network_denied:hostGateway",
+      "passed": true
+    },
+    {
+      "name": "network_denied:alternateProvider",
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "apps/orchestration-server/src/dockerSandboxProvider.ts": "6aa3c2f4c5bb4326a78a7be3ff44b586206659f71cfa6ee6d95e9e44b699f180",
+  "apps/orchestration-server/src/remoteSandboxRuntime.ts": "66f805d431efb1fe4ce07cca74b70e0fa6e00ab7fb24066ec5bffb6b3c5e5f4a",
+  "apps/orchestration-server/src/factoryAttemptWorker.ts": "6bcf7e273dc235ff616fa6b0a29c985b4f3fd9764195fdef2aeeb7628c9b3d57",
+  "convex/factory/providerLiability.ts": "2a49a7547573d49384ad35e5a7f7f9542b532483ff8296e1f886f5ff50f1f3d4",
+  "convex/lib/providerLiability.ts": "d0d907c28b68b18cf51fb342a864a56b8df9bde5189ce398ed98920230d7a1d9",
+  "convex/lib/providerLiabilityValidators.ts": "132472c0879abc821b49258598a34879ade8e5ba18c9de5c884d15110034c060",
+  "convex/schema.ts": "81055a97c1f09ff5739588aa4722b4de45ceec2372bef5996c2b3a5b3a4da796",
+  "convex/serviceCommands.ts": "584ecd39fc8ba15a2c4fa608c80fcad56a66a9eec39e31f3db9098bed873d102",
+  "convex/_generated/api.d.ts": "6ae753d66e2b08b5f5fea20c2fe3b005dbb123f099b102c493973c7717fb27d4",
+  "convex/lib/runtimeContract.ts": "1e7dcb70d7de85f37c66c58679d219d91b60c70332fdd4d17fed76ff071dceb8",
+  "infra/docker-factory/Dockerfile": "70f0f8aeb28d0ec4c74f92e7170448c38b6f4bbeb0653d7f89790be0ddbdb806",
+  "infra/docker-factory/bridge.mjs": "497e291d5c93763c25e116bddac6f45c66cb32c432f3bd94e445e3d8bc4e7315",
+  "infra/docker-factory/supervisor.mjs": "bd7790f0bf67b21ca512b4f15df4c02e8d286446cff5287ea6c0affd30ee4b08",
+  "infra/docker-factory/qualification.mjs": "57d5b3f56eebb8bf30922cbe43eb059946f1c583b1d59c6728a6e814186cb3d6",
+  "infra/docker-factory/runtime-fixture.mjs": "bb37d37276e1f83ee307303363d07a2477a706591464dc62bf7f36bd4bffcc6b"
+}

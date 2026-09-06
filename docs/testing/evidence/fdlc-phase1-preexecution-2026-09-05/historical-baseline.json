@@ -1,0 +1,40 @@
+{
+  "classification": "HISTORICAL",
+  "metric": "PR open-to-merge wall time, not active human effort or end-to-end cycle time",
+  "selection": "docs-prefixed PRs among latest 15 merged PRs returned by GitHub; mixed documentation sizes",
+  "samples": [
+    {
+      "createdAt": "2026-09-02T23:45:51Z",
+      "mergedAt": "2026-09-02T23:54:39Z",
+      "number": 159,
+      "title": "docs: archive legacy root reports",
+      "url": "https://github.com/jaydubya818/MissionControl/pull/159",
+      "openToMergeMinutes": 8.8
+    },
+    {
+      "createdAt": "2026-09-01T12:03:55Z",
+      "mergedAt": "2026-09-04T03:31:39Z",
+      "number": 155,
+      "title": "docs: add security policy",
+      "url": "https://github.com/jaydubya818/MissionControl/pull/155",
+      "openToMergeMinutes": 3807.73
+    },
+    {
+      "createdAt": "2026-08-31T04:48:51Z",
+      "mergedAt": "2026-09-02T23:03:31Z",
+      "number": 152,
+      "title": "docs: document local env setup",
+      "url": "https://github.com/jaydubya818/MissionControl/pull/152",
+      "openToMergeMinutes": 3974.67
+    },
+    {
+      "createdAt": "2026-08-30T21:36:58Z",
+      "mergedAt": "2026-08-30T21:37:56Z",
+      "number": 151,
+      "title": "docs: expand README into a complete product overview",
+      "url": "https://github.com/jaydubya818/MissionControl/pull/151",
+      "openToMergeMinutes": 0.97
+    }
+  ],
+  "medianMinutes": 1908.265
+}

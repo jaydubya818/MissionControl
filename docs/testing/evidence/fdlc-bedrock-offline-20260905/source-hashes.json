@@ -1,0 +1,17 @@
+{
+  "apps/orchestration-server/src/__tests__/bedrockAdapter.test.ts": "9cd74624c475eaa44380f25d6dcb1dd09895842e29be1e062152d562a9acd728",
+  "apps/orchestration-server/src/bedrockAdapter.ts": "43615e075a0ccd249c752426612b45ec9d678f974571a8c218f2eb5f63ca9695",
+  "apps/orchestration-server/src/bedrockBudgetAdapter.ts": "7894c9da4d5216531f0bf529575ef93719e505ccdbd2628bb7676153c9f2aefe",
+  "apps/orchestration-server/src/bedrockIam.ts": "375df72cd87c2872e796c1f4ae335ed2e3e67c602e53ed168da4c2f5a1e34a83",
+  "apps/orchestration-server/src/bedrockPricing.ts": "a9a4db1b84242c30bd9070dc6b9374a451fa5e4d352ccae2016eddaf92c12c2c",
+  "apps/orchestration-server/src/bedrockRoute.ts": "e1a81c9ca0eda049a4cc7f3af9df435c013cd86e358b7f6917fedc6b386841ec",
+  "convex/__tests__/pilotLiabilityAllocation.test.ts": "7cb32f4930ed9eccede8a24c50a957eb041d5abe190851dbe57ab00e125becbd",
+  "convex/lib/pilotLiabilityAllocation.ts": "d831baba6d500007f993fda8ed76146204713bb33889567d0e44cf19b40cac52",
+  "convex/lib/providerLiability.ts": "21afa0b0d45c9b0659f9ae1ad25e29845a56435c42d2a1cacd3c87c094cc777c",
+  "convex/lib/providerLiabilityValidators.ts": "b279a1250e7f7f9f4e77b8abc7d1440ef181fa226ac9a40a103d1242dbccaaef",
+  "scripts/check-fdlc-bedrock-prerequisites.mjs": "558c3abb9f2b9f9e349989aabd491412d126f54654b40295a5d92966d4077aa3",
+  "scripts/fdlc-bedrock-resumption.mts": "cfa4d43e93be05c42f537b04d66a97f6211169db4df72d0473ff5ec1b77e7857",
+  "scripts/lib/fdlc-bedrock-prerequisites.mjs": "c69c0509a13bd424bf521728f2dc9df7a15788df372c2200575be36f6f3451f2",
+  "scripts/lib/fdlc-bedrock-prerequisites.test.mjs": "27c75237d296c1b75c929630d5cb954093fa61c634391f462d0461903cb930d9",
+  "scripts/lib/fdlc-bedrock-resumption.test.mjs": "2087a056b628cbc1bfccf80c918c786e9c41ae59a31cc17d7c3819c895cd3c83"
+}

@@ -28,7 +28,7 @@ adds explicit eval/fan-out proof and conditional scale requirements. Its phase
 numbers differ from the production convergence plan: inference is Phase 4 there
 and Phase 5 in the execution authorization. Use the capability and todo identity
 to resolve this numbering difference. The master authorization supersedes older
-phase-by-phase stopping instructions; it does not supply missing pilot owners.
+phase-by-phase stopping instructions; it does not combine pilot trust gates. The later Phase 1 owner record names FDLC / Mission Control and Jarrett West; live identity, route, budget and execution qualification remain open.
 
 ## Dependency graph derived from current records
 

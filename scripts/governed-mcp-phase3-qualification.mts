@@ -1,3 +1,4 @@
+import { RUNTIME_CONTRACT_VERSION } from "../convex/lib/runtimeContract.ts";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -66,7 +67,7 @@ const evidence = {
   schema: "governed-mcp-phase3-broker-scenario/v1", generatedAt: new Date().toISOString(),
   evidenceClassification: "LOCAL_BROKER_SCENARIO_NOT_CONTROL_PLANE_PERSISTENCE",
   implementationSha,
-  baseline, runtimeContractVersion: 41, admission: "QUALIFICATION_FIXTURE", realServiceAdmitted: false,
+  baseline, historicalPhase3ContractVersion: 41, runtimeContractVersion: RUNTIME_CONTRACT_VERSION, admission: "QUALIFICATION_FIXTURE", realServiceAdmitted: false,
   transport: "STDIO", protocolVersion: tool.protocolVersion, sdk: tool.sdk,
   toolVersion: { id: request.toolVersionId, digest: toolDigest, snapshot: tool },
   toolGrant: { id: request.toolGrantId, digest: grantDigest, snapshot: grant },

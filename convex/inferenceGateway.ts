@@ -1,4 +1,5 @@
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
+import type { MutationCtx } from "./_generated/server";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
 import {
@@ -150,6 +151,24 @@ export const activatePriceBook = mutation({
   },
 });
 
+export function assertCumulativeInferenceBudget(workOrderReservations: readonly Doc<"inferenceReservations">[], projectId: Id<"projects">, maximumMicrousd: number, approvedMicrousd: number) {
+  if (!Number.isSafeInteger(maximumMicrousd) || maximumMicrousd <= 0 || !Number.isSafeInteger(approvedMicrousd) || approvedMicrousd <= 0) throw new Error("Inference allocation money ceiling is invalid.");
+    let allocatedMicrousd = 0n;
+    for (const prior of workOrderReservations) {
+      if (prior.projectId !== projectId || !Number.isSafeInteger(prior.maxCostMicrousd)
+        || prior.maxCostMicrousd <= 0
+        || recordValue(prior.immutableSnapshot).maxCostMicrousd !== prior.maxCostMicrousd) {
+        throw new Error("Existing WorkOrder inference allocation is invalid; reconcile its authority before reserving more.");
+      }
+      allocatedMicrousd += BigInt(prior.maxCostMicrousd);
+    }
+    // Keep every allocation until an explicit settlement contract proves release.
+    // The indexed read and insert share one Convex transaction, including retries.
+    if (allocatedMicrousd + BigInt(maximumMicrousd) > BigInt(approvedMicrousd)) {
+      throw new Error("Aggregate inference reservations exceed the approved WorkOrder cost ceiling.");
+    }
+}
+
 export const createReservation = mutation({
   args: {
     projectId: v.id("projects"), workOrderId: v.id("workOrders"), taskId: v.id("tasks"),
@@ -165,6 +184,8 @@ export const createReservation = mutation({
   handler: async (ctx, args) => {
     if (!gatewayAdmissionEnabled()) throw new Error("GOVERNED_INFERENCE_GATEWAY_DISABLED");
     const access = await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    const aggregate = await ctx.db.query("factoryProviderReservations").withIndex("by_work_order", q => q.eq("workOrderId", args.workOrderId)).first();
+    if (aggregate) throw new Error("WorkOrder aggregate liability requires the composed admission path.");
     const [workOrder, task, run, profile, priceBook, routeCatalog] = await Promise.all([
       ctx.db.get(args.workOrderId), ctx.db.get(args.taskId), ctx.db.get(args.workflowRunId),
       ctx.db.get(args.executionProfileId), ctx.db.get(args.priceBookId),
@@ -238,20 +259,7 @@ export const createReservation = mutation({
     if (logicalReservation) throw new Error("Logical inference request already has an immutable reservation.");
     const workOrderReservations = await ctx.db.query("inferenceReservations")
       .withIndex("by_work_order", (q) => q.eq("workOrderId", args.workOrderId)).collect();
-    let allocatedMicrousd = 0n;
-    for (const prior of workOrderReservations) {
-      if (prior.projectId !== args.projectId || !Number.isSafeInteger(prior.maxCostMicrousd)
-        || prior.maxCostMicrousd <= 0
-        || recordValue(prior.immutableSnapshot).maxCostMicrousd !== prior.maxCostMicrousd) {
-        throw new Error("Existing WorkOrder inference allocation is invalid; reconcile its authority before reserving more.");
-      }
-      allocatedMicrousd += BigInt(prior.maxCostMicrousd);
-    }
-    // Keep every allocation until an explicit settlement contract proves release.
-    // The indexed read and insert share one Convex transaction, including retries.
-    if (allocatedMicrousd + BigInt(args.maxCostMicrousd) > BigInt(approvedMaxCostMicrousd)) {
-      throw new Error("Aggregate inference reservations exceed the approved WorkOrder cost ceiling.");
-    }
+    assertCumulativeInferenceBudget(workOrderReservations, args.projectId, args.maxCostMicrousd, approvedMaxCostMicrousd);
     const id = await ctx.db.insert("inferenceReservations", {
       tenantId: access.project.tenantId, projectId: args.projectId, workOrderId: args.workOrderId,
       taskId: args.taskId, workflowRunId: args.workflowRunId, executionProfileId: args.executionProfileId,
@@ -270,14 +278,14 @@ export const createReservation = mutation({
   },
 });
 
-export const persistIntentInternal = internalMutation({
-  args: {
+const persistIntentTransactionArgs = v.object({
     workflowRunId: v.id("workflowRuns"),
     reservationId: v.id("inferenceReservations"), logicalRequestKey: v.string(), physicalOrdinal: v.number(),
     retryOfIntentId: v.optional(v.id("inferencePhysicalIntents")),
     route: routeValidator, requestDigest: v.string(), intentKey: v.string(),
-  },
-  handler: async (ctx, args) => {
+  });
+
+export async function persistIntentInTransaction(ctx: MutationCtx, args: Infer<typeof persistIntentTransactionArgs>) {
     const reservation = await ctx.db.get(args.reservationId);
     if (!reservation || reservation.workflowRunId !== args.workflowRunId || reservation.state !== "ACTIVE") {
       throw new Error("Inference reservation is unavailable, unscoped, or inactive.");
@@ -337,15 +345,19 @@ export const persistIntentInternal = internalMutation({
       intentDigest: snapshot.digest, state: "PERSISTED", createdAt: snapshot.createdAt,
     });
     return { intentId: id, state: "PERSISTED" as const, created: true as const };
-  },
+}
+
+export const persistIntentInternal = internalMutation({
+  args: persistIntentTransactionArgs.fields,
+  handler: persistIntentInTransaction,
 });
 
-export const claimIntentInternal = internalMutation({
-  args: {
+const claimIntentTransactionArgs = v.object({
     workflowRunId: v.id("workflowRuns"), intentId: v.id("inferencePhysicalIntents"),
     leaseId: v.string(), claimId: v.string(), cancelRequested: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
+  });
+
+export async function claimIntentInTransaction(ctx: MutationCtx, args: Infer<typeof claimIntentTransactionArgs>) {
     const intent = await ctx.db.get(args.intentId);
     if (!intent || intent.workflowRunId !== args.workflowRunId) throw new Error("Physical inference intent is unavailable or unscoped.");
     const [reservation, run] = await Promise.all([ctx.db.get(intent.reservationId), ctx.db.get(intent.workflowRunId)]);
@@ -369,11 +381,14 @@ export const claimIntentInternal = internalMutation({
     if (claimConflict) throw new Error("Physical inference claim ID was replayed.");
     await ctx.db.patch(intent._id, { state: "CLAIMED", claimId, claimedAt: Date.now() });
     return { claimed: true as const, intentId: intent._id, reservationDigest: reservation.reservationDigest };
-  },
+}
+
+export const claimIntentInternal = internalMutation({
+  args: claimIntentTransactionArgs.fields,
+  handler: claimIntentInTransaction,
 });
 
-export const appendReceiptInternal = internalMutation({
-  args: {
+const appendReceiptTransactionArgs = v.object({
     workflowRunId: v.id("workflowRuns"),
     intentId: v.id("inferencePhysicalIntents"), resolvedProvider: v.optional(v.string()),
     resolvedModelId: v.optional(v.string()), providerRequestId: v.optional(v.string()),
@@ -382,8 +397,22 @@ export const appendReceiptInternal = internalMutation({
     status: v.union(v.literal("SUCCEEDED"), v.literal("FAILED"), v.literal("CANCELLED"), v.literal("TIMED_OUT"), v.literal("UNKNOWN")),
     usage: usageValidator, responseDigest: v.optional(v.string()), failureCode: v.optional(v.string()),
     startedAt: v.number(), completedAt: v.number(), batch: v.optional(v.boolean()), serviceTier: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
+  });
+
+async function assertCanonicalProviderRequestOwnership(ctx: MutationCtx, projectId: Id<"projects">, provider: string, providerRequestId: string, ownerReceiptId?: Id<"inferencePhysicalReceipts">) {
+  const [receipts, corrections] = await Promise.all([
+    ctx.db.query("inferencePhysicalReceipts").withIndex("by_provider_request", q => q.eq("projectId", projectId).eq("providerRequestId", providerRequestId)).collect(),
+    ctx.db.query("inferenceReconciliations").withIndex("by_provider_request", q => q.eq("projectId", projectId).eq("providerRequestId", providerRequestId)).collect(),
+  ]);
+  if (receipts.some(receipt => receipt._id !== ownerReceiptId && (receipt.resolvedProvider ?? receipt.route.provider) === provider)) throw new Error("Canonical provider request belongs to another receipt.");
+  for (const correction of corrections) {
+    if (correction.receiptId === ownerReceiptId) continue;
+    const owner = await ctx.db.get(correction.receiptId);
+    if (!owner || (owner.resolvedProvider ?? owner.route.provider) === provider) throw new Error("Canonical provider request belongs to another reconciliation.");
+  }
+}
+
+export async function appendReceiptInTransaction(ctx: MutationCtx, args: Infer<typeof appendReceiptTransactionArgs>) {
     const intent = await ctx.db.get(args.intentId);
     if (!intent || intent.workflowRunId !== args.workflowRunId) throw new Error("Physical inference intent is unavailable or unscoped.");
     const resolvedProvider = optionalBounded(args.resolvedProvider, 100, "Resolved provider");
@@ -438,6 +467,7 @@ export const appendReceiptInternal = internalMutation({
       startedAt: args.startedAt, completedAt: args.completedAt, batch: args.batch, serviceTier: args.serviceTier,
     });
     if (providerRequestId) {
+      await assertCanonicalProviderRequestOwnership(ctx, reservation.projectId, intent.route.provider, providerRequestId);
       const duplicateProviderRequest = await ctx.db.query("inferencePhysicalReceipts")
         .withIndex("by_provider_request", (q) => q.eq("projectId", reservation.projectId).eq("providerRequestId", providerRequestId)).first();
       if (duplicateProviderRequest) throw new Error("Provider response/request ID replay detected.");
@@ -475,27 +505,33 @@ export const appendReceiptInternal = internalMutation({
     await ctx.db.patch(intent._id, { state: args.delivery === "UNKNOWN" ? "AMBIGUOUS" : "RECEIPTED" });
     if (intent.physicalOrdinal >= reservation.maxPhysicalCalls) await ctx.db.patch(reservation._id, { state: "EXHAUSTED" });
     return { receiptId: id, receiptDigest: snapshot.receiptDigest, created: true as const };
-  },
+}
+
+export const appendReceiptInternal = internalMutation({
+  args: appendReceiptTransactionArgs.fields,
+  handler: appendReceiptInTransaction,
 });
 
-export const appendReconciliationInternal = internalMutation({
-  args: {
+const appendReconciliationTransactionArgs = v.object({
     workflowRunId: v.id("workflowRuns"),
     receiptId: v.id("inferencePhysicalReceipts"), providerEventId: v.string(), providerRequestId: v.string(),
     providerBillingId: v.optional(v.string()), observedUsage: v.optional(usageValidator),
     observedCostMicrousd: v.optional(v.number()), completeness: completenessValidator, sourceDigest: v.string(),
     reconciledBy: v.string(),
-  },
-  handler: async (ctx, args) => {
+  });
+
+export async function appendReconciliationInTransaction(ctx: MutationCtx, args: Infer<typeof appendReconciliationTransactionArgs>, options?: { allowPreviouslyUnknownRequest: boolean }) {
     const providerEventId = bounded(args.providerEventId, 300, "Provider event ID");
     const providerRequestId = bounded(args.providerRequestId, 300, "Provider request ID");
     const providerBillingId = optionalBounded(args.providerBillingId, 300, "Provider billing ID");
     const reconciledBy = bounded(args.reconciledBy, 200, "Reconciliation service identity");
     const receipt = await ctx.db.get(args.receiptId);
     if (!receipt || receipt.workflowRunId !== args.workflowRunId
-      || !receipt.providerRequestId || receipt.providerRequestId !== providerRequestId) {
+      || (receipt.providerRequestId ? receipt.providerRequestId !== providerRequestId
+        : !(options?.allowPreviouslyUnknownRequest && receipt.delivery === "UNKNOWN"))) {
       throw new Error("Reconciliation provider request identity does not match a receipt.");
     }
+    await assertCanonicalProviderRequestOwnership(ctx, receipt.projectId, receipt.resolvedProvider ?? receipt.route.provider, providerRequestId, receipt._id);
     if (args.observedCostMicrousd !== undefined && (!Number.isSafeInteger(args.observedCostMicrousd) || args.observedCostMicrousd < 0)) {
       throw new Error("Reconciliation cost is invalid.");
     }
@@ -521,7 +557,11 @@ export const appendReconciliationInternal = internalMutation({
       reconciledBy, reconciledAt: Date.now(),
     });
     return { reconciliationId: id, created: true as const };
-  },
+}
+
+export const appendReconciliationInternal = internalMutation({
+  args: appendReconciliationTransactionArgs.fields,
+  handler: appendReconciliationInTransaction,
 });
 
 export const recordOutcomeEvent = mutation({

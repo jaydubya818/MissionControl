@@ -1,0 +1,58 @@
+{
+  "state": "QUALIFICATION_AWS_IDENTITY_REQUIRED + ARCHITECTURAL_DECISION_REQUIRED",
+  "previousBaselineSha": "0d1a0908cce380d815069ce0a59e1604d2f26ece",
+  "initialMainSha": "ed77c46c9d975a2ed0c666cdaf0a3f0e12e77d4d",
+  "currentMainSha": "eb438f5fd14add2822392858852051dea27d6fd1",
+  "mergeBase": "eb438f5fd14add2822392858852051dea27d6fd1",
+  "mainAdvancedCommits": 3,
+  "implementationCandidateSha": "7f7282ea2ac4877fe6f5e1e684b127cc2a7ebd56",
+  "runtimeContract": {
+    "main": 42,
+    "candidate": 43,
+    "publicAdded": 7,
+    "publicRemoved": 0,
+    "defaultGuard": "PASS",
+    "currentMainGuard": "PASS",
+    "codegen": "AUTHORITATIVE_ISOLATED_CONVEX_CLI"
+  },
+  "focusedTests": {
+    "bedrockAndComposition": 77,
+    "prerequisitesAndResumption": 47,
+    "liabilityRecoveryProfileReadiness": 88,
+    "total": 212,
+    "failed": 0
+  },
+  "dockerLedgerTests": {
+    "passed": 51,
+    "failed": 0,
+    "scope": "ACTUAL_DOCKER_WITH_OFFLINE_FIXTURE_CONTROL_PLANE"
+  },
+  "system": {
+    "result": "PASS",
+    "passed": 19,
+    "failed": 0,
+    "skipped": 0,
+    "total": 19,
+    "evidence": "docs/testing/evidence/fdlc-current-main-reconciliation-system-eb438f5-reviewed-20260905/automated-checks.json",
+    "baseSha": "eb438f5fd14add2822392858852051dea27d6fd1"
+  },
+  "reviews": {
+    "method": "PRIMARY_AGENT_SOURCE_REVIEW_NOT_INDEPENDENT_ATTESTATION",
+    "security": "GO_OFFLINE_HOLD_SCOPE",
+    "dataIntegrity": "GO_OFFLINE_HOLD_SCOPE",
+    "architecture": "BLOCKED_OWNER_DECISION",
+    "simplicity": "GO_OFFLINE_HOLD_SCOPE"
+  },
+  "remaining": [
+    "Approved versioned Bedrock harness/bridge decision and offline composition qualification",
+    "Approved AWS identity and account-specific read-only qualification",
+    "Separate real-model-call authorization if required"
+  ],
+  "modelCalls": 0,
+  "workOrder1Executions": 0,
+  "readiness": "NOT_ISSUED",
+  "merge": "NOT_PERFORMED",
+  "publication": "NOT_PERFORMED",
+  "push": "NOT_PERFORMED",
+  "originalWorkOrderTargetSha256": "0672a5c2cd49b36550cdc2989ff7400ed3c6a55b81e51c46bfddda9de8fd3b88"
+}
