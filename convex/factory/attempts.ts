@@ -461,6 +461,8 @@ async function validateReadOnlyCandidateRecovery(ctx: any, run: any): Promise<bo
   const source = recovery.sourceAttemptId ? await ctx.db.get(recovery.sourceAttemptId) : null;
   const sourceArtifact = source ? await ctx.db.query("runArtifacts")
     .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", source._id).eq("artifactType", "CODE_DIFF")).first() : null;
+  const sourceResultArtifact = source ? await ctx.db.query("runArtifacts")
+    .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", source._id).eq("artifactType", "STRUCTURED_OUTPUT")).first() : null;
   const sourcePublication = source ? await ctx.db.query("runArtifacts")
     .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", source._id).eq("artifactType", "PULL_REQUEST")).first() : null;
   const expectedManifest = source?.executionManifest ? { ...source.executionManifest,
@@ -491,6 +493,9 @@ async function validateReadOnlyCandidateRecovery(ctx: any, run: any): Promise<bo
     || sourceArtifact?.metadata?.treeSha !== recovery.sourceTreeSha
     || sourceArtifact?.metadata?.sourceRevision !== recovery.sourceRevision
     || sourceArtifact?.metadata?.branch !== run.branch
+    || sourceResultArtifact?.metadata?.schema !== "factory-result/v1"
+    || recovery.structuredResult?.schema !== "factory-result/v1"
+    || computeCanonicalHash(sourceResultArtifact.metadata.result) !== computeCanonicalHash(recovery.structuredResult)
     || !previous?.leaseId || !previous.workerId || !previous.workerSessionId
     || !Number.isSafeInteger(previous.workerGeneration) || previous.workerGeneration < 1) {
     throw new Error("Read-only candidate recovery does not match its immutable failed source and exact unpublished checkpoint.");
@@ -1832,7 +1837,23 @@ export const reportVerificationInternal = internalMutation({
         || claimed.executionManifestDigest !== run.executionManifestDigest) {
         throw new Error("Offline verifier evidence does not belong to its authenticated historical claim.");
       }
-      const request = canonicalIsolatedInvocation({ ...run, _id: String(run._id) } as any);
+      const request = canonicalIsolatedInvocation({
+        ...run,
+        executionManifest: run.executionManifest,
+        _id: String(run._id),
+        workOrderId: String(run.workOrderId),
+        parentTaskId: String(run.parentTaskId),
+        executionProfileId: String(run.executionProfileId),
+        executionProfileDigest: run.executionProfileDigest!,
+        executionManifestDigest: run.executionManifestDigest!,
+        lease: {
+          leaseId: args.leaseId,
+          ownerId: args.ownerId,
+          workerId: args.workerId!,
+          workerSessionId: args.workerSessionId!,
+          workerGeneration: args.workerGeneration!,
+        },
+      } as any);
       const parsed = validateOfflineAttemptEvidence(args.packet.offlineExecution, request);
       const idempotencyKey = `factory:${run.runId}:${args.leaseId}:offline-response`;
       const existing = await ctx.db.query("runArtifacts").withIndex("by_idempotency", q => q.eq("idempotencyKey", idempotencyKey)).first();
@@ -2733,6 +2754,15 @@ export const recoverLocalCandidate = mutation({
       || codeDiff?.branch !== failedAttempt.branch) {
       throw new Error("Local candidate recovery requires a durable exact code-diff artifact from the failed publication Attempt.");
     }
+    const resultArtifact = await ctx.db.query("runArtifacts")
+      .withIndex("by_run_type", (q) => q.eq("workflowRunId", failedAttempt._id).eq("artifactType", "STRUCTURED_OUTPUT"))
+      .first();
+    const structuredResult = resultArtifact?.metadata?.schema === "factory-result/v1"
+      ? resultArtifact.metadata.result
+      : undefined;
+    if (!structuredResult || structuredResult.schema !== "factory-result/v1") {
+      throw new Error("Local candidate recovery requires the exact durable factory-result/v1 from the failed publication Attempt.");
+    }
     const priorRecoveryRequestedAt = failedAttempt.metadata?.localCandidateRecovery?.requestedAt;
     const leaseEvents = await ctx.db.query("runEvents")
       .withIndex("by_run_sequence", (q) => q.eq("workflowRunId", failedAttempt._id))
@@ -2766,6 +2796,7 @@ export const recoverLocalCandidate = mutation({
         treeSha: codeDiff.treeSha,
         sourceRevision: codeDiff.sourceRevision,
       },
+      structuredResult,
     });
     const recoveryAttemptId = await ctx.db.insert("workflowRuns", recoveryAttempt);
     await ctx.db.patch(failedAttempt._id, {

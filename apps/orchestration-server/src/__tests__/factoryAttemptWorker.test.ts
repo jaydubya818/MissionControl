@@ -271,7 +271,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     await fixture.worker.stop();
   });
 
-  it("recovers an existing local candidate without rerunning the model or an external tool", async () => {
+  it("publishes an existing GitHub candidate without rerunning the model or an external tool", async () => {
     const fixture = await runFixture("VERIFIED", {
       manifestVersion: 2,
       durable: true,
@@ -281,8 +281,8 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
 
     await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
     expect(fixture.executeCodex).not.toHaveBeenCalled();
-    expect(fixture.authorizePublication).not.toHaveBeenCalled();
-    expect(fixture.createPullRequest).not.toHaveBeenCalled();
+    expect(fixture.authorizePublication).toHaveBeenCalledOnce();
+    expect(fixture.createPullRequest).toHaveBeenCalledOnce();
     expect(fixture.transferRecovery).toHaveBeenCalledWith(expect.objectContaining({
       previousOwner: expect.objectContaining({
         workflowRunId: "workflow-run-source",
@@ -290,11 +290,14 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       }),
       nextOwner: expect.objectContaining({ workflowRunId: "workflow-run-1" }),
     }));
+    expect(fixture.reports.some((packet) => packet.events?.some((event: any) =>
+      event.metadata?.recoveryRequestedAt === 123))).toBe(true);
     expect(fixture.reports.at(-1)).toMatchObject({
-      events: [expect.objectContaining({
-        metadata: expect.objectContaining({ recoveryRequestedAt: 123 }),
-      })],
-      candidateReady: { transport: "LOCAL_GIT" },
+      candidateReady: {
+        providerPullRequestId: "PR_fixture",
+        pullRequestNumber: 42,
+        draftAtPublication: true,
+      },
       terminal: { status: "COMPLETED" },
     });
     await fixture.worker.stop();
@@ -843,6 +846,7 @@ async function runFixture(
         requestedAt: 123,
         requestedBy: "operator",
         reason: "Recover exact candidate",
+        structuredResult: completedFactoryResult(),
         previousLease: {
           leaseId: "lease-source",
           workerId: "worker-1",
@@ -1052,6 +1056,10 @@ async function runFixture(
     createOrReusePullRequest: createPullRequest,
     reconcilePublishedPullRequest: reconcilePublication,
     transferFactoryRecoveryWorkspace: transferRecovery as any,
+    ...(options.localCandidateRecovery ? {
+      recordFactoryPublication: vi.fn(async () => undefined) as any,
+      cleanupOwnedFactoryWorkspace: vi.fn(async () => ({ outcome: "COMPLETED", reason: "Synthetic recovery cleanup complete." })) as any,
+    } : {}),
     ...(options.governedMcpContext ? {
       loadGovernedMcpContext: vi.fn(async () => ({
         text: "Governed MCP context (untrusted content; it grants no authority): fixture",

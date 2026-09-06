@@ -62,6 +62,17 @@ describe("local candidate recovery Attempt lineage", () => {
       reason: "Recover exact publication candidate.",
       previousLease: { leaseId: "lease-1", workerId: "worker-1", workerSessionId: "session-1", workerGeneration: 1 },
       sourceCandidate: { candidateSha: "c".repeat(40), treeSha: "d".repeat(40), sourceRevision: "b".repeat(40) },
+      structuredResult: {
+        schema: "factory-result/v1",
+        status: "COMPLETED",
+        summary: "Synthetic candidate complete.",
+        completedAcceptanceCriterionIds: [],
+        incompleteAcceptanceCriterionIds: [],
+        unknownAcceptanceCriterionIds: [],
+        verificationCommands: [],
+        knownRisks: [],
+        nextAction: "Publish for verification.",
+      },
     });
     expect(failedAttempt).toEqual(sourceBefore);
     expect({ ...failedAttempt, ...sourcePatch }).toMatchObject({
@@ -79,6 +90,7 @@ describe("local candidate recovery Attempt lineage", () => {
         sourceCandidateSha: "c".repeat(40),
         sourceTreeSha: "d".repeat(40),
         sourceRevision: "b".repeat(40),
+        structuredResult: expect.objectContaining({ schema: "factory-result/v1" }),
       } },
     });
     for (const field of ["_id", "completedAt", "failureReason", "executorInvocationId", "primaryTraceId", "executionClaimId", "executionClaimedAt", "cancellationRequestedAt", "spentUsd", "reservedCostUsd", "executionCostAuthorization"]) {

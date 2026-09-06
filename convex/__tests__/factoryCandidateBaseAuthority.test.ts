@@ -159,11 +159,17 @@ async function recoveryClaimFixture() {
     failureCode: "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING", executionManifest: sourceManifest, executionManifestDigest: sourceDigest });
   await f.db.insert("runArtifacts", { workflowRunId: "original-attempt", artifactType: "CODE_DIFF", metadata: {
     headSha: CANDIDATE, treeSha: TREE, sourceRevision: BASE, branch: "mc/candidate" } });
+  const structuredResult = { schema: "factory-result/v1", status: "COMPLETED", summary: "Synthetic candidate complete.",
+    completedAcceptanceCriterionIds: [], incompleteAcceptanceCriterionIds: [], unknownAcceptanceCriterionIds: [],
+    verificationCommands: [], knownRisks: [], nextAction: "Publish for verification." };
+  await f.db.insert("runArtifacts", { workflowRunId: "original-attempt", artifactType: "STRUCTURED_OUTPUT",
+    metadata: { schema: "factory-result/v1", result: structuredResult } });
   const manifest = { ...sourceManifest, causation: { workflowRunId: "run-1" } };
   await f.db.patch("attempt-1", { executionManifest: manifest, executionManifestDigest: `sha256:${computeCanonicalHash(manifest)}`,
     lease: { leaseId: "expired-recovery", ownerId: "service-1", expiresAt: 1, claimedAt: 0, heartbeatAt: 0 },
     metadata: { localCandidateRecovery: { sourceAttemptId: "original-attempt", sourceExecutionManifestDigest: sourceDigest,
       sourceCandidateSha: CANDIDATE, sourceTreeSha: TREE, sourceRevision: BASE,
+      structuredResult,
       previousLease: { leaseId: "original-lease", workerId: "worker-1", workerSessionId: "original-session", workerGeneration: 1 } } } });
   const claim = () => f.invoke(claimInternal, { workflowRunId: "attempt-1", ownerId: "service-1", leaseId: "new-recovery", leaseDurationMs: 60_000 });
   return { ...f, claim };

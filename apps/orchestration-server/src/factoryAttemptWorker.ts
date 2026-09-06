@@ -592,6 +592,7 @@ export class FactoryAttemptWorker {
       });
 
       if (claim.localCandidateRecovery) {
+        const structuredResult = validateFactoryResult(claim.localCandidateRecovery.structuredResult);
         const candidate = await this.dependencies.inspectCandidateChange(claim.worktree, manifest.repository.baseSha);
         const scopeResult = validateChangedFileScope(candidate.changedFiles, {
           allowedPaths: manifest.repository.allowedPaths,
@@ -630,14 +631,22 @@ export class FactoryAttemptWorker {
               recovery: true,
             },
           }],
-          candidateReady: {
-            transport: "LOCAL_GIT",
-            candidateSha: candidate.candidateRevision,
-            treeSha: candidate.treeRevision,
-            baseRef: claim.defaultBranch,
-            headRef: claim.branch,
-          },
-          terminal: { status: "COMPLETED" },
+        });
+        await this.publishCandidate({
+          claim,
+          manifest,
+          structuredResult,
+          changedFiles: scopeResult.changedFiles,
+          verificationRecord: undefined,
+          sourceRevision: candidate.sourceRevision,
+          headSha: candidate.candidateRevision,
+          treeSha: candidate.treeRevision,
+          policyV2: true,
+          report,
+          leaseId,
+          requirePublicationPermit: true,
+          assertActive,
+          signal: controller.signal,
         });
         this.completedCount += 1;
         this.lastError = null;

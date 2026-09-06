@@ -27,6 +27,7 @@ export function buildLocalCandidateRecoveryRows(input: {
     workerGeneration: number;
   };
   sourceCandidate: { candidateSha: string; treeSha: string; sourceRevision: string };
+  structuredResult: unknown;
 }) {
   const recoveryManifest = {
     ...input.failedAttempt.executionManifest,
@@ -67,6 +68,7 @@ export function buildLocalCandidateRecoveryRows(input: {
         sourceCandidateSha: input.sourceCandidate.candidateSha,
         sourceTreeSha: input.sourceCandidate.treeSha,
         sourceRevision: input.sourceCandidate.sourceRevision,
+        structuredResult: input.structuredResult,
         requestedAt: input.requestedAt,
         requestedBy: input.actorId,
         reason: input.reason,

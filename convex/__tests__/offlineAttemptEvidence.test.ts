@@ -135,19 +135,21 @@ describe("offline response evidence consistency (not execution authority)", () =
       executionProfileDigest: packet.request.profileDigest,
       lease: { leaseId: "lease", ownerId: "owner", workerId: "worker", workerSessionId: "session", workerGeneration: 1,
         claimedAt: 1, heartbeatAt: 1, expiresAt: 2 } };
+    const historicalLease = { ...run.lease };
     packet.request = canonicalIsolatedInvocation(run);
     packet.result = invocationResult(packet.request, "SUCCESS", 1, 2);
     const bytes = Buffer.from(JSON.stringify(packet.result));
     Object.assign(packet.evidence, { stdoutBase64: bytes.toString("base64"), capturedStdoutSha256: `sha256:${sha256Hex(bytes)}`,
       validatedRuntimeResult: packet.result });
     const event: any = { workflowRunId: run._id, projectId: run.projectId, tenantId: run.tenantId, actor: "service:owner",
-      eventType: "CHECKPOINT_CREATED", metadata: { ...run.lease, executionManifestDigest: run.executionManifestDigest } };
+      eventType: "CHECKPOINT_CREATED", metadata: { ...historicalLease, executionManifestDigest: run.executionManifestDigest } };
+    run.lease = undefined;
     let artifact: any = null;
     const ctx: any = { db: { get: async (id: string) => id === "attempt" ? run : null,
       insert: async (_table: string, value: any) => { artifact = { ...value, _id: "artifact" }; return "artifact"; },
       query: (table: string) => ({ withIndex: () => ({ first: async () => table === "runEvents" ? event : artifact,
         collect: async () => [] }) }) } };
-    const args = { workflowRunId: "attempt", ...run.lease, packet: { offlineExecution: packet } };
+    const args = { workflowRunId: "attempt", ...historicalLease, packet: { offlineExecution: packet } };
     const report = (reportVerificationInternal as any)._handler;
     expect(await report(ctx, args)).toMatchObject({ retained: true, authoritative: false, duplicate: false });
     expect(artifact.metadata).toMatchObject({ authority: "NONE", behavioralPass: false, disposition: "STALE_FENCED" });
