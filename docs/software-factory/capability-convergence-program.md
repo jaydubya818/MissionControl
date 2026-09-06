@@ -14,10 +14,21 @@ execution record for the existing roadmap, not a replacement roadmap.
 
 The authorization's earlier hashes are historical. Current Mission Control
 contains the offline inference slice (#178/#179), the Fab adapter (#180), and
-shared builder intent (#181/#182). Runtime contract is **v45**. Todo 062 is
+shared builder intent (#181/#182). Runtime contract was **v45** at program start. Todo 062 is
 complete for its bounded, default-off, synthetic Preview scope; it is not
 real-team adoption. Todo 063 remains in progress. The existing Phase 5
 completion record closes only its bounded offline slice, not this program.
+
+Before the first program PR, main advanced to
+`f749b06c8ef39c5bd22c9e0ad76334482ec35b33` (#183). Its WorkOrder readiness
+projection, offline package-manager correction and **runtime v46** are retained.
+The implementation branch was rebased before final qualification. Its newly
+landed [capability coverage plan](../plans/2026-09-04-feat-fdlc-capability-convergence-plan.md)
+adds explicit eval/fan-out proof and conditional scale requirements. Its phase
+numbers differ from the production convergence plan: inference is Phase 4 there
+and Phase 5 in the execution authorization. Use the capability and todo identity
+to resolve this numbering difference. The master authorization supersedes older
+phase-by-phase stopping instructions; it does not supply missing pilot owners.
 
 ## Dependency graph derived from current records
 
@@ -27,7 +38,8 @@ completion record closes only its bounded offline slice, not this program.
 | Todo 059: ten real accepted WorkOrders | Approved exact repository and named team, champion, FDE and incident commander; preflight drill; enrolled execution authority | Admission and exit assessors exist. Real cohort is not proven. Preserve bug, feature, refactor and security/policy diversity and all human decisions. |
 | Todo 060: canonical incident lifecycle | Todo 059 pilot evidence under the existing convergence plan | Existing containment controls support pilot preflight. Full incident aggregate remains dependency-gated; do not silently remove this dependency. |
 | Todo 064: feedback and governed learning | Todo 063 outcome facts; real observed signals for real-loop acceptance | Existing advisory learning machinery is reusable. Implement only the missing canonical projections and bounded processing; real promotion and restoration need attributable human decisions. |
-| Later scale requirements | A complete operating loop and a currently approved required item | Current convergence plan has no unconditional Phase 7 feature list. Multi-agent, multi-repository and scheduling work must be traced to an approved acceptance dependency before implementation. |
+| Comparable evals and bounded fan-out/join | Exact configuration, child reservation conservation; real fixtures for real-work claims | Reuse Eval Control Plane and workflow graph. Qualify failure, timeout, cancellation, conflicts, duplicate events and recovery against a single-worker baseline. Synthetic proof cannot stand in for measured real-work benefit. |
+| Later scale requirements | A complete operating loop and a currently approved required item | The capability coverage plan explicitly defers multi-repository coordination, fair scheduling, enterprise controls, semantic governance, transitive locks and experimental export to separate later WorkOrders. No unconditional requirement to implement those before the initial line is established. |
 
 Canonical sources: [convergence plan](../plans/2026-08-25-feat-software-factory-production-convergence-plan.md),
 [inference plan](../plans/2026-09-05-feat-inference-gateway-outcome-economics-qualification-plan.md),
@@ -63,7 +75,8 @@ denominators and coverage remain explicit. Existing economics WARN remains.
 - Objective: prevent separate logical requests or retry Attempts from each
   reserving the full approved parent WorkOrder budget.
 - Baseline, branch baseline and merge-base:
-  `e9d2f52720e634b79d2c614a7fb9812a6b986fe9`.
+  `f749b06c8ef39c5bd22c9e0ad76334482ec35b33` after integration; original
+  implementation baseline `e9d2f52720e634b79d2c614a7fb9812a6b986fe9`.
 - Implementation branch: `codex/capability-convergence-phase5`.
 - Reuse: existing `inferenceReservations.by_work_order` index and canonical
   `createReservation` mutation; no new budget store or public API.
@@ -75,9 +88,15 @@ denominators and coverage remain explicit. Existing economics WARN remains.
   remain rejected. Replay does not bypass current lease, profile or price-book
   admission checks.
 - Qualification/reviews/PR/merge/final-main: **NOT_RUN** until recorded below.
-- Runtime contract: v45; no public signature change proposed for this slice.
+- Runtime contract: v46 inherited from #183; this slice changes no public signature.
 - Maturity: no promotion. This closes one parent allocation gap, not provider
   dispatch bounds, authoritative billing settlement or real-work economics.
+
+The next todo 063 integration issue is the mismatch between database reservation
+IDs and frozen logical reservation IDs in physical intent/receipt construction.
+After that, claims must enforce finite request/output exposure before transport,
+and receipt persistence must retain observed overrun evidence. These source
+findings are unresolved; the reservation fix alone does not qualify a live path.
 
 ## Remaining acceptance evidence
 

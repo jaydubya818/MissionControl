@@ -2,7 +2,7 @@
 title: Software Factory Capability Maturity Ledger
 status: active
 last_verified: 2026-09-05
-baseline_commit: e9d2f52720e634b79d2c614a7fb9812a6b986fe9
+baseline_commit: f749b06c8ef39c5bd22c9e0ad76334482ec35b33
 owners:
   - product
   - platform
@@ -78,9 +78,9 @@ The ten-outcome threshold remains a pilot gate, not statistical reliability.
 
 ## Current status vocabulary
 
-The labels and capability detail below retain the older qualification record.
-They describe its cited scope only and are superseded by the current matrix for
-current availability claims. Historical artifacts have not been rewritten.
+The capability ledger below is the current source of maturity claims. Each
+entry remains limited to its cited evidence; the superseded historical matrix
+above cannot override later qualification. Historical artifacts remain intact.
 
 - **Qualified:** implemented and backed by deterministic system or browser
   evidence at a cited revision.
