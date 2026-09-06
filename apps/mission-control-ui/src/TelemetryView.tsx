@@ -9,6 +9,7 @@ import { StatusBadge, type StatusBadgeProps } from "@/components/factory/badges"
 import { useToast } from "./Toast";
 import { cn } from "@/lib/utils";
 import { Activity, Zap, Filter, Radio, CheckCircle2 } from "lucide-react";
+import { FactoryIncidentBoundary, FactoryIncidentWorkspace } from "./controlPlane/FactoryIncidentWorkspace";
 
 function fmtTime(ts?: number) {
   if (!ts) return "n/a";
@@ -38,6 +39,37 @@ function EventTypePill({ value }: { value: string }) {
 }
 
 export function TelemetryView({ projectId }: { projectId: Id<"projects"> | null }) {
+  const [surface, setSurface] = useState<"incidents" | "events">("incidents");
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
+      <PageHeader
+        title="Factory Incidents"
+        description="Clarify, contain, restore, correct, and measure without rewriting source evidence."
+        eyebrow="Review & release"
+        actions={
+          <div className="flex items-center gap-1 rounded-lg border border-line bg-surface-1 p-1" role="tablist" aria-label="Incident operations views">
+            <Button size="sm" variant={surface === "incidents" ? "default" : "ghost"} role="tab" aria-selected={surface === "incidents"} onClick={() => setSurface("incidents")}>Incident command</Button>
+            <Button size="sm" variant={surface === "events" ? "default" : "ghost"} role="tab" aria-selected={surface === "events"} onClick={() => setSurface("events")}>Event stream</Button>
+          </div>
+        }
+      />
+      <div className="mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-4 overflow-hidden px-6 pb-6 pt-4">
+        {!projectId ? (
+          <Card className="flex min-h-[360px] items-center justify-center p-8 text-center text-ink-muted">Select a workspace to inspect incidents.</Card>
+        ) : surface === "incidents" ? (
+          <FactoryIncidentBoundary key={projectId}>
+            <FactoryIncidentWorkspace projectId={projectId} />
+          </FactoryIncidentBoundary>
+        ) : (
+          <TelemetryEventStream projectId={projectId} />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TelemetryEventStream({ projectId }: { projectId: Id<"projects"> }) {
   const { toast } = useToast();
   const [typeFilter, setTypeFilter] = useState("");
   const [windowMinutes, setWindowMinutes] = useState(60);
@@ -77,25 +109,15 @@ export function TelemetryView({ projectId }: { projectId: Id<"projects"> | null 
   const inWindow    = stats?.inWindow ?? 0;
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
-      <PageHeader
-        title="ARM Telemetry"
-        description={
-          inWindow > 0
-            ? `Live stream · ${inWindow} events in last ${windowMinutes}m`
-            : "Operational events stream for runs, tool calls, workflow steps, and decision traces."
-        }
-        eyebrow="Operations"
-        actions={
-          <Button size="sm" onClick={handleEmitTestEvent} variant="outline">
-            <Zap className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.7} />
-            Emit Test Event
-          </Button>
-        }
-      />
-
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[12px] text-ink-muted">{inWindow > 0 ? `${inWindow} events in the last ${windowMinutes}m` : "Operational evidence stream"}</p>
+        <Button size="sm" onClick={handleEmitTestEvent} variant="outline">
+          <Zap className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.7} />
+          Emit Test Event
+        </Button>
+      </div>
       {/* Summary stats */}
-      <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-4 overflow-hidden px-6 pb-6 pt-4">
       <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { icon: Activity,     label: "Total Events",     value: totalEvents },
@@ -208,7 +230,6 @@ export function TelemetryView({ projectId }: { projectId: Id<"projects"> | null 
         </div>
       </Card>
       </div>
-      </div>
-    </section>
+    </div>
   );
 }

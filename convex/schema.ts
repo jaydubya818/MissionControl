@@ -62,6 +62,14 @@ import {
   reviewCorrectionCategoryValidator,
 } from "./lib/reviewIntelligenceValidators";
 import { evalControlPlaneTables } from "./lib/evalControlPlaneSchema";
+import {
+  factoryIncidentContainmentActionValidator,
+  factoryIncidentControlExecutionValidator,
+  factoryIncidentEvidenceRefValidator,
+  factoryIncidentPhaseValidator,
+  factoryIncidentProposalKindValidator,
+  factoryIncidentSeverityValidator,
+} from "./lib/factoryIncident";
 
 // ============================================================================
 // ENUMS (as union types)
@@ -8573,6 +8581,113 @@ export const schemaTablesPartTwo = {
     .index("by_release", ["releaseId", "createdAt"])
     .index("by_project", ["projectId", "createdAt"])
     .index("by_idempotency", ["idempotencyKey"]),
+
+  // -----------------------------------------------------------------------
+  // SOFTWARE FACTORY: INCIDENT COMMAND
+  // Thin authority projection over existing evidence. Source records remain
+  // authoritative and are referenced, never copied into an incident store.
+  // -----------------------------------------------------------------------
+  factoryIncidents: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    repositoryId: v.optional(v.id("workspaceRepositories")),
+    incidentKey: v.string(),
+    sourceFingerprint: v.string(),
+    title: v.string(),
+    summary: v.string(),
+    severity: factoryIncidentSeverityValidator,
+    phase: factoryIncidentPhaseValidator,
+    status: v.union(
+      v.literal("OPEN"),
+      v.literal("CONTAINED"),
+      v.literal("RECOVERING"),
+      v.literal("MONITORING"),
+      v.literal("RESOLVED"),
+    ),
+    commanderActorId: v.optional(v.string()),
+    businessImpact: v.string(),
+    recoveryObjective: v.string(),
+    containmentState: v.union(
+      v.literal("UNCONTAINED"),
+      v.literal("CONTAINED"),
+      v.literal("RESTORED"),
+    ),
+    authorityRestored: v.boolean(),
+    currentSequence: v.number(),
+    createdByType: v.union(
+      v.literal("HUMAN"),
+      v.literal("AGENT"),
+      v.literal("SERVICE"),
+    ),
+    createdBy: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId", "updatedAt"])
+    .index("by_project_status", ["projectId", "status", "updatedAt"])
+    .index("by_project_source", ["projectId", "sourceFingerprint"])
+    .index("by_repository", ["repositoryId", "updatedAt"])
+    .index("by_incident_key", ["incidentKey"]),
+
+  factoryIncidentTransitions: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    incidentId: v.id("factoryIncidents"),
+    sequence: v.number(),
+    fromPhase: v.optional(factoryIncidentPhaseValidator),
+    toPhase: factoryIncidentPhaseValidator,
+    decisionKind: v.union(
+      v.literal("DETECTION"),
+      v.literal("COMMANDER_ASSIGNED"),
+      v.literal("CONTAINMENT"),
+      v.literal("PHASE_ADVANCE"),
+      v.literal("RESTORATION"),
+      v.literal("CORRECTIVE_WORK"),
+      v.literal("MEASUREMENT"),
+      v.literal("RESOLUTION"),
+    ),
+    actorType: v.union(
+      v.literal("HUMAN"),
+      v.literal("AGENT"),
+      v.literal("SERVICE"),
+    ),
+    actorId: v.string(),
+    reason: v.string(),
+    evidenceRefs: v.array(factoryIncidentEvidenceRefValidator),
+    containmentActions: v.array(factoryIncidentContainmentActionValidator),
+    controlExecutions: v.optional(v.array(factoryIncidentControlExecutionValidator)),
+    // Read-only compatibility for pre-v50 local qualification records.
+    controlReferences: v.optional(v.array(v.string())),
+    idempotencyKey: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_incident", ["incidentId", "sequence"])
+    .index("by_project", ["projectId", "createdAt"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  factoryIncidentProposals: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    incidentId: v.id("factoryIncidents"),
+    kind: factoryIncidentProposalKindValidator,
+    summary: v.string(),
+    evidenceRefs: v.array(factoryIncidentEvidenceRefValidator),
+    containmentActions: v.array(factoryIncidentContainmentActionValidator),
+    createdByService: v.string(),
+    serviceCommandReceiptId: v.optional(v.id("serviceCommandReceipts")),
+    status: v.union(
+      v.literal("OPEN"),
+      v.literal("ACCEPTED"),
+      v.literal("REJECTED"),
+    ),
+    decidedBy: v.optional(v.string()),
+    decidedAt: v.optional(v.number()),
+    decisionReason: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_incident", ["incidentId", "createdAt"])
+    .index("by_project_status", ["projectId", "status", "createdAt"]),
 
   // -------------------------------------------------------------------------
   // KNOWLEDGE GRAPH (Agentic-KB Graphify overlay + future Obsidian sync)
