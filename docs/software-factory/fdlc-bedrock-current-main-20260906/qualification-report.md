@@ -109,6 +109,14 @@ startup smoke, golden eval, historical evidence immutability, and runtime v51
 compatibility. The System evidence is in
 `docs/testing/evidence/fdlc-bedrock-live-system-20260906/`.
 
+After reconciliation, merge commit
+`b07cb71b867254d22a7514f6bba699d814680be7` passed all 18 current System
+Qualification V2 checks against canonical main `e0b15142a33987983526b87c2144208e40e98657`
+and runtime contract v52. This includes 1,274 Convex tests, 661 orchestration
+tests with 11 intended skips, the complete repository suite, lint, build,
+startup smoke, release security, and the runtime-contract guard. Current evidence
+is in `docs/testing/evidence/system-factory-e2e-v2/`.
+
 ## Blocked work
 
 Until the permission set is reprovisioned, the following work remains inadmissible:
