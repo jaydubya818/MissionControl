@@ -60,7 +60,8 @@ describe("Fab canonical MC harness conformance", () => {
     const route = { accountId: "123456789012", region: "us-east-1", modelId: "anthropic.claude-sonnet-4-6", inferenceProfileId: "us.anthropic.claude-sonnet-4-6", inferenceProfileArn: "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-sonnet-4-6" } as const;
     const config = parseConfig({ ...f.config, provider: "bedrock", model: route.modelId, bedrockRoute: route,
       credential: { ...f.config.credential, provider: "bedrock", source: { kind: "broker" } } });
-    const request = { ...f.request, provider: "bedrock", model: route.modelId };
+    const request = { ...f.request, provider: "aws-bedrock", providerRoute: `us-east-1/${route.inferenceProfileId}`,
+      modelRouteDigest: `sha256:${"a".repeat(64)}`, model: route.modelId };
     return { ...f, config, request, route };
   }
   it("requires an explicit Bedrock broker and cannot select the test model factory or ambient credential path", async () => {
@@ -118,7 +119,7 @@ describe("Fab canonical MC harness conformance", () => {
     }) });
     const result = await runHarnessExecution(adapter, f.request, f.context);
     expect(result.status).toBe("COMPLETED"); expect(calls).toBe(4);
-    expect(result.normalizedResult?.provenance.provider).toBe("bedrock");
+    expect(result.normalizedResult?.provenance.provider).toBe("aws-bedrock");
     expect(result.normalizedResult?.usage.inputTokens).toBe(40);
     expect(result.normalizedResult?.usage.costUsd).toBeNull();
     const observed = result.normalizedResult?.events.items.filter(event => event.summary === "provider_request").map(event => event.metadata?.providerRequest as Record<string, unknown>);
@@ -149,6 +150,7 @@ describe("Fab canonical MC harness conformance", () => {
     const f = fixture(); const registry = new HarnessAdapterRegistry([f.adapter]);
     expect(registry.require({ adapter: "fab", version: "v1" })).toBe(f.adapter);
     expect(harnessManifestIssues(f.adapter.capabilities().capabilityManifest!)).toEqual([]);
+    expect(f.adapter.capabilities().capabilityManifest?.filesystem).toMatchObject({ read: "SUPPORTED", write: "SUPPORTED" });
     expect(Object.values(f.adapter.capabilities().authority).every(value => value === "NONE")).toBe(true);
     const registration = registry.requireRegistration({ adapter: "fab", version: "v1" });
     const eligibility = factoryWorkerEligibility({ worker: { workerId: "worker-1", status: "READY", dirty: false,

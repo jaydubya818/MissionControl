@@ -61,21 +61,23 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
   }
   capabilities(): HarnessExecutorCapabilities {
     return { contractVersion: GENERIC_HARNESS_CONTRACT_VERSION, adapter: "fab", version: "v1", displayName: "Fab (Experimental)",
-      provider: this.options.config.provider, capabilityManifest: structuredClone(this.manifest), runtimeArtifact: structuredClone(this.runtimeArtifact), executionBackends: ["persistent-worker"],
+      provider: factoryProvider(this.options.config), capabilityManifest: structuredClone(this.manifest), runtimeArtifact: structuredClone(this.runtimeArtifact), executionBackends: ["persistent-worker"],
       authority: NO_HARNESS_AUTHORITY, supportsCancel: true, supportsResume: false, supportsRepositoryMutation: true,
       isolationModes: ["WORKSPACE_WRITE"], emittedEvents: ["EXECUTION_STARTED", "TOOL_CALLED", "ARTIFACT_PRODUCED", "EXECUTION_COMPLETED", "EXECUTION_FAILED", "EXECUTION_CANCELED"] };
   }
   validateConfiguration(request: ExecutorRequest) {
     const config = this.options.config; const issues: Array<{field: string; message: string}> = [];
     const issue = (field: string, message: string) => issues.push({ field, message });
+    const provider = factoryProvider(config);
+    const providerRoute = factoryProviderRoute(config);
     const governedWorktreePrefix = `${config.repository}${path.sep}.mission-control${path.sep}worktrees${path.sep}`;
     const repositoryMatches = request.repositoryRoot === config.repository
       || (config.provider === "bedrock" && request.repositoryRoot.startsWith(governedWorktreePrefix));
     if (!repositoryMatches || request.workingDirectory !== request.repositoryRoot) issue("repositoryRoot", "Fab requires the configured repository or its canonical Mission Control Attempt worktree.");
-    if (request.provider !== config.provider || request.model !== config.model) issue("model", "Fab requires the exact explicitly selected provider/model.");
+    if (request.provider !== provider || request.model !== config.model) issue("model", "Fab requires the exact explicitly selected provider/model.");
     if (request.modelRouteDigest !== undefined || request.providerRoute !== undefined || request.reasoningConfig !== undefined) {
       if (!/^sha256:[a-f0-9]{64}$/.test(request.modelRouteDigest ?? "")) issue("modelRouteDigest", "Fab requires the exact frozen model-route digest.");
-      if (request.providerRoute !== config.provider) issue("providerRoute", "Fab requires its exact configured provider route.");
+      if (request.providerRoute !== providerRoute) issue("providerRoute", "Fab requires its exact configured provider route.");
       if (request.reasoningConfig !== undefined) issue("reasoningConfig", "Fab cannot translate reasoning controls; use a separately qualified configuration.");
     }
     if (request.isolation !== "WORKSPACE_WRITE" || request.filesystemReadScope) issue("isolation", "Fab has no whole-agent OS read boundary; WORKSPACE_ONLY and read-only execution are unsupported.");
@@ -176,7 +178,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     const finishedAt = Date.now();
     return { executionId: p.request.executionId, status, output, ...(completed ? {} : { error: "Fab execution blocked, failed or cancelled; inspect its redacted evidence." }), normalizedResult: {
       schemaVersion: "harness-result/v1", executionId: p.request.executionId, status, harness: this.manifest.identity,
-      provenance: { provider: p.model.provider, model: p.model.model,
+      provenance: { provider: p.request.provider ?? p.model.provider, model: p.model.model,
         ...(p.request.modelRouteDigest ? { modelRouteDigest: p.request.modelRouteDigest, providerRoute: p.request.providerRoute } : {}),
         capabilityManifestSha256: harnessCapabilityManifestDigest(this.manifest),
         effectiveConfigSha256: this.manifest.effectiveConfigSha256, executableSha256: this.runtimeArtifact.executableSha256,
@@ -222,8 +224,8 @@ async function createModel(config: FabConfig, redactor: Redactor, environment: N
 export function fabManifest(config: FabConfig): HarnessCapabilityManifest {
   const supported = "SUPPORTED", partial = "PARTIAL", no = "UNSUPPORTED";
   return { schemaVersion: "harness-capability-manifest/v1", scope: "ADAPTER_EFFECTIVE", identity: IDENTITY, effectiveConfigSha256: canonicalHash({ config, runtime: FAB_RUNTIME_COMMIT }),
-    models: { providerSelection: supported, modelSelection: supported, supported: [{ provider: config.provider, modelId: config.model, selection: "PASSTHROUGH", contextWindowTokens: null, modalities: ["text"] }], reasoningControls: no },
-    filesystem: { read: partial, write: partial, pathAllowlist: supported, changedFileCapture: supported },
+    models: { providerSelection: supported, modelSelection: supported, supported: [{ provider: factoryProvider(config), modelId: config.model, selection: "PASSTHROUGH", contextWindowTokens: null, modalities: ["text"] }], reasoningControls: no },
+    filesystem: { read: supported, write: supported, pathAllowlist: supported, changedFileCapture: supported },
     shell: { available: partial, commandTimeout: supported, processTreeCancellation: supported, credentialEnvironmentScrub: supported },
     git: { status: supported, diff: supported, commit: no, branch: no, remotePublication: no },
     browser: { webSearch: no, webFetch: no, interactiveBrowser: no }, tools: { native: supported, mcp: no, structuredOutput: supported, telemetry: supported },
@@ -235,4 +237,14 @@ export function fabManifest(config: FabConfig): HarnessCapabilityManifest {
     telemetry: { tokens: partial, cost: no, toolCalls: supported, modelRequests: supported, retries: supported },
     admission: { maturity: "EXPERIMENTAL", executionBackends: ["persistent-worker"], requiredExternalControls: ["MC Attempt lease checkpoints", "Separate verification Attempt", "MC approval and publication"], prohibitedAuthorities: ["worker-leases", "verification-subjects", "verification-plans", "evidence-authority", "github-publication", "acceptance"] },
     limitations: ["No live provider/model qualification.", "No whole-agent OS sandbox or remote backend.", "Fixed files/checks and bounded UTF-8 snapshots only.", "Uncertain invocation replay denied; MC must reconcile or issue a new Attempt."] };
+}
+
+function factoryProvider(config: FabConfig) {
+  return config.provider === "bedrock" ? "aws-bedrock" : config.provider;
+}
+
+function factoryProviderRoute(config: FabConfig) {
+  return config.provider === "bedrock"
+    ? `${config.bedrockRoute!.region}/${config.bedrockRoute!.inferenceProfileId}`
+    : config.provider;
 }
