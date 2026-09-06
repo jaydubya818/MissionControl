@@ -1,5 +1,5 @@
-import { computeCanonicalHash } from "./genomeHash";
-import type { MutationCtx } from "../_generated/server";
+import { computeCanonicalHash } from "./genomeHash.js";
+import type { MutationCtx } from "../_generated/server.js";
 
 const money = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0;
 const profileDigest = (value: unknown): value is string => typeof value === "string" && /^sha256:[a-f0-9]{64}$/.test(value);

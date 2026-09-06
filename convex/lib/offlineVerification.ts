@@ -1,8 +1,8 @@
 import { sha256Hex } from "@mission-control/shared";
 import { ChangeBudgetVerifier, NegativeConstraintVerifier, VerificationAuthorityVerifier, VerificationEngine,
   type Verifier } from "@mission-control/workflow-engine/verification";
-import type { validateOfflineAttemptEvidence } from "./offlineAttemptEvidence";
-import { gitBlobDigest } from "./gitBlobDigest";
+import type { validateOfflineAttemptEvidence } from "./offlineAttemptEvidence.js";
+import { gitBlobDigest } from "./gitBlobDigest.js";
 
 /** Maps a retained real deterministic response into the existing verification
  * engine. This is qualification evidence only; callers own admission and scope. */

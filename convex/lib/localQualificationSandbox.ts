@@ -1,10 +1,10 @@
-import { computeCanonicalHash } from "./genomeHash";
-import { isolatedSandboxIssues, isolatedSandboxDigest, isolatedSandboxAdmission, isolatedSandboxEligible } from "./isolatedSandbox";
-import { loadLocalRepositoryAdmission } from "./localRepositoryAdmission";
-import type { QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import { computeCanonicalHash } from "./genomeHash.js";
+import { isolatedSandboxIssues, isolatedSandboxDigest, isolatedSandboxAdmission, isolatedSandboxEligible } from "./isolatedSandbox.js";
+import { loadLocalRepositoryAdmission } from "./localRepositoryAdmission.js";
+import type { QueryCtx } from "../_generated/server.js";
+import type { Id } from "../_generated/dataModel.js";
 import { ISOLATED_INVOCATION_EFFECTIVE_CONFIG, ISOLATED_INVOCATION_RUNTIME_ARTIFACT } from "@mission-control/workflow-engine/harness-contract";
-import type { OfflineExecutionPolicy } from "./offlineExecutionPolicy";
+import type { OfflineExecutionPolicy } from "./offlineExecutionPolicy.js";
 
 export const LOCAL_SANDBOX_SCHEMA = "local-qualification-sandbox/v1";
 const operations = ["render-markdown/v1", "verify-document-bytes/v1"];

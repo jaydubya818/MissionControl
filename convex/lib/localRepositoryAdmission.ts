@@ -1,6 +1,6 @@
-import { computeCanonicalHash } from "./genomeHash";
-import type { QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import { computeCanonicalHash } from "./genomeHash.js";
+import type { QueryCtx } from "../_generated/server.js";
+import type { Id } from "../_generated/dataModel.js";
 
 export const LOCAL_QUALIFICATION_MODE = "LOCAL_SYNTHETIC_QUALIFICATION" as const;
 export const LOCAL_QUALIFICATION_PROGRAM = "unpublished-handoff-fixture/v1" as const;
