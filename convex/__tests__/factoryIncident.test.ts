@@ -71,19 +71,45 @@ describe("Factory Incident Command domain", () => {
     })).toBeNull();
   });
 
-  it("rejects forged, duplicate, and acknowledgement-only containment proof", () => {
-    expect(() => normalizeControlExecutions([{
-      controlKey: "PAUSE_REPOSITORY_DISPATCH",
-      commandReceipt: { kind: "AUDIT", recordId: "receipt:ack", relationship: "issued" },
-      observedEffectReceipt: { kind: "AUDIT", recordId: "receipt:ack", relationship: "observed" },
-      observedAt: 1,
-    }], 2)).toThrow("cannot prove its observed effect");
+  it("requires distinct command, acknowledgment, and observed-effect receipts", () => {
     expect(() => normalizeControlExecutions([{
       controlKey: "PAUSE_REPOSITORY_DISPATCH",
       commandReceipt: { kind: "AUDIT", recordId: "receipt:command", relationship: "issued" },
       observedEffectReceipt: { kind: "AUDIT", recordId: "receipt:effect", relationship: "observed" },
+      observedAt: 1,
+    }], 2)).toThrow("requires a distinct acknowledgment receipt");
+    expect(() => normalizeControlExecutions([{
+      controlKey: "PAUSE_REPOSITORY_DISPATCH",
+      commandReceipt: { kind: "AUDIT", recordId: "receipt:command", relationship: "issued" },
+      acknowledgmentReceipt: { kind: "AUDIT", recordId: "receipt:command", relationship: "acknowledged" },
+      observedEffectReceipt: { kind: "AUDIT", recordId: "receipt:effect", relationship: "observed" },
+      observedAt: 1,
+    }], 2)).toThrow("require three distinct receipts");
+    expect(() => normalizeControlExecutions([{
+      controlKey: "PAUSE_REPOSITORY_DISPATCH",
+      commandReceipt: { kind: "AUDIT", recordId: "receipt:command", relationship: "issued" },
+      acknowledgmentReceipt: { kind: "AUDIT", recordId: "receipt:acknowledgment", relationship: "acknowledged" },
+      observedEffectReceipt: { kind: "AUDIT", recordId: "receipt:acknowledgment", relationship: "observed" },
+      observedAt: 1,
+    }], 2)).toThrow("require three distinct receipts");
+    expect(() => normalizeControlExecutions([{
+      controlKey: "PAUSE_REPOSITORY_DISPATCH",
+      commandReceipt: { kind: "AUDIT", recordId: "receipt:command", relationship: "issued" },
+      acknowledgmentReceipt: { kind: "AUDIT", recordId: "receipt:acknowledgment", relationship: "acknowledged" },
+      observedEffectReceipt: { kind: "AUDIT", recordId: "receipt:effect", relationship: "observed" },
       observedAt: 3,
     }], 2)).toThrow("stale, invalid, or in the future");
+    expect(normalizeControlExecutions([{
+      controlKey: "PAUSE_REPOSITORY_DISPATCH",
+      commandReceipt: { kind: "AUDIT", recordId: "receipt:command", relationship: "issued" },
+      acknowledgmentReceipt: { kind: "AUDIT", recordId: "receipt:acknowledgment", relationship: "acknowledged" },
+      observedEffectReceipt: { kind: "AUDIT", recordId: "receipt:effect", relationship: "observed" },
+      observedAt: 2,
+    }], 2)).toEqual([expect.objectContaining({
+      commandReceipt: expect.objectContaining({ recordId: "receipt:command" }),
+      acknowledgmentReceipt: expect.objectContaining({ recordId: "receipt:acknowledgment" }),
+      observedEffectReceipt: expect.objectContaining({ recordId: "receipt:effect" }),
+    })]);
     expect(validateFactoryIncidentTransition({
       currentPhase: "CLARIFY",
       nextPhase: "CONTAIN",
@@ -111,6 +137,11 @@ describe("Factory Incident Command domain", () => {
     expect(controlReceiptRejectionReason({ ...receipt, projectId: "project-2" })).toBe("control-receipt-outside-workspace");
     expect(controlReceiptRejectionReason({ ...receipt, result: "FAIL" })).toBe("control-receipt-not-passing");
     expect(controlReceiptRejectionReason({ ...receipt, checkId: "factory-control:PAUSE_REPOSITORY_DISPATCH:command" })).toBe("control-receipt-role-mismatch");
+    expect(controlReceiptRejectionReason({
+      ...receipt,
+      checkId: "factory-control:PAUSE_REPOSITORY_DISPATCH:acknowledgment",
+      expectedCheckId: "factory-control:PAUSE_REPOSITORY_DISPATCH:acknowledgment",
+    })).toBeNull();
     expect(controlReceiptRejectionReason({ ...receipt, earliestCreatedAt: 11 })).toBe("control-receipt-stale");
     expect(controlReceiptRejectionReason({ ...receipt, createdAt: 12 })).toBe("control-receipt-created-after-observation");
   });

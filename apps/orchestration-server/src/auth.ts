@@ -9,6 +9,7 @@ import { timingSafeEqual } from "node:crypto";
 
 const PUBLIC_ROUTES = new Set([
   "GET /health",
+  "GET /ready",
   "GET /gateway/status",
 ]);
 

@@ -209,6 +209,7 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
   const [reason, setReason] = useState("");
   const [evidenceReferences, setEvidenceReferences] = useState("");
   const [commandReferences, setCommandReferences] = useState("");
+  const [acknowledgmentReferences, setAcknowledgmentReferences] = useState("");
   const [observedEffectReferences, setObservedEffectReferences] = useState("");
   const [selectedActions, setSelectedActions] = useState<ContainmentAction[]>([]);
   const [restoreAuthority, setRestoreAuthority] = useState(false);
@@ -254,13 +255,15 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
     try {
       const controlKeys = upcoming === "CONTAIN" ? selectedActions : upcoming === "RESTORE" ? containedActions : [];
       const commands = commandReferences.split("\n").map((item) => item.trim()).filter(Boolean);
+      const acknowledgments = acknowledgmentReferences.split("\n").map((item) => item.trim()).filter(Boolean);
       const effects = observedEffectReferences.split("\n").map((item) => item.trim()).filter(Boolean);
-      if (controlKeys.length !== commands.length || controlKeys.length !== effects.length) {
-        throw new Error("Each control requires one command receipt and one distinct observed-effect receipt.");
+      if (controlKeys.length !== commands.length || controlKeys.length !== acknowledgments.length || controlKeys.length !== effects.length) {
+        throw new Error("Each control requires distinct command, acknowledgment, and observed-effect receipts.");
       }
       const controlExecutions = controlKeys.map((controlKey, index) => ({
         controlKey,
         commandReceipt: { kind: "EVIDENCE" as const, recordId: commands[index], relationship: "control-command-issued" },
+        acknowledgmentReceipt: { kind: "EVIDENCE" as const, recordId: acknowledgments[index], relationship: "control-command-acknowledged" },
         observedEffectReceipt: { kind: "EVIDENCE" as const, recordId: effects[index], relationship: "control-effect-observed" },
         observedAt: Date.now(),
       }));
@@ -283,6 +286,7 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
       setReason("");
       setEvidenceReferences("");
       setCommandReferences("");
+      setAcknowledgmentReferences("");
       setObservedEffectReferences("");
       setSelectedActions([]);
       setRestoreAuthority(false);
@@ -401,10 +405,11 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
           <Textarea className="mt-3" aria-label="Incident transition reason" placeholder="Decision reason and current facts" value={reason} onChange={(event) => setReason(event.target.value)} />
           <Textarea className="mt-2" aria-label="Incident evidence references" placeholder={upcoming === "MEASURE" ? "One measurement evidence reference per line (required)" : upcoming === "RESTORE" ? "One known-safe evidence reference per line (required)" : "One supporting evidence reference per line"} value={evidenceReferences} onChange={(event) => setEvidenceReferences(event.target.value)} />
           {upcoming === "CONTAIN" || upcoming === "RESTORE" ? (
-            <div className="mt-2 grid gap-2 lg:grid-cols-2">
+            <div className="mt-2 grid gap-2 lg:grid-cols-3">
               <Textarea aria-label="Control command receipts" placeholder="One PASS evidence-envelope ID per control, in control order" value={commandReferences} onChange={(event) => setCommandReferences(event.target.value)} />
+              <Textarea aria-label="Control acknowledgment receipts" placeholder="One distinct PASS acknowledgment evidence-envelope ID per control, in control order" value={acknowledgmentReferences} onChange={(event) => setAcknowledgmentReferences(event.target.value)} />
               <Textarea aria-label="Observed control effects" placeholder="One distinct PASS effect evidence-envelope ID per control, in control order" value={observedEffectReferences} onChange={(event) => setObservedEffectReferences(event.target.value)} />
-              <p className="text-[11px] text-ink-muted lg:col-span-2">A command acknowledgement is not proof that the control took effect.</p>
+              <p className="text-[11px] text-ink-muted lg:col-span-3">Command issuance, acknowledgment, and observed effect require three distinct receipts.</p>
             </div>
           ) : null}
           {error ? <p role="alert" className="mt-2 text-[12px] text-danger">{error}</p> : null}
