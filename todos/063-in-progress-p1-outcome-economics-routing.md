@@ -265,6 +265,20 @@ typecheck, build, startup smoke, runtime guard, and historical evidence checks.
 All 15 critical browser checks pass. Phase 5's frozen offline evidence now binds
 to v52 and continues to deny live comparison or automatic promotion.
 
-Signed restart evidence, exact PR-head CI, merge, clean-main requalification,
-and guarded release remain in progress. The ten accepted real-work outcomes and
-two-route live economics comparison remain separate acceptance requirements.
+Signed restart evidence, exact PR-head CI, merge, and clean-main requalification
+were completed in the closure below. No configured Production target exists for
+the orchestration service. The ten accepted real-work outcomes and two-route live
+economics comparison remain separate acceptance requirements.
+
+### 2026-09-06 — Durable accounting recovery merged and qualified
+
+PR #197 merged as `b17c9c5` after all required exact-head CI and Preview
+contexts passed. A fresh detached checkout of the merge passed 19/19 composed
+gates, the full Phase 5 suite, 15/15 critical browser checks, and an independent
+74/74 signed restart/recovery qualification. The existing Production UI
+deployment remains unchanged. This repository has no configured Production
+target for the orchestration service, so no UI-only deployment was represented
+as releasing the recovery behavior.
+
+The ten accepted real-work outcomes, live two-route comparison, and attributable
+Production incident restoration remain open acceptance requirements.
