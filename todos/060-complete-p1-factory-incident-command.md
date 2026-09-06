@@ -78,6 +78,9 @@ Clarify → Contain → Observe → Isolate → Restore → Correct → Prevent 
   stale/reordered, resolved-immutability, and denied-access checks.
 - Browser-verified the resolved aggregate, Event stream continuity, narrow
   split-pane layout, local denied-state boundary, and zero browser errors.
+- Updated the v2 route smoke contract for the intentionally renamed
+  `Factory Incidents` page and passed all 15 deterministic browser, security,
+  accessibility, and route-smoke tests.
 - Ran the focused 15-test incident suite and the full composed system
   qualification. All 18 qualification gates passed, including release security,
   128 execution-boundary tests, 204 cross-domain contracts, the full repository
