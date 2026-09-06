@@ -1,0 +1,17 @@
+{
+  "schema": "accounting-recovery-source-approval/v1",
+  "status": "AWAITING_SPECIFIC_USER_APPROVAL",
+  "recordedAt": "2026-09-06T17:30:00.659108+00:00",
+  "qualifiedParentMain": "44f240c6e22d0662107508149b888a7d71747b80",
+  "patches": {
+    "startup-review-v2.diff": "9895db1630ad026468ec22dd3f321e8d6a0a9e47b04f6f6f34011edaf285f288",
+    "settlement-errors-review-v2.patch": "fd1a5c71260f7688c6ff9f2d23d4e5b122b6415f7862f7972f204095a8237dd3",
+    "acknowledgment-diagnostic-review.patch": "f54872c53dc83d63491936d64a885de11b52b174c784c9a6792ebf25f211bc2a"
+  },
+  "startupCandidateSha256": "97f6a5dbca2ab071b24e7860c3d006242b20a5c9df939cf1e7b485fd30e9ff2a",
+  "readOnlyStartupTypecheck": "PASS",
+  "patchesApplied": false,
+  "rootReview": "GO_FOR_USER_SOURCE_APPROVAL; full integration qualification remains required",
+  "providerCallsAuthorized": false,
+  "productionReleaseAuthorized": false
+}

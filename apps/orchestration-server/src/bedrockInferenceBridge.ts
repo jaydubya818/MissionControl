@@ -18,6 +18,14 @@ import {
   type BedrockTransport,
 } from "./bedrockAdapter.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
+import type { AccountingCaptureIntent, AccountingTicket, AccountingReference, AccountingAcknowledgment } from "./accountingDeliveryJournal.js";
+
+export interface BedrockAccountingDelivery {
+  scope?: { projectId: string; repositoryId: string };
+  prepare(input: AccountingCaptureIntent): Promise<AccountingTicket>;
+  capture(ticket: AccountingTicket, payload: BedrockSettlementPayload): Promise<AccountingReference>;
+  deliver(reference: AccountingReference): Promise<AccountingAcknowledgment>;
+}
 
 export interface BedrockBridgeBinding {
   projectId: string;
@@ -58,17 +66,21 @@ export class BedrockSettlementError extends Error {
   readonly projectId: string;
   readonly repositoryId: string;
   readonly settlementPayload: BedrockSettlementPayload;
+  readonly accountingReference?: AccountingReference;
 
   constructor(
     scope: Pick<BedrockBridgeBinding, "projectId" | "repositoryId">,
     payload: BedrockSettlementPayload,
     cause: unknown,
+    reference?: AccountingReference,
+    captureFailed = false,
   ) {
-    super("BEDROCK_SETTLEMENT_NOT_ACCEPTED", { cause });
+    super(captureFailed ? "ACCOUNTING_CAPTURE_FAILED" : "BEDROCK_SETTLEMENT_NOT_ACCEPTED", { cause });
     this.name = "BedrockSettlementError";
     this.projectId = scope.projectId;
     this.repositoryId = scope.repositoryId;
     this.settlementPayload = Object.freeze({ ...payload, usage: Object.freeze({ ...payload.usage }) });
+    this.accountingReference = reference ? Object.freeze({ ...reference }) : undefined;
   }
 }
 
@@ -114,10 +126,13 @@ export class BedrockInferenceBridge {
     private readonly authority: BedrockBridgeAuthority,
     private readonly transport: BedrockTransport,
     private readonly now = Date.now,
+    private readonly accounting?: BedrockAccountingDelivery,
   ) {
     this.binding = structuredClone(binding);
     const b = this.binding;
     b.route = bedrockRouteSchema.parse(b.route);
+    if (transport.evidenceClass === "APPROVED_QUALIFICATION" && !accounting) throw new Error("ACCOUNTING_JOURNAL_REQUIRED");
+    if (accounting?.scope && (accounting.scope.projectId !== b.projectId || accounting.scope.repositoryId !== b.repositoryId)) throw new Error("ACCOUNTING_SCOPE_MISMATCH");
     if (
       !["OFFLINE_FIXTURE", "APPROVED_QUALIFICATION"].includes(
         transport.evidenceClass,
@@ -203,8 +218,10 @@ export class BedrockInferenceBridge {
     this.requests.add(requestId);
     let admitted = false;
     let observedSettlement: BedrockSettlementPayload | undefined;
+    let accountingReference: AccountingReference | undefined;
     const startedAt = this.now();
     try {
+      const ticket = await this.accounting?.prepare({ subject, requestId, requestDigest, evidenceClass: this.transport.evidenceClass });
       // Failure/ambiguous reply here permits no send, but never permits replay.
       const proof = await this.authority.reserve({
         ...subject,
@@ -252,15 +269,30 @@ export class BedrockInferenceBridge {
         expectedReceiptRevision: 0,
       } satisfies ProviderUsage;
       observedSettlement = { ...subject, usage };
+      if (this.accounting && ticket) {
+        try { accountingReference = await this.accounting.capture(ticket, observedSettlement); }
+        catch (error) {
+          // Known usage must never be replaced with an empty UNKNOWN observation.
+          // Production authority uses the same bounded accounting client here.
+          await this.authority.settle(structuredClone(observedSettlement)).catch(() => undefined);
+          throw new BedrockSettlementError(b, observedSettlement, error, undefined, true);
+        }
+      }
       try {
-        const receipt = (await this.authority.settle(structuredClone(observedSettlement))) as {
+        const receipt = (this.accounting && accountingReference
+          ? await this.accounting.deliver(accountingReference)
+          : await this.authority.settle(structuredClone(observedSettlement))) as {
           incident?: boolean;
           duplicate?: boolean;
         } | null | undefined;
+        if (this.accounting && accountingReference && typeof receipt?.incident === "boolean" && typeof receipt.duplicate === "boolean") {
+          // Accounting delivery and execution success are separate outcomes.
+          accountingReference = { ...accountingReference, state: "ACKNOWLEDGED" };
+        }
         if (!receipt || receipt.incident !== false || receipt.duplicate !== false)
           throw new Error("BEDROCK_SETTLEMENT_NOT_ACCEPTED");
       } catch (error) {
-        throw new BedrockSettlementError(b, observedSettlement, error);
+        throw new BedrockSettlementError(b, observedSettlement, error, accountingReference);
       }
       return {
         ...result,

@@ -1,0 +1,36 @@
+{
+  "status": "REPRODUCED",
+  "sourceBindings": {
+    "accountingDeliveryJournal.ts": "41d26ed4989ac27e8fc88f1b6c60ac4dcb2ce911ce9d80ef9a61c14dc475d6d9",
+    "accountingDeliveryWorker.ts": "1131f9f1999646b0f684b5075f73c7cd30448937d029a9e49c4eaa9a1b2345cd"
+  },
+  "bundleSha256": "d43f8cb987f589f0e0d4f790946466d9dc5b056f350a0eae4c0a31f33033a7fa",
+  "scope": "Isolated source review probes; no backend, network, credentials, provider or execution authority",
+  "probes": [
+    {
+      "name": "stop-during-bound-observation-read",
+      "reproduced": true,
+      "signedSubmissionStartsAfterStopReturns": 1
+    },
+    {
+      "name": "stop-does-not-await-direct-delivery",
+      "reproduced": true,
+      "aborted": true,
+      "stopReturnedBeforeDeliverySettled": true
+    },
+    {
+      "name": "one-writer-repeated-status-sync-failure",
+      "reproduced": true,
+      "failedAttempts": 4,
+      "retainedTemporaryFiles": 4
+    },
+    {
+      "name": "untrusted-original-ancestor-disappears-after-realpath",
+      "reproduced": true,
+      "nonStickyWorldWritableAncestorAccepted": true,
+      "resolvedParentTrusted": true,
+      "fixtureBoundary": "Temporary path opt-in permits sticky OS temp ancestor only; the original unsafe ancestor is non-sticky 0777"
+    }
+  ],
+  "fixtureStorageRemoved": true
+}

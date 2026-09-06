@@ -6,7 +6,7 @@
   "generatedAt": "2026-09-05T20:00:05.000Z",
   "networkCalls": 0,
   "syntheticCustomerData": false,
-  "runtimeContract": "v50",
+  "runtimeContract": "v52",
   "route": {
     "provider": "openai",
     "providerRoute": "openai-chat-completions",

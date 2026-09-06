@@ -10,6 +10,7 @@ import {
 import { createReservation as createCanonicalReservation } from "../inferenceGateway";
 import { inferencePriceBook } from "@mission-control/shared";
 import { liabilityDigest } from "../lib/providerLiability";
+import { ConvexError } from "convex/values";
 // Profile cryptographic/admission behavior has its own suite. Here vary its
 // eligibility while exercising the actual liability handlers and worker fencing.
 vi.mock("../lib/executionProfileAdmission", () => ({
@@ -429,6 +430,25 @@ it.each(["by_provider_usage", "by_provider_request"])(
 
 const accountingRows = (f: ReturnType<typeof bedrockHandlerFixture>, table: string): any[] => Object.values(f.rows).filter((row: any) => row._table === table);
 const bedrockUsage = (f: ReturnType<typeof bedrockHandlerFixture>, classification = "ACTUAL") => ({ requestId: f.args.requestId, requestDigest: hash, provider: f.price.provider, model: f.price.model, providerRequestId: classification === "ACTUAL" ? "provider-request-1" : "", usageId: classification === "ACTUAL" ? "usage-1" : "", inputTokens: classification === "ACTUAL" ? 1 : 0, outputTokens: classification === "ACTUAL" ? 1 : 0, classification, expectedReceiptRevision: 0 });
+it("returns a typed historical conflict without changing rejection or exact-duplicate behavior", async () => {
+  const f = bedrockHandlerFixture();
+  await handler(reserveRequestInternal)(f.ctx, f.args);
+  const args = { ...f.args, usage: bedrockUsage(f) };
+  expect(await handler(recordUsageInternal)(f.ctx, args)).toMatchObject({ duplicate: false });
+  expect(await handler(recordUsageInternal)(f.ctx, args)).toMatchObject({ duplicate: true });
+  const before = structuredClone(f.rows);
+  const error = await handler(recordUsageInternal)(f.ctx, { ...args, usage: { ...args.usage, inputTokens: 2 } }).catch((e: unknown) => e);
+  expect(error).toBeInstanceOf(ConvexError);
+  expect(error.data).toEqual({ code: "ACCOUNTING_HISTORICAL_CONFLICT", reason: "USAGE_REVISION_CONFLICT" });
+  expect(f.rows).toEqual(before);
+});
+it("does not label an unrelated settlement failure as historical conflict", async () => {
+  const f = bedrockHandlerFixture();
+  f.ctx.db.get = async () => { throw new Error("storage temporarily unavailable"); };
+  const error = await handler(recordUsageInternal)(f.ctx, { ...f.args, usage: bedrockUsage(f) }).catch((e: unknown) => e);
+  expect(error).not.toBeInstanceOf(ConvexError);
+  expect(error.message).toBe("storage temporarily unavailable");
+});
 it.each(["provider", "model"])("retains corrected %s drift as UNKNOWN money and preserves the original receipt", async field => {
   const f = bedrockHandlerFixture();
   allowFixtureOperator(f);

@@ -1,6 +1,6 @@
 /**
  * Mission Control Shared Package
- * 
+ *
  * Shared types, constants, and utilities used across all packages.
  */
 
@@ -18,3 +18,4 @@ export * from "./execution-routing.js";
 export * from "./missionPlannerIdentity.js";
 export * from "./evalControlPlane.js";
 export * from "./missionControlGoldenSuite.js";
+export * from "./factoryDeploymentPackage.js";

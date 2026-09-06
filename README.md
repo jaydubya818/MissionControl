@@ -454,6 +454,9 @@ The honest current claim is:
 - Seventeen deliberate failure injections that failed closed.
 - A bounded 3/3 live Remote Sandbox cohort with Attempt-scoped credentials and
   verified cleanup.
+- A deterministic Factory Incident Command control plane with append-only
+  lifecycle, scoped command authority, independent observed-effect evidence,
+  and separately authorized restoration.
 
 The complete evidence is retained in:
 
@@ -469,6 +472,26 @@ The public client/backend runtime contract is versioned in
 when deployed clients and backend functions cannot safely interoperate.
 
 Current public client/backend runtime contract: **v52**.
+
+### Factory Incident Command (Experimental)
+
+Runtime contract v51 adds a browser-operable incident control plane for the
+governed lifecycle:
+
+`Clarify → Contain → Observe → Isolate → Restore → Correct → Prevent → Measure`
+
+Incident Command deliberately separates a command being issued, the executor
+acknowledging it, and evidence that the intended effect was actually observed.
+An acknowledgment is diagnostic evidence; it cannot certify containment.
+Restoration is a new consequential action and requires its own current,
+incident-scoped authority. Stale, revoked, replayed, forged, or cross-workspace
+authority and evidence fail closed. Incident transitions depend on durable,
+append-only receipts whose authority, provenance, scope, and currentness can be
+independently verified.
+
+This capability remains **Experimental**. Deterministic contract and threat
+tests are complete, but they do not establish general production incident
+actuation, broad provider coverage, or autonomous emergency authority.
 
 ## Current limitations
 
@@ -498,9 +521,11 @@ Current boundaries include:
   Phase 3 fixture and qualifies one real Context7 `query-docs` operation for a
   fixed public React documentation query. No write operation, dynamic discovery
   authority, connector breadth, or general harness MCP runtime is admitted.
-- **Incident response is fragmented.** Alerts, traces, run failures, and operator
-  controls exist, but the canonical browser-operable Factory Incident lifecycle
-  is not complete.
+- **Incident Command — Experimental.** The canonical browser-operable lifecycle
+  and deterministic control plane are implemented. Qualification is bounded to
+  approved synthetic/qualification activity; real production incident
+  actuation, broad provider integration, and autonomous emergency authority
+  remain outside the admitted scope.
 - **Enterprise tenancy is not fully qualified.** Company, workspace, repository,
   and server-side authorization boundaries exist; sustained cross-company and
   service-identity evidence is still required before public multi-tenant claims.

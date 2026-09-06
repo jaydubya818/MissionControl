@@ -68,6 +68,7 @@ import type * as factory_releases from "../factory/releases.js";
 import type * as factory_repetitiveTasks from "../factory/repetitiveTasks.js";
 import type * as factory_workflows from "../factory/workflows.js";
 import type * as factoryMemory from "../factoryMemory.js";
+import type * as factoryPackageImports from "../factoryPackageImports.js";
 import type * as featureFlags from "../featureFlags.js";
 import type * as flakySteps from "../flakySteps.js";
 import type * as gatewayConnection from "../gatewayConnection.js";
@@ -140,6 +141,8 @@ import type * as lib_factoryMemoryTelemetry from "../lib/factoryMemoryTelemetry.
 import type * as lib_factoryMemoryValidators from "../lib/factoryMemoryValidators.js";
 import type * as lib_factoryModelRoute from "../lib/factoryModelRoute.js";
 import type * as lib_factoryOverview from "../lib/factoryOverview.js";
+import type * as lib_factoryPackageImport from "../lib/factoryPackageImport.js";
+import type * as lib_factoryPackageRetrieval from "../lib/factoryPackageRetrieval.js";
 import type * as lib_factoryProjectSeed from "../lib/factoryProjectSeed.js";
 import type * as lib_factoryQualificationScope from "../lib/factoryQualificationScope.js";
 import type * as lib_factoryRelease from "../lib/factoryRelease.js";
@@ -407,6 +410,7 @@ declare const fullApi: ApiFromModules<{
   "factory/repetitiveTasks": typeof factory_repetitiveTasks;
   "factory/workflows": typeof factory_workflows;
   factoryMemory: typeof factoryMemory;
+  factoryPackageImports: typeof factoryPackageImports;
   featureFlags: typeof featureFlags;
   flakySteps: typeof flakySteps;
   gatewayConnection: typeof gatewayConnection;
@@ -479,6 +483,8 @@ declare const fullApi: ApiFromModules<{
   "lib/factoryMemoryValidators": typeof lib_factoryMemoryValidators;
   "lib/factoryModelRoute": typeof lib_factoryModelRoute;
   "lib/factoryOverview": typeof lib_factoryOverview;
+  "lib/factoryPackageImport": typeof lib_factoryPackageImport;
+  "lib/factoryPackageRetrieval": typeof lib_factoryPackageRetrieval;
   "lib/factoryProjectSeed": typeof lib_factoryProjectSeed;
   "lib/factoryQualificationScope": typeof lib_factoryQualificationScope;
   "lib/factoryRelease": typeof lib_factoryRelease;
