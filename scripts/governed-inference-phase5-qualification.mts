@@ -295,7 +295,7 @@ const record = {
   generatedAt: "2026-09-05T20:00:05.000Z",
   networkCalls: 0,
   syntheticCustomerData: false,
-  runtimeContract: "v50",
+  runtimeContract: "v52",
   route: selectedRoute,
   comparisonRoute: { ...comparisonRoute, qualification: "NOT_INDEPENDENTLY_QUALIFIED" },
   identities: {

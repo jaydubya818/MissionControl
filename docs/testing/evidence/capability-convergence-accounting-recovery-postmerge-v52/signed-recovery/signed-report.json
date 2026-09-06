@@ -1,0 +1,52 @@
+{
+  "schema": "fdlc-signed-accounting-recovery-summary/v1",
+  "status": "PASS",
+  "head": "b17c9c5c4d3c664a628ce43303e9794df603e3ca",
+  "startedAt": "2026-09-06T21:24:47.077Z",
+  "completedAt": "2026-09-06T21:24:48.936Z",
+  "scenarioCounts": { "signed": 15, "realProcessKillRestart": 2, "total": 17 },
+  "assertions": {
+    "terminalSettlement": "PASS",
+    "freshDuplicateEnvelopes": 8,
+    "reusedEnvelopeDenied": true,
+    "immutablePayload": true,
+    "unknownDisposition": "PENDING",
+    "authenticationAndScopeDisposition": "SUSPENDED",
+    "historicalConflictDisposition": "BLOCKED_REVIEW",
+    "lostReplyRecovery": "ACKNOWLEDGED",
+    "correctionBeforeRedelivery": "BLOCKED_REVIEW",
+    "allAcknowledgmentCombinations": "ACKNOWLEDGED",
+    "realProcessKills": 2
+  },
+  "backendAssertions": {
+    "serviceCommandReceipts": 21,
+    "usageEvents": 7,
+    "uniqueCommandIds": 21,
+    "deniedReceipts": 2,
+    "failedReceipts": 2
+  },
+  "sourceBindings": {
+    "apps/orchestration-server/src/accountingDeliveryJournal.ts": "a65fc946fa27dd0b2d9a35e707e0d2f801378a3392cef96b3aa725519031e443",
+    "apps/orchestration-server/src/accountingDeliveryRuntime.ts": "45e413b65483de464835813d65446d2dedfeb8d7d88e7b92b448dd7a33891c25",
+    "apps/orchestration-server/src/accountingDeliveryWorker.ts": "72ef39424ff163614235a5242ecd1088bdb41e65a3ccdb22e7a38fae94d74a1a",
+    "apps/orchestration-server/src/serviceCommandClient.ts": "0898843026c06488485d0ccc99fffd4c42a2104d1173029f6de5cacea76d2e3e",
+    "convex/serviceCommands.ts": "e7cc8368a067ab68702410dbe44cd91717fe30fcbd5dbf1c2774c5cf214499ce",
+    "convex/schema.ts": "1d49033adb28b2d2c6174d2047dfff075600d89e28b673004c489d40e04a9a98",
+    "convex/factory/providerLiability.ts": "22b622d6aca64ef906e49add28d21fb045ee5818af2e8843a9ccd6812084aa25",
+    "convex/lib/providerLiability.ts": "11ba884486c8d406d4912452498ead5a4be9f3a548a9b4b5844d7806978b731d",
+    "convex/lib/providerLiabilityValidators.ts": "b279a1250e7f7f9f4e77b8abc7d1440ef181fa226ac9a40a103d1242dbccaaef",
+    "convex/lib/serviceCommandAuth.ts": "1b22348e20cde76556c6949d8bcab1a1dccb56033cee22f12a5098b96a85cec2",
+    "convex/factory/incidents.ts": "8855d4d56f08eedb632273ee6e97f92dbaefae9cb99a367b157855233fbf4b7b",
+    "convex/lib/factoryIncident.ts": "1e871dd1c93f0cd1db86af85513ba349c4c70c09b89ebacba927bec1840f0d43",
+    "convex/lib/factoryIncidentDrills.ts": "7244b180b0973c285003002ce01eb7e00eb152f06a50234b8086f490bad648ab",
+    "packages/shared/src/serviceCommandEnvelope.ts": "97a1a2448c6939028ac3e7fcb21bed87d4de24840a8ecf143c0fab557f4baa18"
+  },
+  "cleanup": {
+    "cloudPortClosed": true,
+    "sitePortClosed": true,
+    "databaseRemoved": true,
+    "storageRemoved": true,
+    "sourceUnchanged": true,
+    "generatedValuesAbsent": true
+  }
+}

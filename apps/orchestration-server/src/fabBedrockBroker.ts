@@ -4,7 +4,12 @@ import type { BedrockBrokerRequest, BedrockBrokerTransport, BedrockRoute as FabB
 import type { HarnessExecutionContext } from "@mission-control/workflow-engine";
 import { liabilityDigest, type ProviderUsage } from "../../../convex/lib/providerLiability.js";
 import type { BedrockBridgeIdentity } from "../../../convex/lib/bedrockBridgeIdentity.js";
-import { canonicalBedrockBridgeAuthority } from "./bedrockInferenceBridge.js";
+import {
+  BedrockSettlementError,
+  canonicalBedrockBridgeAuthority,
+  type BedrockAccountingDelivery,
+  type BedrockSettlementPayload,
+} from "./bedrockInferenceBridge.js";
 import { parseBedrock, type BedrockTransport, type BedrockWire } from "./bedrockAdapter.js";
 import { bedrockRouteSchema, type BedrockRoute } from "./bedrockRoute.js";
 
@@ -30,6 +35,7 @@ export function createFabBedrockBrokerFactory(
   client: ConvexHttpClient,
   configuration: FabBedrockBrokerConfiguration,
   transport: BedrockTransport,
+  accounting?: BedrockAccountingDelivery,
 ) {
   const config = structuredClone(configuration);
   config.route = bedrockRouteSchema.parse(config.route);
@@ -39,6 +45,7 @@ export function createFabBedrockBrokerFactory(
     throw new Error("FAB_BEDROCK_CONFIGURATION_INVALID");
   if (!transport.countInputTokens || transport.evidenceClass !== "APPROVED_QUALIFICATION")
     throw new Error("FAB_BEDROCK_QUALIFIED_TRANSPORT_REQUIRED");
+  if (!accounting) throw new Error("ACCOUNTING_JOURNAL_REQUIRED");
 
   return async (input: { context: HarnessExecutionContext }): Promise<BedrockBrokerTransport> => {
     const attempt = input.context.attempt;
@@ -67,6 +74,9 @@ export function createFabBedrockBrokerFactory(
       projectId: attempt.projectId,
       repositoryId: attempt.repositoryId,
     });
+    if (accounting.scope && (accounting.scope.projectId !== attempt.projectId
+      || accounting.scope.repositoryId !== attempt.repositoryId))
+      throw new Error("ACCOUNTING_SCOPE_MISMATCH");
     let active = false;
     const requests = new Set<string>();
     return {
@@ -98,10 +108,17 @@ export function createFabBedrockBrokerFactory(
         requests.add(request.requestId);
         let admitted = false;
         let settled = false;
+        let observedSettlement: BedrockSettlementPayload | undefined;
         try {
           signal.throwIfAborted();
           await attempt.assertActive();
           const counted = await transport.countInputTokens!(wire, signal);
+          const ticket = await accounting.prepare({
+            subject,
+            requestId: request.requestId,
+            requestDigest: canonicalRequestDigest,
+            evidenceClass: transport.evidenceClass,
+          });
           const proof = await authority.reserve({
             ...subject,
             bridgeIdentity: identity,
@@ -114,6 +131,7 @@ export function createFabBedrockBrokerFactory(
           admitted = true;
           if (proof.requestId !== request.requestId || proof.requestDigest !== canonicalRequestDigest
             || proof.priceDigest !== config.priceDigest || proof.bridgeIdentityDigest !== liabilityDigest(identity)
+            || !Number.isSafeInteger(proof.admittedAt) || proof.admittedAt > Date.now()
             || !Number.isSafeInteger(proof.validUntil) || proof.validUntil <= Date.now())
             throw new Error("FAB_BEDROCK_ADMISSION_PROOF_INVALID");
           const remaining = proof.validUntil - Date.now();
@@ -133,12 +151,26 @@ export function createFabBedrockBrokerFactory(
             classification: "ACTUAL",
             expectedReceiptRevision: 0,
           };
-          const receipt = await authority.settle({ ...subject, usage }) as { incident?: boolean; duplicate?: boolean };
+          observedSettlement = { ...subject, usage } as BedrockSettlementPayload;
+          let accountingReference;
+          try {
+            accountingReference = await accounting.capture(ticket, observedSettlement);
+          } catch (error) {
+            await authority.settle(structuredClone(observedSettlement)).catch(() => undefined);
+            throw new BedrockSettlementError(
+              { projectId: attempt.projectId, repositoryId: attempt.repositoryId },
+              observedSettlement,
+              error,
+              undefined,
+              true,
+            );
+          }
+          const receipt = await accounting.deliver(accountingReference) as { incident?: boolean; duplicate?: boolean };
           if (!receipt || receipt.incident || receipt.duplicate) throw new Error("FAB_BEDROCK_SETTLEMENT_NOT_ACCEPTED");
           settled = true;
           return { requestDigest: request.requestDigest, providerRequestId: parsed.providerRequestId, httpStatus: 200, attempts: 1, body: JSON.stringify(response.body) };
         } catch (error) {
-          if (admitted && !settled) await authority.settle({
+          if (admitted && !settled && !observedSettlement) await authority.settle({
             ...subject,
             usage: { requestId: request.requestId, requestDigest: canonicalRequestDigest, provider: "aws-bedrock", model: "anthropic.claude-sonnet-4-6", providerRequestId: "", usageId: "", inputTokens: 0, outputTokens: 0, classification: "UNKNOWN", expectedReceiptRevision: 0 },
           }).catch(() => undefined);

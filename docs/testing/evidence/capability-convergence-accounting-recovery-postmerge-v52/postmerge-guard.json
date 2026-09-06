@@ -1,0 +1,39 @@
+{
+  "schema": "accounting-recovery-postmerge-guard/v1",
+  "result": "PASS",
+  "pullRequest": 197,
+  "baseSha": "13ce5f0ef961e4e5f07dc78b43109231aa097270",
+  "qualifiedHeadSha": "72bd2392f8f128fa7eb81b36c6cd4d4b9909df44",
+  "mergeSha": "b17c9c5c4d3c664a628ce43303e9794df603e3ca",
+  "mergedAt": "2026-09-06T21:16:42Z",
+  "ciRunId": 34060040867,
+  "ciConclusion": "success",
+  "systemQualification": {
+    "result": "PASS",
+    "passed": 19,
+    "total": 19,
+    "runtimeContract": "v52"
+  },
+  "phase5": {
+    "result": "PASS",
+    "networkCalls": 0,
+    "liveComparisonDecision": "NO_GO"
+  },
+  "criticalBrowser": {
+    "passed": 15,
+    "total": 15
+  },
+  "signedRecovery": {
+    "result": "PASS",
+    "passed": 74,
+    "total": 74,
+    "providerCalls": 0,
+    "productionCalls": 0
+  },
+  "productionUi": {
+    "deploymentId": "dpl_AhPTJbV2zFDnWf3r3JQnHjj4tgUW",
+    "status": "READY_UNCHANGED",
+    "automaticMainDeployment": false
+  },
+  "orchestrationProductionTarget": "NOT_CONFIGURED"
+}

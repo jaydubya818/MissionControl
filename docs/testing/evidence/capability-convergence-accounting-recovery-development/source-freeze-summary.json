@@ -1,0 +1,163 @@
+{
+  "schema": "accounting-recovery-development-checkpoint/v1",
+  "generatedAt": "2026-09-06T17:28:16.077430+00:00",
+  "worktree": "/private/tmp/fdlc-program-accounting-recovery",
+  "branch": "codex/inference-accounting-recovery",
+  "baseline": "c5cbf718eb73ce70154ee7650ce13c1da826234f",
+  "status": "UNAFFECTED_SOURCE_QUALIFIED_OFFLINE__INTEGRATION_BLOCKED",
+  "authoredSourceHashes": {
+    "apps/orchestration-server/src/accountingDeliveryJournal.ts": "a65fc946fa27dd0b2d9a35e707e0d2f801378a3392cef96b3aa725519031e443",
+    "apps/orchestration-server/src/accountingDeliveryWorker.ts": "f899afbfc2f7af81bef41ee4a73722072bcd80c3931e9cefc6f07678c1e2cc4e",
+    "apps/orchestration-server/src/accountingDeliveryRuntime.ts": "45e413b65483de464835813d65446d2dedfeb8d7d88e7b92b448dd7a33891c25",
+    "apps/orchestration-server/src/bedrockInferenceBridge.ts": "88c3cb8d223a6a0c2cbb21318330a56a62fcfa8f05f2541d241db37cb5f54d8c",
+    "apps/orchestration-server/src/bedrockFactoryComposition.ts": "595ff3b3fc0bfc404bc89ba9c14ff9e9026e0d659c45efbe5a5f0c8246f26611",
+    "apps/orchestration-server/src/dockerSandboxProvider.ts": "58d3dfd7b05cede711796162bd357595dd717c0b18b3e572b5a98ace4fdc31b8",
+    "apps/orchestration-server/src/__tests__/accountingCapture.test.ts": "e7fdbb840b83a99b51bacb71caec0e2d525371804178e46450299dfb5e38f878",
+    "apps/orchestration-server/src/__tests__/accountingDelivery.test.ts": "a8192531f1ca5026fbdb31efa6c25ba7576c8e7727f81f6364f1b3240248d13e",
+    "apps/orchestration-server/src/__tests__/accountingDeliveryReview.test.ts": "1ead1bd4daad0b32cd03e9c7b76f1b4457497046bc794eb2dc2a0ea65ef604da",
+    "apps/orchestration-server/src/__tests__/accountingDeliveryRuntime.test.ts": "4de58cdaed1b1381d75849e7d07749f5d7e5e5f9e76ff6d11297a90eaba4855f",
+    "apps/orchestration-server/src/__tests__/accountingDockerDiagnostics.test.ts": "7fefbb48177e2b23f18950401f4ef380956595b8b1ba07795c744ca1a2041f39",
+    "convex/__tests__/providerLiabilityHandlers.test.ts": "1a8e5c0d1747e1e60f47f3e8a995da585258cbd722b89313bab794fb6dd8770b",
+    "docs/software-factory/accounting-delivery-contract.md": "bb7a2f958e3a8c2be8122f73c85d719fff1a83ae34b1eef29dd1abc8c36d41bc"
+  },
+  "unappliedProductionFiles": {
+    "apps/orchestration-server/src/index.ts": {
+      "sha256": "1cf170f4c787ec067bdf13f8ce962d0a920e72091fd9a10e616fb4fd18b9c52c",
+      "matchesBaseline": true
+    },
+    "convex/factory/providerLiability.ts": {
+      "sha256": "adc57d715c56b3f399da4b93f0b08d7e3540963adf86aba60bb41ba3b747cd1d",
+      "matchesBaseline": true
+    },
+    "convex/serviceCommands.ts": {
+      "sha256": "d45916b37ff1050ccc5186f337589e558a196a93c9e19613336c228ebfe76a9a",
+      "matchesBaseline": true
+    }
+  },
+  "validation": [
+    {
+      "name": "unaffected focused orchestration",
+      "result": "PASS",
+      "passed": 110,
+      "skipped": 3,
+      "log": "/private/tmp/fdlc-accounting-recovery-validation/unaffected-final.log",
+      "excluded": [
+        "new acknowledged accounting incident diagnostic regression (source change rejected)",
+        "two existing daemon-condition Docker tests"
+      ],
+      "scope": "actual current source; does not execute candidate startup or blocked typed boundary"
+    },
+    {
+      "name": "orchestration typecheck",
+      "result": "PASS",
+      "log": "/private/tmp/fdlc-accounting-recovery-validation/typecheck-final.log",
+      "scope": "actual current source; startup candidate remains unapplied and unqualified"
+    },
+    {
+      "name": "canonical settlement handler baseline",
+      "result": "PASS",
+      "passed": 84,
+      "skipped": 1,
+      "log": "/private/tmp/fdlc-accounting-recovery-validation/handler-baseline-green.log",
+      "excluded": [
+        "new typed historical conflict regression (production boundary rejected)"
+      ]
+    },
+    {
+      "name": "typed historical conflict regression",
+      "result": "EXPECTED_FAIL_PENDING_APPROVAL",
+      "log": "/private/tmp/fdlc-accounting-recovery-validation/typed-conflict-red.log"
+    },
+    {
+      "name": "acknowledged incident diagnostic regression",
+      "result": "EXPECTED_FAIL_PENDING_APPROVAL",
+      "log": "/private/tmp/fdlc-accounting-recovery-validation/ack-diagnostic-red.log"
+    },
+    {
+      "name": "independent lifecycle/filesystem regressions",
+      "result": "PASS_AFTER_REPRODUCED_FAILURE",
+      "redEvidence": [
+        "/private/tmp/fdlc-accounting-review-XrXXwR/report.json",
+        "/private/tmp/fdlc-accounting-review-XrXXwR/fifo-report.json"
+      ],
+      "greenEvidence": [
+        "/private/tmp/fdlc-accounting-review-fixed-rQvEVf/report.json",
+        "/private/tmp/fdlc-accounting-review-fixed-rQvEVf/fifo-report.json"
+      ]
+    }
+  ],
+  "blockedReviewArtifacts": {
+    "/private/tmp/fdlc-accounting-error-boundary-review.patch": {
+      "sha256": "78d567d01e6db89a459c6233e9896a43c037390f599328cb35db05540277393d",
+      "applied": false
+    },
+    "/private/tmp/fdlc-accounting-error-boundary-review-v2.patch": {
+      "sha256": "fd1a5c71260f7688c6ff9f2d23d4e5b122b6415f7862f7972f204095a8237dd3",
+      "applied": false
+    },
+    "/private/tmp/fdlc-accounting-startup-review.patch": {
+      "sha256": "bd4ff759d52bb1e643ebec094248989d4f541e3e38d325b7dcaf68b251fbd21b",
+      "applied": false
+    },
+    "/private/tmp/fdlc-accounting-startup-candidate-v2.ts": {
+      "sha256": "97f6a5dbca2ab071b24e7860c3d006242b20a5c9df939cf1e7b485fd30e9ff2a",
+      "applied": false
+    },
+    "/private/tmp/fdlc-accounting-startup-review-v2.diff": {
+      "sha256": "9895db1630ad026468ec22dd3f321e8d6a0a9e47b04f6f6f34011edaf285f288",
+      "applied": false
+    },
+    "/private/tmp/fdlc-accounting-ack-diagnostic-review.patch": {
+      "sha256": "f54872c53dc83d63491936d64a885de11b52b174c784c9a6792ebf25f211bc2a",
+      "applied": false
+    }
+  },
+  "blockedScopes": [
+    {
+      "name": "settlement-only typed error boundary",
+      "candidate": "/private/tmp/fdlc-accounting-error-boundary-review-v2.patch",
+      "reason": "Automatic approval review rejected production financial-accounting and service-command error semantics as requiring specific approval despite program source-change authorization. No further retry or workaround performed.",
+      "effectsPending": [
+        "strict historical conflict BLOCKED_REVIEW classification across actual Convex action wrapping",
+        "strict authentication/scope SUSPENDED classification across actual signed action wrapping"
+      ],
+      "unknownCurrentBehavior": "Unfamiliar wrapped errors remain PENDING; exact fixed-backend HTTP 401/403 suspension is already implemented and tested."
+    },
+    {
+      "name": "accounting-only startup wiring",
+      "candidate": "/private/tmp/fdlc-accounting-startup-review-v2.diff",
+      "reason": "Automatic approval review rejected production worker enablement, accounting initialization and provider configuration startup wiring as requiring specific approval. No further retry or workaround performed.",
+      "candidateCorrection": "Catch optional adapter/provider plus full optional Factory registry, scope, worker and host reporter construction. Invalid configuration yields empty registry, disabled workers, no registration or alternate executor. Explicitly pass undefined scope/identity to disabled planning worker.",
+      "effectsPending": [
+        "runtime helper is tested but not imported or started by current index",
+        "integrated startup, status, shutdown and composition not qualified"
+      ]
+    },
+    {
+      "name": "acknowledged incident diagnostic state",
+      "candidate": "/private/tmp/fdlc-accounting-ack-diagnostic-review.patch",
+      "reason": "Automatic approval review rejected production bridge accounting-reference state correction as requiring specific approval. No further retry or workaround performed.",
+      "effectsPending": [
+        "durably acknowledged incident/duplicate can still appear PENDING in synchronous bridge failure diagnostic; output remains refused"
+      ]
+    }
+  ],
+  "limitations": [
+    "No full-suite green claim: two new focused regressions remain intentionally red pending rejected source changes.",
+    "No integrated startup or actual signed-action recovery qualification yet; sibling backend harness remains preparation only.",
+    "Docker diagnostics test uses actual frame/catch/diagnostic code with synthetic subprocess/daemon adapters.",
+    "Runtime has no silent temporary path fallback; tests use explicit isolated temporary fixtures.",
+    "4096 permanent local retention slots are storage/backpressure metadata, not economic reservations; full storage blocks new capture while delivery continues.",
+    "Capture guarantee starts after file and directory fsync; pre-capture response loss and host storage loss remain outside the guarantee.",
+    "Root owns evidence/program documentation and integration; baseline has not been rebased to merged parent."
+  ],
+  "performedActions": {
+    "providerCalls": false,
+    "serviceStartup": false,
+    "backendHarnessExecution": false,
+    "commits": false,
+    "pushes": false,
+    "rebases": false,
+    "deployments": false
+  }
+}

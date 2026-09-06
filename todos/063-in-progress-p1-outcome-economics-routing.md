@@ -226,3 +226,59 @@ The observation slice also clarifies the earlier economics wording: every
 physical call contributes to the cohort cost numerator. Verified and human-
 accepted outcomes use separate denominators. New corrected projection formula v2
 preserves UNKNOWN monetary corrections without changing historical v1 snapshots.
+
+### 2026-09-06 — Durable accounting delivery started
+
+The observation slice passes 57 real local backend scenarios and eight browser
+checks against persisted records. Its in-memory failure payload still disappears
+through the Docker consumer and cannot survive restart. Continue in the isolated
+`codex/inference-accounting-recovery` branch under the
+[accounting delivery contract](../docs/software-factory/accounting-delivery-contract.md).
+The host journal carries immutable observations to the existing historical
+settlement path; it grants no execution, new allocation, correction or release.
+Source implementation and integrated recovery qualification remain pending.
+
+### 2026-09-06 — Recovery source approved and focused qualification passed
+
+The Product Owner approved settlement error classification, independent recovery
+startup, and acknowledgment diagnostics. The applied implementation passes 186
+focused orchestration tests with two existing conditional daemon skips, 196
+backend and authority tests with no skips, orchestration typecheck, and the
+runtime-contract v50 guard across 970 public functions. Explicitly incomplete
+provider configuration disables the complete Factory execution bootstrap while
+the configured accounting recovery runtime remains independently available.
+Actual signed backend recovery, current-main integration, complete qualification,
+CI, merge, clean-main proof, and release remain in progress.
+
+### 2026-09-06 — Recovery integrated and exact-source qualification passed
+
+The recovery source now contains current main `13ce5f0ef961` and runtime contract
+v52. Final review found and corrected one startup race: provider registration
+and both execution workers now wait for successful durable journal readiness.
+The actual index regression proves invalid storage records a bounded diagnostic
+while both workers remain unstarted.
+
+Focused proof passes 196 orchestration tests, 132 backend and authority tests,
+and six incident workspace tests. Exact-source composed qualification passes
+every release-blocking stage, including full repository tests, security, lint,
+typecheck, build, startup smoke, runtime guard, and historical evidence checks.
+All 15 critical browser checks pass. Phase 5's frozen offline evidence now binds
+to v52 and continues to deny live comparison or automatic promotion.
+
+Signed restart evidence, exact PR-head CI, merge, and clean-main requalification
+were completed in the closure below. No configured Production target exists for
+the orchestration service. The ten accepted real-work outcomes and two-route live
+economics comparison remain separate acceptance requirements.
+
+### 2026-09-06 — Durable accounting recovery merged and qualified
+
+PR #197 merged as `b17c9c5` after all required exact-head CI and Preview
+contexts passed. A fresh detached checkout of the merge passed 19/19 composed
+gates, the full Phase 5 suite, 15/15 critical browser checks, and an independent
+74/74 signed restart/recovery qualification. The existing Production UI
+deployment remains unchanged. This repository has no configured Production
+target for the orchestration service, so no UI-only deployment was represented
+as releasing the recovery behavior.
+
+The ten accepted real-work outcomes, live two-route comparison, and attributable
+Production incident restoration remain open acceptance requirements.
