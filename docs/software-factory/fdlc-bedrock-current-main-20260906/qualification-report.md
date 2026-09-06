@@ -1,7 +1,9 @@
 # FDLC Phase 1 Bedrock qualification report
 
 Updated: 2026-09-06. Authoritative baseline: Mission Control main
-`9dd7bb8f790e044f63b19c87a3948a2b160d042f`, runtime contract v51.
+`ccacc5a9284e4141379c3a9b24304053749fd9f7`, runtime contract v51. The
+post-qualification main advance added only incident-command evidence; the
+runtime and Bedrock source bytes are unchanged.
 
 Status: **AWS_IDENTITY_AND_ROUTE_INSPECTION_PASS**.
 
