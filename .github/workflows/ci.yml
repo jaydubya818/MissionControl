@@ -118,10 +118,10 @@ jobs:
       # The worker deliberately scrubs PATH; expose only the action-provisioned pnpm there.
       - name: Provision pnpm for frozen offline worker checks
         run: |
-          pnpm_entry="$(command -v pnpm)"
-          if [[ "$pnpm_entry" != /opt/homebrew/bin/pnpm ]]; then
-            ln -sf "$pnpm_entry" /opt/homebrew/bin/pnpm
-          fi
+          # Link the package entrypoint: the .bin shell shim resolves paths relative to $0.
+          pnpm_entry="$PNPM_HOME/../pnpm/bin/pnpm.cjs"
+          test -f "$pnpm_entry"
+          ln -sf "$pnpm_entry" /opt/homebrew/bin/pnpm
           /opt/homebrew/bin/pnpm --version
 
       - name: Install dependencies
@@ -293,10 +293,10 @@ jobs:
       # The worker deliberately scrubs PATH; expose only the action-provisioned pnpm there.
       - name: Provision pnpm for frozen offline worker checks
         run: |
-          pnpm_entry="$(command -v pnpm)"
-          if [[ "$pnpm_entry" != /opt/homebrew/bin/pnpm ]]; then
-            ln -sf "$pnpm_entry" /opt/homebrew/bin/pnpm
-          fi
+          # Link the package entrypoint: the .bin shell shim resolves paths relative to $0.
+          pnpm_entry="$PNPM_HOME/../pnpm/bin/pnpm.cjs"
+          test -f "$pnpm_entry"
+          ln -sf "$pnpm_entry" /opt/homebrew/bin/pnpm
           /opt/homebrew/bin/pnpm --version
 
       - name: Install frozen dependency graph
