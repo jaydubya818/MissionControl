@@ -2,11 +2,21 @@
 
 Fab remains **Experimental**. This record covers local implementation and injected conformance qualification. It does not establish live provider execution, deployed Convex persistence, controlled GitHub publication, whole-agent containment or Phase 3 completion.
 
-## Source and runtime identity
+## Latest reconciliation
+
+[Current-main qualification](../fab-phase3-inference-reconciliation/README.md)
+passes at `4efffbb035859b824ddb64cc8943b1e8f49f5f4c`, merging main `cc1c530`.
+This includes governed inference accounting and its closure. Contract **v44**
+fences the combined schema; 19 System gates, 15 browser tests, installed Fab/Node
+identity and the incoming accounting check pass in a fresh checkout. Independent
+security review reports GO for this bounded offline merge delta. The sections
+below retain earlier source-specific qualification history.
+
+## Earlier source and runtime identity
 
 The implementation is on `codex/fab-phase3`, reconciled with MC main `f90c50f5b4191467b2117bb8762754f697b1cefd`. Merge `1401a4e` preserves the current-main governed MCP and legacy local candidate recovery work. Runtime contract **v43** includes the Fab lifecycle changes; legacy v1 local attestation remains separate from Fab's v2 pre-publication subject and cannot authorize acceptance or publication.
 
-MC consumes private `@fdlc/fab@0.1.0-experimental.2`, built from FDLC source `1d1240c219d9bf3c1fa5fbb0a80ded96cf13df1f`. Archive SHA-256: `b3a1af223e246208c01745678cbe48a91786070b016b9a1ad7bdb0ad274d8a8d`. Installed 41-file closure SHA-256: `121ef8e14b085f6dba6e7f5598070ad80e79f5c1bfa5c71b890871bf83214999`. Three independent packaging runs, including a fresh detached checkout, produced that archive. Later site/docs commits do not change this immutable package pin. Its native helpers require macOS 26.0+ arm64 and are ad-hoc linker signed; Developer-ID signing/notarization and a Fab licensing decision remain external release gates.
+MC consumes vendored `@fdlc/fab@0.1.0-experimental.2`, built from FDLC source `1d1240c219d9bf3c1fa5fbb0a80ded96cf13df1f`. Archive SHA-256: `b3a1af223e246208c01745678cbe48a91786070b016b9a1ad7bdb0ad274d8a8d`. Installed 41-file closure SHA-256: `121ef8e14b085f6dba6e7f5598070ad80e79f5c1bfa5c71b890871bf83214999`. Three independent packaging runs, including a fresh detached checkout, produced that archive. Later site/docs commits do not change this immutable package pin. Its native helpers require macOS 26.0+ arm64 and are ad-hoc linker signed; Developer-ID signing/notarization and a Fab licensing decision remain external release gates.
 
 Later [upstream reconciliation](../fab-phase3-upstream/README.md) preserves main `6d7146d5205aef729aee2960aed2a4ed8e8ab95c` through local merge `4b95edd9`. Only two incoming documentation files changed. The executable tree is identical to the final clean-qualified implementation below; affected documentation and runtime-contract checks pass against the newer baseline.
 
@@ -41,4 +51,12 @@ Qualification runs append unique governed-MCP records. Historical Phase 2 and sy
 
 No exact live provider/model or enrolled credential has been selected and authorized. All five real-model engineering evaluations remain **NOT RUN**. Deployed admission, persistent restart/requery, real-model lineage, human checkpoint, controlled publication and remote response-loss reconciliation require an authorized non-production MC environment and dedicated qualification GitHub target.
 
-Implementation PRs, CI, merge and post-merge clean-main qualification are also **NOT RUN**. Automatic approval review blocked export to the FDLC and MissionControl GitHub repositories pending explicit destination/data authorization. Local commits and qualification continue. No artifact-upload workflow was added. Public signing and licensing are independent release decisions; green offline qualification does not remove those gates.
+The operator subsequently authorized code and reviewed synthetic-evidence export
+to both named GitHub repositories, cross-linked PRs and merge only after green
+CI/reviews under repository policy. [FDLC PR #15](https://github.com/jaydubya818/FDLC/pull/15)
+is open; its native suite passes after the CI runtime correction. The companion
+Mission Control PR, green final CI, merge and clean post-merge qualification
+remain delivery gates. No artifact-upload workflow was added. Mission Control is
+public: [vendored archive provenance](../../../../vendor/fab/README.md) records
+public retrievability and unresolved Fab licensing. Signing and licensing remain
+separate operator decisions; green offline qualification does not remove them.

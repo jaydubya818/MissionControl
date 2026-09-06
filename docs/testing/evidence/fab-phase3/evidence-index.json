@@ -5,7 +5,7 @@
   "maturity": "Experimental",
   "classification": "OFFLINE_SYNTHETIC_AND_LOCAL_BUILD",
   "files": {
-    "docs/testing/evidence/fab-phase3/README.md": "f28569514b62476c440a0ee47f51e29d8747ede4e228bf94e4c76b353137fbb3",
+    "docs/testing/evidence/fab-phase3/README.md": "96bb1048767ad9847446056319285793d6b51fdc0fdbb711c8518435bc056dc1",
     "docs/testing/evidence/fab-phase3/automated-checks.json": "90da744ad01f108aeafece3cfd5b9f88af29fa608b85a159c31cce6a18e539e2",
     "docs/testing/evidence/fab-phase3/browser-cache-failure.txt": "d1a9704f8988a311d4e81b344c9077a7f832c1b5a275261541fc80257b70f73c",
     "docs/testing/evidence/fab-phase3/browser-final.txt": "3e9d3f5456cedcaed13ece75c017e79bb6271e1bd9df84ee6a05a9d23759bed4",
@@ -50,5 +50,6 @@
     "docs/testing/evidence/governed-mcp-phase3/runs/e8d9b45eca50-2026-09-05T23-06-41-660Z/broker-scenario.json": "aebefe638a9b6e2a35ad2db6663fbb5dae2607dc0c39b543c5c134f86d723ef9",
     "docs/testing/evidence/governed-mcp-phase3/runs/1401a4e402a1-2026-09-05T23-35-09-967Z/broker-scenario.json": "6831b871ed7063d1541cbce04d5dfe4decca838fc68fdcc7077076b28dcaf43b",
     "docs/testing/evidence/governed-mcp-phase3/runs/e3b25f29e379-2026-09-05T23-09-06-674Z/broker-scenario.json": "f9b12b50b5b1215306d49d7b27e07a290ad39bf71eddf5467f434d4c6e058446"
-  }
+  },
+  "latestReconciliationManifest": "docs/testing/evidence/fab-phase3-inference-reconciliation/manifest.json"
 }
