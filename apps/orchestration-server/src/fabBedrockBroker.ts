@@ -73,14 +73,16 @@ export function createFabBedrockBrokerFactory(
       identity: () => ({ route: structuredClone(route), credentialReference, maximumAttempts: 1 }),
       invoke: async (request: BedrockBrokerRequest, signal: AbortSignal) => {
         if (active || requests.has(request.requestId)) throw new Error("FAB_BEDROCK_REQUEST_REPLAY");
-        if (liabilityDigest(request.route) !== liabilityDigest(route)
+        if (!request.requestId || !/^[a-f0-9]{64}$/.test(request.requestDigest)
+          || !Number.isSafeInteger(request.maximumOutputTokens)
+          || request.maximumOutputTokens < 1
+          || liabilityDigest(request.route) !== liabilityDigest(route)
           || request.credentialReference !== credentialReference
-          || request.maximumOutputTokens > config.maximumOutputTokens
-          || !/^[a-f0-9]{64}$/.test(request.requestDigest))
+          || request.maximumOutputTokens > config.maximumOutputTokens)
           throw new Error("FAB_BEDROCK_REQUEST_BINDING_INVALID");
         const wire: BedrockWire = {
           api: "INVOKE_MODEL",
-          region: "us-east-1",
+          region: config.route.region,
           modelId: config.route.inferenceProfileArn,
           body: JSON.parse(request.body),
           maxAttempts: 1,

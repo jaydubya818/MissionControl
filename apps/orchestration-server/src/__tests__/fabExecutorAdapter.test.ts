@@ -95,6 +95,8 @@ describe("Fab canonical MC harness conformance", () => {
     });
     const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockBrokerFactory: broker });
     expect(adapter.validateConfiguration(request)).toEqual([]);
+    const escaped = path.join(f.root, ".mission-control", "worktrees", "..", "..", "outside");
+    expect(adapter.validateConfiguration({ ...request, repositoryRoot: escaped, workingDirectory: escaped }).length).toBeGreaterThan(0);
     await expect(adapter.prepare(request, f.context)).resolves.toBeTruthy();
     expect(broker).toHaveBeenCalledOnce();
     expect(adapter.validateConfiguration({ ...request, repositoryRoot: path.join(f.root, "other"), workingDirectory: path.join(f.root, "other") }).length).toBeGreaterThan(0);

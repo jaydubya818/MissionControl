@@ -70,9 +70,12 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     const issue = (field: string, message: string) => issues.push({ field, message });
     const provider = factoryProvider(config);
     const providerRoute = factoryProviderRoute(config);
-    const governedWorktreePrefix = `${config.repository}${path.sep}.mission-control${path.sep}worktrees${path.sep}`;
+    const isGovernedWorktree = pathIsWithin(
+      path.resolve(config.repository, ".mission-control", "worktrees"),
+      request.repositoryRoot,
+    );
     const repositoryMatches = request.repositoryRoot === config.repository
-      || (config.provider === "bedrock" && request.repositoryRoot.startsWith(governedWorktreePrefix));
+      || (config.provider === "bedrock" && isGovernedWorktree);
     if (!repositoryMatches || request.workingDirectory !== request.repositoryRoot) issue("repositoryRoot", "Fab requires the configured repository or its canonical Mission Control Attempt worktree.");
     if (request.provider !== provider || request.model !== config.model) issue("model", "Fab requires the exact explicitly selected provider/model.");
     if (request.modelRouteDigest !== undefined || request.providerRoute !== undefined || request.reasoningConfig !== undefined) {
@@ -247,4 +250,16 @@ function factoryProviderRoute(config: FabConfig) {
   return config.provider === "bedrock"
     ? `${config.bedrockRoute!.region}/${config.bedrockRoute!.inferenceProfileId}`
     : config.provider;
+}
+
+function pathIsWithin(root: string, candidate: string) {
+  try {
+    const relative = path.relative(realpathSync(root), realpathSync(candidate));
+    return relative.length > 0
+      && relative !== ".."
+      && !relative.startsWith(`..${path.sep}`)
+      && !path.isAbsolute(relative);
+  } catch {
+    return false;
+  }
 }
