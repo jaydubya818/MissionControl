@@ -2,7 +2,7 @@
 title: Software Factory Capability Maturity Ledger
 status: active
 last_verified: 2026-09-05
-baseline_commit: ed77c46c9d975a2ed0c666cdaf0a3f0e12e77d4d
+baseline_commit: f749b06c8ef39c5bd22c9e0ad76334482ec35b33
 owners:
   - product
   - platform
@@ -46,8 +46,8 @@ fetched from origin/main. This is a source reconciliation, not production
 qualification. Runtime environment **P = the real pilot, not yet selected or
 configured; active flags, Factory bindings and runtime availability UNKNOWN**.
 R and P in each row are exact scope references, not shorthand for a successful
-deployment. The `last_verified`/`baseline_commit` frontmatter above retains the
-older qualification baseline; it does not describe a new pilot run.
+deployment. The `last_verified`/`baseline_commit` frontmatter above records the
+latest source reconciliation; it does not establish a new pilot run.
 
 Historical assessment vocabulary:
 
@@ -78,9 +78,9 @@ The ten-outcome threshold remains a pilot gate, not statistical reliability.
 
 ## Current status vocabulary
 
-The labels and capability detail below retain the older qualification record.
-They describe its cited scope only and are superseded by the current matrix for
-current availability claims. Historical artifacts have not been rewritten.
+The capability ledger below is the current source of maturity claims. Each
+entry remains limited to its cited evidence; the superseded historical matrix
+above cannot override later qualification. Historical artifacts remain intact.
 
 - **Qualified:** implemented and backed by deterministic system or browser
   evidence at a cited revision.
@@ -103,6 +103,7 @@ scale, or general production safety.
 | Capability | Owner | Status | Evidence | Current limitation | Next promotion gate |
 | --- | --- | --- | --- | --- | --- |
 | Governed intent, Plans, and WorkOrders | Product + Platform | **Qualified** | [System Factory E2E V2](../testing/evidence/system-factory-e2e-v2/README.md) | One-repository V1 golden path; consequential actions remain separately gated | Complete a real product-repository pilot through human acceptance |
+| Shared builder contributions | Product + Platform | **Preview; default off** | [Todo 062 completion](../testing/evidence/shared-builder-intent-todo062/completion-record.md) | Synthetic demo qualification; contribution acceptance does not approve a Spec, Plan, execution or result | Prove scoped contributions and attributable human decisions with a real team |
 | Agent definitions and Factory binding | Platform | **Qualified** | [System Factory E2E V1](../testing/evidence/system-factory-e2e-v1/README.md) | Builder-facing configuration is primarily developer/operator oriented | Add role-aware contributions to the same Mission/Plan model after the pilot |
 | Skills, context, and Factory Memory | Platform | **Qualified; advisory** | [System Factory E2E V2](../testing/evidence/system-factory-e2e-v2/README.md) | Retrieval is deliberately non-authoritative and phase-gated | Prove relevance, isolation, and stale-context handling on real work |
 | Generic Harness Contract | Platform | **Qualified architecture** | [Generic Harness plan](../plans/2026-08-16-feat-generic-harness-contract-v1-plan.md) | Each harness/model/backend tuple still requires exact admission | Retain one adapter lifecycle and qualify every new tuple independently |
@@ -121,6 +122,7 @@ scale, or general production safety.
 | Release and production feedback | Product + SRE | **Partial** | [README delivery contract](../../README.md#the-delivery-contract) | Human merge remains outside V1 authority; no full production observation/rollback proof | Observe one real release and feed rollback/customer outcome into governed learning |
 | Factory incident response | Security + SRE | **Missing canonical lifecycle** | [Production convergence plan](../plans/2026-08-25-feat-software-factory-production-convergence-plan.md) | Alerts, op events, traces, and run failures are fragmented | Implement Clarify → Contain → Observe → Isolate → Restore → Correct → Prevent → Measure with browser and drill evidence |
 | Cost per accepted outcome | ML/AI + Product | **Partial** | [Production Factory Pilot V3](../testing/evidence/production-factory-pilot-v3/README.md) | Model/provider cost and cost per accepted workload remain `null` | Achieve attributable model, compute, sandbox, and human-attention coverage on real work |
+| Governed inference accounting | ML/AI + Platform | **Experimental; default off** | [Bounded Phase 5 completion](../testing/evidence/governed-inference-phase5/completion-record.md); [current program](../software-factory/capability-convergence-program.md) | Offline receipts and estimated economics only; aggregate reservation hardening is in progress; dispatch bounds, billing settlement and real WorkOrder economics remain incomplete | Qualify finite physical-call liability and attributable live billing before any route or cost maturity promotion |
 | Multi-tenant enterprise operation | Security + Platform | **Partial** | [System Factory E2E V2](../testing/evidence/system-factory-e2e-v2/README.md) | Company/workspace scoping exists; public cross-company operation is not qualified | Complete live cross-company denial and service-identity tests before a second organization |
 | Adoption and builder outcomes | Product + FDE | **Documented; not production-proven** | [V1 Product Strategy](mission-control-v1-product-strategy.md) | No sustained product-team cohort, onboarding baseline, or satisfaction series | Run one design-partner cadence and measure repeat use, onboarding, trust, correction, and retired bespoke paths |
 

@@ -1,0 +1,9 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-phase5
+
+ ✓ convex/__tests__/inferenceGateway.test.ts (23 tests) 11ms
+
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+   Start at  22:14:04
+   Duration  358ms (transform 87ms, setup 0ms, collect 138ms, tests 11ms, environment 0ms, prepare 43ms)
