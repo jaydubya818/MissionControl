@@ -20,6 +20,9 @@ audit records. It does not copy or replace those source records.
 - A workspace operator with `factory.improve` may file and advance ordinary
   investigation, correction, prevention, and measurement phases.
 - Containment, restoration, and resolution require `factory.approve`.
+- Repository-dispatch request, execution, observation, and restoration grant
+  require company-admin authority or an explicitly assigned
+  `factory.incident.control` role; generic delivery approval is insufficient.
 - A signed service may use only `incidents.detect` and `incidents.propose`.
   Agents cannot restore authority, resolve an incident, erase evidence, or
   mutate the immutable command log.
@@ -38,19 +41,21 @@ control categories are repository/workspace dispatch pause, Attempt
 cancellation and credential revocation, worker/harness/model/tool/Factory
 quarantine, Guarded Auto disablement, and publication/release holds.
 
-Each recorded containment action requires two distinct, canonical PASS evidence
-envelopes: the control-command receipt and a later observed-effect receipt. The
-receipt `checkId` must bind the exact control and receipt role, the receipt must
-belong to the incident workspace, and its creation time must precede the
-recorded observation and follow the current phase entry. A command
-acknowledgement is never containment proof, and containment receipts cannot be
-replayed as restoration evidence.
+The qualified `PAUSE_REPOSITORY_DISPATCH` control requires four distinct durable
+records: `COMMAND_REQUESTED`, `COMMAND_ISSUED`, `ACKNOWLEDGED`, and
+`EFFECT_OBSERVED`. The first records authority without changing state, the
+executor alone changes the exact repository projection, and the separately
+invoked observer alone records the observed effect. Incident, project,
+repository, actor, sequence, expiry, request, predecessor, producer, and runtime
+version must match across the lineage. Other unqualified control categories
+continue to require distinct canonical PASS evidence envelopes. An
+acknowledgment is never containment proof.
 Restoration is a later, separate human decision. It requires:
 
 1. the incident has progressed through isolation;
-2. the operator explicitly selects authority restoration;
+2. the commander first records a durable, expiring, incident-scoped restoration grant;
 3. known-safe evidence is attached;
-4. each restored control has its own command and observed-effect evidence envelopes;
+4. each restored control has its own request, command, acknowledgment, and observed-effect lineage;
 5. the optimistic incident sequence is still current.
 
 Restoration records the incident authority decision only. It does not recreate,
@@ -82,9 +87,12 @@ production regression, and evaluation regression. Each drill maps to OWASP
 Agentic Top 10 categories, NIST AI RMF functions, bounded containment, and
 existing evidence classes.
 
-These are deterministic control-plane qualifications, not claims that a real
-production incident occurred. The real pilot still requires an explicitly named
-incident commander and retained live drill evidence.
+Deterministic threat drills do not claim a real production incident occurred.
+The retained local non-production pilot `INC-MTQDOIX7-001053` used the canonical
+commander identity, changed real repository admission, denied an actual
+WorkOrder dispatch with zero runs created, survived backend restart, restored
+only after a separate durable grant, and completed the full lifecycle. It is
+bounded qualification evidence, not general production authority.
 
 ## Rollout and rollback
 
@@ -93,6 +101,6 @@ existing alert and runtime controls authoritative. Roll back the UI/API exposure
 if authorization, idempotency, currentness, or evidence-link checks regress;
 preserve already-created incident records and transitions for audit.
 
-Promotion requires the real product-repository pilot to complete at least one
-named preflight incident drill and demonstrate safe restoration without direct
-database repair.
+Production promotion still requires exact-main deployment and a bounded
+synthetic production acceptance drill. No customer repository or workload may
+be used for that qualification.

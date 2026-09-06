@@ -471,7 +471,7 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
-Current public client/backend runtime contract: **v52**.
+Current public client/backend runtime contract: **v53**.
 
 ### Factory Incident Command (Experimental)
 
@@ -489,9 +489,18 @@ authority and evidence fail closed. Incident transitions depend on durable,
 append-only receipts whose authority, provenance, scope, and currentness can be
 independently verified.
 
-This capability remains **Experimental**. Deterministic contract and threat
-tests are complete, but they do not establish general production incident
-actuation, broad provider coverage, or autonomous emergency authority.
+Runtime contract v53 adds one real bounded actuator for repository dispatch.
+An authorized commander records a durable request; the executor changes the
+exact repository admission projection and records a separate command receipt
+and acknowledgment; a separately invoked observer records the actual effect.
+Resume requires a durable, current restoration authorization created before
+execution. The same admission gate protects WorkOrder dispatch and automatic
+Verification Attempt scheduling.
+
+This capability remains **Experimental**. One local non-production canary
+completed pause, denied dispatch, restart recovery, separately authorized
+resume, independent observation, and the full incident lifecycle. This does not
+establish broad control coverage or autonomous emergency authority.
 
 ## Current limitations
 
