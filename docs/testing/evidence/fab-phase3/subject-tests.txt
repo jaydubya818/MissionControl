@@ -36,4 +36,3 @@ stdout | src/__tests__/executor.test.ts > WorkflowExecutor reliability > creates
       Tests  182 passed (182)
    Start at  16:40:39
    Duration  519ms (transform 709ms, setup 0ms, collect 2.23s, tests 102ms, environment 2ms, prepare 985ms)
-

@@ -8,4 +8,3 @@
       Tests  22 passed (22)
    Start at  16:55:36
    Duration  702ms (transform 295ms, setup 0ms, collect 700ms, tests 43ms, environment 0ms, prepare 100ms)
-
