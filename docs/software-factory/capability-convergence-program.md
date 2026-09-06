@@ -265,3 +265,14 @@ Real incident restoration, observed outcomes, evaluated improvement, human
 promotion, controlled activation and observed rollback remain required at the
 scope specified by the master acceptance criteria. Program completion must not
 be inferred from the bounded offline records or from checklist implementation.
+
+### Current-main integration for observation retention
+
+PR #191 advanced main with documentation-only qualification records. The resolved
+program-record conflict retains both histories; application source is unchanged.
+[Integrated-main qualification](../testing/evidence/capability-convergence-observations-final-v3/README.md)
+on `8cfe354b31d2` against main `d0e3ba889df1` passes all 19 composed gates,
+2958 tests (11 inherited skips), Phase 5 and 15 critical browser checks. All 87
+backend source hashes match; economics remains WARN and all four Production
+targets and guards remain unchanged. Exact PR-head CI and clean-main proof
+remain separate requirements.
