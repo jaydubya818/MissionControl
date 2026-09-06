@@ -8,8 +8,8 @@
     "convex/schema.ts": "a638c1c608afc8e586e9292c3c313db4d1fa015119a06692c773858a5c1b4e5a",
     "packages/shared/src/governedInference.ts": "5c07438ed08a87f5edfc3145855ff42c0e4dc1c656bf7111635b4cbfd97eb2e5"
   },
-  "composedGates": 19,
-  "composedTotal": 19,
+  "composedGates": 18,
+  "composedTotal": 18,
   "repositoryTests": 2773,
   "repositorySkips": 11,
   "phase5": "PASS",
@@ -19,5 +19,7 @@
   },
   "eval": "WARN",
   "providerCalls": 0,
-  "productionChanges": 0
+  "productionChanges": 0,
+  "separateHistoricalV2IntegrityGate": "PASS",
+  "qualifyingGates": 19
 }

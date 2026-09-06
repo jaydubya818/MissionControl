@@ -143,7 +143,8 @@ denominators and coverage remain explicit. Existing economics WARN remains.
   All 12 final-head CI/Preview contexts passed on `c888fb020d5d` and the PR
   merged at `9a68b56c3ee788c4f8b4132a8c7c9d14f32dee28`.
   [Clean-main qualification](../testing/evidence/capability-convergence-identity-postmerge/README.md)
-  passes all 19 composed gates, 2773 tests (11 inherited skips), Phase 5 and
+  passes all 19 required gates (18 composed plus historical V2 integrity),
+  2773 tests (11 inherited skips), Phase 5 and
   15 browser checks. Economics remains WARN; all four Production targets and
   their guards remain unchanged.
 - Maturity: no promotion. After identity repair, claims still need finite
@@ -170,6 +171,11 @@ denominators and coverage remain explicit. Existing economics WARN remains.
 - Initial contract tests reproduced 24 missing checks. Five additional review
   negatives then failed as expected. These are development results, not final
   qualification. Runtime contract advances to v49 for the selected allowance.
+- [Final local qualification](../testing/evidence/capability-convergence-dispatch-final/README.md)
+  on `97fa4ae4d185` passes 19 required gates (18 composed plus historical V2
+  integrity), 2895 repository tests (11 inherited skips), Phase 5 and 15 browser
+  checks. The corrected integration runner additionally passes 140 script Vitest
+  tests and 11 Node tests. Economics remains WARN.
 - Source remains Experimental and default off. Actual account/geography
   enrollment, billing/settlement/overrun evidence and complete outcome metrics
   remain todo 063 requirements; no Production or paid inference is authorized.

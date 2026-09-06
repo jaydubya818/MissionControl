@@ -1,0 +1,31 @@
+{
+  "head": "97fa4ae4d1859ed9abf33dcded6528aab4abff8b",
+  "base": "9a68b56c3ee788c4f8b4132a8c7c9d14f32dee28",
+  "completedAt": "2026-09-06T07:17:37.331Z",
+  "qualifyingGates": 19,
+  "composedGates": 18,
+  "separateHistoricalV2IntegrityGate": "PASS",
+  "repositoryTests": 2895,
+  "repositorySkips": 11,
+  "integrationScriptVitestTests": 140,
+  "integrationNodeTests": 11,
+  "phase5": "PASS",
+  "browser": {
+    "passed": 15,
+    "total": 15
+  },
+  "backendScenarios": 23,
+  "codegen": "PASS",
+  "eval": "WARN",
+  "sourceSha256": {
+    "convex/inferenceGateway.ts": "15f84e27c7c66fbaf00418a11baf2964cc6cd859ea0090d856624a02ebc1f827",
+    "convex/schema.ts": "7819df2912c19926343c088abac0bce2f2ae022036c2759d859dacf614be4375",
+    "packages/shared/src/governedInference.ts": "5c07438ed08a87f5edfc3145855ff42c0e4dc1c656bf7111635b4cbfd97eb2e5",
+    "packages/shared/src/classifyInferenceDispatch.ts": "42222b3778434cf71780b56879604b2b5768002e34594cfdd4f6ba1d8c0384c8",
+    "convex/lib/attemptExecutionProfile.ts": "3b7ade9e198b9d1d6b7e9bfe5553c47d6ad2d6ae8270850e6aedeca0cf0370b9",
+    "apps/orchestration-server/src/governedInferenceGateway.ts": "b8a4b45662885a6c6caf49156683f3c20d8d0eb5da62504ce653068206f495ff",
+    "apps/orchestration-server/src/governedInferenceWire.ts": "4dc1ccf8d66b645b09fddbc97739b024fcf5e6ef2a8e78cfdacb423ec9a98f2d"
+  },
+  "providerCalls": 0,
+  "productionChanges": 0
+}

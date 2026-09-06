@@ -5,7 +5,8 @@ PR [#188](https://github.com/jaydubya818/MissionControl/pull/188) merged at
 contexts passed on `c888fb020d5d1acb8152e03eeb24fbe69b4d8949`.
 
 A fresh detached main checkout passed frozen offline installation, all 19
-composed gates, 2773 repository tests (11 inherited skips), Phase 5 and 15 critical
+required gates (18 composed plus a separate historical V2 integrity check),
+2773 repository tests (11 inherited skips), Phase 5 and 15 critical
 browser checks. The economics eval remains WARN. Gateway, schema and canonical
 constructor hashes match the pre-merge real local backend proof; generated files
 are unchanged. Raw execution logs are retained in
