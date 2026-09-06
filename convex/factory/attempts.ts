@@ -462,7 +462,7 @@ async function validateReadOnlyCandidateRecovery(ctx: any, run: any): Promise<bo
   const sourceArtifact = source ? await ctx.db.query("runArtifacts")
     .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", source._id).eq("artifactType", "CODE_DIFF")).first() : null;
   const sourceResultArtifact = source ? await ctx.db.query("runArtifacts")
-    .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", source._id).eq("artifactType", "STRUCTURED_OUTPUT")).first() : null;
+    .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", `factory:${source.runId}:structured-result`)).first() : null;
   const sourcePublication = source ? await ctx.db.query("runArtifacts")
     .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", source._id).eq("artifactType", "PULL_REQUEST")).first() : null;
   const expectedManifest = source?.executionManifest ? { ...source.executionManifest,
@@ -494,6 +494,13 @@ async function validateReadOnlyCandidateRecovery(ctx: any, run: any): Promise<bo
     || sourceArtifact?.metadata?.sourceRevision !== recovery.sourceRevision
     || sourceArtifact?.metadata?.branch !== run.branch
     || sourceResultArtifact?.metadata?.schema !== "factory-result/v1"
+    || sourceResultArtifact?.workflowRunId !== source._id
+    || sourceResultArtifact?.tenantId !== source.tenantId
+    || sourceResultArtifact?.projectId !== source.projectId
+    || sourceResultArtifact?.workOrderId !== source.workOrderId
+    || String(sourceResultArtifact?._id) !== recovery.structuredResultArtifactId
+    || !/^sha256:[a-f0-9]{64}$/.test(sourceResultArtifact?.contentHash ?? "")
+    || sourceResultArtifact?.contentHash !== recovery.structuredResultContentHash
     || recovery.structuredResult?.schema !== "factory-result/v1"
     || computeCanonicalHash(sourceResultArtifact.metadata.result) !== computeCanonicalHash(recovery.structuredResult)
     || !previous?.leaseId || !previous.workerId || !previous.workerSessionId
@@ -1101,7 +1108,14 @@ export const authorizePublicationInternal = internalMutation({
       || workOrder.currentRevisionNumber !== run.workOrderRevisionNumber) {
       throw new Error("Factory publication WorkOrder authority changed before publication.");
     }
-    if (workOrder.verificationContract?.schemaVersion === 2
+    const recoveryPublication = Boolean(run.metadata?.localCandidateRecovery)
+      ? await validateReadOnlyCandidateRecovery(ctx, run)
+      : false;
+    if (recoveryPublication
+      && args.candidateRevision !== run.metadata.localCandidateRecovery.sourceCandidateSha) {
+      throw new Error("Recovery publication candidate differs from the exact durable source checkpoint.");
+    }
+    if (!recoveryPublication && workOrder.verificationContract?.schemaVersion === 2
       && workOrder.verificationContract.enforcementMode === "ENFORCED") {
       const current = await getCurrentVerificationRoutingOutcome(ctx, workOrder, now, "PREPUBLICATION");
       if (run.verificationSubject?.version !== 2 || !current.eligible || current.sourceAttemptId !== String(run._id)
@@ -1126,6 +1140,51 @@ export const authorizePublicationInternal = internalMutation({
         .order("desc")
         .first(),
     ]);
+    if (recoveryPublication) {
+      const recovery = run.metadata.localCandidateRecovery;
+      if (recovery.publicationPermitId) {
+        throw new Error("Recovery publication permit has already been consumed.");
+      }
+      const approvalsByType = latestApprovalByType(approvals as any[]);
+      const required = requiredApprovalTypes({
+        riskLevel: workOrder.riskLevel as any,
+        requiredApprovals: workOrder.requiredApprovals,
+        isMutating: workOrder.isMutating,
+      });
+      const approved = required.map((approvalType) => approvalsByType.get(approvalType) as any);
+      const missingApproval = approved.find((candidate) => !candidate
+        || candidate.workOrderRevisionNumber !== revisionNumber
+        || !isApprovalUsable(candidate, now));
+      if (missingApproval || approved.length !== required.length) {
+        throw new Error("Required approval changed before recovery publication.");
+      }
+      const publicationValidUntil = Math.min(
+        run.lease?.expiresAt ?? now,
+        ...approved.map((candidate) => candidate.expiresAt).filter((value): value is number => typeof value === "number"),
+      );
+      if (publicationValidUntil <= now + PUBLICATION_SAFETY_WINDOW_MS) {
+        throw new Error("Recovery publication authority expires too soon for a safe provider write.");
+      }
+      const publicationPermitId = `factory-recovery-publication:${run.runId}:${args.leaseId}:${now}`;
+      await ctx.db.patch(run._id, {
+        metadata: { ...run.metadata, localCandidateRecovery: { ...recovery,
+          publicationPermitId, publicationPermitLeaseId: args.leaseId,
+          publicationAuthorizedAt: now, publicationValidUntil } },
+      });
+      await insertEvent(ctx, run, {
+        idempotencyKey: `${publicationPermitId}:event`,
+        eventType: "COMMAND_APPROVED",
+        workflowStep: "pull-request-publication",
+        actor: `service:${args.ownerId}`,
+        status: "APPROVED",
+        startedAt: now,
+        commandSummary: `Single-use recovery publication permit consumed for ${args.candidateRevision.slice(0, 12)}`,
+        metadata: { publicationPermitId, candidateRevision: args.candidateRevision,
+          sourceAttemptId: recovery.sourceAttemptId, sourceTreeSha: recovery.sourceTreeSha,
+          structuredResultArtifactId: recovery.structuredResultArtifactId, validUntil: publicationValidUntil },
+      });
+      return { authorized: true as const, publicationPermitId, candidateRevision: args.candidateRevision, validUntil: publicationValidUntil };
+    }
     if (continuation) {
       if (continuation.status !== "READY_TO_PUBLISH" || continuation.candidateRevision !== args.candidateRevision) {
         throw new Error("Factory publication checkpoint is not ready for authorization.");
@@ -2755,12 +2814,17 @@ export const recoverLocalCandidate = mutation({
       throw new Error("Local candidate recovery requires a durable exact code-diff artifact from the failed publication Attempt.");
     }
     const resultArtifact = await ctx.db.query("runArtifacts")
-      .withIndex("by_run_type", (q) => q.eq("workflowRunId", failedAttempt._id).eq("artifactType", "STRUCTURED_OUTPUT"))
+      .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", `factory:${failedAttempt.runId}:structured-result`))
       .first();
     const structuredResult = resultArtifact?.metadata?.schema === "factory-result/v1"
       ? resultArtifact.metadata.result
       : undefined;
-    if (!structuredResult || structuredResult.schema !== "factory-result/v1") {
+    if (!structuredResult || structuredResult.schema !== "factory-result/v1"
+      || resultArtifact.workflowRunId !== failedAttempt._id
+      || resultArtifact.tenantId !== failedAttempt.tenantId
+      || resultArtifact.projectId !== failedAttempt.projectId
+      || resultArtifact.workOrderId !== failedAttempt.workOrderId
+      || !/^sha256:[a-f0-9]{64}$/.test(resultArtifact.contentHash ?? "")) {
       throw new Error("Local candidate recovery requires the exact durable factory-result/v1 from the failed publication Attempt.");
     }
     const priorRecoveryRequestedAt = failedAttempt.metadata?.localCandidateRecovery?.requestedAt;
@@ -2797,6 +2861,8 @@ export const recoverLocalCandidate = mutation({
         sourceRevision: codeDiff.sourceRevision,
       },
       structuredResult,
+      structuredResultArtifactId: String(resultArtifact._id),
+      structuredResultContentHash: resultArtifact.contentHash,
     });
     const recoveryAttemptId = await ctx.db.insert("workflowRuns", recoveryAttempt);
     await ctx.db.patch(failedAttempt._id, {
@@ -3786,7 +3852,7 @@ async function assertFactoryPullRequestArtifact(
       executionManifestDigest: run.executionManifestDigest,
       publicationPermitId: run.factoryContinuation?.status === "PUBLICATION_AUTHORIZED"
         ? run.factoryContinuation.publicationPermitId
-        : undefined,
+        : run.metadata?.localCandidateRecovery?.publicationPermitId,
     },
   });
   if (validation.ok === false) {

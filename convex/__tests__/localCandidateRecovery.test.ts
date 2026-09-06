@@ -73,6 +73,8 @@ describe("local candidate recovery Attempt lineage", () => {
         knownRisks: [],
         nextAction: "Publish for verification.",
       },
+      structuredResultArtifactId: "result-artifact",
+      structuredResultContentHash: `sha256:${"e".repeat(64)}`,
     });
     expect(failedAttempt).toEqual(sourceBefore);
     expect({ ...failedAttempt, ...sourcePatch }).toMatchObject({
@@ -91,6 +93,8 @@ describe("local candidate recovery Attempt lineage", () => {
         sourceTreeSha: "d".repeat(40),
         sourceRevision: "b".repeat(40),
         structuredResult: expect.objectContaining({ schema: "factory-result/v1" }),
+        structuredResultArtifactId: "result-artifact",
+        structuredResultContentHash: `sha256:${"e".repeat(64)}`,
       } },
     });
     for (const field of ["_id", "completedAt", "failureReason", "executorInvocationId", "primaryTraceId", "executionClaimId", "executionClaimedAt", "cancellationRequestedAt", "spentUsd", "reservedCostUsd", "executionCostAuthorization"]) {

@@ -28,6 +28,8 @@ export function buildLocalCandidateRecoveryRows(input: {
   };
   sourceCandidate: { candidateSha: string; treeSha: string; sourceRevision: string };
   structuredResult: unknown;
+  structuredResultArtifactId: string;
+  structuredResultContentHash: string;
 }) {
   const recoveryManifest = {
     ...input.failedAttempt.executionManifest,
@@ -69,6 +71,8 @@ export function buildLocalCandidateRecoveryRows(input: {
         sourceTreeSha: input.sourceCandidate.treeSha,
         sourceRevision: input.sourceCandidate.sourceRevision,
         structuredResult: input.structuredResult,
+        structuredResultArtifactId: input.structuredResultArtifactId,
+        structuredResultContentHash: input.structuredResultContentHash,
         requestedAt: input.requestedAt,
         requestedBy: input.actorId,
         reason: input.reason,

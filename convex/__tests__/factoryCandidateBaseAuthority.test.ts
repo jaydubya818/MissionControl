@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { claimInternal, reportInternal, reportVerificationInternal, candidateVerificationDispatchFailedInternal } from "../factory/attempts";
+import { authorizePublicationInternal, claimInternal, reportInternal, reportVerificationInternal, candidateVerificationDispatchFailedInternal } from "../factory/attempts";
 import { compilePolicyV2VerificationPlan, effectivePolicyV2VerificationChecks } from "../lib/policyV2Verification";
 import { computeCanonicalHash } from "../lib/genomeHash";
 import { exactModelRouteSnapshot, exactModelRouteDigest, exactModelRouteQualificationSnapshot, modelRouteQualificationDigest } from "../lib/modelRouteAdmission";
@@ -162,7 +162,9 @@ async function recoveryClaimFixture() {
   const structuredResult = { schema: "factory-result/v1", status: "COMPLETED", summary: "Synthetic candidate complete.",
     completedAcceptanceCriterionIds: [], incompleteAcceptanceCriterionIds: [], unknownAcceptanceCriterionIds: [],
     verificationCommands: [], knownRisks: [], nextAction: "Publish for verification." };
-  await f.db.insert("runArtifacts", { workflowRunId: "original-attempt", artifactType: "STRUCTURED_OUTPUT",
+  await f.db.insert("runArtifacts", { _id: "result-artifact", tenantId: "tenant-1", projectId: "project-1",
+    workOrderId: "work-order-1", workflowRunId: "original-attempt", artifactType: "STRUCTURED_OUTPUT",
+    idempotencyKey: "factory:original-run:structured-result", contentHash: `sha256:${"e".repeat(64)}`,
     metadata: { schema: "factory-result/v1", result: structuredResult } });
   const manifest = { ...sourceManifest, causation: { workflowRunId: "run-1" } };
   await f.db.patch("attempt-1", { executionManifest: manifest, executionManifestDigest: `sha256:${computeCanonicalHash(manifest)}`,
@@ -170,8 +172,9 @@ async function recoveryClaimFixture() {
     metadata: { localCandidateRecovery: { sourceAttemptId: "original-attempt", sourceExecutionManifestDigest: sourceDigest,
       sourceCandidateSha: CANDIDATE, sourceTreeSha: TREE, sourceRevision: BASE,
       structuredResult,
+      structuredResultArtifactId: "result-artifact", structuredResultContentHash: `sha256:${"e".repeat(64)}`,
       previousLease: { leaseId: "original-lease", workerId: "worker-1", workerSessionId: "original-session", workerGeneration: 1 } } } });
-  const claim = () => f.invoke(claimInternal, { workflowRunId: "attempt-1", ownerId: "service-1", leaseId: "new-recovery", leaseDurationMs: 60_000 });
+  const claim = () => f.invoke(claimInternal, { workflowRunId: "attempt-1", ownerId: "service-1", leaseId: "new-recovery", leaseDurationMs: 120_000 });
   return { ...f, claim };
 }
 
@@ -204,6 +207,12 @@ describe("Factory candidate source authority through the real report mutation", 
     expect(result.publicationCheckpoint).toBeUndefined();
     expect(await f.db.get("original-attempt")).toMatchObject({ status: "FAILED", failureCode: "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING" });
     expect(await f.db.get("attempt-1")).toMatchObject({ status: "RUNNING", runtimeDispositionReason: expect.stringContaining("executor replay remains prohibited") });
+    const permit = await f.invoke(authorizePublicationInternal, { workflowRunId: "attempt-1", ownerId: "service-1",
+      leaseId: "new-recovery", candidateRevision: CANDIDATE });
+    expect(permit).toMatchObject({ authorized: true, candidateRevision: CANDIDATE,
+      publicationPermitId: expect.stringContaining("factory-recovery-publication:run-1:new-recovery:") });
+    await expect(f.invoke(authorizePublicationInternal, { workflowRunId: "attempt-1", ownerId: "service-1",
+      leaseId: "new-recovery", candidateRevision: CANDIDATE })).rejects.toThrow(/already been consumed/);
   });
   it.each(["ordinary-executor", "substituted-candidate", "changed-source", "cancelled"])("does not reclaim an expired recovery with %s", async (fault) => {
     const f = await recoveryClaimFixture();
