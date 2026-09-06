@@ -30,6 +30,8 @@ import {
   validateFactoryIncidentTransition,
   type FactoryIncidentPhase,
 } from "../lib/factoryIncident";
+import { validateObservedControlReceipt } from "../lib/factoryIncidentControl";
+import { RUNTIME_CONTRACT_VERSION } from "../lib/runtimeContract";
 
 const evidenceRefsArg = v.array(factoryIncidentEvidenceRefValidator);
 const containmentActionsArg = v.array(factoryIncidentContainmentActionValidator);
@@ -87,6 +89,7 @@ const evidenceTables: Partial<Record<string, string>> = {
   ALERT: "alerts",
   EVIDENCE: "evidenceEnvelopes",
   AUDIT: "activities",
+  CONTROL_RECEIPT: "factoryIncidentControlReceipts",
 };
 
 async function requireEvidenceScope(
@@ -115,7 +118,8 @@ async function requireEvidenceScope(
 
 async function requireCanonicalControlReceipts(
   ctx: any,
-  projectId: Id<"projects">,
+  incident: Doc<"factoryIncidents">,
+  nextPhase: FactoryIncidentPhase,
   earliestCreatedAt: number,
   executions: Array<{
     controlKey: string;
@@ -125,6 +129,61 @@ async function requireCanonicalControlReceipts(
   }>,
 ) {
   for (const execution of executions) {
+    if (execution.controlKey === "PAUSE_REPOSITORY_DISPATCH"
+      && (execution.commandReceipt.kind !== "CONTROL_RECEIPT"
+        || execution.observedEffectReceipt.kind !== "CONTROL_RECEIPT")) {
+      throw new Error("Repository dispatch control requires canonical command and observed-effect receipts.");
+    }
+    if (execution.commandReceipt.kind === "CONTROL_RECEIPT"
+      || execution.observedEffectReceipt.kind === "CONTROL_RECEIPT") {
+      if (execution.commandReceipt.kind !== "CONTROL_RECEIPT"
+        || execution.observedEffectReceipt.kind !== "CONTROL_RECEIPT"
+        || !incident.repositoryId
+        || !["CONTAIN", "RESTORE"].includes(nextPhase)) {
+        throw new Error("Control receipt lineage is incomplete or not applicable.");
+      }
+      const commandId = ctx.db.normalizeId("factoryIncidentControlReceipts", execution.commandReceipt.recordId);
+      const effectId = ctx.db.normalizeId("factoryIncidentControlReceipts", execution.observedEffectReceipt.recordId);
+      if (!commandId || !effectId) throw new Error("Control proof must reference canonical durable receipts.");
+      const [command, effect] = await Promise.all([ctx.db.get(commandId), ctx.db.get(effectId)]);
+      const [request, acknowledgment] = command
+        ? await Promise.all([
+            ctx.db.query("factoryIncidentControlReceipts")
+              .withIndex("by_incident_request_type", (query: any) => query.eq("incidentId", incident._id).eq("requestId", command.requestId).eq("receiptType", "COMMAND_REQUESTED"))
+              .unique(),
+            ctx.db.query("factoryIncidentControlReceipts")
+              .withIndex("by_incident_request_type", (query: any) => query.eq("incidentId", incident._id).eq("requestId", command.requestId).eq("receiptType", "ACKNOWLEDGED"))
+              .unique(),
+          ])
+        : [null, null];
+      const operation = nextPhase === "CONTAIN"
+        ? "PAUSE_REPOSITORY_DISPATCH" as const
+        : "RESUME_REPOSITORY_DISPATCH" as const;
+      const restorationAuthorization = operation === "RESUME_REPOSITORY_DISPATCH"
+        && command?.restorationAuthorizationId
+        ? await ctx.db.get(command.restorationAuthorizationId)
+        : null;
+      const rejection = validateObservedControlReceipt({
+        request,
+        command,
+        acknowledgment,
+        effect,
+        incidentId: String(incident._id),
+        projectId: String(incident.projectId),
+        repositoryId: String(incident.repositoryId),
+        operation,
+        controlKey: execution.controlKey,
+        earliestCreatedAt,
+        observedAt: execution.observedAt,
+        evaluatedAt: Date.now(),
+        expectedAuthorityActorId: incident.commanderActorId,
+        expectedAuthoritySequence: incident.currentSequence,
+        expectedRuntimeContractVersion: RUNTIME_CONTRACT_VERSION,
+        restorationAuthorization,
+      });
+      if (rejection) throw new Error(`Control receipt is unavailable, stale, or outside this workspace (${rejection}).`);
+      continue;
+    }
     for (const [receiptKind, receipt] of [
       ["command", execution.commandReceipt],
       ["effect", execution.observedEffectReceipt],
@@ -139,7 +198,7 @@ async function requireCanonicalControlReceipts(
       const expectedCheckId = `factory-control:${execution.controlKey}:${receiptKind}`;
       if (!record || controlReceiptRejectionReason({
         projectId: record.projectId ? String(record.projectId) : undefined,
-        expectedProjectId: String(projectId),
+        expectedProjectId: String(incident.projectId),
         result: record.result,
         checkId: record.checkId,
         expectedCheckId,
@@ -372,7 +431,13 @@ export const advance = mutation({
       evidenceRefs,
       args.nextPhase === "RESTORE" || args.nextPhase === "MEASURE",
     );
-    await requireCanonicalControlReceipts(ctx, incident.projectId, incident.updatedAt, controlExecutions);
+    await requireCanonicalControlReceipts(
+      ctx,
+      incident,
+      args.nextPhase as FactoryIncidentPhase,
+      incident.updatedAt,
+      controlExecutions,
+    );
     const transitionError = validateFactoryIncidentTransition({
       currentPhase: incident.phase as FactoryIncidentPhase,
       nextPhase: args.nextPhase as FactoryIncidentPhase,

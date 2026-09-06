@@ -17,7 +17,7 @@ export type FactoryIncidentPhase = (typeof FACTORY_INCIDENT_PHASES)[number];
 export type FactoryIncidentEvidenceKind =
   | "MISSION" | "WORK_ORDER" | "TASK" | "ATTEMPT" | "TRACE" | "TOOL_CALL"
   | "MODEL_ROUTE" | "FACTORY_VERSION" | "SANDBOX" | "PULL_REQUEST" | "RELEASE"
-  | "ALERT" | "EVIDENCE" | "AUDIT";
+  | "ALERT" | "EVIDENCE" | "AUDIT" | "CONTROL_RECEIPT";
 
 export type FactoryIncidentContainmentAction =
   | "PAUSE_REPOSITORY_DISPATCH" | "PAUSE_WORKSPACE_DISPATCH" | "CANCEL_ATTEMPT"
@@ -59,6 +59,7 @@ export const factoryIncidentEvidenceKindValidator = v.union(
   v.literal("ALERT"),
   v.literal("EVIDENCE"),
   v.literal("AUDIT"),
+  v.literal("CONTROL_RECEIPT"),
 );
 
 export const factoryIncidentEvidenceRefValidator = v.object({
