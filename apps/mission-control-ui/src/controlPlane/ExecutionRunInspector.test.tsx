@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ExecutionRunInspector, RemoteSandboxCard } from "./ExecutionRunInspector";
+import { ExecutionRunInspector, InferenceEconomicsCard, RemoteSandboxCard } from "./ExecutionRunInspector";
 
 const useQuery = vi.fn();
 
@@ -88,5 +88,54 @@ describe("RemoteSandboxCard", () => {
     expect(screen.getByText("Private preview unavailable")).toBeInTheDocument();
     expect(screen.getByText("Teardown unverified")).toBeInTheDocument();
     expect(screen.getByText("Provider deletion timed out.")).toBeInTheDocument();
+  });
+});
+
+describe("InferenceEconomicsCard", () => {
+  it("shows loading and honest empty states", () => {
+    const { rerender } = render(<InferenceEconomicsCard data={undefined} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading inference economics");
+    rerender(<InferenceEconomicsCard data={{
+      gatewayAdmissionEnabled: false, reservations: [], intents: [], receipts: [], reconciliations: [],
+      latestProjection: null, latestComparison: null, state: "EMPTY",
+    }} />);
+    expect(screen.getByText("No governed inference reservation")).toBeInTheDocument();
+    expect(screen.getByText("Gateway disabled")).toBeInTheDocument();
+  });
+
+  it("labels unknown cost as a lower bound and exposes comparison denial", () => {
+    render(<InferenceEconomicsCard data={{
+      gatewayAdmissionEnabled: true,
+      reservations: [{ state: "ACTIVE" }],
+      intents: [{ state: "AMBIGUOUS" }],
+      receipts: [{
+        _id: "receipt-1", physicalOrdinal: 1, route: { provider: "openai", modelId: "gpt-4o-mini-2024-07-18" },
+        delivery: "UNKNOWN", status: "UNKNOWN", costCompleteness: "UNKNOWN",
+      }],
+      reconciliations: [],
+      latestProjection: {
+        outcome: "ACCEPTED", knownCostMicrousd: 0, totalCostMicrousd: undefined,
+        costCoverage: 0, confidence: "NONE", formulaVersion: "accepted-outcome-economics/v1",
+      },
+      latestComparison: { status: "NO_GO", blockers: ["INCOMPLETE_COST_COVERAGE"] },
+      state: "UNKNOWN",
+    }} />);
+    expect(screen.getByText("UNKNOWN")).toBeInTheDocument();
+    expect(screen.getByText("Lower bound; total is unknown")).toBeInTheDocument();
+    expect(screen.getByText("Comparison ineligible")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Automatic promotion remains disabled");
+  });
+
+  it("shows completed accepted-outcome economics without collapsing stages", () => {
+    render(<InferenceEconomicsCard data={{
+      gatewayAdmissionEnabled: true, reservations: [{ state: "EXHAUSTED" }], intents: [{ state: "RECEIPTED" }],
+      receipts: [{ _id: "receipt-1", physicalOrdinal: 1, route: { provider: "openai", modelId: "gpt-4o-mini-2024-07-18" }, delivery: "DELIVERED", status: "SUCCEEDED", costCompleteness: "COMPLETE", costMicrousd: 6750, providerRequestId: "req-1" }],
+      reconciliations: [], latestComparison: null, state: "COMPLETE",
+      latestProjection: { outcome: "ACCEPTED", knownCostMicrousd: 6750, totalCostMicrousd: 6750, costCoverage: 1, confidence: "HIGH", formulaVersion: "accepted-outcome-economics/v1" },
+    }} />);
+    expect(screen.getByText("ACCEPTED")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.getByText("Verification and human acceptance stay separate")).toBeInTheDocument();
+    expect(screen.getByText("req-1")).toBeInTheDocument();
   });
 });

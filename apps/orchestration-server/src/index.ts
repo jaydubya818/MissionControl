@@ -49,6 +49,11 @@ import {
 import { configuredFactoryHarnessAdapters } from "./factoryHarnessComposition.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
 import { MissionPlanningWorker } from "./missionPlanningWorker.js";
+import {
+  ConvexGovernedInferenceLedger,
+  GovernedInferenceGateway,
+  OpenAIChatCompletionsTransport,
+} from "./governedInferenceGateway.js";
 import { resolvePersonaPath, safeClientError } from "./orchestrationSecurity.js";
 import os from "node:os";
 
@@ -1439,18 +1444,40 @@ app.post("/classify", requireAuth(), async (c) => {
     const openaiKey = process.env.OPENAI_API_KEY?.trim();
     let llmClient: { complete: (p: string) => Promise<string> } | undefined;
     if (openaiKey) {
-      const OpenAI = (await import("openai")).default;
-      const openai = new OpenAI({ apiKey: openaiKey });
-      llmClient = {
-        complete: async (prompt: string) => {
-          const res = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: 1024,
-          });
-          return res.choices[0]?.message?.content ?? "";
-        },
-      };
+      if (process.env.MC_GOVERNED_INFERENCE_GATEWAY_ENABLED === "1") {
+        const governed = governedInferenceScope(body.governedInference);
+        const ledger = new ConvexGovernedInferenceLedger(client, governed.projectId, governed.repositoryId);
+        const gateway = new GovernedInferenceGateway(ledger, new OpenAIChatCompletionsTransport(openaiKey));
+        const { routeDigest, ...requestAuthority } = governed;
+        llmClient = {
+          complete: async (prompt: string) => {
+            const response = await gateway.execute<{ choices?: Array<{ message?: { content?: unknown } }> }>({
+              ...requestAuthority,
+              routes: [{
+                provider: "openai", providerRoute: "openai-chat-completions", modelId: "gpt-4o-mini-2024-07-18",
+                routeDigest, adapter: "mission-control-openai-chat-completions",
+                adapterVersion: "1.0.0", endpoint: "https://api.openai.com/v1/chat/completions",
+              }],
+              body: { messages: [{ role: "user", content: prompt }], max_tokens: 1024 },
+            });
+            const content = response?.choices?.[0]?.message?.content;
+            return typeof content === "string" ? content : "";
+          },
+        };
+      } else {
+        const OpenAI = (await import("openai")).default;
+        const openai = new OpenAI({ apiKey: openaiKey });
+        llmClient = {
+          complete: async (prompt: string) => {
+            const res = await openai.chat.completions.create({
+              model: "gpt-4o-mini",
+              messages: [{ role: "user", content: prompt }],
+              max_tokens: 1024,
+            });
+            return res.choices[0]?.message?.content ?? "";
+          },
+        };
+      }
     }
 
     const router = new ContextRouter(
@@ -1466,11 +1493,26 @@ app.post("/classify", requireAuth(), async (c) => {
     };
     const result = await router.routeAsync(context);
     return c.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[orchestration] /classify error:", err);
-    return c.json({ error: err?.message ?? "Classification failed" }, 500);
+    return c.json({ error: safeClientError(err) }, 500);
   }
 });
+
+function governedInferenceScope(value: unknown) {
+  if (!value || typeof value !== "object") {
+    throw new Error("Governed inference scope is required while the gateway flag is enabled.");
+  }
+  const scope = value as Record<string, unknown>;
+  const required = ["projectId", "repositoryId", "workflowRunId", "reservationId", "leaseId", "logicalRequestKey", "routeDigest"] as const;
+  for (const key of required) {
+    if (typeof scope[key] !== "string" || !(scope[key] as string).trim()) {
+      throw new Error(`Governed inference ${key} is required.`);
+    }
+  }
+  if (!/^sha256:[a-f0-9]{64}$/.test(scope.routeDigest as string)) throw new Error("Governed inference routeDigest is invalid.");
+  return Object.fromEntries(required.map((key) => [key, (scope[key] as string).trim()])) as Record<(typeof required)[number], string>;
+}
 
 // ============================================================================
 // GATEWAY WEBSOCKET PROXY (OpenClaw Studio parity)

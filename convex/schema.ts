@@ -531,6 +531,34 @@ export const missionPlanningRunEventsTable = defineTable({
   .index("by_run_timestamp", ["planningRunId", "timestamp"])
   .index("by_mission_timestamp", ["missionId", "timestamp"]);
 
+const inferenceRouteValidator = v.object({
+  provider: v.string(),
+  providerRoute: v.string(),
+  modelId: v.string(),
+  routeDigest: v.string(),
+  adapter: v.string(),
+  adapterVersion: v.string(),
+  endpoint: v.string(),
+});
+
+const inferenceCompletenessValidator = v.union(
+  v.literal("COMPLETE"),
+  v.literal("PARTIAL"),
+  v.literal("UNKNOWN"),
+);
+
+const factoryOutcomeStageValidator = v.union(
+  v.literal("VERIFICATION_PASSED"),
+  v.literal("HUMAN_ACCEPTED"),
+  v.literal("MERGED"),
+  v.literal("DEPLOYED"),
+  v.literal("PRODUCTION_VERIFIED"),
+  v.literal("INCIDENT"),
+  v.literal("ROLLED_BACK"),
+  v.literal("REJECTED"),
+  v.literal("ABANDONED"),
+);
+
 // ============================================================================
 // SCHEMA
 // ============================================================================
@@ -4074,6 +4102,233 @@ export const schemaTablesPartOne = {
     .index("by_run", ["runId"])
     .index("by_project_occurred", ["projectId", "occurredAt"])
     .index("by_agent_occurred", ["agentId", "occurredAt"]),
+
+  // -------------------------------------------------------------------------
+  // GOVERNED INFERENCE + OUTCOME ECONOMICS
+  // Append-only accounting records. Legacy costEvents remain readable but do
+  // not satisfy the governed inference contract.
+  // -------------------------------------------------------------------------
+  inferencePriceBooks: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    priceBookKey: v.string(),
+    version: v.number(),
+    currency: v.literal("USD"),
+    sourceKind: v.union(v.literal("PROVIDER_PUBLISHED"), v.literal("OPERATOR_APPROVED")),
+    sourceReference: v.string(),
+    sourceDigest: v.string(),
+    effectiveFrom: v.number(),
+    effectiveUntil: v.optional(v.number()),
+    rates: v.array(v.object({
+      routeDigest: v.string(),
+      inputMicrousdPerMillionTokens: v.number(),
+      outputMicrousdPerMillionTokens: v.number(),
+      cacheReadMicrousdPerMillionTokens: v.optional(v.number()),
+      cacheWriteMicrousdPerMillionTokens: v.optional(v.number()),
+      reasoningMicrousdPerMillionTokens: v.optional(v.number()),
+      batchMultiplierBps: v.optional(v.number()),
+      serviceTier: v.optional(v.string()),
+    })),
+    immutableSnapshot: v.any(),
+    priceBookDigest: v.string(),
+    state: v.union(v.literal("DRAFT"), v.literal("ACTIVE"), v.literal("RETIRED")),
+    registrationIdempotencyKey: v.string(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_key_version", ["projectId", "priceBookKey", "version"])
+    .index("by_registration", ["projectId", "registrationIdempotencyKey"]),
+
+  inferenceReservations: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workOrderId: v.id("workOrders"),
+    taskId: v.id("tasks"),
+    workflowRunId: v.id("workflowRuns"),
+    logicalRequestKey: v.string(),
+    executionProfileId: v.id("factoryExecutionProfiles"),
+    executionProfileDigest: v.string(),
+    primaryRoute: inferenceRouteValidator,
+    allowedFallbacks: v.array(inferenceRouteValidator),
+    maxPhysicalCalls: v.number(),
+    maxInputTokens: v.number(),
+    maxOutputTokens: v.number(),
+    maxCacheReadTokens: v.number(),
+    maxCacheWriteTokens: v.number(),
+    maxReasoningTokens: v.number(),
+    maxCostMicrousd: v.number(),
+    currency: v.literal("USD"),
+    deadlineAt: v.number(),
+    priceBookId: v.id("inferencePriceBooks"),
+    priceBookDigest: v.string(),
+    policyDigest: v.string(),
+    leaseId: v.string(),
+    leaseExpiresAt: v.number(),
+    immutableSnapshot: v.any(),
+    reservationDigest: v.string(),
+    state: v.union(v.literal("ACTIVE"), v.literal("EXHAUSTED"), v.literal("EXPIRED"), v.literal("CANCELLED")),
+    registrationIdempotencyKey: v.string(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_logical_request", ["projectId", "logicalRequestKey"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_registration", ["projectId", "registrationIdempotencyKey"]),
+
+  inferencePhysicalIntents: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workflowRunId: v.id("workflowRuns"),
+    reservationId: v.id("inferenceReservations"),
+    logicalRequestKey: v.string(),
+    physicalOrdinal: v.number(),
+    retryOfIntentId: v.optional(v.id("inferencePhysicalIntents")),
+    route: inferenceRouteValidator,
+    requestDigest: v.string(),
+    intentDigest: v.string(),
+    state: v.union(v.literal("PERSISTED"), v.literal("CLAIMED"), v.literal("CANCELLED"), v.literal("RECEIPTED"), v.literal("AMBIGUOUS")),
+    claimId: v.optional(v.string()),
+    claimedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_reservation", ["reservationId"])
+    .index("by_logical_request", ["projectId", "logicalRequestKey"])
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_claim", ["claimId"]),
+
+  inferencePhysicalReceipts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workflowRunId: v.id("workflowRuns"),
+    reservationId: v.id("inferenceReservations"),
+    reservationDigest: v.string(),
+    executionProfileId: v.id("factoryExecutionProfiles"),
+    executionProfileDigest: v.string(),
+    policyDigest: v.string(),
+    intentId: v.id("inferencePhysicalIntents"),
+    logicalRequestKey: v.string(),
+    physicalOrdinal: v.number(),
+    route: inferenceRouteValidator,
+    resolvedProvider: v.optional(v.string()),
+    resolvedModelId: v.optional(v.string()),
+    providerRequestId: v.optional(v.string()),
+    providerBillingId: v.optional(v.string()),
+    delivery: v.union(v.literal("DELIVERED"), v.literal("NOT_DELIVERED"), v.literal("UNKNOWN")),
+    status: v.union(v.literal("SUCCEEDED"), v.literal("FAILED"), v.literal("CANCELLED"), v.literal("TIMED_OUT"), v.literal("UNKNOWN")),
+    usage: v.object({
+      inputTokens: v.optional(v.number()),
+      outputTokens: v.optional(v.number()),
+      cacheReadTokens: v.optional(v.number()),
+      cacheWriteTokens: v.optional(v.number()),
+      reasoningTokens: v.optional(v.number()),
+    }),
+    usageCompleteness: inferenceCompletenessValidator,
+    costMicrousd: v.optional(v.number()),
+    costCompleteness: inferenceCompletenessValidator,
+    priceBookId: v.id("inferencePriceBooks"),
+    priceBookDigest: v.string(),
+    responseDigest: v.optional(v.string()),
+    failureCode: v.optional(v.string()),
+    startedAt: v.number(),
+    completedAt: v.number(),
+    receiptDigest: v.string(),
+  })
+    .index("by_intent", ["intentId"])
+    .index("by_reservation", ["reservationId"])
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_provider_request", ["projectId", "providerRequestId"]),
+
+  inferenceReconciliations: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workflowRunId: v.id("workflowRuns"),
+    receiptId: v.id("inferencePhysicalReceipts"),
+    providerEventId: v.string(),
+    providerRequestId: v.string(),
+    providerBillingId: v.optional(v.string()),
+    observedUsage: v.optional(v.any()),
+    observedCostMicrousd: v.optional(v.number()),
+    completeness: inferenceCompletenessValidator,
+    sourceDigest: v.string(),
+    reconciliationDigest: v.string(),
+    reconciledBy: v.string(),
+    reconciledAt: v.number(),
+  })
+    .index("by_receipt", ["receiptId"])
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_provider_event", ["projectId", "providerEventId"])
+    .index("by_provider_request", ["projectId", "providerRequestId"]),
+
+  factoryOutcomeEvents: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.id("workflowRuns"),
+    stage: factoryOutcomeStageValidator,
+    sourceType: v.string(),
+    sourceId: v.string(),
+    sourceDigest: v.string(),
+    occurredAt: v.number(),
+    recordedAt: v.number(),
+    eventDigest: v.string(),
+    recordedBy: v.string(),
+  })
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_source", ["projectId", "sourceType", "sourceId"]),
+
+  factoryOutcomeProjections: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.id("workflowRuns"),
+    routeDigest: v.string(),
+    formulaVersion: v.literal("accepted-outcome-economics/v1"),
+    cohortDigest: v.string(),
+    outcome: v.union(v.literal("ACCEPTED"), v.literal("REJECTED"), v.literal("ABANDONED"), v.literal("IN_PROGRESS")),
+    stages: v.any(),
+    receiptIds: v.array(v.id("inferencePhysicalReceipts")),
+    reconciliationIds: v.array(v.id("inferenceReconciliations")),
+    physicalCallCount: v.number(),
+    knownCostMicrousd: v.number(),
+    totalCostMicrousd: v.optional(v.number()),
+    costCoverage: v.number(),
+    costCompleteness: inferenceCompletenessValidator,
+    freshnessAt: v.number(),
+    confidence: v.union(v.literal("HIGH"), v.literal("LOW"), v.literal("NONE")),
+    lineageDigest: v.string(),
+    projectionDigest: v.string(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_route", ["projectId", "routeDigest"])
+    .index("by_work_order", ["workOrderId"]),
+
+  inferenceRouteComparisons: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    leftRouteDigest: v.string(),
+    rightRouteDigest: v.string(),
+    cohortDigest: v.string(),
+    formulaVersion: v.literal("accepted-outcome-economics/v1"),
+    minimumSampleSize: v.number(),
+    maximumAgeMs: v.number(),
+    leftSummary: v.any(),
+    rightSummary: v.any(),
+    status: v.union(v.literal("NO_GO"), v.literal("ADVISORY_ONLY")),
+    advisoryWinnerRouteDigest: v.optional(v.string()),
+    blockers: v.array(v.string()),
+    automaticPromotionAuthorized: v.literal(false),
+    comparisonDigest: v.string(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_cohort", ["projectId", "cohortDigest"]),
 
   // -------------------------------------------------------------------------
   // AGENT PERFORMANCE (Learning System — Aggregated Metrics)
