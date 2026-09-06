@@ -1,0 +1,35 @@
+{
+  "schema": "fdlc-observation-accounting-proof-summary/v1",
+  "status": "PASS",
+  "head": "4def894fe1555cfe3e4fcc3faba87268f1f08d12",
+  "startedAt": "2026-09-06T19:14:22.478Z",
+  "scenarioCount": 57,
+  "sourceBindingCount": 87,
+  "criticalBindings": {
+    "convex/inferenceGateway.ts": "144c9ba6e43ed129c0fda387ea3ebf4fc327d2e393fdea0e82e48f5f7f7a7392",
+    "convex/factory/providerLiability.ts": "22b622d6aca64ef906e49add28d21fb045ee5818af2e8843a9ccd6812084aa25",
+    "convex/schema.ts": "f6e730fcb333a5305337571c252dad379de21e8e23a1a4ae01d0e0ebd01df2ae",
+    "convex/lib/governedInferenceAdmission.ts": "b106255196b69f800e6f49af4a11daea4499b07dd09c813be717557403f93adc",
+    "convex/lib/providerLiability.ts": "11ba884486c8d406d4912452498ead5a4be9f3a548a9b4b5844d7806978b731d",
+    "packages/shared/src/governedInference.ts": "c69204c1719e4883093301023de25705125f4f675d2d2097a81fae14cc7d6d34"
+  },
+  "coverage": [
+    "logical identity and replay",
+    "eight-way concurrent claim and append behavior",
+    "immutable reservations, intents, receipts, and reconciliations",
+    "historical settlement after expiry, cancellation, completion, replacement, worker rotation, qualification revocation, and retired price book",
+    "scope, lease, generation, request, creation, price, and conflicting replay rejection",
+    "lost or unknown money remains unknown",
+    "overrun, arithmetic overflow, cumulative limits, and monotonic spending fences",
+    "correction integrity and non-promotable comparison outcomes"
+  ],
+  "cleanup": {
+    "cloudPortClosed": true,
+    "sitePortClosed": true,
+    "databaseRemovedAfterReport": true,
+    "storageRemovedAfterReport": true,
+    "originalDatabasesUsed": false,
+    "ephemeralKeyPersisted": false,
+    "sourceUnchanged": true
+  }
+}

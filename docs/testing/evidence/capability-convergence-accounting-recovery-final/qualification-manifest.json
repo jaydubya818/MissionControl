@@ -1,0 +1,41 @@
+{
+  "schema": "fdlc-accounting-recovery-qualification-manifest/v1",
+  "status": "PASS",
+  "head": "4def894fe1555cfe3e4fcc3faba87268f1f08d12",
+  "completedAt": "2026-09-06T19:14:37.000Z",
+  "scenarioCounts": {
+    "observationAndAccounting": 57,
+    "signedSettlementAndRecovery": 15,
+    "realProcessKillRestart": 2,
+    "total": 74
+  },
+  "proofs": {
+    "observationReportSha256": "a5efef0e9c97b5298eda2eea17555b292251b0ecc40fea39804d7b436fbc036b",
+    "observationSourceBindingsSha256": "3231f6a2bb7e505ea39d75193dae86ce533f3e7d301fdd89827f91dc71c5f27f",
+    "signedReportSha256": "5106100609d4a9957326145264440b7a38461de9ad26a93b911f0464bb056784",
+    "signedSourceBindingsSha256": "423ed706275737334e4fab059bb9af108180e639d9a5ac9acc19b6a3c1dc0929",
+    "observationHarnessSha256": "ec5f73b38a114a93344e97ee52da1cd0b987a7022b9cc4b3e3aba4c4bf6e0bc9",
+    "observationScenarioHarnessSha256": "2f6b6b7bf18a31e96c3f77f309918c5d5357870f35757d735e288053d0677683",
+    "signedHarnessSha256": "d3f2b4eb2d21ccf002200c15703a0917c9b752103c606ed27fff19024fe12fb1",
+    "processKillHarnessSha256": "21d13e826115ed4642b0dfcbebb6df6577075bdf8d86d537a956bb407b690f7b"
+  },
+  "cleanup": {
+    "observationCloudPortClosed": true,
+    "observationSitePortClosed": true,
+    "signedCloudPortClosed": true,
+    "signedSitePortClosed": true,
+    "credentialDatabasesRemoved": true,
+    "storageRemoved": true,
+    "generatedSecretsAbsentFromRetainedArtifacts": true,
+    "originalDatabasesUsed": false,
+    "sourceUnchanged": true
+  },
+  "limits": {
+    "loopbackOnly": true,
+    "syntheticOnly": true,
+    "providerCalls": 0,
+    "productionCalls": 0,
+    "actualBilling": false,
+    "humanAcceptance": false
+  }
+}

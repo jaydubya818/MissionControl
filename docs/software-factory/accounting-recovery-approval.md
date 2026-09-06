@@ -18,13 +18,14 @@ which could otherwise throw before accounting starts. Its disabled fallback has
 no executor and cannot start work. The server's existing start path remains the
 only start path; the patch does not start a service during application.
 
-Applied-source evidence: 186 focused orchestration tests pass, with two existing
-conditional daemon checks skipped; 196 backend and authority tests pass with no
-skips; orchestration typecheck and `git diff --check` pass. Both formerly blocked
+Applied-source evidence: 196 focused orchestration tests and 132 backend,
+authority, and incident tests pass with no skips; the incident workspace's six
+component tests, orchestration typecheck, and `git diff --check` pass. Both formerly blocked
 regressions now run without filters and pass. An actual startup import/status
-regression reproduced three failures for missing provider path, blank provider
-path, and missing call authorization, then passed all five startup cases after
-the correction. The four filesystem/lifecycle review findings remain
+regression covers missing provider path, blank provider path, missing call
+authorization, bootstrap construction failure, and durable storage failure. A
+provider cannot register or start either worker until the journal is ready. The
+four filesystem/lifecycle review findings remain
 independently reproduced as fixed. These checks use local synthetic process and
 daemon adapters and make no provider call.
 
@@ -35,11 +36,13 @@ recovery independently available. Its reviewed source hashes and the three
 approved patch hashes are retained in the final recovery evidence. Earlier red
 proof remains historical evidence of the corrected defects.
 
-The applied source preserves runtime contract v50: the runtime-contract guard
-detects no public Convex validator change across 970 functions. Actual signed
-delivery and restart behavior, parent-main integration, full qualification, CI,
-guarded merge, clean-main proof, and release remain required after this source
-checkpoint.
+The applied source uses runtime contract v51 inherited from the integrated
+incident controls. The runtime-contract guard detects no additional public
+Convex validator change across 978 functions. Exact source `4def894` contains
+current main `ccacc5a`; all release-blocking composed qualification stages and
+15 critical browser checks pass. Actual signed delivery and restart evidence,
+CI, guarded merge, clean-main proof, and release remain required after this
+source checkpoint.
 
 The preceding observation slice is already merged in
 [PR #190](https://github.com/jaydubya818/MissionControl/pull/190) at `44f240c`.
