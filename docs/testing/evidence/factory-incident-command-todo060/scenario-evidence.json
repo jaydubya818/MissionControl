@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "factory-incident-command-qualification/v1",
+  "qualifiedAt": "2026-09-05",
+  "baseSha": "f749b06c8ef39c5bd22c9e0ad76334482ec35b33",
+  "runtimeContractVersion": 47,
+  "environment": {
+    "kind": "isolated-local-convex",
+    "production": false,
+    "externalProviderCalls": 0,
+    "customerDataUsed": false
+  },
+  "fixture": {
+    "projectId": "ms7s0zycf96bsqzmk908w6w1pd8dw2na",
+    "incidentId": "v1730yc3wscfxw379jcr13bbk18dw24r",
+    "incidentKey": "INC-MTPDVXMW-111111",
+    "sourceFingerprint": "sha256=1111111111111111111111111111111111111111111111111111111111111111",
+    "commanderActorId": "fixture-incident-commander",
+    "commanderIsRealPilotIdentity": false
+  },
+  "lifecycle": {
+    "phases": [
+      "CLARIFY",
+      "CONTAIN",
+      "OBSERVE",
+      "ISOLATE",
+      "RESTORE",
+      "CORRECT",
+      "PREVENT",
+      "MEASURE",
+      "RESOLVED"
+    ],
+    "finalSequence": 9,
+    "finalStatus": "RESOLVED",
+    "containmentActions": [
+      "PAUSE_REPOSITORY_DISPATCH",
+      "REVOKE_ATTEMPT_CREDENTIALS"
+    ],
+    "containmentControlReferences": [
+      "fixture:dispatch-pause:receipt-1",
+      "fixture:credential-revocation:receipt-1"
+    ],
+    "restorationEvidenceReference": "fixture:evidence:known-safe-route",
+    "restorationControlReference": "fixture:route-restoration:receipt-1",
+    "authorityRestoredExplicitly": true,
+    "measurementEvidenceRetained": true
+  },
+  "deliverySemantics": {
+    "exactResolutionReplay": "returned-existing-sequence-9-transition",
+    "lateReorderedExpectedSequence7": "denied-incident-changed-since-inspection",
+    "resolvedMutation": "immutable"
+  },
+  "authorization": {
+    "publicListWithoutFixtureCompanyContext": "denied-company-account-unavailable-or-unauthorized",
+    "serviceCapabilities": [
+      "incidents.detect",
+      "incidents.propose"
+    ],
+    "serviceRestoreCapability": false,
+    "serviceResolveCapability": false
+  },
+  "threatDrills": [
+    "prompt-goal-injection",
+    "secret-exfiltration-network",
+    "tool-mcp-poisoning",
+    "identity-approval-bypass",
+    "sandbox-policy-mutation",
+    "candidate-evidence-substitution",
+    "supply-chain-compromise",
+    "cross-company-leakage",
+    "rogue-agent-cascade",
+    "runaway-cost-provider",
+    "production-regression",
+    "evaluation-regression"
+  ],
+  "browser": {
+    "route": "/v2/telemetry",
+    "incidentCommandRendered": true,
+    "eventStreamRetained": true,
+    "pageHorizontalOverflow": false,
+    "browserErrors": 0,
+    "screenshots": [
+      "incident-command-resolved.png",
+      "incident-command-detail.png"
+    ]
+  },
+  "claim": "Experimental deterministic control plane implemented; real named-commander pilot drill remains required."
+}

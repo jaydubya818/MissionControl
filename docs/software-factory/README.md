@@ -41,6 +41,7 @@ below and open a reconciliation change; do not silently choose the newest prose.
 | State semantics | [Verification and Gate State Machines](./verification-and-gate-state-machines.md) | Accepted | Cross-record lifecycle and transition rules |
 | Security | [Verification Plane Threat Model](../security/verification-plane-threat-model.md) | Proposed | Trust boundaries, abuse paths, and mitigations |
 | Recovery | [Verification Failure, Recovery, and Reconciliation](./verification-failure-recovery-reconciliation.md) | Proposed | Failure ownership, retries, stale events, and operator recovery |
+| Incident command | [Factory Incident Command](./factory-incident-command.md) | Experimental | Append-only incident lifecycle, separate containment/restoration authority, signed agent proposals, and deterministic threat drills |
 | V1 verifier set | [V1 Verification Profile](./v1-verification-profile.md) | Accepted | Minimum mandatory checks and risk overlays |
 | Demonstration | [Golden-Path Demonstration Manifest](../validation/verification-first-golden-path-manifest.md) | Draft | Reproducible browser and runtime proof contract |
 | Remaining work | [Verification-First Completion Plan](../plans/2026-08-11-feat-verification-first-completion-plan.md) | Accepted, in progress | Work after implemented P0 |

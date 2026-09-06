@@ -58,6 +58,7 @@ import type * as factory_executionProfiles from "../factory/executionProfiles.js
 import type * as factory_githubCi from "../factory/githubCi.js";
 import type * as factory_governedMcp from "../factory/governedMcp.js";
 import type * as factory_health from "../factory/health.js";
+import type * as factory_incidents from "../factory/incidents.js";
 import type * as factory_learning from "../factory/learning.js";
 import type * as factory_metaLoop from "../factory/metaLoop.js";
 import type * as factory_piBridge from "../factory/piBridge.js";
@@ -129,6 +130,8 @@ import type * as lib_factoryConfiguration from "../lib/factoryConfiguration.js";
 import type * as lib_factoryDispatch from "../lib/factoryDispatch.js";
 import type * as lib_factoryHealth from "../lib/factoryHealth.js";
 import type * as lib_factoryHumanReview from "../lib/factoryHumanReview.js";
+import type * as lib_factoryIncident from "../lib/factoryIncident.js";
+import type * as lib_factoryIncidentDrills from "../lib/factoryIncidentDrills.js";
 import type * as lib_factoryLearning from "../lib/factoryLearning.js";
 import type * as lib_factoryMemory from "../lib/factoryMemory.js";
 import type * as lib_factoryMemoryDemoSeed from "../lib/factoryMemoryDemoSeed.js";
@@ -382,6 +385,7 @@ declare const fullApi: ApiFromModules<{
   "factory/githubCi": typeof factory_githubCi;
   "factory/governedMcp": typeof factory_governedMcp;
   "factory/health": typeof factory_health;
+  "factory/incidents": typeof factory_incidents;
   "factory/learning": typeof factory_learning;
   "factory/metaLoop": typeof factory_metaLoop;
   "factory/piBridge": typeof factory_piBridge;
@@ -453,6 +457,8 @@ declare const fullApi: ApiFromModules<{
   "lib/factoryDispatch": typeof lib_factoryDispatch;
   "lib/factoryHealth": typeof lib_factoryHealth;
   "lib/factoryHumanReview": typeof lib_factoryHumanReview;
+  "lib/factoryIncident": typeof lib_factoryIncident;
+  "lib/factoryIncidentDrills": typeof lib_factoryIncidentDrills;
   "lib/factoryLearning": typeof lib_factoryLearning;
   "lib/factoryMemory": typeof lib_factoryMemory;
   "lib/factoryMemoryDemoSeed": typeof lib_factoryMemoryDemoSeed;
