@@ -101,6 +101,13 @@ it("does not register or start provider execution when durable accounting initia
 
   const module = await import("../index.js");
   expect(await module.startFactoryExecution()).toBe(false);
+  const readiness = await module.app.request("/ready");
+  expect(readiness.status).toBe(503);
+  await expect(readiness.json()).resolves.toMatchObject({
+    status: "not_ready",
+    checks: { accounting: "FAILED", factoryExecution: "FAILED" },
+    code: "ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID",
+  });
   const result = await status();
   expect(result.executionConfigurationErrors).toContain("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID");
   expect(result.factoryAttemptWorker).toMatchObject({ enabled: true, lastPollAt: null, activeRunIds: [] });

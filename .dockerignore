@@ -6,4 +6,3 @@ node_modules
 .turbo
 apps/mission-control-ui/dist
 packages/*/dist
-**/*.tsbuildinfo

@@ -58,6 +58,7 @@ describe("orchestration authentication", () => {
 
   it("allows only explicit public probes and CORS preflight", () => {
     expect(isPublicOrchestrationRoute("GET", "/health")).toBe(true);
+    expect(isPublicOrchestrationRoute("GET", "/ready")).toBe(true);
     expect(isPublicOrchestrationRoute("GET", "/gateway/status")).toBe(true);
     expect(isPublicOrchestrationRoute("OPTIONS", "/missions/mission-1/accept")).toBe(true);
     expect(isPublicOrchestrationRoute("POST", "/missions/mission-1/accept")).toBe(false);
