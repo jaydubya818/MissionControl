@@ -71,6 +71,34 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
+### 2026-09-05 - Reservation slice independent review
+
+- Architecture/security/data-integrity review found that the stored allocation
+  also needs to match `immutableSnapshot.maxCostMicrousd`. Added fail-closed
+  equality and regressions for lower, higher and missing frozen amounts.
+- Simplicity/docs/agent-parity review found one wording issue: idempotent replay
+  still requires current admission checks. Corrected the cumulative record.
+- Nonblocking scale limit: admission reads all WorkOrder reservations. Keep the
+  sum in one transaction; revisit a bounded aggregate only when rollout volume
+  requires it. No scale or live-concurrency qualification is claimed here.
+
+### 2026-09-05 - Master program continuation on current main
+
+**Actions:**
+- Reconciled current main `e9d2f52720e634b79d2c614a7fb9812a6b986fe9`,
+  runtime v45, the bounded offline inference closure and completed todo 062.
+- Started the remaining economics acceptance work under the master execution
+  authorization; no new live provider or Production authority is inferred.
+- Identified that independent inference reservations can each consume the
+  same WorkOrder ceiling. The first corrective slice conserves allocations
+  across the existing parent WorkOrder index, including retry Attempts.
+- Created the cumulative program record at
+  `docs/software-factory/capability-convergence-program.md`.
+
+**Limits:**
+- Existing fixture accounting does not prove live spend, complete real costs,
+  the ten-WorkOrder pilot, or the complete Factory improvement/rollback loop.
+
 ### 2026-09-05 - Phase 5 implementation started
 
 **By:** Codex

@@ -236,6 +236,22 @@ export const createReservation = mutation({
     const logicalReservation = await ctx.db.query("inferenceReservations")
       .withIndex("by_logical_request", (q) => q.eq("projectId", args.projectId).eq("logicalRequestKey", snapshot.logicalRequestKey)).first();
     if (logicalReservation) throw new Error("Logical inference request already has an immutable reservation.");
+    const workOrderReservations = await ctx.db.query("inferenceReservations")
+      .withIndex("by_work_order", (q) => q.eq("workOrderId", args.workOrderId)).collect();
+    let allocatedMicrousd = 0n;
+    for (const prior of workOrderReservations) {
+      if (prior.projectId !== args.projectId || !Number.isSafeInteger(prior.maxCostMicrousd)
+        || prior.maxCostMicrousd <= 0
+        || recordValue(prior.immutableSnapshot).maxCostMicrousd !== prior.maxCostMicrousd) {
+        throw new Error("Existing WorkOrder inference allocation is invalid; reconcile its authority before reserving more.");
+      }
+      allocatedMicrousd += BigInt(prior.maxCostMicrousd);
+    }
+    // Keep every allocation until an explicit settlement contract proves release.
+    // The indexed read and insert share one Convex transaction, including retries.
+    if (allocatedMicrousd + BigInt(args.maxCostMicrousd) > BigInt(approvedMaxCostMicrousd)) {
+      throw new Error("Aggregate inference reservations exceed the approved WorkOrder cost ceiling.");
+    }
     const id = await ctx.db.insert("inferenceReservations", {
       tenantId: access.project.tenantId, projectId: args.projectId, workOrderId: args.workOrderId,
       taskId: args.taskId, workflowRunId: args.workflowRunId, executionProfileId: args.executionProfileId,
