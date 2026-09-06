@@ -132,6 +132,9 @@ either todo complete and does not authorize implementation by itself.
 - This todo remains in progress: production outcomes, broader dashboards, and a
   second independently qualified route are intentionally outside the bounded
   Phase 5 slice.
+- Implementation PR `#178` merged as
+  `e76796f76f92577dab9f073bf1007a29285cbe03`; clean post-merge Phase 5,
+  typecheck, documentation, and runtime-contract qualification passed.
 
 ### 2026-08-25 - Approved implementation kickoff
 
