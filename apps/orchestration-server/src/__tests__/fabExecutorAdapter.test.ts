@@ -42,7 +42,15 @@ function fixture(options: { attack?: string; hangModel?: boolean; slowCheck?: bo
   } });
   const request: ExecutorRequest = { executionId: "fixture-attempt:manifest", repositoryRoot: root, workingDirectory: root, provider: config.provider, model: config.model, prompt: "Set the value to 2", allowedPaths: ["src/**"], deniedPaths: [], timeoutMs: 10000, isolation: "WORKSPACE_WRITE" };
   const assertActive = vi.fn(async () => {});
-  const context: HarnessExecutionContext = { emit: vi.fn(), attempt: { workOrderId: "wo-1", attemptId: "attempt-1", executorIdentity: "worker-1:session-1:1", environmentReference: "local-worktree:attempt-1", sourceRevision: baseline, acceptanceCriteria: [{ id: "ac-1", title: config.acceptanceCriteria[0]! }], assertActive } };
+  const context: HarnessExecutionContext = { emit: vi.fn(), attempt: {
+    projectId: "project-1", repositoryId: "repo-1", workflowRunId: "attempt-1",
+    workOrderId: "wo-1", workOrderRevision: 1, attemptId: "attempt-1", leaseId: "lease-1", generation: 1,
+    executionProfileId: "profile-1", executionProfileDigest: `sha256:${"a".repeat(64)}`,
+    harnessDigest: `sha256:${"b".repeat(64)}`, runtimeDigest: `sha256:${"c".repeat(64)}`,
+    modelRouteDigest: `sha256:${"d".repeat(64)}`,
+    executorIdentity: "worker-1:session-1:1", environmentReference: "local-worktree:attempt-1", sourceRevision: baseline,
+    acceptanceCriteria: [{ id: "ac-1", title: config.acceptanceCriteria[0]! }], assertActive,
+  } };
   return { adapter, config, context, request, directory, root, git, baseline, modelCalls: () => modelCalls, assertActive };
 }
 

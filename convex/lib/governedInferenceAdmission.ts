@@ -43,7 +43,7 @@ export async function admitBedrockAccounting(
   aggregate: Aggregate,
   run: Doc<"workflowRuns">,
   price: ProviderPrice,
-  request: { requestId: string; requestDigest: string; outputTokens: number },
+  request: { requestId: string; requestDigest: string; inputTokens: number; outputTokens: number },
 ) {
   if (process.env.MC_GOVERNED_INFERENCE_GATEWAY_ENABLED !== "1")
     throw new Error("GOVERNED_INFERENCE_GATEWAY_DISABLED");
@@ -87,11 +87,10 @@ export async function admitBedrockAccounting(
       harness?: { adapter?: string; version?: string };
     }
   ).harness;
-  if (
-    !routeRow.providerRoute ||
-    harness?.adapter !== "codex" ||
-    harness.version !== "bedrock-v1"
-  )
+  if (!routeRow.providerRoute || !(
+    (harness?.adapter === "codex" && harness.version === "bedrock-v1") ||
+    (harness?.adapter === "fab" && harness.version === "v1")
+  ))
     throw new Error("BEDROCK_ACCOUNTING_ROUTE_DESCRIPTOR_MISSING");
   const route: ExactInferenceRoute = {
     provider: routeRow.provider,
@@ -168,7 +167,7 @@ export async function admitBedrockAccounting(
   if (prior) throw new Error("BEDROCK_ACCOUNTING_REQUEST_REPLAY");
   // The main ledger rounds each dimension upward. The aggregate retains exact nano-USD enforcement.
   const money = safe(
-    (BigInt(price.maximumInputTokens) * BigInt(price.inputNanoUsdPerToken) +
+    (BigInt(request.inputTokens) * BigInt(price.inputNanoUsdPerToken) +
       999n) /
       1000n +
       (BigInt(request.outputTokens) * BigInt(price.outputNanoUsdPerToken) +
@@ -217,7 +216,7 @@ export async function admitBedrockAccounting(
     primaryRoute: route,
     allowedFallbacks: [],
     maxPhysicalCalls: 1,
-    maxInputTokens: price.maximumInputTokens,
+    maxInputTokens: request.inputTokens,
     maxOutputTokens: request.outputTokens,
     maxCacheReadTokens: 0,
     maxCacheWriteTokens: 0,

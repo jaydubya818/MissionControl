@@ -113,7 +113,7 @@ describe("governed Bedrock bridge offline", () => {
     ).rejects.toThrow("lost reply");
     expect(f.reservation.holds[0]).toMatchObject({
       state: "UNKNOWN",
-      maximumNanoUsd: 200020,
+      maximumNanoUsd: 30,
     });
     await expect(
       f.create().infer("two", request, new AbortController().signal),

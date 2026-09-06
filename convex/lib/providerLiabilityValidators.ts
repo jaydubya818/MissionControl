@@ -51,6 +51,7 @@ export const providerHoldValidator = v.object({
   leaseId: v.string(),
   generation: v.number(),
   maximumNanoUsd: v.number(),
+  inputTokens: v.optional(v.number()),
   maximumOutputTokens: v.number(),
   state: v.union(
     v.literal("RESERVED"),

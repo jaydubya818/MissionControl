@@ -51,6 +51,7 @@ import {
 } from "./githubAppRuntime.js";
 import { configuredFactoryHarnessAdapters } from "./factoryHarnessComposition.js";
 import { loadFabExecutorAdapter } from "./fabExecutorAdapter.js";
+import { createFabBedrockBrokerFactory } from "./fabBedrockBroker.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
 import { MissionPlanningWorker } from "./missionPlanningWorker.js";
 import {
@@ -63,8 +64,8 @@ import os from "node:os";
 
 // Fab enrollment/configuration is explicit startup input. Capture its selected source
 // before MC's legacy dotenv loading so repository dotenv cannot enroll or override it.
-const configuredFabAdapter = process.env.FAB_EXECUTOR_ENABLED === "1"
-  ? loadFabExecutorAdapter(requiredRuntimeSetting("FAB_EXECUTOR_CONFIG"), requiredRuntimeSetting("FAB_EXECUTOR_STATE_DIR"))
+const configuredFabPaths = process.env.FAB_EXECUTOR_ENABLED === "1"
+  ? { config: requiredRuntimeSetting("FAB_EXECUTOR_CONFIG"), state: requiredRuntimeSetting("FAB_EXECUTOR_STATE_DIR") }
   : undefined;
 const envSearchPaths = [
   path.resolve(process.cwd(), ".env.local"),
@@ -94,7 +95,7 @@ const DEEPSEEK_HARNESS_EXECUTOR_ENABLED = process.env.DEEPSEEK_HARNESS_EXECUTOR_
 const LEGACY_FACTORY_WORKER_ENABLED = process.env.FACTORY_EXECUTION_ENABLED === "1";
 const CODEX_BEDROCK_HARNESS_ENABLED = process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1";
 const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
-  || Boolean(configuredFabAdapter) || CODEX_BEDROCK_HARNESS_ENABLED;
+  || Boolean(configuredFabPaths) || CODEX_BEDROCK_HARNESS_ENABLED;
 const FACTORY_WORKER_SCOPE = DURABLE_FACTORY_WORKER_ENABLED
   ? {
       projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"),
@@ -111,6 +112,13 @@ const bedrockConfigPath = CODEX_BEDROCK_HARNESS_ENABLED
 const bedrockConfig = bedrockConfigPath ? JSON.parse(readFileSync(bedrockConfigPath, "utf8")) : undefined;
 const bedrockTransport = bedrockConfig?.callAuthorization
   ? qualifiedBedrockTransport(bedrockConfig.route, bedrockConfig.callAuthorization)
+  : undefined;
+const fabBedrockConfigPath = configuredFabPaths
+  ? process.env.FAB_BEDROCK_APPROVED_CONFIG_FILE?.trim()
+  : undefined;
+const fabBedrockConfig = fabBedrockConfigPath ? JSON.parse(readFileSync(fabBedrockConfigPath, "utf8")) : undefined;
+const fabBedrockTransport = fabBedrockConfig?.callAuthorization
+  ? qualifiedBedrockTransport(fabBedrockConfig.route, fabBedrockConfig.callAuthorization)
   : undefined;
 const REMOTE_SANDBOX_BACKEND_READY = Boolean(bedrockTransport)
   || (process.env.CODEX_WORKER_REMOTE_SANDBOX_ENABLED === "1"
@@ -134,6 +142,15 @@ const CONVEX_SERVICE_AUTH_TOKEN = process.env.CONVEX_SERVICE_AUTH_TOKEN?.trim();
 if (CONVEX_SERVICE_AUTH_TOKEN) {
   client.setAuth(CONVEX_SERVICE_AUTH_TOKEN);
 }
+const configuredFabAdapter = configuredFabPaths
+  ? loadFabExecutorAdapter(
+      configuredFabPaths.config,
+      configuredFabPaths.state,
+      fabBedrockTransport
+        ? createFabBedrockBrokerFactory(client, fabBedrockConfig, fabBedrockTransport)
+        : undefined,
+    )
+  : undefined;
 const factoryHarnessRegistry = new HarnessAdapterRegistry(
   [...configuredFactoryHarnessAdapters({
     codexEnabled: CODEX_FACTORY_WORKER_ENABLED,

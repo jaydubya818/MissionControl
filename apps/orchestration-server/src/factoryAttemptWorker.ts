@@ -757,7 +757,16 @@ export class FactoryAttemptWorker {
         let eventPersistence = Promise.resolve();
         const result = await runHarnessExecution(adapter, executorRequest, {
           attempt: workspaceOwner ? {
+            projectId: String(claim.projectId), repositoryId: String(claim.repositoryId),
+            workflowRunId: String(claim.workflowRunId),
             workOrderId: String(claim.workOrderId), attemptId: String(claim.runId),
+            workOrderRevision: manifest.causation.workOrderRevisionNumber,
+            leaseId, generation: claim.lease.workerGeneration,
+            executionProfileId: manifest.executionProfile!.profileId,
+            executionProfileDigest: manifest.executionProfile!.profileDigest,
+            harnessDigest: manifest.harness.capabilityManifestSha256,
+            runtimeDigest: manifest.harness.runtimeArtifactDigest!,
+            modelRouteDigest: manifest.modelRoute!.routeDigest,
             executorIdentity: `${workerLeaseIdentity.workerId}:${workerLeaseIdentity.workerSessionId}:${workerLeaseIdentity.workerGeneration}`,
             environmentReference: `local-worktree:${claim.runId}`, sourceRevision: manifest.repository.baseSha,
             acceptanceCriteria: manifest.workOrderSpecification?.acceptanceCriteria ?? [],

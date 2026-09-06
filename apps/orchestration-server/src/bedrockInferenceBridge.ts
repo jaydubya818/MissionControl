@@ -176,6 +176,11 @@ export class BedrockInferenceBridge {
     let settled = false;
     const startedAt = this.now();
     try {
+      if (!this.transport.countInputTokens)
+        throw new Error("BEDROCK_EXACT_TOKEN_PREFLIGHT_REQUIRED");
+      const counted = await this.transport.countInputTokens(wire, signal);
+      if (!Number.isSafeInteger(counted.inputTokens) || counted.inputTokens < 1)
+        throw new Error("BEDROCK_TOKEN_COUNT_INVALID");
       // Failure/ambiguous reply here permits no send, but never permits replay.
       const proof = await this.authority.reserve({
         ...subject,
@@ -183,6 +188,7 @@ export class BedrockInferenceBridge {
         requestId,
         requestDigest,
         payloadBytes,
+        inputTokens: counted.inputTokens,
         outputTokens: request.maxOutputTokens,
       });
       admitted = true;

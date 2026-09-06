@@ -64,6 +64,7 @@ const request = (r = reservation, id = "one") => ({
   requestId: id,
   requestDigest: sha(id === "one" ? "d" : "e"),
   payloadBytes: 7,
+  inputTokens: 10,
   outputTokens: 10,
   now: 1000,
 });
@@ -124,6 +125,9 @@ describe("authoritative provider liability transitions", () => {
       reserveProviderRequest({ ...request(), payloadBytes: 101 }),
     ).toThrow();
     expect(() =>
+      reserveProviderRequest({ ...request(), inputTokens: 11 }),
+    ).toThrow();
+    expect(() =>
       reserveProviderRequest({ ...request(), outputTokens: 11 }),
     ).toThrow();
     expect(() =>
@@ -144,6 +148,8 @@ describe("authoritative provider liability transitions", () => {
     const settled = settleProviderUsage(held, price, usage).reservation;
     expect(settled.holds[0]).toMatchObject({
       state: "SETTLED",
+      inputTokens: 10,
+      maximumNanoUsd: 30,
       accountedNanoUsd: 7,
       classification: "ACTUAL",
       costClassification: "ESTIMATED",

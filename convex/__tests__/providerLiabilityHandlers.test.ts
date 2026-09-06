@@ -127,6 +127,7 @@ function fixture() {
     requestId: "request",
     requestDigest: hash,
     payloadBytes: 10,
+    inputTokens: 10,
     outputTokens: 10,
   };
   return { ctx, rows, args, price };
