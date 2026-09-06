@@ -2,18 +2,25 @@ import { readFile, writeFile } from "node:fs/promises";
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 
-const [directory] = process.argv.slice(2);
+const [directory, runLabel = "v12"] = process.argv.slice(2);
 if (process.env.CONVEX_SELF_HOSTED_URL !== "http://127.0.0.1:3290" || !process.env.CONVEX_SELF_HOSTED_ADMIN_KEY || !directory) {
   throw new Error("Exact disposable backend required.");
 }
-const projectId = "k57jpqmfrj3rtp5dkgrw1cgd398dww8j";
-const repositoryId = "v57hk3e2j5a657f7akz9npbdx98dx98f";
+if (!/^v[1-9][0-9]*$/.test(runLabel)) throw new Error("Qualification run label must be an explicit vN identity.");
+const scenarioVersion = "context-skills-synthetic-factory/v1";
+const authority = JSON.parse(await readFile(`${directory}/authority-bootstrap.json`, "utf8"));
+const repository = JSON.parse(await readFile(`${directory}/local-repository-registration-proof.json`, "utf8"));
+const projectId = authority.projectId;
+const repositoryId = repository.repositoryId;
 const workerHostId = "local-synthetic-qualification-worker";
 const factory = JSON.parse(await readFile(`${directory}/local-factory-setup.json`, "utf8"));
 const fixture = JSON.parse(await readFile(`${directory}/synthetic-mission-authority-fixture.json`, "utf8")).provisioned;
-const statePath = `${directory}/local-synthetic-mission-v8.json`;
+const statePath = `${directory}/local-synthetic-mission-${runLabel}.json`;
 let state: Record<string, any> = {};
 try { state = JSON.parse(await readFile(statePath, "utf8")); } catch (error: any) { if (error.code !== "ENOENT") throw error; }
+if (state.scenarioVersion && state.scenarioVersion !== scenarioVersion) throw new Error("Frozen scenario version changed within a run.");
+state.scenarioVersion = scenarioVersion;
+state.runLabel = runLabel;
 const identity = (subject: string, name: string, email: string) => ({ subject, issuer: "https://synthetic-qualification.example.test", email, name });
 const client = (subject: string, name: string, email: string) => {
   const value = new ConvexHttpClient(process.env.CONVEX_SELF_HOSTED_URL!);
@@ -32,19 +39,19 @@ async function step(name: string, perform: () => Promise<any>) {
 }
 
 const missionResult = await step("mission", () => owner.mutation(ref("missions:createDraft"), {
-  projectId, idempotencyKey: "synthetic-factory-admission-mission-v8", title: "Synthetic Factory admission",
+  projectId, idempotencyKey: `synthetic-factory-admission-mission-${runLabel}`, title: "Synthetic Factory admission",
   objective: "Create and independently verify the exact unpublished synthetic qualification document.",
   context: "Qualification-only local repository; no inference, transmission, publication, or production authority.",
   constraints: ["External model calls remain zero", "Publication authority remains NONE", "Production authority remains NONE"],
   sourceOfTruthRefs: [{ kind: "REPO", label: "Admitted local fixture", location: "docs/qualification.md" }],
   owner: "Synthetic Qualification Owner", ownerMemberId: fixture.primaryMemberId, owningTeamId: fixture.teamId,
-  repositoryId, codeScopeIds: [factory.scope.scopeId], executionEnvironment: "LOCAL", budgetUsd: 0.02,
+  repositoryId, codeScopeIds: [factory.scope.scopeId], executionEnvironment: "LOCAL", budgetUsd: 0.05,
   stopCondition: "Stop after an exact unpublished candidate receives a separate deterministic verifier Attempt.",
-  maxReadOnlyConcurrency: 1, maxCorrectiveIterations: 1, metadata: { synthetic: true, qualificationOnly: true },
+  maxReadOnlyConcurrency: 1, maxCorrectiveIterations: 1, metadata: { synthetic: true, qualificationOnly: true, scenarioVersion, runLabel },
 }));
 const missionId = missionResult.mission._id;
 const planResult = await step("plan", () => author.mutation(ref("missions:savePlanDraft"), {
-  projectId, missionId, idempotencyKey: "synthetic-factory-admission-plan-v8",
+  projectId, missionId, idempotencyKey: `synthetic-factory-admission-plan-${runLabel}`,
   summary: "Render one frozen synthetic Markdown document through the admitted local Factory and verify its exact Git blob independently.",
   rollbackApproach: "Discard the unpublished local candidate worktree and restore the admitted baseline commit.", estimatedCostUsd: 0,
   assertions: [{ assertionId: "exact-document", title: "Exact synthetic document bytes",
@@ -59,46 +66,46 @@ const planResult = await step("plan", () => author.mutation(ref("missions:savePl
     implementationPolicy: { allowedCommands: ["node -e deterministic-byte-verification"], independentVerification: {
       executable: "node", args: ["-e", "process.exit(0)"], category: "CONTRACT_TEST", commandClass: "TEST",
       evidenceCategory: "TEST_RESULT", timeoutMs: 10_000 }, maxFilesChanged: 1, maxLinesChanged: 10,
-      maxCostUsd: 0.02, maxAttempts: 3, timeoutMinutes: 1, stopCondition: "Stop after exact candidate capture." },
+      maxCostUsd: 0.05, maxAttempts: 3, timeoutMinutes: 1, stopCondition: "Stop after exact candidate capture." },
     dependsOnBlueprintIds: [], assertionIds: ["exact-document"] }],
-  metadata: { synthetic: true, qualificationOnly: true, externalModelCalls: 0 },
+  metadata: { synthetic: true, qualificationOnly: true, externalModelCalls: 0, scenarioVersion, runLabel },
 }));
 const planId = planResult.plan._id;
 await step("submittedPlan", () => author.mutation(ref("missions:submitPlan"), {
-  projectId, missionId, planId, idempotencyKey: "synthetic-factory-admission-plan-submit-v8",
+  projectId, missionId, planId, idempotencyKey: `synthetic-factory-admission-plan-submit-${runLabel}`,
 }));
 const release = await step("releasedPlan", () => owner.mutation(ref("missions:approvePlan"), {
   projectId, missionId, planId, decisionReason: "Exact bounded synthetic plan is safe for local qualification execution.",
-  idempotencyKey: "synthetic-factory-admission-plan-approve-v8",
+  idempotencyKey: `synthetic-factory-admission-plan-approve-${runLabel}`,
 }));
 const workOrder = release.workOrders[0];
 if (!workOrder || workOrder.riskLevel !== "LOW" || workOrder.verificationContract?.schemaVersion !== 2) throw new Error("Canonical released WorkOrder is invalid.");
 await step("startedMission", () => owner.mutation(ref("missions:start"), {
-  missionId, idempotencyKey: "synthetic-factory-admission-mission-start-v8",
+  missionId, idempotencyKey: `synthetic-factory-admission-mission-start-${runLabel}`,
 }));
 const taskResult = await step("task", () => owner.mutation(ref("tasks:create"), {
   projectId, workOrderId: workOrder._id, title: "Render exact synthetic qualification document", type: "DOCS", priority: 3,
-  idempotencyKey: "synthetic-factory-admission-task-v8", source: "DASHBOARD", createdBy: "HUMAN",
-  createdByRef: "user_SyntheticHandoffQualification", metadata: { synthetic: true, qualificationOnly: true },
+  idempotencyKey: `synthetic-factory-admission-task-${runLabel}`, source: "DASHBOARD", createdBy: "HUMAN",
+  createdByRef: "user_SyntheticHandoffQualification", metadata: { synthetic: true, qualificationOnly: true, scenarioVersion, runLabel },
 }));
 const taskId = taskResult.task._id;
 await step("assignedTask", async () => {
   const result = await owner.mutation(ref("tasks:transition"), { taskId, projectId, toStatus: "ASSIGNED", actorType: "HUMAN",
     actorUserId: "user_SyntheticHandoffQualification", reason: "Bound to the canonical Factory Attempt",
-    idempotencyKey: "synthetic-factory-admission-task-assigned-v8" });
+    idempotencyKey: `synthetic-factory-admission-task-assigned-${runLabel}` });
   if (!result.success) throw new Error(`Task assignment failed: ${JSON.stringify(result.errors)}`);
   return result;
 });
 await step("readyTask", async () => {
   const result = await owner.mutation(ref("tasks:transition"), { taskId, projectId, toStatus: "READY", actorType: "HUMAN",
     actorUserId: "user_SyntheticHandoffQualification", reason: "Ready for the exact canonical Factory Attempt",
-    idempotencyKey: "synthetic-factory-admission-task-ready-v8" });
+    idempotencyKey: `synthetic-factory-admission-task-ready-${runLabel}` });
   if (!result.success) throw new Error(`Task readiness failed: ${JSON.stringify(result.errors)}`);
   return result;
 });
 const dispatch = await step("dispatch", () => owner.mutation(ref("workOrders:dispatch"), {
   workOrderId: workOrder._id, taskId, workflowId: "local-repository-producer-v1", actorType: "HUMAN",
-  idempotencyKey: "synthetic-factory-admission-dispatch-v8", repositoryId, codeScopeIds: [factory.scope.scopeId],
+  idempotencyKey: `synthetic-factory-admission-dispatch-${runLabel}`, repositoryId, codeScopeIds: [factory.scope.scopeId],
   owningTeamId: fixture.teamId, ownerMemberId: fixture.primaryMemberId, executionEnvironment: "LOCAL",
   executorHostId: workerHostId, factoryDefinitionVersionId: factory.producerFactoryVersion,
 }));
@@ -109,7 +116,7 @@ let producerAttempt = dispatch.run;
 if (initialAttempt?.status === "FAILED") {
   const retry = await step("retryDispatch", () => owner.mutation(ref("workOrders:dispatch"), {
     workOrderId: workOrder._id, taskId, workflowId: "local-repository-producer-v1", actorType: "HUMAN",
-    idempotencyKey: "synthetic-factory-admission-dispatch-retry-v8", repositoryId, codeScopeIds: [factory.scope.scopeId],
+    idempotencyKey: `synthetic-factory-admission-dispatch-retry-${runLabel}`, repositoryId, codeScopeIds: [factory.scope.scopeId],
     owningTeamId: fixture.teamId, ownerMemberId: fixture.primaryMemberId, executionEnvironment: "LOCAL",
     executorHostId: workerHostId, factoryDefinitionVersionId: factory.producerFactoryVersion,
     retryOfWorkflowRunId: dispatch.run._id,
@@ -117,6 +124,20 @@ if (initialAttempt?.status === "FAILED") {
   }));
   if (!retry.created || !retry.run) throw new Error(`Canonical retry dispatch failed: ${JSON.stringify(retry)}`);
   producerAttempt = retry.run;
+  const refreshed = await owner.query(ref("workOrders:get"), { workOrderId: workOrder._id });
+  const retriedAttempt = refreshed.executionRuns?.find((run: any) => run._id === retry.run._id);
+  if (retriedAttempt?.status === "FAILED") {
+    const recovery = await step("recoveryDispatch", () => owner.mutation(ref("workOrders:dispatch"), {
+      workOrderId: workOrder._id, taskId, workflowId: "local-repository-producer-v1", actorType: "HUMAN",
+      idempotencyKey: `synthetic-factory-admission-dispatch-recovery-${runLabel}`, repositoryId, codeScopeIds: [factory.scope.scopeId],
+      owningTeamId: fixture.teamId, ownerMemberId: fixture.primaryMemberId, executionEnvironment: "LOCAL",
+      executorHostId: workerHostId, factoryDefinitionVersionId: factory.producerFactoryVersion,
+      retryOfWorkflowRunId: retry.run._id,
+      retryReason: "Retry the retained deterministic workload after correcting the local unpublished-candidate lineage admission boundary.",
+    }));
+    if (!recovery.created || !recovery.run) throw new Error(`Canonical recovery dispatch failed: ${JSON.stringify(recovery)}`);
+    producerAttempt = recovery.run;
+  }
 }
 state.workOrderId = workOrder._id; state.taskId = taskId; state.producerAttemptId = producerAttempt._id;
 await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });

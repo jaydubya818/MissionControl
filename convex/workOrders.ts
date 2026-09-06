@@ -48,10 +48,17 @@ import { validateMissionWorkOrderDispatch } from "./lib/missionGovernance";
 import {
   genericHarnessV1RecoveryReady,
   evaluateFactoryDispatchPreflight,
+  evaluateLocalQualificationDispatchPreflight,
   factoryDispatchChecks,
+  factoryLocalQualificationDispatchChecks,
   factoryVersionApprovesWorkOrderScopes,
   selectCurrentFactoryHost,
 } from "./lib/factoryDispatch";
+import {
+  assertLocalRepositoryHost,
+  isLocalQualificationRepository,
+  loadLocalRepositoryAdmission,
+} from "./lib/localRepositoryAdmission";
 import { planReadiness, summarizeWorkOrderReadiness, type ReadinessCheck } from "./lib/workOrderReadiness";
 import { validFactoryBudget, validFactoryExecutionBinding, validFactoryExecutorBinding } from "./lib/factoryConfiguration";
 import { factoryWorkerEligibility } from "./lib/factoryWorkerRuntime";
@@ -3099,6 +3106,7 @@ async function dispatchWorkOrder(
           repositoryId: String(factoryBinding.repository._id),
           providerRepositoryId: factoryBinding.repository.providerRepositoryId,
           repository: factoryBinding.repository.repository,
+          repositoryAdmissionDigest: factoryBinding.version.repositoryAdmissionDigest,
           repositoryDataClassification: factoryBinding.repositoryDataClassification,
           defaultBranch: factoryBinding.repository.defaultBranch,
           baseSha: factoryBinding.baseSha,
@@ -3123,7 +3131,7 @@ async function dispatchWorkOrder(
             qualificationSnapshot: factoryBinding.version.executionProfileQualificationSnapshot,
           } : undefined,
           sandboxProfile: {
-            isolation: "WORKSPACE_WRITE" as const,
+            isolation: factoryBinding.version.purpose === "VERIFICATION" ? "READ_ONLY" as const : "WORKSPACE_WRITE" as const,
             requiredCapabilities: factoryBinding.requiredSandboxCapabilities,
           },
           sandbox: factoryBinding.executionBackend === "remote-sandbox" ? {
@@ -3988,6 +3996,7 @@ async function resolveFactoryDispatchBinding(
   ));
   const selectedExecutionBackend = version.executionBackend ?? "persistent-worker";
   const offline = selectedExecutionBackend === "isolated-container";
+  const selectedIsolation = version.purpose === "VERIFICATION" ? "READ_ONLY" : "WORKSPACE_WRITE";
   const offlineSnapshot = version.executionProfileSnapshot as any;
   if (offline) {
     assertQualificationActivation({ definition, version,
@@ -4014,8 +4023,8 @@ async function resolveFactoryDispatchBinding(
     }
   })();
   const requiredSandboxCapabilities = selectedExecutionBackend === "remote-sandbox"
-    ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
-    : ["git-worktree", "workspace-write", ...(offline ? offlineSnapshot?.requiredSandboxCapabilities ?? [] : [])];
+    ? ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
+    : ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", ...(offline ? offlineSnapshot?.requiredSandboxCapabilities ?? [] : [])];
   const eligibleBindings = repository ? bindings.filter((binding) => {
     if (args.executorHostId && binding.hostId !== args.executorHostId) return false;
     return factoryWorkerEligibility({
@@ -4048,7 +4057,7 @@ async function resolveFactoryDispatchBinding(
         provider: primaryModel?.provider ?? null,
         model: primaryModel?.modelId ?? null,
         harnessCapabilities: offline ? offlineSnapshot?.requiredHarnessCapabilities ?? [] : factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
-        isolation: "WORKSPACE_WRITE",
+        isolation: selectedIsolation,
         sandboxCapabilities: requiredSandboxCapabilities,
         executionBackend: selectedExecutionBackend,
         ...(offline ? { inferenceConstraint: NO_INFERENCE_CONSTRAINT } : {}),
@@ -4064,6 +4073,17 @@ async function resolveFactoryDispatchBinding(
   const host = repository
     ? selectCurrentFactoryHost(eligibleBindings, repository.repository, now, args.executorHostId)
     : null;
+  const localRepositoryAdmission = repository && isLocalQualificationRepository(repository)
+    ? await loadLocalRepositoryAdmission(ctx, repository, now, version)
+    : null;
+  let localHostObservationReady = true;
+  if (localRepositoryAdmission) {
+    try {
+      assertLocalRepositoryHost(localRepositoryAdmission.admission, localRepositoryAdmission.digest, host, now);
+    } catch {
+      localHostObservationReady = false;
+    }
+  }
   const planningRevisionDrift = Boolean(host && workOrder.planningRepositorySha
     && host.baseCommit !== workOrder.planningRepositorySha);
   if (!input.inspect && host && workOrder.planningRepositorySha
@@ -4134,7 +4154,7 @@ async function resolveFactoryDispatchBinding(
     && executionProfileScopeBlockers(executionProfile, {
       workloadClass,
       riskClass: version.riskBoundary,
-      isolation: "WORKSPACE_WRITE",
+      isolation: selectedIsolation,
     }).length === 0
   );
   const offlineBindingReady = offline && executionProfileReady && Boolean(executionProfile)
@@ -4195,6 +4215,7 @@ async function resolveFactoryDispatchBinding(
       && host.baseBranch === repository?.defaultBranch
       && typeof host.baseCommit === "string"
       && /^[a-f0-9]{40,64}$/i.test(host.baseCommit)
+      && localHostObservationReady
     ),
     budgetReady: validFactoryBudget(version.budget),
     recoveryReady: genericHarnessV1RecoveryReady(version.recovery) && sandboxProfileReady && (offline ? offlineBindingReady : validFactoryExecutionBinding({
@@ -4209,14 +4230,38 @@ async function resolveFactoryDispatchBinding(
     activeRepositoryMutation: activeRuns.some((run) => run.isMutating !== false),
   };
   if (input.inspect) return {
-    checks: [...factoryDispatchChecks(preflightInput), {
+    checks: [...(localRepositoryAdmission
+      ? factoryLocalQualificationDispatchChecks({
+          ...preflightInput,
+          repositoryAdmission: {
+            mode: localRepositoryAdmission.admission.mode,
+            digest: localRepositoryAdmission.digest,
+            frozenDigest: version.repositoryAdmissionDigest ?? "",
+            current: localHostObservationReady,
+            publicationAuthority: localRepositoryAdmission.admission.publicationAuthority,
+            productionAuthority: localRepositoryAdmission.admission.productionAuthority,
+          },
+        })
+      : factoryDispatchChecks(preflightInput)), {
       code: "planning-revision-drift", passed: !planningRevisionDrift,
       reason: "Worker base must match the approved planning SHA; drift requires a new researched and approved Plan.",
     }],
     hostId: host?.hostId,
     baseSha: host?.baseCommit,
   };
-  const result = evaluateFactoryDispatchPreflight(preflightInput);
+  const result = localRepositoryAdmission
+    ? evaluateLocalQualificationDispatchPreflight({
+        ...preflightInput,
+        repositoryAdmission: {
+          mode: localRepositoryAdmission.admission.mode,
+          digest: localRepositoryAdmission.digest,
+          frozenDigest: version.repositoryAdmissionDigest ?? "",
+          current: localHostObservationReady,
+          publicationAuthority: localRepositoryAdmission.admission.publicationAuthority,
+          productionAuthority: localRepositoryAdmission.admission.productionAuthority,
+        },
+      })
+    : evaluateFactoryDispatchPreflight(preflightInput);
   if (!result.ok) throw new Error(`Factory dispatch blocked (${result.blocker}): ${result.remediation}`);
   if (!repository || !host) throw new Error("Factory dispatch blocked (binding-missing): Reassess Factory readiness.");
   if (!host.baseCommit || host.baseBranch !== repository.defaultBranch) {

@@ -1033,7 +1033,7 @@ export const createVersion = mutation({
           harnessCapabilityManifestDigest: harness.capabilityManifestSha256, harnessEffectiveConfigSha256: harness.effectiveConfigSha256,
           harnessRuntimeArtifact: harness.runtimeArtifact, harnessRuntimeArtifactDigest: harness.runtimeArtifactSha256,
           executionBackend: "isolated-container" as const, sandboxProfileId: String(sandboxProfileId), sandboxProfileDigest,
-          sandboxProfileSnapshot: sandboxProfile!.immutableSnapshot, isolationModes: ["WORKSPACE_WRITE" as const],
+          sandboxProfileSnapshot: sandboxProfile!.immutableSnapshot, isolationModes: [selectedIsolation],
           requiredHarnessCapabilities: frozenProfileSnapshot.requiredHarnessCapabilities,
           requiredSandboxCapabilities: frozenProfileSnapshot.requiredSandboxCapabilities,
         } } } : {}),

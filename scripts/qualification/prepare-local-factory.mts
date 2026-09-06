@@ -25,26 +25,26 @@ async function step(name: string, perform: () => Promise<any>) {
   console.log(JSON.stringify({ completedSetupStep: name })); return result;
 }
 const componentProof = await Promise.all(["match", "mutation", "canceled", "stale"].map(async name =>
-  ({ name, record: JSON.parse(await readFile(`${directory}/../unpublished-verifier-controls-3/${name}.json`, "utf8")) })));
+  ({ name, record: JSON.parse(await readFile(`${directory}/unpublished-verifier-controls-3/${name}.json`, "utf8")) })));
 const evidenceDigest = `sha256:${sha256Hex(canonicalJson(componentProof))}`;
 const evidenceReference = "local:unpublished-verifier-controls-3/component-controls-not-canonical-pass";
-const snapshot = { schema: "local-qualification-sandbox/v1", provider: "LOCAL_CONTAINER", profileKey: "local-repository-fixture", version: 1,
+const snapshot = { schema: "local-qualification-sandbox/v1", provider: "LOCAL_CONTAINER", profileKey: "local-repository-fixture", version: 2,
   imageDigest: ISOLATED_INVOCATION_RUNTIME_ARTIFACT.imageDigest, bridgeDigest: ISOLATED_INVOCATION_EFFECTIVE_CONFIG.bridgeImplementationDigest,
   backendDigest: ISOLATED_INVOCATION_EFFECTIVE_CONFIG.backendImplementationDigest, isolationPolicy: ISOLATED_CONTAINER_POLICY,
   qualification: { evidenceReference, evidenceDigest, validUntil: a.expiresAt }, localQualification: {
     repositoryId: repository.repositoryId, repositoryAdmissionDigest: repository.repository.admissionDigest,
     environmentId: a.environmentId, projectId: a.projectId, tenantId: a.tenantId, operatorId: a.operatorId, program: a.program,
     operations: ["render-markdown/v1", "verify-document-bytes/v1"], risk: "GREEN", inference: "DENIED", transmission: "DENIED", publication: "NONE", production: "NONE" } };
-const sandboxProfileId = await step("sandboxProfileId", () => mutate("factory/configuration:registerIsolatedSandboxProfile", { projectId: a.projectId, snapshot }));
-await step("sandboxAdmission", () => mutate("factory/configuration:promoteSandboxProfile", { sandboxProfileId, expectedProfileDigest: offlineSandboxDigest(snapshot) }));
+const sandboxProfileId = await step("sandboxProfileIdV2", () => mutate("factory/configuration:registerIsolatedSandboxProfile", { projectId: a.projectId, snapshot }));
+await step("sandboxAdmissionV2", () => mutate("factory/configuration:promoteSandboxProfile", { sandboxProfileId, expectedProfileDigest: offlineSandboxDigest(snapshot) }));
 for (const [purpose, isolation, workload] of [["producer", "WORKSPACE_WRITE", "SOFTWARE_CHANGE"], ["verifier", "READ_ONLY", "VERIFICATION"]] as const) {
-  const registered = await step(`${purpose}Profile`, () => mutate("factory/executionProfiles:registerVersion", { projectId: a.projectId,
-    profileKey: `local-repository-${purpose}`, registrationIdempotencyKey: `local-repository-${purpose}-v1`,
+  const registered = await step(`${purpose}ProfileV2`, () => mutate("factory/executionProfiles:registerVersion", { projectId: a.projectId,
+    profileKey: `local-repository-${purpose}`, registrationIdempotencyKey: `local-repository-${purpose}-v2`,
     executor: { adapter: "isolated-invocation", version: "2" }, executionBackend: "isolated-container", sandboxProfileId, isolationModes: [isolation] }));
   const profile = await query("factory/executionProfiles:get", { executionProfileId: registered.executionProfileId });
-  await step(`${purpose}ProfileAdmission`, () => mutate("factory/executionProfiles:qualify", {
+  await step(`${purpose}ProfileAdmissionV2`, () => mutate("factory/executionProfiles:qualify", {
     executionProfileId: registered.executionProfileId, expectedProfileDigest: profile.profile.profileDigest,
-    qualificationIdempotencyKey: `local-repository-${purpose}-qualification-v1`, evidenceReference, evidenceDigest,
+    qualificationIdempotencyKey: `local-repository-${purpose}-qualification-v2`, evidenceReference, evidenceDigest,
     workloadClasses: [workload], riskClasses: ["GREEN"], validUntil: a.expiresAt }));
 }
 const scope = await step("scope", () => mutate("projects:createRepositoryCodeScope", { repositoryId: repository.repositoryId,
@@ -65,11 +65,12 @@ for (const [purpose, workload, factoryPurpose] of [["producer", operation, "SOFT
   const workflowId = await step(`${purpose}Workflow`, () => mutate("workflows:registerProduction", { projectId: a.projectId,
     workflowId: `local-repository-${purpose}-v1`, name: `Local synthetic ${purpose}`, description: "Deterministic qualification only; no model or publication authority.",
     topology: "LINEAR", maxConcurrency: 1, agents: [], steps: [{ id: "execute", kind: "DETERMINISTIC", agent: "", retryLimit: 0,
-      timeoutMinutes: 1, input: JSON.stringify(workload) }], active: true }));
+      timeoutMinutes: 1, input: JSON.stringify(workload), expects: "A validated deterministic runtime result.",
+      outputSchema: { type: "object", required: ["status"], properties: { status: { type: "string" } } } }], active: true }));
   const definitionId = await step(`${purpose}Factory`, () => mutate("factory/configuration:create", { repositoryId: repository.repositoryId,
     name: `Local synthetic ${purpose}`, purpose: factoryPurpose }));
   await step(`${purpose}FactoryVersion`, () => mutate("factory/configuration:createVersion", { factoryDefinitionId: definitionId,
-    workflowId, executionProfileId: state[`${purpose}Profile`].executionProfileId, codeScopeIds: [scope.scopeId], agentBindings: [],
+    workflowId, executionProfileId: state[`${purpose}ProfileV2`].executionProfileId, codeScopeIds: [scope.scopeId], agentBindings: [],
     policyEnvelopeId: policy._id, environmentId: a.environmentId, budget: { maxCostUsd: 0.01, maxRuntimeMinutes: 1, maxAttempts: 3 },
     verifierIds: [verifierId], riskBoundary: "GREEN", recovery: { pause: false, cancel: true, retry: true, resume: false } }));
 }

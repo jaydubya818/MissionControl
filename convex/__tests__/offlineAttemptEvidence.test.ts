@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { reportInternal } from "../factory/attempts";
+import { reportInternal, reportVerificationInternal } from "../factory/attempts";
 import { sha256Hex } from "@mission-control/shared";
 import { COMPOSITION_SCHEMA, INVOCATION_SCHEMA, INVOCATION_RESULT_SCHEMA, SYNTHETIC_WORKLOAD_DIGEST,
   ISOLATED_CONTAINER_POLICY, ISOLATED_CONTAINER_POLICY_DIGEST, invocationDigest, invocationResult, canonicalIsolatedInvocation,
   RENDER_MARKDOWN_OPERATION_DIGEST, type IsolatedInvocation } from "@mission-control/workflow-engine/harness-contract";
+import { VERIFY_DOCUMENT_OPERATION, VERIFY_DOCUMENT_OPERATION_DIGEST } from "../../packages/workflow-engine/src/deterministicVerification";
 import { validateOfflineAttemptEvidence } from "../lib/offlineAttemptEvidence";
 
 function fixture() {
@@ -106,6 +107,52 @@ describe("offline response evidence consistency (not execution authority)", () =
     }
     await expect(report(ctx, { ...args, packet: { ...args.packet, terminal: { status: "COMPLETED" } } })).rejects.toThrow("evidence-only");
     expect(patch).not.toHaveBeenCalled();
+  });
+  it("retains an expired verifier response by its historical claim without granting result authority", async () => {
+    const packet = fixture();
+    const profile = { schema: "factory-execution-profile/v2", modelRoute: { schema: "factory-inference-constraint/v1", mode: "DENIED" },
+      offlinePolicy: { bridge: { ...packet.request.composition.bridge, implementationDigest: packet.request.composition.bridge.digest,
+        invocationSchema: INVOCATION_SCHEMA, resultSchema: INVOCATION_RESULT_SCHEMA },
+        backend: { ...packet.request.composition.backend, implementationDigest: packet.request.composition.backend.digest },
+        transmission: { schema: "factory-transmission-policy/v1", mode: "DENY_ALL", destinations: [], credentialClasses: [], maxOutboundBytes: 0 },
+        budget: { schema: "factory-provider-budget/v1", mode: "NO_PROVIDER_EXECUTION", maxProviderCalls: 0, maxProviderLiabilityUsd: 0 } },
+      runtimeArtifact: { snapshot: { imageDigest: packet.request.composition.runtimeImage } },
+      sandboxProfile: { profileSnapshot: { isolationPolicy: ISOLATED_CONTAINER_POLICY } } };
+    const manifest = { version: "factory-execution-manifest/v4", executionBackend: "isolated-container", budgetReservationId: "run",
+      causation: { workflowRunId: "run", workOrderId: "work-order", taskId: "task", missionPlanId: "plan", missionPlanVersion: 1,
+        factoryPurpose: "VERIFICATION", missionPlanDigest: packet.request.plan.digest,
+        factoryDefinitionVersionId: "factory", factoryConfigurationDigest: "factory-v1-12345678" },
+      executionProfile: { profileId: "profile", profileDigest: packet.request.profileDigest, profileSnapshot: profile },
+      workflow: { steps: [{ kind: "DETERMINISTIC", timeoutMs: 1000, operation: { reference: VERIFY_DOCUMENT_OPERATION,
+        digest: VERIFY_DOCUMENT_OPERATION_DIGEST, input: { subjectDigest: packet.request.plan.digest,
+          verificationPlanDigest: packet.request.plan.digest, repositoryId: "repository", workOrderId: "work-order",
+          workOrderRevisionNumber: 1, producerAttemptId: "source", candidateSha: "b".repeat(40), candidateTreeSha: "c".repeat(40),
+          path: "docs/fixture.md", expectedContentSha256: `sha256:${"e".repeat(64)}`, candidateContent: "Synthetic fixture." } } }] } };
+    const run: any = { _id: "attempt", runId: "run", tenantId: "tenant", projectId: "project", workOrderId: "work-order", parentTaskId: "task",
+      status: "CANCELED", cancellationRequestedAt: 2, attemptPurpose: "VERIFICATION", factoryPurpose: "VERIFICATION",
+      factoryDefinitionVersionId: "factory", verificationAttemptBinding: { sourceAttemptId: "source", verificationSubjectDigest: packet.request.plan.digest },
+      executionManifest: manifest, executionManifestDigest: invocationDigest(manifest), executionProfileId: "profile",
+      executionProfileDigest: packet.request.profileDigest,
+      lease: { leaseId: "lease", ownerId: "owner", workerId: "worker", workerSessionId: "session", workerGeneration: 1,
+        claimedAt: 1, heartbeatAt: 1, expiresAt: 2 } };
+    packet.request = canonicalIsolatedInvocation(run);
+    packet.result = invocationResult(packet.request, "SUCCESS", 1, 2);
+    const bytes = Buffer.from(JSON.stringify(packet.result));
+    Object.assign(packet.evidence, { stdoutBase64: bytes.toString("base64"), capturedStdoutSha256: `sha256:${sha256Hex(bytes)}`,
+      validatedRuntimeResult: packet.result });
+    const event: any = { workflowRunId: run._id, projectId: run.projectId, tenantId: run.tenantId, actor: "service:owner",
+      eventType: "CHECKPOINT_CREATED", metadata: { ...run.lease, executionManifestDigest: run.executionManifestDigest } };
+    let artifact: any = null;
+    const ctx: any = { db: { get: async (id: string) => id === "attempt" ? run : null,
+      insert: async (_table: string, value: any) => { artifact = { ...value, _id: "artifact" }; return "artifact"; },
+      query: (table: string) => ({ withIndex: () => ({ first: async () => table === "runEvents" ? event : artifact,
+        collect: async () => [] }) }) } };
+    const args = { workflowRunId: "attempt", ...run.lease, packet: { offlineExecution: packet } };
+    const report = (reportVerificationInternal as any)._handler;
+    expect(await report(ctx, args)).toMatchObject({ retained: true, authoritative: false, duplicate: false });
+    expect(artifact.metadata).toMatchObject({ authority: "NONE", behavioralPass: false, disposition: "STALE_FENCED" });
+    await expect(report(ctx, { ...args, packet: { terminal: { status: "COMPLETED" } } }))
+      .rejects.toThrow(/active matching Verification Attempt lease/);
   });
   it("checks bytes against an independent SHA-256 implementation", () => {
     for (const bytes of [Buffer.alloc(0), Buffer.from([0, 255, 128, 1]), Buffer.from("Synthetic 界 evidence"),

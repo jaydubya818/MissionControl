@@ -35,9 +35,12 @@ export async function mapOfflineVerification(input: {
     || observation.blobSha !== gitBlobDigest(workload.input.candidateContent, observation.candidateSha.length)
     || !Number.isSafeInteger(observation.observedAt) || observation.observedAt > now
     || observation.observedAt < retained.result.completedAt || now - observation.observedAt > 60_000
-    || !exact(candidate, ["sourceRevision", "candidateRevision", "treeRevision", "changedFiles", "deletedFiles", "linesAdded", "linesDeleted", "diff"])
+    || !exact(candidate, ["sourceRevision", "candidateRevision", "treeRevision", "rawDiffSha256", "changedFiles", "deletedFiles", "linesAdded", "linesDeleted", "diff"])
     || candidate.sourceRevision !== sourceAttempt.executionBaseSha || candidate.candidateRevision !== workload.input.candidateSha
     || candidate.treeRevision !== workload.input.candidateTreeSha
+    || !/^sha256:[a-f0-9]{64}$/.test(candidate.rawDiffSha256)
+    || (sourceAttempt.verificationSubject?.version === 2
+      && candidate.rawDiffSha256 !== sourceAttempt.verificationSubject.rawDiffSha256)
     || !Array.isArray(candidate.changedFiles) || candidate.changedFiles.length !== 1 || candidate.changedFiles[0] !== workload.input.path
     || !Array.isArray(candidate.deletedFiles) || candidate.deletedFiles.length !== 0
     || !Number.isSafeInteger(candidate.linesAdded) || candidate.linesAdded < 0
@@ -45,9 +48,12 @@ export async function mapOfflineVerification(input: {
     || typeof candidate.diff !== "string" || new TextEncoder().encode(JSON.stringify(candidate)).length > 64_000) {
     throw new Error("Offline verifier response and independent candidate observation are not exact and current.");
   }
+  // The WorkOrder contract names the stable Factory command interface. The
+  // exact v4 manifest and retained workload above prove which admitted
+  // deterministic implementation fulfilled that interface for this Attempt.
   const byteVerifier: Verifier = {
-    id: "verify-document-bytes/v1", name: "Admitted deterministic document byte verifier",
-    supports: check => check.verifierId === "verify-document-bytes/v1" && !check.command,
+    id: "factory-command/v1", name: "Admitted deterministic document byte command",
+    supports: check => check.verifierId === "factory-command/v1" && Boolean(check.command),
     execute: async (_context, check) => ({
       checkId: check.id, name: check.name, category: check.category, verifierId: check.verifierId,
       mandatory: check.mandatory, status: "PASS", summary: "Actual admitted runtime matched the frozen document digest.",
@@ -58,7 +64,8 @@ export async function mapOfflineVerification(input: {
         acceptanceCriterionIds: check.acceptanceCriterionIds,
         producer: { id: "verify-document-bytes/v1", role: "VERIFICATION_FACTORY", independent: true, definitionAuthority: "INDEPENDENT" },
         contentHash: observation.contentSha256,
-        metadata: { responseDigest: retained.packetDigest, evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE", behavioralPass: false } }],
+        metadata: { responseDigest: retained.packetDigest, contractVerifierId: "factory-command/v1",
+          workloadReference: "verify-document-bytes/v1", evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE", behavioralPass: false } }],
     }),
   };
   const engine = new VerificationEngine([new VerificationAuthorityVerifier(), new ChangeBudgetVerifier(),

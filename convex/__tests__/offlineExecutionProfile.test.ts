@@ -14,7 +14,7 @@ import type { OfflineExecutionPolicy } from "../lib/offlineExecutionPolicy";
 import { offlineExecutionManifestSnapshot } from "../lib/executionManifest";
 import { RENDER_MARKDOWN_OPERATION_DIGEST, canonicalIsolatedInvocation } from "@mission-control/workflow-engine/harness-contract";
 import { offlineAttemptSourceCurrentnessIssues } from "../lib/factoryAttempt";
-import { validFactoryExecutionBinding } from "../lib/factoryConfiguration";
+import { factoryWorkloadClassForPurpose, validFactoryExecutionBinding } from "../lib/factoryConfiguration";
 import { loadExecutionProfileAdmission } from "../lib/executionProfileAdmission";
 
 const sha = `sha256:${"a".repeat(64)}`;
@@ -93,6 +93,9 @@ describe("versioned offline Execution Profile", () => {
           sandboxProfileSnapshot: sandbox.immutableSnapshot } } };
     expect(validFactoryExecutionBinding(completeBinding)).toBe(true);
     expect(validFactoryExecutionBinding({ ...completeBinding, offlineAdmission: undefined })).toBe(false);
+    expect(factoryWorkloadClassForPurpose("SOFTWARE")).toBe("SOFTWARE_CHANGE");
+    expect(factoryWorkloadClassForPurpose("VERIFICATION")).toBe("VERIFICATION");
+    expect(factoryWorkloadClassForPurpose("INTELLIGENT_AUTOMATION")).toBe("AUTOMATION");
     const mutations: Array<(value: any) => void> = [
       value => { value.offlineAdmission.purpose = "VERIFICATION"; },
       value => { value.offlineAdmission.agentBindings = [{ workflowAgentId: "agent" }]; },

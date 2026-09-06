@@ -90,7 +90,7 @@ import { buildLocalCandidateRecoveryRows } from "../lib/localCandidateRecovery";
 import { assertQualificationActivation } from "../lib/factoryQualificationScope";
 import { offlineAttemptSourceCurrentnessIssues } from "../lib/factoryAttempt";
 import { validateOfflineAttemptEvidence } from "../lib/offlineAttemptEvidence";
-import { canonicalIsolatedInvocation } from "@mission-control/workflow-engine/harness-contract";
+import { canonicalIsolatedInvocation, renderMarkdownCandidate } from "@mission-control/workflow-engine/harness-contract";
 import { offlineAttemptClaimWindowExpired, reserveOfflineAttemptBudget } from "../lib/offlineAttemptBudget";
 import { buildWorkOrderTaskAuthority, workOrderTaskAuthorityIssue } from "../lib/taskAuthority";
 import {
@@ -540,9 +540,6 @@ export const claimInternal = internalMutation({
     const frozenManifest = run.executionManifest as any;
     const executionBackend = version.executionBackend ?? "persistent-worker";
     const offline = executionBackend === "isolated-container";
-    // Fail closed until the unpublished-candidate handoff and independent
-    // verifier integration are admitted and qualified together.
-    if (offline) throw new Error("Offline canonical claim remains blocked pending independent-verifier handoff qualification.");
     if (offline && (frozenManifest.version !== "factory-execution-manifest/v4"
       || !isNoInferenceConstraint(frozenManifest.inferenceConstraint) || frozenManifest.modelRoute !== undefined
       || version.modelCatalogId !== undefined || !args.workerId || !args.workerSessionId)) {
@@ -652,6 +649,16 @@ export const claimInternal = internalMutation({
     if (!repository || repository.status !== "READY" || repository.projectId !== run.projectId) {
       throw new Error("Factory attempt repository is not ready.");
     }
+    const localRepositoryAdmission = offline && isLocalQualificationRepository(repository)
+      ? await loadLocalRepositoryAdmission(ctx, repository, now, version)
+      : null;
+    if (localRepositoryAdmission) {
+      assertLocalRepositoryHost(localRepositoryAdmission.admission, localRepositoryAdmission.digest, host, now);
+      if (frozenManifest.repository?.mode !== "LOCAL_SYNTHETIC_QUALIFICATION"
+        || frozenManifest.repository?.admissionDigest !== localRepositoryAdmission.digest) {
+        throw new Error("Offline Factory Attempt does not match its exact local repository admission.");
+      }
+    }
     if (!workOrder || workOrder.currentExecutionRunId !== run._id || workOrder.currentRevisionNumber !== run.workOrderRevisionNumber) {
       throw new Error("Factory attempt is no longer the current Work Order revision.");
     }
@@ -675,7 +682,7 @@ export const claimInternal = internalMutation({
     if (!host || host.status !== "READY" || host.dirty || frozenWorktree !== run.worktree || !run.worktree.startsWith(checkoutPrefix)) {
       throw new Error("Factory attempt host binding is no longer ready or does not own the frozen worktree.");
     }
-    if (!installation || installation.status !== "CONNECTED" || installation.projectId !== run.projectId) {
+    if (!localRepositoryAdmission && (!installation || installation.status !== "CONNECTED" || installation.projectId !== run.projectId)) {
       throw new Error("Factory attempt GitHub App installation is not connected.");
     }
 
@@ -785,9 +792,11 @@ export const claimInternal = internalMutation({
       }, now)) {
         return await failExpiredUnclaimedOfflineAttempt(ctx, run);
       }
-      const task = run.parentTaskId ? await ctx.db.get(run.parentTaskId) : null;
+      const governedTaskId = run.parentTaskId;
+      const task = governedTaskId ? await ctx.db.get(governedTaskId) : null;
       if (!task || task.projectId !== run.projectId || task.tenantId !== run.tenantId
         || task.workOrderId !== run.workOrderId || !["READY", "IN_PROGRESS"].includes(task.status)
+        || frozenManifest.causation?.taskId !== String(task._id)
         || workOrderTaskAuthorityIssue({ scope: task.metadata?.authorityScope, workOrder })) {
         throw new Error("Offline claim requires its exact governed ready or running Task.");
       }
@@ -808,7 +817,7 @@ export const claimInternal = internalMutation({
           artifactsSnapshot: { workflowRunId: run._id, executionManifestDigest: run.executionManifestDigest,
             authorityScope: task.metadata?.authorityScope } });
       }
-      const issues = await offlineAttemptAuthorityIssues(ctx, { ...run, status: "RUNNING", lease: decision.lease },
+      const issues = await offlineAttemptAuthorityIssues(ctx, { ...run, parentTaskId: task._id, status: "RUNNING", lease: decision.lease },
         { ...args, workerGeneration: decision.lease.workerGeneration }, now);
       if (issues.length) throw new Error(`Offline claim authority is invalid (${issues.join(",")}).`);
     }
@@ -1014,16 +1023,24 @@ export const claimInternal = internalMutation({
       projectId: run.projectId,
       repositoryId: repository._id,
       repository: repository.repository,
+      repositoryMode: localRepositoryAdmission?.admission.mode,
+      localRepositoryAdmission: localRepositoryAdmission ? {
+        digest: localRepositoryAdmission.digest,
+        root: localRepositoryAdmission.admission.root,
+        baselineCommit: localRepositoryAdmission.admission.baselineCommit,
+        publicationAuthority: localRepositoryAdmission.admission.publicationAuthority,
+        productionAuthority: localRepositoryAdmission.admission.productionAuthority,
+      } : undefined,
       providerRepositoryId: repository.providerRepositoryId,
       defaultBranch: repository.defaultBranch,
       workOrderId: run.workOrderId,
       branch: run.branch,
       worktree: run.worktree,
       checkoutRoot: host.checkoutRoot,
-      installation: {
+      installation: installation ? {
         installationId: installation.installationId,
         appId: installation.appId,
-      },
+      } : undefined,
       model: routeSnapshot?.modelId,
       executorAdapter: run.executorAdapter,
       executorVersion: run.executorVersion,
@@ -1788,7 +1805,54 @@ export const reportVerificationInternal = internalMutation({
     const now = Date.now();
     const run = await ctx.db.get(args.workflowRunId);
     if (!run || run.attemptPurpose !== "VERIFICATION" || run.factoryPurpose !== "VERIFICATION"
-      || !factoryAttemptMutationIsAuthorized(run)
+      || !run.workOrderId || !run.verificationAttemptBinding || !run.factoryDefinitionVersionId) {
+      throw new Error("Verification Attempt is missing its exact subject binding.");
+    }
+    if ((run.executionManifest as any)?.version === "factory-execution-manifest/v4"
+      && args.packet?.offlineExecution !== undefined) {
+      if (Object.keys(args.packet).join(",") !== "offlineExecution" || !mutationWorkerIdentity(args)) {
+        throw new Error("Offline verifier retention requires an evidence-only packet and complete worker identity.");
+      }
+      const claimEvent = await ctx.db.query("runEvents")
+        .withIndex("by_idempotency", q => q.eq("idempotencyKey", `factory-lease:${run.runId}:${args.leaseId}:claimed`)).first();
+      const claimed = claimEvent?.metadata as any;
+      if (!claimEvent || claimEvent.workflowRunId !== run._id || claimEvent.projectId !== run.projectId
+        || claimEvent.tenantId !== run.tenantId || claimEvent.actor !== `service:${args.ownerId}`
+        || !["CHECKPOINT_CREATED", "RUN_RESUMED"].includes(claimEvent.eventType)
+        || claimed?.leaseId !== args.leaseId || claimed.workerId !== args.workerId
+        || claimed.workerSessionId !== args.workerSessionId || claimed.workerGeneration !== args.workerGeneration
+        || claimed.executionManifestDigest !== run.executionManifestDigest) {
+        throw new Error("Offline verifier evidence does not belong to its authenticated historical claim.");
+      }
+      const request = canonicalIsolatedInvocation({ ...run, _id: String(run._id) } as any);
+      const parsed = validateOfflineAttemptEvidence(args.packet.offlineExecution, request);
+      const idempotencyKey = `factory:${run.runId}:${args.leaseId}:offline-response`;
+      const existing = await ctx.db.query("runArtifacts").withIndex("by_idempotency", q => q.eq("idempotencyKey", idempotencyKey)).first();
+      if (existing) {
+        validateStoredOfflineResponse(existing, request, run, args);
+        if (existing.workflowRunId !== run._id || existing.contentHash !== parsed.packetDigest) {
+          throw new Error("Conflicting offline verifier response replay.");
+        }
+        return { retained: true, duplicate: true, authoritative: false, artifactId: existing._id };
+      }
+      const issues = await offlineAttemptAuthorityIssues(ctx, run, args, now);
+      if (!await factoryLeaseRegistrationIsCurrent(ctx, run)) issues.push("WORKER_REGISTRATION_NOT_CURRENT");
+      const artifactId = await ctx.db.insert("runArtifacts", {
+        tenantId: run.tenantId, projectId: run.projectId, missionId: run.missionId,
+        workOrderId: run.workOrderId, workflowRunId: run._id, idempotencyKey,
+        artifactType: "STRUCTURED_OUTPUT", name: "Offline verifier runtime response",
+        description: issues.length ? "Retained verifier response from a stale or fenced Attempt; no result authority."
+          : "Captured deterministic verifier response; canonical result mapping remains separate.",
+        contentHash: parsed.packetDigest, producer: `service:${args.ownerId}`, createdAt: now,
+        metadata: { schema: "factory-offline-attempt-evidence/v1", evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE",
+          behavioralPass: false, leaseId: args.leaseId, workerId: args.workerId, workerSessionId: args.workerSessionId,
+          workerGeneration: args.workerGeneration, executionManifestDigest: run.executionManifestDigest,
+          executionProfile: executionProfileEvidence(run), disposition: issues.length ? "STALE_FENCED" : "CURRENT_AT_INGESTION",
+          currentnessIssues: [...new Set(issues)], packet: args.packet.offlineExecution },
+      });
+      return { retained: true, duplicate: false, authoritative: false, artifactId };
+    }
+    if (!factoryAttemptMutationIsAuthorized(run)
       || !activeLeaseMatches({
         lease: run.lease,
         leaseId: args.leaseId,
@@ -1798,9 +1862,6 @@ export const reportVerificationInternal = internalMutation({
       })
       || !await factoryLeaseRegistrationIsCurrent(ctx, run)) {
       throw new Error("Verification report requires the active matching Verification Attempt lease.");
-    }
-    if (!run.workOrderId || !run.verificationAttemptBinding || !run.factoryDefinitionVersionId) {
-      throw new Error("Verification Attempt is missing its exact subject binding.");
     }
     if ((run.executionManifest as any)?.version === "factory-execution-manifest/v4") {
       const issues = await offlineAttemptAuthorityIssues(ctx, run, args, now);
@@ -2472,8 +2533,9 @@ async function persistPolicyV2CandidateReady(
     || !workOrder.verificationContractDigest || !workOrder.qualityContractDigest) {
     throw new Error("CANDIDATE_READY requires an enforced policy-v2 WorkOrder with frozen contract digests.");
   }
-  if (!repository?.providerRepositoryId
-    || repository.projectId !== run.projectId || workOrder.projectId !== run.projectId
+  const localRepository = isLocalQualificationRepository(repository);
+  if ((!localRepository && !repository?.providerRepositoryId)
+    || !repository || repository.projectId !== run.projectId || workOrder.projectId !== run.projectId
     || workOrder.currentRevisionNumber !== run.workOrderRevisionNumber
     || run.qualityContractDigest !== workOrder.qualityContractDigest
     || run.verificationContractDigest !== workOrder.verificationContractDigest) {
@@ -2485,6 +2547,21 @@ async function persistPolicyV2CandidateReady(
       .withIndex("by_run_type", (q: any) => q.eq("workflowRunId", run._id).eq("artifactType", "CODE_DIFF"))
       .first();
   const localCandidate = candidate?.transport === "LOCAL_GIT";
+  if (localCandidate !== localRepository) {
+    throw new Error("Candidate transport must match the admitted repository authority.");
+  }
+  if (localCandidate) {
+    const [version, host] = await Promise.all([
+      run.factoryDefinitionVersionId ? ctx.db.get(run.factoryDefinitionVersionId) : null,
+      run.hostBindingId ? ctx.db.get(run.hostBindingId) : null,
+    ]);
+    if (!version || !host) throw new Error("Local candidate requires its exact Factory version and host binding.");
+    const admission = await loadLocalRepositoryAdmission(ctx, repository, Date.now(), version);
+    assertLocalRepositoryHost(admission.admission, admission.digest, host, Date.now());
+    if (run.executionManifest?.repository?.admissionDigest !== admission.digest) {
+      throw new Error("Local candidate repository admission no longer matches its frozen execution manifest.");
+    }
+  }
   const pullRequestArtifact = artifactResults.map((result: any) => result.artifact)
     .find((artifact: any) => artifact?.artifactType === "PULL_REQUEST")
     ?? await ctx.db.query("runArtifacts")
@@ -2525,14 +2602,13 @@ async function persistPolicyV2CandidateReady(
     sourceAttemptId: run._id,
     repositoryId: repository._id,
     provider: localCandidate ? "LOCAL_GIT" : "GITHUB",
-    providerRepositoryId: repository.providerRepositoryId,
     candidateSha: candidate.candidateSha,
     treeSha: candidate.treeSha,
     ...(localCandidate ? { localRef: {
       baseRef: candidate.baseRef,
       headRef: candidate.headRef,
       headSha: candidate.candidateSha,
-    } } : { pullRequest: {
+    } } : { providerRepositoryId: repository.providerRepositoryId, pullRequest: {
       providerPullRequestId: candidate.providerPullRequestId,
       number: candidate.pullRequestNumber,
       url: candidate.pullRequestUrl,
@@ -2997,7 +3073,9 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   });
   const requiredSandboxCapabilities = executionBackend === "remote-sandbox"
     ? ["git-worktree", "read-only", "remote-sandbox", "sandbox-provider:exe-dev"]
-    : ["git-worktree", "read-only"];
+    : ["git-worktree", "read-only", ...(offlineVerification
+      ? (executionProfile?.immutableSnapshot as any)?.requiredSandboxCapabilities ?? []
+      : [])];
   const bindingEligibility = repository ? bindings.map((binding: any) => ({ binding, eligibility: factoryWorkerEligibility({
     worker: {
       workerId: binding.hostId,
@@ -3046,6 +3124,14 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     .filter(({ eligibility }: any) => eligibility.eligible)
     .map(({ binding }: any) => binding);
   const host: any = repository ? selectCurrentFactoryHost(eligibleBindings as any[], repository.repository, now) : null;
+  if (offlineVerification && isLocalQualificationRepository(repository)) {
+    if (!host) throw new Error("Offline verifier requires a current admitted local repository host.");
+    const localAdmission = await loadLocalRepositoryAdmission(ctx, repository, now, version);
+    assertLocalRepositoryHost(localAdmission.admission, localAdmission.digest, host, now);
+    if (sourceAttempt.executionManifest?.repository?.admissionDigest !== localAdmission.digest) {
+      throw new Error("Offline verifier source does not match the current frozen local repository admission.");
+    }
+  }
   if (!repository || repository._id !== sourceAttempt.repositoryId || repository.status !== "READY"
     || repositoryDataClassification === "UNCLASSIFIED"
     || repositoryDataClassification !== (version.repositoryDataClassification ?? "UNCLASSIFIED")
@@ -3091,99 +3177,6 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   const executorInvocationId = `verification:${runId}`;
   const worktree = `${host.checkoutRoot.replace(/\/+$/, "")}/.mission-control/worktrees/verify-${runId}`;
   const workflowSnapshot = snapshotWorkflowDefinition(workflow);
-  const executionManifest = buildFactoryExecutionManifest({
-    runId,
-    missionId: workOrder.missionId ? String(workOrder.missionId) : undefined,
-    missionPlanId: workOrder.missionPlanId ? String(workOrder.missionPlanId) : undefined,
-    missionPlanVersion: workOrder.missionPlanRevision,
-    planningRepositorySha: workOrder.planningRepositorySha,
-    qualityContractDigest: workOrder.qualityContractDigest,
-    workOrderId: String(workOrder._id),
-    workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
-    workOrderRevisionId: workOrder.currentRevisionId ? String(workOrder.currentRevisionId) : undefined,
-    factoryDefinitionVersionId: String(version._id),
-    factoryConfigurationDigest: version.configurationDigest,
-    factoryPurpose: "VERIFICATION",
-    repositoryId: String(repository._id),
-    repository: repository.repository,
-    repositoryDataClassification,
-    defaultBranch: repository.defaultBranch,
-    baseSha: subject.kind === "GIT_CANDIDATE" ? subject.candidateSha : sourceAttempt.headSha,
-    branch: sourceAttempt.branch,
-    worktree,
-    executor: frozenHarness,
-    executionBackend,
-    modelRoute: {
-      catalogId: String(modelRoute._id),
-      routeDigest: modelRoute.routeDigest,
-      routeSnapshot: modelRoute.routeSnapshot,
-      qualificationDigest: modelRoute.qualificationDigest,
-      qualificationSnapshot: modelRoute.qualificationSnapshot,
-    },
-    executionProfile: executionProfile ? {
-      profileId: String(version.executionProfileId),
-      profileKey: version.executionProfileKey!,
-      version: version.executionProfileVersion!,
-      profileDigest: version.executionProfileDigest!,
-      profileSnapshot: version.executionProfileSnapshot!,
-      qualificationDigest: version.executionProfileQualificationDigest!,
-      qualificationSnapshot: version.executionProfileQualificationSnapshot!,
-    } : undefined,
-    sandboxProfile: {
-      isolation: "READ_ONLY",
-      requiredCapabilities: requiredSandboxCapabilities,
-    },
-    sandbox: executionBackend === "remote-sandbox" ? {
-      resourceName: factorySandboxResourceName({
-        projectId: String(version.projectId),
-        workflowRunId: runId,
-        attemptId: runId,
-      }),
-      profileId: String(sandboxProfile!._id),
-      profileDigest: sandboxProfile!.profileDigest,
-      profileSnapshot: sandboxProfile!.immutableSnapshot,
-      supervisorVersion: "mission-control-supervisor/v1",
-      resultContract: { schema: "factory-sandbox-result/v1", independentHostValidationRequired: true },
-      credentialGrants: [{ kind: "INFERENCE", secretValueIncluded: false, githubAuthority: "NONE", providerAuthority: "NONE" }],
-      teardown: { credentialsRevokedBeforePublication: true, resourceAbsenceRequiredBeforePublication: true },
-    } : undefined,
-    workflow: workflowSnapshot as any,
-    workOrder: {
-      title: workOrder.title,
-      desiredOutcome: workOrder.desiredOutcome,
-      context: workOrder.context,
-      requirements: workOrder.requirements,
-      acceptanceCriteria: workOrder.acceptanceCriteria,
-      constraints: workOrder.constraints,
-      positiveConstraints: workOrder.positiveConstraints,
-      negativeConstraints: workOrder.negativeConstraints,
-      dataBoundaries: workOrder.dataBoundaries,
-      changeBudget: workOrder.changeBudget,
-      verificationContract: workOrder.verificationContract,
-      autonomyLevel: workOrder.autonomyLevel,
-      riskLevel: workOrder.riskLevel,
-      riskReasons: workOrder.riskReasons,
-      requiredApprovals: workOrder.requiredApprovals,
-      sourceOfTruthRefs: workOrder.sourceOfTruthRefs,
-    },
-    agentBindings: (version.agentBindings ?? []).map((binding: any, index: number) => ({
-      workflowAgentId: binding.workflowAgentId,
-      agentVersionId: String(binding.agentVersionId),
-      agentVersion: agentVersions[index].version,
-      genomeHash: agentVersions[index].genomeHash,
-      promptBundleHash: agentVersions[index].genome.promptBundleHash,
-      toolManifestHash: agentVersions[index].genome.toolManifestHash,
-      model: agentVersions[index].genome.modelConfig,
-    })),
-    codeScopes: codeScopes.map((scope: any) => ({
-      id: String(scope._id), slug: scope.slug, includePaths: scope.includePaths, excludePaths: scope.excludePaths,
-    })),
-    allowedTools: Array.isArray(workflow.metadata?.allowedTools) ? workflow.metadata.allowedTools : [],
-    maxAttempts: version.budget.maxAttempts,
-    maxCostUsd: version.budget.maxCostUsd,
-    maxRuntimeMinutes: version.budget.maxRuntimeMinutes,
-    initialContext: { verificationSubjectDigest: subject.digest, sourceAttemptId: String(sourceAttempt._id) },
-  });
   const steps = workflow.steps.map((step: any, index: number) => ({
     stepId: step.id,
     status: "PENDING" as const,
@@ -3202,9 +3195,8 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     verificationSubject: subject,
     verificationSubjectDigest: subject.digest,
   };
-  // Validate the frozen plan before the first write. Convex mutations do not
-  // roll back writes when a caught error occurs, so compiling after insertion
-  // alone can strand an orphan Verification Attempt.
+  // Validate the frozen plan before the first write. The actual immutable plan
+  // is compiled again after Convex allocates the verifier Attempt identity.
   compilePolicyV2VerificationPlan({
     now,
     workOrder,
@@ -3215,6 +3207,19 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     factoryDefinitionVersionId: String(version._id),
     executorInvocationId,
   });
+  const [mission, policy, task] = await Promise.all([
+    workOrder.missionId ? ctx.db.get(workOrder.missionId) : null,
+    version.policyEnvelopeId ? ctx.db.get(version.policyEnvelopeId) : null,
+    sourceAttempt.parentTaskId ? ctx.db.get(sourceAttempt.parentTaskId) : null,
+  ]);
+  const executionCostAuthorization = offlineVerification
+    ? await reserveOfflineAttemptBudget(ctx, { runId, version, workOrder, mission, policy, now })
+    : undefined;
+  if (offlineVerification && (!task || task.workOrderId !== workOrder._id)) {
+    throw new Error("Offline verifier requires the exact producer Task identity.");
+  }
+  // The initial insert and the manifest patch are one serializable mutation.
+  // No claim can observe the intermediate row without its frozen authority.
   const workflowRunId = await ctx.db.insert("workflowRuns", {
     tenantId: workOrder.tenantId,
     runId,
@@ -3225,6 +3230,7 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     missionId: workOrder.missionId,
     missionRole: workOrder.missionRole,
     workOrderId: workOrder._id,
+    parentTaskId: task?._id,
     workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
     workOrderRevisionId: workOrder.currentRevisionId,
     verificationContractDigest: workOrder.verificationContractDigest,
@@ -3253,8 +3259,6 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     allowedTools: Array.isArray(workflow.metadata?.allowedTools) ? workflow.metadata.allowedTools : [],
     approvedCodeScopeIds: version.codeScopeIds,
     isMutating: false,
-    executionManifest: executionManifest.manifest,
-    executionManifestDigest: executionManifest.digest,
     verificationAttemptBinding: binding,
     status: "PENDING",
     currentStepIndex: 0,
@@ -3272,6 +3276,12 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     escalationOwner: workOrder.ownerMemberId ? String(workOrder.ownerMemberId) : workOrder.requestedBy,
     startedAt: now,
     metadata: { sourceAttemptId: sourceAttempt._id, verificationSubjectDigest: subject.digest },
+    ...(executionCostAuthorization ? {
+      executionCostAuthorization,
+      budgetUsd: executionCostAuthorization.hardLimitUsd,
+      reservedCostUsd: executionCostAuthorization.reservedCostUsd,
+      spentUsd: 0,
+    } : {}),
   });
   const plan = compilePolicyV2VerificationPlan({
     now,
@@ -3283,6 +3293,96 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
     factoryDefinitionVersionId: String(version._id),
     executorInvocationId,
   });
+  const commonManifestInput: any = {
+    runId,
+    missionId: workOrder.missionId ? String(workOrder.missionId) : undefined,
+    missionPlanId: workOrder.missionPlanId ? String(workOrder.missionPlanId) : undefined,
+    missionPlanVersion: workOrder.missionPlanRevision,
+    planningRepositorySha: workOrder.planningRepositorySha,
+    qualityContractDigest: workOrder.qualityContractDigest,
+    workOrderId: String(workOrder._id),
+    workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
+    workOrderRevisionId: workOrder.currentRevisionId ? String(workOrder.currentRevisionId) : undefined,
+    taskId: task ? String(task._id) : undefined,
+    task: task ? { title: task.title, description: task.description } : undefined,
+    factoryDefinitionVersionId: String(version._id),
+    factoryConfigurationDigest: version.configurationDigest,
+    factoryPurpose: "VERIFICATION",
+    repositoryId: String(repository._id),
+    providerRepositoryId: repository.providerRepositoryId,
+    repository: repository.repository,
+    repositoryAdmissionDigest: version.repositoryAdmissionDigest,
+    repositoryDataClassification,
+    defaultBranch: repository.defaultBranch,
+    baseSha: subject.kind === "GIT_CANDIDATE" ? subject.candidateSha : sourceAttempt.headSha,
+    branch: sourceAttempt.branch,
+    worktree,
+    executor: frozenHarness,
+    executionBackend,
+    executionProfile: executionProfile ? {
+      profileId: String(version.executionProfileId),
+      profileKey: version.executionProfileKey!,
+      version: version.executionProfileVersion!,
+      profileDigest: version.executionProfileDigest!,
+      profileSnapshot: version.executionProfileSnapshot!,
+      qualificationDigest: version.executionProfileQualificationDigest!,
+      qualificationSnapshot: version.executionProfileQualificationSnapshot!,
+    } : undefined,
+    sandboxProfile: { isolation: "READ_ONLY", requiredCapabilities: requiredSandboxCapabilities },
+    sandbox: executionBackend === "remote-sandbox" ? {
+      resourceName: factorySandboxResourceName({ projectId: String(version.projectId), workflowRunId: runId, attemptId: runId }),
+      profileId: String(sandboxProfile!._id), profileDigest: sandboxProfile!.profileDigest,
+      profileSnapshot: sandboxProfile!.immutableSnapshot, supervisorVersion: "mission-control-supervisor/v1",
+      resultContract: { schema: "factory-sandbox-result/v1", independentHostValidationRequired: true },
+      credentialGrants: [{ kind: "INFERENCE", secretValueIncluded: false, githubAuthority: "NONE", providerAuthority: "NONE" }],
+      teardown: { credentialsRevokedBeforePublication: true, resourceAbsenceRequiredBeforePublication: true },
+    } : undefined,
+    workflow: workflowSnapshot,
+    workOrder: {
+      title: workOrder.title, desiredOutcome: workOrder.desiredOutcome, context: workOrder.context,
+      requirements: workOrder.requirements, acceptanceCriteria: workOrder.acceptanceCriteria,
+      constraints: workOrder.constraints, positiveConstraints: workOrder.positiveConstraints,
+      negativeConstraints: workOrder.negativeConstraints, dataBoundaries: workOrder.dataBoundaries,
+      changeBudget: workOrder.changeBudget, verificationContract: workOrder.verificationContract,
+      autonomyLevel: workOrder.autonomyLevel, riskLevel: workOrder.riskLevel,
+      riskReasons: workOrder.riskReasons, requiredApprovals: workOrder.requiredApprovals,
+      sourceOfTruthRefs: workOrder.sourceOfTruthRefs,
+    },
+    agentBindings: (version.agentBindings ?? []).map((agentBinding: any, index: number) => ({
+      workflowAgentId: agentBinding.workflowAgentId, agentVersionId: String(agentBinding.agentVersionId),
+      agentVersion: agentVersions[index].version, genomeHash: agentVersions[index].genomeHash,
+      promptBundleHash: agentVersions[index].genome.promptBundleHash,
+      toolManifestHash: agentVersions[index].genome.toolManifestHash, model: agentVersions[index].genome.modelConfig,
+    })),
+    codeScopes: codeScopes.map((scope: any) => ({ id: String(scope._id), slug: scope.slug, includePaths: scope.includePaths, excludePaths: scope.excludePaths })),
+    allowedTools: Array.isArray(workflow.metadata?.allowedTools) ? workflow.metadata.allowedTools : [],
+    maxAttempts: version.budget.maxAttempts,
+    maxCostUsd: version.budget.maxCostUsd,
+    maxRuntimeMinutes: version.budget.maxRuntimeMinutes,
+    initialContext: { verificationSubjectDigest: subject.digest, sourceAttemptId: String(sourceAttempt._id) },
+  };
+  const executionManifest = offlineVerification
+    ? buildFactoryExecutionManifest({
+        ...commonManifestInput,
+        modelRoute: undefined,
+        sandbox: undefined,
+        missionPlanDigest: sourceAttempt.executionManifest?.causation?.missionPlanDigest,
+        budgetReservationId: runId,
+        verification: {
+          subject,
+          verificationPlanDigest: plan.planDigest,
+          candidateContent: renderMarkdownCandidate(sourceAttempt.executionManifest?.workflow?.steps?.[0]?.operation).content,
+        },
+      })
+    : buildFactoryExecutionManifest({
+        ...commonManifestInput,
+        modelRoute: {
+          catalogId: String(modelRoute!._id), routeDigest: modelRoute!.routeDigest,
+          routeSnapshot: modelRoute!.routeSnapshot, qualificationDigest: modelRoute!.qualificationDigest,
+          qualificationSnapshot: modelRoute!.qualificationSnapshot,
+        },
+      });
+  await ctx.db.patch(workflowRunId, { executionManifest: executionManifest.manifest, executionManifestDigest: executionManifest.digest });
   const verificationRunId = await ctx.db.insert("verificationRuns", {
     tenantId: workOrder.tenantId,
     projectId: workOrder.projectId,
@@ -3551,8 +3651,9 @@ function safePrivatePreview(value: unknown) {
 async function factoryLeaseRegistrationIsCurrent(ctx: any, run: any) {
   if (!run.lease) return false;
   const repository = run.repositoryId ? await ctx.db.get(run.repositoryId) : null;
-  if (isLocalQualificationRepository(repository)
-    || run.executionManifest?.repository?.mode === "LOCAL_SYNTHETIC_QUALIFICATION") {
+  const canonicalOfflineLocal = (run.executionManifest as any)?.version === "factory-execution-manifest/v4"
+    || run.executionManifest?.repository?.mode === "LOCAL_SYNTHETIC_QUALIFICATION";
+  if (canonicalOfflineLocal && isLocalQualificationRepository(repository)) {
     try {
       if (!run.lease.workerId || !run.lease.workerSessionId
         || !Number.isSafeInteger(run.lease.workerGeneration) || run.lease.workerGeneration < 1
@@ -3728,6 +3829,7 @@ async function failLostAttempt(ctx: any, run: any, reason: string) {
 async function failExpiredUnclaimedOfflineAttempt(ctx: any, run: any) {
   const now = Date.now();
   const reason = "The offline Attempt expired before its first canonical worker lease; no executor boundary was crossed.";
+  const verifier = run.attemptPurpose === "VERIFICATION";
   await ctx.db.patch(run._id, {
     status: "FAILED",
     completedAt: now,
@@ -3742,6 +3844,7 @@ async function failExpiredUnclaimedOfflineAttempt(ctx: any, run: any) {
     runtimeDispositionReason: reason,
     runtimeReconciledAt: now,
     steps: reconcileTerminalWorkflowSteps(run.steps, "FAILED", reason, now),
+    ...(verifier ? { metadata: { ...(run.metadata ?? {}), verificationSupersededAt: now } } : {}),
   });
   await insertEvent(ctx, run, {
     idempotencyKey: `factory-offline-claim-expired:${run.runId}`,
@@ -3762,7 +3865,30 @@ async function failExpiredUnclaimedOfflineAttempt(ctx: any, run: any) {
     },
   });
   await finishAttemptTrace(ctx, run, { status: "FAILED", completedAt: now, failureReason: reason });
-  if (run.workOrderId) {
+  if (verifier && run.workOrderId && run.verificationAttemptBinding?.sourceAttemptId) {
+    const [workOrder, sourceAttempt, verificationRun] = await Promise.all([
+      ctx.db.get(run.workOrderId),
+      ctx.db.get(run.verificationAttemptBinding.sourceAttemptId),
+      ctx.db.query("verificationRuns").withIndex("by_run", (q: any) => q.eq("workflowRunId", run._id)).first(),
+    ]);
+    if (verificationRun) {
+      await ctx.db.patch(verificationRun._id, {
+        status: "FAILED", failedAt: now, completedAt: now,
+        durationMs: Math.max(0, now - verificationRun.startedAt),
+        verdict: undefined, verdictReasons: [reason],
+      });
+    }
+    if (workOrder && sourceAttempt?.verificationSubject?.digest === run.verificationAttemptBinding.verificationSubjectDigest) {
+      await ctx.db.patch(workOrder._id, {
+        currentExecutionRunId: sourceAttempt._id,
+        state: "AWAITING_VERIFICATION",
+        verificationStatus: "PENDING",
+        blockingIssue: reason,
+        requiredHumanAction: "Retry independent verification for the exact unchanged candidate.",
+        updatedAt: now,
+      });
+    }
+  } else if (run.workOrderId) {
     await ctx.scheduler.runAfter(0, internal.workOrders.syncExecutionOutcome, {
       workflowRunId: run._id,
       eventType: "RUN_FAILED",

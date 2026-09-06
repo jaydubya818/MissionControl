@@ -1,6 +1,5 @@
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";
 
 // Temporary one-purpose setup for the existing disposable qualification backend.
@@ -13,9 +12,20 @@ export const prepare = internalMutation({
       || !process.env.MC_LOCAL_ENVIRONMENT_FIXTURE_NONCE || args.nonce !== process.env.MC_LOCAL_ENVIRONMENT_FIXTURE_NONCE) {
       throw new Error("Environment fixture requires the exact disposable backend and one-time authority.");
     }
-    const projectId = "k57jpqmfrj3rtp5dkgrw1cgd398dww8j" as Id<"projects">;
-    const tenantId = "r97jrhf2q47hm0njny43m3wr118dwj34" as Id<"tenants">;
-    const operatorId = "hx7hzjvda7yk7hk0e93q1px22s8dxhge";
+    const identity = await ctx.auth.getUserIdentity();
+    if (identity?.subject !== "user_SyntheticHandoffQualification") {
+      throw new Error("The exact synthetic qualification operator is required.");
+    }
+    const operator = await ctx.db.query("operators").withIndex("by_auth_id", q => q.eq("authId", identity.subject)).unique();
+    if (!operator || operator.metadata?.schema !== "unpublished-handoff-fixture/v1" || operator.metadata.synthetic !== true) {
+      throw new Error("Existing synthetic operator scope is required.");
+    }
+    const projects = await ctx.db.query("projects").withIndex("by_tenant", q => q.eq("tenantId", operator.tenantId)).collect();
+    const project = projects.find(row => row.metadata?.schema === "unpublished-handoff-fixture/v1" && row.metadata.synthetic === true);
+    if (!project) throw new Error("Existing synthetic project scope is required.");
+    const projectId = project._id;
+    const tenantId = operator.tenantId;
+    const operatorId = String(operator._id);
     const access = await requireWorkspaceAccess(ctx, tenantId, projectId, { permission: COMPANY_PERMISSIONS.MANAGE_REPOSITORIES });
     if (access.membership.operatorId !== operatorId || access.project.metadata?.schema !== "unpublished-handoff-fixture/v1"
       || access.project.metadata.synthetic !== true) throw new Error("Existing synthetic project/operator scope is required.");

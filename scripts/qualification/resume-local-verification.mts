@@ -2,12 +2,13 @@ import { readFile, writeFile } from "node:fs/promises";
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 
-const [directory] = process.argv.slice(2);
+const [directory, runLabel = "v12"] = process.argv.slice(2);
 if (process.env.CONVEX_SELF_HOSTED_URL !== "http://127.0.0.1:3290"
   || !process.env.CONVEX_SELF_HOSTED_ADMIN_KEY || !directory) {
   throw new Error("Exact disposable backend required.");
 }
-const state = JSON.parse(await readFile(`${directory}/local-synthetic-mission-v5.json`, "utf8"));
+if (!/^v[1-9][0-9]*$/.test(runLabel)) throw new Error("Qualification run label must be an explicit vN identity.");
+const state = JSON.parse(await readFile(`${directory}/local-synthetic-mission-${runLabel}.json`, "utf8"));
 const client = new ConvexHttpClient(process.env.CONVEX_SELF_HOSTED_URL);
 client.setAdminAuth(process.env.CONVEX_SELF_HOSTED_ADMIN_KEY, {
   subject: "user_SyntheticHandoffQualification",
@@ -15,11 +16,24 @@ client.setAdminAuth(process.env.CONVEX_SELF_HOSTED_ADMIN_KEY, {
   email: "qualification@example.test",
   name: "Synthetic Qualification Operator",
 });
-const result = await client.mutation(makeFunctionReference<"mutation">("factory/attempts:resumeVerification"), {
-  workOrderId: state.workOrderId,
-  sourceAttemptId: state.producerAttemptId,
-  reason: "Verifier Factory readiness was refreshed against the current canonical worker generation; resume the exact immutable candidate without producer replay.",
-});
+let prior: any;
+try { prior = JSON.parse(await readFile(`${directory}/local-verification-resumption-${runLabel}.json`, "utf8")); } catch {}
+const detail = await client.query(makeFunctionReference<"query">("workOrders:get"), { workOrderId: state.workOrderId });
+const priorAttempt = (prior?.verificationAttemptId
+  ? detail.executionRuns?.find((run: any) => run._id === prior.verificationAttemptId)
+  : undefined)
+  ?? detail.executionRuns?.find((run: any) => run.attemptPurpose === "VERIFICATION" && ["FAILED", "CANCELED"].includes(run.status));
+const result = priorAttempt && ["FAILED", "CANCELED"].includes(priorAttempt.status)
+  ? await client.mutation(makeFunctionReference<"mutation">("factory/attempts:retryVerification"), {
+      workOrderId: state.workOrderId,
+      failedVerificationAttemptId: priorAttempt._id,
+      reason: "Retry the exact immutable candidate after completing the canonical verifier Task binding; the producer is not replayed.",
+    })
+  : await client.mutation(makeFunctionReference<"mutation">("factory/attempts:resumeVerification"), {
+      workOrderId: state.workOrderId,
+      sourceAttemptId: state.producerAttemptId,
+      reason: "Verifier Factory readiness was refreshed against the current canonical worker generation; resume the exact immutable candidate without producer replay.",
+    });
 const evidence = {
   capturedAt: Date.now(),
   workOrderId: state.workOrderId,
@@ -27,5 +41,5 @@ const evidence = {
   verificationAttemptId: result.workflowRun._id,
   created: result.created,
 };
-await writeFile(`${directory}/local-verification-resumption.json`, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
+await writeFile(`${directory}/local-verification-resumption-${runLabel}.json`, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
 console.log(JSON.stringify(evidence));

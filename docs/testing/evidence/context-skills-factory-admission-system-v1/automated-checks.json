@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "system-factory-e2e-automated-checks/v2",
+  "baseSha": "9dd7bb8f790e044f63b19c87a3948a2b160d042f",
+  "startedHead": "75ec5d8c0307895facf64d3de759edba0c350442",
+  "startedAt": "2026-09-06T20:59:59.300Z",
+  "completedAt": "2026-09-06T21:03:41.590Z",
+  "result": "FAIL",
+  "checks": [
+    {
+      "name": "profile-bound governed read-only MCP transport and negative controls",
+      "command": "node --import tsx scripts/governed-mcp-phase3-qualification.mts",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 450
+    },
+    {
+      "name": "frozen dependency, advisory, credential, and release configuration gates",
+      "command": "pnpm run release:security",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 143547
+    },
+    {
+      "name": "release hardening contract tests",
+      "command": "pnpm exec vitest run scripts/lib/dependency-audit-gate.test.mjs scripts/lib/factory-docs-consistency.test.mjs scripts/lib/production-pilot-preflight.test.mjs scripts/lib/production-pilot-evidence.test.mjs scripts/lib/repository-secret-scan.test.mjs scripts/lib/release-config.test.mjs",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 1098
+    },
+    {
+      "name": "historical V1 evidence immutability",
+      "command": "git diff --exit-code 9dd7bb8f790e044f63b19c87a3948a2b160d042f -- docs/testing/evidence/system-factory-e2e-v1",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 13
+    },
+    {
+      "name": "historical V2 evidence immutability",
+      "command": "git diff --exit-code 9dd7bb8f790e044f63b19c87a3948a2b160d042f -- docs/testing/evidence/system-factory-e2e-v2",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 12
+    },
+    {
+      "name": "prepare canonical workspace packages",
+      "command": "pnpm run ci:prepare",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 8224
+    },
+    {
+      "name": "composed system qualification and execution-boundary failures",
+      "command": "pnpm --filter @mission-control/orchestration-server exec vitest run src/__tests__/systemFactoryQualification.test.ts src/__tests__/governedMcpBroker.test.ts src/__tests__/factoryAttemptWorker.test.ts src/__tests__/factoryAttemptWorkerRemote.test.ts src/__tests__/factoryVerification.test.ts src/__tests__/remoteSandboxRuntime.test.ts src/__tests__/sandboxReconciler.test.ts src/__tests__/sandboxCredentials.test.ts src/__tests__/githubAppPublisher.test.ts src/__tests__/auth.test.ts src/__tests__/orchestrationSecurity.test.ts src/__tests__/harnessAdapterRegistry.test.ts src/__tests__/deepseekHarnessExecutorAdapter.test.ts",
+      "status": "FAIL",
+      "exitCode": 1,
+      "durationMs": 68943
+    }
+  ]
+}

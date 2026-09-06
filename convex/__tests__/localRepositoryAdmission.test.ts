@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { parseLocalRepositoryAdmission, assertLocalRepositoryScope, localRepositoryAdmissionDigest,
   assertRepositoryPublicationAllowed, assertLocalRepositoryHost, type LocalRepositoryAdmission } from "../lib/localRepositoryAdmission";
-import { evaluateFactoryDispatchPreflight, evaluateLocalQualificationDispatchPreflight } from "../lib/factoryDispatch";
+import { evaluateFactoryDispatchPreflight, evaluateLocalQualificationDispatchPreflight,
+  factoryLocalQualificationDispatchChecks } from "../lib/factoryDispatch";
 const now = 1000;
 const admission: LocalRepositoryAdmission = {
   schema: "local-synthetic-repository-admission/v1", mode: "LOCAL_SYNTHETIC_QUALIFICATION", program: "unpublished-handoff-fixture/v1",
@@ -77,6 +78,8 @@ describe("local repository admission contract controls (not execution evidence)"
     ready.repositoryAdmission = { mode: admission.mode, digest, frozenDigest: digest, current: true, publicationAuthority: "NONE", productionAuthority: "NONE" };
     expect(evaluateFactoryDispatchPreflight({ ...ready, githubReady: false }).ok).toBe(false);
     expect(evaluateLocalQualificationDispatchPreflight(ready).ok).toBe(true);
+    expect(factoryLocalQualificationDispatchChecks(ready).some(check => check.code === "github-app-not-ready")).toBe(false);
+    expect(factoryLocalQualificationDispatchChecks(ready).find(check => check.code === "local-repository-admission-invalid")?.passed).toBe(true);
     for (const key of Object.keys(ready).filter(key => key !== "repositoryAdmission" && key !== "factoryRequired")) {
       expect(evaluateLocalQualificationDispatchPreflight({ ...ready, [key]: false }).ok, key).toBe(false);
     }

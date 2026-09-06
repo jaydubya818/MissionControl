@@ -323,13 +323,13 @@ export const LEGACY_ISOLATED_INVOCATION_MANIFEST: HarnessCapabilityManifest = {
 export const ISOLATED_INVOCATION_RUNTIME_ARTIFACT: HarnessRuntimeArtifactIdentity = {
   ...LEGACY_ISOLATED_INVOCATION_RUNTIME_ARTIFACT,
   version: "2",
-  imageDigest: "sha256:cc7a1d50410a1cc12fbb2fe51695e977c581e9bafd39519110f9b7d02ae118d9",
+  imageDigest: "sha256:4c0e7e776c25f393ba9eb2e29319dbc38dc4c1d0f8a91e307aeb1a31849269db",
 };
 export const ISOLATED_INVOCATION_EFFECTIVE_CONFIG = {
   ...LEGACY_ISOLATED_INVOCATION_EFFECTIVE_CONFIG,
   operations: ["render-markdown/v1", "synthetic-receipt/v1", "verify-document-bytes/v1"],
-  bridgeImplementationDigest: "sha256:c5b17dadca069427942c924157bd6dd3cd3f969c7541af591c8bfffbd4009ecf",
-  backendImplementationDigest: "sha256:501ce5e0d830ff20e0cb6ce040f1d0c4e6c8ea29b60bb885180be09f1af68447",
+  bridgeImplementationDigest: "sha256:2d8364059e3b65156d9fc47db677eedea6e66bfd9d56fe12b9d4e2c65d66c5f4",
+  backendImplementationDigest: "sha256:3aa5bf9f05616c4574fa59a40c169550fe73b5c0ad029eef5fb252377e577711",
 };
 export const ISOLATED_INVOCATION_ADAPTER_ARTIFACT: HarnessRuntimeArtifactIdentity = {
   ...LEGACY_ISOLATED_INVOCATION_ADAPTER_ARTIFACT,
@@ -343,7 +343,7 @@ export const ISOLATED_INVOCATION_MANIFEST: HarnessCapabilityManifest = {
     harnessVersion: "2",
     adapterId: "isolated-invocation",
     adapterVersion: "2",
-    harnessCommit: "8226f8f4bcdb73d4389a33d8ba0efe05dec4fcfa",
+    harnessCommit: "75ec5d8c0307895facf64d3de759edba0c350442",
   },
   effectiveConfigSha256: canonicalHash(ISOLATED_INVOCATION_EFFECTIVE_CONFIG),
   sandbox: {

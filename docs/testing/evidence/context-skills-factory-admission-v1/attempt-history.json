@@ -1,0 +1,248 @@
+{
+  "schema": "synthetic-factory-attempt-history/v1",
+  "capturedAt": 1788729985476,
+  "history": [
+    {
+      "runLabel": "v8",
+      "scenarioVersion": "context-skills-synthetic-factory/v1",
+      "workOrderId": "wd7zaced1jssgvf5839xd6q5r18dw94e",
+      "state": "BLOCKED",
+      "verificationStatus": "PENDING",
+      "attempts": [
+        {
+          "id": "ws7s9bv4xsw4x6mbya3yfwtfw98dwss5",
+          "purpose": "IMPLEMENTATION",
+          "status": "FAILED",
+          "failureReason": "[Request ID: 2f528db2b13d448a] Server Error\nUncaught Error: Uncaught Error: Candidate publication lineage is stale for the WorkOrder or repository.\n    at persistPolicyV2CandidateReady (../../convex/factory/attempts.ts:2488:27)\n    at async handler (../../convex/factory/attempts.ts:1510:18)\n\n    at async handler (../convex/serviceCommands.ts:489:8)"
+        },
+        {
+          "id": "ws7zaydmejy0g2he1msh1ef88x8dwbbn",
+          "purpose": "IMPLEMENTATION",
+          "status": "FAILED",
+          "failureReason": "The offline Attempt expired before its first canonical worker lease; no executor boundary was crossed."
+        }
+      ],
+      "verification": []
+    },
+    {
+      "runLabel": "v9",
+      "scenarioVersion": "context-skills-synthetic-factory/v1",
+      "workOrderId": "wd7pf7z7sn80fvcqn3prmh5k5n8dwe5v",
+      "state": "BLOCKED",
+      "verificationStatus": "PENDING",
+      "attempts": [
+        {
+          "id": "ws7pqvc5qx7ea2t03bm9h3m7cx8dx4vh",
+          "purpose": "IMPLEMENTATION",
+          "status": "FAILED",
+          "failureReason": "[Request ID: 8e0aa8d442251356] Server Error\nUncaught Error: Uncaught Error: Failed to insert or update a document in table \"workflowRuns\" because it does not match the schema: Value does not match validator.\nPath: .verificationSubject\nValue: {candidateSha: \"9e496a9e1cedbe40a340850aa5c2a39052645ade\", digest: \"sha256:937269607d8c678e4e5dd4f02208cf69e9299831eb4a67706e612d237a93893d\", kind: \"GIT_CANDIDATE\", localRef: {baseRef: \"main\", headRef: \"mc/mh5k5n8dwe5v-zmw5423w\", headSha: \"9e496a9e1cedbe40a340850aa5c2a39052645ade\"}, provider: \"LOCAL_GIT\", repositoryId: \"x57gxavpezz4p6sb3h2mmpqw118dx93y\", sourceAttemptId: \"ws7pqvc5qx7ea2t03bm9h3m7cx8dx4vh\", subjectId: \"verification-subject:937269607d8c678e4e5dd4f02208cf69e9299831eb4a67706e612d237a93893d\", treeSha: \"d37987c1751e19c73faa77f203c0933ffa14b932\", verificationContractDigest: \"sha256:6b0872a62d4b0ba293a4adc3e99cf53b6fb7073abbb673e21fc1d0a5b7e4e57c\", version: 1.0, workOrderId: \"wd7pf7z7sn80fvcqn3prmh5k5n8dwe5v\", workOrderRevisionNumber: 1.0}\nValidator: v.union(v.union(v.object({candidateSha: v.string(), digest: v.string(), kind: v.literal(\"GIT_CANDIDATE\"), provider: v.literal(\"GITHUB\"), providerRepositoryId: v.string(), pullRequest: v.object({baseRef: v.string(), draftAtPublication: v.boolean(), headRef: v.string(), headSha: v.string(), number: v.float64(), providerPullRequestId: v.string(), url: v.string()}), repositoryId: v.id(\"workspaceRepositories\"), sourceAttemptId: v.id(\"workflowRuns\"), subjectId: v.string(), treeSha: v.string(), verificationContractDigest: v.string(), version: v.literal(1.0), workOrderId: v.id(\"workOrders\"), workOrderRevisionNumber: v.float64()}), v.object({candidateSha: v.string(), digest: v.string(), kind: v.literal(\"GIT_CANDIDATE\"), localRef: v.object({baseRef: v.string(), headRef: v.string(), headSha: v.string()}), provider: v.literal(\"LOCAL_GIT\"), providerRepositoryId: v.string(), repositoryId: v.id(\"workspaceRepositories\"), sourceAttemptId: v.id(\"workflowRuns\"), subjectId: v.string(), treeSha"
+        },
+        {
+          "id": "ws7j8w1qf11mknajk9gcykcc898dwf8f",
+          "purpose": "IMPLEMENTATION",
+          "status": "FAILED",
+          "failureReason": "[Request ID: b19365f91c7e3785] Server Error\nUncaught Error: Uncaught Error: Git verification subject requires internal and provider repository identity.\n    at createGitVerificationSubject (../../packages/workflow-engine/src/verificationSubject.ts:101:23)\n    at persistPolicyV2CandidateReady (../../convex/factory/attempts.ts:2527:4)\n    at async handler (../../convex/factory/attempts.ts:1510:18)\n\n    at async handler (../convex/serviceCommands.ts:489:8)"
+        }
+      ],
+      "verification": []
+    },
+    {
+      "runLabel": "v10",
+      "scenarioVersion": "context-skills-synthetic-factory/v1",
+      "workOrderId": "wd7wc41vkstbybmpzma5jmh4f18dwqgp",
+      "state": "BLOCKED",
+      "verificationStatus": "PENDING",
+      "attempts": [
+        {
+          "id": "ws7wv4vhb5zz4fphj4cf4mder98dwtcq",
+          "purpose": "VERIFICATION",
+          "status": "FAILED",
+          "failureReason": "Claimed offline Execution Profile is invalid or stale."
+        },
+        {
+          "id": "ws7g4s1ks86kmrhw7yyd83k4dn8dwp9c",
+          "purpose": "VERIFICATION",
+          "status": "FAILED",
+          "failureReason": "The offline Attempt expired before its first canonical worker lease; no executor boundary was crossed."
+        },
+        {
+          "id": "ws7tyr6cg2kkm03tew5zfs15858dxq2q",
+          "purpose": "IMPLEMENTATION",
+          "status": "COMPLETED"
+        }
+      ],
+      "verification": [
+        {
+          "id": "vd7ysteph1tphcx5cwppmdm06d8dx9vv",
+          "status": "FAILED",
+          "verdictReasons": [
+            "Claimed offline Execution Profile is invalid or stale."
+          ]
+        },
+        {
+          "id": "vd7v6g0r7h0hzqycmy12ckvr1h8dxk7b",
+          "status": "PLANNED",
+          "verdictReasons": [
+            "Verification Attempt is planned for the exact immutable subject."
+          ]
+        }
+      ]
+    },
+    {
+      "runLabel": "v11",
+      "scenarioVersion": "context-skills-synthetic-factory/v1",
+      "workOrderId": "wd7zg1n9syv2dpf3vxvwajktm18dxvfy",
+      "state": "BLOCKED",
+      "verificationStatus": "PENDING",
+      "attempts": [
+        {
+          "id": "ws7nyztavwzsenffx3nmm1z38n8dxm5t",
+          "purpose": "VERIFICATION",
+          "status": "FAILED",
+          "failureReason": "[Request ID: 0b942c265aba44b3] Server Error\nUncaught Error: Uncaught Error: Offline verifier response and independent candidate observation are not exact and current.\n    at mapOfflineVerification (../../convex/lib/offlineVerification.ts:47:33)\n    at handler (../../convex/factory/attempts.ts:2012:46)\n\n    at async handler (../convex/serviceCommands.ts:717:8)"
+        },
+        {
+          "id": "ws7pzegaxqaf7zb6smjgxpzg7n8dxdda",
+          "purpose": "VERIFICATION",
+          "status": "FAILED",
+          "failureReason": "[Request ID: 804d837cda55b135] Server Error\nUncaught Error: Uncaught Error: Offline verifier reports require an exact typed result or terminal-only failure.\n    at handler (../../convex/factory/attempts.ts:1835:4)\n\n    at async handler (../convex/serviceCommands.ts:717:8)"
+        },
+        {
+          "id": "ws7zr9j9jd1f78pxc7tvjnqnxh8dwpth",
+          "purpose": "IMPLEMENTATION",
+          "status": "COMPLETED"
+        }
+      ],
+      "verification": [
+        {
+          "id": "vd7t9d1eajaa2fstm9p4wzyap18dwdcx",
+          "status": "FAILED",
+          "verdictReasons": [
+            "[Request ID: 0b942c265aba44b3] Server Error\nUncaught Error: Uncaught Error: Offline verifier response and independent candidate observation are not exact and current.\n    at mapOfflineVerification (../../convex/lib/offlineVerification.ts:47:33)\n    at handler (../../convex/factory/attempts.ts:2012:46)\n\n    at async handler (../convex/serviceCommands.ts:717:8)"
+          ]
+        },
+        {
+          "id": "vd7yvxpyqy2qthay0fca1bqc058dx4x8",
+          "status": "FAILED",
+          "verdictReasons": [
+            "[Request ID: 804d837cda55b135] Server Error\nUncaught Error: Uncaught Error: Offline verifier reports require an exact typed result or terminal-only failure.\n    at handler (../../convex/factory/attempts.ts:1835:4)\n\n    at async handler (../convex/serviceCommands.ts:717:8)"
+          ]
+        }
+      ]
+    },
+    {
+      "runLabel": "v12",
+      "scenarioVersion": "context-skills-synthetic-factory/v1",
+      "workOrderId": "wd7s1rs09xh8jjhdk79r5c4p158dxr9k",
+      "state": "AWAITING_VERIFICATION",
+      "verificationStatus": "FAIL",
+      "attempts": [
+        {
+          "id": "ws7zv5y722zn65bdssgynw1xq58dwrej",
+          "purpose": "VERIFICATION",
+          "status": "COMPLETED"
+        },
+        {
+          "id": "ws7krwbz6hq9bbp0rn7fkh7n9s8dwhxb",
+          "purpose": "IMPLEMENTATION",
+          "status": "COMPLETED"
+        }
+      ],
+      "verification": [
+        {
+          "id": "vd7ra65tfab7n0ghv4376cnfhs8dx39g",
+          "status": "COMPLETED",
+          "verdict": "BLOCKED",
+          "verdictReasons": [
+            "Required evidence is unavailable: mission:independent-verification.",
+            "Required requirements are uncovered: requirement:exact-document.",
+            "Required risks are uncovered: mission:exact-candidate-integrity."
+          ]
+        }
+      ]
+    },
+    {
+      "runLabel": "v13",
+      "scenarioVersion": "context-skills-synthetic-factory/v1",
+      "workOrderId": "wd7t0hbk2z2a09yp1jq51hdgms8dwnew",
+      "state": "AWAITING_VERIFICATION",
+      "verificationStatus": "PASS",
+      "attempts": [
+        {
+          "id": "ws7qyv1v9169xassttw97vmq518dwvdw",
+          "purpose": "VERIFICATION",
+          "status": "COMPLETED"
+        },
+        {
+          "id": "ws7xsmay6kgj98hj5g9215kndd8dwkvz",
+          "purpose": "IMPLEMENTATION",
+          "status": "COMPLETED"
+        }
+      ],
+      "verification": [
+        {
+          "id": "vd7mbfd3v9w5c8vzsas5d8dqnx8dw879",
+          "status": "COMPLETED",
+          "verdict": "VERIFIED",
+          "verdictReasons": [
+            "All required requirements, risks, and evidence passed with server-derived independence."
+          ]
+        }
+      ]
+    },
+    {
+      "runLabel": "v14",
+      "scenarioVersion": "context-skills-synthetic-factory/v1",
+      "workOrderId": "wd7thfyddm5z7w0tt3q1w48h6x8dwfjp",
+      "state": "READY",
+      "verificationStatus": "PENDING",
+      "attempts": [],
+      "verification": []
+    },
+    {
+      "runLabel": "v15",
+      "scenarioVersion": "context-skills-synthetic-factory/v1",
+      "workOrderId": "wd7x2xf63ssdqtfntkxa1tjmpd8dwd31",
+      "state": "BLOCKED",
+      "verificationStatus": "PENDING",
+      "attempts": [
+        {
+          "id": "ws7z133xrxqepa2bjam5kq9dh98dw5k3",
+          "purpose": "IMPLEMENTATION",
+          "status": "FAILED",
+          "failureReason": "The offline Attempt expired before its first canonical worker lease; no executor boundary was crossed."
+        }
+      ],
+      "verification": []
+    },
+    {
+      "runLabel": "v16",
+      "scenarioVersion": "context-skills-synthetic-factory/v1",
+      "workOrderId": "wd7r5t4149d88dvde8tjh0jajd8dw7bg",
+      "state": "AWAITING_VERIFICATION",
+      "verificationStatus": "PASS",
+      "attempts": [
+        {
+          "id": "ws7kvwdx1gz5mx0y46r8ccd6a18dw0mz",
+          "purpose": "VERIFICATION",
+          "status": "COMPLETED"
+        },
+        {
+          "id": "ws7q4dahj7fevwq08dwrqatvmx8dwz9v",
+          "purpose": "IMPLEMENTATION",
+          "status": "COMPLETED"
+        }
+      ],
+      "verification": [
+        {
+          "id": "vd7xy458ay4xvchp9z268s3sa58dweat",
+          "status": "COMPLETED",
+          "verdict": "VERIFIED",
+          "verdictReasons": [
+            "All required requirements, risks, and evidence passed with server-derived independence."
+          ]
+        }
+      ]
+    }
+  ]
+}

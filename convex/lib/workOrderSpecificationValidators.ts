@@ -216,7 +216,6 @@ const gitVerificationSubjectIdentityFields = {
   ...verificationSubjectIdentityFields,
   kind: v.literal("GIT_CANDIDATE"),
   repositoryId: v.id("workspaceRepositories"),
-  providerRepositoryId: v.string(),
   candidateSha: v.string(),
   treeSha: v.string(),
 };
@@ -224,6 +223,7 @@ const gitVerificationSubjectIdentityFields = {
 const githubVerificationSubjectValidator = v.object({
   ...gitVerificationSubjectIdentityFields,
   provider: v.literal("GITHUB"),
+  providerRepositoryId: v.string(),
   pullRequest: v.object({
     providerPullRequestId: v.string(),
     number: v.number(),

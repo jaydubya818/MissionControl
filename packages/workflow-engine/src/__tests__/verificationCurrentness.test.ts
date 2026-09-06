@@ -59,7 +59,6 @@ function localGitSubject() {
     sourceAttemptId: "source-a",
     repositoryId: "repo-1",
     provider: "LOCAL_GIT",
-    providerRepositoryId: "provider-repo-1",
     candidateSha: "a".repeat(40),
     treeSha: "b".repeat(40),
     localRef: { baseRef: "main", headRef: "candidate", headSha: "a".repeat(40) },

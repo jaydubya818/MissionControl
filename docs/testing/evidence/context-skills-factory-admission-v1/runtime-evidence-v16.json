@@ -1,0 +1,269 @@
+{
+  "observedAt": 1788729737094,
+  "bindings": [
+    {
+      "_creationTime": 1788724755733.931,
+      "_id": "x17p0gdmqcj7q0rzr40v58hkr98dxger",
+      "attestedAt": 1788729718583,
+      "baseBranch": "main",
+      "baseCommit": "df96cf39158bf357c4c75596e6a63f4a442c1b97",
+      "capacity": {
+        "currentRuns": 0,
+        "maxConcurrentRuns": 1
+      },
+      "checkedAt": 1788729718585,
+      "checkoutRoot": "/private/tmp/mc-local-qualification-6dba14d07c09c746158c2d13a35bf9e1/repository",
+      "dirty": false,
+      "hostId": "local-synthetic-qualification-worker",
+      "localQualificationObservation": {
+        "admissionDigest": "sha256:423a92010c15be1bfbbb4c2eb4aa46ef4f26879102754bbf10a2ca46e88b276d",
+        "baselineCommit": "df96cf39158bf357c4c75596e6a63f4a442c1b97",
+        "baselineTree": "89b64dc3ebcc0f57abf5159bcd5b48ac49ae5177",
+        "fixtureContentDigest": "sha256:f04aa5681dbd4fe28c20ac2ad8f03b697bf6095fd8e6ff458a1fa4fef0c31033",
+        "noRemotes": true,
+        "observedAt": 1788729718583,
+        "ownerUid": 501,
+        "root": "/private/tmp/mc-local-qualification-6dba14d07c09c746158c2d13a35bf9e1/repository",
+        "schema": "local-qualification-root-observation/v1"
+      },
+      "observedBranch": "main",
+      "observedCommit": "df96cf39158bf357c4c75596e6a63f4a442c1b97",
+      "projectId": "n57s179n01kha4fxafjty8rrmn8dxpfn",
+      "repository": "local-qualification/unpublished-candidate-handoff-v1",
+      "repositoryId": "x57gxavpezz4p6sb3h2mmpqw118dx93y",
+      "runtime": "node v24.18.1 darwin/arm64",
+      "status": "READY",
+      "workerRuntime": {
+        "draining": false,
+        "executionBackends": [
+          "isolated-container"
+        ],
+        "factoryVersionBindings": [
+          {
+            "adapter": "isolated-invocation",
+            "capabilityManifestSha256": "sha256:96bc4ecba48e24522b8c0002153a98f2d126fcf077861cc33f9470baf6fa6fcb",
+            "effectiveConfigSha256": "12d63834184096193ad355a90bbede69d169a3abfa17dc9bbcfd39422208cf83",
+            "executionBackend": "isolated-container",
+            "factoryConfigurationDigest": "factory-v1-d07cf9c4",
+            "factoryDefinitionVersionId": "t970ra13k3hap1xhd12xv3kw4n8dwerg",
+            "inferenceConstraint": {
+              "mode": "DENIED",
+              "schema": "factory-inference-constraint/v1"
+            },
+            "repositoryId": "x57gxavpezz4p6sb3h2mmpqw118dx93y",
+            "runtimeArtifactSha256": "sha256:950a19c8e2419323c4437954f6e812f8421a4d9fc42838ad099b0e0f24b3d666",
+            "sandboxProfileDigest": "sha256:60e40c03fbdeb6e7e5ba3931c2f143eb0939caaf80acfddac782802112687391",
+            "version": "2"
+          },
+          {
+            "adapter": "isolated-invocation",
+            "capabilityManifestSha256": "sha256:96bc4ecba48e24522b8c0002153a98f2d126fcf077861cc33f9470baf6fa6fcb",
+            "effectiveConfigSha256": "12d63834184096193ad355a90bbede69d169a3abfa17dc9bbcfd39422208cf83",
+            "executionBackend": "isolated-container",
+            "factoryConfigurationDigest": "factory-v1-9b45c1f9",
+            "factoryDefinitionVersionId": "t979t16dcf7y5d8rm3sgck6w018dwqp2",
+            "inferenceConstraint": {
+              "mode": "DENIED",
+              "schema": "factory-inference-constraint/v1"
+            },
+            "repositoryId": "x57gxavpezz4p6sb3h2mmpqw118dx93y",
+            "runtimeArtifactSha256": "sha256:950a19c8e2419323c4437954f6e812f8421a4d9fc42838ad099b0e0f24b3d666",
+            "sandboxProfileDigest": "sha256:60e40c03fbdeb6e7e5ba3931c2f143eb0939caaf80acfddac782802112687391",
+            "version": "2"
+          }
+        ],
+        "generation": 5,
+        "hostRuntimeType": "persistent-worker",
+        "lastHeartbeatAt": 1788729718585,
+        "readiness": "READY",
+        "repositoryAccess": [
+          {
+            "access": "READ_WRITE",
+            "repositoryId": "x57gxavpezz4p6sb3h2mmpqw118dx93y"
+          }
+        ],
+        "sandboxCapabilities": [
+          "git-worktree",
+          "workspace-write",
+          "read-only",
+          "deny-egress",
+          "isolated-container",
+          "no-host-mounts",
+          "read-only-runtime"
+        ],
+        "sessionId": "5389c646-d15d-492a-8200-a09405f05579",
+        "supportedExecutors": [
+          {
+            "adapter": "isolated-invocation",
+            "capabilityManifest": {
+              "admission": {
+                "executionBackends": [
+                  "isolated-container"
+                ],
+                "maturity": "EXPERIMENTAL",
+                "prohibitedAuthorities": [
+                  "worker-leases",
+                  "verification-subjects",
+                  "verification-plans",
+                  "evidence-authority",
+                  "github-publication",
+                  "acceptance"
+                ],
+                "requiredExternalControls": [
+                  "canonical-worker-lease",
+                  "mission-control-sandbox-policy",
+                  "repository-scope-reconciliation",
+                  "independent-verification",
+                  "publication-permit"
+                ]
+              },
+              "browser": {
+                "interactiveBrowser": "UNSUPPORTED",
+                "webFetch": "UNSUPPORTED",
+                "webSearch": "UNSUPPORTED"
+              },
+              "cancellation": {
+                "idempotentCleanup": true,
+                "mode": "PROCESS_SIGNAL",
+                "support": "SUPPORTED"
+              },
+              "context": {
+                "compaction": "UNSUPPORTED",
+                "fork": "UNSUPPORTED",
+                "instructionFiles": "UNSUPPORTED",
+                "persistentSessions": "UNSUPPORTED",
+                "resume": "UNSUPPORTED"
+              },
+              "credentials": {
+                "classes": [],
+                "passedToToolProcesses": false,
+                "redaction": "SUPPORTED"
+              },
+              "effectiveConfigSha256": "12d63834184096193ad355a90bbede69d169a3abfa17dc9bbcfd39422208cf83",
+              "filesystem": {
+                "changedFileCapture": "UNSUPPORTED",
+                "pathAllowlist": "UNSUPPORTED",
+                "read": "UNSUPPORTED",
+                "write": "UNSUPPORTED"
+              },
+              "git": {
+                "branch": "UNSUPPORTED",
+                "commit": "UNSUPPORTED",
+                "diff": "UNSUPPORTED",
+                "remotePublication": "UNSUPPORTED",
+                "status": "UNSUPPORTED"
+              },
+              "headless": {
+                "mode": "API",
+                "support": "SUPPORTED"
+              },
+              "identity": {
+                "adapterId": "isolated-invocation",
+                "adapterVersion": "2",
+                "harnessCommit": "75ec5d8c0307895facf64d3de759edba0c350442",
+                "harnessId": "isolated-invocation",
+                "harnessVersion": "2"
+              },
+              "limitations": [
+                "Offline deterministic execution only; no provider transport or model selection.",
+                "Canonical Attempt and independently qualified exact composition required."
+              ],
+              "models": {
+                "modelSelection": "UNSUPPORTED",
+                "providerSelection": "UNSUPPORTED",
+                "reasoningControls": "UNSUPPORTED",
+                "supported": []
+              },
+              "network": {
+                "destinations": [],
+                "packageInstall": false,
+                "providerApi": false,
+                "runtimeEgressControl": "SUPPORTED"
+              },
+              "sandbox": {
+                "externalSandboxRecommended": true,
+                "isolationModes": [
+                  "READ_ONLY",
+                  "WORKSPACE_WRITE"
+                ],
+                "requirements": [
+                  "isolated-container",
+                  "no-host-mounts",
+                  "deny-egress"
+                ]
+              },
+              "schemaVersion": "harness-capability-manifest/v2",
+              "scope": "ADAPTER_EFFECTIVE",
+              "shell": {
+                "available": "UNSUPPORTED",
+                "commandTimeout": "SUPPORTED",
+                "credentialEnvironmentScrub": "SUPPORTED",
+                "processTreeCancellation": "SUPPORTED"
+              },
+              "streaming": {
+                "durableReplay": "UNSUPPORTED",
+                "events": "SUPPORTED",
+                "modelDeltas": "UNSUPPORTED"
+              },
+              "subagents": {
+                "available": "UNSUPPORTED",
+                "background": "UNSUPPORTED",
+                "eventVisibility": "UNSUPPORTED",
+                "parallel": "UNSUPPORTED"
+              },
+              "telemetry": {
+                "cost": "UNSUPPORTED",
+                "modelRequests": "SUPPORTED",
+                "retries": "SUPPORTED",
+                "tokens": "UNSUPPORTED",
+                "toolCalls": "SUPPORTED"
+              },
+              "tools": {
+                "mcp": "UNSUPPORTED",
+                "native": "UNSUPPORTED",
+                "structuredOutput": "SUPPORTED",
+                "telemetry": "SUPPORTED"
+              }
+            },
+            "capabilityManifestSha256": "sha256:96bc4ecba48e24522b8c0002153a98f2d126fcf077861cc33f9470baf6fa6fcb",
+            "effectiveConfigSha256": "12d63834184096193ad355a90bbede69d169a3abfa17dc9bbcfd39422208cf83",
+            "isolationModes": [
+              "READ_ONLY",
+              "WORKSPACE_WRITE"
+            ],
+            "runtimeArtifact": {
+              "executableSha256": "3aa5bf9f05616c4574fa59a40c169550fe73b5c0ad029eef5fb252377e577711",
+              "imageDigest": null,
+              "kind": "EXECUTABLE",
+              "name": "docker-chroot-offline",
+              "schemaVersion": "harness-runtime-artifact/v1",
+              "version": "2"
+            },
+            "runtimeArtifactSha256": "sha256:fd155cf969b3b30c8c1a739cec59cc6378dd6ec83c55faa7d94339d219973273",
+            "supportsCancel": true,
+            "supportsResume": false,
+            "version": "2"
+          }
+        ]
+      }
+    }
+  ],
+  "repositories": [
+    {
+      "admissionDigest": "sha256:423a92010c15be1bfbbb4c2eb4aa46ef4f26879102754bbf10a2ca46e88b276d",
+      "dataClassification": "PUBLIC",
+      "defaultBranch": "main",
+      "displayName": "Local synthetic qualification — no publication",
+      "isDefault": false,
+      "publicationAuthority": "NONE",
+      "repository": "local-qualification/unpublished-candidate-handoff-v1",
+      "repositoryId": "x57gxavpezz4p6sb3h2mmpqw118dx93y",
+      "repositoryMode": "LOCAL_SYNTHETIC_QUALIFICATION",
+      "scopeCount": 1,
+      "source": "CONNECTION",
+      "status": "READY",
+      "validatedAt": 1788729718585,
+      "webhookStatus": "MISSING"
+    }
+  ]
+}

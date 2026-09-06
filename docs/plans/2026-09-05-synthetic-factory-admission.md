@@ -13,3 +13,7 @@ Complete canonical WorkOrder admission using the exact deterministic contract an
 Qualification: synthetic persisted Mission/approved Plan/WorkOrder, exact profile and Factory, real worker and independent verifier; lifecycle negative controls; actual browser desktop/390px/keyboard/refresh/accessibility; current System Qualification and full repository gates; independent security, data integrity, architecture, simplicity and documentation reviews. Rebuild exact artifacts from captured current source and fix CLI substitution and durable evidence replay concerns before claiming completion.
 
 Only after the complete synthetic flow passes: focused local commits, immutable evidence, and evaluate existing remote-landing authorization without production side effects. Do not consume the historic twelve-call approval.
+
+## Completion
+
+The frozen `context-skills-synthetic-factory/v1` scenario completed on run `v13`. The producer and verifier used separate Attempts, Factory Versions, Execution Profiles, worktrees, leases, and invocation identities. The exact unpublished candidate received a server-derived `VERIFIED` result. Synthetic evidence remains excluded from production acceptance and publication authority. Browser refresh, desktop/mobile rendering, accessibility, failure controls, zero provider calls, and temporary-permission removal are recorded in `docs/testing/evidence/context-skills-factory-admission-v1/`.

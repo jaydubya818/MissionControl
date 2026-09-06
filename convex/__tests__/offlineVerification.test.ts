@@ -19,12 +19,14 @@ function fixture(): Parameters<typeof mapOfflineVerification>[0] {
     packet: { responseDigest: digest, candidateObservation: { candidateSha, treeSha, path: "docs/synthetic.md",
       blobSha: gitBlobDigest(content, 40), contentSha256, observedAt: 21 },
       candidate: { sourceRevision: "e".repeat(40), candidateRevision: candidateSha, treeRevision: treeSha,
+        rawDiffSha256: `sha256:${"f".repeat(64)}`,
         changedFiles: ["docs/synthetic.md"], deletedFiles: [], linesAdded: 1, linesDeleted: 0, diff: "+# Synthetic\n" } },
     workOrder: { _id: "work-order", currentRevisionNumber: 1, title: "Synthetic", riskLevel: "LOW", requiredApprovals: [],
       acceptanceCriteria: [{ id: "document", title: "Exact document", requiredEvidence: [{ category: "TEST_RESULT", minimumCount: 1, independent: true }] }],
       verificationContract: { schemaVersion: 2, enforcementMode: "ENFORCED", requireHumanReview: false,
         checks: [{ id: "bytes", name: "Exact bytes", category: "UNIT_TEST", evidenceCategory: "TEST_RESULT",
-          mandatory: true, acceptanceCriterionIds: ["document"], verifierId: "verify-document-bytes/v1" }] } },
+          mandatory: true, acceptanceCriterionIds: ["document"], verifierId: "factory-command/v1",
+          command: { executable: "node", args: ["-e", "process.exit(0)"], commandClass: "TEST", timeoutMs: 10_000 } }] } },
     run: { _id: "verifier" }, sourceAttempt: { _id: "producer", executionBaseSha: "e".repeat(40) },
     verificationRun: { verificationPlanDigest: digest, verificationSubjectDigest: digest }, now: 22,
   };
@@ -37,7 +39,7 @@ describe("offline verification mapper conformance, not behavioral qualification"
       evidence: [{ metadata: { evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE", behavioralPass: false } }] });
     expect(mapped.checks.some(check => check.verifierId === "factory-verification-authority")).toBe(true);
   });
-  it.each(["blob", "tree", "path", "stale", "future", "extra-file", "baseline", "response", "failed-runtime"])("rejects %s substitution", async mutation => {
+  it.each(["blob", "tree", "path", "stale", "future", "extra-file", "baseline", "raw-diff", "response", "failed-runtime"])("rejects %s substitution", async mutation => {
     const input = fixture();
     if (mutation === "blob") input.packet.candidateObservation.blobSha = "f".repeat(40);
     if (mutation === "tree") input.packet.candidateObservation.treeSha = "f".repeat(40);
@@ -46,6 +48,7 @@ describe("offline verification mapper conformance, not behavioral qualification"
     if (mutation === "future") input.packet.candidateObservation.observedAt = 23;
     if (mutation === "extra-file") input.packet.candidate.changedFiles.push("AGENTS.md");
     if (mutation === "baseline") input.packet.candidate.sourceRevision = "f".repeat(40);
+    if (mutation === "raw-diff") input.packet.candidate.rawDiffSha256 = "unbound";
     if (mutation === "response") input.packet.responseDigest = `sha256:${"f".repeat(64)}`;
     if (mutation === "failed-runtime") input.retained.result.status = "WORKLOAD_FAILURE";
     await expect(mapOfflineVerification(input)).rejects.toThrow("not exact and current");

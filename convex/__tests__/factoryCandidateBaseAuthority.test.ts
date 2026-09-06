@@ -47,7 +47,7 @@ function fixture(prepublication = false) {
     }],
     workspaceRepositories: [{
       _id: "repository-1", projectId: "project-1", repository: "qualification/repo",
-      providerRepositoryId: "provider-repository-1", defaultBranch: "main", status: "READY",
+      provider: "GITHUB", providerRepositoryId: "provider-repository-1", defaultBranch: "main", status: "READY",
     }],
     githubAppInstallations: [{
       _id: "installation-row-1", repositoryId: "repository-1", projectId: "project-1",
@@ -286,6 +286,14 @@ describe("Factory candidate source authority through the real report mutation", 
     }
     const f = fixture(true);
     await expect(f.report({ ...prepublicationPacket(), terminal: { status: "COMPLETED" } })).rejects.toThrow(/cannot include/);
+  });
+
+  it("rejects a local candidate transport for a GitHub-authorized repository before subject persistence", async () => {
+    const f = fixture();
+    await expect(f.report({ candidateReady: { ...candidateReady, transport: "LOCAL_GIT" }, artifacts: [] }))
+      .rejects.toThrow(/transport must match the admitted repository authority/);
+    expect(await f.db.get("attempt-1")).toMatchObject({ status: "RUNNING" });
+    expect((await f.db.get("attempt-1")).verificationSubject).toBeUndefined();
   });
 
   it("accepts durable publication event types and keeps uncertain publication recoverable after its permit expires", async () => {

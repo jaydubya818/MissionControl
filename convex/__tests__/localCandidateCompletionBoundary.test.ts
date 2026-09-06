@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { reportInternal, scheduleVerificationInternal } from "../factory/attempts";
 import { getFunctionName } from "convex/server";
 import { syncExecutionOutcome, accept } from "../workOrders";
+import { LOCAL_QUALIFICATION_MODE, LOCAL_QUALIFICATION_PROGRAM,
+  localRepositoryAdmissionDigest } from "../lib/localRepositoryAdmission";
 
 /** Exercise the existing mutation bodies with persisted synthetic rows. This
  * is structural lifecycle evidence, never observed canonical execution. */
@@ -33,16 +35,40 @@ function fixture() {
     }
     return (syncExecutionOutcome as any)._handler(ctx, args);
   } };
+  const now = Date.now();
   const sha = "a".repeat(40), candidateSha = "b".repeat(40), treeSha = "c".repeat(40), digest = `sha256:${"d".repeat(64)}`;
-  put("workspaceRepositories", { _id: "repository", projectId: "project", providerRepositoryId: "synthetic-repo", defaultBranch: "main" });
-  put("workOrders", { _id: "work-order", projectId: "project", state: "IN_PROGRESS", currentRevisionNumber: 1,
+  const metadata = { schema: LOCAL_QUALIFICATION_PROGRAM, synthetic: true, productionAuthority: false };
+  const admission = { schema: "local-synthetic-repository-admission/v1" as const, mode: LOCAL_QUALIFICATION_MODE,
+    program: LOCAL_QUALIFICATION_PROGRAM, tenantId: "tenant", projectId: "project", engagementId: "project",
+    operatorId: "operator", environmentId: "environment", hostId: "worker", fixtureId: "fixture",
+    root: `/private/tmp/mc-local-qualification-${"1".repeat(32)}/repository`, baselineCommit: sha,
+    baselineTree: treeSha, fixtureContentDigest: `sha256:${"2".repeat(64)}`, expiresAt: now + 600_000,
+    publicationAuthority: "NONE" as const, productionAuthority: "NONE" as const };
+  const admissionDigest = localRepositoryAdmissionDigest(admission);
+  process.env.MC_LOCAL_REPOSITORY_ADMISSION = JSON.stringify(admission);
+  put("tenants", { _id: "tenant", slug: "synthetic-handoff-qualification", active: true, metadata });
+  put("projects", { _id: "project", tenantId: "tenant", slug: "synthetic-unpublished-handoff", metadata });
+  put("operators", { _id: "operator", tenantId: "tenant", active: true, authId: "user_SyntheticHandoffQualification", metadata });
+  put("environments", { _id: "environment", tenantId: "tenant", type: "dev",
+    metadata: { schema: "factory-qualification-environment/v1", synthetic: true, projectId: "project", repositoryId: "repository" } });
+  put("workspaceRepositories", { _id: "repository", tenantId: "tenant", projectId: "project", provider: "LOCAL",
+    repositoryMode: LOCAL_QUALIFICATION_MODE, repository: "local-qualification/fixture", localAdmission: admission,
+    localAdmissionDigest: admissionDigest, defaultBranch: "main" });
+  put("workspaceHostBindings", { _id: "host", projectId: "project", hostId: "worker", checkoutRoot: admission.root,
+    status: "READY", dirty: false, baseCommit: sha, localQualificationObservation: { admissionDigest, root: admission.root,
+      baselineCommit: sha, baselineTree: treeSha, fixtureContentDigest: admission.fixtureContentDigest, noRemotes: true, observedAt: now } });
+  put("factoryDefinitionVersions", { _id: "version", tenantId: "tenant", projectId: "project", repositoryId: "repository",
+    environmentId: "environment", repositoryMode: LOCAL_QUALIFICATION_MODE, repositoryAdmissionDigest: admissionDigest,
+    executionBackend: "isolated-container", inferenceConstraint: { mode: "DENIED" } });
+  put("workOrders", { _id: "work-order", tenantId: "tenant", projectId: "project", state: "IN_PROGRESS", currentRevisionNumber: 1,
     title: "Synthetic candidate", riskLevel: "LOW", isMutating: true, requiredApprovals: [], requirements: [], acceptanceCriteria: [],
     verificationStatus: "PENDING", approvalStatus: "APPROVED", verificationContractDigest: digest, qualityContractDigest: digest,
     verificationContract: { schemaVersion: 2, enforcementMode: "ENFORCED" } });
-  put("workflowRuns", { _id: "attempt", runId: "run", projectId: "project", repositoryId: "repository", workOrderId: "work-order",
+  put("workflowRuns", { _id: "attempt", runId: "run", tenantId: "tenant", projectId: "project", repositoryId: "repository", workOrderId: "work-order",
+    factoryDefinitionVersionId: "version", hostBindingId: "host",
     status: "RUNNING", attemptPurpose: "IMPLEMENTATION", isMutating: true, branch: "mc/synthetic", workOrderRevisionNumber: 1,
     qualityContractDigest: digest, verificationContractDigest: digest, executionManifestDigest: digest,
-    executionManifest: { version: "factory-execution-manifest/v1", repository: { baseSha: sha } },
+    executionManifest: { version: "factory-execution-manifest/v1", repository: { baseSha: sha, admissionDigest } },
     lease: { leaseId: "lease", ownerId: "owner", expiresAt: Date.now() + 60000 },
     startedAt: Date.now(), currentStepIndex: 0, totalSteps: 1, steps: [{ stepId: "build", status: "RUNNING" }] });
   const packet = { artifacts: [{ idempotencyKey: "code-diff", artifactType: "CODE_DIFF", name: "Candidate", contentHash: `git:${candidateSha}`,

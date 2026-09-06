@@ -46,23 +46,8 @@ export interface LocalQualificationDispatchInput extends Omit<FactoryDispatchPre
 }
 
 export function evaluateLocalQualificationDispatchPreflight(input: LocalQualificationDispatchInput): FactoryDispatchPreflightResult {
-  const a = input.repositoryAdmission;
-  if (a?.mode !== "LOCAL_SYNTHETIC_QUALIFICATION" || !a.current || !/^sha256:[a-f0-9]{64}$/.test(a.digest)
-    || a.digest !== a.frozenDigest || a.publicationAuthority !== "NONE" || a.productionAuthority !== "NONE") {
-    return { ok: false, blocker: "local-repository-admission-invalid", remediation: "Re-admit the exact synthetic repository and immutable Factory composition." };
-  }
-  for (const check of checks) {
-    // This supported repository type has no GitHub capability. Every common
-    // gate is still required; the existing GitHub evaluator is unchanged.
-    if (check.key === "githubReady") continue;
-    if (!input[check.key as keyof Omit<FactoryDispatchPreflightInput, "githubReady">]) {
-      return { ok: false, blocker: check.blocker, remediation: check.remediation };
-    }
-  }
-  if (input.mutating && input.activeRepositoryMutation) return {
-    ok: false, blocker: "repository-mutation-already-active", remediation: "Reconcile the active repository Attempt.",
-  };
-  return { ok: true };
+  const failed = factoryLocalQualificationDispatchChecks(input).find((check) => !check.passed);
+  return failed ? { ok: false, blocker: failed.code, remediation: failed.reason } : { ok: true };
 }
 
 const FACTORY_HOST_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
@@ -157,6 +142,22 @@ export function factoryDispatchChecks(input: FactoryDispatchPreflightInput) {
       reason: "Wait for, cancel, or reconcile the active mutating attempt for this repository." });
   }
   return results;
+}
+
+export function factoryLocalQualificationDispatchChecks(input: LocalQualificationDispatchInput) {
+  const a = input.repositoryAdmission;
+  const admissionReady = a?.mode === "LOCAL_SYNTHETIC_QUALIFICATION"
+    && a.current
+    && /^sha256:[a-f0-9]{64}$/.test(a.digest)
+    && a.digest === a.frozenDigest
+    && a.publicationAuthority === "NONE"
+    && a.productionAuthority === "NONE";
+  return [{
+    code: "local-repository-admission-invalid",
+    label: "Local repository admission",
+    passed: admissionReady,
+    reason: "Re-admit the exact synthetic repository and immutable Factory composition.",
+  }, ...factoryDispatchChecks({ ...input, githubReady: true }).filter((check) => check.code !== "github-app-not-ready")];
 }
 
 export function evaluateFactoryDispatchPreflight(input: FactoryDispatchPreflightInput): FactoryDispatchPreflightResult {

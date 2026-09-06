@@ -140,6 +140,14 @@ export function validFactoryExecutionProfileBinding(input: Pick<FactoryConfigura
     && /^sha256:[a-f0-9]{64}$/i.test(input.executionProfileQualificationDigest ?? "");
 }
 
+export function factoryWorkloadClassForPurpose(purpose: string): "SOFTWARE_CHANGE" | "VERIFICATION" | "AUTOMATION" {
+  return purpose === "VERIFICATION"
+    ? "VERIFICATION"
+    : purpose === "INTELLIGENT_AUTOMATION"
+      ? "AUTOMATION"
+      : "SOFTWARE_CHANGE";
+}
+
 export function validFactoryExecutionBinding(input: Pick<FactoryConfigurationInput,
   "executionBackend" | "sandboxProfileId" | "sandboxProfileDigest" | "riskBoundary" | "recovery"
 > & { offlineAdmission?: {
@@ -162,11 +170,12 @@ export function validFactoryExecutionBinding(input: Pick<FactoryConfigurationInp
     const { profile, projection, sandboxProfile, now } = admission;
     try {
       const qualification = profile.qualificationSnapshot as any;
+      const requiredWorkloadClass = factoryWorkloadClassForPurpose(admission.purpose);
       if (projection.executionBackend !== "isolated-container" || profile.executionBackend !== "isolated-container"
         || !admission.projectId || !admission.tenantId
         || profile.projectId !== admission.projectId || profile.tenantId !== admission.tenantId
         || sandboxProfile?.projectId !== admission.projectId || sandboxProfile?.tenantId !== admission.tenantId
-        || !qualification?.scope?.workloadClasses?.includes("SOFTWARE_CHANGE") || !qualification.scope.riskClasses?.includes("GREEN")
+        || !qualification?.scope?.workloadClasses?.includes(requiredWorkloadClass) || !qualification.scope.riskClasses?.includes("GREEN")
         || input.sandboxProfileId !== projection.sandboxProfileId || input.sandboxProfileDigest !== projection.sandboxProfileDigest
         || executionProfileCurrentnessIssues({ profile, sandboxProfile, modelRoute: null, now }).length
         || executionProfilePersistedRecordBlockers(profile).length

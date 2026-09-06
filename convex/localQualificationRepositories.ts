@@ -16,12 +16,15 @@ export const register = mutation({
     ]);
     const access = await requireWorkspaceAccess(ctx, a.tenantId as Id<"tenants">, a.projectId as Id<"projects">,
       { permission: COMPANY_PERMISSIONS.MANAGE_REPOSITORIES });
-    const digest = assertLocalRepositoryScope({ admission: a, project, tenant, operator, environment, actorId: String(access.actorId) });
+    const actorId = access.membership.mode === "AUTHENTICATED"
+      ? String(access.membership.operatorId)
+      : "demo:company-administrator";
+    const digest = assertLocalRepositoryScope({ admission: a, project, tenant, operator, environment, actorId });
     const repository = `local-qualification/${a.fixtureId}`;
     const existing = await ctx.db.query("workspaceRepositories").withIndex("by_project_repository", q =>
       q.eq("projectId", a.projectId as Id<"projects">).eq("repository", repository)).unique();
     if (existing) {
-      assertLocalRepositoryScope({ admission: a, project, tenant, operator, environment, actorId: String(access.actorId), repository: existing });
+      assertLocalRepositoryScope({ admission: a, project, tenant, operator, environment, actorId, repository: existing });
       return existing._id;
     }
     if (environment!.metadata?.repositoryId) throw new Error("Qualification environment already belongs to a repository.");
