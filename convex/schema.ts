@@ -2104,6 +2104,61 @@ export const schemaTablesPartOne = {
     .index("by_mission_revision", ["missionId", "revisionNumber"])
     .index("by_idempotency", ["idempotencyKey"]),
 
+  // Receipt for an authenticated Factory Engineer package import. The source
+  // package remains immutable upstream; Mission Control persists only the
+  // authenticated identity, approval lineage, local mapping, and draft refs.
+  factoryPackageImports: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    repositoryId: v.id("workspaceRepositories"),
+    ownerMemberId: v.id("orgMembers"),
+    owningTeamId: v.id("scrumTeams"),
+    codeScopeIds: v.array(v.id("repositoryCodeScopes")),
+    issuerId: v.string(),
+    packageId: v.string(),
+    packageVersion: v.number(),
+    packageDigest: v.string(),
+    schemaVersion: v.literal("fdlc.factory-deployment-package/v1"),
+    idempotencyKey: v.string(),
+    targetFingerprint: v.string(),
+    mappingDigest: v.string(),
+    mappingRevision: v.number(),
+    status: v.literal("DRAFT_CREATED"),
+    missionId: v.id("missions"),
+    missionPlanId: v.id("missionPlans"),
+    requestedByOperatorId: v.id("operators"),
+    requestedBySubject: v.string(),
+    upstreamCorrelationId: v.string(),
+    upstreamPublishedAt: v.number(),
+    upstreamRetrievedAt: v.number(),
+    approval: v.object({
+      decisionRef: v.string(),
+      decisionVersion: v.number(),
+      decisionDigest: v.string(),
+      approvedBy: v.string(),
+      authorizedByRef: v.string(),
+      authorityBasisRef: v.string(),
+      authorityBasisVersion: v.number(),
+      authorityBasisDigest: v.string(),
+      approvedAt: v.number(),
+    }),
+    requestedTarget: v.object({
+      workspaceRef: v.string(),
+      repositoryRef: v.string(),
+      codeScopeRefs: v.array(v.string()),
+      semanticWorkflowRef: v.string(),
+      environmentClass: v.string(),
+    }),
+    workflowId: v.string(),
+    workflowVersion: v.number(),
+    warnings: v.array(v.string()),
+    importedAt: v.number(),
+  })
+    .index("by_external_identity", ["issuerId", "packageId", "packageVersion"])
+    .index("by_idempotency", ["idempotencyKey"])
+    .index("by_project_imported", ["projectId", "importedAt"])
+    .index("by_mission", ["missionId"]),
+
   // Durable, non-authoritative planning intelligence. A successful row may
   // supply an editable candidate to the Mission Plan Workspace, but cannot
   // submit, approve, dispatch, publish, verify, or accept delivery work.

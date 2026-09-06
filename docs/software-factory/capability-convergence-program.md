@@ -276,3 +276,34 @@ on `8cfe354b31d2` against main `d0e3ba889df1` passes all 19 composed gates,
 backend source hashes match; economics remains WARN and all four Production
 targets and guards remain unchanged. Exact PR-head CI and clean-main proof
 remain separate requirements.
+
+### Durable accounting recovery on integrated runtime v52
+
+The recovery source is integrated with main `13ce5f0ef961`. Provider registration and both execution workers now wait
+for successful durable journal initialization. Invalid storage records the
+bounded `ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID` diagnostic and leaves the
+provider path stopped. Existing historical conflicts remain review-blocked,
+recognized authentication or scope failures suspend delivery, and unknown
+failures remain pending for retry.
+
+The exact-source composed qualification passes every release-blocking stage:
+security and documentation gates, release hardening, historical evidence
+integrity, system behavior and negative controls, full repository tests,
+typecheck and skill lint, runtime-contract guard, production build, startup
+smoke, and whitespace integrity. The critical browser suite passes 15 of 15.
+Phase 5's reproducible fixture is updated to inherited runtime contract v52; its
+offline gate remains `NO_GO` for live route comparison because no second
+independently qualified route or live-spend authority is present. The system
+economics eval remains an advisory WARN for its synthetic zero-call token field.
+
+This checkpoint grants no new provider call, allocation, acceptance, promotion,
+or billing authority. Signed restart evidence passed 74/74 scenarios. PR #197
+passed exact-head CI and merged as `b17c9c5`; its fresh detached checkout passed
+19/19 composed gates, the full Phase 5 suite, and 15/15 critical browser checks.
+The [clean-main evidence](../testing/evidence/capability-convergence-accounting-recovery-postmerge-v52/README.md)
+binds those results to runtime v52 and the reviewed source hashes.
+
+The existing Production UI deployment remains unchanged. No configured
+Production target exists here for the orchestration service that owns this
+recovery path. Program completion still requires the live two-route comparison,
+ten real accepted WorkOrders, and attributable Production incident restoration.

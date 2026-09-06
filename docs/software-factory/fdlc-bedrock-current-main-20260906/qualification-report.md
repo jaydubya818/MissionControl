@@ -1,9 +1,9 @@
 # FDLC Phase 1 Bedrock qualification report
 
 Updated: 2026-09-06. Authoritative baseline: Mission Control main
-`ccacc5a9284e4141379c3a9b24304053749fd9f7`, runtime contract v51. The
-post-qualification main advance added only incident-command evidence; the
-runtime and Bedrock source bytes are unchanged.
+`e0b15142a33987983526b87c2144208e40e98657`, runtime contract v52. The
+candidate is reconciled with the accounting-recovery and Factory Engineer
+package-import changes now on canonical main.
 
 Status: **AWS_IDENTITY_AND_ROUTE_INSPECTION_PASS**.
 
@@ -74,6 +74,12 @@ The assigned Identity Center permission set still contains the inspection policy
 explicit `HoldAllInference` deny. That deny overrides any allow and blocks
 `bedrock:InvokeModel` on the exact approved profile. The assigned role cannot call
 Identity Center administration APIs or modify its own permission set.
+
+After a fresh named-profile SSO login on 2026-09-06, the AWS access portal was
+rechecked. It exposes exactly one account, `083665737366`, and exactly one role,
+`FDLCQualificationTFOperator`. No Identity Center administrator assignment is
+available through the approved identity. No ambient profile, unrelated account,
+cached credential, or root identity was used.
 
 An Identity Center administrator must:
 

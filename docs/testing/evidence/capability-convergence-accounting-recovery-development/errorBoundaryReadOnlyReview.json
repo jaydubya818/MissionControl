@@ -1,0 +1,22 @@
+{
+  "reviewedAt": "2026-09-06T17:08:46.824161+00:00",
+  "patch": "/private/tmp/fdlc-accounting-error-boundary-review.patch",
+  "patchSha256": "78d567d01e6db89a459c6233e9896a43c037390f599328cb35db05540277393d",
+  "verdict": "GO_FOR_DIRECT_RETRY_AFTER_BASELINE_PROOF",
+  "scope": "Settlement rejection transport labels only",
+  "newDatabaseOrNetworkCalls": false,
+  "recordSchemaOrCalculationChanged": false,
+  "originalAuthorizationAndClaimOrder": "UNCHANGED",
+  "checks": [
+    "Exact historical reason allowlist only",
+    "Strict two-field client code/reason data",
+    "Original unknown errors rethrown",
+    "Authentication and signed scope denials remain rejected",
+    "Historical typed errors pass unchanged through action wrapper"
+  ],
+  "requirements": [
+    "Baseline provider-handler rejections and exact duplicates pass",
+    "Corrected handler/client tests and real signed-action qualification after edit",
+    "No indirect application if automatic approval rejects direct retry"
+  ]
+}

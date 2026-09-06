@@ -1,0 +1,54 @@
+{
+  "head": "44f240c6e22d0662107508149b888a7d71747b80",
+  "base": "d0e3ba889df1956bb6bae96d588ee76bb1bfcdca",
+  "completedAt": "2026-09-06T17:16:14.592485+00:00",
+  "qualifyingGates": 19,
+  "composedGates": 19,
+  "repositoryTests": 2958,
+  "repositorySkips": 11,
+  "phase5": "PASS",
+  "criticalBrowser": {
+    "passed": 15,
+    "total": 15
+  },
+  "persistedBackendBrowser": {
+    "passed": 8,
+    "total": 8
+  },
+  "componentBrowser": {
+    "passed": 10,
+    "total": 10
+  },
+  "backendScenarios": 57,
+  "codegen": "PASS",
+  "eval": "WARN",
+  "sourceSha256": {
+    "convex/inferenceGateway.ts": "144c9ba6e43ed129c0fda387ea3ebf4fc327d2e393fdea0e82e48f5f7f7a7392",
+    "convex/schema.ts": "569dfe7e465d3cab84f1d8a8aba3057ac6368f42f9b2c2cbaf592eb1b52b7d61",
+    "packages/shared/src/governedInference.ts": "c69204c1719e4883093301023de25705125f4f675d2d2097a81fae14cc7d6d34",
+    "convex/factory/providerLiability.ts": "adc57d715c56b3f399da4b93f0b08d7e3540963adf86aba60bb41ba3b747cd1d",
+    "convex/lib/providerLiability.ts": "11ba884486c8d406d4912452498ead5a4be9f3a548a9b4b5844d7806978b731d",
+    "apps/orchestration-server/src/bedrockInferenceBridge.ts": "5ee2530984a768c8c3a8cd4a725cd815f34f65c8e6b3b2086da0f3d30149f215",
+    "apps/mission-control-ui/src/controlPlane/ExecutionRunInspector.tsx": "43fd1fb80e80422f91a1bcb00916bdd92316c605edbfa7a8e9f355d4a98e512e",
+    "apps/orchestration-server/src/automationAdapter.ts": "2c3f92ecf9da7086e71090b8e87c1d8959cdbddfedac2137fb3ddb2296f1e058",
+    "apps/orchestration-server/src/__tests__/automationAdapter.test.ts": "9cb0769fe7a07507bf18348a55a15b2b3e59df46ed0fcf46d113b7b8ef858e39"
+  },
+  "all87BackendSourceHashes": "MATCH",
+  "noProviderCalls": true,
+  "noProductionChanges": true,
+  "priorQualification": "capability-convergence-observations-final-v3",
+  "independentCancellationReview": {
+    "verdict": "GO",
+    "blockingFindings": 0,
+    "passed": 11,
+    "sandboxBlocked": 2,
+    "cancellationRegressions": "PASS",
+    "fullPermittedEnvironmentSuite": "13/13 PASS",
+    "note": "Two unrelated socket-listening tests could not complete in the independent reviewer sandbox."
+  },
+  "mergePr": 190,
+  "exactPrHead": "ec2803182c8e147ba79523716be00ad5ba5d9215",
+  "ciRun": 34047394440,
+  "ciContextsPassed": 12,
+  "trackedChangesAfterQualification": false
+}
