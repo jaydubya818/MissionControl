@@ -1,0 +1,13 @@
+{
+  "runId": "mission-control-golden:8b357d0e161f:1788673636855",
+  "verdict": "WARN",
+  "publishable": true,
+  "blocking": "6/6",
+  "advisory": "0/1",
+  "regressions": 0,
+  "negativeControls": "7/7",
+  "accountingErrors": [],
+  "validationErrors": [],
+  "schemaErrors": [],
+  "receiptDigest": "sha256:deff59e88f205a200467342839be6053266cbb6ab40b59aec5ad266e64ca5d38"
+}
