@@ -71,6 +71,20 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
+### 2026-09-05 - Allocation slice merged; persisted identity repair started
+
+- PR #184 merged as `4434cc56448075f4804787325a9586c6290b2215` after every
+  check passed. Clean-main composed qualification, Phase 5 and critical browser
+  tests passed; Production remained unchanged. Evidence is linked from the
+  cumulative program record.
+- Independent next-slice audit confirmed normal intent/receipt persistence uses
+  database reservation IDs where strict constructors require frozen logical IDs.
+  Intent keys/ancestry and reconstructed projection identities also lose the
+  original canonical bytes. Fix the complete persisted chain without weakening
+  equality checks or rewriting history; follow the new identity contract.
+- This remains within todo 063. Live calls, billing authority, real acceptance
+  and Production transitions are still outside this bounded repair's proof.
+
 ### 2026-09-05 - Reservation slice independent review
 
 - Architecture/security/data-integrity review found that the stored allocation
@@ -179,3 +193,14 @@ either todo complete and does not authorize implementation by itself.
 
 **Learnings:**
 - Cost per accepted outcome is useful only when coverage and outcome identity are explicit.
+
+### 2026-09-06 - Canonical identity storage qualification
+
+The independent reviews corrected canonical receipt replay and cohort isolation.
+The real local backend then reproduced an undefined-field digest mismatch masked
+by the old in-memory fixture. New v2 intent, receipt and projection snapshots
+omit absent fields before hashing; v1 history and the global hash remain intact.
+Forty-two focused tests and 13 real local backend scenarios pass. Root code
+generation passes with unchanged generated files. Main advances #185 and #186
+are being integrated before final qualification and merge. Live authority and
+complete outcome economics remain open.

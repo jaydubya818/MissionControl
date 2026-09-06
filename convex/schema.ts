@@ -4280,6 +4280,7 @@ export const schemaTablesPartOne = {
     route: inferenceRouteValidator,
     requestDigest: v.string(),
     intentDigest: v.string(),
+    immutableSnapshot: v.optional(v.any()),
     state: v.union(v.literal("PERSISTED"), v.literal("CLAIMED"), v.literal("CANCELLED"), v.literal("RECEIPTED"), v.literal("AMBIGUOUS")),
     claimId: v.optional(v.string()),
     claimedAt: v.optional(v.number()),
@@ -4326,6 +4327,7 @@ export const schemaTablesPartOne = {
     startedAt: v.number(),
     completedAt: v.number(),
     receiptDigest: v.string(),
+    immutableSnapshot: v.optional(v.any()),
   })
     .index("by_intent", ["intentId"])
     .index("by_reservation", ["reservationId"])
@@ -4392,6 +4394,7 @@ export const schemaTablesPartOne = {
     confidence: v.union(v.literal("HIGH"), v.literal("LOW"), v.literal("NONE")),
     lineageDigest: v.string(),
     projectionDigest: v.string(),
+    immutableSnapshot: v.optional(v.any()),
     createdBy: v.string(),
     createdAt: v.number(),
   })

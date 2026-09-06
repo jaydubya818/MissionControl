@@ -1,0 +1,31 @@
+{
+  "status": "FAIL",
+  "runRoot": "/private/tmp/fdlc-identity-backend-jJ2Cwr",
+  "startedAt": "2026-09-06T06:15:51.604Z",
+  "sourcePath": "/private/tmp/fdlc-program-phase5/convex/inferenceGateway.ts",
+  "sourceSha256": "e5526aa6f61a66e22679af29f0491be2ea332ad067b72f707a45db092aaa0dc0",
+  "sourceBranchHead": "90dc744f5298cb3b83f15121221a1c8a0bdba055",
+  "backendBinary": "/Users/jaywest/.cache/convex/binaries/precompiled-2026-08-25-7cce8fb/convex-local-backend",
+  "backendSha256": "3fefa471e11eab56aabf86039ddf825ed1b4dbadadec2df6b88b6ffd9d604400",
+  "convexVersion": "1.42.3",
+  "gatewayBundleSha256": "a61fc5439509d7814d7fff57f2be3981f8e3667362c5d763c1e04081bd44b064",
+  "reservationTableSha256": "2ab23da9313a26506d51a35257f6a4024480139cff8c053646a5dddaff114f40",
+  "routeValidatorSha256": "0dd9289ebcf4d1fdcc7a7f18214bd15dff76eed1f20b5994ffccfa2c5aa3ae43",
+  "backendUrl": "http://127.0.0.1:57997",
+  "sitePort": 57998,
+  "schemaSourceSha256": "a638c1c608afc8e586e9292c3c313db4d1fa015119a06692c773858a5c1b4e5a",
+  "sharedSourceSha256": "7bf4f6d72940804822501ff11edd2b4e3dd837688dad5ad4b47c898242077f9e",
+  "scope": "Unmodified production inference gateway and shared canonical constructors, fixture-only authorization shim, exact inference table schemas and indexes, synthetic related schemas and records, real local Convex backend. No external provider calls, real billing, full-app authorization, full application schema deployment, or real human acceptance proof.",
+  "tests": [],
+  "cleanup": {
+    "backendExitCode": null,
+    "backendSignal": "SIGTERM",
+    "cloudPortClosed": true,
+    "sitePortClosed": true,
+    "originalDatabasesUsed": false,
+    "ephemeralKeyPersisted": false,
+    "sourceUnchanged": true
+  },
+  "error": "Error: [Request ID: e4065da08acb6333] Server Error\nUncaught Error: Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.\n    at canonicalSnapshot (../convex/gateway.js:791:9)\n    at intentValue (../convex/gateway.js:807:11)\n    at persistIntentInTransaction (../convex/gateway.js:1097:6)\n\n    at api (file:///private/tmp/fdlc-identity-authority-harness/run.mjs:110:91)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///private/tmp/fdlc-identity-authority-harness/run.mjs:161:16",
+  "completedAt": "2026-09-06T06:15:52.205Z"
+}

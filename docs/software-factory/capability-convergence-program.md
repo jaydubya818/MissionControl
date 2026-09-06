@@ -35,7 +35,7 @@ phase-by-phase stopping instructions; it does not combine pilot trust gates. The
 | Existing work | Required predecessors | Current evidence and next work |
 | --- | --- | --- |
 | Todo 063: inference and outcome economics | Bounded first slice already allowed before 062; broader intent dependency now satisfied | Offline boundary exists. Audit and close aggregate liability, dispatch bounds, route identity, settlement and distinct outcome measurement before claiming the master acceptance contract. |
-| Todo 059: ten real accepted WorkOrders | Approved exact repository and named team, champion, FDE and incident commander; preflight drill; enrolled execution authority | Admission and exit assessors exist. Real cohort is not proven. Preserve bug, feature, refactor and security/policy diversity and all human decisions. |
+| Todo 059: ten real accepted WorkOrders | Approved exact repository and Plan/WorkOrders; preflight drill; enrolled execution authority | #185 records FDLC / Mission Control as team and Jarrett West as champion, human FDE/operator and incident commander for preparation. Exact execution, provider and budget prerequisites remain unresolved. Real cohort is not proven. Preserve bug, feature, refactor and security/policy diversity and all human decisions. |
 | Todo 060: canonical incident lifecycle | Todo 059 pilot evidence under the existing convergence plan | Existing containment controls support pilot preflight. Full incident aggregate remains dependency-gated; do not silently remove this dependency. |
 | Todo 064: feedback and governed learning | Todo 063 outcome facts; real observed signals for real-loop acceptance | Existing advisory learning machinery is reusable. Implement only the missing canonical projections and bounded processing; real promotion and restoration need attributable human decisions. |
 | Comparable evals and bounded fan-out/join | Exact configuration, child reservation conservation; real fixtures for real-work claims | Reuse Eval Control Plane and workflow graph. Qualify failure, timeout, cancellation, conflicts, duplicate events and recovery against a single-worker baseline. Synthetic proof cannot stand in for measured real-work benefit. |
@@ -70,7 +70,7 @@ local backend, real provider, real accepted WorkOrder, Preview or Production.
 Calculated monetary estimates are not ACTUAL billing. Missing costs, windows,
 denominators and coverage remain explicit. Existing economics WARN remains.
 
-## Active slice: conserve WorkOrder inference reservations
+## Completed slice: conserve WorkOrder inference reservations
 
 - Objective: prevent separate logical requests or retry Attempts from each
   reserving the full approved parent WorkOrder budget.
@@ -93,16 +93,57 @@ denominators and coverage remain explicit. Existing economics WARN remains.
   passed. Independent architecture/security/data-integrity/simplicity/docs
   findings were addressed. Initial local launcher failure remains recorded.
 - PR: [#184](https://github.com/jaydubya818/MissionControl/pull/184).
-  Required CI, merge and exact-main qualification remain pending.
+  All 12 reported CI/deployment check contexts passed on
+  `c58474afbbdf5be4ca01d9735cf8ef9934854e8d`. Merged at 2026-09-06T05:35:19Z
+  as `4434cc56448075f4804787325a9586c6290b2215`.
+- [Clean-main proof](../testing/evidence/capability-convergence-reservation-postmerge/automated-checks.json)
+  passed all 19 composed gates, plus Phase 5 and 15 critical browser checks.
+  The clean checkout's reservation source hash exactly matches the real local
+  concurrency proof. The [post-merge platform check](../testing/evidence/capability-convergence-reservation-postmerge/postmerge-guard.json)
+  confirms all four Production deployments, aliases, settings and protections
+  unchanged, with no new main/Production deployment. Qualification completed at
+  2026-09-06T05:39:35Z. This closes the bounded allocation slice only.
 - Runtime contract: v46 inherited from #183; this slice changes no public signature.
 - Maturity: no promotion. This closes one parent allocation gap, not provider
   dispatch bounds, authoritative billing settlement or real-work economics.
 
-The next todo 063 integration issue is the mismatch between database reservation
-IDs and frozen logical reservation IDs in physical intent/receipt construction.
-After that, claims must enforce finite request/output exposure before transport,
-and receipt persistence must retain observed overrun evidence. These source
-findings are unresolved; the reservation fix alone does not qualify a live path.
+## Active slice: preserve canonical inference identities
+
+- Original baseline: `4434cc56448075f4804787325a9586c6290b2215`.
+  Integrated baseline: `9e6dfd9b0110c0316b1fc085539b41e2616ebac7`
+  after #185. Main then advanced to `06992d8dc119986592ccfcc2d9f84c4a5e07981b`
+  with #186, narrowed to the Fab broker boundary after overlap coordination. Retain its composed provider admission, transaction helpers,
+  provider-request ownership checks and disabled optional token dimensions.
+- Branch: `codex/inference-ledger-identities`.
+- Objective: repair the mismatch between database IDs and frozen logical IDs in
+  the complete persisted reservation → intent → claim → receipt → reconciliation
+  → outcome projection chain. Preserve canonical bytes and their digests while
+  retaining database IDs for API arguments, foreign keys and navigation.
+- Design: [inference ledger identity contract](./inference-ledger-identity-contract.md).
+  Reuse the existing tables; add optional immutable snapshots for legacy-schema
+  compatibility, require exact snapshots for new canonical processing, and fail
+  closed when an old row has lost unrecoverable identity. Do not rewrite history.
+- Runtime contract: v48 for the optional snapshot schema fields (v47 inherited
+  from #185).
+- Focused handler proof: 42 tests pass, including the full synthetic persisted
+  chain, late receipts, replay drift, corrupted snapshots and legacy cohorts.
+  Independent architecture/security/data-integrity/simplicity/docs review found
+  replay-source and cohort-isolation defects; both are fixed with regressions.
+  All 19 composed gates passed on the original branch head `d367b34b2504`;
+  that proof is historical after the main advance. The rebased 19-gate suite
+  also passed before a real backend revealed the undefined-field storage defect.
+  New v2 snapshots correct it while preserving the global hash and v1 history.
+  [Real local proof](../testing/evidence/capability-convergence-identity-backend/README.md)
+  now passes 13 scenarios and code generation.
+  [Final qualification](../testing/evidence/capability-convergence-identity-final/README.md)
+  passes all 19 composed gates, Phase 5 and 15 critical browser checks on
+  `971d664d81259b005ab986bd2e14cc1a049b98bb`, with gateway/shared/schema hashes
+  matching the real backend proof. The economics eval remains WARN.
+- PR: [#188](https://github.com/jaydubya818/MissionControl/pull/188).
+  Exact final PR-head checks, merge and clean-main proof are pending.
+- Maturity: no promotion. After identity repair, claims still need finite
+  request/output exposure before transport; receipt persistence still needs to
+  retain observed overrun evidence. Live-provider qualification remains gated.
 
 ## Remaining acceptance evidence
 
