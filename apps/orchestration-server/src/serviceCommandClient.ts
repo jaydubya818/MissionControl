@@ -36,7 +36,9 @@ export type ServiceCapability =
   | "planning.renew"
   | "planning.report"
   | "intent.contributions.inspect"
-  | "intent.contributions.draft";
+  | "intent.contributions.draft"
+  | "incidents.detect"
+  | "incidents.propose";
 
 export function createSignedServiceCommand(args: {
   capability: ServiceCapability;
