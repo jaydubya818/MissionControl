@@ -60,6 +60,7 @@ import {
   OpenAIChatCompletionsTransport,
 } from "./governedInferenceGateway.js";
 import { resolvePersonaPath, safeClientError } from "./orchestrationSecurity.js";
+import { resolveServerBinding } from "./runtimeServerConfig.js";
 import os from "node:os";
 
 // Fab enrollment/configuration is explicit startup input. Capture its selected source
@@ -85,7 +86,7 @@ for (const envPath of envSearchPaths) {
 // CONFIG
 // ============================================================================
 
-const PORT = parseInt(process.env.ORCHESTRATION_PORT ?? "4100", 10);
+const { host: HOST, port: PORT } = resolveServerBinding();
 const CONVEX_URL = process.env.CONVEX_URL ?? "";
 const PROJECT_SLUG = process.env.PROJECT_SLUG ?? "openclaw";
 const TICK_INTERVAL_MS = parseInt(process.env.TICK_INTERVAL_MS ?? "30000", 10);
@@ -119,7 +120,7 @@ const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_
   || Boolean(configuredFabAdapter) || CODEX_BEDROCK_HARNESS_ENABLED;
 const factoryConfigurationConflict = DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED;
 if (factoryConfigurationConflict) executionConfigurationErrors.push("FACTORY_EXECUTION_CONFIGURATION_CONFLICT");
-if (process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1" && !accountingRuntime.delivery) executionConfigurationErrors.push("ACCOUNTING_JOURNAL_REQUIRED");
+if (DURABLE_FACTORY_WORKER_ENABLED && !accountingRuntime.delivery) executionConfigurationErrors.push("ACCOUNTING_JOURNAL_REQUIRED");
 const REMOTE_SANDBOX_BACKEND_READY = Boolean(bedrockTransport)
   || (process.env.CODEX_WORKER_REMOTE_SANDBOX_ENABLED === "1"
     && Boolean(process.env.EXEDEV_IDENTITY_FILE?.trim())
@@ -262,6 +263,11 @@ let lastTickAt: number | null = null;
 let lastTickResult: any = null;
 let tickCount = 0;
 let startedAt: number | null = null;
+type FactoryExecutionReadiness = "DISABLED" | "STARTING" | "READY" | "FAILED";
+let factoryExecutionReadiness: FactoryExecutionReadiness = DURABLE_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED
+  ? "STARTING"
+  : "DISABLED";
+let factoryExecutionReadinessCode: string | null = null;
 
 // ============================================================================
 // COORDINATOR TICK
@@ -482,6 +488,30 @@ app.get("/health", (c) => {
     missionPlanningWorker: missionPlanningWorker.status(),
     codexFactoryWorker: CODEX_FACTORY_WORKER_ENABLED ? "enabled" : "disabled",
   });
+});
+
+// Readiness is stricter than liveness: a Production supervisor must not route
+// or advertise the service until durable accounting and worker registration
+// have completed successfully.
+app.get("/ready", (c) => {
+  const accounting = accountingRuntime.status();
+  const accountingInitializing = "initializing" in accounting && accounting.initializing;
+  const accountingReady = !accounting.enabled || (!accountingInitializing && !accounting.lastError);
+  const executionReady = factoryExecutionReadiness === "DISABLED" || factoryExecutionReadiness === "READY";
+  const ready = Boolean(CONVEX_URL)
+    && executionConfigurationErrors.length === 0
+    && accountingReady
+    && executionReady;
+  return c.json({
+    status: ready ? "ready" : "not_ready",
+    checks: {
+      backend: CONVEX_URL ? "READY" : "FAILED",
+      configuration: executionConfigurationErrors.length === 0 ? "READY" : "FAILED",
+      accounting: accountingReady ? "READY" : accountingInitializing ? "STARTING" : "FAILED",
+      factoryExecution: factoryExecutionReadiness,
+    },
+    code: factoryExecutionReadinessCode,
+  }, ready ? 200 : 503);
 });
 
 // Detailed status
@@ -1570,11 +1600,20 @@ const gatewayProxy = createGatewayProxy({
 // ============================================================================
 
 export async function startFactoryExecution(): Promise<boolean> {
+  if (!DURABLE_FACTORY_WORKER_ENABLED && !LEGACY_FACTORY_WORKER_ENABLED) {
+    factoryExecutionReadiness = "DISABLED";
+    factoryExecutionReadinessCode = null;
+    return false;
+  }
+  factoryExecutionReadiness = "STARTING";
+  factoryExecutionReadinessCode = null;
   try {
-    if (CODEX_BEDROCK_HARNESS_ENABLED && !(await accountingRuntime.ready)) {
+    if (DURABLE_FACTORY_WORKER_ENABLED && !(await accountingRuntime.ready)) {
       if (!executionConfigurationErrors.includes("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID")) {
         executionConfigurationErrors.push("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID");
       }
+      factoryExecutionReadiness = "FAILED";
+      factoryExecutionReadinessCode = "ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID";
       return false;
     }
     if (!factoryConfigurationConflict && factoryHostReporter) {
@@ -1582,15 +1621,23 @@ export async function startFactoryExecution(): Promise<boolean> {
       await factoryHostReporter.start();
       factoryAttemptWorker.start();
       missionPlanningWorker.start();
+      factoryExecutionReadiness = "READY";
       return true;
     }
     if (!factoryConfigurationConflict && LEGACY_FACTORY_WORKER_ENABLED) {
       await assertHarnessAdaptersReady(factoryHarnessRegistry);
       factoryAttemptWorker.start();
+      factoryExecutionReadiness = "READY";
       return true;
     }
+    factoryExecutionReadiness = "FAILED";
+    factoryExecutionReadinessCode = factoryConfigurationConflict
+      ? "FACTORY_EXECUTION_CONFIGURATION_CONFLICT"
+      : "FACTORY_BOOTSTRAP_INVALID";
     return false;
   } catch (error) {
+    factoryExecutionReadiness = "FAILED";
+    factoryExecutionReadinessCode = "FACTORY_EXECUTION_STARTUP_FAILED";
     console.error("[orchestration] Factory worker registration failed closed; execution did not start:", error);
     return false;
   }
@@ -1647,10 +1694,12 @@ export function startServer() {
     process.exit(0);
   });
 
-  const server = serve({ fetch: app.fetch, port: PORT }, () => {
-    console.log(`[orchestration] Server listening on http://localhost:${PORT}`);
-    console.log(`[orchestration] Health: http://localhost:${PORT}/health`);
-    console.log(`[orchestration] Gateway WS: ws://localhost:${PORT}/gateway/ws`);
+  const server = serve({ fetch: app.fetch, hostname: HOST, port: PORT }, () => {
+    const displayHost = HOST === "::1" ? `[${HOST}]` : HOST;
+    console.log(`[orchestration] Server listening on http://${displayHost}:${PORT}`);
+    console.log(`[orchestration] Health: http://${displayHost}:${PORT}/health`);
+    console.log(`[orchestration] Readiness: http://${displayHost}:${PORT}/ready`);
+    console.log(`[orchestration] Gateway WS: ws://${displayHost}:${PORT}/gateway/ws`);
   });
 
   server.on("upgrade", (req, socket, head) => {
