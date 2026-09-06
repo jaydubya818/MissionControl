@@ -14,5 +14,5 @@ restoration, customer-data access, or a named real-pilot commander.
 - [Candidate qualification](qualification.md)
 - [Independent reviews](independent-reviews.md)
 - [Dedicated composed-system packet](../factory-incident-command-v51-system/automated-checks.json)
-- Merge identity and exact-main post-merge results are sealed in the closure
-  record after the implementation PR lands.
+- [Completion record](completion-record.md)
+- [Exact-main post-merge packet](../factory-incident-command-v51-postmerge/automated-checks.json)
