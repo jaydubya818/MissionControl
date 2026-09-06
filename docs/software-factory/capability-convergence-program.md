@@ -182,6 +182,13 @@ denominators and coverage remain explicit. Existing economics WARN remains.
 
 ## Remaining acceptance evidence
 
+The separately versioned `codex/bedrock-v1` source landed in PR #185 and remains
+preserved on runtime v49. Exact current-main CI, Docker/orchestration qualification
+and independent architecture, security and data-integrity reviews pass. This closes
+the source-integration dependency without promoting maturity: approved AWS identity,
+account-specific route/pricing, live proof, exact Factory profiles, readiness and
+the governed pilot remain open.
+
 The complete Factory loop and ten real accepted WorkOrders are **NOT_PROVEN**.
 Live inference qualification and its two-route comparison are **NOT_RUN**.
 Real incident restoration, observed outcomes, evaluated improvement, human

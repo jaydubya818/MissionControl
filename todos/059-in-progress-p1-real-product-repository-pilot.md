@@ -328,8 +328,8 @@ architecture items above are superseded by the approved continuation, not erased
 - [x] Authoritative codegen and exact current-main public diff.
 - [x] Full deterministic qualification: latest 4434cc5 System 19/19 PASS; net UI unchanged.
 - [x] Independent reviews and findings resolved.
-- [ ] Recheck main, focused commits, push, PR, CI and qualified merge.
-- [ ] Exact-main postmerge qualification.
+- [x] Recheck main, focused commits, push, PR, CI and qualified merge (#185, merge `9e6dfd9`).
+- [x] Exact-main postmerge qualification, followed by v49 current-tip qualification at `8bf19fc`.
 - [ ] AWS identity/topology/pricing and separately authorized live-call qualification.
 - [ ] Exact profiles/Factory/readiness and authorized Phase 1 pilot execution.
 
