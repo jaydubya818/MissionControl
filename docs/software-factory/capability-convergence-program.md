@@ -241,6 +241,15 @@ repair retains the existing timeout and cancellation bounds; it adds no
 execution or publication authority. Qualification must be repeated on the
 corrected source before merge.
 
+The corrected source `ba130ce5f0f1` passes all 19 composed gates, 2958 tests
+(11 inherited skips), Phase 5 and 15 critical browser checks. Independent
+cancellation review is GO; all cancellation regressions pass, with two unrelated
+socket tests blocked only in the review sandbox and all thirteen passing in the
+permitted environment. [Corrected proof](../testing/evidence/capability-convergence-observations-final-v2/README.md)
+retains the earlier results as history. All 87 backend source hashes still match
+and all four Production targets and guards remain unchanged. Final PR-head CI,
+merge and clean-main qualification remain pending.
+
 The complete Factory loop and ten real accepted WorkOrders are **NOT_PROVEN**.
 Live inference qualification and its two-route comparison are **NOT_RUN**.
 Real incident restoration, observed outcomes, evaluated improvement, human
