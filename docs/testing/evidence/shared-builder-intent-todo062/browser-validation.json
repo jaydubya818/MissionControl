@@ -1,0 +1,25 @@
+{
+  "schema": "shared-builder-intent-browser-validation/v1",
+  "status": "PASS",
+  "date": "2026-09-05",
+  "application": "http://127.0.0.1:5199",
+  "workspace": "Software Factory Demo",
+  "mission": "Spec Intake Golden Path — immutable revision proof",
+  "route": "existing left navigation → Missions → Mission → Specification",
+  "checks": {
+    "loading": "Component browser test renders an explicit loading status while the authorized query resolves.",
+    "empty": "Component browser test renders first-Spec and no-contribution empty guidance.",
+    "error": "Real browser rejected malformed key BAD and retained all entered fields; transport details are sanitized by a regression test.",
+    "denied": "Real Chromium run with the project flag temporarily disabled showed readable history, named the flag, and disabled every write control; flag restored immediately.",
+    "conflict": "Real seeded PRODUCT and DESIGN proposals targeting OUTCOME show CONFLICT and cannot be accepted.",
+    "stale": "Real seeded QA proposal bound to prior Spec revision shows STALE and only offers revision recovery.",
+    "success": "Real browser created QA-DENIAL-002, then appended a human ACCEPTED decision without changing Spec r3.",
+    "resumption": "Reload retained the accepted proposal and decision attribution from Convex.",
+    "narrow": "390x844 light-mode Chromium run passed with no document horizontal overflow.",
+    "keyboard": "Tab advanced from Contributor role to Spec target in the narrow viewport.",
+    "accessibility": "Axe WCAG A/AA reported zero serious or critical violations in main.",
+    "console": "No uncaught page errors in enabled or denied runs."
+  },
+  "externalCalls": 0,
+  "productionMutation": false
+}

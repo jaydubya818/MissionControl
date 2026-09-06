@@ -25,6 +25,7 @@ import {
   type MissionSpecValues,
 } from "../missionSpecModel";
 import { factoryRecipeIdFromMission } from "../missionPlanModel";
+import { SharedBuilderIntentPanel } from "./SharedBuilderIntentPanel";
 
 const actionKey = (action: string) =>
   `ui-mission-spec:${action}:${crypto.randomUUID()}`;
@@ -1906,6 +1907,12 @@ export function MissionSpecificationWorkspace({
           No deterministic Spec Quality findings for this exact revision.
         </div>
       ) : null}
+
+      <SharedBuilderIntentPanel
+        projectId={projectId}
+        mission={mission}
+        currentRevision={current}
+      />
 
       <SpecEditor
         values={values}

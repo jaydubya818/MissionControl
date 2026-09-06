@@ -2234,6 +2234,76 @@ export const schemaTablesPartOne = {
     .index("by_spec", ["missionSpecRevisionId"])
     .index("by_idempotency", ["idempotencyKey"]),
 
+  // Immutable, attributable proposal records in the existing Mission Spec
+  // lineage. These records never mutate or finalize a Spec themselves.
+  missionIntentContributions: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    missionId: v.id("missions"),
+    missionSpecRevisionId: v.id("missionSpecRevisions"),
+    missionSpecDigest: v.string(),
+    idempotencyKey: v.string(),
+    contributionKey: v.string(),
+    revisionNumber: v.number(),
+    supersedesContributionId: v.optional(v.id("missionIntentContributions")),
+    contributorRole: v.union(
+      v.literal("PRODUCT"),
+      v.literal("QA"),
+      v.literal("DESIGN"),
+      v.literal("ENGINEERING"),
+      v.literal("SECURITY_OPERATIONS"),
+    ),
+    targetSection: v.union(
+      v.literal("OUTCOME"),
+      v.literal("REQUIREMENTS"),
+      v.literal("NON_FUNCTIONAL_REQUIREMENTS"),
+      v.literal("ACCEPTANCE_EXPECTATIONS"),
+      v.literal("VERIFICATION_EXPECTATIONS"),
+      v.literal("NON_GOALS"),
+      v.literal("CONSTRAINTS"),
+      v.literal("RISKS"),
+      v.literal("REPOSITORY_SCOPE"),
+    ),
+    targetItemId: v.optional(v.string()),
+    title: v.string(),
+    body: v.string(),
+    evidenceExpectation: v.string(),
+    digest: v.string(),
+    proposedBy: v.string(),
+    proposedActorType: v.union(v.literal("HUMAN"), v.literal("AGENT")),
+    proposedActorSource: v.union(
+      v.literal("AUTHENTICATED"),
+      v.literal("DEVELOPMENT_FALLBACK"),
+      v.literal("SERVICE_COMMAND"),
+    ),
+    proposedAt: v.number(),
+  })
+    .index("by_mission", ["missionId"])
+    .index("by_mission_role", ["missionId", "contributorRole"])
+    .index("by_mission_key_revision", ["missionId", "contributionKey", "revisionNumber"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  // Decisions are append-only and human-only. ACCEPTED means proposal input to
+  // a future Spec revision; it is not Plan approval or delivery acceptance.
+  missionIntentContributionDecisions: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    missionId: v.id("missions"),
+    contributionId: v.id("missionIntentContributions"),
+    contributionDigest: v.string(),
+    missionSpecRevisionId: v.id("missionSpecRevisions"),
+    missionSpecDigest: v.string(),
+    idempotencyKey: v.string(),
+    decision: v.union(v.literal("ACCEPTED"), v.literal("REJECTED")),
+    reason: v.string(),
+    decidedBy: v.string(),
+    decidedActorSource: v.union(v.literal("AUTHENTICATED"), v.literal("DEVELOPMENT_FALLBACK")),
+    decidedAt: v.number(),
+  })
+    .index("by_mission", ["missionId"])
+    .index("by_contribution", ["contributionId"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
   workOrders: defineTable({
     tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
