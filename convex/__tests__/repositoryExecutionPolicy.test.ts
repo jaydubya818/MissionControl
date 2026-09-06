@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ISOLATED_CONTAINER_POLICY, ISOLATED_INVOCATION_EFFECTIVE_CONFIG, ISOLATED_INVOCATION_RUNTIME_ARTIFACT } from "@mission-control/workflow-engine/harness-contract";
 import {
   evaluateRepositoryRemoteExecutionPolicy,
   normalizeRepositoryDataClassification,
@@ -14,6 +15,22 @@ function providerEnforcedSnapshot() {
 }
 
 describe("repository remote execution policy", () => {
+  it("limits deterministic isolation to public work with an exact deny-all policy", () => {
+    const snapshot = { schema: "factory-sandbox-profile/v2", provider: "LOCAL_CONTAINER", profileKey: "synthetic-isolation", version: 1,
+      imageDigest: ISOLATED_INVOCATION_RUNTIME_ARTIFACT.imageDigest,
+      bridgeDigest: ISOLATED_INVOCATION_EFFECTIVE_CONFIG.bridgeImplementationDigest,
+      backendDigest: ISOLATED_INVOCATION_EFFECTIVE_CONFIG.backendImplementationDigest,
+      isolationPolicy: ISOLATED_CONTAINER_POLICY,
+      qualification: { evidenceReference: "synthetic-evidence", evidenceDigest: `sha256:${"a".repeat(64)}`, validUntil: 10000 } };
+    const evaluate = (repositoryDataClassification: unknown, dataBoundaryCount = 0, sandboxProfileSnapshot: unknown = snapshot) =>
+      evaluateRepositoryRemoteExecutionPolicy({ executionBackend: "isolated-container", repositoryDataClassification, dataBoundaryCount, sandboxProfileSnapshot });
+    expect(evaluate("PUBLIC")).toMatchObject({ allowed: true, providerEnforcedEgressProven: false });
+    for (const classification of [undefined, "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]) expect(evaluate(classification).allowed).toBe(false);
+    expect(evaluate("PUBLIC", 1).allowed).toBe(false);
+    expect(evaluate("PUBLIC", 0, {}).allowed).toBe(false);
+    expect(evaluate("PUBLIC", 0, { ...snapshot, isolationPolicy: { network: "HOST" } }).allowed).toBe(false);
+    expect(evaluateRepositoryRemoteExecutionPolicy({ executionBackend: "unknown" as any, repositoryDataClassification: "PUBLIC" }).allowed).toBe(false);
+  });
   it("treats legacy unclassified repositories as sensitive", () => {
     expect(normalizeRepositoryDataClassification(undefined)).toBe("UNCLASSIFIED");
     expect(evaluateRepositoryRemoteExecutionPolicy({

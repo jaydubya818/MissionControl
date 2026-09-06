@@ -33,7 +33,7 @@ describe('OFFLINE current-main composition',()=>{
   expect(summarizeWorkOrderReadiness([{code,label:code,status:'BLOCKED',boundary:'ADMISSION',reason:'Qualification missing'}])).toMatchObject({authoritative:false,admissionEligible:false,executionReady:false,status:'BLOCKED'});
  });
  it('preserves current-main LOCAL_GIT exact verification identities',()=>{
-  const subject=createGitVerificationSubject({version:1,kind:'GIT_CANDIDATE',workOrderId:'fixture',workOrderRevisionNumber:1,verificationContractDigest:sha('a'),sourceAttemptId:'fixture-producing-attempt',repositoryId:'fixture',provider:'LOCAL_GIT',providerRepositoryId:'fixture',candidateSha:'a'.repeat(40),treeSha:'b'.repeat(40),localRef:{baseRef:'main',headRef:'fixture',headSha:'a'.repeat(40)}});
+  const subject=createGitVerificationSubject({version:1,kind:'GIT_CANDIDATE',workOrderId:'fixture',workOrderRevisionNumber:1,verificationContractDigest:sha('a'),sourceAttemptId:'fixture-producing-attempt',repositoryId:'fixture',provider:'LOCAL_GIT',candidateSha:'a'.repeat(40),treeSha:'b'.repeat(40),localRef:{baseRef:'main',headRef:'fixture',headSha:'a'.repeat(40)}});
   expect(verifyVerificationSubjectIdentity(subject)).toBe(true);expect(verifyVerificationSubjectIdentity({...subject,candidateSha:'c'.repeat(40)})).toBe(false);
  });
  it('freezes route and profile identity using the existing Factory digest',()=>{

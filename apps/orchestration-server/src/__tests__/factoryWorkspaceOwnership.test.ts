@@ -7,6 +7,10 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   cleanupOwnedFactoryWorkspace,
+  retainFactoryOfflineResponse,
+  pendingFactoryOfflineResponses,
+  markFactoryOfflineResponseDelivered,
+  recordFactoryOfflineDeliveryFailure,
   ensureFactoryWorkspaceOwnership,
   loadFactoryWorkspaceOwnership,
   recordFactoryExecutorStarted,
@@ -41,6 +45,27 @@ describe("Factory workspace ownership", () => {
     // Reconcile a committed local handoff whose acknowledgement was lost.
     expect(await transferFactoryPublicationWorkspace(transfer)).toMatchObject({ leaseId: "lease-2" });
     expect(await transferFactoryPublicationWorkspace({ ...transfer, nextOwner: { ...transfer.nextOwner, leaseId: "lease-3" } })).toMatchObject({ leaseId: "lease-3" });
+  });
+  it("recovers an undelivered response from the protected ownership journal under the exact old lease", async () => {
+    const { owner, checkoutRoot } = await createFixture();
+    await ensureFactoryWorkspaceOwnership({ owner, allowCreate: true });
+    const scope = { checkoutRoot, serviceId: "synthetic-service", projectId: "project", repositoryId: "repository" };
+    const saved = await retainFactoryOfflineResponse(owner, { ...scope, packet: { synthetic: true, responseBytes: "retained" } });
+    expect(await pendingFactoryOfflineResponses(scope)).toMatchObject([{ leaseId: owner.leaseId,
+      workerSessionId: owner.workerSessionId, offlineResponse: { packet: { responseBytes: "retained" } } }]);
+    expect(await pendingFactoryOfflineResponses({ ...scope, serviceId: "different" })).toEqual([]);
+    expect(await pendingFactoryOfflineResponses({ ...scope, repositoryId: "different" })).toEqual([]);
+    await recordFactoryOfflineDeliveryFailure(owner, saved.offlineResponse!.packetSha256, "synthetic transport unavailable");
+    expect(await pendingFactoryOfflineResponses(scope)).toMatchObject([{ offlineResponse: {
+      lastDeliveryError: "synthetic transport unavailable", lastDeliveryAttemptAt: expect.any(Number),
+      packet: { responseBytes: "retained" },
+    } }]);
+    await expect(retainFactoryOfflineResponse(owner, { ...scope, packet: { replacement: true } })).rejects.toThrow("Conflicting");
+    await expect(markFactoryOfflineResponseDelivered({ ...owner, leaseId: "other" }, saved.offlineResponse!.packetSha256))
+      .rejects.toThrow("ownership tuple");
+    await markFactoryOfflineResponseDelivered(owner, saved.offlineResponse!.packetSha256);
+    expect(await pendingFactoryOfflineResponses(scope)).toEqual([]);
+    expect((await loadFactoryWorkspaceOwnership(owner))?.offlineResponse?.packet).toEqual({ synthetic: true, responseBytes: "retained" });
   });
   it("preserves a workspace when the complete ownership tuple does not match", async () => {
     const fixture = await createFixture();

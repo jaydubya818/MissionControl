@@ -1,4 +1,8 @@
 import { v } from "convex/values";
+import { isLocalQualificationRepository, loadLocalRepositoryAdmission } from "./lib/localRepositoryAdmission";
+import { factoryWorkerVersionBindingValidator } from "./lib/factoryWorkerValidators";
+import { isNoInferenceConstraint } from "./lib/offlineExecutionPolicy";
+import type { FactoryWorkerVersionBinding } from "./lib/factoryWorkerRuntime";
 import { mutation, query } from "./_generated/server";
 import { validateHostBinding } from "./lib/workspaceBindings";
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";
@@ -36,6 +40,11 @@ export const report = mutation({
     repositoryId: v.optional(v.id("workspaceRepositories")),
     repository: v.string(),
     checkoutRoot: v.string(),
+    localQualificationObservation: v.optional(v.object({
+      schema: v.literal("local-qualification-root-observation/v1"), admissionDigest: v.string(), root: v.string(),
+      baselineCommit: v.string(), baselineTree: v.string(), fixtureContentDigest: v.string(),
+      noRemotes: v.literal(true), ownerUid: v.number(), observedAt: v.number(),
+    })),
     observedBranch: v.optional(v.string()),
     observedCommit: v.optional(v.string()),
     baseBranch: v.optional(v.string()),
@@ -68,21 +77,7 @@ export const report = mutation({
         repositoryId: v.id("workspaceRepositories"),
         access: v.union(v.literal("READ"), v.literal("READ_WRITE")),
       })),
-      factoryVersionBindings: v.optional(v.array(v.object({
-        factoryDefinitionVersionId: v.id("factoryDefinitionVersions"),
-        factoryConfigurationDigest: v.string(),
-        adapter: v.string(),
-        version: v.string(),
-        provider: v.string(),
-        model: v.string(),
-        capabilityManifestSha256: v.string(),
-        effectiveConfigSha256: v.string(),
-        runtimeArtifactSha256: v.optional(v.string()),
-        executionBackend: v.string(),
-        modelRouteDigest: v.string(),
-        sandboxProfileDigest: v.optional(v.string()),
-        repositoryId: v.id("workspaceRepositories"),
-      }))),
+      factoryVersionBindings: v.optional(v.array(factoryWorkerVersionBindingValidator)),
       readiness: v.union(
         v.literal("STARTING"),
         v.literal("READY"),
@@ -100,16 +95,31 @@ export const report = mutation({
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Workspace not found");
     if (!project.tenantId) throw new Error("Workspace company assignment is incomplete");
-    await requireWorkspaceAccess(ctx, project.tenantId, project._id, { permission: COMPANY_PERMISSIONS.DISPATCH_WORK });
-    if (!project.githubRepo) throw new Error("Workspace repository is not configured");
+    const access = await requireWorkspaceAccess(ctx, project.tenantId, project._id, { permission: COMPANY_PERMISSIONS.DISPATCH_WORK });
     const repository = args.repositoryId ? await ctx.db.get(args.repositoryId) : null;
+    if (isLocalQualificationRepository(repository)) {
+      const { admission: a, digest } = await loadLocalRepositoryAdmission(ctx, repository, Date.now());
+      const o = args.localQualificationObservation;
+      if (access.membership.operatorId !== a.operatorId || args.hostId !== a.hostId || args.checkoutRoot !== a.root
+        || !args.workerRuntime || args.workerRuntime.executionBackends.some(x => x !== "isolated-container")
+        || args.workerRuntime.sandboxCapabilities.includes("github-app-publication")
+        || !o || o.admissionDigest !== digest || o.root !== a.root || o.baselineCommit !== a.baselineCommit
+        || o.baselineTree !== a.baselineTree || o.fixtureContentDigest !== a.fixtureContentDigest
+        || !o.noRemotes || !Number.isSafeInteger(o.ownerUid) || o.ownerUid < 0
+        || o.observedAt > Date.now() || Date.now() - o.observedAt > 60000
+        || args.baseCommit !== a.baselineCommit || args.observedCommit !== a.baselineCommit
+        || args.dirty || args.status !== "READY") throw new Error("Local qualification host observation is absent, stale or outside admitted ownership.");
+    } else {
+      if (!project.githubRepo) throw new Error("Workspace repository is not configured");
+      if (args.localQualificationObservation) throw new Error("GitHub host reporting cannot consume local qualification authority.");
+    }
     if (args.repositoryId && (!repository || repository.projectId !== args.projectId || repository.repository !== args.repository)) {
       throw new Error("Worker repository access does not match the workspace repository binding");
     }
     const hostId = args.hostId.trim();
     const checkoutRoot = args.checkoutRoot.trim();
     const validationError = validateHostBinding({
-      expectedRepository: repository?.repository ?? project.githubRepo,
+      expectedRepository: repository?.repository ?? project.githubRepo!,
       repository: args.repository,
       hostId,
       checkoutRoot,
@@ -153,7 +163,7 @@ export const report = mutation({
         (args.workerRuntime.factoryVersionBindings ?? []).map((item) => ctx.db.get(item.factoryDefinitionVersionId))
       );
       if (advertisedVersions.some((version, index) => {
-        const binding = args.workerRuntime!.factoryVersionBindings![index];
+        const binding: FactoryWorkerVersionBinding = args.workerRuntime!.factoryVersionBindings![index];
         return !version
           || version.projectId !== args.projectId
           || version.repositoryId !== binding.repositoryId
@@ -164,6 +174,11 @@ export const report = mutation({
           || version.harnessEffectiveConfigSha256 !== binding.effectiveConfigSha256
           || version.harnessRuntimeArtifactDigest !== binding.runtimeArtifactSha256
           || (version.executionBackend ?? "persistent-worker") !== binding.executionBackend
+          || (binding.executionBackend === "isolated-container"
+            ? (!isNoInferenceConstraint(version.inferenceConstraint) || !isNoInferenceConstraint(binding.inferenceConstraint)
+              || version.modelCatalogId !== undefined || version.modelRouteSnapshot !== undefined
+              || version.modelQualificationDigest !== undefined || version.modelQualificationSnapshot !== undefined)
+            : version.inferenceConstraint !== undefined)
           || version.modelRouteDigest !== binding.modelRouteDigest
           || (version.modelRouteSnapshot as any)?.provider !== binding.provider
           || (version.modelRouteSnapshot as any)?.modelId !== binding.model
@@ -189,6 +204,7 @@ export const report = mutation({
       repository: args.repository,
       checkoutRoot,
       observedBranch: args.observedBranch,
+      localQualificationObservation: args.localQualificationObservation,
       observedCommit: args.observedCommit,
       baseBranch: args.baseBranch,
       baseCommit: args.baseCommit,
@@ -212,6 +228,9 @@ export const report = mutation({
     const bindingId = existing
       ? (await ctx.db.patch(existing._id, value), existing._id)
       : await ctx.db.insert("workspaceHostBindings", value);
+    if (isLocalQualificationRepository(repository)) {
+      await ctx.db.patch(repository!._id, { status: "READY", validatedAt: checkedAt, updatedAt: checkedAt });
+    }
 
     if (!existing || existing.status !== args.status || existing.dirty !== args.dirty) {
       await ctx.db.insert("activities", {

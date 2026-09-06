@@ -1,3 +1,8 @@
+import {
+  offlineSandboxDigest as isolatedSandboxDigest,
+  offlineSandboxIssues as isolatedSandboxIssues,
+  offlineSandboxEligible as isolatedSandboxEligible,
+} from "./localQualificationSandbox.js";
 import type {
   HarnessCapabilityManifest,
   HarnessCapabilityRequirement,
@@ -14,8 +19,11 @@ import {
   harnessSupportsModel,
   findKnownHarnessManifest,
   findKnownHarnessRuntimeArtifact,
+  ISOLATED_INVOCATION_EFFECTIVE_CONFIG,
+  LEGACY_ISOLATED_INVOCATION_EFFECTIVE_CONFIG,
 } from "@mission-control/workflow-engine/harness-contract";
 import { computeCanonicalHash } from "./genomeHash.js";
+import { OFFLINE_EXECUTION_PROFILE_SCHEMA, NO_INFERENCE_CONSTRAINT, offlineExecutionPolicyIssues, offlinePolicyDigest, type OfflineExecutionPolicy } from "./offlineExecutionPolicy.js";
 import { factoryHarnessCapabilityRequirements } from "./harnessCapabilities.js";
 import {
   EXACT_MODEL_ROUTE_SCHEMA,
@@ -33,6 +41,7 @@ import { sandboxProfileProductionEligible } from "./sandboxProfileAdmission.js";
 import { mcpToolGrantDigest, mcpToolGrantIssues } from "./governedMcp.js";
 
 export const EXECUTION_PROFILE_SCHEMA = "factory-execution-profile/v1" as const;
+export const OFFLINE_EXECUTION_PROFILE_QUALIFICATION_SCHEMA = "factory-execution-profile-qualification/v2" as const;
 export const EXECUTION_PROFILE_QUALIFICATION_SCHEMA = "factory-execution-profile-qualification/v1" as const;
 export const MAX_EXECUTION_PROFILE_QUALIFICATION_LIFETIME_MS = 366 * 24 * 60 * 60 * 1_000;
 
@@ -85,8 +94,9 @@ export interface ExecutionProfileSnapshotInput {
     snapshot: HarnessRuntimeArtifactIdentity;
     digest: string;
   };
-  executionBackend: ModelRouteExecutionBackend;
-  modelRoute: {
+  executionBackend: ModelRouteExecutionBackend | "isolated-container";
+  offlinePolicy?: OfflineExecutionPolicy;
+  modelRoute?: {
     catalogId: string;
     routeSnapshot: unknown;
     routeDigest: string;
@@ -162,7 +172,7 @@ export interface ExecutionProfilePersistedRecord extends ExecutionProfileAdmissi
 
 /** Flat compatibility projection used by Factory Versions, Attempts, manifests,
  * and workers. Every field is compared against the immutable profile. */
-export interface ExecutionProfileProjection {
+export interface InferenceExecutionProfileProjection {
   profileId: string;
   profileKey: string;
   profileVersion: number;
@@ -190,6 +200,14 @@ export interface ExecutionProfileProjection {
   requiredSandboxCapabilities: string[];
 }
 
+export type ExecutionProfileProjection = InferenceExecutionProfileProjection | (
+  Omit<InferenceExecutionProfileProjection, "modelCatalogId" | "modelRouteSnapshot" | "modelRouteDigest" | "modelQualificationSnapshot" | "modelQualificationDigest"> & {
+    executionBackend: "isolated-container";
+    modelCatalogId?: never; modelRouteSnapshot?: never; modelRouteDigest?: never;
+    modelQualificationSnapshot?: never; modelQualificationDigest?: never;
+  }
+);
+
 export interface ExecutionProfileCurrentness {
   eligible: boolean;
   blocker: ExecutionProfileBlockerCode | null;
@@ -202,7 +220,7 @@ export interface ExecutionProfileCurrentness {
  * caller-supplied exact identities and are independently recomputed below. */
 export function executionProfileSnapshot(input: ExecutionProfileSnapshotInput) {
   const isolationModes = sortedUnique(input.isolationModes);
-  const requiredHarnessCapabilities = requiredHarnessCapabilitiesFor(isolationModes);
+  const requiredHarnessCapabilities = requiredHarnessCapabilitiesFor(isolationModes, input.executionBackend);
   const requiredSandboxCapabilities = requiredSandboxCapabilitiesFor(
     isolationModes,
     input.executionBackend,
@@ -210,10 +228,13 @@ export function executionProfileSnapshot(input: ExecutionProfileSnapshotInput) {
   );
   const manifest = persistedClone(input.harness.capabilityManifest);
   const runtimeArtifact = persistedClone(input.runtimeArtifact.snapshot);
-  const routeSnapshot = persistedClone(input.modelRoute.routeSnapshot);
-  const routeQualification = persistedClone(input.modelRoute.qualificationSnapshot);
+  const route = input.modelRoute;
+  if (!input.offlinePolicy && !route) throw new Error("Inference profile requires a model route.");
+  if (input.offlinePolicy && route) throw new Error("Offline profile forbids model route substitution.");
+  const routeSnapshot = route ? persistedClone(route.routeSnapshot) : undefined;
+  const routeQualification = route ? persistedClone(route.qualificationSnapshot) : undefined;
   const snapshot = {
-    schema: EXECUTION_PROFILE_SCHEMA,
+    schema: input.offlinePolicy ? OFFLINE_EXECUTION_PROFILE_SCHEMA : EXECUTION_PROFILE_SCHEMA,
     profileKey: input.profileKey.trim().toLowerCase(),
     version: input.version,
     harness: {
@@ -228,13 +249,12 @@ export function executionProfileSnapshot(input: ExecutionProfileSnapshotInput) {
       digest: input.runtimeArtifact.digest.trim().toLowerCase(),
     },
     executionBackend: input.executionBackend,
-    modelRoute: {
-      catalogId: input.modelRoute.catalogId.trim(),
-      routeSnapshot,
-      routeDigest: input.modelRoute.routeDigest.trim().toLowerCase(),
-      qualificationSnapshot: routeQualification,
-      qualificationDigest: input.modelRoute.qualificationDigest.trim().toLowerCase(),
-    },
+    modelRoute: (route ? {
+      catalogId: route.catalogId.trim(), routeSnapshot,
+      routeDigest: route.routeDigest.trim().toLowerCase(), qualificationSnapshot: routeQualification,
+      qualificationDigest: route.qualificationDigest.trim().toLowerCase(),
+    } : persistedClone(NO_INFERENCE_CONSTRAINT)) as Record<string, any>,
+    ...(input.offlinePolicy ? { offlinePolicy: persistedClone(input.offlinePolicy) } : {}),
     ...(input.sandboxProfile
       ? {
           sandboxProfile: {
@@ -261,7 +281,7 @@ export function executionProfileSnapshot(input: ExecutionProfileSnapshotInput) {
       cancellationMode: manifest.cancellation.mode,
       idempotentCleanup: manifest.cancellation.idempotentCleanup,
       retryCreatesNewAttempt: true,
-      inFlightRevocationPolicy: "LEASED_ATTEMPT_MAY_COMPLETE" as const,
+      inFlightRevocationPolicy: input.offlinePolicy ? "DENY_STALE_RESULTS" : "LEASED_ATTEMPT_MAY_COMPLETE",
       componentSubstitution: "DENIED" as const,
     },
     authority: executionProfileAuthority(),
@@ -277,9 +297,17 @@ export function executionProfileIssues(input: unknown): string[] {
   if (!plainObject(input)) return ["profile-snapshot-invalid"];
   const profile = input as Record<string, any>;
   const issues: string[] = [];
-  if (profile.schema !== EXECUTION_PROFILE_SCHEMA) issues.push("profile-schema-invalid");
+  const offline = profile.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA;
+  if (profile.schema !== EXECUTION_PROFILE_SCHEMA && !offline) issues.push("profile-schema-invalid");
+  if (offline) {
+    issues.push(...offlineExecutionPolicyIssues(profile.offlinePolicy));
+    if (profile.executionBackend !== "isolated-container") issues.push("offline-backend-required");
+    if (!sameCanonical(profile.modelRoute, NO_INFERENCE_CONSTRAINT)) issues.push("offline-model-route-forbidden");
+    if (profile.toolGrant !== undefined) issues.push("offline-tool-grant-forbidden");
+  }
   if (!onlyKeys(profile, [
     "schema",
+    ...(offline ? ["offlinePolicy"] : []),
     "profileKey",
     "version",
     "harness",
@@ -300,23 +328,23 @@ export function executionProfileIssues(input: unknown): string[] {
   }
   issues.push(...harnessBindingIssues(profile.harness));
   issues.push(...runtimeArtifactBindingIssues(profile.runtimeArtifact));
-  if (profile.executionBackend !== "persistent-worker" && profile.executionBackend !== "remote-sandbox") {
+  if (profile.executionBackend !== "persistent-worker" && profile.executionBackend !== "remote-sandbox" && !(offline && profile.executionBackend === "isolated-container")) {
     issues.push("execution-backend-invalid");
   }
-  issues.push(...modelRouteBindingIssues(profile.modelRoute, profile));
+  if (!offline) issues.push(...modelRouteBindingIssues(profile.modelRoute, profile));
   issues.push(...sandboxBindingIssues(profile.sandboxProfile, profile));
   issues.push(...toolGrantBindingIssues(profile.toolGrant));
   if (!canonicalIsolationModes(profile.isolationModes)) issues.push("isolation-modes-invalid");
 
   const derivedHarness = canonicalIsolationModes(profile.isolationModes)
-    ? requiredHarnessCapabilitiesFor(profile.isolationModes)
+    ? requiredHarnessCapabilitiesFor(profile.isolationModes, profile.executionBackend)
     : [];
   if (!harnessCapabilityRequirements(profile.requiredHarnessCapabilities)
     || !sameCanonical(profile.requiredHarnessCapabilities, derivedHarness)) {
     issues.push("required-harness-capabilities-invalid");
   }
   const derivedSandbox = canonicalIsolationModes(profile.isolationModes)
-    && (profile.executionBackend === "persistent-worker" || profile.executionBackend === "remote-sandbox")
+    && (profile.executionBackend === "persistent-worker" || profile.executionBackend === "remote-sandbox" || (offline && profile.executionBackend === "isolated-container"))
     ? requiredSandboxCapabilitiesFor(
         profile.isolationModes,
         profile.executionBackend,
@@ -334,7 +362,7 @@ export function executionProfileIssues(input: unknown): string[] {
       && profile.isolationModes.some((mode: IsolationMode) => !manifest.sandbox?.isolationModes?.includes(mode))) {
       issues.push("harness-isolation-unsupported");
     }
-    if (profile.executionBackend === "persistent-worker" || profile.executionBackend === "remote-sandbox") {
+    if (profile.executionBackend === "persistent-worker" || profile.executionBackend === "remote-sandbox" || (offline && profile.executionBackend === "isolated-container")) {
       if (!manifest.admission?.executionBackends?.includes(profile.executionBackend)) {
         issues.push("harness-backend-unsupported");
       }
@@ -344,7 +372,7 @@ export function executionProfileIssues(input: unknown): string[] {
       issues.push("harness-capabilities-unsupported");
     }
   }
-  issues.push(...lifecycleIssues(profile.lifecycle, profile.harness?.capabilityManifest));
+  issues.push(...lifecycleIssues(profile.lifecycle, profile.harness?.capabilityManifest, offline));
   if (!allDeniedAuthority(profile.authority)) issues.push("profile-authority-invalid");
   return [...new Set(issues)];
 }
@@ -354,7 +382,7 @@ export function executionProfileDigest(snapshot: unknown) {
   if (issues.length > 0) {
     throw new Error(`Execution Profile identity is invalid (${issues.join(", ")}).`);
   }
-  return `sha256:${computeCanonicalHash({ namespace: EXECUTION_PROFILE_SCHEMA, value: snapshot })}`;
+  return `sha256:${computeCanonicalHash({ namespace: (snapshot as Record<string, any>).schema, value: snapshot })}`;
 }
 
 /** Qualification derives all component bindings from the canonical profile;
@@ -366,7 +394,7 @@ export function executionProfileQualificationSnapshot(input: ExecutionProfileQua
     throw new Error("Execution Profile qualification requires the exact immutable profile digest.");
   }
   const snapshot = {
-    schema: EXECUTION_PROFILE_QUALIFICATION_SCHEMA,
+    schema: profile.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA ? OFFLINE_EXECUTION_PROFILE_QUALIFICATION_SCHEMA : EXECUTION_PROFILE_QUALIFICATION_SCHEMA,
     profile: {
       id: input.profileId.trim(),
       key: profile.profileKey,
@@ -401,7 +429,8 @@ export function executionProfileQualificationIssues(input: unknown): string[] {
   if (!plainObject(input)) return ["qualification-snapshot-invalid"];
   const qualification = input as Record<string, any>;
   const issues: string[] = [];
-  if (qualification.schema !== EXECUTION_PROFILE_QUALIFICATION_SCHEMA) issues.push("qualification-schema-invalid");
+  const offline = qualification.schema === OFFLINE_EXECUTION_PROFILE_QUALIFICATION_SCHEMA;
+  if (qualification.schema !== EXECUTION_PROFILE_QUALIFICATION_SCHEMA && !offline) issues.push("qualification-schema-invalid");
   if (!onlyKeys(qualification, [
     "schema",
     "profile",
@@ -423,7 +452,7 @@ export function executionProfileQualificationIssues(input: unknown): string[] {
     issues.push("qualification-profile-version-invalid");
   }
   if (!sha256(qualification.profile?.digest)) issues.push("qualification-profile-digest-invalid");
-  issues.push(...qualificationComponentIssues(qualification.components));
+  issues.push(...qualificationComponentIssues(qualification.components, offline));
   if (!plainObject(qualification.scope)
     || !onlyKeys(qualification.scope, ["workloadClasses", "riskClasses"])) {
     issues.push("qualification-scope-fields-invalid");
@@ -463,7 +492,7 @@ export function executionProfileQualificationDigest(snapshot: unknown) {
     throw new Error(`Execution Profile qualification is invalid (${issues.join(", ")}).`);
   }
   return `sha256:${computeCanonicalHash({
-    namespace: EXECUTION_PROFILE_QUALIFICATION_SCHEMA,
+    namespace: (snapshot as Record<string, any>).schema,
     value: snapshot,
   })}`;
 }
@@ -485,12 +514,14 @@ export function executionProfileQualificationMatches(input: {
   if (digest !== input.profileDigest) return false;
   const profile = input.profileSnapshot as Record<string, any>;
   const qualification = input.qualificationSnapshot as Record<string, any>;
-  return  ( qualification.profile.id === input.profileId
+  return qualification.profile.id === input.profileId
+    && qualification.schema === (profile.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA
+      ? OFFLINE_EXECUTION_PROFILE_QUALIFICATION_SCHEMA : EXECUTION_PROFILE_QUALIFICATION_SCHEMA)
     && qualification.profile.key === profile.profileKey
     && qualification.profile.version === profile.version
     && qualification.profile.digest === input.profileDigest
     && sameCanonical(qualification.components, qualificationComponents(profile))
-    && qualificationScopeWithinProfile(profile, qualification ) );
+    && qualificationScopeWithinProfile(profile, qualification);
 }
 
 /** Record-only currentness. Live workers/routes/sandboxes are checked by exact
@@ -501,7 +532,7 @@ export function executionProfileCurrentness(
 ): ExecutionProfileCurrentness {
   if (!record) return currentness("EXECUTION_PROFILE_MISSING");
   const profile = record.immutableSnapshot as Record<string, any> | undefined;
-  if (profile?.schema !== EXECUTION_PROFILE_SCHEMA) return currentness("EXECUTION_PROFILE_UNSUPPORTED");
+  if (profile?.schema !== EXECUTION_PROFILE_SCHEMA && profile?.schema !== OFFLINE_EXECUTION_PROFILE_SCHEMA) return currentness("EXECUTION_PROFILE_UNSUPPORTED");
   if (executionProfileIssues(profile).length > 0) return currentness("EXECUTION_PROFILE_SNAPSHOT_INVALID");
   let profileDigest: string;
   try {
@@ -515,7 +546,7 @@ export function executionProfileCurrentness(
   if (record.admissionStatus === "REVOKED" || record.revokedAt !== undefined) {
     return currentness("EXECUTION_PROFILE_REVOKED");
   }
-  if (record.enabled !== true || record.admissionStatus !== "PRODUCTION_PILOT_ELIGIBLE") {
+  if (record.enabled !== true || record.admissionStatus !== (profile.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA ? "OFFLINE_ELIGIBLE" : "PRODUCTION_PILOT_ELIGIBLE")) {
     return currentness("EXECUTION_PROFILE_DISABLED");
   }
   if (record.qualificationStatus !== "EVIDENCE_QUALIFIED") {
@@ -579,6 +610,8 @@ export function executionProfileCurrentnessIssues(input: {
     admissionState?: string;
     admissionSnapshot?: unknown;
     admissionDigest?: string;
+    promotedBy?: string;
+    promotedAt?: number;
     status?: string;
     readinessState?: string;
     readinessExpiresAt?: number;
@@ -609,7 +642,7 @@ export function executionProfileCurrentnessIssues(input: {
     || !sameCanonical(knownManifest, profile.harness.capabilityManifest)) {
     blockers.push("EXECUTION_PROFILE_HARNESS_MISMATCH");
   }
-  if (profile.executionBackend === "persistent-worker") {
+  if (profile.executionBackend === "persistent-worker" || profile.executionBackend === "isolated-container") {
     const knownRuntime = findKnownHarnessRuntimeArtifact(profile.harness.adapter, profile.harness.version);
     if (!knownRuntime
       || harnessRuntimeArtifactDigest(knownRuntime) !== profile.runtimeArtifact.digest
@@ -625,7 +658,9 @@ export function executionProfileCurrentnessIssues(input: {
     runtimeArtifactDigest: profile.runtimeArtifact.digest,
     executionBackend: profile.executionBackend as ModelRouteExecutionBackend,
   };
-  if (!input.modelRoute
+  if (profile.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA) {
+    if (input.modelRoute || input.profile?.modelCatalogId || input.profile?.modelRouteDigest || input.profile?.modelQualificationDigest) blockers.push("EXECUTION_PROFILE_MODEL_ROUTE_MISMATCH");
+  } else if (!input.modelRoute
     || String(input.modelRoute._id ?? "") !== profile.modelRoute.catalogId
     || !sameCanonical(input.modelRoute.routeSnapshot, profile.modelRoute.routeSnapshot)
     || input.modelRoute.routeDigest !== profile.modelRoute.routeDigest
@@ -634,7 +669,13 @@ export function executionProfileCurrentnessIssues(input: {
     || !modelRouteEligibleForNewFactoryVersion(input.modelRoute, exactCompatibility)) {
     blockers.push("EXECUTION_PROFILE_MODEL_ROUTE_MISMATCH");
   }
-  if (profile.executionBackend === "remote-sandbox") {
+  if (profile.executionBackend === "isolated-container") {
+    const sandbox = input.sandboxProfile;
+    if (!sandbox || String(sandbox._id) !== profile.sandboxProfile?.profileId || sandbox.profileDigest !== profile.sandboxProfile?.profileDigest
+      || profile.offlinePolicy?.isolation?.qualifiedAt !== sandbox.promotedAt
+      || profile.offlinePolicy?.isolation?.admissionDigest !== sandbox.admissionDigest
+      || !sameCanonical(sandbox.immutableSnapshot, profile.sandboxProfile?.profileSnapshot) || !isolatedSandboxEligible(sandbox, input.now)) blockers.push("EXECUTION_PROFILE_SANDBOX_MISMATCH");
+  } else if (profile.executionBackend === "remote-sandbox") {
     const sandbox = input.sandboxProfile;
     if (!sandbox
       || String(sandbox._id ?? "") !== profile.sandboxProfile?.profileId
@@ -672,7 +713,7 @@ export function executionProfilePersistedRecordBlockers(
 ): ExecutionProfileBlockerCode[] {
   if (!record) return ["EXECUTION_PROFILE_MISSING"];
   const profile = record.immutableSnapshot as Record<string, any> | undefined;
-  if (profile?.schema !== EXECUTION_PROFILE_SCHEMA) return ["EXECUTION_PROFILE_UNSUPPORTED"];
+  if (profile?.schema !== EXECUTION_PROFILE_SCHEMA && profile?.schema !== OFFLINE_EXECUTION_PROFILE_SCHEMA) return ["EXECUTION_PROFILE_UNSUPPORTED"];
   if (executionProfileIssues(profile).length > 0) return ["EXECUTION_PROFILE_SNAPSHOT_INVALID"];
 
   const blockers: ExecutionProfileBlockerCode[] = [];
@@ -699,9 +740,9 @@ export function executionProfilePersistedRecordBlockers(
   if (record.executionBackend !== profile.executionBackend) {
     blockers.push("EXECUTION_PROFILE_BACKEND_MISMATCH");
   }
-  if (String(record.modelCatalogId ?? "") !== profile.modelRoute.catalogId
+  if (profile.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA ? (record.modelCatalogId !== undefined || record.modelRouteDigest !== undefined || record.modelQualificationDigest !== undefined) : (String(record.modelCatalogId ?? "") !== profile.modelRoute.catalogId
     || record.modelRouteDigest !== profile.modelRoute.routeDigest
-    || record.modelQualificationDigest !== profile.modelRoute.qualificationDigest) {
+    || record.modelQualificationDigest !== profile.modelRoute.qualificationDigest)) {
     blockers.push("EXECUTION_PROFILE_MODEL_ROUTE_MISMATCH");
   }
   const expectedSandbox = profile.sandboxProfile as  | Record<string, any> | undefined;
@@ -800,11 +841,12 @@ export function executionProfileProjectionBlockers(input: {
   if (projection.executionBackend !== profile.executionBackend) {
     blockers.push("EXECUTION_PROFILE_BACKEND_MISMATCH");
   }
-  if (projection.modelCatalogId !== profile.modelRoute.catalogId
+  if (profile.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA ? (Boolean(projection.modelCatalogId) || Boolean(projection.modelRouteDigest) || Boolean(projection.modelQualificationDigest)
+    || projection.modelRouteSnapshot !== undefined || projection.modelQualificationSnapshot !== undefined) : (projection.modelCatalogId !== profile.modelRoute.catalogId
     || projection.modelRouteDigest !== profile.modelRoute.routeDigest
     || projection.modelQualificationDigest !== profile.modelRoute.qualificationDigest
     || !sameCanonical(projection.modelRouteSnapshot, profile.modelRoute.routeSnapshot)
-    || !sameCanonical(projection.modelQualificationSnapshot, profile.modelRoute.qualificationSnapshot)) {
+    || !sameCanonical(projection.modelQualificationSnapshot, profile.modelRoute.qualificationSnapshot))) {
     blockers.push("EXECUTION_PROFILE_MODEL_ROUTE_MISMATCH");
   }
   if (!sandboxProjectionMatches(profile.sandboxProfile, projection)) {
@@ -956,6 +998,31 @@ function modelRouteBindingIssues(input: unknown, profile: Record<string, any>): 
 }
 
 function sandboxBindingIssues(input: unknown, profile: Record<string, any>): string[] {
+  if (profile.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA) {
+    if (!plainObject(input) || !onlyKeys(input, ["profileId", "profileSnapshot", "profileDigest"]) || !boundedIdentity(input.profileId, 200)) return ["sandbox-profile-required"];
+    if (isolatedSandboxIssues(input.profileSnapshot).length) return ["isolated-sandbox-invalid"];
+    const snapshot = input.profileSnapshot;
+    const policy = profile.offlinePolicy;
+    const registered = profile.harness?.version === "1"
+      ? LEGACY_ISOLATED_INVOCATION_EFFECTIVE_CONFIG
+      : ISOLATED_INVOCATION_EFFECTIVE_CONFIG;
+    if (profile.harness?.adapter !== "isolated-invocation" || !["1", "2"].includes(profile.harness?.version)
+      || policy?.bridge?.id !== "isolated-invocation" || policy?.bridge?.version !== "1"
+      || policy?.backend?.id !== "docker-chroot-offline" || policy?.backend?.version !== "1"
+      || policy?.bridge?.implementationDigest !== registered.bridgeImplementationDigest
+      || policy?.backend?.implementationDigest !== registered.backendImplementationDigest
+      || policy?.bridge?.invocationSchema !== registered.invocationSchema
+      || policy?.bridge?.resultSchema !== registered.resultSchema) return ["isolated-implementation-unregistered"];
+    if (isolatedSandboxDigest(snapshot) !== input.profileDigest
+      || profile.runtimeArtifact?.snapshot?.kind !== "CONTAINER_IMAGE"
+      || profile.runtimeArtifact?.snapshot?.imageDigest !== snapshot.imageDigest
+      || policy?.bridge?.implementationDigest !== snapshot.bridgeDigest
+      || policy?.backend?.implementationDigest !== snapshot.backendDigest
+      || policy?.isolation?.profileId !== input.profileId || policy?.isolation?.profileDigest !== input.profileDigest
+      || policy?.isolation?.evidenceDigest !== snapshot.qualification.evidenceDigest
+      || policy?.isolation?.validUntil !== snapshot.qualification.validUntil) return ["isolated-sandbox-composition-mismatch"];
+    return [];
+  }
   if (profile.executionBackend === "persistent-worker") {
     if (input !== undefined) return ["sandbox-profile-not-allowed"];
     if (profile.runtimeArtifact?.snapshot?.kind !== "EXECUTABLE"
@@ -1024,7 +1091,7 @@ function toolGrantBindingIssues(input: unknown): string[] {
   }
 }
 
-function lifecycleIssues(input: unknown, manifestInput: unknown): string[] {
+function lifecycleIssues(input: unknown, manifestInput: unknown, offline = false): string[] {
   if (!plainObject(input)) return ["profile-lifecycle-invalid"];
   const lifecycle = input as Record<string, any>;
   if (!onlyKeys(lifecycle, [
@@ -1040,7 +1107,7 @@ function lifecycleIssues(input: unknown, manifestInput: unknown): string[] {
     && lifecycle.cancellationMode === manifest?.cancellation?.mode
     && lifecycle.idempotentCleanup === manifest?.cancellation?.idempotentCleanup
     && lifecycle.retryCreatesNewAttempt === true
-    && lifecycle.inFlightRevocationPolicy === "LEASED_ATTEMPT_MAY_COMPLETE"
+    && lifecycle.inFlightRevocationPolicy === (offline ? "DENY_STALE_RESULTS" : "LEASED_ATTEMPT_MAY_COMPLETE")
     && lifecycle.componentSubstitution === "DENIED"
     ? []
     : ["profile-lifecycle-invalid"];
@@ -1056,11 +1123,12 @@ function qualificationComponents(profile: Record<string, any>) {
     },
     runtimeArtifactDigest: profile.runtimeArtifact.digest,
     executionBackend: profile.executionBackend,
-    modelRoute: {
+    modelRoute: profile.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA ? NO_INFERENCE_CONSTRAINT : {
       catalogId: profile.modelRoute.catalogId,
       routeDigest: profile.modelRoute.routeDigest,
       qualificationDigest: profile.modelRoute.qualificationDigest,
     },
+    ...(profile.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA ? { offlinePolicyDigest: offlinePolicyDigest(profile.offlinePolicy) } : {}),
     ...(profile.sandboxProfile
       ? {
           sandboxProfile: {
@@ -1087,6 +1155,14 @@ function qualificationScopeWithinProfile(
 ) {
   const workloadClasses = qualification.scope?.workloadClasses as unknown;
   const riskClasses = qualification.scope?.riskClasses as unknown;
+  if (profile.schema === OFFLINE_EXECUTION_PROFILE_SCHEMA) {
+    const verifier = sameCanonical(profile.offlinePolicy.capabilities, ["verify-document-bytes"]);
+    return Array.isArray(workloadClasses) && Array.isArray(riskClasses)
+      && workloadClasses.every(value => value === (verifier ? "VERIFICATION" : "SOFTWARE_CHANGE"))
+      && (!verifier || sameCanonical(profile.isolationModes, ["READ_ONLY"]))
+      && riskClasses.every(value => value === "GREEN")
+      && qualification.validUntil <= profile.offlinePolicy.isolation.validUntil;
+  }
   const routeScope = profile.modelRoute?.qualificationSnapshot?.scope;
   if (!Array.isArray(workloadClasses)
     || !Array.isArray(riskClasses)
@@ -1105,12 +1181,13 @@ function qualificationScopeWithinProfile(
     && riskClasses.every((value) => sandboxQualification.supportedRiskClasses.includes(value ) ));
 }
 
-function qualificationComponentIssues(input: unknown): string[] {
+function qualificationComponentIssues(input: unknown, offline = false): string[] {
   if (!plainObject(input)) return ["qualification-components-invalid"];
   const components = input as Record<string, any>;
   const issues: string[] = [];
   if (!onlyKeys(components, [
     "harness",
+    ...(offline ? ["offlinePolicyDigest"] : []),
     "runtimeArtifactDigest",
     "executionBackend",
     "modelRoute",
@@ -1129,17 +1206,18 @@ function qualificationComponentIssues(input: unknown): string[] {
     issues.push("qualification-harness-invalid");
   }
   if (!sha256(components.runtimeArtifactDigest)) issues.push("qualification-runtime-artifact-invalid");
-  if (components.executionBackend !== "persistent-worker" && components.executionBackend !== "remote-sandbox") {
+  if (components.executionBackend !== "persistent-worker" && components.executionBackend !== "remote-sandbox" && !(offline && components.executionBackend === "isolated-container")) {
     issues.push("qualification-backend-invalid");
   }
-  if (!plainObject(components.modelRoute)
+  if (offline && (components.executionBackend !== "isolated-container" || !sha256(components.offlinePolicyDigest) || !sameCanonical(components.modelRoute, NO_INFERENCE_CONSTRAINT))) issues.push("qualification-offline-components-invalid");
+  if (!offline && (!plainObject(components.modelRoute)
     || !onlyKeys(components.modelRoute, ["catalogId", "routeDigest", "qualificationDigest"])
     || !boundedIdentity(components.modelRoute?.catalogId, 200)
     || !sha256(components.modelRoute?.routeDigest)
-    || !sha256(components.modelRoute?.qualificationDigest)) {
+    || !sha256(components.modelRoute?.qualificationDigest))) {
     issues.push("qualification-model-route-invalid");
   }
-  if (components.executionBackend === "remote-sandbox") {
+  if (components.executionBackend === "remote-sandbox" || (offline && components.executionBackend === "isolated-container")) {
     if (!plainObject(components.sandboxProfile)
       || !onlyKeys(components.sandboxProfile, ["profileId", "profileDigest"])
       || !boundedIdentity(components.sandboxProfile?.profileId, 200)
@@ -1166,7 +1244,12 @@ function qualificationComponentIssues(input: unknown): string[] {
   return issues;
 }
 
-function requiredHarnessCapabilitiesFor(isolationModes: IsolationMode[]) {
+function requiredHarnessCapabilitiesFor(isolationModes: IsolationMode[], backend?: string) {
+  if (backend === "isolated-container") return [
+    { capability: "cancellation.support", minimumSupport: "SUPPORTED" as const },
+    { capability: "headless.support", minimumSupport: "SUPPORTED" as const },
+    { capability: "tools.structuredOutput", minimumSupport: "SUPPORTED" as const },
+  ];
   const requirements = new Map<string, "PARTIAL" | "SUPPORTED">();
   for (const mode of isolationModes) {
     for (const requirement of factoryHarnessCapabilityRequirements(mode)) {
@@ -1181,9 +1264,10 @@ function requiredHarnessCapabilitiesFor(isolationModes: IsolationMode[]) {
 
 function requiredSandboxCapabilitiesFor(
   isolationModes: IsolationMode[],
-  executionBackend: ModelRouteExecutionBackend,
+  executionBackend: ModelRouteExecutionBackend | "isolated-container",
   sandboxSnapshot: unknown,
 ) {
+  if (executionBackend === "isolated-container") return ["deny-egress", "isolated-container", "no-host-mounts", "read-only-runtime"];
   const requirements = new Set<string>(["git-worktree"]);
   if (isolationModes.includes("READ_ONLY")) requirements.add("read-only");
   if (isolationModes.includes("WORKSPACE_WRITE")) requirements.add("workspace-write");

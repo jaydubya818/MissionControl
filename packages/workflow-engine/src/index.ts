@@ -82,6 +82,7 @@ export {
   modelRouteReasoningConfigIssues,
   NO_HARNESS_AUTHORITY,
   runHarnessExecution,
+  HarnessCleanupError,
 } from "./executorAdapter.js";
 
 export type {

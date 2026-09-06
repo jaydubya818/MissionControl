@@ -38,8 +38,8 @@ function rightRotate(value: number, amount: number) {
   return (value >>> amount) | (value << (32 - amount));
 }
 
-export function sha256Hex(input: string): string {
-  const bytes = Array.from(new TextEncoder().encode(input));
+export function sha256Hex(input: string | Uint8Array): string {
+  const bytes = Array.from(typeof input === "string" ? new TextEncoder().encode(input) : input);
   const bitLength = BigInt(bytes.length) * 8n;
   bytes.push(0x80);
   while ((bytes.length % 64) !== 56) bytes.push(0);

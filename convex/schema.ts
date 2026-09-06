@@ -8,6 +8,7 @@ import { providerPriceValidator, providerReservationValidator, providerUsageVali
 
 import { defineSchema, defineTable, type SchemaDefinition } from "convex/server";
 import { v } from "convex/values";
+import { factoryWorkerVersionBindingValidator } from "./lib/factoryWorkerValidators";
 import {
   acceptanceCriterionValidator,
   attemptPurposeValidator,
@@ -1030,7 +1031,17 @@ export const schemaTablesPartOne = {
   workspaceRepositories: defineTable({
     tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),
-    provider: v.union(v.literal("GITHUB")),
+    provider: v.union(v.literal("GITHUB"), v.literal("LOCAL")),
+    repositoryMode: v.optional(v.union(v.literal("GITHUB"), v.literal("LOCAL_SYNTHETIC_QUALIFICATION"))),
+    localAdmissionDigest: v.optional(v.string()),
+    localAdmission: v.optional(v.object({
+      schema: v.literal("local-synthetic-repository-admission/v1"),
+      mode: v.literal("LOCAL_SYNTHETIC_QUALIFICATION"), program: v.literal("unpublished-handoff-fixture/v1"),
+      tenantId: v.string(), projectId: v.string(), engagementId: v.string(), operatorId: v.string(),
+      environmentId: v.string(), hostId: v.string(), fixtureId: v.string(), root: v.string(),
+      baselineCommit: v.string(), baselineTree: v.string(), fixtureContentDigest: v.string(), expiresAt: v.number(),
+      publicationAuthority: v.literal("NONE"), productionAuthority: v.literal("NONE"),
+    })),
     repository: v.string(),
     displayName: v.string(),
     providerRepositoryId: v.optional(v.string()),
@@ -1191,6 +1202,13 @@ export const schemaTablesPartOne = {
     name: v.string(),
     status: v.union(v.literal("DRAFT"), v.literal("ACTIVE"), v.literal("ARCHIVED")),
     activeVersionId: v.optional(v.id("factoryDefinitionVersions")),
+    qualificationActivation: v.optional(v.object({
+      schema: v.literal("factory-qualification-activation/v1"), target: v.literal("QUALIFICATION"),
+      environmentId: v.id("environments"), environmentDigest: v.string(),
+      factoryDefinitionVersionId: v.id("factoryDefinitionVersions"), configurationDigest: v.string(),
+      executionProfileDigest: v.string(), actorId: v.string(), assessmentId: v.id("factoryReadinessAssessments"),
+      evidenceReference: v.string(), activatedAt: v.number(), expiresAt: v.number(),
+    })),
     latestVersion: v.number(),
     createdBy: v.string(),
     createdAt: v.number(),
@@ -1207,8 +1225,7 @@ export const schemaTablesPartOne = {
     profileKey: v.string(),
     version: v.number(),
     profileDigest: v.string(),
-    provider: v.union(v.literal("EXE_DEV"), v.literal("FAKE") ,
-      v.literal("DOCKER") ),
+    provider: v.union(v.literal("EXE_DEV"), v.literal("FAKE"), v.literal("DOCKER"), v.literal("LOCAL_CONTAINER")),
     providerProfile: v.string(),
     providerProfileVersion: v.string(),
     machineImage: v.string(),
@@ -1216,18 +1233,18 @@ export const schemaTablesPartOne = {
     memoryMb: v.number(),
     diskGb: v.number(),
     supervisorVersion: v.string(),
-    executorTransport: v. union(v. literal("SSH" ), v.literal("DOCKER_STDIN") ),
+    executorTransport: v.union(v.literal("SSH"), v.literal("DOCKER_STDIN"), v.literal("STDIO")),
     maxRuntimeMs: v.number(),
     resultPollIntervalMs: v.number(),
     resultRetentionMs: v.number(),
-    networkEgress: v.union(v.literal("UNRESTRICTED"), v.literal("RESTRICTED_ALLOWLIST")),
+    networkEgress: v.union(v.literal("UNRESTRICTED"), v.literal("RESTRICTED_ALLOWLIST"), v.literal("DENY_ALL")),
     egressAllowlist: v.array(v.string()),
     publicIngress: v.literal(false),
     exposedPorts: v.array(v.number()),
     inferenceCredentialMode: v.union(v.literal("ATTEMPT_SCOPED_OPENROUTER"), v.literal("NONE")),
-    repositoryAccessMode: v.literal("CONTROL_PLANE_SNAPSHOT"),
+    repositoryAccessMode: v.union(v.literal("CONTROL_PLANE_SNAPSHOT"), v.literal("NONE")),
     spendLimitUsd: v.number(),
-    spendEnforcement: v.union(v.literal("PROVIDER_KEY_LIMIT"), v.literal("OBSERVATION_ONLY")),
+    spendEnforcement: v.union(v.literal("PROVIDER_KEY_LIMIT"), v.literal("OBSERVATION_ONLY"), v.literal("NO_PROVIDER_EXECUTION")),
     previewMode: v.union(v.literal("DISABLED"), v.literal("PRIVATE_PROXY")),
     previewPort: v.optional(v.number()),
     readinessState: v.union(v.literal("READY"), v.literal("DEGRADED"), v.literal("BLOCKED")),
@@ -1240,7 +1257,7 @@ export const schemaTablesPartOne = {
     immutableSnapshot: v.any(),
     admissionState: v.optional(v.union(
       v.literal("QUALIFICATION_ONLY"),
-      v.literal("PRODUCTION_PILOT_ELIGIBLE")
+      v.literal("PRODUCTION_PILOT_ELIGIBLE"), v.literal("OFFLINE_ELIGIBLE")
     )),
     admissionSnapshot: v.optional(v.any()),
     admissionDigest: v.optional(v.string()),
@@ -1271,12 +1288,12 @@ export const schemaTablesPartOne = {
     harnessEffectiveConfigSha256: v.string(),
     harnessRuntimeArtifact: v.any(),
     harnessRuntimeArtifactDigest: v.string(),
-    executionBackend: v.union(v.literal("persistent-worker"), v.literal("remote-sandbox")),
+    executionBackend: v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"), v.literal("isolated-container")),
     sandboxProfileId: v.optional(v.id("factorySandboxProfiles")),
     sandboxProfileDigest: v.optional(v.string()),
-    modelCatalogId: v.id("modelCatalog"),
-    modelRouteDigest: v.string(),
-    modelQualificationDigest: v.string(),
+    modelCatalogId: v.optional(v.id("modelCatalog")),
+    modelRouteDigest: v.optional(v.string()),
+    modelQualificationDigest: v.optional(v.string()),
     isolationModes: v.array(v.union(v.literal("READ_ONLY"), v.literal("WORKSPACE_WRITE"))),
     requiredHarnessCapabilities: v.array(v.object({
       capability: v.string(),
@@ -1290,6 +1307,7 @@ export const schemaTablesPartOne = {
     qualificationStatus: v.union(v.literal("UNQUALIFIED"), v.literal("EVIDENCE_QUALIFIED")),
     admissionStatus: v.union(
       v.literal("DISABLED"),
+      v.literal("OFFLINE_ELIGIBLE"),
       v.literal("PRODUCTION_PILOT_ELIGIBLE"),
       v.literal("REVOKED"),
     ),
@@ -1419,6 +1437,9 @@ export const schemaTablesPartOne = {
     factoryDefinitionId: v.id("factoryDefinitions"),
     version: v.number(),
     configurationDigest: v.string(),
+    qualificationEnvironmentDigest: v.optional(v.string()),
+    repositoryMode: v.optional(v.literal("LOCAL_SYNTHETIC_QUALIFICATION")),
+    repositoryAdmissionDigest: v.optional(v.string()),
     repositoryId: v.id("workspaceRepositories"),
     repositoryDataClassification: v.optional(v.union(
       v.literal("PUBLIC"),
@@ -1446,7 +1467,22 @@ export const schemaTablesPartOne = {
     modelRouteSnapshot: v.optional(v.any()),
     modelQualificationDigest: v.optional(v.string()),
     modelQualificationSnapshot: v.optional(v.any()),
-    executionBackend: v.optional(v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"))),
+    // Storage is not admission: validFactoryExecutionBinding continues to deny
+    // this backend until canonical dispatch and completion are integrated.
+    inferenceConstraint: v.optional(v.object({ schema: v.literal("factory-inference-constraint/v1"), mode: v.literal("DENIED") })),
+    deterministicOperation: v.optional(v.union(
+      v.object({
+        reference: v.literal("render-markdown/v1"),
+        digest: v.string(),
+        input: v.object({ title: v.string(), paragraphs: v.array(v.string()), outputPath: v.string() }),
+      }),
+      v.object({
+        reference: v.literal("verify-document-bytes/v1"),
+        digest: v.string(),
+        input: v.object({ path: v.string(), expectedContentSha256: v.string() }),
+      }),
+    )),
+    executionBackend: v.optional(v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"), v.literal("isolated-container"))),
     sandboxProfileId: v.optional(v.id("factorySandboxProfiles")),
     sandboxProfileDigest: v.optional(v.string()),
     sandboxProfileSnapshot: v.optional(v.any()),
@@ -1651,6 +1687,11 @@ export const schemaTablesPartOne = {
   // Executor-local checkout reports for a project repository. A checkout path
   // belongs to one host and is never treated as a portable project property.
   workspaceHostBindings: defineTable({
+    localQualificationObservation: v.optional(v.object({
+      schema: v.literal("local-qualification-root-observation/v1"), admissionDigest: v.string(), root: v.string(),
+      baselineCommit: v.string(), baselineTree: v.string(), fixtureContentDigest: v.string(),
+      noRemotes: v.literal(true), ownerUid: v.number(), observedAt: v.number(),
+    })),
     projectId: v.id("projects"),
     hostId: v.string(),
     repositoryId: v.optional(v.id("workspaceRepositories")),
@@ -1691,21 +1732,7 @@ export const schemaTablesPartOne = {
         repositoryId: v.id("workspaceRepositories"),
         access: v.union(v.literal("READ"), v.literal("READ_WRITE")),
       })),
-      factoryVersionBindings: v.optional(v.array(v.object({
-        factoryDefinitionVersionId: v.id("factoryDefinitionVersions"),
-        factoryConfigurationDigest: v.string(),
-        adapter: v.string(),
-        version: v.string(),
-        provider: v.string(),
-        model: v.string(),
-        capabilityManifestSha256: v.string(),
-        effectiveConfigSha256: v.string(),
-        runtimeArtifactSha256: v.optional(v.string()),
-        executionBackend: v.string(),
-        modelRouteDigest: v.string(),
-        sandboxProfileDigest: v.optional(v.string()),
-        repositoryId: v.id("workspaceRepositories"),
-      }))),
+      factoryVersionBindings: v.optional(v.array(factoryWorkerVersionBindingValidator)),
       readiness: v.union(
         v.literal("STARTING"),
         v.literal("READY"),
@@ -5066,7 +5093,7 @@ export const schemaTablesPartTwo = {
   workflows: defineTable({
     // Identity
     projectId: v.optional(v.id("projects")),
-    contractVersion: v.optional(v.literal("factory-workflow-contract/v1")),
+    contractVersion: v.optional(v.union(v.literal("factory-workflow-contract/v1"), v.literal("factory-workflow-contract/v2"))),
     workflowId: v.string(), // e.g., "feature-dev", "bug-fix", "security-audit"
     name: v.string(),
     description: v.string(),
@@ -5100,7 +5127,8 @@ export const schemaTablesPartTwo = {
         v.literal("REDUCE"),
         v.literal("ROUTER"),
         v.literal("VERIFY"),
-        v.literal("GATE")
+        v.literal("GATE"),
+        v.literal("DETERMINISTIC")
       )),
       inputSchema: v.optional(v.any()),
       outputSchema: v.optional(v.any()),
@@ -5256,7 +5284,8 @@ export const schemaTablesPartTwo = {
         v.literal("REDUCE"),
         v.literal("ROUTER"),
         v.literal("VERIFY"),
-        v.literal("GATE")
+        v.literal("GATE"),
+        v.literal("DETERMINISTIC")
       )),
       modelTier: v.optional(v.union(
         v.literal("FAST"),
@@ -5304,7 +5333,7 @@ export const schemaTablesPartTwo = {
     executorHostId: v.optional(v.string()),
     budgetUsd: v.optional(v.number()),
     spentUsd: v.optional(v.number()),
-    executionCostAuthorization: v.optional(v.object({
+    executionCostAuthorization: v.optional(v.union(v.object({
       schema: v.literal("work-order-cost-authorization/v1"),
       estimatedCostUsd: v.number(),
       reservedCostUsd: v.number(),
@@ -5325,7 +5354,39 @@ export const schemaTablesPartTwo = {
       }),
       varianceUsd: v.optional(v.number()),
       authorizedAt: v.number(),
-    })),
+    }), v.object({
+      schema: v.literal("work-order-offline-cost-authorization/v1"),
+      policyEnvelopeId: v.string(),
+      policyEnvelopeDigest: v.string(),
+      workOrderPolicyDigest: v.string(),
+      reservationId: v.string(),
+      factoryConfigurationDigest: v.string(),
+      executionProfileDigest: v.string(),
+      authorizationDigest: v.string(),
+      maxProviderCalls: v.literal(0),
+      maxProviderLiabilityUsd: v.literal(0),
+      estimatedCostUsd: v.number(),
+      reservedCostUsd: v.number(),
+      hardLimitUsd: v.number(),
+      priorCommittedUsd: v.number(),
+      remainingBeforeReservationUsd: v.number(),
+      budgetSource: v.literal("WORK_ORDER_IMPLEMENTATION_POLICY"),
+      estimationInputs: v.object({
+        method: v.literal("FULL_RESOURCE_CEILING_RESERVATION"),
+        approvedWorkOrderCapUsd: v.number(),
+        missionBudgetRemainingUsd: v.number(),
+        policyBudgetRemainingUsd: v.number(),
+        factoryBudget: v.object({ maxCostUsd: v.number(), maxAttempts: v.number(), maxRuntimeMinutes: v.number() }),
+        priorAttemptCount: v.number(),
+      }),
+      actualCost: v.object({
+        status: v.union(v.literal("MEASURED"), v.literal("UNAVAILABLE")),
+        usd: v.optional(v.number()),
+        reason: v.optional(v.string()),
+      }),
+      varianceUsd: v.optional(v.number()),
+      authorizedAt: v.number(),
+    }))),
     stopCondition: v.optional(v.string()),
     scheduledWindow: v.optional(v.object({
       startsAt: v.number(),

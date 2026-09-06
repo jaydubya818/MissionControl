@@ -140,7 +140,12 @@ export async function getCurrentVerificationRoutingOutcome(
         invalidatedAt: receipt.invalidatedAt,
         humanReviewValid: humanReviewValid(receipt),
       })),
-    verificationEvidence: evidence.map((envelope: any) => ({
+    // Qualification/imported/structural evidence cannot inherit production
+    // acceptance authority merely because its identity tuple matches a receipt.
+    // A qualification-only path must prove its environment scope separately.
+    verificationEvidence: evidence.filter((envelope: any) => envelope.provenance === "LIVE"
+      && envelope.metadata?.authority !== "NONE"
+      && envelope.metadata?.evidenceOrigin !== "CONTROL_FIXTURE").map((envelope: any) => ({
       id: String(envelope._id),
       workflowRunId: String(envelope.workflowRunId),
       verificationRunId: String(envelope.verificationRunId),

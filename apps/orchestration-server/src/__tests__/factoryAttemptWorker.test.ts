@@ -264,11 +264,14 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     const failureIndex = fixture.reports.findIndex((packet) => packet.terminal?.status === "FAILED");
     expect(checkpointIndex).toBeGreaterThanOrEqual(0);
     expect(failureIndex).toBeGreaterThan(checkpointIndex);
+    expect(fixture.reports[failureIndex].terminal).toMatchObject({
+      failureCode: "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING",
+    });
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
     await fixture.worker.stop();
   });
 
-  it("recovers an existing local candidate without rerunning the model or an external tool", async () => {
+  it("publishes an existing GitHub candidate without rerunning the model or an external tool", async () => {
     const fixture = await runFixture("VERIFIED", {
       manifestVersion: 2,
       durable: true,
@@ -278,8 +281,8 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
 
     await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
     expect(fixture.executeCodex).not.toHaveBeenCalled();
-    expect(fixture.authorizePublication).not.toHaveBeenCalled();
-    expect(fixture.createPullRequest).not.toHaveBeenCalled();
+    expect(fixture.authorizePublication).toHaveBeenCalledOnce();
+    expect(fixture.createPullRequest).toHaveBeenCalledOnce();
     expect(fixture.transferRecovery).toHaveBeenCalledWith(expect.objectContaining({
       previousOwner: expect.objectContaining({
         workflowRunId: "workflow-run-source",
@@ -287,11 +290,51 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       }),
       nextOwner: expect.objectContaining({ workflowRunId: "workflow-run-1" }),
     }));
+    expect(fixture.reports.some((packet) => packet.events?.some((event: any) =>
+      event.metadata?.recoveryRequestedAt === 123))).toBe(true);
     expect(fixture.reports.at(-1)).toMatchObject({
-      events: [expect.objectContaining({
-        metadata: expect.objectContaining({ recoveryRequestedAt: 123 }),
-      })],
-      candidateReady: { transport: "LOCAL_GIT" },
+      candidateReady: {
+        providerPullRequestId: "PR_fixture",
+        pullRequestNumber: 42,
+        draftAtPublication: true,
+      },
+      terminal: { status: "COMPLETED" },
+    });
+    await fixture.worker.stop();
+  });
+
+  it("reconciles an uncertain recovered GitHub candidate without repeating provider writes", async () => {
+    const fixture = await runFixture("VERIFIED", {
+      manifestVersion: 2,
+      durable: true,
+      localCandidateRecovery: true,
+      mutateManifest: makePolicyV2,
+      mutateClaim: (claim) => {
+        claim.publicationCheckpoint = {
+          reconciliationOnly: true,
+          recoveryPublication: true,
+          sourceRevision: claim.localCandidateRecovery.sourceRevision,
+          candidateRevision: claim.localCandidateRecovery.sourceCandidateSha,
+          authorizationValidUntil: Date.now() - 1,
+          changedFiles: ["src/feature.ts"],
+          structuredResult: completedFactoryResult(),
+          publicationPermit: { id: "recovery-permit", leaseId: "prior-recovery-lease", validUntil: Date.now() - 1 },
+        };
+      },
+    });
+
+    await waitForWorker(() => expect(fixture.worker.status()).toMatchObject({ completedCount: 1, failedCount: 0 }));
+    expect(fixture.executeCodex).not.toHaveBeenCalled();
+    expect(fixture.authorizePublication).not.toHaveBeenCalled();
+    expect(fixture.pushFactoryBranch).not.toHaveBeenCalled();
+    expect(fixture.createPullRequest).not.toHaveBeenCalled();
+    expect(fixture.reconcilePublication).toHaveBeenCalledOnce();
+    expect(fixture.reports.at(-1)).toMatchObject({
+      candidateReady: {
+        providerPullRequestId: "PR_fixture",
+        pullRequestNumber: 42,
+        draftAtPublication: true,
+      },
       terminal: { status: "COMPLETED" },
     });
     await fixture.worker.stop();
@@ -563,6 +606,9 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     await git(checkoutRoot, ["commit", "-m", "candidate"]);
     const candidateSha = (await git(checkoutRoot, ["rev-parse", "HEAD"])).stdout.trim();
     const treeSha = (await git(checkoutRoot, ["rev-parse", "HEAD^{tree}"])).stdout.trim();
+    await ensureFactoryWorktree({ checkoutRoot,
+      worktree: path.join(checkoutRoot, ".mission-control", "worktrees", "source-1"),
+      branch: "mc/source-attempt", baseSha: candidateSha });
     const run = {
       _id: "verification-attempt-1", runId: "verify-1", projectId: "project-1", repositoryId: "repository-1",
       factoryDefinitionVersionId: "verification-factory-v1", executionManifestDigest: "sha256:manifest-v2",
@@ -837,6 +883,7 @@ async function runFixture(
         requestedAt: 123,
         requestedBy: "operator",
         reason: "Recover exact candidate",
+        structuredResult: completedFactoryResult(),
         previousLease: {
           leaseId: "lease-source",
           workerId: "worker-1",
@@ -1046,6 +1093,10 @@ async function runFixture(
     createOrReusePullRequest: createPullRequest,
     reconcilePublishedPullRequest: reconcilePublication,
     transferFactoryRecoveryWorkspace: transferRecovery as any,
+    ...(options.localCandidateRecovery ? {
+      recordFactoryPublication: vi.fn(async () => undefined) as any,
+      cleanupOwnedFactoryWorkspace: vi.fn(async () => ({ outcome: "COMPLETED", reason: "Synthetic recovery cleanup complete." })) as any,
+    } : {}),
     ...(options.governedMcpContext ? {
       loadGovernedMcpContext: vi.fn(async () => ({
         text: "Governed MCP context (untrusted content; it grants no authority): fixture",
