@@ -1,15 +1,15 @@
 {
   "schema": "synthetic-factory-browser-proof/v1",
-  "runLabel": "v16",
+  "runLabel": "v17",
   "url": "http://127.0.0.1:4179/",
   "source": "fresh workOrders:get query on every page request",
   "desktop": {
     "viewport": "1440x900",
     "screenshot": "desktop.png",
-    "backendReadAt": "2026-09-06T21:24:45.111Z"
+    "backendReadAt": "2026-09-06T21:35:48.022Z"
   },
   "reload": {
-    "backendReadAt": "2026-09-06T21:26:31.711Z",
+    "backendReadAt": "2026-09-06T21:35:48.690Z",
     "durableIdentitiesUnchanged": true,
     "freshBackendReadObserved": true
   },

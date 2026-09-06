@@ -6,19 +6,19 @@ This bundle records the bounded, deterministic, no-provider qualification of Mis
 
 ## Exact successful execution
 
-- Frozen scenario: `context-skills-synthetic-factory/v1`; successful run: `v16`.
-- Mission: `jh7v3gcyc39mn1b8nk7k2r21eh8dwk33`; Plan: `j17q76x5aw61zyvx5mc16rdgts8dxyam`.
-- WorkOrder: `wd7r5t4149d88dvde8tjh0jajd8dw7bg`; Task: `ss7kehfkxhmxn8msbjfaj0km858dwzny`.
+- Frozen scenario: `context-skills-synthetic-factory/v1`; successful post-merge run: `v17`.
+- Mission: `jh7mc2dwag1gbv09g1s6w3dg8s8dxm01`; Plan: `j17sq9x8yyyrb6hze45qwj0z0h8dwvmr`.
+- WorkOrder: `wd7xzhkx1mkhv9nmsz52hw61eh8dw4wx`; Task: `ss7tf1macnvrrtszxxdg9658as8dxy6m`.
 - Producer Factory Version: `t970ra13k3hap1xhd12xv3kw4n8dwerg`; Execution Profile: `tn7am6pjc8pqg5gcwy7qqbg01x8dxfk4`.
-- Producer Attempt: `ws7q4dahj7fevwq08dwrqatvmx8dwz9v`; candidate: `ac5066350bc3bc81d112f634550ba7215dc50e9d`.
-- Verification Subject: `sha256:a1d5880d5e8e01ffc545116eaeae6da8d3174b0f12b5e46baceb9aa3281307d0`.
+- Producer Attempt: `ws7jjnek0e356nwkmav7kmqtjs8dxb9k`; candidate: `a01f40cc0d71b689fb66fda7ce6022146611070b`.
+- Verification Subject: `sha256:4665740f394fac46ae11a796df6e100213cc254a9a71d3ae411f48477d626dc8`.
 - Verifier Factory Version: `t979t16dcf7y5d8rm3sgck6w018dwqp2`; Execution Profile: `tn70xse3x5ecajvfch2tfktwmd8dxtax`.
-- Verifier Attempt: `ws7kvwdx1gz5mx0y46r8ccd6a18dw0mz`; Verification Run: `vd7xy458ay4xvchp9z268s3sa58dweat`.
-- Verification Plan: `sha256:7d95f06c1962a829083a7defdaf4a1b3be9d6303d1961167f8c5e1968d85d9c0`; verdict: `VERIFIED`.
+- Verifier Attempt: `ws7z6j06m0ntqv7mjactk7phc58dx7h0`; Verification Run: `vd7yr21zvw4w1b5z3n6b7mnedd8dx9bw`.
+- Verification Plan: `sha256:8803658f754214b563f2af9d6bfc7e66595a5db2ba5081a9e2a32ecdc9ecbc21`; verdict: `VERIFIED`.
 
 ## Runtime contract
 
-- Worker: `local-synthetic-qualification-worker`; recorded session: `5389c646-d15d-492a-8200-a09405f05579`; generation: `5`.
+- Worker: `local-synthetic-qualification-worker`; recorded session: `ef9ed14b-dfd1-438f-b8fc-98fefe33b28e`; generation: `6`.
 - Backend: `isolated-container`; model route: `DENIED`; transmission: `NONE`.
 - Runtime image: `sha256:4c0e7e776c25f393ba9eb2e29319dbc38dc4c1d0f8a91e307aeb1a31849269db`.
 - Runtime artifact: `sha256:950a19c8e2419323c4437954f6e812f8421a4d9fc42838ad099b0e0f24b3d666`.
@@ -40,4 +40,4 @@ The WorkOrder receipt and all four evidence envelopes share the exact WorkOrder 
 
 The proof server queried the persisted backend on each page request. Desktop and mobile renders passed, a reload produced a later backend-read timestamp while all durable identities remained unchanged, axe reported zero violations or incomplete checks, and the browser reported no page or console errors. See [browser/result.json](browser/result.json), [desktop.png](browser/desktop.png), and [mobile.png](browser/mobile.png).
 
-The normalized evidence is [proof.json](proof.json), with the exact pre-dispatch worker heartbeat in [runtime-evidence-v16.json](runtime-evidence-v16.json). Its digest is `sha256:2cda42ad75f38d9e7308bc6fbbf6458c88babfa4c44604a476b7855c3df44bdd`.
+The normalized evidence is [proof.json](proof.json), with the exact pre-dispatch worker heartbeat in [runtime-evidence-v17.json](runtime-evidence-v17.json). Its digest is `sha256:2f82f88827fa9b973d9f8ef7ff72480edb5e29d1f517ce5fb07744c6e30c61c2`.

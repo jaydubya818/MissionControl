@@ -1,9 +1,9 @@
 {
   "schema": "synthetic-factory-admission-proof/v1",
   "classification": "SYNTHETIC_FACTORY_ADMISSION_QUALIFIED",
-  "capturedAt": 1788729791140,
-  "backendReadAt": 1788729791140,
-  "runLabel": "v16",
+  "capturedAt": 1788730531914,
+  "backendReadAt": 1788730531914,
+  "runLabel": "v17",
   "scenarioVersion": "context-skills-synthetic-factory/v1",
   "environment": {
     "target": "QUALIFICATION",
@@ -21,8 +21,8 @@
   },
   "runtime": {
     "workerId": "local-synthetic-qualification-worker",
-    "workerSessionId": "5389c646-d15d-492a-8200-a09405f05579",
-    "workerGeneration": 5,
+    "workerSessionId": "ef9ed14b-dfd1-438f-b8fc-98fefe33b28e",
+    "workerGeneration": 6,
     "hostRuntime": "node v24.18.1 darwin/arm64",
     "runtimeImage": "sha256:4c0e7e776c25f393ba9eb2e29319dbc38dc4c1d0f8a91e307aeb1a31849269db",
     "runtimeArtifactDigest": "sha256:950a19c8e2419323c4437954f6e812f8421a4d9fc42838ad099b0e0f24b3d666",
@@ -30,34 +30,34 @@
     "modelRoute": "DENIED"
   },
   "execution": {
-    "missionId": "jh7v3gcyc39mn1b8nk7k2r21eh8dwk33",
-    "planId": "j17q76x5aw61zyvx5mc16rdgts8dxyam",
-    "workOrderId": "wd7r5t4149d88dvde8tjh0jajd8dw7bg",
-    "taskId": "ss7kehfkxhmxn8msbjfaj0km858dwzny",
-    "producerAttemptId": "ws7q4dahj7fevwq08dwrqatvmx8dwz9v",
+    "missionId": "jh7mc2dwag1gbv09g1s6w3dg8s8dxm01",
+    "planId": "j17sq9x8yyyrb6hze45qwj0z0h8dwvmr",
+    "workOrderId": "wd7xzhkx1mkhv9nmsz52hw61eh8dw4wx",
+    "taskId": "ss7tf1macnvrrtszxxdg9658as8dxy6m",
+    "producerAttemptId": "ws7jjnek0e356nwkmav7kmqtjs8dxb9k",
     "producerStatus": "COMPLETED",
-    "candidateRevision": "ac5066350bc3bc81d112f634550ba7215dc50e9d",
-    "verifierAttemptId": "ws7kvwdx1gz5mx0y46r8ccd6a18dw0mz",
+    "candidateRevision": "a01f40cc0d71b689fb66fda7ce6022146611070b",
+    "verifierAttemptId": "ws7z6j06m0ntqv7mjactk7phc58dx7h0",
     "verifierStatus": "COMPLETED",
-    "verificationRunId": "vd7xy458ay4xvchp9z268s3sa58dweat",
+    "verificationRunId": "vd7yr21zvw4w1b5z3n6b7mnedd8dx9bw",
     "verificationVerdict": "VERIFIED",
-    "verificationSubjectDigest": "sha256:a1d5880d5e8e01ffc545116eaeae6da8d3174b0f12b5e46baceb9aa3281307d0",
-    "verificationPlanDigest": "sha256:7d95f06c1962a829083a7defdaf4a1b3be9d6303d1961167f8c5e1968d85d9c0",
-    "receiptId": "v97j0k8vyxfd6qdf0efp6pqnax8dxfhs"
+    "verificationSubjectDigest": "sha256:4665740f394fac46ae11a796df6e100213cc254a9a71d3ae411f48477d626dc8",
+    "verificationPlanDigest": "sha256:8803658f754214b563f2af9d6bfc7e66595a5db2ba5081a9e2a32ecdc9ecbc21",
+    "receiptId": "v97n4sm156zmkhepks851g27hh8dwb8x"
   },
   "qualificationCurrentness": {
     "current": true,
     "exactLineage": true,
     "evidenceIds": [
-      "s9795ke4gp216z6zq133zb1f518dw870",
-      "s97cvpaxa0v49qhd50zj9270r58dxmky",
-      "s970e88nd3m2vvkzyqqdmcv8398dxqvj",
-      "s97d83j66ah0cg833mz40dwheh8dwrww"
+      "s97c105zsy8kp27dwa8b7v4hsh8dwgy5",
+      "s97ed1jc3dr9xyq9xbfjd9yxf18dxx8c",
+      "s97c3991gvwmp2p3ba22pswfvs8dwgd2",
+      "s976xtk3p03y1z0dq24wytr3458dwg7g"
     ],
     "productionAcceptanceCurrent": false,
     "productionAcceptanceEligible": false,
     "productionFenceReason": [
-      "Evidence s970e88nd3m2vvkzyqqdmcv8398dxqvj is missing or not bound to the exact verification lineage."
+      "Evidence s976xtk3p03y1z0dq24wytr3458dwg7g is missing or not bound to the exact verification lineage."
     ]
   },
   "controls": {
@@ -80,5 +80,5 @@
     "authority": "NONE"
   },
   "productionChanges": 0,
-  "proofDigest": "sha256:2cda42ad75f38d9e7308bc6fbbf6458c88babfa4c44604a476b7855c3df44bdd"
+  "proofDigest": "sha256:2f82f88827fa9b973d9f8ef7ff72480edb5e29d1f517ce5fb07744c6e30c61c2"
 }
