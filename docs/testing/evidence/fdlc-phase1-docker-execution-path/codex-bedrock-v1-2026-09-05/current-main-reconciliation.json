@@ -1,0 +1,27 @@
+{
+  "baseMain": "6d7146d5205aef729aee2960aed2a4ed8e8ab95c",
+  "localHead": "cb373ee36d1645cad4f277f59c75cb7b1cac57f5",
+  "method": "SEMANTIC_PATCH_NO_MERGE",
+  "upstreamChangedFiles": [
+    "apps/orchestration-server/src/__tests__/governedMcpBroker.test.ts",
+    "docs/plans/2026-09-05-feat-inference-gateway-outcome-economics-qualification-plan.md",
+    "docs/product/software-factory-capability-maturity.md",
+    "docs/software-factory/governed-mcp-recertification-policy.md",
+    "docs/testing/evidence/governed-mcp-phase4-recovery/README.md",
+    "docs/testing/evidence/governed-mcp-phase4-recovery/completion-record.md",
+    "docs/testing/evidence/governed-mcp-phase4-recovery/ecosystem-closure-record.md",
+    "package.json",
+    "todos/063-ready-p1-outcome-economics-routing.md"
+  ],
+  "unreconciledUpstreamFiles": [],
+  "commitStatus": "LOCAL_IMPLEMENTATION_COMMITTED",
+  "modelCalls": 0,
+  "workOrder1Executed": false,
+  "upstreamPatchReverseCheck": "PASS (check only; no reverse application)",
+  "retainedCandidateDifferences": {
+    "docs/product/software-factory-capability-maturity.md": "Retained pilot matrix and Docker continuation; clarified historical scope so current-main Phase 4 MCP remains authoritative."
+  },
+  "precommitHead": "c9d7620beb7e2cb779584e700e0fc46cf8e2c77e",
+  "laterObservedOriginMain": "e9d2f52720e634b79d2c614a7fb9812a6b986fe9",
+  "laterMainCompatibility": "NOT_RECONCILED_RUNTIME_V45_VS_CANDIDATE_V43"
+}

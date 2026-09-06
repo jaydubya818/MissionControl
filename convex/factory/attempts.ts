@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { dockerRequestRecoveryMatches } from "../lib/dockerAllocationRecovery";
 import { internalAction, internalMutation, internalQuery, mutation } from "../_generated/server";
 import { internal } from "../_generated/api";
 import {
@@ -473,7 +474,8 @@ export const reportSandboxReconcileInternal = internalMutation({
       .first();
     if (!allocation || allocation.state === "TERMINATED") return { reconciled: false as const, reason: "already-absent" };
     if (args.termination?.resourceName !== allocation.resourceName
-      || args.termination?.providerResourceId !== allocation.providerResourceId
+      || (args.termination?.providerResourceId !== allocation.providerResourceId && !dockerRequestRecoveryMatches(allocation, args.termination))
+      || (!allocation.providerResourceId && !dockerRequestRecoveryMatches(allocation, args.termination))
       || args.termination?.resourceAbsent !== true
       || !Number.isFinite(args.termination?.confirmedAbsentAt)) throw new Error("Orphan reconciliation lacks exact provider resource-absence evidence.");
     if (args.credentialRevocation) {
@@ -501,6 +503,7 @@ export const reportSandboxReconcileInternal = internalMutation({
       terminatedAt: args.termination.confirmedAbsentAt,
       resourceAbsentAt: args.termination.confirmedAbsentAt,
       teardownReceipt: args.termination,
+      ...(!allocation.providerResourceId && args.termination.providerResourceId ? { providerResourceId: args.termination.providerResourceId } : {}),
       updatedAt: Date.now(),
     });
     await ctx.db.patch(run._id, { sandboxTeardownVerifiedAt: args.termination.confirmedAbsentAt });

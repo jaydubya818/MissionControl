@@ -1,0 +1,28 @@
+{
+  "implementationCommit": "cb373ee36d1645cad4f277f59c75cb7b1cac57f5",
+  "baseMain": "6d7146d5205aef729aee2960aed2a4ed8e8ab95c",
+  "checks": [
+    {
+      "name": "runtime-current-main",
+      "command": [
+        "node",
+        "scripts/check-runtime-contract.mjs",
+        "--base",
+        "6d7146d5205aef729aee2960aed2a4ed8e8ab95c"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationSeconds": 2.34
+    },
+    {
+      "name": "runtime-default",
+      "command": [
+        "node",
+        "scripts/check-runtime-contract.mjs"
+      ],
+      "exitCode": 1,
+      "status": "FAIL",
+      "durationSeconds": 2.3
+    }
+  ]
+}

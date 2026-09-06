@@ -1,0 +1,19 @@
+{
+  "verifiedAt": "2026-09-06T05:21:49.335Z",
+  "sourceSha256": "2f6a0713bcd4f2e95549534a71022703321124c4fe27d66d84b984ae5841a174",
+  "sourceMatchesRun": true,
+  "branchHeadAfterRun": "f4c5c8d269cb050f64f80604548d191e06dd8a91",
+  "observedOccRetryLogEntries": 140,
+  "scenariosPassed": 22,
+  "simultaneousRaceTrials": 20,
+  "reservationMutationHttpRequests": 165,
+  "harnessSha256": "9dd396b31ededf29f3b999c49b632e27706c42190ba607facd660b431720053a",
+  "loopbackGuardSha256": "337176ed2b3c7c055b66788b2f334b99399f853770821c406bc9467d7e63ace8",
+  "backendLogSha256": "76408406d58c1021446bf66c07b6ff9ef8d2a835eb6b86324623b7e027fb70a1",
+  "reportSha256": "527707d46d4cdf8b90226e1af8eee102b6cd121a8fce0f3cedfec676abf0dbb6",
+  "knownSetupFailure": {
+    "path": "/private/tmp/fdlc-reservation-backend-u6ouHO/report.json",
+    "reason": "Temporary harness used a CLI option unsupported by the installed CLI. Removed that option; no production source changes. Failed attempt backend stopped and both ports closed."
+  },
+  "networkBoundary": "Node fetch/socket guard permits loopback only; child CLI inherits guard. Backend bound 127.0.0.1 with beacon disabled; backend environment excludes inherited credentials. Generated ephemeral local key exists only in process memory/environment; no real provider transport exists in this harness."
+}

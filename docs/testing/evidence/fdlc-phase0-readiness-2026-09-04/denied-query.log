@@ -1,0 +1,7 @@
+✖ Failed to run function "workOrders:readiness":
+Error: [Request ID: 2decbb45a4d7529e] Server Error
+Uncaught Error: Company account is unavailable or unauthorized.
+    at requireCompanyAccess (../../convex/lib/companyAccess.ts:321:14)
+    at async requireWorkspaceAccess (../../convex/lib/companyAccess.ts:335:7)
+    at async requireAuthorizedDeliveryScope (../../convex/lib/deliveryAuthorization.ts:30:0)
+    at async handler (../convex/workOrders.ts:3714:4)

@@ -6,7 +6,7 @@ export const SANDBOX_SUPERVISOR_VERSION = "mission-control-supervisor/v1" as con
 export const SANDBOX_SECURITY_SCHEMA = "factory-sandbox-security/v1" as const;
 export const RESTRICTED_CANDIDATE_PROFILE = "remote-sandbox/exe-dev/restricted-candidate-v1" as const;
 
-export type SandboxProviderKind = "EXE_DEV" | "FAKE";
+export type SandboxProviderKind = "EXE_DEV" | "FAKE" | "DOCKER";
 export type SandboxReadinessState = "READY" | "DEGRADED" | "BLOCKED";
 export type SandboxAllocationState =
   | "REQUESTED"
@@ -35,7 +35,7 @@ export interface SandboxProfileSnapshot {
   };
   supervisor: {
     version: typeof SANDBOX_SUPERVISOR_VERSION;
-    transport: "SSH";
+    transport: "SSH" | "DOCKER_STDIN";
   };
   runtime: {
     maxRuntimeMs: number;
@@ -75,7 +75,29 @@ export interface SandboxProfileSnapshot {
     providerEgressEnforcementProven?: boolean;
     guestEgressEnforcementProven?: boolean;
     liveCertified?: boolean;
-    evidenceReference?: string;
+    evidenceReference?: string ;
+  };
+  dockerQualification?: {
+    schema: "factory-docker-qualification/v1";
+    imageDigest: string;
+    toolchainDigest: string;
+    evidencePacketReference: string;
+    evidencePacketDigest: string;
+    bridgeProtocol: "docker-attach-framed/v1";
+    harness: "codex/bedrock-v1";
+    containment: {
+      network: "DOCKER_NETWORK_NONE";
+      readOnlyRoot: true;
+      uid: 10001;
+      gid: 10001;
+      noNewPrivileges: true;
+      capabilities: "DROP_ALL";
+      hostMounts: "NONE";
+      credentials: "NONE";
+    };
+    supportedWorkloadClasses: string[];
+    supportedRiskClasses: Array<"GREEN" | "YELLOW">;
+    workloadTimeouts: Array<{ workloadClass: string; maxRuntimeMs: number }> ;
   };
   qualification?: {
     evidencePacketReference: string;
@@ -276,6 +298,12 @@ export interface SandboxSecurityProof {
 
 export interface SandboxTerminationReceipt {
   providerResourceId: string;
+  allocationRecoveryProof?: {
+    schema: "factory-docker-request-recovery/v1";
+    image: string;
+    attemptLeaseId: string;
+    manifestDigest: string;
+  };
   resourceName: string;
   requestedAt: number;
   confirmedAbsentAt: number;

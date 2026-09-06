@@ -1,0 +1,41 @@
+{
+  "observedAt": "2026-09-05T07:43:23.477876+00:00",
+  "mechanism": "outer macOS Seatbelt allowlist; no model calls",
+  "policy": "(version 1)\n(deny default)\n(allow process*)\n(allow sysctl-read)\n(allow mach-lookup)\n(allow file-map-executable)\n(allow file-read-metadata)\n(allow file-read* (subpath \"/System\"))\n(allow file-read* (subpath \"/usr\"))\n(allow file-read* (subpath \"/bin\"))\n(allow file-read* (subpath \"/sbin\"))\n(allow file-read* (subpath \"/Library/Apple\"))\n(allow file-read* (subpath \"/dev\"))\n(allow file-read* (subpath \"/private/etc\"))\n(allow file-read* (subpath \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-6lcc0i3m/workspace\"))\n(allow file-read* (subpath \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-6lcc0i3m/private-temp\"))\n(allow file-read* (subpath \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-6lcc0i3m/home\"))\n(allow file-read* (subpath \"/private/tmp/fdlc-runtime-0146/package/vendor/aarch64-apple-darwin\"))\n(allow file-write* (subpath \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-6lcc0i3m/workspace\"))\n(allow file-write* (subpath \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-6lcc0i3m/private-temp\"))\n",
+  "policySha256": "3f6ca5327fd9777baabf35daf78eaaf31d9256a67182027b4069d4b7ee077c39",
+  "nativeSha256": "ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02",
+  "checks": {
+    "startup": {
+      "command": [
+        "/tmp/fdlc-runtime-0146/package/vendor/aarch64-apple-darwin/bin/codex",
+        "--version"
+      ],
+      "exitCode": -6,
+      "stdout": "",
+      "stderr": ""
+    },
+    "nested_native_tool": {
+      "command": [
+        "/tmp/fdlc-runtime-0146/package/vendor/aarch64-apple-darwin/bin/codex",
+        "sandbox",
+        "-P",
+        "probe",
+        "-c",
+        "permissions.probe.filesystem={\":minimal\"=\"read\",\":workspace_roots\"={\".\"=\"write\"}}",
+        "-C",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-6lcc0i3m/workspace",
+        "--",
+        "/bin/sh",
+        "-c",
+        "echo allowed > \"$1\"",
+        "probe",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-6lcc0i3m/workspace/allowed"
+      ],
+      "exitCode": -6,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  "cleanup": true,
+  "qualification": "FEASIBILITY_ONLY; worker not started; no host admission"
+}

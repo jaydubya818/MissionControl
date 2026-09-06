@@ -1,0 +1,12 @@
+{
+  "evidenceClass": "OFFLINE_REPOSITORY_INSPECTION",
+  "scope": ["docs/software-factory", "infra", "scripts qualification/bootstrap records"],
+  "approvedAccountFound": false,
+  "approvedProjectEnvironmentFound": false,
+  "approvedRoleOrConfigLocationFound": false,
+  "defaultProfilesRead": false,
+  "cachedSessionsRead": false,
+  "awsCredentialsUsed": false,
+  "awsApiCalls": 0,
+  "conclusion": "No approved qualification AWS identity binding found. Null values retained."
+}

@@ -1,0 +1,35 @@
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/apps/orchestration-server
+
+ ✓ src/__tests__/hardLiabilityLedger.test.ts (23 tests) 323ms
+ ✓ src/__tests__/dockerSandboxProvider.test.ts (21 tests) 1364ms
+   ✓ recovers teardown after provider restart, rejects stale identity and tolerates already-absent teardown  981ms
+   ✓ recovers a REQUESTED journal after the Docker create reply is lost, without adopting another lease  379ms
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: cancel and cleanup
+[factory-worker] Attempt factory-run-remote failed: This operation was aborted
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: timeout and cleanup
+[factory-worker] Attempt factory-run-remote failed: Docker execution exceeded its frozen deadline; late results are fenced.
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: startup-failure and cleanup
+[factory-worker] Attempt factory-run-remote failed: Remote sandbox cleanup failed.
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: budget-denial and cleanup
+[factory-worker] Attempt factory-run-remote failed: Inference dispatch denied: no qualified hard-budget broker path.
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: cleanup-failure and cleanup
+[factory-worker] Attempt factory-run-remote failed: Remote sandbox cleanup failed.
+
+ ✓ src/__tests__/dockerFactoryWorker.test.ts (7 tests) 37367ms
+   ✓ dispatches through the real Factory worker into hardened Docker: result and cleanup  21931ms
+   ✓ dispatches through the real Factory worker into hardened Docker: cancel and cleanup  1595ms
+   ✓ dispatches through the real Factory worker into hardened Docker: timeout and cleanup  5362ms
+   ✓ dispatches through the real Factory worker into hardened Docker: startup-failure and cleanup  309ms
+   ✓ dispatches through the real Factory worker into hardened Docker: budget-denial and cleanup  587ms
+   ✓ dispatches through the real Factory worker into hardened Docker: cleanup-failure and cleanup  448ms
+   ✓ reconciles Docker after actual worker process death  7135ms
+
+ Test Files  3 passed (3)
+      Tests  51 passed (51)
+   Start at  15:09:17
+   Duration  38.33s (transform 317ms, setup 0ms, collect 1.14s, tests 39.05s, environment 0ms, prepare 183ms)

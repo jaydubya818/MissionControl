@@ -1,0 +1,28 @@
+{
+  "schema": "factory-docker-worker-death/v1",
+  "fixtureOnly": true,
+  "providerCalls": 0,
+  "workerProcessKilled": true,
+  "containerStoppedWithoutWorker": true,
+  "allocation": {
+    "provider": "DOCKER",
+    "providerResourceId": "7044903fde7759551f4be59060dfd4b05654fc04cd214de9e1a1271b495a2a41",
+    "resourceName": "mc-attempt-129f084de90b5661",
+    "state": "READY",
+    "createdAt": 1788633993009,
+    "readyAt": 1788633993009,
+    "providerMetadata": {
+      "schema": "factory-docker-resource/v1",
+      "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+      "leaseId": "5e7d9c09-e683-4e06-affd-7ed6fc7dbc8b",
+      "manifestDigest": "sha256:eabdebb1325ac0e0456fa65c1259e601be5c16514913d8868c04c2eda10f3bf0"
+    }
+  },
+  "receipt": {
+    "providerResourceId": "7044903fde7759551f4be59060dfd4b05654fc04cd214de9e1a1271b495a2a41",
+    "resourceName": "mc-attempt-129f084de90b5661",
+    "requestedAt": 1788633998173,
+    "confirmedAbsentAt": 1788633998385,
+    "resourceAbsent": true
+  }
+}

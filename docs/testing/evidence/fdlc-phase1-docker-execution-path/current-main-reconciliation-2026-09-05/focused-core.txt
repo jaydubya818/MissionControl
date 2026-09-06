@@ -1,0 +1,15 @@
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+
+ ✓ convex/__tests__/dockerAllocationRecovery.test.ts (12 tests) 2ms
+ ✓ convex/__tests__/pilotLiabilityAllocation.test.ts (9 tests) 2ms
+ ✓ convex/__tests__/workOrderReadiness.test.ts (10 tests) 2ms
+ ✓ convex/__tests__/localCandidateRecovery.test.ts (1 test) 2ms
+ ✓ convex/__tests__/providerLiability.test.ts (24 tests) 8ms
+ ✓ convex/__tests__/providerLiabilityHandlers.test.ts (18 tests) 9ms
+ ✓ convex/__tests__/executionProfile.test.ts (14 tests) 125ms
+
+ Test Files  7 passed (7)
+      Tests  88 passed (88)
+   Start at  15:09:15
+   Duration  533ms (transform 302ms, setup 0ms, collect 732ms, tests 150ms, environment 1ms, prepare 288ms)

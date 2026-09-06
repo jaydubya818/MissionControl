@@ -1,3 +1,4 @@
+import { DockerBoundaryError } from "./dockerSandboxProvider.js";
 import type {
   SandboxAllocation,
   SandboxAllocationRequest,
@@ -208,17 +209,21 @@ export class RemoteSandboxRuntime {
       allocation = await this.waitUntilReady(allocation, request, emit);
 
       failureStage = "CREDENTIAL";
-      grant = await this.credentialBroker.mint({
-        projectId: request.projectId,
-        workflowRunId: request.workflowRunId,
-        attemptId: request.attemptId,
-        attemptLeaseId: request.attemptLeaseId,
-        model: request.executor.model,
-        maxCostUsd: request.profile.spend.maxUsd,
-        expiresAt: this.now() + request.profile.runtime.maxRuntimeMs + 30_000,
-      });
-      const { secret: _secret, ...persistableGrant } = grant;
-      await this.journal.recordCredentialIssued(persistableGrant);
+      assertActive(request.signal);
+      if (request.profile.credentials.inference !== "NONE") {
+        grant = await this.credentialBroker.mint({
+          projectId: request.projectId,
+          workflowRunId: request.workflowRunId,
+          attemptId: request.attemptId,
+          attemptLeaseId: request.attemptLeaseId,
+          model: request.executor.model,
+          maxCostUsd: request.profile.spend.maxUsd,
+          expiresAt: this.now() + request.profile.runtime.maxRuntimeMs + 30_000,
+        });
+        const { secret: _secret, ...persistableGrant } = grant;
+        await this.journal.recordCredentialIssued(persistableGrant);
+      }
+      assertActive(request.signal);
       failureStage = "START";
       const start = await this.provider.start({
         allocation,
@@ -236,10 +241,10 @@ export class RemoteSandboxRuntime {
         repositoryArchive: request.repositoryBundle,
         supervisorSource: request.supervisorSource,
         executor: request.executor,
-        environment: {
+        environment: grant ? {
           OPENAI_API_KEY: grant.secret,
           OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
-        },
+        } : {},
       });
       allocation = { ...allocation, state: "RUNNING", startedAt: start.startedAt };
       await this.resourceObserver?.started({ allocation, processId: start.processId });
@@ -266,7 +271,9 @@ export class RemoteSandboxRuntime {
     } catch (error) {
       const typedError = error instanceof RemoteSandboxExecutionError
         ? error
-        : new RemoteSandboxExecutionError(classifyRemoteError(error, failureStage), error);
+        : error instanceof DockerBoundaryError
+          ? new RemoteSandboxExecutionError(remoteFailure("NON_RETRYABLE_RESULT", `DOCKER_${error.terminalState}`, failureStage, error.message), error)
+          : new RemoteSandboxExecutionError(classifyRemoteError(error, failureStage), error);
       primaryError = typedError;
       if (allocation && request.signal?.aborted) {
         await emit("SANDBOX_CANCELLATION_REQUESTED", { reason: "Attempt cancellation or lease loss" }).catch(() => undefined);
@@ -378,6 +385,12 @@ export class RemoteSandboxRuntime {
       const diagnostics = this.provider.fetchDiagnostics
         ? await this.provider.fetchDiagnostics(current)
         : null;
+      if (this.provider.kind === "DOCKER" && diagnostics?.terminalState === "TIMEOUT") {
+        throw new RemoteSandboxExecutionError(remoteFailure(
+          "NON_RETRYABLE_RESULT", "DOCKER_TIMEOUT", "EXECUTOR",
+          "Docker execution exceeded its frozen deadline; late results are fenced.",
+        ));
+      }
       if (diagnostics?.supervisorProcessRunning === false) {
         // The supervisor atomically renames the bundle immediately before it
         // exits. The first result read can race that rename while the following
@@ -541,7 +554,7 @@ function validateRemoteExecutionRuntimeArtifact(request: RemoteSandboxExecutionR
 
 function exactSandboxProfileImageDigest(profile: SandboxProfileSnapshot) {
   const securityDigest = profile.security?.image?.digest;
-  const referenceDigest = profile.machine.image.match(/@(sha256:[a-f0-9]{64})$/i)?.[1];
+  const referenceDigest = profile.machine.image.match(/(?:^|@)(sha256:[a-f0-9]{64})$/i)?.[1];
   if (securityDigest && /^sha256:[a-f0-9]{64}$/i.test(securityDigest)) {
     if (!referenceDigest || referenceDigest.toLowerCase() !== securityDigest.toLowerCase()) return undefined;
     return securityDigest.toLowerCase();

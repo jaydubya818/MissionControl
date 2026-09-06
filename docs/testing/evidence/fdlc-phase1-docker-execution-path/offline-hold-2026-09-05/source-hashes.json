@@ -1,0 +1,6 @@
+{
+  "docs/software-factory/fdlc-bedrock-qualification-inputs.json": "67daed884645c20e20b2f7e5498633044d43f72550138b22a1b21189ab339fd9",
+  "scripts/check-fdlc-bedrock-prerequisites.mjs": "558c3abb9f2b9f9e349989aabd491412d126f54654b40295a5d92966d4077aa3",
+  "scripts/lib/fdlc-bedrock-prerequisites.mjs": "b974aa9bd1e508fa5eeb0fc98c81aa80221d32e90b11a73841dd09d28c8f20ec",
+  "scripts/lib/fdlc-bedrock-prerequisites.test.mjs": "a97f9ab2ef026393e3db56779c2b730adbf9514eb83410428bc922e959d6f798"
+}

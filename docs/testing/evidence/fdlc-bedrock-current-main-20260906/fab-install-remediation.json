@@ -1,0 +1,7 @@
+{
+  "cause": "pnpm generated node_modules/.bin/fab inside installed runtime; guard includes all recursive files",
+  "remediation": "Removed only fresh-worktree package-local generated bin shim; archive files preserved; no pin or guard changes",
+  "installedPath": "/Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-bedrock-current-main-20260906/node_modules/.pnpm/@fdlc+fab@file+vendor+fab+fdlc-fab-0.1.0-experimental.2.tgz/node_modules/@fdlc/fab",
+  "archiveExact": true,
+  "closureSha256": "121ef8e14b085f6dba6e7f5598070ad80e79f5c1bfa5c71b890871bf83214999"
+}

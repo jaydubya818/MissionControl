@@ -111,17 +111,22 @@ const checks: Array<{
   { key: "worktreeProvided", blocker: "worktree-required", remediation: "Allocate an attempt-specific repository worktree." },
 ];
 
-export function evaluateFactoryDispatchPreflight(input: FactoryDispatchPreflightInput): FactoryDispatchPreflightResult {
-  if (!input.factoryRequired && !input.versionProvided) return { ok: true };
-  for (const check of checks) {
-    if (!input[check.key]) return { ok: false, blocker: check.blocker, remediation: check.remediation };
-  }
+export function factoryDispatchChecks(input: FactoryDispatchPreflightInput) {
+  if (!input.factoryRequired && !input.versionProvided) return [];
+  const results = checks.map((check) => ({
+    code: check.blocker,
+    label: check.key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase()),
+    passed: Boolean(input[check.key]),
+    reason: check.remediation,
+  }));
   if (input.mutating && input.activeRepositoryMutation) {
-    return {
-      ok: false,
-      blocker: "repository-mutation-already-active",
-      remediation: "Wait for, cancel, or reconcile the active mutating attempt for this repository.",
-    };
+    results.push({ code: "repository-mutation-already-active", label: "Repository mutation capacity", passed: false,
+      reason: "Wait for, cancel, or reconcile the active mutating attempt for this repository." });
   }
-  return { ok: true };
+  return results;
+}
+
+export function evaluateFactoryDispatchPreflight(input: FactoryDispatchPreflightInput): FactoryDispatchPreflightResult {
+  const failed = factoryDispatchChecks(input).find((check) => !check.passed);
+  return failed ? { ok: false, blocker: failed.code, remediation: failed.reason } : { ok: true };
 }

@@ -1,0 +1,342 @@
+{
+  "baseMain": "f749b06c8ef39c5bd22c9e0ad76334482ec35b33",
+  "scope": "Exact source/test/config bytes under full System qualification; uncommitted input, later bound by commit attestation",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "d9b6b190a65989e7520db171d9e00125110ddc9276b6c06288ea58315d0a54b1"
+    },
+    {
+      "path": "apps/orchestration-server/package.json",
+      "sha256": "f4eec6c89a84d5a0cea2680afd20a3343881a7b96c1a23363b48d8502774cfae"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/bedrockAdapter.test.ts",
+      "sha256": "8ac2a37770e45a593fbd74bcd825591cee5823394c8cafe15dcef3caea5885a1"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/bedrockInferenceBridge.test.ts",
+      "sha256": "85510e356b7fd1470f85732d1a05a68653806cd5972bfc9341ea318b30a9e85e"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/bedrockProfileComposition.test.ts",
+      "sha256": "d92d09acd5d98f9909f3c22d406e4aaf0a6841b440416c5042950924cc893db5"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/bedrockQualifiedTransport.test.ts",
+      "sha256": "807493fd48cdf5526d927a121973ad9ed8557b97d80ea1a62fb742c7db9ca5f0"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/bedrockReconciliation.test.ts",
+      "sha256": "58a268de32c31658ba05a180023539575f30e8b662f546a736308fd45d621e6b"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/codexExecutorAdapter.test.ts",
+      "sha256": "60463cc9aba550c1f191f63f843912d97bd43d82974cc623e639e058e9a390f5"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/dockerBedrockAdmission.test.ts",
+      "sha256": "e3607124b866a8a594881147972590d45448f1ede5db57d72f3dd40678afc5de"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/dockerBedrockBridge.test.ts",
+      "sha256": "4afb4fb06f70f3ae81879dcd0c1dddf93593afe7857c7389ee24152555b52b28"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/dockerFactoryWorker.test.ts",
+      "sha256": "93e3d70887e2704e4c1ad9b62d778bab0a421eaa01543d2c0aca52b9dfc3d449"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/dockerSandboxProvider.test.ts",
+      "sha256": "333318a7ab5128ee515c40a4dd975d70a8bb4274aa61eab3685d0ef067bc126c"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/factoryAttemptWorkerRemote.test.ts",
+      "sha256": "2164ee83b09b16886d5b8d2c9d50036714195e403860cffb7c679269f7850c63"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/fixtures/bedrockBridgeFixture.ts",
+      "sha256": "a77b12c32a83e77b0645c43373ff701262760f65a5e910bf813bf1b478784382"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/fixtures/bedrockProfileFixture.ts",
+      "sha256": "8a5539f534aec6579e5d504f336b6795fa65171ea5264f4670844a4d8c567882"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/fixtures/remoteWorkerFixture.ts",
+      "sha256": "6688165e7b7f91bbdcda5963c225ce7c93e5dae9344b01e70cf08cf2e5591d20"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/hardLiabilityLedger.test.ts",
+      "sha256": "c0e75503db747320093da0481f0effbc9da89bf3d207314a125221bf16ddb776"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockAdapter.ts",
+      "sha256": "64aa59c0902771b8b6c68a090977a5c34952170b02d6d8ed1536f2ca77c17cac"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockBudgetAdapter.ts",
+      "sha256": "63221e4618bb346b83d1cb8399535130cfc7b29a4dc0e6302b6cdb026c544089"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockFactoryComposition.ts",
+      "sha256": "07d63e170841580c1c6073695ce2e63f9774b132703c84ebc2b99e318cb41798"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockIam.ts",
+      "sha256": "375df72cd87c2872e796c1f4ae335ed2e3e67c602e53ed168da4c2f5a1e34a83"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockInferenceBridge.ts",
+      "sha256": "c0c750cc36f17e9cee3759f9f0a93021d41e0c6692d9a1514d989c03c809d15b"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockModelRouteBinding.ts",
+      "sha256": "d5e452a6fb27a81f091c219e8f23bf6a1e71e8bc9ed820aafa25d4f4d5434f82"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockPricing.ts",
+      "sha256": "135213792330eca98e6fee0c5525b5ed72034a5181b1b34aca66b3f45d2334e9"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockQualifiedTransport.ts",
+      "sha256": "d50c85eeb566c060b2aa041fa841955e554cb33fe711e84339d8e0a02d42ba81"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockResponsesProtocol.ts",
+      "sha256": "34c4cabc31e2d3e938d3d91650080ddf26b13e2fcfc75fa4b106536b597745a4"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockRoute.ts",
+      "sha256": "e1a81c9ca0eda049a4cc7f3af9df435c013cd86e358b7f6917fedc6b386841ec"
+    },
+    {
+      "path": "apps/orchestration-server/src/codexBedrockExecutorAdapter.ts",
+      "sha256": "777eb2ddb96a0dd65b2a9c49421706c948aa2b827f0f11198fa83f291a7fa1ce"
+    },
+    {
+      "path": "apps/orchestration-server/src/codexExecutorAdapter.ts",
+      "sha256": "eee66ebb41988129abe4bada7048fdf137e64ff293b3a6c55fd7058797fe3278"
+    },
+    {
+      "path": "apps/orchestration-server/src/dockerBedrockIdentity.ts",
+      "sha256": "293442425d96404ec973ce763e9615bcf956e1d4715e9932b9b632f67d5a885a"
+    },
+    {
+      "path": "apps/orchestration-server/src/dockerSandboxProvider.ts",
+      "sha256": "7032e904d0cd81ade5d1afc7c09f695a06702ffecf37df0f2a71d79558935c16"
+    },
+    {
+      "path": "apps/orchestration-server/src/factoryAttemptWorker.ts",
+      "sha256": "fdd1595484709338e5ce45183279cbf6d54d5dd8d1bbf884e49d6fb037c93c67"
+    },
+    {
+      "path": "apps/orchestration-server/src/factoryHarnessComposition.ts",
+      "sha256": "91bd3dcf0913f2aa1f44e69638dd4b9eb161c8cfb6a5e16c76e7afe38dcbd4b7"
+    },
+    {
+      "path": "apps/orchestration-server/src/hardLiabilityLedger.ts",
+      "sha256": "2e6bd391719dded666117536aef6d14c3b1c7230b5c4086a8d41dc65311763c3"
+    },
+    {
+      "path": "apps/orchestration-server/src/index.ts",
+      "sha256": "f4ffde0fca593b1c23af5f23e29c2e5a17b46f06a02d48c59431136b959e62bb"
+    },
+    {
+      "path": "apps/orchestration-server/src/remoteSandboxRuntime.ts",
+      "sha256": "66f805d431efb1fe4ce07cca74b70e0fa6e00ab7fb24066ec5bffb6b3c5e5f4a"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxCredentials.ts",
+      "sha256": "bc7d47a4f9ff0f2da88c7af07081ffbf52559d90b257dabc3271afd76c868fc9"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxProvider.ts",
+      "sha256": "557721afb28fd7512a13cbc6c4cc11f7a439f62ba02f7f2a1e0c6c1077534870"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxReconciler.ts",
+      "sha256": "127b1465a252308d0fd2ba55c9d8a90a4fc7246d2b0308bf877c67e857ec3d45"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxResultBundle.ts",
+      "sha256": "792b9c7104417e62558d6a64cf177ec0cc9ff95fa8b0cb6ae48728554eda76eb"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxSupervisor.ts",
+      "sha256": "4c28dcccc73207cdd358edd632beb3cf1e96493ea01638900edfc8dc670180a4"
+    },
+    {
+      "path": "apps/orchestration-server/src/serviceCommandClient.ts",
+      "sha256": "42c1b662da9a5875c19310cff6dcb5a62d6e454739fadd0e84ce552565e65c1d"
+    },
+    {
+      "path": "apps/orchestration-server/src/standaloneRemoteSupervisorSource.ts",
+      "sha256": "dd86d40a322781f15a44f66f4395c02b8740b5deb34538b43f32f60ac7a71e60"
+    },
+    {
+      "path": "convex/__tests__/dockerAllocationRecovery.test.ts",
+      "sha256": "f79c999d8fcb4d55fdc59682f742f4533ecbe121cea363c3d9a8435ccd971eae"
+    },
+    {
+      "path": "convex/__tests__/inferenceGateway.test.ts",
+      "sha256": "c1e4ce3b69f5278cffe4fd16da29be08a088098f0102f06ff57e489664f6ff84"
+    },
+    {
+      "path": "convex/__tests__/pilotLiabilityAllocation.test.ts",
+      "sha256": "7cb32f4930ed9eccede8a24c50a957eb041d5abe190851dbe57ab00e125becbd"
+    },
+    {
+      "path": "convex/__tests__/providerLiability.test.ts",
+      "sha256": "2820af32ac82a8ab46bcf0c3adc7a4ffe9ff345f6191a3fa867a95a8d9415ec3"
+    },
+    {
+      "path": "convex/__tests__/providerLiabilityHandlers.test.ts",
+      "sha256": "451a4ca53a701e8afaed6fa2903ff12d4ea658f74d51e6edbba7aa6138258372"
+    },
+    {
+      "path": "convex/_generated/api.d.ts",
+      "sha256": "87e0e64badb2c4fb725d0be2f327d758bd84a2685bb4c8a138a6b6989e9c8110"
+    },
+    {
+      "path": "convex/factory/attempts.ts",
+      "sha256": "8473381d463b5ec82c68ed1e1dfeb97fd4441a2b9cee1bc5793b30fe08808206"
+    },
+    {
+      "path": "convex/factory/configuration.ts",
+      "sha256": "c8c7241d331e0dc67946743f45d961a2d33ee67c745f0c907403824d451c439c"
+    },
+    {
+      "path": "convex/factory/providerLiability.ts",
+      "sha256": "12bb9831a83e12cd71a52332f01b5f858d308362b2fbc64c4bdd0589fe69a2ec"
+    },
+    {
+      "path": "convex/inferenceGateway.ts",
+      "sha256": "8ae3c823f837762e4d6ae6581104997c2f5db7b7a862394ee88729599427d793"
+    },
+    {
+      "path": "convex/lib/bedrockBridgeIdentity.ts",
+      "sha256": "986a38dff8d16719d092ed2e946b968b299094585e880ee4950ee625a32d5f04"
+    },
+    {
+      "path": "convex/lib/dockerAllocationRecovery.ts",
+      "sha256": "79a571c9d2468580c62cb215fb2647460be98a6adf9800975bbbc7ae3b32c183"
+    },
+    {
+      "path": "convex/lib/dockerSandboxAdmission.ts",
+      "sha256": "1b8bd5a857384dcbd822cad3b53587442da7faa9a14a0ff2ea9033d1fcdc4381"
+    },
+    {
+      "path": "convex/lib/executionProfile.ts",
+      "sha256": "7828e369f31271c9b3614acd6aa29cde3e76a0aa9f952fa0e3835bc20e0f63e8"
+    },
+    {
+      "path": "convex/lib/governedInferenceAdmission.ts",
+      "sha256": "18fbab8ad350296502a5e0e85245f98880b5a4581bb55e6f1db2fdbf37032526"
+    },
+    {
+      "path": "convex/lib/pilotLiabilityAllocation.ts",
+      "sha256": "d831baba6d500007f993fda8ed76146204713bb33889567d0e44cf19b40cac52"
+    },
+    {
+      "path": "convex/lib/providerLiability.ts",
+      "sha256": "21afa0b0d45c9b0659f9ae1ad25e29845a56435c42d2a1cacd3c87c094cc777c"
+    },
+    {
+      "path": "convex/lib/providerLiabilityValidators.ts",
+      "sha256": "b279a1250e7f7f9f4e77b8abc7d1440ef181fa226ac9a40a103d1242dbccaaef"
+    },
+    {
+      "path": "convex/lib/runtimeContract.ts",
+      "sha256": "53384b0865355360a75f5bf763d97e0146735e0bfad1653c6168a6abb3873e72"
+    },
+    {
+      "path": "convex/lib/sandboxProfileAdmission.ts",
+      "sha256": "43609968ba98294d4b8697dc58808b903580ac935cd779ffd8d5f8159bc3e428"
+    },
+    {
+      "path": "convex/schema.ts",
+      "sha256": "339f89712e27875704adca304b292253c309766d42fc2f724554d2c135c5506f"
+    },
+    {
+      "path": "convex/serviceCommands.ts",
+      "sha256": "d45916b37ff1050ccc5186f337589e558a196a93c9e19613336c228ebfe76a9a"
+    },
+    {
+      "path": "infra/docker-bedrock/Dockerfile",
+      "sha256": "38577ff43016ae09eb0d03bfd421324e0d0ac272d5d8c1ebc27cb0ec19b5248c"
+    },
+    {
+      "path": "infra/docker-bedrock/bridge.mjs",
+      "sha256": "43b7561647c9609cb38fa0c5949c290b43f529ee28b4c9a2fa018fd62d9de2aa"
+    },
+    {
+      "path": "infra/docker-bedrock/supervisor.mjs",
+      "sha256": "7674c7d9177e98cd0c52ad0c225110786b9f191dc3cbaaf825dc63c2de17464c"
+    },
+    {
+      "path": "infra/docker-factory/Dockerfile",
+      "sha256": "70f0f8aeb28d0ec4c74f92e7170448c38b6f4bbeb0653d7f89790be0ddbdb806"
+    },
+    {
+      "path": "infra/docker-factory/bridge.mjs",
+      "sha256": "497e291d5c93763c25e116bddac6f45c66cb32c432f3bd94e445e3d8bc4e7315"
+    },
+    {
+      "path": "infra/docker-factory/qualification.mjs",
+      "sha256": "57d5b3f56eebb8bf30922cbe43eb059946f1c583b1d59c6728a6e814186cb3d6"
+    },
+    {
+      "path": "infra/docker-factory/runtime-fixture.mjs",
+      "sha256": "bb37d37276e1f83ee307303363d07a2477a706591464dc62bf7f36bd4bffcc6b"
+    },
+    {
+      "path": "infra/docker-factory/supervisor.mjs",
+      "sha256": "bd7790f0bf67b21ca512b4f15df4c02e8d286446cff5287ea6c0affd30ee4b08"
+    },
+    {
+      "path": "packages/shared/src/governedInference.ts",
+      "sha256": "a7d659d6ddf0e708f4237390eb592b6840e5a3d8b147ef0e77472f754d5b9fbd"
+    },
+    {
+      "path": "packages/telegram-bot/tsconfig.json",
+      "sha256": "698189dd97627a3e15f71756d8547ec07e8f2246a3ffb94bd025a51fe0d62a70"
+    },
+    {
+      "path": "packages/workflow-engine/src/harnessManifests.ts",
+      "sha256": "308c7bcfa24b5f58b31db8f56097822fee79bd6bb8b4102c33eb173081319ddd"
+    },
+    {
+      "path": "packages/workflow-engine/src/index.ts",
+      "sha256": "a8ed18e4e18e4c2884b1426b3e5dcc9bd68be8303aaa13aa0425c5049e7fe04e"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "b8ae7116baf742e144ff6e6dc92ea68827f40fff8a70b9b20ee0c4452e6fd70f"
+    },
+    {
+      "path": "scripts/check-fdlc-bedrock-prerequisites.mjs",
+      "sha256": "bd2a85d8c25a7c3fa57044f602f53dd7f944cb016b45f9e58604b4855a30b171"
+    },
+    {
+      "path": "scripts/fdlc-bedrock-resumption.mts",
+      "sha256": "38b0d1e6a81fbb270010a485396085883be54c1ddfdca10f4088402f81e1fd2e"
+    },
+    {
+      "path": "scripts/governed-mcp-phase3-qualification.mts",
+      "sha256": "a3e9b8d28e80dfe84d00a811f0aff8dcca67e02c9a794bfd61c513e0ecd04247"
+    },
+    {
+      "path": "scripts/lib/fdlc-bedrock-prerequisites.mjs",
+      "sha256": "bc001feef5a0183ad53c7e31605fdc4044d4cbcd4701bab2b972ac7a99f0c280"
+    },
+    {
+      "path": "scripts/lib/fdlc-bedrock-prerequisites.test.mjs",
+      "sha256": "dd86d882df44c8a25c0364f57f96ecdfe4f153fb37bfee77620526cb9a4bbf82"
+    },
+    {
+      "path": "scripts/lib/fdlc-bedrock-resumption.test.mjs",
+      "sha256": "f928a7ea0b05fbcec47a60def9ba7160ca9e15117b2f1f73c6ed76d5d48d470d"
+    }
+  ]
+}

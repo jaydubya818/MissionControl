@@ -35,7 +35,10 @@ import { pathToFileURL } from "url";
 import { createHash, randomUUID } from "node:crypto";
 import { executeAutomation } from "./automationAdapter.js";
 import { discoverLocalInference } from "./localInference.js";
-import { FactoryAttemptWorker } from "./factoryAttemptWorker.js";
+import { readFileSync } from "node:fs";
+import { FactoryAttemptWorker, DEFAULT_DEPENDENCIES } from "./factoryAttemptWorker.js";
+import { bedrockFactoryProviderFactory, selectBedrockFactoryProvider } from "./bedrockFactoryComposition.js";
+import { qualifiedBedrockTransport } from "./bedrockQualifiedTransport.js";
 import {
   FactoryHostReporter,
   factorySandboxCapabilities,
@@ -89,7 +92,9 @@ const AUTOMATION_REPOSITORY_ROOT = path.resolve(process.env.AUTOMATION_REPOSITOR
 const CODEX_FACTORY_WORKER_ENABLED = process.env.CODEX_FACTORY_WORKER_ENABLED === "true";
 const DEEPSEEK_HARNESS_EXECUTOR_ENABLED = process.env.DEEPSEEK_HARNESS_EXECUTOR_ENABLED === "1";
 const LEGACY_FACTORY_WORKER_ENABLED = process.env.FACTORY_EXECUTION_ENABLED === "1";
-const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED || Boolean(configuredFabAdapter);
+const CODEX_BEDROCK_HARNESS_ENABLED = process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1";
+const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
+  || Boolean(configuredFabAdapter) || CODEX_BEDROCK_HARNESS_ENABLED;
 const FACTORY_WORKER_SCOPE = DURABLE_FACTORY_WORKER_ENABLED
   ? {
       projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"),
@@ -100,9 +105,17 @@ const FACTORY_WORKER_SESSION_ID = randomUUID();
 const FACTORY_WORKER_ID = process.env.CODEX_WORKER_HOST_ID?.trim() || `orchestration:${os.hostname()}`;
 const FACTORY_WORKER_MAX_CONCURRENT_RUNS = boundedPositiveInteger(process.env.CODEX_WORKER_MAX_CONCURRENT_RUNS, 1);
 const GITHUB_APP_PUBLICATION_READY = process.env.CODEX_WORKER_GITHUB_APP_PUBLICATION_ENABLED === "1";
-const REMOTE_SANDBOX_BACKEND_READY = process.env.CODEX_WORKER_REMOTE_SANDBOX_ENABLED === "1"
-  && Boolean(process.env.EXEDEV_IDENTITY_FILE?.trim())
-  && Boolean(process.env.OPENROUTER_MANAGEMENT_API_KEY?.trim());
+const bedrockConfigPath = CODEX_BEDROCK_HARNESS_ENABLED
+  ? process.env.CODEX_BEDROCK_APPROVED_CONFIG_FILE?.trim()
+  : undefined;
+const bedrockConfig = bedrockConfigPath ? JSON.parse(readFileSync(bedrockConfigPath, "utf8")) : undefined;
+const bedrockTransport = bedrockConfig?.callAuthorization
+  ? qualifiedBedrockTransport(bedrockConfig.route, bedrockConfig.callAuthorization)
+  : undefined;
+const REMOTE_SANDBOX_BACKEND_READY = Boolean(bedrockTransport)
+  || (process.env.CODEX_WORKER_REMOTE_SANDBOX_ENABLED === "1"
+    && Boolean(process.env.EXEDEV_IDENTITY_FILE?.trim())
+    && Boolean(process.env.OPENROUTER_MANAGEMENT_API_KEY?.trim()));
 const FACTORY_WORKER_EXECUTION_BACKENDS = REMOTE_SANDBOX_BACKEND_READY
   ? ["persistent-worker", "remote-sandbox"] as const
   : ["persistent-worker"] as const;
@@ -124,6 +137,7 @@ if (CONVEX_SERVICE_AUTH_TOKEN) {
 const factoryHarnessRegistry = new HarnessAdapterRegistry(
   [...configuredFactoryHarnessAdapters({
     codexEnabled: CODEX_FACTORY_WORKER_ENABLED,
+    codexBedrockEnabled: CODEX_BEDROCK_HARNESS_ENABLED,
     deepseekEnabled: DEEPSEEK_HARNESS_EXECUTOR_ENABLED,
     legacyFactoryWorkerEnabled: LEGACY_FACTORY_WORKER_ENABLED,
   }), ...(configuredFabAdapter ? [configuredFabAdapter] : [])],
@@ -144,7 +158,13 @@ const factoryAttemptWorker = new FactoryAttemptWorker(
   factoryHarnessRegistry,
   DURABLE_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED,
   undefined,
-  undefined,
+  bedrockTransport ? {
+    ...DEFAULT_DEPENDENCIES,
+    createSandboxProvider: selectBedrockFactoryProvider(
+      bedrockFactoryProviderFactory(client, bedrockConfig, bedrockTransport),
+      DEFAULT_DEPENDENCIES.createSandboxProvider!,
+    ),
+  } : undefined,
   FACTORY_WORKER_SCOPE,
   FACTORY_WORKER_SCOPE ? {
     workerId: FACTORY_WORKER_ID,

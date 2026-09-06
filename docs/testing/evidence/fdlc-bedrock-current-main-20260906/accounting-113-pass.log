@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-bedrock-current-main-20260906
+
+ ✓ convex/__tests__/providerLiability.test.ts (24 tests) 8ms
+ ✓ convex/__tests__/inferenceGateway.test.ts (24 tests) 11ms
+ ✓ convex/__tests__/providerLiabilityHandlers.test.ts (65 tests) 42ms
+
+ Test Files  3 passed (3)
+      Tests  113 passed (113)
+   Start at  22:39:50
+   Duration  394ms (transform 184ms, setup 0ms, collect 390ms, tests 61ms, environment 0ms, prepare 124ms)

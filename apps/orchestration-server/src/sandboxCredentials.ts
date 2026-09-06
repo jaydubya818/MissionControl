@@ -43,7 +43,15 @@ export type SandboxCredentialReference = Omit<SandboxCredentialGrant, "secret">;
 export interface SandboxCredentialBroker {
   mint(request: SandboxCredentialRequest): Promise<SandboxCredentialGrant>;
   revoke(grant: SandboxCredentialReference): Promise<SandboxCredentialRevocationReceipt>;
-}
+ }
+
+export class NoSandboxCredentialBroker implements SandboxCredentialBroker {
+  async mint(): Promise<never> {
+    throw new Error("DOCKER_CREDENTIAL_MINT_PROHIBITED");
+  }
+  async revoke(): Promise<never> {
+    throw new Error("DOCKER_CREDENTIAL_REFERENCE_UNEXPECTED");
+  } }
 
 export class OpenRouterSandboxCredentialBroker implements SandboxCredentialBroker {
   private readonly activeSecrets = new Map<string, string>();

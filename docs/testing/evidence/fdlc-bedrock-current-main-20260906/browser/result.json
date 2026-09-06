@@ -1,0 +1,37 @@
+{
+  "classification": "OFFLINE_SYNTHETIC_BROWSER_COMPONENT_FIXTURE",
+  "result": "PASS",
+  "url": "http://127.0.0.1:5287/",
+  "browser": "Chromium via Playwright CLI",
+  "checks": {
+    "loading": "PASS",
+    "blocked": "PASS",
+    "eligibleWithDeferredIndependentProof": "PASS",
+    "staleSnapshot": "PASS",
+    "refreshCallback": "PASS",
+    "wide1440": "PASS",
+    "narrow390": "PASS",
+    "horizontalOverflow390": "NONE",
+    "consoleErrors": 0,
+    "consoleWarnings": 0
+  },
+  "sourceInspection": {
+    "workOrdersReadinessQueryAndRefresh": "PRESERVED",
+    "currentMainCandidateRecoveryPanel": "PRESERVED",
+    "independentVerificationRecovery": "PRESERVED",
+    "staleDispatchGuard": "PRESERVED",
+    "leftNavigationWorkOrders": "REACHABLE_BY_SOURCE"
+  },
+  "realReadinessIssued": false,
+  "backendCalls": 0,
+  "awsCalls": 0,
+  "modelCalls": 0,
+  "workOrderDispatches": 0,
+  "sourceSha256": {
+    "apps/mission-control-ui/src/controlPlane/WorkOrderReadinessPanel.tsx": "db134641106143d26ae675068b092957154240be9e1a06a9b184499ac4d1ad19",
+    "apps/mission-control-ui/src/controlPlane/WorkOrdersView.tsx": "99b9ae1d0f7cd7dc34bbe0e4b2035de856161202d35f3ce1775ef1e2fcf244a4",
+    "apps/mission-control-ui/src/controlPlane/CandidateRecoveryPanel.tsx": "a7df6cb8a871da75eabc436ae15cf6c17f611b823f1c96770d60e4f67f1024b3",
+    "apps/mission-control-ui/src/shellV2/eosNavConfig.ts": "2a2893c5114301e517e8b226d8186970cbf8d64a92f5b61a7984b5eb3bd9d1f2",
+    "apps/mission-control-ui/src/shellV2/navConfig.ts": "e5b2fdf6962945c31d1246f0e71a62bde2af899ca1103d1e3650277bcea9aaec"
+  }
+}

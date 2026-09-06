@@ -105,7 +105,7 @@ describe("canonical inference reservation authority", () => {
   it("rejects malformed historical liability instead of dropping it from the total", async () => {
     const f = fixture(); const first = await f.reserve("first", 1_000_000);
     await f.db.patch(first.reservationId, { maxCostMicrousd: Number.NaN });
-    await expect(f.reserve("second", 1_000_000)).rejects.toThrow(/liability|reservation.*invalid/i);
+    await expect(f.reserve("second", 1_000_000)).rejects.toThrow(/liability|allocation.*invalid/i);
   });
 
   it("persists, claims and receipts one exact immutable reservation with distinct database IDs", async () => {

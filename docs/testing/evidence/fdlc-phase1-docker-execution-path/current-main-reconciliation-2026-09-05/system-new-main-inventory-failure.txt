@@ -1,0 +1,61 @@
+
+> mission-control@0.9.0 qualify:factory /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> node scripts/system-factory-e2e-qualification.mjs
+
+
+=== profile-bound governed read-only MCP transport and negative controls ===
+Governed MCP Phase 3 broker scenario passed: sha256:7de45ff549953aa804fb8b13e976a69c47a23e2169992284a034a1d3d0e7107b
+Evidence: /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/docs/testing/evidence/governed-mcp-phase3/runs/7f7282ea2ac4-2026-09-05T22-21-08-566Z/broker-scenario.json
+
+=== frozen dependency, advisory, credential, and release configuration gates ===
+
+> mission-control@0.9.0 release:security /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm run security:audit && pnpm run security:authorization && pnpm run security:secrets && pnpm run docs:factory-check
+
+
+> mission-control@0.9.0 security:audit /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> node scripts/check-dependency-audit.mjs
+
+PASS production dependency audit: critical=0 high=0 moderate=2 low=0; accepted-moderate=1124268,1124272
+PASS all dependency audit: critical=0 high=0 moderate=3 low=2; accepted-moderate=1121861,1124268,1124272
+
+> mission-control@0.9.0 security:authorization /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> pnpm exec vitest run scripts/lib/convex-authorization-scan.test.mjs && node scripts/check-convex-authorization.mjs
+
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+
+ ✓ scripts/lib/convex-authorization-scan.test.mjs (9 tests) 16ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  15:21:11
+   Duration  521ms (transform 17ms, setup 0ms, collect 210ms, tests 16ms, environment 0ms, prepare 70ms)
+
+Convex public functions: 951 total · 327 authorized · 0 declared-public · 624 unauthorized (baseline 624).
+
+Convex authorization ratchet: PASS — no new unauthorized public functions.
+
+> mission-control@0.9.0 security:secrets /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+> node scripts/check-repository-secrets.mjs
+
+node:fs:1710
+  const stats = binding.lstat(
+                        ^
+
+Error: ENOENT: no such file or directory, lstat '/Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/docs/testing/evidence/fdlc-phase1-docker-execution-path/current-main-reconciliation-2026-09-05/main-diff.patch'
+    at lstatSync (node:fs:1710:25)
+    at file:///Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/scripts/check-repository-secrets.mjs:24:17
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:643:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'lstat',
+  path: '/Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/docs/testing/evidence/fdlc-phase1-docker-execution-path/current-main-reconciliation-2026-09-05/main-diff.patch'
+}
+
+Node.js v24.18.1
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.

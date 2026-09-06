@@ -1,0 +1,11 @@
+{
+  "apps/orchestration-server/src/dockerSandboxProvider.ts": "f6a7604b2decbd786a79142a6880167866bca9fcf87c6f7501e60f276050be29",
+  "apps/orchestration-server/src/sandboxProvider.ts": "dd94c8d815eca9649e569ac35f7070edc346652f233f75deefca99c8706701ac",
+  "apps/orchestration-server/src/factoryAttemptWorker.ts": "e3c909adaa319ee25e839ee214dab0dfc4b2cfa2478c6323490552c384071566",
+  "convex/lib/dockerAllocationRecovery.ts": "79a571c9d2468580c62cb215fb2647460be98a6adf9800975bbbc7ae3b32c183",
+  "convex/factory/attempts.ts": "ed575d57873ebbf0d5a4b4721bcff3abd68619070ff165ef4e8e175de303f1ae",
+  "convex/_generated/api.d.ts": "97e3c34746afa179adc26c33ee4c25c3c61e02d2e1440ea4d9ac260617cd1a0b",
+  "convex/__tests__/dockerAllocationRecovery.test.ts": "f79c999d8fcb4d55fdc59682f742f4533ecbe121cea363c3d9a8435ccd971eae",
+  "apps/orchestration-server/src/__tests__/dockerSandboxProvider.test.ts": "333318a7ab5128ee515c40a4dd975d70a8bb4274aa61eab3685d0ef067bc126c",
+  "apps/orchestration-server/src/__tests__/dockerFactoryWorker.test.ts": "93e3d70887e2704e4c1ad9b62d778bab0a421eaa01543d2c0aca52b9dfc3d449"
+}

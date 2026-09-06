@@ -56,12 +56,19 @@ No status is treated as a refund. This is a WorkOrder ceiling; a program spannin
 multiple WorkOrders still requires immutable sub-budgets totaling at most $5 or
 one shared canonical WorkOrder budget before live execution.
 
+Current-main reconciliation reuses the cumulative allocation helper delivered
+in PR #184 and the exported atomic ledger functions used by PR #185. Fab's
+snapshot/identity fixes apply to those shared functions. The incoming Bedrock
+bridge is bound to the separate codex/bedrock-v1 Docker tuple; it is not an
+enrollment grant for Fab's persistent-worker adapter. Its exact tuple checks
+remain intact.
+
 The actual handler path also mixed database foreign keys with logical immutable
 reservation IDs. New intents and receipts retain exact snapshots; dispatch checks
 the original intent digest and mirrors, and receipt generation derives the
 claimed state from persisted claim facts. Database IDs remain foreign keys.
 Legacy records are not rewritten or guessed; a legacy intent without its exact
-snapshot cannot dispatch. Runtime contract 46 requires the updated backend and
+snapshot cannot dispatch. Runtime contract 48 requires the updated backend and
 client together. Zero cache/reasoning allowances now represent disabled features.
 
 Focused provider tests cover message/tool continuity, exact profile/region binding,

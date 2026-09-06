@@ -1,0 +1,712 @@
+{
+  "schemaVersion": "mission-control/eval-receipt/v1",
+  "runId": "mission-control-golden:f82fe1d98b15:1788644002506",
+  "idempotencyKey": "f82fe1d98b156278c4fa0c0e2032008e2f010f39:sha256:bc19a806ebacfd3f1e3942faad38e17eec3be92a28a9df863fa1fd19893ba181:sha256:d14e3ccd0db344a6bf6397c71380f1511f429ccbf03faecd37dcc3d0fbaf9090",
+  "suite": {
+    "key": "mission-control-golden-path",
+    "version": 1,
+    "digest": "sha256:d14e3ccd0db344a6bf6397c71380f1511f429ccbf03faecd37dcc3d0fbaf9090"
+  },
+  "baseline": {
+    "baselineId": "mission-control-golden-v1-main",
+    "digest": "sha256:3538953f4840c4b25eb80855cc89a18ce489fc4bf3ab694c631441c3e1ae38fa"
+  },
+  "runStatus": "COMPLETED",
+  "verdict": "WARN",
+  "publishable": true,
+  "releaseBlocking": false,
+  "acceptanceAuthority": false,
+  "provenance": {
+    "repository": "jaydubya818/MissionControl",
+    "revision": "f82fe1d98b156278c4fa0c0e2032008e2f010f39",
+    "baseRevision": "9a80cf3c5cc229bb4a552a9f08ddda5841e70a38",
+    "adapter": {
+      "id": "system-factory-scenario-evidence",
+      "version": "1.0.0",
+      "digest": "sha256:461d40745f8a80277c04004c506a3e5565ea766adc70e73aebfc7f4d69234bd9"
+    },
+    "runtime": {
+      "name": "node",
+      "version": "24.18.1"
+    },
+    "datasetDigest": "sha256:d14e3ccd0db344a6bf6397c71380f1511f429ccbf03faecd37dcc3d0fbaf9090",
+    "resolvedConfigDigest": "sha256:5bee498fb1fde0653cde690c5ab23e0c100b20a70c99a82e50b24825d54578ef",
+    "seed": "mission-control-golden-v1",
+    "artifacts": [
+      {
+        "path": "docs/testing/evidence/fdlc-bedrock-offline-system-final-20260905/scenario-evidence.json",
+        "digest": "sha256:bc19a806ebacfd3f1e3942faad38e17eec3be92a28a9df863fa1fd19893ba181"
+      }
+    ]
+  },
+  "metrics": {
+    "totalCases": 7,
+    "scoredCases": 7,
+    "passedCases": 6,
+    "failedCases": 1,
+    "invalidCases": 0,
+    "skippedCases": 0,
+    "blockingCases": 6,
+    "blockingPassed": 6,
+    "advisoryCases": 1,
+    "advisoryPassed": 0,
+    "completionRate": 1,
+    "blockingPassRate": 1,
+    "advisoryPassRate": 0,
+    "invalidRatio": 0,
+    "totalDurationMs": 9346,
+    "totalCostUsd": 0,
+    "slices": [
+      {
+        "slice": "authority",
+        "cases": 2,
+        "passed": 2,
+        "failed": 0,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 1
+      },
+      {
+        "slice": "economics",
+        "cases": 1,
+        "passed": 0,
+        "failed": 1,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 0
+      },
+      {
+        "slice": "evidence",
+        "cases": 1,
+        "passed": 1,
+        "failed": 0,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 1
+      },
+      {
+        "slice": "harness",
+        "cases": 1,
+        "passed": 1,
+        "failed": 0,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 1
+      },
+      {
+        "slice": "intent",
+        "cases": 1,
+        "passed": 1,
+        "failed": 0,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 1
+      },
+      {
+        "slice": "learning",
+        "cases": 1,
+        "passed": 1,
+        "failed": 0,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 1
+      },
+      {
+        "slice": "lineage",
+        "cases": 1,
+        "passed": 1,
+        "failed": 0,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 1
+      },
+      {
+        "slice": "observability",
+        "cases": 1,
+        "passed": 0,
+        "failed": 1,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 0
+      },
+      {
+        "slice": "provenance",
+        "cases": 1,
+        "passed": 1,
+        "failed": 0,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 1
+      },
+      {
+        "slice": "recovery",
+        "cases": 1,
+        "passed": 1,
+        "failed": 0,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 1
+      },
+      {
+        "slice": "resilience",
+        "cases": 1,
+        "passed": 1,
+        "failed": 0,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 1
+      },
+      {
+        "slice": "safety",
+        "cases": 2,
+        "passed": 2,
+        "failed": 0,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 1
+      },
+      {
+        "slice": "verification",
+        "cases": 1,
+        "passed": 1,
+        "failed": 0,
+        "invalid": 0,
+        "skipped": 0,
+        "passRate": 1
+      }
+    ]
+  },
+  "results": [
+    {
+      "caseKey": "exact-intent-lineage",
+      "caseName": "Exact intent remains bound",
+      "severity": "BLOCKING",
+      "slices": [
+        "intent",
+        "lineage"
+      ],
+      "evidenceRefs": [
+        "docs/testing/evidence/fdlc-bedrock-offline-system-final-20260905/scenario-evidence.json"
+      ],
+      "verdict": "PASS",
+      "score": 1,
+      "assertionResults": [
+        {
+          "code": "finalized-spec-present",
+          "path": "lineage.finalizedSpecRevisionId",
+          "operator": "PRESENT",
+          "passed": true,
+          "observed": "mission-spec-system-factory-e2e-v2-r2",
+          "expected": "present"
+        },
+        {
+          "code": "bound-spec-is-finalized",
+          "path": "lineage.boundSpecRemainedRevision",
+          "operator": "EQUALS_PATH",
+          "passed": true,
+          "observed": "mission-spec-system-factory-e2e-v2-r2",
+          "expected": "mission-spec-system-factory-e2e-v2-r2"
+        },
+        {
+          "code": "newer-spec-did-not-rebind",
+          "path": "lineage.currentSpecRevisionId",
+          "operator": "NOT_EQUALS_PATH",
+          "passed": true,
+          "observed": "mission-spec-system-factory-e2e-v2-r3",
+          "expected": "mission-spec-system-factory-e2e-v2-r2"
+        },
+        {
+          "code": "spec-digest-pinned",
+          "path": "lineage.finalizedSpecDigest",
+          "operator": "SHA256",
+          "passed": true,
+          "observed": "sha256:3187eba71569bb50e9893bd14eeb59d80929476bae7b10d56ca5af78e348b3dc",
+          "expected": "sha256:<64 lowercase hex>"
+        },
+        {
+          "code": "quality-contract-pinned",
+          "path": "lineage.qualityContractDigest",
+          "operator": "SHA256",
+          "passed": true,
+          "observed": "sha256:742129e4ddf06390df7c7d3967a33027097d582dd112e80713cc7cce9a85f365",
+          "expected": "sha256:<64 lowercase hex>"
+        },
+        {
+          "code": "separate-plan-approval",
+          "path": "lineage.planApproval.approvedBy",
+          "operator": "NOT_EQUALS_PATH",
+          "passed": true,
+          "observed": "operator-approver",
+          "expected": "operator-author"
+        },
+        {
+          "code": "work-order-revision-present",
+          "path": "lineage.workOrderRevision",
+          "operator": "NUMBER_GTE",
+          "passed": true,
+          "observed": 1,
+          "expected": ">= 1"
+        }
+      ],
+      "failedAssertionCodes": [],
+      "outputDigest": "sha256:f246de46c0a672db901e88a8f5109a2bec1843bd718c809cefb17c6c57ee6b20"
+    },
+    {
+      "caseKey": "bounded-human-authority",
+      "caseName": "Acceptance authority stays human",
+      "severity": "BLOCKING",
+      "slices": [
+        "authority",
+        "safety"
+      ],
+      "evidenceRefs": [
+        "docs/testing/evidence/fdlc-bedrock-offline-system-final-20260905/scenario-evidence.json"
+      ],
+      "verdict": "PASS",
+      "score": 1,
+      "assertionResults": [
+        {
+          "code": "human-acceptance-actor",
+          "path": "lineage.acceptanceActor",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": "human operator",
+          "expected": "human operator"
+        },
+        {
+          "code": "workorders-only-writer",
+          "path": "authority.workOrderAcceptedEventWriters",
+          "operator": "ARRAY_LENGTH_EQUALS",
+          "passed": true,
+          "observed": [
+            "workOrders.ts"
+          ],
+          "expected": "array length = 1"
+        },
+        {
+          "code": "workorders-writer-present",
+          "path": "authority.workOrderAcceptedEventWriters",
+          "operator": "ARRAY_INCLUDES",
+          "passed": true,
+          "observed": [
+            "workOrders.ts"
+          ],
+          "expected": "workOrders.ts"
+        },
+        {
+          "code": "learning-no-acceptance",
+          "path": "authority.learningHasAcceptanceMutation",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": false,
+          "expected": false
+        },
+        {
+          "code": "observability-no-acceptance",
+          "path": "authority.observabilityHasAcceptanceMutation",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": false,
+          "expected": false
+        },
+        {
+          "code": "plan-self-approval-blocked",
+          "path": "authority.planSelfApprovalGuard",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": true,
+          "expected": true
+        },
+        {
+          "code": "sandbox-no-github-authority",
+          "path": "authority.sandboxHasGithubAuthority",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": false,
+          "expected": false
+        }
+      ],
+      "failedAssertionCodes": [],
+      "outputDigest": "sha256:f246de46c0a672db901e88a8f5109a2bec1843bd718c809cefb17c6c57ee6b20"
+    },
+    {
+      "caseKey": "exact-current-evidence",
+      "caseName": "Evidence matches the exact candidate",
+      "severity": "BLOCKING",
+      "slices": [
+        "evidence",
+        "verification"
+      ],
+      "evidenceRefs": [
+        "docs/testing/evidence/fdlc-bedrock-offline-system-final-20260905/scenario-evidence.json"
+      ],
+      "verdict": "PASS",
+      "score": 1,
+      "assertionResults": [
+        {
+          "code": "quality-gate-eligible",
+          "path": "lineage.qualityGateState",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": "ELIGIBLE",
+          "expected": "ELIGIBLE"
+        },
+        {
+          "code": "verification-subject-present",
+          "path": "lineage.verificationSubjectId",
+          "operator": "PRESENT",
+          "passed": true,
+          "observed": "verification-subject:7b1f599dc5bcc2024016153480e6a0b026de26a7b587108a531b7ae31a7aff0f",
+          "expected": "present"
+        },
+        {
+          "code": "verification-plan-present",
+          "path": "lineage.verificationPlanId",
+          "operator": "PRESENT",
+          "passed": true,
+          "observed": "verification-plan:20999e4f203fcd9598d3239958fe422a8b32a256287b1cd578006cb311127214",
+          "expected": "present"
+        },
+        {
+          "code": "verification-plan-digest",
+          "path": "lineage.verificationPlanDigest",
+          "operator": "SHA256",
+          "passed": true,
+          "observed": "sha256:20999e4f203fcd9598d3239958fe422a8b32a256287b1cd578006cb311127214",
+          "expected": "sha256:<64 lowercase hex>"
+        },
+        {
+          "code": "receipt-present",
+          "path": "lineage.receiptId",
+          "operator": "PRESENT",
+          "passed": true,
+          "observed": "receipt:attempt-verification-current-head",
+          "expected": "present"
+        },
+        {
+          "code": "evidence-set-complete",
+          "path": "lineage.evidenceIds",
+          "operator": "ARRAY_MIN_LENGTH",
+          "passed": true,
+          "observed": [
+            "evidence:attempt-verification-current-head:factory-negative-constraints",
+            "evidence:attempt-verification-current-head:factory-change-budget",
+            "evidence:attempt-verification-current-head:factory-verification-authority",
+            "evidence:attempt-verification-current-head:mission:independent-verification",
+            "evidence:attempt-verification-current-head:spec:VERIFY-001"
+          ],
+          "expected": "array length >= 4"
+        },
+        {
+          "code": "provider-head-is-candidate",
+          "path": "lineage.providerHeadSha",
+          "operator": "EQUALS_PATH",
+          "passed": true,
+          "observed": "9ba871d9efad9b224b2f2cd432fbfb5cfbc9d461",
+          "expected": "9ba871d9efad9b224b2f2cd432fbfb5cfbc9d461"
+        }
+      ],
+      "failedAssertionCodes": [],
+      "outputDigest": "sha256:f246de46c0a672db901e88a8f5109a2bec1843bd718c809cefb17c6c57ee6b20"
+    },
+    {
+      "caseKey": "failure-retry-recovery",
+      "caseName": "Failures recover through new Attempts",
+      "severity": "BLOCKING",
+      "slices": [
+        "recovery",
+        "resilience"
+      ],
+      "evidenceRefs": [
+        "docs/testing/evidence/fdlc-bedrock-offline-system-final-20260905/scenario-evidence.json"
+      ],
+      "verdict": "PASS",
+      "score": 1,
+      "assertionResults": [
+        {
+          "code": "multiple-source-attempts",
+          "path": "lineage.sourceAttemptIds",
+          "operator": "ARRAY_MIN_LENGTH",
+          "passed": true,
+          "observed": [
+            "attempt-source-failed-1",
+            "attempt-source-failed-2",
+            "attempt-source-failed-3",
+            "attempt-source-repaired",
+            "attempt-source-current-head"
+          ],
+          "expected": "array length >= 2"
+        },
+        {
+          "code": "multiple-candidates",
+          "path": "lineage.candidateShas",
+          "operator": "ARRAY_MIN_LENGTH",
+          "passed": true,
+          "observed": [
+            "911cc67e464c075ddd7081ac5d72ceb2e9dc11bc",
+            "c0a4802fa86333248831375766e2393eaef37f80",
+            "4aec47c3d14f18b432ea5b14b9233e535104f567",
+            "b830028fb294f4b14cbdf1bc3b8505e843ff1fbf",
+            "9ba871d9efad9b224b2f2cd432fbfb5cfbc9d461"
+          ],
+          "expected": "array length >= 2"
+        },
+        {
+          "code": "multiple-verification-attempts",
+          "path": "lineage.verificationAttemptIds",
+          "operator": "ARRAY_MIN_LENGTH",
+          "passed": true,
+          "observed": [
+            "attempt-verification-failed-3",
+            "attempt-verification-repaired",
+            "attempt-verification-current-head"
+          ],
+          "expected": "array length >= 2"
+        },
+        {
+          "code": "retry-count-recorded",
+          "path": "performance.sourceRetries",
+          "operator": "NUMBER_GTE",
+          "passed": true,
+          "observed": 4,
+          "expected": ">= 1"
+        },
+        {
+          "code": "failure-matrix-passed",
+          "path": "failureInjection",
+          "operator": "ALL_STRINGS_START_WITH",
+          "passed": true,
+          "observed": {
+            "staleLease": "PASS",
+            "incompleteSpecRevisionBlocked": "PASS",
+            "specRepositoryScopeMismatchBlocked": "PASS",
+            "newerSpecRevisionDidNotRebindApprovedPlanOrWorkOrder": "PASS",
+            "harnessManifestDigestMismatchBlocked": "PASS",
+            "harnessUnsupportedModelBlocked": "PASS",
+            "harnessUnsupportedBackendBlocked": "PASS",
+            "candidatePrHeadMismatch": "PASS",
+            "verificationFailure": "PASS",
+            "retryNewAttempt": "PASS",
+            "contextMiss": "PASS",
+            "deterministicGateFailure": "PASS",
+            "sandboxTeardownFailure": "PASS (focused regression suite)",
+            "repeatedCorrectionLearning": "PASS",
+            "improvementCandidateCannotSelfPromote": "PASS"
+          },
+          "expected": "all values start with PASS"
+        }
+      ],
+      "failedAssertionCodes": [],
+      "outputDigest": "sha256:f246de46c0a672db901e88a8f5109a2bec1843bd718c809cefb17c6c57ee6b20"
+    },
+    {
+      "caseKey": "harness-isolation-provenance",
+      "caseName": "Harness identity and cleanup are pinned",
+      "severity": "BLOCKING",
+      "slices": [
+        "harness",
+        "safety",
+        "provenance"
+      ],
+      "evidenceRefs": [
+        "docs/testing/evidence/fdlc-bedrock-offline-system-final-20260905/scenario-evidence.json"
+      ],
+      "verdict": "PASS",
+      "score": 1,
+      "assertionResults": [
+        {
+          "code": "execution-adapter-present",
+          "path": "harnessLineage.execution.adapter",
+          "operator": "PRESENT",
+          "passed": true,
+          "observed": "codex",
+          "expected": "present"
+        },
+        {
+          "code": "execution-version-present",
+          "path": "harnessLineage.execution.version",
+          "operator": "PRESENT",
+          "passed": true,
+          "observed": "v1",
+          "expected": "present"
+        },
+        {
+          "code": "execution-capability-pinned",
+          "path": "harnessLineage.execution.capabilityManifestSha256",
+          "operator": "SHA256",
+          "passed": true,
+          "observed": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+          "expected": "sha256:<64 lowercase hex>"
+        },
+        {
+          "code": "generic-admission-eligible",
+          "path": "harnessLineage.genericAdmission.exactAdmission.eligible",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": true,
+          "expected": true
+        },
+        {
+          "code": "credential-revoked",
+          "path": "observability.sandboxLifecycleEvents",
+          "operator": "ARRAY_INCLUDES",
+          "passed": true,
+          "observed": [
+            "SANDBOX_REQUESTED",
+            "SANDBOX_ALLOCATED",
+            "SANDBOX_STARTED",
+            "SANDBOX_RESULT_RECEIVED",
+            "SANDBOX_CREDENTIAL_REVOKED",
+            "SANDBOX_TERMINATION_REQUESTED",
+            "SANDBOX_TERMINATED"
+          ],
+          "expected": "SANDBOX_CREDENTIAL_REVOKED"
+        },
+        {
+          "code": "sandbox-terminated",
+          "path": "observability.sandboxLifecycleEvents",
+          "operator": "ARRAY_INCLUDES",
+          "passed": true,
+          "observed": [
+            "SANDBOX_REQUESTED",
+            "SANDBOX_ALLOCATED",
+            "SANDBOX_STARTED",
+            "SANDBOX_RESULT_RECEIVED",
+            "SANDBOX_CREDENTIAL_REVOKED",
+            "SANDBOX_TERMINATION_REQUESTED",
+            "SANDBOX_TERMINATED"
+          ],
+          "expected": "SANDBOX_TERMINATED"
+        },
+        {
+          "code": "manifest-mismatch-contained",
+          "path": "failureInjection.harnessManifestDigestMismatchBlocked",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": "PASS",
+          "expected": "PASS"
+        }
+      ],
+      "failedAssertionCodes": [],
+      "outputDigest": "sha256:f246de46c0a672db901e88a8f5109a2bec1843bd718c809cefb17c6c57ee6b20"
+    },
+    {
+      "caseKey": "learning-cannot-self-promote",
+      "caseName": "Learning remains advisory",
+      "severity": "BLOCKING",
+      "slices": [
+        "learning",
+        "authority"
+      ],
+      "evidenceRefs": [
+        "docs/testing/evidence/fdlc-bedrock-offline-system-final-20260905/scenario-evidence.json"
+      ],
+      "verdict": "PASS",
+      "score": 1,
+      "assertionResults": [
+        {
+          "code": "human-learning-review",
+          "path": "learning.review.actorType",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": "HUMAN",
+          "expected": "HUMAN"
+        },
+        {
+          "code": "no-auto-promotion",
+          "path": "learning.promotionRecommendation.autoPromote",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": false,
+          "expected": false
+        },
+        {
+          "code": "no-released-workorders",
+          "path": "learning.releasedWorkOrderIds",
+          "operator": "ARRAY_LENGTH_EQUALS",
+          "passed": true,
+          "observed": [],
+          "expected": "array length = 0"
+        },
+        {
+          "code": "proposed-plan-only",
+          "path": "learning.submittedPlanStatus",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": "PROPOSED",
+          "expected": "PROPOSED"
+        },
+        {
+          "code": "learning-no-acceptance-capability",
+          "path": "authority.learningHasAcceptanceMutation",
+          "operator": "EQUALS",
+          "passed": true,
+          "observed": false,
+          "expected": false
+        }
+      ],
+      "failedAssertionCodes": [],
+      "outputDigest": "sha256:f246de46c0a672db901e88a8f5109a2bec1843bd718c809cefb17c6c57ee6b20"
+    },
+    {
+      "caseKey": "economics-attribution",
+      "caseName": "Execution economics are attributable",
+      "severity": "ADVISORY",
+      "slices": [
+        "economics",
+        "observability"
+      ],
+      "evidenceRefs": [
+        "docs/testing/evidence/fdlc-bedrock-offline-system-final-20260905/scenario-evidence.json"
+      ],
+      "durationMs": 9346,
+      "costUsd": 0,
+      "verdict": "FAIL",
+      "score": 0.75,
+      "failureOrigin": "SYSTEM_UNDER_TEST",
+      "assertionResults": [
+        {
+          "code": "duration-recorded",
+          "path": "performance.durationMs",
+          "operator": "NUMBER_GTE",
+          "passed": true,
+          "observed": 9346,
+          "expected": ">= 1"
+        },
+        {
+          "code": "model-calls-recorded",
+          "path": "performance.modelCalls",
+          "operator": "IS_NUMBER",
+          "passed": true,
+          "observed": 0,
+          "expected": "finite number"
+        },
+        {
+          "code": "tokens-recorded",
+          "path": "performance.tokens",
+          "operator": "IS_NUMBER",
+          "passed": false,
+          "observed": null,
+          "expected": "finite number"
+        },
+        {
+          "code": "cost-recorded",
+          "path": "performance.costUsd",
+          "operator": "IS_NUMBER",
+          "passed": true,
+          "observed": 0,
+          "expected": "finite number"
+        }
+      ],
+      "failedAssertionCodes": [
+        "tokens-recorded"
+      ],
+      "outputDigest": "sha256:f246de46c0a672db901e88a8f5109a2bec1843bd718c809cefb17c6c57ee6b20"
+    }
+  ],
+  "regressions": [],
+  "accountingErrors": [],
+  "startedAt": "2026-09-05T21:33:22.491Z",
+  "finishedAt": "2026-09-05T21:33:22.514Z",
+  "receiptDigest": "sha256:3661f2b33d9820ef28342070c641c6266bfae25ffbe1627b2fb2615f1a035b17"
+}

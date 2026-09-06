@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { WorkOrderReadinessPanel } from "./WorkOrderReadinessPanel";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
 import type { Doc, Id } from "../../../../convex/_generated/dataModel";
@@ -78,7 +79,7 @@ const QUICK_FILTERS: Array<{ id: WorkOrderQuickFilter; label: string }> = [
   { id: "needs_attention", label: "Needs attention" },
   { id: "blocked", label: "Blocked" },
   { id: "awaiting_approval", label: "Awaiting approval" },
-  { id: "ready_to_dispatch", label: "Ready to dispatch" },
+  { id: "ready_to_dispatch", label: "Awaiting preflight" },
 ];
 
 type WorkOrderDetailTab = "overview" | "review" | "scope" | "tasks" | "audit";
@@ -188,6 +189,12 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   const inspectorReceiptId = searchParams.get("receipt") as Id<"verificationReceipts"> | null;
   const inspectorCriterionId = searchParams.get("criterion");
   const [dispatchError, setDispatchError] = useState<string | null>(null);
+  const [readinessRefresh, setReadinessRefresh] = useState(0);
+  const [readinessNow, setReadinessNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setReadinessNow(Date.now()), 5_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [dispatchTaskSelections, setDispatchTaskSelections] = useState<Record<string, string>>({});
   const [dispatchCodeScopeSelections, setDispatchCodeScopeSelections] = useState<Record<string, string>>({});
   const [dispatchFactorySelections, setDispatchFactorySelections] = useState<Record<string, string>>({});
@@ -475,6 +482,14 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   const selectedDispatchFactoryVersionId = selected
     ? dispatchFactorySelections[selected.workOrder._id] ?? ""
     : "";
+  const workOrderReadiness = useQuery(api.workOrders.readiness,
+    selected && (selected.workOrder.repositoryId || selected.workOrder.missionId) ? {
+      workOrderId: selected.workOrder._id,
+      factoryDefinitionVersionId: selectedDispatchFactoryVersionId
+        ? selectedDispatchFactoryVersionId as Id<"factoryDefinitionVersions"> : undefined,
+      expectedRevision: selected.workOrder.currentRevisionNumber ?? 1,
+      refreshToken: readinessRefresh,
+    } : "skip");
   const activeLocalCodeScopes = (dispatchCodeScopes ?? []).filter((scope) =>
     scope.active
     && scope.allowedEnvironments.includes("LOCAL")
@@ -715,6 +730,11 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                   </div>
                 </div>
 
+                {governedFactoryRequired ? <WorkOrderReadinessPanel
+                  readiness={workOrderReadiness}
+                  now={readinessNow}
+                  onRefresh={() => setReadinessRefresh((value) => value + 1)}
+                /> : null}
                 <WorkOrderDetailTabs
                   active={detailTab}
                   onChange={setDetailTab}
@@ -1508,10 +1528,11 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                         (governedFactoryRequired && !activeFactoryVersionId) ||
                         (governedFactoryRequired && selectedDispatchFactoryVersionId !== activeFactoryVersionId) ||
                         (governedFactoryRequired && !activeFactoryHostId) ||
-                        (governedFactoryRequired && !activeFactory?.readyForBrowserDispatch)
+                        (governedFactoryRequired && (!workOrderReadiness?.admissionEligible
+                          || readinessNow - workOrderReadiness.evaluatedAt > 30_000))
                       }
                     >
-                      {dispatchingId === selected.workOrder._id ? "Dispatching…" : "Dispatch"}
+                      {dispatchingId === selected.workOrder._id ? "Dispatching…" : governedFactoryRequired ? "Dispatch for preparation" : "Dispatch"}
                     </Button>
                     </div>
                   </div>

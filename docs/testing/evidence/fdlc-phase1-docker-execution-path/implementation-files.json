@@ -1,0 +1,18 @@
+{
+  "schema": "fdlc-docker-implementation-files/v1",
+  "baselineSha": "f82fe1d98b156278c4fa0c0e2032008e2f010f39",
+  "files": {
+    "apps/orchestration-server/src/dockerSandboxProvider.ts": "9288bb5b39ddf2dc771bec685e13d2c9218cf773df22989865fb0b236600ea53",
+    "apps/orchestration-server/src/hardLiabilityLedger.ts": "2e6bd391719dded666117536aef6d14c3b1c7230b5c4086a8d41dc65311763c3",
+    "apps/orchestration-server/src/factoryAttemptWorker.ts": "f534cc32711f04aec319974c28599b7a66510434fba1641eb7c54bfb29b8947d",
+    "apps/orchestration-server/src/remoteSandboxRuntime.ts": "ec8f5b323fd0e59a668ec3348ba115ed048aad1d45165a65f3a862ece01724d8",
+    "apps/orchestration-server/src/sandboxProvider.ts": "8d93ef73c55688e55a082be2b63c9e510ecd9ed6cc7366ad8b8ee15fa84e7e85",
+    "apps/orchestration-server/src/sandboxResultBundle.ts": "792b9c7104417e62558d6a64cf177ec0cc9ff95fa8b0cb6ae48728554eda76eb",
+    "apps/orchestration-server/src/sandboxSupervisor.ts": "2665732c25c6b43ed50dd65f57e99a5f18ae905ccebd8e1049a1ea6755b4dbad",
+    "infra/docker-factory/Dockerfile": "e50e3b187d5e58f9a8e49e6f551366f5c8687fe26f8ef518b5d078e2780e736e",
+    "infra/docker-factory/bridge.mjs": "497e291d5c93763c25e116bddac6f45c66cb32c432f3bd94e445e3d8bc4e7315",
+    "infra/docker-factory/supervisor.mjs": "553a83b03856380e7020d7791e670e8302e56e041765d2b02cefe8ef85170198",
+    "infra/docker-factory/qualification.mjs": "2d43bbf4365b160af7fd35a74dda0d027053102c65b7c5b9f3bf02dd28e935f6"
+  },
+  "implementationDigest": "sha256:ec225bbd5585876080f460201a06d125602b8ae028dba80da941fffcf33e9e4b"
+}
