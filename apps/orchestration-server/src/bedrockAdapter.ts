@@ -296,6 +296,10 @@ export function classifyBedrockError(error: unknown) {
 }
 export interface BedrockTransport {
   readonly evidenceClass: "OFFLINE_FIXTURE" | "APPROVED_QUALIFICATION" ;
+  countInputTokens?(
+    wire: BedrockWire,
+    signal: AbortSignal,
+  ): Promise<{ inputTokens: number; requestId: unknown }>;
   send(
     wire: BedrockWire,
     signal: AbortSignal,

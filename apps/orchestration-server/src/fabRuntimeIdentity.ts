@@ -18,6 +18,10 @@ export function fabPackageClosure(root: string): string {
   const entries: Array<[string, string]> = [];
   const visit = (directory: string) => {
     for (const name of readdirSync(directory).sort()) {
+      // Package managers may synthesize a package-local node_modules/.bin
+      // wrapper whose bytes contain installation-specific paths. It is not
+      // part of the immutable Fab archive or its dependency-free runtime.
+      if (directory === canonical && name === "node_modules") continue;
       const file = path.join(directory, name); const info = lstatSync(file);
       if (info.isDirectory()) visit(file);
       else if (info.isFile() && info.nlink === 1) entries.push([path.relative(canonical, file).split(path.sep).join("/"), sha256(readFileSync(file))]);

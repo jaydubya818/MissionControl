@@ -52,6 +52,7 @@ import {
 } from "./githubAppRuntime.js";
 import { configuredFactoryHarnessAdapters } from "./factoryHarnessComposition.js";
 import { loadFabExecutorAdapter } from "./fabExecutorAdapter.js";
+import { createFabBedrockBrokerFactory } from "./fabBedrockBroker.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
 import { MissionPlanningWorker } from "./missionPlanningWorker.js";
 import {
@@ -65,8 +66,12 @@ import os from "node:os";
 // Fab enrollment/configuration is explicit startup input. Capture its selected source
 // before MC's legacy dotenv loading so repository dotenv cannot enroll or override it.
 const executionConfigurationErrors: string[] = [];
-const configuredFabAdapter = process.env.FAB_EXECUTOR_ENABLED === "1"
-  ? optionalExecutionConfiguration("OPTIONAL_ADAPTER_CONFIGURATION_INVALID", () => loadFabExecutorAdapter(requiredRuntimeSetting("FAB_EXECUTOR_CONFIG"), requiredRuntimeSetting("FAB_EXECUTOR_STATE_DIR")), executionConfigurationErrors)
+const configuredFabPaths = process.env.FAB_EXECUTOR_ENABLED === "1"
+  ? optionalExecutionConfiguration("OPTIONAL_ADAPTER_CONFIGURATION_INVALID", () => ({
+      config: requiredRuntimeSetting("FAB_EXECUTOR_CONFIG"),
+      state: requiredRuntimeSetting("FAB_EXECUTOR_STATE_DIR"),
+      bedrock: process.env.FAB_BEDROCK_APPROVED_CONFIG_FILE?.trim(),
+    }), executionConfigurationErrors)
   : undefined;
 const envSearchPaths = [
   path.resolve(process.cwd(), ".env.local"),
@@ -111,15 +116,30 @@ const bedrockConfig = process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1"
     return config;
   }, executionConfigurationErrors)
   : undefined;
+const fabBedrockConfigPath = configuredFabPaths
+  ? configuredFabPaths.bedrock
+  : undefined;
 const bedrockTransport = bedrockConfig?.callAuthorization && accountingRuntime.delivery
   ? optionalExecutionConfiguration("PROVIDER_GRANT_INVALID", () => qualifiedBedrockTransport(bedrockConfig.route, bedrockConfig.callAuthorization), executionConfigurationErrors)
   : undefined;
+const fabBedrockConfig = fabBedrockConfigPath
+  ? optionalExecutionConfiguration("FAB_PROVIDER_CONFIGURATION_INVALID", () => {
+      const config = JSON.parse(readFileSync(fabBedrockConfigPath, "utf8"));
+      if (!config?.callAuthorization) throw new Error("Explicit Fab provider authorization is required.");
+      return config;
+    }, executionConfigurationErrors)
+  : undefined;
+const fabBedrockTransport = fabBedrockConfig?.callAuthorization && accountingRuntime.delivery
+  ? optionalExecutionConfiguration("FAB_PROVIDER_GRANT_INVALID", () => qualifiedBedrockTransport(fabBedrockConfig.route, fabBedrockConfig.callAuthorization), executionConfigurationErrors)
+  : undefined;
 const CODEX_BEDROCK_HARNESS_ENABLED = Boolean(bedrockTransport);
+const BEDROCK_ACCOUNTING_REQUIRED = CODEX_BEDROCK_HARNESS_ENABLED || Boolean(fabBedrockConfigPath);
 const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
-  || Boolean(configuredFabAdapter) || CODEX_BEDROCK_HARNESS_ENABLED;
+  || Boolean(configuredFabPaths) || CODEX_BEDROCK_HARNESS_ENABLED;
 const factoryConfigurationConflict = DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED;
 if (factoryConfigurationConflict) executionConfigurationErrors.push("FACTORY_EXECUTION_CONFIGURATION_CONFLICT");
 if (process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1" && !accountingRuntime.delivery) executionConfigurationErrors.push("ACCOUNTING_JOURNAL_REQUIRED");
+if (fabBedrockConfigPath && !accountingRuntime.delivery) executionConfigurationErrors.push("ACCOUNTING_JOURNAL_REQUIRED");
 const REMOTE_SANDBOX_BACKEND_READY = Boolean(bedrockTransport)
   || (process.env.CODEX_WORKER_REMOTE_SANDBOX_ENABLED === "1"
     && Boolean(process.env.EXEDEV_IDENTITY_FILE?.trim())
@@ -147,6 +167,18 @@ const factoryBootstrap = optionalExecutionConfiguration("FACTORY_BOOTSTRAP_INVAL
   const FACTORY_WORKER_SCOPE = DURABLE_FACTORY_WORKER_ENABLED
     ? { projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"), repositoryId: requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ID") }
     : undefined;
+  const configuredFabAdapter = configuredFabPaths
+    ? loadFabExecutorAdapter(
+        configuredFabPaths.config,
+        configuredFabPaths.state,
+        fabBedrockTransport
+          ? createFabBedrockBrokerFactory(client, fabBedrockConfig, fabBedrockTransport, accountingRuntime.delivery)
+          : undefined,
+      )
+    : undefined;
+  if (configuredFabAdapter?.capabilities().provider === "aws-bedrock" && !fabBedrockTransport) {
+    throw new Error("Fab Bedrock requires an explicit qualified transport and accounting journal.");
+  }
   const factoryHarnessRegistry = new HarnessAdapterRegistry(
     [...configuredFactoryHarnessAdapters({
       codexEnabled: CODEX_FACTORY_WORKER_ENABLED,
@@ -1570,7 +1602,7 @@ const gatewayProxy = createGatewayProxy({
 
 export async function startFactoryExecution(): Promise<boolean> {
   try {
-    if (CODEX_BEDROCK_HARNESS_ENABLED && !(await accountingRuntime.ready)) {
+    if (BEDROCK_ACCOUNTING_REQUIRED && !(await accountingRuntime.ready)) {
       if (!executionConfigurationErrors.includes("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID")) {
         executionConfigurationErrors.push("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID");
       }

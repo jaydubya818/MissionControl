@@ -277,14 +277,17 @@ export const reserveRequestInternal = internalMutation({
     requestId: v.string(),
     requestDigest: v.string(),
     payloadBytes: v.number(),
+    inputTokens: v.number(),
     outputTokens: v.number(),
     bridgeIdentity: v.optional(bedrockBridgeIdentityValidator) },
   handler: async (ctx, args) => {
     const { row, run, price  , profile } = await currentAuthority(ctx, args);
      if (price.snapshot.provider === "aws-bedrock" || args.bridgeIdentity) {
-      if (price.snapshot.api !== "CONVERSE")
-        throw new Error("BEDROCK_PRICE_API_MISMATCH");
       const snapshot = profile.profile?.immutableSnapshot as any;
+      const expectedApi = snapshot?.executionBackend === "persistent-worker"
+        && snapshot?.harness?.adapter === "fab" ? "INVOKE_MODEL" : "CONVERSE";
+      if (price.snapshot.api !== expectedApi)
+        throw new Error("BEDROCK_PRICE_API_MISMATCH");
       assertBedrockBridgeIdentity(
         args.bridgeIdentity,
         {
@@ -326,6 +329,7 @@ export const reserveRequestInternal = internalMutation({
       requestId: args.requestId,
       requestDigest: args.requestDigest,
       payloadBytes: args.payloadBytes,
+      inputTokens: args.inputTokens,
       outputTokens: args.outputTokens,
       now: Date.now(),
     });

@@ -10,7 +10,7 @@ export const bedrockBridgeIdentityValidator = v.object({
   executionProfileDigest: v.string(),
   harnessDigest: v.string(),
   runtimeDigest: v.string(),
-  backend: v.literal("remote-sandbox"),
+  backend: v.union(v.literal("remote-sandbox"), v.literal("persistent-worker")),
   modelRouteDigest: v.string(),
   priceDigest: v.string(),
   provider: v.literal("aws-bedrock"),
@@ -26,7 +26,7 @@ export interface BedrockBridgeIdentity {
   executionProfileDigest: string;
   harnessDigest: string;
   runtimeDigest: string;
-  backend: "remote-sandbox";
+  backend: "remote-sandbox" | "persistent-worker";
   modelRouteDigest: string;
   priceDigest: string;
   provider: "aws-bedrock";
@@ -42,9 +42,15 @@ export function assertBedrockBridgeIdentity(
   if (
     !supplied ||
     liabilityDigest(supplied) !== liabilityDigest(expected) ||
-    profileSnapshot?.harness?.adapter !== "codex" ||
-    profileSnapshot?.harness?.version !== "bedrock-v1" ||
-    profileSnapshot?.sandboxProfile?.profileSnapshot?.provider !== "DOCKER" ||
+    profileSnapshot?.harness?.capabilityManifestDigest !== expected.harnessDigest ||
+    profileSnapshot?.runtimeArtifact?.digest !== expected.runtimeDigest ||
+    profileSnapshot?.executionBackend !== expected.backend ||
+    (expected.backend === "remote-sandbox"
+      ? profileSnapshot?.harness?.adapter !== "codex" ||
+        profileSnapshot?.harness?.version !== "bedrock-v1" ||
+        profileSnapshot?.sandboxProfile?.profileSnapshot?.provider !== "DOCKER"
+      : profileSnapshot?.harness?.adapter !== "fab" ||
+        profileSnapshot?.harness?.version !== "v1") ||
     profileSnapshot?.modelRoute?.routeSnapshot?.provider !== "aws-bedrock" ||
     profileSnapshot?.modelRoute?.routeSnapshot?.modelId !== expected.model
   ) {

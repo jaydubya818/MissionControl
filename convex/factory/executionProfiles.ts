@@ -14,6 +14,7 @@ import { resolveFrozenHarnessBinding } from "../lib/harnessCapabilities";
 import { modelRouteEligibleForNewFactoryVersion } from "../lib/modelRouteAdmission";
 import { sandboxProfileProductionEligible } from "../lib/sandboxProfileAdmission";
 import { executionProfileToolGrantBinding, mcpToolGrantDigest } from "../lib/governedMcp";
+import { findKnownHarnessManifest } from "@mission-control/workflow-engine/harness-contract";
 
 const executionBackend = v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"));
 const isolationMode = v.union(v.literal("READ_ONLY"), v.literal("WORKSPACE_WRITE"));
@@ -64,6 +65,11 @@ export const registerVersion = mutation({
     profileKey: v.string(),
     registrationIdempotencyKey: v.string(),
     executor: v.object({ adapter: v.string(), version: v.string() }),
+    harnessCapabilityManifest: v.optional(v.any()),
+    harnessCapabilityManifestDigest: v.optional(v.string()),
+    harnessEffectiveConfigSha256: v.optional(v.string()),
+    harnessRuntimeArtifact: v.optional(v.any()),
+    harnessRuntimeArtifactDigest: v.optional(v.string()),
     executionBackend,
     modelCatalogId: v.id("modelCatalog"),
     sandboxProfileId: v.optional(v.id("factorySandboxProfiles")),
@@ -130,8 +136,21 @@ export const registerVersion = mutation({
       throw new Error("Execution Profile requires one current exact Tool Grant.");
     }
 
+    const externalHarness = !findKnownHarnessManifest(args.executor.adapter, args.executor.version);
+    if (externalHarness && (!args.harnessCapabilityManifest
+      || !args.harnessCapabilityManifestDigest
+      || !args.harnessEffectiveConfigSha256
+      || !args.harnessRuntimeArtifact
+      || !args.harnessRuntimeArtifactDigest)) {
+      throw new Error("External harness registration requires complete frozen manifest and runtime identity bytes.");
+    }
     const harness = resolveFrozenHarnessBinding({
       executor: args.executor,
+      harnessCapabilityManifest: args.harnessCapabilityManifest,
+      harnessCapabilityManifestDigest: args.harnessCapabilityManifestDigest,
+      harnessEffectiveConfigSha256: args.harnessEffectiveConfigSha256,
+      harnessRuntimeArtifact: args.harnessRuntimeArtifact,
+      harnessRuntimeArtifactDigest: args.harnessRuntimeArtifactDigest,
       executionBackend: args.executionBackend,
       sandboxProfileSnapshot: sandboxProfile?.immutableSnapshot,
     });
@@ -154,6 +173,7 @@ export const registerVersion = mutation({
       harness: {
         adapter: harness.adapter,
         version: harness.version,
+        ...(externalHarness ? { source: "EXTERNAL_FROZEN" as const } : {}),
         capabilityManifest: harness.capabilityManifest,
         capabilityManifestDigest: harness.capabilityManifestSha256,
         effectiveConfigSha256: harness.effectiveConfigSha256,
@@ -409,6 +429,9 @@ function registrationRequestMatches(
     toolGrantId?: unknown;
     executor: { adapter: string; version: string };
     executionBackend: string;
+    harnessCapabilityManifestDigest?: string;
+    harnessEffectiveConfigSha256?: string;
+    harnessRuntimeArtifactDigest?: string;
   },
   profileKey: string,
   isolationModes: string[],
@@ -417,6 +440,9 @@ function registrationRequestMatches(
     && profile.executor?.adapter === args.executor.adapter
     && profile.executor?.version === args.executor.version
     && profile.executionBackend === args.executionBackend
+    && (!args.harnessCapabilityManifestDigest || profile.harnessCapabilityManifestDigest === args.harnessCapabilityManifestDigest)
+    && (!args.harnessEffectiveConfigSha256 || profile.harnessEffectiveConfigSha256 === args.harnessEffectiveConfigSha256)
+    && (!args.harnessRuntimeArtifactDigest || profile.harnessRuntimeArtifactDigest === args.harnessRuntimeArtifactDigest)
     && String(profile.modelCatalogId) === String(args.modelCatalogId)
     && String(profile.sandboxProfileId ?? "") === String(args.sandboxProfileId ?? "")
     && String(profile.toolGrantId ?? "") === String(args.toolGrantId ?? "")

@@ -347,8 +347,19 @@ export interface HarnessNormalizedResult {
 export interface HarnessExecutionContext {
   /** MC-owned invocation linkage and authority check. It never grants authority to the harness. */
   attempt?: {
+    projectId: string;
+    repositoryId: string;
+    workflowRunId: string;
     workOrderId: string;
+    workOrderRevision: number;
     attemptId: string;
+    leaseId: string;
+    generation: number;
+    executionProfileId?: string;
+    executionProfileDigest?: string;
+    harnessDigest?: string;
+    runtimeDigest?: string;
+    modelRouteDigest?: string;
     executorIdentity: string;
     environmentReference: string;
     sourceRevision: string;

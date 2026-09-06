@@ -67,6 +67,7 @@ export async function invokeReservedBedrockFixture(input: {
       requestId: requestId,
       requestDigest,
       payloadBytes: Buffer.byteLength(JSON.stringify(wire.body)),
+      inputTokens: price.maximumInputTokens,
       outputTokens,
       now: now(),
     });

@@ -49,6 +49,7 @@ export interface ProviderHold {
   leaseId: string;
   generation: number;
   maximumNanoUsd: number;
+  inputTokens?: number;
   maximumOutputTokens: number;
   state: "RESERVED" | "UNKNOWN" | "SETTLED" | "OVERRUN";
   receiptRevision: number;
@@ -135,6 +136,7 @@ export function reserveProviderRequest(input: {
   requestId: string;
   requestDigest: string;
   payloadBytes: number;
+  inputTokens: number;
   outputTokens: number;
   now: number;
 }) {
@@ -159,6 +161,9 @@ export function reserveProviderRequest(input: {
     !sha(input.requestDigest) ||
     !integer(input.payloadBytes) ||
     input.payloadBytes > price.maximumPayloadBytes ||
+    !integer(input.inputTokens) ||
+    input.inputTokens < 1 ||
+    input.inputTokens > price.maximumInputTokens ||
     !integer(input.outputTokens) ||
     input.outputTokens < 1 ||
     input.outputTokens > price.maximumOutputTokens
@@ -167,7 +172,7 @@ export function reserveProviderRequest(input: {
   if (original.holds.some((h) => h.requestId === input.requestId))
     throw new Error("REQUEST_REPLAY");
   const maximum =
-    price.maximumInputTokens * price.inputNanoUsdPerToken +
+    input.inputTokens * price.inputNanoUsdPerToken +
     input.outputTokens * price.outputNanoUsdPerToken;
   const used = original.holds.reduce(
     (sum, h) => sum + Math.max(h.maximumNanoUsd, h.accountedNanoUsd ?? 0),
@@ -188,6 +193,7 @@ export function reserveProviderRequest(input: {
     leaseId: a.leaseId,
     generation: a.generation,
     maximumNanoUsd: maximum,
+    inputTokens: input.inputTokens,
     maximumOutputTokens: input.outputTokens,
     state: "RESERVED",
     receiptRevision: 0,
@@ -265,6 +271,7 @@ export function settleProviderUsage(
   const actual = priced !== undefined && priced <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(priced) : undefined;
   const incident =
     actual === undefined || actual > h.maximumNanoUsd ||
+    usage.inputTokens > (h.inputTokens ?? price.maximumInputTokens) ||
     usage.inputTokens > price.maximumInputTokens ||
     usage.outputTokens > h.maximumOutputTokens;
   Object.assign(h, {

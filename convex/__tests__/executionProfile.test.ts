@@ -433,6 +433,92 @@ describe("governed Execution Profile identity", () => {
     })).toBe(false);
   });
 
+  it("admits a validated external harness identity while retaining exact route and record checks", () => {
+    const externalManifest = structuredClone(CODEX_V1_HARNESS_MANIFEST);
+    externalManifest.identity = {
+      ...externalManifest.identity,
+      harnessId: "external-fab",
+      adapterId: "external-fab",
+      adapterVersion: "v1",
+    };
+    const externalManifestDigest = harnessCapabilityManifestDigest(externalManifest);
+    const externalRuntime = { ...CODEX_V1_RUNTIME_ARTIFACT, name: "external-fab" };
+    const externalRuntimeDigest = harnessRuntimeArtifactDigest(externalRuntime);
+    const externalRouteQualification = exactModelRouteQualificationSnapshot({
+      routeDigest,
+      evidenceReference: "docs/evidence/external-route.json",
+      evidenceDigest: digest("e"),
+      workloadClasses: ["SOFTWARE_CHANGE"],
+      riskClasses: ["GREEN"],
+      promotedBy: "operator-1",
+      promotedAt: 100,
+      compatibility: {
+        adapter: "external-fab",
+        version: "v1",
+        capabilityManifestDigest: externalManifestDigest,
+        effectiveConfigSha256: externalManifest.effectiveConfigSha256,
+        runtimeArtifactDigest: externalRuntimeDigest,
+        executionBackend: "persistent-worker",
+      },
+    });
+    const externalProfile = executionProfileSnapshot({
+      profileKey: "external-fab-profile",
+      version: 1,
+      harness: {
+        adapter: "external-fab",
+        version: "v1",
+        source: "EXTERNAL_FROZEN",
+        capabilityManifest: externalManifest,
+        capabilityManifestDigest: externalManifestDigest,
+        effectiveConfigSha256: externalManifest.effectiveConfigSha256,
+      },
+      runtimeArtifact: { snapshot: externalRuntime, digest: externalRuntimeDigest },
+      executionBackend: "persistent-worker",
+      modelRoute: {
+        catalogId: "external-route-1",
+        routeSnapshot,
+        routeDigest,
+        qualificationSnapshot: externalRouteQualification,
+        qualificationDigest: modelRouteQualificationDigest(externalRouteQualification),
+      },
+      isolationModes: ["WORKSPACE_WRITE"],
+    });
+    const externalRecord = {
+      ...record,
+      _id: "external-profile-1",
+      profileKey: externalProfile.profileKey,
+      profileDigest: executionProfileDigest(externalProfile),
+      immutableSnapshot: externalProfile,
+      executor: { adapter: "external-fab", version: "v1" },
+      harnessCapabilityManifest: externalManifest,
+      harnessCapabilityManifestDigest: externalManifestDigest,
+      harnessEffectiveConfigSha256: externalManifest.effectiveConfigSha256,
+      harnessRuntimeArtifact: externalRuntime,
+      harnessRuntimeArtifactDigest: externalRuntimeDigest,
+      modelCatalogId: "external-route-1",
+      modelQualificationDigest: externalProfile.modelRoute.qualificationDigest,
+      isolationModes: externalProfile.isolationModes,
+      requiredHarnessCapabilities: externalProfile.requiredHarnessCapabilities,
+      requiredSandboxCapabilities: externalProfile.requiredSandboxCapabilities,
+    };
+    const externalRouteRecord = {
+      ...modelRouteRecord,
+      _id: "external-route-1",
+      qualificationSnapshot: externalRouteQualification,
+      qualificationDigest: externalProfile.modelRoute.qualificationDigest,
+    };
+    expect(executionProfileCurrentnessIssues({
+      profile: externalRecord,
+      modelRoute: externalRouteRecord,
+      now: 1_500,
+    })).not.toContain("EXECUTION_PROFILE_HARNESS_MISMATCH");
+    expect(executionProfileCurrentnessIssues({
+      profile: externalRecord,
+      modelRoute: externalRouteRecord,
+      now: 1_500,
+    })).not.toContain("EXECUTION_PROFILE_RUNTIME_ARTIFACT_MISMATCH");
+  });
+
   it("fails closed on changed profile bytes, version, config, and digest", () => {
     const changedBytes = { ...profileSnapshot, profileKey: "software-change-tampered" };
     expect(executionProfileDigest(changedBytes)).not.toBe(profileDigest);

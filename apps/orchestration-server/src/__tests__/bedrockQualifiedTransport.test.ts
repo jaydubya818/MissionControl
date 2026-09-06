@@ -53,6 +53,18 @@ it("SDK fixture uses exact endpoint, static supplied credentials, one attempt an
   expect(send).toHaveBeenCalledTimes(1);
   expect(destroy).toHaveBeenCalledOnce();
 });
+it("counts the exact request input through the same explicit one-attempt route", async () => {
+  const send = vi.fn(async () => ({ inputTokens: 37, $metadata: { requestId: "count-id" } }));
+  const destroy = vi.fn();
+  const t = qualifiedBedrockTransport(fixtureRoute, grant(), {
+    readCredentials: async () => envelope(),
+    createClient: () => ({ send, destroy }),
+  });
+  const result = await t.countInputTokens!(wire(), new AbortController().signal);
+  expect(result).toEqual({ inputTokens: 37, requestId: "count-id" });
+  expect(send).toHaveBeenCalledOnce();
+  expect(destroy).toHaveBeenCalledOnce();
+});
 it("missing live-call authority fails before any credential read", () => {
   const read = vi.fn();
   expect(() =>
