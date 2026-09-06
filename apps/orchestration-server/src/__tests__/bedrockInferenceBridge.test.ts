@@ -141,7 +141,7 @@ describe("governed Bedrock bridge offline", () => {
         },
       },
     });
-    expect(f.reservation.holds[0]).toMatchObject({ state: "RESERVED", maximumNanoUsd: 200020 });
+    expect(f.reservation.holds[0]).toMatchObject({ state: "RESERVED", maximumNanoUsd: 30 });
     await expect(bridge.infer("one", request, new AbortController().signal)).rejects.toThrow("REPLAY");
     await expect(bridge.infer("two", request, new AbortController().signal)).rejects.toThrow("REPLAY");
     expect(f.sends).toBe(1);

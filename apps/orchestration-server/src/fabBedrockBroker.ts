@@ -43,6 +43,9 @@ export function createFabBedrockBrokerFactory(
   return async (input: { context: HarnessExecutionContext }): Promise<BedrockBrokerTransport> => {
     const attempt = input.context.attempt;
     if (!attempt) throw new Error("FAB_BEDROCK_ATTEMPT_AUTHORITY_REQUIRED");
+    if (!attempt.executionProfileId || !attempt.executionProfileDigest
+      || !attempt.harnessDigest || !attempt.runtimeDigest || !attempt.modelRouteDigest)
+      throw new Error("FAB_BEDROCK_EXECUTION_PROFILE_AUTHORITY_REQUIRED");
     const route = fabRoute(config.route);
     const credentialReference = "aws:fdlc-qualification:bedrock-sonnet-4-6";
     const identity: BedrockBridgeIdentity = {

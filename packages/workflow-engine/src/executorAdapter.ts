@@ -355,11 +355,11 @@ export interface HarnessExecutionContext {
     attemptId: string;
     leaseId: string;
     generation: number;
-    executionProfileId: string;
-    executionProfileDigest: string;
-    harnessDigest: string;
-    runtimeDigest: string;
-    modelRouteDigest: string;
+    executionProfileId?: string;
+    executionProfileDigest?: string;
+    harnessDigest?: string;
+    runtimeDigest?: string;
+    modelRouteDigest?: string;
     executorIdentity: string;
     environmentReference: string;
     sourceRevision: string;
