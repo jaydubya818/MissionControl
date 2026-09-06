@@ -1,0 +1,196 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-phase5
+
+ ❯ convex/__tests__/inferenceGatewayBaseline.test.ts (20 tests | 13 failed) 16ms
+   × WorkOrder inference allocation authority > rejects duplicate parent allocation across logical requests and permits the exact remaining amount 6ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   × WorkOrder inference allocation authority > keeps the WorkOrder allocation across separate Attempts 1ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   ✓ WorkOrder inference allocation authority > returns exact replays without consuming the allocation twice and rejects changed bytes 1ms
+   × WorkOrder inference allocation authority > does not release ACTIVE allocations without settlement proof 1ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   × WorkOrder inference allocation authority > does not release CANCELLED allocations without settlement proof 0ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   × WorkOrder inference allocation authority > does not release EXPIRED allocations without settlement proof 0ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   × WorkOrder inference allocation authority > does not release EXHAUSTED allocations without settlement proof 0ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   ✓ WorkOrder inference allocation authority > isolates allocations belonging to another WorkOrder 0ms
+   × WorkOrder inference allocation authority > fails closed on invalid existing allocation 0 0ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   × WorkOrder inference allocation authority > fails closed on invalid existing allocation -1 0ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   × WorkOrder inference allocation authority > fails closed on invalid existing allocation 1.5 0ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   × WorkOrder inference allocation authority > fails closed on invalid existing allocation NaN 0ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   × WorkOrder inference allocation authority > fails closed on invalid existing allocation 9007199254740992 0ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   × WorkOrder inference allocation authority > fails closed on a prior reservation with a substituted project 1ms
+     → promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+   × WorkOrder inference allocation authority > does not overflow while adding individually valid allocations 0ms
+     → promise resolved "{ reservationId: 'reservation-3', …(2) }" instead of rejecting
+   ✓ governed inference schema contract > lands the full append-only ledger and required identity indexes atomically 0ms
+   ✓ governed inference schema contract > exposes signed service capabilities while keeping transport mutations internal 0ms
+   ✓ governed inference schema contract > retains unknown cost and autonomous-promotion denials in public projections 0ms
+   ✓ worst-case reservation and comparison controls > denies a reservation whose full exposure exceeds its money ceiling 0ms
+   ✓ worst-case reservation and comparison controls > returns NO_GO when either route has unknown or missing evidence 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > rejects duplicate parent allocation across logical requests and permits the exact remaining amount
+AssertionError: promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "created": true,
++   "reservationDigest": "sha256:bc588b976daecbafc25bf60d0c63f3f8af428453ff1d35d2c98765114df4c8ae",
++   "reservationId": "reservation-2",
+  }
+
+ ❯ convex/__tests__/inferenceGatewayBaseline.test.ts:100:31
+     98|     await reserve();
+     99|     const next = { logicalRequestKey: "request-2", registrationIdempot…
+    100|     await expect(reserve(next)).rejects.toThrow("Aggregate inference r…
+       |                               ^
+    101|     expect(rows).toHaveLength(1);
+    102|     await expect(reserve({ ...next, maxCostMicrousd: 40 })).resolves.t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/13]⎯
+
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > keeps the WorkOrder allocation across separate Attempts
+AssertionError: promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "created": true,
++   "reservationDigest": "sha256:bbef3f2fe6c3be275b3675a941296db63f7d3fa5ab47a7f2a5ed857e7f528e0f",
++   "reservationId": "reservation-2",
+  }
+
+ ❯ convex/__tests__/inferenceGatewayBaseline.test.ts:111:64
+    109|     records.set("attempt-2", { ...records.get("attempt")!, _id: "attem…
+    110|     await expect(reserve({ workflowRunId: "attempt-2", logicalRequestK…
+    111|       registrationIdempotencyKey: "attempt-2:registration-1" })).rejec…
+       |                                                                ^
+    112|     expect(rows).toHaveLength(1);
+    113|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/13]⎯
+
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > does not release ACTIVE allocations without settlement proof
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > does not release CANCELLED allocations without settlement proof
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > does not release EXPIRED allocations without settlement proof
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > does not release EXHAUSTED allocations without settlement proof
+AssertionError: promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "created": true,
++   "reservationDigest": "sha256:4c93241594a6b04583d1bec32bb338d7ccfff987f33b07554557501066a7b2ce",
++   "reservationId": "reservation-2",
+  }
+
+ ❯ convex/__tests__/inferenceGatewayBaseline.test.ts:127:27
+    125|     rows.push({ _id: "prior", projectId: "project", workOrderId: "orde…
+    126|       maxCostMicrousd: 60, state, deadlineAt: 1, leaseExpiresAt: 1 });
+    127|     await expect(reserve()).rejects.toThrow("Aggregate inference reser…
+       |                           ^
+    128|     expect(rows).toHaveLength(1);
+    129|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/13]⎯
+
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > fails closed on invalid existing allocation 0
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > fails closed on invalid existing allocation -1
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > fails closed on invalid existing allocation 1.5
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > fails closed on invalid existing allocation NaN
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > fails closed on invalid existing allocation 9007199254740992
+AssertionError: promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "created": true,
++   "reservationDigest": "sha256:f3329592c908010addf1163c8dba733e43d727860510ae239e0d21b991fa4089",
++   "reservationId": "reservation-2",
+  }
+
+ ❯ convex/__tests__/inferenceGatewayBaseline.test.ts:140:27
+    138|     const { reserve, rows, db } = reservationFixture();
+    139|     rows.push({ _id: "corrupt", projectId: "project", workOrderId: "or…
+    140|     await expect(reserve()).rejects.toThrow("Existing WorkOrder infere…
+       |                           ^
+    141|     expect(db.insert).not.toHaveBeenCalled();
+    142|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/13]⎯
+
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > fails closed on a prior reservation with a substituted project
+AssertionError: promise resolved "{ reservationId: 'reservation-2', …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "created": true,
++   "reservationDigest": "sha256:46ef4c52f35b7bf31dcb553d9019b22755799c0c4949485aacb65ee7741e5834",
++   "reservationId": "reservation-2",
+  }
+
+ ❯ convex/__tests__/inferenceGatewayBaseline.test.ts:147:27
+    145|     const { reserve, rows } = reservationFixture();
+    146|     rows.push({ _id: "wrong-project", projectId: "other-project", work…
+    147|     await expect(reserve()).rejects.toThrow("Existing WorkOrder infere…
+       |                           ^
+    148|   });
+    149|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/13]⎯
+
+ FAIL  convex/__tests__/inferenceGatewayBaseline.test.ts > WorkOrder inference allocation authority > does not overflow while adding individually valid allocations
+AssertionError: promise resolved "{ reservationId: 'reservation-3', …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "created": true,
++   "reservationDigest": "sha256:cdf1803586d29dd767df23144885a5265dd28401d765625b9f96bb27094983f7",
++   "reservationId": "reservation-3",
+  }
+
+ ❯ convex/__tests__/inferenceGatewayBaseline.test.ts:154:27
+    152|     for (let i = 0; i < 2; i++) rows.push({ _id: `prior-${i}`, project…
+    153|       maxCostMicrousd: Number.MAX_SAFE_INTEGER });
+    154|     await expect(reserve()).rejects.toThrow("Aggregate inference reser…
+       |                           ^
+    155|   });
+    156| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/13]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  13 failed | 7 passed (20)
+   Start at  22:11:59
+   Duration  334ms (transform 81ms, setup 0ms, collect 125ms, tests 16ms, environment 0ms, prepare 38ms)

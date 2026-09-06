@@ -80,7 +80,13 @@ either todo complete and does not authorize implementation by itself.
   still requires current admission checks. Corrected the cumulative record.
 - Nonblocking scale limit: admission reads all WorkOrder reservations. Keep the
   sum in one transaction; revisit a bounded aggregate only when rollout volume
-  requires it. No scale or live-concurrency qualification is claimed here.
+  requires it. No high-volume scale qualification is claimed here.
+- Final transaction drill: 22 scenarios on a disposable local Convex backend,
+  165 reservation requests and 140 observed concurrency retries. Exact handler
+  and reservation schema/indexes; fixture authorization and related records.
+  This is local transaction proof, not provider or real-work economics.
+- PR #184 on integrated main `f749b06` / runtime v46; full qualification passed
+  at `f4c5c8d`. CI, merge and final-main proof remain pending in the program record.
 
 ### 2026-09-05 - Master program continuation on current main
 

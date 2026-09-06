@@ -46,8 +46,8 @@ fetched from origin/main. This is a source reconciliation, not production
 qualification. Runtime environment **P = the real pilot, not yet selected or
 configured; active flags, Factory bindings and runtime availability UNKNOWN**.
 R and P in each row are exact scope references, not shorthand for a successful
-deployment. The `last_verified`/`baseline_commit` frontmatter above retains the
-older qualification baseline; it does not describe a new pilot run.
+deployment. The `last_verified`/`baseline_commit` frontmatter above records the
+latest source reconciliation; it does not establish a new pilot run.
 
 Historical assessment vocabulary:
 

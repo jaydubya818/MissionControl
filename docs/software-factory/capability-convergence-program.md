@@ -87,7 +87,13 @@ denominators and coverage remain explicit. Existing economics WARN remains.
   existing reservation without allocating twice; different immutable bytes
   remain rejected. Replay does not bypass current lease, profile or price-book
   admission checks.
-- Qualification/reviews/PR/merge/final-main: **NOT_RUN** until recorded below.
+- Qualification: [retained proof](../testing/evidence/capability-convergence-reservation-final/README.md)
+  at `f4c5c8d269cb050f64f80604548d191e06dd8a91`; 23 handler tests, 22
+  disposable-backend concurrency scenarios, and full composed qualification
+  passed. Independent architecture/security/data-integrity/simplicity/docs
+  findings were addressed. Initial local launcher failure remains recorded.
+- PR: [#184](https://github.com/jaydubya818/MissionControl/pull/184).
+  Required CI, merge and exact-main qualification remain pending.
 - Runtime contract: v46 inherited from #183; this slice changes no public signature.
 - Maturity: no promotion. This closes one parent allocation gap, not provider
   dispatch bounds, authoritative billing settlement or real-work economics.
