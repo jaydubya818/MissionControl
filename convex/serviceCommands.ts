@@ -518,6 +518,89 @@ export const recordGovernedMcpReceipt = action({
   },
 });
 
+export const persistInferenceIntent = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "inference.intents.persist");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveExecutionScope, { workflowRunId: payload.workflowRunId });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(makeFunctionReference<"mutation">("inferenceGateway:persistIntentInternal"), {
+        ...payload.intent,
+        workflowRunId: payload.workflowRunId,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, { receiptId: receipt.receiptId, status: "SUCCEEDED", resultReference: String(result.intentId) });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const claimInferenceIntent = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "inference.intents.claim");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveExecutionScope, { workflowRunId: payload.workflowRunId });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(makeFunctionReference<"mutation">("inferenceGateway:claimIntentInternal"), {
+        ...payload.claim,
+        workflowRunId: payload.workflowRunId,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId, status: result.claimed || result.cancelled ? "SUCCEEDED" : "FAILED",
+        reason: result.claimed || result.cancelled ? undefined : result.reason, resultReference: String(payload.claim.intentId),
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const appendInferenceReceipt = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "inference.receipts.append");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveExecutionScope, { workflowRunId: payload.workflowRunId });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(makeFunctionReference<"mutation">("inferenceGateway:appendReceiptInternal"), {
+        ...payload.receipt,
+        workflowRunId: payload.workflowRunId,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, { receiptId: receipt.receiptId, status: "SUCCEEDED", resultReference: String(result.receiptId) });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
+export const appendInferenceReconciliation = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "inference.reconciliations.append");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveExecutionScope, { workflowRunId: payload.workflowRunId });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(makeFunctionReference<"mutation">("inferenceGateway:appendReconciliationInternal"), {
+        ...payload.reconciliation,
+        workflowRunId: payload.workflowRunId,
+      });
+      await ctx.runMutation(internal.serviceCommands.complete, { receiptId: receipt.receiptId, status: "SUCCEEDED", resultReference: String(result.reconciliationId) });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
 export const claimVerificationAttempt = action({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {
