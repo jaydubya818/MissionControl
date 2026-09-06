@@ -279,12 +279,8 @@ export function inferenceReservation(
     ["Maximum output tokens", input.maxOutputTokens],
     ["Maximum cost", input.maxCostMicrousd],
   ] as const) positiveSafeInteger(value, label);
-  for (const [label, value] of [
-    ["Maximum cache-read tokens", input.maxCacheReadTokens],
-    ["Maximum cache-write tokens", input.maxCacheWriteTokens],
-    ["Maximum reasoning tokens", input.maxReasoningTokens],
-  ] as const) {
-    if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative safe integer.`);
+  for (const [label, value] of [["Maximum cache-read tokens", input.maxCacheReadTokens], ["Maximum cache-write tokens", input.maxCacheWriteTokens], ["Maximum reasoning tokens", input.maxReasoningTokens]] as const) {
+    nonNegativeSafeInteger(value, label);
   }
   if (input.deadlineAt <= input.createdAt || input.leaseExpiresAt <= input.createdAt) {
     throw new Error("Reservation deadline and lease must be live at creation.");

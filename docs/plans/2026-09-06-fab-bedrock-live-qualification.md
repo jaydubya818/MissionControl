@@ -48,28 +48,15 @@ them. Continue independent source work while those prerequisites are pending.
 
 ## Validation
 
-Handler review found that the existing inference gateway compared each
-reservation separately with the WorkOrder ceiling. The correction sums every
-prior reservation maximum in the same indexed insertion transaction, including
-earlier Attempts/revisions and expired, exhausted or cancelled reservations.
-No status is treated as a refund. This is a WorkOrder ceiling; a program spanning
-multiple WorkOrders still requires immutable sub-budgets totaling at most $5 or
-one shared canonical WorkOrder budget before live execution.
-
-Current-main reconciliation reuses the cumulative allocation helper delivered
-in PR #184 and the exported atomic ledger functions used by PR #185. Fab's
-snapshot/identity fixes apply to those shared functions. The incoming Bedrock
+Current main includes a cumulative WorkOrder allocation helper and exported
+atomic inference-ledger functions from PRs #184 and #185. A separate shared-ledger
+continuation owns immutable intent, receipt, reconciliation, and outcome identity.
+Fab does not duplicate or replace that implementation. The incoming Bedrock
 bridge is bound to the separate codex/bedrock-v1 Docker tuple; it is not an
 enrollment grant for Fab's persistent-worker adapter. Its exact tuple checks
-remain intact.
-
-The actual handler path also mixed database foreign keys with logical immutable
-reservation IDs. New intents and receipts retain exact snapshots; dispatch checks
-the original intent digest and mirrors, and receipt generation derives the
-claimed state from persisted claim facts. Database IDs remain foreign keys.
-Legacy records are not rewritten or guessed; a legacy intent without its exact
-snapshot cannot dispatch. Runtime contract 48 requires the updated backend and
-client together. Zero cache/reasoning allowances now represent disabled features.
+remain intact. A program spanning multiple WorkOrders still requires immutable
+sub-budgets totaling at most $5 or one shared canonical program budget before
+live execution.
 
 Focused provider tests cover message/tool continuity, exact profile/region binding,
 missing usage, unsupported blocks, bounded outputs, cancellation/timeout, error

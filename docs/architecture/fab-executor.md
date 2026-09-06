@@ -14,13 +14,10 @@ not register a placeholder. The host still must implement exact CountTokens,
 enrolled identity verification and durable reservation/claim/receipt handling
 before live invocation. Offline tests do not establish those deployed controls.
 
-The existing inference ledger now sums all WorkOrder reservation maxima, including
-earlier Attempts and terminal/unknown outcomes, in its insertion transaction. It
-retains exact logical snapshots separately from database foreign keys, rejects
-legacy intents without their exact snapshot, and permits zero cache/reasoning
-allowances. This enforces a WorkOrder budget only; a multi-WorkOrder qualification
-program requires fixed sub-budgets whose total fits its approved ceiling. No
-reservation refund or admission relaxation is introduced.
+Mission Control's shared Bedrock bridge and cumulative liability ledger are a
+separate `codex/bedrock-v1` Docker tuple. They do not enroll this Fab
+persistent-worker adapter. A Fab broker must reuse canonical authority without
+duplicating the ledger or weakening either tuple's exact admission checks.
 
 ## Canonical lifecycle
 
@@ -50,6 +47,6 @@ Local tests use actual Fab code, native checks, canonical MC worker/verifier/rep
 
 Before claiming Phase 3 complete, enroll and authorize an exact live provider/model, select an authorized non-production MC deployment and controlled GitHub repository, complete live engineering evaluations, and qualify resulting persistent lineage and recovery. Release licensing/signing decisions remain operator-owned. Fab stays Experimental until those evidence gates are satisfied.
 
-Main reconciliation preserves the existing v1 `LOCAL_GIT` attestation route, which remains acceptance-ineligible. Runtime compatibility is v44. Main’s governed inference accounting remains opt-in and separate from Fab’s enrolled provider transport; no shared live gateway qualification is implied. Exact local attestation recovery may reclaim an expired lease only after the server validates the original failed Attempt, frozen manifest/configuration/WorkOrder/repository, unpublished code-diff checkpoint and prior owner. The worker only inspects that candidate; it does not rerun the executor, MCP tools or publication. Ordinary interrupted execution still requires a replacement Attempt. Failed/canceled terminal recovery is preserved and reported as a blocker rather than returned as successful recovery.
+Main reconciliation preserves the existing v1 `LOCAL_GIT` attestation route, which remains acceptance-ineligible. Runtime compatibility remains the current main contract. Main’s governed inference accounting remains opt-in and separate from Fab’s enrolled provider transport; no shared live gateway qualification is implied. Exact local attestation recovery may reclaim an expired lease only after the server validates the original failed Attempt, frozen manifest/configuration/WorkOrder/repository, unpublished code-diff checkpoint and prior owner. The worker only inspects that candidate; it does not rerun the executor, MCP tools or publication. Ordinary interrupted execution still requires a replacement Attempt. Failed/canceled terminal recovery is preserved and reported as a blocker rather than returned as successful recovery.
 
 See [Phase 3 qualification evidence](../testing/evidence/fab-phase3/README.md) for results and remaining external gates.
