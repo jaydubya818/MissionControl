@@ -90,3 +90,14 @@ absence. Never replay an ambiguous request or substitute a provider/model/region
 Returning to a previously approved configuration uses the existing human gates; it
 does not relabel either harness or release unknown exposure. No production activation
 or deployment is authorized. Source landing does not grant live execution authority.
+
+## Committed source and evidence binding
+
+Implementation commit: `8b357d0e161fdf75f64e350d55fb31aed6f14cfa`. All 84 recorded source/test/config
+file hashes match this commit and the final 19/19 System qualification input.
+The eight commit-sensitive checks passed after committing: runtime against current
+main and pinned baseline, authorization, MCP receipt, composed System scenarios,
+golden eval, documentation and secret scan. See
+[commit binding](../../testing/evidence/fdlc-bedrock-current-main-20260906/commit-binding/checks.json).
+The containing evidence follow-up commit changes documentation/evidence only; its
+identity is resolved from Git, avoiding a self-referential embedded commit hash.
