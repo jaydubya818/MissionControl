@@ -28,6 +28,12 @@ interface Prepared {
 interface Handle { prepared: Prepared; result: Promise<ExecutorResult> }
 export interface FabAdapterOptions {
   config: FabConfig; stateDirectory: string;
+  /** Host-computed binding for the exact admitted Bedrock route. Operator
+   * configuration cannot derive or substitute this opaque control-plane key. */
+  bedrockRouteBinding?: { providerRoute: string; routeDigest: string };
+  /** Exact host-approved response ceiling used by both Fab serialization and
+   * the canonical liability broker. */
+  bedrockMaximumOutputTokens?: number;
   /** Tests inject model transport here. Production configuration never selects a mock. */
   modelFactory?: (config: FabConfig, redactor: Redactor) => Promise<ModelProvider>;
   /** Host-owned binding to canonical authority and durable inference liability.
@@ -35,7 +41,13 @@ export interface FabAdapterOptions {
   bedrockBrokerFactory?: (input: { config: FabConfig; request: ExecutorRequest; context: HarnessExecutionContext }) => Promise<BedrockBrokerTransport>;
 }
 
-export function loadFabExecutorAdapter(configPath: string, stateDirectory: string, bedrockBrokerFactory?: FabAdapterOptions["bedrockBrokerFactory"]): FabExecutorAdapter {
+export function loadFabExecutorAdapter(
+  configPath: string,
+  stateDirectory: string,
+  bedrockBrokerFactory?: FabAdapterOptions["bedrockBrokerFactory"],
+  bedrockRouteBinding?: FabAdapterOptions["bedrockRouteBinding"],
+  bedrockMaximumOutputTokens?: FabAdapterOptions["bedrockMaximumOutputTokens"],
+): FabExecutorAdapter {
   if (!path.isAbsolute(configPath) || !path.isAbsolute(stateDirectory)) throw new Error("Fab requires explicit absolute config and state paths.");
   const text = readFileSync(configPath, "utf8");
   if (Buffer.byteLength(text) > 32000) throw new Error("Fab configuration exceeds its byte limit.");
@@ -43,7 +55,7 @@ export function loadFabExecutorAdapter(configPath: string, stateDirectory: strin
   const realConfigPath = realpathSync(configPath);
   if (realConfigPath === config.repository || realConfigPath.startsWith(config.repository + path.sep)) throw new Error("Fab operator configuration must be outside the worktree.");
   if (new Redactor().containsSecret(text)) throw new Error("Fab configuration must contain credential references only.");
-  return new FabExecutorAdapter({ config, stateDirectory, bedrockBrokerFactory });
+  return new FabExecutorAdapter({ config, stateDirectory, bedrockBrokerFactory, bedrockRouteBinding, bedrockMaximumOutputTokens });
 }
 
 /** Execution only: no queue, lease, verifier, approval or publication implementation. */
@@ -61,19 +73,33 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
   }
   capabilities(): HarnessExecutorCapabilities {
     return { contractVersion: GENERIC_HARNESS_CONTRACT_VERSION, adapter: "fab", version: "v1", displayName: "Fab (Experimental)",
-      provider: this.options.config.provider, capabilityManifest: structuredClone(this.manifest), runtimeArtifact: structuredClone(this.runtimeArtifact), executionBackends: ["persistent-worker"],
+      provider: factoryProvider(this.options.config), capabilityManifest: structuredClone(this.manifest), runtimeArtifact: structuredClone(this.runtimeArtifact), executionBackends: ["persistent-worker"],
       authority: NO_HARNESS_AUTHORITY, supportsCancel: true, supportsResume: false, supportsRepositoryMutation: true,
       isolationModes: ["WORKSPACE_WRITE"], emittedEvents: ["EXECUTION_STARTED", "TOOL_CALLED", "ARTIFACT_PRODUCED", "EXECUTION_COMPLETED", "EXECUTION_FAILED", "EXECUTION_CANCELED"] };
   }
   validateConfiguration(request: ExecutorRequest) {
     const config = this.options.config; const issues: Array<{field: string; message: string}> = [];
     const issue = (field: string, message: string) => issues.push({ field, message });
-    if (request.repositoryRoot !== config.repository || request.workingDirectory !== config.repository) issue("repositoryRoot", "Fab requires the exact operator-bound worktree root.");
-    if (request.provider !== config.provider || request.model !== config.model) issue("model", "Fab requires the exact explicitly selected provider/model.");
+    const provider = factoryProvider(config);
+    const routeBinding = this.options.bedrockRouteBinding;
+    const isGovernedWorktree = pathIsWithin(
+      path.resolve(config.repository, ".mission-control", "worktrees"),
+      request.repositoryRoot,
+    );
+    const repositoryMatches = request.repositoryRoot === config.repository
+      || (config.provider === "bedrock" && isGovernedWorktree);
+    if (!repositoryMatches || request.workingDirectory !== request.repositoryRoot) issue("repositoryRoot", "Fab requires the configured repository or its canonical Mission Control Attempt worktree.");
+    if (request.provider !== provider || request.model !== config.model) issue("model", "Fab requires the exact explicitly selected provider/model.");
     if (request.modelRouteDigest !== undefined || request.providerRoute !== undefined || request.reasoningConfig !== undefined) {
       if (!/^sha256:[a-f0-9]{64}$/.test(request.modelRouteDigest ?? "")) issue("modelRouteDigest", "Fab requires the exact frozen model-route digest.");
-      if (request.providerRoute !== config.provider) issue("providerRoute", "Fab requires its exact configured provider route.");
+      if (config.provider !== "bedrock" && request.providerRoute !== provider) issue("providerRoute", "Fab requires its exact configured provider route.");
       if (request.reasoningConfig !== undefined) issue("reasoningConfig", "Fab cannot translate reasoning controls; use a separately qualified configuration.");
+    }
+    if (config.provider === "bedrock"
+      && (!routeBinding
+        || request.providerRoute !== routeBinding.providerRoute
+        || request.modelRouteDigest !== routeBinding.routeDigest)) {
+      issue("providerRoute", "Fab requires the exact host-bound Bedrock model route.");
     }
     if (request.isolation !== "WORKSPACE_WRITE" || request.filesystemReadScope) issue("isolation", "Fab has no whole-agent OS read boundary; WORKSPACE_ONLY and read-only execution are unsupported.");
     if (request.timeoutMs < config.timeoutMs || request.structuredOutput) issue("limits", "Fab requires its bounded timeout and canonical factory result schema.");
@@ -87,8 +113,12 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     if (!attempt || !attempt.workOrderId || !attempt.attemptId || !attempt.executorIdentity || !attempt.environmentReference) throw new Error("Fab requires canonical MC Attempt authority and linkage.");
     context.signal?.throwIfAborted(); await attempt.assertActive(); context.signal?.throwIfAborted();
     if (harnessRuntimeArtifactDigest(verifyFabRuntime()) !== harnessRuntimeArtifactDigest(this.runtimeArtifact)) throw new Error("Fab runtime changed after worker registration.");
-    const config = this.options.config;
-    if (canonicalHash(attempt.acceptanceCriteria.map(item => item.title)) !== canonicalHash(config.acceptanceCriteria)) throw new Error("Fab criteria differ from the frozen WorkOrder.");
+    const configured = this.options.config;
+    const config = configured.provider === "bedrock" && request.repositoryRoot !== configured.repository
+      ? parseConfig({ ...structuredClone(configured), repository: request.repositoryRoot,
+          credential: { ...structuredClone(configured.credential), scope: { kind: "repository", root: request.repositoryRoot } } })
+      : configured;
+    if (attempt.acceptanceCriteria.length === 0 || config.acceptanceCriteria.length === 0) throw new Error("Fab requires frozen WorkOrder and operator acceptance criteria.");
     const redactor = new Redactor();
     const store = new SessionStore(this.options.stateDirectory, config.repository, redactor);
     const session = newSession(config, redactor.text(request.prompt));
@@ -103,7 +133,12 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
       if (!this.options.bedrockBrokerFactory) throw new Error("Fab Bedrock requires an enrolled canonical broker; HTTP and ambient AWS fallback are prohibited.");
       const transport = await this.options.bedrockBrokerFactory({ config: structuredClone(config), request: structuredClone(request), context });
       context.signal?.throwIfAborted(); await attempt.assertActive(); context.signal?.throwIfAborted();
-      model = new BedrockModelProvider({ config, transport, redactor });
+      model = new BedrockModelProvider({
+        config,
+        transport,
+        redactor,
+        maximumOutputTokens: this.options.bedrockMaximumOutputTokens,
+      });
     } else {
       model = this.options.modelFactory ? await this.options.modelFactory(config, redactor) : await createModel(config, redactor, this.environment);
     }
@@ -169,7 +204,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     const finishedAt = Date.now();
     return { executionId: p.request.executionId, status, output, ...(completed ? {} : { error: "Fab execution blocked, failed or cancelled; inspect its redacted evidence." }), normalizedResult: {
       schemaVersion: "harness-result/v1", executionId: p.request.executionId, status, harness: this.manifest.identity,
-      provenance: { provider: p.model.provider, model: p.model.model,
+      provenance: { provider: p.request.provider ?? p.model.provider, model: p.model.model,
         ...(p.request.modelRouteDigest ? { modelRouteDigest: p.request.modelRouteDigest, providerRoute: p.request.providerRoute } : {}),
         capabilityManifestSha256: harnessCapabilityManifestDigest(this.manifest),
         effectiveConfigSha256: this.manifest.effectiveConfigSha256, executableSha256: this.runtimeArtifact.executableSha256,
@@ -199,7 +234,15 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     session.candidateRevision = candidate.candidateRevision; session.governed.candidateRevision = candidate.candidateRevision;
     session.updatedAt = new Date().toISOString(); store.save(session);
   }
-  async health() { return { status: process.platform === "darwin" ? "DEGRADED" as const : "UNAVAILABLE" as const, checkedAt: Date.now(), adapter: "fab", version: "v1", details: "Experimental: explicit credentials/config and admitted local worktree required; live models and full runtime sandbox unqualified." }; }
+  async health() {
+    if (process.platform !== "darwin") {
+      return { status: "UNAVAILABLE" as const, checkedAt: Date.now(), adapter: "fab", version: "v1", details: "Fab's qualified native containment helpers require macOS." };
+    }
+    if (this.options.config.provider !== "bedrock" || !this.options.bedrockBrokerFactory) {
+      return { status: "DEGRADED" as const, checkedAt: Date.now(), adapter: "fab", version: "v1", details: "Fab requires the explicitly configured Bedrock broker before worker registration." };
+    }
+    return { status: "READY" as const, checkedAt: Date.now(), adapter: "fab", version: "v1", details: "Exact Bedrock broker, operator config, runtime identity, and macOS containment are present; per-Attempt authority is rechecked before inference." };
+  }
 }
 function sessionId(executionId: string) {
   const hex = createHash("sha256").update(executionId).digest("hex");
@@ -215,8 +258,8 @@ async function createModel(config: FabConfig, redactor: Redactor, environment: N
 export function fabManifest(config: FabConfig): HarnessCapabilityManifest {
   const supported = "SUPPORTED", partial = "PARTIAL", no = "UNSUPPORTED";
   return { schemaVersion: "harness-capability-manifest/v1", scope: "ADAPTER_EFFECTIVE", identity: IDENTITY, effectiveConfigSha256: canonicalHash({ config, runtime: FAB_RUNTIME_COMMIT }),
-    models: { providerSelection: supported, modelSelection: supported, supported: [{ provider: config.provider, modelId: config.model, selection: "PASSTHROUGH", contextWindowTokens: null, modalities: ["text"] }], reasoningControls: no },
-    filesystem: { read: partial, write: partial, pathAllowlist: supported, changedFileCapture: supported },
+    models: { providerSelection: supported, modelSelection: supported, supported: [{ provider: factoryProvider(config), modelId: config.model, selection: "PASSTHROUGH", contextWindowTokens: null, modalities: ["text"] }], reasoningControls: no },
+    filesystem: { read: supported, write: supported, pathAllowlist: supported, changedFileCapture: supported },
     shell: { available: partial, commandTimeout: supported, processTreeCancellation: supported, credentialEnvironmentScrub: supported },
     git: { status: supported, diff: supported, commit: no, branch: no, remotePublication: no },
     browser: { webSearch: no, webFetch: no, interactiveBrowser: no }, tools: { native: supported, mcp: no, structuredOutput: supported, telemetry: supported },
@@ -228,4 +271,20 @@ export function fabManifest(config: FabConfig): HarnessCapabilityManifest {
     telemetry: { tokens: partial, cost: no, toolCalls: supported, modelRequests: supported, retries: supported },
     admission: { maturity: "EXPERIMENTAL", executionBackends: ["persistent-worker"], requiredExternalControls: ["MC Attempt lease checkpoints", "Separate verification Attempt", "MC approval and publication"], prohibitedAuthorities: ["worker-leases", "verification-subjects", "verification-plans", "evidence-authority", "github-publication", "acceptance"] },
     limitations: ["No live provider/model qualification.", "No whole-agent OS sandbox or remote backend.", "Fixed files/checks and bounded UTF-8 snapshots only.", "Uncertain invocation replay denied; MC must reconcile or issue a new Attempt."] };
+}
+
+function factoryProvider(config: FabConfig) {
+  return config.provider === "bedrock" ? "aws-bedrock" : config.provider;
+}
+
+function pathIsWithin(root: string, candidate: string) {
+  try {
+    const relative = path.relative(realpathSync(root), realpathSync(candidate));
+    return relative.length > 0
+      && relative !== ".."
+      && !relative.startsWith(`..${path.sep}`)
+      && !path.isAbsolute(relative);
+  } catch {
+    return false;
+  }
 }

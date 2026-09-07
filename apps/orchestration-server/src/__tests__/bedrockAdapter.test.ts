@@ -200,9 +200,14 @@ describe("canonical price/provider join", () => {
       price.maximumInputTokens * price.inputNanoUsdPerToken +
         price.maximumOutputTokens * price.outputNanoUsdPerToken,
     ).toBe(3_367_584_000);
-    expect(() =>
-      bedrockQualifiedPrice(qualifiedPriceContract, "INVOKE_MODEL", Date.parse("2026-09-07T00:00:00Z")),
-    ).toThrow("QUALIFIED_PRICE_ROUTE_MISMATCH");
+    const invokeModelPrice = bedrockQualifiedPrice(
+      qualifiedPriceContract,
+      "INVOKE_MODEL",
+      Date.parse("2026-09-07T00:00:00Z"),
+    );
+    expect(liabilityDigest(invokeModelPrice)).toBe(
+      qualifiedPriceContract.qualifiedInvokeModelProviderPriceDigest,
+    );
     expect(() =>
       bedrockQualifiedPrice(
         {

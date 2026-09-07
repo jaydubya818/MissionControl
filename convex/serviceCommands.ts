@@ -961,6 +961,33 @@ export const reportExactModelRouteHealth = action({
   },
 });
 
+export const reportFactoryHost = action({
+  args: { envelope, payloadJson: v.string() },
+  handler: async (ctx, args): Promise<any> => {
+    const payload = await authorize(ctx, args.envelope, args.payloadJson, "hosts.report");
+    const scope = await ctx.runQuery(internal.serviceCommands.resolveRepositoryScope, {
+      projectId: payload.projectId,
+      repositoryId: payload.repositoryId,
+    });
+    const receipt = await claimScoped(ctx, args.envelope, scope);
+    try {
+      const result = await ctx.runMutation(
+        internal.workspaceHostBindings.reportServiceInternal,
+        payload,
+      );
+      await ctx.runMutation(internal.serviceCommands.complete, {
+        receiptId: receipt.receiptId,
+        status: "SUCCEEDED",
+        resultReference: String(result?._id ?? payload.hostId),
+      });
+      return result;
+    } catch (error) {
+      await fail(ctx, receipt.receiptId, error);
+      throw error;
+    }
+  },
+});
+
 export const claimExecution = action({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {

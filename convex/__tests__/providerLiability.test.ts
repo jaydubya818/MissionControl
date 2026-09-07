@@ -65,6 +65,7 @@ const request = (r = reservation, id = "one") => ({
   requestId: id,
   requestDigest: sha(id === "one" ? "d" : "e"),
   payloadBytes: 7,
+  inputTokens: 10,
   outputTokens: 10,
   now: 1000,
 });
@@ -125,6 +126,9 @@ describe("authoritative provider liability transitions", () => {
       reserveProviderRequest({ ...request(), payloadBytes: 101 }),
     ).toThrow();
     expect(() =>
+      reserveProviderRequest({ ...request(), inputTokens: 11 }),
+    ).toThrow();
+    expect(() =>
       reserveProviderRequest({ ...request(), outputTokens: 11 }),
     ).toThrow();
     expect(() =>
@@ -145,6 +149,8 @@ describe("authoritative provider liability transitions", () => {
     const settled = settleProviderUsage(held, price, usage).reservation;
     expect(settled.holds[0]).toMatchObject({
       state: "SETTLED",
+      inputTokens: 10,
+      maximumNanoUsd: 30,
       accountedNanoUsd: 7,
       classification: "ACTUAL",
       costClassification: "ESTIMATED",
@@ -198,6 +204,24 @@ describe("authoritative provider liability transitions", () => {
     expect(() =>
       reserveProviderRequest(request(result.reservation, "two")),
     ).toThrow();
+  });
+  it("retains a provider request identity on an unknown observation", () => {
+    const held = reserveProviderRequest(request()).reservation;
+    const unknown = settleProviderUsage(held, price, {
+      ...usage,
+      classification: "UNKNOWN",
+      providerRequestId: "provider-error-request",
+      usageId: "",
+      inputTokens: 0,
+      outputTokens: 0,
+    }).reservation;
+    expect(unknown.holds[0]).toMatchObject({
+      state: "UNKNOWN",
+      providerRequestId: "provider-error-request",
+      classification: "UNKNOWN",
+      costClassification: "UNKNOWN",
+    });
+    expect(unknown.holds[0].accountedNanoUsd).toBeUndefined();
   });
   it("rejects request ID mismatch and receipt revision races", () => {
     const held = reserveProviderRequest(request()).reservation;
@@ -261,10 +285,13 @@ it('pins the complete qualified Bedrock price at the authority boundary', () => 
     otherBillableDimensions: 'NONE',
   };
   expect(() => assertQualifiedBedrockPrice(qualified, 1_788_000_000_000)).not.toThrow();
+  const qualifiedFab = { ...qualified, api: 'INVOKE_MODEL' as const };
+  expect(liabilityDigest(qualifiedFab)).toBe('sha256:765d485cbf1c66e474e022f7dd34c4387269222763445bc8c9eefcd29e51523e');
+  expect(() => assertQualifiedBedrockPrice(qualifiedFab, 1_788_000_000_000)).not.toThrow();
   for (const mutation of [
     { inputNanoUsdPerToken: 3299 }, { outputNanoUsdPerToken: 16499 },
     { maximumInputTokens: 999_999 }, { maximumOutputTokens: 4095 },
-    { maximumPayloadBytes: 262_143 }, { api: 'INVOKE_MODEL' },
+    { maximumPayloadBytes: 262_143 }, { api: 'RESPONSES' },
     { source: 'https://example.test/substituted' }, { evidenceDigest: sha('f') },
   ]) expect(() => assertQualifiedBedrockPrice({ ...qualified, ...mutation } as ProviderPrice, 1_788_000_000_000))
     .toThrow('BEDROCK_PRICE_NOT_QUALIFIED');

@@ -129,6 +129,7 @@ function fixture() {
     requestId: "request",
     requestDigest: hash,
     payloadBytes: 10,
+    inputTokens: 10,
     outputTokens: 10,
   };
   return { ctx, rows, args, price };
@@ -267,12 +268,12 @@ it.each([
   expect(ctx.db.patch).not.toHaveBeenCalled();
   expect(ctx.db.insert).not.toHaveBeenCalled();
 });
-function bedrockHandlerFixture() {
+function bedrockHandlerFixture(api: "CONVERSE" | "INVOKE_MODEL" = "CONVERSE") {
   const f = fixture();
   Object.assign(f.price, {
     provider: "aws-bedrock",
     model: "anthropic.claude-sonnet-4-6",
-    api: "CONVERSE",
+    api,
     effectiveAt: 1_779_840_000_000,
     expiresAt: 1_791_331_200_000,
     source: "https://www-cdn.anthropic.com/files/4zrzovbb/website/3684c2faafb97418665782cea0001f439f74b1d2.pdf",
@@ -290,12 +291,12 @@ function bedrockHandlerFixture() {
   f.ctx.bridgeProfile = {
     immutableSnapshot: {
       harness: {
-        adapter: "codex",
-        version: "bedrock-v1",
+        adapter: api === "INVOKE_MODEL" ? "fab" : "codex",
+        version: api === "INVOKE_MODEL" ? "v1" : "bedrock-v1",
         capabilityManifestDigest: hash,
       },
       runtimeArtifact: { digest: hash },
-      executionBackend: "remote-sandbox",
+      executionBackend: api === "INVOKE_MODEL" ? "persistent-worker" : "remote-sandbox",
       sandboxProfile: { profileSnapshot: { provider: "DOCKER" } },
       modelRoute: {
         routeSnapshot: { provider: "aws-bedrock", modelId: f.price.model },
@@ -310,7 +311,7 @@ function bedrockHandlerFixture() {
     executionProfileDigest: hash,
     harnessDigest: hash,
     runtimeDigest: hash,
-    backend: "remote-sandbox",
+    backend: api === "INVOKE_MODEL" ? "persistent-worker" : "remote-sandbox",
     modelRouteDigest: hash,
     priceDigest: f.rows.price.digest,
     provider: "aws-bedrock",
@@ -332,8 +333,20 @@ function bedrockHandlerFixture() {
   };
   vi.stubEnv("MC_GOVERNED_INFERENCE_GATEWAY_ENABLED", "1");
   Object.assign(f.rows.wo, { projectId: "project", tenantId: "tenant", approvalStatus: "APPROVED", metadata: { implementationPolicy: { maxCostUsd: 5 } } });
-  Object.assign(f.rows.run, { parentTaskId: "task", executionManifestDigest: hash });
-  f.rows.task = { _id: "task", projectId: "project" };
+  Object.assign(f.rows.run, {
+    runId: "run-execution",
+    parentTaskId: "task",
+    executionManifest: {
+      causation: {
+        workOrderId: "wo",
+        workOrderRevisionNumber: 1,
+        workflowRunId: "run-execution",
+        taskId: "task",
+      },
+    },
+    executionManifestDigest: hash,
+  });
+  f.rows.task = { _id: "task", projectId: "project", workOrderId: "wo" };
   f.rows.profile = { _id: "profile", projectId: "project", profileDigest: hash, modelRouteDigest: hash, modelCatalogId: "route", qualificationExpiresAt: Date.now() + 60000, immutableSnapshot: f.ctx.bridgeProfile.immutableSnapshot };
   f.rows.route = { _id: "route", projectId: "project", provider: f.price.provider, modelId: f.price.model, providerRoute: "fixture-approved-us-bedrock", routeDigest: hash, enabled: true, qualificationStatus: "EVIDENCE_QUALIFIED", admissionStatus: "PRODUCTION_PILOT_ELIGIBLE" };
   const book = inferencePriceBook({ priceBookId: "book", version: 1, currency: "USD", source: { kind: "OPERATOR_APPROVED", reference: f.price.source, digest: f.price.evidenceDigest }, effectiveFrom: f.price.effectiveAt, effectiveUntil: f.price.expiresAt, rates: [{ routeDigest: hash, inputMicrousdPerMillionTokens: 3_300_000, outputMicrousdPerMillionTokens: 16_500_000 }] });
@@ -433,15 +446,23 @@ it("fences a second Bedrock request while first outcome is unresolved", async ()
   ).rejects.toThrow("BEDROCK_PRIOR_REQUEST_UNRESOLVED");
 });
 
-it("rejects a nonqualified Bedrock API substitution", async () => {
+it("rejects a Bedrock API that does not match the frozen harness route", async () => {
   const f = bedrockHandlerFixture();
   f.price.api = "INVOKE_MODEL";
   f.rows.price.digest = liabilityDigest(f.price);
   f.rows.reservation.snapshot.scope.priceDigest = f.rows.price.digest;
   f.args.bridgeIdentity.priceDigest = f.rows.price.digest;
   await expect(handler(reserveRequestInternal)(f.ctx, f.args)).rejects.toThrow(
-    "BEDROCK_PRICE_NOT_QUALIFIED",
+    "BEDROCK_PRICE_API_MISMATCH",
   );
+});
+
+it("admits only the exact qualified InvokeModel price for the frozen Fab route", async () => {
+  const f = bedrockHandlerFixture("INVOKE_MODEL");
+  await expect(handler(reserveRequestInternal)(f.ctx, f.args)).resolves.toMatchObject({
+    priceDigest: "sha256:765d485cbf1c66e474e022f7dd34c4387269222763445bc8c9eefcd29e51523e",
+  });
+  expect(f.rows.reservation.snapshot.holds).toHaveLength(1);
 });
 
 it.each(["by_provider_usage", "by_provider_request"])(

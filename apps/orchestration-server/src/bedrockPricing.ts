@@ -45,6 +45,10 @@ export const bedrockPriceSchema = z
       .string()
       .regex(/^sha256:[a-f0-9]{64}$/)
       .optional(),
+    qualifiedInvokeModelProviderPriceDigest: z
+      .string()
+      .regex(/^sha256:[a-f0-9]{64}$/)
+      .optional(),
   })
   .strict()
   .superRefine((price, ctx) => {
@@ -94,10 +98,10 @@ function convertPrice(
     otherBillableDimensions: "NONE",
   };
   assertProviderPrice(result, now);
-  if (
-    p.qualification === "APPROVED_QUALIFICATION" &&
-    liabilityDigest(result) !== p.qualifiedProviderPriceDigest
-  )
+  const qualifiedDigest = api === "INVOKE_MODEL"
+    ? p.qualifiedInvokeModelProviderPriceDigest
+    : p.qualifiedProviderPriceDigest;
+  if (p.qualification === "APPROVED_QUALIFICATION" && liabilityDigest(result) !== qualifiedDigest)
     throw new Error("QUALIFIED_PRICE_DIGEST_MISMATCH");
   return result;
 }
@@ -113,13 +117,14 @@ export function bedrockFixturePrice(
   return convertPrice(input, api, now);
 }
 
-/** Converts only the reviewed, expiring qualification price for Converse. */
+/** Converts only the reviewed, expiring qualification price for an exact API. */
 export function bedrockQualifiedPrice(
   input: BedrockPriceContract,
   api: BedrockApi,
   now: number,
 ): ProviderPrice {
-  if (input.qualification !== "APPROVED_QUALIFICATION" || api !== "CONVERSE")
+  if (input.qualification !== "APPROVED_QUALIFICATION"
+    || (api !== "CONVERSE" && api !== "INVOKE_MODEL"))
     throw new Error("QUALIFIED_PRICE_ROUTE_MISMATCH");
   return convertPrice(input, api, now);
 }

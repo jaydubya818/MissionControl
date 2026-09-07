@@ -42,7 +42,15 @@ function fixture(options: { attack?: string; hangModel?: boolean; slowCheck?: bo
   } });
   const request: ExecutorRequest = { executionId: "fixture-attempt:manifest", repositoryRoot: root, workingDirectory: root, provider: config.provider, model: config.model, prompt: "Set the value to 2", allowedPaths: ["src/**"], deniedPaths: [], timeoutMs: 10000, isolation: "WORKSPACE_WRITE" };
   const assertActive = vi.fn(async () => {});
-  const context: HarnessExecutionContext = { emit: vi.fn(), attempt: { workOrderId: "wo-1", attemptId: "attempt-1", executorIdentity: "worker-1:session-1:1", environmentReference: "local-worktree:attempt-1", sourceRevision: baseline, acceptanceCriteria: [{ id: "ac-1", title: config.acceptanceCriteria[0]! }], assertActive } };
+  const context: HarnessExecutionContext = { emit: vi.fn(), attempt: {
+    projectId: "project-1", repositoryId: "repo-1", workflowRunId: "attempt-1",
+    workOrderId: "wo-1", workOrderRevision: 1, attemptId: "attempt-1", leaseId: "lease-1", generation: 1,
+    executionProfileId: "profile-1", executionProfileDigest: `sha256:${"a".repeat(64)}`,
+    harnessDigest: `sha256:${"b".repeat(64)}`, runtimeDigest: `sha256:${"c".repeat(64)}`,
+    modelRouteDigest: `sha256:${"d".repeat(64)}`,
+    executorIdentity: "worker-1:session-1:1", environmentReference: "local-worktree:attempt-1", sourceRevision: baseline,
+    acceptanceCriteria: [{ id: "ac-1", title: config.acceptanceCriteria[0]! }], assertActive,
+  } };
   return { adapter, config, context, request, directory, root, git, baseline, modelCalls: () => modelCalls, assertActive };
 }
 
@@ -52,12 +60,29 @@ describe("Fab canonical MC harness conformance", () => {
     const route = { accountId: "123456789012", region: "us-east-1", modelId: "anthropic.claude-sonnet-4-6", inferenceProfileId: "us.anthropic.claude-sonnet-4-6", inferenceProfileArn: "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-sonnet-4-6" } as const;
     const config = parseConfig({ ...f.config, provider: "bedrock", model: route.modelId, bedrockRoute: route,
       credential: { ...f.config.credential, provider: "bedrock", source: { kind: "broker" } } });
-    const request = { ...f.request, provider: "bedrock", model: route.modelId };
-    return { ...f, config, request, route };
+    const routeBinding = { providerRoute: `bedrock-us:${"e".repeat(64)}`, routeDigest: `sha256:${"a".repeat(64)}` };
+    const request = { ...f.request, provider: "aws-bedrock", providerRoute: routeBinding.providerRoute,
+      modelRouteDigest: routeBinding.routeDigest, model: route.modelId };
+    return { ...f, config, request, route, routeBinding };
   }
+  it("reports ready only for the explicit Bedrock broker path", async () => {
+    const f = bedrockFixture();
+    const withoutBroker = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "without-broker"), bedrockRouteBinding: f.routeBinding });
+    await expect(withoutBroker.health()).resolves.toMatchObject({ status: "DEGRADED" });
+    const withBroker = new FabExecutorAdapter({
+      config: f.config,
+      stateDirectory: path.join(f.directory, "with-broker"),
+      bedrockRouteBinding: f.routeBinding,
+      bedrockBrokerFactory: async () => ({
+        identity: () => ({ route: f.route, credentialReference: f.config.credential.id, maximumAttempts: 1 }),
+        invoke: vi.fn(),
+      }),
+    });
+    await expect(withBroker.health()).resolves.toMatchObject({ status: "READY" });
+  });
   it("requires an explicit Bedrock broker and cannot select the test model factory or ambient credential path", async () => {
     const f = bedrockFixture(); const modelFactory = vi.fn();
-    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), modelFactory });
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), modelFactory, bedrockRouteBinding: f.routeBinding });
     await expect(adapter.prepare(f.request, f.context)).rejects.toThrow("enrolled canonical broker");
     expect(modelFactory).not.toHaveBeenCalled();
     expect(adapter.capabilities().capabilityManifest?.network.destinations).toEqual(["bedrock-runtime.us-east-1.amazonaws.com"]);
@@ -65,7 +90,7 @@ describe("Fab canonical MC harness conformance", () => {
   });
   it("rechecks canonical authority after Bedrock broker enrollment before any provider request", async () => {
     const f = bedrockFixture(); const invoke = vi.fn();
-    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockBrokerFactory: async input => {
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockRouteBinding: f.routeBinding, bedrockBrokerFactory: async input => {
       expect(input.request).toEqual(f.request); expect(input.context.attempt?.attemptId).toBe("attempt-1");
       f.assertActive.mockRejectedValue(new Error("lease lost while enrolling broker"));
       return { identity: () => ({ route: f.route, credentialReference: f.config.credential.id, maximumAttempts: 1 }), invoke };
@@ -73,16 +98,36 @@ describe("Fab canonical MC harness conformance", () => {
     await expect(adapter.prepare(f.request, f.context)).rejects.toThrow("lease lost while enrolling broker");
     expect(invoke).not.toHaveBeenCalled();
   });
+  it("derives a Bedrock session only for a canonical MC worktree under the configured checkout", async () => {
+    const f = bedrockFixture();
+    const worktree = path.join(f.root, ".mission-control", "worktrees", "attempt-2");
+    f.git(["worktree", "add", "--detach", worktree, f.baseline]);
+    const request = { ...f.request, repositoryRoot: worktree, workingDirectory: worktree };
+    const broker = vi.fn(async ({ config }: { config: typeof f.config }) => {
+      expect(config.repository).toBe(worktree);
+      expect(config.credential.scope.root).toBe(worktree);
+      return { identity: () => ({ route: f.route, credentialReference: f.config.credential.id, maximumAttempts: 1 as const }),
+        invoke: vi.fn() };
+    });
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockRouteBinding: f.routeBinding, bedrockBrokerFactory: broker });
+    expect(adapter.validateConfiguration(request)).toEqual([]);
+    const escaped = path.join(f.root, ".mission-control", "worktrees", "..", "..", "outside");
+    expect(adapter.validateConfiguration({ ...request, repositoryRoot: escaped, workingDirectory: escaped }).length).toBeGreaterThan(0);
+    await expect(adapter.prepare(request, f.context)).resolves.toBeTruthy();
+    expect(broker).toHaveBeenCalledOnce();
+    expect(adapter.validateConfiguration({ ...request, repositoryRoot: path.join(f.root, "other"), workingDirectory: path.join(f.root, "other") }).length).toBeGreaterThan(0);
+  });
   it("runs the real Fab loop through a synthetic Bedrock broker while preserving canonical request linkage", async () => {
     const f = bedrockFixture(); let calls = 0;
     const providerRequests: Array<{ id: string; digest: string }> = [];
-    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockBrokerFactory: async () => ({
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockRouteBinding: f.routeBinding, bedrockMaximumOutputTokens: 256, bedrockBrokerFactory: async () => ({
       identity: () => ({ route: f.route, credentialReference: f.config.credential.id, maximumAttempts: 1 }),
       invoke: async request => {
         calls++; providerRequests.push({ id: request.requestId, digest: request.requestDigest });
         const wire = JSON.parse(request.body);
         expect(wire.anthropic_version).toBe("bedrock-2023-05-31"); expect(wire.model).toBeUndefined();
         expect(request.route).toEqual(f.route); expect(request.credentialReference).toBe(f.config.credential.id);
+        expect(request.maximumOutputTokens).toBe(256);
         let name = "submit_plan"; let input: Record<string, unknown> = { summary: "Set the value", steps: ["Edit one file", "Run test"] };
         if (calls === 2) { name = "write_file"; input = { path: "src/value.mjs", content: "export const value = 2;\n", expectedHash: createHash("sha256").update("export const value = 1;\n").digest("hex") }; }
         if (calls === 3) { name = "run_check"; input = { id: "test" }; }
@@ -93,7 +138,7 @@ describe("Fab canonical MC harness conformance", () => {
     }) });
     const result = await runHarnessExecution(adapter, f.request, f.context);
     expect(result.status).toBe("COMPLETED"); expect(calls).toBe(4);
-    expect(result.normalizedResult?.provenance.provider).toBe("bedrock");
+    expect(result.normalizedResult?.provenance.provider).toBe("aws-bedrock");
     expect(result.normalizedResult?.usage.inputTokens).toBe(40);
     expect(result.normalizedResult?.usage.costUsd).toBeNull();
     const observed = result.normalizedResult?.events.items.filter(event => event.summary === "provider_request").map(event => event.metadata?.providerRequest as Record<string, unknown>);
@@ -124,6 +169,7 @@ describe("Fab canonical MC harness conformance", () => {
     const f = fixture(); const registry = new HarnessAdapterRegistry([f.adapter]);
     expect(registry.require({ adapter: "fab", version: "v1" })).toBe(f.adapter);
     expect(harnessManifestIssues(f.adapter.capabilities().capabilityManifest!)).toEqual([]);
+    expect(f.adapter.capabilities().capabilityManifest?.filesystem).toMatchObject({ read: "SUPPORTED", write: "SUPPORTED" });
     expect(Object.values(f.adapter.capabilities().authority).every(value => value === "NONE")).toBe(true);
     const registration = registry.requireRegistration({ adapter: "fab", version: "v1" });
     const eligibility = factoryWorkerEligibility({ worker: { workerId: "worker-1", status: "READY", dirty: false,

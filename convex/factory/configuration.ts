@@ -905,7 +905,9 @@ export const createVersion = mutation({
       modelRouteSnapshot: modelRoute?.routeSnapshot,
       sandboxProfileSnapshot: frozenProfileSnapshot.sandboxProfile?.profileSnapshot,
     });
-    const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(selectedExecutor);
+    const adapterRuntimeArtifact = frozenProfileSnapshot.harness.source === "EXTERNAL_FROZEN"
+      ? { runtimeArtifact: harness.runtimeArtifact, runtimeArtifactSha256: harness.runtimeArtifactSha256 }
+      : resolveHarnessAdapterRuntimeArtifact(selectedExecutor);
     const primaryModel = offline ? null : resolveFactoryWorkflowModelRoute({
       workflow,
       agentBindings: args.agentBindings,
@@ -1225,7 +1227,10 @@ async function recordFactoryReadiness(ctx: MutationCtx, version: Doc<"factoryDef
     }
     const selectedIsolation = factoryIsolationMode(version.purpose);
     const frozenHarness = resolveFrozenHarnessBinding(version);
-    const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
+    const versionProfileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+    const adapterRuntimeArtifact = versionProfileSnapshot?.harness?.source === "EXTERNAL_FROZEN"
+      ? { runtimeArtifact: frozenHarness.runtimeArtifact, runtimeArtifactSha256: frozenHarness.runtimeArtifactSha256 }
+      : resolveHarnessAdapterRuntimeArtifact(version.executor);
     const primaryModel = (() => {
       try {
         return resolveFactoryWorkflowModelRoute({ workflow, agentBindings: version.agentBindings ?? [], agentVersions });

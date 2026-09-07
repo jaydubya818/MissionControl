@@ -52,6 +52,8 @@ import {
 } from "./githubAppRuntime.js";
 import { configuredFactoryHarnessAdapters, createIsolatedFactoryHarness } from "./factoryHarnessComposition.js";
 import { loadFabExecutorAdapter } from "./fabExecutorAdapter.js";
+import { createFabBedrockBrokerFactory } from "./fabBedrockBroker.js";
+import { bedrockModelRouteBinding } from "./bedrockModelRouteBinding.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
 import { MissionPlanningWorker } from "./missionPlanningWorker.js";
 import {
@@ -67,8 +69,12 @@ import os from "node:os";
 // Fab enrollment/configuration is explicit startup input. Capture its selected source
 // before MC's legacy dotenv loading so repository dotenv cannot enroll or override it.
 const executionConfigurationErrors: string[] = [];
-const configuredFabAdapter = process.env.FAB_EXECUTOR_ENABLED === "1"
-  ? optionalExecutionConfiguration("OPTIONAL_ADAPTER_CONFIGURATION_INVALID", () => loadFabExecutorAdapter(requiredRuntimeSetting("FAB_EXECUTOR_CONFIG"), requiredRuntimeSetting("FAB_EXECUTOR_STATE_DIR")), executionConfigurationErrors)
+const configuredFabPaths = process.env.FAB_EXECUTOR_ENABLED === "1"
+  ? optionalExecutionConfiguration("OPTIONAL_ADAPTER_CONFIGURATION_INVALID", () => ({
+      config: requiredRuntimeSetting("FAB_EXECUTOR_CONFIG"),
+      state: requiredRuntimeSetting("FAB_EXECUTOR_STATE_DIR"),
+      bedrock: process.env.FAB_BEDROCK_APPROVED_CONFIG_FILE?.trim(),
+    }), executionConfigurationErrors)
   : undefined;
 const envSearchPaths = [
   path.resolve(process.cwd(), ".env.local"),
@@ -117,12 +123,25 @@ const bedrockConfig = process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1"
     return config;
   }, executionConfigurationErrors)
   : undefined;
+const fabBedrockConfigPath = configuredFabPaths
+  ? configuredFabPaths.bedrock
+  : undefined;
 const bedrockTransport = bedrockConfig?.callAuthorization && accountingRuntime.delivery
   ? optionalExecutionConfiguration("PROVIDER_GRANT_INVALID", () => qualifiedBedrockTransport(bedrockConfig.route, bedrockConfig.price, bedrockConfig.callAuthorization), executionConfigurationErrors)
   : undefined;
+const fabBedrockConfig = fabBedrockConfigPath
+  ? optionalExecutionConfiguration("FAB_PROVIDER_CONFIGURATION_INVALID", () => {
+      const config = JSON.parse(readFileSync(fabBedrockConfigPath, "utf8"));
+      if (!config?.callAuthorization || !config?.price) throw new Error("Explicit Fab provider authorization and price are required.");
+      return config;
+    }, executionConfigurationErrors)
+  : undefined;
+const fabBedrockTransport = fabBedrockConfig?.callAuthorization && accountingRuntime.delivery
+  ? optionalExecutionConfiguration("FAB_PROVIDER_GRANT_INVALID", () => qualifiedBedrockTransport(fabBedrockConfig.route, fabBedrockConfig.price, fabBedrockConfig.callAuthorization), executionConfigurationErrors)
+  : undefined;
 const CODEX_BEDROCK_HARNESS_ENABLED = Boolean(bedrockTransport);
 const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
-  || Boolean(configuredFabAdapter) || CODEX_BEDROCK_HARNESS_ENABLED || OFFLINE_FACTORY_WORKER_ENABLED;
+  || Boolean(configuredFabPaths) || CODEX_BEDROCK_HARNESS_ENABLED || OFFLINE_FACTORY_WORKER_ENABLED;
 const factoryConfigurationConflict = DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED;
 if (factoryConfigurationConflict) executionConfigurationErrors.push("FACTORY_EXECUTION_CONFIGURATION_CONFLICT");
 if (DURABLE_FACTORY_WORKER_ENABLED && !accountingRuntime.delivery) executionConfigurationErrors.push("ACCOUNTING_JOURNAL_REQUIRED");
@@ -213,6 +232,25 @@ const factoryBootstrap = optionalExecutionConfiguration("FACTORY_BOOTSTRAP_INVAL
   const FACTORY_WORKER_SCOPE = offlineWorkerScope ?? (DURABLE_FACTORY_WORKER_ENABLED
     ? { projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"), repositoryId: requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ID") }
     : undefined);
+  const configuredFabAdapter = configuredFabPaths
+    ? loadFabExecutorAdapter(
+        configuredFabPaths.config,
+        configuredFabPaths.state,
+        fabBedrockTransport
+          ? createFabBedrockBrokerFactory(client, fabBedrockConfig, fabBedrockTransport, accountingRuntime.delivery)
+          : undefined,
+        fabBedrockConfig
+          ? (() => {
+              const binding = bedrockModelRouteBinding(fabBedrockConfig.route);
+              return { providerRoute: binding.snapshot.providerRoute, routeDigest: binding.routeDigest };
+            })()
+          : undefined,
+        fabBedrockConfig?.maximumOutputTokens,
+      )
+    : undefined;
+  if (configuredFabAdapter?.capabilities().provider === "aws-bedrock" && !fabBedrockTransport) {
+    throw new Error("Fab Bedrock requires an explicit qualified transport and accounting journal.");
+  }
   const factoryHarnessRegistry = new HarnessAdapterRegistry(
     [...configuredFactoryHarnessAdapters({
       codexEnabled: CODEX_FACTORY_WORKER_ENABLED,
