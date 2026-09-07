@@ -30,7 +30,10 @@ import {
   validateFactoryIncidentTransition,
   type FactoryIncidentPhase,
 } from "../lib/factoryIncident";
-import { validateObservedControlReceipt } from "../lib/factoryIncidentControl";
+import {
+  dispatchDenialMeasurementRejectionReason,
+  validateObservedControlReceipt,
+} from "../lib/factoryIncidentControl";
 import { RUNTIME_CONTRACT_VERSION } from "../lib/runtimeContract";
 
 const evidenceRefsArg = v.array(factoryIncidentEvidenceRefValidator);
@@ -95,8 +98,9 @@ const evidenceTables: Partial<Record<string, string>> = {
 async function requireEvidenceScope(
   ctx: any,
   projectId: Id<"projects">,
-  refs: Array<{ kind: string; recordId: string }>,
+  refs: Array<{ kind: string; recordId: string; relationship: string }>,
   requireCanonical = false,
+  incident?: Doc<"factoryIncidents">,
 ) {
   for (const ref of refs) {
     const table = evidenceTables[ref.kind];
@@ -112,6 +116,24 @@ async function requireEvidenceScope(
     const record = await ctx.db.get(normalizedId);
     if (!record || record.projectId !== projectId) {
       throw new Error("Incident evidence reference is unavailable or outside this workspace.");
+    }
+    if (ref.relationship === "measured-dispatch-denial") {
+      const predecessor = record.predecessorReceiptId
+        ? await ctx.db.get(record.predecessorReceiptId)
+        : null;
+      const rejection = incident?.repositoryId
+        ? dispatchDenialMeasurementRejectionReason({
+            receipt: record,
+            predecessor,
+            incidentId: String(incident._id),
+            projectId: String(incident.projectId),
+            repositoryId: String(incident.repositoryId),
+            expectedRuntimeContractVersion: RUNTIME_CONTRACT_VERSION,
+          })
+        : "dispatch-denial-incident-scope-missing";
+      if (ref.kind !== "CONTROL_RECEIPT" || rejection) {
+        throw new Error(`Incident dispatch-denial measurement is invalid (${rejection ?? "wrong-evidence-kind"}).`);
+      }
     }
   }
 }
@@ -432,6 +454,7 @@ export const advance = mutation({
       incident.projectId,
       evidenceRefs,
       args.nextPhase === "RESTORE" || args.nextPhase === "MEASURE",
+      incident,
     );
     await requireCanonicalControlReceipts(
       ctx,

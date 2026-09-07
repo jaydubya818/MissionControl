@@ -490,7 +490,7 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
-Current public client/backend runtime contract: **v54**.
+Current public client/backend runtime contract: **v55**.
 
 ### Factory Deployed Engineer qualification environment
 
@@ -528,7 +528,15 @@ Resume requires a durable, current restoration authorization created before
 execution. The same admission gate protects WorkOrder dispatch and automatic
 Verification Attempt scheduling.
 
-This capability remains **Experimental**. One local non-production canary
+Runtime contract v55 adds a bounded, authenticated production admission
+attempt for an already-paused exact repository. It invokes that same canonical
+gate, persists a distinct `DISPATCH_DENIED` receipt linked to the active
+independently observed PAUSE chain, and creates no Attempt, workflow run,
+worker launch, or external call. Incident Command displays the receipt after
+refresh and reuses its validated lineage as canonical Measure evidence.
+
+This capability remains **Experimental** until the retained production drill is
+sealed on final main. One local non-production canary
 completed pause, denied dispatch, restart recovery, separately authorized
 resume, independent observation, and the full incident lifecycle. This does not
 establish broad control coverage or autonomous emergency authority.

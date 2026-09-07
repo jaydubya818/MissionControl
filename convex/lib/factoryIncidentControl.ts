@@ -3,6 +3,7 @@ import { v } from "convex/values";
 export const REPOSITORY_DISPATCH_CONTROL = "PAUSE_REPOSITORY_DISPATCH" as const;
 export const REPOSITORY_DISPATCH_OBSERVER_ID = "repository-dispatch-admission-observer/v1";
 export const REPOSITORY_DISPATCH_EXECUTOR_ID = "repository-dispatch-control-executor/v1";
+export const REPOSITORY_DISPATCH_GATE_ID = "repository-dispatch-admission-gate/v1";
 export const INCIDENT_COMMAND_AUTHORITY_ID = "incident-command-authority/v1";
 export const INCIDENT_CONTROL_AUTHORITY_MAX_TTL_MS = 5 * 60 * 1_000;
 
@@ -21,6 +22,7 @@ export const factoryIncidentControlReceiptTypeValidator = v.union(
   v.literal("COMMAND_ISSUED"),
   v.literal("ACKNOWLEDGED"),
   v.literal("EFFECT_OBSERVED"),
+  v.literal("DISPATCH_DENIED"),
 );
 
 export type RepositoryDispatchOperation = "PAUSE_REPOSITORY_DISPATCH" | "RESUME_REPOSITORY_DISPATCH";
@@ -41,6 +43,49 @@ export function repositoryDispatchAdmissionRejectionReason(input: {
   if (!input.projection) return null;
   if (String(input.projection.projectId) !== input.projectId) return "repository-dispatch-control-scope-mismatch";
   if (input.projection.admission === "DENIED") return "repository-dispatch-paused";
+  return null;
+}
+
+export function dispatchDenialMeasurementRejectionReason(input: {
+  receipt: any;
+  predecessor: any;
+  incidentId: string;
+  projectId: string;
+  repositoryId: string;
+  expectedRuntimeContractVersion: number;
+}) {
+  const { receipt, predecessor } = input;
+  if (!receipt || !predecessor) return "dispatch-denial-receipt-lineage-missing";
+  if (String(receipt.incidentId) !== input.incidentId
+    || String(receipt.projectId) !== input.projectId
+    || String(receipt.repositoryId) !== input.repositoryId
+    || String(predecessor.incidentId) !== input.incidentId
+    || String(predecessor.projectId) !== input.projectId
+    || String(predecessor.repositoryId) !== input.repositoryId) {
+    return "dispatch-denial-receipt-scope-mismatch";
+  }
+  if (receipt.receiptType !== "DISPATCH_DENIED"
+    || receipt.controlKey !== REPOSITORY_DISPATCH_CONTROL
+    || receipt.operation !== "PAUSE_REPOSITORY_DISPATCH"
+    || receipt.producerId !== REPOSITORY_DISPATCH_GATE_ID
+    || receipt.result !== "PASS"
+    || receipt.expectedAdmission !== "DENIED"
+    || receipt.observedAdmission !== "DENIED"
+    || receipt.runtimeContractVersion !== input.expectedRuntimeContractVersion) {
+    return "dispatch-denial-receipt-invalid";
+  }
+  if (String(receipt.predecessorReceiptId) !== String(predecessor._id)
+    || predecessor.receiptType !== "EFFECT_OBSERVED"
+    || predecessor.controlKey !== REPOSITORY_DISPATCH_CONTROL
+    || predecessor.operation !== "PAUSE_REPOSITORY_DISPATCH"
+    || predecessor.producerId !== REPOSITORY_DISPATCH_OBSERVER_ID
+    || predecessor.result !== "PASS"
+    || predecessor.expectedAdmission !== "DENIED"
+    || predecessor.observedAdmission !== "DENIED"
+    || predecessor.requestId === receipt.requestId
+    || predecessor.createdAt > receipt.createdAt) {
+    return "dispatch-denial-receipt-predecessor-invalid";
+  }
   return null;
 }
 
