@@ -35,6 +35,11 @@ describe("governed Bedrock bridge offline", () => {
       authority: "NONE",
       providerReturnedModel: null,
       automaticRetries: 0,
+      preSendCostClassification: "MAXIMUM_RESERVED",
+      providerReportedInputUsage: 10,
+      providerReportedOutputUsage: 5,
+      settledEstimatedNanoUsd: 15,
+      settledCostClassification: "ESTIMATED",
     });
   });
   it("prevents transmission when canonical admission fails", async () => {
