@@ -217,6 +217,7 @@ const factoryBootstrap = optionalExecutionConfiguration("FACTORY_BOOTSTRAP_INVAL
     [...configuredFactoryHarnessAdapters({
       codexEnabled: CODEX_FACTORY_WORKER_ENABLED,
       codexBedrockEnabled: CODEX_BEDROCK_HARNESS_ENABLED,
+      codexBedrockRouteAdmitted: Boolean(bedrockTransport),
       deepseekEnabled: DEEPSEEK_HARNESS_EXECUTOR_ENABLED,
       legacyFactoryWorkerEnabled: LEGACY_FACTORY_WORKER_ENABLED,
     }), ...(configuredFabAdapter ? [configuredFabAdapter] : []), ...(configuredOfflineAdapter ? [configuredOfflineAdapter] : [])],

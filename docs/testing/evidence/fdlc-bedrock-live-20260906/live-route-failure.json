@@ -1,0 +1,12 @@
+{
+  "schema": "fdlc-bedrock-live-route-failure/v1",
+  "requestId": "fdlc-route-6749103b-f399-4e15-a55c-5658e05d1e7c",
+  "classification": "REJECTED_PRE_INFERENCE",
+  "providerRequestId": "24e8d1d5-c7ff-4cc3-b66d-32d08c4925ee",
+  "httpStatusCode": 403,
+  "attempts": 1,
+  "totalRetryDelay": 0,
+  "error": "AccessDeniedException",
+  "automaticRetries": 0,
+  "reason": "The verified qualification role has an explicit identity-based deny for bedrock:InvokeModel on the exact approved inference-profile ARN. AWS rejected the request before inference; no model output or token usage was returned."
+}

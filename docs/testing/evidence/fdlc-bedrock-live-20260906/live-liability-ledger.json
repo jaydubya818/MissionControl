@@ -1,0 +1,24 @@
+{
+  "schema": "fdlc-live-qualification-liability/v1",
+  "maximumTotalNanoUsd": 5000000000,
+  "settledNanoUsd": 0,
+  "unresolvedNanoUsd": 0,
+  "remainingNanoUsd": 5000000000,
+  "requests": [
+    {
+      "requestId": "fdlc-route-6749103b-f399-4e15-a55c-5658e05d1e7c",
+      "state": "REJECTED_PRE_INFERENCE",
+      "maximumNanoUsd": 924528000,
+      "payloadBytes": 151,
+      "maximumInputTokens": 140000,
+      "maximumOutputTokens": 32,
+      "automaticRetries": 0,
+      "actualNanoUsd": 0,
+      "providerRequestId": "24e8d1d5-c7ff-4cc3-b66d-32d08c4925ee",
+      "httpStatusCode": 403,
+      "attempts": 1,
+      "totalRetryDelay": 0,
+      "error": "AccessDeniedException"
+    }
+  ]
+}

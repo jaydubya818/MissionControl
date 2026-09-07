@@ -53,6 +53,27 @@ it("SDK fixture uses exact endpoint, static supplied credentials, one attempt an
   expect(send).toHaveBeenCalledTimes(1);
   expect(destroy).toHaveBeenCalledOnce();
 });
+it("uses only the explicitly approved named SSO profile without materializing credentials", async () => {
+  const profileCredentials = vi.fn(() => async () => ({
+    accessKeyId: "SYNTHETIC00000000000",
+    secretAccessKey: "SYNTHETIC00000000000",
+    sessionToken: "SYNTHETIC",
+  }));
+  const send = vi.fn(async () => ({ $metadata: { requestId: "provider-profile-id" }, output: {} }));
+  const create = vi.fn((_options: any) => ({ send, destroy: vi.fn() }));
+  const profileGrant = { ...grant(), credentialsFile: undefined, awsProfile: "fdlc-qualification" };
+  const transport = qualifiedBedrockTransport(fixtureRoute, profileGrant, {
+    createProfileCredentials: profileCredentials,
+    createClient: create,
+  });
+  await expect(transport.send(wire(), new AbortController().signal)).resolves.toMatchObject({ requestId: "provider-profile-id" });
+  expect(profileCredentials).toHaveBeenCalledWith("fdlc-qualification");
+  expect(create.mock.calls[0][0].credentials).toBeTypeOf("function");
+});
+it("rejects default or ambiguous credential sources", () => {
+  expect(() => qualifiedBedrockTransport(fixtureRoute, { ...grant(), credentialsFile: undefined, awsProfile: "default" })).toThrow();
+  expect(() => qualifiedBedrockTransport(fixtureRoute, { ...grant(), awsProfile: "fdlc-qualification" })).toThrow();
+});
 it("missing live-call authority fails before any credential read", () => {
   const read = vi.fn();
   expect(() =>

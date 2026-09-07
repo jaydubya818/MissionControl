@@ -3,6 +3,7 @@ import {
   ConverseCommand,
   type ConverseCommandInput,
 } from "@aws-sdk/client-bedrock-runtime";
+import { fromIni } from "@aws-sdk/credential-provider-ini";
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import { bedrockRouteSchema, type BedrockRoute } from "./bedrockRoute.js";
@@ -17,11 +18,18 @@ const grantSchema = z
     expectedStsPrincipalArn: z.string(),
     identityEvidenceDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
     profileEvidenceDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
-    credentialsFile: z.string().startsWith("/"),
+    credentialsFile: z.string().startsWith("/").optional(),
+    awsProfile: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/).optional(),
     validUntil: z.number().int().positive(),
     allowModelCalls: z.literal(true),
   })
-  .strict();
+  .strict()
+  .superRefine((grant, ctx) => {
+    if (Number(Boolean(grant.credentialsFile)) + Number(Boolean(grant.awsProfile)) !== 1)
+      ctx.addIssue({ code: "custom", message: "EXACT_CREDENTIAL_SOURCE_REQUIRED" });
+    if (grant.awsProfile === "default")
+      ctx.addIssue({ code: "custom", message: "DEFAULT_AWS_PROFILE_PROHIBITED" });
+  });
 export type BedrockCallAuthorization = z.infer<typeof grantSchema>;
 const credentialSchema = z
   .object({
@@ -47,6 +55,7 @@ export function qualifiedBedrockTransport(
       send: (command: any, options: any) => Promise<any>;
       destroy: () => void;
     };
+    createProfileCredentials?: (profile: string) => ReturnType<typeof fromIni>;
     now?: () => number;
   } = {},
 ): BedrockTransport {
@@ -87,32 +96,37 @@ export function qualifiedBedrockTransport(
         )
       )
         throw new Error("BEDROCK_BODY_FIELD_UNSUPPORTED");
-      const credentials = credentialSchema.parse(
-        JSON.parse(
-          await (dependencies.readCredentials ?? ((p) => readFile(p, "utf8")))(
-            grant.credentialsFile,
-          ),
-        ),
-      );
+      const credentials = grant.credentialsFile
+        ? credentialSchema.parse(
+            JSON.parse(
+              await (dependencies.readCredentials ?? ((p) => readFile(p, "utf8")))(
+                grant.credentialsFile,
+              ),
+            ),
+          )
+        : undefined;
       assertGrant();
       signal.throwIfAborted();
-      if (
+      if (credentials && (
         credentials.awsAccountId !== r.awsAccountId ||
         credentials.roleArn !== r.roleArn ||
         credentials.principalArn !== grant.expectedStsPrincipalArn ||
         credentials.expiresAt <= now()
-      )
+      ))
         throw new Error("BEDROCK_CREDENTIAL_IDENTITY_MISMATCH");
       const options = {
         region: r.region,
         endpoint: `https://bedrock-runtime.${r.region}.amazonaws.com`,
         maxAttempts: 1,
         followRegionRedirects: false,
-        credentials: {
-          accessKeyId: credentials.accessKeyId,
-          secretAccessKey: credentials.secretAccessKey,
-          sessionToken: credentials.sessionToken,
-        },
+        credentials: credentials
+          ? {
+              accessKeyId: credentials.accessKeyId,
+              secretAccessKey: credentials.secretAccessKey,
+              sessionToken: credentials.sessionToken,
+            }
+          : (dependencies.createProfileCredentials ??
+              ((profile) => fromIni({ profile })))(grant.awsProfile!),
       };
       const client =
         dependencies.createClient?.(options) ??
