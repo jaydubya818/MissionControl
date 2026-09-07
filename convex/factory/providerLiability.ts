@@ -15,6 +15,7 @@ import { factoryLeaseMatchesCurrentRegistration } from "../lib/factoryAttempt";
 import { loadExecutionProfileAdmission } from "../lib/executionProfileAdmission";
 import {
   assertProviderPrice,
+  assertQualifiedBedrockPrice,
   assertProviderReservation,
   liabilityDigest,
   reserveProviderRequest as reserve,
@@ -44,6 +45,8 @@ export const registerPriceVersion = mutation({
       FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
     );
     assertProviderPrice(args.price, Date.now());
+    if (args.price.provider === "aws-bedrock")
+      assertQualifiedBedrockPrice(args.price, Date.now());
     key(args.registrationKey);
     const digest = liabilityDigest(args.price);
     const existing = await ctx.db
@@ -122,6 +125,8 @@ export const createReservation = mutation({
     )
       throw new Error("Price/route mismatch");
     assertProviderPrice(price.snapshot, Date.now());
+    if (price.snapshot.provider === "aws-bedrock")
+      assertQualifiedBedrockPrice(price.snapshot, Date.now());
     if (
       args.expiresAt > price.snapshot.expiresAt ||
       (admission.validUntil != null && args.expiresAt > admission.validUntil)
@@ -272,6 +277,8 @@ async function currentAuthority(
     price.digest !== row.snapshot.scope.priceDigest
   )
     throw new Error("Price identity changed");
+  if (price.snapshot.provider === "aws-bedrock")
+    assertQualifiedBedrockPrice(price.snapshot, Date.now());
   return { row, run, price  , profile };
 }
 export const reserveRequestInternal = internalMutation({

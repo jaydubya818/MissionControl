@@ -269,9 +269,22 @@ it.each([
 });
 function bedrockHandlerFixture() {
   const f = fixture();
-  f.price.api = "CONVERSE";
-  f.price.provider = "aws-bedrock";
-  f.price.model = "anthropic.claude-sonnet-4-6";
+  Object.assign(f.price, {
+    provider: "aws-bedrock",
+    model: "anthropic.claude-sonnet-4-6",
+    api: "CONVERSE",
+    effectiveAt: 1_779_840_000_000,
+    expiresAt: 1_791_331_200_000,
+    source: "https://www-cdn.anthropic.com/files/4zrzovbb/website/3684c2faafb97418665782cea0001f439f74b1d2.pdf",
+    evidenceDigest: "sha256:dc372a994199f77b1e140e775875fd610591c69f31aa8e7ff8394908647b71ad",
+    inputNanoUsdPerToken: 3300,
+    outputNanoUsdPerToken: 16500,
+    maximumInputTokens: 1_000_000,
+    maximumOutputTokens: 4096,
+    maximumPayloadBytes: 262_144,
+  });
+  f.rows.reservation.snapshot.maximumNanoUsd = 3_300_165_000;
+  f.rows.version.budget.maxCostUsd = 5;
   f.rows.price.digest = liabilityDigest(f.price);
   f.rows.reservation.snapshot.scope.priceDigest = f.rows.price.digest;
   f.ctx.bridgeProfile = {
@@ -318,12 +331,12 @@ function bedrockHandlerFixture() {
     evidenceDigest: liabilityDigest(preSendInputBound),
   };
   vi.stubEnv("MC_GOVERNED_INFERENCE_GATEWAY_ENABLED", "1");
-  Object.assign(f.rows.wo, { projectId: "project", tenantId: "tenant", approvalStatus: "APPROVED", metadata: { implementationPolicy: { maxCostUsd: 1 } } });
+  Object.assign(f.rows.wo, { projectId: "project", tenantId: "tenant", approvalStatus: "APPROVED", metadata: { implementationPolicy: { maxCostUsd: 5 } } });
   Object.assign(f.rows.run, { parentTaskId: "task", executionManifestDigest: hash });
   f.rows.task = { _id: "task", projectId: "project" };
   f.rows.profile = { _id: "profile", projectId: "project", profileDigest: hash, modelRouteDigest: hash, modelCatalogId: "route", qualificationExpiresAt: Date.now() + 60000, immutableSnapshot: f.ctx.bridgeProfile.immutableSnapshot };
   f.rows.route = { _id: "route", projectId: "project", provider: f.price.provider, modelId: f.price.model, providerRoute: "fixture-approved-us-bedrock", routeDigest: hash, enabled: true, qualificationStatus: "EVIDENCE_QUALIFIED", admissionStatus: "PRODUCTION_PILOT_ELIGIBLE" };
-  const book = inferencePriceBook({ priceBookId: "book", version: 1, currency: "USD", source: { kind: "OPERATOR_APPROVED", reference: f.price.source, digest: f.price.evidenceDigest }, effectiveFrom: f.price.effectiveAt, effectiveUntil: f.price.expiresAt, rates: [{ routeDigest: hash, inputMicrousdPerMillionTokens: 1000, outputMicrousdPerMillionTokens: 2000 }] });
+  const book = inferencePriceBook({ priceBookId: "book", version: 1, currency: "USD", source: { kind: "OPERATOR_APPROVED", reference: f.price.source, digest: f.price.evidenceDigest }, effectiveFrom: f.price.effectiveAt, effectiveUntil: f.price.expiresAt, rates: [{ routeDigest: hash, inputMicrousdPerMillionTokens: 3_300_000, outputMicrousdPerMillionTokens: 16_500_000 }] });
   f.rows.book = { _id: "book", _table: "inferencePriceBooks", projectId: "project", ...book, sourceKind: book.source.kind, sourceReference: book.source.reference, sourceDigest: book.source.digest, immutableSnapshot: book, priceBookDigest: book.digest, state: "ACTIVE" };
   let sequence = 0;
   f.ctx.db.insert = vi.fn(async (table: string, value: any) => { const id = `${table}-${++sequence}`; f.rows[id] = { _id: id, _table: table, ...value }; return id; });
@@ -343,7 +356,7 @@ it("binds Bedrock request admission evidence through actual handler", async () =
     requestId: f.args.requestId,
     requestDigest: f.args.requestDigest,
     bridgeIdentityDigest: liabilityDigest(f.args.bridgeIdentity),
-    maximumNanoUsd: 30,
+    maximumNanoUsd: 3_300_165_000,
   });
   expect(f.rows.reservation.snapshot.holds[0].preSendInputBound).toEqual(
     f.args.preSendInputBound,
@@ -420,14 +433,14 @@ it("fences a second Bedrock request while first outcome is unresolved", async ()
   ).rejects.toThrow("BEDROCK_PRIOR_REQUEST_UNRESOLVED");
 });
 
-it("rejects a price for another Bedrock API", async () => {
+it("rejects a nonqualified Bedrock API substitution", async () => {
   const f = bedrockHandlerFixture();
   f.price.api = "INVOKE_MODEL";
   f.rows.price.digest = liabilityDigest(f.price);
   f.rows.reservation.snapshot.scope.priceDigest = f.rows.price.digest;
   f.args.bridgeIdentity.priceDigest = f.rows.price.digest;
   await expect(handler(reserveRequestInternal)(f.ctx, f.args)).rejects.toThrow(
-    "BEDROCK_PRICE_API_MISMATCH",
+    "BEDROCK_PRICE_NOT_QUALIFIED",
   );
 });
 
@@ -517,7 +530,7 @@ it("atomically composes a canonical reservation and claimed physical intent befo
   expect(reservation.allowedFallbacks).toEqual([]);
   expect(reservation.maxPhysicalCalls).toBe(1);
   expect(reservation.maxReasoningTokens).toBe(0);
-  expect(reservation.maxCostMicrousd).toBe(2); // each dimension rounds upward; nano cap remains 30
+  expect(reservation.maxCostMicrousd).toBe(3_300_165);
   expect(intent.state).toBe("CLAIMED");
   expect(intent.requestDigest).toBe(hash);
   expect(intent.reservationId).toBe(reservation._id);
@@ -556,7 +569,7 @@ it("retains unknown liability and appends an unknown canonical receipt with no i
   expect(receipt.delivery).toBe("UNKNOWN");
   expect(receipt.usage).toEqual({});
   expect(receipt.costMicrousd).toBeUndefined();
-  expect(f.rows.reservation.snapshot.holds[0]).toMatchObject({ state: "UNKNOWN", maximumNanoUsd: 30 });
+  expect(f.rows.reservation.snapshot.holds[0]).toMatchObject({ state: "UNKNOWN", maximumNanoUsd: 3_300_165_000 });
   await expect(handler(reserveRequestInternal)(f.ctx, { ...f.args, requestId: "retry" })).rejects.toThrow("BEDROCK_PRIOR_REQUEST_UNRESOLVED");
 });
 it("clamps the returned send proof to the governed price-book expiry", async () => {
@@ -572,8 +585,8 @@ it("clamps the returned send proof to the governed price-book expiry", async () 
 });
 it("rejects an aggregate above the WorkOrder ceiling even when this physical call fits", async () => {
   const f = bedrockHandlerFixture();
-  f.rows.reservation.snapshot.maximumNanoUsd = 2_000_000_000;
-  // Factory permits 10 USD; WorkOrder permits 1 USD; this physical call costs only 30 nano-USD.
+  f.rows.reservation.snapshot.maximumNanoUsd = 6_000_000_000;
+  // Factory permits 10 USD while the WorkOrder permits 5 USD.
   f.rows.version.budget.maxCostUsd = 10;
   await expect(handler(reserveRequestInternal)(f.ctx, f.args)).rejects.toThrow("BEDROCK_ACCOUNTING_WORKORDER_BUDGET_MISSING");
   expect(f.ctx.db.insert).not.toHaveBeenCalled();
@@ -610,7 +623,7 @@ it("reconciles UNKNOWN through operator authority without rewriting the canonica
   expect(accountingRows(f, "inferenceReconciliations")[0]).toMatchObject({ providerRequestId: "provider-request-1", receiptId: receipt._id });
   expect(f.rows.reservation.snapshot.holds[0].state).toBe("SETTLED");
 });
-it.each([{ inputTokens: 11, outputTokens: 1 }, { inputTokens: 1, outputTokens: 11 }, { inputTokens: 11, outputTokens: 11 }])("retains observed overrun %j and freezes aggregate atomically without expanding pre-send limits", async observed => {
+it.each([{ inputTokens: 1_000_001, outputTokens: 1 }, { inputTokens: 1, outputTokens: 11 }, { inputTokens: 1_000_001, outputTokens: 11 }])("retains observed overrun %j and freezes aggregate atomically without expanding pre-send limits", async observed => {
   const f = bedrockHandlerFixture();
   await handler(reserveRequestInternal)(f.ctx, f.args);
   const result = await handler(recordUsageInternal)(f.ctx, { ...f.args, usage: { ...bedrockUsage(f), ...observed } });
@@ -658,12 +671,14 @@ it("retains sequential operator corrections for one provider usage ID with exact
   expect((await handler(reconcileUsage)(f.ctx, second)).duplicate).toBe(true);
   expect(accountingRows(f, "inferenceReconciliations")).toHaveLength(2);
 });
-it("retains cumulative canonical allocation after settled paired requests without expanding the WorkOrder ceiling", async () => {
+it("rejects canonical cumulative rounding beyond the WorkOrder ceiling without adding a hold", async () => {
   const f = bedrockHandlerFixture();
-  f.rows.reservation.snapshot.maximumNanoUsd = 90;
+  f.args.outputTokens = 1;
+  f.rows.reservation.snapshot.maximumNanoUsd = 9_900_049_500;
   f.rows.reservation.snapshot.maximumRequests = 3;
   f.rows.reservation.creationDigest = liabilityDigest(f.rows.reservation.snapshot);
-  f.rows.wo.metadata.implementationPolicy.maxCostUsd = 0.000004;
+  f.rows.version.budget.maxCostUsd = 10;
+  f.rows.wo.metadata.implementationPolicy.maxCostUsd = 9.90005;
   for (let ordinal = 1; ordinal <= 2; ordinal++) {
     f.args.requestId = `request-${ordinal}`;
     await handler(reserveRequestInternal)(f.ctx, f.args);
@@ -671,16 +686,18 @@ it("retains cumulative canonical allocation after settled paired requests withou
   }
   const allocations = accountingRows(f, "inferenceReservations");
   expect(allocations.map(row => row.state)).toEqual(["EXHAUSTED", "EXHAUSTED"]);
-  expect(allocations.reduce((sum, row) => sum + row.maxCostMicrousd, 0)).toBe(4);
+  expect(allocations.reduce((sum, row) => sum + row.maxCostMicrousd, 0)).toBe(6_600_034);
   expect(f.rows.reservation.snapshot.holds).toHaveLength(2);
   await expect(handler(reserveRequestInternal)(f.ctx, { ...f.args, requestId: "request-3" })).rejects.toThrow("Aggregate inference reservations exceed the approved WorkOrder cost ceiling");
   expect(accountingRows(f, "inferenceReservations")).toHaveLength(2);
   expect(f.rows.reservation.snapshot.holds).toHaveLength(2);
-  expect(f.rows.wo.metadata.implementationPolicy.maxCostUsd).toBe(0.000004);
+  expect(f.rows.wo.metadata.implementationPolicy.maxCostUsd).toBe(9.90005);
 });
 it("rejects immutable allocation drift before composing the next physical request", async () => {
   const f = bedrockHandlerFixture();
-  f.rows.reservation.snapshot.maximumNanoUsd = 60;
+  f.rows.reservation.snapshot.maximumNanoUsd = 6_600_330_000;
+  f.rows.version.budget.maxCostUsd = 7;
+  f.rows.wo.metadata.implementationPolicy.maxCostUsd = 7;
   f.rows.reservation.creationDigest = liabilityDigest(f.rows.reservation.snapshot);
   await handler(reserveRequestInternal)(f.ctx, f.args);
   await handler(recordUsageInternal)(f.ctx, { ...f.args, usage: bedrockUsage(f) });

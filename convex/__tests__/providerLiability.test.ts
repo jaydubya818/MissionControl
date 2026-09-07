@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   assertProviderPrice,
+  assertQualifiedBedrockPrice,
   liabilityDigest,
   reserveProviderRequest,
   settleProviderUsage,
@@ -244,4 +245,27 @@ it('pins the original usage identity across corrections to prevent historical re
   const held = reserveProviderRequest(request()).reservation;
   const settled = settleProviderUsage(held, price, usage).reservation;
   expect(() => settleProviderUsage(settled, price, { ...usage, usageId: 'replacement', expectedReceiptRevision: 1 }, true)).toThrow('USAGE_IDENTITY_CHANGED');
+});
+
+it('pins the complete qualified Bedrock price at the authority boundary', () => {
+  const qualified: ProviderPrice = {
+    schema: 'factory-provider-price/v1', provider: 'aws-bedrock',
+    model: 'anthropic.claude-sonnet-4-6', api: 'CONVERSE', currency: 'USD',
+    effectiveAt: 1_779_840_000_000, expiresAt: 1_791_331_200_000,
+    source: 'https://www-cdn.anthropic.com/files/4zrzovbb/website/3684c2faafb97418665782cea0001f439f74b1d2.pdf',
+    evidenceDigest: 'sha256:dc372a994199f77b1e140e775875fd610591c69f31aa8e7ff8394908647b71ad',
+    inputNanoUsdPerToken: 3300, outputNanoUsdPerToken: 16500,
+    maximumInputTokens: 1_000_000, maximumOutputTokens: 4096,
+    maximumPayloadBytes: 262_144, inputBound: 'CONSERVATIVELY_BOUNDED',
+    outputIncludesReasoning: true, inclusiveCacheWorstCase: true,
+    otherBillableDimensions: 'NONE',
+  };
+  expect(() => assertQualifiedBedrockPrice(qualified, 1_788_000_000_000)).not.toThrow();
+  for (const mutation of [
+    { inputNanoUsdPerToken: 3299 }, { outputNanoUsdPerToken: 16499 },
+    { maximumInputTokens: 999_999 }, { maximumOutputTokens: 4095 },
+    { maximumPayloadBytes: 262_143 }, { api: 'INVOKE_MODEL' },
+    { source: 'https://example.test/substituted' }, { evidenceDigest: sha('f') },
+  ]) expect(() => assertQualifiedBedrockPrice({ ...qualified, ...mutation } as ProviderPrice, 1_788_000_000_000))
+    .toThrow('BEDROCK_PRICE_NOT_QUALIFIED');
 });

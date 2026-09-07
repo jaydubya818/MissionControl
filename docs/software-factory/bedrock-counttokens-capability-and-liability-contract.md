@@ -63,6 +63,10 @@ usage is retained as `ACTUAL`; money derived from the versioned price remains
 The separate live-call authorization binds the canonical provider-price digest.
 Startup supplies that same full price snapshot to both the transport and bridge;
 substituted rates, ceilings, provider, model, or API fail before credential read.
+The backend independently enforces that digest when registering the price,
+creating the reservation, and admitting the physical request. Response evidence
+keeps `MAXIMUM_RESERVED` pre-send cost separate from provider-reported token
+usage and the resulting `ESTIMATED` settled cost.
 
 ## Enforcement and failure behavior
 
