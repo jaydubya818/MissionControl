@@ -376,6 +376,24 @@ inference call, retry, fallback, or spend occurred. The retained
 records the effective scope and terminal provider response. Todo 063 remains in
 progress; todo 064 remains dependency-blocked.
 
+### Worker-path CountTokens permission applied; inference remains blocked
+
+The exact worker role and Bedrock runtime endpoint policy gained only
+`bedrock:CountTokens` through a saved Terraform plan with zero creates, two
+in-place updates, and zero destroys. Targeted post-apply drift is clean. The
+human permission set fingerprint remained unchanged. AI-FDE PR `#4` merged as
+`8c2aa2b026e8af3ba60fad9d70eef859d4d9c981`, with its merge tree matching the
+reviewed head.
+
+The corrected one-off task used the immutable worker task definition, exact
+worker role, private worker subnets, worker security group, and Bedrock endpoint.
+Bedrock admitted the request but again returned `ValidationException` because
+the approved inference profile does not support token counting. The hard gate
+therefore prohibited generation. No reservation, automatic retry, fallback, or
+billable inference occurred. The retained
+[worker-path evidence](../testing/evidence/todo063-bedrock-worker-counttokens-2026-09-07/README.md)
+keeps Todo 063 in progress and Todo 064 dependency-blocked.
+
 ### Conservative pre-send liability correction — implementation in progress
 
 The Product Owner subsequently classified that response as an exact provider
