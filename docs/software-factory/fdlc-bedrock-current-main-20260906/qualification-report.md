@@ -1,14 +1,14 @@
 # FDLC Phase 1 Bedrock qualification report
 
 Updated: 2026-09-07. Authoritative baseline: Mission Control main
-`ee870794cddb426824fc881a520ccdda028060d6`, runtime contract v55. The
+`beaf1f8cb293845ec2abaa6c3c1502676a5cf83b`, runtime contract v55. The
 candidate is reconciled with the accounting-recovery, Factory Engineer,
 orchestration-readiness, incident-evidence, and repository-dispatch controls on
 canonical main.
 
-Status: **BEDROCK_IAM_ROUTE_PASS / PROVIDER_DAILY_TOKEN_QUOTA_BLOCKED**.
+Status: **BEDROCK_IAM_ROUTE_PASS / BEDROCK_QUOTA_ADMIN_ACTION_REQUIRED**.
 
-External boundary: **QUALIFICATION_BEDROCK_DAILY_TOKEN_QUOTA_REQUIRED**.
+External boundary: **BEDROCK_QUOTA_ADMIN_ACTION_REQUIRED**.
 
 No readiness, WorkOrder execution, pilot acceptance, release, or Production
 qualification is claimed.
@@ -150,6 +150,16 @@ The provider quota hold remains active independently of the accounting result.
   code or public contract. Factory documentation, secret scanning, JSON, and
   whitespace checks pass on the resulting exact head. PR CI supplies the final
   remote exact-head qualification.
+- Commit `14c34b46ad4451f11ec69b07546efad9c6aa510e` records the zero-billable
+  429 reconciliation and adds the fail-closed quota confirmation gate. Merge
+  commit `32160c4f3c7131b16a96faa56ccd757322751deb` integrates canonical main
+  `beaf1f8cb293845ec2abaa6c3c1502676a5cf83b`, including its conservative
+  full-context liability contract. The conflict resolution retains main's
+  explicit temporary-credential envelope and authenticated STS check; it does
+  not restore profile or default-chain credential discovery. Quota-gate tests,
+  all 80 focused Bedrock transport/adapter/liability tests, typechecking,
+  Factory documentation validation, secret scanning, and the two affected
+  full-system/Fab suites pass on the integrated head.
 
 Evidence is under
 `docs/testing/evidence/fdlc-bedrock-live-20260906/`, including caller identity,
