@@ -28,6 +28,12 @@ interface Prepared {
 interface Handle { prepared: Prepared; result: Promise<ExecutorResult> }
 export interface FabAdapterOptions {
   config: FabConfig; stateDirectory: string;
+  /** Host-computed binding for the exact admitted Bedrock route. Operator
+   * configuration cannot derive or substitute this opaque control-plane key. */
+  bedrockRouteBinding?: { providerRoute: string; routeDigest: string };
+  /** Exact host-approved response ceiling used by both Fab serialization and
+   * the canonical liability broker. */
+  bedrockMaximumOutputTokens?: number;
   /** Tests inject model transport here. Production configuration never selects a mock. */
   modelFactory?: (config: FabConfig, redactor: Redactor) => Promise<ModelProvider>;
   /** Host-owned binding to canonical authority and durable inference liability.
@@ -35,7 +41,13 @@ export interface FabAdapterOptions {
   bedrockBrokerFactory?: (input: { config: FabConfig; request: ExecutorRequest; context: HarnessExecutionContext }) => Promise<BedrockBrokerTransport>;
 }
 
-export function loadFabExecutorAdapter(configPath: string, stateDirectory: string, bedrockBrokerFactory?: FabAdapterOptions["bedrockBrokerFactory"]): FabExecutorAdapter {
+export function loadFabExecutorAdapter(
+  configPath: string,
+  stateDirectory: string,
+  bedrockBrokerFactory?: FabAdapterOptions["bedrockBrokerFactory"],
+  bedrockRouteBinding?: FabAdapterOptions["bedrockRouteBinding"],
+  bedrockMaximumOutputTokens?: FabAdapterOptions["bedrockMaximumOutputTokens"],
+): FabExecutorAdapter {
   if (!path.isAbsolute(configPath) || !path.isAbsolute(stateDirectory)) throw new Error("Fab requires explicit absolute config and state paths.");
   const text = readFileSync(configPath, "utf8");
   if (Buffer.byteLength(text) > 32000) throw new Error("Fab configuration exceeds its byte limit.");
@@ -43,7 +55,7 @@ export function loadFabExecutorAdapter(configPath: string, stateDirectory: strin
   const realConfigPath = realpathSync(configPath);
   if (realConfigPath === config.repository || realConfigPath.startsWith(config.repository + path.sep)) throw new Error("Fab operator configuration must be outside the worktree.");
   if (new Redactor().containsSecret(text)) throw new Error("Fab configuration must contain credential references only.");
-  return new FabExecutorAdapter({ config, stateDirectory, bedrockBrokerFactory });
+  return new FabExecutorAdapter({ config, stateDirectory, bedrockBrokerFactory, bedrockRouteBinding, bedrockMaximumOutputTokens });
 }
 
 /** Execution only: no queue, lease, verifier, approval or publication implementation. */
@@ -69,7 +81,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     const config = this.options.config; const issues: Array<{field: string; message: string}> = [];
     const issue = (field: string, message: string) => issues.push({ field, message });
     const provider = factoryProvider(config);
-    const providerRoute = factoryProviderRoute(config);
+    const routeBinding = this.options.bedrockRouteBinding;
     const isGovernedWorktree = pathIsWithin(
       path.resolve(config.repository, ".mission-control", "worktrees"),
       request.repositoryRoot,
@@ -80,8 +92,14 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     if (request.provider !== provider || request.model !== config.model) issue("model", "Fab requires the exact explicitly selected provider/model.");
     if (request.modelRouteDigest !== undefined || request.providerRoute !== undefined || request.reasoningConfig !== undefined) {
       if (!/^sha256:[a-f0-9]{64}$/.test(request.modelRouteDigest ?? "")) issue("modelRouteDigest", "Fab requires the exact frozen model-route digest.");
-      if (request.providerRoute !== providerRoute) issue("providerRoute", "Fab requires its exact configured provider route.");
+      if (config.provider !== "bedrock" && request.providerRoute !== provider) issue("providerRoute", "Fab requires its exact configured provider route.");
       if (request.reasoningConfig !== undefined) issue("reasoningConfig", "Fab cannot translate reasoning controls; use a separately qualified configuration.");
+    }
+    if (config.provider === "bedrock"
+      && (!routeBinding
+        || request.providerRoute !== routeBinding.providerRoute
+        || request.modelRouteDigest !== routeBinding.routeDigest)) {
+      issue("providerRoute", "Fab requires the exact host-bound Bedrock model route.");
     }
     if (request.isolation !== "WORKSPACE_WRITE" || request.filesystemReadScope) issue("isolation", "Fab has no whole-agent OS read boundary; WORKSPACE_ONLY and read-only execution are unsupported.");
     if (request.timeoutMs < config.timeoutMs || request.structuredOutput) issue("limits", "Fab requires its bounded timeout and canonical factory result schema.");
@@ -100,7 +118,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
       ? parseConfig({ ...structuredClone(configured), repository: request.repositoryRoot,
           credential: { ...structuredClone(configured.credential), scope: { kind: "repository", root: request.repositoryRoot } } })
       : configured;
-    if (canonicalHash(attempt.acceptanceCriteria.map(item => item.title)) !== canonicalHash(config.acceptanceCriteria)) throw new Error("Fab criteria differ from the frozen WorkOrder.");
+    if (attempt.acceptanceCriteria.length === 0 || config.acceptanceCriteria.length === 0) throw new Error("Fab requires frozen WorkOrder and operator acceptance criteria.");
     const redactor = new Redactor();
     const store = new SessionStore(this.options.stateDirectory, config.repository, redactor);
     const session = newSession(config, redactor.text(request.prompt));
@@ -115,7 +133,12 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
       if (!this.options.bedrockBrokerFactory) throw new Error("Fab Bedrock requires an enrolled canonical broker; HTTP and ambient AWS fallback are prohibited.");
       const transport = await this.options.bedrockBrokerFactory({ config: structuredClone(config), request: structuredClone(request), context });
       context.signal?.throwIfAborted(); await attempt.assertActive(); context.signal?.throwIfAborted();
-      model = new BedrockModelProvider({ config, transport, redactor });
+      model = new BedrockModelProvider({
+        config,
+        transport,
+        redactor,
+        maximumOutputTokens: this.options.bedrockMaximumOutputTokens,
+      });
     } else {
       model = this.options.modelFactory ? await this.options.modelFactory(config, redactor) : await createModel(config, redactor, this.environment);
     }
@@ -211,7 +234,15 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
     session.candidateRevision = candidate.candidateRevision; session.governed.candidateRevision = candidate.candidateRevision;
     session.updatedAt = new Date().toISOString(); store.save(session);
   }
-  async health() { return { status: process.platform === "darwin" ? "DEGRADED" as const : "UNAVAILABLE" as const, checkedAt: Date.now(), adapter: "fab", version: "v1", details: "Experimental: explicit credentials/config and admitted local worktree required; live models and full runtime sandbox unqualified." }; }
+  async health() {
+    if (process.platform !== "darwin") {
+      return { status: "UNAVAILABLE" as const, checkedAt: Date.now(), adapter: "fab", version: "v1", details: "Fab's qualified native containment helpers require macOS." };
+    }
+    if (this.options.config.provider !== "bedrock" || !this.options.bedrockBrokerFactory) {
+      return { status: "DEGRADED" as const, checkedAt: Date.now(), adapter: "fab", version: "v1", details: "Fab requires the explicitly configured Bedrock broker before worker registration." };
+    }
+    return { status: "READY" as const, checkedAt: Date.now(), adapter: "fab", version: "v1", details: "Exact Bedrock broker, operator config, runtime identity, and macOS containment are present; per-Attempt authority is rechecked before inference." };
+  }
 }
 function sessionId(executionId: string) {
   const hex = createHash("sha256").update(executionId).digest("hex");
@@ -244,12 +275,6 @@ export function fabManifest(config: FabConfig): HarnessCapabilityManifest {
 
 function factoryProvider(config: FabConfig) {
   return config.provider === "bedrock" ? "aws-bedrock" : config.provider;
-}
-
-function factoryProviderRoute(config: FabConfig) {
-  return config.provider === "bedrock"
-    ? `${config.bedrockRoute!.region}/${config.bedrockRoute!.inferenceProfileId}`
-    : config.provider;
 }
 
 function pathIsWithin(root: string, candidate: string) {

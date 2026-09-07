@@ -204,6 +204,24 @@ describe("authoritative provider liability transitions", () => {
       reserveProviderRequest(request(result.reservation, "two")),
     ).toThrow();
   });
+  it("retains a provider request identity on an unknown observation", () => {
+    const held = reserveProviderRequest(request()).reservation;
+    const unknown = settleProviderUsage(held, price, {
+      ...usage,
+      classification: "UNKNOWN",
+      providerRequestId: "provider-error-request",
+      usageId: "",
+      inputTokens: 0,
+      outputTokens: 0,
+    }).reservation;
+    expect(unknown.holds[0]).toMatchObject({
+      state: "UNKNOWN",
+      providerRequestId: "provider-error-request",
+      classification: "UNKNOWN",
+      costClassification: "UNKNOWN",
+    });
+    expect(unknown.holds[0].accountedNanoUsd).toBeUndefined();
+  });
   it("rejects request ID mismatch and receipt revision races", () => {
     const held = reserveProviderRequest(request()).reservation;
     for (const mutation of [

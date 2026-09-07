@@ -1698,7 +1698,11 @@ function validV3ExecutionProfileBinding(
     || !exactObjectKeys(qualification, [
       "schema", "profile", "components", "scope", "evidence", "approvedBy", "approvedAt", "validUntil", "authority",
     ])
-    || !exactObjectKeys(profile?.harness, ["adapter", "version", "capabilityManifest", "capabilityManifestDigest", "effectiveConfigSha256"])
+    || !exactObjectKeys(profile?.harness, [
+      "adapter", "version", "capabilityManifest", "capabilityManifestDigest", "effectiveConfigSha256",
+      ...(profile?.harness?.source === "EXTERNAL_FROZEN" ? ["source"] : []),
+    ])
+    || (profile?.harness?.source !== undefined && profile.harness.source !== "EXTERNAL_FROZEN")
     || !exactObjectKeys(profile?.runtimeArtifact, ["snapshot", "digest"])
     || !exactObjectKeys(profile?.modelRoute, ["catalogId", "routeSnapshot", "routeDigest", "qualificationSnapshot", "qualificationDigest"])
     || !exactObjectKeys(profile?.lifecycle, [

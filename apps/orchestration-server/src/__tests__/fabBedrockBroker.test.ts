@@ -145,4 +145,24 @@ describe("Fab Bedrock broker", () => {
     expect(f.transport.countInputTokens).not.toHaveBeenCalled();
     expect(f.transport.send).not.toHaveBeenCalled();
   });
+
+  it("preserves an AWS request ID while keeping failed provider usage unknown", async () => {
+    const f = fixture();
+    const providerError = Object.assign(new Error("model agreement unavailable"), {
+      name: "ResourceNotFoundException",
+      $metadata: { requestId: "aws-error-request", httpStatusCode: 404 },
+    });
+    f.transport.send.mockRejectedValueOnce(providerError);
+    const broker = await f.brokerFactory({ context: f.context as any });
+    await expect(broker.invoke(f.request, new AbortController().signal)).rejects.toBe(providerError);
+    expect(f.client.action).toHaveBeenCalledTimes(2);
+    const settlement = JSON.parse(f.client.action.mock.calls[1]![1].payloadJson);
+    expect(settlement.usage).toMatchObject({
+      classification: "UNKNOWN",
+      providerRequestId: "aws-error-request",
+      usageId: "",
+      inputTokens: 0,
+      outputTokens: 0,
+    });
+  });
 });

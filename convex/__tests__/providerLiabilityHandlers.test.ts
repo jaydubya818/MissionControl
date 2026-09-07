@@ -307,8 +307,20 @@ it.each([
   };
   vi.stubEnv("MC_GOVERNED_INFERENCE_GATEWAY_ENABLED", "1");
   Object.assign(f.rows.wo, { projectId: "project", tenantId: "tenant", approvalStatus: "APPROVED", metadata: { implementationPolicy: { maxCostUsd: 1 } } });
-  Object.assign(f.rows.run, { parentTaskId: "task", executionManifestDigest: hash });
-  f.rows.task = { _id: "task", projectId: "project" };
+  Object.assign(f.rows.run, {
+    runId: "run-execution",
+    parentTaskId: "task",
+    executionManifest: {
+      causation: {
+        workOrderId: "wo",
+        workOrderRevisionNumber: 1,
+        workflowRunId: "run-execution",
+        taskId: "task",
+      },
+    },
+    executionManifestDigest: hash,
+  });
+  f.rows.task = { _id: "task", projectId: "project", workOrderId: "wo" };
   f.rows.profile = { _id: "profile", projectId: "project", profileDigest: hash, modelRouteDigest: hash, modelCatalogId: "route", qualificationExpiresAt: Date.now() + 60000, immutableSnapshot: f.ctx.bridgeProfile.immutableSnapshot };
   f.rows.route = { _id: "route", projectId: "project", provider: f.price.provider, modelId: f.price.model, providerRoute: "fixture-approved-us-bedrock", routeDigest: hash, enabled: true, qualificationStatus: "EVIDENCE_QUALIFIED", admissionStatus: "PRODUCTION_PILOT_ELIGIBLE" };
   const book = inferencePriceBook({ priceBookId: "book", version: 1, currency: "USD", source: { kind: "OPERATOR_APPROVED", reference: f.price.source, digest: f.price.evidenceDigest }, effectiveFrom: f.price.effectiveAt, effectiveUntil: f.price.expiresAt, rates: [{ routeDigest: hash, inputMicrousdPerMillionTokens: 1000, outputMicrousdPerMillionTokens: 2000 }] });

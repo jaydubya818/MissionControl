@@ -60,13 +60,29 @@ describe("Fab canonical MC harness conformance", () => {
     const route = { accountId: "123456789012", region: "us-east-1", modelId: "anthropic.claude-sonnet-4-6", inferenceProfileId: "us.anthropic.claude-sonnet-4-6", inferenceProfileArn: "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-sonnet-4-6" } as const;
     const config = parseConfig({ ...f.config, provider: "bedrock", model: route.modelId, bedrockRoute: route,
       credential: { ...f.config.credential, provider: "bedrock", source: { kind: "broker" } } });
-    const request = { ...f.request, provider: "aws-bedrock", providerRoute: `us-east-1/${route.inferenceProfileId}`,
-      modelRouteDigest: `sha256:${"a".repeat(64)}`, model: route.modelId };
-    return { ...f, config, request, route };
+    const routeBinding = { providerRoute: `bedrock-us:${"e".repeat(64)}`, routeDigest: `sha256:${"a".repeat(64)}` };
+    const request = { ...f.request, provider: "aws-bedrock", providerRoute: routeBinding.providerRoute,
+      modelRouteDigest: routeBinding.routeDigest, model: route.modelId };
+    return { ...f, config, request, route, routeBinding };
   }
+  it("reports ready only for the explicit Bedrock broker path", async () => {
+    const f = bedrockFixture();
+    const withoutBroker = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "without-broker"), bedrockRouteBinding: f.routeBinding });
+    await expect(withoutBroker.health()).resolves.toMatchObject({ status: "DEGRADED" });
+    const withBroker = new FabExecutorAdapter({
+      config: f.config,
+      stateDirectory: path.join(f.directory, "with-broker"),
+      bedrockRouteBinding: f.routeBinding,
+      bedrockBrokerFactory: async () => ({
+        identity: () => ({ route: f.route, credentialReference: f.config.credential.id, maximumAttempts: 1 }),
+        invoke: vi.fn(),
+      }),
+    });
+    await expect(withBroker.health()).resolves.toMatchObject({ status: "READY" });
+  });
   it("requires an explicit Bedrock broker and cannot select the test model factory or ambient credential path", async () => {
     const f = bedrockFixture(); const modelFactory = vi.fn();
-    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), modelFactory });
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), modelFactory, bedrockRouteBinding: f.routeBinding });
     await expect(adapter.prepare(f.request, f.context)).rejects.toThrow("enrolled canonical broker");
     expect(modelFactory).not.toHaveBeenCalled();
     expect(adapter.capabilities().capabilityManifest?.network.destinations).toEqual(["bedrock-runtime.us-east-1.amazonaws.com"]);
@@ -74,7 +90,7 @@ describe("Fab canonical MC harness conformance", () => {
   });
   it("rechecks canonical authority after Bedrock broker enrollment before any provider request", async () => {
     const f = bedrockFixture(); const invoke = vi.fn();
-    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockBrokerFactory: async input => {
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockRouteBinding: f.routeBinding, bedrockBrokerFactory: async input => {
       expect(input.request).toEqual(f.request); expect(input.context.attempt?.attemptId).toBe("attempt-1");
       f.assertActive.mockRejectedValue(new Error("lease lost while enrolling broker"));
       return { identity: () => ({ route: f.route, credentialReference: f.config.credential.id, maximumAttempts: 1 }), invoke };
@@ -93,7 +109,7 @@ describe("Fab canonical MC harness conformance", () => {
       return { identity: () => ({ route: f.route, credentialReference: f.config.credential.id, maximumAttempts: 1 as const }),
         invoke: vi.fn() };
     });
-    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockBrokerFactory: broker });
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockRouteBinding: f.routeBinding, bedrockBrokerFactory: broker });
     expect(adapter.validateConfiguration(request)).toEqual([]);
     const escaped = path.join(f.root, ".mission-control", "worktrees", "..", "..", "outside");
     expect(adapter.validateConfiguration({ ...request, repositoryRoot: escaped, workingDirectory: escaped }).length).toBeGreaterThan(0);
@@ -104,13 +120,14 @@ describe("Fab canonical MC harness conformance", () => {
   it("runs the real Fab loop through a synthetic Bedrock broker while preserving canonical request linkage", async () => {
     const f = bedrockFixture(); let calls = 0;
     const providerRequests: Array<{ id: string; digest: string }> = [];
-    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockBrokerFactory: async () => ({
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "bedrock-state"), bedrockRouteBinding: f.routeBinding, bedrockMaximumOutputTokens: 256, bedrockBrokerFactory: async () => ({
       identity: () => ({ route: f.route, credentialReference: f.config.credential.id, maximumAttempts: 1 }),
       invoke: async request => {
         calls++; providerRequests.push({ id: request.requestId, digest: request.requestDigest });
         const wire = JSON.parse(request.body);
         expect(wire.anthropic_version).toBe("bedrock-2023-05-31"); expect(wire.model).toBeUndefined();
         expect(request.route).toEqual(f.route); expect(request.credentialReference).toBe(f.config.credential.id);
+        expect(request.maximumOutputTokens).toBe(256);
         let name = "submit_plan"; let input: Record<string, unknown> = { summary: "Set the value", steps: ["Edit one file", "Run test"] };
         if (calls === 2) { name = "write_file"; input = { path: "src/value.mjs", content: "export const value = 2;\n", expectedHash: createHash("sha256").update("export const value = 1;\n").digest("hex") }; }
         if (calls === 3) { name = "run_check"; input = { id: "test" }; }

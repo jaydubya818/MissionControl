@@ -1,5 +1,6 @@
-import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { v, type Infer } from "convex/values";
+import { internalMutation, mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { validateHostBinding } from "./lib/workspaceBindings";
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";
 import {
@@ -29,8 +30,7 @@ export const listByProject = query({
   },
 });
 
-export const report = mutation({
-  args: {
+const reportArgs = {
     projectId: v.id("projects"),
     hostId: v.string(),
     repositoryId: v.optional(v.id("workspaceRepositories")),
@@ -95,12 +95,15 @@ export const report = mutation({
     status: bindingStatus,
     error: v.optional(v.string()),
     checkedAt: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
+  };
+const reportArgsValidator = v.object(reportArgs);
+type ReportArgs = Infer<typeof reportArgsValidator>;
+
+async function reportBinding(ctx: MutationCtx, args: ReportArgs, authenticateUser: boolean) {
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Workspace not found");
     if (!project.tenantId) throw new Error("Workspace company assignment is incomplete");
-    await requireWorkspaceAccess(ctx, project.tenantId, project._id, { permission: COMPANY_PERMISSIONS.DISPATCH_WORK });
+    if (authenticateUser) await requireWorkspaceAccess(ctx, project.tenantId, project._id, { permission: COMPANY_PERMISSIONS.DISPATCH_WORK });
     if (!project.githubRepo) throw new Error("Workspace repository is not configured");
     const repository = args.repositoryId ? await ctx.db.get(args.repositoryId) : null;
     if (args.repositoryId && (!repository || repository.projectId !== args.projectId || repository.repository !== args.repository)) {
@@ -263,5 +266,14 @@ export const report = mutation({
     }
 
     return await ctx.db.get(bindingId);
-  },
+}
+
+export const report = mutation({
+  args: reportArgs,
+  handler: async (ctx, args) => await reportBinding(ctx, args, true),
+});
+
+export const reportServiceInternal = internalMutation({
+  args: reportArgs,
+  handler: async (ctx, args) => await reportBinding(ctx, args, false),
 });

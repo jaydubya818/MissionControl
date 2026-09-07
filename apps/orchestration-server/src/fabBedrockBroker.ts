@@ -128,17 +128,20 @@ export function createFabBedrockBrokerFactory(
         requests.add(request.requestId);
         let admitted = false;
         let settled = false;
+        let stage = "COUNT_TOKENS";
         let observedSettlement: BedrockSettlementPayload | undefined;
         try {
           signal.throwIfAborted();
           await attempt.assertActive();
           const counted = await transport.countInputTokens!(wire, signal);
+          stage = "ACCOUNTING_PREPARE";
           const ticket = await accounting.prepare({
             subject,
             requestId: request.requestId,
             requestDigest: canonicalRequestDigest,
             evidenceClass: transport.evidenceClass,
           });
+          stage = "LIABILITY_RESERVE";
           const proof = await authority.reserve({
             ...subject,
             bridgeIdentity: identity,
@@ -157,6 +160,7 @@ export function createFabBedrockBrokerFactory(
           const remaining = proof.validUntil - Date.now();
           if (remaining < 1) throw new Error("FAB_BEDROCK_ADMISSION_EXPIRED");
           const deadline = AbortSignal.any([signal, AbortSignal.timeout(Math.min(config.timeoutMs, remaining))]);
+          stage = "PROVIDER_SEND";
           const response = await transport.send(wire, deadline);
           const parsed = parseBedrock("INVOKE_MODEL", response.body, response.requestId);
           const usage: ProviderUsage = {
@@ -190,9 +194,18 @@ export function createFabBedrockBrokerFactory(
           settled = true;
           return { requestDigest: request.requestDigest, providerRequestId: parsed.providerRequestId, httpStatus: 200, attempts: 1, body: JSON.stringify(response.body) };
         } catch (error) {
+          const providerRequestId = error && typeof error === "object"
+            && "$metadata" in error
+            && typeof (error as { $metadata?: { requestId?: unknown } }).$metadata?.requestId === "string"
+            ? (error as { $metadata: { requestId: string } }).$metadata.requestId
+            : "";
+          const safeCode = error instanceof Error && /^[A-Z0-9_ -]{1,160}$/.test(error.message)
+            ? error.message
+            : error instanceof Error ? error.name : "UNKNOWN_ERROR";
+          console.error(`[fab-bedrock] ${stage}_FAILED ${safeCode}`);
           if (admitted && !settled && !observedSettlement) await authority.settle({
             ...subject,
-            usage: { requestId: request.requestId, requestDigest: canonicalRequestDigest, provider: "aws-bedrock", model: "anthropic.claude-sonnet-4-6", providerRequestId: "", usageId: "", inputTokens: 0, outputTokens: 0, classification: "UNKNOWN", expectedReceiptRevision: 0 },
+            usage: { requestId: request.requestId, requestDigest: canonicalRequestDigest, provider: "aws-bedrock", model: "anthropic.claude-sonnet-4-6", providerRequestId, usageId: "", inputTokens: 0, outputTokens: 0, classification: "UNKNOWN", expectedReceiptRevision: 0 },
           }).catch(() => undefined);
           throw error;
         } finally {

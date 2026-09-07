@@ -61,7 +61,34 @@ it("counts the exact request input through the same explicit one-attempt route",
     createClient: () => ({ send, destroy }),
   });
   const result = await t.countInputTokens!(wire(), new AbortController().signal);
-  expect(result).toEqual({ inputTokens: 37, requestId: "count-id" });
+  expect(result).toEqual({ inputTokens: 37, requestId: "count-id", classification: "PROVIDER_ACTUAL" });
+  expect(send).toHaveBeenCalledOnce();
+  expect((send.mock.calls as any[][])[0]![0].input.modelId).toBe(fixtureRoute.foundationModelArn);
+  expect(destroy).toHaveBeenCalledOnce();
+});
+it("uses and caches a conservative UTF-8 byte ceiling only when the exact model rejects CountTokens", async () => {
+  const unsupported = Object.assign(new Error("The provided model doesn't support counting tokens"), {
+    name: "ValidationException",
+    $metadata: { httpStatusCode: 400, requestId: "unsupported-count-id" },
+  });
+  const send = vi.fn(async () => { throw unsupported; });
+  const destroy = vi.fn();
+  const t = qualifiedBedrockTransport(fixtureRoute, grant(), {
+    readCredentials: async () => envelope(),
+    createClient: () => ({ send, destroy }),
+  });
+  const request = wire();
+  const expectedCeiling = Buffer.byteLength(JSON.stringify(request.body));
+  await expect(t.countInputTokens!(request, new AbortController().signal)).resolves.toEqual({
+    inputTokens: expectedCeiling,
+    requestId: "unsupported-count-id",
+    classification: "UTF8_BYTE_UPPER_BOUND",
+  });
+  await expect(t.countInputTokens!(request, new AbortController().signal)).resolves.toEqual({
+    inputTokens: expectedCeiling,
+    requestId: null,
+    classification: "UTF8_BYTE_UPPER_BOUND",
+  });
   expect(send).toHaveBeenCalledOnce();
   expect(destroy).toHaveBeenCalledOnce();
 });

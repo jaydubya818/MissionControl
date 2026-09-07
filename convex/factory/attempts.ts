@@ -473,7 +473,13 @@ export const claimInternal = internalMutation({
       ? await ctx.db.get(run.verificationAttemptBinding.sourceAttemptId)
       : null;
     const frozenHarness = resolveFrozenHarnessBinding(version);
-    const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
+    const versionProfileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+    const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(
+      version.executor,
+      versionProfileSnapshot?.harness?.source === "EXTERNAL_FROZEN"
+        ? frozenHarness.runtimeArtifact
+        : undefined,
+    );
     const manifestModelRoute = factoryExecutionManifestModelRoute(frozenManifest);
     const modelRoute = version.modelCatalogId ? await ctx.db.get(version.modelCatalogId) : null;
     const routeSnapshot = manifestModelRoute?.routeSnapshot as Record<string, any> | undefined;
@@ -2574,7 +2580,13 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   );
   const assessment = assessments.sort((left: any, right: any) => right.assessedAt - left.assessedAt)[0];
   const frozenHarness = resolveFrozenHarnessBinding(version);
-  const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
+  const versionProfileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+  const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(
+    version.executor,
+    versionProfileSnapshot?.harness?.source === "EXTERNAL_FROZEN"
+      ? frozenHarness.runtimeArtifact
+      : undefined,
+  );
   const executionBackend = version.executionBackend ?? "persistent-worker";
   const workflowModelRoute = (() => {
     try {

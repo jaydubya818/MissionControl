@@ -113,10 +113,20 @@ export function qualifiedBedrockTransport(
     if (Object.keys(wire.body).some((key) => !allowed.includes(key)))
       throw new Error("BEDROCK_BODY_FIELD_UNSUPPORTED");
   };
+  let countTokensUnsupported = false;
   return {
     evidenceClass: "APPROVED_QUALIFICATION",
     countInputTokens: async (wire, signal) => {
       assertWire(wire);
+      const serializedBody = JSON.stringify(wire.body);
+      // A UTF-8 byte count is a conservative token ceiling for the exact
+      // serialized request and keeps liability enforcement available when a
+      // qualified model does not implement Bedrock CountTokens.
+      if (countTokensUnsupported) return {
+        inputTokens: Buffer.byteLength(serializedBody),
+        requestId: null,
+        classification: "UTF8_BYTE_UPPER_BOUND",
+      };
       const client = await readQualifiedCredentials(signal);
       try {
         const body = structuredClone(wire.body);
@@ -124,7 +134,10 @@ export function qualifiedBedrockTransport(
         delete body.max_tokens;
         const response = await client.send(
           new CountTokensCommand({
-            modelId: wire.modelId,
+            // CountTokens authorization is evaluated against the underlying
+            // regional foundation model. Invocation remains bound to the
+            // qualified inference-profile ARN in send().
+            modelId: r.foundationModelArn,
             input: wire.api === "CONVERSE"
               ? { converse: body as any }
               : { invokeModel: { body: Buffer.from(JSON.stringify(wire.body)) } },
@@ -133,7 +146,19 @@ export function qualifiedBedrockTransport(
         );
         if (!Number.isSafeInteger(response.inputTokens) || response.inputTokens < 1)
           throw new Error("BEDROCK_TOKEN_COUNT_INVALID");
-        return { inputTokens: response.inputTokens, requestId: response.$metadata?.requestId };
+        return { inputTokens: response.inputTokens, requestId: response.$metadata?.requestId, classification: "PROVIDER_ACTUAL" };
+      } catch (error: any) {
+        if (error?.$metadata?.httpStatusCode === 400
+          && error?.name === "ValidationException"
+          && String(error?.message).includes("doesn't support counting tokens")) {
+          countTokensUnsupported = true;
+          return {
+            inputTokens: Buffer.byteLength(serializedBody),
+            requestId: error.$metadata?.requestId,
+            classification: "UTF8_BYTE_UPPER_BOUND",
+          };
+        }
+        throw error;
       } finally {
         client.destroy();
       }

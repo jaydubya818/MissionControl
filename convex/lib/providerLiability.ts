@@ -245,6 +245,12 @@ export function settleProviderUsage(
     h.state = "UNKNOWN";
     h.classification = "UNKNOWN";
     h.costClassification = "UNKNOWN";
+    // Preserve a provider-issued request identity when the transport received
+    // one, without treating the failed response as complete usage evidence.
+    if (usage.providerRequestId) {
+      if (!identity(usage.providerRequestId)) throw new Error("USAGE_INVALID_OR_REPLAYED");
+      h.providerRequestId = usage.providerRequestId;
+    }
     h.usageDigest = d;
     h.receiptRevision++;
     return { reservation: r, duplicate: false, incident: r.frozen };

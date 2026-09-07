@@ -57,12 +57,28 @@ export async function admitBedrockAccounting(
       .withIndex("by_project", (q) => q.eq("projectId", aggregate.projectId))
       .collect(),
   ]);
+  const manifest = run.executionManifest as {
+    causation?: {
+      workOrderId?: unknown;
+      workOrderRevisionNumber?: unknown;
+      workflowRunId?: unknown;
+      taskId?: unknown;
+    };
+  } | undefined;
+  if (!task) throw new Error("BEDROCK_ACCOUNTING_ATTEMPT_AUTHORITY_MISSING");
   if (
     !workOrder ||
     workOrder.projectId !== aggregate.projectId ||
     workOrder.approvalStatus !== "APPROVED" ||
-    !task ||
+    run.projectId !== aggregate.projectId ||
+    run.workOrderId !== aggregate.workOrderId ||
+    run.workOrderRevisionNumber !== aggregate.snapshot.scope.workOrderRevision ||
+    manifest?.causation?.workOrderId !== String(aggregate.workOrderId) ||
+    manifest.causation.workOrderRevisionNumber !== aggregate.snapshot.scope.workOrderRevision ||
+    manifest.causation.workflowRunId !== run.runId ||
     task.projectId !== aggregate.projectId ||
+    task.workOrderId !== aggregate.workOrderId ||
+    manifest?.causation?.taskId !== String(task._id) ||
     !run.executionManifestDigest ||
     !run.lease ||
     !profile ||
@@ -372,7 +388,7 @@ export async function settleBedrockAccounting(
   await appendReceiptInTransaction(ctx, {
     workflowRunId: reservation.workflowRunId,
     intentId: intent._id,
-    ...(usage.classification === "ACTUAL"
+    ...(usage.classification === "ACTUAL" || usage.providerRequestId
       ? {
           resolvedProvider: usage.provider,
           resolvedModelId: usage.model,

@@ -324,7 +324,7 @@ export async function buildExecutionRoutingPreview(
   const { workOrder, workflow } = input;
   if (!workOrder.projectId || !workOrder.repositoryId) return null;
   const cutoffAt = input.cutoffAt ?? Date.now();
-  const [definitions, activePolicy, flagRows, bindings, catalog, activeRuns, workOrderRuns, mission] = await Promise.all([
+  const [definitions, activePolicy, flagRows, bindings, catalog, activeRuns, workOrderRuns, mission, approvals] = await Promise.all([
     ctx.db.query("factoryDefinitions")
       .withIndex("by_repository", (query) => query.eq("repositoryId", workOrder.repositoryId!))
       .collect(),
@@ -344,6 +344,9 @@ export async function buildExecutionRoutingPreview(
       .withIndex("by_work_order", (query) => query.eq("workOrderId", workOrder._id))
       .collect(),
     workOrder.missionId ? ctx.db.get(workOrder.missionId) : Promise.resolve(null),
+    ctx.db.query("approvalDecisions")
+      .withIndex("by_work_order", (query) => query.eq("workOrderId", workOrder._id))
+      .collect(),
   ]);
   const config = activePolicy?.executionRouting ?? DEFAULT_EXECUTION_ROUTING_POLICY;
   const guardedAutoEnabled = resolveFlag(
@@ -356,6 +359,18 @@ export async function buildExecutionRoutingPreview(
     workOrder.projectId,
     cutoffAt,
     config.evidenceWindowDays,
+  );
+  const qualificationAdmission = Boolean(
+    input.fallbackFactoryDefinitionVersionId
+    && typeof (workOrder.metadata as Record<string, unknown> | undefined)?.qualification === "string"
+    && workOrder.riskLevel === "LOW"
+    && workOrder.negativeConstraints?.some((constraint) => constraint.type === "NO_PRODUCTION_ACCESS")
+    && approvals.some((approval) =>
+      approval.approvalType === "HUMAN_REVIEW"
+      && approval.status === "APPROVED"
+      && approval.workOrderRevisionNumber === (workOrder.currentRevisionNumber ?? 1)
+      && (!approval.expiresAt || approval.expiresAt > cutoffAt)
+    )
   );
   const versions = (await Promise.all(definitions
     .filter((definition) => definition.activeVersionId)
@@ -378,7 +393,13 @@ export async function buildExecutionRoutingPreview(
     let adapterRuntimeArtifact: ReturnType<typeof resolveHarnessAdapterRuntimeArtifact> | null = null;
     try {
       frozenHarness = resolveFrozenHarnessBinding(version);
-      adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
+      const profileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+      adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(
+        version.executor,
+        profileSnapshot?.harness?.source === "EXTERNAL_FROZEN"
+          ? frozenHarness.runtimeArtifact
+          : undefined,
+      );
     } catch {
       // Invalid frozen manifests or adapter artifacts remain visible as ineligible candidates.
     }
@@ -574,6 +595,12 @@ export async function buildExecutionRoutingPreview(
         productionCertified: assessment?.status === "PASS"
           && manifest?.admission.maturity === "PRODUCTION"
           && modelRouteReady,
+        qualificationCertified: qualificationAdmission
+          && String(version._id) === String(input.fallbackFactoryDefinitionVersionId)
+          && assessment?.status === "PASS"
+          && Boolean(manifest && ["EXPERIMENTAL", "PREVIEW"].includes(manifest.admission.maturity))
+          && modelRouteReady
+          && workerEligible,
       },
       evidence: aggregateExecutionRoutingEvidence(version._id, workOrder.repositoryId, evidenceBundle),
     });
@@ -628,6 +655,7 @@ export async function buildExecutionRoutingPreview(
     riskTier: workOrderRiskToExecutionTier(workOrder.riskLevel),
     candidates,
     policy,
+    admissionMode: qualificationAdmission ? "QUALIFICATION" : "PRODUCTION",
     fallbackTupleKey,
     pinnedTupleKey,
   });

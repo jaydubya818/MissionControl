@@ -53,6 +53,7 @@ import {
 import { configuredFactoryHarnessAdapters } from "./factoryHarnessComposition.js";
 import { loadFabExecutorAdapter } from "./fabExecutorAdapter.js";
 import { createFabBedrockBrokerFactory } from "./fabBedrockBroker.js";
+import { bedrockModelRouteBinding } from "./bedrockModelRouteBinding.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
 import { MissionPlanningWorker } from "./missionPlanningWorker.js";
 import {
@@ -174,6 +175,13 @@ const factoryBootstrap = optionalExecutionConfiguration("FACTORY_BOOTSTRAP_INVAL
         fabBedrockTransport
           ? createFabBedrockBrokerFactory(client, fabBedrockConfig, fabBedrockTransport, accountingRuntime.delivery)
           : undefined,
+        fabBedrockConfig
+          ? (() => {
+              const binding = bedrockModelRouteBinding(fabBedrockConfig.route);
+              return { providerRoute: binding.snapshot.providerRoute, routeDigest: binding.routeDigest };
+            })()
+          : undefined,
+        fabBedrockConfig?.maximumOutputTokens,
       )
     : undefined;
   if (configuredFabAdapter?.capabilities().provider === "aws-bedrock" && !fabBedrockTransport) {
