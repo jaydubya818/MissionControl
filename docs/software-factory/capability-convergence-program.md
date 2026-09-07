@@ -422,3 +422,24 @@ model authorization, entitlement, and region as available but
 remains `UNKNOWN`; no retry or replacement call is authorized. The retained
 [live-gate evidence](../testing/evidence/todo063-bedrock-live-qualification-2026-09-07/README.md)
 keeps Todo 063 open and Todo 064 dependency-blocked without reopening IAM.
+
+### Account access active; daily token allowance blocks the authorized request
+
+The exact approved use-case submission was already present, and readback now
+reports the Sonnet 4.6 agreement, authorization, entitlement, region, and exact
+US inference profile as available. No model-access write or temporary
+administrative permission was required.
+
+AWS route telemetry reconciled the prior pre-model failure to zero input and
+output tokens with estimated zero cost. A newly authorized request then froze a
+230-byte serialized body, the complete 1,000,000-token conservative input
+ceiling, 16 output tokens, and the qualified price digest before reserving
+3,300,264,000 nano-USD. Prior settled liability was zero, so the cumulative
+maximum remained below the 5,000,000,000 nano-USD hard ceiling.
+
+AWS received exactly one request and returned `ThrottlingException: Too many
+tokens per day` with one SDK attempt and no retry delay. No usage was returned,
+so the full new hold remains `UNKNOWN`; no retry or alternate route occurred.
+The retained [daily-token-gate evidence](../testing/evidence/todo063-bedrock-live-daily-token-gate-2026-09-07/README.md)
+keeps Todo 063 open and Todo 064 dependency-blocked until AWS reports usable
+daily token capacity and a new single-request authorization is granted.

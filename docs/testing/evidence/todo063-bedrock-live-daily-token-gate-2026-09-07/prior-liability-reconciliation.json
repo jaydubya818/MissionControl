@@ -1,0 +1,35 @@
+{
+  "schema": "todo063-provider-usage-reconciliation/v1",
+  "providerRequestId": "7f488e66-813d-4a33-adb0-1d6c98146b39",
+  "route": "us.anthropic.claude-sonnet-4-6",
+  "observationWindow": {
+    "start": "2026-09-07T00:00:00Z",
+    "end": "2026-09-08T00:00:00Z"
+  },
+  "cloudWatchNamespace": "AWS/Bedrock",
+  "cloudWatchRegion": "us-east-1",
+  "exactRouteMetrics": {
+    "Invocations": 2,
+    "InvocationClientErrors": 2,
+    "InvocationServerErrors": 0,
+    "InputTokenCount": 0,
+    "OutputTokenCount": 0,
+    "CacheReadInputTokenCount": 0,
+    "CacheWriteInputTokenCount": 0
+  },
+  "providerError": {
+    "httpStatusCode": 404,
+    "name": "ResourceNotFoundException",
+    "reason": "ACCOUNT_USE_CASE_NOT_SUBMITTED"
+  },
+  "reconciliation": {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "accountedNanoUsd": 0,
+    "usageClassification": "ACTUAL",
+    "moneyClassification": "ESTIMATED",
+    "holdState": "SETTLED",
+    "evidenceDigest": "sha256:22418a229f5cc024c1b9dafbbb9d668ca7189078d8b4c9dc75cc4c0b18a7e52d"
+  },
+  "basis": "The exact provider error occurred before model use. AWS route telemetry records client errors and no processed, generated, cache-read, or cache-write tokens for the complete UTC day containing the request."
+}
