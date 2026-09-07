@@ -99,32 +99,15 @@ the identified Organizations management account `437672023618`, any configured
 delegated-administrator account, or an administrator permission set. The target
 role is denied both `sso:ListInstances` and
 `organizations:DescribeOrganization`, so it cannot discover or administer the
-organization boundary. An existing organization administrator must assign this
-user, or a separately authenticated administrator user/group, to an Identity
-Center administrator permission set in the Organizations management account or
-configured delegated-administrator account. The concrete missing assignment is
-management-account `437672023618` access through the organization's existing
-Identity Center administrator permission set/group, granted to a separate
-administrator principal. Newer handoff evidence identifies
-`FDLC-Qualification Identity Delegated Admin` in account `955857822343`, using
-underlying role `AccountFullAccessRole`, as a candidate delegated-administration
-path. Its previously observed safe principal was
-`arn:aws:sts::955857822343:assumed-role/AccountFullAccessRole/0408e4c8-7091-707f-a9f3-58951212d12f`.
-This candidate is distinct from the unverified management-account profile and
-does not change the rule that authority cannot be bootstrapped from the target
+organization boundary. This authority cannot be bootstrapped from the target
 qualification role.
 
 Read-only local administrator-path discovery found a configured profile named
 `fdlc-qualification-management` declaring management account `437672023618`, SSO
 home region `us-east-1`, and role `AccountFullAccessRole` at the same access
-portal. The live portal still exposes only account `083665737366` and
-`FDLCQualificationTFOperator`, so there is no current assignment evidence for
-that management profile. Because `AccountFullAccessRole` is explicitly excluded
-as a workaround and is not visible as an assigned role, it was not assumed and
-no credentials were requested. No open browser session exposes the management
-account. The organization owner or existing administrator principal, the
-approved Identity Center administrator permission set/group, and the effective
-delegated-administrator assignment remain unverified from the current portal.
+portal. The portal does not expose that management account or role, so there is
+no current assignment evidence for that management profile. It was not assumed
+and remains `ACCOUNT_FULL_ACCESS_ROLE_CONFIGURED_BUT_UNVERIFIED`.
 
 The local AWS configuration file was created at `2026-09-05 16:41:03 -0700`
 and modified at `2026-09-05 16:43:35 -0700`. The profile is a direct, legacy-form
@@ -135,25 +118,38 @@ person, or another tool created it. A targeted search of repository records, Git
 history, and the relevant FDLC handoff attachments found only proposed actions
 and later discovery notes. It found no management-account STS receipt,
 permission-set ARN, principal ID, account-assignment request, provisioning
-request, or successful organization-administration operation for
-`AccountFullAccessRole`. The resulting classification is
-`ACCOUNT_FULL_ACCESS_ROLE_CONFIGURED_BUT_UNVERIFIED` for the management-account
-profile.
+request, or successful organization-administration operation for the management
+account's `AccountFullAccessRole`.
 
-On `2026-09-07T10:51:11-0700`, the distinct local profile
-`fdlc-identity-delegated-bootstrap` was confirmed to declare account
-`955857822343`, role `AccountFullAccessRole`, the same SSO start URL, and region
-`us-east-1`. The SSO login completed, but AWS returned
-`ForbiddenException: No access` while obtaining role credentials for that exact
-account and role. Consequently STS identity, `sso-admin:ListInstances`,
-`organizations:DescribeOrganization`, and
-`organizations:ListDelegatedAdministrators` could not execute. No authoritative
-AWS read-back currently proves that account `955857822343` administers Identity
-Center instance `ins-72234a7377aca2a0`. No bootstrap or policy mutation was
-attempted. The operative boundary is
-`DELEGATED_ADMIN_AUTHORITY_NOT_VERIFIED` with failed predicate: the current SSO
-user has no accessible account assignment for the identified delegated-admin
-role.
+On `2026-09-07T10:51:11-0700`, a distinct local bootstrap profile for account
+`955857822343` and role `AccountFullAccessRole` authenticated to SSO but received
+`ForbiddenException: No access` when requesting role credentials. No operation
+used that broad role. Subsequent control-plane work created and assigned the
+narrow permission set `FDLCQualificationICAdmin` instead.
+
+At `2026-09-07T11:33:20-0700`, a fresh portal session exposed both account
+`083665737366` with `FDLCQualificationTFOperator` and delegated-administration
+account `955857822343` with `FDLCQualificationICAdmin`. STS verified the narrow
+principal as
+`arn:aws:sts::955857822343:assumed-role/AWSReservedSSO_FDLCQualificationICAdmin_3e16b9aa6a493c0f/jaydubya818@gmail.com`.
+Identity Center read-back verified active instance
+`arn:aws:sso:::instance/ssoins-7223d66bba59dce4`, Identity Store
+`24e8d4d8-80e1-70ea-40d0-d16c61e8d5bd`, owner account `437672023618`, and
+primary region `us-east-1`. Permission set
+`arn:aws:sso:::permissionSet/ssoins-7223d66bba59dce4/ps-af3c937e390e975c`
+is assigned to user principal `0408e4c8-7091-707f-a9f3-58951212d12f` in account
+`955857822343` and is provisioned there. Provisioning request
+`7b0562ad-c7e0-46fa-b26d-a6613266c3f2` completed `SUCCEEDED`.
+
+The narrow administrator has no attached AWS-managed or customer-managed
+policies. Its inline policy permits Identity Center inspection plus
+`sso:PutInlinePolicyToPermissionSet` and `sso:ProvisionPermissionSet` only for
+`FDLCQualificationTFOperator`, account `083665737366`, and this exact Identity
+Center instance. General Organizations access is denied. The account assignment
+is authoritative through `sso-admin:ListAccountAssignments`; its original
+creation request identifier is unavailable because the narrow role intentionally
+lacks `sso:ListAccountAssignmentCreationStatus`. The operative state is
+`DELEGATED_ADMIN_ASSIGNMENT_READY`. No Bedrock or Production operation occurred.
 
 The reviewed invocation policy digest is
 `sha256:b89537a26d8a9f0f4e1f2d0455c9985ae8da63fe2623c4e94c671c30097d464d`.
