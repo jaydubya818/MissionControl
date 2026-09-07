@@ -1,0 +1,34 @@
+{
+  "schema": "todo063-bedrock-identity-profile-evidence/v1",
+  "recordedAt": "2026-09-07T17:42:37Z",
+  "approvalReference": "Product Owner attachment ad57871d-4bdb-48d6-ae43-b754b13f65f0",
+  "environment": {
+    "class": "QUALIFICATION_ONLY",
+    "deployment": "calm-buffalo-854",
+    "projectId": "2942379",
+    "workspace": "mission-control://qualification/fdlc-phase-3",
+    "awsProfile": "fdlc-qualification",
+    "region": "us-east-1"
+  },
+  "sts": {
+    "account": "083665737366",
+    "principalArn": "arn:aws:sts::083665737366:assumed-role/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783/jaydubya818@gmail.com",
+    "roleName": "AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783",
+    "expectedIdentityMatched": true,
+    "iamRoleArn": null,
+    "iamRoleArnReason": "iam:GetRole is not allowed for the qualification principal; the ARN was not inferred from the STS session ARN."
+  },
+  "inferenceProfile": {
+    "id": "us.anthropic.claude-sonnet-4-6",
+    "arn": "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
+    "status": "ACTIVE",
+    "type": "SYSTEM_DEFINED",
+    "globalInference": false,
+    "modelArns": [
+      "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
+      "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6",
+      "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-6"
+    ],
+    "approvedTopologyMatched": true
+  }
+}
