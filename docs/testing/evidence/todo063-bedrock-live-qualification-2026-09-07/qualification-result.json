@@ -1,0 +1,72 @@
+{
+  "schema": "todo063-bedrock-live-qualification/v1",
+  "status": "BLOCKED_PRE_MODEL_USE",
+  "capturedAt": "2026-09-07T20:31:19.995Z",
+  "source": {
+    "pullRequest": 214,
+    "mergeCommit": "beaf1f8cb293845ec2abaa6c3c1502676a5cf83b",
+    "runtimeContract": 55,
+    "exactMainFocusedGate": "PASS_256_TESTS"
+  },
+  "provider": {
+    "name": "AWS Bedrock",
+    "accountId": "083665737366",
+    "region": "us-east-1",
+    "inferenceProfileArn": "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
+    "modelId": "anthropic.claude-sonnet-4-6",
+    "countTokensCapability": "UNSUPPORTED",
+    "stsPrincipalArn": "arn:aws:sts::083665737366:assumed-role/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783/jaydubya818@gmail.com"
+  },
+  "request": {
+    "requestId": "todo063-live-request-1",
+    "requestDigest": "sha256:0bb2adf817d144959e38ba71a060981735321cf0dd17cd3bff6eb99af6bbf4b9",
+    "serializedRequestBytes": 232,
+    "syntheticNonSensitive": true,
+    "streaming": false,
+    "automaticRetries": 0,
+    "fallbacks": 0,
+    "physicalRequests": 1
+  },
+  "liability": {
+    "preSendInputBound": {
+      "classification": "CONSERVATIVE_UPPER_BOUND",
+      "countTokensCapability": "UNSUPPORTED",
+      "maximumInputTokens": 1000000,
+      "derivation": "FULL_MODEL_CONTEXT_WINDOW",
+      "evidenceDigest": "sha256:ecf1309e00c82c92baa824c90abda6db720206cfa15f1a429ffd0f55299c3888"
+    },
+    "preSendOutputBound": 4096,
+    "priceDigest": "sha256:ba19028022ec2de109d2863415263b691d13d334618d7f49e7524f3c07e33160",
+    "reservedMaximumNanoUsd": 3367584000,
+    "programMaximumNanoUsd": 5000000000,
+    "programMaximumPhysicalRequests": 1,
+    "providerReportedInputUsage": null,
+    "providerReportedOutputUsage": null,
+    "settledEstimatedCostNanoUsd": null,
+    "usageClassification": "UNKNOWN",
+    "moneyClassification": "UNKNOWN",
+    "finalHoldState": "UNKNOWN",
+    "reservationReleased": false
+  },
+  "providerResult": {
+    "name": "ResourceNotFoundException",
+    "httpStatusCode": 404,
+    "requestId": "7f488e66-813d-4a33-adb0-1d6c98146b39",
+    "sdkAttempts": 1,
+    "totalRetryDelayMs": 0,
+    "reason": "Model use case details have not been submitted for this account. Fill out the Anthropic use case details form before using the model. If you have already filled out the form, try again in 15 minutes."
+  },
+  "availabilityReadback": {
+    "modelId": "anthropic.claude-sonnet-4-6",
+    "agreementAvailability": "NOT_AVAILABLE",
+    "authorizationStatus": "AUTHORIZED",
+    "entitlementAvailability": "AVAILABLE",
+    "regionAvailability": "AVAILABLE"
+  },
+  "durability": {
+    "reservationJournalSha256": "ab4816a9e84cdb3075a40a2b61ed4761f5b72b18f1d999ff863cb5d780ceeba5",
+    "accountingIntentSha256": "5520798d31014ae3b3f66ed210702f3a328c7f61f9f625d5fd53d2885a93a2b1",
+    "credentialEnvelopeDeleted": true
+  },
+  "conclusion": "The pre-send liability contract worked: the maximum was durably reserved before transport and the ambiguous provider failure retained the full hold. The account-level Anthropic agreement/use-case prerequisite prevented model use, so provider usage and calculated settlement remain UNKNOWN. No retry is authorized."
+}
