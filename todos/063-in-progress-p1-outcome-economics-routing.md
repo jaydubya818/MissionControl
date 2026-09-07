@@ -71,6 +71,23 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
+### 2026-09-07 - CountTokens provisioned; approved profile unsupported
+
+- Reprovisioned Identity Center permission set `FDLCQualificationTFOperator`
+  to account `083665737366`; final request
+  `103a21b2-ce2a-4feb-b387-fe5b36d78665` completed `SUCCEEDED`.
+- Effective-policy readback confirms no `bedrock:*`, streaming, Global profile,
+  unrelated model, direct foundation-model inference, or Production authority
+  was added. An unrelated-model CountTokens request was explicitly denied.
+- Exact STS identity revalidation passed. The authorized CountTokens request
+  reached Bedrock for the approved Sonnet 4.6 profile, but Bedrock returned
+  `ValidationException: The provided model doesn't support counting tokens.`
+- No inference call, reservation, provider inference response, retry, fallback,
+  or spend occurred. Evidence is retained under
+  `docs/testing/evidence/todo063-bedrock-counttokens-provisioning-2026-09-07/`.
+  Todo 063 remains in progress at the existing preflight checkpoint; todo 064
+  remains dependency-blocked.
+
 ### 2026-09-07 - Authenticated Bedrock preflight stopped before inference
 
 - Product Owner authorized account `083665737366`, profile

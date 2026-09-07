@@ -354,3 +354,24 @@ records the safe identity, route, request digest and denial. Resume only after
 the Identity Center permission is actually provisioned; reverify STS and repeat
 CountTokens before reserving or sending. Todo 063 remains in progress and todo
 064 remains blocked by its declared dependency.
+
+### CountTokens permission qualified; provider capability blocks inference
+
+Later on 2026-09-07 the Product Owner authorized the exact CountTokens grant.
+Identity Center permission set `FDLCQualificationTFOperator` was reprovisioned
+to account `083665737366`; final provisioning request
+`103a21b2-ce2a-4feb-b387-fe5b36d78665` completed `SUCCEEDED`. Readback confirms
+the grant is limited to the approved US Sonnet 4.6 inference profile and its
+three required backing-model resources. Wildcard Bedrock, streaming, Global
+inference, unrelated models, direct foundation-model inference, and Production
+authority remain absent or explicitly denied. A CountTokens-only unrelated-model
+check returned an explicit authorization denial.
+
+The exact approved CountTokens request then passed IAM authorization and reached
+Bedrock, but the service returned `ValidationException: The provided model
+doesn't support counting tokens.` No deterministic token bound was produced, so
+the existing preflight still prohibits reservation and inference. No inference
+call, retry, fallback, or spend occurred. The retained
+[provisioning and capability evidence](../testing/evidence/todo063-bedrock-counttokens-provisioning-2026-09-07/README.md)
+records the effective scope and terminal provider response. Todo 063 remains in
+progress; todo 064 remains dependency-blocked.
