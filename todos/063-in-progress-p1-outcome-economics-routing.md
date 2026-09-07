@@ -71,6 +71,32 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
+### 2026-09-07 - Account access active; one bounded request reached daily token gate
+
+- Verified that the existing account use-case submission exactly matches the
+  approved bounded internal qualification purpose. Sonnet 4.6 agreement,
+  authorization, entitlement, region, and the exact US inference profile all
+  report available. No access mutation or temporary administrative authority
+  was needed.
+- Reconciled the prior pre-model failure using its provider request ID and
+  full-day exact-route AWS telemetry: two client errors and no input, output,
+  cache-read, or cache-write token datapoints. The prior hold is `SETTLED` at
+  zero accounted nano-USD with `ACTUAL` usage and `ESTIMATED` money semantics.
+- Admitted one newly authorized request from exact main `2f5735d`. The frozen
+  230-byte request reserved the full 1,000,000-token conservative input ceiling
+  plus 16 output tokens, or 3,300,264,000 nano-USD. Prior settled liability was
+  zero, preserving the 5,000,000,000 nano-USD cumulative ceiling.
+- AWS returned `ThrottlingException: Too many tokens per day` with one SDK
+  attempt and zero retry delay. No usage was returned, so the new hold remains
+  `UNKNOWN` at its full maximum. No retry, fallback, stream, alternate model,
+  customer data, or Production credential was used; the temporary credential
+  envelope was deleted.
+- Evidence is under
+  `docs/testing/evidence/todo063-bedrock-live-daily-token-gate-2026-09-07/`.
+  Todo 063 remains in progress and Todo 064 remains dependency-blocked. Resume
+  only after AWS reports usable daily token capacity and the Product Owner
+  explicitly authorizes another single bounded request.
+
 ### 2026-09-07 - Exact-main liability authority hardening
 
 - Reconciled the merged conservative liability implementation with independent
