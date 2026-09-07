@@ -109,6 +109,18 @@ administrator principal. The administrator permission-set/group identity remains
 unobservable from the target role. This authority cannot be bootstrapped from the
 target role.
 
+Read-only local administrator-path discovery found a configured profile named
+`fdlc-qualification-management` declaring management account `437672023618`, SSO
+home region `us-east-1`, and role `AccountFullAccessRole` at the same access
+portal. The live portal still exposes only account `083665737366` and
+`FDLCQualificationTFOperator`, so there is no current assignment evidence for
+that management profile. Because `AccountFullAccessRole` is explicitly excluded
+as a workaround and is not visible as an assigned role, it was not assumed and
+no credentials were requested. No open browser session exposes the management
+account. The organization owner or existing administrator principal, the
+approved Identity Center administrator permission set/group, and any delegated
+administrator remain unidentified.
+
 The reviewed invocation policy digest is
 `sha256:b89537a26d8a9f0f4e1f2d0455c9985ae8da63fe2623c4e94c671c30097d464d`.
 
