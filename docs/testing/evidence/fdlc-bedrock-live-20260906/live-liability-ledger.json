@@ -2,8 +2,8 @@
   "schema": "fdlc-live-qualification-liability/v1",
   "maximumTotalNanoUsd": 5000000000,
   "settledNanoUsd": 0,
-  "unresolvedNanoUsd": 924528000,
-  "remainingNanoUsd": 4075472000,
+  "unresolvedNanoUsd": 0,
+  "remainingNanoUsd": 5000000000,
   "requests": [
     {
       "requestId": "fdlc-route-6749103b-f399-4e15-a55c-5658e05d1e7c",
@@ -52,7 +52,7 @@
     },
     {
       "requestId": "fdlc-route-3bee9a64-4f28-4aca-914d-70f44143f4f0",
-      "state": "UNKNOWN",
+      "state": "REJECTED_PRE_INFERENCE_QUOTA",
       "maximumNanoUsd": 924528000,
       "payloadBytes": 151,
       "maximumInputTokens": 140000,
@@ -63,7 +63,10 @@
       "attempts": 1,
       "totalRetryDelay": 0,
       "error": "ThrottlingException",
-      "message": "Too many tokens per day, please wait before trying again."
+      "message": "Too many tokens per day, please wait before trying again.",
+      "actualNanoUsd": 0,
+      "reconciledAt": "2026-09-07T20:18:37Z",
+      "reconciliationEvidence": "liability-reconciliation.json"
     }
   ]
 }

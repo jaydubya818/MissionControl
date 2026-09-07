@@ -1,6 +1,6 @@
 # FDLC Bedrock live qualification evidence
 
-State: `QUALIFICATION_BEDROCK_DAILY_TOKEN_QUOTA_REQUIRED`.
+State: `BEDROCK_QUOTA_ADMIN_ACTION_REQUIRED`.
 
 The named SSO profile authenticated to the approved non-Production account. Safe
 AWS responses prove the exact caller, ACTIVE US inference profile, three fixed US
@@ -18,14 +18,23 @@ AWS documents that this CRIS-only model does not support CountTokens through its
 profile identifier. The next one-attempt synthetic invocation passed IAM and
 reached Bedrock, then received HTTP 429, provider request ID
 `641e32f7-5dfa-4056-84ba-affc2c2938aa`, and `Too many tokens per day`. It made
-zero retries and used no fallback. Because the response contains no usage receipt,
-the ledger conservatively retains the full `$0.924528` reservation as unresolved,
-leaving `$4.075472` uncommitted under the hard `$5` ceiling. The runner now blocks
-another dispatch while any liability remains unresolved.
+zero retries and used no fallback. The follow-up provider telemetry query found
+exactly one `InvocationThrottles` datapoint at the request minute and no
+`Invocations`, `InputTokenCount`, or `OutputTokenCount` datapoints for the route
+during the UTC-day window. Together with the pre-processing quota rejection and
+empty runtime usage/output, this proves zero billable inference. The ledger
+releases the `$0.924528` reservation, records `$0` settled and `$0` unresolved,
+and restores `$5.00` uncommitted capacity. This accounting reconciliation does
+not release the provider quota hold.
 
-The remaining dependency is available daily Sonnet 4.6 token capacity in account
-`083665737366`; no further call is permitted until the quota resets or AWS makes
-capacity available and the existing unresolved liability is reconciled.
+The exact blocking quota is `L-B29C9321`, **Model invocation max tokens per day
+for Anthropic Claude Sonnet 4.6 (doubled for cross-region calls)**. The documented
+default is 4,320,000,000 tokens per day and the quota is non-adjustable, but the
+restricted role is denied Service Quotas read and request-history APIs. Its
+account-specific applied value, prior requests, and reset/activation condition
+therefore require an authorized administrator in account `083665737366` or AWS
+Support. No further model call is permitted until that state is read and positive
+capacity is confirmed.
 
 `pricing-evidence.json` binds the conservative liability contract to current
 primary AWS route documentation and Anthropic's 2026-05-27 US-only Sonnet 4.6

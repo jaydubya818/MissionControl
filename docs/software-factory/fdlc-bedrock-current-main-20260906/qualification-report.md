@@ -110,10 +110,14 @@ no model output, and no usage receipt.
 The pricing record uses the current standard US-only Sonnet 4.6 rates: $3.30 per
 million input tokens and $16.50 per million output tokens, with cache rates
 recorded but caching disabled. The hard live qualification ceiling remains
-$5.00. The latest request reserved at most $0.924528. Because the 429 response
-contains no usage receipt, the ledger conservatively retains that amount as
-unresolved and leaves $4.075472 uncommitted. The runner now fails closed before
-dispatch whenever unresolved liability is nonzero.
+$5.00. The latest request reserved at most $0.924528. A subsequent read-only
+CloudWatch query covering the UTC day through the request window found one
+route-specific `InvocationThrottles` datapoint at the request minute and no
+`Invocations`, `InputTokenCount`, or `OutputTokenCount` datapoints. AWS performs
+this quota check before inference and bills actual token usage. Combined with the
+empty runtime output and usage receipt, the evidence proves zero billable
+inference. The ledger now records $0 settled, $0 unresolved, and $5.00 remaining.
+The provider quota hold remains active independently of the accounting result.
 
 ## Completed qualification
 
@@ -158,18 +162,31 @@ Current-main System evidence is under
 
 ## Remaining boundary and deterministic resume
 
-AWS daily Sonnet 4.6 token capacity in account `083665737366` is the current
-external dependency. The qualification role does not have
-`servicequotas:ListServiceQuotas`, and the daily quota is not changed by the
-narrow Identity Center policy operation. Do not grant broader administration,
-switch profiles, models, Regions, accounts, or routes to bypass this boundary.
+`BEDROCK_QUOTA_ADMIN_ACTION_REQUIRED` is the current external dependency. The
+blocking quota is `L-B29C9321`, **Model invocation max tokens per day for
+Anthropic Claude Sonnet 4.6 (doubled for cross-region calls)**. It is scoped per
+account, model, and source Region, shared across the model's bedrock-runtime
+inference APIs, documented at a 4,320,000,000-token default, and marked
+non-adjustable. Account-specific values may be reduced. The restricted role is
+denied `GetServiceQuota`, `ListServiceQuotas`, and both quota request-history
+operations, so the applied value, existing request status, and authoritative
+reset or activation condition remain unavailable. The ACTIVE profile and
+AUTHORIZED/AVAILABLE underlying model do not resolve this quota state.
+
+An authorized administrator in account `083665737366` must read quota
+`L-B29C9321` and its request history. If capacity is insufficient, that
+administrator must open or update one AWS Support request for this exact
+non-adjustable quota and US cross-region route; duplicates are prohibited. The
+minimum next-call capacity is 76 unused daily tokens for the frozen 44-token input
+plus `maxOutputTokens=32`, subject independently to the $5 liability ceiling.
+Do not grant broader administration, switch profiles, models, Regions, accounts,
+or routes to bypass this boundary.
 
 Before any new inference attempt:
 
-1. wait for AWS daily capacity to reset or obtain authoritative AWS confirmation
-   that capacity is available for the exact approved route;
-2. reconcile the unresolved $0.924528 liability with authoritative provider or
-   billing evidence;
+1. record the account-specific value and request history for `L-B29C9321`;
+2. obtain authoritative AWS confirmation that at least 76 daily tokens and the
+   applicable per-minute capacity are available for the exact approved route;
 3. reverify `fdlc-qualification`, account `083665737366`, `us-east-1`, and the
    exact profile topology;
 4. refresh the 24-hour price contract if expired; and

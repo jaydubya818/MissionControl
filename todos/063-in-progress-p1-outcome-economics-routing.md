@@ -84,6 +84,21 @@ either todo complete and does not authorize implementation by itself.
   outcomes, complete outcome coverage, and a second independently qualified
   route remain missing. Todo 064 therefore remains dependency-blocked.
 
+### 2026-09-07 — 429 liability reconciled; account quota requires administrator
+
+- Read-only CloudWatch provider telemetry records one route-specific throttle at
+  the request minute and no invocation, input-token, or output-token datapoints
+  through the request window. The pre-inference quota rejection therefore had
+  zero billable model usage; the $0.924528 reservation is released with linked
+  evidence while the provider-send hold remains active.
+- The exact quota is `L-B29C9321`, Model invocation max tokens per day for
+  Anthropic Claude Sonnet 4.6 (doubled for cross-region calls). Its documented
+  default is 4,320,000,000 and it is non-adjustable, but the qualification role
+  is denied quota value and request-history reads. An administrator in account
+  `083665737366` or AWS Support must resolve the applied capacity before one
+  minimum bounded call can run.
+- Todo 063 remains in progress and Todo 064 remains dependency-blocked.
+
 ### 2026-09-07 - Worker-path CountTokens permission applied; profile still unsupported
 
 - Applied a reviewed Terraform plan with zero creates, two in-place updates,

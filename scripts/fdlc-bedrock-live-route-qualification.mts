@@ -7,6 +7,7 @@ import { bedrockModelRouteBinding } from "../apps/orchestration-server/src/bedro
 import { bedrockQualifiedPrice } from "../apps/orchestration-server/src/bedrockPricing.js";
 import { qualifiedBedrockTransport } from "../apps/orchestration-server/src/bedrockQualifiedTransport.js";
 import { serializeBedrock, invokeBedrockTransport } from "../apps/orchestration-server/src/bedrockAdapter.js";
+import { requireConfirmedBedrockQuota } from "./lib/fdlc-bedrock-quota-gate.mjs";
 
 const root = process.cwd();
 const evidenceDir = resolve(root, "docs/testing/evidence/fdlc-bedrock-live-20260906");
@@ -20,6 +21,9 @@ const request = {
   messages: [{ role: "user" as const, content: [{ type: "text" as const, text: "Synthetic qualification. Return exactly: FDLC_BEDROCK_ROUTE_OK" }] }],
   maxOutputTokens: 32,
 };
+const countTokens = JSON.parse(readFileSync(resolve(evidenceDir, "count-tokens-result.json"), "utf8"));
+const quotaDiagnosis = JSON.parse(readFileSync(resolve(evidenceDir, "quota-diagnosis.json"), "utf8"));
+requireConfirmedBedrockQuota({ diagnosis: quotaDiagnosis, route, countTokens, maxOutputTokens: request.maxOutputTokens, now });
 const wire = serializeBedrock(route, "CONVERSE", request);
 const payloadBytes = Buffer.byteLength(JSON.stringify(wire.body));
 if (payloadBytes > price.maximumPayloadBytes) throw new Error("QUALIFICATION_PAYLOAD_EXCEEDS_PRICE_BOUND");
