@@ -463,3 +463,13 @@ places Todo 063 in `TODO_063_WAITING_FOR_AWS_QUOTA` and keeps Todo 064
 dependency-blocked. Resume after AWS exposes usable daily Sonnet 4.6 capacity
 and the exact account quota/request state is verifiable. No additional
 engineering work is required while waiting.
+
+An authorized later readback resolved the previously unreadable applied value.
+At `2026-09-07T23:15:56Z`, qualification account `083665737366` reported
+capacity `0` for non-adjustable quota `L-B29C9321`. AWS Support case
+`178882125400227` is the existing minimum-capacity request. The temporary
+read-only permission was removed, the original permission set was reprovisioned
+successfully, and the exact qualification identity was reverified. The
+[current quota readback](../testing/evidence/todo063-bedrock-quota-readback-2026-09-07/README.md)
+keeps the live, merge, and release gates closed until the applied capacity is
+greater than zero. It consumed no provider request or liability authority.
