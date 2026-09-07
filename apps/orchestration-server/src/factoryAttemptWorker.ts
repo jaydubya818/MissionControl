@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { DOCKER_BEDROCK_CANDIDATE_IDENTITY } from "./dockerBedrockIdentity.js";
+import { realpath } from "node:fs/promises";
 import type { ConvexHttpClient } from "convex/browser";
 import type {
   ExecutorEvent,
@@ -17,6 +18,7 @@ import {
   harnessRuntimeArtifactDigest,
   harnessRuntimeArtifactIssues,
   runHarnessExecution,
+  HarnessCleanupError,
   verificationIsolationBindingDigest,
   verifyGitSubjectPublicationBinding,
 } from "@mission-control/workflow-engine";
@@ -25,12 +27,17 @@ import { evaluateVerificationAuthority } from "@mission-control/workflow-engine/
 import { HarnessAdapterRegistry, type HarnessRuntimeAdapter, type RegisteredHarnessAdapter } from "./harnessAdapterRegistry.js";
 import { ConvexActions, ConvexQueries } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
-import { assertFactoryCandidateUnchanged, commitFactoryChanges, createFactorySourceBundle, ensureFactoryWorktree, ensureVerificationWorktree, inspectCandidateChange, listChangedFiles, materializeRemoteCandidate, prepareFactoryDependencies, pushFactoryBranch } from "./factoryGitRuntime.js";
+import { assertFactoryCandidateUnchanged, captureVerificationDocument, commitFactoryChanges, createFactorySourceBundle, ensureFactoryWorktree, ensureVerificationWorktree, inspectCandidateChange, listChangedFiles, materializeRemoteCandidate, materializeDeterministicCandidate, prepareFactoryDependencies, pushFactoryBranch } from "./factoryGitRuntime.js";
 import { validateChangedFileScope } from "./factoryPathScope.js";
 import { createOrReusePullRequest, reconcilePublishedPullRequest, loadGithubAppPrivateKey, mintInstallationToken } from "./githubAppRuntime.js";
 import { executeIndependentVerification, evaluateVerificationPolicyRejection } from "./factoryVerification.js";
 import {
   cleanupOwnedFactoryWorkspace,
+  ensureFactoryWorkspaceOwnership,
+  retainFactoryOfflineResponse,
+  markFactoryOfflineResponseDelivered,
+  recordFactoryOfflineDeliveryFailure,
+  pendingFactoryOfflineResponses,
   recordFactoryExecutorStarted,
   recordFactoryExecutorTerminated,
   recordFactoryInvocationStarted,
@@ -53,13 +60,26 @@ import type { SandboxResultBundle } from "./sandboxResultBundle.js";
 import { standaloneSandboxSupervisorSource } from "./sandboxSupervisor.js";
 import { reconcileSandboxOrphans, type SandboxCleanupHealth } from "./sandboxReconciler.js";
 import { loadGovernedMcpContext } from "./factoryGovernedMcpContext.js";
+import { canonicalIsolatedInvocation, invocationResult, ISOLATED_INVOCATION_ADAPTER_ARTIFACT } from "@mission-control/workflow-engine/harness-contract";
+import { executionProfileQualificationMatches, executionProfileQualificationDigest,
+  executionProfileProjectionBlockers } from "../../../convex/lib/executionProfile.js";
+import { validateOfflineAttemptEvidence } from "../../../convex/lib/offlineAttemptEvidence.js";
+import type { IsolatedExecutorResult } from "./isolatedInvocationAdapter.js";
 
 export const FACTORY_ATTEMPT_LEASE_DURATION_MS = 120_000;
+export const LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE = "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING";
 const HEARTBEAT_INTERVAL_MS = 20_000;
 const MAX_RESULT_BYTES = 64_000;
 
+class FactoryWorkerFailure extends Error {
+  constructor(readonly code: string, message: string) {
+    super(message);
+    this.name = "FactoryWorkerFailure";
+  }
+}
+
 export interface FrozenHarnessExecutionManifest {
-  version: "factory-execution-manifest/v1" | "factory-execution-manifest/v2" | "factory-execution-manifest/v3";
+  version: "factory-execution-manifest/v1" | "factory-execution-manifest/v2" | "factory-execution-manifest/v3" | "factory-execution-manifest/v4";
   harness: {
     adapter: string;
     version: string;
@@ -281,6 +301,7 @@ export class FactoryAttemptWorker {
     this.polling = true;
     this.lastPollAt = Date.now();
     try {
+      await this.replayOfflineResponses();
       await this.reconcileOrphans();
       const [pending, running] = await Promise.all([
         this.client.query(ConvexQueries.workflowRuns.list as any, factoryRunQueryArgs("PENDING", this.scope)),
@@ -370,6 +391,35 @@ export class FactoryAttemptWorker {
     });
     if (this.cleanupHealth.failed > 0) {
       this.lastError = `Sandbox reconciliation failed for ${this.cleanupHealth.failed} resource(s).`;
+    }
+  }
+
+  private async replayOfflineResponses() {
+    if (!this.scope || !this.adapters.registrations().some(item => item.capabilities.executionBackends.includes("isolated-container"))) return;
+    const checkoutRoot = process.env.CODEX_WORKER_CHECKOUT_ROOT;
+    if (!checkoutRoot) throw new Error("Offline evidence recovery requires the explicit worker checkout root.");
+    const records = await pendingFactoryOfflineResponses({ ...this.scope, checkoutRoot,
+      serviceId: process.env.MISSION_CONTROL_SERVICE_ID?.trim() || "orchestration-server" });
+    for (const owner of records) {
+      if (this.active.has(owner.workflowRunId)) continue;
+      try {
+      const verifier = (owner.offlineResponse!.packet as any)?.request?.workload?.reference === "verify-document-bytes/v1";
+      const response = await this.command(verifier ? "reportVerificationAttempt" : "reportFactoryAttempt", verifier ? "verification:report" : "attempts.report", this.scope, {
+        workflowRunId: owner.workflowRunId, leaseId: owner.leaseId, workerId: owner.workerId,
+        workerSessionId: owner.workerSessionId, workerGeneration: owner.workerGeneration,
+        packet: { offlineExecution: owner.offlineResponse!.packet },
+      });
+      if (response?.retained !== true || response.authoritative !== false) throw new Error("Offline response retention was not acknowledged.");
+      await markFactoryOfflineResponseDelivered(owner, owner.offlineResponse!.packetSha256);
+      } catch (error) {
+        this.lastError = `Offline response delivery failed: ${safeError(error)}`;
+        try {
+          await recordFactoryOfflineDeliveryFailure(owner, owner.offlineResponse!.packetSha256, this.lastError);
+        } catch (journalError) {
+          this.lastError += `; delivery failure persistence failed: ${safeError(journalError)}`;
+          console.error(this.lastError);
+        }
+      }
     }
   }
 
@@ -480,8 +530,9 @@ export class FactoryAttemptWorker {
       });
       assertHarnessAdapterIdentity(manifest, adapterRegistration);
       if (verificationAttempt) {
-        await this.executeVerificationAttempt({ claim, manifest, report, controller });
-        this.completedCount += 1;
+        const completed = await this.executeVerificationAttempt({ claim, manifest, report, controller });
+        if (completed === false) this.failedCount += 1;
+        else this.completedCount += 1;
         this.lastError = null;
         return;
       }
@@ -508,7 +559,7 @@ export class FactoryAttemptWorker {
         this.lastError = null;
         return;
       }
-      if (claim.localCandidateRecovery?.previousLease && workspaceOwner) {
+      if (claim.localCandidateRecovery?.previousLease && !claim.publicationCheckpoint && workspaceOwner) {
         const candidate = await this.dependencies.inspectCandidateChange(claim.worktree, manifest.repository.baseSha);
         if (candidate.candidateRevision !== claim.localCandidateRecovery.sourceCandidateSha
           || candidate.treeRevision !== claim.localCandidateRecovery.sourceTreeSha
@@ -540,7 +591,8 @@ export class FactoryAttemptWorker {
         ownership: workspaceOwner,
       });
 
-      if (claim.localCandidateRecovery) {
+      if (claim.localCandidateRecovery && !claim.publicationCheckpoint) {
+        const structuredResult = validateFactoryResult(claim.localCandidateRecovery.structuredResult);
         const candidate = await this.dependencies.inspectCandidateChange(claim.worktree, manifest.repository.baseSha);
         const scopeResult = validateChangedFileScope(candidate.changedFiles, {
           allowedPaths: manifest.repository.allowedPaths,
@@ -579,14 +631,22 @@ export class FactoryAttemptWorker {
               recovery: true,
             },
           }],
-          candidateReady: {
-            transport: "LOCAL_GIT",
-            candidateSha: candidate.candidateRevision,
-            treeSha: candidate.treeRevision,
-            baseRef: claim.defaultBranch,
-            headRef: claim.branch,
-          },
-          terminal: { status: "COMPLETED" },
+        });
+        await this.publishCandidate({
+          claim,
+          manifest,
+          structuredResult,
+          changedFiles: scopeResult.changedFiles,
+          verificationRecord: undefined,
+          sourceRevision: candidate.sourceRevision,
+          headSha: candidate.candidateRevision,
+          treeSha: candidate.treeRevision,
+          policyV2: true,
+          report,
+          leaseId,
+          requirePublicationPermit: true,
+          assertActive,
+          signal: controller.signal,
         });
         this.completedCount += 1;
         this.lastError = null;
@@ -632,21 +692,51 @@ export class FactoryAttemptWorker {
           signal: controller.signal,
           requirePublicationPermit: true,
           treeSha: candidate.treeRevision,
-          policyV2: subject?.version === 2,
+          policyV2: checkpoint.recoveryPublication === true || subject?.version === 2,
         });
         this.completedCount += 1;
         this.lastError = null;
         return;
       }
 
-      await (this.dependencies.prepareFactoryDependencies ?? prepareFactoryDependencies)({
-        worktree: claim.worktree,
-      });
+      if (manifestExecutionBackend(manifest) !== "isolated-container") {
+        await (this.dependencies.prepareFactoryDependencies ?? prepareFactoryDependencies)({ worktree: claim.worktree });
+      }
 
       let mappedEvents: any[] = [];
       let traceObservations: any[] = [];
       let structuredResult: ReturnType<typeof validateFactoryResult>;
+      let executorExecutionId: string | undefined;
       const executionArtifacts: any[] = [];
+      if (manifestExecutionBackend(manifest) === "isolated-container") {
+        if (!workspaceOwner || !this.scope) throw new Error("Offline execution requires canonical scoped worker ownership.");
+        const invocation = canonicalIsolatedInvocation({ ...claim, _id: String(claim.workflowRunId) });
+        const current = async () => {
+          if (controller.signal.aborted || !leaseHealthy) return false;
+          const renewal = await this.command("renewFactoryAttempt", "attempts.renew", run, {
+            workflowRunId: run._id, leaseId, leaseDurationMs: FACTORY_ATTEMPT_LEASE_DURATION_MS, ...workerLeaseIdentity,
+          });
+          return renewal?.renewed === true && !controller.signal.aborted;
+        };
+        if (!await current()) throw new Error("Offline Attempt authority expired before invocation.");
+        const parsed = await this.executeAndRetainOfflineInvocation({ claim, adapter, invocation, controller, workspaceOwner });
+        if (parsed.result.status !== "SUCCESS") {
+          if (await current()) await report({ terminal: {
+            status: parsed.result.status === "CANCELED" ? "CANCELED" : "FAILED",
+            failureReason: `Offline execution ${parsed.result.status}; retained exact runtime response for this lease.`,
+          } });
+          this.failedCount += 1;
+          return;
+        }
+        if (!await current()) throw new Error("Offline Attempt authority expired before candidate materialization.");
+        await materializeDeterministicCandidate({ worktree: claim.worktree, sourceSha: manifest.repository.baseSha,
+          request: invocation, result: parsed.runtimeResult!, allowedPaths: manifest.repository.allowedPaths,
+          excludedPaths: manifest.repository.excludedPaths });
+        structuredResult = validateFactoryResult({ schema: "factory-result/v1", status: "COMPLETED",
+          summary: parsed.result.summary, completedAcceptanceCriterionIds: [], incompleteAcceptanceCriterionIds: [],
+          unknownAcceptanceCriterionIds: manifest.intent.acceptanceCriterionIds, verificationCommands: [], knownRisks: [],
+          nextAction: "Run independent verification against the exact Git candidate." });
+      } else {
       const frozenModelRoute = manifestModelRoute(manifest);
       if (!frozenModelRoute) throw new Error("Claimed Factory execution manifest has no exact frozen provider/model route.");
       const governedMcpContext = await (this.dependencies.loadGovernedMcpContext ?? loadGovernedMcpContext)({
@@ -655,8 +745,9 @@ export class FactoryAttemptWorker {
         manifest,
         signal: controller.signal,
       });
+      executorExecutionId = `${claim.runId}:${claim.executionManifestDigest}`;
       const executorRequest: ExecutorRequest = {
-        executionId: `${claim.runId}:${claim.executionManifestDigest}`,
+        executionId: executorExecutionId,
         repositoryRoot: claim.worktree,
         workingDirectory: claim.worktree,
         prompt: governedMcpContext
@@ -826,6 +917,7 @@ export class FactoryAttemptWorker {
         }
         structuredResult = parseFactoryResult(normalizedResult.output);
       }
+      }
       if (structuredResult.status !== "COMPLETED") {
         const failureReason = `Execution harness reported ${structuredResult.status}: ${structuredResult.nextAction}`;
         await cleanupRemote();
@@ -907,9 +999,11 @@ export class FactoryAttemptWorker {
         throw new Error("Committed candidate revision changed before verification.");
       }
       controller.signal.throwIfAborted();
-      await adapter.recordCandidate?.(executorRequest.executionId, {
-        sourceRevision: candidate.sourceRevision, candidateRevision: candidate.candidateRevision,
-      });
+      if (executorExecutionId) {
+        await adapter.recordCandidate?.(executorExecutionId, {
+          sourceRevision: candidate.sourceRevision, candidateRevision: candidate.candidateRevision,
+        });
+      }
       const baseArtifacts = [
         structuredResultArtifact(claim, structuredResult),
         ...executionArtifacts,
@@ -934,6 +1028,29 @@ export class FactoryAttemptWorker {
       let verificationRecord: any;
       let verificationResult: any;
       const policyV2 = manifest.workOrderSpecification?.verificationContract?.schemaVersion === 2;
+      if (manifestExecutionBackend(manifest) === "isolated-container") {
+        if (!policyV2 || manifest.workOrderSpecification?.verificationContract?.enforcementMode !== "ENFORCED") {
+          throw new Error("Unpublished offline candidates require enforced independent verification policy v2.");
+        }
+        await this.dependencies.assertFactoryCandidateUnchanged(claim.worktree, headSha);
+        // Completes only the producer Attempt. Canonical ingestion freezes the
+        // LOCAL_GIT subject and schedules a distinct verifier; acceptance and
+        // publication remain governed by their separate authoritative gates.
+        await report({
+          artifacts: baseArtifacts,
+          candidateReady: {
+            transport: "LOCAL_GIT",
+            candidateSha: headSha,
+            treeSha: candidate.treeRevision,
+            baseRef: claim.defaultBranch,
+            headRef: claim.branch,
+          },
+          terminal: { status: "COMPLETED" },
+        });
+        this.completedCount += 1;
+        this.lastError = null;
+        return;
+      }
       if (policyV2 && manifest.repository.verificationPublicationOrder === "VERIFY_BEFORE_PUBLICATION") {
         await this.dependencies.assertFactoryCandidateUnchanged(claim.worktree, headSha);
         await cleanupRemote();
@@ -1048,6 +1165,7 @@ export class FactoryAttemptWorker {
       this.lastError = null;
     } catch (error) {
       let reason = safeError(error);
+      const failureCode = error instanceof FactoryWorkerFailure ? error.code : undefined;
       try {
         await cleanupRemote();
       } catch (cleanupError) {
@@ -1062,6 +1180,7 @@ export class FactoryAttemptWorker {
         await report({ terminal: {
           status: controller.signal.aborted ? "CANCELED" : "FAILED",
           failureReason: reason,
+          ...(failureCode ? { failureCode } : {}),
           remoteFailure: remoteFailureDecision,
         } })
           .catch((reportError) => {
@@ -1093,7 +1212,12 @@ export class FactoryAttemptWorker {
   private async publicationInstallationToken(claim: any) {
     const privateKey = this.dependencies.loadGithubAppPrivateKey();
     const configuredAppId = this.dependencies.getGithubAppId();
-    if (!privateKey || !configuredAppId) throw new Error("GitHub App runtime credentials are not configured.");
+    if (!privateKey || !configuredAppId) {
+      throw new FactoryWorkerFailure(
+        LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE,
+        "GitHub App runtime credentials are not configured.",
+      );
+    }
     if (configuredAppId !== claim.installation.appId) throw new Error("GitHub App runtime identity does not match the frozen installation.");
     if (!claim.providerRepositoryId) throw new Error("GitHub provider repository identity is not frozen.");
     return await this.dependencies.mintInstallationToken({ appId: configuredAppId, installationId: claim.installation.installationId,
@@ -1285,6 +1409,69 @@ export class FactoryAttemptWorker {
     });
   }
 
+  private async executeAndRetainOfflineInvocation(input: {
+    claim: any;
+    adapter: Parameters<typeof runHarnessExecution>[0];
+    invocation: ReturnType<typeof canonicalIsolatedInvocation>;
+    controller: AbortController;
+    workspaceOwner: FactoryWorkspaceOwner;
+  }) {
+    const { claim, adapter, invocation, controller, workspaceOwner } = input;
+    const verifier = claim.attemptPurpose === "VERIFICATION";
+    let response: IsolatedExecutorResult;
+    let cleanupFailed = false;
+    try {
+      response = await runHarnessExecution(adapter, {
+        executionId: invocation.executionId,
+        repositoryRoot: "/workspace",
+        workingDirectory: "/workspace",
+        prompt: JSON.stringify(invocation),
+        allowedPaths: [],
+        timeoutMs: invocation.limits.timeoutMs,
+        isolation: verifier ? "READ_ONLY" : "WORKSPACE_WRITE",
+      }, { signal: controller.signal, emit: () => {} }) as IsolatedExecutorResult;
+    } catch (error) {
+      if (!(error instanceof HarnessCleanupError)) throw error;
+      response = error.result as IsolatedExecutorResult;
+      cleanupFailed = true;
+    }
+    if (typeof response.output !== "string" || Buffer.byteLength(response.output) > MAX_RESULT_BYTES) {
+      throw new Error("Offline result exceeds its bounded output contract.");
+    }
+    const packet = { request: invocation, result: JSON.parse(response.output), evidence: response.invocationEvidence };
+    if (cleanupFailed) {
+      packet.result = invocationResult(invocation, "INFRASTRUCTURE_FAILURE", packet.result.startedAt);
+      packet.evidence = { ...packet.evidence, cleanupVerified: false };
+    }
+    const parsed = validateOfflineAttemptEvidence(packet, invocation);
+    const journal = await retainFactoryOfflineResponse(workspaceOwner, {
+      packet,
+      projectId: String(claim.projectId),
+      repositoryId: String(claim.repositoryId),
+      serviceId: process.env.MISSION_CONTROL_SERVICE_ID?.trim() || "orchestration-server",
+    });
+    // Evidence-only reporting intentionally remains possible after heartbeat
+    // loss. The server proves the exact historical claim and grants no state authority.
+    const retention = await this.command(
+      verifier ? "reportVerificationAttempt" : "reportFactoryAttempt",
+      verifier ? "verification:report" : "attempts.report",
+      claim,
+      {
+        workflowRunId: claim.workflowRunId,
+        leaseId: claim.lease.leaseId,
+        workerId: claim.lease.workerId,
+        workerSessionId: claim.lease.workerSessionId,
+        workerGeneration: claim.lease.workerGeneration,
+        packet: { offlineExecution: packet },
+      },
+    );
+    if (retention?.retained !== true || retention.authoritative !== false) {
+      throw new Error("Offline response retention was not acknowledged.");
+    }
+    await markFactoryOfflineResponseDelivered(workspaceOwner, journal.offlineResponse!.packetSha256);
+    return parsed;
+  }
+
   private async executeVerificationAttempt(input: {
     claim: any;
     manifest: any;
@@ -1296,12 +1483,74 @@ export class FactoryAttemptWorker {
     if (subject?.kind !== "GIT_CANDIDATE" || !plan?.planDigest) {
       throw new Error("Verification Attempt is missing its frozen Git subject or Verification Plan.");
     }
-    await this.dependencies.ensureVerificationWorktree({
+    const verifierRoot = await this.dependencies.ensureVerificationWorktree({
       checkoutRoot: input.claim.checkoutRoot,
       worktree: input.claim.worktree,
       candidateSha: subject.candidateSha,
       treeSha: subject.treeSha,
+      sourceWorktree: input.claim.sourceWorktree,
     });
+    if (manifestExecutionBackend(input.manifest) === "isolated-container") {
+      const claim = input.claim;
+      const invocation = canonicalIsolatedInvocation({ ...claim, _id: String(claim.workflowRunId) });
+      if (subject.provider !== "LOCAL_GIT" || input.manifest.harness.isolation !== "READ_ONLY"
+        || invocation.workload.reference !== "verify-document-bytes/v1"
+        || invocation.workload.input.verificationPlanDigest !== plan.planDigest
+        || !claim.sourceWorktree || claim.sourceWorktree === claim.worktree) {
+        throw new Error("Offline verification requires its separate exact subject, plan and read-only context.");
+      }
+      const captured = await captureVerificationDocument({ repositoryRoot: claim.worktree,
+        candidateSha: subject.candidateSha, treeSha: subject.treeSha, path: invocation.workload.input.path });
+      if (captured.content !== invocation.workload.input.candidateContent) throw new Error("Independent Git blob differs from the frozen verifier input.");
+      const owner = workspaceOwnerFromClaim(claim, input.manifest);
+      if (!owner || !this.scope) throw new Error("Offline verifier requires scoped canonical workspace ownership.");
+      await ensureFactoryWorkspaceOwnership({ owner, allowCreate: true });
+      const current = async () => {
+        if (input.controller.signal.aborted) return false;
+        const renewal = await this.command("renewVerificationAttempt", "verification:renew", claim, {
+          workflowRunId: claim.workflowRunId, leaseId: claim.lease.leaseId, workerId: claim.lease.workerId,
+          workerSessionId: claim.lease.workerSessionId, workerGeneration: claim.lease.workerGeneration,
+          leaseDurationMs: FACTORY_ATTEMPT_LEASE_DURATION_MS,
+        });
+        return renewal?.renewed === true && !input.controller.signal.aborted;
+      };
+      if (!await current()) throw new Error("Offline verifier authority expired before execution.");
+      const parsed = await this.executeAndRetainOfflineInvocation({ claim, invocation, controller: input.controller,
+        workspaceOwner: owner, adapter: this.adapters.require({ adapter: input.manifest.harness.adapter, version: input.manifest.harness.version }) });
+      if (!await current()) throw new Error("Offline verifier authority expired before result handling.");
+      if (parsed.result.status !== "SUCCESS") {
+        await input.report({ terminal: { status: parsed.result.status === "CANCELED" ? "CANCELED" : "FAILED",
+          failureReason: `Offline verifier ${parsed.result.status}; exact runtime response retained.` } });
+        return false;
+      }
+      await this.dependencies.assertFactoryCandidateUnchanged(claim.worktree, subject.candidateSha);
+      await this.dependencies.assertFactoryCandidateUnchanged(claim.sourceWorktree, subject.candidateSha);
+      const finalVerifierRoot = await this.dependencies.ensureVerificationWorktree({
+        checkoutRoot: claim.checkoutRoot, worktree: claim.worktree, sourceWorktree: claim.sourceWorktree,
+        candidateSha: subject.candidateSha, treeSha: subject.treeSha,
+      });
+      if (finalVerifierRoot !== verifierRoot) throw new Error("Verifier canonical root changed during execution.");
+      const observed = await captureVerificationDocument({ repositoryRoot: claim.worktree,
+        candidateSha: subject.candidateSha, treeSha: subject.treeSha, path: captured.path });
+      if (observed.blobSha !== captured.blobSha || observed.contentSha256 !== captured.contentSha256) throw new Error("Verifier candidate bytes changed during execution.");
+      if (!claim.sourceRevision || claim.sourceRevision !== input.manifest.repository.planningRepositorySha) {
+        throw new Error("Offline verifier source baseline is not exact.");
+      }
+      const candidate = await this.dependencies.inspectCandidateChange(claim.worktree, claim.sourceRevision);
+      if (candidate.candidateRevision !== subject.candidateSha || candidate.treeRevision !== subject.treeSha
+        || Buffer.byteLength(JSON.stringify(candidate), "utf8") > 64_000) throw new Error("Independent candidate change observation is invalid or oversized.");
+      const isolationWithoutDigest = { mode: "ISOLATED_CONTAINER" as const,
+        sandboxId: `docker:${parsed.evidence.container.id}`, subjectDigest: subject.digest,
+        verifierRoot, sourceRoot: await realpath(claim.sourceWorktree), initialClean: true, finalSubjectMatch: true,
+        repositoryId: String(claim.repositoryId), headSha: subject.candidateSha, treeSha: subject.treeSha, attestedAt: Date.now() };
+      await input.report({ offlineVerification: { responseDigest: parsed.packetDigest,
+        candidate,
+        candidateObservation: { candidateSha: observed.candidateSha, treeSha: observed.treeSha, path: observed.path,
+          blobSha: observed.blobSha, contentSha256: observed.contentSha256, observedAt: Date.now() } },
+        isolation: { ...isolationWithoutDigest, rootBindingDigest: verificationIsolationBindingDigest(isolationWithoutDigest) },
+        terminal: { status: "COMPLETED" } });
+      return;
+    }
     const candidate = await this.dependencies.inspectCandidateChange(
       input.claim.worktree,
       input.claim.defaultBranch,
@@ -1413,13 +1662,13 @@ function isBoundFactoryAttempt(run: any) {
   );
 }
 
-function validateClaimManifest(claim: any, expectedLeaseId: string) {
+export function validateClaimManifest(claim: any, expectedLeaseId: string) {
   const manifest = claim?.executionManifest as FrozenHarnessExecutionManifest | undefined;
   const executionBackend = manifestExecutionBackend(manifest);
   const capabilityManifest = manifest?.harness?.capabilityManifest;
   if (
     !manifest
-    || !["factory-execution-manifest/v1", "factory-execution-manifest/v2", "factory-execution-manifest/v3"].includes(manifest.version)
+    || !["factory-execution-manifest/v1", "factory-execution-manifest/v2", "factory-execution-manifest/v3", "factory-execution-manifest/v4"].includes(manifest.version)
     || !boundedHarnessIdentity(manifest?.harness?.adapter)
     || !boundedHarnessIdentity(manifest?.harness?.version)
     || manifest.harness.adapter !== claim.executorAdapter
@@ -1440,7 +1689,7 @@ function validateClaimManifest(claim: any, expectedLeaseId: string) {
     || !["WORKSPACE_WRITE", "READ_ONLY", "DETACHED_READ_ONLY"].includes(manifest?.harness?.isolation)
     || manifest?.harness?.pullRequestAuthority !== "CONTROL_PLANE_ONLY"
     || executionBackend === undefined
-    || !manifestModelRoute(manifest)
+    || (manifest.version !== "factory-execution-manifest/v4" && !manifestModelRoute(manifest))
     || !Array.isArray(manifest?.harness?.requiredCapabilities)
     || !Number.isSafeInteger(manifest?.harness?.timeoutMs)
     || manifest.harness.timeoutMs < 1_000
@@ -1452,10 +1701,10 @@ function validateClaimManifest(claim: any, expectedLeaseId: string) {
     || !Array.isArray(manifest?.repository?.excludedPaths)
     || !Array.isArray(manifest?.workflow?.steps)
     || typeof manifest?.compiledPrompt !== "string"
-    || !manifest.compiledPrompt.trim()
+    || (manifest.version === "factory-execution-manifest/v4" ? manifest.compiledPrompt !== "" : !manifest.compiledPrompt.trim())
     || claim.executionManifestDigest !== `sha256:${canonicalHash(manifest)}`
   ) throw new Error("Claimed Factory execution manifest is invalid.");
-  if (hasDecomposedExecutionIdentity(manifest) && !validV2ExecutionBindings(manifest, executionBackend)) {
+  if (hasDecomposedExecutionIdentity(manifest) && manifest.version !== "factory-execution-manifest/v4" && !validV2ExecutionBindings(manifest, executionBackend)) {
     throw new Error("Claimed Factory V2 execution bindings are invalid.");
   }
   if (manifest.version === "factory-execution-manifest/v3"
@@ -1469,12 +1718,16 @@ function validateClaimManifest(claim: any, expectedLeaseId: string) {
       || !claimExecutionProfileEvidenceMatches(claim, manifest))) {
     throw new Error("Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).");
   }
-  if (manifest.version !== "factory-execution-manifest/v3" && claim.executionProfile !== undefined) {
+  if (manifest.version === "factory-execution-manifest/v4") validateOfflineClaimBinding(claim, manifest, expectedLeaseId);
+  if (!["factory-execution-manifest/v3", "factory-execution-manifest/v4"].includes(manifest.version) && claim.executionProfile !== undefined) {
     throw new Error("Claimed profileless Factory manifest contains Execution Profile evidence.");
   }
   const executionRuntimeArtifact = manifestExecutionRuntimeArtifact(manifest);
   if (!executionRuntimeArtifact
-    || !runtimeArtifactMatchesBackend(executionRuntimeArtifact, executionBackend, manifest?.sandbox?.profileSnapshot)) {
+    || !(executionBackend === "isolated-container"
+      ? executionRuntimeArtifact.artifact.kind === "CONTAINER_IMAGE"
+        && executionRuntimeArtifact.artifact.imageDigest === (manifest.executionProfile?.profileSnapshot as any)?.runtimeArtifact?.snapshot?.imageDigest
+      : runtimeArtifactMatchesBackend(executionRuntimeArtifact, executionBackend, manifest?.sandbox?.profileSnapshot))) {
     throw new Error("Claimed Factory execution manifest does not match its exact backend runtime artifact.");
   }
   if (executionBackend === "remote-sandbox") {
@@ -1505,6 +1758,68 @@ function validateClaimManifest(claim: any, expectedLeaseId: string) {
   return manifest;
 }
 
+function validateOfflineClaimBinding(claim: any, manifest: FrozenHarnessExecutionManifest, expectedLeaseId: string) {
+  // The existing general offline contract remains implementation-only. A
+  // verifier is supported solely by this exact fixture-bound repository and
+  // sandbox type, whose full identities are checked immediately below.
+  const localVerifier = claim.attemptPurpose === "VERIFICATION"
+    && claim.repositoryMode === "LOCAL_SYNTHETIC_QUALIFICATION"
+    && (manifest.executionProfile?.profileSnapshot as any)?.sandboxProfile?.profileSnapshot?.schema === "local-qualification-sandbox/v1";
+  const isolation = localVerifier ? "READ_ONLY" : "WORKSPACE_WRITE";
+  const binding = manifest.executionProfile;
+  const profile = binding?.profileSnapshot as any;
+  const qualification = binding?.qualificationSnapshot as any;
+  const local = claim.localRepositoryAdmission;
+  const repository = manifest.repository as any;
+  const scopedSandbox = profile?.sandboxProfile?.profileSnapshot;
+  const deterministicOperations = (manifest.workflow?.steps ?? [])
+    .filter((step: any) => step?.kind === "DETERMINISTIC")
+    .map((step: any) => step?.operation?.reference)
+    .filter((reference: unknown): reference is string => typeof reference === "string");
+  if (!binding || manifest.executionBackend !== "isolated-container" || profile?.schema !== "factory-execution-profile/v2"
+    || claim.lease?.leaseId !== expectedLeaseId || !Number.isFinite(claim.lease?.heartbeatAt)
+    || !Number.isFinite(claim.lease?.expiresAt) || claim.lease.expiresAt <= Date.now()
+    || claim.lease.expiresAt <= claim.lease.heartbeatAt || claim.lease.heartbeatAt > Date.now()
+    || claim.publicationCheckpoint || (!localVerifier && claim.attemptPurpose !== "IMPLEMENTATION")
+    || manifest.causation?.factoryPurpose !== (localVerifier ? "VERIFICATION" : "SOFTWARE") || manifest.repository?.dataClassification !== "PUBLIC"
+    || manifest.workOrderSpecification?.riskLevel !== "LOW" || manifest.workOrderSpecification?.dataBoundaries?.length !== 0
+    || manifest.modelRoute !== undefined || manifest.sandbox !== undefined
+    || !executionProfileQualificationMatches({ profileId: binding.profileId, profileSnapshot: profile,
+      profileDigest: binding.profileDigest, qualificationSnapshot: qualification })
+    || executionProfileQualificationDigest(qualification) !== binding.qualificationDigest
+    || qualification.approvedAt > claim.lease.heartbeatAt || qualification.validUntil <= Date.now()
+    || !qualification.scope.workloadClasses.includes(localVerifier ? "VERIFICATION" : "SOFTWARE_CHANGE") || !qualification.scope.riskClasses.includes("GREEN")
+    || !claimExecutionProfileEvidenceMatches(claim, manifest)) throw new Error("Claimed offline Execution Profile is invalid or stale.");
+  if (claim.repositoryMode === "LOCAL_SYNTHETIC_QUALIFICATION" && (
+    !local || local.publicationAuthority !== "NONE" || local.productionAuthority !== "NONE"
+    || claim.installation || claim.providerRepositoryId || claim.checkoutRoot !== local.root
+    || repository.mode !== claim.repositoryMode || repository.admissionDigest !== local.digest
+    || repository.planningRepositorySha !== local.baselineCommit
+    || scopedSandbox?.schema !== "local-qualification-sandbox/v1"
+    || scopedSandbox.localQualification?.repositoryId !== claim.repositoryId
+    || scopedSandbox.localQualification?.repositoryAdmissionDigest !== local.digest
+    || deterministicOperations.length !== 1
+    || !scopedSandbox.localQualification?.operations?.includes(deterministicOperations[0])
+  )) throw new Error("Local qualification claim does not bind the exact non-publishable repository.");
+  const blockers = executionProfileProjectionBlockers({ profileId: binding.profileId, profileSnapshot: profile,
+    profileDigest: binding.profileDigest, qualificationSnapshot: qualification, qualificationDigest: binding.qualificationDigest,
+    projection: { profileId: binding.profileId, profileKey: binding.profileKey, profileVersion: binding.version,
+      profileDigest: binding.profileDigest, profileSnapshot: profile, qualificationDigest: binding.qualificationDigest,
+      qualificationSnapshot: qualification, executor: { adapter: manifest.harness.adapter, version: manifest.harness.version },
+      harnessCapabilityManifest: manifest.harness.capabilityManifest, harnessCapabilityManifestDigest: manifest.harness.capabilityManifestSha256,
+      harnessEffectiveConfigSha256: manifest.harness.effectiveConfigSha256, harnessRuntimeArtifact: manifest.harness.runtimeArtifact!,
+      harnessRuntimeArtifactDigest: manifest.harness.runtimeArtifactDigest!, executionBackend: "isolated-container",
+      sandboxProfileId: profile.sandboxProfile.profileId, sandboxProfileDigest: profile.sandboxProfile.profileDigest,
+      sandboxProfileSnapshot: profile.sandboxProfile.profileSnapshot, isolationModes: [isolation],
+      requiredHarnessCapabilities: manifest.harness.requiredHarnessCapabilities as any,
+      requiredSandboxCapabilities: profile.requiredSandboxCapabilities } });
+  if (blockers.length || manifest.harness.isolation !== isolation
+    || !sameStringSet(manifest.harness.requiredCapabilities, ["git-worktree", localVerifier ? "read-only" : "workspace-write", ...profile.requiredSandboxCapabilities])) {
+    throw new Error("Claimed offline component projection does not match its exact qualified profile.");
+  }
+  canonicalIsolatedInvocation({ ...claim, _id: String(claim.workflowRunId), executionManifest: manifest });
+}
+
 function assertHarnessAdapterIdentity(
   manifest: FrozenHarnessExecutionManifest,
   registration: RegisteredHarnessAdapter,
@@ -1525,6 +1840,10 @@ function assertHarnessAdapterIdentity(
     throw new Error("Registered harness adapter does not support the frozen execution backend.");
   }
   const expectedRuntimeArtifact = manifestExecutionRuntimeArtifact(manifest);
+  if (executionBackend === "isolated-container"
+    && registration.runtimeArtifactSha256 !== harnessRuntimeArtifactDigest(ISOLATED_INVOCATION_ADAPTER_ARTIFACT)) {
+    throw new Error("Registered offline backend artifact does not match the admitted implementation.");
+  }
   if (executionBackend === "persistent-worker"
     && (!expectedRuntimeArtifact
       || registration.runtimeArtifactSha256 !== expectedRuntimeArtifact.digest
@@ -1570,7 +1889,7 @@ function manifestExecutionBackend(manifest: any): HarnessExecutionBackend | unde
   const backend = hasDecomposedExecutionIdentity(manifest)
     ? manifest?.executionBackend
     : manifest?.harness?.executionBackend;
-  return backend === "persistent-worker" || backend === "remote-sandbox" ? backend : undefined;
+  return backend === "persistent-worker" || backend === "remote-sandbox" || backend === "isolated-container" ? backend : undefined;
 }
 
 function manifestModelRoute(manifest: any): {
@@ -1830,7 +2149,7 @@ function executionProfileEvidenceFromManifest(manifest: FrozenHarnessExecutionMa
     },
     runtimeArtifactDigest: profile.runtimeArtifact?.digest,
     executionBackend: profile.executionBackend,
-    modelRoute: {
+    modelRoute: profile.executionBackend === "isolated-container" ? profile.modelRoute : {
       catalogId: profile.modelRoute?.catalogId,
       routeDigest: profile.modelRoute?.routeDigest,
       qualificationDigest: profile.modelRoute?.qualificationDigest,
@@ -1858,7 +2177,7 @@ function executionProfileEvidenceFromManifest(manifest: FrozenHarnessExecutionMa
 
 function hasDecomposedExecutionIdentity(manifest: any): boolean {
   return manifest?.version === "factory-execution-manifest/v2"
-    || manifest?.version === "factory-execution-manifest/v3";
+    || manifest?.version === "factory-execution-manifest/v3" || manifest?.version === "factory-execution-manifest/v4";
 }
 
 function allDeniedExecutionProfileAuthority(authority: any) {
@@ -2173,8 +2492,8 @@ function validatePublicationCheckpoint(checkpoint: any) {
     || !Number.isFinite(checkpoint.authorizationValidUntil)
     || (checkpoint.reconciliationOnly !== true && checkpoint.authorizationValidUntil <= Date.now() + 60_000)
     || !Array.isArray(checkpoint.changedFiles) || checkpoint.changedFiles.some((file: unknown) => typeof file !== "string")
-    || checkpoint.verification?.verdict !== "VERIFIED"
-    || !checkpoint.verification?.verificationReceiptId) {
+    || (checkpoint.recoveryPublication !== true && (checkpoint.verification?.verdict !== "VERIFIED"
+      || !checkpoint.verification?.verificationReceiptId))) {
     throw new Error("Claimed Factory publication checkpoint is invalid.");
   }
   return checkpoint as {
@@ -2185,6 +2504,7 @@ function validatePublicationCheckpoint(checkpoint: any) {
     verification: any;
     structuredResult: any;
     publicationPermit?: { id: string; leaseId: string; validUntil: number };
+    recoveryPublication?: boolean;
   };
 }
 
@@ -2250,10 +2570,11 @@ function structuredResultArtifact(claim: any, result: ReturnType<typeof parseFac
   return {
     idempotencyKey: `factory:${claim.runId}:structured-result`,
     artifactType: "STRUCTURED_OUTPUT",
-    name: "Execution harness factory-result/v1",
+    name: claim.executionProfile?.executionBackend === "isolated-container" ? "Host mapping of deterministic runtime result" : "Execution harness factory-result/v1",
     description: persistedResult.summary,
     contentHash: `sha256:${createHash("sha256").update(JSON.stringify(persistedResult)).digest("hex")}`,
-    metadata: { schema: "factory-result/v1", acceptanceAuthority: false, result: persistedResult },
+    metadata: { schema: "factory-result/v1", acceptanceAuthority: false, result: persistedResult,
+      ...(claim.executionProfile?.executionBackend === "isolated-container" ? { evidenceOrigin: "HOST_DERIVED", behavioralPass: false } : {}) },
   };
 }
 

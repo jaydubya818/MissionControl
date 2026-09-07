@@ -6,8 +6,41 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { assertCanonicalWorktreeBoundary, assertWorktreeBoundary } from "./factoryPathScope.js";
 import { ensureFactoryWorkspaceOwnership, type FactoryWorkspaceOwner } from "./factoryWorkspaceOwnership.js";
+import { isolatedInvocationIssues, invocationResultMatches, type IsolatedInvocation, type IsolatedInvocationResult } from "@mission-control/workflow-engine/harness-contract";
+import { validateChangedFileScope } from "@mission-control/workflow-engine";
+import { deterministicDocumentPath } from "@mission-control/workflow-engine/harness-contract";
+import { hardenedGitArgs, hardenedGitEnvironment } from "./hardenedGit.js";
 
 const execFileAsync = promisify(execFile);
+
+/** Read the immutable Git blob, never the mutable worktree file or a lossy
+ * UTF-8 projection. No filters, replacement objects, hooks or provider calls. */
+export async function captureVerificationDocument(input: {
+  repositoryRoot: string; candidateSha: string; treeSha: string; path: string;
+}) {
+  const gitSha = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+  if (!gitSha.test(input.candidateSha) || !gitSha.test(input.treeSha) || !deterministicDocumentPath(input.path)) {
+    throw new Error("Verification document identity is invalid.");
+  }
+  const read = async (args: string[]) => (await execFileAsync("git", hardenedGitArgs(args), {
+    cwd: input.repositoryRoot, encoding: "buffer", maxBuffer: 20_000, timeout: 10_000,
+    env: hardenedGitEnvironment(),
+  })).stdout;
+  const tree = new TextDecoder("utf-8", { fatal: true }).decode(await read(["rev-parse", `${input.candidateSha}^{tree}`])).trim();
+  if (tree !== input.treeSha) throw new Error("Verification candidate tree changed.");
+  const entry = new TextDecoder("utf-8", { fatal: true }).decode(await read(["ls-tree", "-z", input.candidateSha, "--", input.path]));
+  const match = /^(100644) blob ([a-f0-9]{40}|[a-f0-9]{64})\t([^\0]+)\0$/.exec(entry);
+  if (!match || match[3] !== input.path) throw new Error("Verification subject is not one non-executable document blob.");
+  const bytes = await read(["cat-file", "blob", match[2]]);
+  const actualBlobSha = createHash(match[2].length === 40 ? "sha1" : "sha256")
+    .update(Buffer.from(`blob ${bytes.length}\0`)).update(bytes).digest("hex");
+  if (actualBlobSha !== match[2]) throw new Error("Verification Git blob digest does not match its bytes.");
+  const content = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+  if (!Buffer.from(content, "utf8").equals(bytes)) throw new Error("Verification document decoding changed its bytes.");
+  if (new TextEncoder().encode(JSON.stringify(content)).length > 8_000) throw new Error("Verification document exceeds its serialized byte limit.");
+  return { candidateSha: input.candidateSha, treeSha: input.treeSha, path: input.path,
+    blobSha: match[2], content, contentSha256: `sha256:${createHash("sha256").update(bytes).digest("hex")}` };
+}
 
 type DependencyInstaller = (worktree: string) => Promise<void>;
 
@@ -192,8 +225,11 @@ export async function ensureVerificationWorktree(input: {
   worktree: string;
   candidateSha: string;
   treeSha: string;
+  sourceWorktree?: string;
 }) {
-  const boundary = assertWorktreeBoundary(input.checkoutRoot, input.worktree);
+  const boundary = await assertCanonicalWorktreeBoundary(input.checkoutRoot, input.worktree, { createRoot: true });
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(input.candidateSha)
+    || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(input.treeSha)) throw new Error("Invalid verification candidate identity.");
   const repositoryRoot = path.resolve((await runGit(boundary.checkoutRoot, ["rev-parse", "--show-toplevel"])).stdout.trim());
   if (await realpath(repositoryRoot) !== await realpath(boundary.checkoutRoot)) {
     throw new Error("Verification host checkout root does not match the Git repository root.");
@@ -202,12 +238,21 @@ export async function ensureVerificationWorktree(input: {
   if (!await exists(boundary.worktree)) {
     await runGit(boundary.checkoutRoot, ["worktree", "add", "--detach", boundary.worktree, input.candidateSha]);
   }
-  const [root, head, tree, status] = await Promise.all([
+  const [root, head, tree, status, branch] = await Promise.all([
     runGit(boundary.worktree, ["rev-parse", "--show-toplevel"]),
     runGit(boundary.worktree, ["rev-parse", "HEAD"]),
     runGit(boundary.worktree, ["rev-parse", "HEAD^{tree}"]),
     runGit(boundary.worktree, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]),
+    runGit(boundary.worktree, ["branch", "--show-current"]),
   ]);
+  if (branch.stdout.trim()) throw new Error("Verification worktree must be detached from mutable branch state.");
+  if (input.sourceWorktree) {
+    const source = await assertCanonicalWorktreeBoundary(input.checkoutRoot, input.sourceWorktree);
+    const sourceRoot = await realpath(source.worktree);
+    const verifierRoot = await realpath(boundary.worktree);
+    if (sourceRoot === verifierRoot || sourceRoot.startsWith(`${verifierRoot}${path.sep}`)
+      || verifierRoot.startsWith(`${sourceRoot}${path.sep}`)) throw new Error("Verification requires separate canonical source and verifier roots.");
+  }
   if (await realpath(path.resolve(root.stdout.trim())) !== await realpath(boundary.worktree)) {
     throw new Error("Verification worktree is not the frozen attempt-specific root.");
   }
@@ -337,13 +382,33 @@ export async function createFactorySourceBundle(worktree: string, sourceSha: str
   if (!/^[a-f0-9]{40,64}$/i.test(sourceSha)) throw new Error("Factory source SHA is invalid.");
   const observed = await currentHead(worktree);
   if (observed !== sourceSha) throw new Error("Factory worktree does not match the frozen source SHA before sandbox upload.");
-  const result = await execFileAsync("git", ["bundle", "create", "-", "HEAD"], {
+  const result = await execFileAsync("git", hardenedGitArgs(["bundle", "create", "-", "HEAD"]), {
     cwd: worktree,
-    env: process.env,
+    env: hardenedGitEnvironment(),
     encoding: "buffer",
     maxBuffer: 32 * 1024 * 1024,
   });
   return Buffer.from(result.stdout);
+}
+
+/** Materialize only a validated new document through the existing Git patch
+ * boundary. Existing files, symlink traversal and dirty/source-shifted trees
+ * are rejected by Git; this grants no verification or publication authority. */
+export async function materializeDeterministicCandidate(input: {
+  worktree: string; sourceSha: string; request: IsolatedInvocation; result: IsolatedInvocationResult;
+  allowedPaths: string[]; excludedPaths: string[];
+}) {
+  if (isolatedInvocationIssues(input.request).length > 0
+    || !invocationResultMatches(input.result, input.request)
+    || input.request.workload.reference !== "render-markdown/v1" || input.result.status !== "SUCCESS"
+    || input.result.candidateFiles.length !== 1) throw new Error("Deterministic candidate lacks a valid exact runtime result.");
+  const candidate = input.result.candidateFiles[0];
+  if (validateChangedFileScope([candidate.path], [{ includePaths: input.allowedPaths, excludePaths: input.excludedPaths }]).length > 0) {
+    throw new Error("Deterministic candidate is outside the approved code scope.");
+  }
+  const lines = candidate.content.slice(0, -1).split("\n");
+  const patch = `diff --git a/${candidate.path} b/${candidate.path}\nnew file mode 100644\n--- /dev/null\n+++ b/${candidate.path}\n@@ -0,0 +1,${lines.length} @@\n${lines.map(line => `+${line}`).join("\n")}\n`;
+  await materializeRemoteCandidate({ worktree: input.worktree, sourceSha: input.sourceSha, patch: Buffer.from(patch, "utf8") });
 }
 
 export async function materializeRemoteCandidate(input: {
@@ -363,8 +428,8 @@ export async function materializeRemoteCandidate(input: {
   const patchPath = path.join(patchDirectory, "candidate.patch");
   try {
     await writeFile(patchPath, input.patch, { mode: 0o600 });
-    await execFileAsync("git", ["apply", "--binary", "--whitespace=nowarn", patchPath], {
-      cwd: input.worktree, env: process.env, maxBuffer: 20 * 1024 * 1024,
+    await execFileAsync("git", hardenedGitArgs(["apply", "--binary", "--whitespace=nowarn", patchPath]), {
+      cwd: input.worktree, env: hardenedGitEnvironment(), maxBuffer: 20 * 1024 * 1024,
     });
   } catch (cause: any) {
     const detail = String(cause?.stderr ?? cause?.message ?? "git apply failed").slice(0, 1_000);
@@ -382,9 +447,9 @@ function assertFactoryBranch(branch: string) {
 
 async function runGit(cwd: string, args: string[], additionalEnv?: Record<string, string>, signal?: AbortSignal) {
   try {
-    return await execFileAsync("git", args, {
+    return await execFileAsync("git", hardenedGitArgs(args), {
       cwd,
-      env: { ...process.env, ...additionalEnv },
+      env: hardenedGitEnvironment(additionalEnv),
       maxBuffer: 20 * 1024 * 1024,
       signal,
     });
@@ -398,7 +463,7 @@ async function runGit(cwd: string, args: string[], additionalEnv?: Record<string
 
 async function gitSucceeds(cwd: string, args: string[]) {
   try {
-    await execFileAsync("git", args, { cwd, env: process.env, maxBuffer: 2 * 1024 * 1024 });
+    await execFileAsync("git", hardenedGitArgs(args), { cwd, env: hardenedGitEnvironment(), maxBuffer: 2 * 1024 * 1024 });
     return true;
   } catch {
     return false;

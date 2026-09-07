@@ -261,10 +261,12 @@ the governed pilot remain open.
 
 The complete Factory loop and ten real accepted WorkOrders are **NOT_PROVEN**.
 Live inference qualification and its two-route comparison are **NOT_RUN**.
-Real incident restoration, observed outcomes, evaluated improvement, human
-promotion, controlled activation and observed rollback remain required at the
-scope specified by the master acceptance criteria. Program completion must not
-be inferred from the bounded offline records or from checklist implementation.
+One attributable Production incident pause/restoration operation is now qualified
+at the exact repository scope recorded below. Production outcome learning,
+evaluated improvement, human promotion, controlled activation and observed
+Factory Version rollback remain required at the scope specified by the master
+acceptance criteria. Program completion must not be inferred from the bounded
+offline records, the single incident operation, or checklist implementation.
 
 ### Current-main integration for observation retention
 
@@ -303,7 +305,73 @@ passed exact-head CI and merged as `b17c9c5`; its fresh detached checkout passed
 The [clean-main evidence](../testing/evidence/capability-convergence-accounting-recovery-postmerge-v52/README.md)
 binds those results to runtime v52 and the reviewed source hashes.
 
-The existing Production UI deployment remains unchanged. No configured
-Production target exists here for the orchestration service that owns this
-recovery path. Program completion still requires the live two-route comparison,
-ten real accepted WorkOrders, and attributable Production incident restoration.
+The existing Production UI deployment remained unchanged during this accounting
+slice. No configured Production target exists here for the orchestration service
+that owns this recovery path. Program completion still requires the live
+two-route comparison and ten real accepted WorkOrders. The later v55 incident
+qualification below closes only its exact repository pause/restoration operation.
+
+### Production-qualified incident pause and restoration — runtime v55
+
+PR #208 merged as `03240af93c442a3f747507a21924b44ff379f80d` and PR #209
+merged as final main `609cc70fc3c30920f8a871403ebbe7e7f34d14dd`. That exact
+source was deployed to Convex Production `gallant-cassowary-27` and Vercel
+deployment `dpl_HGiRteqmkCpQbyHVU8NQTtyaX7GW`; both release identity endpoints
+matched final main.
+
+The retained incident `INC-MTQR363Y-DA535A` exercised an authorized pause denial,
+durable command acknowledgement, observed effect, separate restoration authority,
+resume acknowledgement and observed restoration for exactly
+`jaydubya818/MissionControl`. Workflow-run count remained 13 across the denied
+mutation. The incident resolved at sequence 9 with containment `RESTORED`.
+[Completion evidence](../testing/evidence/factory-incident-command-production-v55/README.md)
+binds the production identities, denial receipt, restoration records, exact-main
+qualification and rollback target.
+
+This advances incident response to **Production-qualified; one exact repository
+operation**. It does not qualify arbitrary repositories or controls, customer
+incidents, autonomous emergency authority, provider inference, real accepted
+WorkOrders, production-value outcomes, learning promotion, or Factory Version
+rollback. Todo 063 and the real pilot remain open at their existing authority
+boundaries.
+
+### Authenticated Bedrock live preflight — denied before inference
+
+On 2026-09-07 the Product Owner approved the dedicated qualification account,
+profile, exact US geographic Sonnet 4.6 route, and a cumulative non-Production
+live-call ceiling of USD 5.00 with zero retries and zero fallbacks. Authenticated
+STS matched account `083665737366` and the expected
+`AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783` session. Bedrock
+returned the active account-specific inference-profile ARN and exactly the three
+approved destination model ARNs.
+
+The exact synthetic CountTokens preflight then failed closed with
+`AccessDeniedException`: no identity-based policy allows `bedrock:CountTokens`
+for that principal on the approved profile. No inference request, reservation,
+provider result, retry, fallback, or spend occurred. The retained
+[preflight evidence](../testing/evidence/todo063-bedrock-live-preflight-2026-09-07/README.md)
+records the safe identity, route, request digest and denial. Resume only after
+the Identity Center permission is actually provisioned; reverify STS and repeat
+CountTokens before reserving or sending. Todo 063 remains in progress and todo
+064 remains blocked by its declared dependency.
+
+### CountTokens permission qualified; provider capability blocks inference
+
+Later on 2026-09-07 the Product Owner authorized the exact CountTokens grant.
+Identity Center permission set `FDLCQualificationTFOperator` was reprovisioned
+to account `083665737366`; final provisioning request
+`103a21b2-ce2a-4feb-b387-fe5b36d78665` completed `SUCCEEDED`. Readback confirms
+the grant is limited to the approved US Sonnet 4.6 inference profile and its
+three required backing-model resources. Wildcard Bedrock, streaming, Global
+inference, unrelated models, direct foundation-model inference, and Production
+authority remain absent or explicitly denied. A CountTokens-only unrelated-model
+check returned an explicit authorization denial.
+
+The exact approved CountTokens request then passed IAM authorization and reached
+Bedrock, but the service returned `ValidationException: The provided model
+doesn't support counting tokens.` No deterministic token bound was produced, so
+the existing preflight still prohibits reservation and inference. No inference
+call, retry, fallback, or spend occurred. The retained
+[provisioning and capability evidence](../testing/evidence/todo063-bedrock-counttokens-provisioning-2026-09-07/README.md)
+records the effective scope and terminal provider response. Todo 063 remains in
+progress; todo 064 remains dependency-blocked.

@@ -3,13 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FactoryIncidentBoundary,
   FactoryIncidentWorkspace,
+  IncidentCreateForm,
   IncidentPermissionState,
 } from "./FactoryIncidentWorkspace";
 
 const useQuery = vi.fn();
+const useMutation = vi.fn();
 vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useQuery(...args),
-  useMutation: () => vi.fn(),
+  useMutation: (...args: unknown[]) => useMutation(...args),
 }));
 
 const incident = {
@@ -29,7 +31,11 @@ const incident = {
 };
 
 describe("FactoryIncidentWorkspace", () => {
-  beforeEach(() => useQuery.mockReset());
+  beforeEach(() => {
+    useQuery.mockReset();
+    useMutation.mockReset();
+    useMutation.mockReturnValue(vi.fn());
+  });
 
   it("renders an explicit loading state", () => {
     useQuery.mockReturnValue(undefined);
@@ -42,6 +48,27 @@ describe("FactoryIncidentWorkspace", () => {
     render(<FactoryIncidentWorkspace projectId={"project-1" as any} />);
     expect(screen.getByText("No incidents recorded")).toBeInTheDocument();
     expect(screen.getByText(/not that alerts or failures never occurred/)).toBeInTheDocument();
+  });
+
+  it("requires and persists a canonical repository when filing an incident", async () => {
+    const createIncident = vi.fn().mockResolvedValue({ incident: { _id: "incident-created" } });
+    useMutation.mockReturnValue(createIncident);
+    useQuery.mockReturnValue([
+      { repositoryId: "repository-1", repository: "jaydubya818/MissionControl", isDefault: true },
+    ]);
+
+    render(<IncidentCreateForm projectId={"project-1" as any} onCreated={vi.fn()} />);
+    await waitFor(() => expect(screen.getByLabelText("Incident repository")).toHaveValue("repository-1"));
+    fireEvent.change(screen.getByLabelText("Incident title"), { target: { value: "Production qualification" } });
+    fireEvent.change(screen.getByLabelText("Incident summary"), { target: { value: "Bounded repository control qualification." } });
+    fireEvent.change(screen.getByLabelText("Business impact"), { target: { value: "Synthetic repository only." } });
+    fireEvent.change(screen.getByLabelText("Recovery objective"), { target: { value: "Restore governed dispatch." } });
+    fireEvent.click(screen.getByRole("button", { name: "File incident" }));
+
+    await waitFor(() => expect(createIncident).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: "project-1",
+      repositoryId: "repository-1",
+    })));
   });
 
   it("separates contained state from authority restoration and shows the next exact phase", async () => {
@@ -75,6 +102,19 @@ describe("FactoryIncidentWorkspace", () => {
     expect(screen.getByText(/immutable decision expects sequence 2/i)).toBeInTheDocument();
   });
 
+  it("does not query repository control for a retained unscoped incident", async () => {
+    useQuery.mockImplementation((_reference, args) => (
+      args && typeof args === "object" && "incidentId" in args
+        ? { incident, transitions: [], proposals: [] }
+        : [incident]
+    ));
+
+    render(<FactoryIncidentWorkspace projectId={"project-1" as any} />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Credential broker anomaly" })).toBeInTheDocument());
+    expect(useQuery).toHaveBeenCalledWith(expect.anything(), "skip");
+    expect(screen.getByRole("button", { name: "File" })).toBeEnabled();
+  });
+
   it("separates command, acknowledgment, and observed-effect proof at containment", async () => {
     const clarifyIncident = { ...incident, phase: "CLARIFY", status: "OPEN", currentSequence: 1 };
     useQuery.mockImplementation((_reference, args) => (
@@ -106,7 +146,8 @@ describe("FactoryIncidentWorkspace", () => {
           activeRequestId: "request-1",
           restorationAuthorizations: [],
           receipts: [
-            { _id: "effect-1", receiptType: "EFFECT_OBSERVED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 4 },
+            { _id: "denial-1", receiptType: "DISPATCH_DENIED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "dispatch-attempt-1", authoritySequence: 1, authorityExpiresAt: Date.now(), observedAdmission: "DENIED", createdAt: 5 },
+            { _id: "effect-1", receiptType: "EFFECT_OBSERVED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, observedAdmission: "DENIED", createdAt: 4 },
             { _id: "ack-1", receiptType: "ACKNOWLEDGED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 3 },
             { _id: "command-1", receiptType: "COMMAND_ISSUED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 2 },
             { _id: "requested-1", receiptType: "COMMAND_REQUESTED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 1 },
@@ -126,6 +167,8 @@ describe("FactoryIncidentWorkspace", () => {
     expect(evidence.getByText("Command executed").parentElement).toHaveTextContent("command-1");
     expect(evidence.getByText("Acknowledged").parentElement).toHaveTextContent("ack-1");
     expect(evidence.getByText("Effect observed").parentElement).toHaveTextContent("effect-1");
+    expect(screen.getByText("Dispatch admission denied").parentElement).toHaveTextContent("denial-1");
+    expect(screen.getByText(/No Attempt, workflow run, or worker launch was created/)).toBeInTheDocument();
   });
 
   it("offers a fresh request after an expired persisted lineage", async () => {

@@ -65,6 +65,30 @@ Clarify → Contain → Observe → Isolate → Restore → Correct → Prevent 
 
 ## Work Log
 
+### 2026-09-07 - Exact Production operation qualified
+
+**By:** Repository operator through Codex
+
+**Actions:**
+- Merged the production admission implementation in PR #208 and the immutable
+  closure record in PR #209; final main is
+  `609cc70fc3c30920f8a871403ebbe7e7f34d14dd`, runtime v55.
+- Deployed that exact source to Convex Production `gallant-cassowary-27` and
+  Vercel deployment `dpl_HGiRteqmkCpQbyHVU8NQTtyaX7GW`, then verified both
+  release identity endpoints against final main.
+- Qualified one exact `jaydubya818/MissionControl` pause/restoration lifecycle,
+  including a durable denied mutation, distinct command/effect evidence,
+  separate restoration authority, observed restoration, and an exact rollback
+  target. Retained evidence is under
+  `docs/testing/evidence/factory-incident-command-production-v55/`.
+
+**Learnings:**
+- Production qualification is operation- and repository-specific. It does not
+  authorize other incident controls, repositories, customer incidents, or
+  autonomous emergency authority.
+- A denied dispatch is safe only when both its durable denial receipt and the
+  absence of an execution-side effect are independently observable.
+
 ### 2026-09-06 - Current-main v51 reconciliation
 
 **By:** Repository operator through Codex

@@ -12,6 +12,11 @@ import {
   harnessSupportsModel,
 } from "@mission-control/workflow-engine/harness-contract";
 import { factoryHarnessCapabilityRequirements } from "./harnessCapabilities";
+import { deterministicFactoryOperation } from "./factoryWorkflowContract";
+import { isNoInferenceConstraint } from "./offlineExecutionPolicy";
+import { validateChangedFileScope } from "@mission-control/workflow-engine/harness-contract";
+import { verifyDocumentWorkloadIssues, type VerifyDocumentWorkload } from "@mission-control/workflow-engine/harness-contract";
+import { verifyVerificationSubjectIdentity } from "@mission-control/workflow-engine/verification-subject";
 import {
   EXACT_MODEL_ROUTE_SCHEMA,
   LEGACY_EXACT_MODEL_ROUTE_SCHEMA,
@@ -76,6 +81,7 @@ export interface FactoryExecutionManifestInput {
   repositoryId: string;
   providerRepositoryId?: string;
   repository: string;
+  repositoryAdmissionDigest?: string;
   repositoryDataClassification?: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
   defaultBranch: string;
   baseSha: string;
@@ -185,7 +191,151 @@ export interface FactoryExecutionManifestInput {
   harnessIsolation?: "WORKSPACE_WRITE" | "DETACHED_READ_ONLY";
 }
 
-export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInput) {
+export type OfflineFactoryExecutionManifestInput = Omit<FactoryExecutionManifestInput, "modelRoute" | "sandbox" | "routedModel" | "executionProfile"> & {
+  executionProfile: FactoryExecutionProfileManifestBinding;
+  missionPlanDigest: string;
+  budgetReservationId: string;
+  verification?: { subject: any; verificationPlanDigest: string; candidateContent: string };
+};
+
+/** Pure versioned snapshot construction; canonical admission owns authority. */
+export function offlineExecutionManifestSnapshot(input: OfflineFactoryExecutionManifestInput) {
+  const verifier = input.factoryPurpose === "VERIFICATION";
+  const profile = input.executionProfile?.profileSnapshot as Record<string, any> | undefined;
+  const binding = input.executionProfile;
+  if (![input.runId, input.missionId, input.missionPlanId, input.workOrderId, input.workOrderRevisionId,
+    input.taskId, input.factoryDefinitionVersionId, input.repositoryId, input.budgetReservationId]
+    .every(value => typeof value === "string" && boundedIdentity(value, 200))
+    || !/^factory-v1-[a-f0-9]{8}$/.test(input.factoryConfigurationDigest)) throw new Error("Offline canonical identities are invalid.");
+  if (input.executionBackend !== "isolated-container" || !["SOFTWARE", "VERIFICATION"].includes(input.factoryPurpose)
+    || input.repositoryDataClassification !== "PUBLIC" || input.workOrder.riskLevel !== "LOW"
+    || (input.workOrder.dataBoundaries?.length ?? 0) !== 0
+    || ["modelRoute", "routedModel", "sandbox"].some(key => (input as any)[key] !== undefined)
+    || input.agentBindings.length !== 0 || input.allowedTools.length !== 0
+    || !input.task || !input.taskId || !input.missionId || !input.missionPlanId
+    || !Number.isSafeInteger(input.missionPlanVersion) || input.missionPlanVersion! < 1
+    || !sha256(input.missionPlanDigest) || input.budgetReservationId !== input.runId
+    || !Number.isSafeInteger(input.workOrderRevisionNumber) || input.workOrderRevisionNumber < 1
+    || !input.workOrderRevisionId
+    || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(input.baseSha)
+    || (!verifier && input.planningRepositorySha !== input.baseSha)
+    || !Number.isSafeInteger(input.maxAttempts) || input.maxAttempts < 1 || input.maxAttempts > 3
+    || !Number.isFinite(input.maxCostUsd) || input.maxCostUsd <= 0 || input.maxCostUsd > 1000
+    || !Number.isSafeInteger(input.maxRuntimeMinutes) || input.maxRuntimeMinutes < 1 || input.maxRuntimeMinutes > 480) {
+    throw new Error("Offline manifest requires complete canonical identity and public bounded non-inference scope.");
+  }
+  if (!profile || executionProfileIssues(profile).length > 0
+    || profile.schema !== "factory-execution-profile/v2" || !isNoInferenceConstraint(profile.modelRoute)
+    || executionProfileDigest(profile) !== binding.profileDigest
+    || executionProfileQualificationIssues(binding.qualificationSnapshot).length > 0
+    || executionProfileQualificationDigest(binding.qualificationSnapshot) !== binding.qualificationDigest
+    || !executionProfileQualificationMatches({ profileId: binding.profileId, profileSnapshot: profile,
+      profileDigest: binding.profileDigest, qualificationSnapshot: binding.qualificationSnapshot })) {
+    throw new Error("Offline manifest requires the exact qualified Execution Profile.");
+  }
+  const operation = deterministicFactoryOperation({ workflow: input.workflow, profileSnapshot: profile,
+    purpose: input.factoryPurpose, riskBoundary: "GREEN", agentBindings: input.agentBindings });
+  const localScope = (profile.sandboxProfile?.profileSnapshot as any)?.localQualification;
+  if (localScope && (localScope.repositoryId !== input.repositoryId
+    || localScope.repositoryAdmissionDigest !== input.repositoryAdmissionDigest
+    || !localScope.operations?.includes(operation.reference))) {
+    throw new Error("Local sandbox cannot execute outside its exact repository admission and frozen operations.");
+  }
+  let frozenOperation: typeof operation | VerifyDocumentWorkload = operation;
+  if (verifier) {
+    const subject = input.verification?.subject;
+    if (operation.reference !== "verify-document-bytes/v1" || !subject
+      || !verifyVerificationSubjectIdentity(subject) || subject.kind !== "GIT_CANDIDATE" || subject.provider !== "LOCAL_GIT"
+      || subject.workOrderId !== input.workOrderId || subject.workOrderRevisionNumber !== input.workOrderRevisionNumber
+      || subject.repositoryId !== input.repositoryId || subject.candidateSha !== input.baseSha
+      || !sha256(input.verification?.verificationPlanDigest)
+      || input.sandboxProfile.isolation !== "READ_ONLY") throw new Error("Offline verifier requires the exact unpublished subject and frozen plan.");
+    frozenOperation = { ...operation, input: { ...operation.input,
+      subjectDigest: subject.digest, verificationPlanDigest: input.verification!.verificationPlanDigest,
+      repositoryId: input.repositoryId, workOrderId: input.workOrderId, workOrderRevisionNumber: input.workOrderRevisionNumber,
+      producerAttemptId: subject.sourceAttemptId, candidateSha: subject.candidateSha, candidateTreeSha: subject.treeSha,
+      candidateContent: input.verification!.candidateContent } };
+    if (verifyDocumentWorkloadIssues(frozenOperation).length) throw new Error("Offline verifier input violates its registered operation bounds.");
+  } else if (operation.reference !== "render-markdown/v1" || input.verification !== undefined) {
+    throw new Error("Offline producer manifest requires only the admitted render operation.");
+  }
+  const blockers = executionProfileProjectionBlockers({ profileId: binding.profileId, profileSnapshot: profile,
+    profileDigest: binding.profileDigest, qualificationSnapshot: binding.qualificationSnapshot, qualificationDigest: binding.qualificationDigest,
+    projection: { profileId: binding.profileId, profileKey: binding.profileKey, profileVersion: binding.version,
+      profileDigest: binding.profileDigest, profileSnapshot: profile, qualificationDigest: binding.qualificationDigest,
+      qualificationSnapshot: binding.qualificationSnapshot, executor: { adapter: input.executor.adapter, version: input.executor.version },
+      harnessCapabilityManifest: input.executor.capabilityManifest, harnessCapabilityManifestDigest: input.executor.capabilityManifestSha256,
+      harnessEffectiveConfigSha256: input.executor.effectiveConfigSha256, harnessRuntimeArtifact: input.executor.runtimeArtifact,
+      harnessRuntimeArtifactDigest: input.executor.runtimeArtifactDigest, executionBackend: "isolated-container",
+      modelCatalogId: undefined, modelRouteSnapshot: undefined, modelRouteDigest: undefined,
+      modelQualificationSnapshot: undefined, modelQualificationDigest: undefined,
+      sandboxProfileId: profile.sandboxProfile.profileId, sandboxProfileDigest: profile.sandboxProfile.profileDigest,
+      sandboxProfileSnapshot: profile.sandboxProfile.profileSnapshot,
+      isolationModes: [input.sandboxProfile.isolation], requiredHarnessCapabilities: profile.requiredHarnessCapabilities,
+      requiredSandboxCapabilities: profile.requiredSandboxCapabilities } });
+  if (blockers.length || input.sandboxProfile.isolation !== (verifier ? "READ_ONLY" : "WORKSPACE_WRITE")
+    || !sameStringSet(input.sandboxProfile.requiredCapabilities, ["git-worktree", verifier ? "read-only" : "workspace-write", ...profile.requiredSandboxCapabilities])
+    || input.codeScopes.length === 0 || input.codeScopes.some(scope => !scope.id || scope.includePaths.length === 0)) {
+    throw new Error("Offline manifest component projection or repository scope mismatch.");
+  }
+  const allowedPaths = [...new Set(input.codeScopes.flatMap(scope => scope.includePaths))].sort();
+  const excludedPaths = [...new Set(input.codeScopes.flatMap(scope => scope.excludePaths))].sort();
+  const documentPath = operation.reference === "render-markdown/v1" ? operation.input.outputPath : operation.input.path;
+  if (validateChangedFileScope([documentPath], [{ includePaths: allowedPaths, excludePaths: excludedPaths }]).length > 0) {
+    throw new Error("Offline operation output is outside its approved code scope.");
+  }
+  const manifest = {
+    version: "factory-execution-manifest/v4" as const,
+    causation: { missionId: input.missionId, missionPlanId: input.missionPlanId, missionPlanVersion: input.missionPlanVersion,
+      missionPlanDigest: input.missionPlanDigest, planningRepositorySha: input.planningRepositorySha,
+      qualityContractDigest: input.qualityContractDigest, workOrderId: input.workOrderId,
+      workOrderRevisionNumber: input.workOrderRevisionNumber, workOrderRevisionId: input.workOrderRevisionId,
+      taskId: input.taskId, workflowRunId: input.runId, factoryDefinitionVersionId: input.factoryDefinitionVersionId,
+      factoryConfigurationDigest: input.factoryConfigurationDigest, factoryPurpose: input.factoryPurpose },
+    repository: { repositoryId: input.repositoryId, repository: input.repository, dataClassification: input.repositoryDataClassification,
+      ...(input.repositoryAdmissionDigest ? { mode: "LOCAL_SYNTHETIC_QUALIFICATION", admissionDigest: input.repositoryAdmissionDigest } : {}),
+      defaultBranch: input.defaultBranch, baseSha: input.baseSha, planningRepositorySha: input.planningRepositorySha,
+      branch: input.branch, worktree: input.worktree, codeScopeIds: input.codeScopes.map(scope => scope.id).sort(), allowedPaths, excludedPaths },
+    intent: { title: input.workOrder.title, desiredOutcome: input.workOrder.desiredOutcome,
+      acceptanceCriterionIds: input.workOrder.acceptanceCriteria.map(criterion => criterion.id), selectedTask: input.task },
+    workOrderSpecification: { schemaVersion: 1, requirements: input.workOrder.requirements ?? [], acceptanceCriteria: input.workOrder.acceptanceCriteria,
+      positiveConstraints: input.workOrder.positiveConstraints ?? [], negativeConstraints: input.workOrder.negativeConstraints ?? [],
+      dataBoundaries: [], changeBudget: input.workOrder.changeBudget, verificationContract: input.workOrder.verificationContract,
+      autonomyLevel: input.workOrder.autonomyLevel, riskLevel: input.workOrder.riskLevel,
+      riskReasons: input.workOrder.riskReasons ?? [], requiredApprovals: input.workOrder.requiredApprovals ?? [] },
+    harness: { adapter: input.executor.adapter, version: input.executor.version,
+      harnessId: input.executor.capabilityManifest.identity.harnessId, harnessVersion: input.executor.capabilityManifest.identity.harnessVersion,
+      harnessCommit: input.executor.capabilityManifest.identity.harnessCommit, capabilityManifest: input.executor.capabilityManifest,
+      capabilityManifestSha256: input.executor.capabilityManifestSha256, effectiveConfigSha256: input.executor.effectiveConfigSha256,
+      runtimeArtifact: input.executor.runtimeArtifact, runtimeArtifactDigest: input.executor.runtimeArtifactDigest,
+      isolation: verifier ? "READ_ONLY" : "WORKSPACE_WRITE", requiredCapabilities: [...input.sandboxProfile.requiredCapabilities].sort(),
+      requiredHarnessCapabilities: profile.requiredHarnessCapabilities, timeoutMs: input.workflow.steps[0].timeoutMinutes * 60000,
+      completionContract: "factory-result/v1", pullRequestAuthority: "CONTROL_PLANE_ONLY" },
+    executionBackend: "isolated-container", executionProfile: binding, inferenceConstraint: profile.modelRoute,
+    offlinePolicy: profile.offlinePolicy, budgetReservationId: input.budgetReservationId,
+    retryPolicy: { schema: "factory-offline-retry-policy/v1", maxAttempts: input.maxAttempts,
+      maxTotalWallClockMs: input.maxRuntimeMinutes * 60000, maxResourceCostUsd: input.maxCostUsd,
+      maxProviderCalls: 0, maxProviderLiabilityUsd: 0 },
+    workflow: { workflowId: input.workflow.workflowId, workflowVersion: input.workflow.version,
+      contractVersion: "factory-workflow-contract/v2", contextHash: `sha256:${computeCanonicalHash(input.initialContext)}`,
+      steps: [{ stepId: input.workflow.steps[0].id, kind: "DETERMINISTIC", operation: frozenOperation,
+        timeoutMs: input.workflow.steps[0].timeoutMinutes * 60000, outputSchema: input.workflow.steps[0].outputSchema }] },
+    compiledPrompt: "", compiledPromptHash: `sha256:${computeCanonicalHash("")}`,
+  };
+  const persisted = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
+  return { manifest: persisted, digest: `sha256:${computeCanonicalHash(persisted)}` };
+}
+
+export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInput): ReturnType<typeof buildInferenceFactoryExecutionManifest>;
+export function buildFactoryExecutionManifest(input: OfflineFactoryExecutionManifestInput): ReturnType<typeof offlineExecutionManifestSnapshot>;
+export function buildFactoryExecutionManifest(rawInput: FactoryExecutionManifestInput | OfflineFactoryExecutionManifestInput) {
+  if (rawInput.executionBackend === "isolated-container") {
+    return offlineExecutionManifestSnapshot(rawInput as OfflineFactoryExecutionManifestInput);
+  }
+  return buildInferenceFactoryExecutionManifest(rawInput as FactoryExecutionManifestInput);
+}
+
+function buildInferenceFactoryExecutionManifest(input: FactoryExecutionManifestInput) {
   if ((input as { executionProfile?: unknown }).executionProfile !== undefined
     && !input.executionProfile) {
     throw new Error("Execution manifest requires a complete exact Execution Profile and qualification binding.");

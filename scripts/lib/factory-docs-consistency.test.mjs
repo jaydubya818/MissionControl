@@ -21,15 +21,19 @@ describe("factory documentation consistency", () => {
     const fixtureRoot = copyDocumentationFixture();
     const readmePath = path.join(fixtureRoot, "README.md");
     const source = readFileSync(path.join(fixtureRoot, "convex/lib/runtimeContract.ts"), "utf8");
-    const sourceVersion = Number(source.match(/RUNTIME_CONTRACT_VERSION\s*=\s*(\d+)/)[1]);
-    writeFileSync(readmePath, readFileSync(readmePath, "utf8").replace(/runtime contract: \*\*v\d+\*\*/, "runtime contract: **v0**"));
+    const version = Number(source.match(/RUNTIME_CONTRACT_VERSION\s*=\s*(\d+)/)?.[1]);
+    expect(Number.isSafeInteger(version) && version > 1).toBe(true);
+    const readme = readFileSync(readmePath, "utf8");
+    const staleReadme = readme.replace(`runtime contract: **v${version}**`, `runtime contract: **v${version - 1}**`);
+    expect(staleReadme).not.toBe(readme);
+    writeFileSync(readmePath, staleReadme);
 
     const planPath = path.join(fixtureRoot, "docs/plans/2026-08-17-feat-autonomous-execution-routing-v1-plan.md");
     writeFileSync(planPath, readFileSync(planPath, "utf8").replace("status: complete", "status: active"));
 
     const result = checkFactoryDocs({ repositoryRoot: fixtureRoot });
     expect(result.ok).toBe(false);
-    expect(result.findings).toContain(`README.md: runtime contract v0 does not match source v${sourceVersion}`);
+    expect(result.findings).toContain(`README.md: runtime contract v${version - 1} does not match source v${version}`);
     expect(result.findings.some((finding) => finding.includes("qualified capability points to plan status active"))).toBe(true);
   });
 });

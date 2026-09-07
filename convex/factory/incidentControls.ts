@@ -7,11 +7,15 @@ import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "../lib/companyA
 import {
   REPOSITORY_DISPATCH_CONTROL,
   REPOSITORY_DISPATCH_EXECUTOR_ID,
+  REPOSITORY_DISPATCH_GATE_ID,
+  REPOSITORY_DISPATCH_OBSERVER_ID,
   INCIDENT_COMMAND_AUTHORITY_ID,
   expectedAdmissionForOperation,
   expectedIncidentPhaseForOperation,
+  dispatchDenialMeasurementRejectionReason,
   repositoryDispatchOperationValidator,
   repositoryDispatchAdmissionRejectionReason,
+  validateObservedControlReceipt,
   validateIncidentControlAuthority,
   type RepositoryDispatchOperation,
 } from "../lib/factoryIncidentControl";
@@ -81,6 +85,163 @@ export const getRepositoryDispatchControl = query({
       activeRequestId: projection?.activeRequestId,
       receipts,
       restorationAuthorizations,
+    };
+  },
+});
+
+/**
+ * Exercise the same fail-closed admission gate used by WorkOrder dispatch.
+ * This is deliberately an admission attempt only: it never creates an
+ * Attempt, workflow run, worker request, or external call.
+ */
+export const attemptRepositoryDispatchAdmission = mutation({
+  args: {
+    incidentId: v.id("factoryIncidents"),
+    repositoryId: v.id("workspaceRepositories"),
+    expectedSequence: v.number(),
+    expectedCommanderActorId: v.string(),
+    requestId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const requestId = cleanRequestId(args.requestId);
+    const incident = await ctx.db.get(args.incidentId);
+    const repository = await ctx.db.get(args.repositoryId);
+    if (!incident || incident.repositoryId !== args.repositoryId || !repository
+      || repository.projectId !== incident.projectId || incident.status === "RESOLVED") {
+      throw new Error("Dispatch admission attempt target is unavailable or outside the incident scope.");
+    }
+    if (!["CONTAIN", "OBSERVE", "ISOLATE"].includes(incident.phase)) {
+      throw new Error("Dispatch admission attempt is valid only while containment remains active.");
+    }
+    const access = await requireWorkspacePermission(
+      ctx, incident.projectId, FACTORY_PERMISSIONS.INCIDENT_CONTROL, { repositoryId: args.repositoryId },
+    );
+    if (args.expectedSequence !== incident.currentSequence) {
+      throw new Error("Dispatch admission attempt denied (incident-control-authority-stale).");
+    }
+    if (!incident.commanderActorId
+      || args.expectedCommanderActorId.trim() !== incident.commanderActorId
+      || access.actorId !== incident.commanderActorId) {
+      throw new Error("Dispatch admission attempt denied (incident-control-commander-mismatch).");
+    }
+    const projection = await loadProjection(ctx, repository._id);
+    if (!projection || projection.admission !== "DENIED"
+      || projection.controlledByIncidentId !== incident._id
+      || !projection.activeRequestId) {
+      throw new Error("Repository dispatch admission was not denied by the canonical pause gate.");
+    }
+    if (requestId === projection.activeRequestId) {
+      throw new Error("Dispatch admission attempt requires a request ID distinct from the PAUSE command lineage.");
+    }
+    const [pauseRequest, pauseCommand, pauseAcknowledgment, observedEffect] = await Promise.all([
+      ctx.db.query("factoryIncidentControlReceipts")
+        .withIndex("by_incident_request_type", (query) => query.eq("incidentId", incident._id).eq("requestId", projection.activeRequestId!).eq("receiptType", "COMMAND_REQUESTED"))
+        .unique(),
+      ctx.db.query("factoryIncidentControlReceipts")
+        .withIndex("by_incident_request_type", (query) => query.eq("incidentId", incident._id).eq("requestId", projection.activeRequestId!).eq("receiptType", "COMMAND_ISSUED"))
+        .unique(),
+      ctx.db.query("factoryIncidentControlReceipts")
+        .withIndex("by_incident_request_type", (query) => query.eq("incidentId", incident._id).eq("requestId", projection.activeRequestId!).eq("receiptType", "ACKNOWLEDGED"))
+        .unique(),
+      ctx.db.query("factoryIncidentControlReceipts")
+        .withIndex("by_incident_request_type", (query) => query.eq("incidentId", incident._id).eq("requestId", projection.activeRequestId!).eq("receiptType", "EFFECT_OBSERVED"))
+        .unique(),
+    ]);
+    const pauseLineageError = validateObservedControlReceipt({
+      request: pauseRequest,
+      command: pauseCommand,
+      acknowledgment: pauseAcknowledgment,
+      effect: observedEffect,
+      incidentId: String(incident._id),
+      projectId: String(incident.projectId),
+      repositoryId: String(repository._id),
+      operation: "PAUSE_REPOSITORY_DISPATCH",
+      controlKey: REPOSITORY_DISPATCH_CONTROL,
+      earliestCreatedAt: incident.createdAt,
+      observedAt: observedEffect?.createdAt ?? now,
+      expectedAuthorityActorId: incident.commanderActorId,
+      expectedAuthoritySequence: pauseCommand?.authoritySequence,
+      expectedRuntimeContractVersion: observedEffect?.runtimeContractVersion ?? -1,
+    });
+    if (pauseLineageError || observedEffect?.producerId !== REPOSITORY_DISPATCH_OBSERVER_ID) {
+      throw new Error(`Dispatch admission denial requires the exact active independently observed PAUSE lineage (${pauseLineageError ?? "observer-mismatch"}).`);
+    }
+
+    let rejection: string | null = null;
+    try {
+      await requireRepositoryDispatchAdmission(ctx, incident.projectId, repository._id);
+    } catch (caught) {
+      rejection = caught instanceof Error ? caught.message : String(caught);
+    }
+    if (rejection !== "WorkOrder dispatch denied (repository-dispatch-paused).") {
+      throw new Error("Repository dispatch admission was not denied by the canonical pause gate.");
+    }
+    const existing = await ctx.db.query("factoryIncidentControlReceipts")
+      .withIndex("by_incident_request_type", (query) => query
+        .eq("incidentId", incident._id)
+        .eq("requestId", requestId)
+        .eq("receiptType", "DISPATCH_DENIED"))
+      .unique();
+    if (existing) {
+      const duplicateError = dispatchDenialMeasurementRejectionReason({
+        receipt: existing,
+        predecessor: observedEffect,
+        incidentId: String(incident._id),
+        projectId: String(incident.projectId),
+        repositoryId: String(repository._id),
+        expectedRuntimeContractVersion: RUNTIME_CONTRACT_VERSION,
+      });
+      if (duplicateError
+        || existing.authorityActorId !== access.actorId
+        || existing.authoritySequence !== incident.currentSequence) {
+        throw new Error("Dispatch admission request ID is already bound to different authority, scope, or runtime.");
+      }
+      return { denialReceipt: existing, duplicate: true as const };
+    }
+    const denialReceiptId = await ctx.db.insert("factoryIncidentControlReceipts", {
+      tenantId: incident.tenantId,
+      projectId: incident.projectId,
+      repositoryId: repository._id,
+      incidentId: incident._id,
+      controlKey: REPOSITORY_DISPATCH_CONTROL,
+      operation: "PAUSE_REPOSITORY_DISPATCH",
+      receiptType: "DISPATCH_DENIED",
+      requestId,
+      authorityActorId: access.actorId,
+      authoritySequence: incident.currentSequence,
+      authorityExpiresAt: observedEffect.authorityExpiresAt,
+      producerId: REPOSITORY_DISPATCH_GATE_ID,
+      initiatedByActorId: access.actorId,
+      expectedAdmission: "DENIED",
+      observedAdmission: "DENIED",
+      predecessorReceiptId: observedEffect._id,
+      result: "PASS",
+      runtimeContractVersion: RUNTIME_CONTRACT_VERSION,
+      createdAt: now,
+    });
+    await ctx.db.insert("activities", {
+      tenantId: incident.tenantId,
+      projectId: incident.projectId,
+      actorType: "HUMAN",
+      actorId: access.actorId,
+      action: "REPOSITORY_DISPATCH_ADMISSION_DENIED",
+      description: `Canonical WorkOrder dispatch admission denied for ${repository.repository}`,
+      targetType: "FACTORY_INCIDENT",
+      targetId: String(incident._id),
+      metadata: {
+        repositoryId: repository._id,
+        requestId,
+        denialReceiptId,
+        reason: "repository-dispatch-paused",
+        attemptCreated: false,
+        workflowRunCreated: false,
+        workerLaunchRequested: false,
+      },
+    });
+    return {
+      denialReceipt: await ctx.db.get(denialReceiptId) as Doc<"factoryIncidentControlReceipts">,
+      duplicate: false as const,
     };
   },
 });

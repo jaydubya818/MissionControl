@@ -106,13 +106,13 @@ describe("Verification Subject identity", () => {
       sourceAttemptId: "attempt-implementation-1",
       repositoryId: "repository-1",
       provider: "LOCAL_GIT",
-      providerRepositoryId: "github-repository-1",
       candidateSha: SHA_A,
       treeSha: SHA_B,
       localRef: { baseRef: "main", headRef: "mc/candidate", headSha: SHA_A },
     });
     expect(subject.digest).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(subject.provider).toBe("LOCAL_GIT");
+    expect(subject).not.toHaveProperty("providerRepositoryId");
     expect(() => createGitVerificationSubject({
       ...subject,
       localRef: { ...subject.localRef, headSha: SHA_B },

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import {
   authorizeRepositoryDispatchRestoration,
+  attemptRepositoryDispatchAdmission,
   executeRepositoryDispatchControl,
   requestRepositoryDispatchControl,
   requireRepositoryDispatchAdmission,
@@ -44,6 +45,7 @@ function createContext() {
     repositoryDispatchControls: [],
     factoryIncidentControlReceipts: [],
     factoryIncidentControlAuthorizations: [],
+    workflowRuns: [],
     activities: [],
   };
   let sequence = 100;
@@ -140,6 +142,82 @@ describe("canonical repository dispatch actuator", () => {
     expect(observed.effectReceipt.receiptType).toBe("EFFECT_OBSERVED");
     expect(observed.effectReceipt.producerId).toBe("repository-dispatch-admission-observer/v1");
     expect(observed.effectReceipt.predecessorReceiptId).toBe(executed.acknowledgment._id);
+
+    Object.assign(state.tables.factoryIncidents[0], { phase: "CONTAIN", currentSequence: 2, status: "CONTAINED" });
+    await expect(functionHandler(attemptRepositoryDispatchAdmission)(state.ctx, {
+      incidentId: state.incidentId,
+      repositoryId: state.repositoryId,
+      expectedSequence: 2,
+      expectedCommanderActorId: state.operatorId,
+      requestId: executed.commandReceipt.requestId,
+    })).rejects.toThrow("request ID distinct from the PAUSE command lineage");
+    const admission = await functionHandler(attemptRepositoryDispatchAdmission)(state.ctx, {
+      incidentId: state.incidentId,
+      repositoryId: state.repositoryId,
+      expectedSequence: 2,
+      expectedCommanderActorId: state.operatorId,
+      requestId: "dispatch-admission:incident-a:000002",
+    });
+    expect(admission.denialReceipt).toMatchObject({
+      receiptType: "DISPATCH_DENIED",
+      expectedAdmission: "DENIED",
+      observedAdmission: "DENIED",
+      result: "PASS",
+      producerId: "repository-dispatch-admission-gate/v1",
+      predecessorReceiptId: observed.effectReceipt._id,
+    });
+    expect(state.tables.workflowRuns).toHaveLength(0);
+    expect(state.tables.activities.at(-1)?.metadata).toMatchObject({
+      attemptCreated: false,
+      workflowRunCreated: false,
+      workerLaunchRequested: false,
+    });
+  });
+
+  it("refuses to manufacture a denial receipt when the canonical gate admits dispatch", async () => {
+    const state = createContext();
+    Object.assign(state.tables.factoryIncidents[0], { phase: "CONTAIN", currentSequence: 2, status: "CONTAINED" });
+    await expect(functionHandler(attemptRepositoryDispatchAdmission)(state.ctx, {
+      incidentId: state.incidentId,
+      repositoryId: state.repositoryId,
+      expectedSequence: 2,
+      expectedCommanderActorId: state.operatorId,
+      requestId: "dispatch-admission:incident-a:enabled",
+    })).rejects.toThrow("was not denied by the canonical pause gate");
+    expect(state.tables.factoryIncidentControlReceipts).toHaveLength(0);
+    expect(state.tables.workflowRuns).toHaveLength(0);
+  });
+
+  it("rejects stale active lineage and denial replay after restoration", async () => {
+    const state = createContext();
+    const executed = await requestAndExecute(state, "PAUSE_REPOSITORY_DISPATCH");
+    await functionHandler(observeRepositoryDispatchControl)(state.ctx, {
+      incidentId: state.incidentId,
+      repositoryId: state.repositoryId,
+      commandReceiptId: executed.commandReceipt._id,
+      acknowledgmentReceiptId: executed.acknowledgment._id,
+      expectedSequence: 1,
+    });
+    Object.assign(state.tables.factoryIncidents[0], { phase: "CONTAIN", currentSequence: 2, status: "CONTAINED" });
+    const args = {
+      incidentId: state.incidentId,
+      repositoryId: state.repositoryId,
+      expectedSequence: 2,
+      expectedCommanderActorId: state.operatorId,
+      requestId: "dispatch-admission:incident-a:replay",
+    };
+    await functionHandler(attemptRepositoryDispatchAdmission)(state.ctx, args);
+
+    state.tables.repositoryDispatchControls[0].activeRequestId = "different-pause-request";
+    await expect(functionHandler(attemptRepositoryDispatchAdmission)(state.ctx, {
+      ...args,
+      requestId: "dispatch-admission:incident-a:stale",
+    })).rejects.toThrow("exact active independently observed PAUSE lineage");
+
+    Object.assign(state.tables.factoryIncidents[0], { phase: "ISOLATE", currentSequence: 2 });
+    Object.assign(state.tables.repositoryDispatchControls[0], { admission: "ENABLED", activeRequestId: "resume-request" });
+    await expect(functionHandler(attemptRepositoryDispatchAdmission)(state.ctx, args))
+      .rejects.toThrow("was not denied by the canonical pause gate");
   });
 
   it("does not let ACK certify containment when the target effect is absent", async () => {

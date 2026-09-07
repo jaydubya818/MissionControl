@@ -71,6 +71,9 @@ export async function admitBedrockAccounting(
   ) {
     throw new Error("BEDROCK_ACCOUNTING_ATTEMPT_AUTHORITY_MISSING");
   }
+  if (!profile.modelCatalogId || !profile.modelRouteDigest) {
+    throw new Error("BEDROCK_ACCOUNTING_ROUTE_MISSING");
+  }
   const routeRow = await ctx.db.get(profile.modelCatalogId);
   if (
     !routeRow ||

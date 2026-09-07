@@ -84,6 +84,44 @@ either todo complete and does not authorize implementation by itself.
   outcomes, complete outcome coverage, and a second independently qualified
   route remain missing. Todo 064 therefore remains dependency-blocked.
 
+### 2026-09-07 - CountTokens provisioned; approved profile unsupported
+
+- Reprovisioned Identity Center permission set `FDLCQualificationTFOperator`
+  to account `083665737366`; final request
+  `103a21b2-ce2a-4feb-b387-fe5b36d78665` completed `SUCCEEDED`.
+- Effective-policy readback confirms no `bedrock:*`, streaming, Global profile,
+  unrelated model, direct foundation-model inference, or Production authority
+  was added. An unrelated-model CountTokens request was explicitly denied.
+- Exact STS identity revalidation passed. The authorized CountTokens request
+  reached Bedrock for the approved Sonnet 4.6 profile, but Bedrock returned
+  `ValidationException: The provided model doesn't support counting tokens.`
+- No inference call, reservation, provider inference response, retry, fallback,
+  or spend occurred. Evidence is retained under
+  `docs/testing/evidence/todo063-bedrock-counttokens-provisioning-2026-09-07/`.
+  Todo 063 remains in progress at the existing preflight checkpoint; todo 064
+  remains dependency-blocked.
+
+### 2026-09-07 - Authenticated Bedrock preflight stopped before inference
+
+- Product Owner authorized account `083665737366`, profile
+  `fdlc-qualification`, the exact US geographic Sonnet 4.6 route, and at most
+  USD 5.00 of non-Production synthetic qualification calls with zero retries
+  and zero fallbacks.
+- Authenticated STS returned the exact expected principal. Read-only Bedrock
+  inspection returned active account-specific profile ARN
+  `arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6`
+  with exactly the permitted `us-east-1`, `us-east-2`, and `us-west-2`
+  foundation-model destinations.
+- The exact synthetic CountTokens preflight failed with
+  `AccessDeniedException`: the verified principal has no identity-based policy
+  allowing `bedrock:CountTokens` on that profile. No Converse/Invoke request,
+  reservation, provider response, retry, fallback, or spend occurred.
+- IAM `GetRole` is also unavailable to this principal, so the canonical IAM role
+  ARN remains unresolved rather than inferred from the STS session ARN.
+- Evidence is retained under
+  `docs/testing/evidence/todo063-bedrock-live-preflight-2026-09-07/`. Todo 063
+  remains in progress and todo 064 remains dependency-blocked.
+
 ### 2026-09-05 - Allocation slice merged; persisted identity repair started
 
 - PR #184 merged as `4434cc56448075f4804787325a9586c6290b2215` after every

@@ -1,0 +1,34 @@
+{
+  "schema": "todo063-bedrock-counttokens-denial/v1",
+  "recordedAt": "2026-09-07T17:42:37Z",
+  "operation": "bedrock:CountTokens",
+  "region": "us-east-1",
+  "modelId": "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
+  "syntheticInput": {
+    "converse": {
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "Reply with exactly: QUALIFICATION_OK"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "serializedInputDigest": "sha256:0851a5ec2206226f1efb2372374a4e94fc20896e8103b9eab2226f471815b581",
+  "result": "DENIED_BEFORE_INFERENCE",
+  "errorClass": "AccessDeniedException",
+  "principalArn": "arn:aws:sts::083665737366:assumed-role/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783/jaydubya818@gmail.com",
+  "deniedResource": "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
+  "denialReason": "No identity-based policy allows bedrock:CountTokens on the approved inference profile.",
+  "providerRequestId": null,
+  "reservationId": null,
+  "inferenceSent": false,
+  "retryCount": 0,
+  "fallbackCount": 0,
+  "spendUsd": 0,
+  "nextRequiredPredicate": "Provision bedrock:CountTokens for the approved Identity Center permission set on the exact approved inference profile."
+}

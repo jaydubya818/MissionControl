@@ -143,7 +143,7 @@ function IncidentEmptyState({ onCreate }: { onCreate: () => void }) {
   );
 }
 
-function IncidentCreateForm({
+export function IncidentCreateForm({
   projectId,
   onCreated,
 }: {
@@ -151,22 +151,38 @@ function IncidentCreateForm({
   onCreated: (incidentId: Id<"factoryIncidents">) => void;
 }) {
   const createIncident = useMutation(api.factory.incidents.create);
+  const repositoryRows = useQuery(api.projects.listRepositories, { projectId }) as Array<{
+    repositoryId: Id<"workspaceRepositories"> | null;
+    repository: string;
+    isDefault: boolean;
+  }> | undefined;
+  const repositories = repositoryRows?.filter(
+    (row): row is typeof row & { repositoryId: Id<"workspaceRepositories"> } => row.repositoryId !== null,
+  ) ?? [];
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [impact, setImpact] = useState("");
   const [objective, setObjective] = useState("");
   const [commander, setCommander] = useState("");
   const [severity, setSeverity] = useState<"SEV1" | "SEV2" | "SEV3" | "SEV4">("SEV3");
+  const [repositoryId, setRepositoryId] = useState<Id<"workspaceRepositories"> | "">("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (repositoryId || repositories.length === 0) return;
+    setRepositoryId(repositories.find((row) => row.isDefault)?.repositoryId ?? repositories[0].repositoryId);
+  }, [repositories, repositoryId]);
 
   const submit = async () => {
     setSubmitting(true);
     setError(null);
     try {
+      if (!repositoryId) throw new Error("Select a canonical repository before filing an actionable incident.");
       const sourceFingerprint = await sha256(`${projectId}:${title.trim()}:${summary.trim()}`);
       const result = await createIncident({
         projectId,
+        repositoryId,
         sourceFingerprint,
         title,
         summary,
@@ -192,21 +208,39 @@ function IncidentCreateForm({
       <Textarea aria-label="Business impact" placeholder="Business impact" value={impact} onChange={(event) => setImpact(event.target.value)} />
       <Textarea aria-label="Recovery objective" placeholder="Known-safe recovery objective" value={objective} onChange={(event) => setObjective(event.target.value)} />
       <Input aria-label="Incident commander" placeholder="Incident commander identity" value={commander} onChange={(event) => setCommander(event.target.value)} />
+      <select
+        aria-label="Incident repository"
+        className="h-9 w-full rounded-md border border-line bg-surface-1 px-3 text-[13px] text-ink"
+        value={repositoryId}
+        onChange={(event) => setRepositoryId(event.target.value as Id<"workspaceRepositories">)}
+      >
+        <option value="" disabled>Select repository</option>
+        {repositories.map((row) => (
+          <option key={row.repositoryId} value={row.repositoryId}>
+            {row.repository}{row.isDefault ? " (default)" : ""}
+          </option>
+        ))}
+      </select>
+      {repositoryRows !== undefined && repositories.length === 0 ? (
+        <p role="alert" className="text-[12px] text-danger">Connect a canonical repository before filing an actionable incident.</p>
+      ) : null}
       <select aria-label="Severity" className="h-9 w-full rounded-md border border-line bg-surface-1 px-3 text-[13px] text-ink" value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}>
         <option value="SEV1">SEV1</option><option value="SEV2">SEV2</option><option value="SEV3">SEV3</option><option value="SEV4">SEV4</option>
       </select>
       {error ? <p role="alert" className="text-[12px] text-danger">{error}</p> : null}
-      <Button size="sm" disabled={submitting} onClick={submit}>{submitting ? "Filing…" : "File incident"}</Button>
+      <Button size="sm" disabled={submitting || !repositoryId} onClick={submit}>{submitting ? "Filing…" : "File incident"}</Button>
     </div>
   );
 }
 
 function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) {
   const detail = useQuery(api.factory.incidents.get, { incidentId });
-  const dispatchControl = useQuery(api.factory.incidentControls.getRepositoryDispatchControl, {
-    incidentId,
-    repositoryId: detail?.incident.repositoryId,
-  });
+  const dispatchControl = useQuery(
+    api.factory.incidentControls.getRepositoryDispatchControl,
+    detail?.incident.repositoryId
+      ? { incidentId, repositoryId: detail.incident.repositoryId }
+      : "skip",
+  );
   const advance = useMutation(api.factory.incidents.advance);
   const assignCommander = useMutation(api.factory.incidents.assignCommander);
   const decideProposal = useMutation(api.factory.incidents.decideProposal);
@@ -214,6 +248,7 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
   const requestDispatchControl = useMutation(api.factory.incidentControls.requestRepositoryDispatchControl);
   const executeDispatchControl = useMutation(api.factory.incidentControls.executeRepositoryDispatchControl);
   const observeDispatchControl = useMutation(api.factory.incidentControlObserver.observeRepositoryDispatchControl);
+  const attemptDispatchAdmission = useMutation(api.factory.incidentControls.attemptRepositoryDispatchAdmission);
   const [reason, setReason] = useState("");
   const [evidenceReferences, setEvidenceReferences] = useState("");
   const [commandReferences, setCommandReferences] = useState("");
@@ -283,6 +318,10 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
   };
   const pauseHistory = historicalChain("PAUSE_REPOSITORY_DISPATCH");
   const resumeHistory = historicalChain("RESUME_REPOSITORY_DISPATCH");
+  const dispatchDenialReceipt = dispatchControl?.receipts?.find((receipt) =>
+    receipt.receiptType === "DISPATCH_DENIED"
+    && receipt.operation === "PAUSE_REPOSITORY_DISPATCH"
+    && receipt.observedAdmission === "DENIED");
   const historicalRestorationAuthorization = dispatchControl?.restorationAuthorizations?.[0];
 
   const requestCanonicalControl = async () => {
@@ -376,6 +415,25 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
     }
   };
 
+  const attemptCanonicalDispatchAdmission = async () => {
+    if (!incident.repositoryId || !incident.commanderActorId) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await attemptDispatchAdmission({
+        incidentId,
+        repositoryId: incident.repositoryId,
+        expectedSequence: incident.currentSequence,
+        expectedCommanderActorId: incident.commanderActorId,
+        requestId: `incident-ui-dispatch-admission:${incidentId}:${incident.currentSequence}:${crypto.randomUUID()}`,
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Dispatch admission attempt failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const recordProposalDecision = async (proposalId: Id<"factoryIncidentProposals">, decision: "ACCEPTED" | "REJECTED") => {
     setError(null);
     try {
@@ -432,7 +490,9 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
       }));
       const evidenceRefs = upcoming === "RESTORE" && canonicalControlSelected && effectReceipt
         ? [{ kind: "CONTROL_RECEIPT" as const, recordId: effectReceipt._id, relationship: "known-safe-restoration" }, ...typedEvidenceRefs]
-        : typedEvidenceRefs;
+        : upcoming === "MEASURE" && dispatchDenialReceipt
+          ? [{ kind: "CONTROL_RECEIPT" as const, recordId: dispatchDenialReceipt._id, relationship: "measured-dispatch-denial" }, ...typedEvidenceRefs]
+          : typedEvidenceRefs;
       await advance({
         incidentId,
         expectedSequence: incident.currentSequence,
@@ -564,7 +624,7 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
             </div>
           ) : null}
           <Textarea className="mt-3" aria-label="Incident transition reason" placeholder="Decision reason and current facts" value={reason} onChange={(event) => setReason(event.target.value)} />
-          <Textarea className="mt-2" aria-label="Incident evidence references" placeholder={upcoming === "MEASURE" ? "One measurement evidence reference per line (required)" : upcoming === "RESTORE" ? "One known-safe evidence reference per line (required)" : "One supporting evidence reference per line"} value={evidenceReferences} onChange={(event) => setEvidenceReferences(event.target.value)} />
+          <Textarea className="mt-2" aria-label="Incident evidence references" placeholder={upcoming === "MEASURE" ? dispatchDenialReceipt ? "Canonical dispatch-denial measurement is attached automatically" : "One measurement evidence reference per line (required)" : upcoming === "RESTORE" ? "One known-safe evidence reference per line (required)" : "One supporting evidence reference per line"} value={evidenceReferences} onChange={(event) => setEvidenceReferences(event.target.value)} />
           {upcoming === "CONTAIN" || upcoming === "RESTORE" ? (
             canonicalControlSelected ? (
               <div className="mt-3 rounded-lg border border-line bg-surface-1 p-3" aria-label="Repository dispatch control evidence">
@@ -620,6 +680,19 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
               </div>
             </div>
           ) : null)}
+          {pauseHistory?.effect && dispatchControl.admission === "DENIED" && !dispatchDenialReceipt ? (
+            <Button className="mt-3" size="sm" variant="outline" disabled={submitting} onClick={() => void attemptCanonicalDispatchAdmission()}>
+              Attempt dispatch admission
+            </Button>
+          ) : null}
+          {dispatchDenialReceipt ? (
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <ControlStage label="Dispatch admission denied" complete detail={dispatchDenialReceipt._id} />
+              <div className="rounded-md border border-success/40 bg-success/5 px-2 py-2 text-[11px] text-success">
+                Exact repository gate returned repository-dispatch-paused. No Attempt, workflow run, or worker launch was created.
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

@@ -1,3 +1,4 @@
+import { offlineSandboxIssues as isolatedSandboxIssues } from "./localQualificationSandbox.js";
 import type { HarnessCapabilityManifest, HarnessCapabilityRequirement, HarnessRuntimeArtifactIdentity } from "@mission-control/workflow-engine/harness-contract";
 import {
   findKnownHarnessManifest,
@@ -6,6 +7,8 @@ import {
   harnessManifestIssues,
   harnessRuntimeArtifactDigest,
   harnessRuntimeArtifactIssues,
+  ISOLATED_INVOCATION_ADAPTER_ARTIFACT,
+  LEGACY_ISOLATED_INVOCATION_ADAPTER_ARTIFACT,
 } from "@mission-control/workflow-engine/harness-contract";
 
 export function resolveFrozenHarnessBinding(input: {
@@ -54,6 +57,9 @@ export function resolveFrozenHarnessBinding(input: {
   if (input.harnessRuntimeArtifactDigest && input.harnessRuntimeArtifactDigest !== artifactDigest) {
     throw new Error("Frozen harness runtime artifact digest is invalid.");
   }
+  if (executionBackend === "isolated-container" && (!known || !knownArtifact
+    || harnessCapabilityManifestDigest(known) !== digest || harnessRuntimeArtifactDigest(knownArtifact) !== artifactDigest
+    || manifest.schemaVersion !== "harness-capability-manifest/v2")) throw new Error("Isolated execution requires an exact registered non-inference harness.");
   assertRuntimeArtifactMatchesBackend(artifact, executionBackend, input.sandboxProfileSnapshot);
   return {
     adapter: input.executor.adapter,
@@ -73,7 +79,11 @@ export function resolveFrozenHarnessBinding(input: {
  * remote backend (for example, a pinned sandbox image).
  */
 export function resolveHarnessAdapterRuntimeArtifact(executor: { adapter: string; version: string }) {
-  const artifact = findKnownHarnessRuntimeArtifact(executor.adapter, executor.version);
+  const artifact = executor.adapter === "isolated-invocation" && executor.version === "2"
+    ? ISOLATED_INVOCATION_ADAPTER_ARTIFACT
+    : executor.adapter === "isolated-invocation" && executor.version === "1"
+      ? LEGACY_ISOLATED_INVOCATION_ADAPTER_ARTIFACT
+      : findKnownHarnessRuntimeArtifact(executor.adapter, executor.version);
   if (!artifact || harnessRuntimeArtifactIssues(artifact).length > 0) {
     throw new Error(`Unknown or invalid harness adapter runtime artifact ${executor.adapter}/${executor.version}.`);
   }
@@ -154,6 +164,12 @@ function assertRuntimeArtifactMatchesBackend(
       || artifact.imageDigest?.toLowerCase() !== imageDigest) {
       throw new Error("Remote-sandbox execution requires the exact immutable Sandbox Profile image artifact.");
     }
+    return;
+  }
+  if (executionBackend === "isolated-container") {
+    const snapshot = sandboxProfileSnapshot as Record<string, any>;
+    if (isolatedSandboxIssues(snapshot).length || artifact.kind !== "CONTAINER_IMAGE" || artifact.executableSha256 !== null
+      || artifact.imageDigest !== snapshot.imageDigest) throw new Error("Isolated container requires the exact qualified image composition.");
     return;
   }
   throw new Error(`Unsupported Factory execution backend ${executionBackend}.`);

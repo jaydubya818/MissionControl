@@ -1,7 +1,7 @@
 # FDLC Phase 1 Bedrock qualification report
 
 Updated: 2026-09-07. Authoritative baseline: Mission Control main
-`46544a44cc3cfc0413246d5abc3571c848bec00c`, runtime contract v53. The
+`73c6d954bceba490a5b65e4b50f0897c01f11863`, runtime contract v55. The
 candidate is reconciled with the accounting-recovery, Factory Engineer,
 orchestration-readiness, incident-evidence, and repository-dispatch controls on
 canonical main.
@@ -127,12 +127,16 @@ dispatch whenever unresolved liability is nonzero.
 - IAM now admits the approved request as far as the Bedrock provider quota gate.
 - Focused Bedrock tests, Factory documentation validation, and policy consistency
   checks pass after the correction.
-- Candidate commit `447ef6569b4e868efee6dbbe290d121abd2eb74b` passed all
-  19 System Qualification V2 checks against baseline
+- Pre-reconciliation candidate commit
+  `447ef6569b4e868efee6dbbe290d121abd2eb74b` passed all 19 System
+  Qualification V2 checks against baseline
   `46544a44cc3cfc0413246d5abc3571c848bec00c` and runtime v53. The run includes
   1,284 Convex tests, 671 orchestration tests with 11 intended skips, full
   repository tests, authorization, secret scanning, lint, build, startup smoke,
   historical evidence immutability, and the runtime-contract guard.
+- The branch is reconciled with main
+  `73c6d954bceba490a5b65e4b50f0897c01f11863`; commit-bound v55 qualification
+  remains required on the integrated merge commit.
 
 Evidence is under
 `docs/testing/evidence/fdlc-bedrock-live-20260906/`, including caller identity,

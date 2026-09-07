@@ -22,13 +22,13 @@ type GitVerificationSubjectIdentity = SubjectIdentity & {
   version: 1;
   kind: "GIT_CANDIDATE";
   repositoryId: string;
-  providerRepositoryId: string;
   candidateSha: string;
   treeSha: string;
 };
 
 export type GithubVerificationSubject = GitVerificationSubjectIdentity & {
   provider: "GITHUB";
+  providerRepositoryId: string;
   pullRequest: {
     providerPullRequestId: string;
     number: number;
@@ -96,8 +96,8 @@ export function createGitVerificationSubject(input: GitSubjectInput): GitVerific
     throw new Error("Git verification subject requires a supported kind and provider.");
   }
   if (input.version !== 1) throw new Error("Legacy Git subject requires version 1.");
-  if (!input.repositoryId || !input.providerRepositoryId) {
-    throw new Error("Git verification subject requires internal and provider repository identity.");
+  if (!input.repositoryId || (input.provider === "GITHUB" && !input.providerRepositoryId)) {
+    throw new Error("Git verification subject requires its exact repository identity.");
   }
   const boundHeadSha = input.provider === "GITHUB" ? input.pullRequest.headSha : input.localRef.headSha;
   if (!SHA.test(input.candidateSha) || !SHA.test(input.treeSha) || boundHeadSha !== input.candidateSha) {
@@ -121,8 +121,8 @@ export function createGitVerificationSubject(input: GitSubjectInput): GitVerific
     sourceAttemptId: input.sourceAttemptId,
     repositoryId: input.repositoryId,
     provider: input.provider,
-    providerRepositoryId: input.providerRepositoryId,
     ...(input.provider === "GITHUB" ? {
+      providerRepositoryId: input.providerRepositoryId,
       providerPullRequestId: input.pullRequest.providerPullRequestId,
       providerPullRequestNumber: input.pullRequest.number,
     } : {

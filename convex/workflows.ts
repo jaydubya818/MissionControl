@@ -12,6 +12,7 @@ import { workflowDefinitionChanged } from "./lib/workflowSnapshot";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
 import {
   factoryWorkflowContractIssues,
+  DETERMINISTIC_WORKFLOW_CONTRACT,
   workflowRunCompatibilityProjection,
 } from "./lib/factoryWorkflowContract";
 
@@ -29,7 +30,7 @@ const workflowSteps = v.array(v.object({
   retryLimit: v.number(),
   timeoutMinutes: v.number(),
   dependsOn: v.optional(v.array(v.string())),
-  kind: v.optional(v.union(v.literal("AGENT"), v.literal("REDUCE"), v.literal("ROUTER"), v.literal("VERIFY"), v.literal("GATE"))),
+  kind: v.optional(v.union(v.literal("AGENT"), v.literal("REDUCE"), v.literal("ROUTER"), v.literal("VERIFY"), v.literal("GATE"), v.literal("DETERMINISTIC"))),
   inputSchema: v.optional(v.any()),
   outputSchema: v.optional(v.any()),
   modelTier: v.optional(v.union(v.literal("FAST"), v.literal("BALANCED"), v.literal("POWERFUL"))),
@@ -181,6 +182,9 @@ export const upsert = mutation({
       .query("workflows")
       .withIndex("by_workflow_id", (q) => q.eq("workflowId", args.workflowId))
       .first();
+    if (existing?.projectId || existing?.contractVersion) {
+      throw new Error("Workspace-owned production workflows must use authorized production registration.");
+    }
     
     const now = Date.now();
     
@@ -246,13 +250,15 @@ export const registerProduction = mutation({
   },
   handler: async (ctx, args) => {
     const access = await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
-    const definition = { ...args, active: args.active ?? true };
+    const deterministic = args.steps.some(step => step.kind === "DETERMINISTIC");
+    const contractVersion: "factory-workflow-contract/v1" | typeof DETERMINISTIC_WORKFLOW_CONTRACT = deterministic ? DETERMINISTIC_WORKFLOW_CONTRACT : "factory-workflow-contract/v1";
+    const definition = { ...args, contractVersion, active: args.active ?? true };
     const issues = factoryWorkflowContractIssues(definition);
     if (issues.length) throw new Error(`Production workflow contract is unsafe (${issues.join(", ")}).`);
     if (!/^[a-z0-9][a-z0-9-]{2,99}$/.test(args.workflowId)
       || !args.name.trim() || args.name.length > 200
       || !args.description.trim() || args.description.length > 2_000
-      || args.agents.length < 1 || args.agents.length > 25
+      || (!deterministic && args.agents.length < 1) || args.agents.length > 25
       || args.steps.length < 1 || args.steps.length > 100) {
       throw new Error("Production workflow identity or size is invalid.");
     }
@@ -265,7 +271,7 @@ export const registerProduction = mutation({
     const now = Date.now();
     const value = {
       projectId: args.projectId,
-      contractVersion: "factory-workflow-contract/v1" as const,
+      contractVersion,
       workflowId: args.workflowId,
       name: args.name.trim(),
       description: args.description.trim(),

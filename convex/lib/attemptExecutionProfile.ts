@@ -24,12 +24,13 @@ export async function resolveCurrentAttemptExecutionProfile(
   now: number,
 ) {
   const profileFieldsPresent = [version, run].some(hasAnyExecutionProfileBinding)
-    || manifest?.version === "factory-execution-manifest/v3"
+    || ["factory-execution-manifest/v3", "factory-execution-manifest/v4"].includes(manifest?.version)
     || manifest?.executionProfile !== undefined;
   if (!profileFieldsPresent) return null;
   if (!version.executionProfileId
     || !run.executionProfileId
-    || manifest?.version !== "factory-execution-manifest/v3"
+    || !["factory-execution-manifest/v3", "factory-execution-manifest/v4"].includes(manifest?.version)
+    || (manifest?.version === "factory-execution-manifest/v4" && version.executionBackend !== "isolated-container")
     || !manifest.executionProfile) {
     throw new Error("Factory Attempt is missing its exact Execution Profile binding.");
   }
@@ -82,6 +83,7 @@ export async function resolveCurrentAttemptExecutionProfile(
 
 export function executionProfileProjectionFromFactoryVersion(version: any) {
   const snapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+  const missingModelIdentity = version.executionBackend === "isolated-container" ? undefined : "";
   return {
     profileId: String(version.executionProfileId ?? ""),
     profileKey: version.executionProfileKey ?? "",
@@ -97,11 +99,11 @@ export function executionProfileProjectionFromFactoryVersion(version: any) {
     harnessRuntimeArtifact: version.harnessRuntimeArtifact,
     harnessRuntimeArtifactDigest: version.harnessRuntimeArtifactDigest ?? "",
     executionBackend: version.executionBackend ?? "persistent-worker",
-    modelCatalogId: String(version.modelCatalogId ?? ""),
+    modelCatalogId: version.modelCatalogId === undefined ? missingModelIdentity : String(version.modelCatalogId),
     modelRouteSnapshot: version.modelRouteSnapshot,
-    modelRouteDigest: version.modelRouteDigest ?? "",
+    modelRouteDigest: version.modelRouteDigest ?? missingModelIdentity,
     modelQualificationSnapshot: version.modelQualificationSnapshot,
-    modelQualificationDigest: version.modelQualificationDigest ?? "",
+    modelQualificationDigest: version.modelQualificationDigest ?? missingModelIdentity,
     sandboxProfileId: version.sandboxProfileId ? String(version.sandboxProfileId) : undefined,
     sandboxProfileSnapshot: version.sandboxProfileSnapshot,
     sandboxProfileDigest: version.sandboxProfileDigest,
@@ -113,6 +115,9 @@ export function executionProfileProjectionFromFactoryVersion(version: any) {
 
 function executionProfileProjectionFromAttempt(run: any, manifest: any) {
   const snapshot = run.executionProfileSnapshot as Record<string, any> | undefined;
+  const offline = manifest?.version === "factory-execution-manifest/v4";
+  const missingModelIdentity = offline ? undefined : "";
+  const sandbox = offline ? manifest.executionProfile?.profileSnapshot?.sandboxProfile : manifest.sandbox;
   return {
     profileId: String(run.executionProfileId ?? ""),
     profileKey: run.executionProfileKey ?? "",
@@ -128,14 +133,14 @@ function executionProfileProjectionFromAttempt(run: any, manifest: any) {
     harnessRuntimeArtifact: manifest.harness?.runtimeArtifact,
     harnessRuntimeArtifactDigest: manifest.harness?.runtimeArtifactDigest ?? "",
     executionBackend: manifest.executionBackend ?? manifest.harness?.executionBackend ?? "",
-    modelCatalogId: manifest.modelRoute?.catalogId ?? manifest.harness?.modelCatalogId ?? "",
+    modelCatalogId: manifest.modelRoute?.catalogId ?? manifest.harness?.modelCatalogId ?? missingModelIdentity,
     modelRouteSnapshot: manifest.modelRoute?.routeSnapshot ?? manifest.harness?.modelRouteSnapshot,
-    modelRouteDigest: manifest.modelRoute?.routeDigest ?? manifest.harness?.modelRouteDigest ?? "",
+    modelRouteDigest: manifest.modelRoute?.routeDigest ?? manifest.harness?.modelRouteDigest ?? missingModelIdentity,
     modelQualificationSnapshot: manifest.modelRoute?.qualificationSnapshot,
-    modelQualificationDigest: manifest.modelRoute?.qualificationDigest ?? manifest.harness?.modelQualificationDigest ?? "",
-    sandboxProfileId: manifest.sandbox?.profileId,
-    sandboxProfileSnapshot: manifest.sandbox?.profileSnapshot,
-    sandboxProfileDigest: manifest.sandbox?.profileDigest,
+    modelQualificationDigest: manifest.modelRoute?.qualificationDigest ?? manifest.harness?.modelQualificationDigest ?? missingModelIdentity,
+    sandboxProfileId: sandbox?.profileId,
+    sandboxProfileSnapshot: sandbox?.profileSnapshot,
+    sandboxProfileDigest: sandbox?.profileDigest,
     isolationModes: snapshot?.isolationModes ?? [],
     requiredHarnessCapabilities: snapshot?.requiredHarnessCapabilities ?? [],
     requiredSandboxCapabilities: snapshot?.requiredSandboxCapabilities ?? [],

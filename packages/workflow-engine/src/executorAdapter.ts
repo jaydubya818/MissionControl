@@ -17,7 +17,7 @@ export type ExecutorEventType =
 
 export const GENERIC_HARNESS_CONTRACT_VERSION = "generic-harness-contract/v1" as const;
 
-export type HarnessExecutionBackend = "persistent-worker" | "remote-sandbox";
+export type HarnessExecutionBackend = "persistent-worker" | "remote-sandbox" | "isolated-container";
 export type HarnessAuthorityLevel = "NONE";
 
 export interface HarnessRuntimeArtifactIdentity {
@@ -158,7 +158,7 @@ export interface HarnessModelCapability {
 }
 
 export interface HarnessCapabilityManifest {
-  schemaVersion: "harness-capability-manifest/v1";
+  schemaVersion: "harness-capability-manifest/v1" | "harness-capability-manifest/v2";
   scope: "ADAPTER_EFFECTIVE";
   identity: {
     harnessId: string;
@@ -382,6 +382,14 @@ export interface HarnessExecutorAdapter<TPrepared = unknown, THandle = unknown> 
   health(): Promise<ExecutorHealth>;
 }
 
+/** A collected result remains evidence when cleanup prevents a successful return. */
+export class HarnessCleanupError extends Error {
+  constructor(readonly result: ExecutorResult, readonly cleanupCause: unknown) {
+    super("Harness cleanup failed; collected result is non-authoritative evidence only.");
+    this.name = "HarnessCleanupError";
+  }
+}
+
 export async function runHarnessExecution<TPrepared, THandle>(
   adapter: HarnessExecutorAdapter<TPrepared, THandle>,
   request: ExecutorRequest,
@@ -389,6 +397,7 @@ export async function runHarnessExecution<TPrepared, THandle>(
 ): Promise<ExecutorResult> {
   const prepared = await adapter.prepare(request, context);
   const handle = await adapter.execute(prepared);
+  let collectedResult: ExecutorResult | undefined;
   let cancellation: Promise<boolean> | undefined;
   const requestCancellation = () => {
     cancellation ??= Promise.resolve().then(() => adapter.cancel(handle, abortReason(context.signal)));
@@ -397,13 +406,18 @@ export async function runHarnessExecution<TPrepared, THandle>(
   if (context.signal?.aborted) requestCancellation();
   else context.signal?.addEventListener("abort", requestCancellation, { once: true });
   try {
-    return await adapter.collectResult(handle);
+    collectedResult = await adapter.collectResult(handle);
+    return collectedResult;
   } finally {
     context.signal?.removeEventListener("abort", requestCancellation);
     try {
       if (cancellation) await cancellation;
     } finally {
-      await adapter.cleanup(handle);
+      try { await adapter.cleanup(handle); }
+      catch (error) {
+        if (collectedResult) throw new HarnessCleanupError(collectedResult, error);
+        throw error;
+      }
     }
   }
 }
@@ -588,7 +602,11 @@ export function harnessManifestIssues(manifest: HarnessCapabilityManifest): stri
   const identity = manifest.identity;
   const boundedId = (value: string, maximum = 100) =>
     value === value.trim() && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) && value.length <= maximum;
-  if (manifest.schemaVersion !== "harness-capability-manifest/v1" || manifest.scope !== "ADAPTER_EFFECTIVE") {
+  const offline = manifest.schemaVersion === "harness-capability-manifest/v2";
+  if (!offline && manifest.admission.executionBackends.includes("isolated-container")) {
+    issues.push("offline-manifest-version-required");
+  }
+  if ((manifest.schemaVersion !== "harness-capability-manifest/v1" && !offline) || manifest.scope !== "ADAPTER_EFFECTIVE") {
     issues.push("manifest-version-invalid");
   }
   if (![identity.harnessId, identity.harnessVersion, identity.adapterId, identity.adapterVersion].every((value) => boundedId(value))) {
@@ -596,7 +614,11 @@ export function harnessManifestIssues(manifest: HarnessCapabilityManifest): stri
   }
   if (!/^[a-f0-9]{40}$/i.test(identity.harnessCommit)) issues.push("manifest-commit-invalid");
   if (!/^[a-f0-9]{64}$/i.test(manifest.effectiveConfigSha256)) issues.push("effective-config-digest-invalid");
-  if (manifest.models.supported.length < 1 || manifest.models.supported.length > 100) issues.push("supported-models-invalid");
+  if (offline && (manifest.models.supported.length !== 0 || manifest.models.providerSelection !== "UNSUPPORTED"
+    || manifest.models.modelSelection !== "UNSUPPORTED" || manifest.models.reasoningControls !== "UNSUPPORTED"
+    || manifest.network.providerApi || manifest.network.packageInstall || manifest.network.destinations.length
+    || manifest.credentials.classes.length || manifest.admission.executionBackends.join(",") !== "isolated-container")) issues.push("offline-inference-forbidden");
+  if ((!offline && manifest.models.supported.length < 1) || manifest.models.supported.length > 100) issues.push("supported-models-invalid");
   if (manifest.models.supported.some((model) => !boundedString(model.provider, 100)
     || !boundedString(model.modelId, 200)
     || !["ADVERTISED", "PASSTHROUGH", "DYNAMIC"].includes(model.selection)

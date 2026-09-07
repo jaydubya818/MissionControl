@@ -75,7 +75,11 @@ export function classifyWorkOrderRisk(input: any): { riskLevel: RiskLevel; riskR
   const requested = (input.riskLevel ?? "MEDIUM") as RiskLevel;
   let riskLevel: RiskLevel = requested;
   const reasons = new Set<string>([`Operator-selected ${requested.toLowerCase()} risk.`]);
-  const text = [input.title, input.desiredOutcome, input.context, ...(input.requirements ?? []).flatMap((item: any) => [item.title, item.description]), ...(input.positiveConstraints ?? [])].filter(Boolean).join(" ").toLowerCase();
+  const text = [input.title, input.desiredOutcome, input.context, ...(input.requirements ?? []).flatMap((item: any) => [item.title, item.description]), ...(input.positiveConstraints ?? [])]
+    .filter(Boolean)
+    .flatMap((value) => String(value).toLowerCase().split(/[.;\n]+/))
+    .filter((clause) => !/\b(?:no|without|never|prohibit(?:ed)?|forbid(?:den)?|outside scope|out of scope)\b[^.;\n]{0,120}\b(?:production|infrastructure|terraform|kubernetes|iam|credential|secret|authentication|authorization|customer data|personally identifiable|pii)\b/.test(clause))
+    .join(" ");
   const paths = [...(input.changeBudget?.allowedPaths ?? [])].join(" ").toLowerCase();
   const promote = (level: RiskLevel, reason: string) => {
     if (RISK_RANK[level] > RISK_RANK[riskLevel]) riskLevel = level;

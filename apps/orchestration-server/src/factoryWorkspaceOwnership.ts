@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { lstat, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rename, unlink, writeFile, readdir, realpath, open } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { hardenedGitArgs, hardenedGitEnvironment } from "./hardenedGit.js";
 import { assertCanonicalWorktreeBoundary, assertWorktreeBoundary } from "./factoryPathScope.js";
 import { canonicalGithubRepositoryFromRemote, isExactGithubPullRequestUrl } from "./factoryRepositoryIdentity.js";
 
@@ -44,6 +45,11 @@ export interface FactoryWorkspaceOwnershipManifest extends FactoryWorkspaceOwner
     headSha: string;
     pullRequestUrl: string;
     recordedAt: number;
+  };
+  offlineResponse?: {
+    serviceId: string; projectId: string; repositoryId: string;
+    packet: unknown; packetSha256: string; capturedAt: number; deliveredAt?: number;
+    lastDeliveryError?: string; lastDeliveryAttemptAt?: number;
   };
   cleanup: {
     status: "PENDING" | "PRESERVED" | "COMPLETED";
@@ -406,6 +412,66 @@ export async function loadFactoryWorkspaceOwnership(owner: FactoryWorkspaceOwner
   return await readManifest(await ownershipManifestPath(owner));
 }
 
+export async function retainFactoryOfflineResponse(owner: FactoryWorkspaceOwner,
+  input: { serviceId: string; projectId: string; repositoryId: string; packet: unknown }) {
+  const json = JSON.stringify(input.packet);
+  if (!input.serviceId || !input.projectId || !input.repositoryId || Buffer.byteLength(json) > 128_000) {
+    throw new Error("Offline response journal scope or size is invalid.");
+  }
+  const packetSha256 = createHash("sha256").update(json).digest("hex");
+  return await updateOwnedManifest(owner, manifest => {
+    if (manifest.offlineResponse) {
+      if (manifest.offlineResponse.packetSha256 !== packetSha256 || manifest.offlineResponse.serviceId !== input.serviceId
+        || manifest.offlineResponse.projectId !== input.projectId || manifest.offlineResponse.repositoryId !== input.repositoryId) {
+        throw new Error("Conflicting offline response for this exact workspace lease.");
+      }
+      return manifest;
+    }
+    return { ...manifest, offlineResponse: { ...input, packetSha256, capturedAt: Date.now() }, updatedAt: Date.now() };
+  });
+}
+
+export async function markFactoryOfflineResponseDelivered(owner: FactoryWorkspaceOwner, packetSha256: string) {
+  return await updateOwnedManifest(owner, manifest => {
+    if (!manifest.offlineResponse || manifest.offlineResponse.packetSha256 !== packetSha256) throw new Error("Offline delivery identity mismatch.");
+    return { ...manifest, offlineResponse: { ...manifest.offlineResponse, deliveredAt: Date.now() }, updatedAt: Date.now() };
+  });
+}
+
+export async function recordFactoryOfflineDeliveryFailure(owner: FactoryWorkspaceOwner, packetSha256: string, reason: string) {
+  return await updateOwnedManifest(owner, manifest => {
+    if (!manifest.offlineResponse || manifest.offlineResponse.packetSha256 !== packetSha256) throw new Error("Offline delivery identity mismatch.");
+    return { ...manifest, offlineResponse: { ...manifest.offlineResponse,
+      lastDeliveryError: reason.slice(0, 500), lastDeliveryAttemptAt: Date.now() }, updatedAt: Date.now() };
+  });
+}
+
+export async function pendingFactoryOfflineResponses(input: {
+  checkoutRoot: string; projectId: string; repositoryId: string; serviceId: string;
+}) {
+  const checkoutRoot = await realpath(input.checkoutRoot);
+  const root = path.join(checkoutRoot, ".mission-control", "worker-state", "workspaces");
+  await ensureProtectedDirectory(root, checkoutRoot);
+  const results: FactoryWorkspaceOwnershipManifest[] = [];
+  for (const name of (await readdir(root)).filter(name => /^[a-f0-9]{64}\.json$/.test(name)).sort()) {
+    const manifest = await readManifest(path.join(root, name));
+    const evidence = manifest?.offlineResponse;
+    if (!manifest || !evidence || evidence.deliveredAt !== undefined || evidence.serviceId !== input.serviceId
+      || evidence.projectId !== input.projectId || evidence.repositoryId !== input.repositoryId) continue;
+    validateOwner(manifest);
+    if (await realpath(manifest.checkoutRoot) !== checkoutRoot
+      || await ownershipManifestPath(manifest) !== path.join(root, name)
+      || createHash("sha256").update(JSON.stringify(evidence.packet)).digest("hex") !== evidence.packetSha256) {
+      throw new Error("Offline response journal identity was altered.");
+    }
+    results.push(manifest);
+    results.sort((a, b) => (a.offlineResponse!.lastDeliveryAttemptAt ?? 0)
+      - (b.offlineResponse!.lastDeliveryAttemptAt ?? 0));
+    if (results.length > 20) results.pop();
+  }
+  return results;
+}
+
 async function updateOwnedManifest(
   owner: FactoryWorkspaceOwner,
   update: (manifest: FactoryWorkspaceOwnershipManifest) => FactoryWorkspaceOwnershipManifest,
@@ -453,7 +519,7 @@ async function ensureProtectedDirectory(directory: string, checkoutRoot: string)
 async function readManifest(manifestPath: string): Promise<FactoryWorkspaceOwnershipManifest | undefined> {
   const file = await lstat(manifestPath).catch(() => null);
   if (!file) return undefined;
-  if (file.isSymbolicLink() || !file.isFile() || (file.mode & 0o077) !== 0) {
+  if (file.isSymbolicLink() || !file.isFile() || (file.mode & 0o077) !== 0 || file.size > 256_000) {
     throw new Error("Workspace ownership manifest must be a regular owner-only protected file.");
   }
   const parsed = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -464,7 +530,11 @@ async function readManifest(manifestPath: string): Promise<FactoryWorkspaceOwner
 async function writeManifest(manifestPath: string, manifest: FactoryWorkspaceOwnershipManifest) {
   const temporaryPath = `${manifestPath}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(temporaryPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
+  const file = await open(temporaryPath, "r");
+  try { await file.sync(); } finally { await file.close(); }
   await rename(temporaryPath, manifestPath);
+  const directory = await open(path.dirname(manifestPath), "r");
+  try { await directory.sync(); } finally { await directory.close(); }
 }
 
 function validateOwner(owner: FactoryWorkspaceOwner) {
@@ -522,13 +592,13 @@ function worktreeListHasExactOwner(output: string, worktree: string, branch: str
 }
 
 async function git(cwd: string, args: string[]) {
-  const result = await execFileAsync("git", args, { cwd, env: process.env, maxBuffer: 20 * 1024 * 1024 });
+  const result = await execFileAsync("git", hardenedGitArgs(args), { cwd, env: hardenedGitEnvironment(), maxBuffer: 20 * 1024 * 1024 });
   return result.stdout.trim();
 }
 
 async function gitSucceeds(cwd: string, args: string[]) {
   try {
-    await execFileAsync("git", args, { cwd, env: process.env, maxBuffer: 2 * 1024 * 1024 });
+    await execFileAsync("git", hardenedGitArgs(args), { cwd, env: hardenedGitEnvironment(), maxBuffer: 2 * 1024 * 1024 });
     return true;
   } catch {
     return false;

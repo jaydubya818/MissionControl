@@ -21,6 +21,26 @@ export type CurrentVerificationAttempt = {
   supersededAt?: number;
   qualityContractDigest?: string;
   verificationAttemptBinding?: VerificationIdentityTuple;
+  executionManifestDigest?: string;
+  executionProfileDigest?: string;
+};
+
+/** Projected only from reserved server-validated verifier evidence. Generic
+ * artifacts and producer reports must never populate this projection. */
+export type LocalCandidateObservation = VerificationIdentityTuple & {
+  evidenceEnvelopeId: string;
+  projectId: string;
+  tenantId: string;
+  repositoryId: string;
+  verificationAttemptId: string;
+  verificationRunId: string;
+  verificationPlanDigest: string;
+  executionManifestDigest: string;
+  executionProfileDigest: string;
+  candidateSha: string;
+  treeSha: string;
+  observedAt: number;
+  expiresAt: number;
 };
 
 export type StoredVerificationResult = VerificationIdentityTuple & {
@@ -107,6 +127,8 @@ export type CurrentVerificationEligibility = {
  * older pass.
  */
 export type CurrentVerificationInput = {
+  projectId?: string;
+  tenantId?: string;
   workOrderId: string;
   workOrderRevisionNumber: number;
   qualityContractDigest?: string;
@@ -117,6 +139,7 @@ export type CurrentVerificationInput = {
   verificationReceipts: StoredVerificationReceipt[];
   verificationEvidence: StoredVerificationEvidence[];
   providerHeads?: GitProviderHeadProjection[];
+  localCandidateObservations?: LocalCandidateObservation[];
   now: number;
 };
 
@@ -292,12 +315,28 @@ function evaluateVerification(input: CurrentVerificationInput, purpose: "ACCEPTA
   });
   const evidenceContext = { ...receiptContext, evidenceSetDigest };
 
-  if (subject.kind === "GIT_CANDIDATE" && subject.provider !== "GITHUB") {
-    return denied("Verified local candidate has no trusted current publication projection and is not acceptance-eligible.", {
-      ...evidenceContext,
-      verifiedOutcome,
-      verificationRecordedAt: receipt.recordedAt,
-    });
+  if (subject.kind === "GIT_CANDIDATE" && subject.provider === "LOCAL_GIT") {
+    const observation = [...(input.localCandidateObservations ?? [])]
+      .filter(item => item.sourceAttemptId === source.id)
+      .sort((a, b) => b.observedAt - a.observedAt)[0];
+    if (!observation || !input.projectId || !input.tenantId
+      || observation.projectId !== input.projectId || observation.tenantId !== input.tenantId
+      || observation.repositoryId !== subject.repositoryId || !tupleMatches(observation, exactIdentity)
+      || observation.verificationAttemptId !== verificationAttempt.id || observation.verificationRunId !== result.id
+      || observation.verificationPlanDigest !== result.verificationPlanDigest
+      || !verificationAttempt.executionManifestDigest || !verificationAttempt.executionProfileDigest
+      || observation.executionManifestDigest !== verificationAttempt.executionManifestDigest
+      || observation.executionProfileDigest !== verificationAttempt.executionProfileDigest
+      || !evidenceEnvelopeIds.includes(observation.evidenceEnvelopeId)
+      || observation.candidateSha !== subject.candidateSha || observation.treeSha !== subject.treeSha
+      || !Number.isSafeInteger(observation.observedAt) || observation.observedAt > input.now
+      || observation.observedAt < verificationAttempt.createdAt
+      || !Number.isSafeInteger(observation.expiresAt) || observation.expiresAt <= input.now
+      || observation.expiresAt > observation.observedAt + 60_000) {
+      return denied("Verified local candidate has no trusted current verifier observation and is not acceptance-eligible.", {
+        ...evidenceContext, verifiedOutcome, verificationRecordedAt: receipt.recordedAt,
+      });
+    }
   }
 
   if (subject.kind === "GIT_CANDIDATE" && subject.provider === "GITHUB" && purpose === "ACCEPTANCE") {

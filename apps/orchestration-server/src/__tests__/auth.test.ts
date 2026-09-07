@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   isPublicOrchestrationRoute,
+  offlineQualificationRouteAllowed,
   orchestrationAuthFailure,
   orchestrationUpgradeFailure,
 } from "../auth.js";
@@ -14,6 +15,15 @@ describe("orchestration authentication", () => {
     restoreEnv("ORCHESTRATION_API_TOKEN", originalOrchestrationToken);
     restoreEnv("MC_API_TOKEN", originalMcToken);
     restoreEnv("NODE_ENV", originalNodeEnv);
+  });
+
+  it("limits offline qualification HTTP access to worker operations", () => {
+    expect(offlineQualificationRouteAllowed("GET", "/health")).toBe(true);
+    expect(offlineQualificationRouteAllowed("GET", "/status")).toBe(true);
+    expect(offlineQualificationRouteAllowed("POST", "/runs/factory-worker/tick")).toBe(true);
+    for (const [method, route] of [["POST", "/tick"], ["POST", "/agents/spawn"], ["POST", "/classify"], ["GET", "/gateway/status"]]) {
+      expect(offlineQualificationRouteAllowed(method, route)).toBe(false);
+    }
   });
 
   it("fails closed in production when no inbound token is configured", () => {

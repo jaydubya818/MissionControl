@@ -47,7 +47,7 @@ export type VerificationIndependenceInput = {
     verificationPlanDigest?: string;
   };
   isolation: {
-    mode: "DETACHED_GIT_WORKTREE" | "FRESH_CLONE" | "REMOTE_SANDBOX" | "AUTOMATION_SNAPSHOT" | "LOCAL_DOCKER_CANARY";
+    mode: "DETACHED_GIT_WORKTREE" | "FRESH_CLONE" | "REMOTE_SANDBOX" | "ISOLATED_CONTAINER" | "AUTOMATION_SNAPSHOT" | "LOCAL_DOCKER_CANARY";
     sandboxId: string;
     rootBindingDigest: string;
     subjectDigest: string;
@@ -166,8 +166,12 @@ export function deriveVerificationIndependence(input: VerificationIndependenceIn
     reasons.push("Verification isolation attestation points at the builder root.");
   }
   if (input.subject.kind === "GIT_CANDIDATE") {
-    if (!["DETACHED_GIT_WORKTREE", "FRESH_CLONE", "REMOTE_SANDBOX"].includes(input.isolation.mode)) {
+    if (!["DETACHED_GIT_WORKTREE", "FRESH_CLONE", "REMOTE_SANDBOX", "ISOLATED_CONTAINER"].includes(input.isolation.mode)) {
       reasons.push("Git verification did not use a fresh Git-capable isolation mode.");
+    }
+    if (input.isolation.mode === "ISOLATED_CONTAINER"
+      && !/^docker:[a-f0-9]{64}$/.test(input.isolation.sandboxId ?? "")) {
+      reasons.push("Git verification isolated-container identity is not exact.");
     }
     if (!input.isolation.repositoryId || input.isolation.repositoryId !== input.subject.repositoryId
       || input.isolation.headSha !== input.subject.candidateSha || input.isolation.treeSha !== input.subject.treeSha) {

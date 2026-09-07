@@ -43,6 +43,7 @@ import {
   type MissionSpecContent,
 } from "./lib/missionSpec";
 import { resolveMissionRepositoryBinding } from "./lib/workspaceRepositories";
+import { isLocalQualificationRepository, loadLocalRepositoryAdmission } from "./lib/localRepositoryAdmission";
 
 const missionState = v.union(
   v.literal("DRAFT"), v.literal("PLANNING"), v.literal("AWAITING_PLAN_APPROVAL"),
@@ -413,11 +414,66 @@ function planningCandidateEditedBeforeSave(
   return computeCanonicalHash(comparable(planInput)) !== computeCanonicalHash(comparable(candidate));
 }
 
+function comparablePlanInput(value: MissionPlanInput) {
+  return {
+    summary: value.summary,
+    rollbackApproach: value.rollbackApproach,
+    estimatedCostUsd: value.estimatedCostUsd,
+    workOrderBlueprints: value.workOrderBlueprints,
+    assertions: value.assertions,
+  };
+}
+
+async function localQualificationPlanFields(ctx: MutationCtx, mission: Doc<"missions">, input: MissionPlanInput, actorId: string) {
+  const repository = mission.repositoryId ? await ctx.db.get(mission.repositoryId) : null;
+  if (!isLocalQualificationRepository(repository)) return null;
+  const { admission, digest } = await loadLocalRepositoryAdmission(ctx, repository, Date.now());
+  if (String(mission.projectId) !== admission.projectId || String(repository!._id) !== String(mission.repositoryId)) {
+    throw new Error("Local qualification Plan repository scope is invalid");
+  }
+  const candidateDigest = `sha256:${computeCanonicalHash(comparablePlanInput(input))}`;
+  return {
+    planningRepositorySha: admission.baselineCommit,
+    planningCandidateDigest: candidateDigest,
+    planningProvenance: {
+      schema: "local-qualification-plan-binding/v1",
+      missionId: String(mission._id),
+      repositoryId: String(repository!._id),
+      repositoryAdmissionDigest: digest,
+      environmentId: admission.environmentId,
+      planningRepositorySha: admission.baselineCommit,
+      candidateDigest,
+      authoredBy: actorId,
+      authority: { approval: false, execution: false, verification: false, acceptance: false },
+    },
+  };
+}
+
 async function assertPlanningPlanBinding(
   ctx: MutationCtx,
   mission: Doc<"missions">,
   plan: Doc<"missionPlans">,
 ) {
+  if (plan.planningProvenance?.schema === "local-qualification-plan-binding/v1") {
+    const repository = mission.repositoryId ? await ctx.db.get(mission.repositoryId) : null;
+    const { admission, digest } = await loadLocalRepositoryAdmission(ctx, repository, Date.now());
+    const candidateDigest = `sha256:${computeCanonicalHash(comparablePlanInput(plan as unknown as MissionPlanInput))}`;
+    if (plan.planningRunId !== undefined || plan.planningResearchPacketDigest !== undefined
+      || plan.planningRepositorySha !== admission.baselineCommit || plan.planningCandidateDigest !== candidateDigest
+      || plan.planningProvenance.missionId !== String(mission._id)
+      || plan.planningProvenance.repositoryId !== String(repository?._id)
+      || plan.planningProvenance.repositoryAdmissionDigest !== digest
+      || plan.planningProvenance.environmentId !== admission.environmentId
+      || plan.planningProvenance.planningRepositorySha !== admission.baselineCommit
+      || plan.planningProvenance.candidateDigest !== candidateDigest
+      || plan.planningProvenance.authority?.approval !== false
+      || plan.planningProvenance.authority?.execution !== false
+      || plan.planningProvenance.authority?.verification !== false
+      || plan.planningProvenance.authority?.acceptance !== false) {
+      throw new Error("Local qualification Plan provenance changed after exact-revision binding; create a new revision");
+    }
+    return;
+  }
   const planningFields = [
     plan.planningRunId,
     plan.planningRepositorySha,
@@ -914,6 +970,9 @@ export const savePlanDraft = mutation({
     const specBinding = await isSpecIntakeEnabled(ctx, args.projectId)
       ? await loadFinalizedSpecBinding(ctx, project, mission)
       : null;
+    const localPlanBinding = planningBinding
+      ? null
+      : await localQualificationPlanFields(ctx, mission, args, operator.actorId);
     const latestPlan = await ctx.db.query("missionPlans").withIndex("by_mission_revision", (q) => q.eq("missionId", mission._id)).order("desc").first();
     const revisionNumber = (latestPlan?.revisionNumber ?? 0) + 1;
     const planId = await ctx.db.insert("missionPlans", {
@@ -930,6 +989,7 @@ export const savePlanDraft = mutation({
       estimatedCostUsd: args.estimatedCostUsd,
       createdBy: operator.actorId,
       ...(planningBinding ? planningPlanFields(planningBinding) : {}),
+      ...(localPlanBinding ?? {}),
       ...specBinding?.fields,
       assertions: args.assertions,
       workOrderBlueprints: args.workOrderBlueprints,
@@ -1002,6 +1062,9 @@ export const submitPlan = mutation({
     const repositoryBinding = await loadMissionRepositoryBinding(ctx, mission, project);
     const proposed = { ...plan, repository: repositoryBinding.repository, repositoryBranch: repositoryBinding.defaultBranch, workOrderBlueprints };
     assertValidPlan(proposed);
+    const localCandidateDigest = plan.planningProvenance?.schema === "local-qualification-plan-binding/v1"
+      ? `sha256:${computeCanonicalHash(comparablePlanInput(proposed as MissionPlanInput))}`
+      : undefined;
     if (mission.budgetUsd !== undefined && proposed.estimatedCostUsd !== undefined && proposed.estimatedCostUsd > mission.budgetUsd) {
       throw new Error("Plan estimate exceeds the Mission budget");
     }
@@ -1015,6 +1078,10 @@ export const submitPlan = mutation({
       repository: repositoryBinding.repository,
       repositoryBranch: repositoryBinding.defaultBranch,
       workOrderBlueprints,
+      ...(localCandidateDigest ? {
+        planningCandidateDigest: localCandidateDigest,
+        planningProvenance: { ...plan.planningProvenance, candidateDigest: localCandidateDigest },
+      } : {}),
       submittedBy: operator.actorId,
       submittedAt: now,
       submittedActorSource: operator.actorSource,

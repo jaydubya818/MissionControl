@@ -1,0 +1,29 @@
+{
+  "capturedAt": "2026-09-07T18:45:25Z",
+  "sourceProfile": "fdlc-qualification",
+  "sourceRegion": "us-east-1",
+  "accountId": "083665737366",
+  "principalArn": "arn:aws:sts::083665737366:assumed-role/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783/jaydubya818@gmail.com",
+  "approvedInferenceProfileArn": "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
+  "countTokensResources": [
+    "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
+    "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
+    "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6",
+    "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-6"
+  ],
+  "controls": {
+    "bedrockWildcardAllow": false,
+    "streamingAllow": false,
+    "streamingExplicitlyDenied": true,
+    "directFoundationModelInferenceExplicitlyDenied": true,
+    "unrelatedModelsAndProfilesExplicitlyDenied": true,
+    "globalInferenceProfileReferences": [],
+    "productionAuthorityAdded": false
+  },
+  "negativeCountTokensCheck": {
+    "modelId": "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0",
+    "result": "AccessDeniedException",
+    "reason": "explicit deny in an identity-based policy"
+  },
+  "note": "AWS evaluates CountTokens for the approved US inference profile against its exact regional backing-model resources. A blanket outside-us-east-1 CountTokens deny blocks the approved profile itself; the source profile allow remains conditioned on us-east-1 and every unrelated CountTokens resource is explicitly denied."
+}

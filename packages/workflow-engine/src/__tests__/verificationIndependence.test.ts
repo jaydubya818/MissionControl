@@ -103,6 +103,20 @@ describe("server-derived verification independence", () => {
     expect(deriveVerificationIndependence(validInput())).toMatchObject({ passed: true, policyVersion: "verification-independence/v1" });
   });
 
+  it("accepts an exact admitted container over a separate subject-bound Git worktree", () => {
+    const input = validInput();
+    const binding = {
+      ...input.isolation,
+      mode: "ISOLATED_CONTAINER" as const,
+      sandboxId: `docker:${"d".repeat(64)}`,
+    };
+    const { rootBindingDigest: _priorDigest, ...withoutDigest } = binding;
+    input.isolation = { ...withoutDigest, rootBindingDigest: verificationIsolationBindingDigest(withoutDigest) };
+    expect(deriveVerificationIndependence(input)).toMatchObject({ passed: true });
+    input.isolation.sandboxId = "docker:unmeasured";
+    expect(deriveVerificationIndependence(input).passed).toBe(false);
+  });
+
   it("rejects the implementation Attempt as its own verifier regardless of spoofed metadata", () => {
     const input = validInput() as VerificationIndependenceInput & { producerIndependent?: boolean };
     input.producerIndependent = true;

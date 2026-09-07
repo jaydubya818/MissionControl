@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { claimInternal, reportInternal, reportVerificationInternal, candidateVerificationDispatchFailedInternal } from "../factory/attempts";
+import { authorizePublicationInternal, claimInternal, reportInternal, reportVerificationInternal, candidateVerificationDispatchFailedInternal } from "../factory/attempts";
 import { compilePolicyV2VerificationPlan, effectivePolicyV2VerificationChecks } from "../lib/policyV2Verification";
 import { computeCanonicalHash } from "../lib/genomeHash";
 import { exactModelRouteSnapshot, exactModelRouteDigest, exactModelRouteQualificationSnapshot, modelRouteQualificationDigest } from "../lib/modelRouteAdmission";
 import { CODEX_V1_HARNESS_MANIFEST, CODEX_V1_RUNTIME_ARTIFACT, harnessCapabilityManifestDigest, harnessRuntimeArtifactDigest } from "@mission-control/workflow-engine";
 import { verificationIsolationBindingDigest } from "@mission-control/workflow-engine";
+import { sha256Hex } from "@mission-control/shared";
 
 const BASE = "a".repeat(40);
 const INTERMEDIATE = "b".repeat(40);
@@ -47,7 +48,7 @@ function fixture(prepublication = false) {
     }],
     workspaceRepositories: [{
       _id: "repository-1", projectId: "project-1", repository: "qualification/repo",
-      providerRepositoryId: "provider-repository-1", defaultBranch: "main", status: "READY",
+      provider: "GITHUB", providerRepositoryId: "provider-repository-1", defaultBranch: "main", status: "READY",
     }],
     githubAppInstallations: [{
       _id: "installation-row-1", repositoryId: "repository-1", projectId: "project-1",
@@ -155,16 +156,35 @@ async function recoveryClaimFixture() {
     executorAdapter: "codex", executorVersion: "v1", executorHostId: "worker-1", worktree: "/fixture/worktree" });
   const original = await f.db.get("attempt-1");
   await f.db.insert("workflowRuns", { ...original, _id: "original-attempt", runId: "original-run", status: "FAILED",
-    failureReason: "GitHub App runtime credentials are not configured.", executionManifest: sourceManifest, executionManifestDigest: sourceDigest });
-  await f.db.insert("runArtifacts", { workflowRunId: "original-attempt", artifactType: "CODE_DIFF", metadata: {
-    headSha: CANDIDATE, treeSha: TREE, sourceRevision: BASE, branch: "mc/candidate" } });
+    failureReason: "Diagnostic wording may change without changing recovery authority.",
+    failureCode: "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING", executionManifest: sourceManifest, executionManifestDigest: sourceDigest });
+  await f.db.insert("runArtifacts", { workflowRunId: "original-attempt", artifactType: "CODE_DIFF",
+    idempotencyKey: `factory:original-run:code-diff:${CANDIDATE}`, metadata: {
+    headSha: CANDIDATE, treeSha: TREE, sourceRevision: BASE, branch: "mc/candidate", changedFiles: ["src/feature.ts"] } });
+  const structuredResult = { schema: "factory-result/v1", status: "COMPLETED", summary: "Synthetic candidate complete.",
+    completedAcceptanceCriterionIds: [], incompleteAcceptanceCriterionIds: [], unknownAcceptanceCriterionIds: [],
+    verificationCommands: [], knownRisks: [], nextAction: "Publish for verification." };
+  await f.db.insert("runArtifacts", { _id: "result-artifact", tenantId: "tenant-1", projectId: "project-1",
+    workOrderId: "work-order-1", workflowRunId: "original-attempt", artifactType: "STRUCTURED_OUTPUT",
+    idempotencyKey: "factory:original-run:structured-result", producer: "service:service-1",
+    contentHash: `sha256:${sha256Hex(JSON.stringify(structuredResult))}`,
+    metadata: { schema: "factory-result/v1", result: structuredResult, leaseId: "original-lease", executionManifestDigest: sourceDigest } });
+  await f.db.insert("runEvents", { _id: "source-claim-event", tenantId: "tenant-1", projectId: "project-1",
+    workflowRunId: "original-attempt", actor: "service:service-1", eventType: "CHECKPOINT_CREATED",
+    idempotencyKey: "factory-lease:original-run:original-lease:claimed", metadata: {
+      leaseId: "original-lease", workerId: "worker-1", workerSessionId: "original-session", workerGeneration: 1,
+      executionManifestDigest: sourceDigest } });
   const manifest = { ...sourceManifest, causation: { workflowRunId: "run-1" } };
   await f.db.patch("attempt-1", { executionManifest: manifest, executionManifestDigest: `sha256:${computeCanonicalHash(manifest)}`,
     lease: { leaseId: "expired-recovery", ownerId: "service-1", expiresAt: 1, claimedAt: 0, heartbeatAt: 0 },
     metadata: { localCandidateRecovery: { sourceAttemptId: "original-attempt", sourceExecutionManifestDigest: sourceDigest,
       sourceCandidateSha: CANDIDATE, sourceTreeSha: TREE, sourceRevision: BASE,
+      structuredResult,
+      structuredResultArtifactId: "result-artifact", structuredResultContentHash: `sha256:${sha256Hex(JSON.stringify(structuredResult))}`,
+      structuredResultClaimLeaseId: "original-lease", structuredResultClaimWorkerId: "worker-1",
+      structuredResultClaimWorkerSessionId: "original-session", structuredResultClaimWorkerGeneration: 1,
       previousLease: { leaseId: "original-lease", workerId: "worker-1", workerSessionId: "original-session", workerGeneration: 1 } } } });
-  const claim = () => f.invoke(claimInternal, { workflowRunId: "attempt-1", ownerId: "service-1", leaseId: "new-recovery", leaseDurationMs: 60_000 });
+  const claim = () => f.invoke(claimInternal, { workflowRunId: "attempt-1", ownerId: "service-1", leaseId: "new-recovery", leaseDurationMs: 120_000 });
   return { ...f, claim };
 }
 
@@ -195,8 +215,36 @@ describe("Factory candidate source authority through the real report mutation", 
     expect(result).toMatchObject({ claimed: true, reclaimed: true, lease: { leaseId: "new-recovery" },
       localCandidateRecovery: { sourceAttemptId: "original-attempt", sourceCandidateSha: CANDIDATE, sourceTreeSha: TREE } });
     expect(result.publicationCheckpoint).toBeUndefined();
-    expect(await f.db.get("original-attempt")).toMatchObject({ status: "FAILED", failureReason: "GitHub App runtime credentials are not configured." });
+    expect(await f.db.get("original-attempt")).toMatchObject({ status: "FAILED", failureCode: "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING" });
     expect(await f.db.get("attempt-1")).toMatchObject({ status: "RUNNING", runtimeDispositionReason: expect.stringContaining("executor replay remains prohibited") });
+    const permit = await f.invoke(authorizePublicationInternal, { workflowRunId: "attempt-1", ownerId: "service-1",
+      leaseId: "new-recovery", candidateRevision: CANDIDATE });
+    expect(permit).toMatchObject({ authorized: true, candidateRevision: CANDIDATE,
+      publicationPermitId: expect.stringContaining("factory-recovery-publication:run-1:new-recovery:") });
+    await expect(f.invoke(authorizePublicationInternal, { workflowRunId: "attempt-1", ownerId: "service-1",
+      leaseId: "new-recovery", candidateRevision: CANDIDATE })).rejects.toThrow(/already been consumed/);
+  });
+  it("binds recovery publication to the exact candidate and preserves uncertain outcomes for read-only reconciliation", async () => {
+    const f = await recoveryClaimFixture();
+    await f.claim();
+    const permit = await f.invoke(authorizePublicationInternal, { workflowRunId: "attempt-1", ownerId: "service-1",
+      leaseId: "new-recovery", candidateRevision: CANDIDATE });
+    const reportRecovery = (packet: Row) => f.invoke(reportInternal, { workflowRunId: "attempt-1",
+      leaseId: "new-recovery", ownerId: "service-1", packet });
+    for (const substitution of [{ headSha: INTERMEDIATE }, { treeSha: INTERMEDIATE }]) {
+      const artifact = pullRequestArtifact(BASE, `pr:recovery-substitution:${Object.keys(substitution)[0]}`);
+      Object.assign(artifact.metadata, { publicationPermitId: permit.publicationPermitId, ...substitution });
+      await expect(reportRecovery({ artifacts: [artifact] })).rejects.toThrow(/exact candidate, tree, source or consumed permit/);
+    }
+    expect(await reportRecovery({ terminal: { status: "FAILED", failureReason: "Provider response was lost after write intent." } }))
+      .toMatchObject({ accepted: true, paused: true, publicationOutcome: "UNKNOWN" });
+    expect(await f.db.get("attempt-1")).toMatchObject({ status: "PENDING", lease: undefined,
+      metadata: { localCandidateRecovery: { reconciliationOnly: true, publicationPermitId: permit.publicationPermitId } } });
+    const reclaimed = await f.invoke(claimInternal, { workflowRunId: "attempt-1", ownerId: "service-1",
+      leaseId: "reconcile-recovery", leaseDurationMs: 120_000 });
+    expect(reclaimed).toMatchObject({ claimed: true, publicationCheckpoint: { reconciliationOnly: true,
+      recoveryPublication: true, candidateRevision: CANDIDATE, sourceRevision: BASE,
+      publicationPermit: { id: permit.publicationPermitId, leaseId: "new-recovery" } } });
   });
   it.each(["ordinary-executor", "substituted-candidate", "changed-source", "cancelled"])("does not reclaim an expired recovery with %s", async (fault) => {
     const f = await recoveryClaimFixture();
@@ -286,6 +334,14 @@ describe("Factory candidate source authority through the real report mutation", 
     }
     const f = fixture(true);
     await expect(f.report({ ...prepublicationPacket(), terminal: { status: "COMPLETED" } })).rejects.toThrow(/cannot include/);
+  });
+
+  it("rejects a local candidate transport for a GitHub-authorized repository before subject persistence", async () => {
+    const f = fixture();
+    await expect(f.report({ candidateReady: { ...candidateReady, transport: "LOCAL_GIT" }, artifacts: [] }))
+      .rejects.toThrow(/transport must match the admitted repository authority/);
+    expect(await f.db.get("attempt-1")).toMatchObject({ status: "RUNNING" });
+    expect((await f.db.get("attempt-1")).verificationSubject).toBeUndefined();
   });
 
   it("accepts durable publication event types and keeps uncertain publication recoverable after its permit expires", async () => {

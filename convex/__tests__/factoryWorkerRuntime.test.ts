@@ -16,6 +16,8 @@ import {
   harnessCapabilityManifestDigest,
   harnessRuntimeArtifactDigest,
 } from "@mission-control/workflow-engine";
+import { ISOLATED_INVOCATION_MANIFEST, ISOLATED_INVOCATION_ADAPTER_ARTIFACT, ISOLATED_INVOCATION_RUNTIME_ARTIFACT } from "@mission-control/workflow-engine/harness-contract";
+import { NO_INFERENCE_CONSTRAINT } from "../lib/offlineExecutionPolicy";
 
 const now = 100_000;
 const codexRuntimeArtifactSha256 = harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT);
@@ -69,6 +71,43 @@ const worker: FactoryWorkerCandidate = {
 };
 
 describe("Factory worker runtime", () => {
+  it("requires denied inference and the exact backend artifact for offline bootstrap", () => {
+    const manifest = ISOLATED_INVOCATION_MANIFEST;
+    const artifact = ISOLATED_INVOCATION_ADAPTER_ARTIFACT;
+    const executor = { ...worker.workerRuntime!.supportedExecutors[0], adapter: "isolated-invocation", version: ISOLATED_INVOCATION_MANIFEST.identity.adapterVersion,
+      capabilityManifest: manifest, capabilityManifestSha256: harnessCapabilityManifestDigest(manifest),
+      effectiveConfigSha256: manifest.effectiveConfigSha256, runtimeArtifact: artifact, runtimeArtifactSha256: harnessRuntimeArtifactDigest(artifact) };
+    const isolatedWorker: FactoryWorkerCandidate = { ...worker, workerRuntime: { ...worker.workerRuntime!,
+      executionBackends: ["isolated-container"], supportedExecutors: [executor] } };
+    const offline: FactoryWorkerRequirements = { ...requirements, executor, provider: null, model: null,
+      inferenceConstraint: NO_INFERENCE_CONSTRAINT, executionBackend: "isolated-container",
+      harnessCapabilities: [{ capability: "cancellation.support", minimumSupport: "SUPPORTED" }] };
+    const eligible = (changed: Partial<FactoryWorkerRequirements>) => factoryWorkerEligibility({ worker: isolatedWorker,
+      requirements: { ...offline, ...changed }, activeWorkerLeaseCount: 0, now }).eligible;
+    expect(eligible({})).toBe(true);
+    for (const changed of [{ inferenceConstraint: undefined }, { provider: "synthetic-provider" }, { model: "synthetic-model" },
+      { modelRouteDigest: `sha256:${"a".repeat(64)}` }, { executionBackend: "persistent-worker" },
+      { executor: { ...executor, runtimeArtifactSha256: harnessRuntimeArtifactDigest(ISOLATED_INVOCATION_RUNTIME_ARTIFACT) } },
+      { factoryDefinitionVersionId: "version-without-exact-binding" }]) expect(eligible(changed)).toBe(false);
+    expect(factoryWorkerEligibility({ worker, requirements: { ...requirements, inferenceConstraint: NO_INFERENCE_CONSTRAINT }, activeWorkerLeaseCount: 0, now }).eligible).toBe(false);
+  });
+
+  it("requires all exact offline version identities and forbids fabricated model fields", () => {
+    const binding = { factoryDefinitionVersionId: "version-1", factoryConfigurationDigest: "factory-v1-deadbeef",
+      adapter: "isolated-invocation", version: ISOLATED_INVOCATION_MANIFEST.identity.adapterVersion, executionBackend: "isolated-container" as const,
+      inferenceConstraint: NO_INFERENCE_CONSTRAINT, capabilityManifestSha256: harnessCapabilityManifestDigest(ISOLATED_INVOCATION_MANIFEST),
+      effectiveConfigSha256: ISOLATED_INVOCATION_MANIFEST.effectiveConfigSha256,
+      runtimeArtifactSha256: harnessRuntimeArtifactDigest(ISOLATED_INVOCATION_RUNTIME_ARTIFACT),
+      sandboxProfileDigest: `sha256:${"b".repeat(64)}`, repositoryId: "repository-1" };
+    const expected = { ...binding, requireRuntimeArtifactBinding: true };
+    expect(factoryWorkerVersionBindingMatches({ binding, requirements: expected })).toBe(true);
+    for (const changed of [{ inferenceConstraint: undefined }, { provider: "fake" }, { model: "fake" },
+      { modelRouteDigest: `sha256:${"c".repeat(64)}` }, { runtimeArtifactSha256: undefined },
+      { sandboxProfileDigest: undefined }, { factoryDefinitionVersionId: "different" }, { repositoryId: "different" }]) {
+      expect(factoryWorkerVersionBindingMatches({ binding: { ...binding, ...changed } as any, requirements: expected })).toBe(false);
+    }
+    expect(factoryWorkerVersionBindingMatches({ binding, requirements: { ...expected, requireRuntimeArtifactBinding: false } })).toBe(false);
+  });
   it("matches every frozen Factory Version host-binding field exactly", () => {
     const binding = {
       factoryDefinitionVersionId: "factory-version-1",

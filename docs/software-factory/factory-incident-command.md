@@ -1,6 +1,6 @@
 ---
 title: Factory Incident Command
-status: EXPERIMENTAL
+status: PRODUCTION_QUALIFIED_ONE_EXACT_REPOSITORY_OPERATION
 last_verified: 2026-09-06
 ---
 
@@ -50,6 +50,17 @@ repository, actor, sequence, expiry, request, predecessor, producer, and runtime
 version must match across the lineage. Other unqualified control categories
 continue to require distinct canonical PASS evidence envelopes. An
 acknowledgment is never containment proof.
+
+The bounded production acceptance path records a fifth, separate
+`DISPATCH_DENIED` receipt. An authenticated incident commander triggers an
+admission attempt against the same exact-repository gate used by WorkOrder
+dispatch. The attempt is valid only while the active projection is denied by
+this incident and the active request has a complete independently observed
+PAUSE lineage. It creates no Attempt, workflow run, worker launch, or external
+call. The receipt is runtime-contract-versioned, append-only, linked to the
+active effect receipt, and is validated again before it can satisfy the
+incident's Measure phase.
+
 Restoration is a later, separate human decision. It requires:
 
 1. the incident has progressed through isolation;
@@ -94,13 +105,22 @@ WorkOrder dispatch with zero runs created, survived backend restart, restored
 only after a separate durable grant, and completed the full lifecycle. It is
 bounded qualification evidence, not general production authority.
 
+The retained Production qualification incident `INC-MTQR363Y-DA535A` exercised
+the same exact-repository gate for `jaydubya818/MissionControl`. Its runtime-v55
+`DISPATCH_DENIED` receipt is linked to the independently observed PAUSE chain;
+workflow-run count remained 13 before and after the admission attempt. A
+separate restoration grant then produced distinct request, command,
+acknowledgment, and independently observed `ENABLED` receipts. The incident
+reached `RESOLVED` at sequence 9 and remained complete after browser refresh.
+See the [Production qualification record](../testing/evidence/factory-incident-command-production-v55/README.md).
+
 ## Rollout and rollback
 
-The incident aggregate is additive and starts at Experimental maturity. Keep
-existing alert and runtime controls authoritative. Roll back the UI/API exposure
-if authorization, idempotency, currentness, or evidence-link checks regress;
-preserve already-created incident records and transitions for audit.
-
-Production promotion still requires exact-main deployment and a bounded
-synthetic production acceptance drill. No customer repository or workload may
-be used for that qualification.
+The incident aggregate is additive and is Production-qualified only for the
+exact `PAUSE_REPOSITORY_DISPATCH` / `RESUME_REPOSITORY_DISPATCH` operation on
+the retained Mission Control qualification repository. Keep existing alert and
+runtime controls authoritative. Roll back the UI/API exposure if authorization,
+idempotency, currentness, or evidence-link checks regress; preserve already-
+created incident records and transitions for audit. Every additional control,
+repository class, or autonomous authority requires its own bounded
+qualification. Customer incidents remain outside this qualification.

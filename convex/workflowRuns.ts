@@ -201,6 +201,9 @@ async function insertRunEvent(ctx: any, args: {
   traceContext?: { traceId?: string; spanId?: string; parentSpanId?: string };
   metadata?: any;
 }) {
+  if (args.idempotencyKey?.startsWith("factory-lease:")) {
+    throw new Error("Factory lease events are server-authored records.");
+  }
   if (args.idempotencyKey) {
     const existing = await ctx.db
       .query("runEvents")
@@ -275,6 +278,10 @@ async function insertRunArtifact(ctx: any, args: {
   automationOutputSnapshot?: any;
   metadata?: any;
 }) {
+  if (args.idempotencyKey?.endsWith(":offline-response")
+    || args.metadata?.schema === "factory-offline-attempt-evidence/v1") {
+    throw new Error("Offline response records require dedicated validated ingestion.");
+  }
   if (args.idempotencyKey) {
     const existing = await ctx.db
       .query("runArtifacts")
@@ -1076,6 +1083,10 @@ export const start = mutation({
     if (!workflow.active) {
       throw new Error(`Workflow is not active: ${args.workflowId}`);
     }
+    if (workflow.contractVersion === "factory-workflow-contract/v2"
+      || workflow.steps.some(step => step.kind === "DETERMINISTIC")) {
+      throw new Error("Deterministic workflows require canonical WorkOrder, Factory and Execution Profile admission.");
+    }
     if (args.projectId && (
       workflow.projectId !== args.projectId
       || workflow.contractVersion !== "factory-workflow-contract/v1"
@@ -1206,6 +1217,8 @@ export const recordEvent = mutation({
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
     if (!run) throw new Error("Workflow run not found");
+    const access = await requireAuthorizedDeliveryScope(ctx, run.projectId, COMPANY_PERMISSIONS.UPDATE_DELIVERY);
+    if (!access) throw new Error("Event writes require an authorized workspace.");
 
     const result = await insertRunEvent(ctx, {
       ...args,

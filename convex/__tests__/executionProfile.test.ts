@@ -565,8 +565,12 @@ describe("governed Execution Profile identity", () => {
       .toBe("EXECUTION_PROFILE_UNQUALIFIED");
     expect(executionProfileCurrentness({
       ...record,
-      immutableSnapshot: { ...profileSnapshot, schema: "factory-execution-profile/v2" },
+      immutableSnapshot: { ...profileSnapshot, schema: "factory-execution-profile/v99" },
     }, 1_500).blocker).toBe("EXECUTION_PROFILE_UNSUPPORTED");
+    expect(executionProfileCurrentness({
+      ...record,
+      immutableSnapshot: { ...profileSnapshot, schema: "factory-execution-profile/v2" },
+    }, 1_500).blocker).toBe("EXECUTION_PROFILE_SNAPSHOT_INVALID");
     expect(executionProfileIssues({ ...profileSnapshot, executionBackend: "unsupported" }))
       .toEqual(expect.arrayContaining(["execution-backend-invalid"]));
   });

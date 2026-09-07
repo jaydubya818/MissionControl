@@ -395,6 +395,8 @@ export async function buildExecutionRoutingPreview(
       ? catalog.find((model) => model._id === version.modelCatalogId)
       : undefined;
     const backend = version.executionBackend ?? "persistent-worker";
+    // Inference routing never invents a model tuple for deterministic work.
+    if (backend === "isolated-container") continue;
     const requiredSandboxCapabilities = backend === "remote-sandbox"
       ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
       : ["git-worktree", "workspace-write"];
