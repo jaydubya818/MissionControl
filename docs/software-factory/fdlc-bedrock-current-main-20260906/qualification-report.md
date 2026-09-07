@@ -105,9 +105,14 @@ Center administrator permission set in the Organizations management account or
 configured delegated-administrator account. The concrete missing assignment is
 management-account `437672023618` access through the organization's existing
 Identity Center administrator permission set/group, granted to a separate
-administrator principal. The administrator permission-set/group identity remains
-unobservable from the target role. This authority cannot be bootstrapped from the
-target role.
+administrator principal. Newer handoff evidence identifies
+`FDLC-Qualification Identity Delegated Admin` in account `955857822343`, using
+underlying role `AccountFullAccessRole`, as a candidate delegated-administration
+path. Its previously observed safe principal was
+`arn:aws:sts::955857822343:assumed-role/AccountFullAccessRole/0408e4c8-7091-707f-a9f3-58951212d12f`.
+This candidate is distinct from the unverified management-account profile and
+does not change the rule that authority cannot be bootstrapped from the target
+qualification role.
 
 Read-only local administrator-path discovery found a configured profile named
 `fdlc-qualification-management` declaring management account `437672023618`, SSO
@@ -118,8 +123,8 @@ that management profile. Because `AccountFullAccessRole` is explicitly excluded
 as a workaround and is not visible as an assigned role, it was not assumed and
 no credentials were requested. No open browser session exposes the management
 account. The organization owner or existing administrator principal, the
-approved Identity Center administrator permission set/group, and any delegated
-administrator remain unidentified.
+approved Identity Center administrator permission set/group, and the effective
+delegated-administrator assignment remain unverified from the current portal.
 
 The local AWS configuration file was created at `2026-09-05 16:41:03 -0700`
 and modified at `2026-09-05 16:43:35 -0700`. The profile is a direct, legacy-form
@@ -132,8 +137,23 @@ and later discovery notes. It found no management-account STS receipt,
 permission-set ARN, principal ID, account-assignment request, provisioning
 request, or successful organization-administration operation for
 `AccountFullAccessRole`. The resulting classification is
-`ACCOUNT_FULL_ACCESS_ROLE_CONFIGURED_BUT_UNVERIFIED`, and the operative boundary
-remains `AWS_ORG_BOOTSTRAP_ADMIN_REQUIRED`.
+`ACCOUNT_FULL_ACCESS_ROLE_CONFIGURED_BUT_UNVERIFIED` for the management-account
+profile.
+
+On `2026-09-07T10:51:11-0700`, the distinct local profile
+`fdlc-identity-delegated-bootstrap` was confirmed to declare account
+`955857822343`, role `AccountFullAccessRole`, the same SSO start URL, and region
+`us-east-1`. The SSO login completed, but AWS returned
+`ForbiddenException: No access` while obtaining role credentials for that exact
+account and role. Consequently STS identity, `sso-admin:ListInstances`,
+`organizations:DescribeOrganization`, and
+`organizations:ListDelegatedAdministrators` could not execute. No authoritative
+AWS read-back currently proves that account `955857822343` administers Identity
+Center instance `ins-72234a7377aca2a0`. No bootstrap or policy mutation was
+attempted. The operative boundary is
+`DELEGATED_ADMIN_AUTHORITY_NOT_VERIFIED` with failed predicate: the current SSO
+user has no accessible account assignment for the identified delegated-admin
+role.
 
 The reviewed invocation policy digest is
 `sha256:b89537a26d8a9f0f4e1f2d0455c9985ae8da63fe2623c4e94c671c30097d464d`.
