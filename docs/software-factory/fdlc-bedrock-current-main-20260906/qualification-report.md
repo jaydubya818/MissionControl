@@ -1,7 +1,7 @@
 # FDLC Phase 1 Bedrock qualification report
 
 Updated: 2026-09-07. Authoritative baseline: Mission Control main
-`73c6d954bceba490a5b65e4b50f0897c01f11863`, runtime contract v55. The
+`ee870794cddb426824fc881a520ccdda028060d6`, runtime contract v55. The
 candidate is reconciled with the accounting-recovery, Factory Engineer,
 orchestration-readiness, incident-evidence, and repository-dispatch controls on
 canonical main.
@@ -140,6 +140,12 @@ dispatch whenever unresolved liability is nonzero.
   1,420 Convex tests, 714 orchestration tests with 11 intended skips, full
   repository tests, authorization, secret scanning, lint, build, startup smoke,
   historical evidence immutability, and the runtime-contract guard.
+- Merge commit `ee2065e4a8d2e70063f8a453da7a109dccfc3de0` then integrated
+  current main `ee870794cddb426824fc881a520ccdda028060d6`. That main delta contains
+  only Todo 063 documentation and CountTokens evidence; it changes no runtime
+  code or public contract. Factory documentation, secret scanning, JSON, and
+  whitespace checks pass on the resulting exact head. PR CI supplies the final
+  remote exact-head qualification.
 
 Evidence is under
 `docs/testing/evidence/fdlc-bedrock-live-20260906/`, including caller identity,
