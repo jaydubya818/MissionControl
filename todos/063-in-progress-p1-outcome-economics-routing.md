@@ -71,6 +71,22 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
+### 2026-09-07 - Worker-path CountTokens permission applied; profile still unsupported
+
+- Applied a reviewed Terraform plan with zero creates, two in-place updates,
+  and zero destroys. Only the exact qualification worker role and its Bedrock
+  runtime VPC endpoint policy gained `bedrock:CountTokens`; targeted post-apply
+  drift is clean and the human permission set fingerprint is unchanged.
+- One corrected one-off task used the immutable worker task definition, exact
+  worker role, private worker network, and approved inference profile. Bedrock
+  admitted the call but returned `ValidationException` because the profile does
+  not support token counting.
+- No generation request, reservation, automatic retry, fallback, or billable
+  inference occurred. AI-FDE PR `#4` merged as `8c2aa2b026e8af3ba60fad9d70eef859d4d9c981`.
+  Evidence is retained under
+  `docs/testing/evidence/todo063-bedrock-worker-counttokens-2026-09-07/`.
+- Todo 063 remains in progress. Todo 064 remains dependency-blocked.
+
 ### 2026-09-07 - CountTokens provisioned; approved profile unsupported
 
 - Reprovisioned Identity Center permission set `FDLCQualificationTFOperator`
