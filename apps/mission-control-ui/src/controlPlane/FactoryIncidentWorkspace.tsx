@@ -143,7 +143,7 @@ function IncidentEmptyState({ onCreate }: { onCreate: () => void }) {
   );
 }
 
-function IncidentCreateForm({
+export function IncidentCreateForm({
   projectId,
   onCreated,
 }: {
@@ -151,22 +151,38 @@ function IncidentCreateForm({
   onCreated: (incidentId: Id<"factoryIncidents">) => void;
 }) {
   const createIncident = useMutation(api.factory.incidents.create);
+  const repositoryRows = useQuery(api.projects.listRepositories, { projectId }) as Array<{
+    repositoryId: Id<"workspaceRepositories"> | null;
+    repository: string;
+    isDefault: boolean;
+  }> | undefined;
+  const repositories = repositoryRows?.filter(
+    (row): row is typeof row & { repositoryId: Id<"workspaceRepositories"> } => row.repositoryId !== null,
+  ) ?? [];
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [impact, setImpact] = useState("");
   const [objective, setObjective] = useState("");
   const [commander, setCommander] = useState("");
   const [severity, setSeverity] = useState<"SEV1" | "SEV2" | "SEV3" | "SEV4">("SEV3");
+  const [repositoryId, setRepositoryId] = useState<Id<"workspaceRepositories"> | "">("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (repositoryId || repositories.length === 0) return;
+    setRepositoryId(repositories.find((row) => row.isDefault)?.repositoryId ?? repositories[0].repositoryId);
+  }, [repositories, repositoryId]);
 
   const submit = async () => {
     setSubmitting(true);
     setError(null);
     try {
+      if (!repositoryId) throw new Error("Select a canonical repository before filing an actionable incident.");
       const sourceFingerprint = await sha256(`${projectId}:${title.trim()}:${summary.trim()}`);
       const result = await createIncident({
         projectId,
+        repositoryId,
         sourceFingerprint,
         title,
         summary,
@@ -192,11 +208,27 @@ function IncidentCreateForm({
       <Textarea aria-label="Business impact" placeholder="Business impact" value={impact} onChange={(event) => setImpact(event.target.value)} />
       <Textarea aria-label="Recovery objective" placeholder="Known-safe recovery objective" value={objective} onChange={(event) => setObjective(event.target.value)} />
       <Input aria-label="Incident commander" placeholder="Incident commander identity" value={commander} onChange={(event) => setCommander(event.target.value)} />
+      <select
+        aria-label="Incident repository"
+        className="h-9 w-full rounded-md border border-line bg-surface-1 px-3 text-[13px] text-ink"
+        value={repositoryId}
+        onChange={(event) => setRepositoryId(event.target.value as Id<"workspaceRepositories">)}
+      >
+        <option value="" disabled>Select repository</option>
+        {repositories.map((row) => (
+          <option key={row.repositoryId} value={row.repositoryId}>
+            {row.repository}{row.isDefault ? " (default)" : ""}
+          </option>
+        ))}
+      </select>
+      {repositoryRows !== undefined && repositories.length === 0 ? (
+        <p role="alert" className="text-[12px] text-danger">Connect a canonical repository before filing an actionable incident.</p>
+      ) : null}
       <select aria-label="Severity" className="h-9 w-full rounded-md border border-line bg-surface-1 px-3 text-[13px] text-ink" value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}>
         <option value="SEV1">SEV1</option><option value="SEV2">SEV2</option><option value="SEV3">SEV3</option><option value="SEV4">SEV4</option>
       </select>
       {error ? <p role="alert" className="text-[12px] text-danger">{error}</p> : null}
-      <Button size="sm" disabled={submitting} onClick={submit}>{submitting ? "Filing…" : "File incident"}</Button>
+      <Button size="sm" disabled={submitting || !repositoryId} onClick={submit}>{submitting ? "Filing…" : "File incident"}</Button>
     </div>
   );
 }

@@ -3,13 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FactoryIncidentBoundary,
   FactoryIncidentWorkspace,
+  IncidentCreateForm,
   IncidentPermissionState,
 } from "./FactoryIncidentWorkspace";
 
 const useQuery = vi.fn();
+const useMutation = vi.fn();
 vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useQuery(...args),
-  useMutation: () => vi.fn(),
+  useMutation: (...args: unknown[]) => useMutation(...args),
 }));
 
 const incident = {
@@ -29,7 +31,11 @@ const incident = {
 };
 
 describe("FactoryIncidentWorkspace", () => {
-  beforeEach(() => useQuery.mockReset());
+  beforeEach(() => {
+    useQuery.mockReset();
+    useMutation.mockReset();
+    useMutation.mockReturnValue(vi.fn());
+  });
 
   it("renders an explicit loading state", () => {
     useQuery.mockReturnValue(undefined);
@@ -42,6 +48,27 @@ describe("FactoryIncidentWorkspace", () => {
     render(<FactoryIncidentWorkspace projectId={"project-1" as any} />);
     expect(screen.getByText("No incidents recorded")).toBeInTheDocument();
     expect(screen.getByText(/not that alerts or failures never occurred/)).toBeInTheDocument();
+  });
+
+  it("requires and persists a canonical repository when filing an incident", async () => {
+    const createIncident = vi.fn().mockResolvedValue({ incident: { _id: "incident-created" } });
+    useMutation.mockReturnValue(createIncident);
+    useQuery.mockReturnValue([
+      { repositoryId: "repository-1", repository: "jaydubya818/MissionControl", isDefault: true },
+    ]);
+
+    render(<IncidentCreateForm projectId={"project-1" as any} onCreated={vi.fn()} />);
+    await waitFor(() => expect(screen.getByLabelText("Incident repository")).toHaveValue("repository-1"));
+    fireEvent.change(screen.getByLabelText("Incident title"), { target: { value: "Production qualification" } });
+    fireEvent.change(screen.getByLabelText("Incident summary"), { target: { value: "Bounded repository control qualification." } });
+    fireEvent.change(screen.getByLabelText("Business impact"), { target: { value: "Synthetic repository only." } });
+    fireEvent.change(screen.getByLabelText("Recovery objective"), { target: { value: "Restore governed dispatch." } });
+    fireEvent.click(screen.getByRole("button", { name: "File incident" }));
+
+    await waitFor(() => expect(createIncident).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: "project-1",
+      repositoryId: "repository-1",
+    })));
   });
 
   it("separates contained state from authority restoration and shows the next exact phase", async () => {
