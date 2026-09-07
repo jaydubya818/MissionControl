@@ -235,10 +235,12 @@ export function IncidentCreateForm({
 
 function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) {
   const detail = useQuery(api.factory.incidents.get, { incidentId });
-  const dispatchControl = useQuery(api.factory.incidentControls.getRepositoryDispatchControl, {
-    incidentId,
-    repositoryId: detail?.incident.repositoryId,
-  });
+  const dispatchControl = useQuery(
+    api.factory.incidentControls.getRepositoryDispatchControl,
+    detail?.incident.repositoryId
+      ? { incidentId, repositoryId: detail.incident.repositoryId }
+      : "skip",
+  );
   const advance = useMutation(api.factory.incidents.advance);
   const assignCommander = useMutation(api.factory.incidents.assignCommander);
   const decideProposal = useMutation(api.factory.incidents.decideProposal);

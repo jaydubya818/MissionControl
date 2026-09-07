@@ -102,6 +102,19 @@ describe("FactoryIncidentWorkspace", () => {
     expect(screen.getByText(/immutable decision expects sequence 2/i)).toBeInTheDocument();
   });
 
+  it("does not query repository control for a retained unscoped incident", async () => {
+    useQuery.mockImplementation((_reference, args) => (
+      args && typeof args === "object" && "incidentId" in args
+        ? { incident, transitions: [], proposals: [] }
+        : [incident]
+    ));
+
+    render(<FactoryIncidentWorkspace projectId={"project-1" as any} />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Credential broker anomaly" })).toBeInTheDocument());
+    expect(useQuery).toHaveBeenCalledWith(expect.anything(), "skip");
+    expect(screen.getByRole("button", { name: "File" })).toBeEnabled();
+  });
+
   it("separates command, acknowledgment, and observed-effect proof at containment", async () => {
     const clarifyIncident = { ...incident, phase: "CLARIFY", status: "OPEN", currentSequence: 1 };
     useQuery.mockImplementation((_reference, args) => (
