@@ -82,9 +82,33 @@ either todo complete and does not authorize implementation by itself.
 - Inference evidence now records `MAXIMUM_RESERVED` separately from provider
   input/output usage and the `ESTIMATED` settled cost. Existing strict response
   parsing rejects unexpected cache usage and retains the full unresolved hold.
-- Focused handler, liability-bound, serialization, and bridge tests pass. The
-  single live synthetic call and remaining Todo 063 acceptance criteria remain
-  pending.
+- Focused handler, liability-bound, serialization, and bridge tests pass. A
+  further live request remains blocked by the account agreement and requires
+  separate request authority after that prerequisite is satisfied.
+
+### 2026-09-07 - Conservative contract landed; one live request reached account agreement gate
+
+- PR `#214` passed all 12 checks and merged as exact main
+  `beaf1f8cb293845ec2abaa6c3c1502676a5cf83b`. The post-merge Todo 063 gate passed
+  256 tests, documentation consistency, and runtime contract v55.
+- Revalidated the exact account, principal, region, active US Sonnet 4.6 profile,
+  and three regional backing models. Before transport, a durable hold reserved
+  the full 1,000,000-token input bound plus 4,096 output tokens: 3,367,584,000
+  nano-USD under the 5,000,000,000 nano-USD one-request program ceiling.
+- AWS received exactly one non-streaming synthetic request with SDK attempts set
+  to one. It returned `ResourceNotFoundException` before model use because the
+  account has not submitted Anthropic use-case details. Readback independently
+  reports `agreementAvailability=NOT_AVAILABLE` while authorization, entitlement,
+  and region availability are present.
+- No provider usage was returned. The hold is durably `UNKNOWN`, the full maximum
+  remains retained, and no zero-cost or successful-inference claim is made. No
+  retry, fallback, alternate route, IAM broadening, or second request occurred;
+  the temporary credential envelope was deleted.
+- Evidence is under
+  `docs/testing/evidence/todo063-bedrock-live-qualification-2026-09-07/`.
+  Todo 063 remains in progress; Todo 064 remains dependency-blocked. Resumption
+  requires the account owner to complete the Anthropic use-case agreement and a
+  new explicit one-request authorization.
 
 ### 2026-09-07 - Worker-path CountTokens permission applied; profile still unsupported
 
