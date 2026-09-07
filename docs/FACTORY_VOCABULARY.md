@@ -6,7 +6,7 @@ what it does **not** prove or authorize — the distinction that keeps capabilit
 separate from authority.
 
 This file is the implementation-side companion to the canonical glossary in
-`ai-software-factory-mastery` (`guide/00-overview/02-canonical-glossary.md`),
+`ai-software-factory-mastery` (`guide/appendix/glossary.md`),
 which defines the same concepts at the operating-model level. Where the two
 differ, the guide describes the general model and this file describes what
 Mission Control actually enforces today.
@@ -56,13 +56,61 @@ gates, and verification intent. The catalog lives in
 recipe resolves to an existing canonical workflow; the recipe does not create
 another execution engine, authorize execution, or accept a result.
 
-**Factory Version** — A versioned, digested factory configuration that binds a
-repository and workflow to execution inputs such as the executor, model route,
-sandbox, agents, policy envelope, environment, budgets, verifiers, risk
-boundary, and recovery controls (`convex/schema.ts`,
-`convex/factory/configuration.ts`). An active Factory Version makes execution
-configuration reproducible and attributable; creating a version is not itself
-activation or approval.
+**Factory Version** — An immutable, qualified composition of Factory
+capabilities used to govern a class of execution. It binds the repository,
+workflow, Execution Profile, agents, policy envelope, budgets, verifiers, risk
+boundary, recovery controls, and qualification evidence (`convex/schema.ts`,
+`convex/factory/configuration.ts`). Qualification alone does not activate the
+version or authorize a particular WorkOrder.
+
+**Execution Profile** — The governed execution composition binding runtime,
+harness, model and tool capabilities, execution backend, environment, and
+applicable policy for an Attempt. A profile is reproducible configuration, not
+authority to execute it.
+
+## Canonical execution and verification
+
+**WorkOrder** — The canonical governed unit of approved work, bound to an exact
+revision and Factory Version. It owns bounded scope, criteria, authority, and
+acceptance; its existence does not make it ready for execution.
+
+**Readiness** — The server-derived determination that all required identities,
+qualifications, authorities, resources, currentness checks, and policies are
+satisfied for a WorkOrder. Mission Control does not treat an unsupported
+`READY` value as evidence.
+
+**Task** — A bounded executable portion of an admitted WorkOrder. A Task can
+complete without accepting the parent WorkOrder.
+
+**Attempt** — One authoritative execution of a Task with durable identity,
+authority, runtime, evidence, and outcome lineage. Retries, corrections, and
+recovery create new Attempts rather than rewriting history.
+
+**Unpublished Candidate** — The exact producer output before independent
+verification or publication authority. Producer completion freezes a subject;
+it does not accept, publish, merge, or release it.
+
+**Verification Subject** — The frozen candidate identity and verification
+contract describing exactly what a verifier evaluates. Candidate or contract
+changes invalidate evidence bound to the old subject.
+
+**Verifier Attempt** — A separate canonical Attempt that independently
+evaluates a Verification Subject. It cannot share producer identity or inherit
+acceptance and publication authority.
+
+**Evidence** — A durable, attributable record of what was authorized, executed,
+observed, verified, or decided. Qualifying evidence binds its subject, actor,
+method, environment, source revision, artifact, time, result, and currentness.
+
+**Human Authority** — Explicit authority retained for consequential decisions
+such as acceptance, publication, release, restoration, or policy promotion.
+Verification can establish eligibility but cannot make the human decision.
+
+The bounded retained proof for this chain is
+`docs/testing/evidence/context-skills-factory-admission-v1/README.md`. Its
+status is `SYNTHETIC_FACTORY_ADMISSION_QUALIFIED`: zero external model calls,
+zero publications, zero Production mutations, and no production acceptance or
+publication authority.
 
 ## Factory learning
 
