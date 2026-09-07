@@ -134,9 +134,12 @@ dispatch whenever unresolved liability is nonzero.
   1,284 Convex tests, 671 orchestration tests with 11 intended skips, full
   repository tests, authorization, secret scanning, lint, build, startup smoke,
   historical evidence immutability, and the runtime-contract guard.
-- The branch is reconciled with main
-  `73c6d954bceba490a5b65e4b50f0897c01f11863`; commit-bound v55 qualification
-  remains required on the integrated merge commit.
+- Integrated merge commit `47ba04dd03d1a236f18234cbbe2b14921372d2aa`
+  passed all 19 System Qualification V2 checks against current main
+  `73c6d954bceba490a5b65e4b50f0897c01f11863` and runtime v55. The run includes
+  1,420 Convex tests, 714 orchestration tests with 11 intended skips, full
+  repository tests, authorization, secret scanning, lint, build, startup smoke,
+  historical evidence immutability, and the runtime-contract guard.
 
 Evidence is under
 `docs/testing/evidence/fdlc-bedrock-live-20260906/`, including caller identity,
@@ -144,6 +147,8 @@ profile topology, CountTokens result, pricing, the effective permission-set
 policy, provisioning status, failure receipt, and liability ledger.
 Commit-bound System evidence is under
 `docs/testing/evidence/fdlc-bedrock-live-system-v53-447ef65-20260907/`.
+Current-main System evidence is under
+`docs/testing/evidence/fdlc-bedrock-live-system-v55-47ba04d-20260907/`.
 
 ## Remaining boundary and deterministic resume
 
