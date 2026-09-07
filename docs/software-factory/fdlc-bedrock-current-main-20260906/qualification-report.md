@@ -127,14 +127,19 @@ dispatch whenever unresolved liability is nonzero.
 - IAM now admits the approved request as far as the Bedrock provider quota gate.
 - Focused Bedrock tests, Factory documentation validation, and policy consistency
   checks pass after the correction.
-- Earlier candidate commits passed all 19 System Qualification V2 checks against
-  runtime v53. Current source changes require commit-bound requalification before
-  merge.
+- Candidate commit `447ef6569b4e868efee6dbbe290d121abd2eb74b` passed all
+  19 System Qualification V2 checks against baseline
+  `46544a44cc3cfc0413246d5abc3571c848bec00c` and runtime v53. The run includes
+  1,284 Convex tests, 671 orchestration tests with 11 intended skips, full
+  repository tests, authorization, secret scanning, lint, build, startup smoke,
+  historical evidence immutability, and the runtime-contract guard.
 
 Evidence is under
 `docs/testing/evidence/fdlc-bedrock-live-20260906/`, including caller identity,
 profile topology, CountTokens result, pricing, the effective permission-set
 policy, provisioning status, failure receipt, and liability ledger.
+Commit-bound System evidence is under
+`docs/testing/evidence/fdlc-bedrock-live-system-v53-447ef65-20260907/`.
 
 ## Remaining boundary and deterministic resume
 
