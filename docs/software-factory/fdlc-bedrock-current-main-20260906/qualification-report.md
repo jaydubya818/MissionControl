@@ -1,10 +1,10 @@
 # FDLC Phase 1 Bedrock qualification report
 
 Updated: 2026-09-06. Authoritative baseline: Mission Control main
-`f01fed47ded95e9456803845211bac49ef54a1f1`, runtime contract v52. The
+`46544a44cc3cfc0413246d5abc3571c848bec00c`, runtime contract v53. The
 candidate is reconciled with the accounting-recovery, Factory Engineer
-package-import, orchestration-readiness, and incident-evidence changes now on
-canonical main.
+package-import, orchestration-readiness, incident-evidence, and governed
+repository-dispatch incident-control changes now on canonical main.
 
 Status: **AWS_IDENTITY_AND_ROUTE_INSPECTION_PASS**.
 
@@ -78,9 +78,11 @@ Identity Center administration APIs or modify its own permission set.
 
 After a fresh named-profile SSO login on 2026-09-06, the AWS access portal was
 rechecked. It exposes exactly one account, `083665737366`, and exactly one role,
-`FDLCQualificationTFOperator`. No Identity Center administrator assignment is
-available through the approved identity. No ambient profile, unrelated account,
-cached credential, or root identity was used.
+`FDLCQualificationTFOperator`. The portal was checked again after direct
+authorization to perform the administrative change and still exposed no Identity
+Center administrator assignment. The qualification role was not used to modify
+itself. No ambient profile, unrelated account, cached credential, or root identity
+was used.
 
 An Identity Center administrator must:
 
@@ -117,6 +119,16 @@ and runtime contract v52. This includes 1,274 Convex tests, 670 orchestration
 tests with 11 intended skips, the complete repository suite, lint, build,
 startup smoke, release security, and the runtime-contract guard. Current evidence
 is in `docs/testing/evidence/fdlc-bedrock-live-system-v52-f01fed-20260906/`.
+
+The latest reconciliation merge commit
+`09ce369fe1408113554f94c90798cf57a0e046e7` then passed all 19 System
+Qualification V2 checks against canonical main
+`46544a44cc3cfc0413246d5abc3571c848bec00c` and runtime contract v53. This run
+includes 1,284 Convex tests, 670 orchestration tests with 11 intended skips,
+the complete repository suite, authorization and secret scanning, lint, build,
+startup smoke, historical-evidence immutability, and the runtime-contract guard.
+The evidence is in
+`docs/testing/evidence/fdlc-bedrock-live-system-v53-46544a-20260906/`.
 
 ## Blocked work
 
