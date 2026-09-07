@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CODEX_V1_HARNESS_MANIFEST,
   CODEX_V1_RUNTIME_ARTIFACT,
+  KNOWN_HARNESS_MANIFESTS,
   harnessRuntimeArtifactDigest,
 } from "@mission-control/workflow-engine";
 import {
@@ -92,5 +93,17 @@ describe("frozen harness runtime identity", () => {
     const adapterRuntime = resolveHarnessAdapterRuntimeArtifact(executor);
     expect(adapterRuntime.runtimeArtifact).toEqual(CODEX_V1_RUNTIME_ARTIFACT);
     expect(adapterRuntime.runtimeArtifactSha256).toBe(harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT));
+  });
+
+  it("resolves an executable worker-host artifact for every Factory harness option", () => {
+    for (const manifest of KNOWN_HARNESS_MANIFESTS) {
+      const adapterRuntime = resolveHarnessAdapterRuntimeArtifact({
+        adapter: manifest.identity.adapterId,
+        version: manifest.identity.adapterVersion,
+      });
+      expect(adapterRuntime.runtimeArtifact.kind).toBe("EXECUTABLE");
+      expect(adapterRuntime.runtimeArtifact.executableSha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(adapterRuntime.runtimeArtifact.imageDigest).toBeNull();
+    }
   });
 });
