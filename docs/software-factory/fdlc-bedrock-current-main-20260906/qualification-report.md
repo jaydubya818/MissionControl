@@ -1,7 +1,7 @@
 # FDLC Phase 1 Bedrock qualification report
 
 Updated: 2026-09-07. Authoritative baseline: Mission Control main
-`466342b5be97434630984fd6e9c99f7279263ca2`, runtime contract v55. The
+`2f5735d672af3fec21ce71ce235fae37e08a30ce`, runtime contract v55. The
 candidate is reconciled with the accounting-recovery, Factory Engineer,
 orchestration-readiness, incident-evidence, and repository-dispatch controls on
 canonical main.
@@ -178,6 +178,11 @@ physical request is authorized or admissible.
   commit `ea2dceeeb818c21831fae71137780cb626591c31` integrates that
   authoritative evidence while preserving the earlier quota event and
   reconciliation as historical evidence.
+- Canonical main `2f5735d672af3fec21ce71ce235fae37e08a30ce` pins the complete
+  qualified Bedrock price digest at registration, reservation, and physical
+  request admission. Merge commit `53950c985c8d66ad52f41c2346cdef1c521e2e0c`
+  integrates that hardening without changing the active agreement, liability,
+  quota, or one-request authorization holds.
 
 Evidence is under
 `docs/testing/evidence/fdlc-bedrock-live-20260906/`, including caller identity,
