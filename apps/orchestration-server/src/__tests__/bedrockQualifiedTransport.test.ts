@@ -3,10 +3,14 @@ import { qualifiedBedrockTransport } from "../bedrockQualifiedTransport.js";
 import { bedrockModelRouteBinding } from "../bedrockModelRouteBinding.js";
 import { serializeBedrock } from "../bedrockAdapter.js";
 import { fixtureRoute, sha } from "./fixtures/bedrockBridgeFixture.js";
+import { bridgeFixture } from "./fixtures/bedrockBridgeFixture.js";
+import { liabilityDigest } from "../../../../convex/lib/providerLiability.js";
+const price = bridgeFixture().price;
 const grant = () => ({
   schema: "fdlc-bounded-bedrock-call-authorization/v1" as const,
   approvalReference: "OFFLINE_FIXTURE_ONLY",
   routeDigest: bedrockModelRouteBinding(fixtureRoute).routeDigest,
+  approvedPriceDigest: liabilityDigest(price),
   expectedStsPrincipalArn:
     "arn:aws:sts::000000000000:assumed-role/fixture/test",
   identityEvidenceDigest: sha("a"),
@@ -23,13 +27,19 @@ const wire = () =>
 const envelope = () =>
   JSON.stringify({
     awsAccountId: "000000000000",
-    roleArn: fixtureRoute.roleArn,
     principalArn: grant().expectedStsPrincipalArn,
     accessKeyId: "SYNTHETIC00000000000",
     secretAccessKey: "SYNTHETIC00000000000",
     sessionToken: "SYNTHETIC",
     expiresAt: Date.now() + 60000,
   });
+const authenticatedSts = () => ({
+  send: vi.fn(async () => ({
+    Account: fixtureRoute.awsAccountId,
+    Arn: fixtureRoute.expectedStsPrincipalArn,
+  })),
+  destroy: vi.fn(),
+});
 it("SDK fixture uses exact endpoint, static supplied credentials, one attempt and metadata identity", async () => {
   const read = vi.fn(async () => envelope()),
     send = vi.fn(async () => ({
@@ -38,9 +48,10 @@ it("SDK fixture uses exact endpoint, static supplied credentials, one attempt an
     })),
     destroy = vi.fn(),
     create = vi.fn((_options: any) => ({ send, destroy }));
-  const t = qualifiedBedrockTransport(fixtureRoute, grant(), {
+  const t = qualifiedBedrockTransport(fixtureRoute, price, grant(), {
     readCredentials: read,
     createClient: create,
+    createStsClient: authenticatedSts,
   });
   expect(read).not.toHaveBeenCalled();
   const result = await t.send(wire(), new AbortController().signal);
@@ -58,24 +69,58 @@ it("missing live-call authority fails before any credential read", () => {
   expect(() =>
     qualifiedBedrockTransport(
       fixtureRoute,
+      price,
       { ...grant(), allowModelCalls: false } as any,
-      { readCredentials: read },
+      { readCredentials: read, createStsClient: authenticatedSts },
     ),
   ).toThrow();
   expect(read).not.toHaveBeenCalled();
 });
+it("rejects self-consistent lower rates not bound by the approved price digest", () => {
+  const read = vi.fn();
+  const lowerPrice = {
+    ...price,
+    maximumInputTokens: price.maximumInputTokens - 1,
+  };
+  expect(() =>
+    qualifiedBedrockTransport(fixtureRoute, lowerPrice, grant(), {
+      readCredentials: read,
+      createStsClient: authenticatedSts,
+    }),
+  ).toThrow("BEDROCK_CALL_AUTHORIZATION_INVALID");
+  expect(read).not.toHaveBeenCalled();
+});
 it("wrong account envelope cannot create a client or send", async () => {
   const create = vi.fn();
-  const t = qualifiedBedrockTransport(fixtureRoute, grant(), {
+  const t = qualifiedBedrockTransport(fixtureRoute, price, grant(), {
     readCredentials: async () =>
       JSON.stringify({
         ...JSON.parse(envelope()),
         awsAccountId: "111111111111",
       }),
     createClient: create,
+    createStsClient: authenticatedSts,
   });
   await expect(t.send(wire(), new AbortController().signal)).rejects.toThrow(
     "CREDENTIAL_IDENTITY",
+  );
+  expect(create).not.toHaveBeenCalled();
+});
+it("rejects mislabeled credentials using authenticated STS identity before inference", async () => {
+  const create = vi.fn();
+  const t = qualifiedBedrockTransport(fixtureRoute, price, grant(), {
+    readCredentials: async () => envelope(),
+    createClient: create,
+    createStsClient: () => ({
+      send: vi.fn(async () => ({
+        Account: fixtureRoute.awsAccountId,
+        Arn: "arn:aws:sts::000000000000:assumed-role/broader-role/test",
+      })),
+      destroy: vi.fn(),
+    }),
+  });
+  await expect(t.send(wire(), new AbortController().signal)).rejects.toThrow(
+    "BEDROCK_AUTHENTICATED_PRINCIPAL_MISMATCH",
   );
   expect(create).not.toHaveBeenCalled();
 });
@@ -84,9 +129,10 @@ it("provider error is not retried and client is destroyed", async () => {
       throw new Error("fixture timeout");
     }),
     destroy = vi.fn();
-  const t = qualifiedBedrockTransport(fixtureRoute, grant(), {
+  const t = qualifiedBedrockTransport(fixtureRoute, price, grant(), {
     readCredentials: async () => envelope(),
     createClient: () => ({ send, destroy }),
+    createStsClient: authenticatedSts,
   });
   await expect(t.send(wire(), new AbortController().signal)).rejects.toThrow();
   expect(send).toHaveBeenCalledTimes(1);
@@ -97,9 +143,10 @@ it.each(["modelId", "additionalModelRequestFields", "guardrailConfig"])(
   async (key) => {
     const read = vi.fn(),
       create = vi.fn();
-    const t = qualifiedBedrockTransport(fixtureRoute, grant(), {
+    const t = qualifiedBedrockTransport(fixtureRoute, price, grant(), {
       readCredentials: read,
       createClient: create,
+      createStsClient: authenticatedSts,
     });
     const w = wire();
     w.body[key] = "unapproved";

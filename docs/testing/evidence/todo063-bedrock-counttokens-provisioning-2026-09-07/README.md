@@ -34,4 +34,4 @@ Evidence:
 - [provisioning receipt](provisioning.json)
 - [effective authorization scope](authorization-scope.json)
 - [CountTokens capability result](counttokens-capability.json)
-
+- [reviewed immutable pricing facts](pricing-source-review.json)

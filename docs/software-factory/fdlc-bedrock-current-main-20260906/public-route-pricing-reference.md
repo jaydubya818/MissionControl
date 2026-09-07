@@ -16,9 +16,9 @@ for hits/refreshes. The approved harness disables cache and reasoning, and the
 cheaper global tier remains prohibited.
 [Provider list prices](https://www-cdn.anthropic.com/files/4zrzovbb/website/3684c2faafb97418665782cea0001f439f74b1d2.pdf).
 
-These are public reference values only. No price registration, activation, route,
-reservation, profile or Factory Version was created. The safe price record remains
-UNQUALIFIED. Exact account applicability, active terms/effective date and route
-provenance must be verified and bound before any real budget admission. Account
-identity remains absent from approved handoff records. Do not substitute fixture
-pricing or this research note for canonical price authority.
+This file records the 2026-09-06 research state and is not itself price authority.
+The later reviewed, expiring qualification price is frozen in
+`../fdlc-bedrock-price-qualified.json`, with its source bytes bound by SHA-256 and
+its exact liability derivation documented in
+`../bedrock-counttokens-capability-and-liability-contract.md`. Do not substitute
+fixture pricing or this historical research note for that canonical artifact.

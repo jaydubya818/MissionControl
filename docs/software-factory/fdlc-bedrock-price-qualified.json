@@ -1,0 +1,31 @@
+{
+  "schema": "fdlc-bedrock-price/v1",
+  "qualification": "APPROVED_QUALIFICATION",
+  "version": "anthropic-2026-05-27-sonnet-4-6-us-standard/v1",
+  "effectiveAt": 1779840000000,
+  "expiresAt": 1791331200000,
+  "currency": "USD",
+  "billingUnit": "MILLION_TOKENS",
+  "provenance": {
+    "url": "https://www-cdn.anthropic.com/files/4zrzovbb/website/3684c2faafb97418665782cea0001f439f74b1d2.pdf",
+    "evidenceDigest": "sha256:dc372a994199f77b1e140e775875fd610591c69f31aa8e7ff8394908647b71ad"
+  },
+  "ratesNanoUsdPerMillion": {
+    "input": 3300000000,
+    "output": 16500000000,
+    "cacheRead": 330000000,
+    "cacheWrite5m": 4125000000,
+    "cacheWrite1h": 6600000000,
+    "reasoning": 16500000000
+  },
+  "cacheMode": "DISABLED",
+  "reasoningMode": "DISABLED",
+  "reasoningBilling": "INCLUDED_IN_OUTPUT",
+  "otherBillableDimensions": "NONE",
+  "maximumInputTokens": 1000000,
+  "maximumOutputTokens": 4096,
+  "maximumPayloadBytes": 262144,
+  "inputBoundEvidence": "Full 1,000,000-token Sonnet 4.6 context ceiling; CountTokens is UNSUPPORTED on the exact approved US profile, so every admitted request reserves the full context ceiling before transmission.",
+  "outputBoundEvidence": "Exact non-streaming Converse request enforces maxTokens=4096; extended thinking, cache controls, retries and fallbacks are prohibited.",
+  "qualifiedProviderPriceDigest": "sha256:ba19028022ec2de109d2863415263b691d13d334618d7f49e7524f3c07e33160"
+}

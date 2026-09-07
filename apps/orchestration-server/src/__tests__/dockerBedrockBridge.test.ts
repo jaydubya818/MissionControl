@@ -114,8 +114,9 @@ it.runIf(process.env.MC_DOCKER_QUALIFICATION === "1")(
         {
           route: budget.binding.route,
           reservationId: budget.binding.reservationId,
-          priceDigest: budget.binding.identity.priceDigest,
-          maximumOutputTokens: 4096,
+          price: budget.price,
+          maximumProgramNanoUsd: budget.binding.maximumProgramNanoUsd,
+          maximumPhysicalRequests: budget.binding.maximumPhysicalRequests,
           timeoutMs: 10000,
         },
         budget.transport,

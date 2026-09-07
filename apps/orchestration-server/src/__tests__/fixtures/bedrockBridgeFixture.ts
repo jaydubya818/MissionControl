@@ -27,12 +27,16 @@ export const fixtureRoute = bedrockRouteSchema.parse({
   inferenceProfileId: "us.anthropic.claude-sonnet-4-6",
   inferenceProfileArn:
     "arn:aws:bedrock:us-east-1:000000000000:inference-profile/us.anthropic.claude-sonnet-4-6",
+  maximumContextTokens: 1_000_000,
+  capabilities: { countTokens: { status: "UNSUPPORTED", evidenceReference: "fixture://counttokens-unsupported", evidenceDigest: `sha256:${"d".repeat(64)}` } },
   topology: "US_GEOGRAPHIC_CROSS_REGION",
   globalInference: false,
   allowedDestinationRegions: ["us-east-1", "us-east-2", "us-west-2"],
   awsAccountId: "000000000000",
   projectEnvironmentId: "OFFLINE-FIXTURE",
   roleArn: "arn:aws:iam::000000000000:role/fixture",
+  expectedStsPrincipalArn:
+    "arn:aws:sts::000000000000:assumed-role/fixture/test",
 });
 export const sha = (c: string) => `sha256:${c.repeat(64)}`;
 export function bridgeFixture() {
@@ -49,7 +53,7 @@ export function bridgeFixture() {
     evidenceDigest: sha("a"),
     inputNanoUsdPerToken: 1,
     outputNanoUsdPerToken: 1,
-    maximumInputTokens: 200000,
+    maximumInputTokens: 1_000_000,
     maximumOutputTokens: 4096,
     maximumPayloadBytes: 1048576,
     inputBound: "CONSERVATIVELY_BOUNDED",
@@ -65,7 +69,9 @@ export function bridgeFixture() {
     generation: 1,
     reservationId: "reservation",
     route: fixtureRoute,
-    maximumOutputTokens: 4096,
+    price,
+    maximumProgramNanoUsd: 2_000_000,
+    maximumPhysicalRequests: 4,
     timeoutMs: 10000,
     identity: {
       schema: "factory-bedrock-inference/v1",
@@ -97,7 +103,7 @@ export function bridgeFixture() {
       modelRouteDigest: binding.identity.modelRouteDigest,
       priceDigest: binding.identity.priceDigest,
     },
-    maximumNanoUsd: 1000000,
+    maximumNanoUsd: 2_000_000,
     expiresAt: now + 60000,
     maximumRequests: 4,
     frozen: false,
@@ -128,6 +134,7 @@ export function bridgeFixture() {
         requestDigest: p.requestDigest as string,
         payloadBytes: p.payloadBytes as number,
         outputTokens: p.outputTokens as number,
+        preSendInputBound: p.preSendInputBound as any,
         now: Date.now(),
       });
       reservation = r.reservation;
@@ -136,6 +143,10 @@ export function bridgeFixture() {
         requestDigest: p.requestDigest as string,
         priceDigest: liabilityDigest(price),
         bridgeIdentityDigest: liabilityDigest(p.bridgeIdentity),
+        maximumNanoUsd: r.hold.maximumNanoUsd,
+        reservationMaximumNanoUsd: reservation.maximumNanoUsd,
+        reservationMaximumRequests: reservation.maximumRequests,
+        holdDigest: liabilityDigest(r.hold),
         admittedAt: Date.now(),
         validUntil: reservation.expiresAt,
       };

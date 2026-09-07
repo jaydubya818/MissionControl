@@ -12,14 +12,16 @@ import { bedrockRouteSchema, type BedrockRoute } from "./bedrockRoute.js";
 import { DockerSandboxProvider } from "./dockerSandboxProvider.js";
 import { DOCKER_BEDROCK_CANDIDATE_IDENTITY } from "./dockerBedrockIdentity.js";
 import { bedrockModelRouteBinding } from "./bedrockModelRouteBinding.js";
+import { liabilityDigest, type ProviderPrice } from "../../../convex/lib/providerLiability.js";
 
 /** Explicit host configuration. IDs select canonical records; they grant no
  * admission. No environment, AWS profile, or credential discovery occurs here. */
 export interface BedrockFactoryConfiguration {
   route: BedrockRoute;
   reservationId: string;
-  priceDigest: string;
-  maximumOutputTokens: number;
+  price: ProviderPrice;
+  maximumProgramNanoUsd: number;
+  maximumPhysicalRequests: number;
   timeoutMs: number;
 }
 export function bedrockFactoryProviderFactory(
@@ -31,8 +33,7 @@ export function bedrockFactoryProviderFactory(
   const config = structuredClone(configuration);
   config.route = bedrockRouteSchema.parse(config.route);
   if (
-    !config.reservationId ||
-    !/^sha256:[a-f0-9]{64}$/.test(config.priceDigest)
+    !config.reservationId
   )
     throw new Error("BEDROCK_CONFIGURATION_REQUIRED");
   return (profile, context) => {
@@ -76,7 +77,9 @@ export function bedrockFactoryProviderFactory(
             generation: claim.lease.workerGeneration,
             reservationId: config.reservationId,
             route: config.route,
-            maximumOutputTokens: config.maximumOutputTokens,
+            price: config.price,
+            maximumProgramNanoUsd: config.maximumProgramNanoUsd,
+            maximumPhysicalRequests: config.maximumPhysicalRequests,
             timeoutMs: config.timeoutMs,
             identity: {
               schema: "factory-bedrock-inference/v1",
@@ -88,7 +91,7 @@ export function bedrockFactoryProviderFactory(
               runtimeDigest: manifest.harness.runtimeArtifactDigest,
               backend: "remote-sandbox",
               modelRouteDigest: manifest.modelRoute.routeDigest,
-              priceDigest: config.priceDigest,
+              priceDigest: liabilityDigest(config.price),
               provider: "aws-bedrock",
               model: "anthropic.claude-sonnet-4-6",
               retryGeneration: 0,
