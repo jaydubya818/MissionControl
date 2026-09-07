@@ -19,6 +19,7 @@ import {
   type BedrockRoute,
   BEDROCK_MODEL,
 } from "./bedrockRoute.js";
+import { bedrockPreSendInputBound } from "./bedrockLiabilityBound.js";
 /** Must durably commit a serialized transaction before resolving. The production
  * authority remains Convex; an in-memory implementation is fixture evidence only. */
 export interface BedrockReservationStore {
@@ -49,6 +50,11 @@ export async function invokeReservedBedrockFixture(input: {
   const outputTokens = input.request.maxOutputTokens;
   const route = bedrockRouteSchema.parse(input.route);
   const wire = serializeBedrock(route, api, input.request);
+  const preSendInputBound = bedrockPreSendInputBound(
+    route,
+    wire,
+    price.maximumPayloadBytes,
+  );
   if (
     transport.evidenceClass !== "OFFLINE_FIXTURE" ||
     price.provider !== "aws-bedrock" ||
@@ -66,8 +72,9 @@ export async function invokeReservedBedrockFixture(input: {
       authority,
       requestId: requestId,
       requestDigest,
-      payloadBytes: Buffer.byteLength(JSON.stringify(wire.body)),
+      payloadBytes: wire.payloadBytes,
       outputTokens,
+      preSendInputBound,
       now: now(),
     });
     return {

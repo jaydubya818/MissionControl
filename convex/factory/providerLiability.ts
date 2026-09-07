@@ -281,6 +281,14 @@ export const reserveRequestInternal = internalMutation({
     requestDigest: v.string(),
     payloadBytes: v.number(),
     outputTokens: v.number(),
+    preSendInputBound: v.optional(v.object({
+      schema: v.literal("provider-pre-send-input-bound/v1"),
+      classification: v.union(v.literal("PROVIDER_EXACT"), v.literal("CONSERVATIVE_UPPER_BOUND")),
+      countTokensCapability: v.union(v.literal("SUPPORTED"), v.literal("UNSUPPORTED")),
+      maximumInputTokens: v.number(), serializedRequestBytes: v.number(),
+      derivation: v.union(v.literal("PROVIDER_COUNTTOKENS"), v.literal("FULL_MODEL_CONTEXT_WINDOW")),
+      capabilityEvidenceDigest: v.string(), evidenceDigest: v.string(),
+    })),
     bridgeIdentity: v.optional(bedrockBridgeIdentityValidator) },
   handler: async (ctx, args) => {
     const { row, run, price  , profile } = await currentAuthority(ctx, args);
@@ -330,6 +338,7 @@ export const reserveRequestInternal = internalMutation({
       requestDigest: args.requestDigest,
       payloadBytes: args.payloadBytes,
       outputTokens: args.outputTokens,
+      preSendInputBound: args.preSendInputBound,
       now: Date.now(),
     });
     const governedAdmission = price.snapshot.provider === "aws-bedrock"
@@ -343,6 +352,9 @@ export const reserveRequestInternal = internalMutation({
     return {
       requestId: args.requestId,
       maximumNanoUsd: decision.hold.maximumNanoUsd,
+      reservationMaximumNanoUsd: decision.reservation.maximumNanoUsd,
+      reservationMaximumRequests: decision.reservation.maximumRequests,
+      holdDigest: liabilityDigest(decision.hold),
       priceDigest: price.digest,
       ...(args.bridgeIdentity
         ? {

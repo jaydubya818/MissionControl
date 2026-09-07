@@ -12,7 +12,7 @@ vi.mock("../accountingDeliveryRuntime.js", async (original) => ({
 }));
 vi.mock("dotenv", () => ({ config: vi.fn() }));
 vi.mock("../bedrockQualifiedTransport.js", () => ({
-  qualifiedBedrockTransport: vi.fn(() => ({ send: vi.fn() })),
+  qualifiedBedrockTransport: vi.fn(() => ({ evidenceClass: "APPROVED_QUALIFICATION", send: vi.fn() })),
 }));
 const roots: string[] = [];
 beforeEach(() => {
@@ -79,19 +79,37 @@ it("does not register or start provider execution when durable accounting initia
   const configPath = path.join(root, "provider.json");
   const accountId = "000000000000";
   const model = "anthropic.claude-sonnet-4-6";
+  const now = Date.now();
   await writeFile(configPath, JSON.stringify({
     route: {
       provider: "AWS Bedrock", region: "us-east-1", modelId: model,
       foundationModelArn: `arn:aws:bedrock:us-east-1::foundation-model/${model}`,
       inferenceProfileId: `us.${model}`,
       inferenceProfileArn: `arn:aws:bedrock:us-east-1:${accountId}:inference-profile/us.${model}`,
+      maximumContextTokens: 1_000_000,
+      capabilities: { countTokens: {
+        status: "UNSUPPORTED", evidenceReference: "fixture://counttokens-unsupported",
+        evidenceDigest: `sha256:${"d".repeat(64)}`,
+      } },
       topology: "US_GEOGRAPHIC_CROSS_REGION", globalInference: false,
       allowedDestinationRegions: ["us-east-1", "us-east-2", "us-west-2"],
       awsAccountId: accountId, projectEnvironmentId: "OFFLINE-FIXTURE",
       roleArn: `arn:aws:iam::${accountId}:role/fixture`,
+      expectedStsPrincipalArn: `arn:aws:sts::${accountId}:assumed-role/fixture/test`,
     },
     callAuthorization: { fixture: true }, reservationId: "reservation",
-    priceDigest: `sha256:${"a".repeat(64)}`, maximumOutputTokens: 64, timeoutMs: 1_000,
+    price: {
+      schema: "factory-provider-price/v1", provider: "aws-bedrock", model,
+      api: "CONVERSE", currency: "USD", effectiveAt: now - 1_000,
+      expiresAt: now + 60_000, source: "https://example.test/price",
+      evidenceDigest: `sha256:${"a".repeat(64)}`, inputNanoUsdPerToken: 1,
+      outputNanoUsdPerToken: 1, maximumInputTokens: 1_000_000,
+      maximumOutputTokens: 64, maximumPayloadBytes: 262_144,
+      inputBound: "CONSERVATIVELY_BOUNDED", outputIncludesReasoning: true,
+      inclusiveCacheWorstCase: true, otherBillableDimensions: "NONE",
+    },
+    maximumProgramNanoUsd: 5_000_000_000, maximumPhysicalRequests: 1,
+    timeoutMs: 1_000,
   }));
   vi.stubEnv("CODEX_BEDROCK_APPROVED_CONFIG_FILE", configPath);
   accounting.create.mockReturnValue({

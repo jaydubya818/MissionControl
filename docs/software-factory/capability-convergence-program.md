@@ -369,9 +369,27 @@ check returned an explicit authorization denial.
 
 The exact approved CountTokens request then passed IAM authorization and reached
 Bedrock, but the service returned `ValidationException: The provided model
-doesn't support counting tokens.` No deterministic token bound was produced, so
-the existing preflight still prohibits reservation and inference. No inference
-call, retry, fallback, or spend occurred. The retained
+doesn't support counting tokens.` At that checkpoint no alternate deterministic
+bound had been authorized, so reservation and inference remained prohibited. No
+inference call, retry, fallback, or spend occurred. The retained
 [provisioning and capability evidence](../testing/evidence/todo063-bedrock-counttokens-provisioning-2026-09-07/README.md)
 records the effective scope and terminal provider response. Todo 063 remains in
 progress; todo 064 remains dependency-blocked.
+
+### Conservative pre-send liability correction — implementation in progress
+
+The Product Owner subsequently classified that response as an exact provider
+capability fact and approved replacing universal CountTokens success with a
+qualified conservative bound. The exact Sonnet 4.6 route declares
+`CountTokens=UNSUPPORTED`; `UNKNOWN` fails closed, while future `SUPPORTED`
+routes retain a provider-exact branch that is not qualified by this work.
+
+For this route, every admitted exact serialized request reserves the complete
+1,000,000-token model context ceiling plus its hard output cap. The qualification
+profile also caps the serialized body at 262,144 UTF-8 bytes. The reviewed price
+sets the 4,096-output-token maximum at 3,367,584,000 nano-USD, under the
+machine-bound 5,000,000,000 nano-USD one-request program ceiling. The bridge now
+binds the full price snapshot and recomputes the expected hold before transport;
+the authenticated transport verifies the temporary credential's actual caller
+through STS before inference. Source review, merge, exact-main qualification and
+the one authorized live call remain required before Todo 063 can close.

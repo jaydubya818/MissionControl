@@ -52,6 +52,16 @@ export const providerHoldValidator = v.object({
   generation: v.number(),
   maximumNanoUsd: v.number(),
   maximumOutputTokens: v.number(),
+  preSendInputBound: v.optional(v.object({
+    schema: v.literal("provider-pre-send-input-bound/v1"),
+    classification: v.union(v.literal("PROVIDER_EXACT"), v.literal("CONSERVATIVE_UPPER_BOUND")),
+    countTokensCapability: v.union(v.literal("SUPPORTED"), v.literal("UNSUPPORTED")),
+    maximumInputTokens: v.number(),
+    serializedRequestBytes: v.number(),
+    derivation: v.union(v.literal("PROVIDER_COUNTTOKENS"), v.literal("FULL_MODEL_CONTEXT_WINDOW")),
+    capabilityEvidenceDigest: v.string(),
+    evidenceDigest: v.string(),
+  })),
   state: v.union(
     v.literal("RESERVED"),
     v.literal("UNKNOWN"),

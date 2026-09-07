@@ -59,6 +59,8 @@ export interface BedrockWire {
   region: "us-east-1";
   modelId: string;
   body: Record<string, unknown>;
+  serializedBody: string;
+  payloadBytes: number;
   maxAttempts: 1;
 }
 export function serializeBedrock(
@@ -138,11 +140,14 @@ export function serializeBedrock(
             : {}),
         };
   // No passthrough fields, prompt caching, extended thinking, streaming or retry overrides.
+  const serializedBody = JSON.stringify(body);
   return {
     api,
     region: r.region,
     modelId: r.inferenceProfileArn,
     body,
+    serializedBody,
+    payloadBytes: Buffer.byteLength(serializedBody, "utf8"),
     maxAttempts: 1,
   };
 }

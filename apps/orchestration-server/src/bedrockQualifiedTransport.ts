@@ -3,17 +3,24 @@ import {
   ConverseCommand,
   type ConverseCommandInput,
 } from "@aws-sdk/client-bedrock-runtime";
+import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import { bedrockRouteSchema, type BedrockRoute } from "./bedrockRoute.js";
 import { bedrockModelRouteBinding } from "./bedrockModelRouteBinding.js";
 import type { BedrockTransport } from "./bedrockAdapter.js";
+import {
+  assertProviderPrice,
+  liabilityDigest,
+  type ProviderPrice,
+} from "../../../convex/lib/providerLiability.js";
 
 const grantSchema = z
   .object({
     schema: z.literal("fdlc-bounded-bedrock-call-authorization/v1"),
     approvalReference: z.string().min(1),
     routeDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+    approvedPriceDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
     expectedStsPrincipalArn: z.string(),
     identityEvidenceDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
     profileEvidenceDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
@@ -26,7 +33,6 @@ export type BedrockCallAuthorization = z.infer<typeof grantSchema>;
 const credentialSchema = z
   .object({
     awsAccountId: z.string(),
-    roleArn: z.string(),
     principalArn: z.string(),
     accessKeyId: z.string().min(16),
     secretAccessKey: z.string().min(16),
@@ -40,6 +46,7 @@ const credentialSchema = z
  * safe handoff/configuration contains its location, never the credentials. */
 export function qualifiedBedrockTransport(
   route: BedrockRoute,
+  price: ProviderPrice,
   authorization: BedrockCallAuthorization,
   dependencies: {
     readCredentials?: (path: string) => Promise<string>;
@@ -47,21 +54,29 @@ export function qualifiedBedrockTransport(
       send: (command: any, options: any) => Promise<any>;
       destroy: () => void;
     };
+    createStsClient?: (options: any) => {
+      send: (command: any, options: any) => Promise<any>;
+      destroy: () => void;
+    };
     now?: () => number;
   } = {},
 ): BedrockTransport {
   const r = bedrockRouteSchema.parse(route),
+    approvedPrice = structuredClone(price),
     grant = grantSchema.parse(authorization),
     now = dependencies.now ?? Date.now;
+  assertProviderPrice(approvedPrice, now());
   const assertGrant = () => {
     if (
       grant.routeDigest !== bedrockModelRouteBinding(r).routeDigest ||
+      grant.approvedPriceDigest !== liabilityDigest(approvedPrice) ||
+      approvedPrice.provider !== "aws-bedrock" ||
+      approvedPrice.model !== r.modelId ||
+      approvedPrice.api !== "CONVERSE" ||
+      approvedPrice.inputBound !== "CONSERVATIVELY_BOUNDED" ||
+      approvedPrice.maximumInputTokens !== r.maximumContextTokens ||
       grant.validUntil <= now() ||
-      !grant.expectedStsPrincipalArn.startsWith(
-        `arn:aws:sts::${r.awsAccountId}:assumed-role/`,
-      ) ||
-      grant.expectedStsPrincipalArn.split("/")[1] !==
-        r.roleArn.split("/").at(-1)
+      grant.expectedStsPrincipalArn !== r.expectedStsPrincipalArn
     )
       throw new Error("BEDROCK_CALL_AUTHORIZATION_INVALID");
   };
@@ -71,6 +86,12 @@ export function qualifiedBedrockTransport(
     send: async (wire, signal) => {
       assertGrant();
       signal.throwIfAborted();
+      let exactBody: Record<string, unknown>;
+      try {
+        exactBody = JSON.parse(wire.serializedBody) as Record<string, unknown>;
+      } catch {
+        throw new Error("BEDROCK_SERIALIZED_BODY_INVALID");
+      }
       if (
         wire.api !== "CONVERSE" ||
         wire.region !== r.region ||
@@ -78,15 +99,27 @@ export function qualifiedBedrockTransport(
         wire.maxAttempts !== 1
       )
         throw new Error("BEDROCK_TRANSPORT_ROUTE_MISMATCH");
+      const allowedBodyFields = [
+        "messages",
+        "system",
+        "toolConfig",
+        "inferenceConfig",
+      ];
       if (
         Object.keys(wire.body).some(
-          (key) =>
-            !["messages", "system", "toolConfig", "inferenceConfig"].includes(
-              key,
-            ),
+          (key) => !allowedBodyFields.includes(key),
+        ) ||
+        Object.keys(exactBody).some(
+          (key) => !allowedBodyFields.includes(key),
         )
       )
         throw new Error("BEDROCK_BODY_FIELD_UNSUPPORTED");
+      if (
+        Buffer.byteLength(wire.serializedBody, "utf8") !== wire.payloadBytes ||
+        JSON.stringify(exactBody) !== wire.serializedBody ||
+        JSON.stringify(wire.body) !== wire.serializedBody
+      )
+        throw new Error("BEDROCK_TRANSPORT_ROUTE_MISMATCH");
       const credentials = credentialSchema.parse(
         JSON.parse(
           await (dependencies.readCredentials ?? ((p) => readFile(p, "utf8")))(
@@ -98,7 +131,6 @@ export function qualifiedBedrockTransport(
       signal.throwIfAborted();
       if (
         credentials.awsAccountId !== r.awsAccountId ||
-        credentials.roleArn !== r.roleArn ||
         credentials.principalArn !== grant.expectedStsPrincipalArn ||
         credentials.expiresAt <= now()
       )
@@ -114,13 +146,33 @@ export function qualifiedBedrockTransport(
           sessionToken: credentials.sessionToken,
         },
       };
+      const stsOptions = {
+        ...options,
+        endpoint: `https://sts.${r.region}.amazonaws.com`,
+      };
+      const stsClient =
+        dependencies.createStsClient?.(stsOptions) ?? new STSClient(stsOptions);
+      try {
+        const caller = await stsClient.send(new GetCallerIdentityCommand({}), {
+          abortSignal: signal,
+        });
+        if (
+          caller.Account !== r.awsAccountId ||
+          caller.Arn !== grant.expectedStsPrincipalArn
+        )
+          throw new Error("BEDROCK_AUTHENTICATED_PRINCIPAL_MISMATCH");
+      } finally {
+        stsClient.destroy();
+      }
+      assertGrant();
+      signal.throwIfAborted();
       const client =
         dependencies.createClient?.(options) ??
         new BedrockRuntimeClient(options);
       try {
         const response = await client.send(
           new ConverseCommand({
-            ...wire.body,
+            ...exactBody,
             modelId: wire.modelId,
           } as ConverseCommandInput),
           { abortSignal: signal },

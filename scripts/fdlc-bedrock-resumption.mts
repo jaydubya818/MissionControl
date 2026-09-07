@@ -41,7 +41,7 @@ process.stdout.write(
         "Load only the explicitly approved qualification credential source in an isolated process; no default chain, profiles or cached sessions.",
         "Read STS GetCallerIdentity; compare Account and assumed role to approved account and role. Resolve IAM role path from authoritative configuration, not only its session basename.",
         "Use only the us-east-1 Bedrock endpoint. Inspect the exact GetInferenceProfile ARN; verify ACTIVE SYSTEM_DEFINED, model relationship and exact three destination models.",
-        "Retrieve and independently verify versioned account-applicable pricing and full input/output/cache/reasoning bounds; real price remains UNQUALIFIED until then.",
+        "Verify the current, unexpired qualification price artifact and its full input/output/cache/reasoning treatment before reservation.",
         "Run offline route negatives against the captured inspection evidence; qualify credential isolation, no-bypass broker and runtime/profile binding under separate live authority.",
         "Request authorization for the minimum bounded live model call. Do not invoke, issue readiness, execute WO1, merge or publish from this plan.",
       ],

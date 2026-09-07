@@ -17,17 +17,21 @@ Timeout/cancel aborts the transport and fences its late response. Transient erro
 classification never triggers a retry. Every attempted send can have an unknown
 billable outcome, including throttles and server errors.
 
-WO1 requests do not enable caching, thinking, streaming, multimodal content,
+Qualification requests do not enable caching, thinking, streaming, multimodal content,
 service-tier overrides or arbitrary model fields. Unsupported response dimensions
-are rejected and preserve liability. Cache/reasoning pricing fields remain explicit;
-real rates and bounds are null and UNQUALIFIED. Fixture price conversion rounds up
-integer nano-USD per million tokens and takes worst-case inclusive rates. It never
-claims an invoice. Reasoning is modeled as included in output and disabled in this
-bounded workload; different semantics require new qualification.
+are rejected and preserve liability. Cache/reasoning pricing fields remain explicit.
+The original null `UNQUALIFIED` record remains historical; the exact Sonnet 4.6 US
+standard qualification rate is now frozen in `fdlc-bedrock-price-qualified.json`.
+Conversion rounds fractional nano-USD per-token rates upward. Because the strict
+request schema cannot emit cache controls and reasoning is disabled, those billing
+dimensions remain in the source contract but cannot increase this admitted request.
+Calculated money is estimated cost, never an invoice claim.
 
 `bedrockBudgetAdapter` composes the existing canonical reservation/settlement
 transitions with the serialized request digest and exact route digest. Input
-liability reserves the entire admitted input ceiling, never a byte heuristic.
+liability reserves either an exact provider CountTokens result on a qualified
+supported route or the entire model context ceiling on this explicitly unsupported
+route, never an optimistic byte heuristic. Unknown capability fails closed.
 Payload bytes and output limits are checked separately. The transaction port must
 commit durably before send; tests use a serialized in-memory fixture. The existing
 Convex transaction handler is the production monetary authority, not that fixture.
@@ -37,10 +41,10 @@ unknown results, expiry and observed overruns fail closed; overruns freeze capac
 Live binding must use the existing signed service-command reservation and receipt
 APIs with a qualified account-specific transport, current Attempt/lease and exact
 profile. It must prove credential isolation and no bypass in the immutable runtime.
-No local fixture can certify that integration or provider billing behavior. Prices,
-full admitted token ceilings, scope and IAM behavior require independent evidence
-before any such binding is authorized. Proposed $1 producer / $1 verifier limits
-may be insufficient when reserving the full model input capacity; no fit is claimed.
+No local fixture can certify that integration or provider billing behavior. The
+separately approved first call has a $5.00 total ceiling; its full input and 4,096
+output liability is $3.367584 under the expiring qualified price. See
+`bedrock-counttokens-capability-and-liability-contract.md` for the exact proof.
 
 API references: [Converse](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html),
 [Anthropic Messages](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html),

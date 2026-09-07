@@ -18,6 +18,7 @@ import {
 } from "../bedrockAdapter.js";
 import {
   bedrockFixturePrice,
+  bedrockQualifiedPrice,
   type BedrockPriceContract,
 } from "../bedrockPricing.js";
 import { bedrockIamSpecification } from "../bedrockIam.js";
@@ -41,11 +42,22 @@ const frozen = JSON.parse(
     "utf8",
   ),
 );
+const qualifiedPriceContract = JSON.parse(
+  readFileSync(
+    new URL(
+      "../../../../docs/software-factory/fdlc-bedrock-price-qualified.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
 const route = bedrockRouteSchema.parse({
   ...frozen,
   awsAccountId: "000000000000",
   projectEnvironmentId: "OFFLINE-FIXTURE",
   roleArn: "arn:aws:iam::000000000000:role/fixture",
+  expectedStsPrincipalArn:
+    "arn:aws:sts::000000000000:assumed-role/fixture/test",
   inferenceProfileArn: `arn:aws:bedrock:us-east-1:000000000000:inference-profile/${BEDROCK_PROFILE}`,
 });
 const request: BedrockRequest = {
@@ -90,7 +102,7 @@ const priceContract: BedrockPriceContract = {
   reasoningMode: "DISABLED",
   reasoningBilling: "INCLUDED_IN_OUTPUT",
   otherBillableDimensions: "NONE",
-  maximumInputTokens: 100,
+  maximumInputTokens: 1_000_000,
   maximumOutputTokens: 20,
   maximumPayloadBytes: 8192,
   inputBoundEvidence: "fixture only",
@@ -111,7 +123,7 @@ function budgetFixture(api: BedrockApi = "CONVERSE") {
   let state: ProviderReservation = {
     schema: "factory-provider-reservation/v1",
     scope,
-    maximumNanoUsd: 240,
+    maximumNanoUsd: 2_000_040,
     expiresAt: 10000,
     maximumRequests: 1,
     frozen: false,
@@ -168,6 +180,39 @@ function budgetFixture(api: BedrockApi = "CONVERSE") {
 describe("canonical price/provider join", () => {
   it("matches the canonical exact route provider", () => {
     expect(bedrockFixturePrice(priceContract, "CONVERSE", 100).provider).toBe(bedrockModelRouteBinding(route).snapshot.provider);
+  });
+  it("binds the reviewed Sonnet 4.6 rate to a sub-$5 full-context liability", () => {
+    const price = bedrockQualifiedPrice(
+      qualifiedPriceContract,
+      "CONVERSE",
+      Date.parse("2026-09-07T00:00:00Z"),
+    );
+    expect(price).toMatchObject({
+      inputNanoUsdPerToken: 3_300,
+      outputNanoUsdPerToken: 16_500,
+      maximumInputTokens: 1_000_000,
+      maximumOutputTokens: 4_096,
+    });
+    expect(liabilityDigest(price)).toBe(
+      qualifiedPriceContract.qualifiedProviderPriceDigest,
+    );
+    expect(
+      price.maximumInputTokens * price.inputNanoUsdPerToken +
+        price.maximumOutputTokens * price.outputNanoUsdPerToken,
+    ).toBe(3_367_584_000);
+    expect(() =>
+      bedrockQualifiedPrice(qualifiedPriceContract, "INVOKE_MODEL", Date.parse("2026-09-07T00:00:00Z")),
+    ).toThrow("QUALIFIED_PRICE_ROUTE_MISMATCH");
+    expect(() =>
+      bedrockQualifiedPrice(
+        {
+          ...qualifiedPriceContract,
+          qualifiedProviderPriceDigest: `sha256:${"f".repeat(64)}`,
+        },
+        "CONVERSE",
+        Date.parse("2026-09-07T00:00:00Z"),
+      ),
+    ).toThrow("QUALIFIED_PRICE_DIGEST_MISMATCH");
   });
 });
 
@@ -402,7 +447,7 @@ describe("OFFLINE / FIXTURE price and hard liability", () => {
       await invokeReservedBedrockFixture(f.args);
       expect(f.state().holds[0]).toMatchObject({
         state: "SETTLED",
-        maximumNanoUsd: 240,
+        maximumNanoUsd: 2_000_040,
         accountedNanoUsd: 10,
       });
     },
@@ -518,7 +563,7 @@ describe("OFFLINE additional failure boundaries", () => {
     ).rejects.toThrow("TIMEOUT_UNKNOWN");
     expect(f.state().holds[0]).toMatchObject({
       state: "UNKNOWN",
-      maximumNanoUsd: 240,
+      maximumNanoUsd: 2_000_040,
     });
     finish({ body: response, requestId: "late-fixture" });
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -650,5 +695,5 @@ it("OFFLINE: freezes the priced output bound across async reservation", async ()
   };
   await invokeReservedBedrockFixture(args);
   expect(f.state().holds[0].maximumOutputTokens).toBe(20);
-  expect(f.state().holds[0].maximumNanoUsd).toBe(240);
+  expect(f.state().holds[0].maximumNanoUsd).toBe(2_000_040);
 });
