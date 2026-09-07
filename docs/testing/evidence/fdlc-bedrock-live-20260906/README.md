@@ -1,6 +1,14 @@
 # FDLC Bedrock live qualification evidence
 
-State: `BEDROCK_QUOTA_ADMIN_ACTION_REQUIRED`.
+Historical state: `BEDROCK_QUOTA_ADMIN_ACTION_REQUIRED`.
+
+Current authoritative state:
+`BEDROCK_ACCOUNT_AGREEMENT_AND_LIABILITY_RECONCILIATION_REQUIRED`. A later
+authorized request is recorded under
+`docs/testing/evidence/todo063-bedrock-live-qualification-2026-09-07/`. It
+reached Bedrock's Anthropic use-case agreement gate and retained a separate
+$3.367584 conservative liability as `UNKNOWN`. This directory remains the
+immutable evidence for the earlier 429 and its zero-billable reconciliation.
 
 The named SSO profile authenticated to the approved non-Production account. Safe
 AWS responses prove the exact caller, ACTIVE US inference profile, three fixed US
@@ -24,8 +32,10 @@ exactly one `InvocationThrottles` datapoint at the request minute and no
 during the UTC-day window. Together with the pre-processing quota rejection and
 empty runtime usage/output, this proves zero billable inference. The ledger
 releases the `$0.924528` reservation, records `$0` settled and `$0` unresolved,
-and restores `$5.00` uncommitted capacity. This accounting reconciliation does
-not release the provider quota hold.
+and restored `$5.00` uncommitted capacity at that historical checkpoint. The
+later account-agreement attempt reserved $3.367584, leaving $1.632416
+uncommitted under the program ceiling. This accounting reconciliation does not
+release the provider quota hold or the later liability hold.
 
 The exact blocking quota is `L-B29C9321`, **Model invocation max tokens per day
 for Anthropic Claude Sonnet 4.6 (doubled for cross-region calls)**. The documented

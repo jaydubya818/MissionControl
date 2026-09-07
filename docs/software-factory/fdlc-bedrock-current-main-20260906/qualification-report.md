@@ -1,14 +1,14 @@
 # FDLC Phase 1 Bedrock qualification report
 
 Updated: 2026-09-07. Authoritative baseline: Mission Control main
-`beaf1f8cb293845ec2abaa6c3c1502676a5cf83b`, runtime contract v55. The
+`466342b5be97434630984fd6e9c99f7279263ca2`, runtime contract v55. The
 candidate is reconciled with the accounting-recovery, Factory Engineer,
 orchestration-readiness, incident-evidence, and repository-dispatch controls on
 canonical main.
 
-Status: **BEDROCK_IAM_ROUTE_PASS / BEDROCK_QUOTA_ADMIN_ACTION_REQUIRED**.
+Status: **BLOCKED_PRE_MODEL_USE / BEDROCK_ACCOUNT_AGREEMENT_AND_LIABILITY_RECONCILIATION_REQUIRED**.
 
-External boundary: **BEDROCK_QUOTA_ADMIN_ACTION_REQUIRED**.
+External boundary: **BEDROCK_ACCOUNT_AGREEMENT_AND_LIABILITY_RECONCILIATION_REQUIRED**.
 
 No readiness, WorkOrder execution, pilot acceptance, release, or Production
 qualification is claimed.
@@ -116,8 +116,21 @@ route-specific `InvocationThrottles` datapoint at the request minute and no
 `Invocations`, `InputTokenCount`, or `OutputTokenCount` datapoints. AWS performs
 this quota check before inference and bills actual token usage. Combined with the
 empty runtime output and usage receipt, the evidence proves zero billable
-inference. The ledger now records $0 settled, $0 unresolved, and $5.00 remaining.
-The provider quota hold remains active independently of the accounting result.
+inference. That request's ledger records $0 settled and $0 unresolved. The
+provider quota hold remains active independently of the accounting result.
+
+Canonical main subsequently recorded a separate authorized request at
+2026-09-07T20:31:19Z after the conservative full-context liability contract
+landed. Before transport, that request durably reserved 3,367,584,000 nano-USD
+for the 1,000,000-token input ceiling plus 4,096 output tokens. AWS returned
+`ResourceNotFoundException`, request ID
+`7f488e66-813d-4a33-adb0-1d6c98146b39`, before model use because Anthropic
+use-case details have not been submitted for account `083665737366`.
+Independent readback reports `agreementAvailability=NOT_AVAILABLE` while
+authorization, entitlement, and region availability remain present. No usage
+receipt was returned, so the complete $3.367584 reservation remains `UNKNOWN`.
+The program ceiling has $1.632416 uncommitted capacity, but no additional
+physical request is authorized or admissible.
 
 ## Completed qualification
 
@@ -160,6 +173,11 @@ The provider quota hold remains active independently of the accounting result.
   all 80 focused Bedrock transport/adapter/liability tests, typechecking,
   Factory documentation validation, secret scanning, and the two affected
   full-system/Fab suites pass on the integrated head.
+- Canonical main `466342b5be97434630984fd6e9c99f7279263ca2` records the later
+  account-agreement failure and its retained conservative liability. Merge
+  commit `ea2dceeeb818c21831fae71137780cb626591c31` integrates that
+  authoritative evidence while preserving the earlier quota event and
+  reconciliation as historical evidence.
 
 Evidence is under
 `docs/testing/evidence/fdlc-bedrock-live-20260906/`, including caller identity,
@@ -169,38 +187,41 @@ Commit-bound System evidence is under
 `docs/testing/evidence/fdlc-bedrock-live-system-v53-447ef65-20260907/`.
 Current-main System evidence is under
 `docs/testing/evidence/fdlc-bedrock-live-system-v55-47ba04d-20260907/`.
+The newest authoritative provider-attempt evidence is under
+`docs/testing/evidence/todo063-bedrock-live-qualification-2026-09-07/`.
 
 ## Remaining boundary and deterministic resume
 
-`BEDROCK_QUOTA_ADMIN_ACTION_REQUIRED` is the current external dependency. The
-blocking quota is `L-B29C9321`, **Model invocation max tokens per day for
-Anthropic Claude Sonnet 4.6 (doubled for cross-region calls)**. It is scoped per
-account, model, and source Region, shared across the model's bedrock-runtime
-inference APIs, documented at a 4,320,000,000-token default, and marked
-non-adjustable. Account-specific values may be reduced. The restricted role is
-denied `GetServiceQuota`, `ListServiceQuotas`, and both quota request-history
-operations, so the applied value, existing request status, and authoritative
-reset or activation condition remain unavailable. The ACTIVE profile and
-AUTHORIZED/AVAILABLE underlying model do not resolve this quota state.
+`BEDROCK_ACCOUNT_AGREEMENT_AND_LIABILITY_RECONCILIATION_REQUIRED` is the current
+external dependency. The account owner for `083665737366` must submit the
+Anthropic model-use details required by Bedrock for Sonnet 4.6 and wait until
+authoritative readback reports `agreementAvailability=AVAILABLE`. This action
+does not require broader IAM authority and must not change the approved profile,
+model, source Region, US geographic topology, account, or runtime role.
 
-An authorized administrator in account `083665737366` must read quota
-`L-B29C9321` and its request history. If capacity is insufficient, that
+The later request's 3,367,584,000 nano-USD hold remains `UNKNOWN` because AWS
+returned no usage. It must be independently reconciled from authoritative
+provider or billing evidence before another reservation. The earlier quota
+`L-B29C9321` remains a separate fail-closed precondition: an authorized
+administrator in account `083665737366` must still record its applied value,
+request history, and sufficient available capacity. If insufficient, the
 administrator must open or update one AWS Support request for this exact
-non-adjustable quota and US cross-region route; duplicates are prohibited. The
-minimum next-call capacity is 76 unused daily tokens for the frozen 44-token input
-plus `maxOutputTokens=32`, subject independently to the $5 liability ceiling.
-Do not grant broader administration, switch profiles, models, Regions, accounts,
-or routes to bypass this boundary.
+non-adjustable quota and US route; duplicate requests are prohibited.
 
 Before any new inference attempt:
 
-1. record the account-specific value and request history for `L-B29C9321`;
-2. obtain authoritative AWS confirmation that at least 76 daily tokens and the
-   applicable per-minute capacity are available for the exact approved route;
-3. reverify `fdlc-qualification`, account `083665737366`, `us-east-1`, and the
+1. complete the Anthropic use-case agreement and record `AVAILABLE` readback;
+2. reconcile or retain the $3.367584 `UNKNOWN` liability using authoritative
+   provider or billing evidence;
+3. record the account-specific value and request history for `L-B29C9321`;
+4. obtain authoritative AWS confirmation that sufficient daily and applicable
+   per-minute capacity are available for the exact approved route;
+5. obtain a new explicit one-request authorization because the prior authority
+   was consumed;
+6. reverify `fdlc-qualification`, account `083665737366`, `us-east-1`, and the
    exact profile topology;
-4. refresh the 24-hour price contract if expired; and
-5. run the bounded qualification runner once, with zero retries and no fallback.
+7. refresh the 24-hour price contract if expired; and
+8. run the bounded qualification runner once, with zero retries and no fallback.
 
 Todo 063 remains in progress because a successful live provider receipt, the
 ten accepted real-work outcomes, complete outcome coverage, and a second
