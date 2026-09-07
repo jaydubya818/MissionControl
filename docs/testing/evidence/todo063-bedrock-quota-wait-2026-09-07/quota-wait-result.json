@@ -1,0 +1,68 @@
+{
+  "schema": "todo063-bedrock-quota-wait/v1",
+  "status": "TODO_063_WAITING_FOR_AWS_QUOTA",
+  "capturedAt": "2026-09-07T21:55:39Z",
+  "source": {
+    "mainCommit": "80670b1f9f5f080b0c838888ed205495e18dc656",
+    "runtimeContract": 55,
+    "exactMainFocusedGate": "PASS_257_TESTS"
+  },
+  "provider": {
+    "name": "AWS Bedrock",
+    "accountId": "083665737366",
+    "region": "us-east-1",
+    "route": "us.anthropic.claude-sonnet-4-6",
+    "providerRequestId": "6919db8e-f1c5-4f54-9557-db37ed817b74",
+    "result": "THROTTLED_DAILY_TOKEN_CAPACITY_EXHAUSTED",
+    "physicalRequestsThisCheckpoint": 0
+  },
+  "telemetryReconciliation": {
+    "observationWindow": {
+      "start": "2026-09-07T21:15:00Z",
+      "end": "2026-09-07T21:18:00Z"
+    },
+    "Invocations": 0,
+    "InvocationThrottles": 2,
+    "InvocationClientErrors": 0,
+    "InvocationServerErrors": 0,
+    "InputTokenCount": 0,
+    "OutputTokenCount": 0,
+    "CacheReadInputTokenCount": 0,
+    "CacheWriteInputTokenCount": 0,
+    "usageClassification": "ACTUAL",
+    "moneyClassification": "ESTIMATED",
+    "accountedNanoUsd": 0,
+    "finalHoldState": "SETTLED",
+    "evidenceDigest": "sha256:9e7daa4043fb8837dff311c489762f9746afc4efd72a0675585903fde47ad655",
+    "reservationJournalSha256": "15769f678467d49d85077491de674d921c7214e9dac06253346b391a8556ae23"
+  },
+  "quota": {
+    "serviceCode": "bedrock",
+    "quotaCode": "L-B29C9321",
+    "controllingCondition": "DAILY_TOKEN_CAPACITY",
+    "appliedCapacity": "UNAVAILABLE_TO_QUALIFICATION_IDENTITY",
+    "currentAvailability": "EXHAUSTED",
+    "resetBehavior": "DAILY; EXACT_RESET_TIME_UNAVAILABLE_TO_QUALIFICATION_IDENTITY",
+    "adjustable": "UNAVAILABLE_TO_QUALIFICATION_IDENTITY",
+    "existingRequestStatus": "UNKNOWN_SERVICE_QUOTAS_READ_DENIED",
+    "newRequestCreated": false
+  },
+  "serviceQuotasReadback": {
+    "identityAccountMatchesQualificationAccount": true,
+    "GetServiceQuota": "ACCESS_DENIED",
+    "GetAWSDefaultServiceQuota": "ACCESS_DENIED",
+    "ListServiceQuotas": "ACCESS_DENIED",
+    "ListRequestedServiceQuotaChangeHistoryByQuota": "ACCESS_DENIED",
+    "iamChanged": false,
+    "identityCenterChanged": false
+  },
+  "authorization": {
+    "freshSingleRequestAuthorizationConsumed": false,
+    "maximumFutureRequestsAfterResume": 1,
+    "hardProgramCeilingNanoUsd": 5000000000
+  },
+  "resumeCondition": "AWS exposes usable daily Sonnet 4.6 token capacity and the exact quota and request state is verifiable.",
+  "todo063Complete": false,
+  "todo064Started": false,
+  "additionalEngineeringWorkRequired": false
+}

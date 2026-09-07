@@ -71,6 +71,26 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
+### 2026-09-07 - Latest hold settled; waiting for AWS daily quota
+
+- Reconciled provider request `6919db8e-f1c5-4f54-9557-db37ed817b74`
+  from exact-route telemetry. The request window contains two invocation
+  throttles and no successful invocation or token datapoints, so the hold is
+  `SETTLED` at zero accounted nano-USD with `ACTUAL` usage and `ESTIMATED` money
+  semantics.
+- Confirmed quota `L-B29C9321` controls the exhausted daily token capacity.
+  The exact qualification identity is denied all required Service Quotas reads,
+  and the remaining configured profiles belong to other accounts or are
+  unavailable. No IAM or Identity Center change was made.
+- No quota request or provider request was sent. Existing request status is
+  unknown because request-history access is denied. The fresh one-request
+  authorization remains unused.
+- Evidence is under
+  `docs/testing/evidence/todo063-bedrock-quota-wait-2026-09-07/`. Todo 063 is
+  `TODO_063_WAITING_FOR_AWS_QUOTA`; Todo 064 remains dependency-blocked. Resume
+  after AWS exposes usable daily capacity and the exact quota/request state is
+  verifiable. No additional engineering work is required while waiting.
+
 ### 2026-09-07 - Account access active; one bounded request reached daily token gate
 
 - Verified that the existing account use-case submission exactly matches the
