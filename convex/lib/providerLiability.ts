@@ -3,6 +3,8 @@ import { computeCanonicalHash } from "./genomeHash.js";
 export const PROVIDER_PRICE_SCHEMA = "factory-provider-price/v1" as const;
 export const PROVIDER_RESERVATION_SCHEMA =
   "factory-provider-reservation/v1" as const;
+export const QUALIFIED_BEDROCK_PROVIDER_PRICE_DIGEST =
+  "sha256:ba19028022ec2de109d2863415263b691d13d334618d7f49e7524f3c07e33160" as const;
 export interface ProviderPrice {
   schema: typeof PROVIDER_PRICE_SCHEMA;
   provider: string;
@@ -114,6 +116,15 @@ export function assertProviderPrice(p: ProviderPrice, now: number) {
     p.otherBillableDimensions !== "NONE"
   )
     throw new Error("PRICE_NOT_BOUNDED");
+}
+export function assertQualifiedBedrockPrice(p: ProviderPrice, now: number) {
+  assertProviderPrice(p, now);
+  if (
+    p.provider !== "aws-bedrock" ||
+    p.model !== "anthropic.claude-sonnet-4-6" ||
+    p.api !== "CONVERSE" ||
+    liabilityDigest(p) !== QUALIFIED_BEDROCK_PROVIDER_PRICE_DIGEST
+  ) throw new Error("BEDROCK_PRICE_NOT_QUALIFIED");
 }
 export function assertProviderReservation(r: ProviderReservation, now: number) {
   const s = r.scope;

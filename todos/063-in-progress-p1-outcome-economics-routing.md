@@ -71,6 +71,21 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
+### 2026-09-07 - Exact-main liability authority hardening
+
+- Reconciled the merged conservative liability implementation with independent
+  architecture, security, accounting, and simplicity review.
+- The Convex authority now pins the complete qualified Bedrock provider-price
+  digest at registration, reservation creation, and physical request admission.
+  A caller cannot substitute lower rates, larger bounds, another API, or stale
+  provenance while retaining Bedrock send authority.
+- Inference evidence now records `MAXIMUM_RESERVED` separately from provider
+  input/output usage and the `ESTIMATED` settled cost. Existing strict response
+  parsing rejects unexpected cache usage and retains the full unresolved hold.
+- Focused handler, liability-bound, serialization, and bridge tests pass. A
+  further live request remains blocked by the account agreement and requires
+  separate request authority after that prerequisite is satisfied.
+
 ### 2026-09-07 - Conservative contract landed; one live request reached account agreement gate
 
 - PR `#214` passed all 12 checks and merged as exact main

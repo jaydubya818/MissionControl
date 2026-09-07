@@ -366,6 +366,13 @@ export class BedrockInferenceBridge {
           preSendInputBound,
           preSendOutputBound: request.maxOutputTokens,
           reservedMaximumNanoUsd: proof.maximumNanoUsd,
+          preSendCostClassification: "MAXIMUM_RESERVED" as const,
+          providerReportedInputUsage: result.usage.inputTokens,
+          providerReportedOutputUsage: result.usage.outputTokens,
+          settledEstimatedNanoUsd:
+            result.usage.inputTokens * b.price.inputNanoUsdPerToken +
+            result.usage.outputTokens * b.price.outputNanoUsdPerToken,
+          settledCostClassification: "ESTIMATED" as const,
         },
       };
     } catch (error) {
