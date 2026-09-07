@@ -35,6 +35,8 @@ const ledger = (() => {
 if (ledger.schema !== "fdlc-live-qualification-liability/v1" || ledger.maximumTotalNanoUsd !== maximumTotalNanoUsd ||
     !Number.isSafeInteger(ledger.settledNanoUsd) || !Number.isSafeInteger(ledger.unresolvedNanoUsd) || !Array.isArray(ledger.requests))
   throw new Error("QUALIFICATION_LEDGER_INVALID");
+if (ledger.unresolvedNanoUsd > 0)
+  throw new Error("QUALIFICATION_UNRESOLVED_LIABILITY");
 if (ledger.settledNanoUsd + ledger.unresolvedNanoUsd + maximumNanoUsd > maximumTotalNanoUsd)
   throw new Error("QUALIFICATION_CUMULATIVE_LIABILITY_EXCEEDED");
 ledger.unresolvedNanoUsd += maximumNanoUsd;
@@ -88,9 +90,17 @@ try {
     ledger.remainingNanoUsd = maximumTotalNanoUsd - ledger.settledNanoUsd - ledger.unresolvedNanoUsd;
     Object.assign(ledger.requests.at(-1), { state: "REJECTED_PRE_INFERENCE", actualNanoUsd: 0, providerRequestId: failure.$metadata?.requestId, httpStatusCode: 403, attempts: failure.$metadata?.attempts, totalRetryDelay: failure.$metadata?.totalRetryDelay, error: failure.name });
   } else {
-    Object.assign(ledger.requests.at(-1), { state: "UNKNOWN", error: failure.name || "UnknownError" });
+    Object.assign(ledger.requests.at(-1), {
+      state: "UNKNOWN",
+      providerRequestId: failure.$metadata?.requestId ?? null,
+      httpStatusCode: failure.$metadata?.httpStatusCode ?? null,
+      attempts: failure.$metadata?.attempts ?? null,
+      totalRetryDelay: failure.$metadata?.totalRetryDelay ?? null,
+      error: failure.name || "UnknownError",
+      message: failure.message,
+    });
   }
   writeFileSync(ledgerPath, JSON.stringify(ledger, null, 2) + "\n", { mode: 0o600 });
-  writeFileSync(resolve(evidenceDir, "live-route-failure.json"), JSON.stringify({ schema: "fdlc-bedrock-live-route-failure/v1", requestId, classification: rejectedBeforeInference ? "REJECTED_PRE_INFERENCE" : "UNKNOWN", providerRequestId: failure.$metadata?.requestId ?? null, httpStatusCode: failure.$metadata?.httpStatusCode ?? null, attempts: failure.$metadata?.attempts ?? null, totalRetryDelay: failure.$metadata?.totalRetryDelay ?? null, error: failure.name || "UnknownError", automaticRetries: 0 }, null, 2) + "\n");
+  writeFileSync(resolve(evidenceDir, "live-route-failure.json"), JSON.stringify({ schema: "fdlc-bedrock-live-route-failure/v1", requestId, classification: rejectedBeforeInference ? "REJECTED_PRE_INFERENCE" : "UNKNOWN", providerRequestId: failure.$metadata?.requestId ?? null, httpStatusCode: failure.$metadata?.httpStatusCode ?? null, attempts: failure.$metadata?.attempts ?? null, totalRetryDelay: failure.$metadata?.totalRetryDelay ?? null, error: failure.name || "UnknownError", message: failure.message, automaticRetries: 0 }, null, 2) + "\n");
   throw error;
 }

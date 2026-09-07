@@ -71,6 +71,19 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
+### 2026-09-07 — Bedrock IAM route admitted; daily provider quota blocked
+
+- The narrow Identity Center administrator provisioned the exact
+  `FDLCQualificationTFOperator` policy to account `083665737366`; canonical AWS
+  read-back matches and the approved Sonnet 4.6 request now passes IAM.
+- The one-attempt synthetic request reached Bedrock and was rejected with HTTP
+  429 `Too many tokens per day`. No retry, fallback, output, or usage receipt was
+  produced. The ledger conservatively retains the $0.924528 maximum reservation
+  as unresolved and blocks another dispatch.
+- Todo 063 remains in progress. Successful live receipt, ten accepted real-work
+  outcomes, complete outcome coverage, and a second independently qualified
+  route remain missing. Todo 064 therefore remains dependency-blocked.
+
 ### 2026-09-05 - Allocation slice merged; persisted identity repair started
 
 - PR #184 merged as `4434cc56448075f4804787325a9586c6290b2215` after every

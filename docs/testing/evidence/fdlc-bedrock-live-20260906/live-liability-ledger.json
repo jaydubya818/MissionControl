@@ -2,8 +2,8 @@
   "schema": "fdlc-live-qualification-liability/v1",
   "maximumTotalNanoUsd": 5000000000,
   "settledNanoUsd": 0,
-  "unresolvedNanoUsd": 0,
-  "remainingNanoUsd": 5000000000,
+  "unresolvedNanoUsd": 924528000,
+  "remainingNanoUsd": 4075472000,
   "requests": [
     {
       "requestId": "fdlc-route-6749103b-f399-4e15-a55c-5658e05d1e7c",
@@ -19,6 +19,51 @@
       "attempts": 1,
       "totalRetryDelay": 0,
       "error": "AccessDeniedException"
+    },
+    {
+      "requestId": "fdlc-route-7c4fe33a-0540-4759-913d-828d5d75bcd0",
+      "state": "REJECTED_PRE_INFERENCE",
+      "maximumNanoUsd": 924528000,
+      "payloadBytes": 151,
+      "maximumInputTokens": 140000,
+      "maximumOutputTokens": 32,
+      "automaticRetries": 0,
+      "actualNanoUsd": 0,
+      "providerRequestId": "87eb39b1-4b2b-4483-83e0-65495b1b01a2",
+      "httpStatusCode": 403,
+      "attempts": 1,
+      "totalRetryDelay": 0,
+      "error": "AccessDeniedException"
+    },
+    {
+      "requestId": "fdlc-route-5308615e-106a-49d9-bd0f-ceb3530445e4",
+      "state": "REJECTED_PRE_INFERENCE",
+      "maximumNanoUsd": 924528000,
+      "payloadBytes": 151,
+      "maximumInputTokens": 140000,
+      "maximumOutputTokens": 32,
+      "automaticRetries": 0,
+      "actualNanoUsd": 0,
+      "providerRequestId": "84dee691-0cca-48af-bc2c-ef93747147d6",
+      "httpStatusCode": 403,
+      "attempts": 1,
+      "totalRetryDelay": 0,
+      "error": "AccessDeniedException"
+    },
+    {
+      "requestId": "fdlc-route-3bee9a64-4f28-4aca-914d-70f44143f4f0",
+      "state": "UNKNOWN",
+      "maximumNanoUsd": 924528000,
+      "payloadBytes": 151,
+      "maximumInputTokens": 140000,
+      "maximumOutputTokens": 32,
+      "automaticRetries": 0,
+      "providerRequestId": "641e32f7-5dfa-4056-84ba-affc2c2938aa",
+      "httpStatusCode": 429,
+      "attempts": 1,
+      "totalRetryDelay": 0,
+      "error": "ThrottlingException",
+      "message": "Too many tokens per day, please wait before trying again."
     }
   ]
 }

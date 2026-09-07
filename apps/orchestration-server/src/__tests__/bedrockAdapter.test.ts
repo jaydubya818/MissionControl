@@ -526,6 +526,50 @@ describe("OFFLINE IAM specification", () => {
       }
     expect(JSON.stringify(p)).not.toContain("global.anthropic");
   });
+
+  it("allows only the approved US profile across its required destinations", () => {
+    const p = bedrockIamSpecification(route);
+    const regionDeny = p.laterInvocationPolicy.Statement.find(
+      (statement) => statement.Sid === "DenyOutsideApprovedUSRegions",
+    );
+    expect(regionDeny?.Condition).toEqual({
+      StringNotEquals: {
+        "aws:RequestedRegion": ["us-east-1", "us-east-2", "us-west-2"],
+      },
+    });
+    const modelAllow = p.laterInvocationPolicy.Statement.find(
+      (statement) => statement.Sid === "ExactModelsThroughProfile",
+    );
+    expect(modelAllow?.Condition).toEqual({
+      StringEquals: {
+        "bedrock:InferenceProfileArn": route.inferenceProfileArn,
+      },
+    });
+    expect(
+      p.laterInvocationPolicy.Statement.find(
+        (statement) => statement.Sid === "DenyDirectModelInvocation",
+      )?.Condition,
+    ).toEqual({
+      StringNotEquals: {
+        "bedrock:InferenceProfileArn": route.inferenceProfileArn,
+      },
+    });
+    expect(
+      p.laterInvocationPolicy.Statement.some(
+        (statement) =>
+          statement.Effect === "Allow" &&
+          statement.Resource === modelAllow?.Resource &&
+          statement.Condition === undefined,
+      ),
+    ).toBe(false);
+    expect(
+      p.laterInvocationPolicy.Statement.find(
+        (statement) => statement.Sid === "DenyOtherModelsAndProfiles",
+      )?.NotResource,
+    ).not.toContain(
+      "arn:aws:bedrock:us-east-1:000000000000:inference-profile/global.anthropic.claude-sonnet-4-6",
+    );
+  });
 });
 
 describe("OFFLINE additional failure boundaries", () => {

@@ -2,13 +2,13 @@
   "schema": "fdlc-bedrock-price/v1",
   "qualification": "QUALIFIED",
   "version": "aws-bedrock-sonnet-4.6-us-geo-2026-09-06",
-  "effectiveAt": 1788715768000,
-  "expiresAt": 1788802168000,
+  "effectiveAt": 1788806900000,
+  "expiresAt": 1788893300000,
   "currency": "USD",
   "billingUnit": "MILLION_TOKENS",
   "provenance": {
     "url": "https://aws.amazon.com/bedrock/pricing/",
-    "evidenceDigest": "sha256:a28e043d37a60c93accb73bd7242a13770fa08ac07b500df263cc54ac500b95f"
+    "evidenceDigest": "sha256:e2344a4c438f23acac673cd7f0223a19fbd4e8a84bfbeae658283d4f57ca0e99"
   },
   "ratesNanoUsdPerMillion": {
     "input": 3300000000,

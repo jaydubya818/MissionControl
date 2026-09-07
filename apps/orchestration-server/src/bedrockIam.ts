@@ -83,11 +83,15 @@ export function bedrockIamSpecification(input: BedrockRoute) {
           },
         },
         {
-          Sid: "DenyOtherSourceOrGlobal",
+          Sid: "DenyOutsideApprovedUSRegions",
           Effect: "Deny",
           Action: invokeActions,
           Resource: "*",
-          Condition: { StringNotEquals: { "aws:RequestedRegion": r.region } },
+          Condition: {
+            StringNotEquals: {
+              "aws:RequestedRegion": [...BEDROCK_DESTINATIONS],
+            },
+          },
         },
         {
           Sid: "DenyStreaming",

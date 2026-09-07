@@ -1,6 +1,6 @@
 {
   "schema": "fdlc-bedrock-pricing-evidence/v1",
-  "capturedAt": "2026-09-06T17:43:35Z",
+  "capturedAt": "2026-09-07T18:48:20Z",
   "route": {
     "provider": "aws-bedrock",
     "model": "anthropic.claude-sonnet-4-6",
