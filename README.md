@@ -242,6 +242,18 @@ acceptance; they do not accept it.
 - Repository classification as `PUBLIC`, `INTERNAL`, `CONFIDENTIAL`, or
   `RESTRICTED`, with fail-closed remote-execution policy.
 
+### Context and Skills admission
+
+- Versioned Factory configurations bind the exact capability manifest, runtime
+  artifact, sandbox profile, execution backend, and producer and verifier
+  Execution Profiles used by an Attempt.
+- Readiness is derived from current repository, worker, runtime, policy, and
+  qualification evidence; it is not an operator-set status.
+- Producer completion yields an immutable candidate without granting
+  verification, acceptance, publication, merge, or deployment authority.
+- A separate verifier Attempt evaluates a frozen Verification Subject and Plan,
+  with stale authority, changed candidates, and self-verification failing closed.
+
 ### Durable execution and recovery
 
 - Attempt-scoped immutable execution manifests.
@@ -457,12 +469,19 @@ The honest current claim is:
 - A deterministic Factory Incident Command control plane with append-only
   lifecycle, scoped command authority, independent observed-effect evidence,
   and separately authorized restoration.
+- A canonical Context & Skills Factory admission path from versioned Factory
+  configuration through derived readiness, WorkOrder admission, producer
+  Attempt, unpublished candidate, separate verifier Attempt, and durable browser
+  evidence. This proof is deterministic and synthetic: model routing was denied,
+  transmission was absent, and it granted no acceptance, publication, or
+  production authority.
 
 The complete evidence is retained in:
 
 - [Real Codex-to-GitHub browser golden path](docs/testing/evidence/real-codex-github-pr-golden-path/README.md)
 - [System Factory E2E V2 qualification](docs/testing/evidence/system-factory-e2e-v2/README.md)
 - [Production Factory Pilot V3](docs/testing/evidence/production-factory-pilot-v3/README.md)
+- [Context & Skills canonical Factory admission](docs/testing/evidence/context-skills-factory-admission-v1/README.md)
 - [Capability Maturity Ledger](docs/product/software-factory-capability-maturity.md)
 
 ![Validated Mission with complete assertion coverage](docs/testing/evidence/real-codex-github-pr-golden-path/mission-validated-pr-61.png)
@@ -547,6 +566,12 @@ Current boundaries include:
   approved synthetic/qualification activity; real production incident
   actuation, broad provider integration, and autonomous emergency authority
   remain outside the admitted scope.
+- **Context & Skills admission — Synthetic qualification only.** The canonical
+  local path is qualified for deterministic no-provider execution with separate
+  producer and verifier identities. It does not establish behavioral performance
+  with a model, trusted production-result ingestion, publication eligibility,
+  acceptance authority, production activation, organizational adoption, or
+  equivalent behavior across other agent runtimes.
 - **Enterprise tenancy is not fully qualified.** Company, workspace, repository,
   and server-side authorization boundaries exist; sustained cross-company and
   service-identity evidence is still required before public multi-tenant claims.
@@ -802,6 +827,7 @@ Start with the document that matches the question you are trying to answer.
 | [Remote Sandbox execution](docs/architecture/remote-sandbox-execution.md) | Remote execution boundary and security posture |
 | [Factory Memory](docs/architecture/factory-memory-context-intelligence.md) | Advisory retrieval, graph, Context Packages, and phase gates |
 | [Factory Learning](docs/architecture/factory-learning-continuous-improvement.md) | Signals, experiments, proposal-only improvement, and promotion governance |
+| [Context & Skills canonical Factory admission](docs/testing/evidence/context-skills-factory-admission-v1/README.md) | Exact synthetic runtime, Factory, WorkOrder, Attempt, candidate, verifier, browser, and authority-boundary evidence |
 | [Contributing](CONTRIBUTING.md) | Issue and pull-request expectations |
 
 Architecture documents define intended contracts. Plans describe proposed or
