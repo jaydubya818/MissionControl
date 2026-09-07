@@ -55,6 +55,7 @@ import {
 } from "../lib/harnessCapabilities";
 import {
   KNOWN_HARNESS_MANIFESTS,
+  harnessCapabilityManifestDigest,
   harnessSupportsModel,
   type RenderMarkdownWorkload,
   type VerifyDocumentTemplate,
@@ -305,26 +306,24 @@ export const getVersionOptions = query({
       })),
       sandboxProfiles: sandboxProfiles.sort((left, right) => left.profileKey.localeCompare(right.profileKey) || right.version - left.version),
       harnesses: KNOWN_HARNESS_MANIFESTS.map((manifest) => {
-        const harness = resolveFrozenHarnessBinding({
-          executor: {
-            adapter: manifest.identity.adapterId,
-            version: manifest.identity.adapterVersion,
-          },
+        const adapterRuntime = resolveHarnessAdapterRuntimeArtifact({
+          adapter: manifest.identity.adapterId,
+          version: manifest.identity.adapterVersion,
         });
-        const capabilityManifestSha256 = harness.capabilityManifestSha256;
+        const capabilityManifestSha256 = harnessCapabilityManifestDigest(manifest);
         const advertised = hostBindings.some((binding) => binding.status === "READY" && !binding.dirty
           && binding.workerRuntime?.supportedExecutors.some((executor) =>
             executor.adapter === manifest.identity.adapterId
             && executor.version === manifest.identity.adapterVersion
             && executor.capabilityManifestSha256 === capabilityManifestSha256
             && executor.effectiveConfigSha256 === manifest.effectiveConfigSha256
-            && executor.runtimeArtifactSha256 === harness.runtimeArtifactSha256
+            && executor.runtimeArtifactSha256 === adapterRuntime.runtimeArtifactSha256
           ));
         return {
           manifest,
           capabilityManifestSha256,
-          runtimeArtifact: harness.runtimeArtifact,
-          runtimeArtifactDigest: harness.runtimeArtifactSha256,
+          runtimeArtifact: adapterRuntime.runtimeArtifact,
+          runtimeArtifactDigest: adapterRuntime.runtimeArtifactSha256,
           available: manifest.admission.maturity === "PRODUCTION" || advertised,
           advertised,
         };
