@@ -16,7 +16,17 @@
   "allowWorkOrderExecution": false,
   "allowReadinessIssuance": false,
   "allowMergeOrPublication": false,
+  "maximumProgramNanoUsd": 5000000000,
+  "maximumPhysicalRequests": 1,
   "inferenceProfileArn": "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
+  "maximumContextTokens": 1000000,
+  "capabilities": {
+    "countTokens": {
+      "status": "UNSUPPORTED",
+      "evidenceReference": "docs/testing/evidence/todo063-bedrock-counttokens-provisioning-2026-09-07/counttokens-capability.json",
+      "evidenceDigest": "sha256:6c3c98e0088381684eecffc9a21d100b5aae4a7bed2c69ad637ba92f97e22da8"
+    }
+  },
   "topology": "US_GEOGRAPHIC_CROSS_REGION",
   "globalInference": false,
   "allowedDestinationRegions": [

@@ -5,12 +5,15 @@ import {
   harnessCapabilityManifestDigest,
 } from "@mission-control/workflow-engine";
 import {
+  assertProviderPrice,
   liabilityDigest,
+  type ProviderPrice,
   type ProviderUsage,
 } from "../../../convex/lib/providerLiability.js";
 import type { BedrockBridgeIdentity } from "../../../convex/lib/bedrockBridgeIdentity.js";
 import { bedrockModelRouteBinding } from "./bedrockModelRouteBinding.js";
 import { bedrockRouteSchema, type BedrockRoute } from "./bedrockRoute.js";
+import { bedrockPreSendInputBound } from "./bedrockLiabilityBound.js";
 import {
   serializeBedrock,
   invokeBedrockTransport,
@@ -36,7 +39,9 @@ export interface BedrockBridgeBinding {
   reservationId: string;
   identity: BedrockBridgeIdentity;
   route: BedrockRoute;
-  maximumOutputTokens: number;
+  price: ProviderPrice;
+  maximumProgramNanoUsd: number;
+  maximumPhysicalRequests: number;
   timeoutMs: number;
 }
 export interface BedrockBridgeAuthority {
@@ -45,6 +50,10 @@ export interface BedrockBridgeAuthority {
     requestDigest: string;
     priceDigest: string;
     bridgeIdentityDigest: string;
+    maximumNanoUsd: number;
+    reservationMaximumNanoUsd: number;
+    reservationMaximumRequests: number;
+    holdDigest: string;
     admittedAt: number;
     validUntil: number;
   }>;
@@ -131,6 +140,11 @@ export class BedrockInferenceBridge {
     this.binding = structuredClone(binding);
     const b = this.binding;
     b.route = bedrockRouteSchema.parse(b.route);
+    try {
+      assertProviderPrice(b.price, this.now());
+    } catch {
+      throw new Error("BEDROCK_BRIDGE_BINDING_INVALID");
+    }
     if (transport.evidenceClass === "APPROVED_QUALIFICATION" && !accounting) throw new Error("ACCOUNTING_JOURNAL_REQUIRED");
     if (accounting?.scope && (accounting.scope.projectId !== b.projectId || accounting.scope.repositoryId !== b.repositoryId)) throw new Error("ACCOUNTING_SCOPE_MISMATCH");
     if (
@@ -146,14 +160,26 @@ export class BedrockInferenceBridge {
       b.identity.model !== b.route.modelId ||
       b.identity.backend !== "remote-sandbox" ||
       b.identity.retryGeneration !== 0 ||
+      liabilityDigest(b.price) !== b.identity.priceDigest ||
+      b.price.provider !== "aws-bedrock" ||
+      b.price.model !== b.route.modelId ||
+      b.price.api !== "CONVERSE" ||
+      b.price.inputBound !== "CONSERVATIVELY_BOUNDED" ||
+      b.price.maximumInputTokens !== b.route.maximumContextTokens ||
+      b.price.maximumOutputTokens > 4096 ||
+      b.price.maximumPayloadBytes > 20 * 1024 * 1024 ||
+      !Number.isSafeInteger(b.maximumProgramNanoUsd) ||
+      b.maximumProgramNanoUsd < 1 ||
+      !Number.isSafeInteger(b.maximumPhysicalRequests) ||
+      b.maximumPhysicalRequests < 1 ||
+      (transport.evidenceClass === "APPROVED_QUALIFICATION" &&
+        (b.maximumProgramNanoUsd !== 5_000_000_000 ||
+          b.maximumPhysicalRequests !== 1)) ||
       !b.reservationId ||
       !b.workflowRunId ||
       !b.leaseId ||
       !Number.isSafeInteger(b.generation) ||
       b.generation < 1 ||
-      !Number.isSafeInteger(b.maximumOutputTokens) ||
-      b.maximumOutputTokens < 1 ||
-      b.maximumOutputTokens > 4096 ||
       !Number.isSafeInteger(b.timeoutMs) ||
       b.timeoutMs < 1 ||
       b.timeoutMs > 900000
@@ -190,6 +216,7 @@ export class BedrockInferenceBridge {
     if (
       this.active ||
       this.blocked ||
+      this.requests.size >= this.binding.maximumPhysicalRequests ||
       this.requests.has(requestId) ||
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(requestId)
     )
@@ -197,16 +224,25 @@ export class BedrockInferenceBridge {
     signal.throwIfAborted();
     const b = this.binding;
     const request = structuredClone(input);
-    if (request.maxOutputTokens > b.maximumOutputTokens)
+    if (request.maxOutputTokens > b.price.maximumOutputTokens)
       throw new Error("BEDROCK_OUTPUT_BOUND_EXCEEDED");
     const wire = serializeBedrock(b.route, "CONVERSE", request);
-    const payloadBytes = Buffer.byteLength(JSON.stringify(wire.body));
-    if (payloadBytes > 1024 * 1024)
-      throw new Error("BEDROCK_INPUT_BOUND_EXCEEDED");
+    const preSendInputBound = bedrockPreSendInputBound(
+      b.route,
+      wire,
+      b.price.maximumPayloadBytes,
+    );
+    const expectedMaximumNanoUsd =
+      preSendInputBound.maximumInputTokens * b.price.inputNanoUsdPerToken +
+      request.maxOutputTokens * b.price.outputNanoUsdPerToken;
+    if (!Number.isSafeInteger(expectedMaximumNanoUsd) || expectedMaximumNanoUsd < 1)
+      throw new Error("BEDROCK_MAXIMUM_LIABILITY_INVALID");
+    const payloadBytes = wire.payloadBytes;
     const requestDigest = liabilityDigest({
       bridge: b.identity,
       route: b.route,
       wire,
+      preSendInputBound,
     });
     const subject = {
       reservationId: b.reservationId,
@@ -230,13 +266,32 @@ export class BedrockInferenceBridge {
         requestDigest,
         payloadBytes,
         outputTokens: request.maxOutputTokens,
+        preSendInputBound,
       });
       admitted = true;
+      const expectedHoldDigest = liabilityDigest({
+        requestId,
+        requestDigest,
+        attemptId: b.workflowRunId,
+        leaseId: b.leaseId,
+        generation: b.generation,
+        maximumNanoUsd: expectedMaximumNanoUsd,
+        maximumOutputTokens: request.maxOutputTokens,
+        preSendInputBound,
+        state: "RESERVED",
+        receiptRevision: 0,
+        classification: "UNKNOWN",
+        costClassification: "UNKNOWN",
+      });
       if (
         proof.requestId !== requestId ||
         proof.requestDigest !== requestDigest ||
         proof.priceDigest !== b.identity.priceDigest ||
         proof.bridgeIdentityDigest !== liabilityDigest(b.identity) ||
+        proof.maximumNanoUsd !== expectedMaximumNanoUsd ||
+        proof.reservationMaximumNanoUsd !== b.maximumProgramNanoUsd ||
+        proof.reservationMaximumRequests !== b.maximumPhysicalRequests ||
+        proof.holdDigest !== expectedHoldDigest ||
         !Number.isSafeInteger(proof.admittedAt) ||
         proof.admittedAt > this.now() ||
         !Number.isSafeInteger(proof.validUntil) ||
@@ -308,6 +363,9 @@ export class BedrockInferenceBridge {
           evidenceClass: this.transport.evidenceClass,
           authority: "NONE",
           automaticRetries: 0,
+          preSendInputBound,
+          preSendOutputBound: request.maxOutputTokens,
+          reservedMaximumNanoUsd: proof.maximumNanoUsd,
         },
       };
     } catch (error) {

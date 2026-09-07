@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1127.0",
-    "@aws-sdk/credential-provider-ini": "3.973.15",
+    "@aws-sdk/client-sts": "^3.1127.0",
     "@fdlc/fab": "file:../../vendor/fab/fdlc-fab-0.1.0-experimental.3.tgz",
     "@hono/node-server": "^1.19.13",
     "@mission-control/agent-runtime": "workspace:*",

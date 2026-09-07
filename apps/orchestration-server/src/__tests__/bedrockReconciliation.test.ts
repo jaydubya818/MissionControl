@@ -10,12 +10,12 @@ import { CODEX_V1_HARNESS_MANIFEST,harnessSupportsModel,harnessCapabilityManifes
 import { DOCKER_CANDIDATE_IDENTITY } from '../dockerSandboxProvider.js';
 import { canonicalHash } from '@mission-control/shared';
 const raw=JSON.parse(readFileSync(new URL('../../../../docs/software-factory/fdlc-bedrock-qualification-inputs.json',import.meta.url),'utf8'));
-const route=bedrockRouteSchema.parse({...raw,awsAccountId:'000000000000',projectEnvironmentId:'OFFLINE-FIXTURE',roleArn:'arn:aws:iam::000000000000:role/fixture',inferenceProfileArn:'arn:aws:bedrock:us-east-1:000000000000:inference-profile/us.anthropic.claude-sonnet-4-6'});
+const route=bedrockRouteSchema.parse({...raw,awsAccountId:'000000000000',projectEnvironmentId:'OFFLINE-FIXTURE',roleArn:'arn:aws:iam::000000000000:role/fixture',expectedStsPrincipalArn:'arn:aws:sts::000000000000:assumed-role/fixture/test',inferenceProfileArn:'arn:aws:bedrock:us-east-1:000000000000:inference-profile/us.anthropic.claude-sonnet-4-6'});
 const sha=(c:string)=>`sha256:${c.repeat(64)}`;
 describe('OFFLINE current-main composition',()=>{
  it('uses canonical V2 route identity without a second router',()=>{const b=bedrockModelRouteBinding(route);expect(exactModelRouteIssues(b.snapshot)).toEqual([]);expect(b.routeDigest).toBe(exactModelRouteDigest(b.snapshot));expect(b.snapshot).not.toHaveProperty('runtimeIdentity');expect(b.authority).toBe('NONE');});
  it.each(['role','project','account'] as const)('binds %s into canonical route identity',field=>{
-  const changed={...route};if(field==='role')changed.roleArn='arn:aws:iam::000000000000:role/other';if(field==='project')changed.projectEnvironmentId='other';if(field==='account'){changed.awsAccountId='111111111111';changed.roleArn='arn:aws:iam::111111111111:role/fixture';changed.inferenceProfileArn='arn:aws:bedrock:us-east-1:111111111111:inference-profile/us.anthropic.claude-sonnet-4-6';}
+  const changed={...route};if(field==='role')changed.roleArn='arn:aws:iam::000000000000:role/other';if(field==='project')changed.projectEnvironmentId='other';if(field==='account'){changed.awsAccountId='111111111111';changed.roleArn='arn:aws:iam::111111111111:role/fixture';changed.expectedStsPrincipalArn='arn:aws:sts::111111111111:assumed-role/fixture/test';changed.inferenceProfileArn='arn:aws:bedrock:us-east-1:111111111111:inference-profile/us.anthropic.claude-sonnet-4-6';}
   expect(bedrockModelRouteBinding(changed).routeDigest).not.toBe(bedrockModelRouteBinding(route).routeDigest);
  });
  it('keeps explicit global-profile denial after canonical binding',()=>expect(()=>bedrockModelRouteBinding({...route,inferenceProfileId:'global.anthropic.claude-sonnet-4-6' as any})).toThrow());

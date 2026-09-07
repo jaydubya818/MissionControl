@@ -7,6 +7,7 @@ import { bedrockModelRouteBinding } from "../apps/orchestration-server/src/bedro
 import { bedrockQualifiedPrice } from "../apps/orchestration-server/src/bedrockPricing.js";
 import { qualifiedBedrockTransport } from "../apps/orchestration-server/src/bedrockQualifiedTransport.js";
 import { serializeBedrock, invokeBedrockTransport } from "../apps/orchestration-server/src/bedrockAdapter.js";
+import { liabilityDigest } from "../convex/lib/providerLiability.js";
 import { requireConfirmedBedrockQuota } from "./lib/fdlc-bedrock-quota-gate.mjs";
 
 const root = process.cwd();
@@ -24,6 +25,8 @@ const request = {
 const countTokens = JSON.parse(readFileSync(resolve(evidenceDir, "count-tokens-result.json"), "utf8"));
 const quotaDiagnosis = JSON.parse(readFileSync(resolve(evidenceDir, "quota-diagnosis.json"), "utf8"));
 requireConfirmedBedrockQuota({ diagnosis: quotaDiagnosis, route, countTokens, maxOutputTokens: request.maxOutputTokens, now });
+const credentialsFile = process.env.FDLC_BEDROCK_CREDENTIALS_FILE;
+if (!credentialsFile?.startsWith("/")) throw new Error("QUALIFICATION_EXACT_CREDENTIAL_FILE_REQUIRED");
 const wire = serializeBedrock(route, "CONVERSE", request);
 const payloadBytes = Buffer.byteLength(JSON.stringify(wire.body));
 if (payloadBytes > price.maximumPayloadBytes) throw new Error("QUALIFICATION_PAYLOAD_EXCEEDS_PRICE_BOUND");
@@ -52,16 +55,17 @@ const grant = {
   schema: "fdlc-bounded-bedrock-call-authorization/v1" as const,
   approvalReference: "docs/software-factory/fdlc-bedrock-qualification-approval.json",
   routeDigest: bedrockModelRouteBinding(route).routeDigest,
-  expectedStsPrincipalArn: route.roleArn.replace("arn:aws:iam::", "arn:aws:sts::").replace("role/aws-reserved/sso.amazonaws.com/", "assumed-role/") + "/jaydubya818@gmail.com",
+  approvedPriceDigest: liabilityDigest(price),
+  expectedStsPrincipalArn: route.expectedStsPrincipalArn,
   identityEvidenceDigest: digestFile(resolve(evidenceDir, "sts-caller-identity.json")),
   profileEvidenceDigest: digestFile(resolve(evidenceDir, "bedrock-inference-profile.json")),
-  awsProfile: "fdlc-qualification",
+  credentialsFile,
   validUntil: Math.min(price.expiresAt, now + 15 * 60_000),
   allowModelCalls: true as const,
 };
 try {
   const started = Date.now();
-  const result = await invokeBedrockTransport(qualifiedBedrockTransport(route, grant), wire, { signal: new AbortController().signal, timeoutMs: 120_000 });
+  const result = await invokeBedrockTransport(qualifiedBedrockTransport(route, price, grant), wire, { signal: new AbortController().signal, timeoutMs: 120_000 });
   const actualNanoUsd = result.usage.inputTokens * price.inputNanoUsdPerToken + result.usage.outputTokens * price.outputNanoUsdPerToken;
   ledger.unresolvedNanoUsd -= maximumNanoUsd;
   ledger.settledNanoUsd += actualNanoUsd;

@@ -267,7 +267,7 @@ it.each([
   expect(ctx.db.patch).not.toHaveBeenCalled();
   expect(ctx.db.insert).not.toHaveBeenCalled();
 });
- function bedrockHandlerFixture() {
+function bedrockHandlerFixture() {
   const f = fixture();
   f.price.api = "CONVERSE";
   f.price.provider = "aws-bedrock";
@@ -304,6 +304,19 @@ it.each([
     model: f.price.model,
     retryGeneration: 0,
   };
+  const preSendInputBound = {
+    schema: "provider-pre-send-input-bound/v1" as const,
+    classification: "CONSERVATIVE_UPPER_BOUND" as const,
+    countTokensCapability: "UNSUPPORTED" as const,
+    maximumInputTokens: f.price.maximumInputTokens,
+    serializedRequestBytes: f.args.payloadBytes,
+    derivation: "FULL_MODEL_CONTEXT_WINDOW" as const,
+    capabilityEvidenceDigest: hash,
+  };
+  f.args.preSendInputBound = {
+    ...preSendInputBound,
+    evidenceDigest: liabilityDigest(preSendInputBound),
+  };
   vi.stubEnv("MC_GOVERNED_INFERENCE_GATEWAY_ENABLED", "1");
   Object.assign(f.rows.wo, { projectId: "project", tenantId: "tenant", approvalStatus: "APPROVED", metadata: { implementationPolicy: { maxCostUsd: 1 } } });
   Object.assign(f.rows.run, { parentTaskId: "task", executionManifestDigest: hash });
@@ -330,9 +343,39 @@ it("binds Bedrock request admission evidence through actual handler", async () =
     requestId: f.args.requestId,
     requestDigest: f.args.requestDigest,
     bridgeIdentityDigest: liabilityDigest(f.args.bridgeIdentity),
+    maximumNanoUsd: 30,
   });
+  expect(f.rows.reservation.snapshot.holds[0].preSendInputBound).toEqual(
+    f.args.preSendInputBound,
+  );
   expect(r.validUntil).toBeGreaterThan(r.admittedAt);
 });
+it.each(["missing", "mutated digest", "unsupported price mode"])(
+  "denies an invalid Bedrock pre-send bound before persistence: %s",
+  async (condition) => {
+    const f = bedrockHandlerFixture();
+    if (condition === "missing") delete f.args.preSendInputBound;
+    if (condition === "mutated digest")
+      f.args.preSendInputBound.evidenceDigest = `sha256:${"b".repeat(64)}`;
+    if (condition === "unsupported price mode") {
+      const snapshot = {
+        ...f.args.preSendInputBound,
+        classification: "PROVIDER_EXACT",
+        countTokensCapability: "SUPPORTED",
+        derivation: "PROVIDER_COUNTTOKENS",
+      };
+      const { evidenceDigest: _prior, ...evidence } = snapshot;
+      f.args.preSendInputBound = {
+        ...evidence,
+        evidenceDigest: liabilityDigest(evidence),
+      };
+    }
+    await expect(handler(reserveRequestInternal)(f.ctx, f.args)).rejects.toThrow(
+      "PRE_SEND_LIABILITY_BOUND_REQUIRED",
+    );
+    expect(f.ctx.db.patch).not.toHaveBeenCalled();
+  },
+);
 it.each([
   "workOrderId",
   "workOrderRevision",

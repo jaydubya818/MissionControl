@@ -115,6 +115,33 @@ either todo complete and does not authorize implementation by itself.
   `docs/testing/evidence/todo063-bedrock-worker-counttokens-2026-09-07/`.
 - Todo 063 remains in progress. Todo 064 remains dependency-blocked.
 
+### 2026-09-07 - Conservative Bedrock liability contract qualified locally
+
+- Replaced universal CountTokens success with explicit
+  `SUPPORTED` / `UNSUPPORTED` / `UNKNOWN` route capability modeling. The exact
+  approved Sonnet 4.6 profile is `UNSUPPORTED` from the retained AWS
+  `ValidationException`; unknown fails closed and no local estimate is labeled
+  provider-exact.
+- Bound the qualification route to exact serialized Converse bytes, a 262,144
+  byte request ceiling, the complete 1,000,000-token context liability, a 4,096
+  output cap, and the reviewed expiring price digest. Maximum one-call liability
+  is 3,367,584,000 nano-USD under the machine-bound 5,000,000,000 nano-USD
+  program ceiling.
+- The canonical Convex transaction retains the pre-send bound in the immutable
+  hold. The bridge independently recomputes the amount and verifies the price,
+  aggregate ceiling, one-request limit, and full hold digest before transport.
+  AWS usage remains ACTUAL, calculated money ESTIMATED, and overrun/ambiguity
+  freezes further execution without retry or fallback.
+- The live credential boundary now authenticates the exact static temporary
+  credentials through STS immediately before Bedrock client construction.
+  Nullable unresolved IAM role metadata grants no authority; the exact STS
+  principal is route- and grant-bound.
+- Independent architecture/simplicity, security, and data-integrity re-reviews
+  are GO for the current unsupported route. The dedicated deterministic gate
+  passes 256 tests, documentation consistency, and the unchanged
+  runtime-contract v55 guard. Source publication, CI, merge, exact-main
+  qualification, and the one bounded live call remain pending.
+
 ### 2026-09-07 - CountTokens provisioned; approved profile unsupported
 
 - Reprovisioned Identity Center permission set `FDLCQualificationTFOperator`

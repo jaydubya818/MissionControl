@@ -23,6 +23,16 @@ export interface ProviderPrice {
   inclusiveCacheWorstCase: true;
   otherBillableDimensions: "NONE";
 }
+export interface PreSendInputBound {
+  schema: "provider-pre-send-input-bound/v1";
+  classification: "PROVIDER_EXACT" | "CONSERVATIVE_UPPER_BOUND";
+  countTokensCapability: "SUPPORTED" | "UNSUPPORTED";
+  maximumInputTokens: number;
+  serializedRequestBytes: number;
+  derivation: "PROVIDER_COUNTTOKENS" | "FULL_MODEL_CONTEXT_WINDOW";
+  capabilityEvidenceDigest: string;
+  evidenceDigest: string;
+}
 export interface ProviderReservationScope {
   projectId: string;
   repositoryId: string;
@@ -50,6 +60,7 @@ export interface ProviderHold {
   generation: number;
   maximumNanoUsd: number;
   maximumOutputTokens: number;
+  preSendInputBound?: PreSendInputBound;
   state: "RESERVED" | "UNKNOWN" | "SETTLED" | "OVERRUN";
   receiptRevision: number;
   providerRequestId?: string;
@@ -136,6 +147,7 @@ export function reserveProviderRequest(input: {
   requestDigest: string;
   payloadBytes: number;
   outputTokens: number;
+  preSendInputBound?: PreSendInputBound;
   now: number;
 }) {
   const { reservation: original, price, authority: a, now } = input;
@@ -164,10 +176,41 @@ export function reserveProviderRequest(input: {
     input.outputTokens > price.maximumOutputTokens
   )
     throw new Error("REQUEST_NOT_BOUNDED");
+  const bound = input.preSendInputBound;
+  if (price.provider === "aws-bedrock") {
+    if (
+      !bound ||
+      bound.schema !== "provider-pre-send-input-bound/v1" ||
+      !["SUPPORTED", "UNSUPPORTED"].includes(bound.countTokensCapability) ||
+      !["PROVIDER_EXACT", "CONSERVATIVE_UPPER_BOUND"].includes(bound.classification) ||
+      !integer(bound.maximumInputTokens) ||
+      bound.maximumInputTokens < 1 ||
+      bound.maximumInputTokens > price.maximumInputTokens ||
+      bound.serializedRequestBytes !== input.payloadBytes ||
+      !sha(bound.capabilityEvidenceDigest) ||
+      !sha(bound.evidenceDigest) ||
+      (bound.countTokensCapability === "UNSUPPORTED" &&
+        (price.inputBound !== "CONSERVATIVELY_BOUNDED" ||
+          bound.classification !== "CONSERVATIVE_UPPER_BOUND" ||
+          bound.derivation !== "FULL_MODEL_CONTEXT_WINDOW" ||
+          bound.maximumInputTokens !== price.maximumInputTokens)) ||
+      (bound.countTokensCapability === "SUPPORTED" &&
+        (price.inputBound !== "EXACTLY_ENFORCEABLE" ||
+          bound.classification !== "PROVIDER_EXACT" ||
+          bound.derivation !== "PROVIDER_COUNTTOKENS"))
+    )
+      throw new Error("PRE_SEND_LIABILITY_BOUND_REQUIRED");
+    const { evidenceDigest, ...snapshot } = bound;
+    if (liabilityDigest(snapshot) !== evidenceDigest)
+      throw new Error("PRE_SEND_LIABILITY_BOUND_REQUIRED");
+  } else if (bound) {
+    throw new Error("PRE_SEND_LIABILITY_BOUND_ROUTE_MISMATCH");
+  }
   if (original.holds.some((h) => h.requestId === input.requestId))
     throw new Error("REQUEST_REPLAY");
+  const maximumInputTokens = bound?.maximumInputTokens ?? price.maximumInputTokens;
   const maximum =
-    price.maximumInputTokens * price.inputNanoUsdPerToken +
+    maximumInputTokens * price.inputNanoUsdPerToken +
     input.outputTokens * price.outputNanoUsdPerToken;
   const used = original.holds.reduce(
     (sum, h) => sum + Math.max(h.maximumNanoUsd, h.accountedNanoUsd ?? 0),
@@ -189,6 +232,7 @@ export function reserveProviderRequest(input: {
     generation: a.generation,
     maximumNanoUsd: maximum,
     maximumOutputTokens: input.outputTokens,
+    ...(bound ? { preSendInputBound: structuredClone(bound) } : {}),
     state: "RESERVED",
     receiptRevision: 0,
     classification: "UNKNOWN",
@@ -265,7 +309,7 @@ export function settleProviderUsage(
   const actual = priced !== undefined && priced <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(priced) : undefined;
   const incident =
     actual === undefined || actual > h.maximumNanoUsd ||
-    usage.inputTokens > price.maximumInputTokens ||
+    usage.inputTokens > (h.preSendInputBound?.maximumInputTokens ?? price.maximumInputTokens) ||
     usage.outputTokens > h.maximumOutputTokens;
   Object.assign(h, {
     state: incident ? "OVERRUN" : "SETTLED",

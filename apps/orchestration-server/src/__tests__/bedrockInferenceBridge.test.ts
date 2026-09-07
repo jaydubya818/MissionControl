@@ -113,7 +113,7 @@ describe("governed Bedrock bridge offline", () => {
     ).rejects.toThrow("lost reply");
     expect(f.reservation.holds[0]).toMatchObject({
       state: "UNKNOWN",
-      maximumNanoUsd: 200020,
+      maximumNanoUsd: 1000020,
     });
     await expect(
       f.create().infer("two", request, new AbortController().signal),
@@ -141,7 +141,7 @@ describe("governed Bedrock bridge offline", () => {
         },
       },
     });
-    expect(f.reservation.holds[0]).toMatchObject({ state: "RESERVED", maximumNanoUsd: 200020 });
+    expect(f.reservation.holds[0]).toMatchObject({ state: "RESERVED", maximumNanoUsd: 1000020 });
     await expect(bridge.infer("one", request, new AbortController().signal)).rejects.toThrow("REPLAY");
     await expect(bridge.infer("two", request, new AbortController().signal)).rejects.toThrow("REPLAY");
     expect(f.sends).toBe(1);
@@ -209,6 +209,9 @@ describe("governed Bedrock bridge offline", () => {
     "requestDigest",
     "priceDigest",
     "bridgeIdentityDigest",
+    "reservationMaximumNanoUsd",
+    "reservationMaximumRequests",
+    "holdDigest",
   ])("rejects substituted proof %s", async (key) => {
     const f = bridgeFixture(),
       before = f.authority.reserve;
@@ -221,6 +224,21 @@ describe("governed Bedrock bridge offline", () => {
     ).rejects.toThrow("PROOF");
     expect(f.sends).toBe(0);
   });
+  it.each([1, 1_000_021])(
+    "rejects substituted reserved liability %s before transport",
+    async (maximumNanoUsd) => {
+      const f = bridgeFixture(),
+        before = f.authority.reserve;
+      f.authority.reserve = async (p) => ({
+        ...(await before(p)),
+        maximumNanoUsd,
+      });
+      await expect(
+        f.create().infer("one", request, new AbortController().signal),
+      ).rejects.toThrow("PROOF");
+      expect(f.sends).toBe(0);
+    },
+  );
   it("does not retrofit V1 manifest", () => {
     const f = bridgeFixture();
     f.binding.identity.harnessDigest = harnessCapabilityManifestDigest(

@@ -118,7 +118,7 @@ const bedrockConfig = process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1"
   }, executionConfigurationErrors)
   : undefined;
 const bedrockTransport = bedrockConfig?.callAuthorization && accountingRuntime.delivery
-  ? optionalExecutionConfiguration("PROVIDER_GRANT_INVALID", () => qualifiedBedrockTransport(bedrockConfig.route, bedrockConfig.callAuthorization), executionConfigurationErrors)
+  ? optionalExecutionConfiguration("PROVIDER_GRANT_INVALID", () => qualifiedBedrockTransport(bedrockConfig.route, bedrockConfig.price, bedrockConfig.callAuthorization), executionConfigurationErrors)
   : undefined;
 const CODEX_BEDROCK_HARNESS_ENABLED = Boolean(bedrockTransport);
 const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
