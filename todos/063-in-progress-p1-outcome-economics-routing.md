@@ -71,20 +71,31 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
-### 2026-09-07 — Bedrock IAM route admitted; daily provider quota blocked
+### 2026-09-07 - Conservative contract landed; one live request reached account agreement gate
 
-- The narrow Identity Center administrator provisioned the exact
-  `FDLCQualificationTFOperator` policy to account `083665737366`; canonical AWS
-  read-back matches and the approved Sonnet 4.6 request now passes IAM.
-- The one-attempt synthetic request reached Bedrock and was rejected with HTTP
-  429 `Too many tokens per day`. No retry, fallback, output, or usage receipt was
-  produced. The ledger conservatively retains the $0.924528 maximum reservation
-  as unresolved and blocks another dispatch.
-- Todo 063 remains in progress. Successful live receipt, ten accepted real-work
-  outcomes, complete outcome coverage, and a second independently qualified
-  route remain missing. Todo 064 therefore remains dependency-blocked.
+- PR `#214` passed all 12 checks and merged as exact main
+  `beaf1f8cb293845ec2abaa6c3c1502676a5cf83b`. The post-merge Todo 063 gate passed
+  256 tests, documentation consistency, and runtime contract v55.
+- Revalidated the exact account, principal, region, active US Sonnet 4.6 profile,
+  and three regional backing models. Before transport, a durable hold reserved
+  the full 1,000,000-token input bound plus 4,096 output tokens: 3,367,584,000
+  nano-USD under the 5,000,000,000 nano-USD one-request program ceiling.
+- AWS received exactly one non-streaming synthetic request with SDK attempts set
+  to one. It returned `ResourceNotFoundException` before model use because the
+  account has not submitted Anthropic use-case details. Readback independently
+  reports `agreementAvailability=NOT_AVAILABLE` while authorization, entitlement,
+  and region availability are present.
+- No provider usage was returned. The hold is durably `UNKNOWN`, the full maximum
+  remains retained, and no zero-cost or successful-inference claim is made. No
+  retry, fallback, alternate route, IAM broadening, or second request occurred;
+  the temporary credential envelope was deleted.
+- Evidence is under
+  `docs/testing/evidence/todo063-bedrock-live-qualification-2026-09-07/`.
+  Todo 063 remains in progress; Todo 064 remains dependency-blocked. Resumption
+  requires the account owner to complete the Anthropic use-case agreement and a
+  new explicit one-request authorization.
 
-### 2026-09-07 — 429 liability reconciled; account quota requires administrator
+### 2026-09-07 — Earlier 429 liability reconciled; account quota requires administrator
 
 - Read-only CloudWatch provider telemetry records one route-specific throttle at
   the request minute and no invocation, input-token, or output-token datapoints
@@ -95,9 +106,23 @@ either todo complete and does not authorize implementation by itself.
   Anthropic Claude Sonnet 4.6 (doubled for cross-region calls). Its documented
   default is 4,320,000,000 and it is non-adjustable, but the qualification role
   is denied quota value and request-history reads. An administrator in account
-  `083665737366` or AWS Support must resolve the applied capacity before one
-  minimum bounded call can run.
-- Todo 063 remains in progress and Todo 064 remains dependency-blocked.
+  `083665737366` or AWS Support must resolve the applied capacity before another
+  bounded call can be considered.
+- This is retained as historical evidence. The later account-agreement failure
+  and its unresolved liability are now the active resumption boundary.
+
+### 2026-09-07 — Earlier Bedrock IAM route admission reached the daily provider quota
+
+- The narrow Identity Center administrator provisioned the exact
+  `FDLCQualificationTFOperator` policy to account `083665737366`; canonical AWS
+  read-back matches and the approved Sonnet 4.6 request passed IAM.
+- The one-attempt synthetic request reached Bedrock and was rejected with HTTP
+  429 `Too many tokens per day`. No retry, fallback, output, or usage receipt was
+  produced. Its initial $0.924528 maximum reservation was later reconciled to
+  zero billable usage by the evidence above.
+- Todo 063 remains in progress. Successful live receipt, ten accepted real-work
+  outcomes, complete outcome coverage, and a second independently qualified
+  route remain missing. Todo 064 therefore remains dependency-blocked.
 
 ### 2026-09-07 - Worker-path CountTokens permission applied; profile still unsupported
 

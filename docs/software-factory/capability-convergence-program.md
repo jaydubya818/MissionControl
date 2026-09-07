@@ -394,7 +394,7 @@ billable inference occurred. The retained
 [worker-path evidence](../testing/evidence/todo063-bedrock-worker-counttokens-2026-09-07/README.md)
 keeps Todo 063 in progress and Todo 064 dependency-blocked.
 
-### Conservative pre-send liability correction — implementation in progress
+### Conservative pre-send liability correction — landed; account agreement blocks model use
 
 The Product Owner subsequently classified that response as an exact provider
 capability fact and approved replacing universal CountTokens success with a
@@ -409,5 +409,16 @@ sets the 4,096-output-token maximum at 3,367,584,000 nano-USD, under the
 machine-bound 5,000,000,000 nano-USD one-request program ceiling. The bridge now
 binds the full price snapshot and recomputes the expected hold before transport;
 the authenticated transport verifies the temporary credential's actual caller
-through STS before inference. Source review, merge, exact-main qualification and
-the one authorized live call remain required before Todo 063 can close.
+through STS before inference. PR #214 passed all 12 checks and merged as
+`beaf1f8cb293845ec2abaa6c3c1502676a5cf83b`; the exact-main focused gate passed
+256 tests and the runtime-contract v55 guard.
+
+The one authorized request then committed the 3,367,584,000 nano-USD maximum
+before transport. AWS received exactly one request and returned
+`ResourceNotFoundException` before model use because Anthropic use-case details
+have not been submitted for account `083665737366`. Readback reports the exact
+model authorization, entitlement, and region as available but
+`agreementAvailability=NOT_AVAILABLE`. No usage was returned, so the full hold
+remains `UNKNOWN`; no retry or replacement call is authorized. The retained
+[live-gate evidence](../testing/evidence/todo063-bedrock-live-qualification-2026-09-07/README.md)
+keeps Todo 063 open and Todo 064 dependency-blocked without reopening IAM.
