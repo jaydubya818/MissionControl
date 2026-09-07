@@ -471,7 +471,19 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
-Current public client/backend runtime contract: **v52**.
+Current public client/backend runtime contract: **v53**.
+
+### Factory Deployed Engineer qualification environment
+
+The bounded FDLC Deploy / Factory Deployed Engineer qualification environment is **ready but not activated**. Its safe identifiers are:
+
+- AWS qualification account `083665737366` in `us-east-1`;
+- qualification hostname `qual.factory-engineer.fdlc.ai`;
+- dedicated Convex qualification deployment `calm-buffalo-854`;
+- workspace `mission-control://qualification/fdlc-phase-3`; and
+- Mission Control project `j17ve66cdc005ntgr6qj31b0fs8dwc62`.
+
+The environment has pinned immutable runtime images and bounded qualification identities. Runtime services remain dormant, Phase 3 live activation has not started, and no Bedrock model invocation or Factory Engineer workload has occurred. This is environment-readiness evidence, not live-qualification or production-operations evidence. See the public [FDE status page](https://fdlc.ai/deploy) for the current release and rollback summary.
 
 ### Factory Incident Command (Experimental)
 
@@ -489,9 +501,18 @@ authority and evidence fail closed. Incident transitions depend on durable,
 append-only receipts whose authority, provenance, scope, and currentness can be
 independently verified.
 
-This capability remains **Experimental**. Deterministic contract and threat
-tests are complete, but they do not establish general production incident
-actuation, broad provider coverage, or autonomous emergency authority.
+Runtime contract v53 adds one real bounded actuator for repository dispatch.
+An authorized commander records a durable request; the executor changes the
+exact repository admission projection and records a separate command receipt
+and acknowledgment; a separately invoked observer records the actual effect.
+Resume requires a durable, current restoration authorization created before
+execution. The same admission gate protects WorkOrder dispatch and automatic
+Verification Attempt scheduling.
+
+This capability remains **Experimental**. One local non-production canary
+completed pause, denied dispatch, restart recovery, separately authorized
+resume, independent observation, and the full incident lifecycle. This does not
+establish broad control coverage or autonomous emergency authority.
 
 ## Current limitations
 
