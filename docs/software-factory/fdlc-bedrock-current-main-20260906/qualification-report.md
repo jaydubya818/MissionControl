@@ -94,15 +94,20 @@ An Identity Center administrator must:
 
 The exact missing assignment was reverified on 2026-09-07. Identity Center user
 `jaydubya818@gmail.com` is assigned only to target account `083665737366` through
-permission set `FDLCQualificationTFOperator`; the access portal exposes no
-management-account or delegated-administrator account and no administrator
-permission set. The target role is denied both `sso:ListInstances` and
+permission set `FDLCQualificationTFOperator`; the access portal does not expose
+the identified Organizations management account `437672023618`, any configured
+delegated-administrator account, or an administrator permission set. The target
+role is denied both `sso:ListInstances` and
 `organizations:DescribeOrganization`, so it cannot discover or administer the
 organization boundary. An existing organization administrator must assign this
 user, or a separately authenticated administrator user/group, to an Identity
 Center administrator permission set in the Organizations management account or
-configured delegated-administrator account. That separate assignment is the
-missing authority; it cannot be bootstrapped from the target role.
+configured delegated-administrator account. The concrete missing assignment is
+management-account `437672023618` access through the organization's existing
+Identity Center administrator permission set/group, granted to a separate
+administrator principal. The administrator permission-set/group identity remains
+unobservable from the target role. This authority cannot be bootstrapped from the
+target role.
 
 The reviewed invocation policy digest is
 `sha256:b89537a26d8a9f0f4e1f2d0455c9985ae8da63fe2623c4e94c671c30097d464d`.
