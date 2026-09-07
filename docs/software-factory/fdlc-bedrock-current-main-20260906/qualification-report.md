@@ -121,6 +121,20 @@ account. The organization owner or existing administrator principal, the
 approved Identity Center administrator permission set/group, and any delegated
 administrator remain unidentified.
 
+The local AWS configuration file was created at `2026-09-05 16:41:03 -0700`
+and modified at `2026-09-05 16:43:35 -0700`. The profile is a direct, legacy-form
+IAM Identity Center profile: it declares an SSO start URL, SSO region, account,
+and role inline, with no `source_profile`, `credential_source`, or named
+`sso_session`. Those fields do not establish whether `aws configure sso`, a
+person, or another tool created it. A targeted search of repository records, Git
+history, and the relevant FDLC handoff attachments found only proposed actions
+and later discovery notes. It found no management-account STS receipt,
+permission-set ARN, principal ID, account-assignment request, provisioning
+request, or successful organization-administration operation for
+`AccountFullAccessRole`. The resulting classification is
+`ACCOUNT_FULL_ACCESS_ROLE_CONFIGURED_BUT_UNVERIFIED`, and the operative boundary
+remains `AWS_ORG_BOOTSTRAP_ADMIN_REQUIRED`.
+
 The reviewed invocation policy digest is
 `sha256:b89537a26d8a9f0f4e1f2d0455c9985ae8da63fe2623c4e94c671c30097d464d`.
 
