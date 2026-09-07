@@ -334,3 +334,23 @@ incidents, autonomous emergency authority, provider inference, real accepted
 WorkOrders, production-value outcomes, learning promotion, or Factory Version
 rollback. Todo 063 and the real pilot remain open at their existing authority
 boundaries.
+
+### Authenticated Bedrock live preflight — denied before inference
+
+On 2026-09-07 the Product Owner approved the dedicated qualification account,
+profile, exact US geographic Sonnet 4.6 route, and a cumulative non-Production
+live-call ceiling of USD 5.00 with zero retries and zero fallbacks. Authenticated
+STS matched account `083665737366` and the expected
+`AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783` session. Bedrock
+returned the active account-specific inference-profile ARN and exactly the three
+approved destination model ARNs.
+
+The exact synthetic CountTokens preflight then failed closed with
+`AccessDeniedException`: no identity-based policy allows `bedrock:CountTokens`
+for that principal on the approved profile. No inference request, reservation,
+provider result, retry, fallback, or spend occurred. The retained
+[preflight evidence](../testing/evidence/todo063-bedrock-live-preflight-2026-09-07/README.md)
+records the safe identity, route, request digest and denial. Resume only after
+the Identity Center permission is actually provisioned; reverify STS and repeat
+CountTokens before reserving or sending. Todo 063 remains in progress and todo
+064 remains blocked by its declared dependency.
