@@ -504,7 +504,7 @@ The bounded FDLC Deploy / Factory Deployed Engineer qualification environment is
 
 The environment has pinned immutable runtime images and bounded qualification identities. Runtime services remain dormant, Phase 3 live activation has not started, and no Bedrock model invocation or Factory Engineer workload has occurred. This is environment-readiness evidence, not live-qualification or production-operations evidence. See the public [FDE status page](https://fdlc.ai/deploy) for the current release and rollback summary.
 
-### Factory Incident Command (Experimental)
+### Factory Incident Command (Production-qualified; one exact repository operation)
 
 Runtime contract v51 adds a browser-operable incident control plane for the
 governed lifecycle:
@@ -535,11 +535,15 @@ independently observed PAUSE chain, and creates no Attempt, workflow run,
 worker launch, or external call. Incident Command displays the receipt after
 refresh and reuses its validated lineage as canonical Measure evidence.
 
-This capability remains **Experimental** until the retained production drill is
-sealed on final main. One local non-production canary
-completed pause, denied dispatch, restart recovery, separately authorized
-resume, independent observation, and the full incident lifecycle. This does not
-establish broad control coverage or autonomous emergency authority.
+This capability is **Production-qualified for one exact repository operation**.
+On implementation main `03240af93c442a3f747507a21924b44ff379f80d`, retained
+Production incident `INC-MTQR363Y-DA535A` completed pause, live dispatch denial,
+separately authorized resume, independent restoration observation, measurement,
+resolution, and refresh recovery for `jaydubya818/MissionControl`. The exact
+Git-source UI deployment is `dpl_5b9qEHYxZkw1NCUEUzQJFsKpb5vM`; the canonical
+executor and admission gate are deployed in Convex Production at runtime
+contract v55. This narrow qualification does not establish broad control
+coverage or autonomous emergency authority.
 
 ## Current limitations
 
@@ -569,11 +573,13 @@ Current boundaries include:
   Phase 3 fixture and qualifies one real Context7 `query-docs` operation for a
   fixed public React documentation query. No write operation, dynamic discovery
   authority, connector breadth, or general harness MCP runtime is admitted.
-- **Incident Command — Experimental.** The canonical browser-operable lifecycle
-  and deterministic control plane are implemented. Qualification is bounded to
-  approved synthetic/qualification activity; real production incident
-  actuation, broad provider integration, and autonomous emergency authority
-  remain outside the admitted scope.
+- **Incident Command — Production-qualified for one exact repository
+  operation.** The retained Production drill proves canonical pause, live
+  dispatch denial, separate restoration authority, independent observation,
+  resolution, and refresh recovery for `jaydubya818/MissionControl`. Other
+  controls, arbitrary repositories, broad provider integration, customer
+  incidents, and autonomous emergency authority remain outside the admitted
+  scope.
 - **Context & Skills admission — Synthetic qualification only.** The canonical
   local path is qualified for deterministic no-provider execution with separate
   producer and verifier identities. It does not establish behavioral performance
