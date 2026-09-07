@@ -248,6 +248,7 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
   const requestDispatchControl = useMutation(api.factory.incidentControls.requestRepositoryDispatchControl);
   const executeDispatchControl = useMutation(api.factory.incidentControls.executeRepositoryDispatchControl);
   const observeDispatchControl = useMutation(api.factory.incidentControlObserver.observeRepositoryDispatchControl);
+  const attemptDispatchAdmission = useMutation(api.factory.incidentControls.attemptRepositoryDispatchAdmission);
   const [reason, setReason] = useState("");
   const [evidenceReferences, setEvidenceReferences] = useState("");
   const [commandReferences, setCommandReferences] = useState("");
@@ -317,6 +318,10 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
   };
   const pauseHistory = historicalChain("PAUSE_REPOSITORY_DISPATCH");
   const resumeHistory = historicalChain("RESUME_REPOSITORY_DISPATCH");
+  const dispatchDenialReceipt = dispatchControl?.receipts?.find((receipt) =>
+    receipt.receiptType === "DISPATCH_DENIED"
+    && receipt.operation === "PAUSE_REPOSITORY_DISPATCH"
+    && receipt.observedAdmission === "DENIED");
   const historicalRestorationAuthorization = dispatchControl?.restorationAuthorizations?.[0];
 
   const requestCanonicalControl = async () => {
@@ -410,6 +415,25 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
     }
   };
 
+  const attemptCanonicalDispatchAdmission = async () => {
+    if (!incident.repositoryId || !incident.commanderActorId) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await attemptDispatchAdmission({
+        incidentId,
+        repositoryId: incident.repositoryId,
+        expectedSequence: incident.currentSequence,
+        expectedCommanderActorId: incident.commanderActorId,
+        requestId: `incident-ui-dispatch-admission:${incidentId}:${incident.currentSequence}:${crypto.randomUUID()}`,
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Dispatch admission attempt failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const recordProposalDecision = async (proposalId: Id<"factoryIncidentProposals">, decision: "ACCEPTED" | "REJECTED") => {
     setError(null);
     try {
@@ -466,7 +490,9 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
       }));
       const evidenceRefs = upcoming === "RESTORE" && canonicalControlSelected && effectReceipt
         ? [{ kind: "CONTROL_RECEIPT" as const, recordId: effectReceipt._id, relationship: "known-safe-restoration" }, ...typedEvidenceRefs]
-        : typedEvidenceRefs;
+        : upcoming === "MEASURE" && dispatchDenialReceipt
+          ? [{ kind: "CONTROL_RECEIPT" as const, recordId: dispatchDenialReceipt._id, relationship: "measured-dispatch-denial" }, ...typedEvidenceRefs]
+          : typedEvidenceRefs;
       await advance({
         incidentId,
         expectedSequence: incident.currentSequence,
@@ -598,7 +624,7 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
             </div>
           ) : null}
           <Textarea className="mt-3" aria-label="Incident transition reason" placeholder="Decision reason and current facts" value={reason} onChange={(event) => setReason(event.target.value)} />
-          <Textarea className="mt-2" aria-label="Incident evidence references" placeholder={upcoming === "MEASURE" ? "One measurement evidence reference per line (required)" : upcoming === "RESTORE" ? "One known-safe evidence reference per line (required)" : "One supporting evidence reference per line"} value={evidenceReferences} onChange={(event) => setEvidenceReferences(event.target.value)} />
+          <Textarea className="mt-2" aria-label="Incident evidence references" placeholder={upcoming === "MEASURE" ? dispatchDenialReceipt ? "Canonical dispatch-denial measurement is attached automatically" : "One measurement evidence reference per line (required)" : upcoming === "RESTORE" ? "One known-safe evidence reference per line (required)" : "One supporting evidence reference per line"} value={evidenceReferences} onChange={(event) => setEvidenceReferences(event.target.value)} />
           {upcoming === "CONTAIN" || upcoming === "RESTORE" ? (
             canonicalControlSelected ? (
               <div className="mt-3 rounded-lg border border-line bg-surface-1 p-3" aria-label="Repository dispatch control evidence">
@@ -654,6 +680,19 @@ function IncidentDetail({ incidentId }: { incidentId: Id<"factoryIncidents"> }) 
               </div>
             </div>
           ) : null)}
+          {pauseHistory?.effect && dispatchControl.admission === "DENIED" && !dispatchDenialReceipt ? (
+            <Button className="mt-3" size="sm" variant="outline" disabled={submitting} onClick={() => void attemptCanonicalDispatchAdmission()}>
+              Attempt dispatch admission
+            </Button>
+          ) : null}
+          {dispatchDenialReceipt ? (
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <ControlStage label="Dispatch admission denied" complete detail={dispatchDenialReceipt._id} />
+              <div className="rounded-md border border-success/40 bg-success/5 px-2 py-2 text-[11px] text-success">
+                Exact repository gate returned repository-dispatch-paused. No Attempt, workflow run, or worker launch was created.
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

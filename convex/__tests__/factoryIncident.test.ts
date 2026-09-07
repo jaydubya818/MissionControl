@@ -10,6 +10,7 @@ import {
   normalizeEvidenceRefs,
   validateFactoryIncidentTransition,
 } from "../lib/factoryIncident";
+import { dispatchDenialMeasurementRejectionReason } from "../lib/factoryIncidentControl";
 import {
   FACTORY_INCIDENT_DRILLS,
   validateFactoryIncidentDrillCatalog,
@@ -196,6 +197,29 @@ describe("Factory Incident Command domain", () => {
       controlExecutions: [],
       measurementReferenceCount: 1,
     })).toBeNull();
+  });
+
+  it("accepts only exact current-runtime dispatch-denial measurement lineage", () => {
+    const predecessor = {
+      _id: "effect-1", incidentId: "incident-1", projectId: "project-1", repositoryId: "repository-1",
+      receiptType: "EFFECT_OBSERVED", controlKey: "PAUSE_REPOSITORY_DISPATCH", operation: "PAUSE_REPOSITORY_DISPATCH",
+      producerId: "repository-dispatch-admission-observer/v1", requestId: "pause-1", result: "PASS",
+      expectedAdmission: "DENIED", observedAdmission: "DENIED", createdAt: 10,
+    };
+    const receipt = {
+      _id: "denial-1", incidentId: "incident-1", projectId: "project-1", repositoryId: "repository-1",
+      receiptType: "DISPATCH_DENIED", controlKey: "PAUSE_REPOSITORY_DISPATCH", operation: "PAUSE_REPOSITORY_DISPATCH",
+      producerId: "repository-dispatch-admission-gate/v1", requestId: "attempt-1", result: "PASS",
+      expectedAdmission: "DENIED", observedAdmission: "DENIED", predecessorReceiptId: "effect-1",
+      runtimeContractVersion: 55, createdAt: 11,
+    };
+    const exact = { receipt, predecessor, incidentId: "incident-1", projectId: "project-1", repositoryId: "repository-1", expectedRuntimeContractVersion: 55 };
+    expect(dispatchDenialMeasurementRejectionReason(exact)).toBeNull();
+    expect(dispatchDenialMeasurementRejectionReason({ ...exact, receipt: { ...receipt, incidentId: "incident-2" } })).toBe("dispatch-denial-receipt-scope-mismatch");
+    expect(dispatchDenialMeasurementRejectionReason({ ...exact, receipt: { ...receipt, receiptType: "ACKNOWLEDGED" } })).toBe("dispatch-denial-receipt-invalid");
+    expect(dispatchDenialMeasurementRejectionReason({ ...exact, receipt: { ...receipt, producerId: "executor" } })).toBe("dispatch-denial-receipt-invalid");
+    expect(dispatchDenialMeasurementRejectionReason({ ...exact, receipt: { ...receipt, runtimeContractVersion: 54 } })).toBe("dispatch-denial-receipt-invalid");
+    expect(dispatchDenialMeasurementRejectionReason({ ...exact, predecessor: { ...predecessor, producerId: "executor" } })).toBe("dispatch-denial-receipt-predecessor-invalid");
   });
 
   it("projects containment, recovery, monitoring, and resolution without conflating them", () => {

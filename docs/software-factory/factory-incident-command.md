@@ -50,6 +50,17 @@ repository, actor, sequence, expiry, request, predecessor, producer, and runtime
 version must match across the lineage. Other unqualified control categories
 continue to require distinct canonical PASS evidence envelopes. An
 acknowledgment is never containment proof.
+
+The bounded production acceptance path records a fifth, separate
+`DISPATCH_DENIED` receipt. An authenticated incident commander triggers an
+admission attempt against the same exact-repository gate used by WorkOrder
+dispatch. The attempt is valid only while the active projection is denied by
+this incident and the active request has a complete independently observed
+PAUSE lineage. It creates no Attempt, workflow run, worker launch, or external
+call. The receipt is runtime-contract-versioned, append-only, linked to the
+active effect receipt, and is validated again before it can satisfy the
+incident's Measure phase.
+
 Restoration is a later, separate human decision. It requires:
 
 1. the incident has progressed through isolation;

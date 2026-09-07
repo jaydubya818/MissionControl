@@ -146,7 +146,8 @@ describe("FactoryIncidentWorkspace", () => {
           activeRequestId: "request-1",
           restorationAuthorizations: [],
           receipts: [
-            { _id: "effect-1", receiptType: "EFFECT_OBSERVED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 4 },
+            { _id: "denial-1", receiptType: "DISPATCH_DENIED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "dispatch-attempt-1", authoritySequence: 1, authorityExpiresAt: Date.now(), observedAdmission: "DENIED", createdAt: 5 },
+            { _id: "effect-1", receiptType: "EFFECT_OBSERVED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, observedAdmission: "DENIED", createdAt: 4 },
             { _id: "ack-1", receiptType: "ACKNOWLEDGED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 3 },
             { _id: "command-1", receiptType: "COMMAND_ISSUED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 2 },
             { _id: "requested-1", receiptType: "COMMAND_REQUESTED", operation: "PAUSE_REPOSITORY_DISPATCH", requestId: "request-1", authoritySequence: 1, authorityExpiresAt: Date.now() + 60_000, createdAt: 1 },
@@ -166,6 +167,8 @@ describe("FactoryIncidentWorkspace", () => {
     expect(evidence.getByText("Command executed").parentElement).toHaveTextContent("command-1");
     expect(evidence.getByText("Acknowledged").parentElement).toHaveTextContent("ack-1");
     expect(evidence.getByText("Effect observed").parentElement).toHaveTextContent("effect-1");
+    expect(screen.getByText("Dispatch admission denied").parentElement).toHaveTextContent("denial-1");
+    expect(screen.getByText(/No Attempt, workflow run, or worker launch was created/)).toBeInTheDocument();
   });
 
   it("offers a fresh request after an expired persisted lineage", async () => {
