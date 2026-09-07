@@ -5,6 +5,13 @@ import {
 } from "../lib/workflowSnapshot";
 
 describe("workflow definition snapshots", () => {
+  it("freezes the deterministic contract discriminator without changing legacy snapshots", () => {
+    const workflow = { workflowId: "synthetic-render", name: "Synthetic", description: "Synthetic", agents: [], steps: [], active: true, version: 1 };
+    expect(snapshotWorkflowDefinition({ ...workflow, contractVersion: "factory-workflow-contract/v1" })).toEqual(snapshotWorkflowDefinition(workflow));
+    const deterministic = { ...workflow, contractVersion: "factory-workflow-contract/v2" };
+    expect(snapshotWorkflowDefinition(deterministic).contractVersion).toBe("factory-workflow-contract/v2");
+    expect(workflowDefinitionChanged(workflow, deterministic)).toBe(true);
+  });
   it("captures the executable version with deterministic defaults", () => {
     const snapshot = snapshotWorkflowDefinition({
       workflowId: "loop-engineering",

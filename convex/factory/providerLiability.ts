@@ -108,6 +108,9 @@ export const createReservation = mutation({
       Date.now(),
     );
     if (!admission.eligible) throw new Error("Execution Profile not current");
+    if (!profile.modelCatalogId || !profile.modelRouteDigest) {
+      throw new Error("Provider reservation requires an inference-enabled Execution Profile");
+    }
     const route = await ctx.db.get(profile.modelCatalogId);
     const routeSnapshot = route?.routeSnapshot as
       | { provider?: string; modelId?: string }

@@ -216,7 +216,6 @@ const gitVerificationSubjectIdentityFields = {
   ...verificationSubjectIdentityFields,
   kind: v.literal("GIT_CANDIDATE"),
   repositoryId: v.id("workspaceRepositories"),
-  providerRepositoryId: v.string(),
   candidateSha: v.string(),
   treeSha: v.string(),
 };
@@ -224,6 +223,7 @@ const gitVerificationSubjectIdentityFields = {
 const githubVerificationSubjectValidator = v.object({
   ...gitVerificationSubjectIdentityFields,
   provider: v.literal("GITHUB"),
+  providerRepositoryId: v.string(),
   pullRequest: v.object({
     providerPullRequestId: v.string(),
     number: v.number(),
@@ -391,7 +391,7 @@ export const verificationIndependenceValidator = v.object({
 export const verificationIsolationAttestationValidator = v.object({
   mode: v.union(
     v.literal("DETACHED_GIT_WORKTREE"), v.literal("FRESH_CLONE"), v.literal("REMOTE_SANDBOX"),
-    v.literal("AUTOMATION_SNAPSHOT"), v.literal("LOCAL_DOCKER_CANARY"),
+    v.literal("AUTOMATION_SNAPSHOT"), v.literal("LOCAL_DOCKER_CANARY"), v.literal("ISOLATED_CONTAINER"),
   ),
   sandboxId: v.string(),
   rootBindingDigest: v.string(),

@@ -1,3 +1,8 @@
+import { assertQualificationActivation } from "./lib/factoryQualificationScope";
+import { reserveOfflineAttemptBudget } from "./lib/offlineAttemptBudget";
+import { NO_INFERENCE_CONSTRAINT } from "./lib/offlineExecutionPolicy";
+import { deterministicFactoryVersionIssues } from "./lib/factoryWorkflowContract";
+import { factoryVersionExecutionProfileProjection } from "./lib/executionProfileAdmission";
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -43,10 +48,17 @@ import { validateMissionWorkOrderDispatch } from "./lib/missionGovernance";
 import {
   genericHarnessV1RecoveryReady,
   evaluateFactoryDispatchPreflight,
+  evaluateLocalQualificationDispatchPreflight,
   factoryDispatchChecks,
+  factoryLocalQualificationDispatchChecks,
   factoryVersionApprovesWorkOrderScopes,
   selectCurrentFactoryHost,
 } from "./lib/factoryDispatch";
+import {
+  assertLocalRepositoryHost,
+  isLocalQualificationRepository,
+  loadLocalRepositoryAdmission,
+} from "./lib/localRepositoryAdmission";
 import { planReadiness, summarizeWorkOrderReadiness, type ReadinessCheck } from "./lib/workOrderReadiness";
 import { validFactoryBudget, validFactoryExecutionBinding, validFactoryExecutorBinding } from "./lib/factoryConfiguration";
 import { factoryWorkerEligibility } from "./lib/factoryWorkerRuntime";
@@ -2860,7 +2872,9 @@ async function dispatchWorkOrder(
     // Execution routing is additive for V1. Legacy dispatches do not enter the
     // Factory tuple control plane unless an exact baseline (or explicit pin)
     // already exists, preserving the default-off rollout contract.
-    const executionRoutingPreview = !remoteRetryState && executionRoutingRequested({
+    const explicitlySelectedFactory = retryFactoryDefinitionVersionId ? await ctx.db.get(retryFactoryDefinitionVersionId) : null;
+    const offlineSelected = explicitlySelectedFactory?.executionBackend === "isolated-container";
+    const executionRoutingPreview = !offlineSelected && !remoteRetryState && executionRoutingRequested({
       factoryDefinitionVersionId: retryFactoryDefinitionVersionId,
       executionRoutingPin: refreshedWorkOrder.executionRoutingPin,
     })
@@ -2974,7 +2988,7 @@ async function dispatchWorkOrder(
       throw new Error(`WorkOrder is not dispatchable (${("reason" in dispatchable ? dispatchable.reason : "unknown")})`);
     }
 
-    const routing = executionRoutingPreview
+    const routing = factoryBinding?.executionBackend === "isolated-container" ? null : executionRoutingPreview
       ? await persistExecutionRoutingDecision(ctx, {
           preview: executionRoutingPreview,
           workOrder: refreshedWorkOrder,
@@ -3076,12 +3090,13 @@ async function dispatchWorkOrder(
       selectedTask?.description?.trim() ||
       selectedTask?.title ||
       refreshedWorkOrder.desiredOutcome;
-    const executionManifest = factoryBinding
-      ? buildFactoryExecutionManifest({
+    const executionManifestInput = factoryBinding
+      ? ({
           runId,
           missionId: refreshedWorkOrder.missionId ? String(refreshedWorkOrder.missionId) : undefined,
           missionPlanId: refreshedWorkOrder.missionPlanId ? String(refreshedWorkOrder.missionPlanId) : undefined,
           missionPlanVersion: missionPlanForDispatch?.revisionNumber,
+          ...(factoryBinding.executionBackend === "isolated-container" ? { missionPlanDigest: `sha256:${computeCanonicalHash(missionPlanForDispatch)}`, budgetReservationId: runId } : {}),
           planningRepositorySha: refreshedWorkOrder.planningRepositorySha,
           qualityContractDigest: refreshedWorkOrder.qualityContractDigest,
           workOrderId: String(refreshedWorkOrder._id),
@@ -3098,6 +3113,7 @@ async function dispatchWorkOrder(
           repositoryId: String(factoryBinding.repository._id),
           providerRepositoryId: factoryBinding.repository.providerRepositoryId,
           repository: factoryBinding.repository.repository,
+          repositoryAdmissionDigest: factoryBinding.version.repositoryAdmissionDigest,
           repositoryDataClassification: factoryBinding.repositoryDataClassification,
           defaultBranch: factoryBinding.repository.defaultBranch,
           baseSha: factoryBinding.baseSha,
@@ -3105,7 +3121,7 @@ async function dispatchWorkOrder(
           worktree: factoryBinding.worktree,
           executor: resolveFrozenHarnessBinding(factoryBinding.version),
           executionBackend: factoryBinding.executionBackend,
-          modelRoute: {
+          modelRoute: factoryBinding.executionBackend === "isolated-container" ? undefined : {
             catalogId: String(factoryBinding.modelRoute._id),
             routeDigest: factoryBinding.modelRoute.routeDigest,
             routeSnapshot: factoryBinding.modelRoute.routeSnapshot,
@@ -3122,7 +3138,7 @@ async function dispatchWorkOrder(
             qualificationSnapshot: factoryBinding.version.executionProfileQualificationSnapshot,
           } : undefined,
           sandboxProfile: {
-            isolation: "WORKSPACE_WRITE",
+            isolation: factoryBinding.version.purpose === "VERIFICATION" ? "READ_ONLY" as const : "WORKSPACE_WRITE" as const,
             requiredCapabilities: factoryBinding.requiredSandboxCapabilities,
           },
           sandbox: factoryBinding.executionBackend === "remote-sandbox" ? {
@@ -3134,20 +3150,20 @@ async function dispatchWorkOrder(
             profileId: String(factoryBinding.sandboxProfile._id),
             profileDigest: factoryBinding.sandboxProfile.profileDigest,
             profileSnapshot: factoryBinding.sandboxProfile.immutableSnapshot,
-            supervisorVersion: "mission-control-supervisor/v1",
+            supervisorVersion: "mission-control-supervisor/v1" as const,
             resultContract: {
-              schema: "factory-sandbox-result/v1",
-              independentHostValidationRequired: true,
+              schema: "factory-sandbox-result/v1" as const,
+              independentHostValidationRequired: true as const,
             },
             credentialGrants: [{
-              kind: "INFERENCE",
-              secretValueIncluded: false,
-              githubAuthority: "NONE",
-              providerAuthority: "NONE",
+              kind: "INFERENCE" as const,
+              secretValueIncluded: false as const,
+              githubAuthority: "NONE" as const,
+              providerAuthority: "NONE" as const,
             }],
             teardown: {
-              credentialsRevokedBeforePublication: true,
-              resourceAbsenceRequiredBeforePublication: true,
+              credentialsRevokedBeforePublication: true as const,
+              resourceAbsenceRequiredBeforePublication: true as const,
             },
           } : undefined,
           workflow: workflowSnapshot as any,
@@ -3198,8 +3214,16 @@ async function dispatchWorkOrder(
           },
         })
       : null;
+    const executionManifest = executionManifestInput ? (() => {
+      if (factoryBinding.executionBackend === "isolated-container") {
+        const { modelRoute: _modelRoute, routedModel: _routedModel, sandbox: _sandbox, ...offlineInput } = executionManifestInput;
+        return buildFactoryExecutionManifest({ ...offlineInput, executionProfile: offlineInput.executionProfile!,
+          missionPlanDigest: `sha256:${computeCanonicalHash(missionPlanForDispatch)}`, budgetReservationId: runId });
+      }
+      return buildFactoryExecutionManifest({ ...executionManifestInput, modelRoute: executionManifestInput.modelRoute! });
+    })() : null;
     const routingBudgetAuthorization = (routing?.executionRoutingSnapshot as any)?.budgetAuthorization;
-    const routeCostPolicy = factoryBinding?.modelRoute.costPolicySnapshot as Record<string, any> | undefined;
+    const routeCostPolicy = factoryBinding?.modelRoute?.costPolicySnapshot as Record<string, any> | undefined;
     const estimatedCostUsd = routingBudgetAuthorization?.estimatedReservationUsd;
     const remainingBeforeReservationUsd = routingBudgetAuthorization?.remainingBeforeReservationUsd;
     const hardLimitUsd = factoryBinding && typeof estimatedCostUsd === "number"
@@ -3210,7 +3234,10 @@ async function dispatchWorkOrder(
             : factoryBinding.version.budget.maxCostUsd,
         )
       : undefined;
-    const executionCostAuthorization = factoryBinding
+    const executionCostAuthorization = factoryBinding?.executionBackend === "isolated-container"
+      ? await reserveOfflineAttemptBudget(ctx, { runId, version: factoryBinding.version, workOrder: refreshedWorkOrder,
+          mission: missionForDispatch, policy: factoryBinding.policy, now })
+      : factoryBinding
       && typeof estimatedCostUsd === "number"
       && typeof hardLimitUsd === "number"
       && hardLimitUsd >= estimatedCostUsd
@@ -3975,6 +4002,20 @@ async function resolveFactoryDispatchBinding(
     agentVersion ? ctx.db.get(agentVersion.templateId) : null
   ));
   const selectedExecutionBackend = version.executionBackend ?? "persistent-worker";
+  const offline = selectedExecutionBackend === "isolated-container";
+  const selectedIsolation = version.purpose === "VERIFICATION" ? "READ_ONLY" : "WORKSPACE_WRITE";
+  const offlineSnapshot = version.executionProfileSnapshot as any;
+  if (offline) {
+    assertQualificationActivation({ definition, version,
+      environment: version.environmentId ? await ctx.db.get(version.environmentId) : null,
+      configuredEnvironmentId: process.env.MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID, now });
+    if (args.model !== undefined || args.authorizedModelOverride !== undefined || workOrder.executionRoutingPin !== undefined
+      || !workOrder.missionId || !workOrder.missionPlanId || workOrder.riskLevel !== "LOW"
+      || workOrder.verificationContract?.schemaVersion !== 2 || workOrder.verificationContract?.enforcementMode !== "ENFORCED"
+      || (workOrder.dataBoundaries?.length ?? 0) !== 0 || deterministicFactoryVersionIssues(version, workflow).length) {
+      throw new Error("Offline WorkOrder admission requires a governed deterministic Mission plan with no inference override.");
+    }
+  }
   const frozenHarness = resolveFrozenHarnessBinding(version);
   const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
   const primaryModel = (() => {
@@ -3989,8 +4030,8 @@ async function resolveFactoryDispatchBinding(
     }
   })();
   const requiredSandboxCapabilities = selectedExecutionBackend === "remote-sandbox"
-    ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
-    : ["git-worktree", "workspace-write"];
+    ? ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
+    : ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", ...(offline ? offlineSnapshot?.requiredSandboxCapabilities ?? [] : [])];
   const eligibleBindings = repository ? bindings.filter((binding) => {
     if (args.executorHostId && binding.hostId !== args.executorHostId) return false;
     return factoryWorkerEligibility({
@@ -4022,10 +4063,11 @@ async function resolveFactoryDispatchBinding(
         executionRuntimeArtifactSha256: frozenHarness.runtimeArtifactSha256,
         provider: primaryModel?.provider ?? null,
         model: primaryModel?.modelId ?? null,
-        harnessCapabilities: factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
-        isolation: "WORKSPACE_WRITE",
+        harnessCapabilities: offline ? offlineSnapshot?.requiredHarnessCapabilities ?? [] : factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
+        isolation: selectedIsolation,
         sandboxCapabilities: requiredSandboxCapabilities,
         executionBackend: selectedExecutionBackend,
+        ...(offline ? { inferenceConstraint: NO_INFERENCE_CONSTRAINT } : {}),
         factoryDefinitionVersionId: String(version._id),
         factoryConfigurationDigest: version.configurationDigest,
         modelRouteDigest: version.modelRouteDigest,
@@ -4038,6 +4080,17 @@ async function resolveFactoryDispatchBinding(
   const host = repository
     ? selectCurrentFactoryHost(eligibleBindings, repository.repository, now, args.executorHostId)
     : null;
+  const localRepositoryAdmission = repository && isLocalQualificationRepository(repository)
+    ? await loadLocalRepositoryAdmission(ctx, repository, now, version)
+    : null;
+  let localHostObservationReady = true;
+  if (localRepositoryAdmission) {
+    try {
+      assertLocalRepositoryHost(localRepositoryAdmission.admission, localRepositoryAdmission.digest, host, now);
+    } catch {
+      localHostObservationReady = false;
+    }
+  }
   const planningRevisionDrift = Boolean(host && workOrder.planningRepositorySha
     && host.baseCommit !== workOrder.planningRepositorySha);
   if (!input.inspect && host && workOrder.planningRepositorySha
@@ -4066,7 +4119,8 @@ async function resolveFactoryDispatchBinding(
     dataBoundaryCount: workOrder.dataBoundaries?.length ?? 0,
   });
   const modelRouteReady = Boolean(
-    modelRoute
+    selectedExecutionBackend !== "isolated-container"
+    && modelRoute
     && primaryModel
     && modelRoute._id === version.modelCatalogId
     && factoryWorkflowModelRouteMatches({
@@ -4102,40 +4156,19 @@ async function resolveFactoryDispatchBinding(
       profileDigest: executionProfile.profileDigest,
       qualificationSnapshot: executionProfile.qualificationSnapshot,
       qualificationDigest: executionProfile.qualificationDigest!,
-      projection: {
-        profileId: String(version.executionProfileId),
-        profileKey: version.executionProfileKey ?? "",
-        profileVersion: version.executionProfileVersion ?? 0,
-        profileDigest: version.executionProfileDigest ?? "",
-        profileSnapshot: version.executionProfileSnapshot,
-        qualificationDigest: version.executionProfileQualificationDigest ?? "",
-        qualificationSnapshot: version.executionProfileQualificationSnapshot,
-        executor: version.executor,
-        harnessCapabilityManifest: version.harnessCapabilityManifest,
-        harnessCapabilityManifestDigest: version.harnessCapabilityManifestDigest ?? "",
-        harnessEffectiveConfigSha256: version.harnessEffectiveConfigSha256 ?? "",
-        harnessRuntimeArtifact: version.harnessRuntimeArtifact,
-        harnessRuntimeArtifactDigest: version.harnessRuntimeArtifactDigest ?? "",
-        executionBackend: selectedExecutionBackend,
-        modelCatalogId: version.modelCatalogId ? String(version.modelCatalogId) : "",
-        modelRouteSnapshot: version.modelRouteSnapshot,
-        modelRouteDigest: version.modelRouteDigest ?? "",
-        modelQualificationSnapshot: version.modelQualificationSnapshot,
-        modelQualificationDigest: version.modelQualificationDigest ?? "",
-        sandboxProfileId: version.sandboxProfileId ? String(version.sandboxProfileId) : undefined,
-        sandboxProfileSnapshot: version.sandboxProfileSnapshot,
-        sandboxProfileDigest: version.sandboxProfileDigest,
-        isolationModes: profileSnapshot?.isolationModes ?? [],
-        requiredHarnessCapabilities: profileSnapshot?.requiredHarnessCapabilities ?? [],
-        requiredSandboxCapabilities: profileSnapshot?.requiredSandboxCapabilities ?? [],
-      },
+      projection: factoryVersionExecutionProfileProjection(version)!,
     }).length === 0
     && executionProfileScopeBlockers(executionProfile, {
       workloadClass,
       riskClass: version.riskBoundary,
-      isolation: "WORKSPACE_WRITE",
+      isolation: selectedIsolation,
     }).length === 0
   );
+  const offlineBindingReady = offline && executionProfileReady && Boolean(executionProfile)
+    && validFactoryExecutionBinding({ ...version, executionBackend: "isolated-container",
+      offlineAdmission: { profile: executionProfile!, sandboxProfile, projection: factoryVersionExecutionProfileProjection(version)!,
+        workflow, repositoryDataClassification, now, projectId: String(version.projectId), tenantId: String(version.tenantId ?? ""),
+        purpose: version.purpose ?? "SOFTWARE", agentBindings: version.agentBindings ?? [], deterministicOperation: version.deterministicOperation } });
   const activeStatuses = ["PENDING", "RUNNING", "PAUSED"] as const;
   const activeRuns = repository
     ? (await Promise.all(activeStatuses.map((status) => ctx.db.query("workflowRuns")
@@ -4177,7 +4210,7 @@ async function resolveFactoryDispatchBinding(
         && Boolean(agentVersion.genome.modelConfig.modelId.trim())
       )
       && agentTemplates.every((template) => template?.active)
-      && modelRouteReady
+      && (offline ? offlineBindingReady : modelRouteReady)
     ),
     policyReady: Boolean(policy?.active && (!policy.projectId || policy.projectId === workOrder.projectId)),
     verifiersReady: verifiers.length > 0 && verifiers.every((item) => item?.active && item.projectId === workOrder.projectId),
@@ -4189,28 +4222,53 @@ async function resolveFactoryDispatchBinding(
       && host.baseBranch === repository?.defaultBranch
       && typeof host.baseCommit === "string"
       && /^[a-f0-9]{40,64}$/i.test(host.baseCommit)
+      && localHostObservationReady
     ),
     budgetReady: validFactoryBudget(version.budget),
-    recoveryReady: genericHarnessV1RecoveryReady(version.recovery) && sandboxProfileReady && validFactoryExecutionBinding({
+    recoveryReady: genericHarnessV1RecoveryReady(version.recovery) && sandboxProfileReady && (offline ? offlineBindingReady : validFactoryExecutionBinding({
       executionBackend: selectedExecutionBackend,
       sandboxProfileId: version.sandboxProfileId ? String(version.sandboxProfileId) : undefined,
       sandboxProfileDigest: version.sandboxProfileDigest,
       riskBoundary: version.riskBoundary,
       recovery: version.recovery,
-    }),
+    })),
     worktreeProvided: Boolean(args.worktree?.trim() || host?.checkoutRoot?.trim()),
     mutating: workOrder.isMutating !== false,
     activeRepositoryMutation: activeRuns.some((run) => run.isMutating !== false),
   };
   if (input.inspect) return {
-    checks: [...factoryDispatchChecks(preflightInput), {
+    checks: [...(localRepositoryAdmission
+      ? factoryLocalQualificationDispatchChecks({
+          ...preflightInput,
+          repositoryAdmission: {
+            mode: localRepositoryAdmission.admission.mode,
+            digest: localRepositoryAdmission.digest,
+            frozenDigest: version.repositoryAdmissionDigest ?? "",
+            current: localHostObservationReady,
+            publicationAuthority: localRepositoryAdmission.admission.publicationAuthority,
+            productionAuthority: localRepositoryAdmission.admission.productionAuthority,
+          },
+        })
+      : factoryDispatchChecks(preflightInput)), {
       code: "planning-revision-drift", passed: !planningRevisionDrift,
       reason: "Worker base must match the approved planning SHA; drift requires a new researched and approved Plan.",
     }],
     hostId: host?.hostId,
     baseSha: host?.baseCommit,
   };
-  const result = evaluateFactoryDispatchPreflight(preflightInput);
+  const result = localRepositoryAdmission
+    ? evaluateLocalQualificationDispatchPreflight({
+        ...preflightInput,
+        repositoryAdmission: {
+          mode: localRepositoryAdmission.admission.mode,
+          digest: localRepositoryAdmission.digest,
+          frozenDigest: version.repositoryAdmissionDigest ?? "",
+          current: localHostObservationReady,
+          publicationAuthority: localRepositoryAdmission.admission.publicationAuthority,
+          productionAuthority: localRepositoryAdmission.admission.productionAuthority,
+        },
+      })
+    : evaluateFactoryDispatchPreflight(preflightInput);
   if (!result.ok) throw new Error(`Factory dispatch blocked (${result.blocker}): ${result.remediation}`);
   if (!repository || !host) throw new Error("Factory dispatch blocked (binding-missing): Reassess Factory readiness.");
   if (!host.baseCommit || host.baseBranch !== repository.defaultBranch) {
@@ -4218,6 +4276,7 @@ async function resolveFactoryDispatchBinding(
   }
   return {
     version,
+    policy,
     repository,
     repositoryDataClassification,
     host,

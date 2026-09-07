@@ -59,7 +59,6 @@ function localGitSubject() {
     sourceAttemptId: "source-a",
     repositoryId: "repo-1",
     provider: "LOCAL_GIT",
-    providerRepositoryId: "provider-repo-1",
     candidateSha: "a".repeat(40),
     treeSha: "b".repeat(40),
     localRef: { baseRef: "main", headRef: "candidate", headSha: "a".repeat(40) },
@@ -215,6 +214,51 @@ describe("exact-current verification acceptance eligibility", () => {
       verifiedOutcome: "SUCCESS",
     });
     expect(result.reasons[0]).toContain("not acceptance-eligible");
+  });
+
+  function observedLocalFixture() {
+    const subject = localGitSubject();
+    const data = fixture(subject);
+    const executionManifestDigest = `sha256:${"1".repeat(64)}`;
+    const executionProfileDigest = `sha256:${"2".repeat(64)}`;
+    return { ...data, projectId: "project", tenantId: "tenant",
+      verificationAttempts: data.verificationAttempts.map(item => ({ ...item, executionManifestDigest, executionProfileDigest })),
+      localCandidateObservations: [{ ...data.verificationAttempts[0].verificationAttemptBinding,
+        evidenceEnvelopeId: data.verificationEvidence[0].id, projectId: "project", tenantId: "tenant", repositoryId: "repo-1",
+        verificationAttemptId: "verify-a", verificationRunId: data.verificationResults[0].id,
+        verificationPlanDigest: planDigest, executionManifestDigest, executionProfileDigest,
+        candidateSha: subject.candidateSha, treeSha: subject.treeSha, observedAt: now - 1, expiresAt: now + 1000,
+      }],
+    };
+  }
+
+  it("requires complete independent lineage plus a current exact local observation", () => {
+    const data = observedLocalFixture();
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(true);
+    expect(evaluateCurrentVerificationEligibility({ ...data, verificationAttempts: [] }).eligible).toBe(false);
+    expect(evaluateCurrentVerificationEligibility({ ...data, verificationEvidence: [] }).eligible).toBe(false);
+    for (const status of ["PENDING", "RUNNING", "FAILED", "CANCELED"]) {
+      expect(evaluateCurrentVerificationEligibility({ ...data,
+        verificationAttempts: data.verificationAttempts.map(item => ({ ...item, status })) }).eligible).toBe(false);
+    }
+  });
+
+  it.each(["projectId", "tenantId", "repositoryId", "verificationAttemptId", "verificationRunId",
+    "verificationPlanDigest", "executionManifestDigest", "executionProfileDigest", "candidateSha", "treeSha",
+    "evidenceEnvelopeId", "workOrderId", "verificationSubjectDigest"] as const)("denies changed local observation %s", field => {
+    const data = observedLocalFixture();
+    data.localCandidateObservations[0][field] = "different";
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
+  });
+
+  it("denies expired, future and excessive-lifetime observations and never falls back to an older pass", () => {
+    for (const change of [{ expiresAt: now }, { observedAt: now + 1 }, { expiresAt: now + 60_001 }]) {
+      const data = observedLocalFixture(); Object.assign(data.localCandidateObservations[0], change);
+      expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
+    }
+    const data = observedLocalFixture();
+    data.localCandidateObservations.push({ ...data.localCandidateObservations[0], observedAt: now, candidateSha: "d".repeat(40) });
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
   });
 
   it("classifies an exact independent Policy V2 failure without making it acceptance-eligible", () => {

@@ -7,8 +7,31 @@ import {
   type HarnessExecutorAdapter,
 } from "@mission-control/workflow-engine";
 import { HarnessAdapterRegistry } from "../harnessAdapterRegistry.js";
+import { ISOLATED_INVOCATION_MANIFEST, ISOLATED_INVOCATION_ADAPTER_ARTIFACT } from "@mission-control/workflow-engine/harness-contract";
 
 describe("HarnessAdapterRegistry", () => {
+  it("requires the exact offline backend artifact and denies expanded capabilities", () => {
+    const adapter = fixtureAdapter("isolated-invocation", ISOLATED_INVOCATION_MANIFEST.identity.adapterVersion);
+    const caps: any = { ...adapter.capabilities(), provider: undefined, supportsRepositoryMutation: false,
+      isolationModes: [...ISOLATED_INVOCATION_MANIFEST.sandbox.isolationModes], executionBackends: ["isolated-container"],
+      runtimeArtifact: structuredClone(ISOLATED_INVOCATION_ADAPTER_ARTIFACT), capabilityManifest: structuredClone(ISOLATED_INVOCATION_MANIFEST) };
+    adapter.capabilities = () => caps;
+    expect(new HarnessAdapterRegistry([adapter]).supports({
+      adapter: "isolated-invocation",
+      version: ISOLATED_INVOCATION_MANIFEST.identity.adapterVersion,
+    }, "isolated-container")).toBe(true);
+    const pristine = structuredClone(caps);
+    const substitutions: Array<(value: any) => void> = [
+      v => { v.provider = "provider"; }, v => { v.supportsRepositoryMutation = true; },
+      v => { v.supportsResume = true; }, v => { v.executionBackends.push("persistent-worker"); },
+      v => { v.runtimeArtifact.executableSha256 = "0".repeat(64); },
+      v => { v.capabilityManifest.effectiveConfigSha256 = "0".repeat(64); },
+    ];
+    for (const substitute of substitutions) {
+      const changed = structuredClone(pristine); substitute(changed); adapter.capabilities = () => changed;
+      expect(() => new HarnessAdapterRegistry([adapter])).toThrow("exact offline backend");
+    }
+  });
   it("represents an intentionally empty execution-disabled runtime without fallback", () => {
     const registry = new HarnessAdapterRegistry([]);
     const missing = { adapter: "deepagents", version: "v1" };

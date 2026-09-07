@@ -32,6 +32,24 @@ export interface FactoryDispatchPreflightResult {
   remediation?: string;
 }
 
+/** Distinct repository contract. Callers must load the exact deployment-owned
+ * admission and bind its digest to the immutable Factory version first. */
+export interface LocalQualificationDispatchInput extends Omit<FactoryDispatchPreflightInput, "githubReady"> {
+  repositoryAdmission: {
+    mode: "LOCAL_SYNTHETIC_QUALIFICATION";
+    digest: string;
+    frozenDigest: string;
+    current: boolean;
+    publicationAuthority: "NONE";
+    productionAuthority: "NONE";
+  };
+}
+
+export function evaluateLocalQualificationDispatchPreflight(input: LocalQualificationDispatchInput): FactoryDispatchPreflightResult {
+  const failed = factoryLocalQualificationDispatchChecks(input).find((check) => !check.passed);
+  return failed ? { ok: false, blocker: failed.code, remediation: failed.reason } : { ok: true };
+}
+
 const FACTORY_HOST_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
 
 export interface FactoryHostCandidate {
@@ -124,6 +142,22 @@ export function factoryDispatchChecks(input: FactoryDispatchPreflightInput) {
       reason: "Wait for, cancel, or reconcile the active mutating attempt for this repository." });
   }
   return results;
+}
+
+export function factoryLocalQualificationDispatchChecks(input: LocalQualificationDispatchInput) {
+  const a = input.repositoryAdmission;
+  const admissionReady = a?.mode === "LOCAL_SYNTHETIC_QUALIFICATION"
+    && a.current
+    && /^sha256:[a-f0-9]{64}$/.test(a.digest)
+    && a.digest === a.frozenDigest
+    && a.publicationAuthority === "NONE"
+    && a.productionAuthority === "NONE";
+  return [{
+    code: "local-repository-admission-invalid",
+    label: "Local repository admission",
+    passed: admissionReady,
+    reason: "Re-admit the exact synthetic repository and immutable Factory composition.",
+  }, ...factoryDispatchChecks({ ...input, githubReady: true }).filter((check) => check.code !== "github-app-not-ready")];
 }
 
 export function evaluateFactoryDispatchPreflight(input: FactoryDispatchPreflightInput): FactoryDispatchPreflightResult {

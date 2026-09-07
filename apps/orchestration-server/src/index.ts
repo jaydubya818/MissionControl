@@ -22,7 +22,7 @@ import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { ConvexHttpClient } from "convex/browser";
 import { createGatewayProxy } from "./gateway-proxy.js";
-import { orchestrationUpgradeFailure, requireAuth } from "./auth.js";
+import { offlineQualificationRouteAllowed, orchestrationUpgradeFailure, requireAuth } from "./auth.js";
 import { ConvexActions, ConvexQueries, ConvexMutations } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
 import { CoordinatorLoop } from "@mission-control/coordinator";
@@ -50,7 +50,7 @@ import {
   loadGithubAppPrivateKey,
   mintInstallationToken,
 } from "./githubAppRuntime.js";
-import { configuredFactoryHarnessAdapters } from "./factoryHarnessComposition.js";
+import { configuredFactoryHarnessAdapters, createIsolatedFactoryHarness } from "./factoryHarnessComposition.js";
 import { loadFabExecutorAdapter } from "./fabExecutorAdapter.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
 import { MissionPlanningWorker } from "./missionPlanningWorker.js";
@@ -60,6 +60,7 @@ import {
   OpenAIChatCompletionsTransport,
 } from "./governedInferenceGateway.js";
 import { resolvePersonaPath, safeClientError } from "./orchestrationSecurity.js";
+import { localQualificationRepositoryBinding } from "./localQualificationRepository.js";
 import { resolveServerBinding } from "./runtimeServerConfig.js";
 import os from "node:os";
 
@@ -76,7 +77,7 @@ const envSearchPaths = [
   path.resolve(process.cwd(), "../../.env"),
 ];
 
-for (const envPath of envSearchPaths) {
+for (const envPath of process.env.MC_OFFLINE_FACTORY_WORKER_ENABLED === "1" ? [] : envSearchPaths) {
   if (fs.existsSync(envPath)) {
     dotenv.config({ path: envPath });
   }
@@ -95,6 +96,10 @@ const AUTOMATION_REPOSITORY_ROOT = path.resolve(process.env.AUTOMATION_REPOSITOR
 const CODEX_FACTORY_WORKER_ENABLED = process.env.CODEX_FACTORY_WORKER_ENABLED === "true";
 const DEEPSEEK_HARNESS_EXECUTOR_ENABLED = process.env.DEEPSEEK_HARNESS_EXECUTOR_ENABLED === "1";
 const LEGACY_FACTORY_WORKER_ENABLED = process.env.FACTORY_EXECUTION_ENABLED === "1";
+const OFFLINE_FACTORY_WORKER_ENABLED = process.env.MC_OFFLINE_FACTORY_WORKER_ENABLED === "1";
+const OFFLINE_LOCAL_REPOSITORY = OFFLINE_FACTORY_WORKER_ENABLED
+  ? localQualificationRepositoryBinding(process.env.MC_LOCAL_REPOSITORY_ADMISSION)
+  : undefined;
 const accountingRuntime = createAccountingDeliveryRuntime({ excludedDirectories: [AUTOMATION_REPOSITORY_ROOT,
   process.env.CODEX_WORKER_CHECKOUT_ROOT ?? process.cwd()] });
 const FACTORY_WORKER_SESSION_ID = randomUUID();
@@ -117,7 +122,7 @@ const bedrockTransport = bedrockConfig?.callAuthorization && accountingRuntime.d
   : undefined;
 const CODEX_BEDROCK_HARNESS_ENABLED = Boolean(bedrockTransport);
 const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
-  || Boolean(configuredFabAdapter) || CODEX_BEDROCK_HARNESS_ENABLED;
+  || Boolean(configuredFabAdapter) || CODEX_BEDROCK_HARNESS_ENABLED || OFFLINE_FACTORY_WORKER_ENABLED;
 const factoryConfigurationConflict = DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED;
 if (factoryConfigurationConflict) executionConfigurationErrors.push("FACTORY_EXECUTION_CONFIGURATION_CONFLICT");
 if (DURABLE_FACTORY_WORKER_ENABLED && !accountingRuntime.delivery) executionConfigurationErrors.push("ACCOUNTING_JOURNAL_REQUIRED");
@@ -125,7 +130,9 @@ const REMOTE_SANDBOX_BACKEND_READY = Boolean(bedrockTransport)
   || (process.env.CODEX_WORKER_REMOTE_SANDBOX_ENABLED === "1"
     && Boolean(process.env.EXEDEV_IDENTITY_FILE?.trim())
     && Boolean(process.env.OPENROUTER_MANAGEMENT_API_KEY?.trim()));
-const FACTORY_WORKER_EXECUTION_BACKENDS = REMOTE_SANDBOX_BACKEND_READY
+const FACTORY_WORKER_EXECUTION_BACKENDS = OFFLINE_FACTORY_WORKER_ENABLED
+  ? ["isolated-container"] as const
+  : REMOTE_SANDBOX_BACKEND_READY
   ? ["persistent-worker", "remote-sandbox"] as const
   : ["persistent-worker"] as const;
 
@@ -143,18 +150,76 @@ const CONVEX_SERVICE_AUTH_TOKEN = process.env.CONVEX_SERVICE_AUTH_TOKEN?.trim();
 if (CONVEX_SERVICE_AUTH_TOKEN) {
   client.setAuth(CONVEX_SERVICE_AUTH_TOKEN);
 }
+const offlineWorkerScope = OFFLINE_FACTORY_WORKER_ENABLED
+  ? {
+      projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"),
+      repositoryId: requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ID"),
+    }
+  : undefined;
+if (OFFLINE_LOCAL_REPOSITORY) {
+  if (CONVEX_URL !== "http://127.0.0.1:3290" || !process.env.CONVEX_SELF_HOSTED_ADMIN_KEY
+    || !process.env.ORCHESTRATION_API_TOKEN?.trim()) {
+    throw new Error("Local qualification worker identity requires the exact disposable backend credential.");
+  }
+  (client as ConvexHttpClient & { setAdminAuth: (token: string, identity: Record<string, string>) => void }).setAdminAuth(
+    process.env.CONVEX_SELF_HOSTED_ADMIN_KEY,
+    {
+      subject: "user_SyntheticHandoffQualification",
+      issuer: "https://synthetic-qualification.example.test",
+      email: "qualification@example.test",
+      name: "Synthetic Qualification Operator",
+    },
+  );
+}
+if (OFFLINE_FACTORY_WORKER_ENABLED) {
+  const endpoint = new URL(CONVEX_URL);
+  if (!["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname)
+    || endpoint.protocol !== "http:" || CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
+    || LEGACY_FACTORY_WORKER_ENABLED || GITHUB_APP_PUBLICATION_READY || REMOTE_SANDBOX_BACKEND_READY
+    || ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"]
+      .some(key => Boolean(process.env[key]))) {
+    throw new Error("Offline worker requires isolated loopback state, no provider credentials and no production publication adapters.");
+  }
+}
+const configuredOfflineAdapter = OFFLINE_FACTORY_WORKER_ENABLED && offlineWorkerScope
+  ? await createIsolatedFactoryHarness({
+      backendBundlePath: requiredRuntimeSetting("MC_OFFLINE_BACKEND_BUNDLE_PATH"),
+      dockerExecutable: requiredRuntimeSetting("MC_OFFLINE_DOCKER_EXECUTABLE"),
+      authority: async request => {
+        if (request.lease.workerId !== FACTORY_WORKER_ID || request.lease.sessionId !== FACTORY_WORKER_SESSION_ID) return false;
+        const verifier = request.workload.reference === "verify-document-bytes/v1";
+        const command = createSignedServiceCommand({
+          capability: verifier ? "verification:renew" : "attempts.renew",
+          ...offlineWorkerScope,
+          payload: {
+            workflowRunId: request.attemptId,
+            leaseId: request.lease.leaseId,
+            workerId: request.lease.workerId,
+            workerSessionId: request.lease.sessionId,
+            workerGeneration: request.lease.generation,
+            leaseDurationMs: 60_000,
+          },
+        });
+        const result = await client.action(
+          (verifier ? ConvexActions.serviceCommands.renewVerificationAttempt : ConvexActions.serviceCommands.renewFactoryAttempt) as any,
+          command,
+        );
+        return result?.renewed === true;
+      },
+    })
+  : undefined;
 const factoryBootstrap = optionalExecutionConfiguration("FACTORY_BOOTSTRAP_INVALID", () => {
   if (executionConfigurationErrors.length) throw new Error("Execution configuration is invalid.");
-  const FACTORY_WORKER_SCOPE = DURABLE_FACTORY_WORKER_ENABLED
+  const FACTORY_WORKER_SCOPE = offlineWorkerScope ?? (DURABLE_FACTORY_WORKER_ENABLED
     ? { projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"), repositoryId: requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ID") }
-    : undefined;
+    : undefined);
   const factoryHarnessRegistry = new HarnessAdapterRegistry(
     [...configuredFactoryHarnessAdapters({
       codexEnabled: CODEX_FACTORY_WORKER_ENABLED,
       codexBedrockEnabled: CODEX_BEDROCK_HARNESS_ENABLED,
       deepseekEnabled: DEEPSEEK_HARNESS_EXECUTOR_ENABLED,
       legacyFactoryWorkerEnabled: LEGACY_FACTORY_WORKER_ENABLED,
-    }), ...(configuredFabAdapter ? [configuredFabAdapter] : [])],
+    }), ...(configuredFabAdapter ? [configuredFabAdapter] : []), ...(configuredOfflineAdapter ? [configuredOfflineAdapter] : [])],
   );
   let occupiedFactoryWorkerSlots = 0;
   const tryAcquireFactoryWorkerSlot = () => {
@@ -190,7 +255,7 @@ const factoryBootstrap = optionalExecutionConfiguration("FACTORY_BOOTSTRAP_INVAL
   const missionPlanningWorker = new MissionPlanningWorker(
     client,
     factoryHarnessRegistry,
-    !factoryConfigurationConflict && DURABLE_FACTORY_WORKER_ENABLED,
+    !factoryConfigurationConflict && DURABLE_FACTORY_WORKER_ENABLED && !OFFLINE_FACTORY_WORKER_ENABLED,
     FACTORY_WORKER_SCOPE,
     FACTORY_WORKER_SCOPE ? {
       workerId: FACTORY_WORKER_ID,
@@ -206,6 +271,7 @@ const factoryBootstrap = optionalExecutionConfiguration("FACTORY_BOOTSTRAP_INVAL
         hostId: FACTORY_WORKER_ID,
         sessionId: FACTORY_WORKER_SESSION_ID,
         checkoutRoot: path.resolve(process.env.CODEX_WORKER_CHECKOUT_ROOT?.trim() || process.cwd()),
+        localQualificationRepository: OFFLINE_LOCAL_REPOSITORY,
         maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
         getCurrentRuns: () => factoryAttemptWorker.status().activeRunIds.length
           + (missionPlanningWorker.status().activeRunId ? 1 : 0),
@@ -232,10 +298,15 @@ const factoryBootstrap = optionalExecutionConfiguration("FACTORY_BOOTSTRAP_INVAL
             isolationModes: [...registration.capabilities.isolationModes],
           };
         }),
-        sandboxCapabilities: factorySandboxCapabilities({
-          githubAppPublicationReady: GITHUB_APP_PUBLICATION_READY,
-          remoteSandboxBackendReady: REMOTE_SANDBOX_BACKEND_READY,
-        }),
+        sandboxCapabilities: [
+          ...factorySandboxCapabilities({
+            githubAppPublicationReady: GITHUB_APP_PUBLICATION_READY,
+            remoteSandboxBackendReady: REMOTE_SANDBOX_BACKEND_READY,
+          }),
+          ...(OFFLINE_FACTORY_WORKER_ENABLED
+            ? ["deny-egress", "isolated-container", "no-host-mounts", "read-only-runtime"]
+            : []),
+        ],
         factoryVersionBindings: parseFactoryVersionBindings(
           process.env.CODEX_WORKER_FACTORY_VERSION_BINDINGS_JSON,
           FACTORY_WORKER_SCOPE.repositoryId,
@@ -473,6 +544,12 @@ app.use("*", cors());
 // connection-status probes declared in auth.ts. This avoids silently exposing
 // new mutation routes when a path prefix is added in the future.
 app.use("*", requireAuth());
+app.use("*", async (c, next) => {
+  if (OFFLINE_FACTORY_WORKER_ENABLED && !offlineQualificationRouteAllowed(c.req.method, c.req.path)) {
+    return c.json({ error: "Route unavailable for offline qualification worker" }, 404);
+  }
+  await next();
+});
 
 // Health check (unauthenticated for load balancers)
 app.get("/health", (c) => {
@@ -1652,15 +1729,17 @@ export function startServer() {
 
   startedAt = Date.now();
 
-  tickTimer = setInterval(() => {
-    runTick().catch((err) => {
-      console.error("[orchestration] Tick loop error:", err);
-    });
-  }, TICK_INTERVAL_MS);
+  if (!OFFLINE_FACTORY_WORKER_ENABLED) {
+    tickTimer = setInterval(() => {
+      runTick().catch((err) => {
+        console.error("[orchestration] Tick loop error:", err);
+      });
+    }, TICK_INTERVAL_MS);
 
-  runTick().then((result) => {
-    console.log(`[orchestration] Initial tick complete:`, result);
-  });
+    runTick().then((result) => {
+      console.log(`[orchestration] Initial tick complete:`, result);
+    });
+  }
   void startFactoryExecution();
 
   if (CODEX_FACTORY_WORKER_ENABLED) {
@@ -1675,6 +1754,8 @@ export function startServer() {
     if (tickTimer) clearInterval(tickTimer);
     factoryHostReporter?.stop();
     await Promise.all([factoryAttemptWorker.stop(), missionPlanningWorker.stop(), accountingRuntime.stop()]);
+    await Promise.all(factoryHarnessRegistry.registrations().map(({ adapter }) =>
+      (adapter as { dispose?: () => Promise<void> }).dispose?.()));
     for (const [name] of activeAgents) {
       try {
         await stopAgent(name);
@@ -1690,6 +1771,8 @@ export function startServer() {
     if (tickTimer) clearInterval(tickTimer);
     factoryHostReporter?.stop();
     await Promise.all([factoryAttemptWorker.stop(), missionPlanningWorker.stop(), accountingRuntime.stop()]);
+    await Promise.all(factoryHarnessRegistry.registrations().map(({ adapter }) =>
+      (adapter as { dispose?: () => Promise<void> }).dispose?.()));
     process.exit(0);
   });
 

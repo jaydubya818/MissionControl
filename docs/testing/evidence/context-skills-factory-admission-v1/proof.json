@@ -1,0 +1,84 @@
+{
+  "schema": "synthetic-factory-admission-proof/v1",
+  "classification": "SYNTHETIC_FACTORY_ADMISSION_QUALIFIED",
+  "capturedAt": 1788730531914,
+  "backendReadAt": 1788730531914,
+  "runLabel": "v17",
+  "scenarioVersion": "context-skills-synthetic-factory/v1",
+  "environment": {
+    "target": "QUALIFICATION",
+    "productionAuthority": "NONE",
+    "publicationAuthority": "NONE",
+    "repositoryId": "x57gxavpezz4p6sb3h2mmpqw118dx93y"
+  },
+  "factory": {
+    "producerVersionId": "t970ra13k3hap1xhd12xv3kw4n8dwerg",
+    "verifierVersionId": "t979t16dcf7y5d8rm3sgck6w018dwqp2",
+    "producerConfigurationDigest": "factory-v1-d07cf9c4",
+    "verifierConfigurationDigest": "factory-v1-9b45c1f9",
+    "producerProfileId": "tn7am6pjc8pqg5gcwy7qqbg01x8dxfk4",
+    "verifierProfileId": "tn70xse3x5ecajvfch2tfktwmd8dxtax"
+  },
+  "runtime": {
+    "workerId": "local-synthetic-qualification-worker",
+    "workerSessionId": "ef9ed14b-dfd1-438f-b8fc-98fefe33b28e",
+    "workerGeneration": 6,
+    "hostRuntime": "node v24.18.1 darwin/arm64",
+    "runtimeImage": "sha256:4c0e7e776c25f393ba9eb2e29319dbc38dc4c1d0f8a91e307aeb1a31849269db",
+    "runtimeArtifactDigest": "sha256:950a19c8e2419323c4437954f6e812f8421a4d9fc42838ad099b0e0f24b3d666",
+    "backend": "isolated-container",
+    "modelRoute": "DENIED"
+  },
+  "execution": {
+    "missionId": "jh7mc2dwag1gbv09g1s6w3dg8s8dxm01",
+    "planId": "j17sq9x8yyyrb6hze45qwj0z0h8dwvmr",
+    "workOrderId": "wd7xzhkx1mkhv9nmsz52hw61eh8dw4wx",
+    "taskId": "ss7tf1macnvrrtszxxdg9658as8dxy6m",
+    "producerAttemptId": "ws7jjnek0e356nwkmav7kmqtjs8dxb9k",
+    "producerStatus": "COMPLETED",
+    "candidateRevision": "a01f40cc0d71b689fb66fda7ce6022146611070b",
+    "verifierAttemptId": "ws7z6j06m0ntqv7mjactk7phc58dx7h0",
+    "verifierStatus": "COMPLETED",
+    "verificationRunId": "vd7yr21zvw4w1b5z3n6b7mnedd8dx9bw",
+    "verificationVerdict": "VERIFIED",
+    "verificationSubjectDigest": "sha256:4665740f394fac46ae11a796df6e100213cc254a9a71d3ae411f48477d626dc8",
+    "verificationPlanDigest": "sha256:8803658f754214b563f2af9d6bfc7e66595a5db2ba5081a9e2a32ecdc9ecbc21",
+    "receiptId": "v97n4sm156zmkhepks851g27hh8dwb8x"
+  },
+  "qualificationCurrentness": {
+    "current": true,
+    "exactLineage": true,
+    "evidenceIds": [
+      "s97c105zsy8kp27dwa8b7v4hsh8dwgy5",
+      "s97ed1jc3dr9xyq9xbfjd9yxf18dxx8c",
+      "s97c3991gvwmp2p3ba22pswfvs8dwgd2",
+      "s976xtk3p03y1z0dq24wytr3458dwg7g"
+    ],
+    "productionAcceptanceCurrent": false,
+    "productionAcceptanceEligible": false,
+    "productionFenceReason": [
+      "Evidence s976xtk3p03y1z0dq24wytr3458dwg7g is missing or not bound to the exact verification lineage."
+    ]
+  },
+  "controls": {
+    "match": true,
+    "mutation": true,
+    "stale": true,
+    "canceled": true
+  },
+  "cleanup": {
+    "temporaryPermission": "REMOVED",
+    "postRemovalDenial": true
+  },
+  "economics": {
+    "externalModelCalls": 0,
+    "providerCalls": 0,
+    "costUsd": 0
+  },
+  "publication": {
+    "count": 0,
+    "authority": "NONE"
+  },
+  "productionChanges": 0,
+  "proofDigest": "sha256:2f82f88827fa9b973d9f8ef7ff72480edb5e29d1f517ce5fb07744c6e30c61c2"
+}

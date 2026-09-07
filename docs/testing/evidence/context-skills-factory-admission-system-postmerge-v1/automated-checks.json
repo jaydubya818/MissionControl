@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "system-factory-e2e-automated-checks/v2",
+  "baseSha": "7c953931bc8b174f571ee7ad4e6b91fdace306ad",
+  "startedHead": "7c953931bc8b174f571ee7ad4e6b91fdace306ad",
+  "startedAt": "2026-09-06T23:40:12.040Z",
+  "completedAt": "2026-09-06T23:42:47.538Z",
+  "result": "PASS",
+  "checks": [
+    {
+      "name": "profile-bound governed read-only MCP transport and negative controls",
+      "command": "node --import tsx scripts/governed-mcp-phase3-qualification.mts",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 711
+    },
+    {
+      "name": "frozen dependency, advisory, credential, and release configuration gates",
+      "command": "pnpm run release:security",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 144178
+    },
+    {
+      "name": "release hardening contract tests",
+      "command": "pnpm exec vitest run scripts/lib/dependency-audit-gate.test.mjs scripts/lib/factory-docs-consistency.test.mjs scripts/lib/production-pilot-preflight.test.mjs scripts/lib/production-pilot-evidence.test.mjs scripts/lib/repository-secret-scan.test.mjs scripts/lib/release-config.test.mjs",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 999
+    },
+    {
+      "name": "historical V1 evidence immutability",
+      "command": "git diff --exit-code 7c953931bc8b174f571ee7ad4e6b91fdace306ad -- docs/testing/evidence/system-factory-e2e-v1",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 9
+    },
+    {
+      "name": "historical V2 evidence immutability",
+      "command": "git diff --exit-code 7c953931bc8b174f571ee7ad4e6b91fdace306ad -- docs/testing/evidence/system-factory-e2e-v2",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 8
+    },
+    {
+      "name": "prepare canonical workspace packages",
+      "command": "pnpm run ci:prepare",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 9591
+    }
+  ]
+}

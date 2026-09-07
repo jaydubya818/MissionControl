@@ -29,6 +29,9 @@ type RepositoryRow = {
   repositoryId: Id<"workspaceRepositories"> | null;
   source: "LEGACY" | "CONNECTION";
   repository: string;
+  repositoryMode?: "GITHUB" | "LOCAL_SYNTHETIC_QUALIFICATION";
+  publicationAuthority?: "NONE";
+  admissionDigest?: string;
   displayName: string;
   defaultBranch: string;
   isDefault: boolean;
@@ -157,7 +160,9 @@ export function WorkspaceRepositoriesPanel({ project }: WorkspaceRepositoriesPan
                     disabled={!row.repositoryId}
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <Github size={14} className="text-ink-muted" aria-hidden />
+                      {row.repositoryMode === "LOCAL_SYNTHETIC_QUALIFICATION"
+                        ? <Layers3 size={14} className="text-ink-muted" aria-hidden />
+                        : <Github size={14} className="text-ink-muted" aria-hidden />}
                       <span className="font-mono text-[13px] font-medium text-ink">{row.repository}</span>
                       {row.isDefault ? <StatusBadge tone="success">Default</StatusBadge> : null}
                       <StatusBadge tone={statusTone(row.status)}>{row.status.toLowerCase()}</StatusBadge>
@@ -173,12 +178,14 @@ export function WorkspaceRepositoriesPanel({ project }: WorkspaceRepositoriesPan
                       <span className="flex items-center gap-1.5">
                         <Layers3 size={12} aria-hidden /> {row.scopeCount} code scope{row.scopeCount === 1 ? "" : "s"}
                       </span>
-                      <span>Webhook {row.webhookStatus.toLowerCase()}</span>
+                      {row.repositoryMode === "LOCAL_SYNTHETIC_QUALIFICATION"
+                        ? <span>Local synthetic qualification · No publication or production authority</span>
+                        : <span>Webhook {row.webhookStatus.toLowerCase()}</span>}
                       {row.validatedAt ? <span>Validated {new Date(row.validatedAt).toLocaleString()}</span> : null}
                     </div>
                   </button>
                   <div className="flex flex-wrap gap-2">
-                    {row.repositoryId && !row.isDefault ? (
+                    {row.repositoryId && !row.isDefault && row.repositoryMode !== "LOCAL_SYNTHETIC_QUALIFICATION" ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -228,7 +235,11 @@ export function WorkspaceRepositoriesPanel({ project }: WorkspaceRepositoriesPan
       {selectedRepository?.repositoryId ? (
         <>
           <RepositoryDataClassificationPanel key={selectedRepository.repositoryId} repository={selectedRepository} />
-          <GitHubAppReadinessPanel repositoryId={selectedRepository.repositoryId} />
+          {selectedRepository.repositoryMode === "LOCAL_SYNTHETIC_QUALIFICATION" ? (
+            <div className="mt-5 border-t border-line pt-5 text-[12px] text-ink-muted">
+              This repository is limited to the admitted local synthetic fixture. GitHub setup, publication, merge, release, and production authority are unavailable.
+            </div>
+          ) : <GitHubAppReadinessPanel repositoryId={selectedRepository.repositoryId} />}
           <FactoryConfigurationPanel
             key={`factory-${selectedRepository.repositoryId}`}
             projectId={project._id}
