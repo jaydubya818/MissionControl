@@ -1,0 +1,163 @@
+{
+  "schema": "todo063-live-reservation-journal/v1",
+  "sourceCommit": "2f5735d672af3fec21ce71ce235fae37e08a30ce",
+  "reservationEvents": [
+    {
+      "type": "CREATED",
+      "at": 1788815765278,
+      "reservation": {
+        "schema": "factory-provider-reservation/v1",
+        "scope": {
+          "projectId": "qualification:todo063",
+          "repositoryId": "jaydubya818/MissionControl",
+          "workOrderId": "todo063-bedrock-live-qualification",
+          "workOrderRevision": 1,
+          "executionProfileId": "todo063-bedrock-profile-v1",
+          "executionProfileDigest": "sha256:981b0afdf238fb85de0d2506994b6401d63b86404a2690be6dbe4d9895591ad4",
+          "modelRouteDigest": "sha256:107341af8cb8b63e059d52b6385ff26eebcf53aa8340dfe56a93288eca4b7988",
+          "priceDigest": "sha256:ba19028022ec2de109d2863415263b691d13d334618d7f49e7524f3c07e33160"
+        },
+        "maximumNanoUsd": 5000000000,
+        "expiresAt": 1788816665278,
+        "maximumRequests": 1,
+        "frozen": false,
+        "holds": []
+      }
+    },
+    {
+      "type": "RESERVED",
+      "at": 1788815765349,
+      "hold": {
+        "requestId": "todo063-live-request-2",
+        "requestDigest": "sha256:a0265e404db87795505cdc52b26f5cfeb13924e67d557d4d43c34f91ec8adfb1",
+        "attemptId": "todo063-live-attempt-2",
+        "leaseId": "todo063-live-lease-2",
+        "generation": 1,
+        "maximumNanoUsd": 3300264000,
+        "maximumOutputTokens": 16,
+        "preSendInputBound": {
+          "schema": "provider-pre-send-input-bound/v1",
+          "classification": "CONSERVATIVE_UPPER_BOUND",
+          "countTokensCapability": "UNSUPPORTED",
+          "maximumInputTokens": 1000000,
+          "serializedRequestBytes": 230,
+          "derivation": "FULL_MODEL_CONTEXT_WINDOW",
+          "capabilityEvidenceDigest": "sha256:6c3c98e0088381684eecffc9a21d100b5aae4a7bed2c69ad637ba92f97e22da8",
+          "evidenceDigest": "sha256:760b8e9bfeaa242c9bf13d3ff04393dc87af89a869cb12b57ad1fb72f9650abd"
+        },
+        "state": "RESERVED",
+        "receiptRevision": 0,
+        "classification": "UNKNOWN",
+        "costClassification": "UNKNOWN"
+      }
+    },
+    {
+      "type": "SETTLED",
+      "at": 1788815766107,
+      "usage": {
+        "requestId": "todo063-live-request-2",
+        "requestDigest": "sha256:a0265e404db87795505cdc52b26f5cfeb13924e67d557d4d43c34f91ec8adfb1",
+        "provider": "aws-bedrock",
+        "model": "anthropic.claude-sonnet-4-6",
+        "providerRequestId": "",
+        "usageId": "",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "classification": "UNKNOWN",
+        "expectedReceiptRevision": 0
+      },
+      "incident": false
+    },
+    {
+      "type": "RECONCILED",
+      "at": 1788818117079,
+      "usage": {
+        "requestId": "todo063-live-request-2",
+        "requestDigest": "sha256:a0265e404db87795505cdc52b26f5cfeb13924e67d557d4d43c34f91ec8adfb1",
+        "provider": "aws-bedrock",
+        "model": "anthropic.claude-sonnet-4-6",
+        "providerRequestId": "6919db8e-f1c5-4f54-9557-db37ed817b74",
+        "usageId": "sha256:8d8e053e83f4e45a3fb18fe88abef29a066b0176d9cb6473886e34fbace92751",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "classification": "ACTUAL",
+        "expectedReceiptRevision": 1
+      },
+      "evidence": {
+        "schema": "todo063-provider-usage-reconciliation/v1",
+        "route": "us.anthropic.claude-sonnet-4-6",
+        "observationWindow": {
+          "start": "2026-09-07T21:15:00Z",
+          "end": "2026-09-07T21:18:00Z"
+        },
+        "cloudWatchNamespace": "AWS/Bedrock",
+        "cloudWatchRegion": "us-east-1",
+        "exactRouteMetrics": {
+          "Invocations": 0,
+          "InvocationClientErrors": 0,
+          "InvocationServerErrors": 0,
+          "InvocationThrottles": 2,
+          "InputTokenCount": 0,
+          "OutputTokenCount": 0,
+          "CacheReadInputTokens": 0,
+          "CacheWriteInputTokens": 0
+        },
+        "providerError": {
+          "requestId": "6919db8e-f1c5-4f54-9557-db37ed817b74",
+          "status": 429,
+          "code": "ThrottlingException",
+          "reason": "TOO_MANY_TOKENS_PER_DAY"
+        },
+        "basis": "AWS provider telemetry records only throttles and no successful invocation, input, output, cache-read, or cache-write token datapoints for the exact route in the request window."
+      },
+      "evidenceDigest": "sha256:9e7daa4043fb8837dff311c489762f9746afc4efd72a0675585903fde47ad655",
+      "incident": false
+    }
+  ],
+  "current": {
+    "schema": "factory-provider-reservation/v1",
+    "scope": {
+      "projectId": "qualification:todo063",
+      "repositoryId": "jaydubya818/MissionControl",
+      "workOrderId": "todo063-bedrock-live-qualification",
+      "workOrderRevision": 1,
+      "executionProfileId": "todo063-bedrock-profile-v1",
+      "executionProfileDigest": "sha256:981b0afdf238fb85de0d2506994b6401d63b86404a2690be6dbe4d9895591ad4",
+      "modelRouteDigest": "sha256:107341af8cb8b63e059d52b6385ff26eebcf53aa8340dfe56a93288eca4b7988",
+      "priceDigest": "sha256:ba19028022ec2de109d2863415263b691d13d334618d7f49e7524f3c07e33160"
+    },
+    "maximumNanoUsd": 5000000000,
+    "expiresAt": 1788816665278,
+    "maximumRequests": 1,
+    "frozen": false,
+    "holds": [
+      {
+        "requestId": "todo063-live-request-2",
+        "requestDigest": "sha256:a0265e404db87795505cdc52b26f5cfeb13924e67d557d4d43c34f91ec8adfb1",
+        "attemptId": "todo063-live-attempt-2",
+        "leaseId": "todo063-live-lease-2",
+        "generation": 1,
+        "maximumNanoUsd": 3300264000,
+        "maximumOutputTokens": 16,
+        "preSendInputBound": {
+          "schema": "provider-pre-send-input-bound/v1",
+          "classification": "CONSERVATIVE_UPPER_BOUND",
+          "countTokensCapability": "UNSUPPORTED",
+          "maximumInputTokens": 1000000,
+          "serializedRequestBytes": 230,
+          "derivation": "FULL_MODEL_CONTEXT_WINDOW",
+          "capabilityEvidenceDigest": "sha256:6c3c98e0088381684eecffc9a21d100b5aae4a7bed2c69ad637ba92f97e22da8",
+          "evidenceDigest": "sha256:760b8e9bfeaa242c9bf13d3ff04393dc87af89a869cb12b57ad1fb72f9650abd"
+        },
+        "state": "SETTLED",
+        "receiptRevision": 2,
+        "classification": "ACTUAL",
+        "costClassification": "ESTIMATED",
+        "usageDigest": "sha256:58ad7791cce93a950030f910cc4d6766c77e1fba324bfce3f0d29a49b179e506",
+        "accountedNanoUsd": 0,
+        "providerRequestId": "6919db8e-f1c5-4f54-9557-db37ed817b74",
+        "usageId": "sha256:8d8e053e83f4e45a3fb18fe88abef29a066b0176d9cb6473886e34fbace92751"
+      }
+    ]
+  }
+}

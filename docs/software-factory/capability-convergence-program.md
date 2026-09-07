@@ -443,3 +443,23 @@ so the full new hold remains `UNKNOWN`; no retry or alternate route occurred.
 The retained [daily-token-gate evidence](../testing/evidence/todo063-bedrock-live-daily-token-gate-2026-09-07/README.md)
 keeps Todo 063 open and Todo 064 dependency-blocked until AWS reports usable
 daily token capacity and a new single-request authorization is granted.
+
+### AWS daily quota wait after authoritative liability reconciliation
+
+Exact-route telemetry for provider request
+`6919db8e-f1c5-4f54-9557-db37ed817b74` reports only invocation throttles and no
+successful invocation or token datapoints. The latest hold is now `SETTLED` at
+zero accounted nano-USD with `ACTUAL` usage and `ESTIMATED` money semantics.
+
+Quota `L-B29C9321` controls the exhausted daily token capacity. The exact
+qualification identity is denied the Service Quotas reads needed to establish
+the applied value, reset schedule, adjustability, or existing-request status;
+the other configured profiles do not provide authority in the qualification
+account. No identity change, quota request, or provider request was made. The
+fresh one-request authorization remains unused.
+
+The retained [quota-wait evidence](../testing/evidence/todo063-bedrock-quota-wait-2026-09-07/README.md)
+places Todo 063 in `TODO_063_WAITING_FOR_AWS_QUOTA` and keeps Todo 064
+dependency-blocked. Resume after AWS exposes usable daily Sonnet 4.6 capacity
+and the exact account quota/request state is verifiable. No additional
+engineering work is required while waiting.
