@@ -1,6 +1,8 @@
-# Fab Phase 3 offline qualification
+# Fab Phase 3 qualification
 
-Fab remains **Experimental**. This record covers local implementation and injected conformance qualification. It does not establish live provider execution, deployed Convex persistence, controlled GitHub publication, whole-agent containment or Phase 3 completion.
+Fab remains **Experimental** and is usable in the approved non-production local mode. Readiness now requires at least one current qualified provider route. OpenRouter is `ACTIVE_QUALIFIED`; Bedrock remains supported but is `EXTERNAL_WAIT` with reason `AWS_QUOTA` and is not a readiness dependency.
+
+The current live qualification uses the exact OpenRouter route `openai/gpt-4.1-mini` through `https://openrouter.ai/api/v1/chat/completions`, non-streaming, with zero retries and no fallback. One bounded synthetic WorkOrder completed, produced a candidate, and passed a separate verifier Attempt. The successful evaluation made eight tool-loop model requests, reported 5,818 input tokens, 346 output tokens, 26,776 ms producer latency, and actual cost of $0.0028808. See the [live evidence record](../fab-openrouter-live-2026-09-07/README.md).
 
 ## Latest reconciliation
 
@@ -47,16 +49,6 @@ Later [upstream reconciliation](../fab-phase3-upstream/README.md) preserves main
 
 Qualification runs append unique governed-MCP records. Historical Phase 2 and system-v1/v2 evidence is preserved. Copied terminal logs remove ANSI control sequences and trailing whitespace; original local logs retain raw output. Evidence contains synthetic fixtures and local build/test metadata, with no live provider calls or customer payloads. A high-confidence secret scan is a bounded check, not universal secret detection.
 
-## External gates and delivery
+## Remaining scope
 
-No exact live provider/model or enrolled credential has been selected and authorized. All five real-model engineering evaluations remain **NOT RUN**. Deployed admission, persistent restart/requery, real-model lineage, human checkpoint, controlled publication and remote response-loss reconciliation require an authorized non-production MC environment and dedicated qualification GitHub target.
-
-The operator subsequently authorized code and reviewed synthetic-evidence export
-to both named GitHub repositories, cross-linked PRs and merge only after green
-CI/reviews under repository policy. [FDLC PR #15](https://github.com/jaydubya818/FDLC/pull/15)
-is open; its native suite passes after the CI runtime correction. The companion
-Mission Control PR, green final CI, merge and clean post-merge qualification
-remain delivery gates. No artifact-upload workflow was added. Mission Control is
-public: [vendored archive provenance](../../../../vendor/fab/README.md) records
-public retrievability and unresolved Fab licensing. Signing and licensing remain
-separate operator decisions; green offline qualification does not remove them.
+OpenRouter qualification establishes the local producer/verifier route and its attempt-scoped credential lifecycle. It does not qualify Fab for production workloads, broader workload families, whole-agent containment, Linux or Windows, Developer-ID signing/notarization, or licensing. Bedrock live qualification remains independently blocked by AWS quota and does not reduce OpenRouter readiness.

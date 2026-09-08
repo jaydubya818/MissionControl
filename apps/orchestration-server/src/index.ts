@@ -53,7 +53,10 @@ import {
 import { configuredFactoryHarnessAdapters, createIsolatedFactoryHarness } from "./factoryHarnessComposition.js";
 import { loadFabExecutorAdapter } from "./fabExecutorAdapter.js";
 import { createFabBedrockBrokerFactory } from "./fabBedrockBroker.js";
+import { createFabOpenRouterBrokerFactory } from "./fabOpenRouterBroker.js";
 import { bedrockModelRouteBinding } from "./bedrockModelRouteBinding.js";
+import { openRouterModelRouteBinding } from "./openRouterModelRouteBinding.js";
+import { OpenRouterSandboxCredentialBroker } from "./sandboxCredentials.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
 import { MissionPlanningWorker } from "./missionPlanningWorker.js";
 import {
@@ -74,8 +77,10 @@ const configuredFabPaths = process.env.FAB_EXECUTOR_ENABLED === "1"
       config: requiredRuntimeSetting("FAB_EXECUTOR_CONFIG"),
       state: requiredRuntimeSetting("FAB_EXECUTOR_STATE_DIR"),
       bedrock: process.env.FAB_BEDROCK_APPROVED_CONFIG_FILE?.trim(),
+      openrouter: process.env.FAB_OPENROUTER_APPROVED_CONFIG_FILE?.trim(),
     }), executionConfigurationErrors)
   : undefined;
+const configuredOpenRouterManagementKey = process.env.OPENROUTER_MANAGEMENT_API_KEY?.trim();
 const envSearchPaths = [
   path.resolve(process.cwd(), ".env.local"),
   path.resolve(process.cwd(), ".env"),
@@ -138,6 +143,19 @@ const fabBedrockConfig = fabBedrockConfigPath
   : undefined;
 const fabBedrockTransport = fabBedrockConfig?.callAuthorization && accountingRuntime.delivery
   ? optionalExecutionConfiguration("FAB_PROVIDER_GRANT_INVALID", () => qualifiedBedrockTransport(fabBedrockConfig.route, fabBedrockConfig.price, fabBedrockConfig.callAuthorization), executionConfigurationErrors)
+  : undefined;
+const fabOpenRouterConfig = configuredFabPaths?.openrouter
+  ? optionalExecutionConfiguration("FAB_OPENROUTER_CONFIGURATION_INVALID", () => {
+      const raw = JSON.parse(readFileSync(configuredFabPaths.openrouter!, "utf8"));
+      const allowed = ["version", "provider", "endpoint", "protocol", "modelId", "maxCostUsd", "maximumOutputTokens"];
+      if (!raw || typeof raw !== "object" || Array.isArray(raw) || Object.keys(raw).some(key => !allowed.includes(key))
+        || raw.version !== 1 || raw.provider !== "openrouter"
+        || raw.endpoint !== "https://openrouter.ai/api/v1/chat/completions"
+        || raw.protocol !== "openrouter-chat-completions/non-streaming") {
+        throw new Error("Exact OpenRouter route configuration is required.");
+      }
+      return openRouterModelRouteBinding(raw);
+    }, executionConfigurationErrors)
   : undefined;
 const CODEX_BEDROCK_HARNESS_ENABLED = Boolean(bedrockTransport);
 const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
@@ -246,10 +264,17 @@ const factoryBootstrap = optionalExecutionConfiguration("FACTORY_BOOTSTRAP_INVAL
             })()
           : undefined,
         fabBedrockConfig?.maximumOutputTokens,
+        fabOpenRouterConfig && configuredOpenRouterManagementKey
+          ? createFabOpenRouterBrokerFactory(new OpenRouterSandboxCredentialBroker(configuredOpenRouterManagementKey), fabOpenRouterConfig)
+          : undefined,
+        fabOpenRouterConfig,
       )
     : undefined;
   if (configuredFabAdapter?.capabilities().provider === "aws-bedrock" && !fabBedrockTransport) {
     throw new Error("Fab Bedrock requires an explicit qualified transport and accounting journal.");
+  }
+  if (configuredFabAdapter?.capabilities().provider === "openrouter" && (!fabOpenRouterConfig || !configuredOpenRouterManagementKey)) {
+    throw new Error("Fab OpenRouter requires an explicit route file and pre-dotenv management credential.");
   }
   const factoryHarnessRegistry = new HarnessAdapterRegistry(
     [...configuredFactoryHarnessAdapters({

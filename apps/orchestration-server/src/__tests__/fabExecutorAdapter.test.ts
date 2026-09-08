@@ -10,6 +10,9 @@ import { harnessManifestIssues, harnessNormalizedResultIssues, runHarnessExecuti
 import { FabExecutorAdapter } from "../fabExecutorAdapter.js";
 import { HarnessAdapterRegistry } from "../harnessAdapterRegistry.js";
 import { commitFactoryChanges } from "../factoryGitRuntime.js";
+import { createFabOpenRouterBrokerFactory } from "../fabOpenRouterBroker.js";
+import { openRouterModelRouteBinding } from "../openRouterModelRouteBinding.js";
+import { FakeSandboxCredentialBroker } from "../sandboxCredentials.js";
 
 const cleanup: string[] = [];
 const KEY = "fab-non-secret-governed-fixture-987654";
@@ -55,6 +58,46 @@ function fixture(options: { attack?: string; hangModel?: boolean; slowCheck?: bo
 }
 
 describe("Fab canonical MC harness conformance", () => {
+  function openRouterFixture() {
+    const f = fixture();
+    const config = parseConfig({ ...f.config, provider: "openrouter", model: "openai/gpt-4.1-mini",
+      credential: { ...f.config.credential, provider: "openrouter", source: { kind: "broker" } } });
+    const routeBinding = openRouterModelRouteBinding({ modelId: config.model, maxCostUsd: 0.5, maximumOutputTokens: 512 });
+    const request = { ...f.request, provider: "openrouter", providerRoute: routeBinding.providerRoute,
+      modelRouteDigest: routeBinding.routeDigest, model: config.model };
+    return { ...f, config, request, routeBinding };
+  }
+  it("runs an exact OpenRouter route with a capped Attempt key and confirmed revocation", async () => {
+    const f = openRouterFixture(); const broker = new FakeSandboxCredentialBroker(); let calls = 0;
+    const factory = createFabOpenRouterBrokerFactory(broker, f.routeBinding, async (_url, init) => {
+      expect(String(_url)).toBe("https://openrouter.ai/api/v1/chat/completions");
+      expect(init?.redirect).toBe("error");
+      calls++;
+      let name = "submit_plan"; let args: Record<string, unknown> = { summary: "Set the value", steps: ["Edit one file", "Run test"] };
+      if (calls === 2) { name = "write_file"; args = { path: "src/value.mjs", content: "export const value = 2;\n", expectedHash: createHash("sha256").update("export const value = 1;\n").digest("hex") }; }
+      if (calls === 3) { name = "run_check"; args = { id: "test" }; }
+      if (calls >= 4) { name = "finish_candidate"; args = { summary: "Value corrected", unresolved: [] }; }
+      return Response.json({ id: `or-${calls}`, model: f.config.model, choices: [{ message: { content: null, tool_calls: [{ id: `call_${calls}`, type: "function", function: { name, arguments: JSON.stringify(args) } }] }, finish_reason: "tool_calls" }], usage: { prompt_tokens: 10, completion_tokens: 5, cost: 0.00001 } }, { headers: { "x-request-id": `req-${calls}` } });
+    });
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "openrouter-state"), openRouterRouteBinding: f.routeBinding, openRouterBrokerFactory: factory });
+    await expect(adapter.health()).resolves.toMatchObject({ status: "READY" });
+    const result = await runHarnessExecution(adapter, f.request, f.context);
+    expect(result.status).toBe("COMPLETED"); expect(result.normalizedResult?.usage.costUsd).toBeCloseTo(0.00004);
+    expect(broker.calls.filter(item => item.startsWith("mint:"))).toHaveLength(1);
+    expect(broker.calls.filter(item => item.startsWith("revoke:"))).toHaveLength(1);
+    expect(result.normalizedResult?.provenance.providerRoute).toBe("openrouter");
+    expect(result.normalizedResult?.events.items.some(event => event.summary === "openrouter_credential_revoked")).toBe(true);
+  });
+  it("revokes the OpenRouter Attempt key when execution admission fails after mint", async () => {
+    const f = openRouterFixture(); const broker = new FakeSandboxCredentialBroker();
+    const factory = createFabOpenRouterBrokerFactory(broker, f.routeBinding, vi.fn());
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "openrouter-admission-state"), openRouterRouteBinding: f.routeBinding, openRouterBrokerFactory: factory });
+    f.context.invocationObserver = { started: async () => { throw new Error("Canonical invocation admission unavailable"); }, completed: async () => {} };
+    const prepared = await adapter.prepare(f.request, f.context);
+    await expect(adapter.execute(prepared)).rejects.toThrow("Canonical invocation admission unavailable");
+    expect(broker.calls.filter(item => item.startsWith("mint:"))).toHaveLength(1);
+    expect(broker.calls.filter(item => item.startsWith("revoke:"))).toHaveLength(1);
+  });
   function bedrockFixture() {
     const f = fixture();
     const route = { accountId: "123456789012", region: "us-east-1", modelId: "anthropic.claude-sonnet-4-6", inferenceProfileId: "us.anthropic.claude-sonnet-4-6", inferenceProfileArn: "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-sonnet-4-6" } as const;
