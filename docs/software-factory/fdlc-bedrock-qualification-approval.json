@@ -1,0 +1,34 @@
+{
+  "schema": "fdlc-bedrock-qualification-approval/v1",
+  "decision": "APPROVED",
+  "approvedAt": "2026-09-06T17:29:28Z",
+  "approvedBy": "Jarrett West",
+  "authority": [
+    "Product Owner attachment b07c0c10-f8c6-45ff-8199-a9a4a4104d51",
+    "Direct chat authorization 2026-09-06"
+  ],
+  "scope": {
+    "environmentClass": "QUALIFICATION_ONLY",
+    "missionControlProjectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+    "awsAccountId": "083665737366",
+    "awsProfile": "fdlc-qualification",
+    "roleArn": "arn:aws:iam::083665737366:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783",
+    "expectedStsPrincipalArn": "arn:aws:sts::083665737366:assumed-role/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783/jaydubya818@gmail.com",
+    "provider": "AWS Bedrock",
+    "sourceRegion": "us-east-1",
+    "underlyingModel": "anthropic.claude-sonnet-4-6",
+    "inferenceProfileId": "us.anthropic.claude-sonnet-4-6",
+    "inferenceProfileArn": "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
+    "topology": "US_GEOGRAPHIC_CROSS_REGION",
+    "allowedDestinationRegions": ["us-east-1", "us-east-2", "us-west-2"],
+    "globalInference": false,
+    "maximumTotalLiveLiabilityUsd": 5,
+    "syntheticInputOnly": true,
+    "automaticRetries": 0
+  },
+  "evidence": {
+    "stsCallerIdentity": "docs/testing/evidence/fdlc-bedrock-live-20260906/sts-caller-identity.json",
+    "bedrockInferenceProfile": "docs/testing/evidence/fdlc-bedrock-live-20260906/bedrock-inference-profile.json",
+    "bedrockFoundationModel": "docs/testing/evidence/fdlc-bedrock-live-20260906/bedrock-foundation-model.json"
+  }
+}

@@ -156,6 +156,35 @@ either todo complete and does not authorize implementation by itself.
   requires the account owner to complete the Anthropic use-case agreement and a
   new explicit one-request authorization.
 
+### 2026-09-07 — Earlier 429 liability reconciled; account quota requires administrator
+
+- Read-only CloudWatch provider telemetry records one route-specific throttle at
+  the request minute and no invocation, input-token, or output-token datapoints
+  through the request window. The pre-inference quota rejection therefore had
+  zero billable model usage; the $0.924528 reservation is released with linked
+  evidence while the provider-send hold remains active.
+- The exact quota is `L-B29C9321`, Model invocation max tokens per day for
+  Anthropic Claude Sonnet 4.6 (doubled for cross-region calls). Its documented
+  default is 4,320,000,000 and it is non-adjustable, but the qualification role
+  is denied quota value and request-history reads. An administrator in account
+  `083665737366` or AWS Support must resolve the applied capacity before another
+  bounded call can be considered.
+- This is retained as historical evidence. The later account-agreement failure
+  and its unresolved liability are now the active resumption boundary.
+
+### 2026-09-07 — Earlier Bedrock IAM route admission reached the daily provider quota
+
+- The narrow Identity Center administrator provisioned the exact
+  `FDLCQualificationTFOperator` policy to account `083665737366`; canonical AWS
+  read-back matches and the approved Sonnet 4.6 request passed IAM.
+- The one-attempt synthetic request reached Bedrock and was rejected with HTTP
+  429 `Too many tokens per day`. No retry, fallback, output, or usage receipt was
+  produced. Its initial $0.924528 maximum reservation was later reconciled to
+  zero billable usage by the evidence above.
+- Todo 063 remains in progress. Successful live receipt, ten accepted real-work
+  outcomes, complete outcome coverage, and a second independently qualified
+  route remain missing. Todo 064 therefore remains dependency-blocked.
+
 ### 2026-09-07 - Worker-path CountTokens permission applied; profile still unsupported
 
 - Applied a reviewed Terraform plan with zero creates, two in-place updates,

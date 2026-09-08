@@ -257,6 +257,11 @@ export class BedrockInferenceBridge {
     let accountingReference: AccountingReference | undefined;
     const startedAt = this.now();
     try {
+      if (!this.transport.countInputTokens)
+        throw new Error("BEDROCK_EXACT_TOKEN_PREFLIGHT_REQUIRED");
+      const counted = await this.transport.countInputTokens(wire, signal);
+      if (!Number.isSafeInteger(counted.inputTokens) || counted.inputTokens < 1)
+        throw new Error("BEDROCK_TOKEN_COUNT_INVALID");
       const ticket = await this.accounting?.prepare({ subject, requestId, requestDigest, evidenceClass: this.transport.evidenceClass });
       // Failure/ambiguous reply here permits no send, but never permits replay.
       const proof = await this.authority.reserve({
@@ -265,6 +270,7 @@ export class BedrockInferenceBridge {
         requestId,
         requestDigest,
         payloadBytes,
+        inputTokens: counted.inputTokens,
         outputTokens: request.maxOutputTokens,
         preSendInputBound,
       });
@@ -276,6 +282,7 @@ export class BedrockInferenceBridge {
         leaseId: b.leaseId,
         generation: b.generation,
         maximumNanoUsd: expectedMaximumNanoUsd,
+        inputTokens: counted.inputTokens,
         maximumOutputTokens: request.maxOutputTokens,
         preSendInputBound,
         state: "RESERVED",

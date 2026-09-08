@@ -1,0 +1,22 @@
+{
+  "schema": "fdlc-bedrock-cloudwatch-429-reconciliation/v1",
+  "capturedAt": "2026-09-07T20:18:37Z",
+  "awsAccountId": "083665737366",
+  "awsProfile": "fdlc-qualification",
+  "region": "us-east-1",
+  "modelIdDimension": "us.anthropic.claude-sonnet-4-6",
+  "startTime": "2026-09-07T00:00:00Z",
+  "endTime": "2026-09-07T19:15:00Z",
+  "periodSeconds": 60,
+  "results": {
+    "Invocations": [],
+    "InputTokenCount": [],
+    "OutputTokenCount": [],
+    "InvocationThrottles": [
+      { "timestamp": "2026-09-07T19:03:00Z", "sum": 1, "unit": "Count" }
+    ]
+  },
+  "awsStatus": "Complete",
+  "messages": [],
+  "queryEvidenceSha256": "2fda23078019eeea37c1938674b05e700e5e338ac2fa62d9b8174d01f5aed016"
+}

@@ -1,0 +1,103 @@
+{
+  "schema": "fab-openrouter-live-qualification/v1",
+  "recordedAt": "2026-09-08T00:51:47.686Z",
+  "status": "FAIL",
+  "inputClassification": "PUBLIC_SYNTHETIC_FIXTURE",
+  "mode": "LOCAL_NON_PRODUCTION",
+  "ids": {
+    "workOrderId": "wo-openrouter-ce37bc43-1ef6-4abb-a8f9-caef160fe2c2",
+    "producerAttemptId": "attempt-producer-8370d5aa-50d0-41b7-b564-fb2f0ea1f9b8",
+    "producerLeaseId": "lease-producer-1c3b4039-50ab-40ae-be67-d545887b280a",
+    "verifierAttemptId": "attempt-verifier-937c6c70-8c1f-45b3-b1ae-2ab50b9e9f8c",
+    "verifierLeaseId": "lease-verifier-42802c34-624e-405a-9879-48671e05b9a0",
+    "workflowRunId": "workflow-openrouter-e3ef8b03-838a-4426-8d54-d3dbe5462a27",
+    "executionId": "execution-openrouter-5b25097c-62f2-445a-a884-783b85b62fad"
+  },
+  "sourceRevision": "82bef26b94f7f2c6c073e742e9a352e2e8ab23c4",
+  "candidateRevision": null,
+  "route": {
+    "providerRoute": "openrouter",
+    "routeDigest": "sha256:7298d9ef168f087e078859f97cab4f50f7f234ed5368b80fdab553fad0cba856",
+    "modelId": "openai/gpt-4.1-mini",
+    "maxCostUsd": 0.5,
+    "maximumOutputTokens": 512,
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "protocol": "openrouter-chat-completions/non-streaming",
+    "retries": 0,
+    "fallback": false,
+    "streaming": false
+  },
+  "liability": {
+    "hardCeilingUsd": 5,
+    "priorConservativeExposureUsd": 1.054822,
+    "maximumNewLiabilityUsd": 0.5,
+    "maximumAggregateLiabilityUsd": 1.554822
+  },
+  "producer": {
+    "status": "FAILED",
+    "health": {
+      "status": "READY",
+      "checkedAt": 1788828707686,
+      "adapter": "fab",
+      "version": "v1",
+      "details": "Exact OpenRouter route and attempt-scoped spend-capped broker are present; Bedrock is optional and currently EXTERNAL_WAIT/AWS_QUOTA."
+    },
+    "modelRequests": 1,
+    "usage": {
+      "inputTokens": null,
+      "outputTokens": null,
+      "cacheReadTokens": null,
+      "cacheWriteTokens": null,
+      "costUsd": null
+    },
+    "latencyMs": 31891,
+    "returnedModels": [],
+    "requests": [
+      {
+        "version": 1,
+        "localRequestId": "f3f6a427-4c86-4ae3-8c14-a75b7a405e33",
+        "provider": "openrouter",
+        "requestedModel": "openai/gpt-4.1-mini",
+        "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+        "protocol": "openrouter-chat-completions/non-streaming",
+        "credentialReference": "fab-openrouter-attempt-broker-v1",
+        "startedAt": "2026-09-08T00:51:15.908Z",
+        "completedAt": "2026-09-08T00:51:16.643Z",
+        "latencyMs": 735,
+        "phase": "FAILED",
+        "outcome": "RESPONSE_RECEIVED",
+        "inputBytes": 3609,
+        "maximumOutputTokens": 512,
+        "retries": 0,
+        "httpStatus": 400,
+        "requestId": null,
+        "responseId": null,
+        "returnedModel": null,
+        "usage": null,
+        "costClassification": "UNKNOWN",
+        "errorCode": "PROVIDER_HTTP"
+      }
+    ],
+    "failure": "Fab execution blocked, failed or cancelled; inspect its redacted evidence."
+  },
+  "verifier": {
+    "status": "NOT_RUN"
+  },
+  "readiness": {
+    "fab": "NOT_READY",
+    "rule": "AT_LEAST_ONE_QUALIFIED_PROVIDER_ROUTE",
+    "providers": [
+      {
+        "provider": "openrouter",
+        "status": "FAILED"
+      },
+      {
+        "provider": "bedrock",
+        "status": "EXTERNAL_WAIT",
+        "reason": "AWS_QUOTA",
+        "readinessDependency": false
+      }
+    ]
+  },
+  "evidenceDigest": "db580645b64c5308af1d4891d9130569d46fa3890f2310367b3b6f973528353b"
+}

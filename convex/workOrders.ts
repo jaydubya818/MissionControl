@@ -68,6 +68,7 @@ import {
   resolveHarnessAdapterRuntimeArtifact,
 } from "./lib/harnessCapabilities";
 import { computeCanonicalHash } from "./lib/genomeHash";
+import { liabilityDigest } from "./lib/providerLiability";
 import { evaluateGithubAppCapabilities, githubInstallationIsStale } from "./lib/githubAppReadiness";
 import { canonicalRepositoryKey } from "./lib/workspaceRepositories";
 import {
@@ -134,7 +135,9 @@ import {
 import {
   evaluateTaskPreExecutionRecovery,
   evaluateTasklessPreExecutionRecovery,
+  isRecognizedPreExecutionValidationFailure,
   TASKLESS_MANIFEST_VALIDATION_FAILURE,
+  FAB_CONFIGURATION_VALIDATION_FAILURE,
   type TaskPreExecutionRecoveryProof,
   type TasklessPreExecutionRecoveryProof,
 } from "./lib/preExecutionRecovery";
@@ -2312,11 +2315,22 @@ async function reconcilePreExecutionReservation(
 ) {
   const authorization = input.sourceRun.executionCostAuthorization;
   if (!authorization) {
+    if ((input.proof.code === "EXECUTION_PROFILE_REJECTED_BEFORE_EXECUTOR"
+      || input.proof.code === "FAB_CONFIGURATION_REJECTED_BEFORE_PROVIDER"
+      || input.proof.code === "FAB_PROVIDER_ADMISSION_REJECTED_BEFORE_INFERENCE")
+      && input.proof.releasedReservationUsd === 0
+      && input.proof.externalProviderLiability) return;
     throw new Error("Pre-execution recovery has no frozen cost authorization.");
   }
   const reason = input.proof.code === "STORED_MANIFEST_DIGEST_MISMATCH_BEFORE_EXECUTOR"
     ? "Server evidence proves the stored manifest failed validation before executor invocation; actual execution spend is zero."
-    : "Server evidence proves a valid stored manifest was rejected before executor invocation because the claim envelope omitted its frozen executor identity; actual execution spend is zero.";
+    : input.proof.code === "EXECUTION_PROFILE_REJECTED_BEFORE_EXECUTOR"
+      ? "Server evidence proves the exact Execution Profile was rejected before executor invocation; actual execution spend is zero."
+      : input.proof.code === "FAB_CONFIGURATION_REJECTED_BEFORE_PROVIDER"
+        ? "Server evidence and the canonical provider reservation prove Fab rejected the admitted request before provider activity; actual execution spend is zero."
+      : input.proof.code === "FAB_PROVIDER_ADMISSION_REJECTED_BEFORE_INFERENCE"
+        ? "Server lifecycle evidence and the canonical provider reservation prove provider admission failed before inference; actual execution spend is zero."
+      : "Server evidence proves a valid stored manifest was rejected before executor invocation because the claim envelope omitted its frozen executor identity; actual execution spend is zero.";
   await ctx.db.patch(input.sourceRun._id, {
     spentUsd: 0,
     reservedCostUsd: 0,
@@ -2434,7 +2448,7 @@ async function dispatchWorkOrder(
     if (args.retryOfWorkflowRunId
       && !args.taskId
       && canonicalChildTasks.length === 0
-      && retryOfRun?.failureReason === TASKLESS_MANIFEST_VALIDATION_FAILURE) {
+      && isRecognizedPreExecutionValidationFailure(retryOfRun?.failureReason)) {
       if (args.actorType !== "HUMAN") {
         throw new Error("Pre-execution recovery requires an authenticated human dispatch.");
       }
@@ -2455,6 +2469,65 @@ async function dispatchWorkOrder(
       const latestRun = [...existingRuns].sort((left, right) =>
         right.startedAt - left.startedAt || String(right._id).localeCompare(String(left._id))
       )[0];
+      const providerReservations = await ctx.db.query("factoryProviderReservations")
+        .withIndex("by_work_order", (query) => query.eq("workOrderId", workOrder._id))
+        .collect();
+      const providerReservation = providerReservations.length === 1 ? providerReservations[0] : null;
+      const providerUsageEvents = providerReservation
+        ? await ctx.db.query("factoryProviderUsageEvents")
+          .withIndex("by_reservation", (query) => query.eq("reservationId", providerReservation._id))
+          .collect()
+        : [];
+      const providerScope = providerReservation?.snapshot.scope;
+      const sourceProviderHolds = providerReservation?.snapshot.holds.filter(
+        (hold) => hold.attemptId === String(retryOfRun._id),
+      ) ?? [];
+      const sourceProviderUsageEvents = providerUsageEvents.filter((event) =>
+        sourceProviderHolds.some((hold) => hold.requestId === event.usage.requestId),
+      );
+      const settledZeroProviderHolds = sourceProviderHolds.filter((hold) => {
+        const usageEvent = sourceProviderUsageEvents.find(
+          (event) => event.usage.requestId === hold.requestId,
+        );
+        return hold.state === "SETTLED"
+          && hold.classification === "ACTUAL"
+          && hold.accountedNanoUsd === 0
+          && typeof hold.providerRequestId === "string"
+          && usageEvent?.usage.classification === "ACTUAL"
+          && usageEvent.usage.inputTokens === 0
+          && usageEvent.usage.outputTokens === 0
+          && usageEvent.usage.providerRequestId === hold.providerRequestId;
+      });
+      const externalProviderLiability = providerReservation ? {
+        reservationId: String(providerReservation._id),
+        reservationDigest: providerReservation.creationDigest,
+        maximumNanoUsd: providerReservation.snapshot.maximumNanoUsd,
+        scopeMatches: providerScope?.projectId === String(workOrder.projectId)
+          && providerScope.repositoryId === String(workOrder.repositoryId)
+          && providerScope.workOrderId === String(workOrder._id)
+          && providerScope.workOrderRevision === (workOrder.currentRevisionNumber ?? 1)
+          && providerScope.executionProfileId === String(retryOfRun.executionProfileId)
+          && providerScope.executionProfileDigest === retryOfRun.executionProfileDigest
+          && providerScope.modelRouteDigest === (retryOfRun.executionManifest as any)?.modelRoute?.routeDigest,
+        integrityValid: liabilityDigest({
+          ...providerReservation.snapshot,
+          frozen: false,
+          holds: [],
+        }) === providerReservation.creationDigest,
+        current: providerReservation.snapshot.expiresAt > Date.now()
+          && providerReservation.snapshot.frozen === false,
+        providerRequestCount: sourceProviderHolds.length,
+        usageEventCount: sourceProviderUsageEvents.length,
+        settledZeroProviderRequestCount: settledZeroProviderHolds.length,
+        settledZeroUsageEventCount: sourceProviderUsageEvents.filter((event) =>
+          event.usage.classification === "ACTUAL"
+          && event.usage.inputTokens === 0
+          && event.usage.outputTokens === 0
+        ).length,
+        providerRequestId: settledZeroProviderHolds.length === 1
+          ? settledZeroProviderHolds[0].providerRequestId
+          : undefined,
+      } : undefined;
       const recovery = evaluateTasklessPreExecutionRecovery({
         run: retryOfRun,
         currentWorkOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
@@ -2466,6 +2539,7 @@ async function dispatchWorkOrder(
         artifactCount: artifacts.length,
         sandboxAllocationCount: sandboxAllocations.length,
         sandboxCredentialGrantCount: sandboxCredentialGrants.length,
+        externalProviderLiability,
       });
       if ("reason" in recovery) {
         throw new Error(`Pre-execution recovery is not allowed (${recovery.reason}).`);
@@ -2497,7 +2571,11 @@ async function dispatchWorkOrder(
       && args.retryOfWorkflowRunId
       && !args.taskId
       && retryTask
-      && retryOfRun?.failureReason === TASKLESS_MANIFEST_VALIDATION_FAILURE) {
+      && (retryOfRun?.failureReason === TASKLESS_MANIFEST_VALIDATION_FAILURE
+        || retryOfRun?.failureReason === FAB_CONFIGURATION_VALIDATION_FAILURE
+        || (retryOfRun?.failureReason === "Fab execution blocked, failed or cancelled; inspect its redacted evidence."
+          && retryOfRun.executorAdapter === "fab"
+          && retryOfRun.executorVersion === "v1"))) {
       if (args.actorType !== "HUMAN") {
         throw new Error("Pre-execution recovery requires an authenticated human dispatch.");
       }
@@ -2518,6 +2596,65 @@ async function dispatchWorkOrder(
       const latestRun = [...existingRuns].sort((left, right) =>
         right.startedAt - left.startedAt || String(right._id).localeCompare(String(left._id))
       )[0];
+      const providerReservations = await ctx.db.query("factoryProviderReservations")
+        .withIndex("by_work_order", (query) => query.eq("workOrderId", workOrder._id))
+        .collect();
+      const providerReservation = providerReservations.length === 1 ? providerReservations[0] : null;
+      const providerUsageEvents = providerReservation
+        ? await ctx.db.query("factoryProviderUsageEvents")
+          .withIndex("by_reservation", (query) => query.eq("reservationId", providerReservation._id))
+          .collect()
+        : [];
+      const providerScope = providerReservation?.snapshot.scope;
+      const sourceProviderHolds = providerReservation?.snapshot.holds.filter(
+        (hold) => hold.attemptId === String(retryOfRun._id),
+      ) ?? [];
+      const sourceProviderUsageEvents = providerUsageEvents.filter((event) =>
+        sourceProviderHolds.some((hold) => hold.requestId === event.usage.requestId),
+      );
+      const settledZeroProviderHolds = sourceProviderHolds.filter((hold) => {
+        const usageEvent = sourceProviderUsageEvents.find(
+          (event) => event.usage.requestId === hold.requestId,
+        );
+        return hold.state === "SETTLED"
+          && hold.classification === "ACTUAL"
+          && hold.accountedNanoUsd === 0
+          && typeof hold.providerRequestId === "string"
+          && usageEvent?.usage.classification === "ACTUAL"
+          && usageEvent.usage.inputTokens === 0
+          && usageEvent.usage.outputTokens === 0
+          && usageEvent.usage.providerRequestId === hold.providerRequestId;
+      });
+      const externalProviderLiability = providerReservation ? {
+        reservationId: String(providerReservation._id),
+        reservationDigest: providerReservation.creationDigest,
+        maximumNanoUsd: providerReservation.snapshot.maximumNanoUsd,
+        scopeMatches: providerScope?.projectId === String(workOrder.projectId)
+          && providerScope.repositoryId === String(workOrder.repositoryId)
+          && providerScope.workOrderId === String(workOrder._id)
+          && providerScope.workOrderRevision === (workOrder.currentRevisionNumber ?? 1)
+          && providerScope.executionProfileId === String(retryOfRun.executionProfileId)
+          && providerScope.executionProfileDigest === retryOfRun.executionProfileDigest
+          && providerScope.modelRouteDigest === (retryOfRun.executionManifest as any)?.modelRoute?.routeDigest,
+        integrityValid: liabilityDigest({
+          ...providerReservation.snapshot,
+          frozen: false,
+          holds: [],
+        }) === providerReservation.creationDigest,
+        current: providerReservation.snapshot.expiresAt > Date.now()
+          && providerReservation.snapshot.frozen === false,
+        providerRequestCount: sourceProviderHolds.length,
+        usageEventCount: sourceProviderUsageEvents.length,
+        settledZeroProviderRequestCount: settledZeroProviderHolds.length,
+        settledZeroUsageEventCount: sourceProviderUsageEvents.filter((event) =>
+          event.usage.classification === "ACTUAL"
+          && event.usage.inputTokens === 0
+          && event.usage.outputTokens === 0
+        ).length,
+        providerRequestId: settledZeroProviderHolds.length === 1
+          ? settledZeroProviderHolds[0].providerRequestId
+          : undefined,
+      } : undefined;
       const recovery = evaluateTaskPreExecutionRecovery({
         run: retryOfRun,
         currentTaskId: String(retryTask._id),
@@ -2530,6 +2667,7 @@ async function dispatchWorkOrder(
         artifactCount: artifacts.length,
         sandboxAllocationCount: sandboxAllocations.length,
         sandboxCredentialGrantCount: sandboxCredentialGrants.length,
+        externalProviderLiability,
       });
       if ("reason" in recovery) {
         throw new Error(`Pre-execution recovery is not allowed (${recovery.reason}).`);
@@ -4017,7 +4155,13 @@ async function resolveFactoryDispatchBinding(
     }
   }
   const frozenHarness = resolveFrozenHarnessBinding(version);
-  const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(version.executor);
+  const versionProfileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+  const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(
+    version.executor,
+    versionProfileSnapshot?.harness?.source === "EXTERNAL_FROZEN"
+      ? frozenHarness.runtimeArtifact
+      : undefined,
+  );
   const primaryModel = (() => {
     try {
       return resolveFactoryWorkflowModelRoute({

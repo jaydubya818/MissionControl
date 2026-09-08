@@ -1,0 +1,77 @@
+{
+  "schema": "fab-openrouter-live-qualification/v1",
+  "recordedAt": "2026-09-08T00:09:24.911Z",
+  "status": "FAIL",
+  "inputClassification": "PUBLIC_SYNTHETIC_FIXTURE",
+  "mode": "LOCAL_NON_PRODUCTION",
+  "ids": {
+    "workOrderId": "wo-openrouter-1afbea68-fbdf-4507-9057-63ef63362a5c",
+    "producerAttemptId": "attempt-producer-29200767-9f09-42b8-b26b-1f87baca98ba",
+    "producerLeaseId": "lease-producer-642e32e0-c4f4-4288-936e-e80b2ececfc5",
+    "verifierAttemptId": "attempt-verifier-f44a1209-cf70-41ae-8ebb-c1e0d27b76e2",
+    "verifierLeaseId": "lease-verifier-f6634b3b-ede7-4f56-847a-760be62fae5a",
+    "workflowRunId": "workflow-openrouter-542dae16-86f4-4cb3-939a-db198c87085e",
+    "executionId": "execution-openrouter-5fba56ad-4e86-4ff1-b91c-b16200e976d8"
+  },
+  "sourceRevision": "ab6f6ab496ced154e96920fff1d4e7441fbb44cc",
+  "candidateRevision": null,
+  "route": {
+    "providerRoute": "openrouter",
+    "routeDigest": "sha256:02588416750bea1ab3254430ae48603bbb6ba91510bed54daabc0b9dc02f9018",
+    "modelId": "openai/gpt-5.1-codex-mini",
+    "maxCostUsd": 0.5,
+    "maximumOutputTokens": 512,
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "protocol": "openrouter-chat-completions/non-streaming",
+    "retries": 0,
+    "fallback": false,
+    "streaming": false
+  },
+  "liability": {
+    "hardCeilingUsd": 5,
+    "priorConservativeExposureUsd": 0.054822,
+    "maximumNewLiabilityUsd": 0.5,
+    "maximumAggregateLiabilityUsd": 0.554822
+  },
+  "producer": {
+    "status": "FAILED",
+    "health": {
+      "status": "READY",
+      "checkedAt": 1788826164911,
+      "adapter": "fab",
+      "version": "v1",
+      "details": "Exact OpenRouter route and attempt-scoped spend-capped broker are present; Bedrock is optional and currently EXTERNAL_WAIT/AWS_QUOTA."
+    },
+    "modelRequests": 1,
+    "usage": {
+      "inputTokens": null,
+      "outputTokens": null,
+      "cacheReadTokens": null,
+      "cacheWriteTokens": null,
+      "costUsd": null
+    },
+    "latencyMs": 31513,
+    "returnedModels": [],
+    "requests": []
+  },
+  "verifier": {
+    "status": "NOT_RUN"
+  },
+  "readiness": {
+    "fab": "NOT_READY",
+    "rule": "AT_LEAST_ONE_QUALIFIED_PROVIDER_ROUTE",
+    "providers": [
+      {
+        "provider": "openrouter",
+        "status": "FAILED"
+      },
+      {
+        "provider": "bedrock",
+        "status": "EXTERNAL_WAIT",
+        "reason": "AWS_QUOTA",
+        "readinessDependency": false
+      }
+    ]
+  },
+  "evidenceDigest": "5226afe45c83691ad386ca31b2fc0b921a70f6c77106bfabd3a1a0ed1f39c2db"
+}

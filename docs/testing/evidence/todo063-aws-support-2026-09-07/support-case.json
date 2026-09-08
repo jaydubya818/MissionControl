@@ -1,0 +1,27 @@
+{
+  "schema": "todo063-aws-support-case/v1",
+  "state": "TODO_063_WAITING_FOR_AWS_SUPPORT",
+  "caseId": "178882125400227",
+  "submittedAt": "2026-09-07T22:47:33.863Z",
+  "accountId": "083665737366",
+  "region": "us-east-1",
+  "service": "Amazon Bedrock",
+  "category": "Service Quotas, General",
+  "severity": "General question",
+  "status": "UNASSIGNED",
+  "quota": {
+    "code": "L-B29C9321",
+    "appliedCapacity": 0,
+    "adjustableThroughServiceQuotas": false,
+    "requestedCapacity": "Minimum nonzero daily token capacity sufficient for one small qualification request"
+  },
+  "resumeCondition": "L-B29C9321 applied capacity is greater than 0",
+  "engineeringState": "COMPLETE_TO_PROVIDER_CAPACITY_BOUNDARY",
+  "additionalProviderCalls": 0,
+  "temporarySupportPermission": {
+    "restored": true,
+    "provisioningRequestId": "540264cf-75f8-4b13-aac4-47f135b5ceba",
+    "provisioningStatus": "SUCCEEDED",
+    "restoredPolicyCanonicalSha256": "62d0227bf2f27e6e3984ec09a88bf1c4855c4a185916412e3a18c9543edbd635"
+  }
+}

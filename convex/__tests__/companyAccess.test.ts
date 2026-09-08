@@ -265,4 +265,19 @@ describe("company access", () => {
     expect(canAccessDeliveryRecord(access, { owningTeamId: "team-b" as Id<"scrumTeams"> })).toBe(false);
     expect(canAccessDeliveryRecord(access, {})).toBe(false);
   });
+
+  it("lets an explicit project delivery approver inspect the record it may approve", () => {
+    const access = {
+      membership: { mode: "AUTHENTICATED", canManageCompany: false },
+      roleNames: ["Qualification Plan Approver"],
+      permissions: [COMPANY_PERMISSIONS.APPROVE_DELIVERY],
+      teamMemberships: [],
+      memberProfiles: [],
+    } as any;
+
+    expect(canAccessDeliveryRecord(access, {
+      owningTeamId: "team-a" as Id<"scrumTeams">,
+      ownerMemberId: "member-a" as Id<"orgMembers">,
+    })).toBe(true);
+  });
 });

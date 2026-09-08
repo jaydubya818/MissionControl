@@ -5,6 +5,8 @@ export const PROVIDER_RESERVATION_SCHEMA =
   "factory-provider-reservation/v1" as const;
 export const QUALIFIED_BEDROCK_PROVIDER_PRICE_DIGEST =
   "sha256:ba19028022ec2de109d2863415263b691d13d334618d7f49e7524f3c07e33160" as const;
+export const QUALIFIED_FAB_BEDROCK_PROVIDER_PRICE_DIGEST =
+  "sha256:765d485cbf1c66e474e022f7dd34c4387269222763445bc8c9eefcd29e51523e" as const;
 export interface ProviderPrice {
   schema: typeof PROVIDER_PRICE_SCHEMA;
   provider: string;
@@ -61,6 +63,7 @@ export interface ProviderHold {
   leaseId: string;
   generation: number;
   maximumNanoUsd: number;
+  inputTokens?: number;
   maximumOutputTokens: number;
   preSendInputBound?: PreSendInputBound;
   state: "RESERVED" | "UNKNOWN" | "SETTLED" | "OVERRUN";
@@ -119,11 +122,16 @@ export function assertProviderPrice(p: ProviderPrice, now: number) {
 }
 export function assertQualifiedBedrockPrice(p: ProviderPrice, now: number) {
   assertProviderPrice(p, now);
+  const expectedDigest = p.api === "CONVERSE"
+    ? QUALIFIED_BEDROCK_PROVIDER_PRICE_DIGEST
+    : p.api === "INVOKE_MODEL"
+      ? QUALIFIED_FAB_BEDROCK_PROVIDER_PRICE_DIGEST
+      : null;
   if (
     p.provider !== "aws-bedrock" ||
     p.model !== "anthropic.claude-sonnet-4-6" ||
-    p.api !== "CONVERSE" ||
-    liabilityDigest(p) !== QUALIFIED_BEDROCK_PROVIDER_PRICE_DIGEST
+    expectedDigest === null ||
+    liabilityDigest(p) !== expectedDigest
   ) throw new Error("BEDROCK_PRICE_NOT_QUALIFIED");
 }
 export function assertProviderReservation(r: ProviderReservation, now: number) {
@@ -157,6 +165,7 @@ export function reserveProviderRequest(input: {
   requestId: string;
   requestDigest: string;
   payloadBytes: number;
+  inputTokens?: number;
   outputTokens: number;
   preSendInputBound?: PreSendInputBound;
   now: number;
@@ -182,6 +191,8 @@ export function reserveProviderRequest(input: {
     !sha(input.requestDigest) ||
     !integer(input.payloadBytes) ||
     input.payloadBytes > price.maximumPayloadBytes ||
+    (input.inputTokens !== undefined &&
+      (!integer(input.inputTokens) || input.inputTokens < 1 || input.inputTokens > price.maximumInputTokens)) ||
     !integer(input.outputTokens) ||
     input.outputTokens < 1 ||
     input.outputTokens > price.maximumOutputTokens
@@ -242,6 +253,7 @@ export function reserveProviderRequest(input: {
     leaseId: a.leaseId,
     generation: a.generation,
     maximumNanoUsd: maximum,
+    ...(input.inputTokens === undefined ? {} : { inputTokens: input.inputTokens }),
     maximumOutputTokens: input.outputTokens,
     ...(bound ? { preSendInputBound: structuredClone(bound) } : {}),
     state: "RESERVED",
@@ -294,6 +306,12 @@ export function settleProviderUsage(
     h.state = "UNKNOWN";
     h.classification = "UNKNOWN";
     h.costClassification = "UNKNOWN";
+    // Preserve a provider-issued request identity without treating a failed
+    // response as complete usage or cost evidence.
+    if (usage.providerRequestId) {
+      if (!identity(usage.providerRequestId)) throw new Error("USAGE_INVALID_OR_REPLAYED");
+      h.providerRequestId = usage.providerRequestId;
+    }
     h.usageDigest = d;
     h.receiptRevision++;
     return { reservation: r, duplicate: false, incident: r.frozen };
@@ -320,6 +338,7 @@ export function settleProviderUsage(
   const actual = priced !== undefined && priced <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(priced) : undefined;
   const incident =
     actual === undefined || actual > h.maximumNanoUsd ||
+    (h.inputTokens !== undefined && usage.inputTokens > h.inputTokens) ||
     usage.inputTokens > (h.preSendInputBound?.maximumInputTokens ?? price.maximumInputTokens) ||
     usage.outputTokens > h.maximumOutputTokens;
   Object.assign(h, {

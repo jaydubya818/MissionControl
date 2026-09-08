@@ -90,10 +90,16 @@ export async function admitBedrockAccounting(
       harness?: { adapter?: string; version?: string };
     }
   ).harness;
+  const expectedHarness = price.api === "INVOKE_MODEL"
+    ? { adapter: "fab", version: "v1" }
+    : price.api === "CONVERSE"
+      ? { adapter: "codex", version: "bedrock-v1" }
+      : null;
   if (
     !routeRow.providerRoute ||
-    harness?.adapter !== "codex" ||
-    harness.version !== "bedrock-v1"
+    !expectedHarness ||
+    harness?.adapter !== expectedHarness.adapter ||
+    harness.version !== expectedHarness.version
   )
     throw new Error("BEDROCK_ACCOUNTING_ROUTE_DESCRIPTOR_MISSING");
   const route: ExactInferenceRoute = {

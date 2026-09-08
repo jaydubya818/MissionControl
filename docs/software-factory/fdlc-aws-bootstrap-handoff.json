@@ -3,10 +3,10 @@
   "AWS_REGION": "us-east-1",
   "QUALIFICATION_AWS_ACCOUNT_ID": "083665737366",
   "EXPECTED_STS_PRINCIPAL_ARN": "arn:aws:sts::083665737366:assumed-role/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783/jaydubya818@gmail.com",
-  "QUALIFICATION_PROJECT_OR_ENVIRONMENT_ID": "mission-control://qualification/fdlc-phase-3",
-  "QUALIFICATION_ROLE_ARN": null,
-  "AUTHORITATIVE_QUALIFICATION_CONFIG_LOCATION": null,
+  "QUALIFICATION_PROJECT_OR_ENVIRONMENT_ID": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+  "QUALIFICATION_ROLE_ARN": "arn:aws:iam::083665737366:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783",
+  "AUTHORITATIVE_QUALIFICATION_CONFIG_LOCATION": "docs/software-factory/fdlc-aws-bootstrap-handoff.json",
   "BEDROCK_INFERENCE_PROFILE_ID": "us.anthropic.claude-sonnet-4-6",
   "BEDROCK_INFERENCE_PROFILE_ARN": "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
-  "APPROVAL_REFERENCE": "Product Owner attachment ad57871d-4bdb-48d6-ae43-b754b13f65f0"
+  "APPROVAL_REFERENCE": "docs/software-factory/fdlc-bedrock-qualification-approval.json"
 }

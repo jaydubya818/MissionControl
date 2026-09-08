@@ -1,0 +1,62 @@
+[
+  {
+    "Id": "invocations",
+    "MetricStat": {
+      "Metric": {
+        "Namespace": "AWS/Bedrock",
+        "MetricName": "Invocations",
+        "Dimensions": [
+          { "Name": "ModelId", "Value": "us.anthropic.claude-sonnet-4-6" }
+        ]
+      },
+      "Period": 60,
+      "Stat": "Sum"
+    },
+    "ReturnData": true
+  },
+  {
+    "Id": "input_tokens",
+    "MetricStat": {
+      "Metric": {
+        "Namespace": "AWS/Bedrock",
+        "MetricName": "InputTokenCount",
+        "Dimensions": [
+          { "Name": "ModelId", "Value": "us.anthropic.claude-sonnet-4-6" }
+        ]
+      },
+      "Period": 60,
+      "Stat": "Sum"
+    },
+    "ReturnData": true
+  },
+  {
+    "Id": "output_tokens",
+    "MetricStat": {
+      "Metric": {
+        "Namespace": "AWS/Bedrock",
+        "MetricName": "OutputTokenCount",
+        "Dimensions": [
+          { "Name": "ModelId", "Value": "us.anthropic.claude-sonnet-4-6" }
+        ]
+      },
+      "Period": 60,
+      "Stat": "Sum"
+    },
+    "ReturnData": true
+  },
+  {
+    "Id": "throttles",
+    "MetricStat": {
+      "Metric": {
+        "Namespace": "AWS/Bedrock",
+        "MetricName": "InvocationThrottles",
+        "Dimensions": [
+          { "Name": "ModelId", "Value": "us.anthropic.claude-sonnet-4-6" }
+        ]
+      },
+      "Period": 60,
+      "Stat": "Sum"
+    },
+    "ReturnData": true
+  }
+]

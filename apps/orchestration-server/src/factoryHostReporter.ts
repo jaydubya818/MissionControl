@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { ConvexHttpClient } from "convex/browser";
-import { ConvexActions, ConvexMutations } from "./convexCalls.js";
+import { ConvexActions } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
 import { canonicalGithubRepositoryFromRemote } from "./factoryRepositoryIdentity.js";
 import { attestLocalQualificationRepository, type LocalQualificationRepositoryBinding } from "./localQualificationRepository.js";
@@ -120,7 +120,7 @@ export class FactoryHostReporter {
         baseBranch: "main", baseCommit: localObservation.baselineCommit, dirty: false,
       } : await inspectFactoryCheckout(this.config.checkoutRoot);
       const now = Date.now();
-      await this.client.mutation(ConvexMutations.workspaceHostBindings.report as any, {
+      const payload = {
         projectId: this.config.projectId,
         repositoryId: this.config.repositoryId,
         hostId: this.config.hostId,
@@ -165,7 +165,17 @@ export class FactoryHostReporter {
         attestedAt: now,
         status: observation.dirty ? "DIRTY" : "READY",
         checkedAt: now,
+      };
+      const hostCommand = createSignedServiceCommand({
+        capability: "hosts.report",
+        projectId: this.config.projectId,
+        repositoryId: this.config.repositoryId,
+        payload,
       });
+      await this.client.action(
+        ConvexActions.serviceCommands.reportFactoryHost as any,
+        hostCommand,
+      );
       for (const binding of this.config.factoryVersionBindings ?? []) {
         if (binding.executionBackend === "isolated-container") continue;
         const command = createSignedServiceCommand({
@@ -195,7 +205,10 @@ export async function inspectFactoryCheckout(cwd: string): Promise<FactoryChecko
     git(cwd, ["remote", "get-url", "origin"]),
     git(cwd, ["branch", "--show-current"]),
     git(cwd, ["rev-parse", "HEAD"]),
-    git(cwd, ["status", "--porcelain=v1", "--untracked-files=all"]),
+    // Attempt worktrees and worker journals are host-owned runtime state. They
+    // live beneath the checkout for bounded path ownership but are not source
+    // changes and must not make an otherwise clean source checkout ineligible.
+    git(cwd, ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude).mission-control/**"]),
     gitOptional(cwd, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]),
   ]);
   const baseBranch = remoteHead?.replace(/^origin\//, "") || branch;

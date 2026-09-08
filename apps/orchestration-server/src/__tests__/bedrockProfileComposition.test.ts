@@ -32,6 +32,14 @@ it("registers Bedrock through existing harness registry only for remote backend"
     ),
   ).toBe(false);
 });
+it("reports READY only when the governed route is explicitly admitted", async () => {
+  await expect(new CodexBedrockExecutorAdapter().health()).resolves.toMatchObject({
+    status: "DEGRADED",
+  });
+  await expect(new CodexBedrockExecutorAdapter(true).health()).resolves.toMatchObject({
+    status: "READY",
+  });
+});
 it("binds Bedrock profile to existing Factory configuration digest", () => {
   const f = bedrockProfileFixture();
   const config: any = {
