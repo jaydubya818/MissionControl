@@ -4293,6 +4293,43 @@ export const schemaTablesPartOne = {
     .index("by_project_occurred", ["projectId", "occurredAt"])
     .index("by_agent_occurred", ["agentId", "occurredAt"]),
 
+  // Durable accounting for the bounded Fab conversational provider route.
+  fabChatBudgets: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    scopeKey: v.string(),
+    hardLimitNanoUsd: v.number(),
+    reservedNanoUsd: v.number(),
+    spentNanoUsd: v.number(),
+    updatedAt: v.number(),
+  }).index("by_scope", ["scopeKey"]),
+
+  fabChatUsageReceipts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    threadId: v.optional(v.id("telegraphThreads")),
+    idempotencyKey: v.string(),
+    provider: v.literal("openrouter"),
+    routeClass: v.union(v.literal("ROUTINE"), v.literal("ARCHITECT")),
+    model: v.string(),
+    routeDigest: v.string(),
+    endpoint: v.string(),
+    responseId: v.optional(v.string()),
+    upstreamProvider: v.optional(v.string()),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+    costNanoUsd: v.number(),
+    costClassification: v.union(v.literal("ACTUAL"), v.literal("ZERO"), v.literal("UNCONFIRMED")),
+    latencyMs: v.number(),
+    status: v.union(v.literal("PENDING"), v.literal("SUCCEEDED"), v.literal("FAILED")),
+    errorCode: v.optional(v.string()),
+    contextDigest: v.optional(v.string()),
+    contextClasses: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+  })
+    .index("by_project_created", ["projectId", "createdAt"])
+    .index("by_project_idempotency", ["projectId", "idempotencyKey"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
   // -------------------------------------------------------------------------
   // GOVERNED INFERENCE + OUTCOME ECONOMICS
   // Append-only accounting records. Legacy costEvents remain readable but do

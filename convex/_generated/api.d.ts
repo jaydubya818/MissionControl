@@ -48,6 +48,7 @@ import type * as executionRouting from "../executionRouting.js";
 import type * as executionWorker from "../executionWorker.js";
 import type * as executorRouter from "../executorRouter.js";
 import type * as executors from "../executors.js";
+import type * as fabChat from "../fabChat.js";
 import type * as factory_agentFleet from "../factory/agentFleet.js";
 import type * as factory_attempts from "../factory/attempts.js";
 import type * as factory_automationDefinitions from "../factory/automationDefinitions.js";
@@ -394,6 +395,7 @@ declare const fullApi: ApiFromModules<{
   executionWorker: typeof executionWorker;
   executorRouter: typeof executorRouter;
   executors: typeof executors;
+  fabChat: typeof fabChat;
   "factory/agentFleet": typeof factory_agentFleet;
   "factory/attempts": typeof factory_attempts;
   "factory/automationDefinitions": typeof factory_automationDefinitions;

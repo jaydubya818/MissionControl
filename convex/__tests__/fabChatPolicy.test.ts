@@ -1,0 +1,73 @@
+import { describe, expect, it } from "vitest";
+import { redactFabContextText, reserveProviderBudget, selectFabRoute } from "../fabChat";
+
+function functionHandler<T extends (...args: any[]) => any>(registered: unknown): T {
+  return (registered as { _handler: T })._handler;
+}
+
+describe("Fab chat policy", () => {
+  it("uses the architect route for design and fix work while keeping routine status reads inexpensive", () => {
+    expect(selectFabRoute("What is the current status?")).toBe("ROUTINE");
+    expect(selectFabRoute("Suggest fixes for repeated failed attempts across the stack")).toBe("ARCHITECT");
+    expect(selectFabRoute("Design the target architecture and implementation plan")).toBe("ARCHITECT");
+  });
+
+  it("removes common credentials and personal identifiers from provider context", () => {
+    const source = "owner@example.com token=github_pat_1234567890 /Users/jaywest/private Bearer sk-secret123456";
+    const result = redactFabContextText(source, 500);
+
+    expect(result).toContain("[redacted-email]");
+    expect(result).toContain("token=[redacted]");
+    expect(result).toContain("/Users/[redacted]/private");
+    expect(result).toContain("Bearer [redacted]");
+    expect(result).not.toContain("owner@example.com");
+    expect(result).not.toContain("github_pat_1234567890");
+    expect(result).not.toContain("jaywest");
+    expect(result).not.toContain("sk-secret123456");
+  });
+
+  it("enforces one deployment-wide liability ceiling across route classes", async () => {
+    const budgets: any[] = [];
+    const receipts: any[] = [];
+    const db = {
+      query: (table: string) => ({
+        withIndex: (_index: string, apply: (q: any) => any) => {
+          const filters: Record<string, unknown> = {};
+          const q = { eq: (field: string, value: unknown) => { filters[field] = value; return q; } };
+          apply(q);
+          return {
+            unique: async () => table === "fabChatBudgets"
+              ? budgets[0] ?? null
+              : receipts.find((row) => row.projectId === filters.projectId && row.idempotencyKey === filters.idempotencyKey) ?? null,
+          };
+        },
+      }),
+      insert: async (table: string, value: any) => {
+        if (table === "fabChatBudgets") {
+          budgets.push({ _id: "budget-1", ...value });
+          return "budget-1";
+        }
+        receipts.push({ _id: `receipt-${receipts.length + 1}`, ...value });
+        return receipts.at(-1)._id;
+      },
+      patch: async (id: string, value: any) => {
+        const row = [...budgets, ...receipts].find((candidate) => candidate._id === id);
+        Object.assign(row, value);
+      },
+    };
+    const handler = functionHandler<(ctx: any, args: any) => Promise<any>>(reserveProviderBudget);
+    const args = { projectId: "project-1", tenantId: "tenant-1", hardLimitNanoUsd: 1_940_000_000, routeClass: "ARCHITECT", contextDigest: "sha256:test", contextClasses: ["operations"] };
+
+    for (let count = 0; count < 19; count += 1) await handler({ db }, { ...args, idempotencyKey: `architect-${count}` });
+    await handler({ db }, { ...args, routeClass: "ROUTINE", idempotencyKey: "routine-1" });
+    await handler({ db }, { ...args, routeClass: "ROUTINE", idempotencyKey: "routine-2" });
+
+    expect(budgets[0].scopeKey).toBe("deployment");
+    expect(budgets[0].reservedNanoUsd).toBe(1_940_000_000);
+    await expect(handler({ db }, { ...args, routeClass: "ROUTINE", idempotencyKey: "routine-over-limit" })).rejects.toThrow(/lifetime spend ceiling/);
+
+    const duplicate = await handler({ db }, { ...args, routeClass: "ROUTINE", idempotencyKey: "routine-2" });
+    expect(duplicate.reserved).toBe(false);
+    expect(budgets[0].reservedNanoUsd).toBe(1_940_000_000);
+  });
+});
