@@ -171,6 +171,7 @@ export const PROVIDER_BUDGET_POLICIES: Record<string, RateLimitPolicy> = {
   "planning.generatePlanFromAnswers": { operation: "planning.generatePlanFromAnswers", limit: 30, globalLimit: 30, windowMs: 60_000 },
   "prd.parsePrd": { operation: "prd.parsePrd", limit: 10, globalLimit: 10, windowMs: 60_000 },
   "mission.reversePrompt": { operation: "mission.reversePrompt", limit: 30, globalLimit: 30, windowMs: 60_000 },
+  "fab.chat": { operation: "fab.chat", limit: 20, globalLimit: 20, windowMs: 60_000 },
   "github.syncIssues": { operation: "github.syncIssues", limit: 20, globalLimit: 20, windowMs: 60_000 },
   "github.updateIssueStatus": { operation: "github.updateIssueStatus", limit: 60, globalLimit: 60, windowMs: 60_000 },
 };
