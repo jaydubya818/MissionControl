@@ -490,7 +490,7 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
-Current public client/backend runtime contract: **v56**.
+Current public client/backend runtime contract: **v57**.
 
 ### Factory Deployed Engineer qualification environment
 

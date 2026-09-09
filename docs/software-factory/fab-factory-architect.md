@@ -35,3 +35,5 @@ The Fab tab reacts to current alerts, incidents, failed traces, cost receipts, a
 Fab may inspect, explain, compare, plan, and suggest. Its answer is advisory evidence. Repository mutation, WorkOrder dispatch, publication, merge, release, deployment, production acceptance, credential changes, and budget expansion continue through Mission Control's existing governed actions and independent verification.
 
 Bedrock remains supported and optional with status `EXTERNAL_WAIT / AWS_QUOTA`. It is not a Fab readiness dependency while an OpenRouter route is qualified and active.
+
+The Fab client and backend ship together under Mission Control runtime contract v57.
