@@ -158,7 +158,7 @@ function budgetFixture(api: BedrockApi = "CONVERSE") {
     canceled: false,
     scope,
   };
-  const send = vi.fn(async () => ({
+  const send = vi.fn(async (_wire: unknown, _signal: AbortSignal) => ({
     body: api === "CONVERSE" ? response : invokeResponse,
     requestId: "provider-fixture-1",
   }));
