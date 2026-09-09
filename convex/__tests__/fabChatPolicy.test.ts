@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redactFabContextText, reserveProviderBudget, selectFabRoute } from "../fabChat";
+import { buildProactiveItems, redactFabContextText, reserveProviderBudget, selectFabRoute } from "../fabChat";
 
 function functionHandler<T extends (...args: any[]) => any>(registered: unknown): T {
   return (registered as { _handler: T })._handler;
@@ -24,6 +24,25 @@ describe("Fab chat policy", () => {
     expect(result).not.toContain("github_pat_1234567890");
     expect(result).not.toContain("jaywest");
     expect(result).not.toContain("sk-secret123456");
+  });
+
+  it("applies each operator's proactive categories and cost threshold without a provider call", () => {
+    const state = {
+      openAlerts: [{ severity: "CRITICAL", title: "Production queue stalled", _creationTime: 10 }],
+      failedTraces: [{ name: "release verification", _creationTime: 20 }],
+      openIncidents: [],
+      openSuggestions: [{ title: "Add queue saturation guard", impact: "HIGH", _creationTime: 30 }],
+      executionCostUsd: 7.5,
+      latestCostAt: 40,
+    };
+    const profile = { communicationStyle: "CONCISE" as const, proactiveEnabled: true, notifyCritical: false, notifyFailures: true, costThresholdUsd: 5, preferences: "", memory: "" };
+
+    expect(buildProactiveItems(state, profile).map((item) => item.kind)).toEqual([
+      "COST_THRESHOLD",
+      "FIX_PROPOSAL",
+      "FAILED_TRACE",
+    ]);
+    expect(buildProactiveItems(state, { ...profile, proactiveEnabled: false })).toEqual([]);
   });
 
   it("enforces one deployment-wide liability ceiling across route classes", async () => {
