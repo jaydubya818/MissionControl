@@ -71,6 +71,21 @@ either todo complete and does not authorize implementation by itself.
 
 ## Work Log
 
+### 2026-09-07 - AWS Support case submitted; waiting for nonzero quota
+
+- Submitted AWS Support case `178882125400227` from account `083665737366` for
+  the minimum nonzero qualification capacity under Bedrock quota
+  `L-B29C9321`. The case was created at `2026-09-07T22:47:33.863Z` and is open,
+  unassigned, and categorized as `Service Quotas, General`.
+- Temporary Support case permissions were removed after submission. Target
+  permission-set reprovisioning completed `SUCCEEDED`, and canonical policy
+  readback matches the pre-support baseline.
+- Todo 063 is `TODO_063_WAITING_FOR_AWS_SUPPORT`. Engineering is complete to the
+  provider-capacity boundary. Resume only when the applied capacity for
+  `L-B29C9321` is greater than zero; no additional provider call was made.
+- Evidence is under
+  `docs/testing/evidence/todo063-aws-support-2026-09-07/`.
+
 ### 2026-09-07 - Latest hold settled; waiting for AWS daily quota
 
 - Reconciled provider request `6919db8e-f1c5-4f54-9557-db37ed817b74`
