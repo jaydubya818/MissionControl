@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isAgentStale } from "../heartbeat.js";
 
 describe("isAgentStale", () => {
   const THRESHOLD_MS = 60_000; // 60 seconds
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it("returns true when lastHeartbeatAt is undefined", () => {
     expect(isAgentStale(undefined, THRESHOLD_MS)).toBe(true);
@@ -19,13 +23,17 @@ describe("isAgentStale", () => {
   });
 
   it("returns false when heartbeat is exactly at threshold", () => {
-    const exactlyAtThreshold = Date.now() - THRESHOLD_MS;
+    const now = 1_700_000_000_000;
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const exactlyAtThreshold = now - THRESHOLD_MS;
     // At exactly the threshold, it should not be stale (not strictly greater)
     expect(isAgentStale(exactlyAtThreshold, THRESHOLD_MS)).toBe(false);
   });
 
   it("returns true when heartbeat is 1ms past threshold", () => {
-    const justPastThreshold = Date.now() - THRESHOLD_MS - 1;
+    const now = 1_700_000_000_000;
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const justPastThreshold = now - THRESHOLD_MS - 1;
     expect(isAgentStale(justPastThreshold, THRESHOLD_MS)).toBe(true);
   });
 });
