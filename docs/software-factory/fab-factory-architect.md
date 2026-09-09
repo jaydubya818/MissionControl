@@ -34,7 +34,7 @@ Each signed-in operator has a private Fab profile within the tenant. The profile
 
 Proactive detection is deterministic and reactive. It does not start background model calls or create unbounded provider spend. Operators can disable the feed, select critical-alert and failed-trace categories, set their own cost threshold, and mark current findings reviewed.
 
-Saved preferences and personal context are not currently sent to OpenRouter. The provider continues to receive the operator's typed message plus the minimized, redacted Factory projection described above. This boundary keeps durable personal context inside Mission Control until that separate external use is explicitly authorized.
+When an operator calls Fab, Mission Control adds only the authenticated operator's response style and non-empty saved preferences or memory to the minimized provider context. Preferences are capped at 1,200 characters and memory at 2,500 characters for each request, pass through the same credential and personal-identifier redaction as Factory context, and are covered by the canonical context digest and explicit `operator-preferences` and `operator-memory` receipt classes. They are sent only to the selected approved OpenRouter model for that request. OpenRouter data collection remains disabled. Operators should not store secrets in the profile.
 
 ## Authority boundary
 

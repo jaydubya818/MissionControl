@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildProactiveItems, redactFabContextText, reserveProviderBudget, selectFabRoute } from "../fabChat";
+import { buildOperatorPersonalization, buildProactiveItems, redactFabContextText, reserveProviderBudget, selectFabRoute } from "../fabChat";
 
 function functionHandler<T extends (...args: any[]) => any>(registered: unknown): T {
   return (registered as { _handler: T })._handler;
@@ -24,6 +24,30 @@ describe("Fab chat policy", () => {
     expect(result).not.toContain("github_pat_1234567890");
     expect(result).not.toContain("jaywest");
     expect(result).not.toContain("sk-secret123456");
+  });
+
+  it("minimizes and redacts saved operator personalization before provider use", () => {
+    const operator = buildOperatorPersonalization({
+      communicationStyle: "EXECUTIVE",
+      preferences: "Email owner@example.com and use token=github_pat_1234567890",
+      memory: `Keep releases calm. Bearer sk-secret123456 ${"x".repeat(3_000)}`,
+    });
+
+    expect(operator).toMatchObject({ responseStyle: "EXECUTIVE" });
+    expect(operator?.preferences).toContain("[redacted-email]");
+    expect(operator?.preferences).toContain("token=[redacted]");
+    expect(operator?.memory).toContain("Bearer [redacted]");
+    expect(operator?.memory.length).toBeLessThanOrEqual(2_500);
+    expect(JSON.stringify(operator)).not.toContain("owner@example.com");
+    expect(JSON.stringify(operator)).not.toContain("github_pat_1234567890");
+    expect(JSON.stringify(operator)).not.toContain("sk-secret123456");
+  });
+
+  it("redacts a credential before truncating personalized context", () => {
+    const result = redactFabContextText(`${"a".repeat(30)} token=github_pat_1234567890`, 45);
+
+    expect(result).toContain("token=[redact");
+    expect(result).not.toContain("github_pat");
   });
 
   it("applies each operator's proactive categories and cost threshold without a provider call", () => {
