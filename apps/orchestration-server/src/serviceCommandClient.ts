@@ -27,6 +27,7 @@ export type ServiceCapability =
   | "review.residual-analysis.record"
   | "sandboxes.list-reconcile"
   | "sandboxes.report-reconcile"
+  | "hosts.report"
   | "models.report-exact-route-health"
   | "executions.claim"
   | "executions.heartbeat"

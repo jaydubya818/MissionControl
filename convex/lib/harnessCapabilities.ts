@@ -78,12 +78,17 @@ export function resolveFrozenHarnessBinding(input: {
  * process. It is intentionally distinct from the artifact that executes in a
  * remote backend (for example, a pinned sandbox image).
  */
-export function resolveHarnessAdapterRuntimeArtifact(executor: { adapter: string; version: string }) {
-  const artifact = executor.adapter === "isolated-invocation" && executor.version === "2"
+export function resolveHarnessAdapterRuntimeArtifact(
+  executor: { adapter: string; version: string },
+  externallyFrozenArtifact?: unknown,
+) {
+  const knownArtifact = executor.adapter === "isolated-invocation" && executor.version === "2"
     ? ISOLATED_INVOCATION_ADAPTER_ARTIFACT
     : executor.adapter === "isolated-invocation" && executor.version === "1"
       ? LEGACY_ISOLATED_INVOCATION_ADAPTER_ARTIFACT
       : findKnownHarnessRuntimeArtifact(executor.adapter, executor.version);
+  const artifact = (externallyFrozenArtifact
+    ?? knownArtifact) as HarnessRuntimeArtifactIdentity | undefined;
   if (!artifact || harnessRuntimeArtifactIssues(artifact).length > 0) {
     throw new Error(`Unknown or invalid harness adapter runtime artifact ${executor.adapter}/${executor.version}.`);
   }

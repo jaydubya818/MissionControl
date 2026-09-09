@@ -1,0 +1,20 @@
+{
+  "schema": "fdlc-bedrock-liability-reconciliation/v1",
+  "reconciledAt": "2026-09-07T20:18:37Z",
+  "requestId": "fdlc-route-3bee9a64-4f28-4aca-914d-70f44143f4f0",
+  "providerRequestId": "641e32f7-5dfa-4056-84ba-affc2c2938aa",
+  "httpStatusCode": 429,
+  "providerClassification": "ThrottlingException",
+  "result": "ZERO_BILLABLE_INFERENCE",
+  "actualNanoUsd": 0,
+  "releasedReservationNanoUsd": 924528000,
+  "evidence": {
+    "failureReceipt": "live-route-failure.json",
+    "failureReceiptSha256": "d5506aa0119f027ebb4e4929a8873f3bff80db8cb39ff6f8792129b0c81d436b",
+    "providerMetrics": "cloudwatch-429-metric-result.json",
+    "providerMetricFinding": "One InvocationThrottles datapoint and no Invocations, InputTokenCount, or OutputTokenCount datapoints for the route through the recorded request window.",
+    "runtimeFinding": "The SDK returned no model output and no usage receipt after one attempt with zero retry delay.",
+    "accountingAuthority": "AWS documents that a request is throttled when the initial quota deduction cannot be made and that billing is based on actual token usage."
+  },
+  "limitations": "CloudWatch metrics are route-level rather than request-ID-indexed. The unique throttle datapoint aligns with the recorded request minute and there are no successful invocation or token metrics in the UTC-day query window."
+}

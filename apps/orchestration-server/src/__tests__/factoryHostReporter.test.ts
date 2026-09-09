@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -77,6 +77,8 @@ describe("Factory host reporting", () => {
     await writeFile(path.join(repository, "README.md"), "ready\n");
     await git(repository, ["add", "README.md"]);
     await git(repository, ["commit", "-m", "fixture"]);
+    await mkdir(path.join(repository, ".mission-control", "worker-state"), { recursive: true });
+    await writeFile(path.join(repository, ".mission-control", "worker-state", "runtime.json"), "{}\n");
 
     const clean = await inspectFactoryCheckout(repository);
     expect(clean).toMatchObject({
@@ -93,8 +95,11 @@ describe("Factory host reporting", () => {
     let report: any;
     let healthReport: any;
     const reporter = new FactoryHostReporter({
-      mutation: async (_mutation: unknown, payload: unknown) => { report = payload; },
-      action: async (_action: unknown, payload: unknown) => { healthReport = payload; },
+      mutation: async () => { throw new Error("Host reporting must not require a user-authenticated mutation."); },
+      action: async (_action: unknown, payload: any) => {
+        if (payload.envelope.capability === "hosts.report") report = payload;
+        else healthReport = payload;
+      },
     } as any, {
       projectId: "project-1",
       repositoryId: "repository-1",
@@ -135,7 +140,13 @@ describe("Factory host reporting", () => {
       }],
     });
     await reporter.report();
-    expect(report.workerRuntime.supportedExecutors).toEqual([{
+    expect(report.envelope).toMatchObject({
+      capability: "hosts.report",
+      projectId: "project-1",
+      repositoryId: "repository-1",
+    });
+    const reportedHost = JSON.parse(report.payloadJson);
+    expect(reportedHost.workerRuntime.supportedExecutors).toEqual([{
       adapter: "codex",
       version: "v1",
       capabilityManifest: CODEX_V1_HARNESS_MANIFEST,

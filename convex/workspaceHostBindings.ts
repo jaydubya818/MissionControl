@@ -1,9 +1,10 @@
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { isLocalQualificationRepository, loadLocalRepositoryAdmission } from "./lib/localRepositoryAdmission";
 import { factoryWorkerVersionBindingValidator } from "./lib/factoryWorkerValidators";
 import { isNoInferenceConstraint } from "./lib/offlineExecutionPolicy";
 import type { FactoryWorkerVersionBinding } from "./lib/factoryWorkerRuntime";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { validateHostBinding } from "./lib/workspaceBindings";
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";
 import {
@@ -33,8 +34,7 @@ export const listByProject = query({
   },
 });
 
-export const report = mutation({
-  args: {
+const reportArgs = {
     projectId: v.id("projects"),
     hostId: v.string(),
     repositoryId: v.optional(v.id("workspaceRepositories")),
@@ -90,17 +90,22 @@ export const report = mutation({
     status: bindingStatus,
     error: v.optional(v.string()),
     checkedAt: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
+  };
+const reportArgsValidator = v.object(reportArgs);
+type ReportArgs = Infer<typeof reportArgsValidator>;
+
+async function reportBinding(ctx: MutationCtx, args: ReportArgs, authenticateUser: boolean) {
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Workspace not found");
     if (!project.tenantId) throw new Error("Workspace company assignment is incomplete");
-    const access = await requireWorkspaceAccess(ctx, project.tenantId, project._id, { permission: COMPANY_PERMISSIONS.DISPATCH_WORK });
+    const access = authenticateUser
+      ? await requireWorkspaceAccess(ctx, project.tenantId, project._id, { permission: COMPANY_PERMISSIONS.DISPATCH_WORK })
+      : null;
     const repository = args.repositoryId ? await ctx.db.get(args.repositoryId) : null;
     if (isLocalQualificationRepository(repository)) {
       const { admission: a, digest } = await loadLocalRepositoryAdmission(ctx, repository, Date.now());
       const o = args.localQualificationObservation;
-      if (access.membership.operatorId !== a.operatorId || args.hostId !== a.hostId || args.checkoutRoot !== a.root
+      if (!access || access.membership.operatorId !== a.operatorId || args.hostId !== a.hostId || args.checkoutRoot !== a.root
         || !args.workerRuntime || args.workerRuntime.executionBackends.some(x => x !== "isolated-container")
         || args.workerRuntime.sandboxCapabilities.includes("github-app-publication")
         || !o || o.admissionDigest !== digest || o.root !== a.root || o.baselineCommit !== a.baselineCommit
@@ -282,5 +287,14 @@ export const report = mutation({
     }
 
     return await ctx.db.get(bindingId);
-  },
+}
+
+export const report = mutation({
+  args: reportArgs,
+  handler: async (ctx, args) => await reportBinding(ctx, args, true),
+});
+
+export const reportServiceInternal = internalMutation({
+  args: reportArgs,
+  handler: async (ctx, args) => await reportBinding(ctx, args, false),
 });

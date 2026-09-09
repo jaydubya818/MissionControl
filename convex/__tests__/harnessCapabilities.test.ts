@@ -106,4 +106,36 @@ describe("frozen harness runtime identity", () => {
       expect(adapterRuntime.runtimeArtifact.imageDigest).toBeNull();
     }
   });
+
+  it("accepts an exact externally frozen executable for an external adapter", () => {
+    const artifact = {
+      schemaVersion: "harness-runtime-artifact/v1" as const,
+      kind: "EXECUTABLE" as const,
+      name: "fab-node-runtime",
+      version: "0.1.0+node.24.darwin.arm64",
+      executableSha256: "c".repeat(64),
+      closureSha256: "d".repeat(64),
+      imageDigest: null,
+    };
+    const resolved = resolveHarnessAdapterRuntimeArtifact(
+      { adapter: "fab", version: "v1" },
+      artifact,
+    );
+    expect(resolved.runtimeArtifact).toEqual(artifact);
+    expect(resolved.runtimeArtifactSha256).toBe(harnessRuntimeArtifactDigest(artifact));
+  });
+
+  it("rejects a container image as an external worker adapter", () => {
+    expect(() => resolveHarnessAdapterRuntimeArtifact(
+      { adapter: "external", version: "v1" },
+      {
+        schemaVersion: "harness-runtime-artifact/v1",
+        kind: "CONTAINER_IMAGE",
+        name: "external-image",
+        version: "v1",
+        executableSha256: null,
+        imageDigest: remoteImageDigest,
+      },
+    )).toThrow(/not an exact worker executable/);
+  });
 });

@@ -133,6 +133,7 @@ export function bridgeFixture() {
         requestId: p.requestId as string,
         requestDigest: p.requestDigest as string,
         payloadBytes: p.payloadBytes as number,
+        inputTokens: p.inputTokens as number,
         outputTokens: p.outputTokens as number,
         preSendInputBound: p.preSendInputBound as any,
         now: Date.now(),
@@ -159,6 +160,7 @@ export function bridgeFixture() {
   };
   const transport: BedrockTransport = {
     evidenceClass: "OFFLINE_FIXTURE",
+    countInputTokens: async () => ({ inputTokens: 10, requestId: "fixture-count" }),
     send: async () => ({
       requestId: `fixture-provider-${++sends}`,
       body: {

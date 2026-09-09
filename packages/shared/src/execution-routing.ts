@@ -77,6 +77,7 @@ export interface ExecutionEligibilityFacts {
   modelApproved: boolean;
   modelAvailable: boolean;
   productionCertified: boolean;
+  qualificationCertified?: boolean;
 }
 
 export interface ExecutionEvidence {
@@ -121,6 +122,7 @@ export interface ExecutionRoutingInput {
   riskTier: ExecutionRiskTier;
   candidates: ExecutionRoutingCandidate[];
   policy: ExecutionRoutingPolicy;
+  admissionMode?: "PRODUCTION" | "QUALIFICATION";
   fallbackTupleKey?: string;
   pinnedTupleKey?: string;
 }
@@ -249,7 +251,10 @@ function rejectionCodes(candidate: ExecutionRoutingCandidate, input: ExecutionRo
     input.policy.minimumContextWindow !== undefined
     && (tuple.model.contextWindow === undefined || tuple.model.contextWindow < input.policy.minimumContextWindow)
   ) codes.push("CONTEXT_WINDOW_INSUFFICIENT");
-  if (!facts.productionCertified || tuple.harness.maturity !== "PRODUCTION") codes.push("PRODUCTION_CERTIFICATION_MISSING");
+  const certificationSatisfied = input.admissionMode === "QUALIFICATION"
+    ? facts.qualificationCertified === true && tuple.tupleKey === input.fallbackTupleKey
+    : facts.productionCertified && tuple.harness.maturity === "PRODUCTION";
+  if (!certificationSatisfied) codes.push("PRODUCTION_CERTIFICATION_MISSING");
   return [...new Set(codes)];
 }
 

@@ -1,7 +1,11 @@
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { resolveFlag, type FlagRow } from "./flags";
-import { requireWorkspaceAccess, type CompanyPermission } from "./companyAccess";
+import {
+  COMPANY_PERMISSIONS,
+  requireWorkspaceAccess,
+  type CompanyPermission,
+} from "./companyAccess";
 import {
   authorizationRequiredFor,
   resolveDeploymentAuthorizationMode,
@@ -35,6 +39,7 @@ export function canAccessDeliveryRecord(
   record: { owningTeamId?: Id<"scrumTeams">; ownerMemberId?: Id<"orgMembers"> }
 ): boolean {
   if (!access || access.membership.mode === "DEMO" || access.membership.canManageCompany) return true;
+  if (access.permissions?.includes(COMPANY_PERMISSIONS.APPROVE_DELIVERY)) return true;
   if (access.roleNames.some((name) => /workspace lead|product manager|company|owner|admin/i.test(name))) return true;
   if (record.owningTeamId && access.teamMemberships?.some((membership) => membership.teamId === record.owningTeamId)) return true;
   if (record.ownerMemberId && access.memberProfiles?.some((profile) => profile._id === record.ownerMemberId)) return true;

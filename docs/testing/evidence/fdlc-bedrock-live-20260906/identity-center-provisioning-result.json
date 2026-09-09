@@ -1,0 +1,21 @@
+{
+  "schema": "fdlc-bedrock-identity-center-provisioning/v1",
+  "capturedAt": "2026-09-07T19:05:46Z",
+  "identityCenterInstanceArn": "arn:aws:sso:::instance/ssoins-7223d66bba59dce4",
+  "administratorAccountId": "955857822343",
+  "administratorPermissionSet": "FDLCQualificationICAdmin",
+  "administratorPermissionSetArn": "arn:aws:sso:::permissionSet/ssoins-7223d66bba59dce4/ps-af3c937e390e975c",
+  "administratorPrincipalId": "0408e4c8-7091-707f-a9f3-58951212d12f",
+  "targetAccountId": "083665737366",
+  "targetPermissionSet": "FDLCQualificationTFOperator",
+  "targetPermissionSetArn": "arn:aws:sso:::permissionSet/ssoins-7223d66bba59dce4/ps-72239125d60268b1",
+  "invocationPolicyDigest": "sha256:6a7ecb6ea08320eb5276acafc36c745d15f2866bb805d114897fe358df349e03",
+  "effectivePolicyEvidence": "docs/testing/evidence/fdlc-bedrock-live-20260906/effective-permission-set-policy.json",
+  "effectivePolicyDigest": "sha256:3729a50bcbb92efd43ee0d6d98006a19aff2de6e386ee31d69873d44c11f8cd0",
+  "provisioningRequestId": "561a9ea1-d73f-42f6-8387-4c901c00d35b",
+  "provisioningStatus": "SUCCEEDED",
+  "readback": "SEMANTIC_EXACT",
+  "accountFullAccessRoleUsed": false,
+  "bedrockCallsFromAdministrator": 0,
+  "productionMutations": 0
+}
