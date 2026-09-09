@@ -4303,6 +4303,23 @@ export const schemaTablesPartOne = {
     updatedAt: v.number(),
   }).index("by_scope", ["scopeKey"]),
 
+  // Private, per-operator Fab preferences and durable personal context.
+  fabOperatorProfiles: defineTable({
+    tenantId: v.id("tenants"),
+    actorId: v.string(),
+    communicationStyle: v.union(v.literal("CONCISE"), v.literal("DETAILED"), v.literal("EXECUTIVE")),
+    proactiveEnabled: v.boolean(),
+    notifyCritical: v.boolean(),
+    notifyFailures: v.boolean(),
+    costThresholdUsd: v.number(),
+    preferences: v.string(),
+    memory: v.string(),
+    lastReviewedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_actor", ["tenantId", "actorId"]),
+
   fabChatUsageReceipts: defineTable({
     tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),

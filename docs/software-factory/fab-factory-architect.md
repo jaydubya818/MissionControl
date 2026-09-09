@@ -30,10 +30,16 @@ The dedicated production key has a $1.94 provider limit. Mission Control also en
 
 The Fab tab reacts to current alerts, incidents, failed traces, cost receipts, and open improvement proposals. Existing deterministic Factory scanners create evidence-linked meta-loop proposals. Fab explains those signals and suggests concrete fixes when the operator opens or asks from the chat.
 
+Each signed-in operator has a private Fab profile within the tenant. The profile stores a preferred response style, written preferences, durable personal context, proactive briefing controls, a cost alert threshold, and the last-reviewed time. The server derives the operator identity from authentication; clients cannot select another operator's profile. A warning dot on the persistent Fab tab makes new findings visible from every Mission Control view.
+
+Proactive detection is deterministic and reactive. It does not start background model calls or create unbounded provider spend. Operators can disable the feed, select critical-alert and failed-trace categories, set their own cost threshold, and mark current findings reviewed.
+
+When an operator calls Fab, Mission Control adds only the authenticated operator's response style and non-empty saved preferences or memory to the minimized provider context. Preferences are capped at 1,200 characters and memory at 2,500 characters for each request, pass through the same credential and personal-identifier redaction as Factory context, and are covered by the canonical context digest and explicit `operator-preferences` and `operator-memory` receipt classes. They are sent only to the selected approved OpenRouter model for that request. OpenRouter data collection remains disabled. Operators should not store secrets in the profile.
+
 ## Authority boundary
 
 Fab may inspect, explain, compare, plan, and suggest. Its answer is advisory evidence. Repository mutation, WorkOrder dispatch, publication, merge, release, deployment, production acceptance, credential changes, and budget expansion continue through Mission Control's existing governed actions and independent verification.
 
 Bedrock remains supported and optional with status `EXTERNAL_WAIT / AWS_QUOTA`. It is not a Fab readiness dependency while an OpenRouter route is qualified and active.
 
-The Fab client and backend ship together under Mission Control runtime contract v57.
+The Fab client and backend ship together under Mission Control runtime contract v58.

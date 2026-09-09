@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, ChevronRight, Factory, MessageSquare, Mic, Send, User } from "lucide-react";
+import { AlertTriangle, BellRing, ChevronRight, Factory, MessageSquare, Mic, Send, Settings2, User } from "lucide-react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -48,10 +48,15 @@ export function ChatDock({
   const [pending, setPending] = useState(false);
   const [selectedThreadId, setSelectedThreadId] = useState<Id<"telegraphThreads"> | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showFabProfile, setShowFabProfile] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({ communicationStyle: "CONCISE" as "CONCISE" | "DETAILED" | "EXECUTIVE", proactiveEnabled: true, notifyCritical: true, notifyFailures: true, costThresholdUsd: 5, preferences: "", memory: "" });
   const logRef = useRef<HTMLDivElement>(null);
 
   const submitChatRequest = useMutation(api.missionChat.submitRequest);
   const submitFabRequest = useAction(api.fabChat.send);
+  const saveFabProfile = useMutation(api.fabChat.saveProfile);
+  const markFabProactiveReviewed = useMutation(api.fabChat.markProactiveReviewed);
   const chatThreads = useQuery(
     api.missionChat.listThreads,
     projectId ? { projectId, limit: 20 } : "skip"
@@ -72,6 +77,23 @@ export function ChatDock({
     api.fabChat.getOperationalBrief,
     projectId ? { projectId } : "skip"
   );
+  const fabProfile = useQuery(
+    api.fabChat.getProfile,
+    projectId ? { projectId } : "skip"
+  );
+
+  useEffect(() => {
+    if (!fabProfile) return;
+    setProfileDraft({
+      communicationStyle: fabProfile.communicationStyle,
+      proactiveEnabled: fabProfile.proactiveEnabled,
+      notifyCritical: fabProfile.notifyCritical,
+      notifyFailures: fabProfile.notifyFailures,
+      costThresholdUsd: fabProfile.costThresholdUsd,
+      preferences: fabProfile.preferences,
+      memory: fabProfile.memory,
+    });
+  }, [fabProfile]);
 
   const sessions =
     mode === "operator"
@@ -267,6 +289,7 @@ export function ChatDock({
         >
           <Factory size={12} aria-hidden />
           Fab
+          {fabBrief?.hasUnreviewed ? <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-label="Fab has new proactive findings" /> : null}
         </button>
       </div>
 
@@ -333,8 +356,32 @@ export function ChatDock({
               <div className="flex items-center gap-1.5 font-medium text-ink">
                 {fabBrief.status === "ATTENTION" ? <AlertTriangle size={12} className="text-warning" aria-hidden /> : <Factory size={12} className="text-success" aria-hidden />}
                 {fabBrief.status === "ATTENTION" ? "Fab found items needing attention" : "Factory signals are stable"}
+                <button type="button" onClick={() => setShowFabProfile((open) => !open)} className="ml-auto rounded p-0.5 text-ink-muted hover:text-ink" title="Fab preferences and memory"><Settings2 size={12} aria-hidden /></button>
               </div>
               <div className="mt-1 text-ink-muted">{fabBrief.criticalAlerts} critical · {fabBrief.openIncidents} incidents · {fabBrief.failedTraces} failed traces · {fabBrief.openFixProposals} fix proposals · ${fabBrief.actualChatCostUsd.toFixed(6)} chat</div>
+              {fabBrief.proactiveItems.length > 0 ? (
+                <div className="mt-2 space-y-1 border-t border-line/70 pt-1.5">
+                  {fabBrief.proactiveItems.slice(0, 3).map((item) => <div key={`${item.kind}:${item.title}`} className="flex gap-1.5 text-ink-secondary"><BellRing size={10} className="mt-0.5 shrink-0 text-warning" aria-hidden /><span className="line-clamp-2">{item.title}</span></div>)}
+                  {fabBrief.hasUnreviewed && projectId ? <button type="button" onClick={() => { setSubmitError(null); void markFabProactiveReviewed({ projectId }).catch((error) => setSubmitError(error instanceof Error ? error.message : "Fab could not mark these findings reviewed.")); }} className="text-[10px] font-medium text-registry-accent hover:underline">Mark reviewed</button> : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {showFabProfile && projectId ? (
+            <div className="mb-2 space-y-2 rounded-lg border border-line bg-surface-1 p-2.5 text-[11px]">
+              <div className="font-medium text-ink">Your Fab preferences and memory</div>
+              <select aria-label="Fab response style" value={profileDraft.communicationStyle} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, communicationStyle: event.target.value as typeof draft.communicationStyle })); }} className="w-full rounded border border-line bg-surface-2 px-2 py-1.5 text-ink">
+                <option value="CONCISE">Concise</option><option value="DETAILED">Detailed</option><option value="EXECUTIVE">Executive</option>
+              </select>
+              <textarea aria-label="Fab preferences" value={profileDraft.preferences} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, preferences: event.target.value })); }} maxLength={2000} rows={2} placeholder="Priorities, working style, areas Fab should emphasize…" className="w-full resize-none rounded border border-line bg-surface-2 px-2 py-1.5 text-ink outline-none focus:border-registry-accent" />
+              <textarea aria-label="Fab personal memory" value={profileDraft.memory} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, memory: event.target.value })); }} maxLength={5000} rows={3} placeholder="Durable context Fab should remember about you and your goals. Do not store secrets." className="w-full resize-none rounded border border-line bg-surface-2 px-2 py-1.5 text-ink outline-none focus:border-registry-accent" />
+              <label className="flex items-center gap-2 text-ink-secondary"><input type="checkbox" checked={profileDraft.proactiveEnabled} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, proactiveEnabled: event.target.checked })); }} />Proactive Factory briefings</label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex items-center gap-1.5 text-ink-secondary"><input type="checkbox" checked={profileDraft.notifyCritical} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, notifyCritical: event.target.checked })); }} />Critical alerts</label>
+                <label className="flex items-center gap-1.5 text-ink-secondary"><input type="checkbox" checked={profileDraft.notifyFailures} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, notifyFailures: event.target.checked })); }} />Failed traces</label>
+              </div>
+              <label className="block text-ink-secondary">Cost alert at ($)<input type="number" min={0} max={100000} step="0.01" value={profileDraft.costThresholdUsd} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, costThresholdUsd: Number(event.target.value) })); }} className="mt-1 w-full rounded border border-line bg-surface-2 px-2 py-1.5 text-ink" /></label>
+              <div className="flex items-center justify-between gap-2"><span className="text-[10px] text-ink-muted">Private profile · minimized and redacted for Fab's approved models. Do not store secrets.</span><button type="button" onClick={() => { setProfileSaved(false); setSubmitError(null); void saveFabProfile({ projectId, ...profileDraft }).then(() => setProfileSaved(true)).catch((error) => setSubmitError(error instanceof Error ? error.message : "Fab could not save your profile.")); }} className="shrink-0 rounded bg-registry-accent px-2.5 py-1.5 font-medium text-white">{profileSaved ? "Saved" : "Save"}</button></div>
             </div>
           ) : null}
           <div className="flex flex-wrap gap-1.5">
