@@ -4,6 +4,7 @@ import {
   DEFAULT_WORK_ORDER_FILTERS,
   deriveAcceptanceReadinessPresentation,
   deriveNextAction,
+  humanizeOperatorCopy,
   filterWorkOrders,
   parseVerificationArguments,
   summarizeRequiredAttention,
@@ -82,6 +83,12 @@ describe("work order queue model", () => {
   it("derives the next operator action", () => {
     expect(deriveNextAction(ITEMS[0])).toBe("Review approval");
     expect(deriveNextAction(ITEMS[1])).toBe("Review outcome");
+  });
+
+  it("plain-languages dense factory jargon", () => {
+    expect(humanizeOperatorCopy("No current source Attempt published a candidate-ready Verification Subject.")).toBe(
+      "Nothing verified yet. Wait for this run to finish and leave evidence.",
+    );
   });
 
   it("never claims acceptance is allowed while the composite acceptance gate is blocked", () => {
