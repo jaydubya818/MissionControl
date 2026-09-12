@@ -33,6 +33,7 @@ const DENSE_OPERATOR_VIEWS = new Set<MainView>([
 ]);
 
 export function shouldAutoCollapseChat(activeView: MainView, constrainedDesktop: boolean) {
+  if (activeView === "control-work-orders") return true;
   return constrainedDesktop && DENSE_OPERATOR_VIEWS.has(activeView);
 }
 

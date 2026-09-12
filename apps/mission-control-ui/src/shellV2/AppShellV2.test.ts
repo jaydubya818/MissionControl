@@ -57,5 +57,7 @@ describe("v2 route synchronization", () => {
     expect(shouldAutoCollapseChat("harness-change-review", true)).toBe(true);
     expect(shouldAutoCollapseChat("command-center", true)).toBe(false);
     expect(shouldAutoCollapseChat("mission-detail", false)).toBe(false);
+    expect(shouldAutoCollapseChat("control-work-orders", false)).toBe(true);
+    expect(shouldAutoCollapseChat("control-work-orders", true)).toBe(true);
   });
 });

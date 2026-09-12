@@ -553,8 +553,8 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
         }
       />
 
-      <div className="flex min-h-0 flex-1 flex-col xl:flex-row xl:overflow-hidden">
-        <div className={`${mobileDetailOpen ? "hidden xl:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col xl:max-w-[34rem] xl:border-r xl:border-[var(--panel-line)]`}>
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row xl:overflow-hidden">
+        <div className={`${mobileDetailOpen ? "hidden lg:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col lg:max-w-[26rem] lg:border-r xl:border-[var(--panel-line)]`}>
         <div className="shrink-0 space-y-4 p-5 pb-3">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="WorkOrders" value={counts.total} />
@@ -611,41 +611,18 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                       setMobileDetailOpen(true);
                     }}
                     aria-label={`${item.title} — next action: ${deriveNextAction(item)}`}
-                    className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedRow ? "border-registry-accent/40 bg-registry-accent-soft" : "border-[var(--panel-line)] bg-card/40 hover:border-registry-accent/20"}`}
+                    className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${selectedRow ? "border-registry-accent/40 bg-registry-accent-soft" : "border-[var(--panel-line)] bg-card/40 hover:border-registry-accent/20"}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-foreground">{item.title}</div>
-                        <div className={`mt-1 whitespace-pre-line text-xs line-clamp-2 ${selectedRow ? "text-foreground/75" : "text-muted-foreground"}`}>{normalizeNarrativeText(item.desiredOutcome)}</div>
+                        <div className={`mt-1 truncate text-xs ${selectedRow ? "text-foreground/75" : "text-muted-foreground"}`}>
+                          {deriveNextAction(item)}
+                        </div>
                       </div>
-                      <Badge variant="outline" className={RISK_STYLES[item.riskLevel] ?? ""}>{item.riskLevel}</Badge>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Badge variant="outline" className={STATE_STYLES[item.state] ?? ""}>{prettyLabel(item.state)}</Badge>
-                      <Badge variant="outline">{item.repository ?? "No repo"}</Badge>
-                      <Badge variant="outline">Workflow: {item.workflowId ?? "—"}</Badge>
-                      <Badge variant="outline">Verification: {item.verificationStatus}</Badge>
-                      {item.metadata?.automationDefinitionId ? <Badge variant="outline" className="border-registry-accent/30 text-registry-accent">Automation review gate</Badge> : null}
-                      {item.latestExecutionRun ? (
-                        <Badge variant="outline">
-                          Run: {item.latestExecutionRun.status} · {item.latestExecutionRun.workflowId}
-                        </Badge>
-                      ) : null}
-                    </div>
-
-                    <div className={`mt-3 grid gap-2 text-xs md:grid-cols-2 ${selectedRow ? "text-foreground/75" : "text-muted-foreground"}`}>
-                      <div>
-                        <span className="text-foreground/80">Assigned:</span> {item.assignedAgent ?? item.assignedSquad ?? "Unassigned"}
-                      </div>
-                      <div>
-                        <span className="text-foreground/80">Requestor:</span> {item.requestedBy ?? "Unknown"}
-                      </div>
-                      <div>
-                        <span className="text-foreground/80">Next action:</span> {deriveNextAction(item)}
-                      </div>
-                      <div className="md:col-span-2 truncate">
-                        <span className="text-foreground/80">Attention:</span> {summarizeRequiredAttention(item)}
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <Badge variant="outline" className={STATE_STYLES[item.state] ?? ""}>{prettyLabel(item.state)}</Badge>
+                        <Badge variant="outline" className={RISK_STYLES[item.riskLevel] ?? ""}>{item.riskLevel}</Badge>
                       </div>
                     </div>
                   </button>
@@ -656,7 +633,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
         </div>
         </div>
 
-        <div className={`${mobileDetailOpen ? "flex" : "hidden xl:flex"} min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-5`}>
+        <div className={`${mobileDetailOpen ? "flex" : "hidden lg:flex"} min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-5`}>
           <Card ref={mobileDetailPanelRef} className="min-h-[420px] min-w-0 flex-1 scroll-mt-4 p-5">
             {!selected ? (
               <div className="text-sm text-muted-foreground">Select a work order to inspect requested outcome, criteria, and linked execution.</div>
@@ -744,6 +721,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                 {governedFactoryRequired ? <WorkOrderReadinessPanel
                   readiness={workOrderReadiness}
                   now={readinessNow}
+                  attemptInFlight={selected.executionRuns.some((run) => ["PENDING", "RUNNING", "PAUSED"].includes(run.status))}
                   onRefresh={() => setReadinessRefresh((value) => value + 1)}
                 /> : null}
                 <WorkOrderDetailTabs
