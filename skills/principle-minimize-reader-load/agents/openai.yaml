@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Minimize Reader Load"
+  short_description: "Apply minimize reader load with discipline"
+  default_prompt: "Use $principle-minimize-reader-load to apply this engineering principle to the current decision."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Experience First"
+  short_description: "Apply experience first with discipline"
+  default_prompt: "Use $principle-experience-first to apply this engineering principle to the current decision."

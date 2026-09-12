@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Migrate Callers Then Delete Legacy Apis"
+  short_description: "Apply migrate callers then delete legacy apis with discipline"
+  default_prompt: "Use $principle-migrate-callers-then-delete-legacy-apis to apply this engineering principle to the current decision."

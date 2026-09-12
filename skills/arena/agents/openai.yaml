@@ -1,0 +1,4 @@
+interface:
+  display_name: "Arena"
+  short_description: "Compare parallel solutions and synthesize the best"
+  default_prompt: "Use $arena to handle this task with the pstack workflow and return a verified result."

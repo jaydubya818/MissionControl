@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deslop"
+  short_description: "Remove unnecessary AI-generated code complexity"
+  default_prompt: "Use $deslop to handle this task with the pstack workflow and return a verified result."

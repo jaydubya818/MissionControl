@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fix Merge Conflicts"
+  short_description: "Resolve merge conflicts and verify the result"
+  default_prompt: "Use $fix-merge-conflicts to handle this task with the pstack workflow and return a verified result."

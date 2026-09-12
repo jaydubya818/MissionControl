@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Never Block On The Human"
+  short_description: "Apply never block on the human with discipline"
+  default_prompt: "Use $principle-never-block-on-the-human to apply this engineering principle to the current decision."

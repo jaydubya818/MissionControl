@@ -1,0 +1,4 @@
+interface:
+  display_name: "Typescript Best Practices"
+  short_description: "Apply disciplined type modeling to TypeScript code"
+  default_prompt: "Use $typescript-best-practices to handle this task with the pstack workflow and return a verified result."

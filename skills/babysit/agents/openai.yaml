@@ -1,0 +1,4 @@
+interface:
+  display_name: "Babysit"
+  short_description: "Shepherd an authorized pull request to a ready state"
+  default_prompt: "Use $babysit to handle this task with the pstack workflow and return a verified result."

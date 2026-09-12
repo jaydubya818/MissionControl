@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Attack The Premise"
+  short_description: "Apply attack the premise with discipline"
+  default_prompt: "Use $principle-attack-the-premise to apply this engineering principle to the current decision."

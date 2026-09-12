@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Model The Domain"
+  short_description: "Apply model the domain with discipline"
+  default_prompt: "Use $principle-model-the-domain to apply this engineering principle to the current decision."

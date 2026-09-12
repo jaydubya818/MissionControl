@@ -12,10 +12,12 @@
  *                               trailing whitespace chomped)
  *   - string lists:             key:
  *                                 - item
+ *   - portable metadata:        metadata:
+ *                                 key: value
  *
- * NOT supported (typed error): nested maps, flow collections ([] / {}),
- * anchors/aliases, multi-document streams, tabs in indentation, non-string
- * scalars (everything parses as a string).
+ * NOT supported (typed error): nested maps below metadata, flow collections
+ * ([] / {}), anchors/aliases, multi-document streams, tabs in indentation,
+ * non-string metadata values (everything else parses as a string).
  */
 
 import { SemverError, parseVersion } from "./semver.js";
@@ -36,18 +38,34 @@ export type SkillRisk = (typeof SKILL_RISK_LEVELS)[number];
 export interface SkillFrontmatter {
   readonly name: string;
   readonly description: string;
-  readonly version: string;
-  readonly owner: string;
+  readonly version?: string;
+  readonly owner?: string;
   readonly risk?: SkillRisk;
   readonly capabilities?: readonly string[];
   readonly requires_tools?: readonly string[];
   readonly related_skills?: readonly string[];
   readonly compatibility?: string;
+  readonly license?: string;
+  readonly allowedTools?: string;
+  readonly userInvocable?: boolean;
+  readonly metadata?: Readonly<Record<string, string>>;
 }
 
-export const REQUIRED_SKILL_FIELDS = ["name", "description", "version", "owner"] as const;
+export const REQUIRED_SKILL_FIELDS = ["name", "description"] as const;
 
-const OPTIONAL_SKILL_FIELDS = ["risk", "capabilities", "requires_tools", "related_skills", "compatibility"] as const;
+const OPTIONAL_SKILL_FIELDS = [
+  "version",
+  "owner",
+  "risk",
+  "capabilities",
+  "requires_tools",
+  "related_skills",
+  "compatibility",
+  "license",
+  "allowed-tools",
+  "user-invocable",
+  "metadata",
+] as const;
 
 const LIST_FIELDS: readonly string[] = ["capabilities", "requires_tools", "related_skills"];
 
@@ -64,10 +82,12 @@ export function isKebabCase(value: string): boolean {
 // ---------------------------------------------------------------------------
 
 export interface RawFrontmatterEntry {
-  readonly value: string | readonly string[];
+  readonly value: string | readonly string[] | RawFrontmatterMap;
   /** 1-based line number of the key. */
   readonly line: number;
 }
+
+export type RawFrontmatterMap = Readonly<Record<string, RawFrontmatterEntry>>;
 
 export interface RawFrontmatter {
   readonly entries: Readonly<Record<string, RawFrontmatterEntry>>;
@@ -205,6 +225,45 @@ function parseList(lines: readonly string[], start: number, keyLine: number): Li
   return { value: items, next: i };
 }
 
+interface MapResult {
+  readonly value: RawFrontmatterMap;
+  readonly next: number;
+}
+
+function parseMetadataMap(lines: readonly string[], start: number, keyLine: number): MapResult {
+  const entries: Record<string, RawFrontmatterEntry> = {};
+  let indent = -1;
+  let i = start;
+  for (; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    const lineIndent = indentOf(line, i + 1);
+    if (lineIndent === 0) break;
+    if (indent === -1) {
+      indent = lineIndent;
+    } else if (lineIndent !== indent) {
+      throw new SkillFrontmatterError("metadata values must be scalars", i + 1);
+    }
+    const match = KEY_RE.exec(line.slice(lineIndent));
+    if (match === null) {
+      throw new SkillFrontmatterError(`expected "key: value" in metadata, got: ${line.trim()}`, i + 1);
+    }
+    const key = match[1];
+    if (key in entries) {
+      throw new SkillFrontmatterError(`duplicate metadata key "${key}"`, i + 1);
+    }
+    const rest = match[2].trim();
+    if (rest === "" || rest === ">" || rest === ">-" || rest === "|" || rest === "|-") {
+      throw new SkillFrontmatterError("metadata values must be scalars", i + 1);
+    }
+    entries[key] = { value: unquoteScalar(rest, i + 1), line: i + 1 };
+  }
+  if (Object.keys(entries).length === 0) {
+    throw new SkillFrontmatterError("expected metadata entries", keyLine);
+  }
+  return { value: entries, next: i };
+}
+
 /**
  * Structurally parse the frontmatter block. Returns null when the file does
  * not start with a "---" line. Throws SkillFrontmatterError (with line
@@ -252,9 +311,15 @@ export function extractRawFrontmatter(markdown: string): RawFrontmatter | null {
       entries[key] = { value: block.value, line: lineNo };
       i = block.next;
     } else if (rest === "") {
-      const list = parseList(yamlLines, i + 1, lineNo);
-      entries[key] = { value: list.value, line: lineNo };
-      i = list.next;
+      if (key === "metadata") {
+        const map = parseMetadataMap(yamlLines, i + 1, lineNo);
+        entries[key] = { value: map.value, line: lineNo };
+        i = map.next;
+      } else {
+        const list = parseList(yamlLines, i + 1, lineNo);
+        entries[key] = { value: list.value, line: lineNo };
+        i = list.next;
+      }
     } else {
       entries[key] = { value: unquoteScalar(rest, lineNo), line: lineNo };
       i++;
@@ -284,7 +349,7 @@ function expectScalar(entry: RawFrontmatterEntry, field: string): string | Front
     return {
       field,
       kind: "invalid",
-      message: `"${field}" must be a string, got a list`,
+      message: `"${field}" must be a string, got ${Array.isArray(entry.value) ? "a list" : "a mapping"}`,
       line: entry.line,
     };
   }
@@ -292,15 +357,62 @@ function expectScalar(entry: RawFrontmatterEntry, field: string): string | Front
 }
 
 function expectList(entry: RawFrontmatterEntry, field: string): readonly string[] | FrontmatterFieldIssue {
-  if (typeof entry.value === "string") {
+  if (!Array.isArray(entry.value)) {
     return {
       field,
       kind: "invalid",
-      message: `"${field}" must be a string list ("- item" entries), got a scalar`,
+      message: `"${field}" must be a string list ("- item" entries), got ${typeof entry.value === "string" ? "a scalar" : "a mapping"}`,
       line: entry.line,
     };
   }
   return entry.value;
+}
+
+function isStringList(value: RawFrontmatterEntry["value"]): value is readonly string[] {
+  return Array.isArray(value);
+}
+
+function expectMetadata(entry: RawFrontmatterEntry):
+  | { readonly value: RawFrontmatterMap }
+  | { readonly issue: FrontmatterFieldIssue } {
+  if (typeof entry.value === "string" || isStringList(entry.value)) {
+    return {
+      issue: {
+        field: "metadata",
+        kind: "invalid",
+        message: `"metadata" must be a string mapping`,
+        line: entry.line,
+      },
+    };
+  }
+  return { value: entry.value };
+}
+
+function metadataStrings(metadata: RawFrontmatterMap): Readonly<Record<string, string>> {
+  return Object.fromEntries(Object.entries(metadata).map(([key, entry]) => [key, entry.value as string]));
+}
+
+function resolvedEntry(
+  raw: RawFrontmatter,
+  metadata: RawFrontmatterMap,
+  field: string,
+): RawFrontmatterEntry | undefined {
+  return raw.entries[field] ?? metadata[field];
+}
+
+function commaSeparatedList(entry: RawFrontmatterEntry, field: string): readonly string[] | FrontmatterFieldIssue {
+  const scalar = expectScalar(entry, field);
+  if (typeof scalar !== "string") return scalar;
+  const values = scalar.split(",").map((value) => value.trim()).filter(Boolean);
+  if (values.length === 0) {
+    return {
+      field,
+      kind: "invalid",
+      message: `"metadata.${field}" must contain at least one comma-separated value`,
+      line: entry.line,
+    };
+  }
+  return values;
 }
 
 /**
@@ -323,7 +435,23 @@ export function validateRawFrontmatter(raw: RawFrontmatter): {
     requires_tools?: readonly string[];
     related_skills?: readonly string[];
     compatibility?: string;
+    license?: string;
+    allowedTools?: string;
+    userInvocable?: boolean;
+    metadata?: Readonly<Record<string, string>>;
   } = {};
+
+  let metadata: RawFrontmatterMap = {};
+  const metadataEntry = raw.entries.metadata;
+  if (metadataEntry !== undefined) {
+    const parsedMetadata = expectMetadata(metadataEntry);
+    if ("issue" in parsedMetadata) {
+      issues.push(parsedMetadata.issue);
+    } else {
+      metadata = parsedMetadata.value;
+      result.metadata = metadataStrings(metadata);
+    }
+  }
 
   for (const [key, entry] of Object.entries(raw.entries)) {
     if (!KNOWN_FIELDS.includes(key)) {
@@ -361,6 +489,21 @@ export function validateRawFrontmatter(raw: RawFrontmatter): {
       });
       continue;
     }
+    result[field] = scalar;
+  }
+
+  for (const field of ["version", "owner"] as const) {
+    const entry = resolvedEntry(raw, metadata, field);
+    if (entry === undefined) continue;
+    const scalar = expectScalar(entry, field);
+    if (typeof scalar !== "string") {
+      issues.push(scalar);
+      continue;
+    }
+    if (scalar.trim() === "") {
+      issues.push({ field, kind: "invalid", message: `"${field}" is empty`, line: entry.line });
+      continue;
+    }
     if (field === "version") {
       try {
         parseVersion(scalar);
@@ -375,7 +518,7 @@ export function validateRawFrontmatter(raw: RawFrontmatter): {
     result[field] = scalar;
   }
 
-  const risk = raw.entries.risk;
+  const risk = resolvedEntry(raw, metadata, "risk");
   if (risk !== undefined) {
     const scalar = expectScalar(risk, "risk");
     if (typeof scalar !== "string") {
@@ -393,9 +536,11 @@ export function validateRawFrontmatter(raw: RawFrontmatter): {
   }
 
   for (const field of LIST_FIELDS) {
-    const entry = raw.entries[field];
+    const entry = resolvedEntry(raw, metadata, field);
     if (entry === undefined) continue;
-    const list = expectList(entry, field);
+    const list = raw.entries[field] !== undefined
+      ? expectList(entry, field)
+      : commaSeparatedList(entry, field);
     if (!Array.isArray(list)) {
       issues.push(list as FrontmatterFieldIssue);
       continue;
@@ -413,12 +558,41 @@ export function validateRawFrontmatter(raw: RawFrontmatter): {
     }
   }
 
+  for (const [field, resultField] of [
+    ["license", "license"],
+    ["allowed-tools", "allowedTools"],
+  ] as const) {
+    const entry = raw.entries[field];
+    if (entry === undefined) continue;
+    const scalar = expectScalar(entry, field);
+    if (typeof scalar !== "string") {
+      issues.push(scalar);
+    } else {
+      result[resultField] = scalar;
+    }
+  }
+
+  const userInvocable = raw.entries["user-invocable"];
+  if (userInvocable !== undefined) {
+    const scalar = expectScalar(userInvocable, "user-invocable");
+    if (typeof scalar !== "string") {
+      issues.push(scalar);
+    } else if (scalar !== "true" && scalar !== "false") {
+      issues.push({
+        field: "user-invocable",
+        kind: "invalid",
+        message: `"user-invocable" must be "true" or "false", got "${scalar}"`,
+        line: userInvocable.line,
+      });
+    } else {
+      result.userInvocable = scalar === "true";
+    }
+  }
+
   const complete =
     issues.length === 0 &&
     result.name !== undefined &&
-    result.description !== undefined &&
-    result.version !== undefined &&
-    result.owner !== undefined;
+    result.description !== undefined;
 
   return { frontmatter: complete ? (result as SkillFrontmatter) : null, issues };
 }
@@ -472,14 +646,19 @@ export function serializeSkillFrontmatter(fm: SkillFrontmatter): string {
     lines.push("description: >-");
     lines.push(`  ${fm.description}`);
   }
-  lines.push(`version: ${serializeScalar(fm.version)}`);
-  lines.push(`owner: ${serializeScalar(fm.owner)}`);
-  if (fm.risk !== undefined) {
+  const metadata = fm.metadata ?? {};
+  if (fm.version !== undefined && metadata.version === undefined) {
+    lines.push(`version: ${serializeScalar(fm.version)}`);
+  }
+  if (fm.owner !== undefined && metadata.owner === undefined) {
+    lines.push(`owner: ${serializeScalar(fm.owner)}`);
+  }
+  if (fm.risk !== undefined && metadata.risk === undefined) {
     lines.push(`risk: ${fm.risk}`);
   }
   for (const field of ["capabilities", "requires_tools", "related_skills"] as const) {
     const list = fm[field];
-    if (list === undefined) continue;
+    if (list === undefined || metadata[field] !== undefined) continue;
     lines.push(`${field}:`);
     for (const item of list) {
       lines.push(`  - ${serializeScalar(item)}`);
@@ -487,6 +666,21 @@ export function serializeSkillFrontmatter(fm: SkillFrontmatter): string {
   }
   if (fm.compatibility !== undefined) {
     lines.push(`compatibility: ${serializeScalar(fm.compatibility)}`);
+  }
+  if (fm.license !== undefined) {
+    lines.push(`license: ${serializeScalar(fm.license)}`);
+  }
+  if (fm.allowedTools !== undefined) {
+    lines.push(`allowed-tools: ${serializeScalar(fm.allowedTools)}`);
+  }
+  if (Object.keys(metadata).length > 0) {
+    lines.push("metadata:");
+    for (const [key, value] of Object.entries(metadata)) {
+      lines.push(`  ${key}: ${serializeScalar(value)}`);
+    }
+  }
+  if (fm.userInvocable !== undefined) {
+    lines.push(`user-invocable: ${fm.userInvocable}`);
   }
   lines.push("---");
   const block = lines.join("\n") + "\n";

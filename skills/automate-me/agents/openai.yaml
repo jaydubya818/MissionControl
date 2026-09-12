@@ -1,0 +1,4 @@
+interface:
+  display_name: "Automate Me"
+  short_description: "Turn recurring work preferences into a personal skill"
+  default_prompt: "Use $automate-me to handle this task with the pstack workflow and return a verified result."

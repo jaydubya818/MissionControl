@@ -1,0 +1,4 @@
+interface:
+  display_name: "Get Pr Comments"
+  short_description: "Fetch and summarize actionable pull-request feedback"
+  default_prompt: "Use $get-pr-comments to handle this task with the pstack workflow and return a verified result."

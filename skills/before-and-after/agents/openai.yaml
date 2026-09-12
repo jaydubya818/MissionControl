@@ -1,0 +1,4 @@
+interface:
+  display_name: "Before and After"
+  short_description: "Capture PR-ready visual comparisons"
+  default_prompt: "Use $before-and-after to capture a matched before-and-after comparison for this UI change."

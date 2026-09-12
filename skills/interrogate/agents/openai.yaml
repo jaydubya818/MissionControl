@@ -1,0 +1,4 @@
+interface:
+  display_name: "Interrogate"
+  short_description: "Run an adversarial multi-model implementation review"
+  default_prompt: "Use $interrogate to handle this task with the pstack workflow and return a verified result."

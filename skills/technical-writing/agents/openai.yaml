@@ -1,0 +1,4 @@
+interface:
+  display_name: "Technical Writing"
+  short_description: "Write clear technical prose for tired engineers"
+  default_prompt: "Use $technical-writing to handle this task with the pstack workflow and return a verified result."

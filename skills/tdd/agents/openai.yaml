@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tdd"
+  short_description: "Reproduce a bug with a focused test before fixing it"
+  default_prompt: "Use $tdd to handle this task with the pstack workflow and return a verified result."

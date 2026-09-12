@@ -129,15 +129,15 @@ risk: extreme
 describe("required-field-missing", () => {
   it("fires once per missing field at -15 each", () => {
     const md = `---
-name: a-skill
-description: ${OK_DESCRIPTION}
+version: 1.0.0
+owner: team
 ---
 
 ## Body
 `;
     const result = lintSkill(md);
     const missing = result.findings.filter((f) => f.rule === "required-field-missing");
-    expect(missing).toHaveLength(2); // version, owner
+    expect(missing).toHaveLength(2); // name, description
     expect(missing.every((f) => f.severity === "error")).toBe(true);
     expect(result.score).toBe(70);
   });
@@ -145,9 +145,9 @@ description: ${OK_DESCRIPTION}
   it("treats empty values as missing", () => {
     const md = `---
 name: a-skill
-description: ${OK_DESCRIPTION}
+description: ""
 version: 1.0.0
-owner: ""
+owner: team
 ---
 
 ## Body
@@ -185,6 +185,7 @@ owner: team
     ["Use when the agent needs to do a thing during long-running orchestration sessions today."],
     ["Handles budget management for agents. Use for recording spend and reacting to budget limits."],
     ["Invoke when a task requires human sign-off before an irreversible action is executed anywhere."],
+    ["Apply when a task needs a focused engineering principle before implementation decisions are made."],
     ["This skill activates when a deliverable is ready to submit to the content review pipeline."],
     ["Trigger: after each run completes, record token counts and cost so the audit trail stays honest."],
   ])("accepts activation phrasing: %s", (description) => {

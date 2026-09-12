@@ -62,7 +62,7 @@ const DESCRIPTION_MIN_CHARS = 80;
 const DESCRIPTION_MAX_CHARS = 500;
 const BODY_MAX_LINES = 500;
 
-const ACTIVATION_RE = /\b(use (this skill )?when|use for|invoke when|trigger|activates? when)\b/i;
+const ACTIVATION_RE = /\b(use (this skill )?when|use for|invoke when|apply when|trigger|activates? when)\b/i;
 
 const DANGEROUS_RE = /rm -rf|curl[^|]*\|\s*(ba)?sh|sudo\s|chmod 777/;
 
@@ -152,7 +152,7 @@ function lintFrontmatter(raw: RawFrontmatter, opts: SkillLintOptions, findings: 
         rule: "activation-language-missing",
         severity: "error",
         message:
-          'description must state when to activate the skill (e.g. "Use this skill when ...", "Invoke when ...")',
+          'description must state when to activate the skill (e.g. "Use this skill when ...", "Apply when ...")',
         line: description.line,
       });
     }

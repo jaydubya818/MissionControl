@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Prove It Works"
+  short_description: "Apply prove it works with discipline"
+  default_prompt: "Use $principle-prove-it-works to apply this engineering principle to the current decision."

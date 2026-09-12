@@ -1,0 +1,4 @@
+interface:
+  display_name: "What Did I Get Done"
+  short_description: "Summarize authored work for a concrete time period"
+  default_prompt: "Use $what-did-i-get-done to handle this task with the pstack workflow and return a verified result."

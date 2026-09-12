@@ -1,0 +1,4 @@
+interface:
+  display_name: "Why"
+  short_description: "Investigate and cite why a system was designed this way"
+  default_prompt: "Use $why to handle this task with the pstack workflow and return a verified result."

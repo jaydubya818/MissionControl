@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Verification Skill"
+  short_description: "Create a project-specific real-behavior verifier"
+  default_prompt: "Use $create-verification-skill to handle this task with the pstack workflow and return a verified result."

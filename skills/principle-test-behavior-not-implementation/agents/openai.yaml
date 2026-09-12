@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Test Behavior Not Implementation"
+  short_description: "Apply test behavior not implementation with discipline"
+  default_prompt: "Use $principle-test-behavior-not-implementation to apply this engineering principle to the current decision."

@@ -4,6 +4,7 @@
 - Always verify UI changes in the browser before calling work done.
 - Use `docs/design.md` and `.claude/skills/design/` as the design reference for UI improvements.
 - Follow documentation-first / spec-driven development (SDD): plan and reference docs before implementing, not chat-only coding.
+- For non-trivial work, start with `mission-control-delivery`, then use `poteto-mode` to select the smallest applicable workflow and load only the matching specialist skills. System, user, Mission Control, and repository instructions override skill guidance. External writes require explicit task authority.
 - When implementing attached plans: do not edit the plan file; use existing todos, mark them in_progress, and complete all of them.
 - For v2 demo and UI review, use `http://localhost:5199` via `pnpm run dev:demo`; use `http://localhost:5180` for latest main-repo UI during active development (EOS flags on).
 - When the user asks to start `localhost:5199` without naming another workspace, use `pnpm run dev:research-lab`; `dev:demo` intentionally opens the separate Software Factory Demo database and makes the preserved Research Lab unavailable.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Make Pr Easy To Review"
+  short_description: "Improve pull-request clarity without behavior changes"
+  default_prompt: "Use $make-pr-easy-to-review to handle this task with the pstack workflow and return a verified result."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Setup Pstack"
+  short_description: "Configure per-role model choices for pstack workflows"
+  default_prompt: "Use $setup-pstack to handle this task with the pstack workflow and return a verified result."

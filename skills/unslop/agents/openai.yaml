@@ -1,0 +1,4 @@
+interface:
+  display_name: "Unslop"
+  short_description: "Edit AI-sounding prose into plain language"
+  default_prompt: "Use $unslop to edit this text into concise, natural prose without changing its meaning."

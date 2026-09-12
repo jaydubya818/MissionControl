@@ -1,0 +1,4 @@
+interface:
+  display_name: "Architect"
+  short_description: "Design types and module boundaries before coding"
+  default_prompt: "Use $architect to handle this task with the pstack workflow and return a verified result."

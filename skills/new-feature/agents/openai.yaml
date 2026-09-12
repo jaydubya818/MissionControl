@@ -1,0 +1,4 @@
+interface:
+  display_name: "New Feature Worktree"
+  short_description: "Isolate repository edits before implementation"
+  default_prompt: "Use $new-feature to prepare a safe isolated worktree for this repository change."

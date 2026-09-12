@@ -82,7 +82,7 @@ for (const target of targets) {
     name: fm.name,
     description: fm.description,
     content,
-    owner: fm.owner,
+    owner: fm.owner ?? "software-factory",
     type: "SKILL",
     contentHash,
     qualityScore: lint.score,

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Structure"
+  short_description: "Choose clear service and action boundaries"
+  default_prompt: "Use $code-structure to review the boundaries in this implementation and propose the smallest clear structure."

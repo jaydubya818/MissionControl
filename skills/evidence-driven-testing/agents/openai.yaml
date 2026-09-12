@@ -1,0 +1,4 @@
+interface:
+  display_name: "Evidence-Driven Testing"
+  short_description: "Prove changed behavior with durable evidence"
+  default_prompt: "Use $evidence-driven-testing to verify this change and produce evidence tied to the exact candidate."

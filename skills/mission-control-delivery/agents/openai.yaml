@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mission Control Delivery"
+  short_description: "Preserve governed delivery and evidence lineage"
+  default_prompt: "Use $mission-control-delivery to execute this software-factory task within its authority and evidence contract."

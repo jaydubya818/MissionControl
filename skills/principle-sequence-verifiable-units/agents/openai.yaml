@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Sequence Verifiable Units"
+  short_description: "Apply sequence verifiable units with discipline"
+  default_prompt: "Use $principle-sequence-verifiable-units to apply this engineering principle to the current decision."

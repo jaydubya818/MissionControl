@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Boundary Discipline"
+  short_description: "Apply boundary discipline with discipline"
+  default_prompt: "Use $principle-boundary-discipline to apply this engineering principle to the current decision."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Poteto Mode"
+  short_description: "Route nontrivial work through rigorous workflows"
+  default_prompt: "Use $poteto-mode to handle this task with the pstack workflow and return a verified result."

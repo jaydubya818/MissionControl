@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Type System Discipline"
+  short_description: "Apply type system discipline with discipline"
+  default_prompt: "Use $principle-type-system-discipline to apply this engineering principle to the current decision."

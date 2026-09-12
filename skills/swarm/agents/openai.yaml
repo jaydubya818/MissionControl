@@ -1,0 +1,4 @@
+interface:
+  display_name: "Swarm"
+  short_description: "Coordinate parallel workers and return one checked result"
+  default_prompt: "Use $swarm to handle this task with the pstack workflow and return a verified result."

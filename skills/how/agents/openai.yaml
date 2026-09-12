@@ -1,0 +1,4 @@
+interface:
+  display_name: "How"
+  short_description: "Explain how a subsystem works and where it belongs"
+  default_prompt: "Use $how to handle this task with the pstack workflow and return a verified result."

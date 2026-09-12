@@ -101,9 +101,12 @@ name: my-skill-name
 description: >-
   When to activate this skill — be specific so agents can discover it.
   Use this skill when …
-version: 1.0.0
-owner: software-factory
-risk: low
+license: MIT
+metadata:
+  version: 1.0.0
+  owner: software-factory
+  risk: low
+  capabilities: example-capability
 ---
 
 # My Skill
@@ -118,6 +121,12 @@ risk: low
 - `description` must include activation language (“Use this skill when…”)
 - Keep description ~80–500 characters
 - Directory name should match `name`
+- Portable Agent Skills require `name` and `description`; Mission Control
+  governance fields belong under the scalar `metadata` map
+- Existing repository skills may keep the legacy top-level `version`, `owner`,
+  `risk`, and string-list fields
+- When both forms provide the same governance field, the legacy top-level value
+  takes precedence
 - Avoid dangerous instructions that bypass policy / approvals
 
 Tessl’s fuller plugin shape (for reference when aligning packages):

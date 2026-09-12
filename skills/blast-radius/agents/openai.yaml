@@ -1,0 +1,4 @@
+interface:
+  display_name: "Blast Radius"
+  short_description: "Find and prove hidden downstream change risks"
+  default_prompt: "Use $blast-radius to handle this task with the pstack workflow and return a verified result."

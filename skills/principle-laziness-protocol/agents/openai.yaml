@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Laziness Protocol"
+  short_description: "Apply laziness protocol with discipline"
+  default_prompt: "Use $principle-laziness-protocol to apply this engineering principle to the current decision."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Outcome Oriented Execution"
+  short_description: "Apply outcome oriented execution with discipline"
+  default_prompt: "Use $principle-outcome-oriented-execution to apply this engineering principle to the current decision."

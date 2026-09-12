@@ -1,0 +1,4 @@
+interface:
+  display_name: "Show Me Your Work"
+  short_description: "Keep an auditable decision log for long-running work"
+  default_prompt: "Use $show-me-your-work to handle this task with the pstack workflow and return a verified result."

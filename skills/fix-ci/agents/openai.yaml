@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fix Ci"
+  short_description: "Diagnose and fix failing pull-request checks"
+  default_prompt: "Use $fix-ci to handle this task with the pstack workflow and return a verified result."

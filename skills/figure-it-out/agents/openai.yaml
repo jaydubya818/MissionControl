@@ -1,0 +1,4 @@
+interface:
+  display_name: "Figure It Out"
+  short_description: "Design an auditable workflow for unusual work"
+  default_prompt: "Use $figure-it-out to handle this task with the pstack workflow and return a verified result."

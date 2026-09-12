@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Separate Before Serializing Shared State"
+  short_description: "Apply separate before serializing shared state with discipline"
+  default_prompt: "Use $principle-separate-before-serializing-shared-state to apply this engineering principle to the current decision."

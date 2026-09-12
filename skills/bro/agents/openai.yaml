@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bro"
+  short_description: "Restate a technical answer in plain human language"
+  default_prompt: "Use $bro to handle this task with the pstack workflow and return a verified result."

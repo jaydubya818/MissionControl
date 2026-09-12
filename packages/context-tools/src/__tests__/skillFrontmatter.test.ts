@@ -97,14 +97,74 @@ body`;
     const md = `---
 name: demo-skill
 description: Use this skill when demonstrating the minimal valid frontmatter shape.
-version: 0.1.0
-owner: team
 ---
 body`;
     const fm = parseSkillFrontmatter(md);
+    expect(fm.version).toBeUndefined();
+    expect(fm.owner).toBeUndefined();
     expect(fm.risk).toBeUndefined();
     expect(fm.capabilities).toBeUndefined();
     expect(fm.compatibility).toBeUndefined();
+  });
+
+  it("normalizes portable Agent Skills metadata", () => {
+    const md = `---
+name: portable-skill
+description: Use this skill when validating portable Agent Skills metadata.
+license: MIT
+compatibility: Works with Agent Skills-compatible harnesses.
+metadata:
+  author: upstream-author
+  source-version: "0.9.29"
+  owner: software-factory
+  risk: medium
+  capabilities: planning,multi-agent-workflow
+allowed-tools: >-
+  Bash(git status *) Bash(pnpm test *)
+user-invocable: false
+---
+body`;
+    expect(parseSkillFrontmatter(md)).toEqual({
+      name: "portable-skill",
+      description: "Use this skill when validating portable Agent Skills metadata.",
+      owner: "software-factory",
+      risk: "medium",
+      capabilities: ["planning", "multi-agent-workflow"],
+      compatibility: "Works with Agent Skills-compatible harnesses.",
+      license: "MIT",
+      allowedTools: "Bash(git status *) Bash(pnpm test *)",
+      userInvocable: false,
+      metadata: {
+        author: "upstream-author",
+        "source-version": "0.9.29",
+        owner: "software-factory",
+        risk: "medium",
+        capabilities: "planning,multi-agent-workflow",
+      },
+    });
+  });
+
+  it("prefers legacy top-level governance fields over metadata", () => {
+    const md = `---
+name: mixed-skill
+description: Use this skill when validating mixed legacy and portable metadata.
+version: 2.0.0
+owner: local-team
+risk: low
+capabilities:
+  - local-capability
+metadata:
+  version: 1.0.0
+  owner: upstream-team
+  risk: high
+  capabilities: upstream-capability
+---
+body`;
+    const fm = parseSkillFrontmatter(md);
+    expect(fm.version).toBe("2.0.0");
+    expect(fm.owner).toBe("local-team");
+    expect(fm.risk).toBe("low");
+    expect(fm.capabilities).toEqual(["local-capability"]);
   });
 
   it("skips blank lines and comments inside the block", () => {
@@ -147,8 +207,6 @@ describe("parseSkillFrontmatter — invalid documents", () => {
   it.each([
     ["name", withFrontmatter({}, ["name"])],
     ["description", withFrontmatter({}, ["description"])],
-    ["version", withFrontmatter({}, ["version"])],
-    ["owner", withFrontmatter({}, ["owner"])],
   ])("throws when required field %s is missing", (field, md) => {
     expect(() => parseSkillFrontmatter(md)).toThrow(new RegExp(`"${field}" is missing`));
   });
@@ -204,6 +262,7 @@ describe("parseSkillFrontmatter — invalid documents", () => {
     ["flow mapping", "compatibility: {a: 1}", /flow collections/],
     ["tab indentation", "capabilities:\n\t- x", /tabs are not allowed/],
     ["nested mapping", "compatibility:\n  nested: yes\n  deeper: no", /list|nested/],
+    ["nested metadata mapping", "metadata:\n  owner:\n    nested: no", /metadata values must be scalars/],
     ["anchor", "owner: &anchor team", /anchors/],
   ])("rejects unsupported YAML (%s) with a typed error", (_label, snippet, re) => {
     const md = `---\nname: demo-skill\ndescription: Use this skill when testing unsupported syntax rejection paths.\nversion: 1.0.0\n${snippet}\n---\nbody`;
@@ -239,7 +298,7 @@ describe("extractRawFrontmatter / validateRawFrontmatter", () => {
     const { frontmatter, issues } = validateRawFrontmatter(raw!);
     expect(frontmatter).toBeNull();
     const fields = issues.map((i) => i.field).sort();
-    expect(fields).toEqual(["description", "name", "owner", "version"]);
+    expect(fields).toEqual(["description", "name", "version"]);
   });
 });
 
@@ -291,12 +350,29 @@ describe("serializeSkillFrontmatter", () => {
     const minimal: SkillFrontmatter = {
       name: "demo-skill",
       description: "Use this skill when verifying that optional fields are omitted from output.",
-      version: "0.1.0",
-      owner: "team",
     };
     const block = serializeSkillFrontmatter(minimal);
+    expect(block).not.toContain("version:");
+    expect(block).not.toContain("owner:");
     expect(block).not.toContain("risk:");
     expect(block).not.toContain("capabilities:");
+  });
+
+  it("round-trips portable fields and metadata", () => {
+    const portable: SkillFrontmatter = {
+      name: "portable-skill",
+      description: "Use this skill when checking portable frontmatter serialization.",
+      owner: "software-factory",
+      license: "MIT",
+      allowedTools: "Bash(git status *)",
+      userInvocable: false,
+      metadata: {
+        owner: "software-factory",
+        author: "upstream-author",
+      },
+    };
+    const block = serializeSkillFrontmatter(portable);
+    expect(parseSkillFrontmatter(block + "body")).toEqual(portable);
   });
 
   it("rejects frontmatter that would not validate", () => {

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Greploop"
+  short_description: "Resolve Greptile feedback in bounded cycles"
+  default_prompt: "Use $greploop to address current Greptile feedback within a bounded review loop."

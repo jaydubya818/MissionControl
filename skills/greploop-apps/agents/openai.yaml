@@ -1,0 +1,4 @@
+interface:
+  display_name: "Greploop Apps"
+  short_description: "Review large PRs with Greptile Apps"
+  default_prompt: "Use $greploop-apps when the normal Greptile trigger rejects this pull request for its size."
