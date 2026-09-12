@@ -198,7 +198,7 @@ WorkOrder acceptance, and the human-gated learning continuation. This is strong
 implementation proof; it is not a claim of fleet-scale production operation or
 general Remote Sandbox certification.
 
-The current public client/backend runtime contract is **v58**. The governed
+The current public client/backend runtime contract is **v59**. The governed
 inference work adds the disabled-by-default price-book, reservation, receipt,
 reconciliation, and accepted-outcome economics contracts. Fab adds exact candidate
 verification and publication bindings plus read-only candidate recovery. Todo 062
@@ -210,7 +210,8 @@ and restoration authority, separate executor acknowledgment, independent
 effect observation, and shared dispatch admission gate; older clients fail
 closed through the existing compatibility check. v58 adds authenticated,
 tenant-scoped Fab operator profiles, personal briefing controls, and durable
-per-user review state.
+per-user review state. v59 adds the authenticated ExecutionIntent intake,
+status, and event contracts used by the isolated shadow-provider path.
 
 Inference receipt v3 retains valid observed overruns and route drift with explicit
 violation codes and ESTIMATED/UNKNOWN monetary classification. A WorkOrder fence
