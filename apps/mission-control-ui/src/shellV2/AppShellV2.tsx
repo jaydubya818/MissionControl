@@ -118,10 +118,10 @@ export function AppShellV2({
   const columns = useResizableColumns();
   const { statusLabel } = useHarnessAnimation(projectId ?? undefined);
 
-  const eosPreview = useFlag("eos.command-center-preview");
-  const showControlStubs = useFlag("ui.control.stubs");
-  const showPreviewRoutes = useFlag("ui.navigation.previews");
-  const showDemoRoutes = useFlag("ui.navigation.demo-routes");
+  const eosPreview = useFlag("eos.command-center-preview", projectId ?? undefined);
+  const showControlStubs = useFlag("ui.control.stubs", projectId ?? undefined);
+  const showPreviewRoutes = useFlag("ui.navigation.previews", projectId ?? undefined);
+  const showDemoRoutes = useFlag("ui.navigation.demo-routes", projectId ?? undefined);
   const baseNavGroups = eosPreview ? EOS_NAV_GROUPS : NAV_GROUPS;
   const filteredGroups = filterNavGroups(baseNavGroups, {
     showControlStubs,
