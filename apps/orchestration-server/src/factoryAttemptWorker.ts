@@ -1,5 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { DOCKER_BEDROCK_CANDIDATE_IDENTITY } from "./dockerBedrockIdentity.js";
+import { copyFile, mkdir } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { realpath } from "node:fs/promises";
 import type { ConvexHttpClient } from "convex/browser";
 import type {
@@ -70,6 +73,19 @@ export const FACTORY_ATTEMPT_LEASE_DURATION_MS = 120_000;
 export const LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE = "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING";
 const HEARTBEAT_INTERVAL_MS = 20_000;
 const MAX_RESULT_BYTES = 64_000;
+
+const FACTORY_SKILLZ = ["mission-control-delivery", "poteto-mode"] as const;
+
+export async function materializeFactorySkillz(worktree: string) {
+  const skillsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../skills");
+  for (const name of FACTORY_SKILLZ) {
+    const source = resolve(skillsRoot, name, "SKILL.md");
+    const destination = resolve(worktree, ".mission-control/skills", name, "SKILL.md");
+    await mkdir(dirname(destination), { recursive: true });
+    await copyFile(source, destination);
+  }
+}
+
 
 class FactoryWorkerFailure extends Error {
   constructor(readonly code: string, message: string) {
@@ -701,6 +717,7 @@ export class FactoryAttemptWorker {
 
       if (manifestExecutionBackend(manifest) !== "isolated-container") {
         await (this.dependencies.prepareFactoryDependencies ?? prepareFactoryDependencies)({ worktree: claim.worktree });
+        await materializeFactorySkillz(claim.worktree);
       }
 
       let mappedEvents: any[] = [];

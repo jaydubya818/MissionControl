@@ -969,6 +969,66 @@ export const createRepositoryCodeScope = mutation({
   },
 });
 
+export const updateRepositoryCodeScope = mutation({
+  args: {
+    scopeId: v.id("repositoryCodeScopes"),
+    includePaths: v.array(v.string()),
+    excludePaths: v.array(v.string()),
+    allowOverlap: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const scope = await ctx.db.get(args.scopeId);
+    if (!scope) return { success: false, error: "Code scope not found" };
+    const project = await ctx.db.get(scope.projectId);
+    const access = await enforceProjectAccess(ctx, project, COMPANY_PERMISSIONS.MANAGE_REPOSITORIES);
+    const validationError = validateCodeScopeInput({
+      name: scope.name,
+      slug: scope.slug,
+      includePaths: args.includePaths,
+      excludePaths: args.excludePaths,
+      approvalPolicy: scope.approvalPolicy,
+      approvalPolicyDescription: scope.approvalPolicyDescription,
+    });
+    if (validationError) return { success: false, error: validationError };
+
+    const scopes = await ctx.db
+      .query("repositoryCodeScopes")
+      .withIndex("by_repository", (q) => q.eq("repositoryId", scope.repositoryId))
+      .collect();
+    const overlaps = findOverlappingScopes(
+      args.includePaths,
+      scopes.filter((row) => row.active && row._id !== scope._id),
+    );
+    if (overlaps.length > 0 && !args.allowOverlap) {
+      return {
+        success: false,
+        error: `This path overlaps ${overlaps.join(", ")}. Review ownership before saving.`,
+        overlaps,
+      };
+    }
+
+    const now = Date.now();
+    const includePaths = normalizeCodePaths(args.includePaths);
+    const excludePaths = normalizeCodePaths(args.excludePaths);
+    await ctx.db.patch(scope._id, {
+      includePaths,
+      excludePaths,
+      updatedAt: now,
+      updatedBy: access?.membership.operatorId,
+    });
+    await ctx.db.insert("activities", {
+      projectId: scope.projectId,
+      actorType: "HUMAN",
+      action: "REPOSITORY_CODE_SCOPE_UPDATED",
+      description: `${scope.name} code scope paths updated`,
+      targetType: "REPOSITORY_CODE_SCOPE",
+      targetId: scope._id,
+      metadata: { repositoryId: scope.repositoryId, includePaths, excludePaths },
+    });
+    return { success: true, includePaths, excludePaths };
+  },
+});
+
 export const archiveRepositoryCodeScope = mutation({
   args: { scopeId: v.id("repositoryCodeScopes") },
   handler: async (ctx, args) => {

@@ -13,6 +13,21 @@ describe("Factory path scope", () => {
     });
   });
 
+  it("ignores factory-owned skill materialization", () => {
+    expect(validateChangedFileScope(
+      [
+        "app/api/health/route.ts",
+        ".mission-control/skills/mission-control-delivery/SKILL.md",
+        ".mission-control/skills/poteto-mode/SKILL.md",
+      ],
+      { allowedPaths: ["app/**"], excludedPaths: [] },
+    )).toEqual({
+      ok: true,
+      changedFiles: ["app/api/health/route.ts"],
+      outsideScope: [],
+    });
+  });
+
   it("treats a non-glob directory as a subtree", () => {
     expect(matchesRepositoryPattern("convex/factory/attempts.ts", "convex")).toBe(true);
     expect(matchesRepositoryPattern("apps/ui/App.tsx", "convex")).toBe(false);

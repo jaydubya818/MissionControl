@@ -53,8 +53,8 @@ export const EOS_NAV_GROUPS: NavGroup[] = [
     items: [
       { view: "control-work-orders" as MainView, label: "Work Orders", icon: ClipboardList },
       { view: "tasks" as MainView, label: "Tasks", icon: ListChecks },
-      { view: "factory" as MainView, label: "Factory Board", icon: Wrench },
-      { view: "atc" as MainView, label: "Queue", icon: Radar },
+      { view: "factory" as MainView, label: "Factory Runs", icon: Wrench },
+      { view: "atc" as MainView, label: "Execution Queue", icon: Radar },
       { view: "automations" as MainView, label: "Automations", icon: Sparkles },
     ],
   },
@@ -63,7 +63,8 @@ export const EOS_NAV_GROUPS: NavGroup[] = [
     label: "Review & release",
     icon: Shield,
     items: [
-      { view: "audit" as MainView, label: "Approvals & Audit", icon: ScrollText },
+      { view: "control-approvals" as MainView, label: "Approvals", icon: CheckCircle2 },
+      { view: "audit" as MainView, label: "Audit Trail", icon: ScrollText },
       { view: "trace-inspector" as MainView, label: "Observability & Evals", icon: GitBranch },
       { view: "telemetry" as MainView, label: "Incidents", icon: Activity },
       { view: "deployments" as MainView, label: "Deployments", icon: GitBranch },
@@ -77,7 +78,7 @@ export const EOS_NAV_GROUPS: NavGroup[] = [
     items: [
       { view: "skills" as MainView, label: "Context Catalog", icon: Sparkles },
       { view: "memory" as MainView, label: "Memory", icon: Brain },
-      { view: "docs" as MainView, label: "Docs", icon: BookOpen },
+      { view: "docs" as MainView, label: "Documentation", icon: BookOpen },
     ],
   },
   {

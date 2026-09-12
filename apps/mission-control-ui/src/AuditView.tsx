@@ -117,9 +117,9 @@ export function AuditView({ projectId }: { projectId: Id<"projects"> | null }) {
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
       <PageHeader
-        title="ARM Audit"
+        title="Approvals & Audit"
         description="Governance trail for approvals, lifecycle transitions, deployments, and policy decisions."
-        eyebrow="Operations"
+        eyebrow="Review & release"
         actions={
           <Button size="sm" variant="outline" onClick={handleExport}>
             <Download className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.7} />

@@ -381,13 +381,15 @@ export async function buildExecutionRoutingPreview(
   const candidates: ExecutionRoutingCandidate[] = [];
   for (const version of versions) {
     const definition = definitions.find((item) => item._id === version.factoryDefinitionId) ?? null;
-    const [assessments, agentVersions, sandboxProfile] = await Promise.all([
+    const [assessments, agentVersions, sandboxProfile, factoryWorkflow] = await Promise.all([
       ctx.db.query("factoryReadinessAssessments")
         .withIndex("by_version", (query) => query.eq("factoryDefinitionVersionId", version._id))
         .collect(),
       Promise.all((version.agentBindings ?? []).map((binding) => ctx.db.get(binding.agentVersionId))),
       version.sandboxProfileId ? ctx.db.get(version.sandboxProfileId) : null,
+      ctx.db.get(version.workflowId),
     ]);
+    const executionWorkflow = factoryWorkflow ?? workflow;
     const assessment = assessments.sort((left, right) => right.assessedAt - left.assessedAt)[0];
     let frozenHarness: ReturnType<typeof resolveFrozenHarnessBinding> | null = null;
     let adapterRuntimeArtifact: ReturnType<typeof resolveHarnessAdapterRuntimeArtifact> | null = null;
@@ -405,11 +407,15 @@ export async function buildExecutionRoutingPreview(
     }
     const primaryModel = (() => {
       try {
-        return resolveFactoryWorkflowModelRoute({ workflow, agentBindings: version.agentBindings ?? [], agentVersions });
+        return resolveFactoryWorkflowModelRoute({ workflow: executionWorkflow, agentBindings: version.agentBindings ?? [], agentVersions });
       } catch {
         return null;
       }
     })();
+    const pinnedFactoryVersion = Boolean(
+      input.fallbackFactoryDefinitionVersionId
+      && String(version._id) === String(input.fallbackFactoryDefinitionVersionId)
+    );
     const workflowAgentsApproved = agentVersions.length > 0
       && agentVersions.every((agentVersion) => agentVersion?.status === "APPROVED");
     const catalogModel = version.modelCatalogId
@@ -496,7 +502,7 @@ export async function buildExecutionRoutingPreview(
       && frozenHarness
       && primaryModel
       && factoryWorkflowModelRouteMatches({
-        workflow,
+        workflow: executionWorkflow,
         agentBindings: version.agentBindings ?? [],
         agentVersions,
       }, version.modelRouteSnapshot as any)
@@ -512,15 +518,14 @@ export async function buildExecutionRoutingPreview(
         repositoryId: String(workOrder.repositoryId),
       })
     );
+    // Exact route qualification already encodes risk class. Do not also
+    // require the legacy riskApproved flag, which is only set for RED
+    // promotions and would block an otherwise admitted HIGH/CRITICAL route.
     const modelApproved = Boolean(
       workflowAgentsApproved
       && modelRouteReady
       && catalogModel
       && !catalogModel.deprecated
-      && (
-        !(workOrder.riskLevel === "HIGH" || workOrder.riskLevel === "CRITICAL")
-        || catalogModel.riskApproved
-      )
     );
     const approvedPlanEstimateUsd = finiteNonNegative(
       (workOrder.metadata as { estimatedCostUsd?: unknown } | undefined)?.estimatedCostUsd,
@@ -564,7 +569,7 @@ export async function buildExecutionRoutingPreview(
         readiness: !assessment ? "MISSING" : assessment.status,
         readinessCurrent: Boolean(assessment && assessment.expiresAt > cutoffAt),
         readinessDigestMatches: assessment?.configurationDigest === version.configurationDigest,
-        workflowMatches: version.workflowId === workflow._id,
+        workflowMatches: version.workflowId === workflow._id || pinnedFactoryVersion,
         repositoryMatches: version.repositoryId === workOrder.repositoryId,
         repositoryAccess,
         workerEligible,

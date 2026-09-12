@@ -41,6 +41,7 @@ describe("filterNavGroups", () => {
       "factory",
       "atc",
       "automations",
+      "control-approvals",
       "audit",
       "trace-inspector",
       "telemetry",

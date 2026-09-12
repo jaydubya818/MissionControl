@@ -39,6 +39,7 @@ import {
   DEFAULT_WORK_ORDER_FILTERS,
   deriveAcceptanceReadinessPresentation,
   deriveNextAction,
+  humanizeOperatorCopy,
   filterWorkOrders,
   parseVerificationArguments,
   summarizeRequiredAttention,
@@ -167,6 +168,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   const mobileDetailPanelRef = useRef<HTMLDivElement>(null);
   const mobileBackButtonRef = useRef<HTMLButtonElement>(null);
   const [filters, setFilters] = useState<WorkOrderQueueFilters>(DEFAULT_WORK_ORDER_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [detailTab, setDetailTab] = useState<WorkOrderDetailTab>("overview");
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("workOrder"));
   const [mobileDetailOpen, setMobileDetailOpen] = useState(() => Boolean(searchParams.get("workOrder")));
@@ -281,10 +283,18 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   };
 
   useEffect(() => {
-    if (!mobileDetailOpen || !selectedDetailId || !globalThis.matchMedia?.("(max-width: 1279px)").matches) return;
+    if (!selectedDetailId) return;
     const frame = requestAnimationFrame(() => {
-      mobileDetailPanelRef.current?.scrollIntoView({ block: "start" });
-      mobileBackButtonRef.current?.focus({ preventScroll: true });
+      const selectedRow = document.querySelector<HTMLButtonElement>(`[data-work-order-id="${selectedDetailId}"]`);
+      selectedRow?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      if (mobileDetailOpen && globalThis.matchMedia?.("(max-width: 1279px)").matches) {
+        mobileDetailPanelRef.current?.scrollIntoView({ block: "start" });
+        mobileBackButtonRef.current?.focus({ preventScroll: true });
+      } else {
+        mobileDetailPanelRef.current?.scrollTo?.({ top: 0 });
+        const inspector = mobileDetailPanelRef.current;
+        inspector?.parentElement?.scrollTo?.({ top: 0 });
+      }
     });
     return () => cancelAnimationFrame(frame);
   }, [mobileDetailOpen, selectedDetailId]);
@@ -400,12 +410,17 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
     canAcceptSelected,
     selected?.currentVerification?.reasons ?? []
   );
-  const nextActionText = canAcceptSelected
-    ? acceptanceReadinessPresentation.heading
-    : acceptanceReadinessPresentation.reasons[0]
-      ?? acceptanceReadinessPresentation.summary
-      ?? selected?.workOrder.requiredHumanAction
-      ?? "Review the current Work Order state.";
+  const attemptInFlight = Boolean(selected?.executionRuns.some((run) => ["PENDING", "RUNNING", "PAUSED"].includes(run.status)));
+  const nextActionText = attemptInFlight
+    ? "This run is in progress. Watch it here — don’t dispatch again."
+    : humanizeOperatorCopy(
+      canAcceptSelected
+        ? acceptanceReadinessPresentation.heading
+        : acceptanceReadinessPresentation.reasons[0]
+          ?? acceptanceReadinessPresentation.summary
+          ?? selected?.workOrder.requiredHumanAction
+          ?? "Review the current work order.",
+    );
 
   const latestReceiptMap = useMemo(
     () => latestByCriterion((selected?.verificationReceipts ?? []).map((receipt) => ({
@@ -545,47 +560,47 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
         }
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        <div className={mobileDetailOpen ? "hidden xl:block" : "block"}>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="WorkOrders" value={counts.total} />
-          <StatCard label="Active" value={counts.active} />
-          <StatCard label="Blocked" value={counts.blocked} tone={counts.blocked > 0 ? "bad" : "default"} />
-          <StatCard label="Needs attention" value={counts.attention} tone={counts.attention > 0 ? "warn" : "good"} />
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row xl:overflow-hidden">
+        <div className={`${mobileDetailOpen ? "hidden lg:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col lg:max-w-[26rem] lg:border-r xl:border-[var(--panel-line)]`}>
+        <div className="shrink-0 space-y-2 px-4 pb-2 pt-3">
+          <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <span>{counts.total} · {counts.active} active · <span className={counts.blocked > 0 ? "text-danger" : undefined}>{counts.blocked} blocked</span></span>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={() => setFiltersOpen((open) => !open)}>
+              {filtersOpen ? "Hide filters" : "Filters"}
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_FILTERS.map((filter) => {
+              const active = filters.quickFilter === filter.id;
+              return (
+                <Button
+                  key={filter.id}
+                  size="sm"
+                  variant={active ? "default" : "outline"}
+                  onClick={() => setFilters((current) => ({ ...current, quickFilter: filter.id }))}
+                  className="h-7 gap-1.5 px-2 text-[11px]"
+                >
+                  {filter.label}
+                  <span className="rounded-full bg-background/20 px-1.5 py-0.5 text-[10px] leading-none">
+                    {quickFilterCounts[filter.id] ?? 0}
+                  </span>
+                </Button>
+              );
+            })}
+          </div>
+          {filtersOpen ? (
+            <div className="grid gap-3 rounded-xl border border-[var(--panel-line)] bg-card/40 p-3 sm:grid-cols-2">
+              <FilterSelect label="Repository" value={filters.repository} onChange={(value) => setFilters((current) => ({ ...current, repository: value }))} options={repositories} />
+              <FilterSelect label="State" value={filters.state} onChange={(value) => setFilters((current) => ({ ...current, state: value }))} options={["READY", "DISPATCHED", "IN_PROGRESS", "BLOCKED", "AWAITING_APPROVAL", "AWAITING_VERIFICATION", "REOPENED", "DONE", "SUPERSEDED"]} />
+              <FilterSelect label="Risk" value={filters.riskLevel} onChange={(value) => setFilters((current) => ({ ...current, riskLevel: value }))} options={["LOW", "MEDIUM", "HIGH", "CRITICAL"]} />
+              <FilterSelect label="Assigned" value={filters.assignedAgent} onChange={(value) => setFilters((current) => ({ ...current, assignedAgent: value }))} options={assignedAgents} />
+              <FilterSelect label="Requested by" value={filters.requestedBy} onChange={(value) => setFilters((current) => ({ ...current, requestedBy: value }))} options={requestors} />
+              <FilterSelect label="Verification" value={filters.verificationStatus} onChange={(value) => setFilters((current) => ({ ...current, verificationStatus: value }))} options={["PENDING", "PASS", "FAIL", "WAIVED", "STALE"]} />
+            </div>
+          ) : null}
         </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {QUICK_FILTERS.map((filter) => {
-            const active = filters.quickFilter === filter.id;
-            return (
-              <Button
-                key={filter.id}
-                size="sm"
-                variant={active ? "default" : "outline"}
-                onClick={() => setFilters((current) => ({ ...current, quickFilter: filter.id }))}
-                className="gap-2"
-              >
-                {filter.label}
-                <span className="rounded-full bg-background/20 px-1.5 py-0.5 text-[11px] leading-none">
-                  {quickFilterCounts[filter.id] ?? 0}
-                </span>
-              </Button>
-            );
-          })}
-        </div>
-
-        <div className="mt-4 grid gap-3 rounded-xl border border-[var(--panel-line)] bg-card/40 p-4 lg:grid-cols-6">
-          <FilterSelect label="Repository" value={filters.repository} onChange={(value) => setFilters((current) => ({ ...current, repository: value }))} options={repositories} />
-          <FilterSelect label="State" value={filters.state} onChange={(value) => setFilters((current) => ({ ...current, state: value }))} options={["READY", "DISPATCHED", "IN_PROGRESS", "BLOCKED", "AWAITING_APPROVAL", "AWAITING_VERIFICATION", "REOPENED", "DONE", "SUPERSEDED"]} />
-          <FilterSelect label="Risk" value={filters.riskLevel} onChange={(value) => setFilters((current) => ({ ...current, riskLevel: value }))} options={["LOW", "MEDIUM", "HIGH", "CRITICAL"]} />
-          <FilterSelect label="Assigned" value={filters.assignedAgent} onChange={(value) => setFilters((current) => ({ ...current, assignedAgent: value }))} options={assignedAgents} />
-          <FilterSelect label="Requested by" value={filters.requestedBy} onChange={(value) => setFilters((current) => ({ ...current, requestedBy: value }))} options={requestors} />
-          <FilterSelect label="Verification" value={filters.verificationStatus} onChange={(value) => setFilters((current) => ({ ...current, verificationStatus: value }))} options={["PENDING", "PASS", "FAIL", "WAIVED", "STALE"]} />
-        </div>
-        </div>
-
-        <div className={`${mobileDetailOpen ? "mt-0 xl:mt-4" : "mt-4"} grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr))]`}>
-          <div className={`${mobileDetailOpen ? "hidden xl:block" : "block"} min-w-0 space-y-3`}>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 pb-5">
+          <div className="min-w-0 space-y-3">
             {filtered.length === 0 ? (
               <Card className="p-8 text-center text-sm text-muted-foreground">
                 No work orders match the current filters.
@@ -603,41 +618,18 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                       setMobileDetailOpen(true);
                     }}
                     aria-label={`${item.title} — next action: ${deriveNextAction(item)}`}
-                    className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedRow ? "border-registry-accent/40 bg-registry-accent-soft" : "border-[var(--panel-line)] bg-card/40 hover:border-registry-accent/20"}`}
+                    className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${selectedRow ? "border-registry-accent/40 bg-registry-accent-soft" : "border-[var(--panel-line)] bg-card/40 hover:border-registry-accent/20"}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-foreground">{item.title}</div>
-                        <div className={`mt-1 whitespace-pre-line text-xs line-clamp-2 ${selectedRow ? "text-foreground/75" : "text-muted-foreground"}`}>{normalizeNarrativeText(item.desiredOutcome)}</div>
+                        <div className={`mt-1 truncate text-xs ${selectedRow ? "text-foreground/75" : "text-muted-foreground"}`}>
+                          {deriveNextAction(item)}
+                        </div>
                       </div>
-                      <Badge variant="outline" className={RISK_STYLES[item.riskLevel] ?? ""}>{item.riskLevel}</Badge>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Badge variant="outline" className={STATE_STYLES[item.state] ?? ""}>{prettyLabel(item.state)}</Badge>
-                      <Badge variant="outline">{item.repository ?? "No repo"}</Badge>
-                      <Badge variant="outline">Workflow: {item.workflowId ?? "—"}</Badge>
-                      <Badge variant="outline">Verification: {item.verificationStatus}</Badge>
-                      {item.metadata?.automationDefinitionId ? <Badge variant="outline" className="border-registry-accent/30 text-registry-accent">Automation review gate</Badge> : null}
-                      {item.latestExecutionRun ? (
-                        <Badge variant="outline">
-                          Run: {item.latestExecutionRun.status} · {item.latestExecutionRun.workflowId}
-                        </Badge>
-                      ) : null}
-                    </div>
-
-                    <div className={`mt-3 grid gap-2 text-xs md:grid-cols-2 ${selectedRow ? "text-foreground/75" : "text-muted-foreground"}`}>
-                      <div>
-                        <span className="text-foreground/80">Assigned:</span> {item.assignedAgent ?? item.assignedSquad ?? "Unassigned"}
-                      </div>
-                      <div>
-                        <span className="text-foreground/80">Requestor:</span> {item.requestedBy ?? "Unknown"}
-                      </div>
-                      <div>
-                        <span className="text-foreground/80">Next action:</span> {deriveNextAction(item)}
-                      </div>
-                      <div className="md:col-span-2 truncate">
-                        <span className="text-foreground/80">Attention:</span> {summarizeRequiredAttention(item)}
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <Badge variant="outline" className={STATE_STYLES[item.state] ?? ""}>{prettyLabel(item.state)}</Badge>
+                        <Badge variant="outline" className={RISK_STYLES[item.riskLevel] ?? ""}>{item.riskLevel}</Badge>
                       </div>
                     </div>
                   </button>
@@ -645,8 +637,11 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
               })
             )}
           </div>
+        </div>
+        </div>
 
-          <Card ref={mobileDetailPanelRef} className={`${mobileDetailOpen ? "block" : "hidden xl:block"} min-h-[420px] min-w-0 scroll-mt-4 p-5`}>
+        <div className={`${mobileDetailOpen ? "flex" : "hidden lg:flex"} min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-5`}>
+          <Card ref={mobileDetailPanelRef} className="min-h-[420px] min-w-0 flex-1 scroll-mt-4 p-5">
             {!selected ? (
               <div className="text-sm text-muted-foreground">Select a work order to inspect requested outcome, criteria, and linked execution.</div>
             ) : (
@@ -733,6 +728,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                 {governedFactoryRequired ? <WorkOrderReadinessPanel
                   readiness={workOrderReadiness}
                   now={readinessNow}
+                  attemptInFlight={selected.executionRuns.some((run) => ["PENDING", "RUNNING", "PAUSED"].includes(run.status))}
                   onRefresh={() => setReadinessRefresh((value) => value + 1)}
                 /> : null}
                 <WorkOrderDetailTabs

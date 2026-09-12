@@ -129,9 +129,8 @@ async function installFrozenPnpmDependencies(worktree: string) {
     if (storeDirectory === candidateRoot || storeDirectory.startsWith(`${candidateRoot}${path.sep}`)) {
       throw new Error("The offline dependency store must be outside the candidate worktree.");
     }
-    await execFileAsync("pnpm", [
+    const installArgs = [
       "install",
-      "--offline",
       "--frozen-lockfile",
       "--ignore-scripts",
       "--ignore-pnpmfile",
@@ -141,27 +140,44 @@ async function installFrozenPnpmDependencies(worktree: string) {
       "--config.side-effects-cache=false",
       `--store-dir=${storeDirectory}`,
       "--reporter=silent",
-    ], {
-      cwd: worktree,
-      env: {
-        PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
-        HOME: scratchHome,
-        TMPDIR: scratchHome,
-        COREPACK_ENABLE_NETWORK: "0",
-        COREPACK_ENABLE_PROJECT_SPEC: "0",
-        COREPACK_ENABLE_AUTO_PIN: "0",
-        COREPACK_DEFAULT_TO_LATEST: "0",
-        COREPACK_HOME: corepackHome,
-        CI: "1",
-        npm_config_ignore_scripts: "true",
-        NPM_CONFIG_IGNORE_SCRIPTS: "true",
-      },
-      timeout: 300_000,
-      maxBuffer: 4 * 1024 * 1024,
-    });
+    ];
+    const env = {
+      PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+      HOME: scratchHome,
+      TMPDIR: scratchHome,
+      COREPACK_ENABLE_PROJECT_SPEC: "0",
+      COREPACK_ENABLE_AUTO_PIN: "0",
+      COREPACK_DEFAULT_TO_LATEST: "0",
+      COREPACK_HOME: corepackHome,
+      CI: "1",
+      npm_config_ignore_scripts: "true",
+      NPM_CONFIG_IGNORE_SCRIPTS: "true",
+    };
+    try {
+      await execFileAsync("pnpm", ["--offline", ...installArgs], {
+        cwd: worktree,
+        env: { ...env, COREPACK_ENABLE_NETWORK: "0" },
+        timeout: 300_000,
+        maxBuffer: 4 * 1024 * 1024,
+      });
+    } catch (offlineError: any) {
+      // First scaffold: lockfile exists, local store does not. One online frozen
+      // install fills the store without rewriting source or running lifecycle scripts.
+      await execFileAsync("pnpm", installArgs, {
+        cwd: worktree,
+        env: { ...env, COREPACK_ENABLE_NETWORK: "1" },
+        timeout: 300_000,
+        maxBuffer: 4 * 1024 * 1024,
+      }).catch((onlineError: any) => {
+        const offline = `${offlineError?.stderr ?? offlineError?.message ?? ""}`.trim();
+        const online = `${onlineError?.stderr ?? onlineError?.stdout ?? onlineError?.message ?? ""}`.trim();
+        throw new Error(`Factory dependency preparation failed${online ? `: ${online.slice(-2_000)}` : offline ? `: ${offline.slice(-2_000)}` : "."}`);
+      });
+    }
   } catch (error: any) {
+    if (error instanceof Error && error.message.startsWith("Factory dependency preparation failed")) throw error;
     const detail = `${error?.stderr ?? error?.stdout ?? error?.message ?? "unknown error"}`.trim();
-    throw new Error(`Factory dependency preparation failed in frozen offline mode${detail ? `: ${detail.slice(-2_000)}` : "."}`);
+    throw new Error(`Factory dependency preparation failed${detail ? `: ${detail.slice(-2_000)}` : "."}`);
   } finally {
     await rm(scratchHome, { recursive: true, force: true });
   }

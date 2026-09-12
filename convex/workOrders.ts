@@ -2973,10 +2973,18 @@ async function dispatchWorkOrder(
       throw new Error("WorkOrder cannot be dispatched without a workflowId");
     }
 
-    const workflow = await ctx.db
+    let workflow = await ctx.db
       .query("workflows")
       .withIndex("by_workflow_id", (q) => q.eq("workflowId", resolvedWorkflowId))
       .first();
+
+    if (args.factoryDefinitionVersionId) {
+      const factoryVersion = await ctx.db.get(args.factoryDefinitionVersionId);
+      if (factoryVersion?.workflowId) {
+        const factoryWorkflow = await ctx.db.get(factoryVersion.workflowId);
+        if (factoryWorkflow?.active) workflow = factoryWorkflow;
+      }
+    }
 
     if (!workflow || !workflow.active) {
       throw new Error(`Workflow not available for dispatch: ${resolvedWorkflowId}`);
