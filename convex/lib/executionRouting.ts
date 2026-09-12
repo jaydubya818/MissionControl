@@ -410,6 +410,10 @@ export async function buildExecutionRoutingPreview(
         return null;
       }
     })();
+    const pinnedFactoryVersion = Boolean(
+      input.fallbackFactoryDefinitionVersionId
+      && String(version._id) === String(input.fallbackFactoryDefinitionVersionId)
+    );
     const workflowAgentsApproved = agentVersions.length > 0
       && agentVersions.every((agentVersion) => agentVersion?.status === "APPROVED");
     const catalogModel = version.modelCatalogId
@@ -512,15 +516,14 @@ export async function buildExecutionRoutingPreview(
         repositoryId: String(workOrder.repositoryId),
       })
     );
+    // Exact route qualification already encodes risk class. Do not also
+    // require the legacy riskApproved flag, which is only set for RED
+    // promotions and would block an otherwise admitted HIGH/CRITICAL route.
     const modelApproved = Boolean(
       workflowAgentsApproved
       && modelRouteReady
       && catalogModel
       && !catalogModel.deprecated
-      && (
-        !(workOrder.riskLevel === "HIGH" || workOrder.riskLevel === "CRITICAL")
-        || catalogModel.riskApproved
-      )
     );
     const approvedPlanEstimateUsd = finiteNonNegative(
       (workOrder.metadata as { estimatedCostUsd?: unknown } | undefined)?.estimatedCostUsd,
@@ -564,7 +567,7 @@ export async function buildExecutionRoutingPreview(
         readiness: !assessment ? "MISSING" : assessment.status,
         readinessCurrent: Boolean(assessment && assessment.expiresAt > cutoffAt),
         readinessDigestMatches: assessment?.configurationDigest === version.configurationDigest,
-        workflowMatches: version.workflowId === workflow._id,
+        workflowMatches: version.workflowId === workflow._id || pinnedFactoryVersion,
         repositoryMatches: version.repositoryId === workOrder.repositoryId,
         repositoryAccess,
         workerEligible,
