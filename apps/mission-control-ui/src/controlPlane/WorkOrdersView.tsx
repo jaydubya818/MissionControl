@@ -281,10 +281,18 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   };
 
   useEffect(() => {
-    if (!mobileDetailOpen || !selectedDetailId || !globalThis.matchMedia?.("(max-width: 1279px)").matches) return;
+    if (!selectedDetailId) return;
     const frame = requestAnimationFrame(() => {
-      mobileDetailPanelRef.current?.scrollIntoView({ block: "start" });
-      mobileBackButtonRef.current?.focus({ preventScroll: true });
+      const selectedRow = document.querySelector<HTMLButtonElement>(`[data-work-order-id="${selectedDetailId}"]`);
+      selectedRow?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      if (mobileDetailOpen && globalThis.matchMedia?.("(max-width: 1279px)").matches) {
+        mobileDetailPanelRef.current?.scrollIntoView({ block: "start" });
+        mobileBackButtonRef.current?.focus({ preventScroll: true });
+      } else {
+        mobileDetailPanelRef.current?.scrollTo?.({ top: 0 });
+        const inspector = mobileDetailPanelRef.current;
+        inspector?.parentElement?.scrollTo?.({ top: 0 });
+      }
     });
     return () => cancelAnimationFrame(frame);
   }, [mobileDetailOpen, selectedDetailId]);
@@ -545,8 +553,9 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
         }
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        <div className={mobileDetailOpen ? "hidden xl:block" : "block"}>
+      <div className="flex min-h-0 flex-1 flex-col xl:flex-row xl:overflow-hidden">
+        <div className={`${mobileDetailOpen ? "hidden xl:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col xl:max-w-[34rem] xl:border-r xl:border-[var(--panel-line)]`}>
+        <div className="shrink-0 space-y-4 p-5 pb-3">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="WorkOrders" value={counts.total} />
           <StatCard label="Active" value={counts.active} />
@@ -554,7 +563,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
           <StatCard label="Needs attention" value={counts.attention} tone={counts.attention > 0 ? "warn" : "good"} />
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           {QUICK_FILTERS.map((filter) => {
             const active = filters.quickFilter === filter.id;
             return (
@@ -574,7 +583,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
           })}
         </div>
 
-        <div className="mt-4 grid gap-3 rounded-xl border border-[var(--panel-line)] bg-card/40 p-4 lg:grid-cols-6">
+        <div className="grid gap-3 rounded-xl border border-[var(--panel-line)] bg-card/40 p-4 sm:grid-cols-2">
           <FilterSelect label="Repository" value={filters.repository} onChange={(value) => setFilters((current) => ({ ...current, repository: value }))} options={repositories} />
           <FilterSelect label="State" value={filters.state} onChange={(value) => setFilters((current) => ({ ...current, state: value }))} options={["READY", "DISPATCHED", "IN_PROGRESS", "BLOCKED", "AWAITING_APPROVAL", "AWAITING_VERIFICATION", "REOPENED", "DONE", "SUPERSEDED"]} />
           <FilterSelect label="Risk" value={filters.riskLevel} onChange={(value) => setFilters((current) => ({ ...current, riskLevel: value }))} options={["LOW", "MEDIUM", "HIGH", "CRITICAL"]} />
@@ -583,9 +592,8 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
           <FilterSelect label="Verification" value={filters.verificationStatus} onChange={(value) => setFilters((current) => ({ ...current, verificationStatus: value }))} options={["PENDING", "PASS", "FAIL", "WAIVED", "STALE"]} />
         </div>
         </div>
-
-        <div className={`${mobileDetailOpen ? "mt-0 xl:mt-4" : "mt-4"} grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr))]`}>
-          <div className={`${mobileDetailOpen ? "hidden xl:block" : "block"} min-w-0 space-y-3`}>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 pb-5">
+          <div className="min-w-0 space-y-3">
             {filtered.length === 0 ? (
               <Card className="p-8 text-center text-sm text-muted-foreground">
                 No work orders match the current filters.
@@ -645,8 +653,11 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
               })
             )}
           </div>
+        </div>
+        </div>
 
-          <Card ref={mobileDetailPanelRef} className={`${mobileDetailOpen ? "block" : "hidden xl:block"} min-h-[420px] min-w-0 scroll-mt-4 p-5`}>
+        <div className={`${mobileDetailOpen ? "flex" : "hidden xl:flex"} min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-5`}>
+          <Card ref={mobileDetailPanelRef} className="min-h-[420px] min-w-0 flex-1 scroll-mt-4 p-5">
             {!selected ? (
               <div className="text-sm text-muted-foreground">Select a work order to inspect requested outcome, criteria, and linked execution.</div>
             ) : (
