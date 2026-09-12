@@ -725,6 +725,31 @@ export function specVerificationCheckId(verificationExpectationId: string) {
   return `spec:${verificationExpectationId}`;
 }
 
+const NEGATED_SCOPE_PREFIX = /(?:\bdo not|\bdoes not|\bdid not|\bmust not|\bshall not|\bwill not|\bnever|\bwithout|\bavoid(?:s|ed|ing)?|\bexclude(?:s|d|ing)?|\bprohibit(?:s|ed|ing)?|\bprevent(?:s|ed|ing)?|\bno)\s+(?:\w+\s+){0,4}$/;
+const NEGATED_SCOPE_SUFFIX = /^(?:\s+\w+){0,3}\s+(?:is|are|remains?|remain)\s+(?:explicitly\s+)?(?:out of scope|excluded|prohibited|not permitted)\b/;
+
+/**
+ * Exact non-goal text is useful as a conservative signal, but Plans also repeat
+ * non-goals as explicit guardrails. Treat an occurrence as included scope only
+ * when it is not locally negated or marked out of scope.
+ */
+export function planIncludesExcludedScope(planText: string, nonGoalDescription: string): boolean {
+  const normalizedPlan = canonicalText(planText);
+  const excluded = canonicalText(nonGoalDescription);
+  if (excluded.length < 8) return false;
+
+  let offset = 0;
+  while (offset < normalizedPlan.length) {
+    const index = normalizedPlan.indexOf(excluded, offset);
+    if (index < 0) return false;
+    const prefix = normalizedPlan.slice(Math.max(0, index - 80), index);
+    const suffix = normalizedPlan.slice(index + excluded.length, index + excluded.length + 80);
+    if (!NEGATED_SCOPE_PREFIX.test(prefix) && !NEGATED_SCOPE_SUFFIX.test(suffix)) return true;
+    offset = index + excluded.length;
+  }
+  return false;
+}
+
 export function buildRequirementsCoverageProjection(input: {
   spec: MissionSpecContent;
   assertions: SpecBoundPlanAssertion[];
@@ -798,8 +823,7 @@ export function analyzeSpecPlanConsistency(input: {
   if (!input.repositoryId || input.repositoryId !== input.spec.repositoryScope.repositoryId) findings.push({ code: "PLAN_REPOSITORY_SCOPE_MISMATCH", severity: "BLOCKING", blocking: true, path: "repositoryScope.repositoryId", artifactType: "LINEAGE", message: "The Plan repository does not match the bound Spec repository scope.", nextAction: "Create a new Plan revision using the bound Spec repository." });
   const planText = canonicalText([input.planSummary, ...input.workOrderBlueprints.flatMap((item) => [item.title, item.desiredOutcome, ...(item.constraints ?? [])])].join(" "));
   for (const nonGoal of input.spec.nonGoals) {
-    const excluded = canonicalText(nonGoal.description);
-    if (excluded.length >= 8 && planText.includes(excluded)) findings.push({ code: "PLAN_NON_GOAL_VIOLATION", severity: "BLOCKING", blocking: true, path: `nonGoals.${nonGoal.id}`, artifactType: "PLAN", artifactId: nonGoal.id, message: `The Plan appears to include excluded scope ${nonGoal.id}.`, nextAction: "Remove the excluded scope or finalize a new Spec revision." });
+    if (planIncludesExcludedScope(planText, nonGoal.description)) findings.push({ code: "PLAN_NON_GOAL_VIOLATION", severity: "BLOCKING", blocking: true, path: `nonGoals.${nonGoal.id}`, artifactType: "PLAN", artifactId: nonGoal.id, message: `The Plan appears to include excluded scope ${nonGoal.id}.`, nextAction: "Remove the excluded scope or finalize a new Spec revision." });
   }
   findings.sort((left, right) => left.code.localeCompare(right.code) || left.path.localeCompare(right.path));
   const digestInput = { coverageDigest: coverage.digest, findings };

@@ -1,0 +1,82 @@
+
+ RUN  v3.2.7 <qualification-worktree>/apps/mission-control-ui
+
+ ❯ src/controlPlane/ExecutionRunInspector.test.tsx (13 tests | 3 failed) 91ms
+   ✓ ExecutionRunInspector shell states > names the exact authority being resolved while loading 40ms
+   ✓ ExecutionRunInspector shell states > gives a recoverable action for a mismatched or unavailable Attempt 10ms
+   ✓ ExecutionRunInspector shell states > explains the empty selection state 5ms
+   ✓ RemoteSandboxCard > shows execution, credential, result, and teardown evidence without exposing secret material 13ms
+   ✓ RemoteSandboxCard > does not render an untrusted preview URL 2ms
+   ✓ InferenceEconomicsCard > leads with the WorkOrder spending stop despite an older complete projection 6ms
+   ✓ InferenceEconomicsCard > shows a WorkOrder spending stop when this Attempt has no reservation 1ms
+   ✓ InferenceEconomicsCard > shows loading and honest empty states 1ms
+   ✓ InferenceEconomicsCard > labels unknown cost as a lower bound and exposes comparison denial 2ms
+   ✓ InferenceEconomicsCard > shows completed accepted-outcome economics without collapsing stages 2ms
+   × InferenceEconomicsCard > keeps an unrepresentable aggregate unknown with a stored projection: true 6ms
+     → expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  Unknown
+Received:
+  Known inference cost$18,014,398,509.481983Lower bound; total is unknown
+   × InferenceEconomicsCard > keeps an unrepresentable aggregate unknown with a stored projection: false 2ms
+     → expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  Unknown
+Received:
+  Known inference cost$18,014,398,509.481983Lower bound; total is unknown
+   × InferenceEconomicsCard > does not replace unknown projected money with an older receipt estimate 1ms
+     → expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  Unknown
+Received:
+  Known inference cost$0.00675Lower bound; total is unknown
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/controlPlane/ExecutionRunInspector.test.tsx > InferenceEconomicsCard > keeps an unrepresentable aggregate unknown with a stored projection: true
+ FAIL  src/controlPlane/ExecutionRunInspector.test.tsx > InferenceEconomicsCard > keeps an unrepresentable aggregate unknown with a stored projection: false
+Error: expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  Unknown
+Received:
+  Known inference cost$18,014,398,509.481983Lower bound; total is unknown
+ ❯ src/controlPlane/ExecutionRunInspector.test.tsx:194:20
+    192|     }} />);
+    193|     const metric = screen.getByText("Known inference cost").parentElem…
+    194|     expect(metric).toHaveTextContent("Unknown");
+       |                    ^
+    195|     expect(metric).toHaveTextContent("Aggregate cost unavailable");
+    196|     expect(metric).not.toHaveTextContent("$");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/controlPlane/ExecutionRunInspector.test.tsx > InferenceEconomicsCard > does not replace unknown projected money with an older receipt estimate
+Error: expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  Unknown
+Received:
+  Known inference cost$0.00675Lower bound; total is unknown
+ ❯ src/controlPlane/ExecutionRunInspector.test.tsx:209:68
+    207|         costCoverage: 0, confidence: "NONE", formulaVersion: "accepted…
+    208|     }} />);
+    209|     expect(screen.getByText("Known inference cost").parentElement).toH…
+       |                                                                    ^
+    210|     expect(screen.getByText(/ESTIMATED ·/)).toBeInTheDocument();
+    211|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 10 passed (13)
+   Start at  01:16:41
+   Duration  738ms (transform 99ms, setup 91ms, collect 237ms, tests 91ms, environment 144ms, prepare 30ms)
+
+undefined
+<qualification-worktree>/apps/mission-control-ui:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/controlPlane/ExecutionRunInspector.test.tsx

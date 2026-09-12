@@ -1,0 +1,30 @@
+{
+  "head": "971d664d81259b005ab986bd2e14cc1a049b98bb",
+  "base": "06992d8dc119986592ccfcc2d9f84c4a5e07981b",
+  "composedGates": {
+    "passed": 19,
+    "total": 19
+  },
+  "fullRepositoryTests": {
+    "passed": 2773,
+    "skipped": 11
+  },
+  "phase5": "PASS",
+  "criticalBrowser": {
+    "passed": 15,
+    "total": 15
+  },
+  "focusedHandlers": {
+    "passed": 42,
+    "total": 42
+  },
+  "realLocalBackendScenarios": {
+    "passed": 13,
+    "total": 13
+  },
+  "codegen": "PASS; generated files unchanged",
+  "evalVerdict": "WARN; inherited economics coverage failure is retained",
+  "providerCalls": 0,
+  "realAcceptedWorkOrders": 0,
+  "productionChanges": 0
+}

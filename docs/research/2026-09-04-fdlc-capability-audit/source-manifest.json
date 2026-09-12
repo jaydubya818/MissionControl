@@ -1,0 +1,563 @@
+{
+  "retrieved_at_utc": "2026-09-05T00:11:23.733866+00:00",
+  "local_head": "dc51cd873a2edaca6972cceb35a3602fd30330ac",
+  "public_main_verified_via_github_api": "1d27266d5d6892a37f897c7d0fe325fe811e63fe",
+  "method": "Public HTTPS HTML retrieval; no authenticated site state, browser interactions, or live Mission Control execution. Hashes identify retrieved HTML; full source content not vendored.",
+  "pages": [
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/00-front-matter/00-how-to-read-this-guide",
+      "status": 200,
+      "sha256": "c3dc2de33accaa81e083064d53472c0f415376c8df0cd39057d1d1a8b28080ac",
+      "words": 2185,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/00-front-matter/01-what-this-guide-covers",
+      "status": 200,
+      "sha256": "5e0029194492e93feb66dfc03fbb1e6d5ef166323290a8426dee786c135fd680",
+      "words": 2091,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/01-understand/01-why-software-engineering-is-changing",
+      "status": 200,
+      "sha256": "5ee3b3514c4fa0651e245f6db8d640c93be898219decf3a5eedd1967babbbdac",
+      "words": 5476,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/01-understand/02-the-factory-in-one-view",
+      "status": 200,
+      "sha256": "ef2cebeefee3c8c36574d5ed5bdc169a547ef0b5b2946edef798eab875eaaa74",
+      "words": 4881,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/01-understand/03-first-principles-trust-evidence-and-authority",
+      "status": 200,
+      "sha256": "122d2fe108de531d4e0395f747bf67b5d6340f8da3253c0554443daa974ec147",
+      "words": 5492,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/02-design/04-the-human-agent-operating-model",
+      "status": 200,
+      "sha256": "5d63f275da3bccc16571738c47992bd12549835708c8bcbfda7ca29e2c0355ea",
+      "words": 8143,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/02-design/05-authoritative-records",
+      "status": 200,
+      "sha256": "a13e8598f8f0afbc102c5822091aa4d9758611f8bb55de4e92cc34e272ac58fa",
+      "words": 10175,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/02-design/06-intent-and-specification-engineering",
+      "status": 200,
+      "sha256": "2366e67be67e5d49bcbcd1f8c59494b84617b40b1924f45d010a71947d42bda8",
+      "words": 7031,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/02-design/07-governance-policy-and-risk-proportional-approval",
+      "status": 200,
+      "sha256": "e7ab93bc2efa082159065ec3d89f527498592e0b41edd3123466b84825656a6d",
+      "words": 10512,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/02-design/08-economics-metrics-and-human-attention",
+      "status": 200,
+      "sha256": "7512736a10b5426bfe509022721548a094c69d09950962b3331f6a766eff2d9d",
+      "words": 7265,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/02-design/09-tokenomics-and-factory-economics",
+      "status": 200,
+      "sha256": "9640b888aea45df74f73e5c0bd717205820c979637923e041002ffae2590cbf2",
+      "words": 5013,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/02-design/10-multi-repository-design",
+      "status": 200,
+      "sha256": "2e159b6124f2cce39eb7417e879d2d89041138677bc82881626c2709a40e6288",
+      "words": 4939,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/11-the-agent-factory",
+      "status": 200,
+      "sha256": "2dc1d44ed1c52eee64af02bdec007fa525d3af59139771c4c4d36e5e9e61ce65",
+      "words": 8463,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/12-skills-as-packages",
+      "status": 200,
+      "sha256": "5a10a21b25077a13be64dc8fabdb750df04c08d11bf45b626261f508ef57aba9",
+      "words": 5407,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/13-control-plane-orchestrator-and-execution-plane",
+      "status": 200,
+      "sha256": "147fc06768d7d3d6835db031e4325570dee75dfb5486fefe449245870a1ca5ec",
+      "words": 10402,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/14-durable-execution",
+      "status": 200,
+      "sha256": "663f5fae72502c2792bb51ef71352e717d504bc7caa774011912a0bc34482a4a",
+      "words": 5758,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/15-coding-harnesses-and-agent-protocols",
+      "status": 200,
+      "sha256": "569b1dc637f316a09187a8cae8e3064e528807dd275dcea85dcb3bbccab81c4d",
+      "words": 7117,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/16-harness-engineering",
+      "status": 200,
+      "sha256": "faa6c66a7cef11a7192b72f17506973f566c971da74f72962ff32d85a511bdf5",
+      "words": 4772,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/17-development-environments-sandboxes-and-compute",
+      "status": 200,
+      "sha256": "80cf41bcf1458e2fae77bf47dbf0109974e92f4aae836dc32b1ef6c5b13907ce",
+      "words": 7932,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/18-agent-architecture",
+      "status": 200,
+      "sha256": "4349a913c80353175a39edb3938bfa224a447fefdbc9562bf4a90a7067a0e63e",
+      "words": 9561,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/19-data-knowledge-and-semantic-engineering",
+      "status": 200,
+      "sha256": "12fc87878b82231c5c916f4f64e17589e0d90a2ba2f4326820144eaff72b8815",
+      "words": 6647,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/20-context-engineering",
+      "status": 200,
+      "sha256": "ebd98bc24f797ac4ef36e782fca7fb668b5951f723377568bfc87945a0384bc1",
+      "words": 6026,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/21-models-and-capability-selection",
+      "status": 200,
+      "sha256": "c805a7fa9a91df49e4b21ae1cfd7f00e63cbd66fb560406581a1e6ef92c2837a",
+      "words": 2302,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/22-routing-and-the-escalation-ladder",
+      "status": 200,
+      "sha256": "1a0b0e44dc77200796dcf6d7512d273050483ddc79c269aa25b32b89516a6175",
+      "words": 7079,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/23-agent-and-loop-engineering",
+      "status": 200,
+      "sha256": "2ebff54d9a905fafe71f93411912adc277e949e856d45cb888fb2bb3fe41bc20",
+      "words": 6792,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/24-loop-engineering-patterns-and-defaults",
+      "status": 200,
+      "sha256": "1167d06a76ce34d0e56019b3aa80f57a953983a828ce012534f9c4c149812819",
+      "words": 3733,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/25-the-12-layer-production-ai-agent-stack",
+      "status": 200,
+      "sha256": "83c36e634612645c3bc042adc1ab8b8a4d9a43691a40831f93ba4152fbf921e2",
+      "words": 5165,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/03-build/26-autonomous-engineering-workflows",
+      "status": 200,
+      "sha256": "3a177044d5d40e4e8329fe9502da400c9dec869f8ecd271d99d3cc1436f0d74d",
+      "words": 8808,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/04-prove/27-quality-and-evidence-architecture",
+      "status": 200,
+      "sha256": "f0bc6fb5053b3db5a2c7ffea56cd569cdb607f46f96acc358a700db176c49e39",
+      "words": 7665,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/04-prove/28-testing-strategy-for-agentic-change",
+      "status": 200,
+      "sha256": "83dc1e1f6688a6ca5a010ab0036b2f36b4b05a92f9413fffeb4d3ffddffcaff9",
+      "words": 4317,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/04-prove/29-evaluation-engineering",
+      "status": 200,
+      "sha256": "9f29a6c99ee17199fe5d4b73c10eb2ad69b2c0de314db89171dd2f0f751bdc04",
+      "words": 7030,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/04-prove/30-evals-as-factory-assets",
+      "status": 200,
+      "sha256": "c6ce4b653fa9cc64a91ca528d2a509aa836ee1cf2bb56d4d1a92b7ec5389d358",
+      "words": 4495,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/04-prove/31-quality-contracts-proof-packages-and-certificates",
+      "status": 200,
+      "sha256": "0baa378b1f144865371b9663d1dd306ce4bc3d104a00a66d89670178643b414f",
+      "words": 8034,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/04-prove/32-cicd-progressive-delivery-and-production-verification",
+      "status": 200,
+      "sha256": "0b582ff72dcfbe387c2206fa96f2867a2a27dae727354384f56ce0eafccf6e5d",
+      "words": 5358,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/04-prove/33-security",
+      "status": 200,
+      "sha256": "5d35f6946be3f244182054a852464db4740503c193f06921dc17ef8de566861f",
+      "words": 8973,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/05-operate/34-the-factory-as-a-platform",
+      "status": 200,
+      "sha256": "e9eb0a047a25a705d538ffc688a541826332e613f72952855e5a6528b2d62864",
+      "words": 6609,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/05-operate/35-observability-telemetry-and-forensics",
+      "status": 200,
+      "sha256": "998b06b33e2845cd5a8b18617dbb25a0ff4b5f395d0262d4ae82e80ef7cdcf3b",
+      "words": 6177,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/05-operate/36-resilience-incidents-and-the-control-tower",
+      "status": 200,
+      "sha256": "9c1597db8f982de9dbed57f07e9d2900858ca91777b18de1ab6e9299127295a0",
+      "words": 6441,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/05-operate/37-control-surfaces-event-contracts-and-storage",
+      "status": 200,
+      "sha256": "1b87868e1e08c54aceb0a496941f7e00a30e664258db70fa6017af326e9a4793",
+      "words": 7182,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/05-operate/38-enterprise-adoption-and-the-infrastructure-landscape",
+      "status": 200,
+      "sha256": "0973f0cdc2448ff2403e8403d7e7c7ff1424d42faa1172eaac11441678f1f125",
+      "words": 11722,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/06-improve/39-production-feedback-review-and-the-agentic-merge-queue",
+      "status": 200,
+      "sha256": "60254fee7edf79a366f4a380427fc59d09881e94949869bb7e3cd87e9981c93a",
+      "words": 9645,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/06-improve/40-governed-learning",
+      "status": 200,
+      "sha256": "2fe09f0a69f4ebc53444bfeb27fd6f4c30e2150a42e4f4342df46e792f9f0488",
+      "words": 5145,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/06-improve/41-meta-loops-and-the-closed-loop-factory",
+      "status": 200,
+      "sha256": "369c2d9fd51d74c1f4aab2cf8aba8b5d0b90a0e5b59bfb1c0dd9f16d9fd772ed",
+      "words": 8703,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/06-improve/42-mission-control-as-a-living-case-study",
+      "status": 200,
+      "sha256": "d75e1d162c369c288fe3c864dce92daae641d37a1b7fa319a8e721b57af2fae3",
+      "words": 12942,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/06-improve/43-mastering-the-factory",
+      "status": 200,
+      "sha256": "51a3bc3952832470960e49969191fd78c2918b479b352ff70b4c9566067f2872",
+      "words": 7435,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/06-improve/44-where-this-is-going",
+      "status": 200,
+      "sha256": "13bd609965a66a8d603ea93a41b8bbc671ddaa6731779d28b6798dbf40c898fe",
+      "words": 4986,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/appendix/architecture-communication",
+      "status": 200,
+      "sha256": "47a6f041a5850254ba2ceea7639fb1e9e0fdc755ad5f494737384fc89bc22bb9",
+      "words": 7408,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/appendix/changelog",
+      "status": 200,
+      "sha256": "0e5a5fc08cba966169a81819bc001c5309097eebcd8f98ff2b7c31890d3bae08",
+      "words": 2245,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/appendix/coverage-and-maturity",
+      "status": 200,
+      "sha256": "16b10adac77e53c412a906616f323f423312f7214c5d9ed97dc6ec8c8272b88c",
+      "words": 1558,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/appendix/glossary",
+      "status": 200,
+      "sha256": "a268e0b10ead1a3895856278ae9e09af8686fb00e23be761ef641fb539bdfe6d",
+      "words": 24143,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/appendix/mission-control/01-implementation-maturity-and-evidence-map",
+      "status": 200,
+      "sha256": "6f35c122f4c24b5d9b1e0ab708c7f1935c14e9c74f0261cb41a5be65d647cbc5",
+      "words": 2095,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/appendix/mission-control/02-verification-first-software-factory",
+      "status": 200,
+      "sha256": "f36ccebf08f0fa31394acc7926c7b242fd7cc14d13e9d7b20c3845ad3c96d783",
+      "words": 2451,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/appendix/mission-control/03-capability-workflow-and-admission-map",
+      "status": 200,
+      "sha256": "9ec6032199db27ac1a05eadca1b1f83baad4aced64a84162214a3011bfb33ace",
+      "words": 3696,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/appendix/operator-surfaces",
+      "status": 200,
+      "sha256": "ffe93454f9c0120290c59309391e4fd5f0aca07c6d8afcb13be9f5f8163b4134",
+      "words": 1319,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/appendix/principles",
+      "status": 200,
+      "sha256": "c6b004e701e90c1c18e2545b3c13ea54fbe42bccc38ace813857fd76164d2846",
+      "words": 7035,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/appendix/research/initial-canon",
+      "status": 200,
+      "sha256": "f2a077a794ced9ff9aca5282b9d958b015ecb40480f9a8e4530783824b8f02ab",
+      "words": 3258,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/appendix/reviewer-guide",
+      "status": 200,
+      "sha256": "1e0e0f138f7b3774c30a6219fa382f5dd15b9e054fb900b679b909cfbb02eee3",
+      "words": 1375,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/stages/01-builder-intent",
+      "status": 200,
+      "sha256": "99bd3880036a977ae741730f9ba83c703a801d5dc541e3846e177c78a537883d",
+      "words": 1726,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/stages/02-plan",
+      "status": 200,
+      "sha256": "5069ec813fe8d1d50438da383c7697877fa6e1867f4843db02429b92d624970d",
+      "words": 1756,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/stages/03-define-agent",
+      "status": 200,
+      "sha256": "7ac130f9e85c9308c14fd487cc614a15c4a8a32b47c506bf2fc563139b82f7a1",
+      "words": 1763,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/stages/04-execute-through-harness",
+      "status": 200,
+      "sha256": "4b6790b8efa4dcc8f46e8ba2b7991cbaf6020b464b0ad8bd6f4cea204f303b8a",
+      "words": 1791,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/stages/05-apply-skills",
+      "status": 200,
+      "sha256": "eafda5472b1214d2212e3f59fe2a6ef754dbaa30ee206bff8b22448ec622662d",
+      "words": 1767,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/stages/06-evaluate",
+      "status": 200,
+      "sha256": "b39c60ac400b0ca9d2b79d2e780f766349bc051c9594810c2aa8a39a0330dc0b",
+      "words": 1743,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/stages/07-improve",
+      "status": 200,
+      "sha256": "e9b7ccdf8abd212073f26233188f2574dbce4a986123b3495bb94fcd53fa3124",
+      "words": 1764,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/docs/stages/08-deliver-software",
+      "status": 200,
+      "sha256": "165c5c6bdf9919f508c7e1c22d921888a52a36bf62844b45808c3d0f6730c8e8",
+      "words": 1825,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://fdlc.ai/guide",
+      "status": 200,
+      "sha256": "ee91d667b0d6d661826cf1902ebffa3b1199bfb50be522d4b529814c28c748bf",
+      "words": 1073,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://fdlc.ai/maturity",
+      "status": 200,
+      "sha256": "259813a28f4624abc8eb12b8f1a1876dffeedf0db6fb2df5716380cb47642f38",
+      "words": 383,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://fdlc.ai/spec",
+      "status": 200,
+      "sha256": "ee0153f9625da6c547863c4828eeb95a77ea68a2af78512ccc17950862133d66",
+      "words": 817,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://fdlc.ai/benchmarks",
+      "status": 200,
+      "sha256": "38df091d82fd5922ff0f3b55593de640063beae71b241426ab4134bd32c40242",
+      "words": 301,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://fdlc.ai/start",
+      "status": 200,
+      "sha256": "5f8481992ddc022d77613a1d3f53a1d978933f520ddd4f2517fe8eaab8d3001f",
+      "words": 118,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://fdlc.ai/enterprise",
+      "status": 200,
+      "sha256": "d08b7aaeb645b193d4e40ffb01351e490ff25f996206afbe33fd9ee3fa62e053",
+      "words": 227,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://fdlc.ai/deploy",
+      "status": 200,
+      "sha256": "76ad179bd7708a3e7f45e713a00bf8e61a008e3413c9ee3c1baa9a99098dbc6d",
+      "words": 270,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://fdlc.ai/manifesto",
+      "status": 200,
+      "sha256": "32771e794086ad74d0e46ae598f9f5f4d50ece62a31a3c4ab2726f2be558afc3",
+      "words": 761,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://fdlc.ai/in-5-minutes",
+      "status": 200,
+      "sha256": "efa1cd8df6bbb8f46da43bb9b8ed5a3c1f7473802f22cbb085a3ba18d4cbbbc3",
+      "words": 1989,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://fdlc.ai/about",
+      "status": 200,
+      "sha256": "a881d0a6ddf8179298b1b7d23c8e0b7f4cf3271c94c719e5a3dfb9a531350ea4",
+      "words": 282,
+      "review_depth": "Retrieved; headings and implementation sections reviewed where present; selected engineering sections examined"
+    },
+    {
+      "url": "https://fdlc.ai/",
+      "sha256": "be26dc6534f3e96b7c8fdd008bcbc666232a30b73c1a39ae25659784a090443e",
+      "review_depth": "Main rendered HTML text reviewed"
+    },
+    {
+      "url": "https://fdlc.ai/framework",
+      "sha256": "df3aea601a5da130a3d5ca5d33fa29adddb1e516f788126d95a61093ef24d7c1",
+      "review_depth": "Main rendered HTML text reviewed"
+    },
+    {
+      "url": "https://fdlc.ai/architecture",
+      "sha256": "819d483c1e88ec2f56caf47a78c2df08dfd3bac8a4b4a783bc8e43e604c03e5e",
+      "review_depth": "Main rendered HTML text reviewed"
+    },
+    {
+      "url": "https://fdlc.ai/mission-control",
+      "sha256": "639bb03f3ab10b5ca47ba6cd7cd70145052026a3ef748bd5512a8170bcc8c712",
+      "review_depth": "Main rendered HTML text reviewed"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/",
+      "sha256": "2eaff0adcaa7b096d7540b37b9463cb03982d302984003074e13b43ca8b80c66",
+      "review_depth": "Main rendered HTML text reviewed"
+    },
+    {
+      "url": "https://ai-software-factory-mastery.vercel.app/guide",
+      "sha256": "d218e328d3cfabbd029f0af2c488d9cf615d17a9a46ee1a5724420d4afee67e2",
+      "review_depth": "Main rendered HTML text reviewed"
+    }
+  ]
+}

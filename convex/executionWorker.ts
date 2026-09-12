@@ -113,6 +113,9 @@ async function createArtifact(ctx: any, run: any, input: {
 }
 
 function assertClaim(run: any, claimId: string) {
+  if (run.executionManifest || run.executionManifestDigest || run.lease) {
+    throw new Error("Canonical Factory Attempts require canonical lease, report, and publication authority.");
+  }
   if (run.executionClaimId !== claimId) throw new Error("Execution lease is no longer owned by this worker.");
   if (TERMINAL_STATUSES.has(run.status)) throw new Error("Execution run is already terminal.");
   if ((run.executionLeaseExpiresAt ?? 0) <= Date.now()) throw new Error("Execution lease expired before the operation completed.");
@@ -139,6 +142,7 @@ export const claimInternal = internalMutation({
       run.projectId === args.projectId
       && run.executorAdapter === "codex"
       && run.executorVersion === "v1"
+      && !run.executionManifest && !run.executionManifestDigest && !run.lease
       && run.isMutating !== false
       && Boolean(run.workOrderId && run.parentTaskId && run.factoryDefinitionVersionId && run.worktree && run.branch)
       && (!run.executionClaimId || (run.executionLeaseExpiresAt ?? 0) <= now)

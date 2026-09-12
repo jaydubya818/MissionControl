@@ -92,6 +92,51 @@ describe("Automation adapter safety", () => {
     }
   });
 
+  it("does not materialize an artifact when cancellation already arrived", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "mc-automation-cancelled-"));
+    const content = "#!/usr/bin/env bash\nprintf should-not-run\n";
+    const controller = new AbortController();
+    controller.abort();
+    try {
+      const result = await executeAutomation({
+        adapterType: "SHELL", repository: "test/repo", repositoryRoot: root, workingDirectory: ".",
+        artifactPath: "automations/cancelled.sh", artifactContent: content, artifactContentHash: hash(content),
+        timeoutMs: 5_000, secretReferences: [], configuration: {},
+      }, controller.signal);
+      expect(result.status).toBe("cancelled");
+      await expect(readFile(path.join(root, "automations/cancelled.sh"))).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(process.platform === "win32")("kills surviving process-group children after the leader exits on cancellation", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "mc-automation-group-"));
+    const content = "#!/usr/bin/env bash\ntrap 'exit 0' TERM\nbash -c 'trap \"\" TERM; printf ready > child-ready; sleep 5' &\nwait\n";
+    const controller = new AbortController();
+    const execution = executeAutomation({
+      adapterType: "SHELL", repository: "test/repo", repositoryRoot: root, workingDirectory: ".",
+      artifactPath: "automations/group.sh", artifactContent: content, artifactContentHash: hash(content),
+      timeoutMs: 10_000, secretReferences: [], configuration: {},
+    }, controller.signal);
+    try {
+      const deadline = Date.now() + 2_000;
+      while (await readFile(path.join(root, "child-ready"), "utf8").catch(() => "") !== "ready") {
+        if (Date.now() >= deadline) throw new Error("Child did not become ready");
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      const abortedAt = Date.now();
+      controller.abort();
+      const result = await execution;
+      expect(result.status).toBe("cancelled");
+      expect(Date.now() - abortedAt).toBeLessThan(2_500);
+    } finally {
+      controller.abort();
+      await execution;
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 15_000);
+
   it("rejects a repository artifact that differs from the approved hash", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "mc-automation-"));
     const first = "#!/usr/bin/env bash\nprintf first\n";

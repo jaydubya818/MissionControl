@@ -26,6 +26,14 @@ Every risky tool call can require human approval. Deployments and identity valid
 
 Eval runs compare baseline vs candidate scores per scenario. Meta-loop suggestions propose new verifiers and scenarios from production failures.
 
+The canonical **Eval Control Plane** is available in **Intelligence →
+Observability & Evals → Eval library**. It adds sealed versioned suites,
+complete case accounting, immutable receipt-derived baselines, typed failure
+origins, pinned provenance, negative-control CI, and case/slice regression
+checks over the existing measurement systems. Its receipts are diagnostic only
+and never approve, dispatch, verify, accept, merge, or release work. See [Eval
+Control Plane V1](../../architecture/eval-control-plane-v1.md).
+
 ## Software factory
 
 - **Tables:** `workOrders`, `workOrderRevisions`, `workflowRuns`, `verificationReceipts`

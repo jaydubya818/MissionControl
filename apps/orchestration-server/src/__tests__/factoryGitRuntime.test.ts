@@ -6,11 +6,16 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   assertFactoryCandidateUnchanged,
+  captureVerificationDocument,
+  assertPlanningWorktreeUnchanged,
   commitFactoryChanges,
   ensureFactoryWorktree,
+  ensurePlanningWorktree,
   ensureVerificationWorktree,
   inspectCandidateChange,
   listChangedFiles,
+  prepareFactoryDependencies,
+  releasePlanningWorktree,
 } from "../factoryGitRuntime.js";
 
 const execFileAsync = promisify(execFile);
@@ -21,6 +26,27 @@ afterEach(async () => {
 });
 
 describe("Factory Git runtime", () => {
+  it("captures immutable document bytes and rejects symlinks, invalid UTF-8 and changed trees", async () => {
+    const repository = await mkdtemp(path.join(tmpdir(), "mc-verifier-blob-")); cleanup.push(repository);
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.name", "Synthetic Test"]);
+    await git(repository, ["config", "user.email", "synthetic@example.test"]);
+    await writeFile(path.join(repository, "document.md"), "# Synthetic original\n");
+    await writeFile(path.join(repository, "invalid.md"), Buffer.from([0xff]));
+    await writeFile(path.join(repository, "bom.md"), Buffer.from("\ufeff# Synthetic BOM\n", "utf8"));
+    await symlink("document.md", path.join(repository, "link.md"));
+    await git(repository, ["add", "."]); await git(repository, ["commit", "-m", "Synthetic verification subject"]);
+    const candidateSha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
+    const treeSha = (await git(repository, ["rev-parse", "HEAD^{tree}"])).stdout.trim();
+    const input = { repositoryRoot: repository, candidateSha, treeSha, path: "document.md" };
+    await writeFile(path.join(repository, "document.md"), "Uncommitted substitution\n");
+    expect(await captureVerificationDocument(input)).toMatchObject({ content: "# Synthetic original\n", candidateSha, treeSha });
+    expect((await captureVerificationDocument({ ...input, path: "bom.md" })).content).toBe("\ufeff# Synthetic BOM\n");
+    await expect(captureVerificationDocument({ ...input, path: "invalid.md" })).rejects.toThrow();
+    await expect(captureVerificationDocument({ ...input, path: "link.md" })).rejects.toThrow("document blob");
+    await expect(captureVerificationDocument({ ...input, treeSha: "0".repeat(40) })).rejects.toThrow("tree changed");
+    await expect(captureVerificationDocument({ ...input, path: "../document.md" })).rejects.toThrow("identity");
+  });
   it("creates and reconciles the exact worktree branch across retries", async () => {
     const repository = await mkdtemp(path.join(tmpdir(), "mc-factory-git-test-"));
     cleanup.push(repository);
@@ -38,6 +64,8 @@ describe("Factory Git runtime", () => {
     await writeFile(path.join(worktree, "apps", "ui", "App.tsx"), "export const value = 2;\n");
     expect(await listChangedFiles(worktree, baseSha)).toEqual(["apps/ui/App.tsx"]);
     const firstHead = await commitFactoryChanges({ worktree, changedFiles: ["apps/ui/App.tsx"], title: "Update app" });
+    expect((await git(worktree, ["show", "-s", "--format=%an <%ae>", firstHead])).stdout.trim())
+      .toBe("Test <test@example.com>");
     const candidate = await inspectCandidateChange(worktree, baseSha);
     expect(candidate).toMatchObject({ sourceRevision: baseSha, candidateRevision: firstHead, changedFiles: ["apps/ui/App.tsx"], linesAdded: 1, linesDeleted: 1 });
     await expect(assertFactoryCandidateUnchanged(worktree, firstHead)).resolves.toBeUndefined();
@@ -45,8 +73,8 @@ describe("Factory Git runtime", () => {
     await writeFile(path.join(repository, "README.md"), "moving default branch\n");
     await git(repository, ["add", "README.md"]);
     await git(repository, ["commit", "-m", "Advance main"]);
-    const movingBase = await inspectCandidateChange(worktree, "main");
-    expect(movingBase.sourceRevision).not.toBe(candidate.sourceRevision);
+    // A moved non-ancestor default branch cannot silently replace the frozen base.
+    await expect(inspectCandidateChange(worktree, "main")).rejects.toThrow();
     const exactBase = await inspectCandidateChange(worktree, "main", candidate.sourceRevision);
     expect(exactBase).toMatchObject({
       sourceRevision: candidate.sourceRevision,
@@ -79,6 +107,44 @@ describe("Factory Git runtime", () => {
     expect(await commitFactoryChanges({ worktree, changedFiles: ["apps/ui/App.tsx"], title: "Update app" })).toBe(firstHead);
   });
 
+  it("prepares frozen dependencies without changing source state", async () => {
+    const repository = await mkdtemp(path.join(tmpdir(), "mc-factory-dependencies-"));
+    cleanup.push(repository);
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.name", "Test"]);
+    await git(repository, ["config", "user.email", "test@example.com"]);
+    await writeFile(path.join(repository, ".gitignore"), "node_modules/\n");
+    await writeFile(path.join(repository, "package.json"), '{"private":true}\n');
+    await writeFile(path.join(repository, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "Initial"]);
+    const baseSha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
+    const worktree = path.join(repository, ".mission-control", "worktrees", "attempt-dependencies");
+    await ensureFactoryWorktree({ checkoutRoot: repository, worktree, branch: "mc/attempt-dependencies", baseSha });
+
+    await expect(prepareFactoryDependencies({ worktree }, async (root) => {
+      await mkdir(path.join(root, "node_modules"), { recursive: true });
+      await writeFile(path.join(root, "node_modules", ".prepared"), "offline\n");
+    })).resolves.toEqual({ status: "PREPARED", packageManager: "pnpm" });
+    expect((await git(worktree, ["status", "--porcelain=v1"])).stdout).toBe("");
+
+    await expect(prepareFactoryDependencies({ worktree }, async (root) => {
+      await writeFile(path.join(root, "package.json"), '{"private":false}\n');
+    })).rejects.toThrow(/changed repository source state/);
+  });
+
+  it("never loads candidate pnpm hooks or lifecycle scripts during offline preparation", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "mc-dependency-hooks-")); cleanup.push(root);
+    await git(root, ["init", "-b", "main"]); await git(root, ["config", "user.name", "Test"]); await git(root, ["config", "user.email", "fixture@example.invalid"]);
+    await writeFile(path.join(root, "package.json"), JSON.stringify({ private: true, scripts: { preinstall: "node -e \"throw Error('lifecycle executed')\"" } }));
+    await writeFile(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\nimporters:\n\n  .: {}\n");
+    await writeFile(path.join(root, ".pnpmfile.cjs"), "throw new Error('candidate pnpmfile executed');\n");
+    await writeFile(path.join(root, ".npmrc"), "ignore-scripts=false\nignore-pnpmfile=false\nglobal-pnpmfile=.pnpmfile.cjs\n");
+    await writeFile(path.join(root, ".gitignore"), "node_modules/\n");
+    await git(root, ["add", "."]); await git(root, ["commit", "-m", "Synthetic preparation fixture"]);
+    await expect(prepareFactoryDependencies({ worktree: root })).resolves.toMatchObject({ status: "PREPARED" });
+  });
+
   it("rejects a worktree root symlink that escapes the canonical checkout", async () => {
     const repository = await mkdtemp(path.join(tmpdir(), "mc-factory-git-symlink-"));
     const escapedRoot = await mkdtemp(path.join(tmpdir(), "mc-factory-git-escaped-"));
@@ -99,6 +165,32 @@ describe("Factory Git runtime", () => {
       branch: "mc/attempt-escape",
       baseSha,
     })).rejects.toThrow(/symbolic link|resolve inside/);
+  });
+
+  it("binds planning to a detached exact SHA and rejects any repository change", async () => {
+    const repository = await mkdtemp(path.join(tmpdir(), "mc-planning-git-test-"));
+    cleanup.push(repository);
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.name", "Test"]);
+    await git(repository, ["config", "user.email", "test@example.com"]);
+    await writeFile(path.join(repository, "README.md"), "planning baseline\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "Planning baseline"]);
+    const planningRepositorySha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
+    const worktree = path.join(repository, ".mission-control", "worktrees", "planning-run-1");
+
+    await expect(ensurePlanningWorktree({ checkoutRoot: repository, worktree, planningRepositorySha }))
+      .resolves.toBe(worktree);
+    expect((await git(worktree, ["branch", "--show-current"])).stdout.trim()).toBe("");
+    await expect(assertPlanningWorktreeUnchanged(worktree, planningRepositorySha)).resolves.toBeUndefined();
+
+    await writeFile(path.join(worktree, "planner-output.tmp"), "unauthorized write\n");
+    await expect(assertPlanningWorktreeUnchanged(worktree, planningRepositorySha))
+      .rejects.toThrow(/Read-only planning left repository changes behind/);
+    await rm(path.join(worktree, "planner-output.tmp"));
+
+    await expect(releasePlanningWorktree({ checkoutRoot: repository, worktree, planningRepositorySha }))
+      .resolves.toBeUndefined();
   });
 });
 

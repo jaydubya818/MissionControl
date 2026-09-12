@@ -1,0 +1,189 @@
+{
+  "schema": "factory-docker-worker-qualification/v1",
+  "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+  "sourceSha": "2b68bc0ad5e686d7821afb9e1b5507b3f36c9905",
+  "fixtureOnly": true,
+  "reports": [
+    {
+      "sandbox": {
+        "operation": "REQUESTED",
+        "request": {
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "projectId": "project-1",
+          "workOrderId": "work-order-1",
+          "workflowRunId": "offline-workflow",
+          "attemptId": "factory-run-remote",
+          "attemptLeaseId": "8916a730-4240-4eeb-8934-8decfe01d0cb",
+          "manifestDigest": "sha256:3cd9a5cb936d9d8a6576a3227f50f6cd3fb8b7e6508f15fad45b897bdebf0a31",
+          "sourceSha": "2b68bc0ad5e686d7821afb9e1b5507b3f36c9905",
+          "profile": {
+            "schema": "factory-sandbox-profile/v1",
+            "profileKey": "fake-standard",
+            "version": 1,
+            "provider": "DOCKER",
+            "providerProfile": "factory/docker-offline/v1",
+            "providerProfileVersion": "1",
+            "machine": {
+              "image": "mission-control/factory-docker-qualification@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "cpu": 1,
+              "memoryMb": 512,
+              "diskGb": 5
+            },
+            "supervisor": {
+              "version": "mission-control-supervisor/v1",
+              "transport": "DOCKER_STDIN"
+            },
+            "runtime": {
+              "maxRuntimeMs": 60000,
+              "resultPollIntervalMs": 250,
+              "resultRetentionMs": 86400000
+            },
+            "network": {
+              "egress": "RESTRICTED_ALLOWLIST",
+              "egressAllowlist": [],
+              "publicIngress": false,
+              "exposedPorts": []
+            },
+            "credentials": {
+              "inference": "NONE",
+              "repositoryAccess": "CONTROL_PLANE_SNAPSHOT",
+              "githubAuthority": "NONE",
+              "providerAuthority": "NONE"
+            },
+            "spend": {
+              "maxUsd": 1,
+              "enforcement": "PROVIDER_KEY_LIMIT"
+            },
+            "teardown": {
+              "terminateOnEveryTerminalState": true,
+              "verifyResourceAbsent": true,
+              "supportsResume": false
+            },
+            "preview": {
+              "mode": "DISABLED"
+            },
+            "readiness": {
+              "state": "DEGRADED",
+              "checkedAt": 1788633990494,
+              "reason": "Deterministic fake provider",
+              "egressEnforcementProven": false
+            }
+          },
+          "requestedAt": 1788633990565
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_REQUESTED:1788633990565",
+          "eventType": "SANDBOX_REQUESTED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788633990565,
+          "endedAt": 1788633990565,
+          "commandSummary": "Sandbox Requested",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "provider": "DOCKER",
+            "profileDigest": "sha256:bc1669d224a092cdd501420956f425b9ccaa69fa47c819b6276572800046863d",
+            "readiness": "DEGRADED"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "FAILED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "reason": "Command failed: /Applications/Docker.app/Contents/Resources/bin/docker --host unix:///Users/jaywest/.docker/run/docker.sock image inspect mission-control/factory-docker-qualification@sha256:0000000000000000000000000000000000000000000000000000000000000000\nError response from daemon: No such image: mission-control/factory-docker-qualification@sha256:0000000000000000000000000000000000000000000000000000000000000000\n",
+        "failureClass": "RETRYABLE_INFRA",
+        "failureCode": "PROVIDER_ALLOCATION",
+        "retryable": true
+      },
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_FAILED:1788633990693",
+          "eventType": "SANDBOX_FAILED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "FAILED",
+          "startedAt": 1788633990693,
+          "endedAt": 1788633990693,
+          "commandSummary": "Sandbox Failed",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "reason": "Command failed: /Applications/Docker.app/Contents/Resources/bin/docker --host unix:///Users/jaywest/.docker/run/docker.sock image inspect mission-control/factory-docker-qualification@sha256:0000000000000000000000000000000000000000000000000000000000000000\nError response from daemon: No such image: mission-control/factory-docker-qualification@sha256:0000000000000000000000000000000000000000000000000000000000000000\n",
+            "failureClass": "RETRYABLE_INFRA",
+            "failureCode": "PROVIDER_ALLOCATION",
+            "failureStage": "ALLOCATION",
+            "retryable": true,
+            "diagnostics": null
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "FAILED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "reason": "Sandbox cleanup ended without a resource-absence receipt."
+      },
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_FAILED:1788633990693",
+          "eventType": "SANDBOX_FAILED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "FAILED",
+          "startedAt": 1788633990693,
+          "endedAt": 1788633990693,
+          "commandSummary": "Sandbox Failed",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "phase": "CLEANUP",
+            "reason": "Sandbox cleanup ended without a resource-absence receipt.",
+            "credentialRevoked": true,
+            "resourceAbsenceProven": false
+          }
+        }
+      ]
+    },
+    {
+      "terminal": {
+        "status": "FAILED",
+        "failureReason": "Remote sandbox cleanup failed.",
+        "remoteFailure": {
+          "class": "UNKNOWN",
+          "code": "REMOTE_WORKER_UNCLASSIFIED",
+          "stage": "UNKNOWN",
+          "retryable": false,
+          "summary": "Remote sandbox cleanup failed."
+        }
+      }
+    }
+  ],
+  "worker": {
+    "enabled": true,
+    "activeRunIds": [],
+    "completedCount": 0,
+    "failedCount": 1,
+    "lastPollAt": 1788633990495,
+    "lastError": "Remote sandbox cleanup failed.",
+    "credentialsConfigured": false,
+    "reconciliationEnabled": true,
+    "cleanupHealth": {
+      "inspected": 0,
+      "activeSandboxes": 0,
+      "healthy": 0,
+      "orphaned": 0,
+      "reconciled": 0,
+      "failed": 0,
+      "activeEphemeralCredentials": 0,
+      "unreconciledCostUsd": 0,
+      "lastReconciledAt": 1788633990496,
+      "failures": []
+    }
+  }
+}

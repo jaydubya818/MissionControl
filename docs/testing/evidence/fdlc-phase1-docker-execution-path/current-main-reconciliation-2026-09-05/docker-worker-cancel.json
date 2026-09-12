@@ -1,0 +1,357 @@
+{
+  "schema": "factory-docker-worker-qualification/v1",
+  "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+  "sourceSha": "1c1d3f690503763d02b767d890da9a1efe486aad",
+  "fixtureOnly": true,
+  "reports": [
+    {
+      "sandbox": {
+        "operation": "REQUESTED",
+        "request": {
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "projectId": "project-1",
+          "workOrderId": "work-order-1",
+          "workflowRunId": "offline-workflow",
+          "attemptId": "factory-run-remote",
+          "attemptLeaseId": "c5041107-6f3a-406e-b340-975ed805e6e5",
+          "manifestDigest": "sha256:8f3184ecceb5c4a8a0370c3fd0a02b8e2207258f81e45792ac81d0a39532676b",
+          "sourceSha": "1c1d3f690503763d02b767d890da9a1efe486aad",
+          "profile": {
+            "schema": "factory-sandbox-profile/v1",
+            "profileKey": "fake-standard",
+            "version": 1,
+            "provider": "DOCKER",
+            "providerProfile": "factory/docker-offline/v1",
+            "providerProfileVersion": "1",
+            "machine": {
+              "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+              "cpu": 1,
+              "memoryMb": 512,
+              "diskGb": 5
+            },
+            "supervisor": {
+              "version": "mission-control-supervisor/v1",
+              "transport": "DOCKER_STDIN"
+            },
+            "runtime": {
+              "maxRuntimeMs": 60000,
+              "resultPollIntervalMs": 250,
+              "resultRetentionMs": 86400000
+            },
+            "network": {
+              "egress": "RESTRICTED_ALLOWLIST",
+              "egressAllowlist": [],
+              "publicIngress": false,
+              "exposedPorts": []
+            },
+            "credentials": {
+              "inference": "NONE",
+              "repositoryAccess": "CONTROL_PLANE_SNAPSHOT",
+              "githubAuthority": "NONE",
+              "providerAuthority": "NONE"
+            },
+            "spend": {
+              "maxUsd": 1,
+              "enforcement": "PROVIDER_KEY_LIMIT"
+            },
+            "teardown": {
+              "terminateOnEveryTerminalState": true,
+              "verifyResourceAbsent": true,
+              "supportsResume": false
+            },
+            "preview": {
+              "mode": "DISABLED"
+            },
+            "readiness": {
+              "state": "DEGRADED",
+              "checkedAt": 1788646180240,
+              "reason": "Deterministic fake provider",
+              "egressEnforcementProven": false
+            }
+          },
+          "requestedAt": 1788646180297
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_REQUESTED:1788646180297",
+          "eventType": "SANDBOX_REQUESTED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788646180297,
+          "endedAt": 1788646180297,
+          "commandSummary": "Sandbox Requested",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "provider": "DOCKER",
+            "profileDigest": "sha256:ad2d5756a0b70a8ae7ffc9aac8e1a97979bdbf3afebd9a9805b38c8b5a4d474c",
+            "readiness": "DEGRADED"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "fce8064f1cd66f0510505563f59ab0502399d61b4e08e3204e54507776db49f5",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "READY",
+          "createdAt": 1788646181064,
+          "readyAt": 1788646181064,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "c5041107-6f3a-406e-b340-975ed805e6e5",
+            "manifestDigest": "sha256:8f3184ecceb5c4a8a0370c3fd0a02b8e2207258f81e45792ac81d0a39532676b"
+          }
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_ALLOCATED:1788646181080",
+          "eventType": "SANDBOX_ALLOCATED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788646181080,
+          "endedAt": 1788646181080,
+          "commandSummary": "Sandbox Allocated",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "providerResourceId": "fce8064f1cd66f0510505563f59ab0502399d61b4e08e3204e54507776db49f5"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "fce8064f1cd66f0510505563f59ab0502399d61b4e08e3204e54507776db49f5",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788646181064,
+          "readyAt": 1788646181064,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "c5041107-6f3a-406e-b340-975ed805e6e5",
+            "manifestDigest": "sha256:8f3184ecceb5c4a8a0370c3fd0a02b8e2207258f81e45792ac81d0a39532676b"
+          },
+          "startedAt": 1788646181097
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_STARTED:1788646181098",
+          "eventType": "SANDBOX_STARTED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788646181098,
+          "endedAt": 1788646181098,
+          "commandSummary": "Sandbox Started",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "processId": "fce8064f1cd66f0510505563f59ab0502399d61b4e08e3204e54507776db49f5"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "fce8064f1cd66f0510505563f59ab0502399d61b4e08e3204e54507776db49f5",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788646181064,
+          "readyAt": 1788646181064,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "c5041107-6f3a-406e-b340-975ed805e6e5",
+            "manifestDigest": "sha256:8f3184ecceb5c4a8a0370c3fd0a02b8e2207258f81e45792ac81d0a39532676b"
+          },
+          "lastHeartbeatAt": 1788646181363
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_CANCELLATION_REQUESTED:1788646181364",
+          "eventType": "SANDBOX_CANCELLATION_REQUESTED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "CANCELED",
+          "startedAt": 1788646181364,
+          "endedAt": 1788646181364,
+          "commandSummary": "Sandbox Cancellation Requested",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "reason": "Attempt cancellation or lease loss"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "FAILED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "reason": "This operation was aborted",
+        "failureClass": "UNKNOWN",
+        "failureCode": "ATTEMPT_CANCELED",
+        "retryable": false
+      },
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_FAILED:1788646181411",
+          "eventType": "SANDBOX_FAILED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "FAILED",
+          "startedAt": 1788646181411,
+          "endedAt": 1788646181411,
+          "commandSummary": "Sandbox Failed",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "reason": "This operation was aborted",
+            "failureClass": "UNKNOWN",
+            "failureCode": "ATTEMPT_CANCELED",
+            "failureStage": "EXECUTOR",
+            "retryable": false,
+            "diagnostics": {
+              "provider": "factory/docker-offline/v1",
+              "terminalState": "CANCELED",
+              "supervisorProcessRunning": true,
+              "exitCode": null,
+              "failure": null,
+              "stderrTail": null,
+              "policyInspection": {
+                "image": "sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+                "user": "10001:10001",
+                "networkMode": "none",
+                "readonlyRootfs": true,
+                "capabilitiesDropped": [
+                  "ALL"
+                ],
+                "securityOptions": [
+                  "no-new-privileges"
+                ],
+                "pidMode": "",
+                "memory": 536870912,
+                "cpu": 1000000000,
+                "pids": 64,
+                "tmpfs": {
+                  "/tmp": "rw,nosuid,nodev,noexec,size=16777216,uid=10001,gid=10001,mode=0700",
+                  "/var/lib/mission-control/attempt": "rw,nosuid,nodev,noexec,size=134217728,uid=10001,gid=10001,mode=0700"
+                },
+                "mounts": [],
+                "privileged": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_TERMINATION_REQUESTED:1788646181411",
+          "eventType": "SANDBOX_TERMINATION_REQUESTED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788646181411,
+          "endedAt": 1788646181411,
+          "commandSummary": "Sandbox Termination Requested",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "providerResourceId": "fce8064f1cd66f0510505563f59ab0502399d61b4e08e3204e54507776db49f5"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "TERMINATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "receipt": {
+          "providerResourceId": "fce8064f1cd66f0510505563f59ab0502399d61b4e08e3204e54507776db49f5",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "requestedAt": 1788646181411,
+          "confirmedAbsentAt": 1788646181508,
+          "resourceAbsent": true
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_TERMINATED:1788646181510",
+          "eventType": "SANDBOX_TERMINATED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "COMPLETED",
+          "startedAt": 1788646181510,
+          "endedAt": 1788646181510,
+          "commandSummary": "Sandbox Terminated",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "confirmedAbsentAt": 1788646181508
+          }
+        }
+      ]
+    },
+    {
+      "terminal": {
+        "status": "CANCELED",
+        "failureReason": "This operation was aborted",
+        "remoteFailure": {
+          "class": "UNKNOWN",
+          "code": "ATTEMPT_CANCELED",
+          "stage": "EXECUTOR",
+          "retryable": false,
+          "summary": "This operation was aborted"
+        }
+      }
+    }
+  ],
+  "worker": {
+    "enabled": true,
+    "activeRunIds": [],
+    "completedCount": 0,
+    "failedCount": 1,
+    "lastPollAt": 1788646180243,
+    "lastError": "This operation was aborted",
+    "credentialsConfigured": false,
+    "reconciliationEnabled": true,
+    "cleanupHealth": {
+      "inspected": 0,
+      "activeSandboxes": 0,
+      "healthy": 0,
+      "orphaned": 0,
+      "reconciled": 0,
+      "failed": 0,
+      "activeEphemeralCredentials": 0,
+      "unreconciledCostUsd": 0,
+      "lastReconciledAt": 1788646180243,
+      "failures": []
+    }
+  }
+}

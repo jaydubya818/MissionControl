@@ -1,0 +1,3 @@
+
+> @mission-control/orchestration-server@0.9.0 typecheck /private/tmp/fab-phase3-mission-control/apps/orchestration-server
+> tsc --noEmit

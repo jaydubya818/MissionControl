@@ -1,0 +1,186 @@
+{
+  "admissionEligible": false,
+  "authoritative": false,
+  "blockers": [
+    {
+      "boundary": "ADMISSION",
+      "code": "work-order-revision",
+      "label": "WorkOrder revision current",
+      "reason": "Refresh this WorkOrder and inspect revision 1; readiness is bound to that revision.",
+      "status": "BLOCKED"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "dispatch-state",
+      "label": "WorkOrder state and approvals",
+      "reason": "Dispatch blocked: approval-required. Inspect current approvals and Attempts.",
+      "status": "BLOCKED"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "factory-selected",
+      "label": "Exact Factory Version",
+      "reason": "Select the exact Factory Version to inspect.",
+      "status": "BLOCKED"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "delivery-scope",
+      "label": "Repository, team, owner and environment",
+      "reason": "Resolve current delivery scope: TEAM_REQUIRED, HUMAN_OWNER_REQUIRED, APPROVED_HOST_BINDING_REQUIRED.",
+      "status": "BLOCKED"
+    }
+  ],
+  "checks": [
+    {
+      "boundary": "ADMISSION",
+      "code": "plan-approved",
+      "label": "Plan approved",
+      "reason": "Approve the exact governed Plan revision before dispatch.",
+      "status": "PASS"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "plan-current",
+      "label": "Plan revision current",
+      "reason": "WorkOrder must reference the Mission's current approved Plan and exact revision.",
+      "status": "PASS"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "work-order-released",
+      "label": "WorkOrder released",
+      "reason": "Release the WorkOrder through governed Plan ingestion.",
+      "status": "PASS"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "work-order-revision",
+      "label": "WorkOrder revision current",
+      "reason": "Refresh this WorkOrder and inspect revision 1; readiness is bound to that revision.",
+      "status": "BLOCKED"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "risk",
+      "label": "Risk classification",
+      "reason": "Classify the WorkOrder risk before selecting an execution tuple.",
+      "status": "PASS"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "workflow",
+      "label": "Workflow available",
+      "reason": "Activate the approved workflow for this WorkOrder.",
+      "status": "PASS"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "dispatch-state",
+      "label": "WorkOrder state and approvals",
+      "reason": "Dispatch blocked: approval-required. Inspect current approvals and Attempts.",
+      "status": "BLOCKED"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "mission-controls",
+      "label": "Mission dependencies, budget and recovery",
+      "reason": "Current Mission dispatch controls pass.",
+      "status": "PASS"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "factory-selected",
+      "label": "Exact Factory Version",
+      "reason": "Select the exact Factory Version to inspect.",
+      "status": "BLOCKED"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "delivery-scope",
+      "label": "Repository, team, owner and environment",
+      "reason": "Resolve current delivery scope: TEAM_REQUIRED, HUMAN_OWNER_REQUIRED, APPROVED_HOST_BINDING_REQUIRED.",
+      "status": "BLOCKED"
+    },
+    {
+      "boundary": "ADMISSION",
+      "code": "operator-authority",
+      "label": "Current human dispatch authority",
+      "reason": "Current operator requires dispatch permission and the appropriate team or WorkOrder ownership.",
+      "status": "PASS"
+    },
+    {
+      "boundary": "PRE_EXECUTION",
+      "code": "repository-preparation",
+      "label": "Attempt repository prepared",
+      "reason": "The admitted worker must allocate an isolated worktree at the exact base SHA and verify source integrity before implementation.",
+      "status": "DEFERRED"
+    },
+    {
+      "boundary": "PRE_EXECUTION",
+      "code": "dependencies",
+      "label": "Attempt dependencies present",
+      "reason": "No preparation receipt exists for a future Attempt. Worker dependency preparation must succeed before implementation; a prior Attempt's receipt is not current proof.",
+      "status": "DEFERRED"
+    },
+    {
+      "boundary": "VERIFICATION",
+      "code": "verifier-preparation",
+      "label": "Independent verifier prepared",
+      "reason": "Verifier registration is checked above. Its separate exact-candidate worktree and dependency preparation must succeed at verification admission.",
+      "status": "DEFERRED"
+    },
+    {
+      "boundary": "VERIFICATION",
+      "code": "candidate-evidence",
+      "label": "Exact-candidate evidence current",
+      "reason": "A new Attempt requires independent evidence for its exact candidate. Existing evidence cannot certify a future change; acceptance remains separately gated.",
+      "status": "DEFERRED"
+    }
+  ],
+  "configurationDigest": null,
+  "evaluatedAt": 1788586218159,
+  "executionBackend": null,
+  "executionReady": false,
+  "factoryVersionId": null,
+  "harnessDigest": null,
+  "hostId": null,
+  "modelRouteDigest": null,
+  "pending": [
+    {
+      "boundary": "PRE_EXECUTION",
+      "code": "repository-preparation",
+      "label": "Attempt repository prepared",
+      "reason": "The admitted worker must allocate an isolated worktree at the exact base SHA and verify source integrity before implementation.",
+      "status": "DEFERRED"
+    },
+    {
+      "boundary": "PRE_EXECUTION",
+      "code": "dependencies",
+      "label": "Attempt dependencies present",
+      "reason": "No preparation receipt exists for a future Attempt. Worker dependency preparation must succeed before implementation; a prior Attempt's receipt is not current proof.",
+      "status": "DEFERRED"
+    },
+    {
+      "boundary": "VERIFICATION",
+      "code": "verifier-preparation",
+      "label": "Independent verifier prepared",
+      "reason": "Verifier registration is checked above. Its separate exact-candidate worktree and dependency preparation must succeed at verification admission.",
+      "status": "DEFERRED"
+    },
+    {
+      "boundary": "VERIFICATION",
+      "code": "candidate-evidence",
+      "label": "Exact-candidate evidence current",
+      "reason": "A new Attempt requires independent evidence for its exact candidate. Existing evidence cannot certify a future change; acceptance remains separately gated.",
+      "status": "DEFERRED"
+    }
+  ],
+  "planId": "zh7f3sjdse5wbqxp9e9gcr9p458dvssa",
+  "planRevision": 1,
+  "runtimeArtifactDigest": null,
+  "schemaVersion": "work-order-readiness/v1",
+  "status": "BLOCKED",
+  "workOrderId": "sx7prk22x2y32t0r9j0ch9pyfh8dtbkf",
+  "workOrderRevision": 1
+}

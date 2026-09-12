@@ -35,6 +35,7 @@
 
 - **Symptom:** 401 when calling `/status`, `/tick`, or `/agents/*`.
 - **Fix:** Set `ORCHESTRATION_API_TOKEN` (or `MC_API_TOKEN`) in the server env and send `Authorization: Bearer <token>` on requests. Leave unset for local dev (no auth).
+- The `/gateway/ws` WebSocket upgrade is gated by the same bearer. Browsers cannot set headers on a WebSocket, so the token is presented by whatever proxies the UI to the server: the Vite dev proxy injects it from `ORCHESTRATION_API_TOKEN` in the UI's env, and a production reverse proxy must add the same `Authorization` header on `/gateway/ws`. A `401` on the upgrade means the proxy in front of the UI is not adding it.
 
 ### Gateway / discovery: "Gateway URL is not set"
 

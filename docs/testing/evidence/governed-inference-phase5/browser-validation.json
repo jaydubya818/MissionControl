@@ -1,0 +1,31 @@
+{
+  "schema": "governed-inference-phase5-browser-validation/v1",
+  "validatedAt": "2026-09-05T18:18:00-07:00",
+  "source": "temporary local visual harness importing the production InferenceEconomicsCard",
+  "temporaryHarnessRetained": false,
+  "server": "Vite development server on localhost:5180",
+  "views": [
+    {
+      "theme": "dark",
+      "viewport": { "width": 1440, "height": 900 },
+      "result": "PASS"
+    },
+    {
+      "theme": "light",
+      "viewport": { "width": 390, "height": 844 },
+      "result": "PASS"
+    }
+  ],
+  "assertions": {
+    "exactRouteVisible": true,
+    "providerRequestIdentityVisible": true,
+    "costCompletenessVisible": true,
+    "outcomeAndAcceptanceRemainDistinct": true,
+    "comparisonNoGoVisible": true,
+    "automaticPromotionDisabledVisible": true,
+    "narrowMetricsReflow": true,
+    "narrowReceiptTableContained": true,
+    "renderErrorsObserved": false,
+    "viteErrorsObserved": false
+  }
+}

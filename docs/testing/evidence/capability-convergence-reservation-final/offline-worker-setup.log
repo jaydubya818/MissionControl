@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-phase5/apps/orchestration-server
+
+ ✓ src/__tests__/factoryGitRuntime.test.ts (5 tests) 995ms
+   ✓ Factory Git runtime > creates and reconciles the exact worktree branch across retries  359ms
+   ✓ Factory Git runtime > never loads candidate pnpm hooks or lifecycle scripts during offline preparation  348ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  22:17:15
+   Duration  1.35s (transform 42ms, setup 0ms, collect 47ms, tests 995ms, environment 0ms, prepare 65ms)

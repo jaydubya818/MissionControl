@@ -1,19 +1,27 @@
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   cleanupOwnedFactoryWorkspace,
+  retainFactoryOfflineResponse,
+  pendingFactoryOfflineResponses,
+  markFactoryOfflineResponseDelivered,
+  recordFactoryOfflineDeliveryFailure,
   ensureFactoryWorkspaceOwnership,
   loadFactoryWorkspaceOwnership,
   recordFactoryExecutorStarted,
   recordFactoryExecutorTerminated,
+  recordFactoryInvocationStarted,
+  recordFactoryInvocationCompleted,
   recordFactoryPublication,
   recordFactorySandboxStarted,
   recordFactorySandboxTerminated,
   transferFactoryPublicationWorkspace,
+  transferFactoryRecoveryWorkspace,
   type FactoryWorkspaceOwner,
 } from "../factoryWorkspaceOwnership.js";
 
@@ -25,6 +33,40 @@ afterEach(async () => {
 });
 
 describe("Factory workspace ownership", () => {
+  it("transfers a finished in-process invocation but preserves unknown execution after a crash", async () => {
+    const fixture = await createFixture();
+    await ensureFactoryWorkspaceOwnership({ owner: fixture.owner, allowCreate: true });
+    await recordFactoryInvocationStarted(fixture.owner, "invocation-1");
+    const transfer = { previousOwner: fixture.owner, nextOwner: { ...fixture.owner, leaseId: "lease-2", workerSessionId: "session-2", workerGeneration: 2 }, checkpointCandidateSha: fixture.headSha };
+    await expect(transferFactoryPublicationWorkspace(transfer)).rejects.toThrow(/terminated workspace/);
+    await expect(recordFactoryInvocationCompleted(fixture.owner, "wrong-invocation")).rejects.toThrow(/does not match/);
+    await recordFactoryInvocationCompleted(fixture.owner, "invocation-1");
+    expect(await transferFactoryPublicationWorkspace(transfer)).toMatchObject({ leaseId: "lease-2", process: { kind: "IN_PROCESS_AGENT", state: "TERMINATED", executionId: "invocation-1" } });
+    // Reconcile a committed local handoff whose acknowledgement was lost.
+    expect(await transferFactoryPublicationWorkspace(transfer)).toMatchObject({ leaseId: "lease-2" });
+    expect(await transferFactoryPublicationWorkspace({ ...transfer, nextOwner: { ...transfer.nextOwner, leaseId: "lease-3" } })).toMatchObject({ leaseId: "lease-3" });
+  });
+  it("recovers an undelivered response from the protected ownership journal under the exact old lease", async () => {
+    const { owner, checkoutRoot } = await createFixture();
+    await ensureFactoryWorkspaceOwnership({ owner, allowCreate: true });
+    const scope = { checkoutRoot, serviceId: "synthetic-service", projectId: "project", repositoryId: "repository" };
+    const saved = await retainFactoryOfflineResponse(owner, { ...scope, packet: { synthetic: true, responseBytes: "retained" } });
+    expect(await pendingFactoryOfflineResponses(scope)).toMatchObject([{ leaseId: owner.leaseId,
+      workerSessionId: owner.workerSessionId, offlineResponse: { packet: { responseBytes: "retained" } } }]);
+    expect(await pendingFactoryOfflineResponses({ ...scope, serviceId: "different" })).toEqual([]);
+    expect(await pendingFactoryOfflineResponses({ ...scope, repositoryId: "different" })).toEqual([]);
+    await recordFactoryOfflineDeliveryFailure(owner, saved.offlineResponse!.packetSha256, "synthetic transport unavailable");
+    expect(await pendingFactoryOfflineResponses(scope)).toMatchObject([{ offlineResponse: {
+      lastDeliveryError: "synthetic transport unavailable", lastDeliveryAttemptAt: expect.any(Number),
+      packet: { responseBytes: "retained" },
+    } }]);
+    await expect(retainFactoryOfflineResponse(owner, { ...scope, packet: { replacement: true } })).rejects.toThrow("Conflicting");
+    await expect(markFactoryOfflineResponseDelivered({ ...owner, leaseId: "other" }, saved.offlineResponse!.packetSha256))
+      .rejects.toThrow("ownership tuple");
+    await markFactoryOfflineResponseDelivered(owner, saved.offlineResponse!.packetSha256);
+    expect(await pendingFactoryOfflineResponses(scope)).toEqual([]);
+    expect((await loadFactoryWorkspaceOwnership(owner))?.offlineResponse?.packet).toEqual({ synthetic: true, responseBytes: "retained" });
+  });
   it("preserves a workspace when the complete ownership tuple does not match", async () => {
     const fixture = await createFixture();
     await ensureFactoryWorkspaceOwnership({ owner: fixture.owner, allowCreate: true });
@@ -176,6 +218,63 @@ describe("Factory workspace ownership", () => {
       nextOwner: { ...fixture.owner, workerSessionId: "session-2", workerGeneration: 2 },
       checkpointCandidateSha: fixture.headSha,
     })).rejects.toThrow(/new lease/);
+  });
+
+  it.each(["before-destination-write", "after-destination-write", "legacy-rename-window", "lost-ack"])("reconciles a recovery transfer interrupted at %s", async (fault) => {
+    const fixture = await createFixture();
+    await ensureFactoryWorkspaceOwnership({ owner: fixture.owner, allowCreate: true });
+    await recordFactoryExecutorStarted(fixture.owner, 34567);
+    await recordFactoryExecutorTerminated(fixture.owner, { pid: 34567, exitCode: 1 });
+    const nextOwner = { ...fixture.owner, workflowRunId: "recovery-attempt", executionManifestDigest: `sha256:${"a".repeat(64)}`,
+      workerSessionId: "session-2", workerGeneration: 2, leaseId: "lease-2" };
+    const file = (id: string) => path.join(fixture.checkoutRoot, ".mission-control/worker-state/workspaces", `${createHash("sha256").update(id).digest("hex")}.json`);
+    const sourcePath = file(fixture.owner.workflowRunId), destinationPath = file(nextOwner.workflowRunId);
+    const original = await readFile(sourcePath, "utf8");
+    const input = { previousOwner: fixture.owner, nextOwner, checkpointCandidateSha: fixture.headSha };
+    if (fault === "before-destination-write") {
+      await mkdir(destinationPath, { mode: 0o700 });
+      await expect(transferFactoryRecoveryWorkspace(input)).rejects.toThrow();
+      expect(await readFile(sourcePath, "utf8")).toBe(original);
+      await rm(destinationPath, { recursive: true });
+    } else if (fault === "legacy-rename-window") {
+      await rename(sourcePath, destinationPath);
+    } else {
+      await transferFactoryRecoveryWorkspace(input);
+      if (fault === "after-destination-write") await writeFile(sourcePath, original, { mode: 0o600 });
+    }
+    expect(await transferFactoryRecoveryWorkspace(input)).toMatchObject({ workflowRunId: nextOwner.workflowRunId, leaseId: "lease-2",
+      recoverySource: { owner: fixture.owner, candidateSha: fixture.headSha } });
+    await expect(access(sourcePath)).rejects.toThrow();
+    await expect(transferFactoryRecoveryWorkspace({ ...input, checkpointCandidateSha: "b".repeat(40) })).rejects.toThrow(/checkpoint/);
+    await expect(transferFactoryRecoveryWorkspace({ ...input, nextOwner: { ...nextOwner, workerId: "other" } })).rejects.toThrow(/same stable worker/);
+    expect(await transferFactoryRecoveryWorkspace({ ...input, nextOwner: { ...nextOwner, leaseId: "lease-3", workerGeneration: 3, workerSessionId: "session-3" } })).toMatchObject({ leaseId: "lease-3" });
+    await expect(transferFactoryRecoveryWorkspace(input)).rejects.toThrow(/monotonic generation/);
+  });
+
+  it("rekeys one clean terminated workspace to an exact linked recovery Attempt", async () => {
+    const fixture = await createFixture();
+    await ensureFactoryWorkspaceOwnership({ owner: fixture.owner, allowCreate: true });
+    await recordFactoryExecutorStarted(fixture.owner, 34567);
+    await recordFactoryExecutorTerminated(fixture.owner, { pid: 34567, exitCode: 1 });
+    const nextOwner = {
+      ...fixture.owner,
+      workflowRunId: "workflow-run-recovery",
+      executionManifestDigest: `sha256:${"a".repeat(64)}`,
+      workerSessionId: "session-2",
+      workerGeneration: 2,
+      leaseId: "lease-2",
+    };
+    expect(await transferFactoryRecoveryWorkspace({
+      previousOwner: fixture.owner,
+      nextOwner,
+      checkpointCandidateSha: fixture.headSha,
+    })).toMatchObject({
+      workflowRunId: "workflow-run-recovery",
+      executionManifestDigest: `sha256:${"a".repeat(64)}`,
+      workerSessionId: "session-2",
+    });
+    expect(await loadFactoryWorkspaceOwnership(fixture.owner)).toBeUndefined();
+    expect(await loadFactoryWorkspaceOwnership(nextOwner)).toMatchObject({ workflowRunId: "workflow-run-recovery" });
   });
 });
 

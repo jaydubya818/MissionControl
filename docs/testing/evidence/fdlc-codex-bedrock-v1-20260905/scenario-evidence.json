@@ -1,0 +1,256 @@
+{
+  "schemaVersion": "system-factory-e2e-qualification/v2",
+  "result": "SYSTEM QUALIFIED V2 WITH KNOWN LIMITATIONS",
+  "baseSha": "6d7146d5205aef729aee2960aed2a4ed8e8ab95c",
+  "runtimeContractVersion": 43,
+  "hardeningV1": {
+    "decision": "HARDENING V1 PASSED",
+    "productionAdvisories": {
+      "before": {
+        "moderate": 4,
+        "high": 0,
+        "critical": 0
+      },
+      "after": {
+        "moderate": 3,
+        "high": 0,
+        "critical": 0
+      }
+    },
+    "completeGraphAdvisories": {
+      "before": {
+        "low": 4,
+        "moderate": 9,
+        "high": 0,
+        "critical": 0
+      },
+      "after": {
+        "low": 2,
+        "moderate": 4,
+        "high": 0,
+        "critical": 0
+      }
+    },
+    "dependencyGate": "PASS",
+    "credentialGate": "PASS",
+    "releaseConfigurationGate": "PASS"
+  },
+  "fixture": {
+    "repository": "sellerfi/system-factory-qualification-fixture",
+    "baseSha": "920eb7f3de2759bfc96d5dcf7306e3a174a57bee",
+    "baseTreeSha": "60e1c7d797ecac6280eb995c95ef60c4371feceb",
+    "finalCandidateSha": "9ba871d9efad9b224b2f2cd432fbfb5cfbc9d461",
+    "definitionOfDone": "node scripts/verify.mjs exits zero in an independent checkout."
+  },
+  "lineage": {
+    "projectConstitutionRevisionId": "constitution-revision-system-factory-e2e-v2-r1",
+    "projectConstitutionDigest": "sha256:95aa75c012aa1d9ee910d41f3cc5b652e519bddb21c71156fce88c04002e002c",
+    "failedSpecRevisionId": "mission-spec-system-factory-e2e-v2-r1",
+    "failedSpecDigest": "sha256:fa04cfd6c6b301f8de2638d98f7c115a0c300c74a9b730440df92b4dbda20077",
+    "finalizedSpecRevisionId": "mission-spec-system-factory-e2e-v2-r2",
+    "finalizedSpecDigest": "sha256:3187eba71569bb50e9893bd14eeb59d80929476bae7b10d56ca5af78e348b3dc",
+    "specQualityEvaluationId": "mission-spec-evaluation-system-factory-e2e-v2-r2",
+    "currentSpecRevisionId": "mission-spec-system-factory-e2e-v2-r3",
+    "currentSpecDigest": "sha256:ae8415db4835972738609e2181788ad74e16ada5d1ce21f91599f02e94a5569c",
+    "boundSpecRemainedRevision": "mission-spec-system-factory-e2e-v2-r2",
+    "specConsistencyDigest": "sha256:37adf4c756baabe243d35973805b973709bcc6755066ffa77ee9204bdf5f05f9",
+    "requirementsCoverageDigest": "sha256:8dd1620c637d5259d8ccffb2340019bb9f22e52aa337d8de1bc3befd9b465b3c",
+    "missionId": "mission-system-factory-e2e-v2",
+    "planId": "plan-system-factory-e2e-v2",
+    "planRevision": 1,
+    "planApproval": {
+      "submittedBy": "operator-author",
+      "approvedBy": "operator-approver",
+      "approvedRevision": 1
+    },
+    "qualityContractDigest": "sha256:742129e4ddf06390df7c7d3967a33027097d582dd112e80713cc7cce9a85f365",
+    "workOrderId": "work-order-system-factory-e2e-v2",
+    "workOrderRevision": 1,
+    "recipe": "progressive-software-delivery",
+    "factoryVersionId": "factory-version-progressive-software-v1",
+    "verificationFactoryVersionId": "factory-version-independent-verification-v1",
+    "contextPackageId": "cf50b66851e40c687448792c",
+    "worker": {
+      "workerId": "worker-system-factory-v2",
+      "sessionId": "worker-session-current",
+      "generation": 2
+    },
+    "leaseId": "lease-source-current-head",
+    "sourceAttemptIds": [
+      "attempt-source-failed-1",
+      "attempt-source-failed-2",
+      "attempt-source-failed-3",
+      "attempt-source-repaired",
+      "attempt-source-current-head"
+    ],
+    "executionManifestDigest": "sha256:a5cf2d8b2045616fc7568bb69f67cbd653c3d85f680cbc427c1e49b9c3cc43ad",
+    "executionBackend": "remote-sandbox",
+    "candidateShas": [
+      "911cc67e464c075ddd7081ac5d72ceb2e9dc11bc",
+      "c0a4802fa86333248831375766e2393eaef37f80",
+      "4aec47c3d14f18b432ea5b14b9233e535104f567",
+      "b830028fb294f4b14cbdf1bc3b8505e843ff1fbf",
+      "9ba871d9efad9b224b2f2cd432fbfb5cfbc9d461"
+    ],
+    "verificationAttemptIds": [
+      "attempt-verification-failed-3",
+      "attempt-verification-repaired",
+      "attempt-verification-current-head"
+    ],
+    "verificationSubjectId": "verification-subject:7b1f599dc5bcc2024016153480e6a0b026de26a7b587108a531b7ae31a7aff0f",
+    "verificationPlanId": "verification-plan:20999e4f203fcd9598d3239958fe422a8b32a256287b1cd578006cb311127214",
+    "verificationPlanDigest": "sha256:20999e4f203fcd9598d3239958fe422a8b32a256287b1cd578006cb311127214",
+    "verificationRunId": "verification-run:attempt-verification-current-head",
+    "evidenceIds": [
+      "evidence:attempt-verification-current-head:factory-negative-constraints",
+      "evidence:attempt-verification-current-head:factory-change-budget",
+      "evidence:attempt-verification-current-head:factory-verification-authority",
+      "evidence:attempt-verification-current-head:mission:independent-verification",
+      "evidence:attempt-verification-current-head:spec:VERIFY-001"
+    ],
+    "receiptId": "receipt:attempt-verification-current-head",
+    "qualityGateState": "ELIGIBLE",
+    "providerPullRequestId": "provider-pr-system-factory-v2",
+    "providerPullRequestUrl": "https://github.invalid/sellerfi/system-factory-qualification-fixture/pull/1",
+    "providerHeadSha": "9ba871d9efad9b224b2f2cd432fbfb5cfbc9d461",
+    "acceptanceEvent": "WORK_ORDER_ACCEPTED via workOrders.accept only",
+    "acceptanceActor": "human operator"
+  },
+  "harnessLineage": {
+    "execution": {
+      "adapter": "codex",
+      "version": "v1",
+      "capabilityManifestSha256": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+      "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081",
+      "executionBackend": "remote-sandbox"
+    },
+    "genericAdmission": {
+      "contractVersion": "generic-harness-contract/v1",
+      "adapter": "deepseek-harness",
+      "version": "0.2.0",
+      "capabilityManifestSha256": "sha256:ba1347c88193af3170adda3e6d7f7c76806b174fea27d669d24f8b1b53017259",
+      "effectiveConfigSha256": "3a2e1bfde534d1168f886c09c3f2fed86adb5a02a3c312043b34a01549225cec",
+      "provider": "local-ollama",
+      "model": "qwen3.5:35b-a3b-q8_0",
+      "executionBackend": "persistent-worker",
+      "maturity": "EXPERIMENTAL",
+      "exactAdmission": {
+        "eligible": true,
+        "workerId": "worker-generic-harness-v2",
+        "sessionId": "worker-generic-harness-session-v2",
+        "generation": 1
+      }
+    }
+  },
+  "observability": {
+    "sourceTraceId": "trace:attempt-source-current-head",
+    "verificationTraceId": "trace:attempt-verification-current-head",
+    "sourceWorkflowRunId": "attempt-source-current-head",
+    "verificationWorkflowRunId": "attempt-verification-current-head",
+    "sandboxLifecycleEvents": [
+      "SANDBOX_REQUESTED",
+      "SANDBOX_ALLOCATED",
+      "SANDBOX_STARTED",
+      "SANDBOX_RESULT_RECEIVED",
+      "SANDBOX_CREDENTIAL_REVOKED",
+      "SANDBOX_TERMINATION_REQUESTED",
+      "SANDBOX_TERMINATED"
+    ],
+    "phases": {
+      "human": [
+        "plan approval",
+        "improvement review",
+        "workOrders.accept"
+      ],
+      "agent": [
+        "bounded fake-provider execution"
+      ],
+      "code": [
+        "context retrieval",
+        "deterministic gates",
+        "independent verification",
+        "exact-current eligibility"
+      ]
+    }
+  },
+  "failureInjection": {
+    "staleLease": "PASS",
+    "incompleteSpecRevisionBlocked": "PASS",
+    "specRepositoryScopeMismatchBlocked": "PASS",
+    "newerSpecRevisionDidNotRebindApprovedPlanOrWorkOrder": "PASS",
+    "harnessManifestDigestMismatchBlocked": "PASS",
+    "harnessUnsupportedModelBlocked": "PASS",
+    "harnessUnsupportedBackendBlocked": "PASS",
+    "candidatePrHeadMismatch": "PASS",
+    "verificationFailure": "PASS",
+    "retryNewAttempt": "PASS",
+    "contextMiss": "PASS",
+    "deterministicGateFailure": "PASS",
+    "sandboxTeardownFailure": "PASS (focused regression suite)",
+    "repeatedCorrectionLearning": "PASS",
+    "improvementCandidateCannotSelfPromote": "PASS"
+  },
+  "learning": {
+    "signalCount": 3,
+    "signalType": "HUMAN_CORRECTION",
+    "contextMissSignalType": "CONTEXT_MISS",
+    "duplicateCount": 1,
+    "clusterKey": "workspace-system-factory-e2e-v2|sellerfi/system-factory-qualification-fixture|HUMAN_CORRECTION|test:listing-fee-deterministic-gate",
+    "candidateId": "improvement-candidate-listing-fee-gate",
+    "candidateType": "ADD_DETERMINISTIC_GATE",
+    "review": {
+      "status": "APPROVED_FOR_EXPERIMENT",
+      "actorType": "HUMAN"
+    },
+    "experimentId": "experiment-listing-fee-gate",
+    "experimentStatus": "COMPLETED",
+    "promotionRecommendation": {
+      "recommendation": "PROMOTION_RECOMMENDED",
+      "sampleLabel": "LOW_SAMPLE",
+      "statisticallySignificant": false,
+      "autoPromote": false,
+      "improvements": [
+        "success rate",
+        "first-pass verification",
+        "retries",
+        "deterministic failures"
+      ],
+      "regressions": []
+    },
+    "promotedMissionId": "mission-learning-followup",
+    "submittedPlanId": "plan-learning-followup",
+    "submittedPlanStatus": "PROPOSED",
+    "releasedWorkOrderIds": [],
+    "modelCalls": 0
+  },
+  "authority": {
+    "workOrderAcceptedEventWriters": [
+      "workOrders.ts"
+    ],
+    "learningHasAcceptanceMutation": false,
+    "observabilityHasAcceptanceMutation": false,
+    "planSelfApprovalGuard": true,
+    "sandboxHasGithubAuthority": false
+  },
+  "performance": {
+    "durationMs": 10762,
+    "sourceGateDurationMs": 4853,
+    "verificationDurationMs": 5302,
+    "sandboxProviderRuntimeMs": 1,
+    "deterministicGateRuns": 7,
+    "sourceAttempts": 5,
+    "sourceRetries": 4,
+    "verificationAttempts": 3,
+    "agentSteps": 1,
+    "modelCalls": 0,
+    "tokens": null,
+    "costUsd": 0
+  },
+  "limitations": [
+    "Remote Sandbox uses FakeSandboxProvider; live exe.dev remains Preview / Not Live Certified.",
+    "PR #89 two-company live identity proof remains deferred by instruction.",
+    "DeepSeek generic-harness admission is exact but remains experimental and explicitly routed; autonomous model/harness routing was not started.",
+    "Loom production admission remains deferred by instruction.",
+    "The provider pull-request identity is deterministic fixture lineage; no external product repository is mutated."
+  ]
+}

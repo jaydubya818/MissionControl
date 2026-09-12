@@ -7,6 +7,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const phase3QualificationBaseSha = "3ae9d86eeff1966862a6959664ec1fe2e6e7240a";
 const evidenceSlug = process.env.MC_QUALIFICATION_EVIDENCE_SLUG ?? "system-factory-e2e-v2";
 if (!/^[a-z0-9][a-z0-9-]*$/.test(evidenceSlug)) {
   throw new Error("MC_QUALIFICATION_EVIDENCE_SLUG must be a simple lowercase evidence directory name.");
@@ -24,6 +25,12 @@ const checks = [];
 mkdirSync(evidenceDirectory, { recursive: true });
 
 const steps = [
+  {
+    name: "profile-bound governed read-only MCP transport and negative controls",
+    command: "node",
+    args: ["--import", "tsx", "scripts/governed-mcp-phase3-qualification.mts"],
+    env: { MC_QUALIFICATION_BASE_SHA: phase3QualificationBaseSha },
+  },
   {
     name: "frozen dependency, advisory, credential, and release configuration gates",
     command: "pnpm",
@@ -64,6 +71,7 @@ const steps = [
     args: [
       "--filter", "@mission-control/orchestration-server", "exec", "vitest", "run",
       "src/__tests__/systemFactoryQualification.test.ts",
+      "src/__tests__/governedMcpBroker.test.ts",
       "src/__tests__/factoryAttemptWorker.test.ts",
       "src/__tests__/factoryAttemptWorkerRemote.test.ts",
       "src/__tests__/factoryVerification.test.ts",
@@ -82,11 +90,23 @@ const steps = [
     },
   },
   {
+    name: "receipt-first Mission Control golden eval",
+    command: "node",
+    args: [
+      "scripts/run-mission-control-eval.mjs",
+      "--input", path.relative(repoRoot, scenarioEvidencePath),
+      "--baseline", "evals/mission-control-golden-v1/baselines/main.json",
+      "--receipt", path.relative(repoRoot, path.join(evidenceDirectory, "eval-receipt.json")),
+      "--check-baseline",
+    ],
+  },
+  {
     name: "Mission, WorkOrder, Memory, Observability, GitHub, and Learning contracts",
     command: "pnpm",
     args: [
       "exec", "vitest", "run",
       "convex/__tests__/missionPlan.test.ts",
+      "convex/__tests__/governedMcp.test.ts",
       "convex/__tests__/missionSpec.test.ts",
       "convex/__tests__/missionSpecAuthority.test.ts",
       "convex/__tests__/missionWorkOrderContract.test.ts",

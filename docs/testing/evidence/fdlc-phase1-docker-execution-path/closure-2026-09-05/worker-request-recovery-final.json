@@ -1,0 +1,2141 @@
+{
+  "schema": "factory-docker-worker-qualification/v1",
+  "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+  "sourceSha": "331d69b4e718212083729b442a034743e08dbe7b",
+  "fixtureOnly": true,
+  "reports": [
+    {
+      "sandbox": {
+        "operation": "REQUESTED",
+        "request": {
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "projectId": "project-1",
+          "workOrderId": "work-order-1",
+          "workflowRunId": "offline-workflow",
+          "attemptId": "factory-run-remote",
+          "attemptLeaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+          "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522",
+          "sourceSha": "331d69b4e718212083729b442a034743e08dbe7b",
+          "profile": {
+            "schema": "factory-sandbox-profile/v1",
+            "profileKey": "fake-standard",
+            "version": 1,
+            "provider": "DOCKER",
+            "providerProfile": "factory/docker-offline/v1",
+            "providerProfileVersion": "1",
+            "machine": {
+              "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+              "cpu": 1,
+              "memoryMb": 512,
+              "diskGb": 5
+            },
+            "supervisor": {
+              "version": "mission-control-supervisor/v1",
+              "transport": "DOCKER_STDIN"
+            },
+            "runtime": {
+              "maxRuntimeMs": 60000,
+              "resultPollIntervalMs": 250,
+              "resultRetentionMs": 86400000
+            },
+            "network": {
+              "egress": "RESTRICTED_ALLOWLIST",
+              "egressAllowlist": [],
+              "publicIngress": false,
+              "exposedPorts": []
+            },
+            "credentials": {
+              "inference": "NONE",
+              "repositoryAccess": "CONTROL_PLANE_SNAPSHOT",
+              "githubAuthority": "NONE",
+              "providerAuthority": "NONE"
+            },
+            "spend": {
+              "maxUsd": 1,
+              "enforcement": "PROVIDER_KEY_LIMIT"
+            },
+            "teardown": {
+              "terminateOnEveryTerminalState": true,
+              "verifyResourceAbsent": true,
+              "supportsResume": false
+            },
+            "preview": {
+              "mode": "DISABLED"
+            },
+            "readiness": {
+              "state": "DEGRADED",
+              "checkedAt": 1788634542571,
+              "reason": "Deterministic fake provider",
+              "egressEnforcementProven": false
+            }
+          },
+          "requestedAt": 1788634542652
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_REQUESTED:1788634542652",
+          "eventType": "SANDBOX_REQUESTED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788634542652,
+          "endedAt": 1788634542652,
+          "commandSummary": "Sandbox Requested",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "provider": "DOCKER",
+            "profileDigest": "sha256:2889eef3800b904badcfbcacad74139978bbaed957f72e712a1f7ceba5ec9ac6",
+            "readiness": "DEGRADED"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "READY",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          }
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_ALLOCATED:1788634542873",
+          "eventType": "SANDBOX_ALLOCATED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788634542873,
+          "endedAt": 1788634542873,
+          "commandSummary": "Sandbox Allocated",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "startedAt": 1788634542894
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_STARTED:1788634542897",
+          "eventType": "SANDBOX_STARTED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788634542897,
+          "endedAt": 1788634542897,
+          "commandSummary": "Sandbox Started",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "processId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634543179
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634543447
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634543714
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634543983
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634544252
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634544519
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634544786
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634545057
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634545324
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634545594
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634545863
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634546129
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634546421
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634546691
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634546960
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634547229
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634547500
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634547771
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634548044
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634548314
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634548579
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634548850
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634549116
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634549381
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634549647
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634549956
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634550222
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634550488
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634550755
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634551029
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634551294
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634551560
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634551827
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634552092
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634552357
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634552638
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634552909
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634553180
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634553448
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634553716
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634553981
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634554246
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634554514
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634554784
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634555053
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634555320
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634555589
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634555858
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634556127
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634556398
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634556666
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634556934
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634557205
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634557473
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634557742
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634558018
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634558286
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634558559
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634558829
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634559098
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634559368
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634559635
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634559904
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634560172
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634560439
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634560707
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634560975
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634561243
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634561512
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634561777
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634562054
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634562350
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634562618
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634562887
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634563157
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634563433
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634563703
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634563975
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634564246
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634564516
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RESULT_READY",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "lastHeartbeatAt": 1788634564794
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RESULT_READY",
+          "createdAt": 1788634542854,
+          "readyAt": 1788634542854,
+          "providerMetadata": {
+            "schema": "factory-docker-resource/v1",
+            "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+            "leaseId": "9f5afcd9-69aa-4f5f-a1ba-ccaf37a37ad5",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522"
+          },
+          "startedAt": 1788634542894,
+          "resultDigest": "sha256:0c9b8a6eab2ab64b9861178e66e03a716aaf5beb825b8a02c40607c6eaf4f2c1"
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "RESULT",
+        "result": {
+          "digest": "sha256:0c9b8a6eab2ab64b9861178e66e03a716aaf5beb825b8a02c40607c6eaf4f2c1",
+          "status": "FAILED",
+          "providerCostUsd": null,
+          "inferenceCostUsd": null
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_RESULT_RECEIVED:1788634564795",
+          "eventType": "SANDBOX_RESULT_RECEIVED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "COMPLETED",
+          "startedAt": 1788634564795,
+          "endedAt": 1788634564795,
+          "commandSummary": "Sandbox Result Received",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "resultDigest": "sha256:0c9b8a6eab2ab64b9861178e66e03a716aaf5beb825b8a02c40607c6eaf4f2c1",
+            "status": "FAILED",
+            "providerCostUsd": null,
+            "inferenceCostUsd": null
+          }
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_TERMINATION_REQUESTED:1788634564796",
+          "eventType": "SANDBOX_TERMINATION_REQUESTED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788634564796,
+          "endedAt": 1788634564796,
+          "commandSummary": "Sandbox Termination Requested",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "TERMINATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "receipt": {
+          "providerResourceId": "91ea04d6ce7ad11e5099ff8e3f05c0933f0cb18105da471e78e5a0834b71585b",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "requestedAt": 1788634564796,
+          "confirmedAbsentAt": 1788634564904,
+          "resourceAbsent": true
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_TERMINATED:1788634564906",
+          "eventType": "SANDBOX_TERMINATED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "COMPLETED",
+          "startedAt": 1788634564906,
+          "endedAt": 1788634564906,
+          "commandSummary": "Sandbox Terminated",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "confirmedAbsentAt": 1788634564904
+          }
+        }
+      ]
+    },
+    {
+      "artifacts": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:structured-result",
+          "artifactType": "STRUCTURED_OUTPUT",
+          "name": "Execution harness factory-result/v1",
+          "description": "{\"schema\":\"factory-docker-probes/v1\",\"runtime\":{\"platform\":\"linux\",\"architecture\":\"x64\",\"node\":\"v26.7.0\",\"codexSha256\":\"2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04\",\"deterministicSandbox\":{\"status\":1,\"signal\":null,\"markerObserved\":false,\"stderr\":\"bwrap: No permissions to create a new namespace, likely because the kernel does not allow non-privileged user namespaces. On e.g. debian this can be enabled with 'sysctl kernel.unprivileged_userns_clone=1'.\\n\",\"errorCode\":null},\"outerBoundaryFixture\":{\"schema\":\"fdlc-codex-runtime-fixture/v1\",\"providerCalls\":0,\"fixtureRequests\":2,\"exitCode\":0,\"markerObserved\":true,\"completed\":true,\"stdout\":\"{\\\"type\\\":\\\"thread.started\\\",\\\"thread_id\\\":\\\"01a072ed-5ce0-7cc2-915c-d751ee670de5\\\"}\\n{\\\"type\\\":\\\"item.completed\\\",\\\"item\\\":{\\\"id\\\":\\\"item_0\\\",\\\"type\\\":\\\"error\\\",\\\"message\\\":\\\"Model metadata for `gpt-5` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.\\\"}}\\n{\\\"type\\\":\\\"turn.started\\\"}\\n{\\\"type\\\":\\\"item.started\\\",\\\"item\\\":{\\\"id\\\":\\\"item_1\\\",\\\"type\\\":\\\"command_execution\\\",\\\"command\\\":\\\"/bin/sh -lc 'printf FDLC_ACTUAL_RUNTIME_OK > /tmp/runtime-marker'\\\",\\\"aggregated_output\\\":\\\"\\\",\\\"exit_code\\\":null,\\\"status\\\":\\\"in_progress\\\"}}\\n{\\\"type\\\":\\\"item.completed\\\",\\\"item\\\":{\\\"id\\\":\\\"item_1\\\",\\\"type\\\":\\\"command_execution\\\",\\\"command\\\":\\\"/bin/sh -lc 'printf FDLC_ACTUAL_RUNTIME_OK > /tmp/runtime-marker'\\\",\\\"aggregated_output\\\":\\\"\\\",\\\"exit_code\\\":0,\\\"status\\\":\\\"completed\\\"}}\\n{\\\"type\\\":\\\"item.completed\\\",\\\"item\\\":{\\\"id\\\":\\\"item_2\\\",\\\"type\\\":\\\"agent_message\\\",\\\"text\\\":\\\"FDLC_OFFLINE_RUNTIME_COMPLETE\\\"}}\\n{\\\"type\\\":\\\"turn.completed\\\",\\\"usage\\\":{\\\"input_tokens\\\":20,\\\"cached_input_tokens\\\":0,\\\"cache_write_input_tokens\\\":0,\\\"output_tokens\\\":20,\\\"reasoning_output_tokens\\\":0}}\\n\",\"stderr\":\"Reading additional input from stdin...\\n\"}},\"checks\":[{\"name\":\"workspace_write_read\",\"passed\":true},{\"name\":\"private_temp\",\"passed\":true},{\"name\":\"nonroot\",\"passed\":true},{\"name\":\"runtime_available\",\"passed\":true},{\"name\":\"actual_codex_tool_execution\",\"passed\":true},{\"name\":\"native_runtime_readonly\",\"passed\":true},{\"name\":\"privilege_escalation_denied\",\"passed\":true},{\"name\":\"runtime_readonly\",\"passed\":true},{\"name\":\"root_readonly\",\"passed\":true},{\"name\":\"absent:/Users/jaywest\",\"passed\":true},{\"name\":\"absent:/host\",\"passed\":true},{\"name\":\"absent:/host/etc\",\"passed\":true},{\"name\":\"absent:/var/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/.codex/auth.json\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/MissionControl\",\"passed\":true},{\"name\":\"absent:/private/tmp\",\"passed\":true},{\"name\":\"no_credentials_env\",\"passed\":true},{\"name\":\"no_new_privileges\",\"passed\":true},{\"name\":\"capabilities_dropped\",\"passed\":true},{\"name\":\"seccomp_filter\",\"passed\":true},{\"name\":\"network_denied:public\",\"passed\":true},{\"name\":\"network_denied:localhost\",\"passed\":true},{\"name\":\"network_denied:metadata\",\"passed\":true},{\"name\":\"network_denied:private\",\"passed\":true},{\"name\":\"network_denied:hostGateway\",\"passed\":true},{\"name\":\"network_denied:alternateProvider\",\"passed\":true}]}",
+          "contentHash": "sha256:5d0d8c1d0ccd37cc7616e7c2220df19192a8d9f4f4b889c082e344e1fa1cb391",
+          "metadata": {
+            "schema": "factory-result/v1",
+            "acceptanceAuthority": false,
+            "result": {
+              "schema": "factory-result/v1",
+              "status": "FAILED",
+              "summary": "{\"schema\":\"factory-docker-probes/v1\",\"runtime\":{\"platform\":\"linux\",\"architecture\":\"x64\",\"node\":\"v26.7.0\",\"codexSha256\":\"2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04\",\"deterministicSandbox\":{\"status\":1,\"signal\":null,\"markerObserved\":false,\"stderr\":\"bwrap: No permissions to create a new namespace, likely because the kernel does not allow non-privileged user namespaces. On e.g. debian this can be enabled with 'sysctl kernel.unprivileged_userns_clone=1'.\\n\",\"errorCode\":null},\"outerBoundaryFixture\":{\"schema\":\"fdlc-codex-runtime-fixture/v1\",\"providerCalls\":0,\"fixtureRequests\":2,\"exitCode\":0,\"markerObserved\":true,\"completed\":true,\"stdout\":\"{\\\"type\\\":\\\"thread.started\\\",\\\"thread_id\\\":\\\"01a072ed-5ce0-7cc2-915c-d751ee670de5\\\"}\\n{\\\"type\\\":\\\"item.completed\\\",\\\"item\\\":{\\\"id\\\":\\\"item_0\\\",\\\"type\\\":\\\"error\\\",\\\"message\\\":\\\"Model metadata for `gpt-5` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.\\\"}}\\n{\\\"type\\\":\\\"turn.started\\\"}\\n{\\\"type\\\":\\\"item.started\\\",\\\"item\\\":{\\\"id\\\":\\\"item_1\\\",\\\"type\\\":\\\"command_execution\\\",\\\"command\\\":\\\"/bin/sh -lc 'printf FDLC_ACTUAL_RUNTIME_OK > /tmp/runtime-marker'\\\",\\\"aggregated_output\\\":\\\"\\\",\\\"exit_code\\\":null,\\\"status\\\":\\\"in_progress\\\"}}\\n{\\\"type\\\":\\\"item.completed\\\",\\\"item\\\":{\\\"id\\\":\\\"item_1\\\",\\\"type\\\":\\\"command_execution\\\",\\\"command\\\":\\\"/bin/sh -lc 'printf FDLC_ACTUAL_RUNTIME_OK > /tmp/runtime-marker'\\\",\\\"aggregated_output\\\":\\\"\\\",\\\"exit_code\\\":0,\\\"status\\\":\\\"completed\\\"}}\\n{\\\"type\\\":\\\"item.completed\\\",\\\"item\\\":{\\\"id\\\":\\\"item_2\\\",\\\"type\\\":\\\"agent_message\\\",\\\"text\\\":\\\"FDLC_OFFLINE_RUNTIME_COMPLETE\\\"}}\\n{\\\"type\\\":\\\"turn.completed\\\",\\\"usage\\\":{\\\"input_tokens\\\":20,\\\"cached_input_tokens\\\":0,\\\"cache_write_input_tokens\\\":0,\\\"output_tokens\\\":20,\\\"reasoning_output_tokens\\\":0}}\\n\",\"stderr\":\"Reading additional input from stdin...\\n\"}},\"checks\":[{\"name\":\"workspace_write_read\",\"passed\":true},{\"name\":\"private_temp\",\"passed\":true},{\"name\":\"nonroot\",\"passed\":true},{\"name\":\"runtime_available\",\"passed\":true},{\"name\":\"actual_codex_tool_execution\",\"passed\":true},{\"name\":\"native_runtime_readonly\",\"passed\":true},{\"name\":\"privilege_escalation_denied\",\"passed\":true},{\"name\":\"runtime_readonly\",\"passed\":true},{\"name\":\"root_readonly\",\"passed\":true},{\"name\":\"absent:/Users/jaywest\",\"passed\":true},{\"name\":\"absent:/host\",\"passed\":true},{\"name\":\"absent:/host/etc\",\"passed\":true},{\"name\":\"absent:/var/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/.codex/auth.json\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/MissionControl\",\"passed\":true},{\"name\":\"absent:/private/tmp\",\"passed\":true},{\"name\":\"no_credentials_env\",\"passed\":true},{\"name\":\"no_new_privileges\",\"passed\":true},{\"name\":\"capabilities_dropped\",\"passed\":true},{\"name\":\"seccomp_filter\",\"passed\":true},{\"name\":\"network_denied:public\",\"passed\":true},{\"name\":\"network_denied:localhost\",\"passed\":true},{\"name\":\"network_denied:metadata\",\"passed\":true},{\"name\":\"network_denied:private\",\"passed\":true},{\"name\":\"network_denied:hostGateway\",\"passed\":true},{\"name\":\"network_denied:alternateProvider\",\"passed\":true}]}",
+              "completedAcceptanceCriterionIds": [],
+              "incompleteAcceptanceCriterionIds": [
+                "ac-remote"
+              ],
+              "unknownAcceptanceCriterionIds": [],
+              "verificationCommands": [],
+              "knownRisks": [
+                "Qualification fixture; not a pilot candidate."
+              ],
+              "nextAction": "Review containment evidence."
+            }
+          }
+        },
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox-result:sha256:0c9b8a6eab2ab64b9861178e66e03a716aaf5beb825b8a02c40607c6eaf4f2c1",
+          "artifactType": "STRUCTURED_OUTPUT",
+          "name": "Remote sandbox result bundle",
+          "description": "{\"schema\":\"factory-docker-probes/v1\",\"runtime\":{\"platform\":\"linux\",\"architecture\":\"x64\",\"node\":\"v26.7.0\",\"codexSha256\":\"2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04\",\"deterministicSandbox\":{\"status\":1,\"signal\":null,\"markerObserved\":false,\"stderr\":\"bwrap: No permissions to create a new namespace, likely because the kernel does not allow non-privileged user namespaces. On e.g. debian this can be enabled with 'sysctl kernel.unprivileged_userns_clone=1'.\\n\",\"errorCode\":null},\"outerBoundaryFixture\":{\"schema\":\"fdlc-codex-runtime-fixture/v1\",\"providerCalls\":0,\"fixtureRequests\":2,\"exitCode\":0,\"markerObserved\":true,\"completed\":true,\"stdout\":\"{\\\"type\\\":\\\"thread.started\\\",\\\"thread_id\\\":\\\"01a072ed-5ce0-7cc2-915c-d751ee670de5\\\"}\\n{\\\"type\\\":\\\"item.completed\\\",\\\"item\\\":{\\\"id\\\":\\\"item_0\\\",\\\"type\\\":\\\"error\\\",\\\"message\\\":\\\"Model metadata for `gpt-5` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.\\\"}}\\n{\\\"type\\\":\\\"turn.started\\\"}\\n{\\\"type\\\":\\\"item.started\\\",\\\"item\\\":{\\\"id\\\":\\\"item_1\\\",\\\"type\\\":\\\"command_execution\\\",\\\"command\\\":\\\"/bin/sh -lc 'printf FDLC_ACTUAL_RUNTIME_OK > /tmp/runtime-marker'\\\",\\\"aggregated_output\\\":\\\"\\\",\\\"exit_code\\\":null,\\\"status\\\":\\\"in_progress\\\"}}\\n{\\\"type\\\":\\\"item.completed\\\",\\\"item\\\":{\\\"id\\\":\\\"item_1\\\",\\\"type\\\":\\\"command_execution\\\",\\\"command\\\":\\\"/bin/sh -lc 'printf FDLC_ACTUAL_RUNTIME_OK > /tmp/runtime-marker'\\\",\\\"aggregated_output\\\":\\\"\\\",\\\"exit_code\\\":0,\\\"status\\\":\\\"completed\\\"}}\\n{\\\"type\\\":\\\"item.completed\\\",\\\"item\\\":{\\\"id\\\":\\\"item_2\\\",\\\"type\\\":\\\"agent_message\\\",\\\"text\\\":\\\"FDLC_OFFLINE_RUNTIME_COMPLETE\\\"}}\\n{\\\"type\\\":\\\"turn.completed\\\",\\\"usage\\\":{\\\"input_tokens\\\":20,\\\"cached_input_tokens\\\":0,\\\"cache_write_input_tokens\\\":0,\\\"output_tokens\\\":20,\\\"reasoning_output_tokens\\\":0}}\\n\",\"stderr\":\"Reading additional input from stdin...\\n\"}},\"checks\":[{\"name\":\"workspace_write_read\",\"passed\":true},{\"name\":\"private_temp\",\"passed\":true},{\"name\":\"nonroot\",\"passed\":true},{\"name\":\"runtime_available\",\"passed\":true},{\"name\":\"actual_codex_tool_execution\",\"passed\":true},{\"name\":\"native_runtime_readonly\",\"passed\":true},{\"name\":\"privilege_escalation_denied\",\"passed\":true},{\"name\":\"runtime_readonly\",\"passed\":true},{\"name\":\"root_readonly\",\"passed\":true},{\"name\":\"absent:/Users/jaywest\",\"passed\":true},{\"name\":\"absent:/host\",\"passed\":true},{\"name\":\"absent:/host/etc\",\"passed\":true},{\"name\":\"absent:/var/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/.codex/auth.json\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/MissionControl\",\"passed\":true},{\"name\":\"absent:/private/tmp\",\"passed\":true},{\"name\":\"no_credentials_env\",\"passed\":true},{\"name\":\"no_new_privileges\",\"passed\":true},{\"name\":\"capabilities_dropped\",\"passed\":true},{\"name\":\"seccomp_filter\",\"passed\":true},{\"name\":\"network_denied:public\",\"passed\":true},{\"name\":\"network_denied:localhost\",\"passed\":true},{\"name\":\"network_denied:metadata\",\"passed\":true},{\"name\":\"network_denied:private\",\"passed\":true},{\"name\":\"network_denied:hostGateway\",\"passed\":true},{\"name\":\"network_denied:alternateProvider\",\"passed\":true}]}",
+          "contentHash": "sha256:0c9b8a6eab2ab64b9861178e66e03a716aaf5beb825b8a02c40607c6eaf4f2c1",
+          "retentionPolicy": "ATTEMPT_EVIDENCE",
+          "sensitivity": "INTERNAL",
+          "metadata": {
+            "schema": "factory-sandbox-result/v1",
+            "sourceSha": "331d69b4e718212083729b442a034743e08dbe7b",
+            "profileDigest": "sha256:2889eef3800b904badcfbcacad74139978bbaed957f72e712a1f7ceba5ec9ac6",
+            "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522",
+            "status": "FAILED",
+            "workOrderRevisionNumber": 1,
+            "changedFiles": [],
+            "diff": {
+              "filesChanged": 0
+            },
+            "commandResults": [
+              {
+                "commandClass": "EXECUTOR",
+                "exitCode": 0,
+                "durationMs": 15510,
+                "timedOut": false
+              }
+            ],
+            "verificationInputs": {
+              "reportedCommands": []
+            },
+            "environment": {
+              "provider": "DOCKER",
+              "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2"
+            },
+            "harness": {
+              "adapter": "codex",
+              "version": "v1",
+              "harnessId": "codex-cli",
+              "harnessVersion": "0.146.0",
+              "provider": "openai",
+              "model": "gpt-5"
+            },
+            "resultProvenance": {
+              "source": "OUTPUT_FILE",
+              "outputFile": {
+                "state": "VALID",
+                "byteLength": 3903
+              },
+              "jsonl": {
+                "byteLength": 0,
+                "lineCount": 0,
+                "malformedLineCount": 0,
+                "terminalCompletedCount": 0,
+                "terminalFailureCount": 0,
+                "validCandidateCount": 0
+              },
+              "context": {
+                "attemptId": "factory-run-remote",
+                "manifestDigest": "sha256:9b9c6695a491e1f77d26b9b55d9e5660dd5ad9012d6033584ac361d4a3f79522",
+                "sourceSha": "331d69b4e718212083729b442a034743e08dbe7b"
+              }
+            },
+            "failure": {
+              "class": "NON_RETRYABLE_RESULT",
+              "code": "DETERMINISTIC_GATE_FAILURE",
+              "stage": "RESULT_VALIDATION",
+              "retryable": false,
+              "summary": "Executor returned FAILED: Review containment evidence."
+            },
+            "patchDigest": "sha256:f00ca9474b8f008e78dd27e23c3b9f7a67ce6d7c3e4995e78a2db970d3bc9cb2",
+            "patchByteLength": 0,
+            "executor": {
+              "exitCode": 0,
+              "stdoutDigest": "sha256:6fd9327a0a0d244329031c7fba4b2e821ef81a2b892c7248145eaf52e320209f",
+              "stderrDigest": "sha256:a474273e9e002f1f493d128aef6ba77402f4d8d1360f5f4c18391447161ee827",
+              "stdoutTail": "",
+              "stderrTail": "",
+              "resultOutput": {
+                "state": "VALID",
+                "byteLength": 3903,
+                "digest": "sha256:68aa61c35f04774aadc1b76ee651685d7b0c5fc4158cae7fa914e0112b862dcf",
+                "tail": "{\"schema\":\"factory-result/v1\",\"status\":\"FAILED\",\"summary\":\"{\\\"schema\\\":\\\"factory-docker-probes/v1\\\",\\\"runtime\\\":{\\\"platform\\\":\\\"linux\\\",\\\"architecture\\\":\\\"x64\\\",\\\"node\\\":\\\"v26.7.0\\\",\\\"codexSha256\\\":\\\"2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04\\\",\\\"deterministicSandbox\\\":{\\\"status\\\":1,\\\"signal\\\":null,\\\"markerObserved\\\":false,\\\"stderr\\\":\\\"bwrap: No permissions to create a new namespace, likely because the kernel does not allow non-privileged user namespaces. On e.g. debian this can be enabled with 'sysctl kernel.unprivileged_userns_clone=1'.\\\\n\\\",\\\"errorCode\\\":null},\\\"outerBoundaryFixture\\\":{\\\"schema\\\":\\\"fdlc-codex-runtime-fixture/v1\\\",\\\"providerCalls\\\":0,\\\"fixtureRequests\\\":2,\\\"exitCode\\\":0,\\\"markerObserved\\\":true,\\\"completed\\\":true,\\\"stdout\\\":\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"thread.started\\\\\\\",\\\\\\\"thread_id\\\\\\\":\\\\\\\"01a072ed-5ce0-7cc2-915c-d751ee670de5\\\\\\\"}\\\\n{\\\\\\\"type\\\\\\\":\\\\\\\"item.completed\\\\\\\",\\\\\\\"item\\\\\\\":{\\\\\\\"id\\\\\\\":\\\\\\\"item_0\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"error\\\\\\\",\\\\\\\"message\\\\\\\":\\\\\\\"Model metadata for `gpt-5` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.\\\\\\\"}}\\\\n{\\\\\\\"type\\\\\\\":\\\\\\\"turn.started\\\\\\\"}\\\\n{\\\\\\\"type\\\\\\\":\\\\\\\"item.started\\\\\\\",\\\\\\\"item\\\\\\\":{\\\\\\\"id\\\\\\\":\\\\\\\"item_1\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"command_execution\\\\\\\",\\\\\\\"command\\\\\\\":\\\\\\\"/bin/sh -lc 'printf FDLC_ACTUAL_RUNTIME_OK > /tmp/runtime-marker'\\\\\\\",\\\\\\\"aggregated_output\\\\\\\":\\\\\\\"\\\\\\\",\\\\\\\"exit_code\\\\\\\":null,\\\\\\\"status\\\\\\\":\\\\\\\"in_progress\\\\\\\"}}\\\\n{\\\\\\\"type\\\\\\\":\\\\\\\"item.completed\\\\\\\",\\\\\\\"item\\\\\\\":{\\\\\\\"id\\\\\\\":\\\\\\\"item_1\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"command_execution\\\\\\\",\\\\\\\"command\\\\\\\":\\\\\\\"/bin/sh -lc 'printf FDLC_ACTUAL_RUNTIME_OK > /tmp/runtime-marker'\\\\\\\",\\\\\\\"aggregated_output\\\\\\\":\\\\\\\"\\\\\\\",\\\\\\\"exit_code\\\\\\\":0,\\\\\\\"status\\\\\\\":\\\\\\\"completed\\\\\\\"}}\\\\n{\\\\\\\"type\\\\\\\":\\\\\\\"item.completed\\\\\\\",\\\\\\\"item\\\\\\\":{\\\\\\\"id\\\\\\\":\\\\\\\"item_2\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"agent_message\\\\\\\",\\\\\\\"text\\\\\\\":\\\\\\\"FDLC_OFFLINE_RUNTIME_COMPLETE\\\\\\\"}}\\\\n{\\\\\\\"type\\\\\\\":\\\\\\\"turn.completed\\\\\\\",\\\\\\\"usage\\\\\\\":{\\\\\\\"input_tokens\\\\\\\":20,\\\\\\\"cached_input_tokens\\\\\\\":0,\\\\\\\"cache_write_input_tokens\\\\\\\":0,\\\\\\\"output_tokens\\\\\\\":20,\\\\\\\"reasoning_output_tokens\\\\\\\":0}}\\\\n\\\",\\\"stderr\\\":\\\"Reading additional input from stdin...\\\\n\\\"}},\\\"checks\\\":[{\\\"name\\\":\\\"workspace_write_read\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"private_temp\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"nonroot\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"runtime_available\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"actual_codex_tool_execution\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"native_runtime_readonly\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"privilege_escalation_denied\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"runtime_readonly\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"root_readonly\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/Users/jaywest\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/host\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/host/etc\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/var/run/docker.sock\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/run/docker.sock\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/Users/jaywest/.codex/auth.json\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/Users/jaywest/MissionControl\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/private/tmp\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"no_credentials_env\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"no_new_privileges\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"capabilities_dropped\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"seccomp_filter\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:public\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:localhost\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:metadata\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:private\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:hostGateway\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:alternateProvider\\\",\\\"passed\\\":true}]}\",\"completedAcceptanceCriterionIds\":[],\"incompleteAcceptanceCriterionIds\":[\"ac-remote\"],\"unknownAcceptanceCriterionIds\":[],\"verificationCommands\":[],\"knownRisks\":[\"Qualification fixture; not a pilot candidate.\"],\"nextAction\":\"Review containment evidence.\"}",
+                "validationIssues": []
+              }
+            },
+            "usage": {
+              "providerCostUsd": null,
+              "inferenceCostUsd": null,
+              "inputTokens": null,
+              "outputTokens": null,
+              "observedAt": 1788634564655,
+              "providerRuntimeMs": 15510,
+              "enforcement": "OBSERVATION_ONLY"
+            },
+            "secretValuesIncluded": false,
+            "acceptanceAuthority": "NONE",
+            "verificationAuthority": "NONE",
+            "publicationAuthority": "NONE"
+          }
+        }
+      ],
+      "terminal": {
+        "status": "FAILED",
+        "failureReason": "Executor returned FAILED: Review containment evidence.",
+        "remoteFailure": {
+          "class": "NON_RETRYABLE_RESULT",
+          "code": "DETERMINISTIC_GATE_FAILURE",
+          "stage": "RESULT_VALIDATION",
+          "retryable": false,
+          "summary": "Executor returned FAILED: Review containment evidence."
+        }
+      }
+    }
+  ],
+  "worker": {
+    "enabled": true,
+    "activeRunIds": [],
+    "completedCount": 0,
+    "failedCount": 1,
+    "lastPollAt": 1788634542575,
+    "lastError": null,
+    "credentialsConfigured": false,
+    "reconciliationEnabled": true,
+    "cleanupHealth": {
+      "inspected": 0,
+      "activeSandboxes": 0,
+      "healthy": 0,
+      "orphaned": 0,
+      "reconciled": 0,
+      "failed": 0,
+      "activeEphemeralCredentials": 0,
+      "unreconciledCostUsd": 0,
+      "lastReconciledAt": 1788634542576,
+      "failures": []
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+    "inferenceProfileName": "US Anthropic Claude Sonnet 4.6",
+    "description": "Routes requests to Claude Sonnet 4.6 in us-east-1, us-east-2, us-west-2.",
+    "createdAt": "2026-02-13T21:58:21.393000+00:00",
+    "updatedAt": "2026-02-13T21:58:21.393000+00:00",
+    "inferenceProfileArn": "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
+    "models": [
+        {
+            "modelArn": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6"
+        },
+        {
+            "modelArn": "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6"
+        },
+        {
+            "modelArn": "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-6"
+        }
+    ],
+    "inferenceProfileId": "us.anthropic.claude-sonnet-4-6",
+    "status": "ACTIVE",
+    "type": "SYSTEM_DEFINED"
+}

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createGitVerificationSubject } from "@mission-control/workflow-engine/verification-subject";
 import {
   activeLeaseMatches,
   classifyFactoryAttemptReconciliation,
@@ -7,7 +8,9 @@ import {
   expiredFactoryLeaseIdIsReplay,
   factoryAttemptMutationIsAuthorized,
   factoryAttemptRequiresReplacementOnClaim,
+  factoryAttemptSourceBindingMatches,
   factoryLeaseMatchesCurrentRegistration,
+  frozenFactorySourceRevision,
   lostFactoryAttemptFailure,
   renewAttemptLease,
   validateFactoryPullRequestLineage,
@@ -15,8 +18,161 @@ import {
 
 const workerA = { workerId: "worker-a", sessionId: "session-a", generation: 1 };
 const workerB = { workerId: "worker-b", sessionId: "session-b", generation: 3 };
+const verificationContractDigest = `sha256:${"d".repeat(64)}`;
 
 describe("Factory attempt leases", () => {
+  it("rejects an intermediate worker-selected base that could hide verification authority changes", () => {
+    const base = "a".repeat(40); const intermediate = "b".repeat(40);
+    const run = { executionManifest: { repository: { baseSha: base } } };
+    expect(frozenFactorySourceRevision(run, base)).toBe(base);
+    expect(() => frozenFactorySourceRevision(run, intermediate)).toThrow("frozen");
+    expect(() => frozenFactorySourceRevision({ ...run, executionBaseSha: intermediate }, base)).toThrow("frozen");
+    expect(() => frozenFactorySourceRevision({}, base)).toThrow("frozen");
+    expect(() => frozenFactorySourceRevision(run, undefined)).toThrow("frozen");
+  });
+  it("binds implementation claims to the host base and verification claims to the immutable candidate", () => {
+    const baseSha = "a".repeat(40);
+    const candidateSha = "b".repeat(40);
+    const verifiedSubject = createGitVerificationSubject({
+      version: 1,
+      kind: "GIT_CANDIDATE",
+      workOrderId: "work-order-1",
+      workOrderRevisionNumber: 3,
+      verificationContractDigest,
+      sourceAttemptId: "source-attempt-1",
+      repositoryId: "repository-1",
+      provider: "GITHUB",
+      providerRepositoryId: "provider-repository-1",
+      candidateSha,
+      treeSha: "c".repeat(40),
+      pullRequest: {
+        providerPullRequestId: "provider-pr-1",
+        number: 1,
+        url: "https://github.com/acme/repo/pull/1",
+        baseRef: "main",
+        headRef: "mc/work-order-1",
+        headSha: candidateSha,
+        draftAtPublication: true,
+      },
+    });
+    const binding = {
+      sourceAttemptId: "source-attempt-1",
+      workOrderId: "work-order-1",
+      workOrderRevisionNumber: 3,
+      verificationContractDigest,
+      verificationSubject: verifiedSubject,
+      verificationSubjectDigest: verifiedSubject.digest,
+    };
+    const source = {
+      _id: "source-attempt-1",
+      attemptPurpose: "IMPLEMENTATION",
+      status: "COMPLETED",
+      candidateReadyAt: 100,
+      repositoryId: "repository-1",
+      workOrderId: "work-order-1",
+      workOrderRevisionNumber: 3,
+      verificationContractDigest,
+      branch: "mc/work-order-1",
+      headSha: candidateSha,
+      verificationSubject: verifiedSubject,
+      executionManifest: { repository: { baseSha } },
+      executionBaseSha: baseSha,
+    };
+
+    expect(factoryAttemptSourceBindingMatches({
+      attemptPurpose: "IMPLEMENTATION",
+      manifestBaseSha: baseSha,
+      hostBaseCommit: baseSha,
+    })).toBe(true);
+    expect(factoryAttemptSourceBindingMatches({
+      attemptPurpose: "VERIFICATION",
+      manifestBaseSha: candidateSha,
+      hostBaseCommit: baseSha,
+      repositoryId: "repository-1",
+      workOrderId: "work-order-1",
+      workOrderRevisionNumber: 3,
+      verificationContractDigest,
+      branch: "mc/work-order-1",
+      verificationAttemptBinding: binding,
+      verificationSourceAttempt: source,
+    })).toBe(true);
+  });
+
+  it("rejects verification claims with a tampered candidate or mismatched subject tuple", () => {
+    const candidateSha = "b".repeat(40);
+    const subject = createGitVerificationSubject({
+      version: 1,
+      kind: "GIT_CANDIDATE",
+      workOrderId: "work-order-1",
+      workOrderRevisionNumber: 3,
+      verificationContractDigest,
+      sourceAttemptId: "source-attempt-1",
+      repositoryId: "repository-1",
+      provider: "GITHUB",
+      providerRepositoryId: "provider-repository-1",
+      candidateSha,
+      treeSha: "c".repeat(40),
+      pullRequest: {
+        providerPullRequestId: "provider-pr-1",
+        number: 1,
+        url: "https://github.com/acme/repo/pull/1",
+        baseRef: "main",
+        headRef: "mc/work-order-1",
+        headSha: candidateSha,
+        draftAtPublication: true,
+      },
+    });
+    const binding = {
+      sourceAttemptId: "source-attempt-1",
+      workOrderId: "work-order-1",
+      workOrderRevisionNumber: 3,
+      verificationContractDigest,
+      verificationSubject: subject,
+      verificationSubjectDigest: subject.digest,
+    };
+    const source = {
+      _id: "source-attempt-1",
+      attemptPurpose: "IMPLEMENTATION",
+      status: "COMPLETED",
+      candidateReadyAt: 100,
+      repositoryId: "repository-1",
+      workOrderId: "work-order-1",
+      workOrderRevisionNumber: 3,
+      verificationContractDigest,
+      branch: "mc/work-order-1",
+      headSha: candidateSha,
+      verificationSubject: subject,
+      executionManifest: { repository: { baseSha: "a".repeat(40) } },
+      executionBaseSha: "a".repeat(40),
+    };
+    const exact = {
+      attemptPurpose: "VERIFICATION",
+      manifestBaseSha: candidateSha,
+      hostBaseCommit: "a".repeat(40),
+      repositoryId: "repository-1",
+      workOrderId: "work-order-1",
+      workOrderRevisionNumber: 3,
+      verificationContractDigest,
+      branch: "mc/work-order-1",
+      verificationAttemptBinding: binding,
+      verificationSourceAttempt: source,
+    };
+
+    expect(factoryAttemptSourceBindingMatches({ ...exact, manifestBaseSha: "d".repeat(40) })).toBe(false);
+    expect(factoryAttemptSourceBindingMatches({
+      ...exact,
+      verificationSourceAttempt: { ...source, executionBaseSha: "e".repeat(40) },
+    })).toBe(false);
+    expect(factoryAttemptSourceBindingMatches({
+      ...exact,
+      verificationAttemptBinding: { ...binding, verificationSubjectDigest: "sha256:tampered" },
+    })).toBe(false);
+    expect(factoryAttemptSourceBindingMatches({
+      ...exact,
+      verificationSourceAttempt: { ...source, headSha: "d".repeat(40) },
+    })).toBe(false);
+  });
+
   it("classifies a lost remote lease as retryable infrastructure", () => {
     expect(lostFactoryAttemptFailure({ executionBackend: "remote-sandbox" })).toEqual({
       failureClass: "RETRYABLE_INFRA",

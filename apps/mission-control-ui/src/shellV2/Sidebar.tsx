@@ -34,7 +34,7 @@ export function SidebarItem({ item, active, onNavigate }: SidebarItemProps): JSX
         </span>
       ) : null}
       {item.count != null && item.count > 0 ? (
-        <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-muted">
+        <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-secondary">
           {item.count}
         </span>
       ) : null}
@@ -135,10 +135,7 @@ export function Sidebar({
 }: SidebarProps): JSX.Element {
   const navGroups = groups ?? NAV_GROUPS;
   const activeGroupId = (navGroups.find((g) => g.items.some((i) => i.view === activeView)) ?? navGroups[0]).id;
-  const [expandedIds, setExpandedIds] = useState<string[]>(() => [
-    navGroups[0].id,
-    activeGroupId,
-  ]);
+  const [expandedIds, setExpandedIds] = useState<string[]>(() => [activeGroupId]);
 
   // Keep the group owning the active view expanded as navigation happens
   const effectiveExpanded = expandedIds.includes(activeGroupId)

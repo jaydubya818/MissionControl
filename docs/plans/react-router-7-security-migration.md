@@ -9,7 +9,7 @@ Risk acceptance expiry: 2026-11-15
 
 ## Objective
 
-Move the Mission Control UI from React Router 6.30.4 to a patched React Router 7 release without changing product navigation semantics or introducing Framework/Data Router SSR behavior.
+Move the Mission Control UI from React Router 6.30.6 to a patched React Router 7 release without changing product navigation semantics or introducing Framework/Data Router SSR behavior.
 
 ## Why this is separate
 
@@ -21,7 +21,7 @@ React Router 7 is a major-version migration. The current advisories' required pr
 2. Upgrade `react-router-dom` and `react-router` together to the current patched 7.x release and adopt only required compatibility changes.
 3. Preserve `/v2/*` deep-link, refresh, back/forward, feature-flag, and unknown-route behavior.
 4. Run the runtime-contract guard, UI typecheck/build, the complete route smoke suite, critical accessibility suite, and the System Qualification browser matrix.
-5. Remove advisory acceptances 1124268, 1124270, and 1124272 only after `pnpm audit --prod` proves they are absent.
+5. Remove advisory acceptances 1124268 and 1124272 only after `pnpm audit --prod` proves they are absent.
 
 ## Acceptance criteria
 

@@ -184,6 +184,32 @@ export function emptyMissionSpec(input: {
   };
 }
 
+export function missionSpecWithCurrentMissionScope(
+  values: MissionSpecValues,
+  mission: MissionSpecSeedMission,
+): MissionSpecValues {
+  const repositoryId = mission.repositoryId
+    ? String(mission.repositoryId)
+    : undefined;
+  const codeScopeIds = (mission.codeScopeIds ?? []).map(String);
+  if (
+    values.repositoryScope.repositoryId === repositoryId &&
+    values.repositoryScope.codeScopeIds.length === codeScopeIds.length &&
+    values.repositoryScope.codeScopeIds.every(
+      (codeScopeId, index) => codeScopeId === codeScopeIds[index],
+    )
+  ) {
+    return values;
+  }
+  return {
+    ...values,
+    repositoryScope: {
+      repositoryId,
+      codeScopeIds,
+    },
+  };
+}
+
 export function hydrateChecklistDispositions(
   values: MissionSpecValues,
   constitution?: { content?: ProjectConstitutionContent } | null,

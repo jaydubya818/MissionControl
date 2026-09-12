@@ -1,0 +1,41 @@
+{
+  "observedAt": "2026-09-05T07:31:02.334524+00:00",
+  "runtimePackageFiles": [
+    {
+      "path": "README.md",
+      "matches": true
+    },
+    {
+      "path": "package.json",
+      "matches": true
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/bin/codex",
+      "matches": true
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/bin/codex-code-mode-host",
+      "matches": true
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/codex-package.json",
+      "matches": true
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/codex-path/rg",
+      "matches": true
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/codex-resources/zsh/bin/zsh",
+      "matches": true
+    }
+  ],
+  "runtimePackageUnchanged": true,
+  "fixturePathsAbsent": true,
+  "processInventorySucceeded": true,
+  "lingeringFixtureProcesses": [],
+  "scope": "Fixture and exact package checks, not a global host integrity attestation",
+  "pilotTargetSha256": "0672a5c2cd49b36550cdc2989ff7400ed3c6a55b81e51c46bfddda9de8fd3b88",
+  "controlPlaneInstance": "local-jaydubya818-missioncontrol_df0fe",
+  "initialProcessInventory": "sandbox denied ps; repeated with approved read-only access"
+}

@@ -76,7 +76,7 @@ export interface DurableCodexWorkerOptions {
   pollIntervalMs?: number;
   leaseDurationMs?: number;
   heartbeatIntervalMs?: number;
-  executor?: CodexV1ExecutorAdapter;
+  executor: CodexV1ExecutorAdapter;
 }
 
 export class DurableCodexWorker {
@@ -94,7 +94,7 @@ export class DurableCodexWorker {
     this.pollIntervalMs = options.pollIntervalMs ?? 5_000;
     this.leaseDurationMs = options.leaseDurationMs ?? 60_000;
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 15_000;
-    this.executor = options.executor ?? new CodexV1ExecutorAdapter();
+    this.executor = options.executor;
     if (!Number.isSafeInteger(this.leaseDurationMs) || this.leaseDurationMs < 10_000 || this.leaseDurationMs > 5 * 60_000) {
       throw new Error("Worker lease duration must be between 10 seconds and 5 minutes.");
     }

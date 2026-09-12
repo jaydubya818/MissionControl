@@ -1,0 +1,44 @@
+{
+  "schema": "fdlc-bedrock-quota-diagnosis/v1",
+  "capturedAt": "2026-09-07T20:18:37Z",
+  "state": "BEDROCK_QUOTA_ADMIN_ACTION_REQUIRED",
+  "awsAccountId": "083665737366",
+  "awsProfile": "fdlc-qualification",
+  "region": "us-east-1",
+  "inferenceProfileId": "us.anthropic.claude-sonnet-4-6",
+  "underlyingModelId": "anthropic.claude-sonnet-4-6",
+  "quota": {
+    "name": "Model invocation max tokens per day for Anthropic Claude Sonnet 4.6 (doubled for cross-region calls)",
+    "code": "L-B29C9321",
+    "codeSource": "https://repost.aws/questions/QU1-ujT14PQBySaZt738tXgw/throttlingexception-on-first-bedrock-request-new-account-quota-stuck",
+    "serviceCode": "bedrock",
+    "scope": "account, model, and source Region; shared by bedrock-runtime inference APIs for the model",
+    "documentedDefaultValueTokensPerDay": 4320000000,
+    "adjustable": false,
+    "currentAppliedValue": null,
+    "currentUsage": {
+      "actualInputTokensObserved": 0,
+      "actualOutputTokensObserved": 0,
+      "window": "2026-09-07T00:00:00Z/2026-09-07T19:15:00Z",
+      "source": "cloudwatch-429-metric-result.json"
+    },
+    "resetWindowOrTime": null
+  },
+  "serviceQuotaApi": {
+    "GetServiceQuota": "ACCESS_DENIED",
+    "ListServiceQuotas": "ACCESS_DENIED",
+    "ListRequestedServiceQuotaChangeHistory": "ACCESS_DENIED",
+    "ListRequestedServiceQuotaChangeHistoryByQuota": "ACCESS_DENIED"
+  },
+  "existingIncreaseRequest": "UNKNOWN_DUE_TO_ACCESS_DENIED",
+  "inferenceProfileStatus": "ACTIVE",
+  "modelAuthorizationStatus": "AUTHORIZED",
+  "modelEntitlementAvailability": "AVAILABLE",
+  "requiredExternalAction": "Using an authorized administrator identity in account 083665737366, read quota L-B29C9321 and its request history. If its applied value or available capacity is insufficient, open or update one AWS Support request for that exact non-adjustable quota and the US Sonnet 4.6 cross-region route. Do not submit a duplicate request. Record the applied value, request ID/status, and AWS-confirmed reset or activation condition before resuming.",
+  "minimumResumeCapacity": "At least 76 unused daily tokens and applicable per-minute capacity for the frozen 44-token input plus maxOutputTokens=32; the independent $5 liability ceiling remains controlling.",
+  "documentation": [
+    "https://docs.aws.amazon.com/bedrock/latest/userguide/quotas-runtime.html",
+    "https://docs.aws.amazon.com/bedrock/latest/userguide/quotas-token-burndown.html",
+    "https://docs.aws.amazon.com/general/latest/gr/bedrock.html"
+  ]
+}

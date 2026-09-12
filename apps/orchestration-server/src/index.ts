@@ -22,7 +22,12 @@ import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { ConvexHttpClient } from "convex/browser";
 import { createGatewayProxy } from "./gateway-proxy.js";
-import { isShadowProviderRoute, requireAuth } from "./auth.js";
+import {
+  isShadowProviderRoute,
+  offlineQualificationRouteAllowed,
+  orchestrationUpgradeFailure,
+  requireAuth,
+} from "./auth.js";
 import { ConvexActions, ConvexQueries, ConvexMutations } from "./convexCalls.js";
 import { createSignedServiceCommand } from "./serviceCommandClient.js";
 import { CoordinatorLoop } from "@mission-control/coordinator";
@@ -35,24 +40,57 @@ import { pathToFileURL } from "url";
 import { createHash, randomUUID } from "node:crypto";
 import { executeAutomation } from "./automationAdapter.js";
 import { discoverLocalInference } from "./localInference.js";
-import { FactoryAttemptWorker } from "./factoryAttemptWorker.js";
-import { FactoryHostReporter, type FactoryHostReporterConfig } from "./factoryHostReporter.js";
+import { readFileSync } from "node:fs";
+import { FactoryAttemptWorker, DEFAULT_DEPENDENCIES } from "./factoryAttemptWorker.js";
+import { bedrockFactoryProviderFactory, selectBedrockFactoryProvider } from "./bedrockFactoryComposition.js";
+import { qualifiedBedrockTransport } from "./bedrockQualifiedTransport.js";
+import { createAccountingDeliveryRuntime, optionalExecutionConfiguration } from "./accountingDeliveryRuntime.js";
+import {
+  FactoryHostReporter,
+  factorySandboxCapabilities,
+  type FactoryHostReporterConfig,
+} from "./factoryHostReporter.js";
 import {
   fetchGithubPullRequestEvidence,
   loadGithubAppPrivateKey,
   mintInstallationToken,
 } from "./githubAppRuntime.js";
-import { CodexV1ExecutorAdapter } from "./codexExecutorAdapter.js";
-import { DeepSeekHarnessExecutorAdapter } from "./deepseekHarnessExecutorAdapter.js";
+import { configuredFactoryHarnessAdapters, createIsolatedFactoryHarness } from "./factoryHarnessComposition.js";
+import { loadFabExecutorAdapter } from "./fabExecutorAdapter.js";
+import { createFabBedrockBrokerFactory } from "./fabBedrockBroker.js";
+import { createFabOpenRouterBrokerFactory } from "./fabOpenRouterBroker.js";
+import { bedrockModelRouteBinding } from "./bedrockModelRouteBinding.js";
+import { openRouterModelRouteBinding } from "./openRouterModelRouteBinding.js";
+import { OpenRouterSandboxCredentialBroker } from "./sandboxCredentials.js";
 import { HarnessAdapterRegistry } from "./harnessAdapterRegistry.js";
+import { MissionPlanningWorker } from "./missionPlanningWorker.js";
+import {
+  ConvexGovernedInferenceLedger,
+  GovernedInferenceGateway,
+  OpenAIChatCompletionsTransport,
+} from "./governedInferenceGateway.js";
 import { resolvePersonaPath, safeClientError } from "./orchestrationSecurity.js";
 import {
   createExecutionIntentShadowApp,
   loadExecutionIntentShadowConfig,
   type ExecutionIntentShadowStore,
 } from "./executionIntentShadow.js";
+import { localQualificationRepositoryBinding } from "./localQualificationRepository.js";
+import { resolveServerBinding } from "./runtimeServerConfig.js";
 import os from "node:os";
 
+// Fab enrollment/configuration is explicit startup input. Capture its selected source
+// before MC's legacy dotenv loading so repository dotenv cannot enroll or override it.
+const executionConfigurationErrors: string[] = [];
+const configuredFabPaths = process.env.FAB_EXECUTOR_ENABLED === "1"
+  ? optionalExecutionConfiguration("OPTIONAL_ADAPTER_CONFIGURATION_INVALID", () => ({
+      config: requiredRuntimeSetting("FAB_EXECUTOR_CONFIG"),
+      state: requiredRuntimeSetting("FAB_EXECUTOR_STATE_DIR"),
+      bedrock: process.env.FAB_BEDROCK_APPROVED_CONFIG_FILE?.trim(),
+      openrouter: process.env.FAB_OPENROUTER_APPROVED_CONFIG_FILE?.trim(),
+    }), executionConfigurationErrors)
+  : undefined;
+const configuredOpenRouterManagementKey = process.env.OPENROUTER_MANAGEMENT_API_KEY?.trim();
 const envSearchPaths = [
   path.resolve(process.cwd(), ".env.local"),
   path.resolve(process.cwd(), ".env"),
@@ -60,7 +98,7 @@ const envSearchPaths = [
   path.resolve(process.cwd(), "../../.env"),
 ];
 
-for (const envPath of envSearchPaths) {
+for (const envPath of process.env.MC_OFFLINE_FACTORY_WORKER_ENABLED === "1" ? [] : envSearchPaths) {
   if (fs.existsSync(envPath)) {
     dotenv.config({ path: envPath });
   }
@@ -73,7 +111,7 @@ const SHADOW_PROVIDER_ONLY = process.env.SHADOW_PROVIDER_ONLY === "true";
 // CONFIG
 // ============================================================================
 
-const PORT = parseInt(process.env.ORCHESTRATION_PORT ?? "4100", 10);
+const { host: HOST, port: PORT } = resolveServerBinding();
 const CONVEX_URL = process.env.CONVEX_URL ?? "";
 const PROJECT_SLUG = process.env.PROJECT_SLUG ?? "openclaw";
 const TICK_INTERVAL_MS = parseInt(process.env.TICK_INTERVAL_MS ?? "30000", 10);
@@ -82,20 +120,69 @@ const AUTOMATION_REPOSITORY_ROOT = path.resolve(process.env.AUTOMATION_REPOSITOR
 const CODEX_FACTORY_WORKER_ENABLED = process.env.CODEX_FACTORY_WORKER_ENABLED === "true";
 const DEEPSEEK_HARNESS_EXECUTOR_ENABLED = process.env.DEEPSEEK_HARNESS_EXECUTOR_ENABLED === "1";
 const LEGACY_FACTORY_WORKER_ENABLED = process.env.FACTORY_EXECUTION_ENABLED === "1";
-const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED;
-const FACTORY_WORKER_SCOPE = DURABLE_FACTORY_WORKER_ENABLED
-  ? {
-      projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"),
-      repositoryId: requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ID"),
-    }
+const OFFLINE_FACTORY_WORKER_ENABLED = process.env.MC_OFFLINE_FACTORY_WORKER_ENABLED === "1";
+const OFFLINE_LOCAL_REPOSITORY = OFFLINE_FACTORY_WORKER_ENABLED
+  ? localQualificationRepositoryBinding(process.env.MC_LOCAL_REPOSITORY_ADMISSION)
   : undefined;
+const accountingRuntime = createAccountingDeliveryRuntime({ excludedDirectories: [AUTOMATION_REPOSITORY_ROOT,
+  process.env.CODEX_WORKER_CHECKOUT_ROOT ?? process.cwd()] });
 const FACTORY_WORKER_SESSION_ID = randomUUID();
 const FACTORY_WORKER_ID = process.env.CODEX_WORKER_HOST_ID?.trim() || `orchestration:${os.hostname()}`;
 const FACTORY_WORKER_MAX_CONCURRENT_RUNS = boundedPositiveInteger(process.env.CODEX_WORKER_MAX_CONCURRENT_RUNS, 1);
-const REMOTE_SANDBOX_BACKEND_READY = process.env.CODEX_WORKER_REMOTE_SANDBOX_ENABLED === "1"
-  && Boolean(process.env.EXEDEV_IDENTITY_FILE?.trim())
-  && Boolean(process.env.OPENROUTER_MANAGEMENT_API_KEY?.trim());
-const FACTORY_WORKER_EXECUTION_BACKENDS = REMOTE_SANDBOX_BACKEND_READY
+const GITHUB_APP_PUBLICATION_READY = process.env.CODEX_WORKER_GITHUB_APP_PUBLICATION_ENABLED === "1";
+const bedrockConfigPath = process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1"
+  ? process.env.CODEX_BEDROCK_APPROVED_CONFIG_FILE?.trim()
+  : undefined;
+const bedrockConfig = process.env.CODEX_BEDROCK_HARNESS_ENABLED === "1"
+  ? optionalExecutionConfiguration("PROVIDER_CONFIGURATION_INVALID", () => {
+    if (!bedrockConfigPath) throw new Error("Explicit provider configuration is required.");
+    const config = JSON.parse(readFileSync(bedrockConfigPath, "utf8"));
+    if (!config?.callAuthorization) throw new Error("Explicit provider authorization is required.");
+    return config;
+  }, executionConfigurationErrors)
+  : undefined;
+const fabBedrockConfigPath = configuredFabPaths
+  ? configuredFabPaths.bedrock
+  : undefined;
+const bedrockTransport = bedrockConfig?.callAuthorization && accountingRuntime.delivery
+  ? optionalExecutionConfiguration("PROVIDER_GRANT_INVALID", () => qualifiedBedrockTransport(bedrockConfig.route, bedrockConfig.price, bedrockConfig.callAuthorization), executionConfigurationErrors)
+  : undefined;
+const fabBedrockConfig = fabBedrockConfigPath
+  ? optionalExecutionConfiguration("FAB_PROVIDER_CONFIGURATION_INVALID", () => {
+      const config = JSON.parse(readFileSync(fabBedrockConfigPath, "utf8"));
+      if (!config?.callAuthorization || !config?.price) throw new Error("Explicit Fab provider authorization and price are required.");
+      return config;
+    }, executionConfigurationErrors)
+  : undefined;
+const fabBedrockTransport = fabBedrockConfig?.callAuthorization && accountingRuntime.delivery
+  ? optionalExecutionConfiguration("FAB_PROVIDER_GRANT_INVALID", () => qualifiedBedrockTransport(fabBedrockConfig.route, fabBedrockConfig.price, fabBedrockConfig.callAuthorization), executionConfigurationErrors)
+  : undefined;
+const fabOpenRouterConfig = configuredFabPaths?.openrouter
+  ? optionalExecutionConfiguration("FAB_OPENROUTER_CONFIGURATION_INVALID", () => {
+      const raw = JSON.parse(readFileSync(configuredFabPaths.openrouter!, "utf8"));
+      const allowed = ["version", "provider", "endpoint", "protocol", "modelId", "maxCostUsd", "maximumOutputTokens"];
+      if (!raw || typeof raw !== "object" || Array.isArray(raw) || Object.keys(raw).some(key => !allowed.includes(key))
+        || raw.version !== 1 || raw.provider !== "openrouter"
+        || raw.endpoint !== "https://openrouter.ai/api/v1/chat/completions"
+        || raw.protocol !== "openrouter-chat-completions/non-streaming") {
+        throw new Error("Exact OpenRouter route configuration is required.");
+      }
+      return openRouterModelRouteBinding(raw);
+    }, executionConfigurationErrors)
+  : undefined;
+const CODEX_BEDROCK_HARNESS_ENABLED = Boolean(bedrockTransport);
+const DURABLE_FACTORY_WORKER_ENABLED = CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
+  || Boolean(configuredFabPaths) || CODEX_BEDROCK_HARNESS_ENABLED || OFFLINE_FACTORY_WORKER_ENABLED;
+const factoryConfigurationConflict = DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED;
+if (factoryConfigurationConflict) executionConfigurationErrors.push("FACTORY_EXECUTION_CONFIGURATION_CONFLICT");
+if (DURABLE_FACTORY_WORKER_ENABLED && !accountingRuntime.delivery) executionConfigurationErrors.push("ACCOUNTING_JOURNAL_REQUIRED");
+const REMOTE_SANDBOX_BACKEND_READY = Boolean(bedrockTransport)
+  || (process.env.CODEX_WORKER_REMOTE_SANDBOX_ENABLED === "1"
+    && Boolean(process.env.EXEDEV_IDENTITY_FILE?.trim())
+    && Boolean(process.env.OPENROUTER_MANAGEMENT_API_KEY?.trim()));
+const FACTORY_WORKER_EXECUTION_BACKENDS = OFFLINE_FACTORY_WORKER_ENABLED
+  ? ["isolated-container"] as const
+  : REMOTE_SANDBOX_BACKEND_READY
   ? ["persistent-worker", "remote-sandbox"] as const
   : ["persistent-worker"] as const;
 
@@ -134,67 +221,204 @@ const executionIntentShadowStore: ExecutionIntentShadowStore = {
     input,
   ) as Awaited<ReturnType<ExecutionIntentShadowStore["events"]>>,
 };
-const enabledFactoryHarnessAdapters = [
-  ...((CODEX_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED) ? [new CodexV1ExecutorAdapter()] : []),
-  ...(DEEPSEEK_HARNESS_EXECUTOR_ENABLED ? [new DeepSeekHarnessExecutorAdapter()] : []),
-];
-const factoryHarnessRegistry = new HarnessAdapterRegistry(
-  enabledFactoryHarnessAdapters.length > 0 ? enabledFactoryHarnessAdapters : [new CodexV1ExecutorAdapter()],
-);
-const factoryAttemptWorker = new FactoryAttemptWorker(
-  client,
-  factoryHarnessRegistry,
-  DURABLE_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED,
-  undefined,
-  undefined,
-  FACTORY_WORKER_SCOPE,
-  FACTORY_WORKER_SCOPE ? {
-    workerId: FACTORY_WORKER_ID,
-    sessionId: FACTORY_WORKER_SESSION_ID,
-    maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
-  } : undefined,
-);
-const factoryHostReporter = FACTORY_WORKER_SCOPE
-  ? new FactoryHostReporter(client, {
-      projectId: FACTORY_WORKER_SCOPE.projectId,
-      repositoryId: FACTORY_WORKER_SCOPE.repositoryId,
-      hostId: FACTORY_WORKER_ID,
-      sessionId: FACTORY_WORKER_SESSION_ID,
-      checkoutRoot: path.resolve(process.env.CODEX_WORKER_CHECKOUT_ROOT?.trim() || process.cwd()),
-      maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
-      getCurrentRuns: () => factoryAttemptWorker.status().activeRunIds.length,
-      approvedModelIds: commaSeparatedValues(process.env.CODEX_WORKER_APPROVED_MODEL_IDS),
-      networkPolicyStatus: attestationStatus(process.env.CODEX_WORKER_NETWORK_POLICY_STATUS),
-      secretPolicyStatus: attestationStatus(process.env.CODEX_WORKER_SECRET_POLICY_STATUS),
-      hostRuntimeType: "persistent-worker",
-      executionBackends: [...FACTORY_WORKER_EXECUTION_BACKENDS],
-      supportedExecutors: factoryHarnessRegistry.registrations().map((registration) => {
-        const manifest = registration.manifest;
-        if (!manifest || !registration.capabilityManifestSha256 || !registration.effectiveConfigSha256) {
-          throw new Error(`Factory harness ${registration.capabilities.adapter}/${registration.capabilities.version} is missing its frozen capability manifest.`);
-        }
-        return {
-          adapter: manifest.identity.adapterId,
-          version: manifest.identity.adapterVersion,
-          capabilityManifestSha256: registration.capabilityManifestSha256,
-          effectiveConfigSha256: registration.effectiveConfigSha256,
-          capabilityManifest: manifest,
-          supportsCancel: registration.capabilities.supportsCancel,
-          supportsResume: registration.capabilities.supportsResume,
-          isolationModes: [...registration.capabilities.isolationModes],
-        };
-      }),
-      sandboxCapabilities: [
-        "git-worktree", "workspace-write", "read-only", "github-app-publication",
-        ...(REMOTE_SANDBOX_BACKEND_READY ? ["remote-sandbox", "sandbox-provider:exe-dev"] : []),
-      ],
-      factoryVersionBindings: parseFactoryVersionBindings(
-        process.env.CODEX_WORKER_FACTORY_VERSION_BINDINGS_JSON,
-        FACTORY_WORKER_SCOPE.repositoryId,
-      ),
-      onError: (error) => console.error("[orchestration] Factory host report failed:", error),
+const offlineWorkerScope = OFFLINE_FACTORY_WORKER_ENABLED
+  ? {
+      projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"),
+      repositoryId: requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ID"),
+    }
+  : undefined;
+if (OFFLINE_LOCAL_REPOSITORY) {
+  if (CONVEX_URL !== "http://127.0.0.1:3290" || !process.env.CONVEX_SELF_HOSTED_ADMIN_KEY
+    || !process.env.ORCHESTRATION_API_TOKEN?.trim()) {
+    throw new Error("Local qualification worker identity requires the exact disposable backend credential.");
+  }
+  (client as ConvexHttpClient & { setAdminAuth: (token: string, identity: Record<string, string>) => void }).setAdminAuth(
+    process.env.CONVEX_SELF_HOSTED_ADMIN_KEY,
+    {
+      subject: "user_SyntheticHandoffQualification",
+      issuer: "https://synthetic-qualification.example.test",
+      email: "qualification@example.test",
+      name: "Synthetic Qualification Operator",
+    },
+  );
+}
+if (OFFLINE_FACTORY_WORKER_ENABLED) {
+  const endpoint = new URL(CONVEX_URL);
+  if (!["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname)
+    || endpoint.protocol !== "http:" || CODEX_FACTORY_WORKER_ENABLED || DEEPSEEK_HARNESS_EXECUTOR_ENABLED
+    || LEGACY_FACTORY_WORKER_ENABLED || GITHUB_APP_PUBLICATION_READY || REMOTE_SANDBOX_BACKEND_READY
+    || ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"]
+      .some(key => Boolean(process.env[key]))) {
+    throw new Error("Offline worker requires isolated loopback state, no provider credentials and no production publication adapters.");
+  }
+}
+const configuredOfflineAdapter = OFFLINE_FACTORY_WORKER_ENABLED && offlineWorkerScope
+  ? await createIsolatedFactoryHarness({
+      backendBundlePath: requiredRuntimeSetting("MC_OFFLINE_BACKEND_BUNDLE_PATH"),
+      dockerExecutable: requiredRuntimeSetting("MC_OFFLINE_DOCKER_EXECUTABLE"),
+      authority: async request => {
+        if (request.lease.workerId !== FACTORY_WORKER_ID || request.lease.sessionId !== FACTORY_WORKER_SESSION_ID) return false;
+        const verifier = request.workload.reference === "verify-document-bytes/v1";
+        const command = createSignedServiceCommand({
+          capability: verifier ? "verification:renew" : "attempts.renew",
+          ...offlineWorkerScope,
+          payload: {
+            workflowRunId: request.attemptId,
+            leaseId: request.lease.leaseId,
+            workerId: request.lease.workerId,
+            workerSessionId: request.lease.sessionId,
+            workerGeneration: request.lease.generation,
+            leaseDurationMs: 60_000,
+          },
+        });
+        const result = await client.action(
+          (verifier ? ConvexActions.serviceCommands.renewVerificationAttempt : ConvexActions.serviceCommands.renewFactoryAttempt) as any,
+          command,
+        );
+        return result?.renewed === true;
+      },
     })
-  : null;
+  : undefined;
+const factoryBootstrap = optionalExecutionConfiguration("FACTORY_BOOTSTRAP_INVALID", () => {
+  if (executionConfigurationErrors.length) throw new Error("Execution configuration is invalid.");
+  const FACTORY_WORKER_SCOPE = offlineWorkerScope ?? (DURABLE_FACTORY_WORKER_ENABLED
+    ? { projectId: requiredRuntimeSetting("CODEX_WORKER_PROJECT_ID"), repositoryId: requiredRuntimeSetting("CODEX_WORKER_REPOSITORY_ID") }
+    : undefined);
+  const configuredFabAdapter = configuredFabPaths
+    ? loadFabExecutorAdapter(
+        configuredFabPaths.config,
+        configuredFabPaths.state,
+        fabBedrockTransport
+          ? createFabBedrockBrokerFactory(client, fabBedrockConfig, fabBedrockTransport, accountingRuntime.delivery)
+          : undefined,
+        fabBedrockConfig
+          ? (() => {
+              const binding = bedrockModelRouteBinding(fabBedrockConfig.route);
+              return { providerRoute: binding.snapshot.providerRoute, routeDigest: binding.routeDigest };
+            })()
+          : undefined,
+        fabBedrockConfig?.maximumOutputTokens,
+        fabOpenRouterConfig && configuredOpenRouterManagementKey
+          ? createFabOpenRouterBrokerFactory(new OpenRouterSandboxCredentialBroker(configuredOpenRouterManagementKey), fabOpenRouterConfig)
+          : undefined,
+        fabOpenRouterConfig,
+      )
+    : undefined;
+  if (configuredFabAdapter?.capabilities().provider === "aws-bedrock" && !fabBedrockTransport) {
+    throw new Error("Fab Bedrock requires an explicit qualified transport and accounting journal.");
+  }
+  if (configuredFabAdapter?.capabilities().provider === "openrouter" && (!fabOpenRouterConfig || !configuredOpenRouterManagementKey)) {
+    throw new Error("Fab OpenRouter requires an explicit route file and pre-dotenv management credential.");
+  }
+  const factoryHarnessRegistry = new HarnessAdapterRegistry(
+    [...configuredFactoryHarnessAdapters({
+      codexEnabled: CODEX_FACTORY_WORKER_ENABLED,
+      codexBedrockEnabled: CODEX_BEDROCK_HARNESS_ENABLED,
+      codexBedrockRouteAdmitted: Boolean(bedrockTransport),
+      deepseekEnabled: DEEPSEEK_HARNESS_EXECUTOR_ENABLED,
+      legacyFactoryWorkerEnabled: LEGACY_FACTORY_WORKER_ENABLED,
+    }), ...(configuredFabAdapter ? [configuredFabAdapter] : []), ...(configuredOfflineAdapter ? [configuredOfflineAdapter] : [])],
+  );
+  let occupiedFactoryWorkerSlots = 0;
+  const tryAcquireFactoryWorkerSlot = () => {
+    if (occupiedFactoryWorkerSlots >= FACTORY_WORKER_MAX_CONCURRENT_RUNS) return null;
+    occupiedFactoryWorkerSlots += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      occupiedFactoryWorkerSlots = Math.max(0, occupiedFactoryWorkerSlots - 1);
+    };
+  };
+  const factoryAttemptWorker = new FactoryAttemptWorker(
+    client,
+    factoryHarnessRegistry,
+    !factoryConfigurationConflict && (DURABLE_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED),
+    undefined,
+    bedrockTransport ? {
+      ...DEFAULT_DEPENDENCIES,
+      createSandboxProvider: selectBedrockFactoryProvider(
+        bedrockFactoryProviderFactory(client, bedrockConfig, bedrockTransport, accountingRuntime.delivery),
+        DEFAULT_DEPENDENCIES.createSandboxProvider!,
+      ),
+    } : undefined,
+    FACTORY_WORKER_SCOPE,
+    FACTORY_WORKER_SCOPE ? {
+      workerId: FACTORY_WORKER_ID,
+      sessionId: FACTORY_WORKER_SESSION_ID,
+      maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
+    } : undefined,
+    tryAcquireFactoryWorkerSlot,
+  );
+  const missionPlanningWorker = new MissionPlanningWorker(
+    client,
+    factoryHarnessRegistry,
+    !factoryConfigurationConflict && DURABLE_FACTORY_WORKER_ENABLED && !OFFLINE_FACTORY_WORKER_ENABLED,
+    FACTORY_WORKER_SCOPE,
+    FACTORY_WORKER_SCOPE ? {
+      workerId: FACTORY_WORKER_ID,
+      sessionId: FACTORY_WORKER_SESSION_ID,
+    } : undefined,
+    undefined,
+    tryAcquireFactoryWorkerSlot,
+  );
+  const factoryHostReporter = FACTORY_WORKER_SCOPE
+    ? new FactoryHostReporter(client, {
+        projectId: FACTORY_WORKER_SCOPE.projectId,
+        repositoryId: FACTORY_WORKER_SCOPE.repositoryId,
+        hostId: FACTORY_WORKER_ID,
+        sessionId: FACTORY_WORKER_SESSION_ID,
+        checkoutRoot: path.resolve(process.env.CODEX_WORKER_CHECKOUT_ROOT?.trim() || process.cwd()),
+        localQualificationRepository: OFFLINE_LOCAL_REPOSITORY,
+        maxConcurrentRuns: FACTORY_WORKER_MAX_CONCURRENT_RUNS,
+        getCurrentRuns: () => factoryAttemptWorker.status().activeRunIds.length
+          + (missionPlanningWorker.status().activeRunId ? 1 : 0),
+        approvedModelIds: commaSeparatedValues(process.env.CODEX_WORKER_APPROVED_MODEL_IDS),
+        networkPolicyStatus: attestationStatus(process.env.CODEX_WORKER_NETWORK_POLICY_STATUS),
+        secretPolicyStatus: attestationStatus(process.env.CODEX_WORKER_SECRET_POLICY_STATUS),
+        hostRuntimeType: "persistent-worker",
+        executionBackends: [...FACTORY_WORKER_EXECUTION_BACKENDS],
+        supportedExecutors: factoryHarnessRegistry.registrations().map((registration) => {
+          const manifest = registration.manifest;
+          if (!manifest || !registration.capabilityManifestSha256 || !registration.effectiveConfigSha256) {
+            throw new Error(`Factory harness ${registration.capabilities.adapter}/${registration.capabilities.version} is missing its frozen capability manifest.`);
+          }
+          return {
+            adapter: manifest.identity.adapterId,
+            version: manifest.identity.adapterVersion,
+            capabilityManifestSha256: registration.capabilityManifestSha256,
+            effectiveConfigSha256: registration.effectiveConfigSha256,
+            runtimeArtifact: registration.runtimeArtifact,
+            runtimeArtifactSha256: registration.runtimeArtifactSha256,
+            capabilityManifest: manifest,
+            supportsCancel: registration.capabilities.supportsCancel,
+            supportsResume: registration.capabilities.supportsResume,
+            isolationModes: [...registration.capabilities.isolationModes],
+          };
+        }),
+        sandboxCapabilities: [
+          ...factorySandboxCapabilities({
+            githubAppPublicationReady: GITHUB_APP_PUBLICATION_READY,
+            remoteSandboxBackendReady: REMOTE_SANDBOX_BACKEND_READY,
+          }),
+          ...(OFFLINE_FACTORY_WORKER_ENABLED
+            ? ["deny-egress", "isolated-container", "no-host-mounts", "read-only-runtime"]
+            : []),
+        ],
+        factoryVersionBindings: parseFactoryVersionBindings(
+          process.env.CODEX_WORKER_FACTORY_VERSION_BINDINGS_JSON,
+          FACTORY_WORKER_SCOPE.repositoryId,
+        ),
+        onError: (error) => console.error("[orchestration] Factory host report failed:", error),
+      })
+    : null;
+  return { factoryHarnessRegistry, factoryAttemptWorker, missionPlanningWorker, factoryHostReporter, scope: FACTORY_WORKER_SCOPE };
+}, executionConfigurationErrors);
+const factoryHarnessRegistry = factoryBootstrap?.factoryHarnessRegistry ?? new HarnessAdapterRegistry([]);
+const factoryAttemptWorker = factoryBootstrap?.factoryAttemptWorker ?? new FactoryAttemptWorker(client, factoryHarnessRegistry, false);
+const missionPlanningWorker = factoryBootstrap?.missionPlanningWorker ?? new MissionPlanningWorker(client, factoryHarnessRegistry, false, undefined, undefined);
+const factoryHostReporter = factoryBootstrap?.factoryHostReporter ?? null;
+const FACTORY_WORKER_SCOPE = factoryBootstrap?.scope;
 const coordinator = new CoordinatorLoop({ pollIntervalMs: TICK_INTERVAL_MS });
 const activeAgents = new Map<string, AgentLifecycle>();
 const memoryManagers = new Map<string, MemoryManager>();
@@ -207,6 +431,11 @@ let lastTickAt: number | null = null;
 let lastTickResult: any = null;
 let tickCount = 0;
 let startedAt: number | null = null;
+type FactoryExecutionReadiness = "DISABLED" | "STARTING" | "READY" | "FAILED";
+let factoryExecutionReadiness: FactoryExecutionReadiness = DURABLE_FACTORY_WORKER_ENABLED || LEGACY_FACTORY_WORKER_ENABLED
+  ? "STARTING"
+  : "DISABLED";
+let factoryExecutionReadinessCode: string | null = null;
 
 // ============================================================================
 // COORDINATOR TICK
@@ -421,6 +650,12 @@ app.use("*", cors());
 // connection-status probes declared in auth.ts. This avoids silently exposing
 // new mutation routes when a path prefix is added in the future.
 app.use("*", requireAuth());
+app.use("*", async (c, next) => {
+  if (OFFLINE_FACTORY_WORKER_ENABLED && !offlineQualificationRouteAllowed(c.req.method, c.req.path)) {
+    return c.json({ error: "Route unavailable for offline qualification worker" }, 404);
+  }
+  await next();
+});
 
 app.route(
   "/v1/execution-intents",
@@ -437,9 +672,34 @@ app.get("/health", (c) => {
     lastTickAt,
     activeAgents: Array.from(activeAgents.keys()),
     factoryAttemptWorker: factoryAttemptWorker.status(),
+    missionPlanningWorker: missionPlanningWorker.status(),
     codexFactoryWorker: CODEX_FACTORY_WORKER_ENABLED ? "enabled" : "disabled",
     shadowProviderOnly: SHADOW_PROVIDER_ONLY,
   });
+});
+
+// Readiness is stricter than liveness: a Production supervisor must not route
+// or advertise the service until durable accounting and worker registration
+// have completed successfully.
+app.get("/ready", (c) => {
+  const accounting = accountingRuntime.status();
+  const accountingInitializing = "initializing" in accounting && accounting.initializing;
+  const accountingReady = !accounting.enabled || (!accountingInitializing && !accounting.lastError);
+  const executionReady = factoryExecutionReadiness === "DISABLED" || factoryExecutionReadiness === "READY";
+  const ready = Boolean(CONVEX_URL)
+    && executionConfigurationErrors.length === 0
+    && accountingReady
+    && executionReady;
+  return c.json({
+    status: ready ? "ready" : "not_ready",
+    checks: {
+      backend: CONVEX_URL ? "READY" : "FAILED",
+      configuration: executionConfigurationErrors.length === 0 ? "READY" : "FAILED",
+      accounting: accountingReady ? "READY" : accountingInitializing ? "STARTING" : "FAILED",
+      factoryExecution: factoryExecutionReadiness,
+    },
+    code: factoryExecutionReadinessCode,
+  }, ready ? 200 : 503);
 });
 
 // Detailed status
@@ -464,6 +724,9 @@ app.get("/status", (c) => {
       port: PORT,
     },
     factoryAttemptWorker: factoryAttemptWorker.status(),
+    accountingDelivery: accountingRuntime.status(),
+    executionConfigurationErrors,
+    missionPlanningWorker: missionPlanningWorker.status(),
   });
 });
 
@@ -476,6 +739,11 @@ app.post("/tick", async (c) => {
 app.post("/runs/factory-worker/tick", async (c) => {
   await factoryAttemptWorker.tick();
   return c.json({ success: true, status: factoryAttemptWorker.status() });
+});
+
+app.post("/runs/planning-worker/tick", async (c) => {
+  await missionPlanningWorker.tick();
+  return c.json({ success: true, status: missionPlanningWorker.status() });
 });
 
 // Spawn an agent
@@ -1426,13 +1694,10 @@ app.get("/local-inference/discover", async (c) => {
 });
 
 app.post("/local-inference/sync", async (c) => {
-  const providers = await discoverLocalInference();
-  return c.json({
-    providers,
-    synced: [],
-    authorizationRequired: true,
-    message: "Use the authenticated Model Routing control plane to approve discovered models.",
-  });
+  return c.json(
+    { error: "Local model sync requires a signed, workspace-scoped service command." },
+    501,
+  );
 });
 
 // Tier 2 context classification (LLM fallback when Tier 1 confidence is low)
@@ -1445,17 +1710,24 @@ app.post("/classify", requireAuth(), async (c) => {
     const { ContextRouter } = await import("@mission-control/context-router");
     const openaiKey = process.env.OPENAI_API_KEY?.trim();
     let llmClient: { complete: (p: string) => Promise<string> } | undefined;
-    if (openaiKey) {
-      const OpenAI = (await import("openai")).default;
-      const openai = new OpenAI({ apiKey: openaiKey });
+    if (openaiKey && process.env.MC_GOVERNED_INFERENCE_GATEWAY_ENABLED === "1") {
+      const governed = governedInferenceScope(body.governedInference);
+      const ledger = new ConvexGovernedInferenceLedger(client, governed.projectId, governed.repositoryId);
+      const gateway = new GovernedInferenceGateway(ledger, new OpenAIChatCompletionsTransport(openaiKey));
+      const { routeDigest, ...requestAuthority } = governed;
       llmClient = {
         complete: async (prompt: string) => {
-          const res = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: 1024,
-          });
-          return res.choices[0]?.message?.content ?? "";
+          const response = await gateway.execute<{ choices?: Array<{ message?: { content?: unknown } }> }>({
+            ...requestAuthority,
+            routes: [{
+              provider: "openai", providerRoute: "openai-chat-completions", modelId: "gpt-4o-mini-2024-07-18",
+              routeDigest, adapter: "mission-control-openai-chat-completions",
+              adapterVersion: "1.0.0", endpoint: "https://api.openai.com/v1/chat/completions",
+            }],
+            body: { messages: [{ role: "user", content: prompt }], max_completion_tokens: 1024 },
+          }, c.req.raw.signal);
+          const content = response?.choices?.[0]?.message?.content;
+          return typeof content === "string" ? content : "";
         },
       };
     }
@@ -1473,11 +1745,26 @@ app.post("/classify", requireAuth(), async (c) => {
     };
     const result = await router.routeAsync(context);
     return c.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[orchestration] /classify error:", err);
-    return c.json({ error: err?.message ?? "Classification failed" }, 500);
+    return c.json({ error: safeClientError(err) }, 500);
   }
 });
+
+function governedInferenceScope(value: unknown) {
+  if (!value || typeof value !== "object") {
+    throw new Error("Governed inference scope is required while the gateway flag is enabled.");
+  }
+  const scope = value as Record<string, unknown>;
+  const required = ["projectId", "repositoryId", "workflowRunId", "reservationId", "leaseId", "logicalRequestKey", "routeDigest"] as const;
+  for (const key of required) {
+    if (typeof scope[key] !== "string" || !(scope[key] as string).trim()) {
+      throw new Error(`Governed inference ${key} is required.`);
+    }
+  }
+  if (!/^sha256:[a-f0-9]{64}$/.test(scope.routeDigest as string)) throw new Error("Governed inference routeDigest is invalid.");
+  return Object.fromEntries(required.map((key) => [key, (scope[key] as string).trim()])) as Record<(typeof required)[number], string>;
+}
 
 // ============================================================================
 // GATEWAY WEBSOCKET PROXY (OpenClaw Studio parity)
@@ -1490,6 +1777,8 @@ const gatewayProxy = createGatewayProxy({
     const token = (process.env.GATEWAY_TOKEN ?? "").trim();
     return { url, token };
   },
+  // Upgrades bypass Hono, so apply the same bearer rule as requireAuth() here.
+  authorizeUpgrade: orchestrationUpgradeFailure,
   log: (msg) => console.log(`[gateway] ${msg}`),
   logError: (msg, err) => console.error(`[gateway] ${msg}`, err),
 });
@@ -1498,7 +1787,52 @@ const gatewayProxy = createGatewayProxy({
 // START
 // ============================================================================
 
+export async function startFactoryExecution(): Promise<boolean> {
+  if (!DURABLE_FACTORY_WORKER_ENABLED && !LEGACY_FACTORY_WORKER_ENABLED) {
+    factoryExecutionReadiness = "DISABLED";
+    factoryExecutionReadinessCode = null;
+    return false;
+  }
+  factoryExecutionReadiness = "STARTING";
+  factoryExecutionReadinessCode = null;
+  try {
+    if (DURABLE_FACTORY_WORKER_ENABLED && !(await accountingRuntime.ready)) {
+      if (!executionConfigurationErrors.includes("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID")) {
+        executionConfigurationErrors.push("ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID");
+      }
+      factoryExecutionReadiness = "FAILED";
+      factoryExecutionReadinessCode = "ACCOUNTING_CONFIGURATION_OR_STORAGE_INVALID";
+      return false;
+    }
+    if (!factoryConfigurationConflict && factoryHostReporter) {
+      await assertHarnessAdaptersReady(factoryHarnessRegistry);
+      await factoryHostReporter.start();
+      factoryAttemptWorker.start();
+      missionPlanningWorker.start();
+      factoryExecutionReadiness = "READY";
+      return true;
+    }
+    if (!factoryConfigurationConflict && LEGACY_FACTORY_WORKER_ENABLED) {
+      await assertHarnessAdaptersReady(factoryHarnessRegistry);
+      factoryAttemptWorker.start();
+      factoryExecutionReadiness = "READY";
+      return true;
+    }
+    factoryExecutionReadiness = "FAILED";
+    factoryExecutionReadinessCode = factoryConfigurationConflict
+      ? "FACTORY_EXECUTION_CONFIGURATION_CONFLICT"
+      : "FACTORY_BOOTSTRAP_INVALID";
+    return false;
+  } catch (error) {
+    factoryExecutionReadiness = "FAILED";
+    factoryExecutionReadinessCode = "FACTORY_EXECUTION_STARTUP_FAILED";
+    console.error("[orchestration] Factory worker registration failed closed; execution did not start:", error);
+    return false;
+  }
+}
+
 export function startServer() {
+  accountingRuntime.start();
   console.log(`[orchestration] Mission Control Orchestration Server`);
   console.log(`[orchestration] Convex URL: ${CONVEX_URL ? "configured" : "MISSING"}`);
   console.log(`[orchestration] Project: ${PROJECT_SLUG}`);
@@ -1508,7 +1842,7 @@ export function startServer() {
 
   startedAt = Date.now();
 
-  if (!SHADOW_PROVIDER_ONLY) {
+  if (!OFFLINE_FACTORY_WORKER_ENABLED && !SHADOW_PROVIDER_ONLY) {
     tickTimer = setInterval(() => {
       runTick().catch((err) => {
         console.error("[orchestration] Tick loop error:", err);
@@ -1519,18 +1853,7 @@ export function startServer() {
       console.log(`[orchestration] Initial tick complete:`, result);
     });
   }
-  if (DURABLE_FACTORY_WORKER_ENABLED && LEGACY_FACTORY_WORKER_ENABLED) {
-    throw new Error("Configure exactly one Factory execution worker; legacy and durable workers cannot run together.");
-  }
-  if (factoryHostReporter) {
-    void assertHarnessAdaptersReady(factoryHarnessRegistry).then(() => factoryHostReporter.start())
-      .then(() => factoryAttemptWorker.start())
-      .catch((error) => console.error("[orchestration] Factory worker registration failed closed; execution did not start:", error));
-  } else if (LEGACY_FACTORY_WORKER_ENABLED) {
-    void assertHarnessAdaptersReady(factoryHarnessRegistry)
-      .then(() => factoryAttemptWorker.start())
-      .catch((error) => console.error("[orchestration] Factory adapter health check failed closed; execution did not start:", error));
-  }
+  void startFactoryExecution();
 
   if (CODEX_FACTORY_WORKER_ENABLED) {
     console.log(`[orchestration] Durable verification-first harness worker enabled for one governed repository (${factoryHarnessRegistry.capabilities().map((item) => `${item.adapter}/${item.version}`).join(", ")}).`);
@@ -1543,7 +1866,9 @@ export function startServer() {
     console.log("\n[orchestration] Shutting down...");
     if (tickTimer) clearInterval(tickTimer);
     factoryHostReporter?.stop();
-    await factoryAttemptWorker.stop();
+    await Promise.all([factoryAttemptWorker.stop(), missionPlanningWorker.stop(), accountingRuntime.stop()]);
+    await Promise.all(factoryHarnessRegistry.registrations().map(({ adapter }) =>
+      (adapter as { dispose?: () => Promise<void> }).dispose?.()));
     for (const [name] of activeAgents) {
       try {
         await stopAgent(name);
@@ -1558,14 +1883,18 @@ export function startServer() {
     console.log("\n[orchestration] SIGTERM received, shutting down...");
     if (tickTimer) clearInterval(tickTimer);
     factoryHostReporter?.stop();
-    await factoryAttemptWorker.stop();
+    await Promise.all([factoryAttemptWorker.stop(), missionPlanningWorker.stop(), accountingRuntime.stop()]);
+    await Promise.all(factoryHarnessRegistry.registrations().map(({ adapter }) =>
+      (adapter as { dispose?: () => Promise<void> }).dispose?.()));
     process.exit(0);
   });
 
-  const server = serve({ fetch: app.fetch, port: PORT }, () => {
-    console.log(`[orchestration] Server listening on http://localhost:${PORT}`);
-    console.log(`[orchestration] Health: http://localhost:${PORT}/health`);
-    console.log(`[orchestration] Gateway WS: ws://localhost:${PORT}/gateway/ws`);
+  const server = serve({ fetch: app.fetch, hostname: HOST, port: PORT }, () => {
+    const displayHost = HOST === "::1" ? `[${HOST}]` : HOST;
+    console.log(`[orchestration] Server listening on http://${displayHost}:${PORT}`);
+    console.log(`[orchestration] Health: http://${displayHost}:${PORT}/health`);
+    console.log(`[orchestration] Readiness: http://${displayHost}:${PORT}/ready`);
+    console.log(`[orchestration] Gateway WS: ws://${displayHost}:${PORT}/gateway/ws`);
   });
 
   server.on("upgrade", (req, socket, head) => {

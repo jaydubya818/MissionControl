@@ -1,0 +1,225 @@
+{
+  "status": "PASS",
+  "runRoot": "/private/tmp/fdlc-reservation-backend-bb7Vvz",
+  "startedAt": "2026-09-06T05:20:36.511Z",
+  "sourcePath": "/private/tmp/fdlc-program-phase5/convex/inferenceGateway.ts",
+  "sourceSha256": "2f6a0713bcd4f2e95549534a71022703321124c4fe27d66d84b984ae5841a174",
+  "sourceBranchHead": "0915113105d4be6b844def360ca0856c7579e232",
+  "backendBinary": "/Users/jaywest/.cache/convex/binaries/precompiled-2026-08-25-7cce8fb/convex-local-backend",
+  "backendSha256": "3fefa471e11eab56aabf86039ddf825ed1b4dbadadec2df6b88b6ffd9d604400",
+  "convexVersion": "1.42.3",
+  "gatewayBundleSha256": "eb4aa0cc48670431eb7f52d533c6c8d31bcefcb4245b420c4029926c24a090f8",
+  "reservationTableSha256": "fd8e49ca804cbfbb44f032d870e7c0e469504706a1195261c472c7b280440070",
+  "routeValidatorSha256": "0dd9289ebcf4d1fdcc7a7f18214bd15dff76eed1f20b5994ffccfa2c5aa3ae43",
+  "backendUrl": "http://127.0.0.1:63682",
+  "sitePort": 63683,
+  "scope": "Unmodified production createReservation source bundled with a fixture-only auth shim; exact reservation table schema and indexes, synthetic related table schemas/records; real local Convex transaction engine; no provider calls, production/app auth proof, full application schema proof, or real WorkOrders.",
+  "tests": [
+    {
+      "name": "simultaneous competing admissions trial 1",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous competing admissions trial 2",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous competing admissions trial 3",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous competing admissions trial 4",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous competing admissions trial 5",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous competing admissions trial 6",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous competing admissions trial 7",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous competing admissions trial 8",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous competing admissions trial 9",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous competing admissions trial 10",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous competing admissions trial 11",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous competing admissions trial 12",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "budgetRejections": 7,
+      "allocatedMicrousd": 60,
+      "parentCeilingMicrousd": 100
+    },
+    {
+      "name": "simultaneous exact replay trial 1",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "replayResponses": 7,
+      "identicalReservationIdAndDigest": true,
+      "allocatedMicrousd": 100
+    },
+    {
+      "name": "simultaneous exact replay trial 2",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "replayResponses": 7,
+      "identicalReservationIdAndDigest": true,
+      "allocatedMicrousd": 100
+    },
+    {
+      "name": "simultaneous exact replay trial 3",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "replayResponses": 7,
+      "identicalReservationIdAndDigest": true,
+      "allocatedMicrousd": 100
+    },
+    {
+      "name": "simultaneous exact replay trial 4",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "replayResponses": 7,
+      "identicalReservationIdAndDigest": true,
+      "allocatedMicrousd": 100
+    },
+    {
+      "name": "simultaneous exact replay trial 5",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "replayResponses": 7,
+      "identicalReservationIdAndDigest": true,
+      "allocatedMicrousd": 100
+    },
+    {
+      "name": "simultaneous exact replay trial 6",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "replayResponses": 7,
+      "identicalReservationIdAndDigest": true,
+      "allocatedMicrousd": 100
+    },
+    {
+      "name": "simultaneous exact replay trial 7",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "replayResponses": 7,
+      "identicalReservationIdAndDigest": true,
+      "allocatedMicrousd": 100
+    },
+    {
+      "name": "simultaneous exact replay trial 8",
+      "passed": true,
+      "simultaneousRequests": 8,
+      "createdReservations": 1,
+      "replayResponses": 7,
+      "identicalReservationIdAndDigest": true,
+      "allocatedMicrousd": 100
+    },
+    {
+      "name": "second Attempt shares parent balance",
+      "passed": true,
+      "excessiveAllocationRejected": true,
+      "exactRemainderAdmitted": true,
+      "distinctAttempts": 2,
+      "allocatedMicrousd": 100
+    },
+    {
+      "name": "frozen allocation drift fails closed",
+      "passed": true,
+      "frozenAllocationMicrousd": 60,
+      "corruptedStoredAmountMicrousd": 1,
+      "proposedAllocationMicrousd": 99,
+      "newReservationRejected": true
+    }
+  ],
+  "cleanup": {
+    "backendExitCode": null,
+    "backendSignal": "SIGTERM",
+    "cloudPortClosed": true,
+    "sitePortClosed": true,
+    "originalDatabasesUsed": false,
+    "ephemeralKeyPersisted": false,
+    "sourceUnchanged": true
+  },
+  "completedAt": "2026-09-06T05:20:39.259Z"
+}

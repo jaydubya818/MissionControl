@@ -1,0 +1,35 @@
+{
+  "observedAt": "2026-09-05T07:18:22.290960+00:00",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "ba4e1f69ff48386e72a9c5e1edaf76aad64a475c2d51af79ccba6d1128261ba7"
+    },
+    {
+      "path": "package.json",
+      "sha256": "b0e67b81a2aeb0edb529b5884fbc8f46a94c7bfa58cbb362e39c2368d95bc8b1"
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/bin/codex",
+      "sha256": "ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02"
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/bin/codex-code-mode-host",
+      "sha256": "dcf8f6621229f3401ac2a0b4dea9043676c87ea761359e80c647971321670cba"
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/codex-package.json",
+      "sha256": "dc8605948fa15c2ccb3e0249b3c2e158e7eb5ab2532a77f98ef3f3bb0700d942"
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/codex-path/rg",
+      "sha256": "882ee4837235e252ce5ffecc3c1707f6d5b7db0054b7922301b5dc0f466a0fed"
+    },
+    {
+      "path": "vendor/aarch64-apple-darwin/codex-resources/zsh/bin/zsh",
+      "sha256": "3070e0b5a71b25930f78aeaecd23d6c1081b19b2b83975e5cd29a075d6c463b9"
+    }
+  ],
+  "globalRuntimeUntouched": true,
+  "globalInstallReason": "UNKNOWN: installed package/version established; operator or updater attribution not established"
+}

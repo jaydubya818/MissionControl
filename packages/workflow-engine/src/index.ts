@@ -1,8 +1,8 @@
 /**
  * Workflow Engine
- * 
+ *
  * Multi-agent workflow execution inspired by Antfarm.
- * 
+ *
  * Key patterns:
  * - Deterministic workflows (same steps, same order)
  * - Agent verification (separate verifier checks implementer's work)
@@ -77,8 +77,12 @@ export {
   harnessExecutionRequestDigest,
   harnessManifestIssues,
   harnessNormalizedResultIssues,
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
+  modelRouteReasoningConfigIssues,
   NO_HARNESS_AUTHORITY,
   runHarnessExecution,
+  HarnessCleanupError,
 } from "./executorAdapter.js";
 
 export type {
@@ -104,17 +108,24 @@ export type {
   HarnessExecutorCapabilities,
   HarnessModelCapability,
   HarnessNormalizedResult,
+  HarnessRuntimeArtifactIdentity,
   HarnessSupportLevel,
   IsolationMode,
+  ModelRouteReasoningConfig,
 } from "./executorAdapter.js";
 
 export {
-  CODEX_HARNESS_EFFECTIVE_CONFIG,
+  CODEX_HARNESS_EFFECTIVE_CONFIG ,
+  CODEX_BEDROCK_EFFECTIVE_CONFIG,
+  CODEX_BEDROCK_V1_HARNESS_MANIFEST ,
   CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
   DEEPSEEK_HARNESS_EFFECTIVE_CONFIG,
   DEEPSEEK_V1_HARNESS_MANIFEST,
+  DEEPSEEK_V1_RUNTIME_ARTIFACT,
   KNOWN_HARNESS_MANIFESTS,
   findKnownHarnessManifest,
+  findKnownHarnessRuntimeArtifact,
   harnessSupportsModel,
 } from "./harnessManifests.js";
 
@@ -165,6 +176,9 @@ export {
 export {
   createAutomationVerificationSubject,
   createGitVerificationSubject,
+  createPrepublicationGitVerificationSubject,
+  createGitSubjectPublicationBinding,
+  verifyGitSubjectPublicationBinding,
   normalizeAttemptPurpose,
   normalizeFactoryPurpose,
   normalizeWorkOrderKind,
@@ -173,6 +187,10 @@ export {
   type AutomationVerificationSubject,
   type FactoryPurpose,
   type GitVerificationSubject,
+  type PrepublicationGitVerificationSubject,
+  type GitSubjectPublicationBinding,
+  type GithubVerificationSubject,
+  type LocalGitVerificationSubject,
   type VerificationSubject,
   type WorkOrderKind,
 } from "./verificationSubject.js";

@@ -1,0 +1,98 @@
+{
+  "schema": "todo063-bedrock-live-qualification/v2",
+  "status": "BLOCKED_AFTER_ONE_PROVIDER_REQUEST",
+  "capturedAt": "2026-09-07T21:16:06Z",
+  "source": {
+    "pullRequest": 216,
+    "mergeCommit": "2f5735d672af3fec21ce71ce235fae37e08a30ce",
+    "runtimeContract": 55,
+    "exactMainFocusedGate": "PASS_257_TESTS"
+  },
+  "accountAccess": {
+    "useCaseSubmission": "PRESENT_EXACT_MATCH",
+    "temporaryAdministrativeAuthorityUsed": false,
+    "temporaryAdministrativeAuthorityRemoved": true,
+    "modelId": "anthropic.claude-sonnet-4-6",
+    "agreementAvailability": "AVAILABLE",
+    "authorizationStatus": "AUTHORIZED",
+    "entitlementAvailability": "AVAILABLE",
+    "regionAvailability": "AVAILABLE"
+  },
+  "provider": {
+    "name": "AWS Bedrock",
+    "accountId": "083665737366",
+    "region": "us-east-1",
+    "inferenceProfileArn": "arn:aws:bedrock:us-east-1:083665737366:inference-profile/us.anthropic.claude-sonnet-4-6",
+    "modelId": "anthropic.claude-sonnet-4-6",
+    "countTokensCapability": "UNSUPPORTED",
+    "stsPrincipalArn": "arn:aws:sts::083665737366:assumed-role/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783/jaydubya818@gmail.com"
+  },
+  "priorLiability": {
+    "providerRequestId": "7f488e66-813d-4a33-adb0-1d6c98146b39",
+    "reservedMaximumNanoUsd": 3367584000,
+    "providerReportedInputUsage": 0,
+    "providerReportedOutputUsage": 0,
+    "accountedNanoUsd": 0,
+    "usageClassification": "ACTUAL",
+    "moneyClassification": "ESTIMATED",
+    "finalHoldState": "SETTLED",
+    "evidenceDigest": "sha256:22418a229f5cc024c1b9dafbbb9d668ca7189078d8b4c9dc75cc4c0b18a7e52d"
+  },
+  "request": {
+    "requestId": "todo063-live-request-2",
+    "requestDigest": "sha256:a0265e404db87795505cdc52b26f5cfeb13924e67d557d4d43c34f91ec8adfb1",
+    "serializedRequestBytes": 230,
+    "syntheticNonSensitive": true,
+    "streaming": false,
+    "automaticRetries": 0,
+    "fallbacks": 0,
+    "physicalRequests": 1
+  },
+  "liability": {
+    "preSendInputBound": {
+      "classification": "CONSERVATIVE_UPPER_BOUND",
+      "countTokensCapability": "UNSUPPORTED",
+      "maximumInputTokens": 1000000,
+      "derivation": "FULL_MODEL_CONTEXT_WINDOW",
+      "evidenceDigest": "sha256:760b8e9bfeaa242c9bf13d3ff04393dc87af89a869cb12b57ad1fb72f9650abd"
+    },
+    "preSendOutputBound": 16,
+    "priceDigest": "sha256:ba19028022ec2de109d2863415263b691d13d334618d7f49e7524f3c07e33160",
+    "reservedMaximumNanoUsd": 3300264000,
+    "priorSettledLiabilityNanoUsd": 0,
+    "cumulativeMaximumNanoUsd": 3300264000,
+    "programMaximumNanoUsd": 5000000000,
+    "providerReportedInputUsage": null,
+    "providerReportedOutputUsage": null,
+    "settledEstimatedCostNanoUsd": null,
+    "usageClassification": "UNKNOWN",
+    "moneyClassification": "UNKNOWN",
+    "finalHoldState": "UNKNOWN",
+    "reservationReleased": false
+  },
+  "providerResult": {
+    "name": "ThrottlingException",
+    "httpStatusCode": 429,
+    "requestId": "6919db8e-f1c5-4f54-9557-db37ed817b74",
+    "sdkAttempts": 1,
+    "totalRetryDelayMs": 0,
+    "reason": "Too many tokens per day, please wait before trying again."
+  },
+  "telemetryReadback": {
+    "namespace": "AWS/Bedrock",
+    "region": "us-east-1",
+    "modelIdDimension": "us.anthropic.claude-sonnet-4-6",
+    "minute": "2026-09-07T21:16:00Z",
+    "InvocationThrottles": 1
+  },
+  "durability": {
+    "priorReservationJournalSha256": "aff8a85e19d3fb337996e2ec38be80d999e03355c1239dd8010d12347bc4a52a",
+    "newReservationJournalSha256": "7a9d964416d1b491374b32e646ca0301290186c53d2311bb9b4321693bbd96ce",
+    "accountingIntentSha256": "a9ab0c85189d3cb7f0887f09e18610850ab23d510101fa8a1ab7ef760dfd9efe",
+    "credentialEnvelopeDeleted": true
+  },
+  "blockingPredicate": "BEDROCK_DAILY_TOKEN_ALLOWANCE_EXHAUSTED",
+  "todo063Complete": false,
+  "todo064Started": false,
+  "conclusion": "Account access is active and the bounded send contract held. AWS rejected the one authorized request at the daily token allowance, returned no usage, and the gateway retained the full new hold as UNKNOWN without retry."
+}

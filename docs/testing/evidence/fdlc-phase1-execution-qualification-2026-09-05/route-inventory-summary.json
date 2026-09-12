@@ -1,0 +1,22 @@
+{
+  "catalogRecordCount": 11,
+  "keysObserved": [
+    "_creationTime",
+    "_id",
+    "availability",
+    "capabilities",
+    "contextWindow",
+    "deprecated",
+    "displayName",
+    "estimatedCostPerRunUsd",
+    "modelId",
+    "provider",
+    "riskApproved",
+    "supportsTools",
+    "tier",
+    "updatedAt"
+  ],
+  "admissibleExactRouteCount": 0,
+  "qualification": "BLOCKED",
+  "note": "Legacy catalog entries and estimatedCostPerRunUsd do not supply exact route identity/qualification or actual price."
+}

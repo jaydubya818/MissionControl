@@ -6,6 +6,7 @@ export const GOVERNED_LIFECYCLE = "Mission → approved Plan → WorkOrder → T
 
 const CURRENT_DOCS = [
   "README.md",
+  "docs/OVERVIEW.md",
   "docs/product/software-factory-capability-maturity.md",
   "docs/software-factory/README.md",
   "docs/software-factory/remote-sandbox-runtime.md",
@@ -40,6 +41,7 @@ export function checkFactoryDocs({ repositoryRoot }) {
   };
 
   const readme = read("README.md");
+  const overview = read("docs/OVERVIEW.md");
   const ledger = read("docs/product/software-factory-capability-maturity.md");
   const runtimeSource = read("convex/lib/runtimeContract.ts");
   const currentRunbook = read("docs/MISSION_CONTROL_RUNBOOK.md");
@@ -49,8 +51,21 @@ export function checkFactoryDocs({ repositoryRoot }) {
   const observabilityPlan = read("docs/plans/2026-08-15-feat-observability-traces-evals-v1-plan.md");
   const remoteSandbox = read("docs/software-factory/remote-sandbox-runtime.md");
 
-  checkRuntimeVersion({ readme, runtimeSource, findings });
-  checkLifecycle({ filePath: "README.md", source: readme, findings });
+  checkRuntimeVersion({
+    filePath: "README.md",
+    source: readme,
+    documentedVersionPattern: /runtime contract:\s*\*\*v(\d+)\*\*/,
+    runtimeSource,
+    findings,
+  });
+  checkRuntimeVersion({
+    filePath: "docs/OVERVIEW.md",
+    source: overview,
+    documentedVersionPattern: /runtime contract is \*\*v(\d+)\*\*/,
+    runtimeSource,
+    findings,
+  });
+  checkLifecycle({ filePath: "docs/OVERVIEW.md", source: overview, findings });
   checkLifecycle({ filePath: "docs/product/software-factory-capability-maturity.md", source: ledger, findings });
 
   for (const capability of REQUIRED_CAPABILITIES) {
@@ -59,8 +74,8 @@ export function checkFactoryDocs({ repositoryRoot }) {
     }
   }
 
-  if (!readme.includes("**Production-pilot eligible; Preview**") || !readme.includes("3/3 live exe.dev cohort")) {
-    findings.push("README.md: Remote Sandbox must distinguish bounded live pilot evidence from general production certification");
+  if (!overview.includes("**Production-pilot eligible; Preview**") || !overview.includes("3/3 live exe.dev cohort")) {
+    findings.push("docs/OVERVIEW.md: Remote Sandbox must distinguish bounded live pilot evidence from general production certification");
   }
   if (!remoteSandbox.includes("Production-pilot eligible / Preview; not general production certified")) {
     findings.push("docs/software-factory/remote-sandbox-runtime.md: current Remote Sandbox boundary is missing or stale");
@@ -90,13 +105,13 @@ export function checkFactoryDocs({ repositoryRoot }) {
   return { ok: findings.length === 0, findings };
 }
 
-function checkRuntimeVersion({ readme, runtimeSource, findings }) {
+function checkRuntimeVersion({ filePath, source, documentedVersionPattern, runtimeSource, findings }) {
   const sourceVersion = runtimeSource.match(/RUNTIME_CONTRACT_VERSION\s*=\s*(\d+)/)?.[1];
-  const documentedVersion = readme.match(/runtime contract is \*\*v(\d+)\*\*/)?.[1];
+  const documentedVersion = source.match(documentedVersionPattern)?.[1];
   if (!sourceVersion) findings.push("convex/lib/runtimeContract.ts: runtime contract version is unreadable");
-  if (!documentedVersion) findings.push("README.md: runtime contract version claim is missing");
+  if (!documentedVersion) findings.push(`${filePath}: runtime contract version claim is missing`);
   if (sourceVersion && documentedVersion && sourceVersion !== documentedVersion) {
-    findings.push(`README.md: runtime contract v${documentedVersion} does not match source v${sourceVersion}`);
+    findings.push(`${filePath}: runtime contract v${documentedVersion} does not match source v${sourceVersion}`);
   }
 }
 

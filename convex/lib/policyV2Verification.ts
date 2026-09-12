@@ -7,6 +7,15 @@ import {
 } from "@mission-control/workflow-engine/verification-plan";
 
 const SYSTEM_VERIFICATION_CHECKS = {
+  verificationAuthority: {
+    id: "factory-verification-authority",
+    name: "Verification authority",
+    category: "POLICY",
+    verifierId: "factory-verification-authority",
+    mandatory: true,
+    acceptanceCriterionIds: [],
+    evidenceCategory: "POLICY_RESULT",
+  },
   changeBudget: {
     id: "factory-change-budget",
     name: "Change budget",
@@ -29,6 +38,9 @@ const SYSTEM_VERIFICATION_CHECKS = {
 
 export function effectivePolicyV2VerificationChecks(workOrder: any): any[] {
   const checks = [...(workOrder.verificationContract?.checks ?? [])];
+  if (!checks.some((check) => check.verifierId === SYSTEM_VERIFICATION_CHECKS.verificationAuthority.verifierId)) {
+    checks.unshift(SYSTEM_VERIFICATION_CHECKS.verificationAuthority);
+  }
   if (workOrder.changeBudget && !checks.some((check) => check.verifierId === SYSTEM_VERIFICATION_CHECKS.changeBudget.verifierId)) {
     checks.unshift(SYSTEM_VERIFICATION_CHECKS.changeBudget);
   }

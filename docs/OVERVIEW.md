@@ -152,9 +152,15 @@ The next promotion gate is one named product-repository pilot with at least ten
 accepted WorkOrders, an eight-stage preflight incident drill, actual or
 explicitly unknown cost attribution, observed outcomes, failure evidence, and a
 human `GO` or `NO_GO` decision. Guarded Auto, autonomous merge, autonomous
-deployment, and learning promotion remain disabled. Factory Incident Command,
-the first read-only MCP broker proof, shared QA/product/design intent, and
-outcome-aware routing follow only after that pilot evidence exists.
+deployment, and learning promotion remain disabled. The governed read-only MCP
+broker now qualifies the local Phase 3 fixture plus one exact Context7
+`query-docs` operation for one fixed public React documentation query. It does
+not admit writes, dynamic authority, connector breadth, or general harness MCP
+support. Shared QA/product/design intent is qualified behind its default-off
+flag, and Factory Incident Command now has an Experimental deterministic control
+plane with separate containment and restoration decisions. One bounded local
+repository-dispatch canary is retained at v53; authenticated Production
+acceptance and outcome-aware routing remain later promotion work.
 
 ### The developer becomes an operator
 
@@ -192,12 +198,30 @@ WorkOrder acceptance, and the human-gated learning continuation. This is strong
 implementation proof; it is not a claim of fleet-scale production operation or
 general Remote Sandbox certification.
 
-The current public client/backend runtime contract is **v33**.
+The current public client/backend runtime contract is **v58**. The governed
+inference work adds the disabled-by-default price-book, reservation, receipt,
+reconciliation, and accepted-outcome economics contracts. Fab adds exact candidate
+verification and publication bindings plus read-only candidate recovery. Todo 062
+adds default-off attributable shared-intent proposals and human decisions. Pilot
+readiness adds exact revision-bound WorkOrder inspection. Factory Incident
+Command adds the append-only lifecycle and signed detect/propose boundary. v53
+adds the one narrow repository-dispatch pause/resume actuator, durable request
+and restoration authority, separate executor acknowledgment, independent
+effect observation, and shared dispatch admission gate; older clients fail
+closed through the existing compatibility check. v58 adds authenticated,
+tenant-scoped Fab operator profiles, personal briefing controls, and durable
+per-user review state.
+
+Inference receipt v3 retains valid observed overruns and route drift with explicit
+violation codes and ESTIMATED/UNKNOWN monetary classification. A WorkOrder fence
+blocks further inference admission; historical settlement grants no execution
+authority. Canonical v2 receipts retain their original identity and digest.
 
 | Capability                                 | Current status                                   | Boundary                                                                                        |
 | ------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
 | Governed Missions and Plan approval        | **Live; system-qualified**                       | One-repository V1 golden path; consequential execution still requires separate gates            |
 | Spec-Driven Mission Intake                 | **Merged and qualified; default off**            | Project flag `missions.spec-intake-v1`; `FINALIZED` means planning-ready only                   |
+| Shared Builder Intent                      | **Preview-qualified; default off**               | Exact Spec-bound proposals; agents draft/inspect, authorized humans decide; no Plan authority  |
 | Quality Contracts                          | **Implemented; accepted normative architecture** | Immutable projection of approved Plan intent, not a second planning system                      |
 | Verification Factory / policy-v2           | **Implemented; system-qualified**                | Exact-subject, independent, fail-closed verification before acceptance                          |
 | Factory Memory                             | **Implemented; default off by phase**            | Advisory retrieval and Attempt-bound Context Packages; no acceptance authority                  |
@@ -211,6 +235,7 @@ The current public client/backend runtime contract is **v33**.
 | Real product-repository pilot gates         | **Implemented; pilot pending**                   | Deterministic preflight and exit assessment exist; the named team and ten accepted WorkOrders remain real-world evidence work |
 | Remote Sandbox N=1                         | **Production-pilot eligible; Preview**           | 3/3 live exe.dev cohort; provider-enforced egress and sustained real-work evidence remain missing |
 | Loom admission                             | **Future**                                       | Configuration discovery and fixtures exist; no pinned runtime adapter                           |
+| Governed read-only MCP capability          | **Experimental; one qualified real-service operation** | Exact Context7 profile/grant/version/query only; no writes, dynamic discovery authority, connector breadth, or harness-native MCP |
 | System Qualification                       | **V1 merged; known limitations**                 | Deterministic command plus durable repository evidence; no live-provider claim                  |
 
 The canonical status, evidence, limitation, and promotion gate for each major

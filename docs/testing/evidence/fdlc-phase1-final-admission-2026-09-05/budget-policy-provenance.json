@@ -1,0 +1,22 @@
+{
+  "observedAt": "2026-09-05T07:48:16.709195+00:00",
+  "sources": [
+    {
+      "name": "original-budget-preflight",
+      "path": "/Users/jaywest/.codex/attachments/56167e07-96f1-4673-956c-2f0ee2e24174/pasted-text.txt",
+      "sha256": "dc0e96e90c18700328443ee703fa510eaf1a14b7bca6914ab97fdc56a6d157e9",
+      "startLine": 645,
+      "endLine": 671,
+      "excerpt": "## 18. Cost/budget preflight\n\nBefore execution define the bounded pilot budget.\n\nUse existing Mission Control budget controls.\n\nRecord:\n\n- known model cost basis\n\n- token limits\n\n- retry limits\n\n- Attempt limits\n\n- execution time limit\n\n- other measurable resource limits\n\nIf actual monetary cost cannot be determined:\n\nrecord UNKNOWN.\n\nDo not invent provider prices.\n\nDo not weaken hard-budget admission merely to allow the pilot."
+    },
+    {
+      "name": "workorder-budget-instruction",
+      "path": "/Users/jaywest/.codex/attachments/5de573d0-245f-4c38-855b-2438227a547c/pasted-text.txt",
+      "sha256": "51df90b79055240a3eaa55e8117832d349bcaec3fa5d761385d758a83f23fb4e",
+      "startLine": 281,
+      "endLine": 307,
+      "excerpt": "7. BUDGET\n\n==================================================\n\nResolve the exact budget authority for WorkOrder 1.\n\nRecord:\n\n- token limit\n\n- execution time limit\n\n- retry limit\n\n- Attempt limit\n\n- monetary limit where known\n\n- unknown cost components\n\n- reservation/admission behavior\n\nUNKNOWN cost may remain UNKNOWN where actual provider pricing cannot be proven.\n\nUNKNOWN must never become zero.\n\nDo not weaken hard-budget admission."
+    }
+  ],
+  "finding": "Pilot-specific token-limit and no-hard-budget-weakening instructions; exact input/output semantics and numerical limits unspecified. No generic Factory hard-token gate found."
+}

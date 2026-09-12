@@ -1,9 +1,11 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { ConvexHttpClient } from "convex/browser";
-import { ConvexMutations } from "./convexCalls.js";
+import { ConvexActions } from "./convexCalls.js";
+import { createSignedServiceCommand } from "./serviceCommandClient.js";
 import { canonicalGithubRepositoryFromRemote } from "./factoryRepositoryIdentity.js";
-import type { HarnessCapabilityManifest } from "@mission-control/workflow-engine";
+import { attestLocalQualificationRepository, type LocalQualificationRepositoryBinding } from "./localQualificationRepository.js";
+import type { HarnessCapabilityManifest, HarnessRuntimeArtifactIdentity } from "@mission-control/workflow-engine";
 
 const execFileAsync = promisify(execFile);
 
@@ -13,6 +15,7 @@ export interface FactoryHostReporterConfig {
   hostId: string;
   sessionId: string;
   checkoutRoot: string;
+  localQualificationRepository?: LocalQualificationRepositoryBinding;
   maxConcurrentRuns: number;
   getCurrentRuns: () => number;
   approvedModelIds?: string[];
@@ -25,6 +28,8 @@ export interface FactoryHostReporterConfig {
     version: string;
     capabilityManifestSha256: string;
     effectiveConfigSha256: string;
+    runtimeArtifact: HarnessRuntimeArtifactIdentity;
+    runtimeArtifactSha256: string;
     capabilityManifest: HarnessCapabilityManifest;
     supportsCancel: boolean;
     supportsResume: boolean;
@@ -36,15 +41,17 @@ export interface FactoryHostReporterConfig {
     factoryConfigurationDigest: string;
     adapter: string;
     version: string;
-    provider: string;
-    model: string;
     capabilityManifestSha256: string;
     effectiveConfigSha256: string;
+    runtimeArtifactSha256?: string;
     executionBackend: string;
-    modelRouteDigest: string;
     sandboxProfileDigest?: string;
     repositoryId: string;
-  }>;
+  } & (
+    | { provider: string; model: string; modelRouteDigest: string; inferenceConstraint?: never }
+    | { executionBackend: "isolated-container"; provider?: never; model?: never; modelRouteDigest?: never;
+        inferenceConstraint: { schema: "factory-inference-constraint/v1"; mode: "DENIED" }; runtimeArtifactSha256: string; sandboxProfileDigest: string }
+  )>;
   readiness?: "STARTING" | "READY" | "DRAINING" | "BLOCKED";
   draining?: boolean;
   intervalMs?: number;
@@ -59,6 +66,19 @@ export interface FactoryCheckoutObservation {
   baseBranch: string;
   baseCommit: string;
   dirty: boolean;
+}
+
+export function factorySandboxCapabilities(options: {
+  githubAppPublicationReady: boolean;
+  remoteSandboxBackendReady: boolean;
+}) {
+  return [
+    "git-worktree",
+    "workspace-write",
+    "read-only",
+    ...(options.githubAppPublicationReady ? ["github-app-publication"] : []),
+    ...(options.remoteSandboxBackendReady ? ["remote-sandbox", "sandbox-provider:exe-dev"] : []),
+  ];
 }
 
 export class FactoryHostReporter {
@@ -92,14 +112,21 @@ export class FactoryHostReporter {
     if (this.reporting) return;
     this.reporting = true;
     try {
-      const observation = await inspectFactoryCheckout(this.config.checkoutRoot);
+      const localObservation = this.config.localQualificationRepository
+        ? await attestLocalQualificationRepository(this.config.localQualificationRepository) : undefined;
+      const observation = localObservation ? {
+        repository: `local-qualification/${this.config.localQualificationRepository!.fixtureId}`,
+        checkoutRoot: localObservation.root, observedBranch: "main", observedCommit: localObservation.baselineCommit,
+        baseBranch: "main", baseCommit: localObservation.baselineCommit, dirty: false,
+      } : await inspectFactoryCheckout(this.config.checkoutRoot);
       const now = Date.now();
-      await this.client.mutation(ConvexMutations.workspaceHostBindings.report as any, {
+      const payload = {
         projectId: this.config.projectId,
         repositoryId: this.config.repositoryId,
         hostId: this.config.hostId,
         repository: observation.repository,
         checkoutRoot: observation.checkoutRoot,
+        localQualificationObservation: localObservation,
         observedBranch: observation.observedBranch,
         observedCommit: observation.observedCommit,
         baseBranch: observation.baseBranch,
@@ -120,6 +147,8 @@ export class FactoryHostReporter {
             version: executor.version,
             capabilityManifestSha256: executor.capabilityManifestSha256,
             effectiveConfigSha256: executor.effectiveConfigSha256,
+            runtimeArtifact: executor.runtimeArtifact,
+            runtimeArtifactSha256: executor.runtimeArtifactSha256,
             capabilityManifest: executor.capabilityManifest,
             supportsCancel: executor.supportsCancel,
             supportsResume: executor.supportsResume,
@@ -136,7 +165,34 @@ export class FactoryHostReporter {
         attestedAt: now,
         status: observation.dirty ? "DIRTY" : "READY",
         checkedAt: now,
+      };
+      const hostCommand = createSignedServiceCommand({
+        capability: "hosts.report",
+        projectId: this.config.projectId,
+        repositoryId: this.config.repositoryId,
+        payload,
       });
+      await this.client.action(
+        ConvexActions.serviceCommands.reportFactoryHost as any,
+        hostCommand,
+      );
+      for (const binding of this.config.factoryVersionBindings ?? []) {
+        if (binding.executionBackend === "isolated-container") continue;
+        const command = createSignedServiceCommand({
+          capability: "models.report-exact-route-health",
+          projectId: this.config.projectId,
+          repositoryId: this.config.repositoryId,
+          payload: {
+            factoryDefinitionVersionId: binding.factoryDefinitionVersionId,
+            expectedRouteDigest: binding.modelRouteDigest,
+            availability: "HEALTHY",
+          },
+        });
+        await this.client.action(
+          ConvexActions.serviceCommands.reportExactModelRouteHealth as any,
+          command,
+        );
+      }
     } finally {
       this.reporting = false;
     }
@@ -149,7 +205,10 @@ export async function inspectFactoryCheckout(cwd: string): Promise<FactoryChecko
     git(cwd, ["remote", "get-url", "origin"]),
     git(cwd, ["branch", "--show-current"]),
     git(cwd, ["rev-parse", "HEAD"]),
-    git(cwd, ["status", "--porcelain=v1", "--untracked-files=all"]),
+    // Attempt worktrees and worker journals are host-owned runtime state. They
+    // live beneath the checkout for bounded path ownership but are not source
+    // changes and must not make an otherwise clean source checkout ineligible.
+    git(cwd, ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude).mission-control/**"]),
     gitOptional(cwd, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]),
   ]);
   const baseBranch = remoteHead?.replace(/^origin\//, "") || branch;

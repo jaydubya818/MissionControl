@@ -1,0 +1,3 @@
+
+> @mission-control/orchestration-server@0.9.0 typecheck <qualification-worktree>/apps/orchestration-server
+> tsc --noEmit

@@ -1,0 +1,42 @@
+{
+  "schema": "fdlc-accounting-recovery-postmerge-proof/v1",
+  "status": "PASS",
+  "head": "b17c9c5c4d3c664a628ce43303e9794df603e3ca",
+  "startedAt": "2026-09-06T21:24:47.077Z",
+  "completedAt": "2026-09-06T21:25:08.435Z",
+  "scenarioCounts": {
+    "observationAndAccounting": 57,
+    "signedSettlementAndRecovery": 15,
+    "realProcessKillRestart": 2,
+    "total": 74
+  },
+  "sourceBindingCounts": {
+    "observationBundle": 53,
+    "signedRecovery": 14
+  },
+  "proofDigests": {
+    "observationReportSha256": "144c6b4336d8c85995086692e15202e9cba8e17b81ebaf211d753516036cecf1",
+    "observationSourceBindingsSha256": "973de5dacf1be5dc3a349387209da5db051df7166a2e4b0c5a271b9a75b6eb0b",
+    "signedReportSha256": "3144c1303f48a4713e283dc3967e51d2c96944fcdbf61555733a9f1b11844fa4",
+    "signedSourceBindingsSha256": "bbd17338df683c7227355bec8feb94597c268ea1667cb0ae11f44e54d289e54a"
+  },
+  "cleanup": {
+    "observationCloudPortClosed": true,
+    "observationSitePortClosed": true,
+    "signedCloudPortClosed": true,
+    "signedSitePortClosed": true,
+    "credentialDatabasesRemoved": true,
+    "storageRemoved": true,
+    "generatedValuesAbsentFromRetainedArtifacts": true,
+    "originalDatabasesUsed": false,
+    "sourceUnchanged": true
+  },
+  "limits": {
+    "loopbackOnly": true,
+    "syntheticOnly": true,
+    "providerCalls": 0,
+    "productionCalls": 0,
+    "actualBilling": false,
+    "humanAcceptance": false
+  }
+}

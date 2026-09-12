@@ -1,0 +1,69 @@
+{
+  "schema": "fdlc-offline-runtime-containment-probe/v1",
+  "observedAt": "2026-09-05T07:17:30.637476+00:00",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "executable": "/tmp/fdlc-runtime-0146/package/vendor/aarch64-apple-darwin/bin/codex",
+  "executableSha256": "ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02",
+  "package": "@openai/codex@0.146.0-darwin-arm64",
+  "archiveIntegrity": "sha512-nb61yX4r5L6Z0dlC4o3u0GAK1YCd4TUvjaB382bajDoh84V+uv2hTBIVZ++fgXWV9yoeuNrNnNcn7GoTGOe2Tg==",
+  "archiveIntegrityMatch": true,
+  "runtimeDigestMatch": true,
+  "modelCalls": 0,
+  "probes": {
+    "adapter_mutation_workspace_write": {
+      "args": [
+        "/tmp/fdlc-runtime-0146/package/vendor/aarch64-apple-darwin/bin/codex",
+        "sandbox",
+        "-c",
+        "sandbox_mode=\"workspace-write\"",
+        "-c",
+        "sandbox_workspace_write.network_access=false",
+        "-C",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4/workspace",
+        "--",
+        "/bin/sh",
+        "-c",
+        "if cat \"$1\" >/dev/null 2>&1; then echo workspace_read=ALLOWED; else echo workspace_read=DENIED; fi; if cat \"$2\" >/dev/null 2>&1; then echo outside_read=ALLOWED; else echo outside_read=DENIED; fi; if /bin/sh -c 'cat \"$1\" >/dev/null 2>&1' child \"$2\"; then echo subprocess_outside_read=ALLOWED; else echo subprocess_outside_read=DENIED; fi; if touch \"$3\" 2>/dev/null; then echo workspace_write=ALLOWED; else echo workspace_write=DENIED; fi",
+        "canary",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4/workspace/README.md",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4/outside-repository/canary",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4/workspace/adapter_mutation_workspace_write"
+      ],
+      "exitCode": 2,
+      "stdout": "",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4\" (codex_home: AbsolutePathBuf(\"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4/codex-home\"))\nerror: the following required arguments were not provided:\n  --permission-profile <NAME>\n\nUsage: codex sandbox --permission-profile <NAME> --config <key=value> --cd <DIR> <COMMAND>...\n\nFor more information, try '--help'.\n"
+    },
+    "existing_read_only_planning_profile": {
+      "args": [
+        "/tmp/fdlc-runtime-0146/package/vendor/aarch64-apple-darwin/bin/codex",
+        "sandbox",
+        "-P",
+        "mission-planner-contained",
+        "-c",
+        "permissions.mission-planner-contained.filesystem={\":minimal\"=\"read\",glob_scan_max_depth=8,\":workspace_roots\"={\".\"=\"read\",\".env\"=\"deny\",\".env.*\"=\"deny\",\"**/.env\"=\"deny\",\"**/.env.*\"=\"deny\"}}",
+        "-c",
+        "permissions.mission-planner-contained.network.enabled=false",
+        "-C",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4/workspace",
+        "--",
+        "/bin/sh",
+        "-c",
+        "if cat \"$1\" >/dev/null 2>&1; then echo workspace_read=ALLOWED; else echo workspace_read=DENIED; fi; if cat \"$2\" >/dev/null 2>&1; then echo outside_read=ALLOWED; else echo outside_read=DENIED; fi; if /bin/sh -c 'cat \"$1\" >/dev/null 2>&1' child \"$2\"; then echo subprocess_outside_read=ALLOWED; else echo subprocess_outside_read=DENIED; fi; if touch \"$3\" 2>/dev/null; then echo workspace_write=ALLOWED; else echo workspace_write=DENIED; fi",
+        "canary",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4/workspace/README.md",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4/outside-repository/canary",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4/workspace/existing_read_only_planning_profile"
+      ],
+      "exitCode": 0,
+      "stdout": "workspace_read=ALLOWED\noutside_read=DENIED\nsubprocess_outside_read=DENIED\nworkspace_write=DENIED\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4\" (codex_home: AbsolutePathBuf(\"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4/codex-home\"))\n"
+    }
+  },
+  "startup": {
+    "returncode": 0,
+    "stdout": "codex-cli 0.146.0\n",
+    "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4\" (codex_home: AbsolutePathBuf(\"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-admission-canary-dtk_x7w4/codex-home\"))\n"
+  },
+  "fixtureCleanup": true,
+  "qualification": "OFFLINE_IDENTITY_ONLY; NOT_HOST_ADMISSION"
+}

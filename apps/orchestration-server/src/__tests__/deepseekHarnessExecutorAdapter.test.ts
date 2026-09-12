@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -11,6 +11,7 @@ import {
   deepSeekOwnedProcessGroupExists,
   type DeepSeekPreparedExecution,
 } from "../deepseekHarnessExecutorAdapter.js";
+import { deepSeekInstallationTreeDigest } from "../deepseekInstallationTree.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -37,11 +38,31 @@ function request(root: string) {
     isolation: "WORKSPACE_WRITE" as const,
     provider: "local-ollama",
     model: "qwen3.5:35b-a3b-q8_0",
+    modelRouteDigest: `sha256:${"a".repeat(64)}`,
+    providerRoute: "local-ollama",
   };
 }
 
 function installation(root: string) {
-  return { root, executable: path.join(root, "deepseek-stub.js"), executableSha256: "b".repeat(64) };
+  return {
+    root,
+    executable: path.join(root, "deepseek-stub.js"),
+    executableSha256: "b".repeat(64),
+    closureSha256: "c".repeat(64),
+  };
+}
+
+async function installationTree() {
+  const root = await mkdtemp(path.join(tmpdir(), "mc-deepseek-installation-"));
+  await mkdir(path.join(root, ".git"), { recursive: true });
+  await mkdir(path.join(root, "apps", "cli", "lib"), { recursive: true });
+  await mkdir(path.join(root, "node_modules", "dependency"), { recursive: true });
+  await writeFile(path.join(root, ".git", "HEAD"), "ref: refs/heads/main\n");
+  await writeFile(path.join(root, "apps", "cli", "lib", "bin.js"), "import './sibling.js';\n");
+  await writeFile(path.join(root, "apps", "cli", "lib", "sibling.js"), "export const sibling = 1;\n");
+  await writeFile(path.join(root, "node_modules", "dependency", "index.js"), "export const dependency = 1;\n");
+  await symlink("dependency", path.join(root, "node_modules", "dependency-link"));
+  return root;
 }
 
 async function processCanExecute(pid: number): Promise<boolean> {
@@ -114,11 +135,52 @@ describe("DeepSeekHarnessExecutorAdapter", () => {
         events: { toolCalls: 1, modelRequests: 1, retries: 0, sessionCount: 1 },
       });
       expect(result.normalizedResult?.provenance.providerMetadata).toEqual(expect.objectContaining({ experimental: true }));
+      expect(result.normalizedResult?.provenance).toMatchObject({
+        modelRouteDigest: `sha256:${"a".repeat(64)}`,
+        providerRoute: "local-ollama",
+      });
       expect(harnessNormalizedResultIssues(result.normalizedResult!)).toEqual([]);
       expect(events).toContain("EXECUTION_COMPLETED");
       await adapter.cleanup(handle);
       await adapter.cleanup(handle);
       expect(result.normalizedResult?.cleanup.status).toBe("COMPLETED");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects exact reasoning controls it cannot translate", async () => {
+    const root = await repository();
+    try {
+      const adapter = new DeepSeekHarnessExecutorAdapter({ upstreamRoot: root, enabled: true });
+      expect(adapter.validateConfiguration({
+        ...request(root),
+        reasoningConfig: { effort: "high" },
+      })).toContainEqual(expect.objectContaining({ field: "reasoningConfig" }));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails health and prepare before provider verification or process execution when runtime closure verification fails", async () => {
+    const root = await repository();
+    const verifyProvider = vi.fn(async () => undefined);
+    const runner = vi.fn();
+    const adapter = new DeepSeekHarnessExecutorAdapter({
+      upstreamRoot: root,
+      enabled: true,
+      verifyInstallation: async () => { throw new Error("installation closure digest mismatch"); },
+      verifyProvider,
+      runner,
+    });
+    try {
+      await expect(adapter.health()).resolves.toMatchObject({
+        status: "UNAVAILABLE",
+        details: expect.stringContaining("closure digest mismatch"),
+      });
+      await expect(adapter.prepare(request(root), { emit: () => undefined })).rejects.toThrow("closure digest mismatch");
+      expect(verifyProvider).not.toHaveBeenCalled();
+      expect(runner).not.toHaveBeenCalled();
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -217,5 +279,71 @@ setInterval(() => undefined, 1000);
     expect(env).not.toHaveProperty("CONVEX_SERVICE_AUTH_TOKEN");
     expect(env).not.toHaveProperty("GITHUB_APP_PRIVATE_KEY");
     expect(env).not.toHaveProperty("OPENROUTER_MANAGEMENT_API_KEY");
+  });
+});
+
+describe("deepSeekInstallationTreeDigest", () => {
+  it("is deterministic, excludes only root Git metadata, and detects sibling, dependency, and added-file drift", async () => {
+    const root = await installationTree();
+    try {
+      const expected = await deepSeekInstallationTreeDigest(root);
+      await expect(deepSeekInstallationTreeDigest(root)).resolves.toBe(expected);
+
+      await writeFile(path.join(root, ".git", "ignored"), "mutable checkout metadata\n");
+      await expect(deepSeekInstallationTreeDigest(root)).resolves.toBe(expected);
+
+      const sibling = path.join(root, "apps", "cli", "lib", "sibling.js");
+      await writeFile(sibling, "export const sibling = 2;\n");
+      await expect(deepSeekInstallationTreeDigest(root)).resolves.not.toBe(expected);
+      await writeFile(sibling, "export const sibling = 1;\n");
+
+      const dependency = path.join(root, "node_modules", "dependency", "index.js");
+      await writeFile(dependency, "export const dependency = 2;\n");
+      await expect(deepSeekInstallationTreeDigest(root)).resolves.not.toBe(expected);
+      await writeFile(dependency, "export const dependency = 1;\n");
+
+      await writeFile(path.join(root, "node_modules", "dependency", "added.js"), "export {};\n");
+      await expect(deepSeekInstallationTreeDigest(root)).resolves.not.toBe(expected);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("detects internal symlink drift and rejects links outside the tree or into excluded Git metadata", async () => {
+    const root = await installationTree();
+    const external = await mkdtemp(path.join(tmpdir(), "mc-deepseek-external-"));
+    try {
+      const expected = await deepSeekInstallationTreeDigest(root);
+      const link = path.join(root, "node_modules", "dependency-link");
+      await rm(link);
+      await symlink("../apps/cli/lib", link);
+      await expect(deepSeekInstallationTreeDigest(root)).resolves.not.toBe(expected);
+
+      await symlink(tmpdir(), path.join(root, "outside-link"));
+      await expect(deepSeekInstallationTreeDigest(root)).rejects.toThrow("symlink escapes its root");
+      await rm(path.join(root, "outside-link"));
+
+      const redirect = path.join(external, "redirect");
+      await symlink(path.join(root, "node_modules", "dependency"), redirect);
+      await symlink(redirect, path.join(root, "external-redirect-link"));
+      await expect(deepSeekInstallationTreeDigest(root)).rejects.toThrow("symlink escapes its root");
+      await rm(path.join(root, "external-redirect-link"));
+
+      await symlink(".git/HEAD", path.join(root, "git-metadata-link"));
+      await expect(deepSeekInstallationTreeDigest(root)).rejects.toThrow("symlink targets excluded .git metadata");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      await rm(external, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(process.platform === "win32")("rejects special filesystem entries", async () => {
+    const root = await installationTree();
+    try {
+      await execFileAsync("mkfifo", [path.join(root, "runtime.pipe")]);
+      await expect(deepSeekInstallationTreeDigest(root)).rejects.toThrow("installation contains a special file");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905
+
+ ✓ scripts/lib/fdlc-bedrock-prerequisites.test.mjs (44 tests) 3ms
+ ✓ scripts/lib/fdlc-bedrock-resumption.test.mjs (3 tests) 529ms
+
+ Test Files  2 passed (2)
+      Tests  47 passed (47)
+   Start at  15:08:20
+   Duration  738ms (transform 17ms, setup 0ms, collect 21ms, tests 532ms, environment 0ms, prepare 68ms)

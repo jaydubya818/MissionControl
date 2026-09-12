@@ -1,0 +1,41 @@
+{
+  "observedAt": "2026-09-05T07:43:57.694272+00:00",
+  "mechanism": "outer macOS Seatbelt allowlist; no model calls",
+  "policy": "(version 1)\n(deny default)\n(allow process*)\n(allow sysctl-read)\n(allow mach-lookup)\n(allow file-map-executable)\n(allow file-read*)\n(allow file-read* (subpath \"/System\"))\n(allow file-read* (subpath \"/usr\"))\n(allow file-read* (subpath \"/bin\"))\n(allow file-read* (subpath \"/sbin\"))\n(allow file-read* (subpath \"/Library/Apple\"))\n(allow file-read* (subpath \"/dev\"))\n(allow file-read* (subpath \"/private/etc\"))\n(allow file-read* (subpath \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-3tcf0yk_/workspace\"))\n(allow file-read* (subpath \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-3tcf0yk_/private-temp\"))\n(allow file-read* (subpath \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-3tcf0yk_/home\"))\n(allow file-read* (subpath \"/private/tmp/fdlc-runtime-0146/package/vendor/aarch64-apple-darwin\"))\n(allow file-write* (subpath \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-3tcf0yk_/workspace\"))\n(allow file-write* (subpath \"/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-3tcf0yk_/private-temp\"))\n",
+  "policySha256": "702cf8c262350538a1dd1e6d51dc72275dfa95b69d33636159c3f88e2ef6ca3a",
+  "nativeSha256": "ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02",
+  "checks": {
+    "startup": {
+      "command": [
+        "/tmp/fdlc-runtime-0146/package/vendor/aarch64-apple-darwin/bin/codex",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "codex-cli 0.146.0\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Operation not permitted (os error 1)\n"
+    },
+    "nested_native_tool": {
+      "command": [
+        "/tmp/fdlc-runtime-0146/package/vendor/aarch64-apple-darwin/bin/codex",
+        "sandbox",
+        "-P",
+        "probe",
+        "-c",
+        "permissions.probe.filesystem={\":minimal\"=\"read\",\":workspace_roots\"={\".\"=\"write\"}}",
+        "-C",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-3tcf0yk_/workspace",
+        "--",
+        "/bin/sh",
+        "-c",
+        "echo allowed > \"$1\"",
+        "probe",
+        "/private/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/fdlc-outer-3tcf0yk_/workspace/allowed"
+      ],
+      "exitCode": 71,
+      "stdout": "",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Operation not permitted (os error 1)\nsandbox-exec: sandbox_apply: Operation not permitted\n"
+    }
+  },
+  "cleanup": true,
+  "qualification": "FEASIBILITY_ONLY; worker not started; no host admission"
+}

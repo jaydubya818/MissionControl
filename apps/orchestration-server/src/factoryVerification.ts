@@ -24,7 +24,7 @@ import {
 const execFileAsync = promisify(execFile);
 const SAFE_EXECUTABLES = new Set([
   "pnpm", "npm", "node", "yarn", "python", "python3", "pytest",
-  "bundle", "ruby", "rake", "go", "cargo", "make", "swift", "xcodebuild", "dotnet", "mvn", "gradle",
+  "bundle", "ruby", "rake", "go", "cargo", "wasm-pack", "make", "swift", "xcodebuild", "dotnet", "mvn", "gradle",
 ]);
 const NEVER_EXECUTE = new Set(["DESTRUCTIVE", "PRODUCTION_ACCESS", "SECRETS_ACCESS", "PUBLISH"]);
 
@@ -53,6 +53,18 @@ export async function executeIndependentVerification(input: {
     candidate: input.candidate,
     signal: input.signal,
   });
+}
+
+/** Produce canonical policy evidence without loading or running candidate code. */
+export async function evaluateVerificationPolicyRejection(input: Parameters<typeof executeIndependentVerification>[0]) {
+  const workOrder = normalizeSpecification(input);
+  const engine = new VerificationEngine([
+    new VerificationAuthorityVerifier(),
+    new ChangeBudgetVerifier(),
+    new NegativeConstraintVerifier(),
+  ]);
+  // Command verifiers are deliberately absent: their proof remains NOT_CONFIGURED.
+  return await engine.execute({ workflowRunId: input.workflowRunId, workOrder, candidate: input.candidate, signal: input.signal });
 }
 
 class FactoryCommandVerifier implements Verifier {
@@ -218,13 +230,14 @@ function normalizeSpecification(input: { workOrderId: string; workOrderRevisionN
  * execute before any check began.
  */
 function sanitizedEnvironment(scratchHome: string) {
-  const allowed = ["PATH", "TMPDIR", "LANG", "LC_ALL", "CI", "NODE_ENV"];
+  const allowed = ["PATH", "TMPDIR", "LANG", "LC_ALL", "CI", "NODE_ENV", "CARGO_HOME", "WASM_PACK_CACHE"];
   return {
     ...Object.fromEntries(allowed.flatMap((key) => (process.env[key] ? [[key, process.env[key]!]] : []))),
     HOME: scratchHome,
     npm_config_ignore_scripts: "true",
     npm_config_yes: "false",
     NPM_CONFIG_IGNORE_SCRIPTS: "true",
+    CARGO_NET_OFFLINE: "true",
     // Refuse implicit registry auth even if a candidate writes its own .npmrc.
     npm_config_userconfig: `${scratchHome}/.npmrc-verifier-empty`,
     GIT_TERMINAL_PROMPT: "0",

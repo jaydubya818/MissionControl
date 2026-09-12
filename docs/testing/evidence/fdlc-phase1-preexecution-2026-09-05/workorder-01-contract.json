@@ -1,0 +1,12 @@
+{
+  "baseRevision": "9a80cf3c5cc229bb4a552a9f08ddda5841e70a38",
+  "file": "docs/guides/RUN.md",
+  "baselineSha256": "0672a5c2cd49b36550cdc2989ff7400ed3c6a55b81e51c46bfddda9de8fd3b88",
+  "expectedSha256": "2012221334f6b0149efab53d32762cbe6ddca2fc5e164c8bdc4b7da10181659d",
+  "oldBytes": "](../README.md#software-factory-demo-local-end-to-end)",
+  "newBytes": "](../../README.md#software-factory-demo-local-end-to-end)",
+  "occurrences": 1,
+  "oldTargetExists": false,
+  "newTargetExists": true,
+  "candidateCreated": false
+}

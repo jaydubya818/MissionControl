@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-dispatch/apps/orchestration-server
+
+ ✓ src/__tests__/governedInferenceWire.test.ts (54 tests) 9ms
+ ✓ src/__tests__/governedInferenceGateway.test.ts (43 tests) 28ms
+
+ Test Files  2 passed (2)
+      Tests  97 passed (97)
+   Start at  00:06:32
+   Duration  363ms (transform 96ms, setup 0ms, collect 189ms, tests 37ms, environment 0ms, prepare 62ms)

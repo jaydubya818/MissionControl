@@ -1,0 +1,1112 @@
+{
+  "schema": "factory-docker-worker-qualification/v1",
+  "image": "sha256:932ba8bfa7013073d562be2bc15c67fcc04d6b328d5b9df3b7c3f8fc046983f4",
+  "sourceSha": "4dc792ca8a8293889656e7ca71a5ea500682d649",
+  "fixtureOnly": true,
+  "reports": [
+    {
+      "sandbox": {
+        "operation": "REQUESTED",
+        "request": {
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "projectId": "project-1",
+          "workOrderId": "work-order-1",
+          "workflowRunId": "offline-workflow",
+          "attemptId": "factory-run-remote",
+          "attemptLeaseId": "1b29ee36-d415-4ef2-9266-72c3951ec033",
+          "manifestDigest": "sha256:5aaf533e296c4e139af784abdff04930f56eb771fa5878719bd472f9d38b842c",
+          "sourceSha": "4dc792ca8a8293889656e7ca71a5ea500682d649",
+          "profile": {
+            "schema": "factory-sandbox-profile/v1",
+            "profileKey": "fake-standard",
+            "version": 1,
+            "provider": "DOCKER",
+            "providerProfile": "factory/docker-offline/v1",
+            "providerProfileVersion": "1",
+            "machine": {
+              "image": "sha256:932ba8bfa7013073d562be2bc15c67fcc04d6b328d5b9df3b7c3f8fc046983f4",
+              "cpu": 1,
+              "memoryMb": 512,
+              "diskGb": 5
+            },
+            "supervisor": {
+              "version": "mission-control-supervisor/v1",
+              "transport": "DOCKER_STDIN"
+            },
+            "runtime": {
+              "maxRuntimeMs": 60000,
+              "resultPollIntervalMs": 250,
+              "resultRetentionMs": 86400000
+            },
+            "network": {
+              "egress": "RESTRICTED_ALLOWLIST",
+              "egressAllowlist": [],
+              "publicIngress": false,
+              "exposedPorts": []
+            },
+            "credentials": {
+              "inference": "NONE",
+              "repositoryAccess": "CONTROL_PLANE_SNAPSHOT",
+              "githubAuthority": "NONE",
+              "providerAuthority": "NONE"
+            },
+            "spend": {
+              "maxUsd": 1,
+              "enforcement": "PROVIDER_KEY_LIMIT"
+            },
+            "teardown": {
+              "terminateOnEveryTerminalState": true,
+              "verifyResourceAbsent": true,
+              "supportsResume": false
+            },
+            "preview": {
+              "mode": "DISABLED"
+            },
+            "readiness": {
+              "state": "DEGRADED",
+              "checkedAt": 1788629610980,
+              "reason": "Deterministic fake provider",
+              "egressEnforcementProven": false
+            }
+          },
+          "requestedAt": 1788629611047
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_REQUESTED:1788629611048",
+          "eventType": "SANDBOX_REQUESTED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788629611048,
+          "endedAt": 1788629611048,
+          "commandSummary": "Sandbox Requested",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "provider": "DOCKER",
+            "profileDigest": "sha256:9b272842b5f3cb187da2ef4b4fc41373d686765a7ed60a3c5473737d5ae88b19",
+            "readiness": "DEGRADED"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "READY",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_ALLOCATED:1788629611161",
+          "eventType": "SANDBOX_ALLOCATED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788629611161,
+          "endedAt": 1788629611161,
+          "commandSummary": "Sandbox Allocated",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "startedAt": 1788629611177
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_STARTED:1788629611179",
+          "eventType": "SANDBOX_STARTED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788629611179,
+          "endedAt": 1788629611179,
+          "commandSummary": "Sandbox Started",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "processId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629611443
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629611709
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629611976
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629612244
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629612510
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629612780
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629613050
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629613317
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629613584
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629613852
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629614120
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629614389
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629614658
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629614927
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629615195
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629615461
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629615727
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629615995
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629616263
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629616545
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629616815
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629617085
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629617356
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629617630
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629617899
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629618170
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629618451
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629618735
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629618999
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629619284
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629619574
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629619852
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629620138
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629620428
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629620716
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629621001
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629621285
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629621573
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629621861
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629622144
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629622421
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629622711
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629622998
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629623283
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RUNNING",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629623547
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RESULT_READY",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "lastHeartbeatAt": 1788629623819
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "UPDATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "allocation": {
+          "provider": "DOCKER",
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "state": "RESULT_READY",
+          "createdAt": 1788629611146,
+          "readyAt": 1788629611146,
+          "startedAt": 1788629611177,
+          "resultDigest": "sha256:4ecb98f66c3730d1d11982aaf0d5ecbadefacbe6655e2a0f58fa4afcb4e60fbd"
+        }
+      }
+    },
+    {
+      "sandbox": {
+        "operation": "RESULT",
+        "result": {
+          "digest": "sha256:4ecb98f66c3730d1d11982aaf0d5ecbadefacbe6655e2a0f58fa4afcb4e60fbd",
+          "status": "FAILED",
+          "providerCostUsd": null,
+          "inferenceCostUsd": null
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_RESULT_RECEIVED:1788629623821",
+          "eventType": "SANDBOX_RESULT_RECEIVED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "COMPLETED",
+          "startedAt": 1788629623821,
+          "endedAt": 1788629623821,
+          "commandSummary": "Sandbox Result Received",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "resultDigest": "sha256:4ecb98f66c3730d1d11982aaf0d5ecbadefacbe6655e2a0f58fa4afcb4e60fbd",
+            "status": "FAILED",
+            "providerCostUsd": null,
+            "inferenceCostUsd": null
+          }
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_TERMINATION_REQUESTED:1788629623821",
+          "eventType": "SANDBOX_TERMINATION_REQUESTED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "RUNNING",
+          "startedAt": 1788629623821,
+          "endedAt": 1788629623821,
+          "commandSummary": "Sandbox Termination Requested",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84"
+          }
+        }
+      ]
+    },
+    {
+      "sandbox": {
+        "operation": "TERMINATED",
+        "resourceName": "mc-attempt-129f084de90b5661",
+        "receipt": {
+          "providerResourceId": "d4b7425819c5fc92f11f87d9acadbce8257513809899dda996d45aca35828a84",
+          "resourceName": "mc-attempt-129f084de90b5661",
+          "requestedAt": 1788629623821,
+          "confirmedAbsentAt": 1788629623926,
+          "resourceAbsent": true
+        }
+      }
+    },
+    {
+      "events": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox:SANDBOX_TERMINATED:1788629623927",
+          "eventType": "SANDBOX_TERMINATED",
+          "workflowStep": "remote-sandbox-execution",
+          "status": "COMPLETED",
+          "startedAt": 1788629623927,
+          "endedAt": 1788629623927,
+          "commandSummary": "Sandbox Terminated",
+          "metadata": {
+            "resourceName": "mc-attempt-129f084de90b5661",
+            "attemptId": "factory-run-remote",
+            "confirmedAbsentAt": 1788629623926
+          }
+        }
+      ]
+    },
+    {
+      "artifacts": [
+        {
+          "idempotencyKey": "factory:factory-run-remote:structured-result",
+          "artifactType": "STRUCTURED_OUTPUT",
+          "name": "Execution harness factory-result/v1",
+          "description": "{\"schema\":\"factory-docker-probes/v1\",\"checks\":[{\"name\":\"workspace_write_read\",\"passed\":true},{\"name\":\"private_temp\",\"passed\":true},{\"name\":\"nonroot\",\"passed\":true},{\"name\":\"runtime_available\",\"passed\":true},{\"name\":\"runtime_readonly\",\"passed\":true},{\"name\":\"root_readonly\",\"passed\":true},{\"name\":\"absent:/Users/jaywest\",\"passed\":true},{\"name\":\"absent:/host\",\"passed\":true},{\"name\":\"absent:/host/etc\",\"passed\":true},{\"name\":\"absent:/var/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/.codex/auth.json\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/MissionControl\",\"passed\":true},{\"name\":\"absent:/private/tmp\",\"passed\":true},{\"name\":\"no_credentials_env\",\"passed\":true},{\"name\":\"no_new_privileges\",\"passed\":true},{\"name\":\"capabilities_dropped\",\"passed\":true},{\"name\":\"seccomp_filter\",\"passed\":true},{\"name\":\"network_denied:public\",\"passed\":true},{\"name\":\"network_denied:localhost\",\"passed\":true},{\"name\":\"network_denied:metadata\",\"passed\":true},{\"name\":\"network_denied:private\",\"passed\":true},{\"name\":\"network_denied:hostGateway\",\"passed\":true},{\"name\":\"network_denied:alternateProvider\",\"passed\":true}]}",
+          "contentHash": "sha256:52cea5dbc6c80eaec88fd903fd624d711315f27c71201350ce459cfe08d8a291",
+          "metadata": {
+            "schema": "factory-result/v1",
+            "acceptanceAuthority": false,
+            "result": {
+              "schema": "factory-result/v1",
+              "status": "FAILED",
+              "summary": "{\"schema\":\"factory-docker-probes/v1\",\"checks\":[{\"name\":\"workspace_write_read\",\"passed\":true},{\"name\":\"private_temp\",\"passed\":true},{\"name\":\"nonroot\",\"passed\":true},{\"name\":\"runtime_available\",\"passed\":true},{\"name\":\"runtime_readonly\",\"passed\":true},{\"name\":\"root_readonly\",\"passed\":true},{\"name\":\"absent:/Users/jaywest\",\"passed\":true},{\"name\":\"absent:/host\",\"passed\":true},{\"name\":\"absent:/host/etc\",\"passed\":true},{\"name\":\"absent:/var/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/.codex/auth.json\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/MissionControl\",\"passed\":true},{\"name\":\"absent:/private/tmp\",\"passed\":true},{\"name\":\"no_credentials_env\",\"passed\":true},{\"name\":\"no_new_privileges\",\"passed\":true},{\"name\":\"capabilities_dropped\",\"passed\":true},{\"name\":\"seccomp_filter\",\"passed\":true},{\"name\":\"network_denied:public\",\"passed\":true},{\"name\":\"network_denied:localhost\",\"passed\":true},{\"name\":\"network_denied:metadata\",\"passed\":true},{\"name\":\"network_denied:private\",\"passed\":true},{\"name\":\"network_denied:hostGateway\",\"passed\":true},{\"name\":\"network_denied:alternateProvider\",\"passed\":true}]}",
+              "completedAcceptanceCriterionIds": [],
+              "incompleteAcceptanceCriterionIds": [
+                "ac-remote"
+              ],
+              "unknownAcceptanceCriterionIds": [],
+              "verificationCommands": [],
+              "knownRisks": [
+                "Qualification fixture; not a pilot candidate."
+              ],
+              "nextAction": "Review containment evidence."
+            }
+          }
+        },
+        {
+          "idempotencyKey": "factory:factory-run-remote:sandbox-result:sha256:4ecb98f66c3730d1d11982aaf0d5ecbadefacbe6655e2a0f58fa4afcb4e60fbd",
+          "artifactType": "STRUCTURED_OUTPUT",
+          "name": "Remote sandbox result bundle",
+          "description": "{\"schema\":\"factory-docker-probes/v1\",\"checks\":[{\"name\":\"workspace_write_read\",\"passed\":true},{\"name\":\"private_temp\",\"passed\":true},{\"name\":\"nonroot\",\"passed\":true},{\"name\":\"runtime_available\",\"passed\":true},{\"name\":\"runtime_readonly\",\"passed\":true},{\"name\":\"root_readonly\",\"passed\":true},{\"name\":\"absent:/Users/jaywest\",\"passed\":true},{\"name\":\"absent:/host\",\"passed\":true},{\"name\":\"absent:/host/etc\",\"passed\":true},{\"name\":\"absent:/var/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/run/docker.sock\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/.codex/auth.json\",\"passed\":true},{\"name\":\"absent:/Users/jaywest/MissionControl\",\"passed\":true},{\"name\":\"absent:/private/tmp\",\"passed\":true},{\"name\":\"no_credentials_env\",\"passed\":true},{\"name\":\"no_new_privileges\",\"passed\":true},{\"name\":\"capabilities_dropped\",\"passed\":true},{\"name\":\"seccomp_filter\",\"passed\":true},{\"name\":\"network_denied:public\",\"passed\":true},{\"name\":\"network_denied:localhost\",\"passed\":true},{\"name\":\"network_denied:metadata\",\"passed\":true},{\"name\":\"network_denied:private\",\"passed\":true},{\"name\":\"network_denied:hostGateway\",\"passed\":true},{\"name\":\"network_denied:alternateProvider\",\"passed\":true}]}",
+          "contentHash": "sha256:4ecb98f66c3730d1d11982aaf0d5ecbadefacbe6655e2a0f58fa4afcb4e60fbd",
+          "retentionPolicy": "ATTEMPT_EVIDENCE",
+          "sensitivity": "INTERNAL",
+          "metadata": {
+            "schema": "factory-sandbox-result/v1",
+            "sourceSha": "4dc792ca8a8293889656e7ca71a5ea500682d649",
+            "profileDigest": "sha256:9b272842b5f3cb187da2ef4b4fc41373d686765a7ed60a3c5473737d5ae88b19",
+            "manifestDigest": "sha256:5aaf533e296c4e139af784abdff04930f56eb771fa5878719bd472f9d38b842c",
+            "status": "FAILED",
+            "workOrderRevisionNumber": 1,
+            "changedFiles": [],
+            "diff": {
+              "filesChanged": 0
+            },
+            "commandResults": [
+              {
+                "commandClass": "EXECUTOR",
+                "exitCode": 0,
+                "durationMs": 6208,
+                "timedOut": false
+              }
+            ],
+            "verificationInputs": {
+              "reportedCommands": []
+            },
+            "environment": {
+              "provider": "DOCKER",
+              "image": "sha256:932ba8bfa7013073d562be2bc15c67fcc04d6b328d5b9df3b7c3f8fc046983f4"
+            },
+            "harness": {
+              "adapter": "codex",
+              "version": "v1",
+              "harnessId": "codex-cli",
+              "harnessVersion": "0.146.0",
+              "provider": "openai",
+              "model": "gpt-5"
+            },
+            "resultProvenance": {
+              "source": "OUTPUT_FILE",
+              "outputFile": {
+                "state": "VALID",
+                "byteLength": 1631
+              },
+              "jsonl": {
+                "byteLength": 0,
+                "lineCount": 0,
+                "malformedLineCount": 0,
+                "terminalCompletedCount": 0,
+                "terminalFailureCount": 0,
+                "validCandidateCount": 0
+              },
+              "context": {
+                "attemptId": "factory-run-remote",
+                "manifestDigest": "sha256:5aaf533e296c4e139af784abdff04930f56eb771fa5878719bd472f9d38b842c",
+                "sourceSha": "4dc792ca8a8293889656e7ca71a5ea500682d649"
+              }
+            },
+            "failure": {
+              "class": "NON_RETRYABLE_RESULT",
+              "code": "DETERMINISTIC_GATE_FAILURE",
+              "stage": "RESULT_VALIDATION",
+              "retryable": false,
+              "summary": "Executor returned FAILED: Review containment evidence."
+            },
+            "patchDigest": "sha256:f00ca9474b8f008e78dd27e23c3b9f7a67ce6d7c3e4995e78a2db970d3bc9cb2",
+            "patchByteLength": 0,
+            "executor": {
+              "exitCode": 0,
+              "stdoutDigest": "sha256:6fd9327a0a0d244329031c7fba4b2e821ef81a2b892c7248145eaf52e320209f",
+              "stderrDigest": "sha256:a474273e9e002f1f493d128aef6ba77402f4d8d1360f5f4c18391447161ee827",
+              "stdoutTail": "",
+              "stderrTail": "",
+              "resultOutput": {
+                "state": "VALID",
+                "byteLength": 1631,
+                "digest": "sha256:5f9f47e679b9e246b6e5d032f57ee6f1691b19334c556c78141f597afa16155c",
+                "tail": "{\"schema\":\"factory-result/v1\",\"status\":\"FAILED\",\"summary\":\"{\\\"schema\\\":\\\"factory-docker-probes/v1\\\",\\\"checks\\\":[{\\\"name\\\":\\\"workspace_write_read\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"private_temp\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"nonroot\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"runtime_available\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"runtime_readonly\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"root_readonly\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/Users/jaywest\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/host\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/host/etc\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/var/run/docker.sock\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/run/docker.sock\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/Users/jaywest/.codex/auth.json\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/Users/jaywest/MissionControl\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"absent:/private/tmp\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"no_credentials_env\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"no_new_privileges\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"capabilities_dropped\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"seccomp_filter\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:public\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:localhost\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:metadata\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:private\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:hostGateway\\\",\\\"passed\\\":true},{\\\"name\\\":\\\"network_denied:alternateProvider\\\",\\\"passed\\\":true}]}\",\"completedAcceptanceCriterionIds\":[],\"incompleteAcceptanceCriterionIds\":[\"ac-remote\"],\"unknownAcceptanceCriterionIds\":[],\"verificationCommands\":[],\"knownRisks\":[\"Qualification fixture; not a pilot candidate.\"],\"nextAction\":\"Review containment evidence.\"}",
+                "validationIssues": []
+              }
+            },
+            "usage": {
+              "providerCostUsd": null,
+              "inferenceCostUsd": null,
+              "inputTokens": null,
+              "outputTokens": null,
+              "observedAt": 1788629623461,
+              "providerRuntimeMs": 6208,
+              "enforcement": "OBSERVATION_ONLY"
+            },
+            "secretValuesIncluded": false,
+            "acceptanceAuthority": "NONE",
+            "verificationAuthority": "NONE",
+            "publicationAuthority": "NONE"
+          }
+        }
+      ],
+      "terminal": {
+        "status": "FAILED",
+        "failureReason": "Executor returned FAILED: Review containment evidence.",
+        "remoteFailure": {
+          "class": "NON_RETRYABLE_RESULT",
+          "code": "DETERMINISTIC_GATE_FAILURE",
+          "stage": "RESULT_VALIDATION",
+          "retryable": false,
+          "summary": "Executor returned FAILED: Review containment evidence."
+        }
+      }
+    }
+  ],
+  "worker": {
+    "enabled": true,
+    "activeRunIds": [],
+    "completedCount": 0,
+    "failedCount": 1,
+    "lastPollAt": 1788629610984,
+    "lastError": null,
+    "credentialsConfigured": false,
+    "reconciliationEnabled": true,
+    "cleanupHealth": {
+      "inspected": 0,
+      "activeSandboxes": 0,
+      "healthy": 0,
+      "orphaned": 0,
+      "reconciled": 0,
+      "failed": 0,
+      "activeEphemeralCredentials": 0,
+      "unreconciledCostUsd": 0,
+      "lastReconciledAt": 1788629610985,
+      "failures": []
+    }
+  }
+}

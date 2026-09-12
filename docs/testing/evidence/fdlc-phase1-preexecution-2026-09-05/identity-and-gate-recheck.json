@@ -1,0 +1,29 @@
+{
+  "checkedAt": "2026-09-05T06:59:07.510151+00:00",
+  "identities": {
+    "owningTeam": "FDLC / Mission Control",
+    "champion": "Jarrett West",
+    "humanFdeOperator": "Jarrett West",
+    "incidentCommander": "Jarrett West"
+  },
+  "gateWaivers": [],
+  "backend": {
+    "url": "http://127.0.0.1:3214",
+    "operation": "read-only projects:list query",
+    "result": "CONNECTION_REFUSED"
+  },
+  "workOrderReadiness": {
+    "result": "NOT_EVALUATED",
+    "reason": "No authorized real WorkOrder or live execution tuple; configured backend unavailable."
+  },
+  "phase0Pr": {
+    "number": 169,
+    "head": "f82fe1d98b156278c4fa0c0e2032008e2f010f39",
+    "state": "OPEN",
+    "systemQualification": "IN_PROGRESS at check",
+    "otherReportedChecks": "SUCCESS"
+  },
+  "recommendation": "NO_GO",
+  "realWorkOrderExecuted": false,
+  "modelCallMade": false
+}

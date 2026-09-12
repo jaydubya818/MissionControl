@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronRight, Factory, MessageSquare, Mic, Send, User } from "lucide-react";
-import { useMutation, useQuery } from "convex/react";
+import { AlertTriangle, BellRing, ChevronRight, Factory, MessageSquare, Mic, Send, Settings2, User } from "lucide-react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { MainView } from "../TopNav";
@@ -19,11 +19,10 @@ type ChatItem =
   | { kind: "streaming"; pending: boolean; stream?: string; startedAt: number };
 
 const FACTORY_PROMPTS = [
-  { label: "Set up code review", view: "harness-code-review-wizard" as MainView },
-  { label: "Sync PR checks", view: "harness-change-review" as MainView },
-  { label: "Open meta loop", view: "harness-meta-loop" as MainView },
-  { label: "Evaluate GitHub skills", view: "skills" as MainView },
-  { label: "Factory health", view: "harness-health" as MainView },
+  { label: "What needs attention?", prompt: "Give me the current Factory status and what needs attention." },
+  { label: "Review failures", prompt: "Show me the current failures and incidents." },
+  { label: "Check costs", prompt: "Show me current Factory costs and remaining Fab budget." },
+  { label: "Active work", prompt: "Summarize active WorkOrders." },
 ];
 
 export interface ChatDockProps {
@@ -49,26 +48,52 @@ export function ChatDock({
   const [pending, setPending] = useState(false);
   const [selectedThreadId, setSelectedThreadId] = useState<Id<"telegraphThreads"> | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showFabProfile, setShowFabProfile] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({ communicationStyle: "CONCISE" as "CONCISE" | "DETAILED" | "EXECUTIVE", proactiveEnabled: true, notifyCritical: true, notifyFailures: true, costThresholdUsd: 5, preferences: "", memory: "" });
   const logRef = useRef<HTMLDivElement>(null);
 
   const submitChatRequest = useMutation(api.missionChat.submitRequest);
+  const submitFabRequest = useAction(api.fabChat.send);
+  const saveFabProfile = useMutation(api.fabChat.saveProfile);
+  const markFabProactiveReviewed = useMutation(api.fabChat.markProactiveReviewed);
   const chatThreads = useQuery(
     api.missionChat.listThreads,
     projectId ? { projectId, limit: 20 } : "skip"
   );
   const chatSession = useQuery(
     api.missionChat.getSession,
-    selectedThreadId ? { threadId: selectedThreadId } : "skip"
+    mode === "operator" && selectedThreadId ? { threadId: selectedThreadId } : "skip"
   );
-  const factoryHealth = useQuery(
-    api.factory.health.getFactoryHealth,
+  const fabThreads = useQuery(
+    api.fabChat.listThreads,
+    projectId ? { projectId, limit: 20 } : "skip"
+  );
+  const fabSession = useQuery(
+    api.fabChat.getSession,
+    mode === "factory" && selectedThreadId ? { threadId: selectedThreadId } : "skip"
+  );
+  const fabBrief = useQuery(
+    api.fabChat.getOperationalBrief,
+    projectId ? { projectId } : "skip"
+  );
+  const fabProfile = useQuery(
+    api.fabChat.getProfile,
     projectId ? { projectId } : "skip"
   );
 
-  const runs = useQuery(
-    api.analytics.recentRunTurns,
-    projectId ? { projectId, limit: 20 } : { limit: 20 }
-  );
+  useEffect(() => {
+    if (!fabProfile) return;
+    setProfileDraft({
+      communicationStyle: fabProfile.communicationStyle,
+      proactiveEnabled: fabProfile.proactiveEnabled,
+      notifyCritical: fabProfile.notifyCritical,
+      notifyFailures: fabProfile.notifyFailures,
+      costThresholdUsd: fabProfile.costThresholdUsd,
+      preferences: fabProfile.preferences,
+      memory: fabProfile.memory,
+    });
+  }, [fabProfile]);
 
   const sessions =
     mode === "operator"
@@ -88,108 +113,52 @@ export function ChatDock({
         ]
       : [
           {
-            id: "default",
-            title: "Factory Agent",
+            id: "new",
+            title: "New Fab chat",
             channel: "factory",
-            messageCount: messages.length,
+            messageCount: 0,
           },
-          ...(runs ?? []).slice(0, 5).map((r) => ({
-            id: r.id,
-            title: r.label,
+          ...(fabThreads ?? []).map((thread) => ({
+            id: thread._id,
+            title: thread.title,
             channel: "factory",
-            messageCount: r.toolCount,
+            messageCount: thread.messageCount,
           })),
         ];
 
   useEffect(() => {
     setSelectedThreadId(null);
-    setSessionId(mode === "operator" ? "new" : "default");
+    setSessionId("new");
     setMessages([]);
     setSubmitError(null);
   }, [mode, projectId]);
 
-  const renderedMessages: ChatItem[] =
-    mode === "operator"
-      ? [
-          ...(chatSession?.messages ?? []).map((message): ChatItem =>
-            message.senderType === "HUMAN"
-              ? { kind: "user", text: message.content }
-              : {
-                  kind: "turn",
-                  turn: {
-                    reply: message.content,
-                    gate: {
-                      decision: "allow",
-                      reason: "Persisted Mission Control work record",
-                    },
-                    latencyMs: 0,
-                    iterations: 1,
-                    cost: 0,
-                    model: "mission-control",
-                  },
-                }
-          ),
-          ...messages.filter((message) => message.kind === "streaming"),
-        ]
-      : messages;
+  const activeSession = mode === "operator" ? chatSession : fabSession;
+  const renderedMessages: ChatItem[] = [
+    ...(activeSession?.messages ?? []).map((message): ChatItem =>
+      message.senderType === "HUMAN"
+        ? { kind: "user", text: message.content }
+        : {
+            kind: "turn",
+            turn: {
+              reply: message.content,
+              gate: {
+                decision: "allow",
+                reason: mode === "factory" ? "Fab · governed read" : "Persisted Mission Control work record",
+              },
+              latencyMs: Number(message.metadata?.latencyMs ?? 0),
+              iterations: 1,
+              cost: Number(message.metadata?.costNanoUsd ?? 0) / 1_000_000_000,
+              model: String(message.metadata?.model ?? (mode === "factory" ? "live-factory-context" : "mission-control")),
+            },
+          }
+    ),
+    ...messages.filter((message) => message.kind === "streaming"),
+  ];
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [renderedMessages.length, pending]);
-
-  const factoryReply = useCallback(
-    async (text: string, startedAt: number) => {
-      const lower = text.toLowerCase();
-      if (lower.includes("meta loop") || lower.includes("suggestion")) {
-        onNavigate?.("harness-meta-loop");
-        return {
-          reply: "Opening the evidence-backed improvement inbox. Empty means no qualifying real signals have been observed yet.",
-          gate: { decision: "allow" as const, reason: "factory agent — meta loop" },
-        };
-      }
-      if (lower.includes("code review") || lower.includes("review wizard")) {
-        onNavigate?.("harness-code-review-wizard");
-        return {
-          reply: "Opening the factory-first code review wizard. Start with verifiers, then PR lenses.",
-          gate: { decision: "allow" as const, reason: "factory agent — code review" },
-        };
-      }
-      if (lower.includes("pr") || lower.includes("change review") || lower.includes("mutation")) {
-        onNavigate?.("harness-change-review");
-        return {
-          reply: "Navigate to Change Review to sync PR/CI data and mutation testing reports.",
-          gate: { decision: "allow" as const, reason: "factory agent — PR checks" },
-        };
-      }
-      if (lower.includes("analyze") || lower.includes("github") || lower.includes("skill")) {
-        onNavigate?.("skills");
-        return {
-          reply: "Open Registry → Evaluate to analyze a public GitHub repo for SKILL.md files.",
-          gate: { decision: "allow" as const, reason: "factory agent — registry analyze" },
-        };
-      }
-      if (lower.includes("health") || lower.includes("maturity")) {
-        onNavigate?.("harness-health");
-        const stage = factoryHealth?.maturityStage ?? "unknown";
-        return {
-          reply: `Factory maturity: ${stage}. Opening health dashboard for loop coverage and ledger signals.`,
-          gate: { decision: "allow" as const, reason: "factory agent — health" },
-        };
-      }
-      if (lower.includes("delegate") || lower.includes("automate")) {
-        onNavigate?.("harness-launch");
-        return {
-          reply: "Use Launch to schedule recurring outer-loop workflows once success rate is high.",
-          gate: { decision: "allow" as const, reason: "factory agent — delegation" },
-        };
-      }
-      return {
-        reply: `Factory Agent ready. Try: "sync PR checks", "set up code review", "open meta loop", or "analyze github skills". Current project: ${projectId ? "scoped" : "all projects"}.`,
-        gate: { decision: "skip" as const, reason: "factory agent — general routing" },
-      };
-    },
-    [factoryHealth?.maturityStage, onNavigate, projectId]
-  );
 
   const send = useCallback(() => {
     const text = input.trim();
@@ -206,30 +175,29 @@ export function ChatDock({
       { kind: "streaming", pending: true, stream: "", startedAt },
     ]);
 
-    const finish = (turn: TurnCardData) => {
-      setPending(false);
-      setMessages((m) => {
-        const withoutStream = m.filter((x) => x.kind !== "streaming");
-        return [...withoutStream, { kind: "turn", turn }];
-      });
-    };
-
     if (mode === "factory") {
-      void factoryReply(text, startedAt)
-        .then(({ reply, gate }) => {
-          finish({
-            reply,
-            gate,
-            latencyMs: Date.now() - startedAt,
-            iterations: 1,
-            cost: 0.004,
-            model: "factory-agent-router",
-          });
+      if (!projectId) {
+        setPending(false);
+        setMessages([]);
+        setSubmitError("Select a workspace before asking Fab.");
+        return;
+      }
+      void submitFabRequest({
+        projectId,
+        threadId: selectedThreadId ?? undefined,
+        content: text,
+        idempotencyKey: `fab-chat:${projectId}:${startedAt}`,
+      })
+        .then((result) => {
+          setSelectedThreadId(result.threadId);
+          setSessionId(result.threadId);
+          setMessages([]);
+          setPending(false);
         })
         .catch((error) => {
           setPending(false);
           setMessages((current) => current.filter((item) => item.kind !== "streaming"));
-          setSubmitError(error instanceof Error ? error.message : "Factory routing failed.");
+          setSubmitError(error instanceof Error ? error.message : "Fab could not answer.");
         });
       return;
     }
@@ -261,12 +229,12 @@ export function ChatDock({
         );
       });
   }, [
-    factoryReply,
     input,
     mode,
     pending,
     projectId,
     selectedThreadId,
+    submitFabRequest,
     submitChatRequest,
   ]);
 
@@ -320,7 +288,8 @@ export function ChatDock({
           )}
         >
           <Factory size={12} aria-hidden />
-          Factory Agent
+          Fab
+          {fabBrief?.hasUnreviewed ? <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-label="Fab has new proactive findings" /> : null}
         </button>
       </div>
 
@@ -338,16 +307,19 @@ export function ChatDock({
           if (mode === "operator") {
             const thread = (chatThreads ?? []).find((candidate) => candidate._id === nextSessionId);
             setSelectedThreadId(thread?._id ?? null);
+          } else {
+            const thread = (fabThreads ?? []).find((candidate) => candidate._id === nextSessionId);
+            setSelectedThreadId(thread?._id ?? null);
           }
         }}
         onViewAllHistory={() => {
-          const first = chatThreads?.[0];
-          if (mode === "operator" && first) {
+          const first = mode === "operator" ? chatThreads?.[0] : fabThreads?.[0];
+          if (first) {
             setSessionId(first._id);
             setSelectedThreadId(first._id);
           }
         }}
-        modelLabel={mode === "factory" ? "factory-agent" : "factory-router"}
+        modelLabel={mode === "factory" ? "fab · dual route" : "factory-router"}
       />
 
       {mode === "operator" && chatSession?.task && (
@@ -378,20 +350,47 @@ export function ChatDock({
       )}
 
       {mode === "factory" ? (
-        <div className="flex shrink-0 flex-wrap gap-1.5 border-b border-line px-3 py-2">
-          {FACTORY_PROMPTS.map((p) => (
-            <button
-              key={p.view}
-              type="button"
-              onClick={() => {
-                onNavigate?.(p.view);
-                setInput(p.label);
-              }}
-              className="rounded-full border border-line bg-surface-1 px-2.5 py-1 text-[10px] text-ink-secondary hover:border-registry-accent/40 hover:text-ink"
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="shrink-0 border-b border-line px-3 py-2">
+          {fabBrief ? (
+            <div className={cn("mb-2 rounded-lg border px-2.5 py-2 text-[11px]", fabBrief.status === "ATTENTION" ? "border-warning/40 bg-warning/5" : "border-success/30 bg-success/5")}>
+              <div className="flex items-center gap-1.5 font-medium text-ink">
+                {fabBrief.status === "ATTENTION" ? <AlertTriangle size={12} className="text-warning" aria-hidden /> : <Factory size={12} className="text-success" aria-hidden />}
+                {fabBrief.status === "ATTENTION" ? "Fab found items needing attention" : "Factory signals are stable"}
+                <button type="button" onClick={() => setShowFabProfile((open) => !open)} className="ml-auto rounded p-0.5 text-ink-muted hover:text-ink" title="Fab preferences and memory"><Settings2 size={12} aria-hidden /></button>
+              </div>
+              <div className="mt-1 text-ink-muted">{fabBrief.criticalAlerts} critical · {fabBrief.openIncidents} incidents · {fabBrief.failedTraces} failed traces · {fabBrief.openFixProposals} fix proposals · ${fabBrief.actualChatCostUsd.toFixed(6)} chat</div>
+              {fabBrief.proactiveItems.length > 0 ? (
+                <div className="mt-2 space-y-1 border-t border-line/70 pt-1.5">
+                  {fabBrief.proactiveItems.slice(0, 3).map((item) => <div key={`${item.kind}:${item.title}`} className="flex gap-1.5 text-ink-secondary"><BellRing size={10} className="mt-0.5 shrink-0 text-warning" aria-hidden /><span className="line-clamp-2">{item.title}</span></div>)}
+                  {fabBrief.hasUnreviewed && projectId ? <button type="button" onClick={() => { setSubmitError(null); void markFabProactiveReviewed({ projectId }).catch((error) => setSubmitError(error instanceof Error ? error.message : "Fab could not mark these findings reviewed.")); }} className="text-[10px] font-medium text-registry-accent hover:underline">Mark reviewed</button> : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {showFabProfile && projectId ? (
+            <div className="mb-2 space-y-2 rounded-lg border border-line bg-surface-1 p-2.5 text-[11px]">
+              <div className="font-medium text-ink">Your Fab preferences and memory</div>
+              <select aria-label="Fab response style" value={profileDraft.communicationStyle} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, communicationStyle: event.target.value as typeof draft.communicationStyle })); }} className="w-full rounded border border-line bg-surface-2 px-2 py-1.5 text-ink">
+                <option value="CONCISE">Concise</option><option value="DETAILED">Detailed</option><option value="EXECUTIVE">Executive</option>
+              </select>
+              <textarea aria-label="Fab preferences" value={profileDraft.preferences} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, preferences: event.target.value })); }} maxLength={2000} rows={2} placeholder="Priorities, working style, areas Fab should emphasize…" className="w-full resize-none rounded border border-line bg-surface-2 px-2 py-1.5 text-ink outline-none focus:border-registry-accent" />
+              <textarea aria-label="Fab personal memory" value={profileDraft.memory} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, memory: event.target.value })); }} maxLength={5000} rows={3} placeholder="Durable context Fab should remember about you and your goals. Do not store secrets." className="w-full resize-none rounded border border-line bg-surface-2 px-2 py-1.5 text-ink outline-none focus:border-registry-accent" />
+              <label className="flex items-center gap-2 text-ink-secondary"><input type="checkbox" checked={profileDraft.proactiveEnabled} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, proactiveEnabled: event.target.checked })); }} />Proactive Factory briefings</label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex items-center gap-1.5 text-ink-secondary"><input type="checkbox" checked={profileDraft.notifyCritical} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, notifyCritical: event.target.checked })); }} />Critical alerts</label>
+                <label className="flex items-center gap-1.5 text-ink-secondary"><input type="checkbox" checked={profileDraft.notifyFailures} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, notifyFailures: event.target.checked })); }} />Failed traces</label>
+              </div>
+              <label className="block text-ink-secondary">Cost alert at ($)<input type="number" min={0} max={100000} step="0.01" value={profileDraft.costThresholdUsd} onChange={(event) => { setProfileSaved(false); setProfileDraft((draft) => ({ ...draft, costThresholdUsd: Number(event.target.value) })); }} className="mt-1 w-full rounded border border-line bg-surface-2 px-2 py-1.5 text-ink" /></label>
+              <div className="flex items-center justify-between gap-2"><span className="text-[10px] text-ink-muted">Private profile · minimized and redacted for Fab's approved models. Do not store secrets.</span><button type="button" onClick={() => { setProfileSaved(false); setSubmitError(null); void saveFabProfile({ projectId, ...profileDraft }).then(() => setProfileSaved(true)).catch((error) => setSubmitError(error instanceof Error ? error.message : "Fab could not save your profile.")); }} className="shrink-0 rounded bg-registry-accent px-2.5 py-1.5 font-medium text-white">{profileSaved ? "Saved" : "Save"}</button></div>
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-1.5">
+            {FACTORY_PROMPTS.map((p) => (
+              <button key={p.label} type="button" onClick={() => setInput(p.prompt)} className="rounded-full border border-line bg-surface-1 px-2.5 py-1 text-[10px] text-ink-secondary hover:border-registry-accent/40 hover:text-ink">
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -399,7 +398,7 @@ export function ChatDock({
         {renderedMessages.length === 0 ? (
           <p className="px-0.5 py-2 text-[13px] text-ink-muted">
             {mode === "factory"
-              ? "Factory Agent routes harness work: code review setup, PR sync, meta loop, and registry analyze."
+              ? "Ask Fab about Factory health, failures, traces, costs, active work, architecture, QA, design, or your next software requirement."
               : "Message Mission Control from any tab. Open Overview to watch factory flow, or Gateway for channel conversations."}
           </p>
         ) : (
@@ -438,7 +437,7 @@ export function ChatDock({
           onKeyDown={onKeyDown}
           placeholder={
             mode === "factory"
-              ? "Ask Factory Agent to route harness work…"
+              ? "Ask Fab about the Factory or your next requirement…"
               : "Message Mission Control…"
           }
           autoComplete="off"

@@ -1,0 +1,28 @@
+{
+  "recordedAt": "2026-09-06T16:44:46.297726+00:00",
+  "pr": 190,
+  "failedHead": "c5a4faec6e940655f5aedd01e4ce6d8a278fe853",
+  "ciRun": 34022562128,
+  "failedJob": 101457685004,
+  "ciFailure": "Existing cancellation test took 5033ms instead of <1000ms",
+  "baselineReproduction": {
+    "failed": 2,
+    "passed": 11,
+    "defects": [
+      "Pre-aborted call materialized an artifact",
+      "Process-group child survived after leader exit"
+    ]
+  },
+  "focusedValidation": {
+    "passed": 13,
+    "typecheck": "PASS",
+    "originalTestsChanged": false
+  },
+  "sourceSha256": {
+    "apps/orchestration-server/src/automationAdapter.ts": "2c3f92ecf9da7086e71090b8e87c1d8959cdbddfedac2137fb3ddb2296f1e058",
+    "apps/orchestration-server/src/__tests__/automationAdapter.test.ts": "9cb0769fe7a07507bf18348a55a15b2b3e59df46ed0fcf46d113b7b8ef858e39"
+  },
+  "independentReview": "PENDING",
+  "fullCorrectedHeadQualification": "PENDING",
+  "merge": "NOT_PERFORMED"
+}

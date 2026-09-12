@@ -46,11 +46,11 @@ export async function reconcileSandboxOrphans(input: {
     failed: 0,
     oldestLiveSandboxAt: input.candidates
       .filter((candidate) => candidate.allocation.state !== "TERMINATED")
-      .reduce<number | undefined>((oldest, candidate) => oldest === undefined || candidate.allocation.createdAt < oldest ? candidate.allocation.createdAt : oldest, undefined),
+      .reduce<number | undefined>((oldest, candidate) =>  ( oldest === undefined || candidate.allocation.createdAt < oldest ? candidate.allocation.createdAt : oldest ) , undefined),
     activeEphemeralCredentials: input.candidates.filter((candidate) => Boolean(candidate.credential)).length,
     unreconciledCostUsd: input.candidates.reduce((total, candidate) => {
-      const allocation = candidate.allocation as SandboxAllocation & { providerCostUsd?: number; inferenceCostUsd?: number };
-      return total + Number(allocation.providerCostUsd ?? 0) + Number(allocation.inferenceCostUsd ?? 0);
+      const allocation = candidate.allocation as SandboxAllocation & { providerCostUsd?: number; inferenceCostUsd?: number  ; };
+      return  ( total + Number(allocation.providerCostUsd ?? 0) + Number(allocation.inferenceCostUsd ?? 0 ) );
     }, 0),
     lastReconciledAt: now,
     failures: [],
@@ -61,7 +61,9 @@ export async function reconcileSandboxOrphans(input: {
       continue;
     }
     health.orphaned += 1;
-    const provider = input.providers.get(candidate.allocation.provider);
+    const provider =  input.providers.get(
+        `${candidate.allocation.provider}:${candidate.allocation.providerMetadata?.image ?? ""}`,
+      ) ?? input.providers.get(candidate.allocation.provider);
     if (!provider) {
       health.failed += 1;
       health.failures.push({ resourceName: candidate.allocation.resourceName, reason: `No provider registered for ${candidate.allocation.provider}.` });

@@ -24,6 +24,29 @@ const deepSeekHarness = {
   available: false,
   advertised: false,
 };
+const localExecutionProfile = {
+  _id: "execution-profile-local-1",
+  profileKey: "codex-local",
+  version: 1,
+  profileDigest: "sha256:profile-local",
+  qualificationDigest: "sha256:qualification-local",
+  qualificationExpiresAt: Date.now() + 60_000,
+  executor: { adapter: "codex", version: "v1" },
+  executionBackend: "persistent-worker",
+  modelCatalogId: "model-route-1",
+  modelRouteDigest: "sha256:route-1",
+  isolationModes: ["READ_ONLY", "WORKSPACE_WRITE"],
+};
+const remoteExecutionProfile = {
+  ...localExecutionProfile,
+  _id: "execution-profile-remote-1",
+  profileKey: "codex-exe",
+  profileDigest: "sha256:profile-remote",
+  qualificationDigest: "sha256:qualification-remote",
+  executionBackend: "remote-sandbox",
+  sandboxProfileId: "sandbox-profile-1",
+  sandboxProfileDigest: "sha256:sandbox-profile-1",
+};
 
 const mocks = vi.hoisted(() => ({
   definitions: [] as any[],
@@ -33,7 +56,9 @@ const mocks = vi.hoisted(() => ({
   verifiers: [{ _id: "verifier-1", label: "Independent review" }],
   versionOptions: {
     codeScopes: [{ _id: "scope-1", name: "Application", includePaths: ["apps/example/**"] }],
-    agentVersions: [{ _id: "agent-version-1", version: 2, template: { name: "Implementer" }, modelConfig: { modelId: "gpt-5" } }],
+    agentVersions: [{ _id: "agent-version-1", version: 2, template: { name: "Implementer" }, modelConfig: { provider: "openai", modelId: "gpt-5" } }],
+    modelRoutes: [{ _id: "model-route-1", provider: "openai", modelId: "gpt-5", displayName: "GPT-5" }],
+    executionProfiles: [] as any[],
     sandboxProfiles: [] as any[],
     harnesses: [] as any[],
   },
@@ -45,9 +70,10 @@ const mocks = vi.hoisted(() => ({
   createPolicy: vi.fn(),
   createVerifier: vi.fn(),
   agentTemplates: [] as any[],
+  governedTools: { grants: [] as any[], versions: [], maturity: "QUALIFICATION_FIXTURE", limitations: [] },
   createAgentTemplate: vi.fn(),
   createAgentVersion: vi.fn(),
-  upsertWorkflow: vi.fn(),
+  registerProductionWorkflow: vi.fn(),
 }));
 
 vi.mock("../../../../convex/_generated/api", () => ({
@@ -62,7 +88,8 @@ vi.mock("../../../../convex/_generated/api", () => ({
       assessReadiness: "factory.assessReadiness",
       activate: "factory.activate",
     },
-    workflows: { list: "workflows.list", upsert: "workflows.upsert" },
+    "factory/governedMcp": { list: "governedMcp.list" },
+    workflows: { list: "workflows.list", registerProduction: "workflows.registerProduction" },
     "governance/policyEnvelopes": { listPolicyEnvelopes: "policies.list", createPolicyEnvelope: "policies.create" },
     "context/verifiers": { list: "verifiers.list", create: "verifiers.create" },
     "registry/agentTemplates": { listTemplates: "agentTemplates.list", createTemplate: "agentTemplates.create" },
@@ -79,6 +106,7 @@ vi.mock("convex/react", () => ({
     if (query === "policies.list") return mocks.policies;
     if (query === "verifiers.list") return mocks.verifiers;
     if (query === "agentTemplates.list") return mocks.agentTemplates;
+    if (query === "governedMcp.list") return mocks.governedTools;
     return undefined;
   },
   useMutation: (mutation: string) => {
@@ -91,7 +119,7 @@ vi.mock("convex/react", () => ({
     if (mutation === "verifiers.create") return mocks.createVerifier;
     if (mutation === "agentTemplates.create") return mocks.createAgentTemplate;
     if (mutation === "agentVersions.create") return mocks.createAgentVersion;
-    if (mutation === "workflows.upsert") return mocks.upsertWorkflow;
+    if (mutation === "workflows.registerProduction") return mocks.registerProductionWorkflow;
     throw new Error(`Unexpected mutation: ${mutation}`);
   },
 }));
@@ -132,9 +160,12 @@ describe("FactoryConfigurationPanel", () => {
     mocks.policies = [{ _id: "policy-1", name: "Default governance" }];
     mocks.verifiers = [{ _id: "verifier-1", label: "Independent review" }];
     mocks.agentTemplates = [];
+    mocks.governedTools = { grants: [], versions: [], maturity: "QUALIFICATION_FIXTURE", limitations: [] };
     mocks.versionOptions = {
       codeScopes: [{ _id: "scope-1", name: "Application", includePaths: ["apps/example/**"] }],
-      agentVersions: [{ _id: "agent-version-1", version: 2, template: { name: "Implementer" }, modelConfig: { modelId: "gpt-5" } }],
+      agentVersions: [{ _id: "agent-version-1", version: 2, template: { name: "Implementer" }, modelConfig: { provider: "openai", modelId: "gpt-5" } }],
+      modelRoutes: [{ _id: "model-route-1", provider: "openai", modelId: "gpt-5", displayName: "GPT-5" }],
+      executionProfiles: [localExecutionProfile],
       sandboxProfiles: [],
       harnesses: [codexHarness],
     };
@@ -148,18 +179,62 @@ describe("FactoryConfigurationPanel", () => {
     mocks.createVerifier.mockReset().mockResolvedValue("verifier-created");
     mocks.createAgentTemplate.mockReset().mockResolvedValue({ _id: "template-created", slug: "factory-local-codex-runner" });
     mocks.createAgentVersion.mockReset().mockResolvedValue({ _id: "agent-version-created" });
-    mocks.upsertWorkflow.mockReset().mockResolvedValue("workflow-created");
+    mocks.registerProductionWorkflow.mockReset().mockResolvedValue("workflow-created");
   });
 
   it("creates a draft Factory from the explicit empty state", async () => {
     renderPanel();
     expect(screen.getByText(/No Factory exists for this repository/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Create Factory" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Software Factory" }));
 
     await waitFor(() => expect(mocks.createFactory).toHaveBeenCalledWith({
       repositoryId: "repository-1",
       name: "Software Factory",
+      purpose: "SOFTWARE",
+    }));
+  });
+
+  it("keeps revoked Tool Grants visible with safe remediation", () => {
+    mocks.governedTools = {
+      maturity: "QUALIFICATION_FIXTURE",
+      limitations: ["No real admitted MCP service"],
+      versions: [],
+      grants: [{
+        _id: "grant-1",
+        grantKey: "phase3-doctrine-read",
+        version: 1,
+        grantDigest: "sha256:grant",
+        toolVersionDigest: "sha256:tool",
+        state: "REVOKED",
+        current: false,
+        revocationReason: "qualification proof",
+        immutableSnapshot: {
+          operation: "read_factory_doctrine_excerpt",
+          destination: "LOCAL_PROCESS",
+          credentialClass: "NONE",
+        },
+      }],
+    };
+
+    renderPanel();
+
+    expect(screen.getByRole("region", { name: "Governed tool grants" })).toBeInTheDocument();
+    expect(screen.getByText("revoked")).toBeInTheDocument();
+    expect(screen.getByText(/Create a new exact grant and Execution Profile/i)).toBeInTheDocument();
+  });
+
+  it("creates a separate Verification Factory for the same repository", async () => {
+    mocks.definitions = [{ _id: "factory-1", repositoryId: "repository-1", status: "ACTIVE", purpose: "SOFTWARE", name: "Software Factory" }];
+    mocks.detail = detailWith("PASS");
+    renderPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Verification Factory" }));
+
+    await waitFor(() => expect(mocks.createFactory).toHaveBeenCalledWith({
+      repositoryId: "repository-1",
+      name: "Verification Factory",
+      purpose: "VERIFICATION",
     }));
   });
 
@@ -200,8 +275,7 @@ describe("FactoryConfigurationPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create configuration version" }));
 
     await waitFor(() => expect(mocks.createVersion).toHaveBeenCalledWith(expect.objectContaining({
-      executor: { adapter: "codex", version: "v1" },
-      executionBackend: "persistent-worker",
+      executionProfileId: "execution-profile-local-1",
       codeScopeIds: ["scope-1"],
       agentBindings: [{ workflowAgentId: "implementer", agentVersionId: "agent-version-1" }],
       recovery: { pause: false, cancel: true, retry: true, resume: false },
@@ -228,6 +302,39 @@ describe("FactoryConfigurationPanel", () => {
 
     expect(screen.getByLabelText("Isolated Sandbox")).toBeDisabled();
     expect(screen.getByText(/internal repository: no eligible profile proves provider-enforced egress/i)).toBeInTheDocument();
+  });
+
+  it("blocks Factory version creation until a compatible qualified Execution Profile exists", () => {
+    mocks.definitions = [{ _id: "factory-1", repositoryId: "repository-1", status: "DRAFT" }];
+    mocks.detail = { definition: { _id: "factory-1", status: "DRAFT" }, versions: [], assessments: [] };
+    mocks.versionOptions = { ...mocks.versionOptions, executionProfiles: [] };
+    renderPanel();
+
+    expect(screen.getByLabelText("Qualified Execution Profile")).toBeDisabled();
+    expect(screen.getByText(/Register and qualify an exact profile/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create configuration version" })).toBeDisabled();
+  });
+
+  it("labels the exact governed tool as a qualification fixture without claiming harness support", () => {
+    mocks.definitions = [{ _id: "factory-1", repositoryId: "repository-1", status: "DRAFT" }];
+    mocks.detail = { definition: { _id: "factory-1", status: "DRAFT" }, versions: [], assessments: [] };
+    mocks.versionOptions = {
+      ...mocks.versionOptions,
+      executionProfiles: [{
+        ...localExecutionProfile,
+        toolGrant: {
+          id: "grant-1", digest: "sha256:grant", key: "doctrine-read", version: 1,
+          operation: "read_factory_doctrine_excerpt", expiresAt: Date.now() + 60_000,
+          credentialClass: "NONE", destination: "LOCAL_PROCESS", admission: "QUALIFICATION_FIXTURE",
+        },
+      }],
+    };
+    renderPanel();
+
+    expect(screen.getByText(/Qualified fixture tool/i)).toBeInTheDocument();
+    expect(screen.getByText(/read_factory_doctrine_excerpt/i)).toBeInTheDocument();
+    expect(screen.getByText(/no real MCP service is admitted/i)).toBeInTheDocument();
+    expect(screen.getByText(/Harness MCP remains unsupported/i)).toBeInTheDocument();
   });
 
   it("shows experimental harness capability detail only in Advanced and disables selection until a worker advertises the exact pin", () => {
@@ -259,6 +366,7 @@ describe("FactoryConfigurationPanel", () => {
     mocks.detail = { definition: { _id: "factory-1", status: "DRAFT" }, versions: [], assessments: [] };
     mocks.versionOptions = {
       ...mocks.versionOptions,
+      executionProfiles: [localExecutionProfile, remoteExecutionProfile],
       sandboxProfiles: [{
         _id: "sandbox-profile-1", profileKey: "exe-standard", version: 1, provider: "EXE_DEV",
         readinessState: "DEGRADED", previewMode: "DISABLED",
@@ -266,13 +374,12 @@ describe("FactoryConfigurationPanel", () => {
     };
     renderPanel();
 
-    fireEvent.click(screen.getByLabelText("Isolated Sandbox"));
+    fireEvent.change(screen.getByLabelText("Qualified Execution Profile"), { target: { value: "execution-profile-remote-1" } });
     await waitFor(() => expect(screen.getByLabelText("Sandbox Profile")).toHaveValue("sandbox-profile-1"));
     fireEvent.click(screen.getByRole("button", { name: "Create configuration version" }));
 
     await waitFor(() => expect(mocks.createVersion).toHaveBeenCalledWith(expect.objectContaining({
-      executionBackend: "remote-sandbox",
-      sandboxProfileId: "sandbox-profile-1",
+      executionProfileId: "execution-profile-remote-1",
       riskBoundary: "YELLOW",
     })));
     expect(screen.getByText(/Preview · Not Live Certified/i)).toBeInTheDocument();
@@ -360,7 +467,8 @@ describe("FactoryConfigurationPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Create Verification-First workflow" }));
 
-    await waitFor(() => expect(mocks.upsertWorkflow).toHaveBeenCalledWith(expect.objectContaining({
+    await waitFor(() => expect(mocks.registerProductionWorkflow).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: "project-1",
       name: "Verification-First V1 Delivery",
       agents: expect.arrayContaining([expect.objectContaining({ id: "independent-verifier" })]),
       steps: expect.arrayContaining([expect.objectContaining({ id: "verify", kind: "VERIFY" })]),

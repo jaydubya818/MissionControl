@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   evaluateRemoteRetryPolicy,
+  codeScopeApprovalPoliciesForDispatch,
   dispatchApprovalAllowed,
   dispatchInvalidatesVerificationReceipts,
   findActiveRun,
@@ -22,6 +23,17 @@ describe("public work order dispatch authority", () => {
 });
 
 describe("work order dispatch policy", () => {
+  it("applies code-scope approval policies only to repository mutations", () => {
+    expect(codeScopeApprovalPoliciesForDispatch({
+      isMutating: false,
+      approvalPolicies: ["HUMAN_REVIEW"],
+    })).toEqual([]);
+    expect(codeScopeApprovalPoliciesForDispatch({
+      isMutating: true,
+      approvalPolicies: ["HUMAN_REVIEW"],
+    })).toEqual(["HUMAN_REVIEW"]);
+  });
+
   it("preserves immutable policy-v2 receipt history across recovery dispatch", () => {
     expect(dispatchInvalidatesVerificationReceipts({
       verificationContract: { schemaVersion: 2 },
@@ -53,6 +65,24 @@ describe("work order dispatch policy", () => {
         requiredApprovals: [],
       })
     ).toBe(true);
+  });
+
+  it("allows explicitly read-only high-risk work without an implicit approval gate", () => {
+    expect(dispatchApprovalAllowed({
+      riskLevel: "HIGH",
+      approvalStatus: "NOT_REQUIRED",
+      requiredApprovals: [],
+      isMutating: false,
+    })).toBe(true);
+    expect(validateDispatchable({
+      state: "READY",
+      riskLevel: "HIGH",
+      approvalStatus: "NOT_REQUIRED",
+      requiredApprovals: [],
+      isMutating: false,
+      hasWorkflowId: true,
+      activeRunStatuses: [],
+    })).toEqual({ ok: true });
   });
 
   it("finds an active run when one exists", () => {

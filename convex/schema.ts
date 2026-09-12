@@ -1,12 +1,14 @@
+import { providerPriceValidator, providerReservationValidator, providerUsageValidator } from "./lib/providerLiabilityValidators";
 /**
  * Convex Database Schema — V0
- * 
+ *
  * Aligned with Bootstrap Kit (docs/openclaw-bootstrap/schema/SCHEMA.md)
  * Source of truth for Mission Control data model.
  */
 
-import { defineSchema, defineTable } from "convex/server";
+import { defineSchema, defineTable, type SchemaDefinition } from "convex/server";
 import { v } from "convex/values";
+import { factoryWorkerVersionBindingValidator } from "./lib/factoryWorkerValidators";
 import {
   acceptanceCriterionValidator,
   attemptPurposeValidator,
@@ -18,6 +20,7 @@ import {
   discoveredVerificationRiskValidator,
   evidenceCategoryValidator,
   factoryPurposeValidator,
+  gitSubjectPublicationBindingValidator,
   negativeConstraintValidator,
   requiredVerificationRiskValidator,
   requirementValidator,
@@ -59,6 +62,20 @@ import {
   reviewActionValidator,
   reviewCorrectionCategoryValidator,
 } from "./lib/reviewIntelligenceValidators";
+import { evalControlPlaneTables } from "./lib/evalControlPlaneSchema";
+import {
+  factoryIncidentContainmentActionValidator,
+  factoryIncidentControlExecutionValidator,
+  factoryIncidentEvidenceRefValidator,
+  factoryIncidentPhaseValidator,
+  factoryIncidentProposalKindValidator,
+  factoryIncidentSeverityValidator,
+} from "./lib/factoryIncident";
+import {
+  factoryIncidentControlReceiptTypeValidator,
+  repositoryDispatchAdmissionValidator,
+  repositoryDispatchOperationValidator,
+} from "./lib/factoryIncidentControl";
 
 // ============================================================================
 // ENUMS (as union types)
@@ -408,11 +425,161 @@ const contextEvalRunStatus = v.union(
   v.literal("CANCELED")
 );
 
+export const missionPlanningRunsTable = defineTable({
+  tenantId: v.optional(v.id("tenants")),
+  projectId: v.id("projects"),
+  missionId: v.id("missions"),
+  repositoryId: v.id("workspaceRepositories"),
+  idempotencyKey: v.string(),
+  status: v.union(
+    v.literal("QUEUED"),
+    v.literal("RESEARCHING"),
+    v.literal("GENERATING"),
+    v.literal("VALIDATING"),
+    v.literal("SUCCEEDED"),
+    v.literal("FAILED"),
+    v.literal("CANCELED"),
+  ),
+  attemptCount: v.number(),
+  maxAttempts: v.number(),
+  nextAttemptAt: v.optional(v.number()),
+  lease: v.optional(v.object({
+    leaseId: v.string(),
+    ownerId: v.string(),
+    workerId: v.string(),
+    workerSessionId: v.string(),
+    claimedAt: v.number(),
+    heartbeatAt: v.number(),
+    expiresAt: v.number(),
+  })),
+  planningRepositorySha: v.string(),
+  hostBindingId: v.id("workspaceHostBindings"),
+  hostId: v.string(),
+  factoryDefinitionId: v.id("factoryDefinitions"),
+  factoryDefinitionVersionId: v.id("factoryDefinitionVersions"),
+  factoryConfigurationDigest: v.string(),
+  executionProfileId: v.optional(v.id("factoryExecutionProfiles")),
+  executionProfileKey: v.optional(v.string()),
+  executionProfileVersion: v.optional(v.number()),
+  executionProfileDigest: v.optional(v.string()),
+  executionProfileSnapshot: v.optional(v.any()),
+  executionProfileQualificationDigest: v.optional(v.string()),
+  executionProfileQualificationSnapshot: v.optional(v.any()),
+  workflowId: v.id("workflows"),
+  workflowVersion: v.number(),
+  plannerIdentity: v.optional(v.any()),
+  factoryAdmissionAgentVersionId: v.optional(v.id("agentVersions")),
+  factoryAdmissionAgentSnapshot: v.optional(v.any()),
+  // Legacy fields remain readable for runs created before truthful built-in
+  // planner provenance was introduced.
+  plannerAgentVersionId: v.optional(v.id("agentVersions")),
+  plannerAgentSnapshot: v.optional(v.any()),
+  executor: v.object({
+    adapter: v.string(),
+    version: v.string(),
+    capabilityManifestSha256: v.string(),
+    effectiveConfigSha256: v.string(),
+    runtimeArtifact: v.optional(v.any()),
+    runtimeArtifactSha256: v.optional(v.string()),
+    requireFactoryVersionRuntimeArtifactBinding: v.optional(v.boolean()),
+  }),
+  executionBackend: v.optional(v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"))),
+  modelRoutingDecisionId: v.id("modelRoutingDecisions"),
+  modelCatalogId: v.id("modelCatalog"),
+  modelProvider: v.string(),
+  modelId: v.string(),
+  modelRouteDigest: v.string(),
+  modelRouteSnapshot: v.optional(v.any()),
+  modelQualificationDigest: v.optional(v.string()),
+  modelQualificationSnapshot: v.optional(v.any()),
+  inputSnapshot: v.any(),
+  inputDigest: v.string(),
+  researchPacket: v.optional(v.any()),
+  researchPacketDigest: v.optional(v.string()),
+  harnessExecutions: v.optional(v.array(v.any())),
+  candidatePlan: v.optional(v.any()),
+  candidateDigest: v.optional(v.string()),
+  provenance: v.optional(v.any()),
+  outputDigest: v.optional(v.string()),
+  validationErrors: v.optional(v.array(v.string())),
+  failure: v.optional(v.object({
+    code: v.string(),
+    message: v.string(),
+    retryable: v.boolean(),
+    failedAt: v.number(),
+  })),
+  adoptedPlanId: v.optional(v.id("missionPlans")),
+  requestedBy: v.string(),
+  requestedActorSource: v.union(v.literal("AUTHENTICATED"), v.literal("DEVELOPMENT_FALLBACK")),
+  createdAt: v.number(),
+  startedAt: v.optional(v.number()),
+  completedAt: v.optional(v.number()),
+  updatedAt: v.number(),
+})
+  .index("by_mission", ["missionId"])
+  .index("by_mission_created", ["missionId", "createdAt"])
+  .index("by_mission_status", ["missionId", "status"])
+  .index("by_repository_status", ["repositoryId", "status"])
+  .index("by_idempotency", ["idempotencyKey"]);
+
+export const missionPlanningRunEventsTable = defineTable({
+  tenantId: v.optional(v.id("tenants")),
+  projectId: v.id("projects"),
+  missionId: v.id("missions"),
+  planningRunId: v.id("missionPlanningRuns"),
+  eventType: v.string(),
+  status: v.union(
+    v.literal("QUEUED"),
+    v.literal("RESEARCHING"),
+    v.literal("GENERATING"),
+    v.literal("VALIDATING"),
+    v.literal("SUCCEEDED"),
+    v.literal("FAILED"),
+    v.literal("CANCELED"),
+  ),
+  actorType,
+  actorId: v.optional(v.string()),
+  summary: v.string(),
+  timestamp: v.number(),
+  metadata: v.optional(v.any()),
+})
+  .index("by_run", ["planningRunId"])
+  .index("by_run_timestamp", ["planningRunId", "timestamp"])
+  .index("by_mission_timestamp", ["missionId", "timestamp"]);
+
+const inferenceRouteValidator = v.object({
+  provider: v.string(),
+  providerRoute: v.string(),
+  modelId: v.string(),
+  routeDigest: v.string(),
+  adapter: v.string(),
+  adapterVersion: v.string(),
+  endpoint: v.string(),
+});
+
+const inferenceCompletenessValidator = v.union(
+  v.literal("COMPLETE"),
+  v.literal("PARTIAL"),
+  v.literal("UNKNOWN"),
+);
+
+const factoryOutcomeStageValidator = v.union(
+  v.literal("VERIFICATION_PASSED"),
+  v.literal("HUMAN_ACCEPTED"),
+  v.literal("MERGED"),
+  v.literal("DEPLOYED"),
+  v.literal("PRODUCTION_VERIFIED"),
+  v.literal("INCIDENT"),
+  v.literal("ROLLED_BACK"),
+  v.literal("REJECTED"),
+  v.literal("ABANDONED"),
+);
+
 // ============================================================================
 // SCHEMA
 // ============================================================================
 
-export default defineSchema({
+export const schemaTablesPartOne = {
   // -------------------------------------------------------------------------
   // AUTONOMOUS VENTURE FACTORY: EXECUTION INTENT SHADOW INTAKE
   // -------------------------------------------------------------------------
@@ -920,7 +1087,17 @@ export default defineSchema({
   workspaceRepositories: defineTable({
     tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),
-    provider: v.union(v.literal("GITHUB")),
+    provider: v.union(v.literal("GITHUB"), v.literal("LOCAL")),
+    repositoryMode: v.optional(v.union(v.literal("GITHUB"), v.literal("LOCAL_SYNTHETIC_QUALIFICATION"))),
+    localAdmissionDigest: v.optional(v.string()),
+    localAdmission: v.optional(v.object({
+      schema: v.literal("local-synthetic-repository-admission/v1"),
+      mode: v.literal("LOCAL_SYNTHETIC_QUALIFICATION"), program: v.literal("unpublished-handoff-fixture/v1"),
+      tenantId: v.string(), projectId: v.string(), engagementId: v.string(), operatorId: v.string(),
+      environmentId: v.string(), hostId: v.string(), fixtureId: v.string(), root: v.string(),
+      baselineCommit: v.string(), baselineTree: v.string(), fixtureContentDigest: v.string(), expiresAt: v.number(),
+      publicationAuthority: v.literal("NONE"), productionAuthority: v.literal("NONE"),
+    })),
     repository: v.string(),
     displayName: v.string(),
     providerRepositoryId: v.optional(v.string()),
@@ -1056,6 +1233,23 @@ export default defineSchema({
     .index("by_installation", ["installationId"])
     .index("by_received", ["receivedAt"]),
 
+  factoryProviderPrices: defineTable({
+    projectId: v.id("projects"), snapshot: providerPriceValidator, digest: v.string(),
+    registrationKey: v.string(), createdBy: v.string(), createdAt: v.number(),
+  }).index("by_project_key", ["projectId", "registrationKey"]).index("by_project_digest", ["projectId", "digest"]),
+  factoryProviderReservations: defineTable({
+    projectId: v.id("projects"), workOrderId: v.id("workOrders"), executionProfileId: v.id("factoryExecutionProfiles"), priceId: v.id("factoryProviderPrices"),
+    snapshot: providerReservationValidator, creationDigest: v.string(), idempotencyKey: v.string(), createdBy: v.string(), createdAt: v.number(), updatedAt: v.number(),
+  }).index("by_project_key", ["projectId", "idempotencyKey"]).index("by_work_order", ["workOrderId"]),
+  factoryProviderUsageEvents: defineTable({
+    projectId: v.id("projects"), reservationId: v.id("factoryProviderReservations"), usage: providerUsageValidator, digest: v.string(),
+    corrected: v.boolean(), evidenceReference: v.optional(v.string()), actorId: v.string(), createdAt: v.number(), incident: v.boolean(),
+  }).index("by_reservation", ["reservationId"]).index("by_reservation_digest", ["reservationId", "digest"]) .index("by_provider_usage", ["usage.provider", "usage.usageId"])
+    .index("by_provider_request", [
+      "usage.provider",
+      "usage.providerRequestId",
+    ]) ,
+
   factoryDefinitions: defineTable({
     tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),
@@ -1064,6 +1258,13 @@ export default defineSchema({
     name: v.string(),
     status: v.union(v.literal("DRAFT"), v.literal("ACTIVE"), v.literal("ARCHIVED")),
     activeVersionId: v.optional(v.id("factoryDefinitionVersions")),
+    qualificationActivation: v.optional(v.object({
+      schema: v.literal("factory-qualification-activation/v1"), target: v.literal("QUALIFICATION"),
+      environmentId: v.id("environments"), environmentDigest: v.string(),
+      factoryDefinitionVersionId: v.id("factoryDefinitionVersions"), configurationDigest: v.string(),
+      executionProfileDigest: v.string(), actorId: v.string(), assessmentId: v.id("factoryReadinessAssessments"),
+      evidenceReference: v.string(), activatedAt: v.number(), expiresAt: v.number(),
+    })),
     latestVersion: v.number(),
     createdBy: v.string(),
     createdAt: v.number(),
@@ -1080,7 +1281,7 @@ export default defineSchema({
     profileKey: v.string(),
     version: v.number(),
     profileDigest: v.string(),
-    provider: v.union(v.literal("EXE_DEV"), v.literal("FAKE")),
+    provider: v.union(v.literal("EXE_DEV"), v.literal("FAKE"), v.literal("DOCKER"), v.literal("LOCAL_CONTAINER")),
     providerProfile: v.string(),
     providerProfileVersion: v.string(),
     machineImage: v.string(),
@@ -1088,18 +1289,18 @@ export default defineSchema({
     memoryMb: v.number(),
     diskGb: v.number(),
     supervisorVersion: v.string(),
-    executorTransport: v.literal("SSH"),
+    executorTransport: v.union(v.literal("SSH"), v.literal("DOCKER_STDIN"), v.literal("STDIO")),
     maxRuntimeMs: v.number(),
     resultPollIntervalMs: v.number(),
     resultRetentionMs: v.number(),
-    networkEgress: v.union(v.literal("UNRESTRICTED"), v.literal("RESTRICTED_ALLOWLIST")),
+    networkEgress: v.union(v.literal("UNRESTRICTED"), v.literal("RESTRICTED_ALLOWLIST"), v.literal("DENY_ALL")),
     egressAllowlist: v.array(v.string()),
     publicIngress: v.literal(false),
     exposedPorts: v.array(v.number()),
     inferenceCredentialMode: v.union(v.literal("ATTEMPT_SCOPED_OPENROUTER"), v.literal("NONE")),
-    repositoryAccessMode: v.literal("CONTROL_PLANE_SNAPSHOT"),
+    repositoryAccessMode: v.union(v.literal("CONTROL_PLANE_SNAPSHOT"), v.literal("NONE")),
     spendLimitUsd: v.number(),
-    spendEnforcement: v.union(v.literal("PROVIDER_KEY_LIMIT"), v.literal("OBSERVATION_ONLY")),
+    spendEnforcement: v.union(v.literal("PROVIDER_KEY_LIMIT"), v.literal("OBSERVATION_ONLY"), v.literal("NO_PROVIDER_EXECUTION")),
     previewMode: v.union(v.literal("DISABLED"), v.literal("PRIVATE_PROXY")),
     previewPort: v.optional(v.number()),
     readinessState: v.union(v.literal("READY"), v.literal("DEGRADED"), v.literal("BLOCKED")),
@@ -1112,7 +1313,7 @@ export default defineSchema({
     immutableSnapshot: v.any(),
     admissionState: v.optional(v.union(
       v.literal("QUALIFICATION_ONLY"),
-      v.literal("PRODUCTION_PILOT_ELIGIBLE")
+      v.literal("PRODUCTION_PILOT_ELIGIBLE"), v.literal("OFFLINE_ELIGIBLE")
     )),
     admissionSnapshot: v.optional(v.any()),
     admissionDigest: v.optional(v.string()),
@@ -1127,12 +1328,174 @@ export default defineSchema({
     .index("by_profile_version", ["projectId", "profileKey", "version"])
     .index("by_digest", ["profileDigest"]),
 
+  // Immutable, subordinate execution compositions. These rows have no active
+  // pointer and cannot be routed or dispatched independently of a Factory
+  // Definition Version.
+  factoryExecutionProfiles: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    profileKey: v.string(),
+    version: v.number(),
+    profileDigest: v.string(),
+    immutableSnapshot: v.any(),
+    executor: v.object({ adapter: v.string(), version: v.string() }),
+    harnessCapabilityManifest: v.any(),
+    harnessCapabilityManifestDigest: v.string(),
+    harnessEffectiveConfigSha256: v.string(),
+    harnessRuntimeArtifact: v.any(),
+    harnessRuntimeArtifactDigest: v.string(),
+    executionBackend: v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"), v.literal("isolated-container")),
+    sandboxProfileId: v.optional(v.id("factorySandboxProfiles")),
+    sandboxProfileDigest: v.optional(v.string()),
+    modelCatalogId: v.optional(v.id("modelCatalog")),
+    modelRouteDigest: v.optional(v.string()),
+    modelQualificationDigest: v.optional(v.string()),
+    isolationModes: v.array(v.union(v.literal("READ_ONLY"), v.literal("WORKSPACE_WRITE"))),
+    requiredHarnessCapabilities: v.array(v.object({
+      capability: v.string(),
+      minimumSupport: v.union(v.literal("PARTIAL"), v.literal("SUPPORTED")),
+    })),
+    requiredSandboxCapabilities: v.array(v.string()),
+    toolGrantId: v.optional(v.id("mcpToolGrants")),
+    toolGrantDigest: v.optional(v.string()),
+    registrationIdempotencyKey: v.string(),
+    enabled: v.boolean(),
+    qualificationStatus: v.union(v.literal("UNQUALIFIED"), v.literal("EVIDENCE_QUALIFIED")),
+    admissionStatus: v.union(
+      v.literal("DISABLED"),
+      v.literal("OFFLINE_ELIGIBLE"),
+      v.literal("PRODUCTION_PILOT_ELIGIBLE"),
+      v.literal("REVOKED"),
+    ),
+    qualificationSnapshot: v.optional(v.any()),
+    qualificationDigest: v.optional(v.string()),
+    qualificationExpiresAt: v.optional(v.number()),
+    qualificationIdempotencyKey: v.optional(v.string()),
+    promotedBy: v.optional(v.string()),
+    promotedAt: v.optional(v.number()),
+    revokedBy: v.optional(v.string()),
+    revokedAt: v.optional(v.number()),
+    revocationReason: v.optional(v.string()),
+    createdBy: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_admission", ["projectId", "admissionStatus"])
+    .index("by_profile_version", ["projectId", "profileKey", "version"])
+    .index("by_digest", ["profileDigest"])
+    .index("by_registration_idempotency", ["projectId", "registrationIdempotencyKey"])
+    .index("by_qualification_idempotency", ["projectId", "qualificationIdempotencyKey"]),
+
+  // Phase 3 exact Tool Versions. Registration is descriptive and disabled;
+  // qualification is the only path to admission.
+  mcpToolVersions: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    serverKey: v.string(),
+    serverVersion: v.string(),
+    toolVersionDigest: v.string(),
+    immutableSnapshot: v.any(),
+    registrationIdempotencyKey: v.string(),
+    enabled: v.boolean(),
+    qualificationStatus: v.union(v.literal("UNQUALIFIED"), v.literal("EVIDENCE_QUALIFIED")),
+    qualificationEvidence: v.optional(v.any()),
+    qualificationDigest: v.optional(v.string()),
+    qualificationExpiresAt: v.optional(v.number()),
+    qualifiedBy: v.optional(v.string()),
+    qualifiedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_digest", ["toolVersionDigest"])
+    .index("by_registration", ["projectId", "registrationIdempotencyKey"]),
+
+  // Workspace-scoped, immutable, expiring authority for exactly one operation.
+  mcpToolGrants: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    grantKey: v.string(),
+    version: v.number(),
+    grantDigest: v.string(),
+    immutableSnapshot: v.any(),
+    toolVersionId: v.id("mcpToolVersions"),
+    toolVersionDigest: v.string(),
+    state: v.union(v.literal("ACTIVE"), v.literal("REVOKED")),
+    issuedAt: v.number(),
+    expiresAt: v.number(),
+    registrationIdempotencyKey: v.string(),
+    revokedBy: v.optional(v.string()),
+    revokedAt: v.optional(v.number()),
+    revocationReason: v.optional(v.string()),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_state", ["projectId", "state"])
+    .index("by_grant_version", ["projectId", "grantKey", "version"])
+    .index("by_digest", ["grantDigest"])
+    .index("by_registration", ["projectId", "registrationIdempotencyKey"]),
+
+  // Immutable authorization/completion pairs. Payloads and credentials are
+  // excluded; run events/artifacts remain the evidence warehouse.
+  mcpToolCallReceipts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.id("workflowRuns"),
+    attemptLeaseId: v.string(),
+    workerId: v.string(),
+    workerSessionId: v.string(),
+    workerGeneration: v.number(),
+    executionProfileId: v.id("factoryExecutionProfiles"),
+    executionProfileDigest: v.string(),
+    toolGrantId: v.id("mcpToolGrants"),
+    toolGrantDigest: v.string(),
+    toolVersionId: v.id("mcpToolVersions"),
+    toolVersionDigest: v.string(),
+    callId: v.string(),
+    phase: v.union(v.literal("AUTHORIZATION"), v.literal("COMPLETION")),
+    sequence: v.number(),
+    operation: v.string(),
+    status: v.union(v.literal("ALLOWED"), v.literal("DENIED"), v.literal("SUCCEEDED"), v.literal("FAILED"), v.literal("CANCELED"), v.literal("TIMED_OUT")),
+    reason: v.string(),
+    requestDigest: v.string(),
+    requestBytes: v.number(),
+    retryCount: v.number(),
+    costStatus: v.literal("UNKNOWN"),
+    outputDigest: v.optional(v.string()),
+    outputBytes: v.optional(v.number()),
+    poisoningDetected: v.optional(v.boolean()),
+    redactionApplied: v.optional(v.boolean()),
+    serverImplementationDigest: v.string(),
+    expectedServerVersion: v.optional(v.string()),
+    observedServerVersion: v.optional(v.string()),
+    expectedInputSchemaDigest: v.optional(v.string()),
+    observedInputSchemaDigest: v.optional(v.string()),
+    receiptDigest: v.string(),
+    occurredAt: v.number(),
+    durationMs: v.optional(v.number()),
+    lateOrStale: v.optional(v.boolean()),
+    evidenceEventId: v.optional(v.id("runEvents")),
+    evidenceArtifactId: v.optional(v.id("runArtifacts")),
+  })
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_attempt_grant_phase", ["workflowRunId", "toolGrantId", "phase"])
+    .index("by_call_phase", ["callId", "phase"])
+    .index("by_project", ["projectId"])
+    .index("by_digest", ["receiptDigest"]),
+
   factoryDefinitionVersions: defineTable({
     tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),
     factoryDefinitionId: v.id("factoryDefinitions"),
     version: v.number(),
     configurationDigest: v.string(),
+    qualificationEnvironmentDigest: v.optional(v.string()),
+    repositoryMode: v.optional(v.literal("LOCAL_SYNTHETIC_QUALIFICATION")),
+    repositoryAdmissionDigest: v.optional(v.string()),
     repositoryId: v.id("workspaceRepositories"),
     repositoryDataClassification: v.optional(v.union(
       v.literal("PUBLIC"),
@@ -1146,12 +1509,36 @@ export default defineSchema({
     harnessCapabilityManifest: v.optional(v.any()),
     harnessCapabilityManifestDigest: v.optional(v.string()),
     harnessEffectiveConfigSha256: v.optional(v.string()),
+    harnessRuntimeArtifact: v.optional(v.any()),
+    harnessRuntimeArtifactDigest: v.optional(v.string()),
+    executionProfileId: v.optional(v.id("factoryExecutionProfiles")),
+    executionProfileKey: v.optional(v.string()),
+    executionProfileVersion: v.optional(v.number()),
+    executionProfileDigest: v.optional(v.string()),
+    executionProfileSnapshot: v.optional(v.any()),
+    executionProfileQualificationDigest: v.optional(v.string()),
+    executionProfileQualificationSnapshot: v.optional(v.any()),
     modelCatalogId: v.optional(v.id("modelCatalog")),
     modelRouteDigest: v.optional(v.string()),
     modelRouteSnapshot: v.optional(v.any()),
     modelQualificationDigest: v.optional(v.string()),
     modelQualificationSnapshot: v.optional(v.any()),
-    executionBackend: v.optional(v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"))),
+    // Storage is not admission: validFactoryExecutionBinding continues to deny
+    // this backend until canonical dispatch and completion are integrated.
+    inferenceConstraint: v.optional(v.object({ schema: v.literal("factory-inference-constraint/v1"), mode: v.literal("DENIED") })),
+    deterministicOperation: v.optional(v.union(
+      v.object({
+        reference: v.literal("render-markdown/v1"),
+        digest: v.string(),
+        input: v.object({ title: v.string(), paragraphs: v.array(v.string()), outputPath: v.string() }),
+      }),
+      v.object({
+        reference: v.literal("verify-document-bytes/v1"),
+        digest: v.string(),
+        input: v.object({ path: v.string(), expectedContentSha256: v.string() }),
+      }),
+    )),
+    executionBackend: v.optional(v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"), v.literal("isolated-container"))),
     sandboxProfileId: v.optional(v.id("factorySandboxProfiles")),
     sandboxProfileDigest: v.optional(v.string()),
     sandboxProfileSnapshot: v.optional(v.any()),
@@ -1217,7 +1604,8 @@ export default defineSchema({
     profileDigest: v.string(),
     profileSnapshot: v.any(),
     sourceSha: v.string(),
-    provider: v.union(v.literal("EXE_DEV"), v.literal("FAKE")),
+    provider: v.union(v.literal("EXE_DEV"), v.literal("FAKE" ),
+      v.literal("DOCKER" )),
     providerResourceId: v.optional(v.string()),
     resourceName: v.string(),
     state: v.union(
@@ -1355,6 +1743,11 @@ export default defineSchema({
   // Executor-local checkout reports for a project repository. A checkout path
   // belongs to one host and is never treated as a portable project property.
   workspaceHostBindings: defineTable({
+    localQualificationObservation: v.optional(v.object({
+      schema: v.literal("local-qualification-root-observation/v1"), admissionDigest: v.string(), root: v.string(),
+      baselineCommit: v.string(), baselineTree: v.string(), fixtureContentDigest: v.string(),
+      noRemotes: v.literal(true), ownerUid: v.number(), observedAt: v.number(),
+    })),
     projectId: v.id("projects"),
     hostId: v.string(),
     repositoryId: v.optional(v.id("workspaceRepositories")),
@@ -1383,6 +1776,8 @@ export default defineSchema({
         version: v.string(),
         capabilityManifestSha256: v.optional(v.string()),
         effectiveConfigSha256: v.optional(v.string()),
+        runtimeArtifact: v.optional(v.any()),
+        runtimeArtifactSha256: v.optional(v.string()),
         capabilityManifest: v.optional(v.any()),
         supportsCancel: v.boolean(),
         supportsResume: v.boolean(),
@@ -1393,20 +1788,7 @@ export default defineSchema({
         repositoryId: v.id("workspaceRepositories"),
         access: v.union(v.literal("READ"), v.literal("READ_WRITE")),
       })),
-      factoryVersionBindings: v.optional(v.array(v.object({
-        factoryDefinitionVersionId: v.id("factoryDefinitionVersions"),
-        factoryConfigurationDigest: v.string(),
-        adapter: v.string(),
-        version: v.string(),
-        provider: v.string(),
-        model: v.string(),
-        capabilityManifestSha256: v.string(),
-        effectiveConfigSha256: v.string(),
-        executionBackend: v.string(),
-        modelRouteDigest: v.string(),
-        sandboxProfileDigest: v.optional(v.string()),
-        repositoryId: v.id("workspaceRepositories"),
-      }))),
+      factoryVersionBindings: v.optional(v.array(factoryWorkerVersionBindingValidator)),
       readiness: v.union(
         v.literal("STARTING"),
         v.literal("READY"),
@@ -1476,6 +1858,8 @@ export default defineSchema({
     )),
     qualificationSnapshot: v.optional(v.any()),
     qualificationDigest: v.optional(v.string()),
+    costPolicySnapshot: v.optional(v.any()),
+    costPolicyDigest: v.optional(v.string()),
     registeredBy: v.optional(v.string()),
     registeredAt: v.optional(v.number()),
     promotedBy: v.optional(v.string()),
@@ -1712,6 +2096,11 @@ export default defineSchema({
     estimatedCostUsd: v.optional(v.number()),
     repository: v.optional(v.string()),
     repositoryBranch: v.optional(v.string()),
+    planningRunId: v.optional(v.id("missionPlanningRuns")),
+    planningRepositorySha: v.optional(v.string()),
+    planningResearchPacketDigest: v.optional(v.string()),
+    planningCandidateDigest: v.optional(v.string()),
+    planningProvenance: v.optional(v.any()),
     createdBy: v.string(),
     submittedBy: v.optional(v.string()),
     submittedAt: v.optional(v.number()),
@@ -1802,6 +2191,68 @@ export default defineSchema({
     .index("by_mission_status", ["missionId", "status"])
     .index("by_mission_revision", ["missionId", "revisionNumber"])
     .index("by_idempotency", ["idempotencyKey"]),
+
+  // Receipt for an authenticated Factory Engineer package import. The source
+  // package remains immutable upstream; Mission Control persists only the
+  // authenticated identity, approval lineage, local mapping, and draft refs.
+  factoryPackageImports: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    repositoryId: v.id("workspaceRepositories"),
+    ownerMemberId: v.id("orgMembers"),
+    owningTeamId: v.id("scrumTeams"),
+    codeScopeIds: v.array(v.id("repositoryCodeScopes")),
+    issuerId: v.string(),
+    packageId: v.string(),
+    packageVersion: v.number(),
+    packageDigest: v.string(),
+    schemaVersion: v.literal("fdlc.factory-deployment-package/v1"),
+    idempotencyKey: v.string(),
+    targetFingerprint: v.string(),
+    mappingDigest: v.string(),
+    mappingRevision: v.number(),
+    status: v.literal("DRAFT_CREATED"),
+    missionId: v.id("missions"),
+    missionPlanId: v.id("missionPlans"),
+    requestedByOperatorId: v.id("operators"),
+    requestedBySubject: v.string(),
+    upstreamCorrelationId: v.string(),
+    upstreamPublishedAt: v.number(),
+    upstreamRetrievedAt: v.number(),
+    approval: v.object({
+      decisionRef: v.string(),
+      decisionVersion: v.number(),
+      decisionDigest: v.string(),
+      approvedBy: v.string(),
+      authorizedByRef: v.string(),
+      authorityBasisRef: v.string(),
+      authorityBasisVersion: v.number(),
+      authorityBasisDigest: v.string(),
+      approvedAt: v.number(),
+    }),
+    requestedTarget: v.object({
+      workspaceRef: v.string(),
+      repositoryRef: v.string(),
+      codeScopeRefs: v.array(v.string()),
+      semanticWorkflowRef: v.string(),
+      environmentClass: v.string(),
+    }),
+    workflowId: v.string(),
+    workflowVersion: v.number(),
+    warnings: v.array(v.string()),
+    importedAt: v.number(),
+  })
+    .index("by_external_identity", ["issuerId", "packageId", "packageVersion"])
+    .index("by_idempotency", ["idempotencyKey"])
+    .index("by_project_imported", ["projectId", "importedAt"])
+    .index("by_mission", ["missionId"]),
+
+  // Durable, non-authoritative planning intelligence. A successful row may
+  // supply an editable candidate to the Mission Plan Workspace, but cannot
+  // submit, approve, dispatch, publish, verify, or accept delivery work.
+  missionPlanningRuns: missionPlanningRunsTable,
+
+  missionPlanningRunEvents: missionPlanningRunEventsTable,
 
   validationAssertions: defineTable({
     tenantId: v.optional(v.id("tenants")),
@@ -1954,12 +2405,88 @@ export default defineSchema({
     .index("by_spec", ["missionSpecRevisionId"])
     .index("by_idempotency", ["idempotencyKey"]),
 
+  // Immutable, attributable proposal records in the existing Mission Spec
+  // lineage. These records never mutate or finalize a Spec themselves.
+  missionIntentContributions: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    missionId: v.id("missions"),
+    missionSpecRevisionId: v.id("missionSpecRevisions"),
+    missionSpecDigest: v.string(),
+    idempotencyKey: v.string(),
+    contributionKey: v.string(),
+    revisionNumber: v.number(),
+    supersedesContributionId: v.optional(v.id("missionIntentContributions")),
+    contributorRole: v.union(
+      v.literal("PRODUCT"),
+      v.literal("QA"),
+      v.literal("DESIGN"),
+      v.literal("ENGINEERING"),
+      v.literal("SECURITY_OPERATIONS"),
+    ),
+    targetSection: v.union(
+      v.literal("OUTCOME"),
+      v.literal("REQUIREMENTS"),
+      v.literal("NON_FUNCTIONAL_REQUIREMENTS"),
+      v.literal("ACCEPTANCE_EXPECTATIONS"),
+      v.literal("VERIFICATION_EXPECTATIONS"),
+      v.literal("NON_GOALS"),
+      v.literal("CONSTRAINTS"),
+      v.literal("RISKS"),
+      v.literal("REPOSITORY_SCOPE"),
+    ),
+    targetItemId: v.optional(v.string()),
+    title: v.string(),
+    body: v.string(),
+    evidenceExpectation: v.string(),
+    digest: v.string(),
+    proposedBy: v.string(),
+    proposedActorType: v.union(v.literal("HUMAN"), v.literal("AGENT")),
+    proposedActorSource: v.union(
+      v.literal("AUTHENTICATED"),
+      v.literal("DEVELOPMENT_FALLBACK"),
+      v.literal("SERVICE_COMMAND"),
+    ),
+    proposedAt: v.number(),
+  })
+    .index("by_mission", ["missionId"])
+    .index("by_mission_role", ["missionId", "contributorRole"])
+    .index("by_mission_key_revision", ["missionId", "contributionKey", "revisionNumber"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  // Decisions are append-only and human-only. ACCEPTED means proposal input to
+  // a future Spec revision; it is not Plan approval or delivery acceptance.
+  missionIntentContributionDecisions: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    missionId: v.id("missions"),
+    contributionId: v.id("missionIntentContributions"),
+    contributionDigest: v.string(),
+    missionSpecRevisionId: v.id("missionSpecRevisions"),
+    missionSpecDigest: v.string(),
+    idempotencyKey: v.string(),
+    decision: v.union(v.literal("ACCEPTED"), v.literal("REJECTED")),
+    reason: v.string(),
+    decidedBy: v.string(),
+    decidedActorSource: v.union(v.literal("AUTHENTICATED"), v.literal("DEVELOPMENT_FALLBACK")),
+    decidedAt: v.number(),
+  })
+    .index("by_mission", ["missionId"])
+    .index("by_contribution", ["contributionId"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
   workOrders: defineTable({
+    inferenceSpendingFence: v.optional(v.object({
+      fencedAt: v.number(), sourceDigest: v.string(), violationCodes: v.array(v.string()),
+      receiptId: v.optional(v.id("inferencePhysicalReceipts")),
+    })),
     tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     missionId: v.optional(v.id("missions")),
     missionPlanId: v.optional(v.id("missionPlans")),
     missionPlanRevision: v.optional(v.number()),
+    planningRunId: v.optional(v.id("missionPlanningRuns")),
+    planningRepositorySha: v.optional(v.string()),
     qualityContractDigest: v.optional(v.string()),
     missionSpecLineage: v.optional(missionSpecLineageValidator),
     missionSequence: v.optional(v.number()),
@@ -2755,6 +3282,7 @@ export default defineSchema({
     parentTaskId: v.optional(v.id("tasks")),
     // Canonical governed-delivery parent. Mission is derived through Work Order.
     workOrderId: v.optional(v.id("workOrders")),
+    planningRepositorySha: v.optional(v.string()),
     
     // Work artifacts
     workPlan: v.optional(v.object({
@@ -3821,6 +4349,293 @@ export default defineSchema({
     .index("by_project_occurred", ["projectId", "occurredAt"])
     .index("by_agent_occurred", ["agentId", "occurredAt"]),
 
+  // Durable accounting for the bounded Fab conversational provider route.
+  fabChatBudgets: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    scopeKey: v.string(),
+    hardLimitNanoUsd: v.number(),
+    reservedNanoUsd: v.number(),
+    spentNanoUsd: v.number(),
+    updatedAt: v.number(),
+  }).index("by_scope", ["scopeKey"]),
+
+  // Private, per-operator Fab preferences and durable personal context.
+  fabOperatorProfiles: defineTable({
+    tenantId: v.id("tenants"),
+    actorId: v.string(),
+    communicationStyle: v.union(v.literal("CONCISE"), v.literal("DETAILED"), v.literal("EXECUTIVE")),
+    proactiveEnabled: v.boolean(),
+    notifyCritical: v.boolean(),
+    notifyFailures: v.boolean(),
+    costThresholdUsd: v.number(),
+    preferences: v.string(),
+    memory: v.string(),
+    lastReviewedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_actor", ["tenantId", "actorId"]),
+
+  fabChatUsageReceipts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    threadId: v.optional(v.id("telegraphThreads")),
+    idempotencyKey: v.string(),
+    provider: v.literal("openrouter"),
+    routeClass: v.union(v.literal("ROUTINE"), v.literal("ARCHITECT")),
+    model: v.string(),
+    routeDigest: v.string(),
+    endpoint: v.string(),
+    responseId: v.optional(v.string()),
+    upstreamProvider: v.optional(v.string()),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+    costNanoUsd: v.number(),
+    costClassification: v.union(v.literal("ACTUAL"), v.literal("ZERO"), v.literal("UNCONFIRMED")),
+    latencyMs: v.number(),
+    status: v.union(v.literal("PENDING"), v.literal("SUCCEEDED"), v.literal("FAILED")),
+    errorCode: v.optional(v.string()),
+    contextDigest: v.optional(v.string()),
+    contextClasses: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+  })
+    .index("by_project_created", ["projectId", "createdAt"])
+    .index("by_project_idempotency", ["projectId", "idempotencyKey"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  // -------------------------------------------------------------------------
+  // GOVERNED INFERENCE + OUTCOME ECONOMICS
+  // Append-only accounting records. Legacy costEvents remain readable but do
+  // not satisfy the governed inference contract.
+  // -------------------------------------------------------------------------
+  inferencePriceBooks: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    priceBookKey: v.string(),
+    version: v.number(),
+    currency: v.literal("USD"),
+    sourceKind: v.union(v.literal("PROVIDER_PUBLISHED"), v.literal("OPERATOR_APPROVED")),
+    sourceReference: v.string(),
+    sourceDigest: v.string(),
+    effectiveFrom: v.number(),
+    effectiveUntil: v.optional(v.number()),
+    rates: v.array(v.object({
+      routeDigest: v.string(),
+      inputMicrousdPerMillionTokens: v.number(),
+      outputMicrousdPerMillionTokens: v.number(),
+      cacheReadMicrousdPerMillionTokens: v.optional(v.number()),
+      cacheWriteMicrousdPerMillionTokens: v.optional(v.number()),
+      reasoningMicrousdPerMillionTokens: v.optional(v.number()),
+      batchMultiplierBps: v.optional(v.number()),
+      serviceTier: v.optional(v.string()),
+    })),
+    immutableSnapshot: v.any(),
+    priceBookDigest: v.string(),
+    state: v.union(v.literal("DRAFT"), v.literal("ACTIVE"), v.literal("RETIRED")),
+    registrationIdempotencyKey: v.string(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_key_version", ["projectId", "priceBookKey", "version"])
+    .index("by_registration", ["projectId", "registrationIdempotencyKey"]),
+
+  inferenceReservations: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workOrderId: v.id("workOrders"),
+    taskId: v.id("tasks"),
+    workflowRunId: v.id("workflowRuns"),
+    logicalRequestKey: v.string(),
+    executionProfileId: v.id("factoryExecutionProfiles"),
+    executionProfileDigest: v.string(),
+    primaryRoute: inferenceRouteValidator,
+    allowedFallbacks: v.array(inferenceRouteValidator),
+    maxPhysicalCalls: v.number(),
+    maxInputTokens: v.number(),
+    maxOutputTokens: v.number(),
+    maxCacheReadTokens: v.number(),
+    maxCacheWriteTokens: v.number(),
+    maxReasoningTokens: v.number(),
+    maxCostMicrousd: v.number(),
+    currency: v.literal("USD"),
+    deadlineAt: v.number(),
+    priceBookId: v.id("inferencePriceBooks"),
+    priceBookDigest: v.string(),
+    policyDigest: v.string(),
+    leaseId: v.string(),
+    leaseExpiresAt: v.number(),
+    immutableSnapshot: v.any(),
+    reservationDigest: v.string(),
+    state: v.union(v.literal("ACTIVE"), v.literal("EXHAUSTED"), v.literal("EXPIRED"), v.literal("CANCELLED")),
+    registrationIdempotencyKey: v.string(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_logical_request", ["projectId", "logicalRequestKey"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_registration", ["projectId", "registrationIdempotencyKey"]),
+
+  inferencePhysicalIntents: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workflowRunId: v.id("workflowRuns"),
+    reservationId: v.id("inferenceReservations"),
+    logicalRequestKey: v.string(),
+    physicalOrdinal: v.number(),
+    retryOfIntentId: v.optional(v.id("inferencePhysicalIntents")),
+    route: inferenceRouteValidator,
+    requestDigest: v.string(),
+    intentDigest: v.string(),
+    immutableSnapshot: v.optional(v.any()),
+    state: v.union(v.literal("PERSISTED"), v.literal("CLAIMED"), v.literal("CANCELLED"), v.literal("RECEIPTED"), v.literal("AMBIGUOUS")),
+    claimId: v.optional(v.string()),
+    claimedAt: v.optional(v.number()),
+    dispatchAllowance: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_reservation", ["reservationId"])
+    .index("by_logical_request", ["projectId", "logicalRequestKey"])
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_claim", ["claimId"]),
+
+  inferencePhysicalReceipts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workflowRunId: v.id("workflowRuns"),
+    reservationId: v.id("inferenceReservations"),
+    reservationDigest: v.string(),
+    executionProfileId: v.id("factoryExecutionProfiles"),
+    executionProfileDigest: v.string(),
+    policyDigest: v.string(),
+    intentId: v.id("inferencePhysicalIntents"),
+    logicalRequestKey: v.string(),
+    physicalOrdinal: v.number(),
+    route: inferenceRouteValidator,
+    resolvedProvider: v.optional(v.string()),
+    resolvedModelId: v.optional(v.string()),
+    providerRequestId: v.optional(v.string()),
+    providerBillingId: v.optional(v.string()),
+    delivery: v.union(v.literal("DELIVERED"), v.literal("NOT_DELIVERED"), v.literal("UNKNOWN")),
+    status: v.union(v.literal("SUCCEEDED"), v.literal("FAILED"), v.literal("CANCELLED"), v.literal("TIMED_OUT"), v.literal("UNKNOWN")),
+    usage: v.object({
+      inputTokens: v.optional(v.number()),
+      outputTokens: v.optional(v.number()),
+      cacheReadTokens: v.optional(v.number()),
+      cacheWriteTokens: v.optional(v.number()),
+      reasoningTokens: v.optional(v.number()),
+    }),
+    usageCompleteness: inferenceCompletenessValidator,
+    costMicrousd: v.optional(v.number()),
+    costCompleteness: inferenceCompletenessValidator,
+    costClassification: v.optional(v.union(v.literal("ESTIMATED"), v.literal("UNKNOWN"))),
+    violationCodes: v.optional(v.array(v.string())),
+    priceBookId: v.id("inferencePriceBooks"),
+    priceBookDigest: v.string(),
+    responseDigest: v.optional(v.string()),
+    failureCode: v.optional(v.string()),
+    startedAt: v.number(),
+    completedAt: v.number(),
+    receiptDigest: v.string(),
+    immutableSnapshot: v.optional(v.any()),
+  })
+    .index("by_intent", ["intentId"])
+    .index("by_reservation", ["reservationId"])
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_provider_request", ["projectId", "providerRequestId"]),
+
+  inferenceReconciliations: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workflowRunId: v.id("workflowRuns"),
+    receiptId: v.id("inferencePhysicalReceipts"),
+    providerEventId: v.string(),
+    providerRequestId: v.string(),
+    providerBillingId: v.optional(v.string()),
+    observedUsage: v.optional(v.any()),
+    observedCostMicrousd: v.optional(v.number()),
+    completeness: inferenceCompletenessValidator,
+    sourceDigest: v.string(),
+    reconciliationDigest: v.string(),
+    reconciledBy: v.string(),
+    reconciledAt: v.number(),
+  })
+    .index("by_receipt", ["receiptId"])
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_provider_event", ["projectId", "providerEventId"])
+    .index("by_provider_request", ["projectId", "providerRequestId"]),
+
+  factoryOutcomeEvents: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.id("workflowRuns"),
+    stage: factoryOutcomeStageValidator,
+    sourceType: v.string(),
+    sourceId: v.string(),
+    sourceDigest: v.string(),
+    occurredAt: v.number(),
+    recordedAt: v.number(),
+    eventDigest: v.string(),
+    recordedBy: v.string(),
+  })
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_source", ["projectId", "sourceType", "sourceId"]),
+
+  factoryOutcomeProjections: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.id("workflowRuns"),
+    routeDigest: v.string(),
+    formulaVersion: v.union(v.literal("accepted-outcome-economics/v1"), v.literal("accepted-outcome-economics/v2")),
+    cohortDigest: v.string(),
+    outcome: v.union(v.literal("ACCEPTED"), v.literal("REJECTED"), v.literal("ABANDONED"), v.literal("IN_PROGRESS")),
+    stages: v.any(),
+    receiptIds: v.array(v.id("inferencePhysicalReceipts")),
+    reconciliationIds: v.array(v.id("inferenceReconciliations")),
+    physicalCallCount: v.number(),
+    knownCostMicrousd: v.optional(v.number()),
+    totalCostMicrousd: v.optional(v.number()),
+    costCoverage: v.number(),
+    costCompleteness: inferenceCompletenessValidator,
+    freshnessAt: v.number(),
+    confidence: v.union(v.literal("HIGH"), v.literal("LOW"), v.literal("NONE")),
+    lineageDigest: v.string(),
+    projectionDigest: v.string(),
+    immutableSnapshot: v.optional(v.any()),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_route", ["projectId", "routeDigest"])
+    .index("by_work_order", ["workOrderId"]),
+
+  inferenceRouteComparisons: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    leftRouteDigest: v.string(),
+    rightRouteDigest: v.string(),
+    cohortDigest: v.string(),
+    formulaVersion: v.union(v.literal("accepted-outcome-economics/v1"), v.literal("accepted-outcome-economics/v2")),
+    minimumSampleSize: v.number(),
+    maximumAgeMs: v.number(),
+    leftSummary: v.any(),
+    rightSummary: v.any(),
+    status: v.union(v.literal("NO_GO"), v.literal("ADVISORY_ONLY")),
+    advisoryWinnerRouteDigest: v.optional(v.string()),
+    blockers: v.array(v.string()),
+    automaticPromotionAuthorized: v.literal(false),
+    comparisonDigest: v.string(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_cohort", ["projectId", "cohortDigest"]),
+
   // -------------------------------------------------------------------------
   // AGENT PERFORMANCE (Learning System — Aggregated Metrics)
   // -------------------------------------------------------------------------
@@ -3935,6 +4750,9 @@ export default defineSchema({
     // for defined values (e.g., .filter(q => q.neq(q.field("systemRole"), undefined)))
     // to exclude records where systemRole is not set.
     .index("by_system_role", ["systemRole"]),
+};
+
+export const schemaTablesPartTwo = {
 
   // -------------------------------------------------------------------------
   // SOFTWARE FACTORY OPERATING STRUCTURE
@@ -4385,7 +5203,7 @@ export default defineSchema({
   workflows: defineTable({
     // Identity
     projectId: v.optional(v.id("projects")),
-    contractVersion: v.optional(v.literal("factory-workflow-contract/v1")),
+    contractVersion: v.optional(v.union(v.literal("factory-workflow-contract/v1"), v.literal("factory-workflow-contract/v2"))),
     workflowId: v.string(), // e.g., "feature-dev", "bug-fix", "security-audit"
     name: v.string(),
     description: v.string(),
@@ -4419,7 +5237,8 @@ export default defineSchema({
         v.literal("REDUCE"),
         v.literal("ROUTER"),
         v.literal("VERIFY"),
-        v.literal("GATE")
+        v.literal("GATE"),
+        v.literal("DETERMINISTIC")
       )),
       inputSchema: v.optional(v.any()),
       outputSchema: v.optional(v.any()),
@@ -4484,11 +5303,19 @@ export default defineSchema({
     verificationContractDigest: v.optional(v.string()),
     factoryDefinitionVersionId: v.optional(v.id("factoryDefinitionVersions")),
     factoryConfigurationDigest: v.optional(v.string()),
+    executionProfileId: v.optional(v.id("factoryExecutionProfiles")),
+    executionProfileKey: v.optional(v.string()),
+    executionProfileVersion: v.optional(v.number()),
+    executionProfileDigest: v.optional(v.string()),
+    executionProfileSnapshot: v.optional(v.any()),
+    executionProfileQualificationDigest: v.optional(v.string()),
+    executionProfileQualificationSnapshot: v.optional(v.any()),
     factoryPurpose: v.optional(factoryPurposeValidator),
     attemptPurpose: v.optional(attemptPurposeValidator),
     executorInvocationId: v.optional(v.string()),
     primaryTraceId: v.optional(v.id("traces")),
     qualityContractDigest: v.optional(v.string()),
+    planningRepositorySha: v.optional(v.string()),
     // Immutable Factory Memory snapshot selected before execution. This is
     // explanatory context only and never participates in acceptance authority.
     factoryContextPackageId: v.optional(v.id("factoryContextPackages")),
@@ -4507,6 +5334,12 @@ export default defineSchema({
     sandboxAllocationId: v.optional(v.id("sandboxAllocations")),
     sandboxResultDigest: v.optional(v.string()),
     sandboxTeardownVerifiedAt: v.optional(v.number()),
+    // Historical workspace owner at a pause, never an active lease or authority.
+    checkpointLease: v.optional(v.object({
+      leaseId: v.string(), ownerId: v.string(), workerId: v.optional(v.string()),
+      workerSessionId: v.optional(v.string()), workerGeneration: v.optional(v.number()),
+      claimedAt: v.number(), heartbeatAt: v.number(), expiresAt: v.number(),
+    })),
     lease: v.optional(v.object({
       leaseId: v.string(),
       ownerId: v.string(),
@@ -4561,7 +5394,8 @@ export default defineSchema({
         v.literal("REDUCE"),
         v.literal("ROUTER"),
         v.literal("VERIFY"),
-        v.literal("GATE")
+        v.literal("GATE"),
+        v.literal("DETERMINISTIC")
       )),
       modelTier: v.optional(v.union(
         v.literal("FAST"),
@@ -4609,6 +5443,60 @@ export default defineSchema({
     executorHostId: v.optional(v.string()),
     budgetUsd: v.optional(v.number()),
     spentUsd: v.optional(v.number()),
+    executionCostAuthorization: v.optional(v.union(v.object({
+      schema: v.literal("work-order-cost-authorization/v1"),
+      estimatedCostUsd: v.number(),
+      reservedCostUsd: v.number(),
+      hardLimitUsd: v.number(),
+      priorCommittedUsd: v.number(),
+      remainingBeforeReservationUsd: v.number(),
+      budgetSource: v.union(
+        v.literal("WORK_ORDER_IMPLEMENTATION_POLICY"),
+        v.literal("MISSION"),
+        v.literal("FACTORY_VERSION"),
+      ),
+      estimationInputs: v.any(),
+      routeCostPolicyDigest: v.string(),
+      actualCost: v.object({
+        status: v.union(v.literal("MEASURED"), v.literal("UNAVAILABLE")),
+        usd: v.optional(v.number()),
+        reason: v.optional(v.string()),
+      }),
+      varianceUsd: v.optional(v.number()),
+      authorizedAt: v.number(),
+    }), v.object({
+      schema: v.literal("work-order-offline-cost-authorization/v1"),
+      policyEnvelopeId: v.string(),
+      policyEnvelopeDigest: v.string(),
+      workOrderPolicyDigest: v.string(),
+      reservationId: v.string(),
+      factoryConfigurationDigest: v.string(),
+      executionProfileDigest: v.string(),
+      authorizationDigest: v.string(),
+      maxProviderCalls: v.literal(0),
+      maxProviderLiabilityUsd: v.literal(0),
+      estimatedCostUsd: v.number(),
+      reservedCostUsd: v.number(),
+      hardLimitUsd: v.number(),
+      priorCommittedUsd: v.number(),
+      remainingBeforeReservationUsd: v.number(),
+      budgetSource: v.literal("WORK_ORDER_IMPLEMENTATION_POLICY"),
+      estimationInputs: v.object({
+        method: v.literal("FULL_RESOURCE_CEILING_RESERVATION"),
+        approvedWorkOrderCapUsd: v.number(),
+        missionBudgetRemainingUsd: v.number(),
+        policyBudgetRemainingUsd: v.number(),
+        factoryBudget: v.object({ maxCostUsd: v.number(), maxAttempts: v.number(), maxRuntimeMinutes: v.number() }),
+        priorAttemptCount: v.number(),
+      }),
+      actualCost: v.object({
+        status: v.union(v.literal("MEASURED"), v.literal("UNAVAILABLE")),
+        usd: v.optional(v.number()),
+        reason: v.optional(v.string()),
+      }),
+      varianceUsd: v.optional(v.number()),
+      authorizedAt: v.number(),
+    }))),
     stopCondition: v.optional(v.string()),
     scheduledWindow: v.optional(v.object({
       startsAt: v.number(),
@@ -4654,6 +5542,7 @@ export default defineSchema({
       v.literal("EXECUTING"),
       v.literal("VALIDATING"),
       v.literal("AWAITING_HUMAN_REVIEW"),
+      v.literal("AWAITING_VERIFICATION"),
       v.literal("PUBLISHING"),
       v.literal("TERMINAL"),
     )),
@@ -4683,6 +5572,7 @@ export default defineSchema({
       publicationValidUntil: v.optional(v.number()),
     })),
     verificationSubject: v.optional(verificationSubjectValidator),
+    subjectPublicationBinding: v.optional(gitSubjectPublicationBindingValidator),
     candidateReadyAt: v.optional(v.number()),
     verificationAttemptBinding: v.optional(verificationAttemptBindingValidator),
     verificationIsolationAttestation: v.optional(verificationIsolationAttestationValidator),
@@ -6613,6 +7503,11 @@ export default defineSchema({
     .index("by_factory_version", ["factoryDefinitionVersionId"]),
 
   // -------------------------------------------------------------------------
+  // EVAL CONTROL PLANE (diagnostic evidence; never acceptance authority)
+  // -------------------------------------------------------------------------
+  ...evalControlPlaneTables,
+
+  // -------------------------------------------------------------------------
   // FACTORY LEARNING (advisory projections; never acceptance authority)
   // -------------------------------------------------------------------------
   learningSignals: defineTable({
@@ -7702,7 +8597,12 @@ export default defineSchema({
       v.literal("FINALIZED")
     ),
     actorId: v.string(),
-    actorIdentitySource: v.optional(v.literal("CLIENT_ASSERTED_TRUSTED_OPERATOR")),
+    actorIdentitySource: v.optional(v.union(
+      v.literal("CLIENT_ASSERTED_TRUSTED_OPERATOR"),
+      v.literal("AUTHENTICATED_OPERATOR"),
+      v.literal("LOCAL_DEMO_OPERATOR"),
+      v.literal("SYSTEM"),
+    )),
     reason: v.string(),
     policyVersion: v.string(),
     definitionVersion: v.number(),
@@ -7913,6 +8813,180 @@ export default defineSchema({
     .index("by_project", ["projectId", "createdAt"])
     .index("by_idempotency", ["idempotencyKey"]),
 
+  // -----------------------------------------------------------------------
+  // SOFTWARE FACTORY: INCIDENT COMMAND
+  // Thin authority projection over existing evidence. Source records remain
+  // authoritative and are referenced, never copied into an incident store.
+  // -----------------------------------------------------------------------
+  factoryIncidents: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    repositoryId: v.optional(v.id("workspaceRepositories")),
+    incidentKey: v.string(),
+    sourceFingerprint: v.string(),
+    title: v.string(),
+    summary: v.string(),
+    severity: factoryIncidentSeverityValidator,
+    phase: factoryIncidentPhaseValidator,
+    status: v.union(
+      v.literal("OPEN"),
+      v.literal("CONTAINED"),
+      v.literal("RECOVERING"),
+      v.literal("MONITORING"),
+      v.literal("RESOLVED"),
+    ),
+    commanderActorId: v.optional(v.string()),
+    businessImpact: v.string(),
+    recoveryObjective: v.string(),
+    containmentState: v.union(
+      v.literal("UNCONTAINED"),
+      v.literal("CONTAINED"),
+      v.literal("RESTORED"),
+    ),
+    authorityRestored: v.boolean(),
+    currentSequence: v.number(),
+    createdByType: v.union(
+      v.literal("HUMAN"),
+      v.literal("AGENT"),
+      v.literal("SERVICE"),
+    ),
+    createdBy: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId", "updatedAt"])
+    .index("by_project_status", ["projectId", "status", "updatedAt"])
+    .index("by_project_source", ["projectId", "sourceFingerprint"])
+    .index("by_repository", ["repositoryId", "updatedAt"])
+    .index("by_incident_key", ["incidentKey"]),
+
+  // Restart-safe repository dispatch admission. Absence means ENABLED; a row
+  // exists only after the first canonical Incident Command actuation.
+  repositoryDispatchControls: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    repositoryId: v.id("workspaceRepositories"),
+    admission: repositoryDispatchAdmissionValidator,
+    // Incident that last changed or reaffirmed this projection. Retained after
+    // resume so an expired restoration observation can be safely reissued.
+    controlledByIncidentId: v.optional(v.id("factoryIncidents")),
+    activeRequestId: v.optional(v.string()),
+    generation: v.number(),
+    updatedBy: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_repository", ["repositoryId"])
+    .index("by_project", ["projectId", "updatedAt"]),
+
+  // Durable, current, incident-scoped authority that must precede restoration.
+  factoryIncidentControlAuthorizations: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    repositoryId: v.id("workspaceRepositories"),
+    incidentId: v.id("factoryIncidents"),
+    operation: v.literal("RESUME_REPOSITORY_DISPATCH"),
+    authorityActorId: v.string(),
+    authoritySequence: v.number(),
+    authorityExpiresAt: v.number(),
+    idempotencyKey: v.string(),
+    reason: v.string(),
+    consumedByRequestId: v.optional(v.string()),
+    consumedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_incident_sequence", ["incidentId", "authoritySequence", "createdAt"])
+    .index("by_project", ["projectId", "createdAt"])
+    .index("by_incident_idempotency", ["incidentId", "idempotencyKey"]),
+
+  // Append-only command/ack/effect evidence. Only the independent observer
+  // may produce EFFECT_OBSERVED rows.
+  factoryIncidentControlReceipts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    repositoryId: v.id("workspaceRepositories"),
+    incidentId: v.id("factoryIncidents"),
+    controlKey: v.literal("PAUSE_REPOSITORY_DISPATCH"),
+    operation: repositoryDispatchOperationValidator,
+    receiptType: factoryIncidentControlReceiptTypeValidator,
+    requestId: v.string(),
+    authorityActorId: v.string(),
+    authoritySequence: v.number(),
+    authorityExpiresAt: v.number(),
+    producerId: v.string(),
+    initiatedByActorId: v.optional(v.string()),
+    restorationAuthorizationId: v.optional(v.id("factoryIncidentControlAuthorizations")),
+    expectedAdmission: repositoryDispatchAdmissionValidator,
+    observedAdmission: v.optional(repositoryDispatchAdmissionValidator),
+    predecessorReceiptId: v.optional(v.id("factoryIncidentControlReceipts")),
+    result: v.union(v.literal("PASS"), v.literal("FAIL")),
+    runtimeContractVersion: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_incident", ["incidentId", "createdAt"])
+    .index("by_project", ["projectId", "createdAt"])
+    .index("by_repository", ["repositoryId", "createdAt"])
+    .index("by_incident_request_type", ["incidentId", "requestId", "receiptType"]),
+
+  factoryIncidentTransitions: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    incidentId: v.id("factoryIncidents"),
+    sequence: v.number(),
+    fromPhase: v.optional(factoryIncidentPhaseValidator),
+    toPhase: factoryIncidentPhaseValidator,
+    decisionKind: v.union(
+      v.literal("DETECTION"),
+      v.literal("COMMANDER_ASSIGNED"),
+      v.literal("CONTAINMENT"),
+      v.literal("PHASE_ADVANCE"),
+      v.literal("RESTORATION"),
+      v.literal("CORRECTIVE_WORK"),
+      v.literal("MEASUREMENT"),
+      v.literal("RESOLUTION"),
+    ),
+    actorType: v.union(
+      v.literal("HUMAN"),
+      v.literal("AGENT"),
+      v.literal("SERVICE"),
+    ),
+    actorId: v.string(),
+    reason: v.string(),
+    evidenceRefs: v.array(factoryIncidentEvidenceRefValidator),
+    containmentActions: v.array(factoryIncidentContainmentActionValidator),
+    controlExecutions: v.optional(v.array(factoryIncidentControlExecutionValidator)),
+    // Read-only compatibility for pre-v50 local qualification records.
+    controlReferences: v.optional(v.array(v.string())),
+    idempotencyKey: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_incident", ["incidentId", "sequence"])
+    .index("by_project", ["projectId", "createdAt"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  factoryIncidentProposals: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    incidentId: v.id("factoryIncidents"),
+    kind: factoryIncidentProposalKindValidator,
+    summary: v.string(),
+    evidenceRefs: v.array(factoryIncidentEvidenceRefValidator),
+    containmentActions: v.array(factoryIncidentContainmentActionValidator),
+    createdByService: v.string(),
+    serviceCommandReceiptId: v.optional(v.id("serviceCommandReceipts")),
+    status: v.union(
+      v.literal("OPEN"),
+      v.literal("ACCEPTED"),
+      v.literal("REJECTED"),
+    ),
+    decidedBy: v.optional(v.string()),
+    decidedAt: v.optional(v.number()),
+    decisionReason: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_incident", ["incidentId", "createdAt"])
+    .index("by_project_status", ["projectId", "status", "createdAt"]),
+
   // -------------------------------------------------------------------------
   // KNOWLEDGE GRAPH (Agentic-KB Graphify overlay + future Obsidian sync)
   // -------------------------------------------------------------------------
@@ -7976,4 +9050,10 @@ export default defineSchema({
     .index("by_project_source", ["projectId", "source"])
     .index("by_source", ["source"])
     .index("by_external", ["source", "externalId"]),
-});
+};
+
+type MissionControlSchemaTables = typeof schemaTablesPartOne & typeof schemaTablesPartTwo;
+const schemaTables: MissionControlSchemaTables = { ...schemaTablesPartOne, ...schemaTablesPartTwo };
+const schema: SchemaDefinition<MissionControlSchemaTables, true> = defineSchema(schemaTables);
+
+export default schema;

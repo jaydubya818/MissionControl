@@ -1,0 +1,76 @@
+
+ RUN  v3.2.7 <qualification-worktree>
+
+ ❯ convex/__tests__/inferenceObservations.test.ts (19 tests | 3 failed | 16 skipped) 18ms
+   ↓ retains individual overruns, fences the WorkOrder and blocks a previously persisted claim and new allocation
+   ↓ sums validated canonical usage and preserves cumulative overruns despite mutable duplicated fields
+   ↓ retains resolved provider drift and marks requested-route pricing unknown
+   ↓ retains resolved model drift and marks requested-route pricing unknown
+   ↓ reads an unchanged canonical v2 receipt without migrating its digest
+   ↓ rejects structurally invalid reconciliation counters -1
+   ↓ rejects structurally invalid reconciliation counters 1.5
+   ↓ rejects structurally invalid reconciliation counters 9007199254740992
+   ↓ rejects structurally invalid reconciliation counters NaN
+   ↓ retains cumulative reconciliation tokens overrun and keeps the first fence after a lower correction
+   ↓ retains cumulative reconciliation money overrun and keeps the first fence after a lower correction
+   ↓ returns the scoped spending fence in economics and rejects a substituted WorkOrder
+   ↓ includes prior reconciliation counters when a later physical receipt arrives
+   ↓ rejects a substituted prior reconciliation instead of using its duplicated counters
+   ↓ keeps authoritative UNKNOWN correction money in the projection and subsequent cumulative observations
+   ↓ reads frozen v1 formula projections unchanged and excludes them from v2 comparisons
+   × rejects canonical reconciliation cost tampering before projecting money 10ms
+     → promise resolved "{ …(4) }" instead of rejecting
+   × rejects canonical reconciliation completeness tampering before projecting money 2ms
+     → promise resolved "{ …(4) }" instead of rejecting
+   × persists projection overflow as UNKNOWN with every canonical receipt and reconciliation retained 6ms
+     → Outcome known cost exceeds safe integer accounting bounds.
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  convex/__tests__/inferenceObservations.test.ts > rejects canonical reconciliation cost tampering before projecting money
+ FAIL  convex/__tests__/inferenceObservations.test.ts > rejects canonical reconciliation completeness tampering before projecting money
+AssertionError: promise resolved "{ …(4) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "costCompleteness": "COMPLETE",
++   "outcome": "IN_PROGRESS",
++   "projectionDigest": "sha256:5f08e5bdbd92ca630a6267de3bcb2a0bcd22aae05421022d9ce4f12241c8ae71",
++   "projectionId": "factoryOutcomeProjections-db-1",
+  }
+
+ ❯ convex/__tests__/inferenceObservations.test.ts:188:40
+    186|   else event.completeness = "COMPLETE";
+    187|   await expect(f.invoke(createOutcomeProjection, { workflowRunId: "att…
+    188|     routeDigest: f.route.routeDigest })).rejects.toThrow("Canonical re…
+       |                                        ^
+    189|   expect(f.tableRows("factoryOutcomeProjections")).toHaveLength(0);
+    190| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  convex/__tests__/inferenceObservations.test.ts > persists projection overflow as UNKNOWN with every canonical receipt and reconciliation retained
+Error: Outcome known cost exceeds safe integer accounting bounds.
+ ❯ safeMicrousd packages/shared/src/governedInference.ts:229:38
+ ❯ sumMicrousd packages/shared/src/governedInference.ts:234:10
+ ❯ projectFactoryOutcome packages/shared/src/governedInference.ts:631:29
+ ❯ Function.handler [as _handler] convex/inferenceGateway.ts:923:24
+    921|     const projectedAt = Date.now();
+    922|     const receiptSnapshots = new Map(receipts.map((receipt) => [receip…
+    923|     const projection = projectFactoryOutcome({
+       |                        ^
+    924|       projectionId: `${run._id}:v${prior.length + 1}`, cohortDigest: r…
+    925|       projectId: String(run.projectId), workOrderId: String(run.workOr…
+ ❯ convex/__tests__/inferenceObservations.test.ts:202:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 16 skipped (19)
+   Start at  01:18:30
+   Duration  457ms (transform 171ms, setup 0ms, collect 251ms, tests 18ms, environment 0ms, prepare 38ms)

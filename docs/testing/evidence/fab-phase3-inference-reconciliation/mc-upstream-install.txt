@@ -1,0 +1,36 @@
+Scope: all 20 workspace projects
+(node:61867) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +697
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 697, reused 692, downloaded 0, added 188
+Progress: resolved 697, reused 692, downloaded 0, added 321
+Progress: resolved 697, reused 692, downloaded 0, added 456
+Progress: resolved 697, reused 692, downloaded 0, added 583
+Progress: resolved 697, reused 692, downloaded 0, added 684
+Progress: resolved 697, reused 692, downloaded 0, added 688
+Progress: resolved 697, reused 692, downloaded 0, added 693
+Progress: resolved 697, reused 692, downloaded 0, added 697, done
+
+dependencies:
++ @mission-control/research-adapters 0.1.0 <- packages/research-adapters
++ @mission-control/shared 0.9.0 <- packages/shared
++ @mission-control/workflow-engine 0.9.0 <- packages/workflow-engine
++ convex 1.42.3
+
+devDependencies:
++ @axe-core/playwright 4.12.1
++ @playwright/test 1.59.1
++ @taskmasterai/cli 1.1.4
++ @types/node 20.19.30
++ ajv 8.18.0
++ ajv-formats 3.0.1
++ concurrently 8.2.2
++ tsx 4.21.0
++ turbo 1.13.4
++ typescript 5.9.3
++ vitest 3.2.7
+
+Done in 8s

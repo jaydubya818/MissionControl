@@ -28,6 +28,10 @@ import {
 } from "../missionPlanModel";
 import { getFactoryRecipe, resolveRecipeWorkflow } from "../../factoryExperience/recipeCatalog";
 import { useFactoryExperienceLevel } from "../../factoryExperience/useFactoryExperienceLevel";
+import {
+  canApplyPlanningCandidate,
+  shouldShowPlanReleaseReadOnlyNotice,
+} from "./missionPlanningPresentation";
 
 const newKey = (action: string) => `ui-mission-plan:${action}:${crypto.randomUUID()}`;
 
@@ -70,6 +74,81 @@ function PlanLineagePanel({ plan, specRevision, constitution, advanced }: {
     return specRevision ? <div className="rounded-xl border border-info-accent/25 bg-info-soft/35 p-3 text-sm text-ink-secondary">The first saved Plan revision will bind immutably to <span className="font-medium text-ink">Spec r{specRevision.revisionNumber}</span> and Constitution r{constitution?.revisionNumber ?? "?"}. A newer Spec will not rebind it.</div> : null;
   }
   return <section className="rounded-xl border border-line bg-surface-1 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-[13px] font-semibold text-ink">Frozen planning lineage</h2><p className="mt-1 text-[12px] text-ink-muted">This Plan remains bound to the exact revisions below until an operator creates a new Plan revision.</p></div><StatusBadge tone={plan.requirementsCoverageProjection?.complete ? "success" : plan.status === "DRAFT" ? "info" : "warning"}>{plan.requirementsCoverageProjection?.complete ? "Coverage complete" : "Coverage pending"}</StatusBadge></div><div className="mt-4 grid gap-3 sm:grid-cols-3"><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Mission Spec</div><div className="mt-1 text-sm font-medium text-ink">r{specRevision?.revisionNumber ?? "?"}</div>{advanced ? <div className="mt-1 break-all font-mono text-[10px] text-ink-muted">{plan.missionSpecDigest}</div> : null}</div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Constitution</div><div className="mt-1 text-sm font-medium text-ink">r{constitution?.revisionNumber ?? "?"}</div>{advanced ? <div className="mt-1 break-all font-mono text-[10px] text-ink-muted">{plan.projectConstitutionDigest}</div> : null}</div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Quality evaluation</div><div className="mt-1 break-all font-mono text-[10px] text-ink-secondary">{String(plan.missionSpecQualityEvaluationId)}</div></div></div>{advanced && plan.requirementsCoverageProjection ? <div className="mt-4 overflow-x-auto" tabIndex={0} aria-label="Frozen planning lineage coverage matrix"><table className="w-full min-w-[760px] text-left text-xs"><thead className="text-[10px] uppercase tracking-wide text-ink-muted"><tr><th className="pb-2">Requirement</th><th className="pb-2">Assertions</th><th className="pb-2">WorkOrders</th><th className="pb-2">Criteria</th><th className="pb-2">Verification</th></tr></thead><tbody className="divide-y divide-line">{plan.requirementsCoverageProjection.rows.map((row) => <tr key={row.specRequirementId}><td className="py-2 font-mono text-[10px]">{row.specRequirementId}</td><td className="py-2 font-mono text-[10px]">{row.planAssertionIds.join(", ")}</td><td className="py-2 font-mono text-[10px]">{row.workOrderBlueprintIds.join(", ")}</td><td className="py-2 font-mono text-[10px]">{row.acceptanceCriterionIds.join(", ")}</td><td className="py-2 font-mono text-[10px]">{row.verificationCheckIds.join(", ")}</td></tr>)}</tbody></table></div> : null}{plan.specConsistencyFindings?.length ? <div className="mt-4 rounded-lg border border-warning/30 bg-warning/5 p-3"><div className="text-xs font-medium text-ink">Consistency findings</div><ul className="mt-2 space-y-1 text-xs text-ink-secondary">{plan.specConsistencyFindings.map((finding, index) => <li key={`${finding.code}:${index}`}><span className="font-mono text-[10px] text-ink-muted">{finding.code}</span> {finding.message}</li>)}</ul></div> : null}</section>;
+}
+
+function planningTone(status: string) {
+  if (status === "SUCCEEDED") return "success" as const;
+  if (status === "FAILED") return "warning" as const;
+  if (["RESEARCHING", "GENERATING", "VALIDATING"].includes(status)) return "info" as const;
+  return "neutral" as const;
+}
+
+function PlanningRepositoryBinding({ plan }: { plan: Doc<"missionPlans"> | null }) {
+  if (!plan) return null;
+  return (
+    <section className="rounded-xl border border-line bg-surface-1 p-4" aria-label="Plan repository provenance">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-ink-muted">Planning repository revision</div>
+          <div className="mt-1 break-all font-mono text-[11px] text-ink-secondary">
+            {plan.planningRepositorySha ?? "No Planning Agent SHA — this is a manual or legacy Plan."}
+          </div>
+        </div>
+        <StatusBadge tone={plan.planningRepositorySha ? "success" : "neutral"}>
+          {plan.planningRepositorySha ? "Exact SHA bound" : "Not agent-bound"}
+        </StatusBadge>
+      </div>
+      {plan.planningRepositorySha ? <p className="mt-2 text-xs text-ink-muted">Dispatch must use this same immutable revision. Repository drift fails closed before execution.</p> : null}
+    </section>
+  );
+}
+
+function PlanningAgentPanel({ run, relationshipLabel, requesting, requestError, candidateApplied, canApply, canRequest, showRequestAction, onRequest, onApply }: {
+  run: any;
+  relationshipLabel: "Bound to this Plan" | "Latest unadopted candidate" | "Current planning run";
+  requesting: boolean;
+  requestError: string | null;
+  candidateApplied: boolean;
+  canApply: boolean;
+  canRequest: boolean;
+  showRequestAction: boolean;
+  onRequest: () => void;
+  onApply: () => void;
+}) {
+  const active = run && ["QUEUED", "RESEARCHING", "GENERATING", "VALIDATING"].includes(run.status);
+  return <section className="rounded-xl border border-line bg-surface-1 p-4" aria-label={`Planning Agent — ${relationshipLabel}`}><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">{relationshipLabel}</div><h2 className="mt-1 text-[13px] font-semibold text-ink">Planning Agent</h2><p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-ink-muted">Researches one immutable repository revision in an enforced workspace-contained read-only harness, then returns an editable candidate. Submission and approval remain human decisions.</p></div>{run ? <StatusBadge tone={planningTone(run.status)}>{run.status.toLowerCase().replaceAll("_", " ")}</StatusBadge> : <StatusBadge tone="neutral">Not run</StatusBadge>}</div>{requestError ? <div role="alert" className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{requestError}</div> : null}{run ? <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Exact repository SHA</div><div className="mt-1 break-all font-mono text-[10px] text-ink-secondary">{run.planningRepositorySha}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Planner</div><div className="mt-1 text-xs text-ink-secondary">{run.plannerIdentity?.displayName ?? "Mission Planner"} · {run.plannerIdentity?.plannerId ?? "mission-planner"}/{run.plannerIdentity?.version ?? "v1"}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Model route</div><div className="mt-1 break-all font-mono text-[10px] text-ink-secondary">{run.modelProvider}/{run.modelId}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Attempt</div><div className="mt-1 text-xs text-ink-secondary">{run.attemptCount}/{run.maxAttempts}</div></div></div> : null}{active ? <div role="status" className="mt-4 rounded-lg border border-info-accent/25 bg-info-soft/35 p-3 text-sm text-ink-secondary">{run.status === "QUEUED" ? "Waiting for the repository-scoped planning worker." : run.status === "RESEARCHING" ? "Inspecting the exact checkout and collecting line-level citations." : run.status === "GENERATING" ? "Repository research passed validation. Generating the Plan candidate." : "Validating workflows, dependencies, assertions, budgets, and provenance before persistence."}</div> : null}{run?.status === "FAILED" ? <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-ink-secondary"><div className="font-medium text-ink">Planning stopped safely</div><p className="mt-1">{run.failure?.message ?? "The run failed without a validated candidate."}</p><p className="mt-2 text-xs text-ink-muted">Resolve the reported repository, Factory, model-route, or evidence issue, then generate a new candidate. Partial output cannot be submitted.</p></div> : null}{run?.status === "SUCCEEDED" ? <div className="mt-4 space-y-3"><div className="rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-ink-secondary"><span className="font-medium text-ink">Candidate ready for human review.</span> {run.researchPacket?.files?.length ?? 0} files and {run.researchPacket?.citations?.length ?? 0} exact citations are bound to <span className="font-mono text-[11px]">{run.researchPacketDigest}</span>.</div>{run.researchPacket?.citations?.length ? <details className="rounded-lg border border-line p-3"><summary className="cursor-pointer text-xs font-medium text-ink">Repository evidence</summary><ul className="mt-3 space-y-2 text-xs text-ink-secondary">{run.researchPacket.citations.slice(0, 8).map((citation: any) => <li key={citation.id}><span className="font-mono text-[10px] text-ink-muted">{citation.path}:{citation.startLine}-{citation.endLine}</span><div className="mt-0.5 line-clamp-2 whitespace-pre-wrap">{citation.excerpt}</div></li>)}</ul></details> : null}</div> : null}{run?.harnessExecutions?.length ? <details className="mt-3 rounded-lg border border-line p-3"><summary className="cursor-pointer text-xs font-medium text-ink">Durable execution receipts</summary><ul className="mt-3 space-y-2 text-xs text-ink-secondary">{run.harnessExecutions.map((execution: any) => <li key={`${execution.phase}:${execution.executionId}`} className="rounded-md bg-surface-2 p-2"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium text-ink">{execution.phase === "RESEARCH" ? "Research" : "Generation"}</span><StatusBadge tone={execution.status === "COMPLETED" ? "success" : "warning"}>{String(execution.status).toLowerCase()}</StatusBadge></div><div className="mt-1 break-all font-mono text-[10px] text-ink-muted">{execution.executionId}</div><div className="mt-1 break-all font-mono text-[10px] text-ink-muted">{execution.promptIdentity?.version} · {execution.promptIdentity?.digest}</div></li>)}</ul></details> : null}<div className="mt-4 flex flex-wrap justify-end gap-2">{canApply && run?.status === "SUCCEEDED" && !candidateApplied ? <Button type="button" variant="outline" onClick={onApply}>Apply candidate to editor</Button> : null}{showRequestAction ? <Button type="button" onClick={onRequest} disabled={!canRequest || requesting || active}>{requesting ? "Queueing…" : run ? "Generate new candidate" : "Generate Plan candidate"}</Button> : null}</div></section>;
+}
+
+function PlanningRunHistory({ runs, events }: { runs: any[]; events: any[] }) {
+  if (!runs.length) return null;
+  return (
+    <details className="rounded-xl border border-line bg-surface-1 p-4">
+      <summary className="cursor-pointer text-[13px] font-semibold text-ink">Planning run history and audit events</summary>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <ol className="space-y-2">
+          {runs.map((run) => (
+            <li key={run._id} className="rounded-lg border border-line p-3 text-xs text-ink-secondary">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[10px]">{String(run._id)}</span>
+                <StatusBadge tone={planningTone(run.status)}>{run.status.toLowerCase().replaceAll("_", " ")}</StatusBadge>
+              </div>
+              <div className="mt-2 font-mono text-[10px] text-ink-muted">{run.planningRepositorySha}</div>
+              <div className="mt-1">{new Date(run.createdAt).toLocaleString()} · attempt {run.attemptCount}/{run.maxAttempts}</div>
+            </li>
+          ))}
+        </ol>
+        <ol className="space-y-2">
+          {events.map((event) => (
+            <li key={event._id} className="border-l-2 border-line pl-3 text-xs text-ink-secondary">
+              <div className="font-medium text-ink">{event.eventType.toLowerCase().replaceAll("_", " ")}</div>
+              <div className="mt-0.5">{event.summary}</div>
+              <div className="mt-1 text-[10px] text-ink-muted">{event.actorType} · {new Date(event.timestamp).toLocaleString()}</div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </details>
+  );
 }
 
 function PlanEditor({
@@ -200,32 +279,39 @@ export function MissionPlanWorkspace({
   project: any;
   plans: any[];
 }) {
-  const enabled = useFlag("missions.plan-release-v1");
+  const enabled = useFlag("missions.plan-release-v1", projectId);
   const [experienceLevel] = useFactoryExperienceLevel();
   const workflowsQuery = useQuery(api.workflows.list, { activeOnly: true });
+  const repositories = useQuery(api.projects.listRepositories, { projectId });
   const specIntake = useQuery(api.missionSpecs.getMissionIntake, { projectId, missionId: mission._id });
+  const planningState = useQuery(api.missionPlanning.getForMission, { projectId, missionId: mission._id });
   const workflows = useMemo<MissionPlanWorkflowOption[]>(() => (workflowsQuery ?? []).map((workflow: any) => ({ workflowId: workflow.workflowId, name: workflow.name, version: workflow.version })), [workflowsQuery]);
   const recipeId = factoryRecipeIdFromMission(mission);
   const recipe = getFactoryRecipe(recipeId);
   const recipeWorkflow = useMemo(() => resolveRecipeWorkflow(recipeId, workflows), [recipeId, workflows]);
   const orderedPlans = useMemo(() => [...plans].sort((left, right) => right.revisionNumber - left.revisionNumber), [plans]);
   const currentPlan = orderedPlans[0] ?? null;
+  const missionRepository = repositories?.find(
+    (repository: any) => String(repository._id) === String(mission.repositoryId),
+  );
+  const repositoryName = missionRepository?.repository ?? project?.githubRepo;
+  const repositoryBranch = missionRepository?.defaultBranch ?? project?.githubBranch;
   const boundSpecRevision = currentPlan?.missionSpecRevisionId
     ? specIntake?.revisions.find((revision) => String(revision._id) === String(currentPlan.missionSpecRevisionId))
     : specIntake?.currentRevision;
   const boundConstitution = currentPlan?.projectConstitutionRevisionId
     ? specIntake?.constitutionRevisions.find((revision) => String(revision._id) === String(currentPlan.projectConstitutionRevisionId))
     : specIntake?.currentConstitution;
-  const lineagePanel = <PlanLineagePanel plan={currentPlan} specRevision={boundSpecRevision} constitution={boundConstitution} advanced={experienceLevel === "advanced"} />;
+  const lineagePanel = <><PlanLineagePanel plan={currentPlan} specRevision={boundSpecRevision} constitution={boundConstitution} advanced={experienceLevel === "advanced"} /><PlanningRepositoryBinding plan={currentPlan} /></>;
   const basePlan = currentPlan?.basePlanId ? orderedPlans.find((plan) => plan._id === currentPlan.basePlanId) ?? null : null;
   const initialValues = useMemo(() => {
     const values = currentPlan
-      ? planToMissionPlanValues(currentPlan, project?.githubRepo, project?.githubBranch)
+      ? planToMissionPlanValues(currentPlan, repositoryName, repositoryBranch)
       : recipe
         ? missionPlanFromFactoryRecipe({ recipe, missionTitle: mission.title, missionObjective: mission.objective, workflow: recipeWorkflow })
         : emptyMissionPlan(workflows[0]);
-    return { ...values, repository: currentPlan?.repository ?? project?.githubRepo, repositoryBranch: currentPlan?.repositoryBranch ?? project?.githubBranch };
-  }, [currentPlan?._id, currentPlan?.draftVersion, mission.objective, mission.title, project?.githubRepo, project?.githubBranch, recipe?.id, recipeWorkflow?.workflowId, workflows[0]?.workflowId]);
+    return { ...values, repository: currentPlan?.repository ?? repositoryName, repositoryBranch: currentPlan?.repositoryBranch ?? repositoryBranch };
+  }, [currentPlan?._id, currentPlan?.draftVersion, mission.objective, mission.title, recipe?.id, recipeWorkflow?.workflowId, repositoryBranch, repositoryName, workflows[0]?.workflowId]);
   const [values, setValues] = useState<MissionPlanValues>(initialValues);
   const [baseline, setBaseline] = useState<MissionPlanValues>(initialValues);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "acting" | "error">("idle");
@@ -233,7 +319,10 @@ export function MissionPlanWorkspace({
   const [showValidation, setShowValidation] = useState(false);
   const [decisionReason, setDecisionReason] = useState("");
   const [showAbandon, setShowAbandon] = useState(false);
-  const dirty = !missionPlanValuesEqual(values, baseline);
+  const [planningRequesting, setPlanningRequesting] = useState(false);
+  const [planningRequestError, setPlanningRequestError] = useState<string | null>(null);
+  const [appliedPlanningRunId, setAppliedPlanningRunId] = useState<Id<"missionPlanningRuns"> | null>(null);
+  const dirty = Boolean(appliedPlanningRunId) || !missionPlanValuesEqual(values, baseline);
   const errors = validateMissionPlanValues(values);
 
   const savePlanDraft = useMutation(api.missions.savePlanDraft);
@@ -242,6 +331,7 @@ export function MissionPlanWorkspace({
   const approvePlan = useMutation(api.missions.approvePlan);
   const forkPlanRevision = useMutation(api.missions.forkPlanRevision);
   const abandonPlanDraft = useMutation(api.missions.abandonPlanDraft);
+  const requestPlanningRun = useMutation(api.missionPlanning.request);
 
   useEffect(() => {
     if (!dirty) {
@@ -249,6 +339,49 @@ export function MissionPlanWorkspace({
       setBaseline(initialValues);
     }
   }, [dirty, initialValues]);
+
+  const boundPlanningRun = planningState?.bound ?? null;
+  const latestUnadoptedPlanningRun = planningState?.latestUnadopted ?? null;
+  const currentPlanningRun = boundPlanningRun ?? latestUnadoptedPlanningRun ?? planningState?.latest ?? null;
+  useEffect(() => {
+    if (currentPlan
+      || dirty
+      || latestUnadoptedPlanningRun?.status !== "SUCCEEDED"
+      || !latestUnadoptedPlanningRun.candidatePlan
+      || appliedPlanningRunId === latestUnadoptedPlanningRun._id) return;
+    setValues(planToMissionPlanValues(latestUnadoptedPlanningRun.candidatePlan, repositoryName, repositoryBranch));
+    setAppliedPlanningRunId(latestUnadoptedPlanningRun._id);
+    setStatus("idle");
+    setMessage("The validated Planning Agent candidate was applied to the unsaved editor for human review.");
+  }, [appliedPlanningRunId, currentPlan, dirty, latestUnadoptedPlanningRun?._id, latestUnadoptedPlanningRun?.status, repositoryBranch, repositoryName]);
+
+  function applyPlanningCandidate(run: any) {
+    if (!canApplyPlanningCandidate(currentPlan) || run?.status !== "SUCCEEDED" || !run.candidatePlan) return;
+    if ((currentPlan || dirty) && !window.confirm("Replace the current unsaved editor content with this validated Planning Agent candidate? The saved Plan is unchanged until you save.")) return;
+    setValues(planToMissionPlanValues(run.candidatePlan, repositoryName, repositoryBranch));
+    setAppliedPlanningRunId(run._id);
+    setShowValidation(false);
+    setStatus("idle");
+    setMessage("Planning Agent candidate applied. Review and save it before submission.");
+  }
+
+  async function generatePlanningCandidate() {
+    if (planningRequesting || !enabled) return;
+    setPlanningRequesting(true);
+    setPlanningRequestError(null);
+    try {
+      const result = await requestPlanningRun({ projectId, missionId: mission._id, idempotencyKey: newKey("generate-candidate") });
+      setMessage(result.created
+        ? "Planning run queued against an exact repository revision."
+        : "duplicateReason" in result && result.duplicateReason === "ACTIVE_RUN_EXISTS"
+          ? "An active planning run already exists for this Mission. Its current state is shown here."
+          : "This planning request was already queued.");
+    } catch (error) {
+      setPlanningRequestError(error instanceof Error ? error.message : "The Planning Agent run could not be queued.");
+    } finally {
+      setPlanningRequesting(false);
+    }
+  }
 
   async function save() {
     if (status === "saving" || !enabled) return null;
@@ -259,11 +392,12 @@ export function MissionPlanWorkspace({
         missionId: mission._id,
         planId: currentPlan?.status === "DRAFT" ? currentPlan._id : undefined,
         expectedDraftVersion: currentPlan?.status === "DRAFT" ? currentPlan.draftVersion ?? 1 : undefined,
+        planningRunId: appliedPlanningRunId ?? undefined,
         idempotencyKey: newKey("save"),
         ...missionPlanPayload(values),
       });
-      const persisted = planToMissionPlanValues(result.plan, project?.githubRepo, project?.githubBranch);
-      setValues(persisted); setBaseline(persisted); setStatus("saved"); setMessage(result.created ? "Plan draft created." : "Plan draft saved.");
+      const persisted = planToMissionPlanValues(result.plan, repositoryName, repositoryBranch);
+      setValues(persisted); setBaseline(persisted); setAppliedPlanningRunId(null); setStatus("saved"); setMessage(result.created ? "Plan draft created." : "Plan draft saved.");
       return result.plan;
     } catch (error) {
       setStatus("error"); setMessage(error instanceof Error ? error.message : "Plan draft could not be saved."); return null;
@@ -288,28 +422,68 @@ export function MissionPlanWorkspace({
     }
   }
 
-  if (workflowsQuery === undefined || specIntake === undefined) return <div className="rounded-xl border border-line bg-surface-1 px-4 py-10 text-center text-sm text-ink-muted">Loading plan workflows and lineage…</div>;
+  if (workflowsQuery === undefined || repositories === undefined || specIntake === undefined || planningState === undefined) return <div className="rounded-xl border border-line bg-surface-1 px-4 py-10 text-center text-sm text-ink-muted">Loading plan workflows, lineage, and planning evidence…</div>;
 
-  const readOnlyNotice = !enabled ? <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-ink-secondary">Mission plan release is read-only. Enable <code className="font-mono">missions.plan-release-v1</code> for a verified local/project scope to edit or decide.</div> : null;
+  const readOnlyNotice = shouldShowPlanReleaseReadOnlyNotice(enabled, currentPlan) ? <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-ink-secondary">Mission plan release is read-only. Enable <code className="font-mono">missions.plan-release-v1</code> for a verified local/project scope to edit or decide.</div> : null;
   const statusMessage = message ? <div role={status === "error" ? "alert" : "status"} className={`rounded-xl border p-3 text-sm ${status === "error" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-line bg-surface-1 text-ink-secondary"}`}>{message}</div> : null;
+  const canEditCandidate = canApplyPlanningCandidate(currentPlan);
+  const canRequestCandidate = Boolean(enabled && canEditCandidate && ["DRAFT", "PLANNING"].includes(mission.state));
+  const planningPanel = <>
+    {boundPlanningRun ? <PlanningAgentPanel
+      run={boundPlanningRun}
+      relationshipLabel="Bound to this Plan"
+      requesting={planningRequesting}
+      requestError={latestUnadoptedPlanningRun ? null : planningRequestError}
+      candidateApplied
+      canApply={false}
+      canRequest={canRequestCandidate}
+      showRequestAction={!latestUnadoptedPlanningRun && canEditCandidate}
+      onRequest={generatePlanningCandidate}
+      onApply={() => undefined}
+    /> : null}
+    {latestUnadoptedPlanningRun ? <PlanningAgentPanel
+      run={latestUnadoptedPlanningRun}
+      relationshipLabel={currentPlan ? "Latest unadopted candidate" : "Current planning run"}
+      requesting={planningRequesting}
+      requestError={planningRequestError}
+      candidateApplied={appliedPlanningRunId === latestUnadoptedPlanningRun._id}
+      canApply={canEditCandidate}
+      canRequest={canRequestCandidate}
+      showRequestAction={canEditCandidate}
+      onRequest={generatePlanningCandidate}
+      onApply={() => applyPlanningCandidate(latestUnadoptedPlanningRun)}
+    /> : !boundPlanningRun ? <PlanningAgentPanel
+      run={currentPlanningRun}
+      relationshipLabel="Current planning run"
+      requesting={planningRequesting}
+      requestError={planningRequestError}
+      candidateApplied={Boolean(currentPlanningRun && appliedPlanningRunId === currentPlanningRun._id)}
+      canApply={canEditCandidate}
+      canRequest={canRequestCandidate}
+      showRequestAction={canEditCandidate}
+      onRequest={generatePlanningCandidate}
+      onApply={() => applyPlanningCandidate(currentPlanningRun)}
+    /> : null}
+    <PlanningRunHistory runs={planningState.runs} events={planningState.events} />
+  </>;
 
   if (currentPlan?.status === "PROPOSED") {
     const diff = summarizePlanDiff(basePlan ? planToMissionPlanValues(basePlan) : null, planToMissionPlanValues(currentPlan));
-    return <div className="space-y-5">{readOnlyNotice}{statusMessage}{lineagePanel}<section className="rounded-xl border border-warning/30 bg-surface-1 p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-[13px] font-semibold text-ink">Revision {currentPlan.revisionNumber} needs a decision</h3><p className="mt-1 text-[12px] text-ink-muted">Approval releases {currentPlan.workOrderBlueprints.length} WorkOrders. It does not start execution.</p></div><StatusBadge tone="warning">Awaiting approval</StatusBadge></div><div className="mt-4 grid gap-3 sm:grid-cols-4"><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Repository</div><div className="mt-1 font-mono text-xs text-ink">{currentPlan.repository ?? "Unknown"}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Estimated cost</div><div className="mt-1 text-sm text-ink">{currentPlan.estimatedCostUsd == null ? "Unknown" : `$${currentPlan.estimatedCostUsd.toFixed(2)}`}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Assertions</div><div className="mt-1 text-sm text-ink">{currentPlan.assertions.length}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Submitted by</div><div className="mt-1 text-sm text-ink">{currentPlan.submittedBy ?? currentPlan.createdBy}</div></div></div></section><section className="rounded-xl border border-line bg-surface-1 p-4"><h3 className="text-[13px] font-semibold text-ink">Revision comparison</h3><ul className="mt-3 space-y-1.5 text-sm text-ink-secondary">{diff.map((item) => <li key={item}>— {item}</li>)}</ul></section><section className="space-y-3 rounded-xl border border-line bg-surface-1 p-4"><div><Label htmlFor="mission-plan-decision">Decision rationale</Label><Textarea id="mission-plan-decision" className="mt-1.5" value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} placeholder="Why is this plan safe to release, or what must change?" /></div><div className="flex flex-wrap justify-end gap-2"><Button variant="outline" disabled={!enabled || status === "acting"} onClick={() => act("reject")}>Reject plan</Button><Button disabled={!enabled || status === "acting"} onClick={() => act("approve")}>{status === "acting" ? "Recording…" : `Approve and release ${currentPlan.workOrderBlueprints.length} WorkOrders`}</Button></div></section></div>;
+    return <div className="space-y-5">{readOnlyNotice}{statusMessage}{lineagePanel}{planningPanel}<section className="rounded-xl border border-warning/30 bg-surface-1 p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-[13px] font-semibold text-ink">Revision {currentPlan.revisionNumber} needs a decision</h3><p className="mt-1 text-[12px] text-ink-muted">Approval releases {currentPlan.workOrderBlueprints.length} WorkOrders. It does not start execution.</p></div><StatusBadge tone="warning">Awaiting approval</StatusBadge></div><div className="mt-4 grid gap-3 sm:grid-cols-4"><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Repository</div><div className="mt-1 font-mono text-xs text-ink">{currentPlan.repository ?? "Unknown"}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Estimated cost</div><div className="mt-1 text-sm text-ink">{currentPlan.estimatedCostUsd == null ? "Unknown" : `$${currentPlan.estimatedCostUsd.toFixed(2)}`}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Assertions</div><div className="mt-1 text-sm text-ink">{currentPlan.assertions.length}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Submitted by</div><div className="mt-1 text-sm text-ink">{currentPlan.submittedBy ?? currentPlan.createdBy}</div></div></div></section><section className="rounded-xl border border-line bg-surface-1 p-4"><h3 className="text-[13px] font-semibold text-ink">Revision comparison</h3><ul className="mt-3 space-y-1.5 text-sm text-ink-secondary">{diff.map((item) => <li key={item}>— {item}</li>)}</ul></section><section className="space-y-3 rounded-xl border border-line bg-surface-1 p-4"><div><Label htmlFor="mission-plan-decision">Decision rationale</Label><Textarea id="mission-plan-decision" className="mt-1.5" value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} placeholder="Why is this plan safe to release, or what must change?" /></div><div className="flex flex-wrap justify-end gap-2"><Button variant="outline" disabled={!enabled || status === "acting"} onClick={() => act("reject")}>Reject plan</Button><Button disabled={!enabled || status === "acting"} onClick={() => act("approve")}>{status === "acting" ? "Recording…" : `Approve and release ${currentPlan.workOrderBlueprints.length} WorkOrders`}</Button></div></section></div>;
   }
 
   if (currentPlan?.status === "REJECTED") {
-    return <div className="space-y-5">{readOnlyNotice}{statusMessage}{lineagePanel}<section className="rounded-xl border border-warning/30 bg-surface-1 p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-[13px] font-semibold text-ink">Revision {currentPlan.revisionNumber} was rejected</h3><p className="mt-2 text-sm text-ink-secondary">{currentPlan.decisionReason}</p><div className="mt-2 text-xs text-ink-muted">{currentPlan.decidedBy ?? "Unknown actor"} · {currentPlan.decidedAt ? new Date(currentPlan.decidedAt).toLocaleString() : "Unknown time"}</div></div><StatusBadge tone="warning">Rejected</StatusBadge></div><div className="mt-4 flex justify-end"><Button disabled={!enabled || status === "acting"} onClick={() => act("fork")}>Create revision</Button></div></section></div>;
+    return <div className="space-y-5">{readOnlyNotice}{statusMessage}{lineagePanel}{planningPanel}<section className="rounded-xl border border-warning/30 bg-surface-1 p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-[13px] font-semibold text-ink">Revision {currentPlan.revisionNumber} was rejected</h3><p className="mt-2 text-sm text-ink-secondary">{currentPlan.decisionReason}</p><div className="mt-2 text-xs text-ink-muted">{currentPlan.decidedBy ?? "Unknown actor"} · {currentPlan.decidedAt ? new Date(currentPlan.decidedAt).toLocaleString() : "Unknown time"}</div></div><StatusBadge tone="warning">Rejected</StatusBadge></div><div className="mt-4 flex justify-end"><Button disabled={!enabled || status === "acting"} onClick={() => act("fork")}>Create revision</Button></div></section></div>;
   }
 
   if (currentPlan?.status === "APPROVED") {
-    return <div className="space-y-5">{readOnlyNotice}{statusMessage}{lineagePanel}<section className="rounded-xl border border-success/30 bg-surface-1 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="text-[13px] font-semibold text-ink">Revision {currentPlan.revisionNumber} approved and released</h2><p className="mt-1 text-[12px] text-ink-muted">Execution remains a separate governed action.</p></div><StatusBadge tone="success">Approved</StatusBadge></div>{currentPlan.legacyRelease ? <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-ink-secondary">Legacy approval — release provenance unavailable. WorkOrders will not be materialized automatically.</div> : <div className="mt-4 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3"><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Released WorkOrders</div><div className="mt-1 text-lg font-semibold text-ink">{currentPlan.releasedWorkOrderIds?.length ?? 0}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Decision actor</div><div className="mt-1 break-words text-sm text-ink">{currentPlan.decidedBy ?? currentPlan.approvedBy}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Released</div><div className="mt-1 text-sm text-ink">{currentPlan.releasedAt ? new Date(currentPlan.releasedAt).toLocaleString() : "Unknown"}</div></div></div>}<div className="mt-4 rounded-lg border border-line p-3 text-sm text-ink-secondary"><span className="font-medium text-ink">Decision rationale:</span> {currentPlan.decisionReason ?? "Not recorded"}</div></section></div>;
+    return <div className="space-y-5">{readOnlyNotice}{statusMessage}{lineagePanel}{planningPanel}<section className="rounded-xl border border-success/30 bg-surface-1 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="text-[13px] font-semibold text-ink">Revision {currentPlan.revisionNumber} approved and released</h2><p className="mt-1 text-[12px] text-ink-muted">Execution remains a separate governed action.</p></div><StatusBadge tone="success">Approved</StatusBadge></div>{currentPlan.legacyRelease ? <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-ink-secondary">Legacy approval — release provenance unavailable. WorkOrders will not be materialized automatically.</div> : <div className="mt-4 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3"><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Released WorkOrders</div><div className="mt-1 text-lg font-semibold text-ink">{currentPlan.releasedWorkOrderIds?.length ?? 0}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Decision actor</div><div className="mt-1 break-words text-sm text-ink">{currentPlan.decidedBy ?? currentPlan.approvedBy}</div></div><div><div className="text-[10px] uppercase tracking-wide text-ink-muted">Released</div><div className="mt-1 text-sm text-ink">{currentPlan.releasedAt ? new Date(currentPlan.releasedAt).toLocaleString() : "Unknown"}</div></div></div>}<div className="mt-4 rounded-lg border border-line p-3 text-sm text-ink-secondary"><span className="font-medium text-ink">Decision rationale:</span> {currentPlan.decisionReason ?? "Not recorded"}</div></section></div>;
   }
 
   if (currentPlan?.status === "SUPERSEDED" && mission.state === "DRAFT") {
-    return <div className="space-y-5">{readOnlyNotice}{statusMessage}{lineagePanel}<section className="rounded-xl border border-line bg-surface-1 p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-[13px] font-semibold text-ink">Plan draft closed</h3><p className="mt-2 text-sm text-ink-secondary">{currentPlan.decisionReason}</p></div><StatusBadge tone="neutral">Superseded</StatusBadge></div><p className="mt-4 text-sm text-ink-muted">Update the Mission definition, then create a new plan draft.</p></section></div>;
+    return <div className="space-y-5">{readOnlyNotice}{statusMessage}{lineagePanel}{planningPanel}<section className="rounded-xl border border-line bg-surface-1 p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-[13px] font-semibold text-ink">Plan draft closed</h3><p className="mt-2 text-sm text-ink-secondary">{currentPlan.decisionReason}</p></div><StatusBadge tone="neutral">Superseded</StatusBadge></div><p className="mt-4 text-sm text-ink-muted">Update the Mission definition, then create a new plan draft.</p></section></div>;
   }
 
   const editable = !currentPlan || currentPlan.status === "DRAFT";
-  return <div className="space-y-5">{readOnlyNotice}{statusMessage}{lineagePanel}{editable ? <>{recipe && !currentPlan ? <div className="rounded-xl border border-info-accent/25 bg-info-soft/35 p-3 text-[12.5px] text-ink-secondary"><span className="font-medium text-ink">Composed from {recipe.name}.</span> {recipeWorkflow ? `Matched active workflow ${recipeWorkflow.name} v${recipeWorkflow.version}.` : "No compatible active workflow matched; select one before saving."} This is an editable draft and still requires normal submission and human approval.</div> : null}<ErrorList errors={showValidation ? errors : []} /><PlanEditor values={values} workflows={workflows} errors={showValidation ? errors : []} spec={boundSpecRevision?.content} onChange={(next) => { setValues(next); setStatus("idle"); setMessage(null); }} /><div className="sticky bottom-0 rounded-xl border border-line bg-app/95 p-3 backdrop-blur"><div className="flex flex-wrap items-center justify-between gap-3"><div className="text-xs text-ink-muted">{dirty ? "Unsaved plan changes" : currentPlan ? `Revision ${currentPlan.revisionNumber} saved` : "Plan draft not yet saved"}</div><div className="flex flex-wrap gap-2">{currentPlan ? <Button type="button" variant="outline" onClick={() => setShowAbandon((value) => !value)} disabled={!enabled || status === "saving" || status === "acting"}>Abandon draft</Button> : null}<Button type="button" variant="outline" onClick={save} disabled={!enabled || !dirty || status === "saving"}>{status === "saving" ? "Saving…" : currentPlan ? "Save draft" : "Create plan draft"}</Button><Button type="button" onClick={() => { setShowValidation(true); act("submit"); }} disabled={!enabled || !currentPlan || dirty || status === "acting"}>Submit for approval</Button></div></div>{showAbandon ? <div className="mt-3 grid gap-2 border-t border-line pt-3 sm:grid-cols-[1fr_auto]"><Textarea value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} placeholder="Reason for returning to Mission definition" /><Button variant="destructive" disabled={!decisionReason.trim() || status === "acting"} onClick={() => act("abandon")}>Confirm abandon</Button></div> : null}</div></> : <section className="rounded-xl border border-line bg-surface-1 p-4"><div className="flex items-center justify-between gap-3"><h3 className="text-[13px] font-semibold text-ink">Revision {currentPlan?.revisionNumber}</h3><StatusBadge tone={planTone(currentPlan?.status ?? "UNKNOWN")}>{currentPlan?.status ?? "Unknown"}</StatusBadge></div></section>}</div>;
+  return <div className="space-y-5">{readOnlyNotice}{statusMessage}{lineagePanel}{planningPanel}{editable ? <>{recipe && !currentPlan ? <div className="rounded-xl border border-info-accent/25 bg-info-soft/35 p-3 text-[12.5px] text-ink-secondary"><span className="font-medium text-ink">Composed from {recipe.name}.</span> {recipeWorkflow ? `Matched active workflow ${recipeWorkflow.name} v${recipeWorkflow.version}.` : "No compatible active workflow matched; select one before saving."} This is an editable draft and still requires normal submission and human approval.</div> : null}<ErrorList errors={showValidation ? errors : []} /><PlanEditor values={values} workflows={workflows} errors={showValidation ? errors : []} spec={boundSpecRevision?.content} onChange={(next) => { setValues(next); setStatus("idle"); setMessage(null); }} /><div className="sticky bottom-0 rounded-xl border border-line bg-app/95 p-3 backdrop-blur"><div className="flex flex-wrap items-center justify-between gap-3"><div className="text-xs text-ink-muted">{dirty ? "Unsaved plan changes" : currentPlan ? `Revision ${currentPlan.revisionNumber} saved` : "Plan draft not yet saved"}</div><div className="flex flex-wrap gap-2">{currentPlan ? <Button type="button" variant="outline" onClick={() => setShowAbandon((value) => !value)} disabled={!enabled || status === "saving" || status === "acting"}>Abandon draft</Button> : null}<Button type="button" variant="outline" onClick={save} disabled={!enabled || !dirty || status === "saving"}>{status === "saving" ? "Saving…" : currentPlan ? "Save draft" : "Create plan draft"}</Button><Button type="button" onClick={() => { setShowValidation(true); act("submit"); }} disabled={!enabled || !currentPlan || dirty || status === "acting"}>Submit for approval</Button></div></div>{showAbandon ? <div className="mt-3 grid gap-2 border-t border-line pt-3 sm:grid-cols-[1fr_auto]"><Textarea value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} placeholder="Reason for returning to Mission definition" /><Button variant="destructive" disabled={!decisionReason.trim() || status === "acting"} onClick={() => act("abandon")}>Confirm abandon</Button></div> : null}</div></> : <section className="rounded-xl border border-line bg-surface-1 p-4"><div className="flex items-center justify-between gap-3"><h3 className="text-[13px] font-semibold text-ink">Revision {currentPlan?.revisionNumber}</h3><StatusBadge tone={planTone(currentPlan?.status ?? "UNKNOWN")}>{currentPlan?.status ?? "Unknown"}</StatusBadge></div></section>}</div>;
 }

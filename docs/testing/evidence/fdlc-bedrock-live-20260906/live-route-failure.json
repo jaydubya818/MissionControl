@@ -1,0 +1,12 @@
+{
+  "schema": "fdlc-bedrock-live-route-failure/v1",
+  "requestId": "fdlc-route-3bee9a64-4f28-4aca-914d-70f44143f4f0",
+  "classification": "UNKNOWN",
+  "providerRequestId": "641e32f7-5dfa-4056-84ba-affc2c2938aa",
+  "httpStatusCode": 429,
+  "attempts": 1,
+  "totalRetryDelay": 0,
+  "error": "ThrottlingException",
+  "message": "Too many tokens per day, please wait before trying again.",
+  "automaticRetries": 0
+}

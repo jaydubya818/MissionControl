@@ -2,12 +2,16 @@ import {
   GENERIC_HARNESS_CONTRACT_VERSION,
   harnessCapabilityManifestDigest,
   harnessManifestIssues,
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
   type ExecutorRequest,
   type HarnessCapabilityManifest,
   type HarnessExecutionBackend,
   type HarnessExecutorAdapter,
   type HarnessExecutorCapabilities,
+  type HarnessRuntimeArtifactIdentity,
 } from "@mission-control/workflow-engine";
+import { ISOLATED_INVOCATION_MANIFEST, ISOLATED_INVOCATION_ADAPTER_ARTIFACT } from "@mission-control/workflow-engine/harness-contract";
 
 export interface HarnessAdapterBinding {
   adapter: string;
@@ -21,6 +25,10 @@ export interface RemoteHarnessInvocation {
   outputSchemaPath?: string;
   outputSchema?: Record<string, unknown>;
   model?: string;
+  provider?: string;
+  modelRouteDigest?: string;
+  providerRoute?: string;
+  reasoningConfig?: ExecutorRequest["reasoningConfig"];
   prompt: string;
   allowedPaths: string[];
   timeoutMs: number;
@@ -32,6 +40,7 @@ export interface RemoteHarnessInvocationContext {
 }
 
 export type HarnessRuntimeAdapter = HarnessExecutorAdapter<any, any> & {
+  validateRemoteConfiguration?: (request: ExecutorRequest) => ReturnType<HarnessExecutorAdapter["validateConfiguration"]>;
   createRemoteInvocation?: (
     request: ExecutorRequest,
     context: RemoteHarnessInvocationContext,
@@ -44,6 +53,8 @@ export interface RegisteredHarnessAdapter {
   manifest?: HarnessCapabilityManifest;
   capabilityManifestSha256?: string;
   effectiveConfigSha256?: string;
+  runtimeArtifact: HarnessRuntimeArtifactIdentity;
+  runtimeArtifactSha256: string;
 }
 
 export class HarnessAdapterRegistry {
@@ -53,7 +64,6 @@ export class HarnessAdapterRegistry {
     adapters: HarnessRuntimeAdapter[],
     options: { requiredExecutionBackends?: HarnessExecutionBackend[] } = {},
   ) {
-    if (adapters.length === 0) throw new Error("Harness adapter registry requires at least one adapter.");
     for (const adapter of adapters) {
       const capabilities = snapshotCapabilities(adapter.capabilities());
       validateCapabilities(capabilities);
@@ -75,6 +85,8 @@ export class HarnessAdapterRegistry {
         manifest: manifest ? snapshotManifest(manifest) : undefined,
         capabilityManifestSha256: manifest ? harnessCapabilityManifestDigest(manifest) : undefined,
         effectiveConfigSha256: manifest?.effectiveConfigSha256,
+        runtimeArtifact: structuredClone(capabilities.runtimeArtifact),
+        runtimeArtifactSha256: harnessRuntimeArtifactDigest(capabilities.runtimeArtifact),
       });
     }
   }
@@ -107,6 +119,7 @@ export class HarnessAdapterRegistry {
       ...registration,
       capabilities: snapshotCapabilities(registration.capabilities),
       manifest: registration.manifest ? snapshotManifest(registration.manifest) : undefined,
+      runtimeArtifact: structuredClone(registration.runtimeArtifact),
     };
   }
 
@@ -119,6 +132,7 @@ export class HarnessAdapterRegistry {
       ...registration,
       capabilities: snapshotCapabilities(registration.capabilities),
       manifest: registration.manifest ? snapshotManifest(registration.manifest) : undefined,
+      runtimeArtifact: structuredClone(registration.runtimeArtifact),
     }));
   }
 }
@@ -137,10 +151,22 @@ function validateCapabilities(capabilities: HarnessExecutorCapabilities) {
   if (capabilities.provider !== undefined && !boundedIdentity(capabilities.provider)) {
     throw new Error(`Harness adapter ${bindingKey(capabilities)} provider identity is invalid.`);
   }
+  const runtimeArtifactIssues = harnessRuntimeArtifactIssues(capabilities.runtimeArtifact);
+  if (runtimeArtifactIssues.length > 0) {
+    throw new Error(`Harness adapter ${bindingKey(capabilities)} runtime artifact is invalid (${runtimeArtifactIssues.join(", ")}).`);
+  }
   if (capabilities.executionBackends.length === 0
     || new Set(capabilities.executionBackends).size !== capabilities.executionBackends.length
-    || capabilities.executionBackends.some((backend) => !["persistent-worker", "remote-sandbox"].includes(backend))) {
+    || capabilities.executionBackends.some((backend) => !["persistent-worker", "remote-sandbox", "isolated-container"].includes(backend))) {
     throw new Error(`Harness adapter ${bindingKey(capabilities)} execution backends are invalid.`);
+  }
+  if (capabilities.executionBackends.includes("isolated-container")
+    && (capabilities.executionBackends.length !== 1 || capabilities.provider !== undefined
+      || capabilities.supportsRepositoryMutation || capabilities.supportsResume
+      || !capabilities.capabilityManifest
+      || harnessCapabilityManifestDigest(capabilities.capabilityManifest) !== harnessCapabilityManifestDigest(ISOLATED_INVOCATION_MANIFEST)
+      || harnessRuntimeArtifactDigest(capabilities.runtimeArtifact) !== harnessRuntimeArtifactDigest(ISOLATED_INVOCATION_ADAPTER_ARTIFACT))) {
+    throw new Error("Isolated worker registration requires the exact offline backend artifact and manifest without inference or repository authority.");
   }
   const authorityDomains = ["worker", "verification", "publication", "acceptance", "memory", "observability", "learning"] as const;
   const authorityKeys = Object.keys(capabilities.authority);
@@ -189,6 +215,7 @@ function snapshotCapabilities(capabilities: HarnessExecutorCapabilities): Harnes
     capabilityManifest: capabilities.capabilityManifest
       ? snapshotManifest(capabilities.capabilityManifest)
       : undefined,
+    runtimeArtifact: structuredClone(capabilities.runtimeArtifact),
     executionBackends: [...capabilities.executionBackends],
     authority: { ...capabilities.authority },
     isolationModes: [...capabilities.isolationModes],

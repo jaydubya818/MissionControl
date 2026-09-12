@@ -19,11 +19,13 @@ import {
   finalizationForRevision,
   hydrateChecklistDispositions,
   missionSpecCompleteness,
+  missionSpecWithCurrentMissionScope,
   missionSpecValuesEqual,
   nextMissionSpecId,
   type MissionSpecValues,
 } from "../missionSpecModel";
 import { factoryRecipeIdFromMission } from "../missionPlanModel";
+import { SharedBuilderIntentPanel } from "./SharedBuilderIntentPanel";
 
 const actionKey = (action: string) =>
   `ui-mission-spec:${action}:${crypto.randomUUID()}`;
@@ -1570,11 +1572,11 @@ export function MissionSpecificationWorkspace({
 
   useEffect(() => {
     if (!dirty) {
-      setValues(seedValues);
+      setValues(missionSpecWithCurrentMissionScope(seedValues, mission));
       setBaseline(seedValues);
       setRevising(false);
     }
-  }, [dirty, seedValues]);
+  }, [dirty, mission.codeScopeIds, mission.repositoryId, seedValues]);
 
   if (intake === undefined)
     return (
@@ -1905,6 +1907,12 @@ export function MissionSpecificationWorkspace({
           No deterministic Spec Quality findings for this exact revision.
         </div>
       ) : null}
+
+      <SharedBuilderIntentPanel
+        projectId={projectId}
+        mission={mission}
+        currentRevision={current}
+      />
 
       <SpecEditor
         values={values}

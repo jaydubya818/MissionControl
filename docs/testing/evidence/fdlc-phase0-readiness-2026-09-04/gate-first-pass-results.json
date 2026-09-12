@@ -1,0 +1,47 @@
+[
+  {
+    "gate": "test",
+    "exitCode": 0,
+    "seconds": 31.67
+  },
+  {
+    "gate": "lint",
+    "exitCode": 0,
+    "seconds": 32.45
+  },
+  {
+    "gate": "build",
+    "exitCode": 0,
+    "seconds": 14.65
+  },
+  {
+    "gate": "ci-typecheck",
+    "exitCode": 0,
+    "seconds": 27.7
+  },
+  {
+    "gate": "runtime-contract",
+    "exitCode": 0,
+    "seconds": 3.0
+  },
+  {
+    "gate": "release-security",
+    "exitCode": 1,
+    "seconds": 5.24
+  },
+  {
+    "gate": "eval",
+    "exitCode": 0,
+    "seconds": 0.92
+  },
+  {
+    "gate": "factory",
+    "exitCode": 1,
+    "seconds": 4.65
+  },
+  {
+    "gate": "diff",
+    "exitCode": 0,
+    "seconds": 0.03
+  }
+]

@@ -1,0 +1,1744 @@
+{
+  "previousBaseline": "0d1a0908cce380d815069ce0a59e1604d2f26ece",
+  "sourceHead": "f82fe1d98b156278c4fa0c0e2032008e2f010f39",
+  "currentMain": "ed77c46c9d975a2ed0c666cdaf0a3f0e12e77d4d",
+  "sourceMergeBase": "9a80cf3c5cc229bb4a552a9f08ddda5841e70a38",
+  "candidateMergeBase": "ed77c46c9d975a2ed0c666cdaf0a3f0e12e77d4d",
+  "mainCommitsAdvanced": 2,
+  "currentMainContract": 42,
+  "proposedContract": 43,
+  "sourcePreserved": true,
+  "environmentFilesCopied": false,
+  "files": [
+    {
+      "path": "README.md",
+      "classification": "SEMANTIC_MERGE",
+      "sourceHash": "672820eabe219a929c2cf457a4a65e7d997a0a69dd6e4894f36b6140535e550f"
+    },
+    {
+      "path": "apps/mission-control-ui/src/TaskDrawerTabs.tsx",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "269f2585946e0223451cee1a8b85c8cacae53cf76a03f6adee1bc814766db787"
+    },
+    {
+      "path": "apps/mission-control-ui/src/controlPlane/WorkOrderReadinessPanel.tsx",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "db134641106143d26ae675068b092957154240be9e1a06a9b184499ac4d1ad19"
+    },
+    {
+      "path": "apps/mission-control-ui/src/controlPlane/WorkOrdersView.tsx",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "5c006abfeca0dbacb1893d19d4e7358b09b51a024a9eed2ba3f7aa47deaa191a"
+    },
+    {
+      "path": "apps/mission-control-ui/src/workspace/FactoryConfigurationPanel.tsx",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "017d7a7ed152fd0b4ceb4520e63413adaa67eaebef0462e3cb9844e39e6d3bfb"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/bedrockAdapter.test.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "9cd74624c475eaa44380f25d6dcb1dd09895842e29be1e062152d562a9acd728"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/codexExecutorAdapter.test.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "60463cc9aba550c1f191f63f843912d97bd43d82974cc623e639e058e9a390f5"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/dockerFactoryWorker.test.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "93e3d70887e2704e4c1ad9b62d778bab0a421eaa01543d2c0aca52b9dfc3d449"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/dockerSandboxProvider.test.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "333318a7ab5128ee515c40a4dd975d70a8bb4274aa61eab3685d0ef067bc126c"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "447e2758c9c51e369bdabbc5ea50335e8ffa4fd52320d30bd579a0c5d12a34fe"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/factoryAttemptWorkerRemote.test.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2164ee83b09b16886d5b8d2c9d50036714195e403860cffb7c679269f7850c63"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/factoryWorkspaceOwnership.test.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "dd80b4e9e86e0c68916c9f2d37ebe537fa8a3fc9b128ffd2f3f3e3a8b23d1b59"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/fixtures/remoteWorkerFixture.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "6688165e7b7f91bbdcda5963c225ce7c93e5dae9344b01e70cf08cf2e5591d20"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/governedMcpBroker.test.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "5ce9a86e13cc74d04c76ebbf3eceaf83549d41e68a9a2670265417e6e8e01294"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/hardLiabilityLedger.test.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c0e75503db747320093da0481f0effbc9da89bf3d207314a125221bf16ddb776"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockAdapter.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "43615e075a0ccd249c752426612b45ec9d678f974571a8c218f2eb5f63ca9695"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockBudgetAdapter.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "7894c9da4d5216531f0bf529575ef93719e505ccdbd2628bb7676153c9f2aefe"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockIam.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "375df72cd87c2872e796c1f4ae335ed2e3e67c602e53ed168da4c2f5a1e34a83"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockPricing.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "a9a4db1b84242c30bd9070dc6b9374a451fa5e4d352ccae2016eddaf92c12c2c"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockRoute.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "e1a81c9ca0eda049a4cc7f3af9df435c013cd86e358b7f6917fedc6b386841ec"
+    },
+    {
+      "path": "apps/orchestration-server/src/dockerSandboxProvider.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f6a7604b2decbd786a79142a6880167866bca9fcf87c6f7501e60f276050be29"
+    },
+    {
+      "path": "apps/orchestration-server/src/factoryAttemptWorker.ts",
+      "classification": "SEMANTIC_MERGE",
+      "sourceHash": "e3c909adaa319ee25e839ee214dab0dfc4b2cfa2478c6323490552c384071566"
+    },
+    {
+      "path": "apps/orchestration-server/src/factoryGovernedMcpContext.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "ecaecadce683d476bfe74175d8248aaba0bf0ee5d457e0585856d5cdbd4e13c7"
+    },
+    {
+      "path": "apps/orchestration-server/src/factoryWorkspaceOwnership.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "64564c5cf59be1ccae8750fb8c287cfc4911283822aa23564db8c09d0f555c22"
+    },
+    {
+      "path": "apps/orchestration-server/src/governedMcpBroker.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "f5a8eed20736efc0edd630a4263dbe9e3c5c13ec637286add781b1968c445c44"
+    },
+    {
+      "path": "apps/orchestration-server/src/governedMcpContracts.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "cf4a6d70a296900ca85f6f2c8ee6f5035c7f83db7e39a739efe3d24c7d6148ad"
+    },
+    {
+      "path": "apps/orchestration-server/src/hardLiabilityLedger.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2e6bd391719dded666117536aef6d14c3b1c7230b5c4086a8d41dc65311763c3"
+    },
+    {
+      "path": "apps/orchestration-server/src/remoteSandboxRuntime.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "66f805d431efb1fe4ce07cca74b70e0fa6e00ab7fb24066ec5bffb6b3c5e5f4a"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxProvider.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "dd94c8d815eca9649e569ac35f7070edc346652f233f75deefca99c8706701ac"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxResultBundle.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "792b9c7104417e62558d6a64cf177ec0cc9ff95fa8b0cb6ae48728554eda76eb"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxSupervisor.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "db3449462bbd875b68e443b7ba8ae372fc02ff5919a5d94ce6c8bc94c26c8ca4"
+    },
+    {
+      "path": "apps/orchestration-server/src/serviceCommandClient.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "6a83b44bd7138a4f68b29267f5efc63d92200282d8db127256cc383c44791f53"
+    },
+    {
+      "path": "convex/__tests__/dockerAllocationRecovery.test.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f79c999d8fcb4d55fdc59682f742f4533ecbe121cea363c3d9a8435ccd971eae"
+    },
+    {
+      "path": "convex/__tests__/governedHardeningAuthority.test.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "0c4535e20912bfe2a6959db51f7c9c40565b4c51a3ac466eacd8880a976b0021"
+    },
+    {
+      "path": "convex/__tests__/governedMcp.test.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "8fa649ec6b325137794c7c4621afc107613c52e0388453f5d85199d8030bd5e7"
+    },
+    {
+      "path": "convex/__tests__/localCandidateRecovery.test.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "convex/__tests__/pilotLiabilityAllocation.test.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "7cb32f4930ed9eccede8a24c50a957eb041d5abe190851dbe57ab00e125becbd"
+    },
+    {
+      "path": "convex/__tests__/providerLiability.test.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2820af32ac82a8ab46bcf0c3adc7a4ffe9ff345f6191a3fa867a95a8d9415ec3"
+    },
+    {
+      "path": "convex/__tests__/providerLiabilityHandlers.test.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "fbce694fe7dd0b965fa91226c173dcb024e49eea466b2efdacb44775fc05864a"
+    },
+    {
+      "path": "convex/__tests__/workOrderReadiness.test.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "cbc326c6f19f116febafc534f04e924a635f75ec66f042cbfa9fc55df1cae3c3"
+    },
+    {
+      "path": "convex/_generated/api.d.ts",
+      "classification": "SUPERSEDED_BY_MAIN",
+      "sourceHash": "97e3c34746afa179adc26c33ee4c25c3c61e02d2e1440ea4d9ac260617cd1a0b"
+    },
+    {
+      "path": "convex/factory/attempts.ts",
+      "classification": "SEMANTIC_MERGE",
+      "sourceHash": "ed575d57873ebbf0d5a4b4721bcff3abd68619070ff165ef4e8e175de303f1ae"
+    },
+    {
+      "path": "convex/factory/configuration.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "f00a048fb8381e210f2db4fc6f818832b35f74f8745ffb5833455d2d2c825425"
+    },
+    {
+      "path": "convex/factory/governedMcp.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "b4fbc6ef2bc4484b747ef4875219a3e4ec60bf60801e94977d518696b0e7caf6"
+    },
+    {
+      "path": "convex/factory/providerLiability.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2a49a7547573d49384ad35e5a7f7f9542b532483ff8296e1f886f5ff50f1f3d4"
+    },
+    {
+      "path": "convex/lib/dockerAllocationRecovery.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "79a571c9d2468580c62cb215fb2647460be98a6adf9800975bbbc7ae3b32c183"
+    },
+    {
+      "path": "convex/lib/factoryAttempt.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "e8e2834dd4cba30166ce80e1f89f6776f191b44f8fd6614eef421513ad3bd40d"
+    },
+    {
+      "path": "convex/lib/factoryDispatch.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c52842cd42e9abb32f30087f5b7620a0cb62cd761a3bf44e77098f2ef56ae575"
+    },
+    {
+      "path": "convex/lib/governedMcp.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "f9fe93ab399aedec631dc7d3c92ad1d6380da9048a6f903da83bfe210378d73e"
+    },
+    {
+      "path": "convex/lib/localCandidateRecovery.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "convex/lib/pilotLiabilityAllocation.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "d831baba6d500007f993fda8ed76146204713bb33889567d0e44cf19b40cac52"
+    },
+    {
+      "path": "convex/lib/providerLiability.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "21afa0b0d45c9b0659f9ae1ad25e29845a56435c42d2a1cacd3c87c094cc777c"
+    },
+    {
+      "path": "convex/lib/providerLiabilityValidators.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "b279a1250e7f7f9f4e77b8abc7d1440ef181fa226ac9a40a103d1242dbccaaef"
+    },
+    {
+      "path": "convex/lib/runtimeContract.ts",
+      "classification": "SEMANTIC_MERGE",
+      "sourceHash": "1e7dcb70d7de85f37c66c58679d219d91b60c70332fdd4d17fed76ff071dceb8"
+    },
+    {
+      "path": "convex/lib/workOrderReadiness.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "358cced53de61b9230ad166e01dfe4a4718fd6aa786779a69f1b79d021bdbe52"
+    },
+    {
+      "path": "convex/lib/workOrderSpecificationValidators.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "8489c9c83a07489b7705df090aa8952d0ee807bd4d1dae5e6f5169ed02ff8265"
+    },
+    {
+      "path": "convex/schema.ts",
+      "classification": "SEMANTIC_MERGE",
+      "sourceHash": "81055a97c1f09ff5739588aa4722b4de45ceec2372bef5996c2b3a5b3a4da796"
+    },
+    {
+      "path": "convex/serviceCommands.ts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "584ecd39fc8ba15a2c4fa608c80fcad56a66a9eec39e31f3db9098bed873d102"
+    },
+    {
+      "path": "convex/workOrders.ts",
+      "classification": "SEMANTIC_MERGE",
+      "sourceHash": "e1686e3e46aca64a8f13aedb1924de8638e1413d60a80e3a0df8a0417e222dc2"
+    },
+    {
+      "path": "docs/OVERVIEW.md",
+      "classification": "SEMANTIC_MERGE",
+      "sourceHash": "2d6857d63f8e3600c7001b677f71587a861e91cd73fdb8476791e001818d3917"
+    },
+    {
+      "path": "docs/decisions/governed-mcp-tool-capability.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "2fdbc958a3d1dadec5792083539d2119c57ee8c45a757eeee8ca47ba4cb2449d"
+    },
+    {
+      "path": "docs/plans/2026-09-04-feat-fdlc-capability-convergence-plan.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "25c63d93318eeff54674e9ef383e172665913938a6791458a2e5fcbb6a5feaa8"
+    },
+    {
+      "path": "docs/product/software-factory-capability-maturity.md",
+      "classification": "SEMANTIC_MERGE",
+      "sourceHash": "aed988d6bd4a3bb074f28646b3d28c0ff6dfa58b47be4fc09b3855e1ba8db992"
+    },
+    {
+      "path": "docs/research/2026-09-04-fdlc-capability-audit/current-main-reconciliation.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "258e6c7839b75201a4c159e6afd7d86395d2ab6a13e4ed58cceb87e7c90ef163"
+    },
+    {
+      "path": "docs/research/2026-09-04-fdlc-capability-audit/source-manifest.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "d92f6dc8559f1fa1b2f3ea1d9221d9779a1c43ec4a4c3b1fbc07c0322d60fd8f"
+    },
+    {
+      "path": "docs/software-factory/fdlc-bedrock-contract-drift-record.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "fac64f4c0855cd12d59e61df0b83f3624911fe2e1631f822ba929ea60e6b72bc"
+    },
+    {
+      "path": "docs/software-factory/fdlc-bedrock-iam-specification.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "355da58e54ef38a600b7ea4223c3c69f510e14af73575b835afdc96f04a1ce70"
+    },
+    {
+      "path": "docs/software-factory/fdlc-bedrock-offline-contract.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "b026ea8589180313cf48c58b5bf7020bb20587bf9b1f55107373a95da5c94843"
+    },
+    {
+      "path": "docs/software-factory/fdlc-bedrock-offline-implementation-plan.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "6f842a089790f36c20eb55d3a5f3c0254b828cb71098126dc1712a5ee2e563b0"
+    },
+    {
+      "path": "docs/software-factory/fdlc-bedrock-price-unqualified.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "184c3fb20a423fd383aaa7512eafad2f34d5e2ac562098d351c836611904d9b7"
+    },
+    {
+      "path": "docs/software-factory/fdlc-bedrock-qualification-inputs.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "e56bb07742e3f587fc4993af99c19a0a5bf5a3f9946123b8c55cc13f4a0bf883"
+    },
+    {
+      "path": "docs/software-factory/fdlc-bedrock-resumption.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "101304001f4d7503318f1c3a291a3b5c3678fea15afeb0bb9a1b49532231d0f0"
+    },
+    {
+      "path": "docs/software-factory/fdlc-docker-closure-contract-plan.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "9c37cf4b6658d84e943f55bb51cd097d5a7ae49a9a447f88b7a8b73ee65cc2b4"
+    },
+    {
+      "path": "docs/software-factory/fdlc-docker-implementation-plan.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "44edfa64f204042c08ea81e956e420c510c18bb3c66f335c2e22b1b6c8ee6e1d"
+    },
+    {
+      "path": "docs/software-factory/fdlc-phase1-docker-execution-path-qualification-report.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "eae229c337f0cb64af8c1010ca7125a3755e8a4b40b6c07f76465e5f098cfe2a"
+    },
+    {
+      "path": "docs/software-factory/fdlc-phase1-execution-path-qualification-report.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c3db57d3b0754485067b4fb9de72c5ff5cc49b475682b1df661556c255f3de75"
+    },
+    {
+      "path": "docs/software-factory/fdlc-phase1-execution-proposal.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "fee1c59a19ccf512d592047dbc4243b3cc28ff17d6a0037a9e47ca6a8001684b"
+    },
+    {
+      "path": "docs/software-factory/fdlc-phase1-pilot-record.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "0a8740288f378b145522af0fdaa4808cc793d3a6a5e1d6e25bfefc0af61f1427"
+    },
+    {
+      "path": "docs/software-factory/fdlc-workorder-01-admission-closure-report.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "6875da1435bb97b078134c39dc4d2e650ee14a00b2e84a8c9b3ade09c6388b73"
+    },
+    {
+      "path": "docs/software-factory/fdlc-workorder-01-admission-report.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "566c7bf1a14a9f6a69329465a27ba709488d72204223902254def57edddbbb29"
+    },
+    {
+      "path": "docs/software-factory/fdlc-workorder-01-final-admission-report.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "32ecc6fa93d8572c51e7caca8f3022f7f1c2b0931be5de7b7501ca4b9485cddd"
+    },
+    {
+      "path": "docs/software-factory/fdlc-workorder-01-preflight.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "705b0e2afc5eb652da8ed80b39f16d9fd88e5464ed2e319edbe8d3158b4c95e3"
+    },
+    {
+      "path": "docs/software-factory/phase4-real-mcp-service-selection-v2.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/software-factory/phase4-real-mcp-service-selection.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/software-factory/worker-runtime-operations.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "253925ff0b46873e69efa97822df73c862f4355bb7474b5dd7e65c5f340225dc"
+    },
+    {
+      "path": "docs/software-factory/workorder-readiness-contract.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "acc7a4a4cf2e11eec23169991f830498685ac295bd08d9f5c46203ce50cb15a8"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/configuration-search.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "caff2fdf3330a2d611a39ee8a9a579d3cd159a4cabc5f06b527528b1b492ed17"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/docker-worker-budget-denial.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "417efc4d105a2e1a79f776987613681d7eef03365f6eb992a4c2bb6ceca67d28"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/docker-worker-cancel.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c288532184ae1d7be19dde9f3c48b6a36ce505ab88ff6778a77abc94d4a7b3a9"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/docker-worker-cleanup-failure.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "813b33ff7b594b69427db1341dfc8dd5e09024d06d1277ce805bbf65436f135d"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/docker-worker-cleanup-recovery.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "d967aedd00cdcb492b8dbbe62d0197f850d3b3461be586ecde854268e55cb3aa"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/docker-worker-request-recovery.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c682cf31d568eeeb4bbebf2d95095ef0b766ef420360089a2553b957f2587402"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/docker-worker-startup-failure.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "a2c811e7bababae17f79126165191a0f5dbca1b2ad4c118d20ec27e65f97c360"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/docker-worker-timeout.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "413e7915ac2bd1cd53a77b9151a27d50a21956aa815dfd648f1a1930e9a9e775"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/docker-worker-worker-death.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "bbdbe5fb67456ed6f0e23c04aa40690f1fd568bac0d6a42d9b808486677b986c"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/docker-worker.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "5188c58fa35e827803c964f696a17b759029aaf1d3e6640f8e8d8db8b77add49"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/fdlc-bedrock-price-unqualified.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "184c3fb20a423fd383aaa7512eafad2f34d5e2ac562098d351c836611904d9b7"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/fdlc-bedrock-qualification-inputs.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "e56bb07742e3f587fc4993af99c19a0a5bf5a3f9946123b8c55cc13f4a0bf883"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/fdlc-bedrock-resumption.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "101304001f4d7503318f1c3a291a3b5c3678fea15afeb0bb9a1b49532231d0f0"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/final-hold-report.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "eae229c337f0cb64af8c1010ca7125a3755e8a4b40b6c07f76465e5f098cfe2a"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/prerequisite-assessment.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "00de92c9f2720aac964ff5d022590145f52e11669d8a51f343ac7c79dd78f2fb"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/prior-hold-report.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "dbdb1302a1f8e8e1aafb035425f082ef9f10eb1f42041313885adb1ba407ad08"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/prior-inputs.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "67daed884645c20e20b2f7e5498633044d43f72550138b22a1b21189ab339fd9"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/source-hashes.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "1602a41331758d8a972c2659ac22c3b1ecb9fcbf4d1c4e08416aba764b2f1fd7"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-20260905/verification-summary.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "6e4f441260105e9fc9eba3e4eceb570b0c7e77cc2c4890eae7b25b1b5d8627b7"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-system-20260905/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "76572dd61a3f49c93029d8241aa3fbb7414c795c479424c620d5aa9fa191d6c3"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-system-20260905/eval-receipt.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "9b92636b48c41fdfcd2d2c25d74a2204d51b1a70aa7f207531d01b103e406885"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-system-20260905/scenario-evidence.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f40adf730470820f949e3cfcb2d7d1966a5119148ff2751308b2b513b5df1a1b"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-system-final-20260905/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f1e859f9d539a92ae9fc5b429aa884fa1c3b288309a4759a357b012362a6f614"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-system-final-20260905/eval-receipt.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "8972f931ad5227c4b11d26f69cc23f4aa56f702efdc9635bf891415a5da786f5"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-system-final-20260905/scenario-evidence.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "bc19a806ebacfd3f1e3942faad38e17eec3be92a28a9df863fa1fd19893ba181"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-system-reviewed-20260905/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "4468f4b4d561aec0c5177072bae6c5353eb5841c3d0f7fa40d82bc14a10bd493"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-system-reviewed-20260905/eval-receipt.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2fa2b49cf8736f0c07e446d7dc56dccf0eebf192f5d5201e12784920e3e43783"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-bedrock-offline-system-reviewed-20260905/scenario-evidence.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "85968b5503b9f3b296b6014a9308b204537fe649429336056d7159c3b0b9de39"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-closure-recovery-20260905/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f28ce1068853fb2c4d5e636d43a7a2d786628219c7706e1889330a5f1bec113e"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-closure-recovery-20260905/eval-receipt.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "82381b66527cd89f3499d94efadc3c9976496435072cdf54c34ba7dc5d62f8c5"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-closure-recovery-20260905/scenario-evidence.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "ca12b2ef42e20888c592fe711ddc003bf443695811fcd9c2d72660d6b26e6099"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-closure-system-20260905/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "dfc6ad5080d6edc1cb19875328924d12f09e4a23cb90cb0fcebd33703cd75383"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-closure-system-20260905/eval-receipt.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "405f05ab7ec259682f03b20039c11ce22f2b57244d4f7c14f1247fce52677501"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-closure-system-20260905/scenario-evidence.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "6ed78d27521845cab646803a2a5b1e4fb73ffb8140928d8296933909a1e984b0"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-closure-system-final-20260905/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c512090511cccc97671d2f4b87715516f0d8ab54b0a429ea03da82e8ec6344c7"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-closure-system-final-20260905/eval-receipt.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "ea88bec3fe0159dafbbf880a2401d816e7a95816ae691f959aeb5f4bcf9316a7"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-closure-system-final-20260905/scenario-evidence.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "3c40a1aecfae4eecdf096546e5943be25871aaf296c464bea096c4abfb58c2c1"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-recovery-reviewed-20260905/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "b9cf48d915153839e63a64b1c17100c8ed717f47c94fedbc39d815b2df0f11d7"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-recovery-reviewed-20260905/eval-receipt.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f6aadcac02fc560634992f053168c27b39f81dab5033e7f82907ff40a2a72d5f"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-docker-recovery-reviewed-20260905/scenario-evidence.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c4e40b63c115e071542d6bcd1c3ef54ee19606912404bb752af7c1497a69fc70"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04-final/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "01705a8ee735be5493961c8404151c95ffdf8eb47a5dadfda045600b74428588"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04-final/eval-receipt.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "0509c3cc1dafd16d9c28cbef60bb0b853dd6c4a5e8a29a10661d045b5068c967"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04-final/scenario-evidence.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f8a535a5f1623e3f1b94e93577dfb2af86bf9f075e9d8b5639fc9d1ee547b967"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04-qualified/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "6a2c4069e5c1e2c505b06e04dd6b98bc73178a641e64bad383f9564fe244964f"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/README.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f76aeaeb7ecf180ec7e22f485f727e9426931ae8f47c573e8dc66b63e7b36d3a"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "bfeb687b544857166f885707a37823aeb48dba7caeb83b1df0c62ded0f543d5c"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/denied-query.log",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "05b9b5b8fb9cad47d038dddc72fa95b705c1bea081fa216e3feec754db2b6dde"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/gate-first-pass-results.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c30c3699b48a15ce2e3144f0477b1f62c03c94a3e690db80058e774cf2f4d532"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/negative-control-failure.log",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "051e61f7fd38c3ccb85141a8793cfe5c9ac0af2775027ccd15c0b7eb2c8ca205"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/restricted-test-failure.log",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "40a36c2c6fe37c28062dd18d8c2eedd6c5cd5c16a88f4641e09431685138516e"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/runtime-docs-failure.log",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c176b7a48425bc4c063c7d0d4f47559a2e0d946d8bc2e13578087bb3edd91f2d"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/security-corrected.log",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "5e1d1a08bc3b8b7fdc338b050238aabe7fb79bdcb41a2a8ef9c62bbbeb2fa7c3"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/stale-workorder-query.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "9285caef7dabc46d2da1ddc81781618a9c68abc647a8463b09b1ecffe5074f6e"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-review-2026-09-05/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "eafdcd63492377681dc4f16ee80a57a813bd7b4732c902fb57d0c2b8d61c6bbc"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-review-2026-09-05/eval-receipt.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "59fdbfa32907c0d8cb25cda5be6372272bbe7fb71f79421125cd56fa4882c716"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase0-review-2026-09-05/scenario-evidence.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "59b1bf1de86e235da4991259d5fc6ac105751575fb04d02871f691c22b65ce27"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-bootstrap-2026-09-05/live-scope.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "d953930be2fe184f94933cb9d2422427df675676fe4f48193e0df17f5cbc4bdf"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-bootstrap-2026-09-05/package-files.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f4a67b0e63faa9b5b134d270fbdbfdd11d25e136ed1909e01aae3d2ac5735dfe"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-bootstrap-2026-09-05/probe.py",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "220ec352385666707eb7d5a9cd337333726cb5418c17c470c954df3e44227f71"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-bootstrap-2026-09-05/runtime-containment.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "37d695a63a13e7dad4815705f4df9a268cd07c7a3c3830e8f83dcd3aadad0690"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-bootstrap-2026-09-05/verification.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "48c2b97faafead3aebc542fa409e51b48a71a743c0c2e5cfe9555e4ea4d3ea30"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-closure-2026-09-05/budget-verification.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "a88066ca3be109812d98b092418cc6c5510e3c15046c0d24ee278fff06eab8d3"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-closure-2026-09-05/cleanup-runtime.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "668f4b8e4f9b903d2d5a9dbd5dc3fa985049d8c8af753be0acbf963ac2f14944"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-closure-2026-09-05/mutation-matrix-v1.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f0512f014499930b078a70a55e29933900fa5944994e7ab4fd5d6ebd617a56d5"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-closure-2026-09-05/mutation-matrix-v1.py",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "06688630918cf3c4cc8e5abe2aad36f94dba8550128bfd189dd4bb13016f1cab"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-closure-2026-09-05/mutation-matrix-v2.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "946291adb98a3259358dd3067307793542d92844c8429f541c76c7b2b837bb78"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-closure-2026-09-05/mutation-matrix-v2.py",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "de7fee984f2b93cf8bd2da1cd4733ff77fe4b183274bd2fb7e6c5c095ce3f68c"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-closure-2026-09-05/mutation-matrix.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f1959fb43ce3cbf6b0cedd3ccafe9902d1b1720a14a69c8d3fe902d4bb29053c"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-admission-closure-2026-09-05/mutation-matrix.py",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "0b6981da4369d665c4ec2b8096eb0b6865099e175ab83d11e3b8bbe707273505"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/README.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "529697d019b96cd343f8fd9d8db1150b96be5388f9e9892cca1dc0efbfe06db1"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/bedrock-approved-route-2026-09-05/approved-route-intent.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "9785c4da3f0b13872bf9cdc27dc33e07a5ad5dd185306f84a973a268bd44fc6b"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/bedrock-approved-route-2026-09-05/configuration-audit.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "709ad7c318191704f27eeb51b07bd423c5ab6b02516870b52b917b42f660fbe4"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/bedrock-approved-route-2026-09-05/prior-qualification-report.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "95d0a99404ec9894c6f9aeea53644d70117c8dc5750cd9c6f0fbe9af5f548198"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/before-runtime-probe-worker-cancel.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "6a31eea4a546a99bbb1407e4293a6691c07a34b3744135a6a1f5dc6f6cda715e"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/before-runtime-probe-worker.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "71907a7e64318155f600db5662c527e17b9c7ef2c453b1fd01ee21e5fb51b843"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/architecture-simplicity-review.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f72a66adc8d021dac6a57fbba9a1fadfc01de265e0f85f4a5769e2339c161de8"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/authority-boundary-audit.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "81e173701d662546324838b342b86cba60373f7672d6c407d4275aa5af7bc2eb"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/contract-lineage-audit.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "76cd3bd62c4997a2f860e268b513760ac4a099b8737b0880f77cdb87a4cd87af"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/current-source-hashes.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "68d540c8c02acde982d7ce132d66beeabe5eccd5e1ee789ba7d435cfe75a04af"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/data-integrity-review-current.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "d43ec0dbc2f07cdfbd555abd907495fe86fa6b2705c500d2304f52da03c380f1"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/documentation-review.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "aa97a76a78280d361f6f703403dc4f15123e8ac7838a82ccaf97daa76daebe79"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/generated-api.diff",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "632567aca71a011f35e23088a7eb4576193f8a13cc18fd41f7298accf59ca1b8"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/README.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "529697d019b96cd343f8fd9d8db1150b96be5388f9e9892cca1dc0efbfe06db1"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/before-runtime-probe-worker-cancel.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "6a31eea4a546a99bbb1407e4293a6691c07a34b3744135a6a1f5dc6f6cda715e"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/before-runtime-probe-worker.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "71907a7e64318155f600db5662c527e17b9c7ef2c453b1fd01ee21e5fb51b843"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/containment-runtime.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "82292d5f5c8064be20847080b2bd95bad4246c5364633b0104af2956cac43039"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/data-integrity-review.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "0e08aff9ff1733da4303baf3b5725313f3a57adc74245c6a51d4be985d753f4a"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/docker-engine.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "e95a5ad4bdb8620ae1411a96b040e514fd9b917a946067b45b60cc81a713f7a2"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/docker-image.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "7acde0a707cdc5a6f72ea27c84131ca64f214de2a09f85602abbd8394e4d283c"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/fdlc-phase1-docker-execution-path-qualification-report.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "a634ce6b182767a2757250c0058f2576771b7a34a852263f332120e3c8e43d3a"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/final-container-inventory.jsonl",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/gates.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "fa1c2b2b90def6a4cd1f398aed530855c123cc8513a22b13a162258b9a05d35c"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/implementation-files.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "9af465c0eff9525d794aa4accfdd7f8c43309741f3d97eabc626d36e815adefa"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/preserved-state-manifest.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "660681f920ee6c11038d60269981b3a29230d55aa9a82a0bb4fc0e82b05c1c47"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/runtime-contract-explicit-command.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "1cd77ead38d32a25bb25e3fbf0dba1079e6132d9b97ba4f1ab9abce170a514b8"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/security-review.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "a8179f103e892499820d31f72246fa4ef0ec2b4c7b7f49cbc35219c2dd9f45f6"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/summary.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "7a6ef11f7c51478c5c37b944c100a6ea9f52e4338bc621b5955f4af6fb2930f0"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/target-integrity.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "b56e3d5f901b77ae887a4e28225a809d804400ddc5d8837d2c430ae43faf5c87"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/worker-cancel.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "90da0c749a3c10eae5c5f038f8ea3c1aa10afee20660bd8098bca872044d43b3"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/worker-earlier-image.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "8fb0a0a52361f88409403cea8b2b8695ae631835c49b1698197ba477acc31bb2"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/history/worker.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2846164f99544123902057d9f43c8494e9142a1188e99a9a8c9ddfe8e842d19f"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/image-inspect.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "98d7bd36a71326da02798c90b92f8bf3ff8732bc74a5468830ac03851fc99eda"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/liability-occ-script.mjs",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "615c9c3749b15a381e8f5e79ca6c79d72ee3e1ec60a370f4174e1ab6b24eb9d0"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/liability-occ.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "07e46b6f8f4f9a0772393bf2e4828adeb2464338979f83a250fa318ba9b5745e"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/qualification-state-after-recovery.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "95d0a99404ec9894c6f9aeea53644d70117c8dc5750cd9c6f0fbe9af5f548198"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/recovery-continuation-request-recovery.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "129f9813c828761c13931bf155db13c4a5e69ec3eb952aaeb699770ab3a50847"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/recovery-generated-api.diff",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "6a72b98b08e98f2e145d7bb7cbb174eebbf189245dc67d39364fa4aa5a7fc43d"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/recovery-reviewed-source-hashes.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "03559714c8554bc33674fc56433c16bee477baf2ac5056e3a1fda2ac2e5fd178"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/recovery-security-review.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "8478fdef781097d1d077701fd2e1f4b476989d2a60baa443b85658d57cf2113c"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/review-followups.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "70067032416a01cc5bdbdfaf04b9b00b367c11ca02649b65d847fff79fa3eacd"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/reviewed-source-hashes.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "cb3c6b03590d8e3fdf6384b365d6f2955296cbf1e3556b46ce31b3261ded74e4"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/route-inventory.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2b4ab377785c599b400a57f3c1bf23186bc465abe0ddb51f2febc0d011bf2dd9"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/security-review-current.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "d8be889fb846580304b753ef98a4e9349f4b93d4d0ce9e502e965bd4c5de3953"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-cleanup-cleanup-failure.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "a41dfdb9b7041dc08f32a2cc455e681d629f0b826c682f7ef238250affa34750"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-cleanup-cleanup-recovery.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "e11b1ff2ea32a986dac7f86f9d67721de85bc57b2d8370effdb51175745cfd50"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-death-01-worker-death.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "45e57ee7cfbd259bec9c499cb9ed861097d6bf7c8470582e521a1400b33fb716"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-final-budget-denial.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "29de47cc6ab76c3e8f17ed8dd015f35bd9db124dc2c179086a89d8f1b04dfe56"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-final-cancel.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "d534378fd0c5eb583870ca90264edad6a57d874c843cd7a65bad5d249efffca0"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-final-startup-failure.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "a21b42f042278b465e5b17bc85854b32863180ce5b0fe5bdd35e64697eb215d9"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-final-timeout.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "42dbf049bbcedc5befa0023468d3a5b4775609906d1342342b481b35e59d35d5"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-final-worker-death.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "89319bb0a040fd0ec15605729ea7083794d374e5b3a1ed38ed616bb4d104b115"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-final.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "5fafb5a18d4eae99b054d70da230c5156fd03202417f3f86b9a4a4020bbf1c1d"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-lifecycle-01-timeout.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c3df49a2455a21ad58bf892fb8359bedc966f73a20f21b0258ff9a592865f500"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-lifecycle-02-timeout.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "54cb71a4d7ffda2b69051336efb600e0a12ffbe3e73fdaed6d557a9500764841"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-negatives-01-budget-denial.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "94ab2d42894ee4c1dde96afa0ebaf46f801a4ecadd192e88b0b5d9e0a9d95fd1"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-negatives-01-startup-failure.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "45c579acc48d041dc696da8b5f86e240d9286dc841390ff7e1feaa38c94f317d"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-recovery-reviewed-budget-denial.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f4c557f350b92fbac4b7d13fc8a08634693f9217b6b45dd68c51fef32eef4c53"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-recovery-reviewed-cancel.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "eb0929160ccdfdb6cb1f5814d3405595fbf956815ee3b1d5441fa1e1d6b2a35a"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-recovery-reviewed-cleanup-failure.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "567d0c9f7a18f1e865df81372e8043f7137c9bf2a6224affa59ea57ade07e759"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-recovery-reviewed-cleanup-recovery.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "44200015e03779e352c24c59bd1dee1e2954ddbacf74287e5b06daed5be0a647"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-recovery-reviewed-request-recovery.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "9038f0d5d8806963e3a851138defaaf9ebb027ca69f39edc0f4fdae083b2ec2c"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-recovery-reviewed-startup-failure.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "75b7d1788710168587e764a76a8ee6476321384e03ee8ed08e921543a880c634"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-recovery-reviewed-timeout.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "503ce22b33d43ed7254f4a77502a4891d75b233ec804b8a863b2f5d2b289d563"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-recovery-reviewed-worker-death.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "5444c5fcb6dbac64914564e2875e1f0e10416a1d2f4ce96bb39acb271e8ee152"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-recovery-reviewed.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2cf8735c5c5fac66dda4e09823547473778188c9442f968cc3511bd37d2bdd72"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-request-recovery-final-budget-denial.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c4fcb60b0f586c31e6506a7cb7dc60b82aa340d1aa3679668ce8ac56987b398f"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-request-recovery-final-cancel.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "b52ac13691609698e359631ea433fa94f46eda0fd25bcbd3cfbb2c2196a7b79d"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-request-recovery-final-cleanup-failure.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "990581a9024874ade4d6034e7cd05f41a676271983e434792156bea94281415e"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-request-recovery-final-cleanup-recovery.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "fa99325427389a7fa3826d73c18d66853e5647b34257002ab37c219b5b387f2b"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-request-recovery-final-request-recovery.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "eb8265c5214f1817fa6c61b07445ada9445c9c23e53261de83b256a71b74b76b"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-request-recovery-final-startup-failure.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "54c32129eab1ccf0e77680c9f8b6d4389748f22252834f1574755f12056a2f58"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-request-recovery-final-timeout.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "75655b678761963f811789aa4782dfa14c999cb50cec4f43997a394b9557c052"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-request-recovery-final-worker-death.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "583724fde9ee590649db45e317df71a1050d894176cbc9d4c6bfd6c83b51c8ea"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-request-recovery-final.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "27b1e40725eec843019229cbc119f95b3bf94f6e6a676b580f981c61c3a7cb14"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-reviewed-final-budget-denial.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "7af80227d60f7ea3407d96f9025cb7f719177f847076abd85fc6e66d7d2a8f7f"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-reviewed-final-cancel.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "19a39dc313689a8f075ebc529dc18a237cb48168c58e4156deec4309cb076ae6"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-reviewed-final-startup-failure.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "ab3cf31a470c76d630f40b11efc471a3472ada1a3d83b002004a542fcfe73c76"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-reviewed-final-timeout.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "6a05dd0b223cb4bf721a9beb960ad3dde9bbf4475266547f3518b444a0c810fb"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-reviewed-final-worker-death.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "52dbc2e51f509e97588b55e5b8b06d6a24af5bca3951bc50a0978061f4baf0c2"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-reviewed-final.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "10c86f48313b5b05752e10a4c343438f400df2553efafd622d381f750ec2f33b"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-runtime-02-cancel.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "46daad7bcccd52bb475ab020ee74e290cbfe03ba1b63e2907a6bb5c56f9c8608"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-runtime-02.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "310eaf8523adb8cea106a6656b55c790689a541a24ae4a48a5e372340bd614bb"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-runtime-cancel.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f1ca5e15905b42614c02c2a1460bd0782089c3752e112679feeccdfa90822b6e"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/closure-2026-09-05/worker-runtime.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "637dd1af39f418e6a100dd4c33d91805d5bf8dd02739788039b9db9c834c59e0"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/containment-runtime.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "82292d5f5c8064be20847080b2bd95bad4246c5364633b0104af2956cac43039"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/data-integrity-review.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "0e08aff9ff1733da4303baf3b5725313f3a57adc74245c6a51d4be985d753f4a"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/docker-engine.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "e95a5ad4bdb8620ae1411a96b040e514fd9b917a946067b45b60cc81a713f7a2"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/docker-image.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "7acde0a707cdc5a6f72ea27c84131ca64f214de2a09f85602abbd8394e4d283c"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/final-container-inventory.jsonl",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/gates.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "fa1c2b2b90def6a4cd1f398aed530855c123cc8513a22b13a162258b9a05d35c"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/implementation-files.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "9af465c0eff9525d794aa4accfdd7f8c43309741f3d97eabc626d36e815adefa"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/offline-hold-2026-09-05/frozen-inputs.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "67daed884645c20e20b2f7e5498633044d43f72550138b22a1b21189ab339fd9"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/offline-hold-2026-09-05/prerequisite-assessment.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "1399c01f0ba261d6ff3be105bd55f78bd2e242c52eda2f0fa38f7a5f2d03149f"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/offline-hold-2026-09-05/prior-qualification-report.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c6e074026bca2a2820bf39e91ecf97403170a26507454492e72043f6cd80f1a2"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/offline-hold-2026-09-05/source-hashes.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "cf56f7f7fc2c1e0efde5afadff411c5c5b23ff0fbd8782f585e28f5a74deed93"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/offline-hold-2026-09-05/verification-results.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "9e2d02e193a7c0f7097399909cede9abac7a456d88f64f913aa372092d548aa3"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/runtime-contract-explicit-command.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "1cd77ead38d32a25bb25e3fbf0dba1079e6132d9b97ba4f1ab9abce170a514b8"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/security-review.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "a8179f103e892499820d31f72246fa4ef0ec2b4c7b7f49cbc35219c2dd9f45f6"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/summary.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "7a6ef11f7c51478c5c37b944c100a6ea9f52e4338bc621b5955f4af6fb2930f0"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/target-integrity.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "b56e3d5f901b77ae887a4e28225a809d804400ddc5d8837d2c430ae43faf5c87"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/worker-cancel.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "90da0c749a3c10eae5c5f038f8ea3c1aa10afee20660bd8098bca872044d43b3"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/worker-earlier-image.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "8fb0a0a52361f88409403cea8b2b8695ae631835c49b1698197ba477acc31bb2"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-execution-path/worker.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2846164f99544123902057d9f43c8494e9142a1188e99a9a8c9ddfe8e842d19f"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-system-qualification/automated-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "d04fb092800b9daa30bb0901fbc40c6478bb6a5bd30b9adf6d3f51156164affe"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-system-qualification/eval-receipt.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "5a3b492b94d04b3c5106157cc2007b8dbb867a4c5a94fc632fcabbeb9142f866"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-docker-system-qualification/scenario-evidence.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f4a13f9b001b20c1fc84e203421a12f509433ddb84592c84b7cd45ae1aa66550"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-path-2026-09-05/final-checks.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "e6d16318f3721cee6eaaa161fdbe203968927fef56073805cbcddb9ae38c2d02"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-path-2026-09-05/infrastructure-inventory.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "a60bec00477305b85e97b82587347cbce2801fa110f983fcc6d1679737ef6add"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-path-2026-09-05/local-container-canary.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "be1c2664663d2ce03fd25677b1c6d2720540fd888bd0a0fbe813a03334a259db"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-path-2026-09-05/nested-sandbox-diagnosis.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "4d116f24b947e46b2672febfd251d5507225dc7d6fede07475f33a6262c39d31"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-path-2026-09-05/scope-currentness.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "65137499bef8b30e73d82abaa1161473131d847b5cd17fc9a07a5725551bca0b"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/README.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "618202c718aa13c6c40cc1921117a95507aa4172e3ef6f990a5cd4cf33b84db6"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/SHA256SUMS.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f61b6fd669bacb145ac61ecab16f4d118b792522429827386791a359ff7e6b0c"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/backend-startup.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "1d4750ff45e900fb1089c5f815402c518fb564ab56d18bacbc57bbbfc6958325"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/composition-options.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2aa0b23045ae51cd4be03e3d6ca7448d8e1045fdf7fe9bdc38fc2ba564b92e96"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/factory.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c1320dd50cc14606ffab330e73be8ab72398a2c12a1e6dadd589cd4844b63d56"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/final-health.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2693149bfa1a80ab740aa64bc90f31cdb7c12b253c74c34a9b4bfa9750b64f05"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/host-query.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "8320e32e29a9fcf2348d374a4c9616f9e10983f5814c506b5b4080f9a225b254"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/route-inventory-summary.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "01a4429832032b024bd9d3cec40b2927e71b8993dc3f8493cd8d3bfb089cc334"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/runtime-attestation.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "1daab73d803e15eba7d2a18c63ac53ddbdf2bc635d0234d04d200f668f636ed4"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/runtime.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "97bd283dabd8ae022644a06c1585c335234001738c4c8cea1aa03697baa3638d"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/structure.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "1e8641a0f8dfa6027d02d6886a0977c6d6b63affed466535f3b03272799a0848"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-execution-qualification-2026-09-05/verifiers.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "8320e32e29a9fcf2348d374a4c9616f9e10983f5814c506b5b4080f9a225b254"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-final-admission-2026-09-05/budget-policy-provenance.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "13b053301690cfb6bbac4bcad9e03465fdffe80297ff047216ccfb1fbcef5eb7"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-final-admission-2026-09-05/final-integrity.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "83a0ff80e607b7cc2563874aa6a0818088de4b196713afcf3a719b970e6d4c55"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-final-admission-2026-09-05/outer-boundary-probe-initial.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "0a7ba7cf858435542d161d5d2fdbba7cfdacbad30bb7a31f8d077669e46e2eb1"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-final-admission-2026-09-05/outer-boundary-probe-restricted-read.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "965bcce1437f531b1cded05c6f3d111d4d2e48f4932455ca13c87aa6bdcdc6ff"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-final-admission-2026-09-05/outer-boundary-probe.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c1b406b8c3f28b24f2d4582e96df6aae00143c56876a8eeb3de2792cb5f5473a"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-final-admission-2026-09-05/outer-boundary-probe.py",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2ab8b1726ee9f51c3b7ea509d7e8ecf07731d2bd05d254372c3092465770a6d3"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-preexecution-2026-09-05/README.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c6b313177f694816dd96b19483b689100fa49451cdd05144e61c63d48a093053"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-preexecution-2026-09-05/SHA256SUMS.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "698d156245eab707bf80b19b50d404ef0c38468867802b3a84c0ffb60955e24a"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-preexecution-2026-09-05/branch-protection.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "5dfd1f32094580349ffeccd21af75a477d21368d0a183a28db389307841e4b87"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-preexecution-2026-09-05/documentation-link-findings.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "5ab20c6c67145cff1cb207009dbec8261bfd3b0c540e6056991b8f378ab8ae58"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-preexecution-2026-09-05/historical-baseline.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "e004bbfec3144d0d3b01244b69247d6d1675efaf5dc24ac08583d880dec38a25"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-preexecution-2026-09-05/identity-and-gate-recheck.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "1adc57a6a905c6573a2e45b5f79b45d9b232e3ecaa0ff7ac86cb271154c86378"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-preexecution-2026-09-05/repository.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "8b0324c54d9498fd5ffaedfd081d1c61a51a925338f34fe707cc82ebda5b87a2"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-preexecution-2026-09-05/workorder-01-contract.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "8f0e7a030581c61c14bb9ec9ad255e2c648bed940fbe6ee395cc25e0b0a292aa"
+    },
+    {
+      "path": "docs/testing/evidence/fdlc-phase1-preexecution-2026-09-05/worktree-preparation.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "9547c354322a969adc49e50b88b343e7ed2c72301bce1e93d8b55415064a199f"
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase3/runs/0d1a0908cce3-2026-09-05T21-16-02-928Z/broker-scenario.json",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase3/runs/aa8c12b1d490-2026-09-05T21-29-59-397Z/broker-scenario.json",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase3/runs/f82fe1d98b15-2026-09-05T18-32-41-371Z/broker-scenario.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "69852f95a32ae34eb4619e47facf9890a954fa5f16ad7e7948496530e9384549"
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase3/runs/f82fe1d98b15-2026-09-05T18-45-55-812Z/broker-scenario.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "3412957b9f86e0fe2da185b5c19eda030da57864f3928ec74a0bfcede4ac1cad"
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase3/runs/f82fe1d98b15-2026-09-05T18-55-46-697Z/broker-scenario.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "bf2745d6fc9be02bf9f3994504776d2d2f55f0615ec21f4faf5c658cdac39414"
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase3/runs/f82fe1d98b15-2026-09-05T18-59-13-747Z/broker-scenario.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "f1b266baf22ed708f091db818af35ab5bef9428c81d9ab80ee7bfe478875a17a"
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase3/runs/f82fe1d98b15-2026-09-05T21-27-54-948Z/broker-scenario.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "28c18314ab7a20c2d051642a3b7d7b0781557af5ac317fdb964b29a66fb49637"
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase3/runs/f82fe1d98b15-2026-09-05T21-32-58-782Z/broker-scenario.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "03d5f3911d755dfb85842a4553e64b9004f370755c1b6595c3fc4cf206185a0f"
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase3/runs/f82fe1d98b15-2026-09-05T21-35-50-238Z/broker-scenario.json",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "508f6f28039df46983521b097dcfbad23c566ec8e6f1375a41d368e36edb9f5c"
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-real-service/README.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-real-service/first-live-call-preflight.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-real-service/no-go-record.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-real-service/second-live-call-preflight.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-recovery/README.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-recovery/browser-attempt-authorization.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-recovery/browser-validation.json",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-recovery/canonical-browser-attempt.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-recovery/direct-live-qualification.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-recovery/first-live-call-preflight.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-recovery/independent-verification.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-recovery/post-merge-qualification.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-recovery/pre-merge-qualification.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/governed-mcp-phase4-recovery/shared-demo-environment-blocker.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "docs/testing/evidence/system-factory-e2e-v2/automated-checks.json",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "d294a3a89387e8a5447657bac46072867d90d168f8127645128bca22a7ea0af6"
+    },
+    {
+      "path": "docs/testing/evidence/system-factory-e2e-v2/eval-receipt.json",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "4819f84b70b41966025360fc52486c8eacc484e01057d54058bb2d01eb15d60a"
+    },
+    {
+      "path": "docs/testing/evidence/system-factory-e2e-v2/scenario-evidence.json",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "954b151e702ea99fde672481f4f10c3fdba096c8a86215e91c721ed9cd613d12"
+    },
+    {
+      "path": "infra/docker-factory/Dockerfile",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "70f0f8aeb28d0ec4c74f92e7170448c38b6f4bbeb0653d7f89790be0ddbdb806"
+    },
+    {
+      "path": "infra/docker-factory/bridge.mjs",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "497e291d5c93763c25e116bddac6f45c66cb32c432f3bd94e445e3d8bc4e7315"
+    },
+    {
+      "path": "infra/docker-factory/qualification.mjs",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "57d5b3f56eebb8bf30922cbe43eb059946f1c583b1d59c6728a6e814186cb3d6"
+    },
+    {
+      "path": "infra/docker-factory/runtime-fixture.mjs",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "bb37d37276e1f83ee307303363d07a2477a706591464dc62bf7f36bd4bffcc6b"
+    },
+    {
+      "path": "infra/docker-factory/supervisor.mjs",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "bd7790f0bf67b21ca512b4f15df4c02e8d286446cff5287ea6c0affd30ee4b08"
+    },
+    {
+      "path": "package.json",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "301594a43f21544e43473cd1d2d7bca74ef2d8d6350261eacdc7d838c028bf15"
+    },
+    {
+      "path": "packages/workflow-engine/src/__tests__/verificationCurrentness.test.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "ad779a2071363adb85148645ebb6f5135cef010bf0bdfe227ee5a4569075a90a"
+    },
+    {
+      "path": "packages/workflow-engine/src/__tests__/verificationSubject.test.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "2349505dc2a02cef326034420f81406bbfa26fc5cba70ea8cc544c0b3fb2957e"
+    },
+    {
+      "path": "packages/workflow-engine/src/index.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "8ee370ab935bbd043ff378e290c0ce78907fa7aefed0d09ee0beaf3d541b2028"
+    },
+    {
+      "path": "packages/workflow-engine/src/verificationCurrentness.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "eeede5ac6510973f92231cf6b5fd74d1772fb6d9a766d5df0600e7054ae36ef8"
+    },
+    {
+      "path": "packages/workflow-engine/src/verificationSubject.ts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": "9fcd90f9bbd32208b4cc95f1580b4d068a538f95820d4eccdde9eb833dfc5d2a"
+    },
+    {
+      "path": "scripts/check-fdlc-bedrock-prerequisites.mjs",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "558c3abb9f2b9f9e349989aabd491412d126f54654b40295a5d92966d4077aa3"
+    },
+    {
+      "path": "scripts/dev-phase4-mcp-qualification.mjs",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "scripts/fdlc-bedrock-resumption.mts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "cfa4d43e93be05c42f537b04d66a97f6211169db4df72d0473ff5ec1b77e7857"
+    },
+    {
+      "path": "scripts/governed-mcp-phase3-qualification.mts",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "a3e9b8d28e80dfe84d00a811f0aff8dcca67e02c9a794bfd61c513e0ecd04247"
+    },
+    {
+      "path": "scripts/governed-mcp-phase4-live-diagnostic.mts",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "scripts/lib/factory-docs-consistency.test.mjs",
+      "classification": "SEMANTIC_MERGE",
+      "sourceHash": "8f16f427122e89fe3ef7101c2d79f9fc74adb8a14f2bb8507319ae5fbd3ae124"
+    },
+    {
+      "path": "scripts/lib/fdlc-bedrock-prerequisites.mjs",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "c69c0509a13bd424bf521728f2dc9df7a15788df372c2200575be36f6f3451f2"
+    },
+    {
+      "path": "scripts/lib/fdlc-bedrock-prerequisites.test.mjs",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "27c75237d296c1b75c929630d5cb954093fa61c634391f462d0461903cb930d9"
+    },
+    {
+      "path": "scripts/lib/fdlc-bedrock-resumption.test.mjs",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "2087a056b628cbc1bfccf80c918c786e9c41ae59a31cc17d7c3819c895cd3c83"
+    },
+    {
+      "path": "scripts/lib/phase4-qualification-runtime.mjs",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "scripts/lib/phase4-qualification-runtime.test.mjs",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "scripts/prepare-phase4-mcp-qualification.mjs",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "todos/059-in-progress-p1-real-product-repository-pilot.md",
+      "classification": "PRESERVE_PHASE1",
+      "sourceHash": "bbcd507981acf23db5c5f2bbece919a7e0a7a140e128659ff424e6f82cf1bc16"
+    },
+    {
+      "path": "todos/061-complete-p1-governed-read-only-mcp.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    },
+    {
+      "path": "todos/071-complete-p1-qualify-one-real-readonly-mcp-service.md",
+      "classification": "PRESERVE_MAIN",
+      "sourceHash": null
+    }
+  ]
+}

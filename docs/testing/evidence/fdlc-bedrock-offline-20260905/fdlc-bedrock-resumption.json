@@ -1,0 +1,13 @@
+{
+  "QUALIFICATION_AWS_ACCOUNT_ID": null,
+  "QUALIFICATION_PROJECT_OR_ENVIRONMENT_ID": null,
+  "QUALIFICATION_ROLE_ARN": null,
+  "AUTHORITATIVE_QUALIFICATION_CONFIG_LOCATION": null,
+  "provider": "AWS Bedrock",
+  "sourceRegion": "us-east-1",
+  "modelId": "anthropic.claude-sonnet-4-6",
+  "executionTopology": "US geographic cross-region inference",
+  "inferenceProfileId": "us.anthropic.claude-sonnet-4-6",
+  "allowedDestinationRegions": ["us-east-1", "us-east-2", "us-west-2"],
+  "globalInference": "NOT_APPROVED"
+}

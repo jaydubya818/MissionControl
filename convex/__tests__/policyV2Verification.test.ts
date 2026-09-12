@@ -76,6 +76,7 @@ describe("policy-v2 Verification Plan compilation", () => {
       requiredRisks: [{ id: "risk:subject", severity: "HIGH", affectedAreas: ["convex/**"] }],
     });
     expect(plan.requiredEvidence).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "factory-verification-authority", required: true }),
       expect.objectContaining({ id: "factory-change-budget", required: true }),
       expect.objectContaining({ id: "check:test", requirementIds: ["requirement:behavior"], requiredRiskIds: ["risk:subject"], required: true }),
     ]));

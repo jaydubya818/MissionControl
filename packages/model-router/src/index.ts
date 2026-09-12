@@ -20,6 +20,29 @@ export {
 } from "./execution-routing";
 export { ClaudeProvider, CLAUDE_MODELS } from "./providers/claude";
 export { OpenAIProvider, OPENAI_MODELS } from "./providers/openai";
+export {
+  INFERENCE_INTENT_SCHEMA,
+  INFERENCE_PRICE_BOOK_SCHEMA,
+  INFERENCE_RECEIPT_SCHEMA,
+  INFERENCE_RESERVATION_SCHEMA,
+  OUTCOME_EVENT_SCHEMA,
+  OUTCOME_FORMULA_VERSION,
+  OUTCOME_PROJECTION_SCHEMA,
+  calculateInferenceCost,
+  canonicalOutcomeSourceDigest,
+  claimPhysicalInferenceIntent,
+  compareRouteEconomics,
+  factoryOutcomeEvent,
+  inferencePriceBook,
+  inferenceReservation,
+  logicalInferenceRequestKey,
+  markPhysicalIntentAmbiguous,
+  physicalInferenceIntent,
+  physicalInferenceReceipt,
+  projectFactoryOutcome,
+  summarizeRouteEconomics,
+  usageCompleteness,
+} from "./governed-inference";
 export type {
   ModelConfig,
   ModelProvider,
@@ -57,3 +80,20 @@ export type {
   ExecutionRoutingResult,
   ExecutionTuple,
 } from "./execution-routing";
+export type {
+  DeliveryState,
+  ExactInferenceRoute,
+  FactoryOutcomeEvent,
+  FactoryOutcomeProjection,
+  InferencePriceBook,
+  InferenceReconciliation,
+  InferenceReservation,
+  ObservationCompleteness,
+  OutcomeStage,
+  PhysicalInferenceIntent,
+  PhysicalInferenceReceipt,
+  PhysicalIntentState,
+  PriceBookRate,
+  ProviderUsageObservation,
+  RouteEconomicsSummary,
+} from "./governed-inference";

@@ -1,0 +1,24 @@
+{
+  "schema": "fdlc-bedrock-count-tokens-result/v1",
+  "capturedAt": "2026-09-07T18:48:20Z",
+  "awsAccountId": "083665737366",
+  "awsProfile": "fdlc-qualification",
+  "sourceRegion": "us-east-1",
+  "inferenceProfileId": "us.anthropic.claude-sonnet-4-6",
+  "underlyingModel": "anthropic.claude-sonnet-4-6",
+  "inputDigest": "sha256:abd21ce1366ecfff6b5cd2b179c88c4b1b1333370de4c68b4a295eff16fbcf83",
+  "inputTokens": 44,
+  "automaticRetries": 0,
+  "profileIdentifierCompatibility": {
+    "supported": false,
+    "error": "ValidationException: The provided model doesn't support counting tokens.",
+    "attempts": 1,
+    "automaticRetries": 0
+  },
+  "countingRoute": {
+    "modelId": "anthropic.claude-sonnet-4-6",
+    "result": "PASS",
+    "attempts": 1,
+    "automaticRetries": 0
+  }
+}

@@ -1,0 +1,1207 @@
+
+=== profile-bound governed read-only MCP transport and negative controls ===
+Governed MCP Phase 3 broker scenario passed: sha256:7de45ff549953aa804fb8b13e976a69c47a23e2169992284a034a1d3d0e7107b
+Evidence: /private/tmp/fab-phase3-mc-validation/docs/testing/evidence/governed-mcp-phase3/runs/f5ed5d10ac58-2026-09-06T00-04-49-113Z/broker-scenario.json
+
+=== frozen dependency, advisory, credential, and release configuration gates ===
+
+> mission-control@0.9.0 release:security /private/tmp/fab-phase3-mc-validation
+> pnpm run security:audit && pnpm run security:authorization && pnpm run security:secrets && pnpm run docs:factory-check
+
+
+> mission-control@0.9.0 security:audit /private/tmp/fab-phase3-mc-validation
+> node scripts/check-dependency-audit.mjs
+
+PASS production dependency audit: critical=0 high=0 moderate=2 low=0; accepted-moderate=1124268,1124272
+PASS all dependency audit: critical=0 high=0 moderate=3 low=2; accepted-moderate=1121861,1124268,1124272
+
+> mission-control@0.9.0 security:authorization /private/tmp/fab-phase3-mc-validation
+> pnpm exec vitest run scripts/lib/convex-authorization-scan.test.mjs && node scripts/check-convex-authorization.mjs
+
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation
+
+ ✓ scripts/lib/convex-authorization-scan.test.mjs (9 tests) 12ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  17:04:52
+   Duration  484ms (transform 15ms, setup 0ms, collect 199ms, tests 12ms, environment 0ms, prepare 57ms)
+
+Convex public functions: 946 total · 322 authorized · 0 declared-public · 624 unauthorized (baseline 624).
+
+Convex authorization ratchet: PASS — no new unauthorized public functions.
+
+> mission-control@0.9.0 security:secrets /private/tmp/fab-phase3-mc-validation
+> node scripts/check-repository-secrets.mjs
+
+PASS repository secret scan: 2825 tracked files checked; no credential material found
+
+> mission-control@0.9.0 docs:factory-check /private/tmp/fab-phase3-mc-validation
+> node scripts/check-factory-docs.mjs
+
+PASS factory documentation consistency
+
+=== release hardening contract tests ===
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation
+
+ ✓ scripts/lib/release-config.test.mjs (5 tests) 2ms
+ ✓ scripts/lib/repository-secret-scan.test.mjs (4 tests) 2ms
+ ✓ scripts/lib/dependency-audit-gate.test.mjs (4 tests) 2ms
+ ✓ scripts/lib/production-pilot-preflight.test.mjs (4 tests) 2ms
+ ✓ scripts/lib/production-pilot-evidence.test.mjs (5 tests) 4ms
+ ✓ scripts/lib/factory-docs-consistency.test.mjs (2 tests) 503ms
+   ✓ factory documentation consistency > rejects runtime-version and maturity-plan drift  500ms
+
+ Test Files  6 passed (6)
+      Tests  24 passed (24)
+   Start at  17:04:55
+   Duration  764ms (transform 41ms, setup 0ms, collect 103ms, tests 515ms, environment 0ms, prepare 301ms)
+
+
+=== historical V1 evidence immutability ===
+
+=== historical V2 evidence immutability ===
+
+=== prepare canonical workspace packages ===
+
+> mission-control@0.9.0 ci:prepare /private/tmp/fab-phase3-mc-validation
+> pnpm --filter @mission-control/shared build && pnpm --filter @mission-control/state-machine build && pnpm --filter @mission-control/policy-engine build && pnpm --filter @mission-control/workflow-engine build && pnpm --filter @mission-control/coordinator build && pnpm --filter @mission-control/context-router build && pnpm --filter @mission-control/model-router build && pnpm --filter @mission-control/memory build && pnpm --filter @mission-control/context-tools build && pnpm --filter @mission-control/agent-runtime build && pnpm --filter @mission-control/telegraph build && pnpm --filter @mission-control/meetings build && pnpm --filter @mission-control/research-adapters build
+
+
+> @mission-control/shared@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/shared
+> tsc
+
+
+> @mission-control/state-machine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/state-machine
+> tsc
+
+
+> @mission-control/policy-engine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/policy-engine
+> tsc
+
+
+> @mission-control/workflow-engine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/workflow-engine
+> tsc
+
+
+> @mission-control/coordinator@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/coordinator
+> tsc
+
+
+> @mission-control/context-router@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/context-router
+> tsc
+
+
+> @mission-control/model-router@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/model-router
+> tsc
+
+
+> @mission-control/memory@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/memory
+> tsc
+
+
+> @mission-control/context-tools@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/context-tools
+> tsc
+
+
+> @mission-control/agent-runtime@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/agent-runtime
+> tsc
+
+
+> @mission-control/telegraph@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/telegraph
+> tsc
+
+
+> @mission-control/meetings@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/meetings
+> tsc
+
+
+> @mission-control/research-adapters@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/research-adapters
+> tsc
+
+
+=== composed system qualification and execution-boundary failures ===
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/apps/orchestration-server
+
+ ✓ src/__tests__/orchestrationSecurity.test.ts (9 tests) 3ms
+ ✓ src/__tests__/auth.test.ts (6 tests) 2ms
+ ✓ src/__tests__/factoryVerification.test.ts (2 tests) 65ms
+ ✓ src/__tests__/sandboxCredentials.test.ts (3 tests) 6ms
+ ✓ src/__tests__/sandboxReconciler.test.ts (3 tests) 3ms
+ ✓ src/__tests__/githubAppPublisher.test.ts (6 tests) 121ms
+ ✓ src/__tests__/harnessAdapterRegistry.test.ts (7 tests) 4ms
+ ✓ src/__tests__/governedMcpBroker.test.ts (16 tests) 118ms
+ ✓ src/__tests__/deepseekHarnessExecutorAdapter.test.ts (10 tests) 606ms
+ ✓ src/__tests__/factoryAttemptWorkerRemote.test.ts (2 tests) 481ms
+   ✓ FactoryAttemptWorker remote Sandbox backend > runs beneath the canonical worker lease, verifies on the host, cleans up, and only then publishes one PR  479ms
+ ✓ src/__tests__/remoteSandboxRuntime.test.ts (24 tests) 1393ms
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > persists the policy-v2 candidate checkpoint before a GitHub credential publication failure
+[factory-worker] Attempt factory-run-1 failed: GitHub App runtime credentials are not configured.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > denies local recovery when the clean worktree no longer matches the durable source checkpoint
+[factory-worker] Attempt factory-run-1 failed: Local candidate recovery workspace does not match the durable source Attempt checkpoint.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 profile bytes are substituted after admission
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 claim evidence is missing or substituted
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > rejects a V3 qualification already stale at the server claim instant
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different runtime executable
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when legacy V1 normalized provenance reports a different runtime executable
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different provider route
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > fences publication at intent-expiry
+[factory-worker] Attempt factory-run-1 failed: Publication permit is missing or expired for candidate 8eb3b91bed17.
+
+ ✓ src/__tests__/systemFactoryQualification.test.ts (4 tests) 9911ms
+   ✓ Mission Control full-system Factory qualification V2 > proves exact governed lineage, failures, recovery, authority, and learning on an isolated fixture  9899ms
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > fences publication at lease-loss-after-push
+[factory-worker] Attempt factory-run-1 failed: Attempt authority was lost or cancelled.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > reconciles lost-provider-response after permit expiry without provider writes or model replay
+[factory-worker] Attempt factory-run-1 failed: Fixture provider outcome uncertain after request
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > reconciles lost-terminal-response after permit expiry without provider writes or model replay
+[factory-worker] Attempt factory-run-1 failed: Controlled terminal response loss after workspace cleanup
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > denies publication when MC's final authority check rejects the lease
+[factory-worker] Attempt factory-run-1 failed: Control plane did not authorize pull-request publication.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect
+[factory-worker] Attempt factory-run-1 failed: Fixture provider outcome uncertain after request
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect
+[factory-worker] Attempt factory-run-1 failed: Workspace ownership tuple mismatch; workspace was preserved.
+
+ ✓ src/__tests__/factoryAttemptWorker.test.ts (36 tests) 18982ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > turns governed issue intent into a verified, evidence-linked pull request  407ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > injects profile-bound governed MCP output as untrusted pre-harness context  452ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > executes an independently registered harness identity through the unchanged governed lifecycle  386ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > uses only the frozen V2 provider/model route and ignores a mutable claim model override  386ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > publishes an ordinary policy-v2 candidate through the governed provider path  332ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > constructs the worker from the exact frozen V3 Execution Profile  389ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > uses the server claim instant for V3 expiry so an admitted lease may finish  392ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > completes the durable worker golden path and cleans only its proven worktree  434ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > does not create a pull request when the control plane rejects the verification packet  386ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > pauses for human review and resumes publication without rerunning Codex or verification  490ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > persists a verification mismatch, blocks publication, and recovers with a new immutable Attempt  722ms
+   ✓ Fab governed golden path using the canonical MC worker > fences publication at intent-expiry  1713ms
+   ✓ Fab governed golden path using the canonical MC worker > fences publication at lease-loss-after-push  1474ms
+   ✓ Fab governed golden path using the canonical MC worker > reconciles lost-provider-response after permit expiry without provider writes or model replay  1601ms
+   ✓ Fab governed golden path using the canonical MC worker > reconciles lost-terminal-response after permit expiry without provider writes or model replay  1536ms
+   ✓ Fab governed golden path using the canonical MC worker > pauses without a PR, verifies a v2 subject separately, then transfers the owned workspace for approved draft publication  1490ms
+   ✓ Fab governed golden path using the canonical MC worker > links a real Fab candidate to a separate exact-subject verifier, approval and fixture publication  1385ms
+   ✓ Fab governed golden path using the canonical MC worker > denies publication when MC's final authority check rejects the lease  1220ms
+   ✓ Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect  1269ms
+
+ Test Files  13 passed (13)
+      Tests  128 passed (128)
+   Start at  17:05:07
+   Duration  19.74s (transform 1.02s, setup 0ms, collect 3.39s, tests 31.70s, environment 1ms, prepare 827ms)
+
+
+=== receipt-first Mission Control golden eval ===
+{
+  "runId": "mission-control-golden:f5ed5d10ac58:1788653127245",
+  "verdict": "WARN",
+  "publishable": true,
+  "blocking": "6/6",
+  "advisory": "0/1",
+  "regressions": 0,
+  "negativeControls": "7/7",
+  "accountingErrors": [],
+  "validationErrors": [],
+  "schemaErrors": [],
+  "receiptDigest": "sha256:7eae814a1205180103e74fd4cdb800afff9764559dc7c32efb99208c84623190"
+}
+
+=== Mission, WorkOrder, Memory, Observability, GitHub, and Learning contracts ===
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation
+
+ ✓ convex/__tests__/missionPlan.test.ts (7 tests) 2ms
+ ✓ convex/__tests__/reviewPackage.test.ts (17 tests) 4ms
+ ✓ convex/__tests__/githubCiIngest.test.ts (14 tests) 3ms
+ ✓ convex/__tests__/workOrderGovernance.test.ts (12 tests) 3ms
+ ✓ convex/__tests__/githubAppReadiness.test.ts (7 tests) 50ms
+ ✓ convex/__tests__/factoryLearning.test.ts (13 tests) 12ms
+ ✓ convex/__tests__/factoryMemory.test.ts (13 tests) 20ms
+ ✓ convex/__tests__/reviewIntelligence.test.ts (6 tests) 5ms
+ ✓ convex/__tests__/reviewIntelligenceGoldenPath.test.ts (1 test) 4ms
+ ✓ convex/__tests__/missionWorkOrderContract.test.ts (7 tests) 11ms
+ ✓ convex/__tests__/missionSpec.test.ts (9 tests) 13ms
+ ✓ convex/__tests__/verificationPersistence.test.ts (5 tests) 5ms
+ ✓ convex/__tests__/qualityContract.test.ts (4 tests) 6ms
+ ✓ convex/__tests__/observabilityGoldenPath.test.ts (6 tests) 9ms
+ ✓ convex/__tests__/factoryConfiguration.test.ts (10 tests) 5ms
+ ✓ convex/__tests__/policyV2Verification.test.ts (3 tests) 7ms
+ ✓ convex/__tests__/factoryWorkerRuntime.test.ts (13 tests) 14ms
+ ✓ convex/__tests__/governedMcp.test.ts (4 tests) 15ms
+ ✓ convex/__tests__/workflowObservability.test.ts (5 tests) 2ms
+ ✓ convex/__tests__/factoryRuntimeGoldenPath.test.ts (2 tests) 5ms
+ ✓ convex/__tests__/executionManifest.test.ts (24 tests) 77ms
+ ✓ convex/__tests__/reviewIntelligenceAuthority.test.ts (5 tests) 6ms
+ ✓ convex/__tests__/executionRecovery.test.ts (3 tests) 14ms
+ ✓ convex/__tests__/qualityGateDecision.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/missionSpecAuthority.test.ts (3 tests) 5ms
+ ✓ convex/__tests__/codexFactoryWorkerGuardrails.test.ts (5 tests) 1ms
+ ✓ convex/__tests__/verificationEligibilitySchemaContract.test.ts (2 tests) 1ms
+
+ Test Files  27 passed (27)
+      Tests  204 passed (204)
+   Start at  17:05:27
+   Duration  894ms (transform 1.40s, setup 0ms, collect 4.20s, tests 299ms, environment 3ms, prepare 1.43s)
+
+
+=== generic harness contract and exact manifest admission ===
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/workflow-engine
+
+ ✓ src/__tests__/executorAdapter.test.ts (4 tests) 3ms
+ ✓ src/__tests__/harnessContract.test.ts (6 tests) 6ms
+
+ Test Files  2 passed (2)
+      Tests  10 passed (10)
+   Start at  17:05:29
+   Duration  376ms (transform 127ms, setup 0ms, collect 227ms, tests 9ms, environment 0ms, prepare 111ms)
+
+
+=== Verification Factory exact-current contracts ===
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/workflow-engine
+
+ ✓ src/__tests__/verification.test.ts (8 tests) 6ms
+ ✓ src/__tests__/verificationDecision.test.ts (8 tests) 5ms
+ ✓ src/__tests__/verificationPlan.test.ts (4 tests) 3ms
+ ✓ src/__tests__/verificationIndependence.test.ts (9 tests) 4ms
+ ✓ src/__tests__/verificationSubject.test.ts (9 tests) 7ms
+ ✓ src/__tests__/verificationCurrentness.test.ts (16 tests) 9ms
+
+ Test Files  6 passed (6)
+      Tests  54 passed (54)
+   Start at  17:05:30
+   Duration  381ms (transform 205ms, setup 0ms, collect 582ms, tests 33ms, environment 0ms, prepare 386ms)
+
+
+=== Factory Memory deterministic golden path ===
+
+> @mission-control/memory@0.9.0 test /private/tmp/fab-phase3-mc-validation/packages/memory
+> vitest run
+
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/memory
+
+ ✓ src/__tests__/global.test.ts (5 tests) 2ms
+ ✓ src/__tests__/session.test.ts (9 tests) 2ms
+ ✓ src/__tests__/manager.test.ts (4 tests) 12ms
+ ✓ src/__tests__/factory.test.ts (9 tests) 13ms
+
+ Test Files  4 passed (4)
+      Tests  27 passed (27)
+   Start at  17:05:31
+   Duration  377ms (transform 114ms, setup 0ms, collect 194ms, tests 29ms, environment 0ms, prepare 209ms)
+
+
+=== Progressive Factory and Factory Learning UI contracts ===
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/apps/mission-control-ui
+
+ ✓ src/factoryExperience/factoryLearningModel.test.ts (4 tests) 1ms
+ ✓ src/factoryExperience/phaseProjection.test.ts (3 tests) 2ms
+ ✓ src/factoryExperience/recipeCatalog.test.ts (11 tests) 4ms
+ ✓ src/factoryExperience/useFactoryExperienceLevel.test.tsx (3 tests) 9ms
+ ✓ src/factoryExperience/FactoryPhaseInspector.test.tsx (2 tests) 48ms
+ ✓ src/factoryExperience/ExperienceLevelSelector.test.tsx (1 test) 44ms
+ ✓ src/factoryExperience/CreateFactoryMissionDialog.test.tsx (1 test) 73ms
+ ✓ src/controlPlane/ReviewEvidencePackage.test.tsx (8 tests) 151ms
+
+ Test Files  8 passed (8)
+      Tests  33 passed (33)
+   Start at  17:05:32
+   Duration  1.53s (transform 260ms, setup 2.94s, collect 1.51s, tests 333ms, environment 3.70s, prepare 517ms)
+
+
+=== full repository tests ===
+
+> mission-control@0.9.0 test /private/tmp/fab-phase3-mc-validation
+> pnpm run ci:prepare && pnpm -r --if-present run test && pnpm exec vitest run convex/__tests__
+
+
+> mission-control@0.9.0 ci:prepare /private/tmp/fab-phase3-mc-validation
+> pnpm --filter @mission-control/shared build && pnpm --filter @mission-control/state-machine build && pnpm --filter @mission-control/policy-engine build && pnpm --filter @mission-control/workflow-engine build && pnpm --filter @mission-control/coordinator build && pnpm --filter @mission-control/context-router build && pnpm --filter @mission-control/model-router build && pnpm --filter @mission-control/memory build && pnpm --filter @mission-control/context-tools build && pnpm --filter @mission-control/agent-runtime build && pnpm --filter @mission-control/telegraph build && pnpm --filter @mission-control/meetings build && pnpm --filter @mission-control/research-adapters build
+
+
+> @mission-control/shared@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/shared
+> tsc
+
+
+> @mission-control/state-machine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/state-machine
+> tsc
+
+
+> @mission-control/policy-engine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/policy-engine
+> tsc
+
+
+> @mission-control/workflow-engine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/workflow-engine
+> tsc
+
+
+> @mission-control/coordinator@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/coordinator
+> tsc
+
+
+> @mission-control/context-router@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/context-router
+> tsc
+
+
+> @mission-control/model-router@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/model-router
+> tsc
+
+
+> @mission-control/memory@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/memory
+> tsc
+
+
+> @mission-control/context-tools@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/context-tools
+> tsc
+
+
+> @mission-control/agent-runtime@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/agent-runtime
+> tsc
+
+
+> @mission-control/telegraph@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/telegraph
+> tsc
+
+
+> @mission-control/meetings@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/meetings
+> tsc
+
+
+> @mission-control/research-adapters@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/research-adapters
+> tsc
+
+Scope: 19 of 20 workspace projects
+apps/mission-control-ui test$ vitest run
+packages/research-adapters test$ vitest run
+packages/context-tools test$ vitest run
+packages/shared test$ vitest run
+apps/mission-control-ui test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/apps/mission-control-ui
+packages/context-tools test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/context-tools
+packages/research-adapters test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/research-adapters
+packages/shared test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/shared
+packages/context-tools test:  ✓ src/__tests__/lock.test.ts (17 tests) 3ms
+packages/context-tools test:  ✓ src/__tests__/skillLint.test.ts (38 tests) 17ms
+packages/context-tools test:  ✓ src/__tests__/semver.test.ts (47 tests) 12ms
+packages/context-tools test:  ✓ src/__tests__/skillFrontmatter.test.ts (50 tests) 71ms
+packages/context-tools test:  ✓ src/__tests__/resolver.test.ts (19 tests) 19ms
+packages/context-tools test:  ✓ src/__tests__/manifest.test.ts (26 tests) 63ms
+packages/context-tools test:  Test Files  6 passed (6)
+packages/context-tools test:       Tests  197 passed (197)
+packages/context-tools test:    Start at  17:05:42
+packages/context-tools test:    Duration  1.02s (transform 616ms, setup 0ms, collect 1.66s, tests 185ms, environment 0ms, prepare 921ms)
+packages/shared test:  ✓ src/__tests__/identity.test.ts (10 tests) 2ms
+packages/shared test:  ✓ src/__tests__/factoryMemorySecurity.test.ts (15 tests) 3ms
+packages/shared test:  ✓ src/__tests__/canonicalDigest.test.ts (2 tests) 9ms
+packages/context-tools test: Done
+packages/research-adapters test:  ✓ src/__tests__/webRssAdapter.test.ts (17 tests) 20ms
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retries a retryable error code and returns the eventual success
+packages/shared test: [retry] Attempt 1/5 failed, retrying in 1ms... { errorCode: 'ECONNRESET' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > stops at maxAttempts and rethrows the last error
+packages/shared test: [retry] Attempt 1/3 failed, retrying in 1ms... { errorCode: 'ETIMEDOUT' }
+packages/shared test:  ✓ src/__tests__/utils.test.ts (19 tests) 14ms
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > stops at maxAttempts and rethrows the last error
+packages/shared test: [retry] Attempt 2/3 failed, retrying in 2ms... { errorCode: 'ETIMEDOUT' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > falls back to error.name when no code is present
+packages/shared test: [retry] Attempt 1/5 failed, retrying in 1ms... { errorCode: 'RATE_LIMITED' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > retries everything when retryableErrors is explicitly undefined
+packages/shared test: [retry] Attempt 1/5 failed, retrying in 1ms... { errorCode: 'Error' }
+packages/research-adapters test:  Test Files  1 passed (1)
+packages/research-adapters test:       Tests  17 passed (17)
+packages/research-adapters test:    Start at  17:05:42
+packages/research-adapters test:    Duration  1.22s (transform 294ms, setup 0ms, collect 401ms, tests 20ms, environment 0ms, prepare 172ms)
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > wraps a non-Error rejection value before rethrowing
+packages/shared test: [retry] Attempt 1/5 failed, retrying in 1ms... { errorCode: 'Error' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > wraps a non-Error rejection value before rethrowing
+packages/shared test: [retry] Attempt 2/5 failed, retrying in 2ms... { errorCode: 'Error' }
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > wraps a non-Error rejection value before rethrowing
+packages/shared test: [retry] Attempt 3/5 failed, retrying in 4ms... { errorCode: 'Error' }
+apps/mission-control-ui test:  ✓ src/controlPlane/workOrdersModel.test.ts (12 tests) 3ms
+packages/shared test: stdout | src/__tests__/retry.test.ts > withRetry > retryability > wraps a non-Error rejection value before rethrowing
+packages/shared test: [retry] Attempt 4/5 failed, retrying in 4ms... { errorCode: 'Error' }
+apps/mission-control-ui test:  ✓ src/controlPlane/operatorDecisionModel.test.ts (6 tests) 2ms
+packages/shared test: stderr | src/__tests__/retry.test.ts > createHeartbeat > keeps beating after a failure instead of tearing the loop down
+packages/shared test: [heartbeat] Beat failed (1 consecutive), retrying in 10ms...
+packages/shared test:  ✓ src/__tests__/evalControlPlane.test.ts (6 tests) 56ms
+packages/shared test:  ✓ src/__tests__/retry.test.ts (17 tests) 80ms
+packages/shared test:  Test Files  6 passed (6)
+packages/shared test:       Tests  69 passed (69)
+packages/shared test:    Start at  17:05:43
+packages/shared test:    Duration  1.02s (transform 469ms, setup 0ms, collect 699ms, tests 164ms, environment 1ms, prepare 911ms)
+packages/research-adapters test: Done
+packages/shared test: Done
+apps/mission-control-ui test:  ✓ src/shellV2/navConfig.test.ts (6 tests) 70ms
+apps/mission-control-ui test:  ✓ src/eos/missionPlanModel.test.ts (8 tests) 3ms
+apps/mission-control-ui test:  ✓ src/KnowledgeGraphPanel.test.tsx (4 tests) 72ms
+apps/mission-control-ui test: stderr | src/eos/components/OperatingControlPlane.test.tsx > OperatingControlPlane > renders truthful role lenses, attention, ownership, fleet boundaries, and deep-link state
+apps/mission-control-ui test: ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+apps/mission-control-ui test: ⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+apps/mission-control-ui test:  ✓ src/eos/views/MissionExecutionWorkspace.test.tsx (2 tests) 79ms
+apps/mission-control-ui test:  ✓ src/eos/components/OperatingControlPlane.test.tsx (4 tests) 151ms
+apps/mission-control-ui test:  ✓ src/controlPlane/ReviewEvidencePackage.test.tsx (8 tests) 233ms
+apps/mission-control-ui test:  ✓ src/controlPlane/ExecutionRunInspector.test.tsx (5 tests) 104ms
+apps/mission-control-ui test:  ✓ src/workspace/WorkspaceRepositoriesPanel.test.tsx (9 tests) 228ms
+apps/mission-control-ui test:  ✓ src/eos/missionSpecModel.test.ts (5 tests) 2ms
+apps/mission-control-ui test:  ✓ src/harness/components/ResearchWatchlistPanel.test.tsx (9 tests) 366ms
+apps/mission-control-ui test:  ✓ src/workspace/FactoryConfigurationPanel.test.tsx (17 tests) 422ms
+apps/mission-control-ui test:  ✓ src/controlPlane/WorkOrderApprovalsView.test.tsx (6 tests) 360ms
+apps/mission-control-ui test:  ✓ src/components/AttentionQueuePanel.test.tsx (5 tests) 114ms
+apps/mission-control-ui test:  ✓ src/eos/views/CommandCenterView.test.tsx (3 tests) 309ms
+apps/mission-control-ui test:  ✓ src/lib/graphEngineering.test.ts (5 tests) 2ms
+apps/mission-control-ui test:  ✓ src/shellV2/navFilter.test.ts (5 tests) 2ms
+apps/mission-control-ui test:  ✓ src/RegistryView.test.tsx (10 tests) 277ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/recipeCatalog.test.ts (11 tests) 4ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/phaseProjection.test.ts (3 tests) 2ms
+apps/mission-control-ui test:  ✓ src/workspace/workspaceSelection.test.ts (8 tests) 2ms
+apps/mission-control-ui test:  ✓ src/eos/missionDraftModel.test.ts (3 tests) 2ms
+apps/mission-control-ui test:  ✓ src/controlPlane/RunRecoveryPanel.test.tsx (3 tests) 90ms
+apps/mission-control-ui test:  ✓ src/eos/views/MissionDraftForm.test.tsx (2 tests) 86ms
+apps/mission-control-ui test:  ✓ src/controlPlane/CandidateRecoveryPanel.test.tsx (3 tests) 104ms
+apps/mission-control-ui test:  ✓ src/components/factory/badges.test.tsx (13 tests) 54ms
+apps/mission-control-ui test:  ✓ src/releases/factoryReleaseModel.test.ts (4 tests) 3ms
+apps/mission-control-ui test:  ✓ src/shellV2/AppShellV2.test.ts (4 tests) 2ms
+apps/mission-control-ui test:  ✓ src/lib/runtimeCompatibility.test.ts (12 tests) 12ms
+apps/mission-control-ui test:  ✓ src/eos/traceViewModel.test.ts (3 tests) 3ms
+apps/mission-control-ui test:  ✓ src/controlPlane/FactoryContextRunCard.test.tsx (2 tests) 30ms
+apps/mission-control-ui test:  ✓ src/lib/registryEvalComparison.test.ts (2 tests) 2ms
+apps/mission-control-ui test:  ✓ src/shellV2/Sidebar.test.tsx (5 tests) 181ms
+apps/mission-control-ui test:  ✓ src/radarModel.test.ts (4 tests) 8ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/CreateFactoryMissionDialog.test.tsx (1 test) 102ms
+apps/mission-control-ui test:  ✓ src/auth/clerkConvexDiagnostic.test.ts (4 tests) 3ms
+apps/mission-control-ui test:  ✓ src/components/taskboardStatsModel.test.ts (2 tests) 2ms
+apps/mission-control-ui test:  ✓ src/workspace/companySelection.test.ts (4 tests) 1ms
+apps/mission-control-ui test:  ✓ src/lib/gatewayStatus.test.ts (2 tests) 61ms
+apps/mission-control-ui test:  ✓ src/controlPlane/runInspectorModel.test.ts (3 tests) 2ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/factoryLearningModel.test.ts (4 tests) 3ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/useFactoryExperienceLevel.test.tsx (3 tests) 13ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/FactoryPhaseInspector.test.tsx (2 tests) 67ms
+apps/mission-control-ui test:  ✓ src/controlPlane/EvidenceLineagePanel.test.tsx (2 tests) 59ms
+apps/mission-control-ui test:  ✓ src/eos/missionRoutes.test.ts (5 tests) 3ms
+apps/mission-control-ui test:  ✓ src/eos/views/missionPlanningPresentation.test.ts (3 tests) 2ms
+apps/mission-control-ui test:  ✓ src/CostAnalytics.test.tsx (2 tests) 22ms
+apps/mission-control-ui test:  ✓ src/lib/docsSiteConfig.test.ts (8 tests) 3ms
+apps/mission-control-ui test:  ✓ src/eos/missionExecutionModel.test.ts (4 tests) 2ms
+apps/mission-control-ui test:  ✓ src/auth/clerkConvexAuth.test.ts (2 tests) 7ms
+apps/mission-control-ui test:  ✓ src/lib/skillPitfalls.test.ts (3 tests) 2ms
+apps/mission-control-ui test:  ✓ src/hooks/useFlag.test.tsx (2 tests) 10ms
+apps/mission-control-ui test:  ✓ src/automations/automationModel.test.ts (2 tests) 1ms
+apps/mission-control-ui test:  ✓ src/controlPlane/factoryOverviewModel.test.ts (2 tests) 1ms
+apps/mission-control-ui test:  ✓ src/eos/evalControlPlaneViewModel.test.ts (3 tests) 5ms
+apps/mission-control-ui test:  ✓ src/shellV2/navCounts.test.ts (6 tests) 4ms
+apps/mission-control-ui test:  ✓ src/controlPlane/ExecutionRecoveryCard.test.tsx (1 test) 30ms
+apps/mission-control-ui test:  ✓ src/components/docs/MarkdownDoc.test.ts (4 tests) 4ms
+apps/mission-control-ui test:  ✓ src/lib/harnessWorkshop.test.ts (4 tests) 2ms
+apps/mission-control-ui test:  ✓ src/lib/harnessPatterns.test.ts (4 tests) 3ms
+apps/mission-control-ui test:  ✓ src/controlPlane/workOrderLifecycleModel.test.ts (2 tests) 2ms
+apps/mission-control-ui test:  ✓ src/eos/missionPresentation.test.ts (12 tests) 3ms
+apps/mission-control-ui test:  ✓ src/lib/registryViews.test.ts (2 tests) 1ms
+apps/mission-control-ui test:  ✓ src/auth/authMode.test.ts (4 tests) 2ms
+apps/mission-control-ui test:  ✓ src/lib/harnessArchitect.test.ts (3 tests) 2ms
+apps/mission-control-ui test:  ✓ src/harness/lib/loopSemantics.test.ts (2 tests) 1ms
+apps/mission-control-ui test:  ✓ src/lib/harnessAdw.test.ts (3 tests) 1ms
+apps/mission-control-ui test:  ✓ src/factoryExperience/ExperienceLevelSelector.test.tsx (1 test) 46ms
+apps/mission-control-ui test:  ✓ src/harness/HarnessSection.test.ts (1 test) 1ms
+apps/mission-control-ui test:  ✓ src/lib/displayText.test.ts (2 tests) 1ms
+apps/mission-control-ui test:  ✓ src/eos/views/MissionDetailView.test.ts (1 test) 1ms
+apps/mission-control-ui test:  Test Files  72 passed (72)
+apps/mission-control-ui test:       Tests  326 passed (326)
+apps/mission-control-ui test:    Start at  17:05:42
+apps/mission-control-ui test:    Duration  5.92s (transform 3.46s, setup 18.10s, collect 12.97s, tests 3.86s, environment 27.47s, prepare 3.94s)
+apps/mission-control-ui test: Done
+packages/meetings test$ vitest run
+packages/model-router test$ vitest run
+packages/state-machine test$ vitest run
+packages/policy-engine test$ vitest run
+packages/meetings test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/meetings
+packages/policy-engine test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/policy-engine
+packages/meetings test:  ✓ src/__tests__/manual.test.ts (7 tests) 21ms
+packages/meetings test:  Test Files  1 passed (1)
+packages/meetings test:       Tests  7 passed (7)
+packages/meetings test:    Start at  17:05:48
+packages/meetings test:    Duration  432ms (transform 38ms, setup 0ms, collect 37ms, tests 21ms, environment 0ms, prepare 167ms)
+packages/state-machine test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/state-machine
+packages/policy-engine test:  ✓ src/__tests__/rules.test.ts (20 tests) 5ms
+packages/policy-engine test:  ✓ src/__tests__/safety.test.ts (21 tests) 7ms
+packages/meetings test: Done
+packages/telegraph test$ vitest run
+packages/model-router test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/model-router
+packages/state-machine test:  ✓ src/__tests__/transitions.test.ts (17 tests) 4ms
+packages/state-machine test:  ✓ src/__tests__/validator.test.ts (23 tests) 3ms
+packages/state-machine test:  ✓ src/__tests__/states.test.ts (12 tests) 3ms
+packages/state-machine test:  Test Files  3 passed (3)
+packages/state-machine test:       Tests  52 passed (52)
+packages/state-machine test:    Start at  17:05:49
+packages/state-machine test:    Duration  451ms (transform 179ms, setup 0ms, collect 368ms, tests 11ms, environment 0ms, prepare 190ms)
+packages/policy-engine test:  ✓ src/__tests__/evaluator.test.ts (23 tests) 3ms
+packages/policy-engine test:  ✓ src/__tests__/allowlists.test.ts (28 tests) 4ms
+packages/policy-engine test:  Test Files  4 passed (4)
+packages/policy-engine test:       Tests  92 passed (92)
+packages/policy-engine test:    Start at  17:05:48
+packages/policy-engine test:    Duration  930ms (transform 395ms, setup 0ms, collect 1.25s, tests 19ms, environment 0ms, prepare 240ms)
+packages/model-router test:  ✓ src/__tests__/cost-estimator.test.ts (6 tests) 2ms
+packages/model-router test:  ✓ src/__tests__/router.test.ts (15 tests) 4ms
+packages/state-machine test: Done
+packages/policy-engine test: Done
+packages/model-router test:  ✓ src/__tests__/execution-routing.test.ts (18 tests) 5ms
+packages/model-router test:  Test Files  3 passed (3)
+packages/model-router test:       Tests  39 passed (39)
+packages/model-router test:    Start at  17:05:49
+packages/model-router test:    Duration  446ms (transform 144ms, setup 0ms, collect 208ms, tests 11ms, environment 0ms, prepare 182ms)
+packages/telegraph test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/telegraph
+packages/model-router test: Done
+packages/telegraph test:  ✓ src/__tests__/internal.test.ts (7 tests) 4ms
+packages/telegraph test:  ✓ src/__tests__/telegram.test.ts (10 tests) 4ms
+packages/telegraph test:  Test Files  2 passed (2)
+packages/telegraph test:       Tests  17 passed (17)
+packages/telegraph test:    Start at  17:05:49
+packages/telegraph test:    Duration  265ms (transform 38ms, setup 0ms, collect 36ms, tests 8ms, environment 0ms, prepare 119ms)
+packages/telegraph test: Done
+packages/workflow-engine test$ vitest run
+packages/coordinator test$ vitest run
+packages/workflow-engine test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/workflow-engine
+packages/coordinator test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/coordinator
+packages/workflow-engine test:  ✓ src/__tests__/parser.test.ts (17 tests) 3ms
+packages/workflow-engine test:  ✓ src/__tests__/verification.test.ts (8 tests) 6ms
+packages/workflow-engine test:  ✓ src/__tests__/implementationPolicy.test.ts (8 tests) 3ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationAuthority.test.ts (27 tests) 12ms
+packages/workflow-engine test:  ✓ src/__tests__/graph.test.ts (5 tests) 2ms
+packages/workflow-engine test:  ✓ src/__tests__/renderer.test.ts (18 tests) 7ms
+packages/workflow-engine test:  ✓ src/__tests__/loader.test.ts (18 tests) 19ms
+packages/workflow-engine test: stdout | src/__tests__/executor.test.ts > WorkflowExecutor reliability > stores the required output fields on workflow-created tasks
+packages/workflow-engine test: [WorkflowExecutor] Started run-123/researchArchitecture as task task-1
+packages/workflow-engine test: stdout | src/__tests__/executor.test.ts > WorkflowExecutor reliability > does not re-transition a Task that creation already moved to READY
+packages/workflow-engine test: [WorkflowExecutor] Started run-123/approval as task task-1
+packages/workflow-engine test: stdout | src/__tests__/executor.test.ts > WorkflowExecutor reliability > creates a gate approval bound to the task, run, version, and evidence digest
+packages/workflow-engine test: [WorkflowExecutor] Started run-123/approval as task task-1
+packages/workflow-engine test:  ✓ src/__tests__/executor.test.ts (19 tests) 21ms
+packages/coordinator test:  ✓ src/__tests__/dependency-graph.test.ts (11 tests) 3ms
+packages/coordinator test:  ✓ src/__tests__/decomposer.test.ts (7 tests) 2ms
+packages/coordinator test:  ✓ src/__tests__/delegator.test.ts (8 tests) 5ms
+packages/coordinator test:  ✓ src/__tests__/loop.test.ts (2 tests) 2ms
+packages/coordinator test:  ✓ src/__tests__/workflowTrigger.test.ts (18 tests) 3ms
+packages/coordinator test:  Test Files  5 passed (5)
+packages/coordinator test:       Tests  46 passed (46)
+packages/coordinator test:    Start at  17:05:50
+packages/coordinator test:    Duration  416ms (transform 95ms, setup 0ms, collect 355ms, tests 15ms, environment 0ms, prepare 365ms)
+packages/workflow-engine test:  ✓ src/__tests__/executorAdapter.test.ts (4 tests) 3ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationDecision.test.ts (8 tests) 6ms
+packages/workflow-engine test:  ✓ src/__tests__/handoff.test.ts (3 tests) 3ms
+packages/workflow-engine test:  ✓ src/__tests__/repositoryScope.test.ts (3 tests) 3ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationIndependence.test.ts (9 tests) 5ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationPlan.test.ts (4 tests) 3ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationCurrentness.test.ts (16 tests) 9ms
+packages/workflow-engine test:  ✓ src/__tests__/verificationSubject.test.ts (9 tests) 11ms
+packages/workflow-engine test:  ✓ src/__tests__/harnessContract.test.ts (6 tests) 12ms
+packages/workflow-engine test:  Test Files  17 passed (17)
+packages/workflow-engine test:       Tests  182 passed (182)
+packages/workflow-engine test:    Start at  17:05:50
+packages/workflow-engine test:    Duration  805ms (transform 1.24s, setup 0ms, collect 4.67s, tests 128ms, environment 2ms, prepare 1.21s)
+packages/coordinator test: Done
+packages/workflow-engine test: Done
+packages/context-router test$ vitest run
+packages/memory test$ vitest run
+packages/memory test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/memory
+packages/context-router test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/context-router
+packages/memory test:  ✓ src/__tests__/global.test.ts (5 tests) 2ms
+packages/memory test:  ✓ src/__tests__/session.test.ts (9 tests) 15ms
+packages/memory test:  ✓ src/__tests__/manager.test.ts (4 tests) 20ms
+packages/context-router test:  ✓ src/__tests__/classifier.test.ts (22 tests) 6ms
+packages/context-router test:  ✓ src/__tests__/router.test.ts (16 tests) 6ms
+packages/context-router test:  Test Files  2 passed (2)
+packages/context-router test:       Tests  38 passed (38)
+packages/context-router test:    Start at  17:05:51
+packages/context-router test:    Duration  325ms (transform 62ms, setup 0ms, collect 72ms, tests 13ms, environment 0ms, prepare 117ms)
+packages/memory test:  ✓ src/__tests__/factory.test.ts (9 tests) 14ms
+packages/memory test:  Test Files  4 passed (4)
+packages/memory test:       Tests  27 passed (27)
+packages/memory test:    Start at  17:05:51
+packages/memory test:    Duration  640ms (transform 283ms, setup 0ms, collect 693ms, tests 51ms, environment 0ms, prepare 211ms)
+packages/context-router test: Done
+packages/memory test: Done
+packages/agent-runtime test$ vitest run
+packages/agent-runtime test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/packages/agent-runtime
+packages/agent-runtime test:  ✓ src/__tests__/heartbeat.test.ts (5 tests) 1ms
+packages/agent-runtime test:  ✓ src/__tests__/persona.test.ts (14 tests) 2ms
+packages/agent-runtime test:  Test Files  2 passed (2)
+packages/agent-runtime test:       Tests  19 passed (19)
+packages/agent-runtime test:    Start at  17:05:52
+packages/agent-runtime test:    Duration  258ms (transform 35ms, setup 0ms, collect 45ms, tests 3ms, environment 0ms, prepare 103ms)
+packages/agent-runtime test: Done
+apps/orchestration-server test$ vitest run
+apps/orchestration-server test:  RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation/apps/orchestration-server
+apps/orchestration-server test:  ↓ src/__tests__/governedContextBridge.integration.test.ts (1 test | 1 skipped)
+apps/orchestration-server test:  ✓ src/__tests__/gatewayProxy.test.ts (15 tests) 82ms
+apps/orchestration-server test:  ✓ src/__tests__/exeDevSandboxProvider.test.ts (14 tests) 9ms
+apps/orchestration-server test:  ✓ src/__tests__/missionPlanningWorker.test.ts (9 tests) 30ms
+apps/orchestration-server test:  ✓ src/__tests__/remoteStructuredResult.test.ts (17 tests) 5ms
+apps/orchestration-server test:  ✓ src/__tests__/governedMcpBroker.test.ts (16 tests) 152ms
+apps/orchestration-server test:  ✓ src/__tests__/githubAppRuntime.test.ts (10 tests) 12ms
+apps/orchestration-server test:  ✓ src/__tests__/missionPlanningContract.test.ts (8 tests) 79ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryVerificationAuthority.test.ts (8 tests) 548ms
+apps/orchestration-server test:  ✓ src/__tests__/githubAppPublisher.test.ts (6 tests) 183ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryHostReporter.test.ts (9 tests) 302ms
+apps/orchestration-server test:  ✓ src/__tests__/harnessAdapterRegistry.test.ts (7 tests) 4ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryAttemptWorkerRemote.test.ts (2 tests) 997ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker remote Sandbox backend > runs beneath the canonical worker lease, verifies on the host, cleans up, and only then publishes one PR  995ms
+apps/orchestration-server test:  ✓ src/__tests__/deepseekHarnessExecutorAdapter.test.ts (10 tests) 1278ms
+apps/orchestration-server test:    ✓ DeepSeekHarnessExecutorAdapter > cancels the dedicated owned executor process group  348ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryVerification.test.ts (2 tests) 92ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryGovernedMcpContext.test.ts (2 tests) 145ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryObservability.test.ts (2 tests) 3ms
+apps/orchestration-server test:  ✓ src/__tests__/sandboxCredentials.test.ts (3 tests) 6ms
+apps/orchestration-server test:  ✓ src/__tests__/auth.test.ts (6 tests) 2ms
+apps/orchestration-server test:  ✓ src/__tests__/sandboxReconciler.test.ts (3 tests) 3ms
+apps/orchestration-server test:  ✓ src/__tests__/automationAdapter.test.ts (11 tests) 1256ms
+apps/orchestration-server test:    ✓ Automation adapter safety > executes TypeScript and Python artifacts through fixed argv adapters  972ms
+apps/orchestration-server test:  ✓ src/__tests__/serviceCommandClient.test.ts (3 tests) 3ms
+apps/orchestration-server test:  ✓ src/__tests__/orchestrationSecurity.test.ts (9 tests) 4ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryHarnessComposition.test.ts (5 tests) 12ms
+apps/orchestration-server test:  ✓ src/__tests__/codexExecutorAdapter.test.ts (14 tests) 1763ms
+apps/orchestration-server test:    ✓ CodexV1ExecutorAdapter > cancels the dedicated owned executor process group  529ms
+apps/orchestration-server test:    ✓ CodexV1ExecutorAdapter > closes the Codex CLI stdin pipe so an explicit prompt can start  452ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryPathScope.test.ts (3 tests) 2ms
+apps/orchestration-server test:  ✓ src/__tests__/fabRuntimeIdentity.test.ts (2 tests) 34ms
+apps/orchestration-server test:  ✓ src/__tests__/localInference.test.ts (1 test) 4ms
+apps/orchestration-server test:  ✓ src/__tests__/sandboxSupervisor.test.ts (5 tests) 1921ms
+apps/orchestration-server test:    ✓ sandbox supervisor candidate capture > includes staged, unstaged, and newly created files, and excludes ignored ones  319ms
+apps/orchestration-server test:    ✓ sandbox supervisor candidate capture > reads V2 model/backend bindings and rejects a tampered runtime artifact before execution  312ms
+apps/orchestration-server test:    ✓ sandbox supervisor candidate capture > admits V3 only with a current exact Execution Profile before running the executor  394ms
+apps/orchestration-server test:    ✓ sandbox supervisor candidate capture > keeps the standalone remote supervisor equivalent to the in-process one  598ms
+apps/orchestration-server test:  ✓ src/__tests__/localInferenceBoundary.test.ts (1 test) 311ms
+apps/orchestration-server test:    ✓ local inference catalog boundary > rejects legacy HTTP synchronization until a signed workspace command exists  311ms
+apps/orchestration-server test:  ✓ src/__tests__/remoteSandboxRuntime.test.ts (24 tests) 2201ms
+apps/orchestration-server test:    ✓ sandbox supervisor > pins the source, runs a bounded executor, and writes a content-addressed binary patch  312ms
+apps/orchestration-server test:    ✓ sandbox supervisor > reconstructs one terminal Codex JSONL result with exact context and atomic persistence  412ms
+apps/orchestration-server test:    ✓ sandbox supervisor > preserves diagnostics but no final result when the supervisor crashes after execution  323ms
+apps/orchestration-server test:    ✓ sandbox supervisor > redacts an Attempt credential before truncating crash diagnostics  312ms
+apps/orchestration-server test:    ✓ sandbox supervisor > bounds executor output in memory while preserving full byte counts and stream digests  433ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryGitRuntime.test.ts (5 tests) 2345ms
+apps/orchestration-server test:    ✓ Factory Git runtime > creates and reconciles the exact worktree branch across retries  1012ms
+apps/orchestration-server test:    ✓ Factory Git runtime > prepares frozen dependencies without changing source state  375ms
+apps/orchestration-server test:    ✓ Factory Git runtime > never loads candidate pnpm hooks or lifecycle scripts during offline preparation  615ms
+apps/orchestration-server test: stderr | src/__tests__/durableCodexWorker.test.ts > durable Codex worker Git boundary > retains a non-terminal lease when the worker shuts down
+apps/orchestration-server test: [codex-worker] Worker stopped for run-restart; durable worktree and non-terminal lease retained for recovery.
+apps/orchestration-server test:  ✓ src/__tests__/durableCodexWorker.test.ts (7 tests) 2463ms
+apps/orchestration-server test:    ✓ durable Codex worker Git boundary > creates and recovers the exact linked worktree without resetting partial changes  550ms
+apps/orchestration-server test:    ✓ durable Codex worker Git boundary > blocks verification commands that change Git history  578ms
+apps/orchestration-server test:    ✓ durable Codex worker Git boundary > rechecks approved file scope after verification commands mutate the worktree  767ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryWorkspaceOwnership.test.ts (14 tests) 3121ms
+apps/orchestration-server test:    ✓ Factory workspace ownership > removes only an exact, clean, published, terminated worktree  462ms
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > persists the policy-v2 candidate checkpoint before a GitHub credential publication failure
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: GitHub App runtime credentials are not configured.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > denies local recovery when the clean worktree no longer matches the durable source checkpoint
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Local candidate recovery workspace does not match the durable source Attempt checkpoint.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 profile bytes are substituted after admission
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 claim evidence is missing or substituted
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > rejects a V3 qualification already stale at the server claim instant
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different runtime executable
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when legacy V1 normalized provenance reports a different runtime executable
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different provider route
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+apps/orchestration-server test:  ✓ src/__tests__/fabExecutorAdapter.test.ts (13 tests) 8318ms
+apps/orchestration-server test:    ✓ Fab canonical MC harness conformance > requires durable request evidence before dispatch and records in-process lifecycle  808ms
+apps/orchestration-server test:    ✓ Fab canonical MC harness conformance > produces real checked edits, canonical evidence and candidate linkage without acceptance authority  1425ms
+apps/orchestration-server test:    ✓ Fab canonical MC harness conformance > rejects injected path or authority ../escape.mjs  798ms
+apps/orchestration-server test:    ✓ Fab canonical MC harness conformance > rejects injected path or authority .env  787ms
+apps/orchestration-server test:    ✓ Fab canonical MC harness conformance > rejects injected path or authority src/credentials.json  772ms
+apps/orchestration-server test:    ✓ Fab canonical MC harness conformance > rejects injected path or authority self-approval  789ms
+apps/orchestration-server test:    ✓ Fab canonical MC harness conformance > preserves an actual killed worker's uncertain model request and refuses its replay  669ms
+apps/orchestration-server test:    ✓ Fab canonical MC harness conformance > cancels during model execution and prevents successful handoff  340ms
+apps/orchestration-server test:    ✓ Fab canonical MC harness conformance > cancels during check execution and prevents successful handoff  646ms
+apps/orchestration-server test:    ✓ Fab canonical MC harness conformance > fails closed when lease authority is lost after an observed tool  502ms
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > fences publication at intent-expiry
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Publication permit is missing or expired for candidate 2da64d583492.
+apps/orchestration-server test:  ✓ src/__tests__/systemFactoryQualification.test.ts (4 tests) 10389ms
+apps/orchestration-server test:    ✓ Mission Control full-system Factory qualification V2 > proves exact governed lineage, failures, recovery, authority, and learning on an isolated fixture  10376ms
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > fences publication at lease-loss-after-push
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Attempt authority was lost or cancelled.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > reconciles lost-provider-response after permit expiry without provider writes or model replay
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Fixture provider outcome uncertain after request
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > reconciles lost-terminal-response after permit expiry without provider writes or model replay
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Controlled terminal response loss after workspace cleanup
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > denies publication when MC's final authority check rejects the lease
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Control plane did not authorize pull-request publication.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Fixture provider outcome uncertain after request
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Workspace ownership tuple mismatch; workspace was preserved.
+apps/orchestration-server test:  ✓ src/__tests__/factoryAttemptWorker.test.ts (36 tests) 20588ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > turns governed issue intent into a verified, evidence-linked pull request  806ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > injects profile-bound governed MCP output as untrusted pre-harness context  965ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > completes a non-mutating candidate as durable evidence without provider publication  380ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > executes an independently registered harness identity through the unchanged governed lifecycle  409ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > uses only the frozen V2 provider/model route and ignores a mutable claim model override  394ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > publishes an ordinary policy-v2 candidate through the governed provider path  339ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > constructs the worker from the exact frozen V3 Execution Profile  393ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > uses the server claim instant for V3 expiry so an admitted lease may finish  390ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > completes the durable worker golden path and cleans only its proven worktree  444ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > does not create a pull request when the control plane rejects the verification packet  393ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > pauses for human review and resumes publication without rerunning Codex or verification  547ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > persists a verification mismatch, blocks publication, and recovers with a new immutable Attempt  715ms
+apps/orchestration-server test:    ✓ Fab governed golden path using the canonical MC worker > fences publication at intent-expiry  1502ms
+apps/orchestration-server test:    ✓ Fab governed golden path using the canonical MC worker > fences publication at lease-loss-after-push  1569ms
+apps/orchestration-server test:    ✓ Fab governed golden path using the canonical MC worker > reconciles lost-provider-response after permit expiry without provider writes or model replay  1804ms
+apps/orchestration-server test:    ✓ Fab governed golden path using the canonical MC worker > reconciles lost-terminal-response after permit expiry without provider writes or model replay  1751ms
+apps/orchestration-server test:    ✓ Fab governed golden path using the canonical MC worker > pauses without a PR, verifies a v2 subject separately, then transfers the owned workspace for approved draft publication  1573ms
+apps/orchestration-server test:    ✓ Fab governed golden path using the canonical MC worker > links a real Fab candidate to a separate exact-subject verifier, approval and fixture publication  1387ms
+apps/orchestration-server test:    ✓ Fab governed golden path using the canonical MC worker > denies publication when MC's final authority check rejects the lease  1264ms
+apps/orchestration-server test:    ✓ Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect  1301ms
+apps/orchestration-server test:  Test Files  36 passed | 1 skipped (37)
+apps/orchestration-server test:       Tests  306 passed | 1 skipped (307)
+apps/orchestration-server test:    Start at  17:05:53
+apps/orchestration-server test:    Duration  21.41s (transform 1.58s, setup 0ms, collect 6.31s, tests 58.67s, environment 3ms, prepare 2.01s)
+apps/orchestration-server test: Done
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mc-validation
+
+ ✓ convex/__tests__/contextManifests.test.ts (24 tests) 4ms
+ ✓ convex/__tests__/integration.test.ts (12 tests) 7ms
+ ✓ convex/__tests__/factoryLearning.test.ts (13 tests) 13ms
+ ✓ convex/__tests__/factoryMemory.test.ts (13 tests) 26ms
+ ✓ convex/__tests__/factoryAttempt.test.ts (17 tests) 5ms
+ ✓ convex/__tests__/modelRouteAdmission.test.ts (12 tests) 6ms
+ ✓ convex/__tests__/missionSpec.test.ts (9 tests) 9ms
+ ✓ convex/__tests__/factoryModelRoute.test.ts (13 tests) 9ms
+ ✓ convex/__tests__/factoryRelease.test.ts (12 tests) 4ms
+ ✓ convex/__tests__/companyAccess.test.ts (10 tests) 4ms
+ ✓ convex/__tests__/factoryWorkerRuntime.test.ts (13 tests) 12ms
+ ✓ convex/__tests__/factoryHumanReview.test.ts (11 tests) 3ms
+ ✓ convex/__tests__/evidenceAuthorityClasses.test.ts (19 tests) 3ms
+ ✓ convex/__tests__/executionRoutingEvidence.test.ts (7 tests) 6ms
+ ✓ convex/__tests__/executionManifest.test.ts (24 tests) 71ms
+ ✓ convex/__tests__/automationAuthorization.test.ts (4 tests) 7ms
+ ✓ convex/__tests__/missionPlanningExecutionProfile.test.ts (5 tests) 45ms
+ ✓ convex/__tests__/tasks.test.ts (31 tests) 7ms
+ ✓ convex/__tests__/executionProfile.test.ts (14 tests) 177ms
+ ✓ convex/__tests__/missionWorkOrderContract.test.ts (7 tests) 3ms
+ ✓ convex/__tests__/workOrderDispatch.test.ts (37 tests) 7ms
+ ✓ convex/__tests__/factoryCandidateBaseAuthority.test.ts (16 tests) 44ms
+ ✓ convex/__tests__/readOnlyRunControl.test.ts (10 tests) 3ms
+ ✓ convex/__tests__/taskAttemptScheduler.test.ts (23 tests) 2ms
+ ✓ convex/__tests__/observabilityGoldenPath.test.ts (6 tests) 9ms
+ ✓ convex/__tests__/policyV2Verification.test.ts (3 tests) 4ms
+ ✓ convex/__tests__/contextPackages.test.ts (22 tests) 3ms
+ ✓ convex/__tests__/githubCiIngest.test.ts (14 tests) 4ms
+ ✓ convex/__tests__/softwareFactoryControlPlane.test.ts (9 tests) 3ms
+ ✓ convex/__tests__/reviewIntelligence.test.ts (6 tests) 7ms
+ ✓ convex/__tests__/workOrderGovernance.test.ts (12 tests) 7ms
+ ✓ convex/__tests__/modelRoutingAuthorization.test.ts (16 tests) 13ms
+ ✓ convex/__tests__/governedHardeningAuthority.test.ts (6 tests) 54ms
+ ✓ convex/__tests__/missionPlan.test.ts (7 tests) 2ms
+ ✓ convex/__tests__/riskClassifier.test.ts (20 tests) 3ms
+ ✓ convex/__tests__/factoryConfiguration.test.ts (10 tests) 4ms
+ ✓ convex/__tests__/evalControlPlaneGoldenPath.test.ts (2 tests) 21ms
+ ✓ convex/__tests__/harnessPrChecks.test.ts (10 tests) 6ms
+ ✓ convex/__tests__/getActiveTenant.test.ts (11 tests) 2ms
+ ✓ convex/__tests__/continuousResearchProjection.test.ts (4 tests) 4ms
+ ✓ convex/__tests__/preExecutionRecovery.test.ts (16 tests) 2ms
+ ✓ convex/__tests__/githubAppConnections.test.ts (3 tests) 7ms
+ ✓ convex/__tests__/githubAppReadiness.test.ts (7 tests) 96ms
+ ✓ convex/__tests__/workOrderRevision.test.ts (8 tests) 11ms
+ ✓ convex/__tests__/factoryDispatch.test.ts (10 tests) 2ms
+ ✓ convex/__tests__/missionGovernance.test.ts (11 tests) 3ms
+ ✓ convex/__tests__/featureFlags.test.ts (14 tests) 3ms
+ ✓ convex/__tests__/sandboxProfileAdmission.test.ts (3 tests) 7ms
+ ✓ convex/__tests__/researchIngestionPolicy.test.ts (5 tests) 14ms
+ ✓ convex/__tests__/actionAuthorization.test.ts (23 tests) 33ms
+ ✓ convex/__tests__/factoryRuntimeGoldenPath.test.ts (2 tests) 3ms
+ ✓ convex/__tests__/automationGovernance.test.ts (7 tests) 8ms
+ ✓ convex/__tests__/reviewIntelligenceAuthority.test.ts (5 tests) 3ms
+ ✓ convex/__tests__/reviewPackage.test.ts (17 tests) 5ms
+ ✓ convex/__tests__/rateLimit.test.ts (9 tests) 3ms
+ ✓ convex/__tests__/missionPlanningRunState.test.ts (6 tests) 3ms
+ ✓ convex/__tests__/reviewIntelligenceGoldenPath.test.ts (1 test) 4ms
+ ✓ convex/__tests__/workOrderSpecification.test.ts (8 tests) 2ms
+ ✓ convex/__tests__/qualityContract.test.ts (4 tests) 4ms
+ ✓ convex/__tests__/deliveryPermissionLadder.test.ts (8 tests) 3ms
+ ✓ convex/__tests__/armPolicy.test.ts (5 tests) 2ms
+ ✓ convex/__tests__/researchSourcePolicy.test.ts (5 tests) 6ms
+ ✓ convex/__tests__/taskProjection.test.ts (10 tests) 3ms
+ ✓ convex/__tests__/localCandidateRecovery.test.ts (6 tests) 21ms
+ ✓ convex/__tests__/governedMcp.test.ts (4 tests) 20ms
+ ✓ convex/__tests__/knowledgeGraph.test.ts (7 tests) 4ms
+ ✓ convex/__tests__/workflowExecutionControl.test.ts (5 tests) 9ms
+ ✓ convex/__tests__/workspaceRepositories.test.ts (8 tests) 3ms
+ ✓ convex/__tests__/repetitiveTaskCandidates.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/verificationPersistence.test.ts (5 tests) 5ms
+ ✓ convex/__tests__/loopResearchEvidence.test.ts (3 tests) 2ms
+ ✓ convex/__tests__/repositoryExecutionPolicy.test.ts (8 tests) 3ms
+ ✓ convex/__tests__/loopWorkflowProjection.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/contextEvals.test.ts (11 tests) 4ms
+ ✓ convex/__tests__/loopEngineering.test.ts (6 tests) 5ms
+ ✓ convex/__tests__/taskWorkflowState.test.ts (5 tests) 2ms
+ ✓ convex/__tests__/workflowObservability.test.ts (5 tests) 2ms
+ ✓ convex/__tests__/continuousResearchEvidence.test.ts (5 tests) 21ms
+ ✓ convex/__tests__/skillAutomation.test.ts (11 tests) 6ms
+ ✓ convex/__tests__/runInspector.test.ts (5 tests) 9ms
+ ✓ convex/__tests__/factoryActionAuthorization.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/workOrderParentSync.test.ts (13 tests) 4ms
+ ✓ convex/__tests__/harnessCapabilities.test.ts (4 tests) 7ms
+ ✓ convex/__tests__/authorizationRollout.test.ts (5 tests) 3ms
+ ✓ convex/__tests__/factoryWorkflowContract.test.ts (3 tests) 5ms
+ ✓ convex/__tests__/prdParser.test.ts (5 tests) 31ms
+ ✓ convex/__tests__/missionEvidencePolicy.test.ts (3 tests) 1ms
+ ✓ convex/__tests__/prEvaluation.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/qualityGateDecision.test.ts (4 tests) 4ms
+ ✓ convex/__tests__/taskAuthority.test.ts (5 tests) 7ms
+ ✓ convex/__tests__/workflowSnapshot.test.ts (3 tests) 6ms
+ ✓ convex/__tests__/workOrders.test.ts (8 tests) 3ms
+ ✓ convex/__tests__/outputValidation.test.ts (6 tests) 3ms
+ ✓ convex/__tests__/continuousEvidenceLineage.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/missionSpecAuthority.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/workflowTaskGuards.test.ts (2 tests) 1ms
+ ✓ convex/__tests__/missionDraft.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/executionRecovery.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/publicActionSurface.test.ts (3 tests) 2ms
+ ✓ convex/__tests__/sanitize.test.ts (7 tests) 4ms
+ ✓ convex/__tests__/executionWorkerAuthority.test.ts (4 tests) 4ms
+ ✓ convex/__tests__/repetitiveTasks.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/missionPromptScheduling.test.ts (6 tests) 3ms
+ ✓ convex/__tests__/serviceCommandAuth.test.ts (7 tests) 7ms
+ ✓ convex/__tests__/factoryOverview.test.ts (3 tests) 1ms
+ ✓ convex/__tests__/operatorEvals.test.ts (3 tests) 4ms
+ ✓ convex/__tests__/piBridge.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/automationDispatch.test.ts (4 tests) 2ms
+ ✓ convex/__tests__/workspaceBindings.test.ts (3 tests) 1ms
+ ✓ convex/__tests__/factoryProjectSeed.test.ts (2 tests) 2ms
+ ✓ convex/__tests__/factoryReviewReadModel.test.ts (1 test) 3ms
+ ✓ convex/__tests__/operatorControls.test.ts (5 tests) 5ms
+ ✓ convex/__tests__/codexFactoryWorkerGuardrails.test.ts (5 tests) 38ms
+ ✓ convex/__tests__/executionRoutingRollout.test.ts (2 tests) 2ms
+ ✓ convex/__tests__/workflowRunState.test.ts (3 tests) 10ms
+ ✓ convex/__tests__/companyMemberPolicy.test.ts (4 tests) 3ms
+ ✓ convex/__tests__/contextActivation.test.ts (2 tests) 5ms
+ ✓ convex/__tests__/metaLoopSignals.test.ts (3 tests) 3ms
+ ✓ convex/__tests__/verificationEligibilitySchemaContract.test.ts (2 tests) 2ms
+ ✓ convex/__tests__/mergeGates.test.ts (2 tests) 2ms
+ ✓ convex/__tests__/executionPolicy.test.ts (3 tests) 2ms
+ ✓ convex/__tests__/runEventSchemaContract.test.ts (1 test) 1ms
+ ✓ convex/__tests__/factoryHealth.test.ts (3 tests) 2ms
+ ✓ convex/__tests__/graphEngineering.test.ts (1 test) 1ms
+ ✓ convex/__tests__/executionRoutingCost.test.ts (3 tests) 1ms
+
+ Test Files  125 passed (125)
+      Tests  972 passed (972)
+   Start at  17:06:15
+   Duration  3.45s (transform 3.82s, setup 0ms, collect 12.65s, tests 1.18s, environment 99ms, prepare 6.92s)
+
+
+=== TypeScript and skill lint ===
+
+> mission-control@0.9.0 lint /private/tmp/fab-phase3-mc-validation
+> pnpm run typecheck && node scripts/skill-lint.mjs
+
+
+> mission-control@0.9.0 typecheck /private/tmp/fab-phase3-mc-validation
+> pnpm run ci:prepare && pnpm -r --if-present run typecheck
+
+
+> mission-control@0.9.0 ci:prepare /private/tmp/fab-phase3-mc-validation
+> pnpm --filter @mission-control/shared build && pnpm --filter @mission-control/state-machine build && pnpm --filter @mission-control/policy-engine build && pnpm --filter @mission-control/workflow-engine build && pnpm --filter @mission-control/coordinator build && pnpm --filter @mission-control/context-router build && pnpm --filter @mission-control/model-router build && pnpm --filter @mission-control/memory build && pnpm --filter @mission-control/context-tools build && pnpm --filter @mission-control/agent-runtime build && pnpm --filter @mission-control/telegraph build && pnpm --filter @mission-control/meetings build && pnpm --filter @mission-control/research-adapters build
+
+
+> @mission-control/shared@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/shared
+> tsc
+
+
+> @mission-control/state-machine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/state-machine
+> tsc
+
+
+> @mission-control/policy-engine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/policy-engine
+> tsc
+
+
+> @mission-control/workflow-engine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/workflow-engine
+> tsc
+
+
+> @mission-control/coordinator@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/coordinator
+> tsc
+
+
+> @mission-control/context-router@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/context-router
+> tsc
+
+
+> @mission-control/model-router@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/model-router
+> tsc
+
+
+> @mission-control/memory@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/memory
+> tsc
+
+
+> @mission-control/context-tools@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/context-tools
+> tsc
+
+
+> @mission-control/agent-runtime@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/agent-runtime
+> tsc
+
+
+> @mission-control/telegraph@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/telegraph
+> tsc
+
+
+> @mission-control/meetings@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/meetings
+> tsc
+
+
+> @mission-control/research-adapters@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/research-adapters
+> tsc
+
+Scope: 19 of 20 workspace projects
+apps/mission-control-ui typecheck$ tsc --noEmit
+packages/research-adapters typecheck$ tsc --noEmit
+packages/shared typecheck$ tsc --noEmit
+packages/context-tools typecheck$ tsc --noEmit
+packages/research-adapters typecheck: Done
+packages/shared typecheck: Done
+packages/context-tools typecheck: Done
+apps/mission-control-ui typecheck: Done
+packages/model-router typecheck$ tsc --noEmit
+packages/state-machine typecheck$ tsc --noEmit
+packages/policy-engine typecheck$ tsc --noEmit
+packages/state-machine typecheck: Done
+packages/policy-engine typecheck: Done
+packages/model-router typecheck: Done
+packages/telegram-bot typecheck$ tsc --noEmit
+packages/coordinator typecheck$ tsc --noEmit
+packages/workflow-engine typecheck$ tsc --noEmit
+packages/coordinator typecheck: Done
+packages/workflow-engine typecheck: Done
+packages/telegram-bot typecheck: Done
+apps/workflow-executor typecheck$ tsc --noEmit
+packages/cli typecheck$ tsc --noEmit
+packages/memory typecheck$ tsc --noEmit
+packages/context-router typecheck$ tsc --noEmit
+packages/memory typecheck: Done
+packages/context-router typecheck: Done
+apps/workflow-executor typecheck: Done
+packages/cli typecheck: Done
+packages/agent-runtime typecheck$ tsc --noEmit
+packages/agent-runtime typecheck: Done
+apps/orchestration-server typecheck$ tsc --noEmit
+apps/orchestration-server typecheck: Done
+SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-budget-control/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-heartbeat/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-record-memory/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-register-agent/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-request-approval/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-run-logging/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-submit-deliverable/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/mission-control-task-lifecycle/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+skills/workspace-handoff-checklist/SKILL.md — score 100/100 (validation 100, implementation 100, activation 100)
+
+10 skill(s) linted — 0 error(s), 0 warning(s), average score 100/100
+
+=== runtime-contract guard ===
+Runtime contract guard: PASS
+Accepted 2 public Convex contract change(s) with version v42 → v43.
+- factory/attempts:retryCandidateVerification: added
+- factory/attempts:retryPublicationReconciliation: added
+
+=== production build ===
+
+> mission-control@0.9.0 build /private/tmp/fab-phase3-mc-validation
+> pnpm -r --if-present run build
+
+Scope: 19 of 20 workspace projects
+apps/mission-control-ui build$ vite build
+packages/context-tools build$ tsc
+packages/openclaw-sdk build$ tsc
+packages/research-adapters build$ tsc
+packages/research-adapters build: Done
+packages/shared build$ tsc
+packages/context-tools build: Done
+apps/mission-control-ui build: vite v6.4.3 building for production...
+apps/mission-control-ui build: transforming...
+packages/openclaw-sdk build: Done
+packages/shared build: Done
+apps/mission-control-ui build: ✓ 3411 modules transformed.
+apps/mission-control-ui build: rendering chunks...
+apps/mission-control-ui build: computing gzip size...
+apps/mission-control-ui build: dist/index.html                                      0.71 kB │ gzip:   0.36 kB
+apps/mission-control-ui build: dist/assets/index-D8rZ_Li7.css                     161.17 kB │ gzip:  26.32 kB
+apps/mission-control-ui build: dist/assets/vendor-motion-DMof9TtM.js                0.03 kB │ gzip:   0.05 kB
+apps/mission-control-ui build: dist/assets/displayText-ByTDteOn.js                  0.06 kB │ gzip:   0.08 kB
+apps/mission-control-ui build: dist/assets/dateInput-BcNRYiFV.js                    0.32 kB │ gzip:   0.24 kB
+apps/mission-control-ui build: dist/assets/schematicFormatters-CrdMyzN6.js          0.35 kB │ gzip:   0.24 kB
+apps/mission-control-ui build: dist/assets/orchestrationUrl-2AWO-j4K.js             0.36 kB │ gzip:   0.27 kB
+apps/mission-control-ui build: dist/assets/textarea-D0-J8jBR.js                     0.52 kB │ gzip:   0.35 kB
+apps/mission-control-ui build: dist/assets/useFactoryExperienceLevel-BSjOeOHd.js    0.69 kB │ gzip:   0.39 kB
+apps/mission-control-ui build: dist/assets/empty-state-DxQr3MKz.js                  0.73 kB │ gzip:   0.40 kB
+apps/mission-control-ui build: dist/assets/MetricBlock-CKq0ddN0.js                  0.84 kB │ gzip:   0.44 kB
+apps/mission-control-ui build: dist/assets/HarnessFirstReviewModal-D3TwSVMS.js      1.07 kB │ gzip:   0.60 kB
+apps/mission-control-ui build: dist/assets/card-Bdyyd6Y7.js                         1.08 kB │ gzip:   0.42 kB
+apps/mission-control-ui build: dist/assets/tabs-8SbEW45X.js                         1.14 kB │ gzip:   0.48 kB
+apps/mission-control-ui build: dist/assets/SchematicKpiStrip-Drau45wn.js            1.14 kB │ gzip:   0.60 kB
+apps/mission-control-ui build: dist/assets/SchematicPageHead-CVgS00mV.js            1.33 kB │ gzip:   0.74 kB
+apps/mission-control-ui build: dist/assets/badge-hWKwgQFj.js                        1.34 kB │ gzip:   0.60 kB
+apps/mission-control-ui build: dist/assets/PageHeader-DhP2iEOR.js                   1.40 kB │ gzip:   0.61 kB
+apps/mission-control-ui build: dist/assets/gatewayStatus-DlVkqWLH.js                1.45 kB │ gzip:   0.75 kB
+apps/mission-control-ui build: dist/assets/automationModel-BSdJ-_aP.js              1.62 kB │ gzip:   0.81 kB
+apps/mission-control-ui build: dist/assets/badges-jzF37l3p.js                       1.73 kB │ gzip:   0.78 kB
+apps/mission-control-ui build: dist/assets/DataTable-DmWRG5-9.js                    1.85 kB │ gzip:   0.86 kB
+apps/mission-control-ui build: dist/assets/MutationTestingPanel-DmgfMuU2.js         2.32 kB │ gzip:   0.95 kB
+apps/mission-control-ui build: dist/assets/sheet-Cc51ZAQM.js                        2.38 kB │ gzip:   0.95 kB
+apps/mission-control-ui build: dist/assets/table-B0jxFSrr.js                        2.41 kB │ gzip:   0.91 kB
+apps/mission-control-ui build: dist/assets/UsageTrendCharts-BM0DQtvj.js             3.43 kB │ gzip:   1.25 kB
+apps/mission-control-ui build: dist/assets/chartTheme-BLvSY_lW.js                   4.01 kB │ gzip:   1.52 kB
+apps/mission-control-ui build: dist/assets/ScheduleView-BbxdvYUJ.js                 5.36 kB │ gzip:   1.78 kB
+apps/mission-control-ui build: dist/assets/CreateTaskModal-Dt2mYRGD.js              7.13 kB │ gzip:   2.56 kB
+apps/mission-control-ui build: dist/assets/CreateAgentModal-CuA4oljw.js             7.33 kB │ gzip:   2.33 kB
+apps/mission-control-ui build: dist/assets/vendor-convex-BYrEwiOd.js               12.34 kB │ gzip:   4.48 kB
+apps/mission-control-ui build: dist/assets/DashboardOverview-BT4UbPDw.js           16.30 kB │ gzip:   5.25 kB
+apps/mission-control-ui build: dist/assets/attentionQueue-B_5sYqtl.js              23.24 kB │ gzip:   7.50 kB
+apps/mission-control-ui build: dist/assets/index-CM34ya4k.js                       24.82 kB │ gzip:   7.42 kB
+apps/mission-control-ui build: dist/assets/CodeSection-Bx-Th_yu.js                 31.79 kB │ gzip:   6.40 kB
+apps/mission-control-ui build: dist/assets/QualitySection-CKIWb58F.js              39.01 kB │ gzip:   8.85 kB
+apps/mission-control-ui build: dist/assets/ChatSection-B4bSjAAn.js                 53.94 kB │ gzip:  13.73 kB
+apps/mission-control-ui build: dist/assets/ExecutionRunInspector-3FzPpekI.js       67.78 kB │ gzip:  15.78 kB
+apps/mission-control-ui build: dist/assets/TaskDrawerTabs-yfP9J3bu.js              73.15 kB │ gzip:  19.09 kB
+apps/mission-control-ui build: dist/assets/vendor-icons-DN9gQWQV.js                83.88 kB │ gzip:  16.62 kB
+apps/mission-control-ui build: dist/assets/AgentsSection-OdJb_GTm.js              106.18 kB │ gzip:  25.33 kB
+apps/mission-control-ui build: dist/assets/ModalLayer-CuGWiHct.js                 108.52 kB │ gzip:  27.20 kB
+apps/mission-control-ui build: dist/assets/CommsSection-BwEV7FlQ.js               137.79 kB │ gzip:  29.91 kB
+apps/mission-control-ui build: dist/assets/ContentSection-CEOqZqsp.js             140.08 kB │ gzip:  31.84 kB
+apps/mission-control-ui build: dist/assets/ControlSection-DTyJgesX.js             142.31 kB │ gzip:  33.69 kB
+apps/mission-control-ui build: dist/assets/OpsSection-C-9FMJ3M.js                 166.42 kB │ gzip:  41.36 kB
+apps/mission-control-ui build: dist/assets/HarnessSection-BPONgfK_.js             222.90 kB │ gzip:  55.96 kB
+apps/mission-control-ui build: dist/assets/vendor-charts-D21FeXyo.js              321.47 kB │ gzip:  81.33 kB
+apps/mission-control-ui build: dist/assets/KnowledgeSection-DiqYkJze.js           402.46 kB │ gzip: 114.16 kB
+apps/mission-control-ui build: dist/assets/PlatformSection-DmPHqv6X.js            464.71 kB │ gzip: 110.13 kB
+apps/mission-control-ui build: dist/assets/vendor-usaifpO0.js                     491.50 kB │ gzip: 156.81 kB
+apps/mission-control-ui build: ✓ built in 5.66s
+apps/mission-control-ui build: Done
+packages/meetings build$ tsc
+packages/model-router build$ tsc
+packages/policy-engine build$ tsc
+packages/state-machine build$ tsc
+packages/state-machine build: Done
+packages/telegraph build$ tsc
+packages/policy-engine build: Done
+packages/model-router build: Done
+packages/meetings build: Done
+packages/telegraph build: Done
+packages/telegram-bot build$ tsc
+packages/coordinator build$ tsc
+packages/workflow-engine build$ tsc
+packages/coordinator build: Done
+packages/workflow-engine build: Done
+packages/telegram-bot build: Done
+apps/workflow-executor build$ tsc
+packages/context-router build$ tsc
+packages/cli build$ tsc
+packages/memory build$ tsc
+packages/memory build: Done
+apps/workflow-executor build: Done
+packages/cli build: Done
+packages/context-router build: Done
+packages/agent-runtime build$ tsc
+packages/agent-runtime build: Done
+apps/orchestration-server build$ tsc
+apps/orchestration-server build: Done
+
+=== orchestration startup smoke ===
+
+> mission-control@0.9.0 smoke:orchestration-start /private/tmp/fab-phase3-mc-validation
+> pnpm run ci:prepare && pnpm --filter @mission-control/orchestration-server build && pnpm --filter @mission-control/orchestration-server smoke:start
+
+
+> mission-control@0.9.0 ci:prepare /private/tmp/fab-phase3-mc-validation
+> pnpm --filter @mission-control/shared build && pnpm --filter @mission-control/state-machine build && pnpm --filter @mission-control/policy-engine build && pnpm --filter @mission-control/workflow-engine build && pnpm --filter @mission-control/coordinator build && pnpm --filter @mission-control/context-router build && pnpm --filter @mission-control/model-router build && pnpm --filter @mission-control/memory build && pnpm --filter @mission-control/context-tools build && pnpm --filter @mission-control/agent-runtime build && pnpm --filter @mission-control/telegraph build && pnpm --filter @mission-control/meetings build && pnpm --filter @mission-control/research-adapters build
+
+
+> @mission-control/shared@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/shared
+> tsc
+
+
+> @mission-control/state-machine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/state-machine
+> tsc
+
+
+> @mission-control/policy-engine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/policy-engine
+> tsc
+
+
+> @mission-control/workflow-engine@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/workflow-engine
+> tsc
+
+
+> @mission-control/coordinator@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/coordinator
+> tsc
+
+
+> @mission-control/context-router@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/context-router
+> tsc
+
+
+> @mission-control/model-router@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/model-router
+> tsc
+
+
+> @mission-control/memory@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/memory
+> tsc
+
+
+> @mission-control/context-tools@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/context-tools
+> tsc
+
+
+> @mission-control/agent-runtime@0.9.0 build /private/tmp/fab-phase3-mc-validation/packages/agent-runtime
+> tsc
+
+
+> @mission-control/telegraph@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/telegraph
+> tsc
+
+
+> @mission-control/meetings@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/meetings
+> tsc
+
+
+> @mission-control/research-adapters@0.1.0 build /private/tmp/fab-phase3-mc-validation/packages/research-adapters
+> tsc
+
+
+> @mission-control/orchestration-server@0.9.0 build /private/tmp/fab-phase3-mc-validation/apps/orchestration-server
+> tsc
+
+
+> @mission-control/orchestration-server@0.9.0 smoke:start /private/tmp/fab-phase3-mc-validation/apps/orchestration-server
+> node ../../scripts/smoke-orchestration-start.mjs
+
+Built orchestration artifact loaded successfully under Node ESM.
+
+=== git whitespace integrity ===

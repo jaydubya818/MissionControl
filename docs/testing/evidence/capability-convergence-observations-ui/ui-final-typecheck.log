@@ -1,0 +1,3 @@
+
+> mission-control-ui@0.9.0 typecheck <qualification-worktree>/apps/mission-control-ui
+> tsc --noEmit

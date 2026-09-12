@@ -17,6 +17,23 @@ describe("repository secret scanner", () => {
     expect(JSON.stringify(findings)).not.toContain("ghp_");
   });
 
+  it("detects credential classes the classic GitHub rule cannot match", () => {
+    const finegrained = `github_pat_${"A1".repeat(11)}_${"b3".repeat(30)}`;
+    const installation = `ghs_246813579_${"eyJ"}${"aB7_".repeat(12)}.${"cD8-".repeat(12)}.${"eF9_".repeat(12)}`;
+    const telegram = `8123456789:AA${"Qr7xKz".repeat(6)}`;
+
+    expect(scanTextForSecrets(finegrained)).toEqual([
+      { rule: "github-fine-grained-token", line: 1 },
+    ]);
+    expect(scanTextForSecrets(installation)).toEqual([
+      { rule: "github-installation-token", line: 1 },
+    ]);
+    expect(scanTextForSecrets(telegram)).toEqual([{ rule: "telegram-bot-token", line: 1 }]);
+    expect(JSON.stringify(scanTextForSecrets(`${finegrained}\n${telegram}`))).not.toContain(
+      "github_pat_",
+    );
+  });
+
   it("ignores explicit placeholder fixtures", () => {
     expect(scanTextForSecrets("AKIAIOSFODNN7EXAMPLE\nsk-1234567890abcdefghijklmnopqrstuvwxyz")).toEqual([]);
     expect(scanTextForSecrets(`GITHUB_APP_PRIVATE_KEY="fixture-value-that-looks-real" // secret-scan: allow-fixture`)).toEqual([]);

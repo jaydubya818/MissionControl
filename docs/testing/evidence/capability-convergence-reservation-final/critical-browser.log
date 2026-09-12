@@ -1,0 +1,41 @@
+
+> mission-control@0.9.0 test:e2e:critical /private/tmp/fdlc-program-phase5
+> npx playwright test -c playwright.config.ts tests/e2e/critical-accessibility.e2e.spec.ts tests/e2e/dashboard-smoke.e2e.spec.ts tests/e2e/v2-routes-smoke.e2e.spec.ts
+
+npm warn Unknown env config "store-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+[2m[WebServer] [22m(node:37114) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:37248) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 15 tests using 3 workers
+
+(node:37640) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:37639) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:37638) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:37639) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:37638) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:37640) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 [chromium] › tests/e2e/dashboard-smoke.e2e.spec.ts:13:1 › home dashboard loads and shows main sections (1.8s)
+  ✓   3 [chromium] › tests/e2e/critical-accessibility.e2e.spec.ts:99:3 › Command Center has no critical accessibility violations (2.4s)
+  ✓   4 [chromium] › tests/e2e/dashboard-smoke.e2e.spec.ts:21:1 › navigate to Tasks and back to Home (1.1s)
+  ✓   5 [chromium] › tests/e2e/critical-accessibility.e2e.spec.ts:99:3 › Tasks has no critical accessibility violations (1.0s)
+  ✓   6 [chromium] › tests/e2e/dashboard-smoke.e2e.spec.ts:31:1 › mobile shell keeps navigation and chat off canvas (663ms)
+  ✓   7 [chromium] › tests/e2e/critical-accessibility.e2e.spec.ts:99:3 › Work Orders has no critical accessibility violations (1.0s)
+  ✓   8 [chromium] › tests/e2e/critical-accessibility.e2e.spec.ts:99:3 › Decision Center has no critical accessibility violations (899ms)
+  ✓   9 [chromium] › tests/e2e/critical-accessibility.e2e.spec.ts:99:3 › Automations has no critical accessibility violations (924ms)
+  ✓   1 [chromium] › tests/e2e/v2-routes-smoke.e2e.spec.ts:30:1 › v2 routes render in the software-factory shell (6.5s)
+  ✓  10 [chromium] › tests/e2e/critical-accessibility.e2e.spec.ts:99:3 › Execution Routing has no critical accessibility violations (790ms)
+  ✓  11 [chromium] › tests/e2e/critical-accessibility.e2e.spec.ts:99:3 › Agent Registry has no critical accessibility violations (803ms)
+  ✓  12 [chromium] › tests/e2e/critical-accessibility.e2e.spec.ts:127:3 › Command Center has no color contrast violations across supported themes and viewports (2.5s)
+  ✓  13 [chromium] › tests/e2e/critical-accessibility.e2e.spec.ts:127:3 › Work Orders has no color contrast violations across supported themes and viewports (2.3s)
+  ✓  14 [chromium] › tests/e2e/critical-accessibility.e2e.spec.ts:127:3 › Automations has no color contrast violations across supported themes and viewports (2.1s)
+  ✓  15 [chromium] › tests/e2e/critical-accessibility.e2e.spec.ts:157:1 › PRD import dialog is named, keyboard reachable, and has no critical violations (831ms)
+
+  15 passed (17.3s)

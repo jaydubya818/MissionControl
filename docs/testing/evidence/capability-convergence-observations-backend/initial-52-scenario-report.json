@@ -1,0 +1,473 @@
+{
+  "status": "PASS",
+  "runRoot": "/private/tmp/fdlc-observation-backend-QrepBv",
+  "startedAt": "2026-09-06T08:04:42.920Z",
+  "sourcePath": "/private/tmp/fdlc-program-observations/convex/inferenceGateway.ts",
+  "sourceSha256": "f12d5b4c03091f4d6af54ca6497edbc9212ba4f422d0c661a36b634fd2474019",
+  "sourceBranchHead": "8bf19fcb7e46f4b80a862054d22fbd7ca7ed436f",
+  "backendBinary": "/Users/jaywest/.cache/convex/binaries/precompiled-2026-08-25-7cce8fb/convex-local-backend",
+  "backendSha256": "3fefa471e11eab56aabf86039ddf825ed1b4dbadadec2df6b88b6ffd9d604400",
+  "convexVersion": "1.42.3",
+  "gatewayBundleSha256": "cb9e7b39bd9d08c94e5c2c539d44af8ce303e05702e5a34a814aac54d2beacf0",
+  "reservationTableSha256": "32c49a3458600455320dfb6da0c9d5cae9217c72612a7cb8f41c9a260cd296e3",
+  "routeValidatorSha256": "0dd9289ebcf4d1fdcc7a7f18214bd15dff76eed1f20b5994ffccfa2c5aa3ae43",
+  "backendUrl": "http://127.0.0.1:52557",
+  "sitePort": 52558,
+  "schemaSourceSha256": "a920a437c5f9566dd6db2876281068b6b15d3d0dfb6c686eb44624c4a3d1118e",
+  "sharedSourceSha256": "81ceabe316941ed0c667c945db5ac2f1dd0ae9348b6e886a3f2fbabccac6f185",
+  "providerBundleSha256": "da618bd7effd46b6452a0a4fbe4fef1e0886950a1b873d7040a5e9941a203a49",
+  "providerTableSha256": "0a4fc6a8fd1c4b967d4dfa50f257a0ef07e4479724fb0453901bbdb4385621ed",
+  "sourceBindings": {
+    "convex/inferenceGateway.ts": "f12d5b4c03091f4d6af54ca6497edbc9212ba4f422d0c661a36b634fd2474019",
+    "convex/factory/providerLiability.ts": "adc57d715c56b3f399da4b93f0b08d7e3540963adf86aba60bb41ba3b747cd1d",
+    "convex/schema.ts": "a920a437c5f9566dd6db2876281068b6b15d3d0dfb6c686eb44624c4a3d1118e",
+    "convex/_generated/server.js": "aea87b3ee367e0e870f3da81ffce8babd8ea1aea695a1e38689841aebc09a1e8",
+    "packages/shared/src/types/agent.ts": "bed7cb9858c8c9da706e31f792c6424683e2bfc7c0c15b02032f8aba7b5ed4a1",
+    "packages/shared/src/types/task.ts": "036a9c7dc3cc9150d3efaed330ec4d56dbcdcee86b63434701b6f7ca549af9ec",
+    "packages/shared/src/types/run.ts": "566c80d775b363f2787c31e08af1229529d84562d8a7622caf819a6eb50d0619",
+    "packages/shared/src/types/toolCall.ts": "4948b3a7e6078035b3d37ac136706a8fc154c563ddc4e003d07f6acdd3867f8c",
+    "packages/shared/src/types/approval.ts": "62ca50e13854cbbd9e444bf1e676ca30a274558ea2548a72468fee68431cb26d",
+    "packages/shared/src/types/message.ts": "9fd4b421a8aaca775ef2e685baa612cce4071fff450ee7cf4902bcf1a79ac011",
+    "packages/shared/src/types/activity.ts": "e1c51e8c7649389535df3ba32821e7744bf73b5023d7b7e8582ad1adbc9dcc1e",
+    "packages/shared/src/types/alert.ts": "41796bf98cc46ee7adffad404a0a731566f70f643ecf47d3f24ca06bf6ab11f3",
+    "packages/shared/src/types/policy.ts": "5419af1f923e7f34b66c8c735271967203d232666e7e82910a7d8ad238c1f45a",
+    "packages/shared/src/types/identity.ts": "6fdd87908890ed69c7100f8fe18c3c5c4b3ea1f1cb828b697dc89b179126837c",
+    "packages/shared/src/types/org.ts": "6f5adf6dc5c876ee995642082625adce7566922cbc008816c872d3436d0c051c",
+    "packages/shared/src/types/telegraph.ts": "1dd2b41e28e6e3765ef65f232554ccb451724ec5b0c27ca9b353d28d5df1f53b",
+    "packages/shared/src/types/voice.ts": "9eb26d578c6a96adda664b0267e1c4a55408bd15e9510f43235aced0fe88f807",
+    "packages/shared/src/types/meeting.ts": "5a13cad4cd68ff1fd87f8b5711f0e5b93d3607bf841584f071134587a82638b2",
+    "packages/shared/src/types/index.ts": "7519a9e5ed91fe21e678ffb8e37ce547f7cc1f3d3bbfcf7ac03c8daf016be5ee",
+    "packages/shared/src/constants.ts": "a1ed46116f7248b3bd063b26d8a258462968d2643ea5a263b9474b95c72831f4",
+    "packages/shared/src/utils.ts": "f2e51d5e3a7dc7a7ad99d9d47024332239b33b36e43bfce2d6011d0565ce328a",
+    "packages/shared/src/logger.ts": "5bd37bd353e8b78785bddf93e64386e2d112f89ed1e03ab6f6f55afdec3e62c9",
+    "packages/shared/src/retry.ts": "d60c7b262eec873c9a480c1a51aae13f1f1f8b0e359e6110f84484bba1b8c7d3",
+    "packages/shared/src/serviceCommandEnvelope.ts": "97a1a2448c6939028ac3e7fcb21bed87d4de24840a8ecf143c0fab557f4baa18",
+    "packages/shared/src/canonicalDigest.ts": "04c52d612f8b765e2e23895ad19f72ef639ab83cbb238e74f0625f04e29f8530",
+    "packages/shared/src/governedInference.ts": "81ceabe316941ed0c667c945db5ac2f1dd0ae9348b6e886a3f2fbabccac6f185",
+    "packages/shared/src/classifyInferenceDispatch.ts": "42222b3778434cf71780b56879604b2b5768002e34594cfdd4f6ba1d8c0384c8",
+    "packages/shared/src/factoryMemorySecurity.ts": "0153c01e9aeaaf44952d8edd3e3c16cd20e976142f6fd257b4767bb2c0d5b857",
+    "packages/shared/src/execution-routing.ts": "60e4f44a1cb07725b4fcf554d7e641891ddfd1d9f323063eb603f62d9f996ecf",
+    "packages/shared/src/missionPlannerIdentity.ts": "16649f1ae36a67923b71fd43ced2005910c5c0846322f36f13d39f57196d4c68",
+    "packages/shared/src/evalControlPlane.ts": "d5d971684cf4b31ea13f989312a9b09b069652c96e4e4221e0f637788e444252",
+    "packages/shared/src/missionControlGoldenSuite.ts": "6f6de3e87e087e84389360768b9591b3e844eb053cf91040a9a458f76e0aeada",
+    "packages/shared/src/index.ts": "4ecc196545b652b991365c91fa97942ae4a08c4da03700d51a8446fe46dc1f76",
+    "packages/workflow-engine/dist/executorAdapter.js": "d72b2c14046c16aaca7dcad712813836d075685580314ee05e93c8010f3d0851",
+    "packages/workflow-engine/dist/harnessManifests.js": "5c9ca4bace23bc22a221ef746214efbcb8f5c2494cc7bb0a148a0f22cb5009d2",
+    "packages/workflow-engine/dist/harnessContract.js": "39504d71ffed630e0c914bd2221c7f62d87f9b486fb59835ff151635d08d3a66",
+    "convex/lib/genomeHash.ts": "d10f82f5cc6a0a5336c7220e79f2450a21b4db1cd17e942ced208269acd5f888",
+    "convex/lib/harnessCapabilities.ts": "17e9c01fba1062c455fc2a5c9b191044698b8c8759e1c19079573675b5c36b1f",
+    "convex/lib/modelRouteAdmission.ts": "9616d3e20dd9d52277b83539be93c139c9815d47d854a7da6db1a697f81e8a9c",
+    "convex/lib/dockerSandboxAdmission.ts": "1b8bd5a857384dcbd822cad3b53587442da7faa9a14a0ff2ea9033d1fcdc4381",
+    "convex/lib/sandboxProfileAdmission.ts": "43609968ba98294d4b8697dc58808b903580ac935cd779ffd8d5f8159bc3e428",
+    "convex/lib/governedMcp.ts": "5a657ef21f2d17b0acdf083092a11ec4306767fd6a6977c7b22f9d7044c793a1",
+    "convex/lib/executionProfile.ts": "7828e369f31271c9b3614acd6aa29cde3e76a0aa9f952fa0e3835bc20e0f63e8",
+    "convex/lib/executionProfileAdmission.ts": "87375cce83aebccb5b509737d0ddd206e52eac3bbf4d4283f974c14408546c82",
+    "packages/workflow-engine/dist/verificationIdentity.js": "61db34fe31e237b862f524592e1ebec8cd1a054e4253aea6ab976de7a7bf9763",
+    "packages/workflow-engine/dist/verificationSubject.js": "134a84c8697dfe01281ba228db13c628b786437ee8996eff08d1fe24efaa3d63",
+    "convex/lib/factoryAttempt.ts": "aa3fd11cb376793a8864078d6eb816dfd86ceac209c6ba1b69257414a8d277e2",
+    "convex/lib/attemptExecutionProfile.ts": "3b7ade9e198b9d1d6b7e9bfe5553c47d6ad2d6ae8270850e6aedeca0cf0370b9",
+    "convex/lib/governedInferenceAdmission.ts": "b106255196b69f800e6f49af4a11daea4499b07dd09c813be717557403f93adc",
+    "convex/lib/providerLiability.ts": "11ba884486c8d406d4912452498ead5a4be9f3a548a9b4b5844d7806978b731d",
+    "convex/lib/bedrockBridgeIdentity.ts": "986a38dff8d16719d092ed2e946b968b299094585e880ee4950ee625a32d5f04",
+    "convex/lib/providerLiabilityValidators.ts": "b279a1250e7f7f9f4e77b8abc7d1440ef181fa226ac9a40a103d1242dbccaaef",
+    "packages/shared/dist/types/agent.js": "f07a4eca7f7822279c9b3d6b43d167614aab5fc3dc9fcfe5834e0f0ae9db6d69",
+    "packages/shared/dist/types/task.js": "4aa85fc88b5545aebdabb3c849bb1ec589b668d2404ebc832b38ebfe6571fa74",
+    "packages/shared/dist/types/run.js": "d86ec91ada16420ef9e124926ca331a0ec6114f0366979c51111cd42b8bae238",
+    "packages/shared/dist/types/toolCall.js": "1e3d7a441cd52f6589cea2566c9acd3a0b97ddada2771bb7d854353fbafc3251",
+    "packages/shared/dist/types/approval.js": "f6b7b8f3110c55f944561ce4ebb00d9d011b3ffb0461775e9350286dcd645c1a",
+    "packages/shared/dist/types/message.js": "0180e6c533f8cab2d61082e96bb122b9938eee629d512381e8144ce316dfb08c",
+    "packages/shared/dist/types/activity.js": "e36e2681159c6380af0fac89e563a44a4d2e861d73411859bd2c9d95dac9fdf1",
+    "packages/shared/dist/types/alert.js": "2f2d47e4084d704bc3bcbbd88d9c51c7ce199d1876f8edbe3a495fd03c41e8ab",
+    "packages/shared/dist/types/policy.js": "745abe1cfc20890b62bef43af51a80ba4314c30c5c35901c6d34a796408274c3",
+    "packages/shared/dist/types/identity.js": "53ba1c7d38761eede3734a4ed8d37aa156186e27ec42614efe0da0d5467a1ecc",
+    "packages/shared/dist/types/org.js": "5ec9e51e9ff5747c25d802e5098ab963526102602b7eef400cf0d46ecf7303ae",
+    "packages/shared/dist/types/telegraph.js": "67dea73f89c23cf9d5e0476a941a0347d739759e511adb7fd597c0f65514ead0",
+    "packages/shared/dist/types/voice.js": "41f4142ea7ff39cdf26f33c0f6ca0c1dd4768e49b37f61deb01092507ae492d8",
+    "packages/shared/dist/types/meeting.js": "6fae5fd8be46728bd7f315bbcb0d65b4a3f5139eddfe92caf9df0e59941e1ae1",
+    "packages/shared/dist/types/index.js": "9ada428b347521d6834daf84f98062d0811cd41cf14b7a942861abe0d247863f",
+    "packages/shared/dist/constants.js": "f5b112daea5250f55e4c46b705a2cff99848980eb11f246306492f1a739df09c",
+    "packages/shared/dist/utils.js": "87fab00c8fc950c7d8737ad4ddc66e342e28fbcd97e5be78cde78d55f861ab71",
+    "packages/shared/dist/logger.js": "aa808eab238b51f9ad6ba50cde17d789acad0cfd31782e1bfa54f870724f2088",
+    "packages/shared/dist/retry.js": "850f59cea4f5f2ad6cea8ae056de8859c3c7cdf1ef23026368ad9ea1abb87c91",
+    "packages/shared/dist/serviceCommandEnvelope.js": "16d30c61d69aedd68f7a845d9a1b98dd4b15cf45a924d0521267744e2be20c5d",
+    "packages/shared/dist/canonicalDigest.js": "5892489c3b3da412eb5d3da932417e71c8852056c9ddb4341c9e30c7430658ed",
+    "packages/shared/dist/governedInference.js": "b294f9bc4ec58b4da81e2e839c2fadac96b3b7314abcd8aa550e46e8a0b61c23",
+    "packages/shared/dist/classifyInferenceDispatch.js": "ef58fcc5779582cb7f5c5ee3cac31e8079a2bfc443ac1792912b32c781ebaa9b",
+    "packages/shared/dist/factoryMemorySecurity.js": "95bbad71688571ea6b5f514f58f6af177bc5d7ba6c14910a80d430b1b713acab",
+    "packages/shared/dist/execution-routing.js": "6333c1e179e176d30548d7ae90731d7e3e31277d27bd29e2d50bd56097d43b78",
+    "packages/shared/dist/missionPlannerIdentity.js": "d2e6e45ec3c95df054dcaf20ebe0b5a31f16f3f706d5ed88328755489eb65ea2",
+    "packages/shared/dist/evalControlPlane.js": "9279630c8096a476ff5aaa03efc21b0237898ad3c4e1d8b910f3bf437cfe4aac",
+    "packages/shared/dist/missionControlGoldenSuite.js": "96923f2e8eecb559f054771f7752a581c0c01b2e45363ad6027e75ab1f1eede8",
+    "packages/shared/dist/index.js": "d8c3eec7881f495d4306ff946ead59759c35d5e89ff410694a121bee2b7ff82d",
+    "convex/lib/executionManifest.ts": "3d4525ff42c7daf336a0fc1214862deffceec28e0c8bfd502e1bca0f6ff948ba",
+    "convex/lib/factoryConfiguration.ts": "85498a397f7b0a936dd5970f99c05a6ced24c30f44d7e35a0fee376c1c1e347c",
+    "convex/__tests__/helpers/classifyAuthority.fixture.ts": "4d9a9a1e84ca971260e5f136ad36bb763279ec5f270cf3e7541e8b2a09c5c647",
+    "packages/workflow-engine/src/executorAdapter.ts": "536d934556d3836cc19c64b83abf8f977e3824a72710f9c47237335f1ce01911",
+    "packages/workflow-engine/src/harnessManifests.ts": "308c7bcfa24b5f58b31db8f56097822fee79bd6bb8b4102c33eb173081319ddd",
+    "packages/workflow-engine/src/harnessContract.ts": "6635451dc1e0a05ec071f5cd8c08cbe231764d2ac267d4b2502c0e8c8af641a2"
+  },
+  "harnessBindings": {
+    "run.mjs": "03159bfdf83a77b445c38136f3a72e88b086fb01833df5f7d5352a5250e85f6a",
+    "fixture.ts": "1c8ff75527db91e7380b31a2aa5680ea051ae994f2590c3159b8b7e8352978a2",
+    "bedrockAuthority.ts": "5fcb27ab2fb545ceb41b5276b5fcc22c27451361a9055b2e3b84d9f507d125d3",
+    "observations.mjs": "a7df7a4015c005a82fb044e9ee0ff28dca45f2abfd9a0242de89d0fa8680cabb",
+    "loopback-only.mjs": "337176ed2b3c7c055b66788b2f334b99399f853770821c406bc9467d7e63ace8"
+  },
+  "scope": "Unmodified production inference gateway, provider liability handlers and canonical constructors, fixture-only authorization shim, exact inference/provider table schemas and indexes, synthetic related schemas and offline canonical qualifications, real local Convex backend. No external provider calls, real billing, full-app authorization, full application schema deployment, or real human acceptance proof.",
+  "dispatchSharedSha256": "42222b3778434cf71780b56879604b2b5768002e34594cfdd4f6ba1d8c0384c8",
+  "profileGuardSha256": "3b7ade9e198b9d1d6b7e9bfe5553c47d6ad2d6ae8270850e6aedeca0cf0370b9",
+  "tests": [
+    {
+      "name": "logical intent identity and exact replay",
+      "passed": true
+    },
+    {
+      "name": "single claim under eight concurrent requests",
+      "passed": true,
+      "successfulClaims": 1,
+      "deniedClaims": 7
+    },
+    {
+      "name": "failed primary and successful fallback retain canonical snapshots",
+      "passed": true
+    },
+    {
+      "name": "synthetic reconciliation is idempotent",
+      "passed": true
+    },
+    {
+      "name": "synthetic accepted projection and NO_GO comparison preserve source identities",
+      "passed": true,
+      "actualHumanAcceptance": false,
+      "syntheticCostMicrousd": 7
+    },
+    {
+      "name": "original reservation and intent snapshots remain immutable after claim and receipt",
+      "passed": true
+    },
+    {
+      "name": "canonical replay rejects duplicated row drift",
+      "passed": true
+    },
+    {
+      "name": "receipt replay binds pricing context",
+      "passed": true
+    },
+    {
+      "name": "legacy snapshots block only their selected cohort",
+      "passed": true
+    },
+    {
+      "name": "missing receipt snapshot prevents invented projection identity",
+      "passed": true
+    },
+    {
+      "name": "missing frozen intent cannot claim",
+      "passed": true
+    },
+    {
+      "name": "corrupted frozen intent cannot claim",
+      "passed": true
+    },
+    {
+      "name": "late receipt survives frozen lease expiry using committed claim time",
+      "passed": true
+    },
+    {
+      "name": "real durable selected allowance and eight-way concurrent claim",
+      "passed": true,
+      "granted": 1,
+      "denied": 7,
+      "canonicalRoundtrip": true
+    },
+    {
+      "name": "real selected dispatch denies revision and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies profile and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies worker and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies factory and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies qualification and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies price and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies parameters and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies budget and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies cancel and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "v3 stores inputTokens overrun atomically with spending fence",
+      "passed": true,
+      "receiptId": "jx7e22hb6w7ab0gkyzjdwvb5y18dw8t0",
+      "receiptDigest": "sha256:21c5d2addbf765a9a4e0f76202bb25e0e0cdca3b7897b927fb1f8bd6cde5e0a4",
+      "retainedCounters": {
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "inputTokens": 2,
+        "outputTokens": 0,
+        "reasoningTokens": 0
+      },
+      "violationCodes": [
+        "RESERVATION_INPUT_TOKEN_LIMIT_EXCEEDED"
+      ]
+    },
+    {
+      "name": "v3 stores outputTokens overrun atomically with spending fence",
+      "passed": true,
+      "receiptId": "jx7385k64r4whtcrpchm6xr6mh8dwxa2",
+      "receiptDigest": "sha256:355399210bce21669f0a6faa93d732159310af1ca44af9a352007079d2edb0ce",
+      "retainedCounters": {
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "inputTokens": 0,
+        "outputTokens": 2,
+        "reasoningTokens": 0
+      },
+      "violationCodes": [
+        "RESERVATION_OUTPUT_TOKEN_LIMIT_EXCEEDED"
+      ]
+    },
+    {
+      "name": "v3 stores cacheReadTokens overrun atomically with spending fence",
+      "passed": true,
+      "receiptId": "jx72ey7fj7n91tj3wp47verpqs8dwmpz",
+      "receiptDigest": "sha256:d9453b3427a2e3e72c66a052d0eb9d1d03ca687fd57f3c0c8b316fc8047c0b74",
+      "retainedCounters": {
+        "cacheReadTokens": 2,
+        "cacheWriteTokens": 0,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "reasoningTokens": 0
+      },
+      "violationCodes": [
+        "RESERVATION_CACHE_READ_TOKEN_LIMIT_EXCEEDED"
+      ]
+    },
+    {
+      "name": "v3 stores cacheWriteTokens overrun atomically with spending fence",
+      "passed": true,
+      "receiptId": "jx796vm2p1t5nv8pgp1w2ydq5s8dwfjm",
+      "receiptDigest": "sha256:f61967990ca901c7ff1d190e673669bc9a0cd39a50e226bf08eca08c80e4ff91",
+      "retainedCounters": {
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "reasoningTokens": 0
+      },
+      "violationCodes": [
+        "RESERVATION_CACHE_WRITE_TOKEN_LIMIT_EXCEEDED"
+      ]
+    },
+    {
+      "name": "v3 stores reasoningTokens overrun atomically with spending fence",
+      "passed": true,
+      "receiptId": "jx70qe4w9q1jvqbhwkkad8sx4n8dwwp1",
+      "receiptDigest": "sha256:c34b745eafcb31f751fe45081128af305ec8a828fedbf36e15f9816c467af497",
+      "retainedCounters": {
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "reasoningTokens": 2
+      },
+      "violationCodes": [
+        "RESERVATION_REASONING_TOKEN_LIMIT_EXCEEDED"
+      ]
+    },
+    {
+      "name": "v3 retains resolvedProvider drift without requested-route pricing",
+      "passed": true,
+      "receiptDigest": "sha256:380dd66111cdcc5c284ef9143bbe0f46f83b62af79d966e2d628308fdd5f90c0",
+      "classification": "UNKNOWN"
+    },
+    {
+      "name": "v3 retains resolvedModelId drift without requested-route pricing",
+      "passed": true,
+      "receiptDigest": "sha256:aad2f8d94de17b967711853cfa3d09418272da8ab62ff0d15b9736b8911ccfe5",
+      "classification": "UNKNOWN"
+    },
+    {
+      "name": "canonical cost ceiling and incident fence deny eight existing-intent claims plus new admission",
+      "passed": true,
+      "successfulSubsequentClaims": 0,
+      "retainedAllocationCount": 2,
+      "retainedAllocationMicrousd": 100
+    },
+    {
+      "name": "cumulative v3 usage ignores row drift and eight concurrent appends store one receipt",
+      "passed": true,
+      "originalReceiptDigest": "sha256:2ce5c0ef36e75b0a55d9b2960faccefc87f893814557cbf81a23768b581a65ba",
+      "createdReceipts": 1,
+      "exactDuplicates": 7,
+      "cumulativeInputTokens": 2
+    },
+    {
+      "name": "cumulative observed cost exceeds retained reservation without clipping",
+      "passed": true,
+      "secondCostMicrousd": 2,
+      "maximumCostMicrousd": 2
+    },
+    {
+      "name": "two previously claimed concurrent overruns both persist and retain one atomic incident fence",
+      "passed": true,
+      "retainedObservations": 2,
+      "fenceSourceDigest": "sha256:683e51925bfafdc02a323f5a5655a4528248bd26db73c28c1f15187d017d05de"
+    },
+    {
+      "name": "v3 stores overflow observation with absent unknown cost",
+      "passed": true,
+      "receiptDigest": "sha256:165c378be24c0811ab479d178cf99caadf766354f4ca460379be3d831a79efc4"
+    },
+    {
+      "name": "v3 stores missing-price observation with absent unknown cost",
+      "passed": true,
+      "receiptDigest": "sha256:46e097f35930068851d69dfeccac28aba9d04bd982c1613ca94fe74b54c1d6b6"
+    },
+    {
+      "name": "malformed observed counters are rejected without an invented receipt",
+      "passed": true,
+      "negativeCases": 3
+    },
+    {
+      "name": "historical v2 storage replays and projects without rewriting old bytes",
+      "passed": true,
+      "historicalReceiptDigest": "sha256:8291c0cfdefb2f8880d696e8c96523ccb8edc57e35ad93edd22f45e653884b95"
+    },
+    {
+      "name": "invalid reconciliation counters and costs cannot enter durable accounting",
+      "passed": true,
+      "deniedCases": 6
+    },
+    {
+      "name": "stored corrections enter cumulative limits and tampered correction bytes fail closed",
+      "passed": true,
+      "originalInputTokens": 0,
+      "correctedPriorInputTokens": 2,
+      "newInputTokens": 1,
+      "missingOutputCounterPreserved": true
+    },
+    {
+      "name": "real Bedrock composed admission creates one hold and canonical claim under eight concurrent requests",
+      "passed": true,
+      "successfulAdmissions": 1,
+      "deniedAdmissions": 7,
+      "maximumHeldNanoUsd": 20000,
+      "canonicalReservationId": "k9755x4rd46gabr39sfm6hj8pn8dxn4d",
+      "fixtureQualificationOnly": true
+    },
+    {
+      "name": "first composed settlement after expiry is historical and idempotent, without new spending authority",
+      "passed": true,
+      "createdSettlements": 1,
+      "exactDuplicates": 7,
+      "receiptDigest": "sha256:022dd6ba9c5cac6d2781a1fadbdddc2bb87d2f10332585d27df99bcc4d66895e",
+      "retainedMaximumNanoUsd": 20000
+    },
+    {
+      "name": "first composed settlement after cancel is historical and idempotent, without new spending authority",
+      "passed": true,
+      "createdSettlements": 1,
+      "exactDuplicates": 7,
+      "receiptDigest": "sha256:46d9c49d46c61fec9c5a0c22cf026b981b972eda68b208969f996104afa5956d",
+      "retainedMaximumNanoUsd": 20000
+    },
+    {
+      "name": "first composed settlement after completion is historical and idempotent, without new spending authority",
+      "passed": true,
+      "createdSettlements": 1,
+      "exactDuplicates": 7,
+      "receiptDigest": "sha256:80a1be109ab0f6285741582dab20ada79a5cce140e83fa31c5237994aff367f4",
+      "retainedMaximumNanoUsd": 20000
+    },
+    {
+      "name": "first composed settlement after replacement is historical and idempotent, without new spending authority",
+      "passed": true,
+      "createdSettlements": 1,
+      "exactDuplicates": 7,
+      "receiptDigest": "sha256:763a1991eeaeede2220baf1063b74de316f9182c07c8d4d4c8e3ebc550812dd5",
+      "retainedMaximumNanoUsd": 20000
+    },
+    {
+      "name": "first composed settlement after worker-rotation is historical and idempotent, without new spending authority",
+      "passed": true,
+      "createdSettlements": 1,
+      "exactDuplicates": 7,
+      "receiptDigest": "sha256:2d44504194ce1e598c37c8e93408b96c66dac86bbe864b5e18d29d2025e428a4",
+      "retainedMaximumNanoUsd": 20000
+    },
+    {
+      "name": "first composed settlement after profile-revocation is historical and idempotent, without new spending authority",
+      "passed": true,
+      "createdSettlements": 1,
+      "exactDuplicates": 7,
+      "receiptDigest": "sha256:c339a05e7c190e8f858e380d37fa245fceeb1935109b674d8fc3802a1484150c",
+      "retainedMaximumNanoUsd": 20000
+    },
+    {
+      "name": "first composed settlement after retired-book is historical and idempotent, without new spending authority",
+      "passed": true,
+      "createdSettlements": 1,
+      "exactDuplicates": 7,
+      "receiptDigest": "sha256:1db8dc5271c22ece6b26c4ad1f6dc14818bf3023b0ee989430edcb2adf47295a",
+      "retainedMaximumNanoUsd": 20000
+    },
+    {
+      "name": "historical settlement rejects scope, lease, generation, request, creation, price and conflicting replay substitutions",
+      "passed": true,
+      "deniedHistoricalSubstitutions": 10,
+      "deniedReceiptConflicts": 2
+    },
+    {
+      "name": "provider request and usage identities cannot settle another reservation",
+      "passed": true,
+      "deniedOwnershipCollisions": 2
+    },
+    {
+      "name": "composed overrun and evidence correction retain original observation, hold, aggregate and monotonic fence",
+      "passed": true,
+      "originalReceiptDigest": "sha256:39c62343874742e2f8254f1aa0d2300f0cf5f2071d2b348c2d0e20d4651da8b9",
+      "correctionCount": 1,
+      "heldMaximumNanoUsd": 20000
+    },
+    {
+      "name": "wrong-model correction keeps latest projected money unknown without rewriting original receipt or releasing hold",
+      "passed": true,
+      "originalCostMicrousd": 5,
+      "effectiveMoneyClassification": "UNKNOWN",
+      "retainedHoldNanoUsd": 20000,
+      "originalReceiptDigest": "sha256:1b46d4cdf9906409232657c227e941dff89654bcc9f03f00cff9ad02a5a316ba"
+    }
+  ],
+  "cleanup": {
+    "backendExitCode": null,
+    "backendSignal": "SIGTERM",
+    "cloudPortClosed": true,
+    "sitePortClosed": true,
+    "originalDatabasesUsed": false,
+    "ephemeralKeyPersisted": false,
+    "sourceUnchanged": true
+  },
+  "completedAt": "2026-09-06T08:04:53.063Z"
+}

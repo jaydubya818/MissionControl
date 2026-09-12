@@ -27,6 +27,39 @@ Work Orders without canonical Child Tasks retain the legacy dispatch path.
 Historical legacy WorkflowRuns also retain their existing recovery path instead
 of being reclassified as canonical Task Attempts.
 
+### Narrow Task-less pre-execution recovery
+
+An explicit retry may atomically establish the missing canonical boundary only
+when the control plane can prove that a Task-less failed run stopped before the
+executor boundary. V1 recognizes only the historical stored-manifest digest
+mismatch: the frozen manifest recomputes to a different digest, the terminal
+failure is the exact manifest-validation failure, recorded spend is zero, and
+there is no executor execution event, sandbox allocation, or artifact. The
+claim-time `executorInvocationId` marker is not execution-start evidence.
+
+The retry transaction creates one system-owned governed Child Task, advances
+it from `INBOX` to `READY` with an audited transition, reconciles only the
+failed run's reservation to proven zero spend, and creates the replacement
+Attempt under the new Task. If routing or any later dispatch gate fails, the
+entire recovery rolls back. The failed WorkflowRun remains Task-less and its
+manifest, status, events, and failure evidence are never rewritten. The new
+run is the first canonical Task Attempt while retaining explicit Work Order
+retry causation to the historical run and reusing its exact frozen Factory
+Version.
+
+If that first canonical Attempt fails at the same pre-execution validation
+boundary, recovery reuses the existing Task rather than materializing another
+one. The only currently recognized Task-linked case is the claim-envelope
+transport defect: the stored manifest digest must validate, its Task causation
+and frozen executor identity must match the run, the exact event history must
+contain only start, claim checkpoint, and manifest-validation failure, spend
+must be zero, and no artifact, sandbox, or credential grant may exist. The
+claim response carries `executorAdapter` and `executorVersion` so the worker can
+validate the manifest against the same immutable identity. A qualifying retry
+releases only that Attempt's reservation and starts the next Attempt under the
+same Task and exact Factory Version; any later admission failure rolls the
+entire transaction back.
+
 ## Attempt identity and retry
 
 Each successful dispatch creates one immutable WorkflowRun with:
@@ -64,6 +97,8 @@ events.
 - Attempt status does not silently move Task state.
 - Task completion does not accept the Work Order.
 - No historical backfill or destructive migration is performed.
+- No general reservation refund or legacy Task backfill is introduced; the
+  pre-execution recovery predicate is intentionally exact and fail-closed.
 - Parallel Child Task execution, automatic Task selection, and Kanban redesign
   remain separate product decisions.
 

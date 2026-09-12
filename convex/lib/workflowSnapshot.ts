@@ -1,4 +1,5 @@
 export interface WorkflowDefinitionSnapshot {
+  contractVersion?: "factory-workflow-contract/v2";
   workflowId: string;
   name: string;
   description: string;
@@ -22,6 +23,7 @@ export function snapshotWorkflowDefinition(
   workflow: any
 ): WorkflowDefinitionSnapshot {
   return {
+    ...(workflow.contractVersion === "factory-workflow-contract/v2" ? { contractVersion: workflow.contractVersion as "factory-workflow-contract/v2" } : {}),
     workflowId: workflow.workflowId,
     name: workflow.name,
     description: workflow.description,
@@ -44,6 +46,7 @@ export function snapshotWorkflowDefinition(
 
 export function executableWorkflowFingerprint(workflow: any): string {
   return JSON.stringify({
+    ...(workflow.contractVersion === "factory-workflow-contract/v2" ? { contractVersion: workflow.contractVersion } : {}),
     workflowId: workflow.workflowId,
     name: workflow.name,
     description: workflow.description,

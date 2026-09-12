@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "provider": "openrouter",
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "protocol": "openrouter-chat-completions/non-streaming",
+  "modelId": "openai/gpt-4.1-mini",
+  "maxCostUsd": 0.5,
+  "maximumOutputTokens": 512
+}

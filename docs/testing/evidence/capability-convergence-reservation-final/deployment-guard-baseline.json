@@ -1,0 +1,2355 @@
+{
+  "observedAt": "2026-09-06T05:12:09.442Z",
+  "readOnly": true,
+  "projects": [
+    {
+      "id": "prj_MTztpwHj7IeGwuSMUzdcytLjo6zs",
+      "name": "fdlc",
+      "settings": {
+        "rootDirectory": null,
+        "framework": null,
+        "buildCommand": null,
+        "installCommand": null,
+        "outputDirectory": null,
+        "nodeVersion": "24.x",
+        "autoAssignCustomDomains": true,
+        "gitProviderOptions": {
+          "createDeployments": "enabled"
+        },
+        "microfrontends": {
+          "enabled": true,
+          "groupIds": [
+            "mfe_1we4N3uLnAPIkT2Gpgv2T4NJ5PO4"
+          ],
+          "isDefaultApp": true,
+          "defaultRoute": "/",
+          "updatedAt": 1788550552781
+        }
+      },
+      "link": {
+        "type": "github",
+        "org": "jaydubya818",
+        "repo": "FDLC",
+        "productionBranch": "main"
+      },
+      "production": {
+        "id": "dpl_GvmTzMNUmpKt3825k69MUgL6YwTX",
+        "name": "fdlc",
+        "url": "fdlc-pcmfy8cqy-jaydubya818.vercel.app",
+        "target": "production",
+        "readyState": "READY",
+        "createdAt": 1788560121951,
+        "alias": [
+          "fdlc.ai",
+          "fdlc.vercel.app",
+          "www.fdlc.ai",
+          "fdlc-jaydubya818.vercel.app",
+          "fdlc-prod-jaydubya818.vercel.app",
+          "fdlc-git-main-jaydubya818.vercel.app"
+        ],
+        "sha": "e4112bb06333b8244c18fc4a9736b1f3c807bc78",
+        "branch": "main"
+      },
+      "aliases": [
+        {
+          "alias": "fdlc.ai",
+          "deployment": {
+            "id": "dpl_GvmTzMNUmpKt3825k69MUgL6YwTX",
+            "name": "fdlc",
+            "url": "fdlc-pcmfy8cqy-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788560121951,
+            "alias": [
+              "fdlc.ai",
+              "fdlc.vercel.app",
+              "www.fdlc.ai",
+              "fdlc-jaydubya818.vercel.app",
+              "fdlc-prod-jaydubya818.vercel.app",
+              "fdlc-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "e4112bb06333b8244c18fc4a9736b1f3c807bc78",
+            "branch": "main"
+          }
+        },
+        {
+          "alias": "www.fdlc.ai",
+          "deployment": {
+            "id": "dpl_GvmTzMNUmpKt3825k69MUgL6YwTX",
+            "name": "fdlc",
+            "url": "fdlc-pcmfy8cqy-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788560121951,
+            "alias": [
+              "fdlc.ai",
+              "fdlc.vercel.app",
+              "www.fdlc.ai",
+              "fdlc-jaydubya818.vercel.app",
+              "fdlc-prod-jaydubya818.vercel.app",
+              "fdlc-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "e4112bb06333b8244c18fc4a9736b1f3c807bc78",
+            "branch": "main"
+          }
+        },
+        {
+          "alias": "fdlc.vercel.app",
+          "deployment": {
+            "id": "dpl_GvmTzMNUmpKt3825k69MUgL6YwTX",
+            "name": "fdlc",
+            "url": "fdlc-pcmfy8cqy-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788560121951,
+            "alias": [
+              "fdlc.ai",
+              "fdlc.vercel.app",
+              "www.fdlc.ai",
+              "fdlc-jaydubya818.vercel.app",
+              "fdlc-prod-jaydubya818.vercel.app",
+              "fdlc-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "e4112bb06333b8244c18fc4a9736b1f3c807bc78",
+            "branch": "main"
+          }
+        },
+        {
+          "alias": "fdlc-jaydubya818.vercel.app",
+          "deployment": {
+            "id": "dpl_3citBEKomhN1hhtDk9QR1CZqF4Ru",
+            "name": "fdlc",
+            "url": "fdlc-77qxk56sv-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788591950653,
+            "alias": [
+              "fdlc-jaydubya818.vercel.app"
+            ]
+          }
+        },
+        {
+          "alias": "fdlc-prod-jaydubya818.vercel.app",
+          "deployment": {
+            "id": "dpl_GvmTzMNUmpKt3825k69MUgL6YwTX",
+            "name": "fdlc",
+            "url": "fdlc-pcmfy8cqy-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788560121951,
+            "alias": [
+              "fdlc.ai",
+              "fdlc.vercel.app",
+              "www.fdlc.ai",
+              "fdlc-jaydubya818.vercel.app",
+              "fdlc-prod-jaydubya818.vercel.app",
+              "fdlc-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "e4112bb06333b8244c18fc4a9736b1f3c807bc78",
+            "branch": "main"
+          }
+        },
+        {
+          "alias": "fdlc-git-main-jaydubya818.vercel.app",
+          "deployment": {
+            "id": "dpl_GvmTzMNUmpKt3825k69MUgL6YwTX",
+            "name": "fdlc",
+            "url": "fdlc-pcmfy8cqy-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788560121951,
+            "alias": [
+              "fdlc.ai",
+              "fdlc.vercel.app",
+              "www.fdlc.ai",
+              "fdlc-jaydubya818.vercel.app",
+              "fdlc-prod-jaydubya818.vercel.app",
+              "fdlc-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "e4112bb06333b8244c18fc4a9736b1f3c807bc78",
+            "branch": "main"
+          }
+        }
+      ],
+      "recentDeployments": [
+        {
+          "uid": "dpl_CH1cnZq8oLHkSAiee9Td71zuNpNf",
+          "name": "fdlc",
+          "url": "fdlc-duqq9f9jq-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788667123378,
+          "created": 1788667123378,
+          "sha": "3c90bb85bc25868dfeb55fe930145801be2285f5",
+          "branch": "codex/fab-phase3"
+        },
+        {
+          "uid": "dpl_FRZFGmztzyBd4LFeQEBzfSk9z5pG",
+          "name": "fdlc",
+          "url": "fdlc-jniggc3ei-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788666899484,
+          "created": 1788666899484,
+          "sha": "8e4216f4bac7fe6da78ac765922c59fe6af5ee9c",
+          "branch": "codex/fab-phase3"
+        },
+        {
+          "uid": "dpl_EeCX8Awvmfg6Lv5YpZhKHyaKSKQz",
+          "name": "fdlc",
+          "url": "fdlc-7in95o26y-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788666517442,
+          "created": 1788666517442,
+          "sha": "59d851279dc085a238421b92d3d1b5c63048f2c9",
+          "branch": "codex/fab-phase3"
+        },
+        {
+          "uid": "dpl_Fe95RSw8TYvEGqC9o3b7m5PqRwcL",
+          "name": "fdlc",
+          "url": "fdlc-gi9hpe878-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788657755286,
+          "created": 1788657755286,
+          "sha": "051b41cc2db3bb6c6ceab00daa6447d938a129a0",
+          "branch": "codex/fdlc-guide-migration-final"
+        },
+        {
+          "uid": "dpl_7BAzsiKo2uPZ34fuAR9dpuxP4z3y",
+          "name": "fdlc",
+          "url": "fdlc-483no7kwx-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788657755147,
+          "created": 1788657755147,
+          "sha": "051b41cc2db3bb6c6ceab00daa6447d938a129a0",
+          "branch": "codex/fdlc-guide-migration-final-compat"
+        },
+        {
+          "uid": "dpl_CuXcX5Jq1RrNgY12s4cWwHFGq16d",
+          "name": "fdlc",
+          "url": "fdlc-7hhsuopzq-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788657753895,
+          "created": 1788657753895,
+          "sha": "6ed3f56a47eff317b3099259b2e20e1ddaebd9f5",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_2a53wyCpFbBYPPVKHFEP4sLP8jSu",
+          "name": "fdlc",
+          "url": "fdlc-6kagwsg99-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788653274686,
+          "created": 1788653274686,
+          "sha": "e44c55cb4e34f48c49b21ed92caad94874b78422",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_DAghWZ4WafeinaDQWQjmdWxe9iBm",
+          "name": "fdlc",
+          "url": "fdlc-3t6sfibk8-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788651396048,
+          "created": 1788651396048,
+          "sha": "05d1a3b82f9cd43246c02aa178b094f32d5fa022",
+          "branch": "codex/phase4-mcp-closure"
+        },
+        {
+          "uid": "dpl_4RD39SFBPgyN8JzqpzaN9Q7n7Fmn",
+          "name": "fdlc",
+          "url": "fdlc-7o2whm3go-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788649188351,
+          "created": 1788649188351,
+          "sha": "438f773688476414761aefabc005fce1133442a7",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_GE6sFQ5oNHfS1zUaGQXi3c2n6uRX",
+          "name": "fdlc",
+          "url": "fdlc-f9wdchyov-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788647715805,
+          "created": 1788647715805,
+          "sha": "d9b10c9b86836d78a3c5c1f3b97e6f820bdfaffc",
+          "branch": "codex/phase4-mcp-closure"
+        },
+        {
+          "uid": "dpl_G8oVD1R3t1oFWB4NbGnVN7uFNdDK",
+          "name": "fdlc",
+          "url": "fdlc-c3gtsgqfu-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788646603559,
+          "created": 1788646603559,
+          "sha": "9aacb5d69206d91efe48f34b5766017aab782fbb",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_GoJK7ztfBbhj4rgGkjGpGFK12DjZ",
+          "name": "fdlc",
+          "url": "fdlc-hvpv2ye8w-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788645389842,
+          "created": 1788645389842,
+          "sha": "fd23965af6c328a70f878d1ec164fe27f961336e",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_5VTVppS32PKtviDsi7VdggGbgZXc",
+          "name": "fdlc",
+          "url": "fdlc-4tfam3xwk-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788644148057,
+          "created": 1788644148057,
+          "sha": "75945e58db131104e2edb2f8e119ff4522deee1d",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_5dbyW3rMPFAK6HjRWo3MV4QscMMk",
+          "name": "fdlc",
+          "url": "fdlc-40zl0fztu-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788643376389,
+          "created": 1788643376389,
+          "sha": "20d1e5680bb3f719bae92e7577dd712e45db779f",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_HRFLxngxbka46hPMzcFNKmTheh3e",
+          "name": "fdlc",
+          "url": "fdlc-ttqjm4r4r-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788640217770,
+          "created": 1788640217770,
+          "sha": "65b13b9c508f8b91c2cc5ae5863e049ab259f19f",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_GYsajDzvwdN52HkApSK12SmUkA7A",
+          "name": "fdlc",
+          "url": "fdlc-9fd96dafq-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788637456214,
+          "created": 1788637456214,
+          "sha": "982c5626a301792d00accf1d05d23327b6296067",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_7UcCC1vE5YScr3eMYZL1fPfWACft",
+          "name": "fdlc",
+          "url": "fdlc-jm35xg5ma-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788636371167,
+          "created": 1788636371167,
+          "sha": "982c5626a301792d00accf1d05d23327b6296067",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_DNXZcEx22V2jEYw24dxTmpicQi3R",
+          "name": "fdlc",
+          "url": "fdlc-jow5uvb9z-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788594452663,
+          "created": 1788594452663
+        },
+        {
+          "uid": "dpl_3citBEKomhN1hhtDk9QR1CZqF4Ru",
+          "name": "fdlc",
+          "url": "fdlc-77qxk56sv-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788591950653,
+          "created": 1788591950653
+        },
+        {
+          "uid": "dpl_CNWG3bjXCefGBw8wjV7iHsrUAVDV",
+          "name": "fdlc",
+          "url": "fdlc-4ugv9iriu-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788566968872,
+          "created": 1788566968872,
+          "sha": "e6a1654d3c0943cd8bd68a27d14d1b7da6a8fa59",
+          "branch": "codex/context-skills-engineering"
+        },
+        {
+          "uid": "dpl_2EbWnaj6jwAbGGjTCjA2YTnB8h5s",
+          "name": "fdlc",
+          "url": "fdlc-dnisrjeup-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788566570397,
+          "created": 1788566570397,
+          "sha": "4cadb1774bbc5e062394296d1099db05c78d1d7d",
+          "branch": "codex/context-skills-engineering"
+        },
+        {
+          "uid": "dpl_CyCJej1B8ohjF3iNhddfpLx5fp3u",
+          "name": "fdlc",
+          "url": "fdlc-h9xs5vczh-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788563453101,
+          "created": 1788563453101,
+          "sha": "8057d1fd2c9aafaad309488aaa6038bd61b61e57",
+          "branch": "codex/reconcile-microfrontends-main"
+        },
+        {
+          "uid": "dpl_H5mUXNC7gJ8tjtzDeLMiEE7V8PLC",
+          "name": "fdlc",
+          "url": "fdlc-61sesqic9-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788562833692,
+          "created": 1788562833692,
+          "sha": "8057d1fd2c9aafaad309488aaa6038bd61b61e57",
+          "branch": "codex/reconcile-microfrontends-main"
+        },
+        {
+          "uid": "dpl_9eiDLke5shPx49dD1dZqs7QDwbgn",
+          "name": "fdlc",
+          "url": "fdlc-9bhi29rty-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788560170595,
+          "created": 1788560170595
+        },
+        {
+          "uid": "dpl_GvmTzMNUmpKt3825k69MUgL6YwTX",
+          "name": "fdlc",
+          "url": "fdlc-pcmfy8cqy-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788560121951,
+          "created": 1788560121951,
+          "sha": "e4112bb06333b8244c18fc4a9736b1f3c807bc78",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_A6CXChbVMvRX5yxpyDHM2fJmCtWv",
+          "name": "fdlc",
+          "url": "fdlc-8ae1rkslh-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788559343835,
+          "created": 1788559343835,
+          "sha": "2b97fb136ba3d7909d2cb2847f3fb47e0b02455d",
+          "branch": "codex/fdlc-guide-consolidation"
+        },
+        {
+          "uid": "dpl_695v6JP7d5eqC3aurrzYHkvYfkWc",
+          "name": "fdlc",
+          "url": "fdlc-41na6h9zj-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788557208758,
+          "created": 1788557208758,
+          "sha": "2b97fb136ba3d7909d2cb2847f3fb47e0b02455d",
+          "branch": "codex/fdlc-guide-consolidation"
+        },
+        {
+          "uid": "dpl_62AtaVaq8Xz8LfGMaQqKx8iwjXmx",
+          "name": "fdlc",
+          "url": "fdlc-ogj0gqwra-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788556462630,
+          "created": 1788556462630,
+          "sha": "2b97fb136ba3d7909d2cb2847f3fb47e0b02455d",
+          "branch": "codex/fdlc-guide-consolidation"
+        },
+        {
+          "uid": "dpl_DR6zzZjvdhVwjcdcHAJFJU9kY5Rb",
+          "name": "fdlc",
+          "url": "fdlc-cj8g2w34e-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788555743341,
+          "created": 1788555743341,
+          "sha": "d92be801b79947f9a031012fc2637a872ac51116",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_3xXotre4QE4EjNhLNEMdRGrj46Wx",
+          "name": "fdlc",
+          "url": "fdlc-of59a9wzl-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788555740274,
+          "created": 1788555740274,
+          "sha": "bdc275bc4dfe259dc6ca46e35849edde0a477e35",
+          "branch": "main"
+        }
+      ],
+      "environmentMetadata": [
+        {
+          "id": "5hLXrBltreeODc2a",
+          "key": "GUIDE_LEGACY_REDIRECTS_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655659981,
+          "updatedAt": 1788655659981
+        },
+        {
+          "id": "7fUCwxQMEOR449iX",
+          "key": "GUIDE_LEGACY_REDIRECTS_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788562919339,
+          "updatedAt": 1788562919339
+        },
+        {
+          "id": "J1JG9vrpAntGK6b4",
+          "key": "FDLC_BRIDGE_GUIDE_ORIGIN",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788637391260,
+          "updatedAt": 1788637391260
+        },
+        {
+          "id": "QSVaMXwxV1t2EWM2",
+          "key": "GUIDE_LEGACY_REDIRECTS_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655650552,
+          "updatedAt": 1788655650552
+        },
+        {
+          "id": "SacE0WGTo55PTCpv",
+          "key": "NEXT_PUBLIC_SITE_URL",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655658818,
+          "updatedAt": 1788655658818
+        },
+        {
+          "id": "sQ0e8thfNN3ycv12",
+          "key": "GUIDE_LEGACY_REDIRECTS_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788550608659,
+          "updatedAt": 1788550608659
+        },
+        {
+          "id": "z4w15E8Exq4RnmKP",
+          "key": "NEXT_PUBLIC_SITE_URL",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655649227,
+          "updatedAt": 1788655649227
+        }
+      ],
+      "protection": {
+        "sso": {
+          "deploymentType": "all_except_custom_domains"
+        },
+        "passwordConfigured": false,
+        "automationBypassCount": 0
+      }
+    },
+    {
+      "id": "prj_KZQBsEEmJMnEpCx3DHW4mfzIOAuO",
+      "name": "ai-software-factory-mastery",
+      "settings": {
+        "rootDirectory": "site",
+        "framework": "nextjs",
+        "buildCommand": null,
+        "installCommand": null,
+        "outputDirectory": null,
+        "nodeVersion": "24.x",
+        "autoAssignCustomDomains": false,
+        "gitProviderOptions": {
+          "createDeployments": "enabled"
+        },
+        "microfrontends": {
+          "enabled": true,
+          "groupIds": [
+            "mfe_1we4N3uLnAPIkT2Gpgv2T4NJ5PO4"
+          ],
+          "isDefaultApp": false,
+          "defaultRoute": "/guide",
+          "updatedAt": 1788550552928
+        }
+      },
+      "link": {
+        "type": "github",
+        "org": "jaydubya818",
+        "repo": "ai-software-factory-mastery",
+        "productionBranch": "main"
+      },
+      "production": {
+        "id": "dpl_EZemFq1QbGX1YG5WG8C1BAmd8Yur",
+        "name": "ai-software-factory-mastery",
+        "url": "ai-software-factory-mastery-m9hawsnky-jaydubya818.vercel.app",
+        "target": "production",
+        "readyState": "READY",
+        "createdAt": 1788542178999,
+        "alias": [
+          "ai-software-factory-mastery.vercel.app",
+          "ai-software-factory-mastery-jaydubya818.vercel.app",
+          "ai-software-factory-mastery-git-main-jaydubya818.vercel.app"
+        ],
+        "sha": "87d3841f96353d03278311dfc7e7b2d25649a331",
+        "branch": "main"
+      },
+      "aliases": [
+        {
+          "alias": "ai-software-factory-mastery.vercel.app",
+          "deployment": {
+            "id": "dpl_EZemFq1QbGX1YG5WG8C1BAmd8Yur",
+            "name": "ai-software-factory-mastery",
+            "url": "ai-software-factory-mastery-m9hawsnky-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788542178999,
+            "alias": [
+              "ai-software-factory-mastery.vercel.app",
+              "ai-software-factory-mastery-jaydubya818.vercel.app",
+              "ai-software-factory-mastery-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "87d3841f96353d03278311dfc7e7b2d25649a331",
+            "branch": "main"
+          }
+        },
+        {
+          "alias": "ai-software-factory-mastery-jaydubya818.vercel.app",
+          "deployment": {
+            "id": "dpl_EZemFq1QbGX1YG5WG8C1BAmd8Yur",
+            "name": "ai-software-factory-mastery",
+            "url": "ai-software-factory-mastery-m9hawsnky-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788542178999,
+            "alias": [
+              "ai-software-factory-mastery.vercel.app",
+              "ai-software-factory-mastery-jaydubya818.vercel.app",
+              "ai-software-factory-mastery-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "87d3841f96353d03278311dfc7e7b2d25649a331",
+            "branch": "main"
+          }
+        },
+        {
+          "alias": "ai-software-factory-mastery-git-main-jaydubya818.vercel.app",
+          "deployment": {
+            "id": "dpl_EZemFq1QbGX1YG5WG8C1BAmd8Yur",
+            "name": "ai-software-factory-mastery",
+            "url": "ai-software-factory-mastery-m9hawsnky-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788542178999,
+            "alias": [
+              "ai-software-factory-mastery.vercel.app",
+              "ai-software-factory-mastery-jaydubya818.vercel.app",
+              "ai-software-factory-mastery-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "87d3841f96353d03278311dfc7e7b2d25649a331",
+            "branch": "main"
+          }
+        }
+      ],
+      "recentDeployments": [
+        {
+          "uid": "dpl_8LCvy1mTL4DjPZQwUKihbAbuZRcw",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-8ilo74cjx-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788661077012,
+          "created": 1788661077012,
+          "sha": "164aa6d0345a7f86b4be8ea124739f41e27260ce",
+          "branch": "codex/fdlc-guide-migration-final"
+        },
+        {
+          "uid": "dpl_GDhAXe8YH8FjzM9k2Zbwr9z9Nwmw",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-fgd1o8awu-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788661076879,
+          "created": 1788661076879,
+          "sha": "164aa6d0345a7f86b4be8ea124739f41e27260ce",
+          "branch": "codex/fdlc-guide-migration-final-compat"
+        },
+        {
+          "uid": "dpl_EYUseEmcAbvoiXdEMjgkr1LEENCp",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-8vh4xovxt-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788661076595,
+          "created": 1788661076595,
+          "sha": "164aa6d0345a7f86b4be8ea124739f41e27260ce",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_GZnfGyWczxSUCyZ7J7fQjkdUsxWy",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-1iuqbwgd0-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788652524346,
+          "created": 1788652524346,
+          "sha": "2eb968fdfbe4ed30e468e70af01c1e38eb7623fe",
+          "branch": "codex/ecosystem-final-browser-fixes"
+        },
+        {
+          "uid": "dpl_2MHuYknuBCG7dxBuPAs5VQjdTyjP",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-jbmdrvby5-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788647718847,
+          "created": 1788647718847,
+          "sha": "b794e3c47b2cf21abb9b64e5872b5a6f47c7bd13",
+          "branch": "codex/phase4-mcp-closure"
+        },
+        {
+          "uid": "dpl_4z6cLFMLHqtgW3fL9tApJYFChZsy",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-3szj2iver-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788645513897,
+          "created": 1788645513897,
+          "sha": "efd23059007cf2050170a3653bfe3a831c9f245b",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_GXXzdTShB9qfMsFyv4gCZLauFFSC",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-791g6p8q2-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788644151393,
+          "created": 1788644151393,
+          "sha": "72642fbbf87b8fa0210f506e5c2fe212ef10647f",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_BCxkfz1Rxy7ggEmEDnQrW2CEvwq9",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-glahwyo8o-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788643376022,
+          "created": 1788643376022,
+          "sha": "876fae2bcd4cd7309dc4049b31c6df58179539f8",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_ATbgSMiRTB4gXXAM3bHtunPCwd85",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-ed3wsat9m-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788642767954,
+          "created": 1788642767954,
+          "sha": "17ebd6e32deb2ef53b99dee9489aaca0c8c9d6ae",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_82B75fDVLnGSCKvvvAH4bnsviQpX",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-biu4j5q2q-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788640054291,
+          "created": 1788640054291,
+          "sha": "9d11c7578fc797845d10bc528ccb1cc5023bf13c",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_EYYQaUg7BAcUhVVtQTzxMjFCJgLN",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-pxvr0h18x-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788637292196,
+          "created": 1788637292196,
+          "sha": "8cf00f9e1882fb01af58d22a95881d4833d39d06",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_Bx23w32YJPKUZjgnpbXXc4aaduBG",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-5hjddxgfl-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "ERROR",
+          "state": "ERROR",
+          "createdAt": 1788637159986,
+          "created": 1788637159986,
+          "sha": "8cf00f9e1882fb01af58d22a95881d4833d39d06",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_43hEWuxKdQZHC2YKQsaz2Dq7ksf8",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-k957zk5j1-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788593109582,
+          "created": 1788593109582,
+          "sha": "78329095fc306b56d67911235a439cdecf1f98fb",
+          "branch": "codex/context-skills-engineering"
+        },
+        {
+          "uid": "dpl_31bmLc5LA4gr2DRDQDb6996DHyK4",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-5haw4ica2-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788591286077,
+          "created": 1788591286077
+        },
+        {
+          "uid": "dpl_C5WwtscSGyNr65CHGy9orgzW1t7F",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-9hir9sh0g-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788590728087,
+          "created": 1788590728087,
+          "sha": "70347495e448e65c735e695a5173448033d03cb4",
+          "branch": "codex/context-skills-engineering"
+        },
+        {
+          "uid": "dpl_Bewc2td4kcZY5RE4S2cboEJCRqYc",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-hkp83qaci-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788589076297,
+          "created": 1788589076297
+        },
+        {
+          "uid": "dpl_5DeTdaKcuPs6XPArirypeTcQigan",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-elzie692y-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788566596110,
+          "created": 1788566596110,
+          "sha": "5126525e807cf84c791b6d17282a70c1ddde478f",
+          "branch": "codex/context-skills-engineering"
+        },
+        {
+          "uid": "dpl_9dmvMo1WBSCF36bNd3axo3Vs4pNj",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-pf50nt70w-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788563336332,
+          "created": 1788563336332,
+          "sha": "7b9f00beda0eab41348c8650a61009c6ab630fbf",
+          "branch": "codex/reconcile-microfrontends-main"
+        },
+        {
+          "uid": "dpl_65u3xP5QoL6JfhrxWeD3EvyuPxm4",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-l7ls6baw7-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788559221865,
+          "created": 1788559221865,
+          "sha": "7b9f00beda0eab41348c8650a61009c6ab630fbf",
+          "branch": "codex/fdlc-guide-consolidation"
+        },
+        {
+          "uid": "dpl_2LNPL6nzTiUXtaPT3dWv6cVtZCh8",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-9rhkqwtfn-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788556548989,
+          "created": 1788556548989,
+          "sha": "b2765ed65a712f6b41b560f64eb7a1f06e95d99f",
+          "branch": "codex/fdlc-guide-consolidation"
+        },
+        {
+          "uid": "dpl_G5TFrpCciTpFdw6QTbtyVzbfAFU8",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-ityyquy8s-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788550748063,
+          "created": 1788550748063,
+          "sha": "09a4dc6fd5d3e733e91dc18b2b1a3c3f949db719",
+          "branch": "codex/fdlc-guide-consolidation"
+        },
+        {
+          "uid": "dpl_5BLJp4p3ABZyxF5TURzxaPteho7Q",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-bsqbre68m-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788550648838,
+          "created": 1788550648838,
+          "sha": "09a4dc6fd5d3e733e91dc18b2b1a3c3f949db719",
+          "branch": "codex/fdlc-guide-consolidation"
+        },
+        {
+          "uid": "dpl_4iKHBmwQBrQNCqUsty4B3UEBL1YN",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-nsibhj9ig-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788542241194,
+          "created": 1788542241194,
+          "sha": "87d3841f96353d03278311dfc7e7b2d25649a331",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_EZemFq1QbGX1YG5WG8C1BAmd8Yur",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-m9hawsnky-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788542178999,
+          "created": 1788542178999,
+          "sha": "87d3841f96353d03278311dfc7e7b2d25649a331",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_DyAgHQGWFMEbXapuqwbMELtid4sd",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-90vb4rwkt-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788540970808,
+          "created": 1788540970808,
+          "sha": "a73441b8571a3ed568db6a79e1e7b9a0d7369c01",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_CDy8dytNRRiGqEw97A1qmxh7GXkY",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-rmpgzyxyg-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788540883295,
+          "created": 1788540883295,
+          "sha": "a73441b8571a3ed568db6a79e1e7b9a0d7369c01",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_H4h54DFHp5GNcLchX82xkuHTvb5F",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-b0obuhq1w-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788540056641,
+          "created": 1788540056641,
+          "sha": "85ecc7e369af3e9468aeabbf8382a7f1c3063b4f",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_B7bNq2bZakKrFfKMqv7hYwwCbrUF",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-2i1aavf7u-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788502889996,
+          "created": 1788502889996,
+          "sha": "aae586b287e5f34c55e6864fed9e8eac9fd2a287",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_5ynH4wr57axG33S9s1qhYxf1ZA33",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-39ldcfegx-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788502864316,
+          "created": 1788502864316,
+          "sha": "aae586b287e5f34c55e6864fed9e8eac9fd2a287",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_8rW1DKnRBpc76ZeAeF8MsASvTWMj",
+          "name": "ai-software-factory-mastery",
+          "url": "ai-software-factory-mastery-8e05z54lp-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788501924253,
+          "created": 1788501924253,
+          "sha": "07612b715e4996fd6893f28a2762d2c0b8034253",
+          "branch": "main"
+        }
+      ],
+      "environmentMetadata": [
+        {
+          "id": "5ErvE1oz43wCvggm",
+          "key": "NEXT_PUBLIC_SITE_URL",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788550654363,
+          "updatedAt": 1788550654363
+        },
+        {
+          "id": "67854haIuJu33KAf",
+          "key": "FDLC_MFE_CONFIG_SHA256",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788637218014,
+          "updatedAt": 1788637218014
+        },
+        {
+          "id": "6LirPt1o0hcae0Ds",
+          "key": "GUIDE_LEGACY_REDIRECTS_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655667351,
+          "updatedAt": 1788655667351
+        },
+        {
+          "id": "AfqrAzSlm73D7iTI",
+          "key": "NEXT_PUBLIC_SITE_URL",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655657151,
+          "updatedAt": 1788655657151
+        },
+        {
+          "id": "eBGSHkJ4TDmEWmxA",
+          "key": "GUIDE_MFE_PREVIEW_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655652002,
+          "updatedAt": 1788655652002
+        },
+        {
+          "id": "GGJnblGAWiQzFXSN",
+          "key": "GUIDE_MFE_PREVIEW_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788556306565,
+          "updatedAt": 1788556306565
+        },
+        {
+          "id": "GSLSWygmGHn5qwS1",
+          "key": "GUIDE_LEGACY_REDIRECTS_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788550662751,
+          "updatedAt": 1788550662751
+        },
+        {
+          "id": "gWW3M32qn3F06pqO",
+          "key": "FDLC_MFE_SOURCE_COMMIT",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788562929345,
+          "updatedAt": 1788562929345
+        },
+        {
+          "id": "HnPLXumWgCFLPw0J",
+          "key": "GUIDE_MFE_PREVIEW_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788637216211,
+          "updatedAt": 1788637216211
+        },
+        {
+          "id": "iNHAgBz2PlcOms2i",
+          "key": "FDLC_MFE_CONFIG_SHA256",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655654263,
+          "updatedAt": 1788655654263
+        },
+        {
+          "id": "jNAA7Rd70HU2khHn",
+          "key": "NEXT_PUBLIC_SITE_URL",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788562941014,
+          "updatedAt": 1788562941014
+        },
+        {
+          "id": "JvyToOyaX3NvMOv6",
+          "key": "GUIDE_LEGACY_REDIRECTS_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788562945485,
+          "updatedAt": 1788562945485
+        },
+        {
+          "id": "My7Uloo4LDrh4iZM",
+          "key": "NEXT_PUBLIC_SITE_URL",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788637216133,
+          "updatedAt": 1788637216133
+        },
+        {
+          "id": "nMla3gQEbq8HnhSI",
+          "key": "FDLC_MFE_SOURCE_COMMIT",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655664605,
+          "updatedAt": 1788655664605
+        },
+        {
+          "id": "PCaJlvAbgXgy31UF",
+          "key": "FDLC_MFE_CONFIG_SHA256",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655662653,
+          "updatedAt": 1788655662653
+        },
+        {
+          "id": "pqfm0ItpUiRyiWLK",
+          "key": "FDLC_MFE_CONFIG_SHA256",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788556270822,
+          "updatedAt": 1788556270822
+        },
+        {
+          "id": "QEvUSMplchXkAUt4",
+          "key": "NEXT_PUBLIC_SITE_URL",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655666057,
+          "updatedAt": 1788655666057
+        },
+        {
+          "id": "rMylmc6Bh3ei2Xxu",
+          "key": "FDLC_MFE_SOURCE_COMMIT",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788637216046,
+          "updatedAt": 1788637216046
+        },
+        {
+          "id": "ssG0ZWTl51qd0TI0",
+          "key": "FDLC_MFE_SOURCE_COMMIT",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788556288177,
+          "updatedAt": 1788556288177
+        },
+        {
+          "id": "SWvWbv7wu5IT8lUD",
+          "key": "GUIDE_MFE_PREVIEW_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655661352,
+          "updatedAt": 1788655661352
+        },
+        {
+          "id": "tjhaUnufSwCo7krn",
+          "key": "FDLC_MFE_CONFIG_SHA256",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788562924820,
+          "updatedAt": 1788562924820
+        },
+        {
+          "id": "uBfeO0xCcPhgaNjI",
+          "key": "GUIDE_MFE_PREVIEW_ENABLED",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788562936299,
+          "updatedAt": 1788562936299
+        },
+        {
+          "id": "UkyGEvussjL1yKDo",
+          "key": "FDLC_MFE_SOURCE_COMMIT",
+          "target": [
+            "preview"
+          ],
+          "type": "plain",
+          "createdAt": 1788655655871,
+          "updatedAt": 1788655655871
+        }
+      ],
+      "protection": {
+        "sso": {
+          "deploymentType": "all_except_custom_domains"
+        },
+        "passwordConfigured": false,
+        "automationBypassCount": 1
+      }
+    },
+    {
+      "id": "prj_qPYbvpQkiLDP9DUk2RlkM6iyT3pG",
+      "name": "ai-software-factory-mastery_documentation",
+      "settings": {
+        "rootDirectory": null,
+        "framework": null,
+        "buildCommand": null,
+        "installCommand": null,
+        "outputDirectory": null,
+        "nodeVersion": "24.x",
+        "autoAssignCustomDomains": true,
+        "commandForIgnoringBuildStep": null,
+        "gitProviderOptions": {
+          "createDeployments": "enabled"
+        }
+      },
+      "link": {
+        "type": "github",
+        "org": "jaydubya818",
+        "repo": "ai-software-factory-mastery",
+        "productionBranch": "main"
+      },
+      "production": {
+        "id": "dpl_Dr15FrDkdktTatFmNfcWJAZVk8nF",
+        "name": "ai-software-factory-mastery_documentation",
+        "url": "ai-software-factory-masterydocumentation-7zgk5lbun-jaydubya818.vercel.app",
+        "target": "production",
+        "readyState": "READY",
+        "createdAt": 1788542179020,
+        "alias": [
+          "ai-software-factory-masterydocument.vercel.app",
+          "ai-software-factory-masterydocumentation-jaydubya818.vercel.app",
+          "ai-software-factory-masterydocumentation-git-main-jaydubya818.vercel.app"
+        ],
+        "sha": "87d3841f96353d03278311dfc7e7b2d25649a331",
+        "branch": "main"
+      },
+      "aliases": [
+        {
+          "alias": "ai-software-factory-masterydocument.vercel.app",
+          "deployment": {
+            "id": "dpl_Dr15FrDkdktTatFmNfcWJAZVk8nF",
+            "name": "ai-software-factory-mastery_documentation",
+            "url": "ai-software-factory-masterydocumentation-7zgk5lbun-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788542179020,
+            "alias": [
+              "ai-software-factory-masterydocument.vercel.app",
+              "ai-software-factory-masterydocumentation-jaydubya818.vercel.app",
+              "ai-software-factory-masterydocumentation-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "87d3841f96353d03278311dfc7e7b2d25649a331",
+            "branch": "main"
+          }
+        },
+        {
+          "alias": "ai-software-factory-masterydocumentation-jaydubya818.vercel.app",
+          "deployment": {
+            "id": "dpl_Dr15FrDkdktTatFmNfcWJAZVk8nF",
+            "name": "ai-software-factory-mastery_documentation",
+            "url": "ai-software-factory-masterydocumentation-7zgk5lbun-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788542179020,
+            "alias": [
+              "ai-software-factory-masterydocument.vercel.app",
+              "ai-software-factory-masterydocumentation-jaydubya818.vercel.app",
+              "ai-software-factory-masterydocumentation-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "87d3841f96353d03278311dfc7e7b2d25649a331",
+            "branch": "main"
+          }
+        },
+        {
+          "alias": "ai-software-factory-masterydocumentation-git-main-jaydubya818.vercel.app",
+          "deployment": {
+            "id": "dpl_Dr15FrDkdktTatFmNfcWJAZVk8nF",
+            "name": "ai-software-factory-mastery_documentation",
+            "url": "ai-software-factory-masterydocumentation-7zgk5lbun-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788542179020,
+            "alias": [
+              "ai-software-factory-masterydocument.vercel.app",
+              "ai-software-factory-masterydocumentation-jaydubya818.vercel.app",
+              "ai-software-factory-masterydocumentation-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "87d3841f96353d03278311dfc7e7b2d25649a331",
+            "branch": "main"
+          }
+        }
+      ],
+      "recentDeployments": [
+        {
+          "uid": "dpl_XSJqGwRM1QR2PMDCkU24Ze1Q9n5z",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-8gogwe7xs-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788661076394,
+          "created": 1788661076394,
+          "sha": "164aa6d0345a7f86b4be8ea124739f41e27260ce",
+          "branch": "codex/fdlc-guide-migration-final-compat"
+        },
+        {
+          "uid": "dpl_HM5bM9VH3sp9v8AdGRABgvoctkAa",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-opmzqz7ag-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788661076172,
+          "created": 1788661076172,
+          "sha": "164aa6d0345a7f86b4be8ea124739f41e27260ce",
+          "branch": "codex/fdlc-guide-migration-final"
+        },
+        {
+          "uid": "dpl_BdakACGokJsyL1Rmn9JyjTHUq3hT",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-ec8j24317-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788661076127,
+          "created": 1788661076127,
+          "sha": "164aa6d0345a7f86b4be8ea124739f41e27260ce",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_DLVFWFWrhwu3YuYphL39qLNwq8sT",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-93dp5c4m2-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788652523892,
+          "created": 1788652523892,
+          "sha": "2eb968fdfbe4ed30e468e70af01c1e38eb7623fe",
+          "branch": "codex/ecosystem-final-browser-fixes"
+        },
+        {
+          "uid": "dpl_CV1qXX57PZDuu9cEYx6LRcZhTDrg",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-awzdpagvc-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788647718182,
+          "created": 1788647718182,
+          "sha": "b794e3c47b2cf21abb9b64e5872b5a6f47c7bd13",
+          "branch": "codex/phase4-mcp-closure"
+        },
+        {
+          "uid": "dpl_FKuTYHiWzkc6zpk2QNbkd7B1aHrY",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-ko69xit63-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788645514639,
+          "created": 1788645514639,
+          "sha": "efd23059007cf2050170a3653bfe3a831c9f245b",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_6MqykYSJABgGWesByLNhfCoYDeCA",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-adft3rvc6-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788644150655,
+          "created": 1788644150655,
+          "sha": "72642fbbf87b8fa0210f506e5c2fe212ef10647f",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_qi6YKPRirHAa9aEbvpZwX7ARQ4mR",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-mo7a2420f-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788643375223,
+          "created": 1788643375223,
+          "sha": "876fae2bcd4cd7309dc4049b31c6df58179539f8",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_5enxapDuB3U3DNbdDTMEi2VxNA3A",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-hahloy74g-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788642766371,
+          "created": 1788642766371,
+          "sha": "17ebd6e32deb2ef53b99dee9489aaca0c8c9d6ae",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_CLXhAjt3W9kuSNgUqiWYeKQTU2vD",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-k1w9159n9-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788640053621,
+          "created": 1788640053621,
+          "sha": "9d11c7578fc797845d10bc528ccb1cc5023bf13c",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_2Ff9WS1nu8shDJsa7vh2zMp9Lmgw",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-nav9qpwvv-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788637159396,
+          "created": 1788637159396,
+          "sha": "8cf00f9e1882fb01af58d22a95881d4833d39d06",
+          "branch": "codex/fdlc-guide-migration-bridge"
+        },
+        {
+          "uid": "dpl_CpcD2dsLot95ij6RnDY5TrQA5zip",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-h0agv8lzc-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788593108839,
+          "created": 1788593108839,
+          "sha": "78329095fc306b56d67911235a439cdecf1f98fb",
+          "branch": "codex/context-skills-engineering"
+        },
+        {
+          "uid": "dpl_FLxBixzgpa2VvUwDRDn9EchxRNuY",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-dwn0d8snv-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788590727336,
+          "created": 1788590727336,
+          "sha": "70347495e448e65c735e695a5173448033d03cb4",
+          "branch": "codex/context-skills-engineering"
+        },
+        {
+          "uid": "dpl_GV6eDoecThwMM6TSSEA6tWs3b8PW",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-2zjxxjp36-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788566592596,
+          "created": 1788566592596,
+          "sha": "5126525e807cf84c791b6d17282a70c1ddde478f",
+          "branch": "codex/context-skills-engineering"
+        },
+        {
+          "uid": "dpl_47Hj2pc8hyvWytHxsDQjvucKhiYf",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-ajlih4oyr-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788559220689,
+          "created": 1788559220689,
+          "sha": "7b9f00beda0eab41348c8650a61009c6ab630fbf",
+          "branch": "codex/fdlc-guide-consolidation"
+        },
+        {
+          "uid": "dpl_6MVdKXEWixLP8tAddzA1HqBDiNgS",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-lfbrese8p-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788556547954,
+          "created": 1788556547954,
+          "sha": "b2765ed65a712f6b41b560f64eb7a1f06e95d99f",
+          "branch": "codex/fdlc-guide-consolidation"
+        },
+        {
+          "uid": "dpl_FtPPHTuVryNGYpaWy9ya6uKM6cAD",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-2xwt1fisu-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788550647967,
+          "created": 1788550647967,
+          "sha": "09a4dc6fd5d3e733e91dc18b2b1a3c3f949db719",
+          "branch": "codex/fdlc-guide-consolidation"
+        },
+        {
+          "uid": "dpl_Dr15FrDkdktTatFmNfcWJAZVk8nF",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-7zgk5lbun-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788542179020,
+          "created": 1788542179020,
+          "sha": "87d3841f96353d03278311dfc7e7b2d25649a331",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_J6kgpXZmQcAFVNSYsKSGo8UxERRd",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-g1bocrh3m-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788540883640,
+          "created": 1788540883640,
+          "sha": "a73441b8571a3ed568db6a79e1e7b9a0d7369c01",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_8wjrTBxsUPPAAr7fbYWB6FAerVsz",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-bnupat1co-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788540057146,
+          "created": 1788540057146,
+          "sha": "85ecc7e369af3e9468aeabbf8382a7f1c3063b4f",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_4dexoQQG2U9ExJvkqmXEpNo6z9Lv",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-ccch4165d-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788502864309,
+          "created": 1788502864309,
+          "sha": "aae586b287e5f34c55e6864fed9e8eac9fd2a287",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_5QDSnzxvk5y8b3VwkpHxmobifQwy",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-ewnk8hnxz-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788501898812,
+          "created": 1788501898812,
+          "sha": "07612b715e4996fd6893f28a2762d2c0b8034253",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_8q6qzLRcDGrQy6xHvC49y1cDtDPy",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-dk0geq3p3-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788459567471,
+          "created": 1788459567471,
+          "sha": "c87c64c804fbcdac37040bc297e93de8863c1d10",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_47A6QpdiaSb7G3eKPM4MaYKQYYBf",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-bd9rjdv06-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788459189503,
+          "created": 1788459189503,
+          "sha": "ec8e397b71dfff89761a00336f1c5291d8bc5b02",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_BivBMNL9HtdqGSxbVV9hMsAxdpPZ",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-i16tla2il-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788459177657,
+          "created": 1788459177657,
+          "sha": "8af891c07cb89dc77e574e9aab2f9207d502ff96",
+          "branch": "codex/phase-1-4-structural-migration"
+        },
+        {
+          "uid": "dpl_BqG46aSziqThHN1b1T7NVdkSkbZo",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-fgunadq5x-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788414699478,
+          "created": 1788414699478,
+          "sha": "4870438f55bfd46369dd1bef28856fb14624ab7e",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_EAMWQdxL5RnrPG829cNnYW2fjGZL",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-prqyebatn-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788413804830,
+          "created": 1788413804830,
+          "sha": "4870438f55bfd46369dd1bef28856fb14624ab7e",
+          "branch": "codex/phase-0-fixes"
+        },
+        {
+          "uid": "dpl_FZR9RgrajmU1uLiyjiTTbzZRnQfh",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-89m7euuu7-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788398230827,
+          "created": 1788398230827,
+          "sha": "96552fd6dd91d3626946099daf43bdf12a7144d1",
+          "branch": "codex/factory-production-convergence-docs"
+        },
+        {
+          "uid": "dpl_5z4TSS5ZHHWbVQidpGBaFp6AyQKH",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-79sedjwrn-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788394875424,
+          "created": 1788394875424,
+          "sha": "2db7fd86e8532ad255be58589e29ba56f6ae276b",
+          "branch": "claude/guide-rewrite"
+        },
+        {
+          "uid": "dpl_9xDUitRL8sssgsBZynLeH2oZ3BWZ",
+          "name": "ai-software-factory-mastery_documentation",
+          "url": "ai-software-factory-masterydocumentation-fwy5i32dw-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788394874420,
+          "created": 1788394874420,
+          "sha": "2db7fd86e8532ad255be58589e29ba56f6ae276b",
+          "branch": "main"
+        }
+      ],
+      "environmentMetadata": [],
+      "protection": {
+        "sso": {
+          "deploymentType": "all_except_custom_domains"
+        },
+        "passwordConfigured": false,
+        "automationBypassCount": 0
+      }
+    },
+    {
+      "id": "prj_ggkZ8Mb23czMept96KQ2ndO0wks4",
+      "name": "mission-control-ui",
+      "settings": {
+        "rootDirectory": null,
+        "framework": null,
+        "buildCommand": "cd apps/mission-control-ui && pnpm build",
+        "installCommand": "pnpm install",
+        "outputDirectory": "apps/mission-control-ui/dist",
+        "nodeVersion": "24.x",
+        "autoAssignCustomDomains": false,
+        "commandForIgnoringBuildStep": null,
+        "gitProviderOptions": {
+          "createDeployments": "enabled"
+        }
+      },
+      "link": {
+        "type": "github",
+        "org": "jaydubya818",
+        "repo": "MissionControl",
+        "productionBranch": "main"
+      },
+      "production": {
+        "id": "dpl_AhPTJbV2zFDnWf3r3JQnHjj4tgUW",
+        "name": "mission-control-ui",
+        "url": "mission-control-r2smos2ay-jaydubya818.vercel.app",
+        "target": "production",
+        "readyState": "READY",
+        "createdAt": 1786814265185,
+        "alias": [
+          "mission-control-ui-jaydubya818.vercel.app",
+          "mission-control-ui-git-main-jaydubya818.vercel.app"
+        ],
+        "sha": "16ae0ed2596b6f6fcea843089d7b408ea1fa8c42",
+        "branch": "main"
+      },
+      "aliases": [
+        {
+          "alias": "mission-control-ui-eight.vercel.app",
+          "deployment": {
+            "id": "dpl_AhPTJbV2zFDnWf3r3JQnHjj4tgUW",
+            "name": "mission-control-ui",
+            "url": "mission-control-r2smos2ay-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1786814265185,
+            "alias": [
+              "mission-control-ui-jaydubya818.vercel.app",
+              "mission-control-ui-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "16ae0ed2596b6f6fcea843089d7b408ea1fa8c42",
+            "branch": "main"
+          }
+        },
+        {
+          "alias": "mission-control-ui-jaydubya818.vercel.app",
+          "deployment": {
+            "id": "dpl_7V7AjCvnxMXohVBEAADAqvgdH75w",
+            "name": "mission-control-ui",
+            "url": "mission-control-gbzxew0n5-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788644545996,
+            "alias": [
+              "mission-control-ui-jaydubya818.vercel.app",
+              "mission-control-ui-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "ed77c46c9d975a2ed0c666cdaf0a3f0e12e77d4d",
+            "branch": "main"
+          }
+        },
+        {
+          "alias": "mission-control-ui-git-main-jaydubya818.vercel.app",
+          "deployment": {
+            "id": "dpl_7V7AjCvnxMXohVBEAADAqvgdH75w",
+            "name": "mission-control-ui",
+            "url": "mission-control-gbzxew0n5-jaydubya818.vercel.app",
+            "target": "production",
+            "readyState": "READY",
+            "createdAt": 1788644545996,
+            "alias": [
+              "mission-control-ui-jaydubya818.vercel.app",
+              "mission-control-ui-git-main-jaydubya818.vercel.app"
+            ],
+            "sha": "ed77c46c9d975a2ed0c666cdaf0a3f0e12e77d4d",
+            "branch": "main"
+          }
+        }
+      ],
+      "recentDeployments": [
+        {
+          "uid": "dpl_HWP35RpAQa2Ge9UHq91gZCLn62n6",
+          "name": "mission-control-ui",
+          "url": "mission-control-9ynd7n8qp-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788671446300,
+          "created": 1788671446300,
+          "sha": "406f8f5d872ce1b8e30bc0fc69b900dc1070dce0",
+          "branch": "codex/pilot-readiness-current-main"
+        },
+        {
+          "uid": "dpl_8itVHxUW9qWLa8MhqUiFZpvbkVay",
+          "name": "mission-control-ui",
+          "url": "mission-control-q5b95tfu0-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788669984875,
+          "created": 1788669984875,
+          "sha": "c00d6463663f9d5ec041e5961820cf44e3bfa5bd",
+          "branch": "codex/todo062-postmerge-closure"
+        },
+        {
+          "uid": "dpl_5qhMAskFWrZFkK1fDAjirGqcmPEm",
+          "name": "mission-control-ui",
+          "url": "mission-control-jwol3wwvp-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788669277780,
+          "created": 1788669277780,
+          "sha": "f6f91f91c1710b630789aa9d3784ea32dade666f",
+          "branch": "codex/todo062-shared-builder-intent"
+        },
+        {
+          "uid": "dpl_2Kptar1nU828uvzTB3Fi9yA1kaua",
+          "name": "mission-control-ui",
+          "url": "mission-control-4vhla2cpe-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788668014887,
+          "created": 1788668014887,
+          "sha": "2238b26acc8d05c57491fa46e0874bcd8c08a679",
+          "branch": "codex/fab-phase3"
+        },
+        {
+          "uid": "dpl_7WNVr27WvTG5u3zfPXnwpEKTb7Xt",
+          "name": "mission-control-ui",
+          "url": "mission-control-d1kjc7uks-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788667801163,
+          "created": 1788667801163,
+          "sha": "a81313868fcc95d049b943d587de1b925d672af1",
+          "branch": "codex/fab-phase3"
+        },
+        {
+          "uid": "dpl_A9K1DJVwg54m38TSnYym3P6LGcbC",
+          "name": "mission-control-ui",
+          "url": "mission-control-3q9gdef02-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788667212119,
+          "created": 1788667212119,
+          "sha": "3b6640237e437df92dce681bef1b44e0b15105b1",
+          "branch": "codex/fab-phase3"
+        },
+        {
+          "uid": "dpl_d6L5V6ADsWT36rdCdvaJnfDVdUuF",
+          "name": "mission-control-ui",
+          "url": "mission-control-8vy9h3wtg-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788665930215,
+          "created": 1788665930215,
+          "sha": "c90bc4da6ecf7e9a387b6f274d2520ba5a7c1fb9",
+          "branch": "codex/phase5-postmerge-closure"
+        },
+        {
+          "uid": "dpl_9axDLZHGoYyGk1NEoyx14sPEMysw",
+          "name": "mission-control-ui",
+          "url": "mission-control-lrq873rct-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788665286016,
+          "created": 1788665286016,
+          "sha": "06213b8df33d3c8410796d0a736514b4dec24bf8",
+          "branch": "codex/phase5-inference-outcome-economics"
+        },
+        {
+          "uid": "dpl_EZ8h4GQdcHutFUft1HFNfyX7WjrF",
+          "name": "mission-control-ui",
+          "url": "mission-control-757n9aie9-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788651720688,
+          "created": 1788651720688,
+          "sha": "d599c1b106c190e45386787d5ff1dc3bf1da905b",
+          "branch": "codex/phase4-closure-postmerge-qualification"
+        },
+        {
+          "uid": "dpl_9GQP4C7f1UF1nRCwtsdx1X2nBmnC",
+          "name": "mission-control-ui",
+          "url": "mission-control-46pd3ss9d-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788647713832,
+          "created": 1788647713832,
+          "sha": "ba8a95c84bffe4603d625e924d0f02f0b6672c97",
+          "branch": "codex/phase4-closure-phase5-plan"
+        },
+        {
+          "uid": "dpl_DD1CgUhB9RphxjzWhYae2WzyLQuD",
+          "name": "mission-control-ui",
+          "url": "mission-control-43z8rwxyx-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788644913836,
+          "created": 1788644913836,
+          "sha": "4e15aeb44f7b55c21c6cd4db44e46be9d7150ef0",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_7V7AjCvnxMXohVBEAADAqvgdH75w",
+          "name": "mission-control-ui",
+          "url": "mission-control-gbzxew0n5-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788644545996,
+          "created": 1788644545996,
+          "sha": "ed77c46c9d975a2ed0c666cdaf0a3f0e12e77d4d",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_HsQJobMxBd5Mwz6WAnewTDMZzJSJ",
+          "name": "mission-control-ui",
+          "url": "mission-control-3omzgjves-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788644212281,
+          "created": 1788644212281,
+          "sha": "eb13facae5d9038c75ec0c82e22cd54bae256a06",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_GAtwLwzHEc8UCgExqt4dEvyzoR7G",
+          "name": "mission-control-ui",
+          "url": "mission-control-ktv5p8li9-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788644086369,
+          "created": 1788644086369,
+          "sha": "cc934422fcffa511cb21e81d50501b8e0b143271",
+          "branch": "codex/phase4-completion-record"
+        },
+        {
+          "uid": "dpl_3TEsftZAAj2n11pf2e7SjiyXKQJQ",
+          "name": "mission-control-ui",
+          "url": "mission-control-ng1gtkonr-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788643574384,
+          "created": 1788643574384,
+          "sha": "aa8c12b1d4907589b71cef3cb421ef2a2c380676",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_2wGoVkZqY6a8bzeLm8b2hBXR6cZW",
+          "name": "mission-control-ui",
+          "url": "mission-control-c6ekitywz-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788643416566,
+          "created": 1788643416566,
+          "sha": "caba45db0169ed707f17f0b397d3020f18d3fb81",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_F1TJGNLoZd8asU8b5M9oKja5QMAF",
+          "name": "mission-control-ui",
+          "url": "mission-control-e3hztezbj-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788643222412,
+          "created": 1788643222412,
+          "sha": "63d202dcde29c27a068e30fdde185b95cde8a0de",
+          "branch": "codex/phase4-real-readonly-mcp"
+        },
+        {
+          "uid": "dpl_Ctd2sRcxWL9myyMUsNxEmoQWtsVb",
+          "name": "mission-control-ui",
+          "url": "mission-control-qjre4u204-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788640087907,
+          "created": 1788640087907,
+          "sha": "2fc0048dfb5c28f01d80e26c92b5cfb8127af419",
+          "branch": "codex/software-factory-contracts-integration"
+        },
+        {
+          "uid": "dpl_5ih6ySzvkc7zJeXsiqbrfye2X229",
+          "name": "mission-control-ui",
+          "url": "mission-control-5ssluuh07-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788602992755,
+          "created": 1788602992755,
+          "sha": "0d1a0908cce380d815069ce0a59e1604d2f26ece",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_8CN5ygu753MNVfTareXDDZFJDJjk",
+          "name": "mission-control-ui",
+          "url": "mission-control-dsa3gxjcl-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788602541341,
+          "created": 1788602541341,
+          "sha": "1f5291488a21026e45bcbb45322c8b89cb469e5a",
+          "branch": "codex/phase3-completion-record"
+        },
+        {
+          "uid": "dpl_AXiNSvjARyw9xApjVQbJpXHN8Ru2",
+          "name": "mission-control-ui",
+          "url": "mission-control-66myv8u8y-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788602125451,
+          "created": 1788602125451,
+          "sha": "d64939db525e3b1da0bf3f2cffb60c16f76994ec",
+          "branch": "codex/phase3-completion-record"
+        },
+        {
+          "uid": "dpl_7arcdadEfT75auoERBVPx4pUj1Mh",
+          "name": "mission-control-ui",
+          "url": "mission-control-4534r0hvk-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788601661967,
+          "created": 1788601661967,
+          "sha": "6611a03c6025e7e19548e9a742237e2e466030ee",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_CgvewYAW4gRGrvcTGkrFpwiwfadQ",
+          "name": "mission-control-ui",
+          "url": "mission-control-m7viv2uue-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788601309639,
+          "created": 1788601309639,
+          "sha": "2034a869d3921d435fc586bb3195a0cf64eea5d3",
+          "branch": "codex/phase3-governed-readonly-mcp"
+        },
+        {
+          "uid": "dpl_7PmHVjnRmrmKqwxMQit1va22WCyg",
+          "name": "mission-control-ui",
+          "url": "mission-control-7jsakeq0f-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788600927163,
+          "created": 1788600927163,
+          "sha": "82b22d3d77064c013905144f9b412762a898d9b6",
+          "branch": "codex/phase3-governed-readonly-mcp"
+        },
+        {
+          "uid": "dpl_CcFAgwnwfnxJpFCGsG7NVKP7UiHs",
+          "name": "mission-control-ui",
+          "url": "mission-control-q8gmotiyy-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788600884232,
+          "created": 1788600884232,
+          "sha": "c3fde2db7429fc9a749bb52f7a6f5046ba7afcd3",
+          "branch": "codex/phase3-governed-readonly-mcp"
+        },
+        {
+          "uid": "dpl_68rJQZzNYgkeMLVetFDsuEoMZPgK",
+          "name": "mission-control-ui",
+          "url": "mission-control-rhilbhkps-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788592178721,
+          "created": 1788592178721,
+          "sha": "3ae9d86eeff1966862a6959664ec1fe2e6e7240a",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_H2xbzPdNsLVgAG49BKzUyr3NpDGw",
+          "name": "mission-control-ui",
+          "url": "mission-control-8fki6tteg-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788591713197,
+          "created": 1788591713197,
+          "sha": "68770edcb15f275f6667e3788472849cc09f7c62",
+          "branch": "codex/phase2-execution-profile"
+        },
+        {
+          "uid": "dpl_ADnpv5zYsbiwozv32igVBBqZKgXx",
+          "name": "mission-control-ui",
+          "url": "mission-control-bokixpdbx-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788591115928,
+          "created": 1788591115928,
+          "sha": "f82fe1d98b156278c4fa0c0e2032008e2f010f39",
+          "branch": "codex/fdlc-pilot-readiness"
+        },
+        {
+          "uid": "dpl_4RSMBjLQE7o6EpFsjXxf9JLtX1KB",
+          "name": "mission-control-ui",
+          "url": "mission-control-rj2kxqi2l-jaydubya818.vercel.app",
+          "target": "production",
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788569349113,
+          "created": 1788569349113,
+          "sha": "9a80cf3c5cc229bb4a552a9f08ddda5841e70a38",
+          "branch": "main"
+        },
+        {
+          "uid": "dpl_22soTgixx1KRfPGmjJw1Q6aUMjLd",
+          "name": "mission-control-ui",
+          "url": "mission-control-olrb274bw-jaydubya818.vercel.app",
+          "target": null,
+          "readyState": "READY",
+          "state": "READY",
+          "createdAt": 1788568903162,
+          "created": 1788568903162,
+          "sha": "36e0e901aa2554a778e39b4db71e358a93077c69",
+          "branch": "codex/phase1-model-runtime-identity"
+        }
+      ],
+      "environmentMetadata": [
+        {
+          "id": "0kiZxVYtuPgKw8KF",
+          "key": "VITE_FLAG_CONTEXT_REGISTRY",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788377106333,
+          "updatedAt": 1788377106333
+        },
+        {
+          "id": "0wLa8GSGtM5DN6mN",
+          "key": "VITE_CONVEX_URL",
+          "target": [
+            "preview"
+          ],
+          "type": "sensitive",
+          "createdAt": 1786806385245,
+          "updatedAt": 1786806385245
+        },
+        {
+          "id": "5xcf5VorYnatkvJ0",
+          "key": "VITE_CLERK_PUBLISHABLE_KEY",
+          "target": [
+            "production"
+          ],
+          "type": "encrypted",
+          "createdAt": 1786559963552,
+          "updatedAt": 1786559963552
+        },
+        {
+          "id": "hQmnyLp1TxVViVv0",
+          "key": "VITE_AUTH_MODE",
+          "target": [
+            "production"
+          ],
+          "type": "encrypted",
+          "createdAt": 1786559963137,
+          "updatedAt": 1786559963137
+        },
+        {
+          "id": "ld4VBRINejFRS2ac",
+          "key": "VITE_CONVEX_URL",
+          "target": [
+            "production"
+          ],
+          "type": "encrypted",
+          "createdAt": 1770007468912,
+          "updatedAt": 1786520163149
+        },
+        {
+          "id": "pkEu9zuZqsc5quv6",
+          "key": "VITE_CLERK_PUBLISHABLE_KEY",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1786559963279,
+          "updatedAt": 1786559963279
+        },
+        {
+          "id": "SB1Ddvevwv42wHtV",
+          "key": "VITE_FLAG_UI_SHELL_V2",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788377104901,
+          "updatedAt": 1788377104901
+        },
+        {
+          "id": "tdyhE7nzrjUbNjSa",
+          "key": "VITE_CONVEX_URL",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1786515225718,
+          "updatedAt": 1786515225718
+        },
+        {
+          "id": "tsZEOC5cg9Ni0FSd",
+          "key": "VITE_FLAG_EOS_COMMAND_CENTER_PREVIEW",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788377107763,
+          "updatedAt": 1788377107763
+        },
+        {
+          "id": "tYMDyR3u45zm4EFs",
+          "key": "VITE_CONVEX_URL",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788377103280,
+          "updatedAt": 1788377103280
+        },
+        {
+          "id": "XrUHXqL7LXAh0Fma",
+          "key": "VITE_FLAG_COMPANY_CONTEXT",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1788377109190,
+          "updatedAt": 1788377109190
+        },
+        {
+          "id": "zSOc745QB9qrvdLj",
+          "key": "VITE_AUTH_MODE",
+          "target": [
+            "preview"
+          ],
+          "type": "encrypted",
+          "createdAt": 1786559962932,
+          "updatedAt": 1786559962932
+        }
+      ],
+      "protection": {
+        "sso": {
+          "deploymentType": "all_except_custom_domains"
+        },
+        "passwordConfigured": false,
+        "automationBypassCount": 1
+      }
+    }
+  ]
+}

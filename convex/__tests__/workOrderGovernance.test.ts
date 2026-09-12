@@ -33,6 +33,28 @@ describe("work order governance helpers", () => {
     expect(requiredApprovalTypes({ riskLevel: "HIGH", requiredApprovals: [] })).toEqual(["RISK_REVIEW"]);
   });
 
+  it("does not invent an implicit risk approval for explicitly read-only work", () => {
+    expect(requiredApprovalTypes({
+      riskLevel: "HIGH",
+      requiredApprovals: [],
+      isMutating: false,
+    })).toEqual([]);
+    expect(deriveApprovalStatus({
+      riskLevel: "HIGH",
+      requiredApprovals: [],
+      approvals: [],
+      isMutating: false,
+    })).toBe("NOT_REQUIRED");
+    expect(evaluateAcceptance({
+      riskLevel: "HIGH",
+      requiredApprovals: [],
+      approvalDecisions: [],
+      acceptanceCriteria: [{ id: "ac-1", title: "Read-only review passes", status: "PASS" }],
+      verificationReceipts: receipts([{ acceptanceCriterionId: "ac-1", status: "PASSED" }]),
+      isMutating: false,
+    }).eligible).toBe(true);
+  });
+
   it("marks verification stale when any criterion is stale", () => {
     expect(deriveVerificationStatus([{ status: "PASS" }, { status: "STALE" }])).toBe("STALE");
   });

@@ -1,0 +1,182 @@
+[
+  {
+    "file": "docs/architecture/MULTI_PROJECT_MODEL.md",
+    "line": 239,
+    "target": "../runbook/STATE_MACHINE.md"
+  },
+  {
+    "file": "docs/changelog/ALL_PHASES_COMPLETE.md",
+    "line": 559,
+    "target": "../README.md"
+  },
+  {
+    "file": "docs/changelog/ALL_PHASES_COMPLETE.md",
+    "line": 560,
+    "target": "../GETTING_STARTED.md"
+  },
+  {
+    "file": "docs/changelog/ALL_PHASES_COMPLETE.md",
+    "line": 561,
+    "target": "../RUN.md"
+  },
+  {
+    "file": "docs/changelog/ALL_PHASES_COMPLETE.md",
+    "line": 564,
+    "target": "RUNBOOK.md"
+  },
+  {
+    "file": "docs/changelog/ALL_PHASES_COMPLETE.md",
+    "line": 566,
+    "target": "TELEGRAM_COMMANDS.md"
+  },
+  {
+    "file": "docs/changelog/ALL_PHASES_COMPLETE.md",
+    "line": 569,
+    "target": "MULTI_PROJECT_MODEL.md"
+  },
+  {
+    "file": "docs/changelog/ALL_PHASES_COMPLETE.md",
+    "line": 570,
+    "target": "OPENCLAW_INTEGRATION.md"
+  },
+  {
+    "file": "docs/changelog/ALL_PHASES_COMPLETE.md",
+    "line": 571,
+    "target": "EPIC_2_8_IMPLEMENTATION.md"
+  },
+  {
+    "file": "docs/changelog/ALL_PHASES_COMPLETE.md",
+    "line": 574,
+    "target": "../packages/telegram-bot/DEPLOY.md"
+  },
+  {
+    "file": "docs/changelog/IMPLEMENTATION_COMPLETE.md",
+    "line": 562,
+    "target": "../README.md"
+  },
+  {
+    "file": "docs/changelog/IMPLEMENTATION_COMPLETE.md",
+    "line": 563,
+    "target": "../GETTING_STARTED.md"
+  },
+  {
+    "file": "docs/changelog/IMPLEMENTATION_COMPLETE.md",
+    "line": 564,
+    "target": "RUNBOOK.md"
+  },
+  {
+    "file": "docs/changelog/IMPLEMENTATION_COMPLETE.md",
+    "line": 565,
+    "target": "MULTI_PROJECT_MODEL.md"
+  },
+  {
+    "file": "docs/changelog/IMPLEMENTATION_COMPLETE.md",
+    "line": 566,
+    "target": "TELEGRAM_COMMANDS.md"
+  },
+  {
+    "file": "docs/changelog/IMPLEMENTATION_COMPLETE.md",
+    "line": 567,
+    "target": "EPIC_2_8_IMPLEMENTATION.md"
+  },
+  {
+    "file": "docs/changelog/PHASE_5_FIXED.md",
+    "line": 212,
+    "target": "docs/PHASE_5_COMPLETE.md"
+  },
+  {
+    "file": "docs/changelog/PHASE_5_FIXED.md",
+    "line": 213,
+    "target": "docs/ALL_PHASES_COMPLETE.md"
+  },
+  {
+    "file": "docs/changelog/WHATS_NEW.md",
+    "line": 179,
+    "target": "GETTING_STARTED.md"
+  },
+  {
+    "file": "docs/changelog/WHATS_NEW.md",
+    "line": 180,
+    "target": "DEPLOY_NOW.md"
+  },
+  {
+    "file": "docs/changelog/WHATS_NEW.md",
+    "line": 181,
+    "target": "docs/OPENCLAW_INTEGRATION.md"
+  },
+  {
+    "file": "docs/changelog/WHATS_NEW.md",
+    "line": 182,
+    "target": "docs/TELEGRAM_COMMANDS.md"
+  },
+  {
+    "file": "docs/changelog/WHATS_NEW.md",
+    "line": 183,
+    "target": "docs/ALL_PHASES_COMPLETE.md"
+  },
+  {
+    "file": "docs/changelog/WHATS_NEXT.md",
+    "line": 405,
+    "target": "GETTING_STARTED.md"
+  },
+  {
+    "file": "docs/changelog/WHATS_NEXT.md",
+    "line": 406,
+    "target": "DEPLOY_NOW.md"
+  },
+  {
+    "file": "docs/changelog/WHATS_NEXT.md",
+    "line": 407,
+    "target": "docs/OPENCLAW_INTEGRATION.md"
+  },
+  {
+    "file": "docs/changelog/WHATS_NEXT.md",
+    "line": 408,
+    "target": "docs/TELEGRAM_COMMANDS.md"
+  },
+  {
+    "file": "docs/changelog/WHATS_NEXT.md",
+    "line": 409,
+    "target": "docs/RUNBOOK.md"
+  },
+  {
+    "file": "docs/guides/DEPLOY_NOW.md",
+    "line": 325,
+    "target": "docs/ALL_PHASES_COMPLETE.md"
+  },
+  {
+    "file": "docs/guides/DEPLOY_NOW.md",
+    "line": 326,
+    "target": "docs/OPENCLAW_INTEGRATION.md"
+  },
+  {
+    "file": "docs/guides/DEPLOY_NOW.md",
+    "line": 327,
+    "target": "docs/TELEGRAM_COMMANDS.md"
+  },
+  {
+    "file": "docs/guides/DEPLOY_NOW.md",
+    "line": 328,
+    "target": "packages/telegram-bot/DEPLOY.md"
+  },
+  {
+    "file": "docs/guides/RUN.md",
+    "line": 6,
+    "target": "../README.md"
+  },
+  {
+    "file": "docs/guides/TELEGRAM_COMMANDS.md",
+    "line": 422,
+    "target": "RUNBOOK.md"
+  },
+  {
+    "file": "docs/guides/TELEGRAM_COMMANDS.md",
+    "line": 423,
+    "target": "MULTI_PROJECT_MODEL.md"
+  },
+  {
+    "file": "docs/guides/TELEGRAM_COMMANDS.md",
+    "line": 424,
+    "target": "../packages/telegram-bot/README.md"
+  }
+]

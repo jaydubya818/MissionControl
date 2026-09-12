@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "system-factory-e2e-automated-checks/v2",
+  "baseSha": "e0b15142a33987983526b87c2144208e40e98657",
+  "startedHead": "3cf097ddd8cd5fd65cc762fb1c2aaa84bfdec499",
+  "startedAt": "2026-09-06T22:21:45.717Z",
+  "completedAt": "2026-09-06T22:21:46.081Z",
+  "result": "PASS",
+  "checks": [
+    {
+      "name": "profile-bound governed read-only MCP transport and negative controls",
+      "command": "node --import tsx scripts/governed-mcp-phase3-qualification.mts",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 363
+    }
+  ]
+}

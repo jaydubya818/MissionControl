@@ -1,0 +1,14 @@
+- main [ref=f2e3]:
+  - paragraph [ref=f2e4]: OFFLINE FIXTURE — no authority issued
+  - navigation [ref=f2e5]:
+    - button "loading" [ref=f2e6]
+    - button "blocked" [ref=f2e7]
+    - button "expired" [ref=f2e8]
+    - button "eligible" [ref=f2e9]
+  - region "WorkOrder execution readiness" [ref=f2e10]:
+    - generic [ref=f2e11]:
+      - generic [ref=f2e12]:
+        - heading "WorkOrder execution readiness" [level=3] [ref=f2e13]
+        - status [ref=f2e14]: Checking current WorkOrder authority…
+      - button "Refresh checks" [ref=f2e15]
+  - paragraph [ref=f2e16]: "Refreshes: 0"

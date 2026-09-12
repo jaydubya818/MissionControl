@@ -1,0 +1,15 @@
+{
+  "status": "REPRODUCED",
+  "sourceBindings": {
+    "accountingDeliveryJournal.ts": "41d26ed4989ac27e8fc88f1b6c60ac4dcb2ce911ce9d80ef9a61c14dc475d6d9",
+    "accountingDeliveryWorker.ts": "1131f9f1999646b0f684b5075f73c7cd30448937d029a9e49c4eaa9a1b2345cd"
+  },
+  "bundleSha256": "d43f8cb987f589f0e0d4f790946466d9dc5b056f350a0eae4c0a31f33033a7fa",
+  "regularFileValidationReachedWithin300ms": false,
+  "fifoMode": "0600",
+  "childStopped": {
+    "code": null,
+    "signal": "SIGKILL"
+  },
+  "scope": "POSIX FIFO read in isolated child against copied reviewed source; no backend/network/provider calls"
+}

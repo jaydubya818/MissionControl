@@ -4,6 +4,7 @@ import {
   COMPANY_PERMISSIONS,
   FACTORY_PERMISSIONS,
   listCompanyMemberships,
+  localDemoOperatorAcceptanceEnabled,
   roleGrantsPermission,
   teamMembershipGrantsPermission,
   requireCompanyAccess,
@@ -13,12 +14,18 @@ import {
 import { canAccessDeliveryRecord } from "../lib/deliveryAuthorization";
 
 const originalDemoFlag = process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
+const originalLocalAcceptanceFlag = process.env.MC_ALLOW_LOCAL_OPERATOR_GOVERNED_ACCEPTANCE;
 
 afterEach(() => {
   if (originalDemoFlag === undefined) {
     delete process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
   } else {
     process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT = originalDemoFlag;
+  }
+  if (originalLocalAcceptanceFlag === undefined) {
+    delete process.env.MC_ALLOW_LOCAL_OPERATOR_GOVERNED_ACCEPTANCE;
+  } else {
+    process.env.MC_ALLOW_LOCAL_OPERATOR_GOVERNED_ACCEPTANCE = originalLocalAcceptanceFlag;
   }
 });
 
@@ -232,6 +239,19 @@ describe("company access", () => {
     expect(memberships.every((item) => item.mode === "DEMO")).toBe(true);
   });
 
+  it("requires both explicit local-demo flags before governed acceptance is enabled", () => {
+    delete process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT;
+    process.env.MC_ALLOW_LOCAL_OPERATOR_GOVERNED_ACCEPTANCE = "1";
+    expect(localDemoOperatorAcceptanceEnabled()).toBe(false);
+
+    process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT = "1";
+    delete process.env.MC_ALLOW_LOCAL_OPERATOR_GOVERNED_ACCEPTANCE;
+    expect(localDemoOperatorAcceptanceEnabled()).toBe(false);
+
+    process.env.MC_ALLOW_LOCAL_OPERATOR_GOVERNED_ACCEPTANCE = "1";
+    expect(localDemoOperatorAcceptanceEnabled()).toBe(true);
+  });
+
   it("keeps team-scoped operators inside their assigned delivery records", () => {
     const access = {
       membership: { mode: "AUTHENTICATED", canManageCompany: false },
@@ -244,5 +264,20 @@ describe("company access", () => {
     expect(canAccessDeliveryRecord(access, { ownerMemberId: "member-a" as Id<"orgMembers"> })).toBe(true);
     expect(canAccessDeliveryRecord(access, { owningTeamId: "team-b" as Id<"scrumTeams"> })).toBe(false);
     expect(canAccessDeliveryRecord(access, {})).toBe(false);
+  });
+
+  it("lets an explicit project delivery approver inspect the record it may approve", () => {
+    const access = {
+      membership: { mode: "AUTHENTICATED", canManageCompany: false },
+      roleNames: ["Qualification Plan Approver"],
+      permissions: [COMPANY_PERMISSIONS.APPROVE_DELIVERY],
+      teamMemberships: [],
+      memberProfiles: [],
+    } as any;
+
+    expect(canAccessDeliveryRecord(access, {
+      owningTeamId: "team-a" as Id<"scrumTeams">,
+      ownerMemberId: "member-a" as Id<"orgMembers">,
+    })).toBe(true);
   });
 });

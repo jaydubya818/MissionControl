@@ -1,13 +1,42 @@
 import { computeCanonicalHash } from "./genomeHash";
-import type { HarnessCapabilityManifest } from "@mission-control/workflow-engine/harness-contract";
+import type {
+  HarnessCapabilityManifest,
+  HarnessRuntimeArtifactIdentity,
+} from "@mission-control/workflow-engine/harness-contract";
 import {
   harnessCapabilityManifestDigest,
   harnessCapabilityRequirementsSatisfied,
   harnessManifestIssues,
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
   harnessSupportsModel,
 } from "@mission-control/workflow-engine/harness-contract";
 import { factoryHarnessCapabilityRequirements } from "./harnessCapabilities";
-import { exactModelRouteDigest, exactModelRouteIssues } from "./modelRouteAdmission";
+import { deterministicFactoryOperation } from "./factoryWorkflowContract";
+import { isNoInferenceConstraint } from "./offlineExecutionPolicy";
+import { validateChangedFileScope } from "@mission-control/workflow-engine/harness-contract";
+import { verifyDocumentWorkloadIssues, type VerifyDocumentWorkload } from "@mission-control/workflow-engine/harness-contract";
+import { verifyVerificationSubjectIdentity } from "@mission-control/workflow-engine/verification-subject";
+import {
+  EXACT_MODEL_ROUTE_SCHEMA,
+  LEGACY_EXACT_MODEL_ROUTE_SCHEMA,
+  LEGACY_MODEL_ROUTE_QUALIFICATION_SCHEMA,
+  MODEL_ROUTE_QUALIFICATION_SCHEMA,
+  exactModelRouteDigest,
+  exactModelRouteIssues,
+  legacyModelRouteMatchesExecution,
+  modelRouteExecutionCompatibilityMatches,
+  modelRouteQualificationDigest,
+  modelRouteQualificationIssues,
+} from "./modelRouteAdmission";
+import {
+  executionProfileDigest,
+  executionProfileIssues,
+  executionProfileProjectionBlockers,
+  executionProfileQualificationDigest,
+  executionProfileQualificationIssues,
+  executionProfileQualificationMatches,
+} from "./executionProfile";
 
 export function factorySandboxResourceName(input: {
   projectId: string;
@@ -21,21 +50,38 @@ export function factorySandboxResourceName(input: {
   return `mc-attempt-${identity}`;
 }
 
+export interface FactoryExecutionProfileManifestBinding {
+  profileId: string;
+  profileKey: string;
+  version: number;
+  profileDigest: string;
+  profileSnapshot: unknown;
+  qualificationDigest: string;
+  qualificationSnapshot: unknown;
+}
+
 export interface FactoryExecutionManifestInput {
   runId: string;
   missionId?: string;
   missionPlanId?: string;
   missionPlanVersion?: number;
+  planningRepositorySha?: string;
   qualityContractDigest?: string;
   workOrderId: string;
   workOrderRevisionNumber: number;
   workOrderRevisionId?: string;
   taskId?: string;
+  task?: {
+    title: string;
+    description?: string;
+  };
   factoryDefinitionVersionId: string;
   factoryConfigurationDigest: string;
   factoryPurpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGENT_AUTOMATION";
   repositoryId: string;
+  providerRepositoryId?: string;
   repository: string;
+  repositoryAdmissionDigest?: string;
   repositoryDataClassification?: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
   defaultBranch: string;
   baseSha: string;
@@ -47,14 +93,22 @@ export interface FactoryExecutionManifestInput {
     capabilityManifest: HarnessCapabilityManifest;
     capabilityManifestSha256: string;
     effectiveConfigSha256: string;
+    runtimeArtifact: HarnessRuntimeArtifactIdentity;
+    runtimeArtifactDigest: string;
   };
   executionBackend: string;
-  modelRoute?: {
+  modelRoute: {
     catalogId: string;
     routeDigest: string;
     routeSnapshot: unknown;
     qualificationDigest: string;
+    qualificationSnapshot: unknown;
   };
+  /**
+   * Additive exact execution-composition authority. Historical profileless
+   * inputs deliberately continue to emit their frozen V1/V2 manifests.
+   */
+  executionProfile?: FactoryExecutionProfileManifestBinding;
   sandboxProfile: {
     isolation: "READ_ONLY" | "WORKSPACE_WRITE";
     requiredCapabilities: string[];
@@ -137,9 +191,162 @@ export interface FactoryExecutionManifestInput {
   harnessIsolation?: "WORKSPACE_WRITE" | "DETACHED_READ_ONLY";
 }
 
-export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInput) {
+export type OfflineFactoryExecutionManifestInput = Omit<FactoryExecutionManifestInput, "modelRoute" | "sandbox" | "routedModel" | "executionProfile"> & {
+  executionProfile: FactoryExecutionProfileManifestBinding;
+  missionPlanDigest: string;
+  budgetReservationId: string;
+  verification?: { subject: any; verificationPlanDigest: string; candidateContent: string };
+};
+
+/** Pure versioned snapshot construction; canonical admission owns authority. */
+export function offlineExecutionManifestSnapshot(input: OfflineFactoryExecutionManifestInput) {
+  const verifier = input.factoryPurpose === "VERIFICATION";
+  const profile = input.executionProfile?.profileSnapshot as Record<string, any> | undefined;
+  const binding = input.executionProfile;
+  if (![input.runId, input.missionId, input.missionPlanId, input.workOrderId, input.workOrderRevisionId,
+    input.taskId, input.factoryDefinitionVersionId, input.repositoryId, input.budgetReservationId]
+    .every(value => typeof value === "string" && boundedIdentity(value, 200))
+    || !/^factory-v1-[a-f0-9]{8}$/.test(input.factoryConfigurationDigest)) throw new Error("Offline canonical identities are invalid.");
+  if (input.executionBackend !== "isolated-container" || !["SOFTWARE", "VERIFICATION"].includes(input.factoryPurpose)
+    || input.repositoryDataClassification !== "PUBLIC" || input.workOrder.riskLevel !== "LOW"
+    || (input.workOrder.dataBoundaries?.length ?? 0) !== 0
+    || ["modelRoute", "routedModel", "sandbox"].some(key => (input as any)[key] !== undefined)
+    || input.agentBindings.length !== 0 || input.allowedTools.length !== 0
+    || !input.task || !input.taskId || !input.missionId || !input.missionPlanId
+    || !Number.isSafeInteger(input.missionPlanVersion) || input.missionPlanVersion! < 1
+    || !sha256(input.missionPlanDigest) || input.budgetReservationId !== input.runId
+    || !Number.isSafeInteger(input.workOrderRevisionNumber) || input.workOrderRevisionNumber < 1
+    || !input.workOrderRevisionId
+    || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(input.baseSha)
+    || (!verifier && input.planningRepositorySha !== input.baseSha)
+    || !Number.isSafeInteger(input.maxAttempts) || input.maxAttempts < 1 || input.maxAttempts > 3
+    || !Number.isFinite(input.maxCostUsd) || input.maxCostUsd <= 0 || input.maxCostUsd > 1000
+    || !Number.isSafeInteger(input.maxRuntimeMinutes) || input.maxRuntimeMinutes < 1 || input.maxRuntimeMinutes > 480) {
+    throw new Error("Offline manifest requires complete canonical identity and public bounded non-inference scope.");
+  }
+  if (!profile || executionProfileIssues(profile).length > 0
+    || profile.schema !== "factory-execution-profile/v2" || !isNoInferenceConstraint(profile.modelRoute)
+    || executionProfileDigest(profile) !== binding.profileDigest
+    || executionProfileQualificationIssues(binding.qualificationSnapshot).length > 0
+    || executionProfileQualificationDigest(binding.qualificationSnapshot) !== binding.qualificationDigest
+    || !executionProfileQualificationMatches({ profileId: binding.profileId, profileSnapshot: profile,
+      profileDigest: binding.profileDigest, qualificationSnapshot: binding.qualificationSnapshot })) {
+    throw new Error("Offline manifest requires the exact qualified Execution Profile.");
+  }
+  const operation = deterministicFactoryOperation({ workflow: input.workflow, profileSnapshot: profile,
+    purpose: input.factoryPurpose, riskBoundary: "GREEN", agentBindings: input.agentBindings });
+  const localScope = (profile.sandboxProfile?.profileSnapshot as any)?.localQualification;
+  if (localScope && (localScope.repositoryId !== input.repositoryId
+    || localScope.repositoryAdmissionDigest !== input.repositoryAdmissionDigest
+    || !localScope.operations?.includes(operation.reference))) {
+    throw new Error("Local sandbox cannot execute outside its exact repository admission and frozen operations.");
+  }
+  let frozenOperation: typeof operation | VerifyDocumentWorkload = operation;
+  if (verifier) {
+    const subject = input.verification?.subject;
+    if (operation.reference !== "verify-document-bytes/v1" || !subject
+      || !verifyVerificationSubjectIdentity(subject) || subject.kind !== "GIT_CANDIDATE" || subject.provider !== "LOCAL_GIT"
+      || subject.workOrderId !== input.workOrderId || subject.workOrderRevisionNumber !== input.workOrderRevisionNumber
+      || subject.repositoryId !== input.repositoryId || subject.candidateSha !== input.baseSha
+      || !sha256(input.verification?.verificationPlanDigest)
+      || input.sandboxProfile.isolation !== "READ_ONLY") throw new Error("Offline verifier requires the exact unpublished subject and frozen plan.");
+    frozenOperation = { ...operation, input: { ...operation.input,
+      subjectDigest: subject.digest, verificationPlanDigest: input.verification!.verificationPlanDigest,
+      repositoryId: input.repositoryId, workOrderId: input.workOrderId, workOrderRevisionNumber: input.workOrderRevisionNumber,
+      producerAttemptId: subject.sourceAttemptId, candidateSha: subject.candidateSha, candidateTreeSha: subject.treeSha,
+      candidateContent: input.verification!.candidateContent } };
+    if (verifyDocumentWorkloadIssues(frozenOperation).length) throw new Error("Offline verifier input violates its registered operation bounds.");
+  } else if (operation.reference !== "render-markdown/v1" || input.verification !== undefined) {
+    throw new Error("Offline producer manifest requires only the admitted render operation.");
+  }
+  const blockers = executionProfileProjectionBlockers({ profileId: binding.profileId, profileSnapshot: profile,
+    profileDigest: binding.profileDigest, qualificationSnapshot: binding.qualificationSnapshot, qualificationDigest: binding.qualificationDigest,
+    projection: { profileId: binding.profileId, profileKey: binding.profileKey, profileVersion: binding.version,
+      profileDigest: binding.profileDigest, profileSnapshot: profile, qualificationDigest: binding.qualificationDigest,
+      qualificationSnapshot: binding.qualificationSnapshot, executor: { adapter: input.executor.adapter, version: input.executor.version },
+      harnessCapabilityManifest: input.executor.capabilityManifest, harnessCapabilityManifestDigest: input.executor.capabilityManifestSha256,
+      harnessEffectiveConfigSha256: input.executor.effectiveConfigSha256, harnessRuntimeArtifact: input.executor.runtimeArtifact,
+      harnessRuntimeArtifactDigest: input.executor.runtimeArtifactDigest, executionBackend: "isolated-container",
+      modelCatalogId: undefined, modelRouteSnapshot: undefined, modelRouteDigest: undefined,
+      modelQualificationSnapshot: undefined, modelQualificationDigest: undefined,
+      sandboxProfileId: profile.sandboxProfile.profileId, sandboxProfileDigest: profile.sandboxProfile.profileDigest,
+      sandboxProfileSnapshot: profile.sandboxProfile.profileSnapshot,
+      isolationModes: [input.sandboxProfile.isolation], requiredHarnessCapabilities: profile.requiredHarnessCapabilities,
+      requiredSandboxCapabilities: profile.requiredSandboxCapabilities } });
+  if (blockers.length || input.sandboxProfile.isolation !== (verifier ? "READ_ONLY" : "WORKSPACE_WRITE")
+    || !sameStringSet(input.sandboxProfile.requiredCapabilities, ["git-worktree", verifier ? "read-only" : "workspace-write", ...profile.requiredSandboxCapabilities])
+    || input.codeScopes.length === 0 || input.codeScopes.some(scope => !scope.id || scope.includePaths.length === 0)) {
+    throw new Error("Offline manifest component projection or repository scope mismatch.");
+  }
+  const allowedPaths = [...new Set(input.codeScopes.flatMap(scope => scope.includePaths))].sort();
+  const excludedPaths = [...new Set(input.codeScopes.flatMap(scope => scope.excludePaths))].sort();
+  const documentPath = operation.reference === "render-markdown/v1" ? operation.input.outputPath : operation.input.path;
+  if (validateChangedFileScope([documentPath], [{ includePaths: allowedPaths, excludePaths: excludedPaths }]).length > 0) {
+    throw new Error("Offline operation output is outside its approved code scope.");
+  }
+  const manifest = {
+    version: "factory-execution-manifest/v4" as const,
+    causation: { missionId: input.missionId, missionPlanId: input.missionPlanId, missionPlanVersion: input.missionPlanVersion,
+      missionPlanDigest: input.missionPlanDigest, planningRepositorySha: input.planningRepositorySha,
+      qualityContractDigest: input.qualityContractDigest, workOrderId: input.workOrderId,
+      workOrderRevisionNumber: input.workOrderRevisionNumber, workOrderRevisionId: input.workOrderRevisionId,
+      taskId: input.taskId, workflowRunId: input.runId, factoryDefinitionVersionId: input.factoryDefinitionVersionId,
+      factoryConfigurationDigest: input.factoryConfigurationDigest, factoryPurpose: input.factoryPurpose },
+    repository: { repositoryId: input.repositoryId, repository: input.repository, dataClassification: input.repositoryDataClassification,
+      ...(input.repositoryAdmissionDigest ? { mode: "LOCAL_SYNTHETIC_QUALIFICATION", admissionDigest: input.repositoryAdmissionDigest } : {}),
+      defaultBranch: input.defaultBranch, baseSha: input.baseSha, planningRepositorySha: input.planningRepositorySha,
+      branch: input.branch, worktree: input.worktree, codeScopeIds: input.codeScopes.map(scope => scope.id).sort(), allowedPaths, excludedPaths },
+    intent: { title: input.workOrder.title, desiredOutcome: input.workOrder.desiredOutcome,
+      acceptanceCriterionIds: input.workOrder.acceptanceCriteria.map(criterion => criterion.id), selectedTask: input.task },
+    workOrderSpecification: { schemaVersion: 1, requirements: input.workOrder.requirements ?? [], acceptanceCriteria: input.workOrder.acceptanceCriteria,
+      positiveConstraints: input.workOrder.positiveConstraints ?? [], negativeConstraints: input.workOrder.negativeConstraints ?? [],
+      dataBoundaries: [], changeBudget: input.workOrder.changeBudget, verificationContract: input.workOrder.verificationContract,
+      autonomyLevel: input.workOrder.autonomyLevel, riskLevel: input.workOrder.riskLevel,
+      riskReasons: input.workOrder.riskReasons ?? [], requiredApprovals: input.workOrder.requiredApprovals ?? [] },
+    harness: { adapter: input.executor.adapter, version: input.executor.version,
+      harnessId: input.executor.capabilityManifest.identity.harnessId, harnessVersion: input.executor.capabilityManifest.identity.harnessVersion,
+      harnessCommit: input.executor.capabilityManifest.identity.harnessCommit, capabilityManifest: input.executor.capabilityManifest,
+      capabilityManifestSha256: input.executor.capabilityManifestSha256, effectiveConfigSha256: input.executor.effectiveConfigSha256,
+      runtimeArtifact: input.executor.runtimeArtifact, runtimeArtifactDigest: input.executor.runtimeArtifactDigest,
+      isolation: verifier ? "READ_ONLY" : "WORKSPACE_WRITE", requiredCapabilities: [...input.sandboxProfile.requiredCapabilities].sort(),
+      requiredHarnessCapabilities: profile.requiredHarnessCapabilities, timeoutMs: input.workflow.steps[0].timeoutMinutes * 60000,
+      completionContract: "factory-result/v1", pullRequestAuthority: "CONTROL_PLANE_ONLY" },
+    executionBackend: "isolated-container", executionProfile: binding, inferenceConstraint: profile.modelRoute,
+    offlinePolicy: profile.offlinePolicy, budgetReservationId: input.budgetReservationId,
+    retryPolicy: { schema: "factory-offline-retry-policy/v1", maxAttempts: input.maxAttempts,
+      maxTotalWallClockMs: input.maxRuntimeMinutes * 60000, maxResourceCostUsd: input.maxCostUsd,
+      maxProviderCalls: 0, maxProviderLiabilityUsd: 0 },
+    workflow: { workflowId: input.workflow.workflowId, workflowVersion: input.workflow.version,
+      contractVersion: "factory-workflow-contract/v2", contextHash: `sha256:${computeCanonicalHash(input.initialContext)}`,
+      steps: [{ stepId: input.workflow.steps[0].id, kind: "DETERMINISTIC", operation: frozenOperation,
+        timeoutMs: input.workflow.steps[0].timeoutMinutes * 60000, outputSchema: input.workflow.steps[0].outputSchema }] },
+    compiledPrompt: "", compiledPromptHash: `sha256:${computeCanonicalHash("")}`,
+  };
+  const persisted = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
+  return { manifest: persisted, digest: `sha256:${computeCanonicalHash(persisted)}` };
+}
+
+export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInput): ReturnType<typeof buildInferenceFactoryExecutionManifest>;
+export function buildFactoryExecutionManifest(input: OfflineFactoryExecutionManifestInput): ReturnType<typeof offlineExecutionManifestSnapshot>;
+export function buildFactoryExecutionManifest(rawInput: FactoryExecutionManifestInput | OfflineFactoryExecutionManifestInput) {
+  if (rawInput.executionBackend === "isolated-container") {
+    return offlineExecutionManifestSnapshot(rawInput as OfflineFactoryExecutionManifestInput);
+  }
+  return buildInferenceFactoryExecutionManifest(rawInput as FactoryExecutionManifestInput);
+}
+
+function buildInferenceFactoryExecutionManifest(input: FactoryExecutionManifestInput) {
+  if ((input as { executionProfile?: unknown }).executionProfile !== undefined
+    && !input.executionProfile) {
+    throw new Error("Execution manifest requires a complete exact Execution Profile and qualification binding.");
+  }
   if (!/^[a-f0-9]{40,64}$/i.test(input.baseSha)) {
     throw new Error("Execution manifest requires an immutable full base SHA.");
+  }
+  if (input.planningRepositorySha !== undefined
+    && (!/^[a-f0-9]{40,64}$/i.test(input.planningRepositorySha)
+      || (input.factoryPurpose === "SOFTWARE" && input.baseSha !== input.planningRepositorySha))) {
+    throw new Error("Execution manifest does not match the approved Plan planning repository SHA.");
   }
   if (!Number.isSafeInteger(input.maxAttempts) || input.maxAttempts < 1 || input.maxAttempts > 20
     || !Number.isFinite(input.maxCostUsd) || input.maxCostUsd <= 0 || input.maxCostUsd > 1_000
@@ -149,12 +356,20 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
   if (!input.executor.adapter.trim() || !input.executor.version.trim() || !input.executionBackend.trim()) {
     throw new Error("Execution manifest requires a provider-neutral executor and backend binding.");
   }
+  if (Boolean(input.taskId) !== Boolean(input.task)) {
+    throw new Error("Execution manifest requires the selected Task identity and instructions together.");
+  }
   if (harnessManifestIssues(input.executor.capabilityManifest).length > 0
     || input.executor.capabilityManifest.identity.adapterId !== input.executor.adapter
     || input.executor.capabilityManifest.identity.adapterVersion !== input.executor.version
     || input.executor.capabilityManifestSha256 !== harnessCapabilityManifestDigest(input.executor.capabilityManifest)
     || input.executor.effectiveConfigSha256 !== input.executor.capabilityManifest.effectiveConfigSha256) {
     throw new Error("Execution manifest requires an exact valid harness capability and effective-configuration binding.");
+  }
+  if (harnessRuntimeArtifactIssues(input.executor.runtimeArtifact).length > 0
+    || !/^sha256:[a-f0-9]{64}$/i.test(input.executor.runtimeArtifactDigest)
+    || harnessRuntimeArtifactDigest(input.executor.runtimeArtifact) !== input.executor.runtimeArtifactDigest) {
+    throw new Error("Execution manifest requires an exact valid harness runtime-artifact binding.");
   }
   if (!input.executor.capabilityManifest.admission.executionBackends.includes(input.executionBackend)) {
     throw new Error("Selected harness does not support the execution backend.");
@@ -165,23 +380,69 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
   if (input.executionBackend !== "remote-sandbox" && input.sandbox) {
     throw new Error("A Sandbox Profile cannot be attached to a non-sandbox execution backend.");
   }
-  if (input.modelRoute && (
+  if (!executionRuntimeArtifactMatchesBackend(
+    input.executor.runtimeArtifact,
+    input.executionBackend,
+    input.sandbox?.profileSnapshot,
+  )) {
+    throw new Error("Execution manifest runtime artifact does not match the exact frozen backend environment.");
+  }
+  if (!input.modelRoute || (
     exactModelRouteIssues(input.modelRoute.routeSnapshot).length > 0
     || exactModelRouteDigest(input.modelRoute.routeSnapshot) !== input.modelRoute.routeDigest
-    || !/^sha256:[a-f0-9]{64}$/i.test(input.modelRoute.qualificationDigest)
+    || modelRouteQualificationIssues(input.modelRoute.qualificationSnapshot).length > 0
+    || modelRouteQualificationDigest(input.modelRoute.qualificationSnapshot) !== input.modelRoute.qualificationDigest
   )) {
     throw new Error("Execution manifest requires an exact qualified model-route binding.");
+  }
+  const routeSnapshot = input.modelRoute.routeSnapshot as Record<string, any>;
+  const qualificationSnapshot = input.modelRoute.qualificationSnapshot as Record<string, any>;
+  if (qualificationSnapshot.routeDigest !== input.modelRoute.routeDigest
+    || (routeSnapshot.schema === EXACT_MODEL_ROUTE_SCHEMA
+      && qualificationSnapshot.schema !== MODEL_ROUTE_QUALIFICATION_SCHEMA)
+    || (routeSnapshot.schema === LEGACY_EXACT_MODEL_ROUTE_SCHEMA
+      && qualificationSnapshot.schema !== LEGACY_MODEL_ROUTE_QUALIFICATION_SCHEMA)) {
+    throw new Error("Execution manifest requires matching model-route and qualification schema bindings.");
+  }
+  if (routeSnapshot.schema === EXACT_MODEL_ROUTE_SCHEMA
+    && !modelRouteExecutionCompatibilityMatches(input.modelRoute.qualificationSnapshot, {
+      adapter: input.executor.adapter,
+      version: input.executor.version,
+      capabilityManifestDigest: input.executor.capabilityManifestSha256,
+      effectiveConfigSha256: input.executor.effectiveConfigSha256,
+      runtimeArtifactDigest: input.executor.runtimeArtifactDigest,
+      executionBackend: input.executionBackend as "persistent-worker" | "remote-sandbox",
+    })) {
+    throw new Error("Execution manifest model-route qualification does not admit the frozen harness, runtime artifact, and backend.");
   }
   const allowedPaths = Array.from(new Set(input.codeScopes.flatMap((scope) => scope.includePaths))).sort();
   const excludedPaths = Array.from(new Set(input.codeScopes.flatMap((scope) => scope.excludePaths))).sort();
   const contextHash = `sha256:${computeCanonicalHash(input.initialContext)}`;
   const bindings = new Map(input.agentBindings.map((binding) => [binding.workflowAgentId, binding]));
+  const executableRoutes: Array<{
+    stepId: string;
+    provider: string;
+    modelId: string;
+    temperature?: number;
+    maxTokens?: number;
+  }> = [];
   const steps = input.workflow.steps.map((step) => {
     const binding = bindings.get(step.agent);
     if (!binding) throw new Error(`Execution manifest is missing agent binding ${step.agent}.`);
+    const kind = step.kind ?? "AGENT";
+    const resolvedModel = input.routedModel ?? binding.model.modelId;
+    if (kind !== "GATE") {
+      executableRoutes.push({
+        stepId: step.id,
+        provider: binding.model.provider,
+        modelId: resolvedModel,
+        ...(binding.model.temperature !== undefined ? { temperature: binding.model.temperature } : {}),
+        ...(binding.model.maxTokens !== undefined ? { maxTokens: binding.model.maxTokens } : {}),
+      });
+    }
     return {
       stepId: step.id,
-      kind: step.kind ?? "AGENT",
+      kind,
       workflowAgentId: step.agent,
       agentVersionId: binding.agentVersionId,
       agentVersion: binding.agentVersion,
@@ -190,80 +451,189 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
       promptTemplate: step.input,
       toolManifestHash: binding.toolManifestHash,
       allowedTools: [...input.allowedTools].sort(),
-      modelRoute: input.routedModel ?? binding.model.modelId,
+      modelRoute: resolvedModel,
       modelConfiguration: binding.model,
       timeoutMs: Math.min(step.timeoutMinutes, input.maxRuntimeMinutes) * 60_000,
       outputSchema: step.outputSchema,
       contextHash,
     };
   });
-  const firstStep = steps[0];
-  if (!firstStep || !harnessSupportsModel(input.executor.capabilityManifest, firstStep.modelConfiguration.provider, firstStep.modelRoute)) {
-    throw new Error("Selected harness capability manifest does not admit the frozen provider/model route.");
+  const executionRoute = executableRoutes[0];
+  if (!executionRoute) {
+    throw new Error("Execution manifest requires at least one executable workflow model role.");
   }
-  const routeSnapshot = input.modelRoute?.routeSnapshot as Record<string, any> | undefined;
-  if (routeSnapshot && (
-    routeSnapshot.provider !== firstStep.modelConfiguration.provider
-    || routeSnapshot.modelId !== firstStep.modelRoute
-    || routeSnapshot.capabilityIdentity?.adapter !== input.executor.adapter
-    || routeSnapshot.capabilityIdentity?.version !== input.executor.version
-    || routeSnapshot.capabilityIdentity?.capabilityManifestDigest !== input.executor.capabilityManifestSha256
-    || routeSnapshot.capabilityIdentity?.effectiveConfigSha256 !== input.executor.effectiveConfigSha256
-  )) {
-    throw new Error("Execution manifest model route does not match the frozen harness and agent identity.");
+  if (executableRoutes.some((route) => (
+    route.provider !== executionRoute.provider
+    || route.modelId !== executionRoute.modelId
+    || (routeSnapshot.schema === EXACT_MODEL_ROUTE_SCHEMA && (
+      route.temperature !== executionRoute.temperature
+      || route.maxTokens !== executionRoute.maxTokens
+    ))
+  ))) {
+    throw new Error("Every executable workflow role must resolve to the same exact inference route.");
+  }
+  if (routeSnapshot.provider !== executionRoute.provider || routeSnapshot.modelId !== executionRoute.modelId) {
+    throw new Error("Execution manifest model route does not match the frozen executable workflow identity.");
+  }
+  if (routeSnapshot.schema === EXACT_MODEL_ROUTE_SCHEMA
+    && (routeSnapshot.reasoningConfig?.temperature !== executionRoute.temperature
+      || routeSnapshot.reasoningConfig?.maxTokens !== executionRoute.maxTokens)) {
+    throw new Error("Execution manifest reasoning controls do not match the frozen executable workflow identity.");
+  }
+  if (executableRoutes.some((route) => !harnessSupportsModel(
+    input.executor.capabilityManifest,
+    route.provider,
+    route.modelId,
+  ))) {
+    throw new Error("Selected harness capability manifest does not admit every frozen executable provider/model route.");
+  }
+  if (routeSnapshot.schema === LEGACY_EXACT_MODEL_ROUTE_SCHEMA
+    && (!legacyModelRouteMatchesExecution(routeSnapshot, {
+      adapter: input.executor.adapter,
+      version: input.executor.version,
+      capabilityManifestDigest: input.executor.capabilityManifestSha256,
+      effectiveConfigSha256: input.executor.effectiveConfigSha256,
+      executionBackend: input.executionBackend as "persistent-worker" | "remote-sandbox",
+      executableSha256: input.executor.runtimeArtifact.executableSha256 ?? undefined,
+      imageDigest: input.executor.runtimeArtifact.imageDigest ?? undefined,
+    }) || !legacyRuntimeArtifactMatches(
+      routeSnapshot,
+      input.executor.runtimeArtifact,
+      input.executionBackend,
+    ))) {
+    throw new Error("Legacy execution manifest route does not match the frozen harness and runtime artifact.");
   }
   const requiredHarnessCapabilities = factoryHarnessCapabilityRequirements(input.sandboxProfile.isolation);
   if (!harnessCapabilityRequirementsSatisfied(input.executor.capabilityManifest, requiredHarnessCapabilities)) {
     throw new Error("Selected harness does not satisfy the frozen Attempt capability requirements.");
   }
+  if (input.executionProfile) {
+    if (routeSnapshot.schema !== EXACT_MODEL_ROUTE_SCHEMA) {
+      throw new Error("Execution Profile binding requires a decomposed V2 model route.");
+    }
+    assertExecutionProfileBinding(input, requiredHarnessCapabilities);
+  }
   const compiledPrompt = compileFactoryPrompt(input, allowedPaths, excludedPaths);
+  const causation = {
+    missionId: input.missionId,
+    missionPlanId: input.missionPlanId,
+    missionPlanVersion: input.missionPlanVersion,
+    planningRepositorySha: input.planningRepositorySha,
+    qualityContractDigest: input.qualityContractDigest,
+    workOrderId: input.workOrderId,
+    workOrderRevisionNumber: input.workOrderRevisionNumber,
+    workOrderRevisionId: input.workOrderRevisionId,
+    ...(input.taskId ? { taskId: input.taskId } : {}),
+    workflowRunId: input.runId,
+    factoryDefinitionVersionId: input.factoryDefinitionVersionId,
+    factoryConfigurationDigest: input.factoryConfigurationDigest,
+    factoryPurpose: input.factoryPurpose,
+  };
+  const repository = {
+    repositoryId: input.repositoryId,
+    ...(input.providerRepositoryId ? { providerRepositoryId: input.providerRepositoryId } : {}),
+    repository: input.repository,
+    dataClassification: input.repositoryDataClassification,
+    defaultBranch: input.defaultBranch,
+    baseSha: input.baseSha,
+    planningRepositorySha: input.planningRepositorySha,
+    branch: input.branch,
+    worktree: input.worktree,
+    codeScopeIds: input.codeScopes.map((scope) => scope.id).sort(),
+    allowedPaths,
+    excludedPaths,
+    ...((input.workOrder.verificationContract as { schemaVersion?: number })?.schemaVersion === 2
+      ? { verificationPublicationOrder: "VERIFY_BEFORE_PUBLICATION" as const } : {}),
+  };
+  const intent = {
+    title: input.workOrder.title,
+    desiredOutcome: input.workOrder.desiredOutcome,
+    acceptanceCriterionIds: input.workOrder.acceptanceCriteria.map((criterion) => criterion.id),
+    ...(input.task ? { selectedTask: input.task } : {}),
+  };
+  const workOrderSpecification = {
+    schemaVersion: 1,
+    requirements: input.workOrder.requirements ?? [],
+    acceptanceCriteria: input.workOrder.acceptanceCriteria,
+    positiveConstraints: input.workOrder.positiveConstraints ?? [],
+    negativeConstraints: input.workOrder.negativeConstraints ?? [],
+    dataBoundaries: input.workOrder.dataBoundaries ?? [],
+    changeBudget: input.workOrder.changeBudget,
+    verificationContract: input.workOrder.verificationContract,
+    autonomyLevel: input.workOrder.autonomyLevel,
+    riskLevel: input.workOrder.riskLevel,
+    riskReasons: input.workOrder.riskReasons ?? [],
+    requiredApprovals: input.workOrder.requiredApprovals ?? [],
+  };
+  const retryPolicy = {
+    schema: "factory-remote-retry-policy/v1",
+    maxAttempts: input.maxAttempts,
+    maxTotalWallClockMs: input.maxRuntimeMinutes * 60_000,
+    maxModelSpendUsd: input.maxCostUsd,
+    maxProviderResources: 1,
+    retryableFailureClasses: ["RETRYABLE_INFRA", "RETRYABLE_EXECUTION"] as const,
+    failClosedFailureClasses: ["NON_RETRYABLE_RESULT", "UNKNOWN"] as const,
+  };
+  const workflow = {
+    workflowId: input.workflow.workflowId,
+    workflowVersion: input.workflow.version,
+    contextHash,
+    steps,
+  };
+  const compiledPromptHash = `sha256:${computeCanonicalHash(compiledPrompt)}`;
+
+  if (routeSnapshot.schema === LEGACY_EXACT_MODEL_ROUTE_SCHEMA) {
+    const manifest = {
+      version: "factory-execution-manifest/v1" as const,
+      causation,
+      repository,
+      intent,
+      workOrderSpecification,
+      harness: {
+        adapter: input.executor.adapter,
+        version: input.executor.version,
+        harnessId: input.executor.capabilityManifest.identity.harnessId,
+        harnessVersion: input.executor.capabilityManifest.identity.harnessVersion,
+        harnessCommit: input.executor.capabilityManifest.identity.harnessCommit,
+        capabilityManifest: input.executor.capabilityManifest,
+        capabilityManifestSha256: input.executor.capabilityManifestSha256,
+        effectiveConfigSha256: input.executor.effectiveConfigSha256,
+        provider: executionRoute.provider,
+        model: executionRoute.modelId,
+        modelCatalogId: input.modelRoute.catalogId,
+        modelRouteDigest: input.modelRoute.routeDigest,
+        modelRouteSnapshot: input.modelRoute.routeSnapshot,
+        modelQualificationDigest: input.modelRoute.qualificationDigest,
+        isolation: input.sandboxProfile.isolation,
+        executionBackend: input.executionBackend,
+        requiredCapabilities: [...new Set(input.sandboxProfile.requiredCapabilities)].sort(),
+        requiredHarnessCapabilities,
+        timeoutMs: input.maxRuntimeMinutes * 60_000,
+        completionContract: "factory-result/v1",
+        pullRequestAuthority: "CONTROL_PLANE_ONLY",
+      },
+      retryPolicy,
+      sandbox: input.sandbox,
+      workflow,
+      compiledPromptHash,
+      compiledPrompt,
+    };
+    const persistedManifest = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
+    return {
+      manifest: persistedManifest,
+      digest: `sha256:${computeCanonicalHash(persistedManifest)}`,
+    };
+  }
+
+  if (routeSnapshot.schema !== EXACT_MODEL_ROUTE_SCHEMA) {
+    throw new Error("Execution manifest requires a supported exact model-route schema.");
+  }
   const manifest = {
-    version: "factory-execution-manifest/v1",
-    causation: {
-      missionId: input.missionId,
-      missionPlanId: input.missionPlanId,
-      missionPlanVersion: input.missionPlanVersion,
-      qualityContractDigest: input.qualityContractDigest,
-      workOrderId: input.workOrderId,
-      workOrderRevisionNumber: input.workOrderRevisionNumber,
-      workOrderRevisionId: input.workOrderRevisionId,
-      taskId: input.taskId,
-      workflowRunId: input.runId,
-      factoryDefinitionVersionId: input.factoryDefinitionVersionId,
-      factoryConfigurationDigest: input.factoryConfigurationDigest,
-      factoryPurpose: input.factoryPurpose,
-    },
-    repository: {
-      repositoryId: input.repositoryId,
-      repository: input.repository,
-      dataClassification: input.repositoryDataClassification,
-      defaultBranch: input.defaultBranch,
-      baseSha: input.baseSha,
-      branch: input.branch,
-      worktree: input.worktree,
-      codeScopeIds: input.codeScopes.map((scope) => scope.id).sort(),
-      allowedPaths,
-      excludedPaths,
-    },
-    intent: {
-      title: input.workOrder.title,
-      desiredOutcome: input.workOrder.desiredOutcome,
-      acceptanceCriterionIds: input.workOrder.acceptanceCriteria.map((criterion) => criterion.id),
-    },
-    workOrderSpecification: {
-      schemaVersion: 1,
-      requirements: input.workOrder.requirements ?? [],
-      acceptanceCriteria: input.workOrder.acceptanceCriteria,
-      positiveConstraints: input.workOrder.positiveConstraints ?? [],
-      negativeConstraints: input.workOrder.negativeConstraints ?? [],
-      dataBoundaries: input.workOrder.dataBoundaries ?? [],
-      changeBudget: input.workOrder.changeBudget,
-      verificationContract: input.workOrder.verificationContract,
-      autonomyLevel: input.workOrder.autonomyLevel,
-      riskLevel: input.workOrder.riskLevel,
-      riskReasons: input.workOrder.riskReasons ?? [],
-      requiredApprovals: input.workOrder.requiredApprovals ?? [],
-    },
+    version: "factory-execution-manifest/v2" as const,
+    causation,
+    repository,
+    intent,
+    workOrderSpecification,
     harness: {
       adapter: input.executor.adapter,
       version: input.executor.version,
@@ -273,43 +643,234 @@ export function buildFactoryExecutionManifest(input: FactoryExecutionManifestInp
       capabilityManifest: input.executor.capabilityManifest,
       capabilityManifestSha256: input.executor.capabilityManifestSha256,
       effectiveConfigSha256: input.executor.effectiveConfigSha256,
-      provider: firstStep.modelConfiguration.provider,
-      model: firstStep.modelRoute,
-      modelCatalogId: input.modelRoute?.catalogId,
-      modelRouteDigest: input.modelRoute?.routeDigest,
-      modelRouteSnapshot: input.modelRoute?.routeSnapshot,
-      modelQualificationDigest: input.modelRoute?.qualificationDigest,
+      runtimeArtifact: input.executor.runtimeArtifact,
+      runtimeArtifactDigest: input.executor.runtimeArtifactDigest,
       isolation: input.sandboxProfile.isolation,
-      executionBackend: input.executionBackend,
       requiredCapabilities: [...new Set(input.sandboxProfile.requiredCapabilities)].sort(),
       requiredHarnessCapabilities,
       timeoutMs: input.maxRuntimeMinutes * 60_000,
       completionContract: "factory-result/v1",
       pullRequestAuthority: "CONTROL_PLANE_ONLY",
     },
-    retryPolicy: {
-      schema: "factory-remote-retry-policy/v1",
-      maxAttempts: input.maxAttempts,
-      maxTotalWallClockMs: input.maxRuntimeMinutes * 60_000,
-      maxModelSpendUsd: input.maxCostUsd,
-      maxProviderResources: 1,
-      retryableFailureClasses: ["RETRYABLE_INFRA", "RETRYABLE_EXECUTION"] as const,
-      failClosedFailureClasses: ["NON_RETRYABLE_RESULT", "UNKNOWN"] as const,
+    modelRoute: {
+      catalogId: input.modelRoute.catalogId,
+      routeDigest: input.modelRoute.routeDigest,
+      routeSnapshot: input.modelRoute.routeSnapshot,
+      qualificationDigest: input.modelRoute.qualificationDigest,
+      qualificationSnapshot: input.modelRoute.qualificationSnapshot,
     },
+    executionBackend: input.executionBackend,
+    retryPolicy,
     sandbox: input.sandbox,
-    workflow: {
-      workflowId: input.workflow.workflowId,
-      workflowVersion: input.workflow.version,
-      contextHash,
-      steps,
-    },
-    compiledPromptHash: `sha256:${computeCanonicalHash(compiledPrompt)}`,
+    workflow,
+    compiledPromptHash,
     compiledPrompt,
   };
+  if (input.executionProfile) {
+    const profileManifest = {
+      ...manifest,
+      version: "factory-execution-manifest/v3" as const,
+      executionProfile: input.executionProfile,
+    };
+    const persistedProfileManifest = JSON.parse(JSON.stringify(profileManifest)) as typeof profileManifest;
+    return {
+      manifest: persistedProfileManifest,
+      digest: `sha256:${computeCanonicalHash(persistedProfileManifest)}`,
+    };
+  }
+  const persistedManifest = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
   return {
-    manifest,
-    digest: `sha256:${computeCanonicalHash(manifest)}`,
+    manifest: persistedManifest,
+    digest: `sha256:${computeCanonicalHash(persistedManifest)}`,
   };
+}
+
+function assertExecutionProfileBinding(
+  input: FactoryExecutionManifestInput,
+  selectedHarnessRequirements: ReturnType<typeof factoryHarnessCapabilityRequirements>,
+) {
+  const binding = input.executionProfile;
+  if (!binding
+    || Object.keys(binding).some((key) => ![
+      "profileId",
+      "profileKey",
+      "version",
+      "profileDigest",
+      "profileSnapshot",
+      "qualificationDigest",
+      "qualificationSnapshot",
+    ].includes(key))
+    || !boundedIdentity(binding.profileId, 200)
+    || !/^[a-z0-9][a-z0-9-]{2,63}$/.test(binding.profileKey)
+    || !Number.isSafeInteger(binding.version)
+    || binding.version < 1
+    || !sha256(binding.profileDigest)
+    || !sha256(binding.qualificationDigest)
+    || executionProfileIssues(binding.profileSnapshot).length > 0
+    || executionProfileDigest(binding.profileSnapshot) !== binding.profileDigest
+    || executionProfileQualificationIssues(binding.qualificationSnapshot).length > 0
+    || executionProfileQualificationDigest(binding.qualificationSnapshot) !== binding.qualificationDigest) {
+    throw new Error("Execution manifest requires a complete exact Execution Profile and qualification binding.");
+  }
+
+  const profile = binding.profileSnapshot as Record<string, any>;
+  const qualification = binding.qualificationSnapshot as Record<string, any>;
+  const profileSandbox = profile.sandboxProfile as Record<string, any> | undefined;
+  const attemptSandbox = input.sandbox;
+  const expectedSandboxCapabilities = selectedSandboxCapabilities(
+    input.executionBackend,
+    input.sandboxProfile.isolation,
+    profileSandbox?.profileSnapshot,
+  );
+  const selectedRequirements = [...selectedHarnessRequirements]
+    .sort((left, right) => left.capability.localeCompare(right.capability));
+  const profileRequirements = [...(profile.requiredHarnessCapabilities ?? [])]
+    .sort((left: any, right: any) => String(left.capability).localeCompare(String(right.capability)));
+
+  if (!executionProfileQualificationMatches({
+    profileId: binding.profileId,
+    profileSnapshot: profile,
+    profileDigest: binding.profileDigest,
+    qualificationSnapshot: qualification,
+  })) {
+    throw new Error("Execution Profile qualification does not authorize the frozen component tuple.");
+  }
+
+  const projectionBlockers = executionProfileProjectionBlockers({
+    profileId: binding.profileId,
+    profileSnapshot: profile,
+    profileDigest: binding.profileDigest,
+    qualificationSnapshot: qualification,
+    qualificationDigest: binding.qualificationDigest,
+    projection: {
+      profileId: binding.profileId,
+      profileKey: binding.profileKey,
+      profileVersion: binding.version,
+      profileDigest: binding.profileDigest,
+      profileSnapshot: profile,
+      qualificationDigest: binding.qualificationDigest,
+      qualificationSnapshot: qualification,
+      executor: { adapter: input.executor.adapter, version: input.executor.version },
+      harnessCapabilityManifest: input.executor.capabilityManifest,
+      harnessCapabilityManifestDigest: input.executor.capabilityManifestSha256,
+      harnessEffectiveConfigSha256: input.executor.effectiveConfigSha256,
+      harnessRuntimeArtifact: input.executor.runtimeArtifact,
+      harnessRuntimeArtifactDigest: input.executor.runtimeArtifactDigest,
+      executionBackend: input.executionBackend,
+      modelCatalogId: input.modelRoute.catalogId,
+      modelRouteSnapshot: input.modelRoute.routeSnapshot,
+      modelRouteDigest: input.modelRoute.routeDigest,
+      modelQualificationSnapshot: input.modelRoute.qualificationSnapshot,
+      modelQualificationDigest: input.modelRoute.qualificationDigest,
+      ...(attemptSandbox
+        ? {
+            sandboxProfileId: attemptSandbox.profileId,
+            sandboxProfileSnapshot: attemptSandbox.profileSnapshot,
+            sandboxProfileDigest: attemptSandbox.profileDigest,
+          }
+        : {}),
+      isolationModes: profile.isolationModes,
+      requiredHarnessCapabilities: profile.requiredHarnessCapabilities,
+      requiredSandboxCapabilities: profile.requiredSandboxCapabilities,
+    },
+  });
+  if (projectionBlockers.length > 0
+    || !Array.isArray(profile.isolationModes)
+    || !profile.isolationModes.includes(input.sandboxProfile.isolation)
+    || !requirementsContain(profileRequirements, selectedRequirements)
+    || !sameStringSet(input.sandboxProfile.requiredCapabilities, expectedSandboxCapabilities)
+    || !expectedSandboxCapabilities.every((capability) => profile.requiredSandboxCapabilities?.includes(capability))) {
+    const suffix = projectionBlockers.length > 0 ? ` (${projectionBlockers.join(", ")})` : "";
+    throw new Error(`Execution Profile does not match the frozen harness, runtime, backend, model route, isolation, or capabilities${suffix}.`);
+  }
+}
+
+function selectedSandboxCapabilities(
+  executionBackend: string,
+  isolation: "READ_ONLY" | "WORKSPACE_WRITE",
+  sandboxProfileSnapshot: unknown,
+) {
+  const capabilities = ["git-worktree", isolation === "READ_ONLY" ? "read-only" : "workspace-write"];
+  if (executionBackend === "remote-sandbox") {
+    const provider = (sandboxProfileSnapshot as Record<string, any> | undefined)?.provider;
+    capabilities.push("remote-sandbox", `sandbox-provider:${String(provider ?? "").toLowerCase().replace(/_/g, "-")}`);
+  }
+  return capabilities.sort();
+}
+
+function requirementsContain(
+  available: Array<{ capability: string; minimumSupport: string }>,
+  selected: Array<{ capability: string; minimumSupport: string }>,
+) {
+  return selected.every((requirement) => available.some((candidate) =>
+    candidate.capability === requirement.capability
+    && candidate.minimumSupport === requirement.minimumSupport
+  ));
+}
+
+function sameStringSet(left: unknown, right: unknown) {
+  return Array.isArray(left)
+    && Array.isArray(right)
+    && left.every((item) => typeof item === "string")
+    && right.every((item) => typeof item === "string")
+    && JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+}
+
+function boundedIdentity(value: unknown, maximum: number): value is string {
+  return typeof value === "string"
+    && value === value.trim()
+    && value.length > 0
+    && value.length <= maximum
+    && !/[\0\r\n]/.test(value);
+}
+
+function sha256(value: unknown): value is string {
+  return typeof value === "string" && /^sha256:[a-f0-9]{64}$/.test(value);
+}
+
+function legacyRuntimeArtifactMatches(
+  routeSnapshot: Record<string, any>,
+  artifact: HarnessRuntimeArtifactIdentity,
+  executionBackend: string,
+) {
+  const runtime = routeSnapshot.runtimeIdentity;
+  if (artifact.version !== runtime.cliVersion) return false;
+  if (executionBackend === "persistent-worker") {
+    return artifact.kind === "EXECUTABLE"
+      && artifact.executableSha256 === runtime.executableSha256;
+  }
+  if (executionBackend === "remote-sandbox") {
+    return artifact.kind === "CONTAINER_IMAGE"
+      && artifact.imageDigest === runtime.imageDigest;
+  }
+  return false;
+}
+
+function executionRuntimeArtifactMatchesBackend(
+  artifact: HarnessRuntimeArtifactIdentity,
+  executionBackend: string,
+  sandboxProfileSnapshot: unknown,
+) {
+  if (executionBackend === "persistent-worker") {
+    return artifact.kind === "EXECUTABLE"
+      && Boolean(artifact.executableSha256)
+      && artifact.imageDigest === null;
+  }
+  if (executionBackend !== "remote-sandbox") return false;
+  const snapshot = sandboxProfileSnapshot as Record<string, any> | undefined;
+  const securityDigest = snapshot?.security?.image?.digest;
+  const referenceDigest = typeof snapshot?.machine?.image === "string"
+    ? snapshot.machine.image.match(/@(sha256:[a-f0-9]{64})$/i)?.[1]
+    : undefined;
+  const exactImageDigest = typeof securityDigest === "string" && /^sha256:[a-f0-9]{64}$/i.test(securityDigest)
+    ? (referenceDigest && referenceDigest.toLowerCase() === securityDigest.toLowerCase()
+        ? securityDigest.toLowerCase()
+        : undefined)
+    : referenceDigest?.toLowerCase();
+  return artifact.kind === "CONTAINER_IMAGE"
+    && artifact.executableSha256 === null
+    && Boolean(exactImageDigest)
+    && artifact.imageDigest?.toLowerCase() === exactImageDigest;
 }
 
 function compileFactoryPrompt(
@@ -347,6 +908,8 @@ function compileFactoryPrompt(
     `Work Order: ${input.workOrder.title}`,
     `Desired outcome: ${input.workOrder.desiredOutcome}`,
     input.workOrder.context ? `Context: ${input.workOrder.context}` : "",
+    input.task ? `Selected Child Task: ${input.task.title}` : "",
+    input.task?.description ? `Task instructions: ${input.task.description}` : "",
     "",
     "Acceptance criteria:",
     criteria,

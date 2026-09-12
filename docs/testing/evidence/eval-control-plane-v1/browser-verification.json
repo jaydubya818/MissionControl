@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "mission-control/browser-verification/v1",
+  "feature": "eval-control-plane-v1",
+  "capturedAt": "2026-09-02T18:46:00.000Z",
+  "route": "/v2/trace-inspector",
+  "runtime": {
+    "uiOrigin": "http://localhost:5201",
+    "backend": "isolated-local-convex",
+    "seed": "mc-demo-v2"
+  },
+  "assertions": {
+    "latestVerdict": "WARN",
+    "publishable": true,
+    "blockingPassed": 6,
+    "blockingCases": 6,
+    "advisoryPassed": 0,
+    "advisoryCases": 1,
+    "regressions": 0,
+    "historicalInvalidRuns": 1,
+    "declaredNegativeControls": 7,
+    "keyboardReceiptHistory": "PASS",
+    "refreshPersistence": "PASS",
+    "consoleErrors": 0,
+    "failedRequests": 0
+  },
+  "accessibility": [
+    {
+      "viewport": "1440x1000",
+      "theme": "dark",
+      "standard": ["wcag2a", "wcag2aa"],
+      "violations": 0,
+      "incomplete": 0
+    },
+    {
+      "viewport": "390x844",
+      "theme": "light",
+      "standard": ["wcag2a", "wcag2aa"],
+      "violations": 0,
+      "incomplete": 0
+    }
+  ],
+  "screenshots": ["1440-dark.png", "1440-light.png", "390-light.png"]
+}

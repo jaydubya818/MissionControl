@@ -1,0 +1,20 @@
+{
+  "schema": "fdlc-bedrock-price/v1",
+  "qualification": "UNQUALIFIED",
+  "version": null,
+  "effectiveAt": null,
+  "expiresAt": null,
+  "currency": "USD",
+  "billingUnit": "MILLION_TOKENS",
+  "provenance": {"url": null, "evidenceDigest": null},
+  "ratesNanoUsdPerMillion": {"input": null, "output": null, "cacheRead": null, "cacheWrite5m": null, "cacheWrite1h": null, "reasoning": null},
+  "cacheMode": "DISABLED",
+  "reasoningMode": "DISABLED",
+  "reasoningBilling": "INCLUDED_IN_OUTPUT",
+  "otherBillableDimensions": "NONE",
+  "maximumInputTokens": null,
+  "maximumOutputTokens": null,
+  "maximumPayloadBytes": null,
+  "inputBoundEvidence": null,
+  "outputBoundEvidence": null
+}

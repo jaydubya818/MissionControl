@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "system-factory-e2e-automated-checks/v2",
+  "baseSha": "0d1a0908cce380d815069ce0a59e1604d2f26ece",
+  "startedHead": "8a42c186977baa1a8c536124091814de82d8352c",
+  "startedAt": "2026-09-05T23:07:32.576Z",
+  "completedAt": "2026-09-05T23:07:38.423Z",
+  "result": "FAIL",
+  "checks": [
+    {
+      "name": "profile-bound governed read-only MCP transport and negative controls",
+      "command": "node --import tsx scripts/governed-mcp-phase3-qualification.mts",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 331
+    },
+    {
+      "name": "frozen dependency, advisory, credential, and release configuration gates",
+      "command": "pnpm run release:security",
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 4397
+    },
+    {
+      "name": "release hardening contract tests",
+      "command": "pnpm exec vitest run scripts/lib/dependency-audit-gate.test.mjs scripts/lib/factory-docs-consistency.test.mjs scripts/lib/production-pilot-preflight.test.mjs scripts/lib/production-pilot-evidence.test.mjs scripts/lib/repository-secret-scan.test.mjs scripts/lib/release-config.test.mjs",
+      "status": "FAIL",
+      "exitCode": 1,
+      "durationMs": 1118
+    }
+  ]
+}

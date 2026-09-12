@@ -1,0 +1,38 @@
+{
+  "status": "FAIL",
+  "runRoot": "/private/tmp/fdlc-identity-backend-ryJhHn",
+  "startedAt": "2026-09-06T06:22:04.269Z",
+  "sourcePath": "/private/tmp/fdlc-program-phase5/convex/inferenceGateway.ts",
+  "sourceSha256": "610201941c860aa7126dcb01916e036ba5ea8ef592e862724f3f57f2fa00e1f6",
+  "sourceBranchHead": "90dc744f5298cb3b83f15121221a1c8a0bdba055",
+  "backendBinary": "/Users/jaywest/.cache/convex/binaries/precompiled-2026-08-25-7cce8fb/convex-local-backend",
+  "backendSha256": "3fefa471e11eab56aabf86039ddf825ed1b4dbadadec2df6b88b6ffd9d604400",
+  "convexVersion": "1.42.3",
+  "gatewayBundleSha256": "163d662cc826f518575595c23ef2ce3820e8462169dbb30cc14e8a45841af625",
+  "reservationTableSha256": "2ab23da9313a26506d51a35257f6a4024480139cff8c053646a5dddaff114f40",
+  "routeValidatorSha256": "0dd9289ebcf4d1fdcc7a7f18214bd15dff76eed1f20b5994ffccfa2c5aa3ae43",
+  "backendUrl": "http://127.0.0.1:59043",
+  "sitePort": 59044,
+  "schemaSourceSha256": "a638c1c608afc8e586e9292c3c313db4d1fa015119a06692c773858a5c1b4e5a",
+  "sharedSourceSha256": "5c07438ed08a87f5edfc3145855ff42c0e4dc1c656bf7111635b4cbfd97eb2e5",
+  "scope": "Unmodified production inference gateway and shared canonical constructors, fixture-only authorization shim, exact inference table schemas and indexes, synthetic related schemas and records, real local Convex backend. No external provider calls, real billing, full-app authorization, full application schema deployment, or real human acceptance proof.",
+  "tests": [
+    {
+      "name": "root schema code generation with isolated loopback configuration",
+      "passed": true,
+      "generatedDiff": ""
+    }
+  ],
+  "cleanup": {
+    "backendExitCode": null,
+    "backendSignal": "SIGTERM",
+    "cloudPortClosed": true,
+    "sitePortClosed": true,
+    "originalDatabasesUsed": false,
+    "ephemeralKeyPersisted": false,
+    "sourceUnchanged": true
+  },
+  "generatedDiff": "",
+  "error": "Error: CLI failed: deployment.log code 1\n    at cliRun (file:///private/tmp/fdlc-identity-authority-harness/run.mjs:106:91)\n    at async file:///private/tmp/fdlc-identity-authority-harness/run.mjs:122:2",
+  "completedAt": "2026-09-06T06:22:16.464Z"
+}

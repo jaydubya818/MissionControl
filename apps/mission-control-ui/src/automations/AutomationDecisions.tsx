@@ -26,12 +26,12 @@ export function AutomationDecisions({
 
   return (
     <div className="space-y-4">
-      <Card className="border-amber-400/20 bg-amber-400/[0.04] p-4">
+      <Card className="border-warn/20 bg-warn-soft p-4">
         <div className="flex gap-3">
-          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
           <div>
             <h2 className="text-sm font-semibold text-foreground">Trusted-operator attribution</h2>
-            <p className="mt-1 text-xs leading-relaxed text-amber-100/80">
+            <p className="mt-1 text-xs leading-relaxed text-warn">
               Actor labels are asserted by the trusted deployment and are not independently authenticated Mission Control identities.
             </p>
           </div>
@@ -71,7 +71,7 @@ export function AutomationDecisions({
                   </td>
                   <td className="px-3 py-3">
                     <div className="text-foreground">{decision.actorId}</div>
-                    <div className="mt-1 text-[11px] text-amber-100/70">
+                    <div className="mt-1 text-[11px] text-warn">
                       {decision.actorIdentitySource ?? (decision.actorId.startsWith("automation-") ? "SYSTEM" : "LEGACY_UNSPECIFIED")}
                     </div>
                   </td>

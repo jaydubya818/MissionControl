@@ -1,0 +1,14 @@
+{
+  "command": [
+    "node",
+    "scripts/check-runtime-contract.mjs",
+    "--base",
+    "f82fe1d98b156278c4fa0c0e2032008e2f010f39"
+  ],
+  "baselineSha": "f82fe1d98b156278c4fa0c0e2032008e2f010f39",
+  "publicApiChanges": false,
+  "runtimeContractVersion": 40,
+  "defaultBaselineRef": "origin/main",
+  "defaultBaselineSha": "0d1a0908cce380d815069ce0a59e1604d2f26ece",
+  "defaultBaselineVersion": 41
+}

@@ -1,0 +1,180 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-phase5
+
+ ❯ convex/__tests__/inferencePersistence.test.ts (15 tests | 11 failed) 21ms
+   × canonical identities through persisted inference handlers > retains exact snapshots through failure, fallback, reconciliation and a synthetic accepted outcome 7ms
+     → Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+   × canonical identities through persisted inference handlers > binds exact intent replay to the original logical intent key 2ms
+     → promise rejected "Error: Canonical inference snapshot is mi…" instead of resolving
+   ✓ canonical identities through persisted inference handlers > rejects a legacy intent with unrecoverable canonical identity before claim 1ms
+   ✓ canonical identities through persisted inference handlers > rejects changed frozen intent bytes before claim 1ms
+   × canonical identities through persisted inference handlers > checks the frozen lease even if mutable lease fields were extended 2ms
+     → expected [Function] to throw error including 'RESERVATION_LEASE_STALE' but got 'Canonical inference snapshot is missi…'
+   × canonical identities through persisted inference handlers > retains a late receipt using the original committed claim time 1ms
+     → Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+   × canonical identities through persisted inference handlers > rejects receipt replay with changed pricing context {"batch":true} 1ms
+     → Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+   × canonical identities through persisted inference handlers > rejects receipt replay with changed pricing context {"serviceTier":"different-tier"} 1ms
+     → Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+   × canonical identities through persisted inference handlers > compares replay against frozen observations despite duplicated row drift 1ms
+     → Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+   ✓ canonical identities through persisted inference handlers > keeps primary requests from acquiring retry ancestry 1ms
+   ✓ canonical identities through persisted inference handlers > denies substituted Attempt scope before recording an intent 0ms
+   × canonical identities through persisted inference handlers > rejects missing receipt snapshots instead of inventing canonical IDs 0ms
+     → Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+   × canonical identities through persisted inference handlers > rejects corrupted receipt snapshots instead of inventing canonical IDs 0ms
+     → Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+   × canonical identities through persisted inference handlers > isolates a new cohort from unrelated historical projections without snapshots 0ms
+     → Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+   × canonical identities through persisted inference handlers > denies route comparison when a legacy projection lacks a canonical snapshot 2ms
+     → Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  convex/__tests__/inferencePersistence.test.ts > canonical identities through persisted inference handlers > retains exact snapshots through failure, fallback, reconciliation and a synthetic accepted outcome
+Error: Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+ ❯ canonicalSnapshot convex/inferenceGateway.ts:69:11
+     67|   const { [digestKey]: recordedDigest, ...bytes } = recordValue(value);
+     68|   if (bytes.schema !== schema || recordedDigest !== expectedDigest || …
+     69|     throw new Error("Canonical inference snapshot is missing, invalid,…
+       |           ^
+     70|   }
+     71|   return value as T;
+ ❯ intentValue convex/inferenceGateway.ts:86:20
+ ❯ Function.claimIntentInTransaction [as _handler] convex/inferenceGateway.ts:442:50
+ ❯ convex/__tests__/inferencePersistence.test.ts:57:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯
+
+ FAIL  convex/__tests__/inferencePersistence.test.ts > canonical identities through persisted inference handlers > binds exact intent replay to the original logical intent key
+AssertionError: promise rejected "Error: Canonical inference snapshot is mi…" instead of resolving
+ ❯ convex/__tests__/inferencePersistence.test.ts:125:30
+    123|     const f = await persistedChain();
+    124|     const first = await f.persist(1);
+    125|     await expect(f.persist(1)).resolves.toEqual({ ...first, created: f…
+       |                              ^
+    126|     await expect(f.persist(1, undefined, { intentKey: "substituted-int…
+    127|   });
+
+Caused by: Error: Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+ ❯ canonicalSnapshot convex/inferenceGateway.ts:69:11
+ ❯ intentValue convex/inferenceGateway.ts:86:20
+ ❯ Function.persistIntentInTransaction [as _handler] convex/inferenceGateway.ts:346:33
+ ❯ convex/__tests__/inferencePersistence.test.ts:125:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯
+
+ FAIL  convex/__tests__/inferencePersistence.test.ts > canonical identities through persisted inference handlers > checks the frozen lease even if mutable lease fields were extended
+AssertionError: expected [Function] to throw error including 'RESERVATION_LEASE_STALE' but got 'Canonical inference snapshot is missi…'
+
+Expected: "RESERVATION_LEASE_STALE"
+Received: "Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest."
+
+ ❯ convex/__tests__/inferencePersistence.test.ts:152:5
+    150|     await f.db.patch(f.reservation.reservationId, { leaseExpiresAt: Da…
+    151|     f.records.set("attempt", { ...f.records.get("attempt")!, lease: { …
+    152|     await expect(f.claim(first.intentId)).rejects.toThrow("RESERVATION…
+       |     ^
+    153|     expect((await f.db.get(first.intentId))!.state).toBe("PERSISTED");
+    154|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯
+
+ FAIL  convex/__tests__/inferencePersistence.test.ts > canonical identities through persisted inference handlers > retains a late receipt using the original committed claim time
+Error: Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+ ❯ canonicalSnapshot convex/inferenceGateway.ts:69:11
+     67|   const { [digestKey]: recordedDigest, ...bytes } = recordValue(value);
+     68|   if (bytes.schema !== schema || recordedDigest !== expectedDigest || …
+     69|     throw new Error("Canonical inference snapshot is missing, invalid,…
+       |           ^
+     70|   }
+     71|   return value as T;
+ ❯ intentValue convex/inferenceGateway.ts:86:20
+ ❯ Function.claimIntentInTransaction [as _handler] convex/inferenceGateway.ts:442:50
+ ❯ convex/__tests__/inferencePersistence.test.ts:159:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/11]⎯
+
+ FAIL  convex/__tests__/inferencePersistence.test.ts > canonical identities through persisted inference handlers > rejects receipt replay with changed pricing context {"batch":true}
+ FAIL  convex/__tests__/inferencePersistence.test.ts > canonical identities through persisted inference handlers > rejects receipt replay with changed pricing context {"serviceTier":"different-tier"}
+Error: Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+ ❯ canonicalSnapshot convex/inferenceGateway.ts:69:11
+     67|   const { [digestKey]: recordedDigest, ...bytes } = recordValue(value);
+     68|   if (bytes.schema !== schema || recordedDigest !== expectedDigest || …
+     69|     throw new Error("Canonical inference snapshot is missing, invalid,…
+       |           ^
+     70|   }
+     71|   return value as T;
+ ❯ intentValue convex/inferenceGateway.ts:86:20
+ ❯ Function.claimIntentInTransaction [as _handler] convex/inferenceGateway.ts:442:50
+ ❯ convex/__tests__/inferencePersistence.test.ts:169:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/11]⎯
+
+ FAIL  convex/__tests__/inferencePersistence.test.ts > canonical identities through persisted inference handlers > compares replay against frozen observations despite duplicated row drift
+Error: Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+ ❯ canonicalSnapshot convex/inferenceGateway.ts:69:11
+     67|   const { [digestKey]: recordedDigest, ...bytes } = recordValue(value);
+     68|   if (bytes.schema !== schema || recordedDigest !== expectedDigest || …
+     69|     throw new Error("Canonical inference snapshot is missing, invalid,…
+       |           ^
+     70|   }
+     71|   return value as T;
+ ❯ intentValue convex/inferenceGateway.ts:86:20
+ ❯ Function.claimIntentInTransaction [as _handler] convex/inferenceGateway.ts:442:50
+ ❯ convex/__tests__/inferencePersistence.test.ts:176:39
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/11]⎯
+
+ FAIL  convex/__tests__/inferencePersistence.test.ts > canonical identities through persisted inference handlers > rejects missing receipt snapshots instead of inventing canonical IDs
+ FAIL  convex/__tests__/inferencePersistence.test.ts > canonical identities through persisted inference handlers > rejects corrupted receipt snapshots instead of inventing canonical IDs
+Error: Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+ ❯ canonicalSnapshot convex/inferenceGateway.ts:69:11
+     67|   const { [digestKey]: recordedDigest, ...bytes } = recordValue(value);
+     68|   if (bytes.schema !== schema || recordedDigest !== expectedDigest || …
+     69|     throw new Error("Canonical inference snapshot is missing, invalid,…
+       |           ^
+     70|   }
+     71|   return value as T;
+ ❯ intentValue convex/inferenceGateway.ts:86:20
+ ❯ Function.claimIntentInTransaction [as _handler] convex/inferenceGateway.ts:442:50
+ ❯ convex/__tests__/inferencePersistence.test.ts:199:39
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/11]⎯
+
+ FAIL  convex/__tests__/inferencePersistence.test.ts > canonical identities through persisted inference handlers > isolates a new cohort from unrelated historical projections without snapshots
+Error: Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+ ❯ canonicalSnapshot convex/inferenceGateway.ts:69:11
+     67|   const { [digestKey]: recordedDigest, ...bytes } = recordValue(value);
+     68|   if (bytes.schema !== schema || recordedDigest !== expectedDigest || …
+     69|     throw new Error("Canonical inference snapshot is missing, invalid,…
+       |           ^
+     70|   }
+     71|   return value as T;
+ ❯ intentValue convex/inferenceGateway.ts:86:20
+ ❯ Function.claimIntentInTransaction [as _handler] convex/inferenceGateway.ts:442:50
+ ❯ convex/__tests__/inferencePersistence.test.ts:210:39
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/11]⎯
+
+ FAIL  convex/__tests__/inferencePersistence.test.ts > canonical identities through persisted inference handlers > denies route comparison when a legacy projection lacks a canonical snapshot
+Error: Canonical inference snapshot is missing, invalid, or inconsistent with its recorded digest.
+ ❯ canonicalSnapshot convex/inferenceGateway.ts:69:11
+     67|   const { [digestKey]: recordedDigest, ...bytes } = recordValue(value);
+     68|   if (bytes.schema !== schema || recordedDigest !== expectedDigest || …
+     69|     throw new Error("Canonical inference snapshot is missing, invalid,…
+       |           ^
+     70|   }
+     71|   return value as T;
+ ❯ intentValue convex/inferenceGateway.ts:86:20
+ ❯ Function.claimIntentInTransaction [as _handler] convex/inferenceGateway.ts:442:50
+ ❯ convex/__tests__/inferencePersistence.test.ts:223:39
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/11]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  11 failed | 4 passed (15)
+   Start at  23:18:00
+   Duration  339ms (transform 81ms, setup 0ms, collect 126ms, tests 21ms, environment 0ms, prepare 39ms)
+

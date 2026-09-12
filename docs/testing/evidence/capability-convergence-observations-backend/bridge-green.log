@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-observations/apps/orchestration-server
+
+ ✓ src/__tests__/bedrockProfileComposition.test.ts (5 tests) 30ms
+ ✓ src/__tests__/bedrockInferenceBridge.test.ts (35 tests) 51ms
+
+ Test Files  2 passed (2)
+      Tests  40 passed (40)
+   Start at  00:35:48
+   Duration  732ms (transform 244ms, setup 0ms, collect 646ms, tests 81ms, environment 0ms, prepare 82ms)

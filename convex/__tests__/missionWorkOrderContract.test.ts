@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { compileMissionWorkOrderContract } from "../lib/missionWorkOrderContract";
 import type { MissionPlanAssertionInput, MissionPlanBlueprintInput } from "../lib/missionPlan";
 import type { MissionSpecContent } from "../lib/missionSpec";
+import { validateWorkOrderSpecification } from "../lib/workOrderSpecification";
 
 const assertion: MissionPlanAssertionInput = {
   assertionId: "focused-tests",
@@ -108,7 +109,8 @@ describe("Mission WorkOrder contract compiler", () => {
     expect(contract.acceptanceCriteria[0]).toMatchObject({
       requiredEvidence: [{ category: "TEST_RESULT", minimumCount: 1, independent: true }],
     });
-    expect(contract.requiredApprovals).toEqual(["HUMAN_REVIEW"]);
+    expect(contract.requiredApprovals).toEqual([]);
+    expect(contract.metadata.planApprovalRequirements).toEqual([]);
     expect(contract.metadata.independentVerification.subject).toBe("IMMUTABLE_CANDIDATE_SHA");
   });
 
@@ -140,6 +142,24 @@ describe("Mission WorkOrder contract compiler", () => {
     expect(contract).not.toHaveProperty("verificationContract");
   });
 
+  it("retains Plan-gate requirements as audit metadata without creating duplicate WorkOrder gates", () => {
+    const contract = compileMissionWorkOrderContract({
+      blueprint: {
+        ...blueprint,
+        requiredApprovals: ["Confirm exact planning SHA", "Approve contract decision"],
+      },
+      assertions: [assertion],
+      rollbackApproach: "Revert the candidate commit.",
+      codeScopes: [{ includePaths: ["convex/**"], excludePaths: [] }],
+    });
+
+    expect(contract.requiredApprovals).toEqual([]);
+    expect(contract.metadata.planApprovalRequirements).toEqual([
+      "Approve contract decision",
+      "Confirm exact planning SHA",
+    ]);
+  });
+
   it("maps only evidence-bearing Spec expectations into WorkOrder verification", () => {
     const contract = compileMissionWorkOrderContract({
       blueprint,
@@ -166,5 +186,35 @@ describe("Mission WorkOrder contract compiler", () => {
       { category: "TEST_RESULT", minimumCount: 1, independent: true },
     ]);
     expect(JSON.stringify(contract)).not.toContain("CHECK-REQ-001");
+  });
+
+  it("does not synthesize an unenforceable verifier contract for a read-only validator WorkOrder", () => {
+    const contract = compileMissionWorkOrderContract({
+      blueprint: {
+        ...blueprint,
+        role: "VALIDATOR",
+        isMutating: false,
+        branchStrategy: undefined,
+        implementationPolicy: undefined,
+        dependsOnBlueprintIds: ["implement"],
+      },
+      assertions: [{
+        ...assertion,
+        sourceRequirementIds: ["REQ-001"],
+        sourceAcceptanceExpectationIds: ["AC-001"],
+        sourceVerificationExpectationIds: ["VERIFY-001"],
+      }],
+      codeScopes: [],
+      spec,
+    });
+
+    expect(contract).not.toHaveProperty("verificationContract");
+    expect(contract.metadata).toMatchObject({ specVerificationExpectationIds: ["VERIFY-001"] });
+    expect(validateWorkOrderSpecification({
+      title: "Validate the candidate",
+      desiredOutcome: "Produce independent read-only evidence.",
+      riskLevel: "MEDIUM",
+      ...contract,
+    })).toEqual({ valid: true, issues: [] });
   });
 });

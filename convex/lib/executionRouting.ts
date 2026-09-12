@@ -10,11 +10,20 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { resolveFlag, type FlagRow } from "./flags";
 import { countActiveFactoryWorkerLeases, factoryWorkerEligibility } from "./factoryWorkerRuntime";
-import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } from "./harnessCapabilities";
-import { loadModelCatalogForProject } from "./modelCatalogScope";
+import {
+  factoryWorkflowModelRouteMatches,
+  frozenFactoryModelRouteEligible,
+  resolveFactoryWorkflowModelRoute,
+} from "./factoryModelRoute";
+import {
+  factoryHarnessCapabilityRequirements,
+  resolveFrozenHarnessBinding,
+  resolveHarnessAdapterRuntimeArtifact,
+} from "./harnessCapabilities";
+import { loadFactoryModelCatalogForProject } from "./modelCatalogScope";
 import { getCurrentVerificationRoutingOutcome } from "./currentVerification";
 import { sandboxProfileProductionEligible } from "./sandboxProfileAdmission";
-import { modelRouteProductionEligible } from "./modelRouteAdmission";
+import { modelRouteQualifiedFor } from "./modelRouteAdmission";
 import {
   harnessCapabilityRequirementsSatisfied,
   harnessSupportsModel,
@@ -62,19 +71,42 @@ function finiteNonNegative(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
-function rate(numerator: number, denominator: number) {
-  return denominator > 0 ? numerator / denominator : undefined;
+export function workOrderCostBudget(input: {
+  approvedWorkOrderCapUsd?: number;
+  missionBudgetRemainingUsd?: number;
+  explicitRoutingBudgetRemainingUsd?: number;
+  routingPolicyBudgetLimitUsd?: number;
+  priorCommittedUsd: number;
+}) {
+  const approvedRemaining = input.approvedWorkOrderCapUsd === undefined
+    ? undefined
+    : Math.max(0, input.approvedWorkOrderCapUsd - input.priorCommittedUsd);
+  const limits = [
+    approvedRemaining,
+    input.missionBudgetRemainingUsd,
+    input.explicitRoutingBudgetRemainingUsd,
+    input.routingPolicyBudgetLimitUsd,
+  ].filter((value): value is number => value !== undefined && Number.isFinite(value) && value >= 0);
+  return {
+    approvedRemainingUsd: approvedRemaining,
+    maximumEstimatedCostUsd: limits.length ? Math.min(...limits) : undefined,
+  };
 }
 
-function primaryAgentVersion(
-  workflow: Doc<"workflows">,
-  version: Doc<"factoryDefinitionVersions">,
-  agentVersions: Array<Doc<"agentVersions"> | null>,
-) {
-  const primaryIndex = (version.agentBindings ?? []).findIndex(
-    (binding) => binding.workflowAgentId === workflow.steps?.[0]?.agent,
-  );
-  return agentVersions[primaryIndex >= 0 ? primaryIndex : 0] ?? null;
+const RESERVATION_HOLDING_RUN_STATUSES = new Set(["PENDING", "RUNNING", "PAUSED"]);
+
+export function committedWorkOrderRunCostUsd(run: {
+  status: string;
+  spentUsd?: unknown;
+  reservedCostUsd?: unknown;
+}) {
+  const spentUsd = finiteNonNegative(run.spentUsd) ?? 0;
+  if (!RESERVATION_HOLDING_RUN_STATUSES.has(run.status)) return spentUsd;
+  return Math.max(spentUsd, finiteNonNegative(run.reservedCostUsd) ?? 0);
+}
+
+function rate(numerator: number, denominator: number) {
+  return denominator > 0 ? numerator / denominator : undefined;
 }
 
 export async function loadExecutionRoutingEvidenceBundle(
@@ -266,6 +298,20 @@ function workerReasonPriority(reason: string) {
   return priorities[reason] ?? 100;
 }
 
+/**
+ * Exact route qualifications for GREEN and YELLOW work may intentionally omit
+ * a route-wide cost policy. In that case the estimate approved with the
+ * WorkOrder's Mission Plan is the conservative reservation for routing. A
+ * missing route estimate must stay unknown when the approved Plan also omitted
+ * an estimate; callers must not invent a price.
+ */
+export function executionRoutingEstimatedCost(
+  routeEstimatedCostUsd: number | undefined,
+  approvedPlanEstimateUsd: number | undefined,
+) {
+  return routeEstimatedCostUsd ?? approvedPlanEstimateUsd;
+}
+
 export async function buildExecutionRoutingPreview(
   ctx: RoutingCtx,
   input: {
@@ -278,7 +324,7 @@ export async function buildExecutionRoutingPreview(
   const { workOrder, workflow } = input;
   if (!workOrder.projectId || !workOrder.repositoryId) return null;
   const cutoffAt = input.cutoffAt ?? Date.now();
-  const [definitions, activePolicy, flagRows, bindings, catalog, activeRuns] = await Promise.all([
+  const [definitions, activePolicy, flagRows, bindings, catalog, activeRuns, workOrderRuns, mission, approvals] = await Promise.all([
     ctx.db.query("factoryDefinitions")
       .withIndex("by_repository", (query) => query.eq("repositoryId", workOrder.repositoryId!))
       .collect(),
@@ -290,9 +336,16 @@ export async function buildExecutionRoutingPreview(
     ctx.db.query("workspaceHostBindings")
       .withIndex("by_project", (query) => query.eq("projectId", workOrder.projectId!))
       .collect(),
-    loadModelCatalogForProject(ctx, workOrder.projectId),
+    loadFactoryModelCatalogForProject(ctx, workOrder.projectId),
     ctx.db.query("workflowRuns")
       .withIndex("by_status", (query) => query.eq("status", "RUNNING"))
+      .collect(),
+    ctx.db.query("workflowRuns")
+      .withIndex("by_work_order", (query) => query.eq("workOrderId", workOrder._id))
+      .collect(),
+    workOrder.missionId ? ctx.db.get(workOrder.missionId) : Promise.resolve(null),
+    ctx.db.query("approvalDecisions")
+      .withIndex("by_work_order", (query) => query.eq("workOrderId", workOrder._id))
       .collect(),
   ]);
   const config = activePolicy?.executionRouting ?? DEFAULT_EXECUTION_ROUTING_POLICY;
@@ -306,6 +359,18 @@ export async function buildExecutionRoutingPreview(
     workOrder.projectId,
     cutoffAt,
     config.evidenceWindowDays,
+  );
+  const qualificationAdmission = Boolean(
+    input.fallbackFactoryDefinitionVersionId
+    && typeof (workOrder.metadata as Record<string, unknown> | undefined)?.qualification === "string"
+    && workOrder.riskLevel === "LOW"
+    && workOrder.negativeConstraints?.some((constraint) => constraint.type === "NO_PRODUCTION_ACCESS")
+    && approvals.some((approval) =>
+      approval.approvalType === "HUMAN_REVIEW"
+      && approval.status === "APPROVED"
+      && approval.workOrderRevisionNumber === (workOrder.currentRevisionNumber ?? 1)
+      && (!approval.expiresAt || approval.expiresAt > cutoffAt)
+    )
   );
   const versions = (await Promise.all(definitions
     .filter((definition) => definition.activeVersionId)
@@ -325,21 +390,38 @@ export async function buildExecutionRoutingPreview(
     ]);
     const assessment = assessments.sort((left, right) => right.assessedAt - left.assessedAt)[0];
     let frozenHarness: ReturnType<typeof resolveFrozenHarnessBinding> | null = null;
+    let adapterRuntimeArtifact: ReturnType<typeof resolveHarnessAdapterRuntimeArtifact> | null = null;
     try {
       frozenHarness = resolveFrozenHarnessBinding(version);
+      const profileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+      adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(
+        version.executor,
+        profileSnapshot?.harness?.source === "EXTERNAL_FROZEN"
+          ? frozenHarness.runtimeArtifact
+          : undefined,
+      );
     } catch {
-      // Invalid frozen manifests remain visible as ineligible candidates.
+      // Invalid frozen manifests or adapter artifacts remain visible as ineligible candidates.
     }
-    const primaryAgent = primaryAgentVersion(workflow, version, agentVersions);
-    const primaryModel = primaryAgent?.genome.modelConfig;
+    const primaryModel = (() => {
+      try {
+        return resolveFactoryWorkflowModelRoute({ workflow, agentBindings: version.agentBindings ?? [], agentVersions });
+      } catch {
+        return null;
+      }
+    })();
+    const workflowAgentsApproved = agentVersions.length > 0
+      && agentVersions.every((agentVersion) => agentVersion?.status === "APPROVED");
     const catalogModel = version.modelCatalogId
       ? catalog.find((model) => model._id === version.modelCatalogId)
       : undefined;
     const backend = version.executionBackend ?? "persistent-worker";
+    // Inference routing never invents a model tuple for deterministic work.
+    if (backend === "isolated-container") continue;
     const requiredSandboxCapabilities = backend === "remote-sandbox"
       ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
       : ["git-worktree", "workspace-write"];
-    const workerResults = frozenHarness ? bindings.map((binding) => factoryWorkerEligibility({
+    const workerResults = frozenHarness && adapterRuntimeArtifact ? bindings.map((binding) => factoryWorkerEligibility({
       worker: {
         workerId: binding.hostId,
         status: binding.status,
@@ -365,7 +447,10 @@ export async function buildExecutionRoutingPreview(
           version: frozenHarness.version,
           capabilityManifestSha256: frozenHarness.capabilityManifestSha256,
           effectiveConfigSha256: frozenHarness.effectiveConfigSha256,
+          runtimeArtifactSha256: adapterRuntimeArtifact.runtimeArtifactSha256,
+          requireFactoryVersionRuntimeArtifactBinding: Boolean(version.harnessRuntimeArtifactDigest),
         },
+        executionRuntimeArtifactSha256: frozenHarness.runtimeArtifactSha256,
         provider: primaryModel?.provider ?? null,
         model: primaryModel?.modelId ?? null,
         harnessCapabilities: factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
@@ -406,18 +491,44 @@ export async function buildExecutionRoutingPreview(
       && sandboxProfile.egressEnforcementProven
       && sandboxProfileProductionEligible(sandboxProfile)
     );
+    const modelRouteReady = Boolean(
+      catalogModel
+      && frozenHarness
+      && primaryModel
+      && factoryWorkflowModelRouteMatches({
+        workflow,
+        agentBindings: version.agentBindings ?? [],
+        agentVersions,
+      }, version.modelRouteSnapshot as any)
+      && frozenFactoryModelRouteEligible({
+        route: catalogModel,
+        version,
+        harness: frozenHarness,
+        executionBackend: backend,
+      })
+      && modelRouteQualifiedFor(catalogModel, {
+        workloadClass: workOrder.kind ?? "SOFTWARE_CHANGE",
+        riskClass: workOrderRiskToExecutionTier(workOrder.riskLevel),
+        repositoryId: String(workOrder.repositoryId),
+      })
+    );
     const modelApproved = Boolean(
-      primaryAgent?.status === "APPROVED"
+      workflowAgentsApproved
+      && modelRouteReady
       && catalogModel
-      && catalogModel.routeDigest === version.modelRouteDigest
-      && modelRouteProductionEligible(catalogModel)
       && !catalogModel.deprecated
       && (
         !(workOrder.riskLevel === "HIGH" || workOrder.riskLevel === "CRITICAL")
         || catalogModel.riskApproved
       )
     );
-    const estimatedCost = catalogModel?.estimatedCostPerRunUsd;
+    const approvedPlanEstimateUsd = finiteNonNegative(
+      (workOrder.metadata as { estimatedCostUsd?: unknown } | undefined)?.estimatedCostUsd,
+    );
+    const estimatedCost = executionRoutingEstimatedCost(
+      catalogModel?.estimatedCostPerRunUsd,
+      approvedPlanEstimateUsd,
+    );
     const contextWindow = catalogModel?.contextWindow
       ?? manifest?.models.supported.find((model) =>
         model.provider === primaryModel?.provider
@@ -485,7 +596,13 @@ export async function buildExecutionRoutingPreview(
         modelAvailable: Boolean(catalogModel && ["HEALTHY", "DEGRADED"].includes(catalogModel.availability)),
         productionCertified: assessment?.status === "PASS"
           && manifest?.admission.maturity === "PRODUCTION"
-          && modelRouteProductionEligible(catalogModel),
+          && modelRouteReady,
+        qualificationCertified: qualificationAdmission
+          && String(version._id) === String(input.fallbackFactoryDefinitionVersionId)
+          && assessment?.status === "PASS"
+          && Boolean(manifest && ["EXPERIMENTAL", "PREVIEW"].includes(manifest.admission.maturity))
+          && modelRouteReady
+          && workerEligible,
       },
       evidence: aggregateExecutionRoutingEvidence(version._id, workOrder.repositoryId, evidenceBundle),
     });
@@ -493,10 +610,26 @@ export async function buildExecutionRoutingPreview(
 
   const pin = workOrder.executionRoutingPin;
   const requestedMode: ExecutionRoutingMode = pin ? "PINNED" : (config.mode ?? "ADVISORY");
-  const maximumEstimatedCostUsd = Math.min(
-    finiteNonNegative((workOrder.metadata as { modelBudgetRemainingUsd?: unknown } | undefined)?.modelBudgetRemainingUsd) ?? Number.POSITIVE_INFINITY,
-    activePolicy?.budgetLimitUsd ?? Number.POSITIVE_INFINITY,
-  );
+  const metadata = workOrder.metadata as {
+    estimatedCostUsd?: unknown;
+    modelBudgetRemainingUsd?: unknown;
+    implementationPolicy?: { maxCostUsd?: unknown; maxAttempts?: unknown; timeoutMinutes?: unknown };
+  } | undefined;
+  const approvedWorkOrderCapUsd = finiteNonNegative(metadata?.implementationPolicy?.maxCostUsd);
+  const plannedEstimateUsd = finiteNonNegative(metadata?.estimatedCostUsd);
+  const priorCommittedUsd = workOrderRuns
+    .filter((run) => (run.attemptPurpose ?? "IMPLEMENTATION") === "IMPLEMENTATION")
+    .reduce((sum, run) => sum + committedWorkOrderRunCostUsd(run), 0);
+  const missionBudgetRemainingUsd = mission?.budgetUsd === undefined
+    ? undefined
+    : Math.max(0, mission.budgetUsd - mission.spentUsd);
+  const budget = workOrderCostBudget({
+    approvedWorkOrderCapUsd,
+    missionBudgetRemainingUsd,
+    explicitRoutingBudgetRemainingUsd: finiteNonNegative(metadata?.modelBudgetRemainingUsd),
+    routingPolicyBudgetLimitUsd: finiteNonNegative(activePolicy?.budgetLimitUsd),
+    priorCommittedUsd,
+  });
   const policy: ExecutionRoutingPolicy = {
     mode: requestedMode,
     policyVersion: activePolicy?.version ?? 0,
@@ -506,7 +639,7 @@ export async function buildExecutionRoutingPreview(
     minimumEvidenceCoverage: config.minimumEvidenceCoverage,
     minimumScoreMargin: config.minimumScoreMargin,
     evidenceWindowDays: config.evidenceWindowDays,
-    maximumEstimatedCostUsd: Number.isFinite(maximumEstimatedCostUsd) ? maximumEstimatedCostUsd : undefined,
+    maximumEstimatedCostUsd: budget.maximumEstimatedCostUsd,
     minimumContextWindow: config.minimumContextWindow
       ?? finiteNonNegative((workOrder.metadata as { requiredContextTokens?: unknown } | undefined)?.requiredContextTokens),
   };
@@ -524,6 +657,7 @@ export async function buildExecutionRoutingPreview(
     riskTier: workOrderRiskToExecutionTier(workOrder.riskLevel),
     candidates,
     policy,
+    admissionMode: qualificationAdmission ? "QUALIFICATION" : "PRODUCTION",
     fallbackTupleKey,
     pinnedTupleKey,
   });
@@ -537,6 +671,22 @@ export async function buildExecutionRoutingPreview(
     cutoffAt,
     selectedFactoryDefinitionVersionId: selectedCandidate?.tuple.factoryDefinitionVersionId as Id<"factoryDefinitionVersions"> | undefined,
     selectedModel: selectedCandidate?.tuple.model,
+    budgetAuthorization: {
+      schema: "work-order-cost-authorization/v1" as const,
+      approvedWorkOrderCapUsd,
+      plannedEstimateUsd,
+      missionBudgetRemainingUsd,
+      explicitRoutingBudgetRemainingUsd: finiteNonNegative(metadata?.modelBudgetRemainingUsd),
+      routingPolicyBudgetLimitUsd: finiteNonNegative(activePolicy?.budgetLimitUsd),
+      priorCommittedUsd,
+      remainingBeforeReservationUsd: budget.maximumEstimatedCostUsd,
+      estimatedReservationUsd: selectedCandidate?.tuple.model.estimatedCostPerRunUsd,
+      budgetSource: approvedWorkOrderCapUsd !== undefined
+        ? "WORK_ORDER_IMPLEMENTATION_POLICY" as const
+        : missionBudgetRemainingUsd !== undefined
+          ? "MISSION" as const
+          : "FACTORY_VERSION" as const,
+    },
   };
 }
 

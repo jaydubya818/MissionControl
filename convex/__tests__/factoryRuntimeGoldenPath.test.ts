@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { activeLeaseMatches, classifyFactoryAttemptReconciliation, evaluateAttemptClaim, releaseAttemptLease, renewAttemptLease } from "../lib/factoryAttempt";
 import { factoryWorkerEligibility, type FactoryWorkerCandidate } from "../lib/factoryWorkerRuntime";
-import { CODEX_V1_HARNESS_MANIFEST, harnessCapabilityManifestDigest } from "@mission-control/workflow-engine";
+import {
+  CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
+  harnessCapabilityManifestDigest,
+  harnessRuntimeArtifactDigest,
+} from "@mission-control/workflow-engine";
 
 const capabilityManifestSha256 = harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST);
 
@@ -23,6 +28,8 @@ describe("Factory worker runtime golden path", () => {
           capabilityManifest: CODEX_V1_HARNESS_MANIFEST,
           capabilityManifestSha256,
           effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+          runtimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
+          runtimeArtifactSha256: harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT),
           supportsCancel: true,
           supportsResume: false,
           isolationModes: ["WORKSPACE_WRITE"],
@@ -43,6 +50,7 @@ describe("Factory worker runtime golden path", () => {
           version: "v1",
           capabilityManifestSha256,
           effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+          runtimeArtifactSha256: harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT),
         },
         provider: "openai",
         model: "gpt-5.6-terra",

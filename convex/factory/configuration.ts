@@ -1,11 +1,27 @@
+import { dockerSandboxAdmission, DOCKER_ADMISSION_SCHEMA } from "../lib/dockerSandboxAdmission";
+import { qualificationEnvironmentDigest } from "../lib/factoryQualificationScope";
+import {
+  isLocalQualificationRepository,
+  loadLocalRepositoryAdmission,
+  LOCAL_QUALIFICATION_MODE,
+} from "../lib/localRepositoryAdmission";
+import type { IsolatedSandboxSnapshot } from "../lib/isolatedSandbox";
+import {
+  offlineSandboxIssues,
+  offlineSandboxDigest,
+  offlineSandboxAdmission,
+  assertLocalSandboxScope,
+} from "../lib/localQualificationSandbox";
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
-import type { QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { QueryCtx, MutationCtx } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "../lib/companyAccess";
 import {
   factoryConfigurationDigest,
+  factoryVersionConfigurationDigest,
   validFactoryBudget,
+  validFactoryExecutionProfileBinding,
   validFactoryExecutorBinding,
   validFactoryExecutionBinding,
   type FactoryConfigurationInput,
@@ -13,18 +29,44 @@ import {
 import { evaluateGithubAppCapabilities, githubInstallationIsStale } from "../lib/githubAppReadiness";
 import { canonicalRepositoryKey } from "../lib/workspaceRepositories";
 import { genericHarnessV1RecoveryReady, selectCurrentFactoryHost } from "../lib/factoryDispatch";
-import { factoryWorkflowContractIssues } from "../lib/factoryWorkflowContract";
+import {
+  executionProfileCurrentness,
+  executionProfileProjectionBlockers,
+} from "../lib/executionProfile";
+import {
+  executionProfileScopeBlockers,
+  loadExecutionProfileAdmission,
+  factoryVersionExecutionProfileProjection,
+} from "../lib/executionProfileAdmission";
+import { factoryWorkflowContractIssues, deterministicFactoryOperation, deterministicFactoryVersionIssues, DETERMINISTIC_WORKFLOW_CONTRACT } from "../lib/factoryWorkflowContract";
+import { NO_INFERENCE_CONSTRAINT } from "../lib/offlineExecutionPolicy";
 import { computeCanonicalHash } from "../lib/genomeHash";
 import { factoryWorkerEligibility } from "../lib/factoryWorkerRuntime";
-import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } from "../lib/harnessCapabilities";
-import { KNOWN_HARNESS_MANIFESTS, harnessCapabilityManifestDigest, harnessSupportsModel } from "@mission-control/workflow-engine/harness-contract";
+import {
+  factoryVersionModelRouteOptions,
+  factoryWorkflowModelRouteMatches,
+  frozenFactoryModelRouteEligible,
+  resolveFactoryWorkflowModelRoute,
+} from "../lib/factoryModelRoute";
+import {
+  factoryHarnessCapabilityRequirements,
+  resolveFrozenHarnessBinding,
+  resolveHarnessAdapterRuntimeArtifact,
+} from "../lib/harnessCapabilities";
+import {
+  KNOWN_HARNESS_MANIFESTS,
+  harnessCapabilityManifestDigest,
+  harnessSupportsModel,
+  type RenderMarkdownWorkload,
+  type VerifyDocumentTemplate,
+} from "@mission-control/workflow-engine/harness-contract";
 import {
   SANDBOX_PROFILE_ADMISSION_SCHEMA,
   qualifiedSandboxSnapshotIssues,
   sandboxProfileProductionEligible,
 } from "../lib/sandboxProfileAdmission";
-import { loadModelCatalogForProject } from "../lib/modelCatalogScope";
-import { exactModelRouteDigest, modelRouteProductionEligible } from "../lib/modelRouteAdmission";
+import { modelRouteQualifiedFor } from "../lib/modelRouteAdmission";
+import { loadFactoryModelCatalogForProject } from "../lib/modelCatalogScope";
 import {
   evaluateRepositoryRemoteExecutionPolicy,
   normalizeRepositoryDataClassification,
@@ -43,8 +85,96 @@ const recovery = v.object({
 });
 const riskBoundary = v.union(v.literal("GREEN"), v.literal("YELLOW"), v.literal("RED"));
 const factoryPurpose = v.union(v.literal("SOFTWARE"), v.literal("VERIFICATION"), v.literal("INTELLIGENT_AUTOMATION"));
-const executionBackend = v.union(v.literal("persistent-worker"), v.literal("remote-sandbox"));
 const sandboxRiskClass = v.union(v.literal("GREEN"), v.literal("YELLOW"));
+
+function factoryWorkloadClass(purpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGENT_AUTOMATION" | undefined) {
+  return purpose === "VERIFICATION"
+    ? "VERIFICATION"
+    : purpose === "INTELLIGENT_AUTOMATION"
+      ? "AUTOMATION"
+      : "SOFTWARE_CHANGE";
+}
+
+function factoryIsolationMode(purpose: "SOFTWARE" | "VERIFICATION" | "INTELLIGENT_AUTOMATION" | undefined) {
+  return purpose === "VERIFICATION" ?  ( "READ_ONLY" as const  ) :  ( "WORKSPACE_WRITE" as const ) ;
+}
+
+function hasAnyExecutionProfileBinding(version: Doc<"factoryDefinitionVersions">) {
+  return [
+    version.executionProfileId,
+    version.executionProfileKey,
+    version.executionProfileVersion,
+    version.executionProfileDigest,
+    version.executionProfileSnapshot,
+    version.executionProfileQualificationDigest,
+    version.executionProfileQualificationSnapshot,
+  ].some((value) => value !== undefined);
+}
+
+
+function evaluateFactoryVersionExecutionProfile(input: {
+  version: Doc<"factoryDefinitionVersions">;
+  profile: Doc<"factoryExecutionProfiles"> | null;
+  admissionBlockers: string[];
+  now: number;
+}) {
+  const { version, profile, admissionBlockers, now } = input;
+  if (!version.executionProfileId) {
+    const malformed = hasAnyExecutionProfileBinding(version);
+    return {
+      eligible: !malformed,
+      legacy: !malformed,
+      blockers: malformed ? ["EXECUTION_PROFILE_MISSING"] : [],
+      profileDigest: undefined,
+      qualificationDigest: undefined,
+      validUntil: undefined,
+    };
+  }
+  const blockers = [
+    ...(!profile
+      || String(profile._id) !== String(version.executionProfileId)
+      || String(profile.projectId) !== String(version.projectId)
+      || (version.tenantId && String(profile.tenantId) !== String(version.tenantId))
+      ? ["EXECUTION_PROFILE_IDENTITY_MISMATCH"]
+      : []),
+    ...admissionBlockers,
+  ];
+  const currentness = executionProfileCurrentness(profile, now);
+  if (profile) {
+    blockers.push(...executionProfileScopeBlockers(profile, {
+      workloadClass: factoryWorkloadClass(version.purpose),
+      riskClass: version.riskBoundary,
+      isolation: factoryIsolationMode(version.purpose),
+    }));
+  }
+  if (profile && currentness.eligible) {
+    blockers.push(...executionProfileProjectionBlockers({
+      profileId: String(profile._id),
+      profileSnapshot: profile.immutableSnapshot,
+      profileDigest: profile.profileDigest,
+      qualificationSnapshot: profile.qualificationSnapshot!,
+      qualificationDigest: profile.qualificationDigest!,
+      projection: factoryVersionExecutionProfileProjection(version),
+    }));
+  }
+  if (!validFactoryExecutionProfileBinding({
+    executionProfileId: String(version.executionProfileId),
+    executionProfileVersion: version.executionProfileVersion,
+    executionProfileDigest: version.executionProfileDigest,
+    executionProfileQualificationDigest: version.executionProfileQualificationDigest,
+  })) {
+    blockers.push("EXECUTION_PROFILE_IDENTITY_MISMATCH");
+  }
+  const stableBlockers = [...new Set(blockers)];
+  return {
+    eligible: stableBlockers.length === 0,
+    legacy: false,
+    blockers: stableBlockers,
+    profileDigest: currentness.profileDigest,
+    qualificationDigest: currentness.qualificationDigest,
+    validUntil: currentness.validUntil,
+  };
+}
 
 export const list = query({
   args: { projectId: v.id("projects") },
@@ -87,7 +217,7 @@ export const getVersionOptions = query({
     if (!repository || repository.projectId !== args.projectId) {
       throw new Error("Factory repository is outside the workspace.");
     }
-    const [codeScopes, approvedVersions, sandboxProfiles, hostBindings] = await Promise.all([
+    const [codeScopes, approvedVersions, sandboxProfiles, hostBindings, modelCatalog, executionProfileRows] = await Promise.all([
       ctx.db.query("repositoryCodeScopes")
         .withIndex("by_repository", (q) => q.eq("repositoryId", repository._id))
         .collect(),
@@ -100,6 +230,12 @@ export const getVersionOptions = query({
       ctx.db.query("workspaceHostBindings")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect(),
+      loadFactoryModelCatalogForProject(ctx, args.projectId),
+      ctx.db.query("factoryExecutionProfiles")
+        .withIndex("by_project_admission", (q) => q
+          .eq("projectId", args.projectId)
+          .eq("admissionStatus", "PRODUCTION_PILOT_ELIGIBLE"))
+        .take(100),
     ]);
     const agentVersions = (await Promise.all(approvedVersions
       .filter((version) => !version.projectId || version.projectId === args.projectId)
@@ -117,11 +253,63 @@ export const getVersionOptions = query({
         };
       })))
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
+    const now = Date.now();
+    const executionProfiles = (await Promise.all(executionProfileRows.map(async (profileRow) => {
+      const admission = await loadExecutionProfileAdmission(ctx, profileRow._id, now);
+      const profile = admission.profile;
+      if (!profile || !admission.eligible || profile.projectId !== args.projectId) return null;
+      const snapshot = profile.immutableSnapshot as Record<string, any>;
+      return {
+        _id: profile._id,
+        profileKey: profile.profileKey,
+        version: profile.version,
+        profileDigest: profile.profileDigest,
+        qualificationDigest: profile.qualificationDigest!,
+        qualificationExpiresAt: profile.qualificationExpiresAt!,
+        executor: profile.executor,
+        executionBackend: profile.executionBackend,
+        modelCatalogId: profile.modelCatalogId,
+        modelRouteDigest: profile.modelRouteDigest,
+        sandboxProfileId: profile.sandboxProfileId,
+        sandboxProfileDigest: profile.sandboxProfileDigest,
+        toolGrant: snapshot.toolGrant ? {
+          id: snapshot.toolGrant.grantId,
+          digest: snapshot.toolGrant.grantDigest,
+          key: snapshot.toolGrant.grantSnapshot?.grantKey,
+          version: snapshot.toolGrant.grantSnapshot?.version,
+          operation: snapshot.toolGrant.grantSnapshot?.operation,
+          expiresAt: snapshot.toolGrant.grantSnapshot?.expiresAt,
+          credentialClass: snapshot.toolGrant.grantSnapshot?.credentialClass,
+          destination: snapshot.toolGrant.grantSnapshot?.destination,
+          admission: snapshot.toolGrant.grantSnapshot?.toolVersionSnapshot?.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE"
+            ?  ( "QUALIFIED_REAL_READ_ONLY_SERVICE" as const
+             ) :  "QUALIFICATION_FIXTURE" as const,
+         } : null,
+        mcpSupport: snapshot.toolGrant ?  ( "EXACT_HOST_BROKER_ONLY" as const  ) :  ( "NO_TOOL_CAPABILITY" as const ) ,
+        isolationModes: snapshot.isolationModes,
+      };
+    }))).filter((profile): profile is NonNullable<typeof profile> => Boolean(profile));
     return {
       codeScopes: codeScopes.filter((scope) => scope.active),
       agentVersions,
+      executionProfiles: executionProfiles.sort((left, right) =>
+        left.profileKey.localeCompare(right.profileKey) || right.version - left.version
+      ),
+      modelRoutes: factoryVersionModelRouteOptions(modelCatalog).map((route) => ({
+        _id: route._id,
+        provider: route.provider,
+        modelId: route.modelId,
+        displayName: route.displayName,
+        routeDigest: route.routeDigest,
+        qualificationStatus: route.qualificationStatus,
+        admissionStatus: route.admissionStatus,
+      })),
       sandboxProfiles: sandboxProfiles.sort((left, right) => left.profileKey.localeCompare(right.profileKey) || right.version - left.version),
       harnesses: KNOWN_HARNESS_MANIFESTS.map((manifest) => {
+        const adapterRuntime = resolveHarnessAdapterRuntimeArtifact({
+          adapter: manifest.identity.adapterId,
+          version: manifest.identity.adapterVersion,
+        });
         const capabilityManifestSha256 = harnessCapabilityManifestDigest(manifest);
         const advertised = hostBindings.some((binding) => binding.status === "READY" && !binding.dirty
           && binding.workerRuntime?.supportedExecutors.some((executor) =>
@@ -129,10 +317,13 @@ export const getVersionOptions = query({
             && executor.version === manifest.identity.adapterVersion
             && executor.capabilityManifestSha256 === capabilityManifestSha256
             && executor.effectiveConfigSha256 === manifest.effectiveConfigSha256
+            && executor.runtimeArtifactSha256 === adapterRuntime.runtimeArtifactSha256
           ));
         return {
           manifest,
           capabilityManifestSha256,
+          runtimeArtifact: adapterRuntime.runtimeArtifact,
+          runtimeArtifactDigest: adapterRuntime.runtimeArtifactSha256,
           available: manifest.admission.maturity === "PRODUCTION" || advertised,
           advertised,
         };
@@ -168,8 +359,17 @@ async function loadActiveFactoryContext(
       .collect(),
   ]);
   const now = Date.now();
+  const executionProfileAdmission = version.executionProfileId
+    ? await loadExecutionProfileAdmission(ctx, version.executionProfileId, now)
+    : null;
   const latestAssessment = assessments.sort((left, right) => right.assessedAt - left.assessedAt)[0] ?? null;
   const host = selectCurrentFactoryHost(bindings, repository.repository, now);
+  const executionProfileReadiness = evaluateFactoryVersionExecutionProfile({
+    version,
+    profile: executionProfileAdmission?.profile ?? null,
+    admissionBlockers: executionProfileAdmission?.blockers ?? [],
+    now,
+  });
   return {
     definition,
     version,
@@ -185,12 +385,14 @@ async function loadActiveFactoryContext(
       observedBranch: host.observedBranch,
       checkedAt: host.checkedAt,
     } : null,
+    executionProfileReadiness,
     readyForBrowserDispatch: Boolean(
       repository.status === "READY"
       && workflow?.active
       && latestAssessment?.status === "PASS"
       && latestAssessment.expiresAt > now
       && latestAssessment.configurationDigest === version.configurationDigest
+      && executionProfileReadiness.eligible
       && host
     ),
   };
@@ -264,7 +466,8 @@ export const create = mutation({
 export const createSandboxProfile = mutation({
   args: {
     projectId: v.id("projects"),
-    profileKey: v.string(),
+     provider: v.optional(v.union(v.literal("EXE_DEV"), v.literal("DOCKER"))),
+    dockerQualification: v.optional(v.any()), profileKey: v.string(),
     providerProfile: v.string(),
     providerProfileVersion: v.string(),
     machineImage: v.string(),
@@ -302,7 +505,14 @@ export const createSandboxProfile = mutation({
   handler: async (ctx, args) => {
     const access = await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
     const project = await ctx.db.get(args.projectId);
-    if (!project) throw new Error("Sandbox Profile workspace is unavailable.");
+    if (!project) throw new Error("Sandbox Profile workspace is unavailable." );
+    const docker = args.provider === "DOCKER";
+    if (
+      docker
+        ? !args.dockerQualification || args.certification !== undefined
+        : args.dockerQualification !== undefined
+    )
+      throw new Error("Provider-specific qualification evidence required." );
     const profileKey = args.profileKey.trim();
     if (!/^[a-z0-9][a-z0-9-]{2,63}$/.test(profileKey)) throw new Error("Sandbox Profile key must be a stable lowercase identifier.");
     if (!args.providerProfile.trim() || !args.providerProfileVersion.trim() || !args.machineImage.trim()) throw new Error("Sandbox provider and image identity are required.");
@@ -326,14 +536,18 @@ export const createSandboxProfile = mutation({
       !args.readinessEvidence.providerReachable ? "Provider API is unreachable." : null,
       !args.readinessEvidence.capacityAvailable ? "Provider account has no allocation capacity." : null,
       args.readinessEvidence.automaticCredentialCount > 0 ? "Automatic provider credentials are attached." : null,
-      !args.certification ? "Live exe.dev lifecycle certification is not recorded." : null,
+      !args.certification  && !docker ? "Live exe.dev lifecycle certification is not recorded." : null,
     ].filter((reason): reason is string => Boolean(reason));
     const readinessState = blockedReasons.length > 0
-      ? "BLOCKED" as const
-      : args.networkEgress === "UNRESTRICTED" || Boolean(args.certification)
-        ? "DEGRADED" as const
-        : "READY" as const;
-    const readinessReason = blockedReasons.join(" ") || (readinessState === "DEGRADED"
+      ?  ( "BLOCKED" as const
+       ) : args.networkEgress === "UNRESTRICTED" || Boolean(args.certification)
+         ||
+            docker ?  ( "DEGRADED" as const
+         ) :  ( "READY" as const ) ;
+    const readinessReason = blockedReasons.join(" " ) ||
+      (docker
+        ? "Exact Docker lifecycle and network-none containment evidence; model route remains separately governed."
+        : undefined ) || (readinessState === "DEGRADED"
       ? args.certification
         ? "Guest-kernel nftables enforcement is proven; provider-enforced egress is unavailable."
         : "Provider egress is unrestricted and represented honestly."
@@ -342,14 +556,16 @@ export const createSandboxProfile = mutation({
       schema: "factory-sandbox-profile/v1",
       profileKey,
       version,
-      provider: "EXE_DEV",
+      provider:  docker ? ("DOCKER" as const) : ( "EXE_DEV" as const) ,
       providerProfile: args.providerProfile.trim(),
       providerProfileVersion: args.providerProfileVersion.trim(),
       machine: { image: args.machineImage.trim(), cpu: args.cpu, memoryMb: args.memoryMb, diskGb: args.diskGb },
-      supervisor: { version: "mission-control-supervisor/v1", transport: "SSH" },
+      supervisor: { version: "mission-control-supervisor/v1", transport:  docker ? ("DOCKER_STDIN" as const) : ( "SSH"  as const) },
       runtime: { maxRuntimeMs: args.maxRuntimeMs, resultPollIntervalMs: args.resultPollIntervalMs, resultRetentionMs: args.resultRetentionMs },
       network: { egress: args.networkEgress, egressAllowlist: [...new Set(args.egressAllowlist)].sort(), publicIngress: false, exposedPorts: [] },
-      credentials: { inference: "ATTEMPT_SCOPED_OPENROUTER", repositoryAccess: "CONTROL_PLANE_SNAPSHOT", githubAuthority: "NONE", providerAuthority: "NONE" },
+      credentials: { inference:  docker
+          ? ("NONE" as const)
+          : ( "ATTEMPT_SCOPED_OPENROUTER" as const) , repositoryAccess: "CONTROL_PLANE_SNAPSHOT", githubAuthority: "NONE", providerAuthority: "NONE" },
       spend: { maxUsd: args.spendLimitUsd, enforcement: args.spendEnforcement },
       teardown: { terminateOnEveryTerminalState: true, verifyResourceAbsent: true, supportsResume: false },
       preview: { mode: args.previewMode, ...(args.previewPort ? { port: args.previewPort } : {}) },
@@ -358,11 +574,12 @@ export const createSandboxProfile = mutation({
         checkedAt: now,
         reason: readinessReason,
         egressEnforcementProven: args.readinessEvidence.egressEnforcementProven,
-        liveCertified: args.certification?.liveCertified ?? false,
+        liveCertified:  docker || ( args.certification?.liveCertified ?? false ) ,
         providerEgressEnforcementProven: false,
         guestEgressEnforcementProven: Boolean(args.certification && args.readinessEvidence.egressEnforcementProven),
         evidenceReference: args.readinessEvidence.evidenceReference.trim(),
-      },
+      } ,
+      ...(docker ? { dockerQualification: args.dockerQualification } : {}) ,
       ...(args.certification ? {
         qualification: {
           evidencePacketReference: args.certification.evidencePacketReference.trim(),
@@ -384,7 +601,7 @@ export const createSandboxProfile = mutation({
         security: args.certification.security,
       } : {}),
     };
-    if (args.certification) {
+    if (args.certification || docker ) {
       const issues = qualifiedSandboxSnapshotIssues(snapshot);
       if (issues.length) throw new Error(`Certified hardened Sandbox Profile is invalid (${issues.join(", ")}).`);
     }
@@ -395,7 +612,7 @@ export const createSandboxProfile = mutation({
       profileKey,
       version,
       profileDigest,
-      provider: "EXE_DEV",
+      provider:  docker ? ("DOCKER" as const) : ( "EXE_DEV" as const) ,
       providerProfile: snapshot.providerProfile,
       providerProfileVersion: snapshot.providerProfileVersion,
       machineImage: snapshot.machine.image,
@@ -403,7 +620,7 @@ export const createSandboxProfile = mutation({
       memoryMb: args.memoryMb,
       diskGb: args.diskGb,
       supervisorVersion: "mission-control-supervisor/v1",
-      executorTransport: "SSH",
+      executorTransport:  docker ? ("DOCKER_STDIN" as const) : ( "SSH" as const) ,
       maxRuntimeMs: args.maxRuntimeMs,
       resultPollIntervalMs: args.resultPollIntervalMs,
       resultRetentionMs: args.resultRetentionMs,
@@ -411,7 +628,9 @@ export const createSandboxProfile = mutation({
       egressAllowlist: snapshot.network.egressAllowlist,
       publicIngress: false,
       exposedPorts: [],
-      inferenceCredentialMode: "ATTEMPT_SCOPED_OPENROUTER",
+      inferenceCredentialMode:  docker
+        ? ("NONE" as const)
+        : ( "ATTEMPT_SCOPED_OPENROUTER" as const) ,
       repositoryAccessMode: "CONTROL_PLANE_SNAPSHOT",
       spendLimitUsd: args.spendLimitUsd,
       spendEnforcement: args.spendEnforcement,
@@ -433,6 +652,47 @@ export const createSandboxProfile = mutation({
   },
 });
 
+/** Register a disabled local-container composition in the existing Sandbox Profile store. */
+export const registerIsolatedSandboxProfile = mutation({
+  args: { projectId: v.id("projects"), snapshot: v.any() },
+  handler: async (ctx, args) => {
+    const access = await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    await assertLocalSandboxScope(ctx, args.snapshot, Date.now(), access.actorId, {
+      projectId: args.projectId,
+      tenantId: access.project.tenantId,
+    });
+    const issues = offlineSandboxIssues(args.snapshot);
+    if (issues.length) throw new Error(`Invalid isolated Sandbox Profile (${issues.join(",")}).`);
+    const snapshot = args.snapshot as IsolatedSandboxSnapshot;
+    const digest = offlineSandboxDigest(snapshot);
+    const previous = await ctx.db.query("factorySandboxProfiles").withIndex("by_profile_version", q => q.eq("projectId", args.projectId).eq("profileKey", snapshot.profileKey)).collect();
+    const same = previous.find(row => row.version === snapshot.version);
+    if (same) {
+      if (same.profileDigest !== digest || offlineSandboxDigest(same.immutableSnapshot) !== digest) throw new Error("Sandbox version is immutable.");
+      return same._id;
+    }
+    if (snapshot.version !== previous.reduce((n, row) => Math.max(n, row.version), 0) + 1) throw new Error("Sandbox versions must be sequential.");
+    const now = Date.now();
+    if (snapshot.qualification.validUntil <= now) throw new Error("Isolation evidence is stale.");
+    const id = await ctx.db.insert("factorySandboxProfiles", {
+      tenantId: access.project.tenantId, projectId: args.projectId, profileKey: snapshot.profileKey, version: snapshot.version,
+      profileDigest: digest, provider: "LOCAL_CONTAINER", providerProfile: "docker-chroot-offline", providerProfileVersion: "1",
+      machineImage: snapshot.imageDigest, cpu: 1, memoryMb: 256, diskGb: 0,
+      supervisorVersion: "isolated-invocation/v1", executorTransport: "STDIO", maxRuntimeMs: 60000,
+      resultPollIntervalMs: 250, resultRetentionMs: 60000, networkEgress: "DENY_ALL", egressAllowlist: [], publicIngress: false,
+      exposedPorts: [], inferenceCredentialMode: "NONE", repositoryAccessMode: "NONE", spendLimitUsd: 0,
+      spendEnforcement: "NO_PROVIDER_EXECUTION", previewMode: "DISABLED", readinessState: "READY",
+      readinessReason: "Offline composition requires separate reviewed admission.", readinessCheckedAt: now,
+      readinessExpiresAt: snapshot.qualification.validUntil, egressEnforcementProven: true,
+      immutableSnapshot: snapshot, admissionState: "QUALIFICATION_ONLY", status: "ACTIVE", createdBy: access.actorId, createdAt: now,
+    });
+    await ctx.db.insert("activities", { tenantId: access.project.tenantId, projectId: args.projectId, actorType: "HUMAN", actorId: access.actorId,
+      action: "SANDBOX_PROFILE_REGISTERED", description: "Registered qualification-only local container profile", targetType: "FACTORY_SANDBOX_PROFILE", targetId: id,
+      metadata: { profileDigest: digest } });
+    return id;
+  },
+});
+
 export const promoteSandboxProfile = mutation({
   args: {
     sandboxProfileId: v.id("factorySandboxProfiles"),
@@ -448,11 +708,32 @@ export const promoteSandboxProfile = mutation({
     if (profile.status !== "ACTIVE" || profile.profileDigest !== args.expectedProfileDigest) {
       throw new Error("Sandbox Profile identity does not match the reviewed immutable profile.");
     }
+    if (profile.provider === "LOCAL_CONTAINER") {
+      await assertLocalSandboxScope(ctx, profile.immutableSnapshot, Date.now(), access.actorId, {
+        projectId: profile.projectId,
+        tenantId: profile.tenantId,
+      });
+      const admissionSnapshot = offlineSandboxAdmission(profile.immutableSnapshot as IsolatedSandboxSnapshot, access.actorId, Date.now());
+      if (offlineSandboxDigest(profile.immutableSnapshot) !== profile.profileDigest || profile.admissionSnapshot || profile.admissionState !== "QUALIFICATION_ONLY") throw new Error("Isolated profile is stale, modified or already admitted.");
+      const admissionDigest = `sha256:${computeCanonicalHash({ namespace: admissionSnapshot.schema, value: admissionSnapshot })}`;
+      await ctx.db.patch(profile._id, { admissionState: "OFFLINE_ELIGIBLE", admissionSnapshot, admissionDigest, promotedBy: access.actorId, promotedAt: admissionSnapshot.promotedAt });
+      await ctx.db.insert("activities", { tenantId: profile.tenantId, projectId: profile.projectId, actorType: "HUMAN", actorId: access.actorId,
+        action: "SANDBOX_PROFILE_PROMOTED", description: "Admitted exact local container for offline execution only", targetType: "FACTORY_SANDBOX_PROFILE", targetId: profile._id,
+        metadata: { profileDigest: profile.profileDigest, admissionDigest } });
+      return { sandboxProfileId: profile._id, profileDigest: profile.profileDigest, admissionDigest };
+    }
     const issues = qualifiedSandboxSnapshotIssues(profile.immutableSnapshot);
     if (issues.length) throw new Error(`Sandbox Profile does not contain qualified hardened evidence (${issues.join(", ")}).`);
     const snapshot = profile.immutableSnapshot as any;
     const promotedAt = Date.now();
-    const admissionSnapshot = {
+    const admissionSnapshot =  snapshot.provider === "DOCKER"
+        ? dockerSandboxAdmission(
+            snapshot,
+            profile.profileDigest,
+            access.actorId,
+            promotedAt,
+          )
+        : {
       schema: SANDBOX_PROFILE_ADMISSION_SCHEMA,
       state: "PRODUCTION_PILOT_ELIGIBLE",
       profileDigest: profile.profileDigest,
@@ -482,7 +763,9 @@ export const promoteSandboxProfile = mutation({
       },
     };
     const admissionDigest = `sha256:${computeCanonicalHash({
-      namespace: SANDBOX_PROFILE_ADMISSION_SCHEMA,
+      namespace :
+        snapshot.provider === "DOCKER"
+          ? DOCKER_ADMISSION_SCHEMA : SANDBOX_PROFILE_ADMISSION_SCHEMA,
       value: admissionSnapshot,
     })}`;
     await ctx.db.patch(profile._id, {
@@ -511,10 +794,7 @@ export const createVersion = mutation({
   args: {
     factoryDefinitionId: v.id("factoryDefinitions"),
     workflowId: v.id("workflows"),
-    modelCatalogId: v.optional(v.id("modelCatalog")),
-    executor: v.object({ adapter: v.string(), version: v.string() }),
-    executionBackend: v.optional(executionBackend),
-    sandboxProfileId: v.optional(v.id("factorySandboxProfiles")),
+    executionProfileId: v.id("factoryExecutionProfiles"),
     codeScopeIds: v.array(v.id("repositoryCodeScopes")),
     agentBindings: v.array(v.object({
       workflowAgentId: v.string(),
@@ -531,24 +811,37 @@ export const createVersion = mutation({
     const definition = await ctx.db.get(args.factoryDefinitionId);
     if (!definition || definition.status === "ARCHIVED") throw new Error("Factory is unavailable or archived.");
     const access = await requireWorkspacePermission(ctx, definition.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    const now = Date.now();
     const repository = await ctx.db.get(definition.repositoryId);
     const workflow = await ctx.db.get(args.workflowId);
     const policy = args.policyEnvelopeId ? await ctx.db.get(args.policyEnvelopeId) : null;
     const environment = args.environmentId ? await ctx.db.get(args.environmentId) : null;
-    const [verifiers, codeScopes, agentVersions, sandboxProfile, modelCatalog] = await Promise.all([
+    const executionProfileAdmission = await loadExecutionProfileAdmission(ctx, args.executionProfileId, now);
+    const { profile: executionProfile, sandboxProfile, modelRoute } = executionProfileAdmission;
+    const [verifiers, codeScopes, agentVersions] = await Promise.all([
       Promise.all(args.verifierIds.map((id) => ctx.db.get(id))),
       Promise.all(args.codeScopeIds.map((id) => ctx.db.get(id))),
       Promise.all(args.agentBindings.map((binding) => ctx.db.get(binding.agentVersionId))),
-      args.sandboxProfileId ? ctx.db.get(args.sandboxProfileId) : null,
-      loadModelCatalogForProject(ctx, definition.projectId),
     ]);
     if (!repository || repository.projectId !== definition.projectId) throw new Error("Factory repository scope is invalid.");
+    if (!executionProfile
+      || executionProfile.projectId !== definition.projectId
+      || (definition.tenantId && executionProfile.tenantId !== definition.tenantId)) {
+      throw new Error("Execution Profile is unavailable or outside the Factory workspace.");
+    }
+    const offline = executionProfile.executionBackend === "isolated-container";
+    const environmentDigest = offline ? qualificationEnvironmentDigest({ environment, projectId: definition.projectId,
+      tenantId: definition.tenantId, repositoryId: repository._id,
+      configuredEnvironmentId: process.env.MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID }) : undefined;
+    if (!executionProfileAdmission.eligible || (!offline && !modelRoute) || (offline && modelRoute)) {
+      throw new Error(`Execution Profile is not current (${executionProfileAdmission.blockers.join(", ")}).`);
+    }
     const repositoryDataClassification = normalizeRepositoryDataClassification(repository.dataClassification);
     if (repositoryDataClassification === "UNCLASSIFIED") {
       throw new Error("Classify the Factory repository before creating an executable version.");
     }
     if (!workflow) throw new Error("Workflow not found.");
-    if (workflow.projectId !== definition.projectId || workflow.contractVersion !== "factory-workflow-contract/v1") {
+    if (workflow.projectId !== definition.projectId || workflow.contractVersion !== (offline ? DETERMINISTIC_WORKFLOW_CONTRACT : "factory-workflow-contract/v1")) {
       throw new Error("Factory versions require a current workspace-owned production workflow.");
     }
     const workflowContractIssues = factoryWorkflowContractIssues(workflow);
@@ -586,33 +879,68 @@ export const createVersion = mutation({
         throw new Error("Approved agent versions require prompt, tool, and model manifests.");
       }
     }
-    const harness = resolveFrozenHarnessBinding({ executor: args.executor });
-    const firstStepAgent = workflow.steps[0]?.agent;
-    const primaryAgentIndex = args.agentBindings.findIndex((binding) => binding.workflowAgentId === firstStepAgent);
-    const primaryModel = agentVersions[primaryAgentIndex >= 0 ? primaryAgentIndex : 0]?.genome.modelConfig;
-    if (!primaryModel || !harnessSupportsModel(harness.capabilityManifest, primaryModel.provider, primaryModel.modelId)) {
-      throw new Error(`${args.executor.adapter}/${args.executor.version} does not admit the selected workflow model route.`);
+    const frozenProfileSnapshot = executionProfile.immutableSnapshot as Record<string, any>;
+    const deterministicOperation = offline ? deterministicFactoryOperation({
+      workflow, profileSnapshot: frozenProfileSnapshot, purpose: definition.purpose ?? "SOFTWARE",
+      riskBoundary: args.riskBoundary, agentBindings: args.agentBindings,
+      modelRoute: modelRoute ?? undefined, modelCatalogId: executionProfile.modelCatalogId,
+    }) : undefined;
+    const selectedExecutionBackend = frozenProfileSnapshot.executionBackend as "persistent-worker" | "remote-sandbox" | "isolated-container";
+    if (offline && !evaluateRepositoryRemoteExecutionPolicy({
+      executionBackend: "isolated-container", repositoryDataClassification,
+      sandboxProfileSnapshot: sandboxProfile?.immutableSnapshot,
+    }).allowed) throw new Error("Isolated execution requires a public repository and an exact offline isolation policy.");
+    const selectedExecutor = {
+      adapter: String(frozenProfileSnapshot.harness.adapter),
+      version: String(frozenProfileSnapshot.harness.version),
+    };
+    const harness = resolveFrozenHarnessBinding({
+      executor: selectedExecutor,
+      harnessCapabilityManifest: frozenProfileSnapshot.harness.capabilityManifest,
+      harnessCapabilityManifestDigest: frozenProfileSnapshot.harness.capabilityManifestDigest,
+      harnessEffectiveConfigSha256: frozenProfileSnapshot.harness.effectiveConfigSha256,
+      harnessRuntimeArtifact: frozenProfileSnapshot.runtimeArtifact.snapshot,
+      harnessRuntimeArtifactDigest: frozenProfileSnapshot.runtimeArtifact.digest,
+      executionBackend: selectedExecutionBackend,
+      modelRouteSnapshot: modelRoute?.routeSnapshot,
+      sandboxProfileSnapshot: frozenProfileSnapshot.sandboxProfile?.profileSnapshot,
+    });
+    const adapterRuntimeArtifact = frozenProfileSnapshot.harness.source === "EXTERNAL_FROZEN"
+      ? { runtimeArtifact: harness.runtimeArtifact, runtimeArtifactSha256: harness.runtimeArtifactSha256 }
+      : resolveHarnessAdapterRuntimeArtifact(selectedExecutor);
+    const primaryModel = offline ? null : resolveFactoryWorkflowModelRoute({
+      workflow,
+      agentBindings: args.agentBindings,
+      agentVersions,
+    });
+    if (!offline && (!primaryModel || !modelRoute
+      || !factoryWorkflowModelRouteMatches({ workflow, agentBindings: args.agentBindings, agentVersions }, modelRoute.routeSnapshot as any)
+      || !harnessSupportsModel(harness.capabilityManifest, primaryModel.provider, primaryModel.modelId))) {
+      throw new Error(`${selectedExecutor.adapter}/${selectedExecutor.version} does not admit the selected workflow model route.`);
     }
-    const matchingModelRoutes = modelCatalog.filter((route) =>
-      (!args.modelCatalogId || route._id === args.modelCatalogId)
-      && route.provider === primaryModel.provider.trim().toLowerCase()
-      && route.modelId === primaryModel.modelId
-    );
-    if (matchingModelRoutes.length !== 1) {
-      throw new Error("Factory versions require exactly one explicitly qualified model-catalog route.");
+    const workloadClass = factoryWorkloadClass(definition.purpose);
+    const selectedIsolation = factoryIsolationMode(definition.purpose);
+    const profileScopeBlockers = executionProfileScopeBlockers(executionProfile, {
+      workloadClass,
+      riskClass: args.riskBoundary,
+      isolation: selectedIsolation,
+    });
+    if (profileScopeBlockers.length > 0) {
+      throw new Error(`Execution Profile qualification does not cover this Factory workload, risk, and isolation scope (${profileScopeBlockers.join(", ")}).`);
     }
-    const modelRoute = matchingModelRoutes[0];
-    const routeSnapshot = modelRoute.routeSnapshot as Record<string, any> | undefined;
-    if (!modelRouteProductionEligible(modelRoute)
-      || !routeSnapshot
-      || exactModelRouteDigest(routeSnapshot) !== modelRoute.routeDigest
-      || routeSnapshot.capabilityIdentity?.adapter !== harness.adapter
-      || routeSnapshot.capabilityIdentity?.version !== harness.version
-      || routeSnapshot.capabilityIdentity?.capabilityManifestDigest !== harness.capabilityManifestSha256
-      || routeSnapshot.capabilityIdentity?.effectiveConfigSha256 !== harness.effectiveConfigSha256) {
-      throw new Error("Factory versions require the exact promoted model route for the frozen harness identity.");
+    if (!offline && (!modelRoute || !modelRouteQualifiedFor(modelRoute, {
+      workloadClass,
+      riskClass: args.riskBoundary,
+      repositoryId: String(repository._id),
+    }))) {
+      throw new Error("The Execution Profile model-route qualification does not cover this Factory repository, workload, and risk scope.");
     }
-    if (!validFactoryExecutorBinding(args.executor)) {
+    const routeSnapshot = modelRoute?.routeSnapshot as Record<string, any> | undefined;
+    if (!offline && !routeSnapshot) throw new Error("The selected exact model route is missing its immutable snapshot.");
+    if (!executionProfile.qualificationSnapshot || !executionProfile.qualificationDigest) {
+      throw new Error("Execution Profile qualification identity is incomplete.");
+    }
+    if (!validFactoryExecutorBinding(selectedExecutor)) {
       throw new Error("Factory executor requires a bounded exact harness adapter/version binding.");
     }
     if (!genericHarnessV1RecoveryReady(args.recovery)) {
@@ -621,17 +949,16 @@ export const createVersion = mutation({
     if (!validFactoryBudget(args.budget)) {
       throw new Error("Factory budget must use positive V1 limits: cost <= $1,000, runtime <= 480 minutes, attempts <= 3.");
     }
-    const selectedExecutionBackend = args.executionBackend ?? "persistent-worker";
     if (!harness.capabilityManifest.admission.executionBackends.includes(selectedExecutionBackend)) {
-      throw new Error(`${args.executor.adapter}/${args.executor.version} does not support ${selectedExecutionBackend}.`);
+      throw new Error(`${selectedExecutor.adapter}/${selectedExecutor.version} does not support ${selectedExecutionBackend}.`);
     }
     if (harness.capabilityManifest.admission.maturity === "EXPERIMENTAL") {
       const bindings = await ctx.db.query("workspaceHostBindings")
         .withIndex("by_project", (q) => q.eq("projectId", definition.projectId))
         .collect();
       const requiredSandboxCapabilities = selectedExecutionBackend === "remote-sandbox"
-        ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
-        : ["git-worktree", "workspace-write"];
+        ? ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
+        : ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", ...(offline ? frozenProfileSnapshot.requiredSandboxCapabilities : [])];
       const eligible = bindings.some((binding) => factoryWorkerEligibility({
         worker: {
           workerId: binding.hostId,
@@ -650,16 +977,18 @@ export const createVersion = mutation({
             version: harness.version,
             capabilityManifestSha256: harness.capabilityManifestSha256,
             effectiveConfigSha256: harness.effectiveConfigSha256,
+            runtimeArtifactSha256: adapterRuntimeArtifact.runtimeArtifactSha256,
           },
-          provider: primaryModel.provider,
-          model: primaryModel.modelId,
-          harnessCapabilities: factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
-          isolation: "WORKSPACE_WRITE",
+          provider: primaryModel?.provider ?? null,
+          model: primaryModel?.modelId ?? null,
+          harnessCapabilities: offline ? frozenProfileSnapshot.requiredHarnessCapabilities : factoryHarnessCapabilityRequirements(selectedIsolation),
+          isolation: selectedIsolation,
           sandboxCapabilities: requiredSandboxCapabilities,
           executionBackend: selectedExecutionBackend,
+          ...(offline ? { inferenceConstraint: NO_INFERENCE_CONSTRAINT } : {}),
         },
         activeWorkerLeaseCount: 0,
-        now: Date.now(),
+        now,
       }).eligible);
       if (!eligible) {
         throw new Error("Experimental harness selection requires a current eligible canonical worker advertising the exact manifest and configuration.");
@@ -670,12 +999,9 @@ export const createVersion = mutation({
         || sandboxProfile.projectId !== definition.projectId
         || sandboxProfile.status !== "ACTIVE"
         || sandboxProfile.readinessState === "BLOCKED"
-        || sandboxProfile.readinessExpiresAt <= Date.now()
+        || sandboxProfile.readinessExpiresAt <= now
         || !sandboxProfileProductionEligible(sandboxProfile)) {
         throw new Error("Remote sandbox execution requires a current dispatchable Sandbox Profile in this workspace.");
-      }
-      if (routeSnapshot.runtimeIdentity?.imageDigest !== (sandboxProfile!.immutableSnapshot as any)?.security?.image?.digest) {
-        throw new Error("Remote model route image identity does not match the promoted Sandbox Profile.");
       }
       if (!(sandboxProfile!.admissionSnapshot as any)?.scope?.riskClasses?.includes(args.riskBoundary)) {
         throw new Error("The promoted Sandbox Profile is not eligible for this Factory risk boundary.");
@@ -688,40 +1014,62 @@ export const createVersion = mutation({
       if (!repositoryExecutionPolicy.allowed) {
         throw new Error("Sensitive repository remote execution requires provider-enforced egress evidence.");
       }
-    } else if (args.sandboxProfileId) {
-      throw new Error("A Sandbox Profile can only be attached to the remote-sandbox execution backend.");
-    } else if (!routeSnapshot.runtimeIdentity?.executableSha256) {
-      throw new Error("Local model routes require an exact executable digest.");
     }
-    const modelQualification = modelRoute.qualificationSnapshot as Record<string, any>;
-    if (!modelQualification.scope?.riskClasses?.includes(args.riskBoundary)) {
-      throw new Error("The exact model route is not qualified for this Factory risk boundary.");
-    }
-
-    const sandboxProfileDigest = selectedExecutionBackend === "remote-sandbox" ? sandboxProfile!.profileDigest : undefined;
+    const sandboxProfileDigest = selectedExecutionBackend !== "persistent-worker" ? sandboxProfile!.profileDigest : undefined;
+    const sandboxProfileId = selectedExecutionBackend !== "persistent-worker" ? executionProfile.sandboxProfileId : undefined;
     if (!validFactoryExecutionBinding({
       executionBackend: selectedExecutionBackend,
-      sandboxProfileId: args.sandboxProfileId ? String(args.sandboxProfileId) : undefined,
+      sandboxProfileId: sandboxProfileId ? String(sandboxProfileId) : undefined,
       sandboxProfileDigest,
       riskBoundary: args.riskBoundary,
       recovery: args.recovery,
+      ...(offline ? { offlineAdmission: { profile: executionProfile, sandboxProfile, workflow, repositoryDataClassification, now,
+        projectId: String(definition.projectId), tenantId: String(definition.tenantId ?? ""),
+        purpose: definition.purpose ?? "SOFTWARE", agentBindings: args.agentBindings, deterministicOperation,
+        projection: {
+          profileId: String(executionProfile._id), profileKey: executionProfile.profileKey, profileVersion: executionProfile.version,
+          profileDigest: executionProfile.profileDigest, profileSnapshot: frozenProfileSnapshot,
+          qualificationDigest: executionProfile.qualificationDigest!, qualificationSnapshot: executionProfile.qualificationSnapshot,
+          executor: selectedExecutor, harnessCapabilityManifest: harness.capabilityManifest,
+          harnessCapabilityManifestDigest: harness.capabilityManifestSha256, harnessEffectiveConfigSha256: harness.effectiveConfigSha256,
+          harnessRuntimeArtifact: harness.runtimeArtifact, harnessRuntimeArtifactDigest: harness.runtimeArtifactSha256,
+          executionBackend: "isolated-container" as const, sandboxProfileId: String(sandboxProfileId), sandboxProfileDigest,
+          sandboxProfileSnapshot: sandboxProfile!.immutableSnapshot, isolationModes: [selectedIsolation],
+          requiredHarnessCapabilities: frozenProfileSnapshot.requiredHarnessCapabilities,
+          requiredSandboxCapabilities: frozenProfileSnapshot.requiredSandboxCapabilities,
+        } } } : {}),
     })) {
       throw new Error("Factory execution backend, risk, Sandbox Profile, and recovery settings are incompatible.");
     }
 
-    const configuration: FactoryConfigurationInput = {
+    const localRepositoryAdmission = isLocalQualificationRepository(repository)
+      ? await loadLocalRepositoryAdmission(ctx, repository, now)
+      : null;
+    if (localRepositoryAdmission && (!offline
+      || args.environmentId !== localRepositoryAdmission.admission.environmentId
+      || access.actorId !== localRepositoryAdmission.admission.operatorId)) {
+      throw new Error("Local repository requires its exact synthetic operator, environment and offline composition.");
+    }
+    const commonConfiguration = {
       purpose: definition.purpose ?? "SOFTWARE",
       repositoryId: String(repository._id),
+      ...(localRepositoryAdmission ? {
+        repositoryMode: LOCAL_QUALIFICATION_MODE,
+        repositoryAdmissionDigest: localRepositoryAdmission.digest,
+      } : {}),
       repositoryDataClassification,
       workflowId: String(workflow._id),
-      executor: args.executor,
+      executor: selectedExecutor,
       harnessCapabilityManifest: harness.capabilityManifest,
       harnessCapabilityManifestDigest: harness.capabilityManifestSha256,
       harnessEffectiveConfigSha256: harness.effectiveConfigSha256,
-      modelCatalogId: String(modelRoute._id),
-      modelRouteDigest: modelRoute.routeDigest!,
-      executionBackend: selectedExecutionBackend,
-      sandboxProfileId: args.sandboxProfileId ? String(args.sandboxProfileId) : undefined,
+      harnessRuntimeArtifact: harness.runtimeArtifact,
+      harnessRuntimeArtifactDigest: harness.runtimeArtifactSha256,
+      executionProfileId: String(executionProfile._id),
+      executionProfileVersion: executionProfile.version,
+      executionProfileDigest: executionProfile.profileDigest,
+      executionProfileQualificationDigest: executionProfile.qualificationDigest,
+      sandboxProfileId: sandboxProfileId ? String(sandboxProfileId) : undefined,
       sandboxProfileDigest,
       codeScopeIds: args.codeScopeIds.map(String),
       agentBindings: args.agentBindings.map((binding) => ({
@@ -730,11 +1078,33 @@ export const createVersion = mutation({
       })),
       policyEnvelopeId: args.policyEnvelopeId ? String(args.policyEnvelopeId) : undefined,
       environmentId: args.environmentId ? String(args.environmentId) : undefined,
+      ...(offline ? { qualificationEnvironmentDigest: environmentDigest } : {}),
       budget: args.budget,
       verifierIds: args.verifierIds.map(String),
       riskBoundary: args.riskBoundary,
       recovery: args.recovery,
     };
+    const offlineConfiguration: FactoryConfigurationInput | undefined = !offline ? undefined
+      : definition.purpose === "VERIFICATION" ? {
+        ...commonConfiguration, executionBackend: "isolated-container", purpose: "VERIFICATION", riskBoundary: "GREEN",
+        agentBindings: [], inferenceConstraint: NO_INFERENCE_CONSTRAINT,
+        deterministicOperation: deterministicOperation as VerifyDocumentTemplate,
+        sandboxProfileId: String(sandboxProfileId!), sandboxProfileDigest: sandboxProfileDigest!,
+        executionProfileQualificationDigest: executionProfile.qualificationDigest!,
+      } : {
+        ...commonConfiguration, executionBackend: "isolated-container", purpose: "SOFTWARE", riskBoundary: "GREEN",
+        agentBindings: [], inferenceConstraint: NO_INFERENCE_CONSTRAINT,
+        deterministicOperation: deterministicOperation as RenderMarkdownWorkload,
+        sandboxProfileId: String(sandboxProfileId!), sandboxProfileDigest: sandboxProfileDigest!,
+        executionProfileQualificationDigest: executionProfile.qualificationDigest!,
+      };
+    const configuration: FactoryConfigurationInput = offline ? offlineConfiguration! : {
+      ...commonConfiguration, executionBackend: selectedExecutionBackend as "persistent-worker" | "remote-sandbox",
+      modelCatalogId: frozenProfileSnapshot.modelRoute.catalogId, modelRouteDigest: frozenProfileSnapshot.modelRoute.routeDigest,
+    };
+    if (!validFactoryExecutionProfileBinding(configuration)) {
+      throw new Error("Factory version requires a complete exact Execution Profile identity.");
+    }
     const configurationDigest = factoryConfigurationDigest(configuration);
     const duplicate = await ctx.db.query("factoryDefinitionVersions")
       .withIndex("by_digest", (q) => q.eq("configurationDigest", configurationDigest))
@@ -752,31 +1122,48 @@ export const createVersion = mutation({
       repositoryDataClassification,
       purpose: definition.purpose ?? "SOFTWARE",
       workflowId: workflow._id,
-      executor: args.executor,
+      executor: selectedExecutor,
       harnessCapabilityManifest: harness.capabilityManifest,
       harnessCapabilityManifestDigest: harness.capabilityManifestSha256,
       harnessEffectiveConfigSha256: harness.effectiveConfigSha256,
-      modelCatalogId: modelRoute._id,
-      modelRouteDigest: modelRoute.routeDigest,
-      modelRouteSnapshot: modelRoute.routeSnapshot,
-      modelQualificationDigest: modelRoute.qualificationDigest,
-      modelQualificationSnapshot: modelRoute.qualificationSnapshot,
+      harnessRuntimeArtifact: harness.runtimeArtifact,
+      harnessRuntimeArtifactDigest: harness.runtimeArtifactSha256,
+      executionProfileId: executionProfile._id,
+      executionProfileKey: executionProfile.profileKey,
+      executionProfileVersion: executionProfile.version,
+      executionProfileDigest: executionProfile.profileDigest,
+      executionProfileSnapshot: executionProfile.immutableSnapshot,
+      executionProfileQualificationDigest: executionProfile.qualificationDigest,
+      executionProfileQualificationSnapshot: executionProfile.qualificationSnapshot,
+      modelCatalogId: executionProfile.modelCatalogId,
+      modelRouteDigest: offline ? undefined : frozenProfileSnapshot.modelRoute.routeDigest,
+      modelRouteSnapshot: offline ? undefined : frozenProfileSnapshot.modelRoute.routeSnapshot,
+      modelQualificationDigest: offline ? undefined : frozenProfileSnapshot.modelRoute.qualificationDigest,
+      modelQualificationSnapshot: offline ? undefined : frozenProfileSnapshot.modelRoute.qualificationSnapshot,
+      ...(offline ? { inferenceConstraint: NO_INFERENCE_CONSTRAINT, deterministicOperation } : {}),
       executionBackend: selectedExecutionBackend,
-      sandboxProfileId: args.sandboxProfileId,
+      sandboxProfileId,
       sandboxProfileDigest,
-      sandboxProfileSnapshot: selectedExecutionBackend === "remote-sandbox" ? sandboxProfile!.immutableSnapshot : undefined,
+      sandboxProfileSnapshot: selectedExecutionBackend !== "persistent-worker"
+        ? frozenProfileSnapshot.sandboxProfile.profileSnapshot
+        : undefined,
       codeScopeIds: args.codeScopeIds,
       agentBindings: args.agentBindings,
       policyEnvelopeId: args.policyEnvelopeId,
       environmentId: args.environmentId,
+      ...(offline ? { qualificationEnvironmentDigest: environmentDigest } : {}),
+      ...(localRepositoryAdmission ? {
+        repositoryMode: LOCAL_QUALIFICATION_MODE,
+        repositoryAdmissionDigest: localRepositoryAdmission.digest,
+      } : {}),
       budget: args.budget,
       verifierIds: args.verifierIds,
       riskBoundary: args.riskBoundary,
       recovery: args.recovery,
       createdBy: access.actorId,
-      createdAt: Date.now(),
+      createdAt: now,
     });
-    await ctx.db.patch(definition._id, { latestVersion: version, updatedAt: Date.now() });
+    await ctx.db.patch(definition._id, { latestVersion: version, updatedAt: now });
     return versionId;
   },
 });
@@ -787,9 +1174,14 @@ export const assessReadiness = mutation({
     const version = await ctx.db.get(args.factoryDefinitionVersionId);
     if (!version) throw new Error("Factory version not found.");
     const access = await requireWorkspacePermission(ctx, version.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    return await recordFactoryReadiness(ctx, version, access.actorId);
+  },
+});
+
+async function recordFactoryReadiness(ctx: MutationCtx, version: Doc<"factoryDefinitionVersions">, actorId: string) {
     const now = Date.now();
     const expiry = now + 24 * 60 * 60 * 1_000;
-    const [repository, workflow, policy, installation, bindings, verifiers, codeScopes, agentVersions, sandboxProfile, modelRoute] = await Promise.all([
+    const [repository, workflow, policy, installation, bindings, verifiers, codeScopes, agentVersions, sandboxProfile, modelRoute, executionProfileAdmission] = await Promise.all([
       ctx.db.get(version.repositoryId),
       ctx.db.get(version.workflowId),
       version.policyEnvelopeId ? ctx.db.get(version.policyEnvelopeId) : null,
@@ -800,6 +1192,9 @@ export const assessReadiness = mutation({
       Promise.all((version.agentBindings ?? []).map((binding) => ctx.db.get(binding.agentVersionId))),
       version.sandboxProfileId ? ctx.db.get(version.sandboxProfileId) : null,
       version.modelCatalogId ? ctx.db.get(version.modelCatalogId) : null,
+      version.executionProfileId
+        ? loadExecutionProfileAdmission(ctx, version.executionProfileId, now)
+        : Promise.resolve(null),
     ]);
     const github = installation ? evaluateGithubAppCapabilities(installation) : null;
     const agentTemplates = await Promise.all(agentVersions.map((agentVersion) =>
@@ -810,14 +1205,44 @@ export const assessReadiness = mutation({
       !githubInstallationIsStale(installation.verifiedAt, now)
     );
     const selectedExecutionBackend = version.executionBackend ?? "persistent-worker";
+    const offline = selectedExecutionBackend === "isolated-container";
+    const localRepository = isLocalQualificationRepository(repository);
+    let localAdmissionReady = false;
+    if (localRepository) {
+      try {
+        await loadLocalRepositoryAdmission(ctx, repository, now, version);
+        localAdmissionReady = true;
+      } catch {
+        localAdmissionReady = false;
+      }
+    }
+    const offlineSnapshot = version.executionProfileSnapshot as any;
+    let environmentReady = !offline;
+    if (offline) {
+      try { environmentReady = qualificationEnvironmentDigest({
+        environment: version.environmentId ? await ctx.db.get(version.environmentId) : null,
+        projectId: version.projectId, tenantId: version.tenantId, repositoryId: version.repositoryId,
+        configuredEnvironmentId: process.env.MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID,
+      }) === version.qualificationEnvironmentDigest; } catch { environmentReady = false; }
+    }
+    const selectedIsolation = factoryIsolationMode(version.purpose);
     const frozenHarness = resolveFrozenHarnessBinding(version);
-    const primaryAgentIndex = (version.agentBindings ?? []).findIndex((binding) => binding.workflowAgentId === workflow?.steps?.[0]?.agent);
-    const primaryModel = agentVersions[primaryAgentIndex >= 0 ? primaryAgentIndex : 0]?.genome.modelConfig;
+    const versionProfileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+    const adapterRuntimeArtifact = versionProfileSnapshot?.harness?.source === "EXTERNAL_FROZEN"
+      ? { runtimeArtifact: frozenHarness.runtimeArtifact, runtimeArtifactSha256: frozenHarness.runtimeArtifactSha256 }
+      : resolveHarnessAdapterRuntimeArtifact(version.executor);
+    const primaryModel = (() => {
+      try {
+        return resolveFactoryWorkflowModelRoute({ workflow, agentBindings: version.agentBindings ?? [], agentVersions });
+      } catch {
+        return null;
+      }
+    })();
     const requiredSandboxCapabilities = selectedExecutionBackend === "remote-sandbox"
-      ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
-      : ["git-worktree", "workspace-write"];
+      ? ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
+      : ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", ...(offline ? offlineSnapshot?.requiredSandboxCapabilities ?? [] : [])];
     const host = repository
-      ? bindings.find((binding) => factoryWorkerEligibility({
+      ?  ( bindings.find((binding) => factoryWorkerEligibility({
           worker: {
             workerId: binding.hostId,
             status: binding.status,
@@ -840,13 +1265,17 @@ export const assessReadiness = mutation({
               version: frozenHarness.version,
               capabilityManifestSha256: frozenHarness.capabilityManifestSha256,
               effectiveConfigSha256: frozenHarness.effectiveConfigSha256,
+              runtimeArtifactSha256: adapterRuntimeArtifact.runtimeArtifactSha256,
+              requireFactoryVersionRuntimeArtifactBinding: Boolean(version.harnessRuntimeArtifactDigest),
             },
+            executionRuntimeArtifactSha256: frozenHarness.runtimeArtifactSha256,
             provider: primaryModel?.provider ?? null,
             model: primaryModel?.modelId ?? null,
-            harnessCapabilities: factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
-            isolation: "WORKSPACE_WRITE",
+            harnessCapabilities: offline ? offlineSnapshot?.requiredHarnessCapabilities ?? [] : factoryHarnessCapabilityRequirements(selectedIsolation),
+            isolation: selectedIsolation,
             sandboxCapabilities: requiredSandboxCapabilities,
             executionBackend: selectedExecutionBackend,
+            ...(offline ? { inferenceConstraint: NO_INFERENCE_CONSTRAINT } : {}),
             factoryDefinitionVersionId: String(version._id),
             factoryConfigurationDigest: version.configurationDigest,
             modelRouteDigest: version.modelRouteDigest,
@@ -855,7 +1284,7 @@ export const assessReadiness = mutation({
           activeWorkerLeaseCount: 0,
           now,
         }).eligible) ?? null
-      : null;
+       ) : null;
     const liveRepositoryDataClassification = normalizeRepositoryDataClassification(repository?.dataClassification);
     const repositoryClassificationReady = liveRepositoryDataClassification !== "UNCLASSIFIED"
       && liveRepositoryDataClassification === (version.repositoryDataClassification ?? "UNCLASSIFIED");
@@ -874,25 +1303,83 @@ export const assessReadiness = mutation({
       && sandboxProfileProductionEligible(sandboxProfile)
     );
     const modelRouteReady = Boolean(
-      modelRoute
+      selectedExecutionBackend !== "isolated-container"
+      && modelRoute
+      && primaryModel
+      && repository
       && modelRoute._id === version.modelCatalogId
-      && modelRoute.routeSnapshot
-      && modelRoute.routeDigest === version.modelRouteDigest
-      && exactModelRouteDigest(modelRoute.routeSnapshot) === version.modelRouteDigest
-      && JSON.stringify(modelRoute.routeSnapshot) === JSON.stringify(version.modelRouteSnapshot)
-      && modelRoute.qualificationDigest === version.modelQualificationDigest
-      && JSON.stringify(modelRoute.qualificationSnapshot) === JSON.stringify(version.modelQualificationSnapshot)
-      && modelRouteProductionEligible(modelRoute)
+      && factoryWorkflowModelRouteMatches({
+        workflow,
+        agentBindings: version.agentBindings ?? [],
+        agentVersions,
+      }, version.modelRouteSnapshot as any)
+      && frozenFactoryModelRouteEligible({
+        route: modelRoute,
+        version,
+        harness: frozenHarness,
+        executionBackend: selectedExecutionBackend,
+      })
+      && modelRouteQualifiedFor(modelRoute, {
+        workloadClass: factoryWorkloadClass(version.purpose),
+        riskClass: version.riskBoundary,
+        repositoryId: String(repository._id),
+      })
     );
+    const executionProfileReadiness = evaluateFactoryVersionExecutionProfile({
+      version,
+      profile: executionProfileAdmission?.profile ?? null,
+      admissionBlockers: executionProfileAdmission?.blockers ?? [],
+      now,
+    });
+    const offlineBindingReady = offline && executionProfileAdmission?.eligible && Boolean(executionProfileAdmission.profile)
+      && factoryVersionConfigurationDigest(version) === version.configurationDigest
+      && deterministicFactoryVersionIssues(version, workflow).length === 0
+      && validFactoryExecutionBinding({ ...version, executionBackend: "isolated-container",
+        offlineAdmission: { profile: executionProfileAdmission!.profile!, sandboxProfile: executionProfileAdmission!.sandboxProfile,
+          projection: factoryVersionExecutionProfileProjection(version)!, workflow,
+          repositoryDataClassification: liveRepositoryDataClassification, now, projectId: String(version.projectId),
+          tenantId: String(version.tenantId ?? ""), purpose: version.purpose ?? "SOFTWARE",
+          agentBindings: version.agentBindings ?? [], deterministicOperation: version.deterministicOperation } });
+    const assessmentExpiry = executionProfileReadiness.validUntil
+      ? Math.min(expiry, executionProfileReadiness.validUntil)
+      : expiry;
     const checks = [
-      check("github", "GitHub App connection", githubReady, now, expiry, "Install or repair the exact least-privilege GitHub App connection."),
+      ...(localRepository ? [
+        check("local-repository-admission", "Exact local repository admission", localAdmissionReady, now, expiry,
+          "Restore the exact current local synthetic repository admission."),
+        {
+          id: "local-github-non-applicable",
+          label: "GitHub publication authority",
+          status: "NOT_APPLICABLE" as const,
+          checkedAt: now,
+          evidence: {
+            reason: "NOT_APPLICABLE_FOR_LOCAL_SYNTHETIC_QUALIFICATION",
+            publicationAuthority: "NONE",
+            productionAuthority: "NONE",
+          },
+        },
+      ] : [
+        check("github", "GitHub App connection", githubReady, now, expiry,
+          "Install or repair the exact least-privilege GitHub App connection."),
+      ]),
       check("repository", "Repository access", repository?.status === "READY", now, expiry, "Validate repository access before activation."),
       check("repository-classification", "Repository data classification", repositoryClassificationReady, now, undefined, "Classify the repository and create a new immutable Factory version."),
       check("provider-egress", "Sensitive repository egress boundary", repositoryExecutionPolicy.allowed, now, expiry, "Use Local execution or a remote profile with provider-enforced egress evidence."),
       check("workflow", "Workflow version", workflow?.active === true, now, undefined, "Select an active versioned workflow."),
       check("workflow-contract", "Structured workflow contract", factoryWorkflowContractIssues(workflow).length === 0, now, undefined, "Replace heuristic completion and provider authority with schema-validated handoffs."),
       check("executor", "Generic harness adapter", validFactoryExecutorBinding(version.executor), now, undefined, "Select an exact adapter/version advertised by the canonical worker."),
-      check("model-route", "Exact qualified model route", modelRouteReady, now, undefined, "Create a new Factory version bound to an enabled, evidence-qualified exact model route."),
+      check("execution-profile", "Exact qualified Execution Profile", executionProfileReadiness.eligible, now, executionProfileReadiness.validUntil, "Select a current exact qualified Execution Profile and create a new immutable Factory version."),
+      ...(offline
+        ? [check("governed-mcp", "No tool authority", Boolean(offlineBindingReady && !offlineSnapshot?.toolGrant
+          && offlineSnapshot?.harness?.capabilityManifest?.tools?.mcp === "UNSUPPORTED"), now, undefined,
+          "Offline execution must have no Tool Grant and explicitly unsupported MCP capability.")]
+        : (version.executionProfileSnapshot as Record<string, any> | undefined)?.toolGrant
+        ? [check("governed-mcp", "Exact governed read-only MCP fixture", executionProfileReadiness.eligible, now, executionProfileReadiness.validUntil, "Replace the stale or revoked Tool Grant and create a new immutable Execution Profile and Factory version.")]
+        : [{ id: "governed-mcp", label: "Governed MCP capability", status: "NOT_APPLICABLE" as const, checkedAt: now, evidence: { maturity: "NO_TOOL_CAPABILITY", harnessMcpSupport: "UNSUPPORTED" } }]),
+      check("model-route", offline ? "Inference explicitly denied" : "Exact qualified model route",
+        offline ? Boolean(offlineBindingReady) : modelRouteReady, now, undefined, "Bind the exact qualified execution composition."),
+      ...(offline ? [check("qualification-environment", "Exact synthetic development environment", environmentReady, now, undefined,
+        "Bind the exact configured qualification environment; production targets are prohibited.")] : []),
       check("code-scopes", "Frozen code scopes", Boolean(
         version.codeScopeIds?.length
         && repository
@@ -917,7 +1404,12 @@ export const assessReadiness = mutation({
       check("host", "Canonical worker admission", Boolean(host), now, expiry, `Report a clean current worker offering ${selectedExecutionBackend} and its required capabilities.`),
       check("recovery", "Executor-compatible recovery", genericHarnessV1RecoveryReady(version.recovery), now, undefined, "Enable cancel and bounded retry; Generic Harness Contract V1 does not add pause or in-process resume authority."),
     ];
-    const status = checks.every((item) => item.status === "VERIFIED") ? "PASS" as const : "BLOCKED" as const;
+    const status = checks.every((item) => item.status === "VERIFIED" || (item.status === "NOT_APPLICABLE"
+      && ((item.id === "governed-mcp" && !(version.executionProfileSnapshot as any)?.toolGrant
+        && frozenHarness.capabilityManifest.tools.mcp === "UNSUPPORTED")
+        || (item.id === "local-github-non-applicable" && localRepository && localAdmissionReady))))
+      ? "PASS" as const
+      : "BLOCKED" as const;
     return await ctx.db.insert("factoryReadinessAssessments", {
       tenantId: version.tenantId,
       projectId: version.projectId,
@@ -926,30 +1418,67 @@ export const assessReadiness = mutation({
       configurationDigest: version.configurationDigest,
       status,
       checks,
-      assessedBy: access.actorId,
+      assessedBy: actorId,
       assessedAt: now,
-      expiresAt: expiry,
+      expiresAt: assessmentExpiry,
     });
-  },
-});
+}
 
 export const activate = mutation({
-  args: { factoryDefinitionVersionId: v.id("factoryDefinitionVersions") },
+  args: { factoryDefinitionVersionId: v.id("factoryDefinitionVersions"),
+    target: v.optional(v.union(v.literal("QUALIFICATION"), v.literal("PRODUCTION"))),
+    evidenceReference: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const version = await ctx.db.get(args.factoryDefinitionVersionId);
     if (!version) throw new Error("Factory version not found.");
     const access = await requireWorkspacePermission(ctx, version.projectId, FACTORY_PERMISSIONS.APPROVE);
+    const now = Date.now();
+    const offline = version.executionBackend === "isolated-container";
+    let environmentDigest: string | undefined;
+    if (offline) {
+      if (args.target !== "QUALIFICATION" || !args.evidenceReference?.trim() || args.evidenceReference.length > 2000) {
+        throw new Error("Offline Factory activation requires an explicit qualification target and evidence; production is prohibited.");
+      }
+      environmentDigest = qualificationEnvironmentDigest({
+        environment: version.environmentId ? await ctx.db.get(version.environmentId) : null,
+        projectId: version.projectId, tenantId: version.tenantId, repositoryId: version.repositoryId,
+        configuredEnvironmentId: process.env.MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID,
+      });
+      if (environmentDigest !== version.qualificationEnvironmentDigest) throw new Error("Qualification environment changed after Factory version creation.");
+    } else if (args.target === "QUALIFICATION") throw new Error("Qualification activation requires the exact offline composition.");
+
+    const executionProfileAdmission = version.executionProfileId
+      ? await loadExecutionProfileAdmission(ctx, version.executionProfileId, now)
+      : null;
+    const executionProfileReadiness = evaluateFactoryVersionExecutionProfile({
+      version,
+      profile: executionProfileAdmission?.profile ?? null,
+      admissionBlockers: executionProfileAdmission?.blockers ?? [],
+      now,
+    });
+    if (!executionProfileReadiness.eligible) {
+      throw new Error(`The exact Execution Profile is not current (${executionProfileReadiness.blockers.join(", ")}).`);
+    }
+    const freshAssessmentId = offline ? await recordFactoryReadiness(ctx, version, access.actorId) : null;
     const assessments = await ctx.db.query("factoryReadinessAssessments")
       .withIndex("by_version", (q) => q.eq("factoryDefinitionVersionId", version._id))
       .collect();
-    const latest = assessments.sort((left, right) => right.assessedAt - left.assessedAt)[0];
-    if (!latest || latest.status !== "PASS" || latest.expiresAt <= Date.now() || latest.configurationDigest !== version.configurationDigest) {
+    const latest = freshAssessmentId ? await ctx.db.get(freshAssessmentId)
+      : assessments.sort((left, right) => right.assessedAt - left.assessedAt)[0];
+    if (!latest || latest.status !== "PASS" || latest.expiresAt <= now || latest.configurationDigest !== version.configurationDigest) {
       throw new Error("A current passing readiness assessment for this exact Factory version is required.");
     }
     const definition = await ctx.db.get(version.factoryDefinitionId);
-    if (!definition) throw new Error("Factory not found.");
-    const now = Date.now();
-    await ctx.db.patch(definition._id, { status: "ACTIVE", activeVersionId: version._id, updatedAt: now });
+    if (!definition || definition.projectId !== version.projectId || definition.tenantId !== version.tenantId
+      || definition.status === "ARCHIVED" || (offline && definition.latestVersion !== version.version)) throw new Error("Factory is stale or outside scope.");
+    const qualificationActivation = offline ? {
+      schema: "factory-qualification-activation/v1" as const, target: "QUALIFICATION" as const,
+      environmentId: version.environmentId!, environmentDigest: environmentDigest!,
+      factoryDefinitionVersionId: version._id, configurationDigest: version.configurationDigest,
+      executionProfileDigest: version.executionProfileDigest!, actorId: access.actorId, assessmentId: latest._id,
+      evidenceReference: args.evidenceReference!.trim(), activatedAt: now, expiresAt: latest.expiresAt,
+    } : undefined;
+    await ctx.db.patch(definition._id, { status: "ACTIVE", activeVersionId: version._id, updatedAt: now, qualificationActivation });
     await ctx.db.insert("activities", {
       tenantId: definition.tenantId,
       projectId: definition.projectId,
@@ -959,7 +1488,7 @@ export const activate = mutation({
       description: `Activated ${definition.name} version ${version.version}`,
       targetType: "FACTORY_DEFINITION_VERSION",
       targetId: version._id,
-      metadata: { configurationDigest: version.configurationDigest, assessmentId: latest._id },
+      metadata: { configurationDigest: version.configurationDigest, assessmentId: latest._id, qualificationActivation },
     });
     return { factoryDefinitionId: definition._id, activeVersionId: version._id };
   },
@@ -976,7 +1505,7 @@ function check(
   return {
     id,
     label,
-    status: passing ? "VERIFIED" as const : "MISSING" as const,
+    status: passing ?  ( "VERIFIED" as const  ) :  ( "MISSING" as const ) ,
     checkedAt,
     expiresAt,
     remediation: passing ? undefined : remediation,

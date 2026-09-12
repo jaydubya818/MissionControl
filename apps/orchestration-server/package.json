@@ -13,6 +13,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1127.0",
+    "@aws-sdk/client-sts": "^3.1127.0",
+    "@fdlc/fab": "file:../../vendor/fab/fdlc-fab-0.1.0-experimental.9.tgz",
     "@hono/node-server": "^1.19.13",
     "@mission-control/agent-runtime": "workspace:*",
     "@mission-control/context-router": "workspace:*",
@@ -20,15 +23,17 @@
     "@mission-control/memory": "workspace:*",
     "@mission-control/shared": "workspace:*",
     "@mission-control/workflow-engine": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.26.0",
     "ajv": "8.18.0",
     "ajv-formats": "3.0.1",
     "canonicalize": "2.1.0",
     "convex": "^1.31.7",
     "dotenv": "^16.3.1",
-    "hono": "^4.12.34",
+    "hono": "^4.13.7",
     "openai": "^4.73.0",
     "ws": "^8.21.3",
-    "yaml": "^2.3.4"
+    "yaml": "^2.3.4",
+    "zod": "4.3.6"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",

@@ -1,0 +1,39 @@
+{
+  "schema": "fdlc-provider-liability-occ/v1",
+  "fixtureOnly": true,
+  "providerCalls": 0,
+  "backend": "precompiled-2026-08-25-7cce8fb",
+  "scope": "isolated disposable Convex backend; same pure reservation function and production index read/write pattern, not end-to-end admission",
+  "concurrentBudgetCreation": [
+    {
+      "status": "fulfilled"
+    },
+    {
+      "status": "rejected"
+    }
+  ],
+  "concurrentRequests": [
+    {
+      "status": "fulfilled"
+    },
+    {
+      "status": "rejected"
+    }
+  ],
+  "maximumNanoUsd": 30,
+  "holds": [
+    {
+      "attemptId": "fixture",
+      "classification": "UNKNOWN",
+      "costClassification": "UNKNOWN",
+      "generation": 1,
+      "leaseId": "fixture",
+      "maximumNanoUsd": 30,
+      "maximumOutputTokens": 10,
+      "receiptRevision": 0,
+      "requestDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "requestId": "A",
+      "state": "RESERVED"
+    }
+  ]
+}

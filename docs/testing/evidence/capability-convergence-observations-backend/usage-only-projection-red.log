@@ -1,0 +1,50 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-observations/packages/model-router
+
+ ❯ src/__tests__/governed-inference.test.ts (17 tests | 1 failed | 15 skipped) 8ms
+   ↓ governed inference reservation and intent > freezes a finite exact-route reservation
+   ↓ governed inference reservation and intent > rejects fallback loops, missing rates, duplicates, stale leases, and overflow
+   ↓ governed inference reservation and intent > lets cancellation win before claim and never redispatches ambiguous claims
+   ↓ immutable provider receipts and pricing > prices cache dimensions from the frozen price book
+   ↓ immutable provider receipts and pricing > keeps missing usage and ambiguous delivery unknown
+   ↓ immutable provider receipts and pricing > retains provider and resolved-model drift with unknown pricing
+   ↓ immutable provider receipts and pricing > retains usage with UNKNOWN cost for overflow
+   ↓ immutable provider receipts and pricing > retains usage with UNKNOWN cost for missingRate
+   ↓ immutable provider receipts and pricing > retains usage with UNKNOWN cost for batchRate
+   ↓ immutable provider receipts and pricing > fails closed instead of rounding unsafe financial arithmetic
+   ✓ outcome economics > does not reprice a corrected UNKNOWN observation after a usage-only correction: false 3ms
+   × outcome economics > does not reprice a corrected UNKNOWN observation after a usage-only correction: true 4ms
+     → expected 'COMPLETE' to be 'UNKNOWN' // Object.is equality
+   ↓ outcome economics > requires independent verification before human acceptance and preserves absent later stages
+   ↓ outcome economics > attributes failed primary and fallback spend to one selected-route outcome
+   ↓ outcome economics > never lets unknown cost improve a route
+   ↓ outcome economics > freezes newer provider reconciliation into projection cost and lineage
+   ↓ outcome economics > keeps comparisons advisory and fails closed for an unqualified route
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/governed-inference.test.ts > outcome economics > does not reprice a corrected UNKNOWN observation after a usage-only correction: true
+AssertionError: expected 'COMPLETE' to be 'UNKNOWN' // Object.is equality
+
+Expected: "UNKNOWN"
+Received: "COMPLETE"
+
+ ❯ src/__tests__/governed-inference.test.ts:255:41
+    253|       reconciliations: [{ reconciliationId: "unknown", receiptId: rece…
+    254|         ...(laterUsageOnly ? [{ reconciliationId: "usage-only", receip…
+    255|     expect(projection.costCompleteness).toBe("UNKNOWN"); expect(projec…
+       |                                         ^
+    256|     expect(receipt.costCompleteness).toBe("COMPLETE");
+    257|     expect(projection.reconciliationIds).toHaveLength(laterUsageOnly ?…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 15 skipped (17)
+   Start at  00:58:26
+   Duration  258ms (transform 50ms, setup 0ms, collect 73ms, tests 8ms, environment 0ms, prepare 26ms)
+
+undefined
+/private/tmp/fdlc-program-observations/packages/model-router:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/__tests__/governed-inference.test.ts -t after a usage-only correction

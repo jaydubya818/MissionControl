@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-current-main-reconciliation-20260905/apps/orchestration-server
+
+ ✓ src/__tests__/bedrockAdapter.test.ts (61 tests) 44ms
+ ✓ src/__tests__/bedrockReconciliation.test.ts (16 tests) 7ms
+
+ Test Files  2 passed (2)
+      Tests  77 passed (77)
+   Start at  15:19:47
+   Duration  547ms (transform 202ms, setup 0ms, collect 482ms, tests 52ms, environment 0ms, prepare 71ms)

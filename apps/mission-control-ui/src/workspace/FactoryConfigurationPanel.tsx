@@ -18,20 +18,29 @@ export function FactoryConfigurationPanel({
   repositoryDataClassification: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED" | "UNCLASSIFIED";
 }) {
   const definitions = useQuery(api["factory/configuration"].list, { projectId });
+  const governedTools = useQuery(api["factory/governedMcp"].list, { projectId });
   const createFactory = useMutation(api["factory/configuration"].create);
-  const [pending, setPending] = useState(false);
+  const [pendingPurpose, setPendingPurpose] = useState<"SOFTWARE" | "VERIFICATION" | "">("");
   const [error, setError] = useState("");
-  const definition = definitions?.find((item) => item.repositoryId === repositoryId);
+  const repositoryDefinitions = definitions?.filter((item) =>
+    item.repositoryId === repositoryId && item.status !== "ARCHIVED"
+  ) ?? [];
+  const softwareFactory = repositoryDefinitions.find((item) => (item.purpose ?? "SOFTWARE") === "SOFTWARE");
+  const verificationFactory = repositoryDefinitions.find((item) => item.purpose === "VERIFICATION");
 
-  const create = async () => {
-    setPending(true);
+  const create = async (purpose: "SOFTWARE" | "VERIFICATION") => {
+    setPendingPurpose(purpose);
     setError("");
     try {
-      await createFactory({ repositoryId, name: "Software Factory" });
+      await createFactory({
+        repositoryId,
+        name: purpose === "SOFTWARE" ? "Software Factory" : "Verification Factory",
+        purpose,
+      });
     } catch {
       setError("The Factory could not be created. Confirm workspace automation authority and try again.");
     } finally {
-      setPending(false);
+      setPendingPurpose("");
     }
   };
 
@@ -47,31 +56,85 @@ export function FactoryConfigurationPanel({
             <Factory size={14} aria-hidden /> Factory configuration
           </div>
           <div className="mt-1 text-[12px] text-ink-muted">
-            Freeze the repository, workflow, executor, policy, budget, verifiers, and recovery boundary before activation.
+            Freeze the repository, workflow, qualified execution profile, policy, budget, verifiers, and recovery boundary before activation.
           </div>
         </div>
-        {!definition ? (
-          <Button variant="outline" size="sm" disabled={pending} onClick={create}>
-            {pending ? "Creating…" : "Create Factory"}
-          </Button>
-        ) : (
-          <StatusBadge tone={definition.status === "ACTIVE" ? "success" : "neutral"}>
-            {definition.status.toLowerCase()}
-          </StatusBadge>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {!softwareFactory ? (
+            <Button variant="outline" size="sm" disabled={Boolean(pendingPurpose)} onClick={() => void create("SOFTWARE")}>
+              {pendingPurpose === "SOFTWARE" ? "Creating…" : "Create Software Factory"}
+            </Button>
+          ) : null}
+          {!verificationFactory ? (
+            <Button variant="outline" size="sm" disabled={Boolean(pendingPurpose)} onClick={() => void create("VERIFICATION")}>
+              {pendingPurpose === "VERIFICATION" ? "Creating…" : "Create Verification Factory"}
+            </Button>
+          ) : null}
+        </div>
       </div>
+      {governedTools && governedTools.grants.length > 0 ? (
+        <section className="mt-3 rounded-lg border border-line bg-surface-2 p-3" aria-label="Governed tool grants">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[12px] font-medium text-ink">Governed tool grants</div>
+              <div className="mt-0.5 text-[10.5px] text-ink-muted">Exact read-only grants. Discovery and tool output never create authority.</div>
+            </div>
+            <StatusBadge tone={governedTools.maturity === "QUALIFIED_ONE_REAL_READ_ONLY_SERVICE" ? "success" : "warning"}>{governedTools.maturity === "QUALIFIED_ONE_REAL_READ_ONLY_SERVICE" ? "one real service" : "qualification fixture"}</StatusBadge>
+          </div>
+          <ul className="mt-2 space-y-2" aria-label="Tool Grant history">
+            {governedTools.grants
+              .slice()
+              .sort((left, right) => right.version - left.version)
+              .map((grant) => {
+                const snapshot = grant.immutableSnapshot as Record<string, any>;
+                const tool = snapshot.toolVersionSnapshot as Record<string, any>;
+                const state = grant.current ? "qualified" : grant.state === "REVOKED" ? "revoked" : "stale";
+                return (
+                  <li key={grant._id} className="rounded-md border border-line bg-surface-1 p-2.5 text-[11px] text-ink-secondary">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-ink">{grant.grantKey} · v{grant.version}</span>
+                      <StatusBadge tone={grant.current ? "success" : "warning"}>{state}</StatusBadge>
+                    </div>
+                    <div className="mt-1 break-all font-mono text-[10px] text-ink-muted">{grant.grantDigest} · tool {grant.toolVersionDigest}</div>
+                    <div className="mt-1">{snapshot.operation} · read-only · {String(snapshot.destination).toLowerCase().replace(/_/g, " ")} · credential {String(snapshot.credentialClass).toLowerCase()}</div>
+                    <div className="mt-1 text-ink-muted">{tool?.server?.key} · {tool?.transport?.kind?.toLowerCase().replace(/_/g, " ")} · {tool?.dataClassification?.toLowerCase()} · {grant.current ? "service contract current" : "service contract unavailable"}</div>
+                    {grant.state === "REVOKED" ? (
+                      <div className="mt-1 text-warning">Revoked: {grant.revocationReason ?? "new calls are denied"}. Create a new exact grant and Execution Profile; history remains immutable.</div>
+                    ) : null}
+                  </li>
+                );
+              })}
+          </ul>
+        </section>
+      ) : null}
       {error ? <div role="alert" className="mt-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">{error}</div> : null}
-      {!definition ? (
+      {repositoryDefinitions.length === 0 ? (
         <div className="mt-3 rounded-lg border border-dashed border-line bg-surface-2 px-4 py-4 text-[12.5px] text-ink-secondary">
           No Factory exists for this repository. Creating one does not activate or dispatch work.
         </div>
       ) : (
-        <FactoryVersionEditor
-          factoryDefinitionId={definition._id}
-          projectId={projectId}
-          repositoryId={repositoryId}
-          repositoryDataClassification={repositoryDataClassification}
-        />
+        <div className="space-y-4">
+          {repositoryDefinitions.map((definition) => {
+            const purpose = definition.purpose ?? "SOFTWARE";
+            return (
+              <section key={definition._id} aria-label={`${purpose === "VERIFICATION" ? "Verification" : "Software"} Factory`} className="mt-3 rounded-lg border border-line bg-surface-1 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[12.5px] font-medium text-ink">{definition.name}</div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge tone="neutral">{purpose.toLowerCase()}</StatusBadge>
+                    <StatusBadge tone={definition.status === "ACTIVE" ? "success" : "neutral"}>{definition.status.toLowerCase()}</StatusBadge>
+                  </div>
+                </div>
+                <FactoryVersionEditor
+                  factoryDefinitionId={definition._id}
+                  projectId={projectId}
+                  repositoryId={repositoryId}
+                  repositoryDataClassification={repositoryDataClassification}
+                />
+              </section>
+            );
+          })}
+        </div>
       )}
     </section>
   );
@@ -102,7 +165,7 @@ function FactoryVersionEditor({
   const createVerifier = useMutation(api["context/verifiers"].create);
   const createAgentTemplate = useMutation(api["registry/agentTemplates"].createTemplate);
   const createAgentVersion = useMutation(api["registry/agentVersions"].createVersion);
-  const upsertWorkflow = useMutation(api.workflows.upsert);
+  const registerProductionWorkflow = useMutation(api.workflows.registerProduction);
   const [workflowId, setWorkflowId] = useState("");
   const [policyId, setPolicyId] = useState("");
   const [verifierIds, setVerifierIds] = useState<string[]>([]);
@@ -115,7 +178,9 @@ function FactoryVersionEditor({
   const [experienceLevel] = useFactoryExperienceLevel();
   const [executionBackend, setExecutionBackend] = useState<"persistent-worker" | "remote-sandbox">("persistent-worker");
   const [harnessKey, setHarnessKey] = useState("codex\0v1");
+  const [modelCatalogId, setModelCatalogId] = useState("");
   const [sandboxProfileId, setSandboxProfileId] = useState("");
+  const [executionProfileId, setExecutionProfileId] = useState("");
   const [pending, setPending] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -224,7 +289,8 @@ function FactoryVersionEditor({
         required: ["status", ...required],
         additionalProperties: false,
       });
-      const id = await upsertWorkflow({
+      const id = await registerProductionWorkflow({
+        projectId,
         workflowId: `verification-first-v1-${projectId}`,
         name: "Verification-First V1 Delivery",
         description: "Structured planning, bounded implementation, independent verification, and policy gating for governed V1 delivery.",
@@ -287,7 +353,6 @@ function FactoryVersionEditor({
           },
         ],
         active: true,
-        createdBy: "operator",
       });
       setWorkflowId(id);
       setMessage("Structured Verification-First V1 workflow created and selected.");
@@ -311,6 +376,22 @@ function FactoryVersionEditor({
   ) ?? versionOptions?.harnesses[0];
   const defaultAgentVersionId = versionOptions?.agentVersions[0]?._id;
   const selectedWorkflowAgentKey = selectedWorkflow?.agents.map((agent) => agent.id).join(":") ?? "";
+  const primaryWorkflowAgentId = selectedWorkflow?.steps?.[0]?.agent ?? selectedWorkflow?.agents[0]?.id;
+  const primaryAgentVersion = versionOptions?.agentVersions.find((version) =>
+    version._id === agentBindings[primaryWorkflowAgentId ?? ""]
+  );
+  const compatibleModelRoutes = (versionOptions?.modelRoutes ?? []).filter((route) =>
+    route.provider === primaryAgentVersion?.modelConfig?.provider?.trim().toLowerCase()
+    && route.modelId === primaryAgentVersion?.modelConfig?.modelId
+  );
+  const compatibleModelRouteKey = compatibleModelRoutes.map((route) => route._id).join(":");
+  const requiredIsolationMode = detail?.definition.purpose === "VERIFICATION" ? "READ_ONLY" : "WORKSPACE_WRITE";
+  const compatibleExecutionProfiles = (versionOptions?.executionProfiles ?? []).filter((profile) =>
+    profile.isolationModes.includes(requiredIsolationMode)
+    && compatibleModelRoutes.some((route) => route._id === profile.modelCatalogId)
+  );
+  const compatibleExecutionProfileKey = compatibleExecutionProfiles.map((profile) => profile._id).join(":");
+  const selectedExecutionProfile = compatibleExecutionProfiles.find((profile) => profile._id === executionProfileId);
 
   useEffect(() => {
     if (!selectedWorkflow || !defaultAgentVersionId || selectedWorkflow.agents.length === 0) return;
@@ -326,6 +407,24 @@ function FactoryVersionEditor({
       return changed ? next : current;
     });
   }, [defaultAgentVersionId, selectedWorkflowAgentKey]);
+
+  useEffect(() => {
+    if (compatibleModelRoutes.some((route) => route._id === modelCatalogId)) return;
+    setModelCatalogId(compatibleModelRoutes[0]?._id ?? "");
+  }, [compatibleModelRouteKey, modelCatalogId]);
+
+  useEffect(() => {
+    if (compatibleExecutionProfiles.some((profile) => profile._id === executionProfileId)) return;
+    setExecutionProfileId(compatibleExecutionProfiles[0]?._id ?? "");
+  }, [compatibleExecutionProfileKey, executionProfileId]);
+
+  useEffect(() => {
+    if (!selectedExecutionProfile) return;
+    setHarnessKey(`${selectedExecutionProfile.executor.adapter}\0${selectedExecutionProfile.executor.version}`);
+    setModelCatalogId(selectedExecutionProfile.modelCatalogId);
+    setExecutionBackend(selectedExecutionProfile.executionBackend);
+    setSandboxProfileId(selectedExecutionProfile.sandboxProfileId ?? "");
+  }, [selectedExecutionProfile?._id]);
 
   useEffect(() => {
     if (!workflowId && workflows?.[0]?._id) setWorkflowId(workflows[0]._id);
@@ -445,8 +544,8 @@ function FactoryVersionEditor({
     setError("");
     setMessage("");
     const workflow = workflows.find((item) => item._id === workflowId);
-    if (!workflowId || !policyId || verifierIds.length === 0 || codeScopeIds.length === 0) {
-      setError("Select an active workflow, policy, code scope, and at least one independent verifier.");
+    if (!workflowId || !policyId || verifierIds.length === 0 || codeScopeIds.length === 0 || !executionProfileId) {
+      setError("Select an active workflow, qualified Execution Profile, policy, code scope, and at least one independent verifier.");
       return;
     }
     if (!workflow || workflow.agents.some((agent) => !agentBindings[agent.id])) {
@@ -478,12 +577,7 @@ function FactoryVersionEditor({
       await createVersion({
         factoryDefinitionId,
         workflowId: workflowId as Id<"workflows">,
-        executor: {
-          adapter: selectedHarness.manifest.identity.adapterId,
-          version: selectedHarness.manifest.identity.adapterVersion,
-        },
-        executionBackend,
-        sandboxProfileId: executionBackend === "remote-sandbox" ? sandboxProfileId as Id<"factorySandboxProfiles"> : undefined,
+        executionProfileId: executionProfileId as Id<"factoryExecutionProfiles">,
         codeScopeIds: codeScopeIds as Id<"repositoryCodeScopes">[],
         agentBindings: workflow.agents.map((agent) => ({
           workflowAgentId: agent.id,
@@ -536,7 +630,7 @@ function FactoryVersionEditor({
   };
 
   const selectedSandboxProfile = (versionOptions.sandboxProfiles ?? []).find((profile) => profile._id === sandboxProfileId);
-  const saveButton = <Button size="sm" disabled={Boolean(pending)} onClick={save}>{pending === "save" ? "Saving…" : "Create configuration version"}</Button>;
+  const saveButton = <Button size="sm" disabled={Boolean(pending) || !selectedExecutionProfile} onClick={save}>{pending === "save" ? "Saving…" : "Create configuration version"}</Button>;
 
   return (
     <div className="mt-3 space-y-3">
@@ -552,6 +646,38 @@ function FactoryVersionEditor({
             <div className="mt-1 text-[11.5px] leading-relaxed text-ink-muted">The Factory experience level selected in the operator shell controls disclosure here. Acceptance, independent verification, publication, and merge authority stay outside the execution backend.</div>
           </div>
         </div>
+        <label className="mt-3 block text-[11.5px] text-ink-muted">Qualified Execution Profile
+          <select
+            aria-label="Qualified Execution Profile"
+            className="mt-1 w-full rounded-md border border-line bg-surface-1 px-2 py-2 text-[12px] text-ink"
+            value={executionProfileId}
+            onChange={(event) => setExecutionProfileId(event.target.value)}
+            disabled={compatibleExecutionProfiles.length === 0}
+          >
+            <option value="">{compatibleExecutionProfiles.length === 0 ? "No compatible qualified profile" : "Select exact profile"}</option>
+            {compatibleExecutionProfiles.map((profile) => (
+              <option key={profile._id} value={profile._id}>
+                {profile.profileKey} · v{profile.version} · {profile.executor.adapter}/{profile.executor.version} · {profile.executionBackend}
+              </option>
+            ))}
+          </select>
+          {selectedExecutionProfile ? (
+            <span className="mt-2 block rounded-md border border-line bg-surface-1 p-3">
+              <span className="block font-mono text-[10.5px] text-ink-muted">{selectedExecutionProfile.profileDigest} · qualification {selectedExecutionProfile.qualificationDigest}</span>
+              {selectedExecutionProfile.toolGrant ? (
+                <span className="mt-2 block text-[11.5px] leading-relaxed text-ink-secondary">
+                  <span className="font-medium text-ink">{selectedExecutionProfile.toolGrant.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE" ? "Qualified real read-only service" : "Qualified fixture tool"}</span> · {selectedExecutionProfile.toolGrant.key} v{selectedExecutionProfile.toolGrant.version} · <span className="font-mono">{selectedExecutionProfile.toolGrant.operation}</span><br />
+                  Host broker only · read-only · credential {selectedExecutionProfile.toolGrant.credentialClass.toLowerCase()} · expires {new Date(selectedExecutionProfile.toolGrant.expiresAt).toLocaleString()}<br />
+                  <span className={selectedExecutionProfile.toolGrant.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE" ? "text-success" : "text-warning"}>{selectedExecutionProfile.toolGrant.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE" ? "One exact real service operation is admitted. Tool output remains untrusted; harness MCP remains unsupported." : "Qualification fixture — no real MCP service is admitted. Harness MCP remains unsupported."}</span>
+                </span>
+              ) : (
+                <span className="mt-2 block text-[11.5px] text-ink-muted">No tool capability. Historical profiles do not inherit MCP authority.</span>
+              )}
+            </span>
+          ) : (
+            <span className="mt-1 block text-warning">Register and qualify an exact profile for this workflow route and {requiredIsolationMode.toLowerCase().replace(/_/g, " ")} boundary.</span>
+          )}
+        </label>
         <ExecutionBackendSelector
           backend={executionBackend}
           onBackendChange={setExecutionBackend}
@@ -563,6 +689,7 @@ function FactoryVersionEditor({
           remoteBlockReason={remoteSandboxEligible
             ? undefined
             : `${repositoryDataClassification.toLowerCase()} repository: no eligible profile proves provider-enforced egress.`}
+          locked
         />
         {experienceLevel === "basic" ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
@@ -626,6 +753,7 @@ function FactoryVersionEditor({
               const next = versionOptions.harnesses.find((item) => `${item.manifest.identity.adapterId}\0${item.manifest.identity.adapterVersion}` === event.target.value);
               if (next && !next.manifest.admission.executionBackends.includes("remote-sandbox")) setExecutionBackend("persistent-worker");
             }}
+            disabled
           >
             {versionOptions.harnesses.map((item) => {
               const identity = item.manifest.identity;
@@ -650,6 +778,13 @@ function FactoryVersionEditor({
           <Button className="mt-2" type="button" variant="outline" size="sm" disabled={Boolean(pending)} onClick={createVerificationWorkflow}>
             {pending === "workflow" ? "Creating workflow…" : "Create Verification-First workflow"}
           </Button>
+        </label>
+        <label className="text-[11.5px] text-ink-muted">Qualified model route
+          <select className="mt-1 w-full rounded-md border border-line bg-surface-1 px-2 py-2 text-[12px] text-ink" value={modelCatalogId} onChange={(event) => setModelCatalogId(event.target.value)} disabled>
+            <option value="">{compatibleModelRoutes.length === 0 ? "No compatible promoted route" : "Select qualified route"}</option>
+            {compatibleModelRoutes.map((route) => <option key={route._id} value={route._id}>{route.displayName} · {route.provider}/{route.modelId}</option>)}
+          </select>
+          {compatibleModelRoutes.length === 0 ? <span className="mt-2 block text-warning">Promote an exact route matching the first workflow agent and selected harness before creating this version.</span> : null}
         </label>
         <label className="text-[11.5px] text-ink-muted">Governance policy
           <select className="mt-1 w-full rounded-md border border-line bg-surface-1 px-2 py-2 text-[12px] text-ink" value={policyId} onChange={(event) => setPolicyId(event.target.value)}>
@@ -772,6 +907,7 @@ function ExecutionBackendSelector({
   showProfileDetails,
   remoteEligible,
   remoteBlockReason,
+  locked = false,
 }: {
   backend: "persistent-worker" | "remote-sandbox";
   onBackendChange: (backend: "persistent-worker" | "remote-sandbox") => void;
@@ -781,6 +917,7 @@ function ExecutionBackendSelector({
   showProfileDetails: boolean;
   remoteEligible: boolean;
   remoteBlockReason?: string;
+  locked?: boolean;
 }) {
   const selected = profiles.find((profile) => profile._id === profileId);
   return (
@@ -788,11 +925,11 @@ function ExecutionBackendSelector({
       <legend className="sr-only">Execution boundary</legend>
       <div className="mt-3 grid gap-2 @md:grid-cols-2">
         <label className={`flex min-h-16 cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${backend === "persistent-worker" ? "border-[var(--focus-ring)] bg-surface-1" : "border-line bg-surface-1/50"}`}>
-          <input aria-label="Local" className="mt-1" type="radio" name="factory-execution-backend" checked={backend === "persistent-worker"} onChange={() => onBackendChange("persistent-worker")} />
+          <input aria-label="Local" className="mt-1" type="radio" name="factory-execution-backend" checked={backend === "persistent-worker"} disabled={locked} onChange={() => onBackendChange("persistent-worker")} />
           <span><span className="block text-[12.5px] font-medium text-ink">Local</span><span className="mt-0.5 block text-[11.5px] text-ink-muted">Execute in the canonical worker's owned host worktree. No provider spend.</span></span>
         </label>
         <label className={`flex min-h-16 items-start gap-3 rounded-md border p-3 transition-colors ${remoteEligible ? "cursor-pointer" : "cursor-not-allowed opacity-70"} ${backend === "remote-sandbox" ? "border-[var(--focus-ring)] bg-surface-1" : "border-line bg-surface-1/50"}`}>
-          <input aria-label="Isolated Sandbox" className="mt-1" type="radio" name="factory-execution-backend" checked={backend === "remote-sandbox"} disabled={!remoteEligible} onChange={() => onBackendChange("remote-sandbox")} />
+          <input aria-label="Isolated Sandbox" className="mt-1" type="radio" name="factory-execution-backend" checked={backend === "remote-sandbox"} disabled={locked || !remoteEligible} onChange={() => onBackendChange("remote-sandbox")} />
           <span>
             <span className="block text-[12.5px] font-medium text-ink">Isolated Sandbox</span>
             <span className="mt-0.5 block text-[11.5px] text-ink-muted">
@@ -804,7 +941,7 @@ function ExecutionBackendSelector({
       {backend === "remote-sandbox" ? (
         <div className="mt-3 rounded-md border border-line bg-surface-1 p-3">
           {showProfileDetails ? <label className="text-[11.5px] text-ink-muted">Sandbox Profile
-            <select className="mt-1 w-full rounded-md border border-line bg-surface-1 px-2 py-2 text-[12px] text-ink" value={profileId} onChange={(event) => onProfileChange(event.target.value)}>
+            <select className="mt-1 w-full rounded-md border border-line bg-surface-1 px-2 py-2 text-[12px] text-ink" value={profileId} onChange={(event) => onProfileChange(event.target.value)} disabled={locked}>
               <option value="">Select immutable profile</option>
               {profiles.map((profile) => <option key={profile._id} value={profile._id} disabled={profile.readinessState === "BLOCKED"}>{profile.profileKey} · v{profile.version} · {profile.readinessState.toLowerCase()}</option>)}
             </select>

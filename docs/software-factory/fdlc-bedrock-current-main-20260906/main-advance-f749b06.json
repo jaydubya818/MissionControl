@@ -1,0 +1,180 @@
+{
+  "from": "e9d2f52720e634b79d2c614a7fb9812a6b986fe9",
+  "to": "f749b06c8ef39c5bd22c9e0ad76334482ec35b33",
+  "fromRuntime": 45,
+  "toRuntime": 46,
+  "proposedRuntime": 47,
+  "publicDelta": "6 additions, 1 changed, 0 removals; readiness already present",
+  "classification": [
+    {
+      "file": "README.md",
+      "classification": "SEMANTIC_MERGE",
+      "reason": "Keep current-main README and update declared runtime v47."
+    },
+    {
+      "file": "apps/mission-control-ui/src/controlPlane/WorkOrderReadinessPanel.tsx",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "apps/mission-control-ui/src/controlPlane/WorkOrdersView.tsx",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "apps/orchestration-server/src/factoryGitRuntime.ts",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "convex/__tests__/workOrderReadiness.test.ts",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "convex/_generated/api.d.ts",
+      "classification": "SEMANTIC_MERGE",
+      "reason": "Regenerate current API union authoritatively after reconciliation."
+    },
+    {
+      "file": "convex/lib/factoryDispatch.ts",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "convex/lib/runtimeContract.ts",
+      "classification": "SEMANTIC_MERGE",
+      "reason": "Advance once from new baseline v46 to v47 per revised contract plan."
+    },
+    {
+      "file": "convex/lib/workOrderReadiness.ts",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "convex/workOrders.ts",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/OVERVIEW.md",
+      "classification": "SEMANTIC_MERGE",
+      "reason": "Keep current-main overview and update declared runtime v47."
+    },
+    {
+      "file": "docs/plans/2026-09-04-feat-fdlc-capability-convergence-plan.md",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/product/software-factory-capability-maturity.md",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/research/2026-09-04-fdlc-capability-audit/current-main-reconciliation.md",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/research/2026-09-04-fdlc-capability-audit/source-manifest.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/software-factory/fdlc-phase1-pilot-record.md",
+      "classification": "SEMANTIC_MERGE",
+      "reason": "Retain later explicitly approved named identities and Phase 1 evidence; main adds older unknown-identity snapshot already preserved in history."
+    },
+    {
+      "file": "docs/software-factory/workorder-readiness-contract.md",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04-final/automated-checks.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04-final/eval-receipt.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04-final/scenario-evidence.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04-qualified/automated-checks.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/README.md",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/automated-checks.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/denied-query.log",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/gate-first-pass-results.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/negative-control-failure.log",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/restricted-test-failure.log",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/runtime-docs-failure.log",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/security-corrected.log",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-readiness-2026-09-04/stale-workorder-query.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-review-2026-09-05/automated-checks.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-review-2026-09-05/eval-receipt.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "docs/testing/evidence/fdlc-phase0-review-2026-09-05/scenario-evidence.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Main readiness/Phase 0 implementation and evidence supersedes historical duplicate."
+    },
+    {
+      "file": "todos/059-in-progress-p1-real-product-repository-pilot.md",
+      "classification": "SEMANTIC_MERGE",
+      "reason": "Retain main kickoff and later Phase 1 records plus active continuation."
+    }
+  ]
+}

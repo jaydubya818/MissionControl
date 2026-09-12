@@ -1,0 +1,85 @@
+*** Begin Patch
+*** Update File: /private/tmp/fdlc-program-accounting-recovery/convex/factory/providerLiability.ts
+@@
+-} from "../lib/bedrockBridgeIdentity"; import { v } from "convex/values";
++} from "../lib/bedrockBridgeIdentity"; import { v, ConvexError } from "convex/values";
+@@
+ export const recordUsageInternal = internalMutation({
+@@
+   handler: async (ctx, args) => {
++    try {
+@@
+     return await applyUsage(
+@@
+       false,
+     );
++    } catch (error) {
++      // Preserve rejection while carrying only exact authoritative reasons
++      // through the signed action's transport boundary.
++      const reasons = new Set(["USAGE_SUBJECT_MISMATCH", "USAGE_INVALID_OR_REPLAYED", "USAGE_IDENTITY_CHANGED",
++        "USAGE_REVISION_CONFLICT", "PROVIDER_RECEIPT_ALREADY_OWNED", "Historical usage reservation scope mismatch",
++        "Historical usage price identity mismatch", "Usage Attempt mismatch"]);
++      if (error instanceof Error && reasons.has(error.message)) {
++        throw new ConvexError({ code: "ACCOUNTING_HISTORICAL_CONFLICT", reason: error.message });
++      }
++      throw error;
++    }
+   },
+ });
+*** Update File: /private/tmp/fdlc-program-accounting-recovery/convex/serviceCommands.ts
+@@
+-import { v } from "convex/values";
++import { v, ConvexError } from "convex/values";
+@@
+ export const recordProviderUsage = action({
+@@
+   handler: async (ctx, args): Promise<any> => {
++    try {
+@@
+     } catch (error) { await fail(ctx, receipt.receiptId, error); throw error; }
++    } catch (error) {
++      // Settlement-only transport labels; authentication and denial order above
++      // are unchanged. Unknown failures and historical typed errors pass through.
++      if (error instanceof Error) {
++        const authenticationReasons: Record<string, string> = {
++          "Service command denied (signature-invalid).": "SERVICE_SIGNATURE_INVALID",
++          "Service command denied (service-command-secret-not-configured).": "SERVICE_SECRET_UNCONFIGURED",
++        };
++        const reason = Object.hasOwn(authenticationReasons, error.message) ? authenticationReasons[error.message] : undefined;
++        if (reason) throw new ConvexError({ code: "ACCOUNTING_AUTHENTICATION_REQUIRED", reason });
++        if (error.message === "Service command denied (command-scope-mismatch).") {
++          throw new ConvexError({ code: "ACCOUNTING_SCOPE_REJECTED", reason: "SERVICE_SCOPE_MISMATCH" });
++        }
++      }
++      throw error;
++    }
+   },
+ });
+*** Update File: /private/tmp/fdlc-program-accounting-recovery/apps/orchestration-server/src/accountingDeliveryWorker.ts
+@@
+ import { makeFunctionReference } from "convex/server";
++import { ConvexError } from "convex/values";
+@@
+ export function accountingDeliveryFailure(error: unknown): { state: AccountingDeliveryStatus["state"]; code: string } {
+@@
+-  if (blocked.has(message)) return { state: "BLOCKED_REVIEW", code: "ACCOUNTING_HISTORICAL_CONFLICT" };
+-  if (["MISSION_CONTROL_SERVICE_COMMAND_SECRET is required for service commands.",
+-    "Service command denied (signature-invalid).", "Service command denied (service-command-secret-not-configured).",
+-    "Service command denied (command-scope-mismatch)."].includes(message)) return { state: "SUSPENDED", code: "ACCOUNTING_AUTHENTICATION_REQUIRED" };
++  if (error instanceof ConvexError && error.data && typeof error.data === "object" && !Array.isArray(error.data)) {
++    const data = error.data as Record<string, unknown>;
++    if (Object.keys(data).sort().join(",") === "code,reason" && typeof data.reason === "string") {
++      if (data.code === "ACCOUNTING_HISTORICAL_CONFLICT" && blocked.has(data.reason)) return { state: "BLOCKED_REVIEW", code: data.code };
++      if (data.code === "ACCOUNTING_AUTHENTICATION_REQUIRED" && ["SERVICE_SIGNATURE_INVALID", "SERVICE_SECRET_UNCONFIGURED"].includes(data.reason)) return { state: "SUSPENDED", code: data.code };
++      if (data.code === "ACCOUNTING_SCOPE_REJECTED" && data.reason === "SERVICE_SCOPE_MISMATCH") return { state: "SUSPENDED", code: data.code };
++    }
++  }
++  if (message === "MISSION_CONTROL_SERVICE_COMMAND_SECRET is required for service commands.") return { state: "SUSPENDED", code: "ACCOUNTING_AUTHENTICATION_REQUIRED" };
+*** Update File: /private/tmp/fdlc-program-accounting-recovery/apps/orchestration-server/src/__tests__/accountingDelivery.test.ts
+@@
+ import { bridgeFixture, sha } from "./fixtures/bedrockBridgeFixture.js";
++import { ConvexError } from "convex/values";
+@@
+-    const f = await fixture(), reference = await capture(f.journal), submit = vi.fn(async () => { throw new Error("USAGE_REVISION_CONFLICT"); });
++    const f = await fixture(), reference = await capture(f.journal), submit = vi.fn(async () => { throw new ConvexError({ code: "ACCOUNTING_HISTORICAL_CONFLICT", reason: "USAGE_REVISION_CONFLICT" }); });
+*** End Patch

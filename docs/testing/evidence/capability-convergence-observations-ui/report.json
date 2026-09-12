@@ -1,0 +1,78 @@
+{
+  "scope": "Synthetic local component rendering; no backend or provider authority",
+  "status": "PASS",
+  "checks": [
+    {
+      "state": "loading",
+      "width": 1440,
+      "overflow": false,
+      "violations": [],
+      "result": "PASS"
+    },
+    {
+      "state": "empty",
+      "width": 1440,
+      "overflow": false,
+      "violations": [],
+      "result": "PASS"
+    },
+    {
+      "state": "fenced",
+      "width": 1440,
+      "overflow": false,
+      "violations": [],
+      "result": "PASS"
+    },
+    {
+      "state": "empty-fenced",
+      "width": 1440,
+      "overflow": false,
+      "violations": [],
+      "result": "PASS"
+    },
+    {
+      "state": "overflow",
+      "width": 1440,
+      "overflow": false,
+      "violations": [],
+      "result": "PASS"
+    },
+    {
+      "state": "loading",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "result": "PASS"
+    },
+    {
+      "state": "empty",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "result": "PASS"
+    },
+    {
+      "state": "fenced",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "result": "PASS"
+    },
+    {
+      "state": "empty-fenced",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "result": "PASS"
+    },
+    {
+      "state": "overflow",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "result": "PASS"
+    }
+  ],
+  "errors": [],
+  "sourceSha256": "43fd1fb80e80422f91a1bcb00916bdd92316c605edbfa7a8e9f355d4a98e512e"
+}

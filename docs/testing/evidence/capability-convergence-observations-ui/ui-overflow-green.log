@@ -1,0 +1,9 @@
+
+ RUN  v3.2.7 <qualification-worktree>/apps/mission-control-ui
+
+ ✓ src/controlPlane/ExecutionRunInspector.test.tsx (13 tests) 99ms
+
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+   Start at  01:17:12
+   Duration  703ms (transform 96ms, setup 81ms, collect 218ms, tests 99ms, environment 125ms, prepare 31ms)

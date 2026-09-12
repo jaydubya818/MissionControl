@@ -1,0 +1,63 @@
+{
+  "schema": "governed-mcp-phase3-browser-evidence/v1",
+  "capturedAt": "2026-09-05T09:22:00.000Z",
+  "application": "Mission Control V2 operator shell",
+  "url": "http://localhost:5199",
+  "workspace": "Software Factory Demo",
+  "visibleWorkspaceRepositoryCard": "jaydubya818/MissionControl",
+  "selectedFactoryRepository": "jaydubya818/spectrum-design-data-mc-demo",
+  "implementationSha": "045176e44deef520a88988212af202b6d4c82e19",
+  "dataClassification": "ISOLATED_LOCAL_QUALIFICATION_FIXTURE",
+  "realMcpServiceCalled": false,
+  "checks": [
+    {
+      "name": "Execution Profile capability display",
+      "status": "PASS",
+      "evidence": "exact-profile-desktop.png",
+      "detail": "The exact qualified profile shows its profile and qualification digests, one read-only operation, local-process destination, credential NONE, expiry, broker-only authority, and the explicit harness-MCP-unsupported limitation."
+    },
+    {
+      "name": "Tool Grant read-only history",
+      "status": "PASS",
+      "evidence": "tool-grant-history-desktop.png",
+      "detail": "The existing Factory Configuration surface shows the current qualified grant and immutable revoked predecessor with exact grant/tool digests and safe remediation."
+    },
+    {
+      "name": "Readiness and revoked currentness",
+      "status": "PASS",
+      "evidence": "readiness-revoked-currentness-desktop.png plus semantic browser capture",
+      "detail": "After revocation, a fresh readiness assessment marks both the exact profile and exact governed MCP fixture missing and instructs the operator to replace the stale/revoked grant, then create a new immutable profile and Factory version. The screenshot shows the selected frozen Factory version; the semantic capture verified the rows below the viewport."
+    },
+    {
+      "name": "390px usability",
+      "status": "PASS",
+      "evidence": "exact-profile-mobile-390.png",
+      "detail": "Viewport width, body scroll width, and document scroll width were all 390px; no horizontal overflow was present."
+    },
+    {
+      "name": "Refresh persistence",
+      "status": "PASS",
+      "evidence": "fresh agent-browser session and semantic snapshot",
+      "detail": "A fresh browser session retained Factory Version 6 and recomputed the revoked profile/grant currentness from Convex state. The shell header continued to show the workspace's default MissionControl repository card while the Factory panel remained selected on the separate public spectrum-design-data-mc-demo repository."
+    },
+    {
+      "name": "Attempt call, receipt, denial, and unavailable-server presentation",
+      "status": "AUTOMATED_COMPONENT_AND_INTEGRATION_ONLY",
+      "evidence": "apps/mission-control-ui/src/controlPlane/ExecutionRunInspector.test.tsx and Factory V2 qualification",
+      "detail": "These states are exercised through the integrated read model, UI component tests, broker tests, and Factory qualification. No browser-dispatched live Attempt or external MCP server was claimed."
+    }
+  ],
+  "artifacts": [
+    { "path": "exact-profile-desktop.png", "sha256": "83bc2e2e0a8b4970e6e11bfca6132419217a957b8df457b447d44c35e9b6e56c" },
+    { "path": "exact-profile-mobile-390.png", "sha256": "9b2ff4f042f44fa1feba4717060fee402bb850f513c3485fd4827523520ac326" },
+    { "path": "readiness-revoked-currentness-desktop.png", "sha256": "98855adc9ffb4d014992868c2474f4fdbc4eea58a7af947cd6d7749fb739eefc" },
+    { "path": "tool-grant-history-desktop.png", "sha256": "05539e606b34193e2c356bf7f9ff23a62167dcb2d4dee6ffe7a7c938a440038c" }
+  ],
+  "limitations": [
+    "Local demo data only.",
+    "No external transmission, credential, service cost, or production/internal data was used.",
+    "The screenshot viewport does not display every readiness row; semantic browser evidence records the exact currentness text.",
+    "The shell's left repository card identifies the workspace default; it is not the selected repository inside Workspaces & Repositories.",
+    "Browser verification does not upgrade the fixture to a real admitted MCP service."
+  ]
+}

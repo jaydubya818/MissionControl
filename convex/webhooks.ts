@@ -5,7 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, action, internalMutation } from "./_generated/server";
+import { mutation, query, action, internalAction, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 
 /** HMAC-SHA256 hex using Web Crypto (Convex default runtime). */
@@ -222,7 +222,15 @@ export const triggerEvent = internalMutation({
 // DELIVERY (Actions) — uses Web Crypto for HMAC (no Node runtime)
 // ============================================================================
 
-export const deliverPending = action({
+/**
+ * Drive pending webhook deliveries.
+ *
+ * `internalAction` restores what this used to be — `packages/telegram-bot`'s
+ * built declaration still records it as `RegisteredAction<"internal">`. As a
+ * public action it took no arguments and resolved no caller, so anyone holding
+ * the deployment URL could drive outbound webhook delivery on demand.
+ */
+export const deliverPending = internalAction({
   args: {},
   handler: async (ctx): Promise<{ delivered: number }> => {
     const deliveries = await ctx.runMutation(internal.webhooks.getPendingDeliveries, {});

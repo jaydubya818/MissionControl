@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  advanceWorkOrderTaskAuthorityForRetry,
   buildWorkOrderTaskAuthority,
   workOrderTaskAuthorityIssue,
 } from "../lib/taskAuthority";
@@ -36,6 +37,36 @@ describe("Work Order Task authority", () => {
   it("accepts exact current Work Order provenance", () => {
     expect(workOrderTaskAuthorityIssue({
       scope: buildWorkOrderTaskAuthority(workOrder),
+      workOrder,
+    })).toBeNull();
+  });
+
+  it("advances intact authority for a retry after a non-objective revision", () => {
+    expect(advanceWorkOrderTaskAuthorityForRetry({
+      scope: {
+        kind: "WORK_ORDER_DESIRED_OUTCOME",
+        workOrderId: "work-order-1",
+        workOrderRevisionNumber: 2,
+        authorityRef: "work-order:work-order-1:revision:2:desired-outcome",
+        objective: workOrder.desiredOutcome,
+      },
+      workOrder,
+    })).toEqual(buildWorkOrderTaskAuthority(workOrder));
+  });
+
+  it("does not repair missing or tampered retry authority", () => {
+    expect(advanceWorkOrderTaskAuthorityForRetry({
+      scope: undefined,
+      workOrder,
+    })).toBeNull();
+    expect(advanceWorkOrderTaskAuthorityForRetry({
+      scope: {
+        kind: "WORK_ORDER_DESIRED_OUTCOME",
+        workOrderId: "work-order-1",
+        workOrderRevisionNumber: 2,
+        authorityRef: "work-order:work-order-1:revision:2:desired-outcome",
+        objective: "A different objective",
+      },
       workOrder,
     })).toBeNull();
   });

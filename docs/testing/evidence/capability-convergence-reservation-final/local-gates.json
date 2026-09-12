@@ -1,0 +1,72 @@
+[
+  {
+    "name": "composed",
+    "command": [
+      "pnpm",
+      "qualify:factory:v2"
+    ],
+    "startedAt": "2026-09-06T05:21:15.380505+00:00",
+    "finishedAt": "2026-09-06T05:23:43.977372+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "inference",
+    "command": [
+      "pnpm",
+      "test:inference:phase5"
+    ],
+    "startedAt": "2026-09-06T05:23:43.977909+00:00",
+    "finishedAt": "2026-09-06T05:23:56.196411+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "lint",
+    "command": [
+      "pnpm",
+      "lint"
+    ],
+    "startedAt": "2026-09-06T05:23:56.196723+00:00",
+    "finishedAt": "2026-09-06T05:24:24.733087+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "build",
+    "command": [
+      "pnpm",
+      "build"
+    ],
+    "startedAt": "2026-09-06T05:24:24.733404+00:00",
+    "finishedAt": "2026-09-06T05:24:33.838232+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "runtime",
+    "command": [
+      "pnpm",
+      "ci:runtime-contract"
+    ],
+    "startedAt": "2026-09-06T05:24:33.838774+00:00",
+    "finishedAt": "2026-09-06T05:24:39.411833+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "critical-browser",
+    "command": [
+      "pnpm",
+      "test:e2e:critical"
+    ],
+    "startedAt": "2026-09-06T05:24:39.412184+00:00",
+    "finishedAt": "2026-09-06T05:24:57.821702+00:00",
+    "exitCode": 0
+  },
+  {
+    "name": "docs",
+    "command": [
+      "pnpm",
+      "docs:factory-check"
+    ],
+    "startedAt": "2026-09-06T05:24:57.822261+00:00",
+    "finishedAt": "2026-09-06T05:24:58.095228+00:00",
+    "exitCode": 0
+  }
+]

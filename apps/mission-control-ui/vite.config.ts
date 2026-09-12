@@ -5,7 +5,10 @@ import { defineConfig, loadEnv } from "vite";
 
 export default defineConfig(({ mode }) => {
   const envDir = path.resolve(__dirname, "../..");
-  const orchestrationEnv = loadEnv(mode, envDir, "ORCHESTRATION_API_TOKEN");
+  const orchestrationEnv = loadEnv(mode, envDir, ["ORCHESTRATION_API_TOKEN", "MC_API_TOKEN"]);
+  const orchestrationToken =
+    orchestrationEnv.ORCHESTRATION_API_TOKEN?.trim()
+    || orchestrationEnv.MC_API_TOKEN?.trim();
   return {
     plugins: [react(), tailwindcss()],
     envDir,
@@ -40,12 +43,17 @@ export default defineConfig(({ mode }) => {
           target: "http://localhost:4100",
           changeOrigin: true,
           ws: true,
+          // The /gateway/ws upgrade is gated by the same bearer as HTTP routes;
+          // the browser never holds the token, the proxy presents it.
+          headers: orchestrationToken
+            ? { Authorization: `Bearer ${orchestrationToken}` }
+            : undefined,
         },
         "/orchestration": {
           target: "http://localhost:4100",
           changeOrigin: true,
-          headers: orchestrationEnv.ORCHESTRATION_API_TOKEN
-            ? { Authorization: `Bearer ${orchestrationEnv.ORCHESTRATION_API_TOKEN}` }
+          headers: orchestrationToken
+            ? { Authorization: `Bearer ${orchestrationToken}` }
             : undefined,
         },
       },

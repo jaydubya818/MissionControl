@@ -39,21 +39,21 @@ describe("filterNavGroups", () => {
       "control-work-orders",
       "tasks",
       "factory",
-      "trace-inspector",
-      "agents",
       "atc",
       "automations",
       "audit",
+      "trace-inspector",
       "telemetry",
-      "operator-evals",
-      "harness-loops",
+      "deployments",
       "skills",
       "memory",
       "docs",
-      "identity",
-      "deployments",
       "projects",
+      "agents",
+      "identity",
       "model-routing",
+      "operator-evals",
+      "harness-loops",
     ]);
   });
 
@@ -68,7 +68,7 @@ describe("filterNavGroups", () => {
     }).flatMap((group) => group.items);
 
     expect(previewViews.find((item) => item.view === "effectiveness")).toBeUndefined();
-    expect(previewViews.find((item) => item.view === "dag")?.badge).toBe("Preview");
+    expect(previewViews.find((item) => item.view === "policies")?.badge).toBe("Preview");
     expect(previewViews.find((item) => item.view === "harness-loops")?.badge).toBeUndefined();
     expect(demoViews.find((item) => item.view === "dossier")?.badge).toBe("Demo");
   });

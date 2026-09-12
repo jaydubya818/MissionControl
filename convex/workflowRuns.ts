@@ -33,6 +33,8 @@ import {
   finishAttemptTrace,
   recordRunEventObservation,
 } from "./lib/observabilityPersistence";
+import { loadExecutionProfileAdmission } from "./lib/executionProfileAdmission";
+import { executionProfileProjectionBlockers } from "./lib/executionProfile";
 
 // ============================================================================
 // HELPERS
@@ -41,6 +43,48 @@ import {
 function generateRunId(): string {
   // Generate short 8-character ID (similar to Antfarm's run IDs)
   return Math.random().toString(36).substring(2, 10);
+}
+
+const EXECUTION_PROFILE_BINDING_FIELDS = [
+  "executionProfileId",
+  "executionProfileKey",
+  "executionProfileVersion",
+  "executionProfileDigest",
+  "executionProfileSnapshot",
+  "executionProfileQualificationDigest",
+  "executionProfileQualificationSnapshot",
+] as const;
+
+function workflowRunExecutionProfileProjection(run: Record<string, any>) {
+  const manifest = run.executionManifest as Record<string, any> | undefined;
+  const snapshot = run.executionProfileSnapshot as Record<string, any> | undefined;
+  return {
+    profileId: String(run.executionProfileId ?? ""),
+    profileKey: run.executionProfileKey ?? "",
+    profileVersion: run.executionProfileVersion ?? 0,
+    profileDigest: run.executionProfileDigest ?? "",
+    profileSnapshot: run.executionProfileSnapshot,
+    qualificationDigest: run.executionProfileQualificationDigest ?? "",
+    qualificationSnapshot: run.executionProfileQualificationSnapshot,
+    executor: { adapter: run.executorAdapter ?? "", version: run.executorVersion ?? "" },
+    harnessCapabilityManifest: manifest?.harness?.capabilityManifest,
+    harnessCapabilityManifestDigest: manifest?.harness?.capabilityManifestSha256 ?? "",
+    harnessEffectiveConfigSha256: manifest?.harness?.effectiveConfigSha256 ?? "",
+    harnessRuntimeArtifact: manifest?.harness?.runtimeArtifact,
+    harnessRuntimeArtifactDigest: manifest?.harness?.runtimeArtifactDigest ?? "",
+    executionBackend: manifest?.executionBackend ?? manifest?.harness?.executionBackend ?? "",
+    modelCatalogId: manifest?.modelRoute?.catalogId ?? manifest?.harness?.modelCatalogId ?? "",
+    modelRouteSnapshot: manifest?.modelRoute?.routeSnapshot ?? manifest?.harness?.modelRouteSnapshot,
+    modelRouteDigest: manifest?.modelRoute?.routeDigest ?? manifest?.harness?.modelRouteDigest ?? "",
+    modelQualificationSnapshot: manifest?.modelRoute?.qualificationSnapshot,
+    modelQualificationDigest: manifest?.modelRoute?.qualificationDigest ?? manifest?.harness?.modelQualificationDigest ?? "",
+    sandboxProfileId: manifest?.sandbox?.profileId,
+    sandboxProfileSnapshot: manifest?.sandbox?.profileSnapshot,
+    sandboxProfileDigest: manifest?.sandbox?.profileDigest,
+    isolationModes: snapshot?.isolationModes ?? [],
+    requiredHarnessCapabilities: snapshot?.requiredHarnessCapabilities ?? [],
+    requiredSandboxCapabilities: snapshot?.requiredSandboxCapabilities ?? [],
+  };
 }
 
 function markVerificationAttemptSuperseded(
@@ -157,6 +201,9 @@ async function insertRunEvent(ctx: any, args: {
   traceContext?: { traceId?: string; spanId?: string; parentSpanId?: string };
   metadata?: any;
 }) {
+  if (args.idempotencyKey?.startsWith("factory-lease:")) {
+    throw new Error("Factory lease events are server-authored records.");
+  }
   if (args.idempotencyKey) {
     const existing = await ctx.db
       .query("runEvents")
@@ -231,6 +278,10 @@ async function insertRunArtifact(ctx: any, args: {
   automationOutputSnapshot?: any;
   metadata?: any;
 }) {
+  if (args.idempotencyKey?.endsWith(":offline-response")
+    || args.metadata?.schema === "factory-offline-attempt-evidence/v1") {
+    throw new Error("Offline response records require dedicated validated ingestion.");
+  }
   if (args.idempotencyKey) {
     const existing = await ctx.db
       .query("runArtifacts")
@@ -549,6 +600,32 @@ export const getInspector = query({
       run.factoryDefinitionVersionId ? ctx.db.get(run.factoryDefinitionVersionId) : null,
       run.repositoryId ? ctx.db.get(run.repositoryId) : null,
     ]);
+    const now = Date.now();
+    const executionProfileFieldCount = EXECUTION_PROFILE_BINDING_FIELDS
+      .filter((field) => run[field] !== undefined).length;
+    const hasExecutionProfileBinding = executionProfileFieldCount > 0
+      || (run.executionManifest as Record<string, any> | undefined)?.version === "factory-execution-manifest/v3";
+    const completeExecutionProfileBinding = executionProfileFieldCount === EXECUTION_PROFILE_BINDING_FIELDS.length
+      && (run.executionManifest as Record<string, any> | undefined)?.version === "factory-execution-manifest/v3";
+    const executionProfileAdmission = completeExecutionProfileBinding && run.executionProfileId
+      ? await loadExecutionProfileAdmission(ctx, run.executionProfileId, now)
+      : null;
+    const executionProfileBindingBlockers = !hasExecutionProfileBinding
+      ? []
+      : !completeExecutionProfileBinding
+        ? ["EXECUTION_PROFILE_MISSING"]
+        : executionProfileAdmission?.profile
+          ? executionProfileProjectionBlockers({
+              profileId: String(executionProfileAdmission.profile._id),
+              profileSnapshot: executionProfileAdmission.profile.immutableSnapshot,
+              profileDigest: executionProfileAdmission.profile.profileDigest,
+              qualificationSnapshot: executionProfileAdmission.profile.qualificationSnapshot,
+              qualificationDigest: executionProfileAdmission.profile.qualificationDigest ?? "",
+              projection: workflowRunExecutionProfileProjection(run),
+            })
+          : ["EXECUTION_PROFILE_MISSING"];
+    const executionProfileBindingMatches = !hasExecutionProfileBinding
+      || (completeExecutionProfileBinding && executionProfileBindingBlockers.length === 0);
     const reviewReadModel = workOrder
       ? await loadFactoryAttemptReviewReadModel(ctx, { now: Date.now(), run, workOrder })
       : buildFactoryAttemptReviewReadModel({
@@ -614,6 +691,30 @@ export const getInspector = query({
       continuousEvidenceLineage,
       recovery,
       reviewPackage,
+      executionProfile: hasExecutionProfileBinding ? {
+        profileId: run.executionProfileId,
+        profileKey: run.executionProfileKey,
+        version: run.executionProfileVersion,
+        profileDigest: run.executionProfileDigest,
+        qualificationDigest: run.executionProfileQualificationDigest,
+        qualificationEvidence: (run.executionProfileQualificationSnapshot as any)?.evidence,
+        qualificationValidUntil: (run.executionProfileQualificationSnapshot as any)?.validUntil,
+        exactBindingMatches: executionProfileBindingMatches,
+        currentlyEligible: Boolean(executionProfileAdmission?.eligible && executionProfileBindingMatches),
+        blockers: [
+          ...(executionProfileAdmission?.blockers ?? []),
+          ...executionProfileBindingBlockers,
+        ],
+        harness: (run.executionProfileSnapshot as any)?.harness,
+        runtimeArtifact: (run.executionProfileSnapshot as any)?.runtimeArtifact,
+        executionBackend: (run.executionProfileSnapshot as any)?.executionBackend,
+        modelRoute: (run.executionProfileSnapshot as any)?.modelRoute,
+        sandboxProfile: (run.executionProfileSnapshot as any)?.sandboxProfile,
+      } : {
+        compatibility: "FROZEN_PROFILELESS_V1_V2",
+        currentlyEligible: null,
+        blockers: [],
+      },
       sandbox: sandboxAllocation ? {
         allocation: sandboxAllocation,
         credentialGrants: sandboxCredentialGrants.map((grant) => ({
@@ -982,6 +1083,10 @@ export const start = mutation({
     if (!workflow.active) {
       throw new Error(`Workflow is not active: ${args.workflowId}`);
     }
+    if (workflow.contractVersion === "factory-workflow-contract/v2"
+      || workflow.steps.some(step => step.kind === "DETERMINISTIC")) {
+      throw new Error("Deterministic workflows require canonical WorkOrder, Factory and Execution Profile admission.");
+    }
     if (args.projectId && (
       workflow.projectId !== args.projectId
       || workflow.contractVersion !== "factory-workflow-contract/v1"
@@ -1112,6 +1217,8 @@ export const recordEvent = mutation({
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
     if (!run) throw new Error("Workflow run not found");
+    const access = await requireAuthorizedDeliveryScope(ctx, run.projectId, COMPANY_PERMISSIONS.UPDATE_DELIVERY);
+    if (!access) throw new Error("Event writes require an authorized workspace.");
 
     const result = await insertRunEvent(ctx, {
       ...args,

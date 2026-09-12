@@ -212,14 +212,18 @@ const verificationSubjectIdentityFields = {
   digest: v.string(),
 };
 
-export const gitVerificationSubjectValidator = v.object({
+const gitVerificationSubjectIdentityFields = {
   ...verificationSubjectIdentityFields,
   kind: v.literal("GIT_CANDIDATE"),
   repositoryId: v.id("workspaceRepositories"),
-  provider: v.literal("GITHUB"),
-  providerRepositoryId: v.string(),
   candidateSha: v.string(),
   treeSha: v.string(),
+};
+
+const githubVerificationSubjectValidator = v.object({
+  ...gitVerificationSubjectIdentityFields,
+  provider: v.literal("GITHUB"),
+  providerRepositoryId: v.string(),
   pullRequest: v.object({
     providerPullRequestId: v.string(),
     number: v.number(),
@@ -230,6 +234,21 @@ export const gitVerificationSubjectValidator = v.object({
     draftAtPublication: v.boolean(),
   }),
 });
+
+const localGitVerificationSubjectValidator = v.object({
+  ...gitVerificationSubjectIdentityFields,
+  provider: v.literal("LOCAL_GIT"),
+  localRef: v.object({
+    baseRef: v.string(),
+    headRef: v.string(),
+    headSha: v.string(),
+  }),
+});
+
+export const gitVerificationSubjectValidator = v.union(
+  githubVerificationSubjectValidator,
+  localGitVerificationSubjectValidator,
+);
 
 export const automationVerificationSubjectValidator = v.object({
   ...verificationSubjectIdentityFields,
@@ -249,8 +268,22 @@ export const automationVerificationSubjectValidator = v.object({
   outputArtifactContentHashes: v.array(v.string()),
 });
 
+export const prepublicationGitVerificationSubjectValidator = v.object({
+  ...verificationSubjectIdentityFields, version: v.literal(2), kind: v.literal("GIT_CANDIDATE"),
+  repositoryId: v.id("workspaceRepositories"), provider: v.literal("GITHUB"), providerRepositoryId: v.string(),
+  baseSha: v.string(), candidateSha: v.string(), treeSha: v.string(), rawDiffSha256: v.string(), baseRef: v.string(), headRef: v.string(),
+});
+
+export const gitSubjectPublicationBindingValidator = v.object({
+  version: v.literal(1), verificationSubjectDigest: v.string(), sourceAttemptId: v.id("workflowRuns"), repositoryId: v.id("workspaceRepositories"),
+  publicationPermitId: v.string(), publicationPermitLeaseId: v.string(), approvalDecisionId: v.id("approvalDecisions"),
+  verificationReceiptId: v.id("verificationReceipts"), digest: v.string(),
+  pullRequest: v.object({ providerPullRequestId: v.string(), number: v.number(), url: v.string(), baseRef: v.string(), headRef: v.string(), headSha: v.string(), draftAtPublication: v.boolean() }),
+});
+
 export const verificationSubjectValidator = v.union(
   gitVerificationSubjectValidator,
+  prepublicationGitVerificationSubjectValidator,
   automationVerificationSubjectValidator,
 );
 
@@ -358,7 +391,7 @@ export const verificationIndependenceValidator = v.object({
 export const verificationIsolationAttestationValidator = v.object({
   mode: v.union(
     v.literal("DETACHED_GIT_WORKTREE"), v.literal("FRESH_CLONE"), v.literal("REMOTE_SANDBOX"),
-    v.literal("AUTOMATION_SNAPSHOT"), v.literal("LOCAL_DOCKER_CANARY"),
+    v.literal("AUTOMATION_SNAPSHOT"), v.literal("LOCAL_DOCKER_CANARY"), v.literal("ISOLATED_CONTAINER"),
   ),
   sandboxId: v.string(),
   rootBindingDigest: v.string(),

@@ -1,0 +1,140 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-dispatch
+
+ ❯ convex/__tests__/inferenceDispatch.test.ts (24 tests | 24 failed) 30ms
+   × classification dispatch claim > atomically persists a bounded allowance with the unique claim and exact identities 8ms
+     → expected undefined to match object { …(14) }
+   × classification dispatch claim > denies revision before claiming 2ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies currentAttempt before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies approval before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies profile before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies profileDigest before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies route before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies hostGeneration before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies missingRegistration before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies factoryBudget before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies workOrderBudget before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies priceRetired before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies priceDigest before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies priceExpiry before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies unpricedCache before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies inputBound before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies outputBound before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies cacheBound before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies payload before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies requestOutput before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies policy before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies repository before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies aggregate before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+   × classification dispatch claim > denies disabled before claiming 1ms
+     → promise resolved "{ claimed: true, …(2) }" instead of rejecting
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 24 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > atomically persists a bounded allowance with the unique claim and exact identities
+AssertionError: expected undefined to match object { …(14) }
+
+- Expected:
+{
+  "attemptId": "attempt",
+  "intentId": "inferencePhysicalIntents-db-1",
+  "intentLogicalId": "canonical-intent",
+  "maxCostMicrousd": 300000,
+  "maximumCacheReadTokens": 128000,
+  "maximumInputTokens": 128000,
+  "maximumOutputTokens": 1024,
+  "maximumPhysicalCalls": 1,
+  "payloadBytes": 200,
+  "repositoryId": "repo",
+  "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "reservationDigest": "sha256:4f8fd6630ffad77f55e0752e778ebf918a36bd6ae05a553e81e7a44bf6653d1d",
+  "reservationId": "inferenceReservations-db-1",
+  "schema": "classify-inference-dispatch/v1",
+}
+
++ Received:
+undefined
+
+ ❯ convex/__tests__/inferenceDispatch.test.ts:62:38
+     60|     const f = await fixture();
+     61|     const result = await f.claim();
+     62|     expect(result.dispatchAllowance).toMatchObject({
+       |                                      ^
+     63|       schema: "classify-inference-dispatch/v1", intentId: f.args.inten…
+     64|       intentLogicalId: "canonical-intent", reservationId: f.reservatio…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/24]⎯
+
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies revision before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies currentAttempt before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies approval before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies profile before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies profileDigest before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies route before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies hostGeneration before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies missingRegistration before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies factoryBudget before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies workOrderBudget before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies priceRetired before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies priceDigest before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies priceExpiry before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies unpricedCache before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies inputBound before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies outputBound before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies cacheBound before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies payload before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies requestOutput before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies policy before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies repository before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies aggregate before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies disabled before claiming
+AssertionError: promise resolved "{ claimed: true, …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "claimed": true,
++   "intentId": "inferencePhysicalIntents-db-1",
++   "reservationDigest": "sha256:6014ecadd440aec2d014acbf2808ce880a989df7aa95563c69a967f5ded4e0eb",
+  }
+
+ ❯ convex/__tests__/inferenceDispatch.test.ts:116:27
+    114|       reservation.immutableSnapshot.digest = reservation.reservationDi…
+    115|     }
+    116|     await expect(f.claim()).rejects.toThrow();
+       |                           ^
+    117|     expect((await f.db.get(f.args.intentId))!.state).toBe("PERSISTED");
+    118|     expect((await f.db.get(f.args.intentId))!.dispatchAllowance).toBeU…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/24]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  24 failed (24)
+   Start at  23:52:58
+   Duration  319ms (transform 66ms, setup 0ms, collect 109ms, tests 30ms, environment 0ms, prepare 27ms)

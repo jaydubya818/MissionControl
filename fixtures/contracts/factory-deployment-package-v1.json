@@ -1,0 +1,259 @@
+{
+  "schema_version": "fdlc.factory-deployment-package/v1",
+  "package_id": "10000000-0000-4000-8000-000000000001",
+  "package_version": 1,
+  "status": "PUBLISHED",
+  "issuer": {
+    "issuer_id": "factory-engineer",
+    "issuer_type": "FDLC_FACTORY_ENGINEER",
+    "environment": "test",
+    "authority_scope": "DEPLOYMENT_PACKAGE_PUBLISH"
+  },
+  "issued_at": "2026-09-04T16:00:00Z",
+  "approval": {
+    "decision_ref": {
+      "kind": "APPROVED_INPUT",
+      "ref": "factory_deployment_package_approval:10000000-0000-4000-8000-000000000010",
+      "version": 1,
+      "sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "approved_by": "20000000-0000-4000-8000-000000000001",
+    "authorized_by_ref": "customer_factory_model:30000000-0000-4000-8000-000000000001",
+    "authority_basis_ref": {
+      "kind": "APPROVED_INPUT",
+      "ref": "customer_factory_model:30000000-0000-4000-8000-000000000001",
+      "version": 3,
+      "sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "approved_at": "2026-09-04T16:00:00Z"
+  },
+  "integrity": {
+    "canonicalization": "fdlc-canonical-json/v1",
+    "algorithm": "sha256",
+    "digest": "sha256:5a27aaeb78ffe078dbae41146caf1e8884c9621790e6df903dc62e561a127c37"
+  },
+  "source": {
+    "engagement_id": "40000000-0000-4000-8000-000000000001",
+    "customer_factory_model": {
+      "id": "30000000-0000-4000-8000-000000000001",
+      "version": 3,
+      "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "current_workflow": {
+      "id": "30000000-0000-4000-8000-000000000002",
+      "version": 2,
+      "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "target_workflow": {
+      "id": "30000000-0000-4000-8000-000000000003",
+      "version": 1,
+      "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    "readiness_assessment": {
+      "id": "30000000-0000-4000-8000-000000000004",
+      "version": 1,
+      "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    "factory_opportunity": {
+      "id": "30000000-0000-4000-8000-000000000005",
+      "version": 1,
+      "digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  },
+  "target": {
+    "workspace_ref": "sellerfi-production",
+    "repository_ref": "github.com/sellerfi/marketplace",
+    "requested_code_scopes": [
+      "apps/marketplace/**"
+    ],
+    "semantic_execution_workflow_ref": "software-change/verified-pr/v1",
+    "environment_class": "ISOLATED_NON_PRODUCTION"
+  },
+  "deployment_intent": {
+    "mission_title": "Harden buyer diligence document verification",
+    "mission_context": "SellerFi buyers need deterministic document checks before trusting a listing.",
+    "stop_condition": "Stop before merge, deployment, production access, or any customer-data mutation.",
+    "plan_summary": "Add bounded verification, deterministic tests, and an independently validated result.",
+    "rollback_approach": "Revert the isolated change set and preserve the previous verification path.",
+    "objective": "Reduce buyer diligence risk without expanding runtime authority.",
+    "intent": "Create a reviewable implementation candidate; Mission Control retains execution authority.",
+    "specification": "Implement the bounded verification rule in the requested code scope and prove it with tests.",
+    "acceptance_criteria": [
+      {
+        "key": "criterion_verified",
+        "statement": "The verifier rejects malformed documents and accepts the supported valid fixture.",
+        "verification_method": "Run the focused deterministic test suite."
+      }
+    ],
+    "constraints": [
+      {
+        "key": "constraint_scope",
+        "statement": "Changes remain inside apps/marketplace/**."
+      }
+    ],
+    "required_capabilities": [
+      {
+        "key": "capability_python",
+        "statement": "Implement and test the Python verification boundary."
+      }
+    ],
+    "required_agents": [],
+    "required_skills": [],
+    "required_tools": [],
+    "model_requirements": [],
+    "context_requirements": [
+      {
+        "key": "context_repository",
+        "statement": "Use the repository state selected by Mission Control."
+      }
+    ],
+    "environment_requirements": [
+      {
+        "key": "environment_isolated",
+        "statement": "Run only in an isolated non-production environment."
+      }
+    ],
+    "authority_boundaries": [
+      {
+        "key": "authority_no_publish",
+        "subject": "worker",
+        "maximum_authority": "Prepare a candidate change and verification evidence.",
+        "prohibited_actions": [
+          "merge",
+          "deploy",
+          "access production data"
+        ]
+      }
+    ],
+    "policy_requirements": [
+      {
+        "key": "policy_human_acceptance",
+        "statement": "A human must accept the verified candidate."
+      }
+    ],
+    "approval_requirements": [
+      {
+        "key": "approval_change",
+        "statement": "Require human approval before merge."
+      }
+    ],
+    "verification_contract": [
+      {
+        "key": "verification_tests",
+        "statement": "Run focused tests against valid and malformed fixtures.",
+        "evidence_required": [
+          "test command",
+          "exit status",
+          "test report"
+        ],
+        "independent": true
+      }
+    ],
+    "evaluation_requirements": [
+      {
+        "key": "evaluation_no_regression",
+        "statement": "Existing buyer diligence behavior remains green."
+      }
+    ],
+    "rollback_requirements": [
+      {
+        "key": "rollback_revert",
+        "statement": "The change can be reverted without data migration."
+      }
+    ],
+    "observability_requirements": [
+      {
+        "key": "observability_denials",
+        "statement": "Verification denials emit structured, non-sensitive reason codes."
+      }
+    ],
+    "economics_baseline": {
+      "currency": "USD",
+      "expected_annual_value": "125000.00",
+      "implementation_cost_ceiling": "25000.00"
+    },
+    "risk_summary": [
+      {
+        "key": "risk_false_acceptance",
+        "statement": "A false acceptance could reduce buyer trust."
+      }
+    ],
+    "evidence_refs": [
+      {
+        "kind": "EVIDENCE",
+        "ref": "evidence_asset:50000000-0000-4000-8000-000000000001",
+        "version": null,
+        "sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+      }
+    ],
+    "decision_refs": [
+      {
+        "kind": "APPROVED_INPUT",
+        "ref": "fdlc_readiness:30000000-0000-4000-8000-000000000004",
+        "version": 1,
+        "sha256": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+      }
+    ],
+    "provenance": [
+      {
+        "kind": "VERIFIED_CLAIM",
+        "ref": "assertion:50000000-0000-4000-8000-000000000002",
+        "version": 1,
+        "sha256": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      }
+    ],
+    "plan_assertions": [
+      {
+        "assertion_id": "assertion_verifier_behavior",
+        "title": "Verifier behavior is deterministic",
+        "outcome": "Supported valid input passes and malformed input fails closed.",
+        "verification_method": "TEST",
+        "pass_condition": "All focused verifier tests pass with zero unexpected acceptances.",
+        "required_evidence": "Focused test report with command, exit status, and case results.",
+        "requires_independent_validation": true,
+        "waiver_allowed": false
+      }
+    ],
+    "work_order_blueprints": [
+      {
+        "key": "implement_verifier",
+        "title": "Implement bounded document verification",
+        "outcome": "A deterministic verifier enforces the supported document contract.",
+        "requirements": [
+          "Reject malformed documents",
+          "Preserve supported valid behavior"
+        ],
+        "acceptance_criterion_refs": [
+          "criterion_verified"
+        ],
+        "constraints": [
+          "constraint_scope"
+        ],
+        "requested_code_scopes": [
+          "apps/marketplace/**"
+        ],
+        "capability_requirement_refs": [
+          "capability_python"
+        ],
+        "verification_requirement_refs": [
+          "verification_tests"
+        ],
+        "authority_boundary_refs": [
+          "authority_no_publish"
+        ],
+        "sequence": 1,
+        "execution_role": "WORKER",
+        "is_mutating": true,
+        "priority": 1,
+        "risk_level": "MEDIUM",
+        "required_approvals": [
+          "approval_change"
+        ],
+        "dependencies": [],
+        "assertion_ids": [
+          "assertion_verifier_behavior"
+        ]
+      }
+    ]
+  }
+}

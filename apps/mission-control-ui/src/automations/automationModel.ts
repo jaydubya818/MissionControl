@@ -65,13 +65,13 @@ export function runStatusLabel(run: {
 
 export function statusTone(status: string): string {
   if (["ACTIVE", "HEALTHY", "PASSED", "PASS", "DONE", "FRESH", "VERIFIED", "ELIGIBLE"].includes(status)) {
-    return "border-emerald-500/30 text-emerald-300";
+    return "border-ok/30 text-ok";
   }
   if (["PAUSED", "ATTENTION", "PENDING", "AWAITING_APPROVAL", "MISSING", "EXPIRED"].includes(status)) {
-    return "border-amber-500/30 text-amber-200";
+    return "border-warn/30 text-warn";
   }
   if (["SUSPENDED", "DEGRADED", "FAILED", "FAIL", "STALE", "INELIGIBLE"].includes(status)) {
-    return "border-red-500/30 text-red-200";
+    return "border-err/30 text-err";
   }
   return "border-border text-muted-foreground";
 }

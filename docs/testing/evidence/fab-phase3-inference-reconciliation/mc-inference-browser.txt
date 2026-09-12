@@ -1,0 +1,8 @@
+
+> mission-control@0.9.0 test:e2e:critical /private/tmp/fab-phase3-mc-validation-2
+> npx playwright test -c playwright.config.ts tests/e2e/critical-accessibility.e2e.spec.ts tests/e2e/dashboard-smoke.e2e.spec.ts tests/e2e/v2-routes-smoke.e2e.spec.ts
+
+
+Running 15 tests using 3 workers
+···············
+  15 passed (15.2s)

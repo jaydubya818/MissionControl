@@ -8,6 +8,25 @@ export type FactoryHumanReviewOutcome = "RESUME_PUBLISH" | "FAIL_ATTEMPT";
 
 export const PUBLICATION_SAFETY_WINDOW_MS = 60_000;
 
+type ReviewSource = {
+  _id: string;
+  verificationSubject?: { kind: string; version: number; digest: string; candidateSha?: string; verificationContractDigest: string };
+};
+type ReviewReceiptIdentity = {
+  workflowRunId: string; sourceAttemptId?: string; verificationAttemptId?: string;
+  verificationSubjectDigest?: string; verificationContractDigest?: string; candidateRevision?: string; independenceValid?: boolean;
+};
+
+/** A v2 receipt belongs to the separate verifier; never manufacture a builder receipt. */
+export function factoryReviewReceiptMatchesSource(run: ReviewSource, receipt: ReviewReceiptIdentity) {
+  const subject = run.verificationSubject;
+  if (subject?.kind !== "GIT_CANDIDATE" || subject.version !== 2) return receipt.workflowRunId === run._id;
+  return receipt.sourceAttemptId === run._id && receipt.workflowRunId !== run._id
+    && receipt.workflowRunId === receipt.verificationAttemptId && receipt.independenceValid === true
+    && receipt.verificationSubjectDigest === subject.digest && receipt.verificationContractDigest === subject.verificationContractDigest
+    && receipt.candidateRevision === subject.candidateSha;
+}
+
 export function factoryHumanReviewOutcome(decision: FactoryHumanReviewDecision): FactoryHumanReviewOutcome {
   if (decision === "APPROVE") return "RESUME_PUBLISH";
   return "FAIL_ATTEMPT";
@@ -51,6 +70,7 @@ export function validateHumanReviewApprovalContext(input: {
     _id: string;
     status: string;
     workOrderRevisionNumber?: number;
+    verificationSubject?: ReviewSource["verificationSubject"];
     factoryContinuation?: {
       status: string;
       workOrderRevisionNumber: number;
@@ -84,6 +104,7 @@ export function validatePublishContinuation(input: {
     _id: string;
     status: string;
     workOrderRevisionNumber?: number;
+    verificationSubject?: ReviewSource["verificationSubject"];
     factoryContinuation?: {
       status: string;
       workOrderRevisionNumber: number;
@@ -102,7 +123,7 @@ export function validatePublishContinuation(input: {
     status: string;
     expiresAt?: number;
   } | null;
-  sourceReceipt?: {
+  sourceReceipt?: ReviewReceiptIdentity & {
     _id: string;
     workflowRunId: string;
     workOrderRevisionNumber?: number;
@@ -110,7 +131,7 @@ export function validatePublishContinuation(input: {
     verdict?: string;
     candidateRevision?: string;
   } | null;
-  resolvedReceipt?: {
+  resolvedReceipt?: ReviewReceiptIdentity & {
     _id: string;
     workflowRunId: string;
     workOrderRevisionNumber?: number;
@@ -139,16 +160,17 @@ export function validatePublishContinuation(input: {
   }
   if (approval.expiresAt && approval.expiresAt <= now) return { ok: false as const, reason: "approval-expired" };
   const source = input.sourceReceipt;
+  const prepublication = input.run.verificationSubject?.kind === "GIT_CANDIDATE" && input.run.verificationSubject.version === 2;
   if (!source || source._id !== continuation.verificationReceiptId
-    || source.workflowRunId !== input.run._id
+    || !factoryReviewReceiptMatchesSource(input.run, source)
     || source.workOrderRevisionNumber !== input.workOrderRevisionNumber
-    || source.status !== "PENDING" || source.verdict !== "REQUIRES_HUMAN_REVIEW"
+    || !((source.status === "PENDING" && source.verdict === "REQUIRES_HUMAN_REVIEW") || (prepublication && source.status === "PASSED" && source.verdict === "VERIFIED"))
     || source.candidateRevision !== continuation.candidateRevision) {
     return { ok: false as const, reason: "source-receipt-invalid" };
   }
   const resolved = input.resolvedReceipt;
   if (!resolved || resolved._id !== continuation.resolvedVerificationReceiptId
-    || resolved.workflowRunId !== input.run._id
+    || !factoryReviewReceiptMatchesSource(input.run, resolved) || resolved.workflowRunId !== source.workflowRunId
     || resolved.workOrderRevisionNumber !== input.workOrderRevisionNumber
     || resolved.status !== "PASSED" || resolved.verdict !== "VERIFIED"
     || resolved.candidateRevision !== continuation.candidateRevision

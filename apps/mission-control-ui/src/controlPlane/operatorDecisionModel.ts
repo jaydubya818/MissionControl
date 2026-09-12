@@ -178,7 +178,8 @@ export function buildOperatorDecisionPacket(
   const remainingUncertainty = approval.remainingUncertainty ?? [];
   remainingUncertainty.forEach((item) => missingInformation.add(item));
 
-  const isAcceptanceDecision = /accept|release|complete|close/i.test(`${approval.approvalType} ${approval.requestedAction}`);
+  const isAcceptanceDecision = /^(?:FINAL[_ -])?(?:ACCEPTANCE|RELEASE|COMPLETION|CLOSURE)$/i.test(approval.approvalType.trim())
+    || /^(?:accept|release|complete|close)\b/i.test(approval.requestedAction.trim());
   if (isAcceptanceDecision) {
     evidence
       .filter((item) => !["PASSED", "WAIVED"].includes(item.status))

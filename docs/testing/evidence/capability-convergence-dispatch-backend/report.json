@@ -1,0 +1,132 @@
+{
+  "status": "PASS",
+  "runRoot": "/private/tmp/fdlc-dispatch-backend-8LkUI0",
+  "startedAt": "2026-09-06T07:08:17.476Z",
+  "sourcePath": "/private/tmp/fdlc-program-dispatch/convex/inferenceGateway.ts",
+  "sourceSha256": "15f84e27c7c66fbaf00418a11baf2964cc6cd859ea0090d856624a02ebc1f827",
+  "sourceBranchHead": "9a68b56c3ee788c4f8b4132a8c7c9d14f32dee28",
+  "backendBinary": "/Users/jaywest/.cache/convex/binaries/precompiled-2026-08-25-7cce8fb/convex-local-backend",
+  "backendSha256": "3fefa471e11eab56aabf86039ddf825ed1b4dbadadec2df6b88b6ffd9d604400",
+  "convexVersion": "1.42.3",
+  "gatewayBundleSha256": "97baa6999f8cfc769b965312f4e67479186b132502d9821b83e318c906ec9b83",
+  "reservationTableSha256": "0ec917e0c29866fa0b2333d6be378c40fa8dbfd49d04fb2d1cd942ff1b1875e9",
+  "routeValidatorSha256": "0dd9289ebcf4d1fdcc7a7f18214bd15dff76eed1f20b5994ffccfa2c5aa3ae43",
+  "backendUrl": "http://127.0.0.1:63121",
+  "sitePort": 63122,
+  "schemaSourceSha256": "7819df2912c19926343c088abac0bce2f2ae022036c2759d859dacf614be4375",
+  "sharedSourceSha256": "5c07438ed08a87f5edfc3145855ff42c0e4dc1c656bf7111635b4cbfd97eb2e5",
+  "scope": "Unmodified production inference gateway and shared canonical constructors, fixture-only authorization shim, exact inference table schemas and indexes, synthetic related schemas and records, real local Convex backend. No external provider calls, real billing, full-app authorization, full application schema deployment, or real human acceptance proof.",
+  "dispatchSharedSha256": "42222b3778434cf71780b56879604b2b5768002e34594cfdd4f6ba1d8c0384c8",
+  "profileGuardSha256": "3b7ade9e198b9d1d6b7e9bfe5553c47d6ad2d6ae8270850e6aedeca0cf0370b9",
+  "tests": [
+    {
+      "name": "logical intent identity and exact replay",
+      "passed": true
+    },
+    {
+      "name": "single claim under eight concurrent requests",
+      "passed": true,
+      "successfulClaims": 1,
+      "deniedClaims": 7
+    },
+    {
+      "name": "failed primary and successful fallback retain canonical snapshots",
+      "passed": true
+    },
+    {
+      "name": "synthetic reconciliation is idempotent",
+      "passed": true
+    },
+    {
+      "name": "synthetic accepted projection and NO_GO comparison preserve source identities",
+      "passed": true,
+      "actualHumanAcceptance": false,
+      "syntheticCostMicrousd": 7
+    },
+    {
+      "name": "original reservation and intent snapshots remain immutable after claim and receipt",
+      "passed": true
+    },
+    {
+      "name": "canonical replay rejects duplicated row drift",
+      "passed": true
+    },
+    {
+      "name": "receipt replay binds pricing context",
+      "passed": true
+    },
+    {
+      "name": "legacy snapshots block only their selected cohort",
+      "passed": true
+    },
+    {
+      "name": "missing receipt snapshot prevents invented projection identity",
+      "passed": true
+    },
+    {
+      "name": "missing frozen intent cannot claim",
+      "passed": true
+    },
+    {
+      "name": "corrupted frozen intent cannot claim",
+      "passed": true
+    },
+    {
+      "name": "late receipt survives frozen lease expiry using committed claim time",
+      "passed": true
+    },
+    {
+      "name": "real durable selected allowance and eight-way concurrent claim",
+      "passed": true,
+      "granted": 1,
+      "denied": 7,
+      "canonicalRoundtrip": true
+    },
+    {
+      "name": "real selected dispatch denies revision and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies profile and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies worker and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies factory and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies qualification and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies price and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies parameters and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies budget and retains allocation",
+      "passed": true
+    },
+    {
+      "name": "real selected dispatch denies cancel and retains allocation",
+      "passed": true
+    }
+  ],
+  "cleanup": {
+    "backendExitCode": null,
+    "backendSignal": "SIGTERM",
+    "cloudPortClosed": true,
+    "sitePortClosed": true,
+    "originalDatabasesUsed": false,
+    "ephemeralKeyPersisted": false,
+    "sourceUnchanged": true
+  },
+  "completedAt": "2026-09-06T07:08:21.081Z"
+}

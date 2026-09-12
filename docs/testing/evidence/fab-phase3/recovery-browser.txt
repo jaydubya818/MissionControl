@@ -1,0 +1,26 @@
+### Result
+{"schema":"fab-recovery-browser/v1","environment":"ISOLATED_COMPONENT_FIXTURE","results":[{"theme":"dark","width":1440,"violations":[],"overflow":false},{"theme":"dark","width":390,"violations":[],"overflow":false},{"theme":"light","width":1440,"violations":[],"overflow":false},{"theme":"light","width":390,"violations":[],"overflow":false}]}
+### Ran Playwright code
+```js
+await (async (page) => {
+  const results = [];
+  for (const theme of ['dark','light']) {
+    for (const width of [1440,390]) {
+      await page.setViewportSize({width, height: 1000});
+      await page.goto(`http://127.0.0.1:4174/?theme=${theme}`);
+      await page.getByRole('button', {name:'Reconcile publication'}).waitFor();
+      await page.addScriptTag({path:'/private/tmp/fab-phase3-mission-control/node_modules/.pnpm/axe-core@4.12.1/node_modules/axe-core/axe.min.js'});
+      const audit = await page.evaluate(async () => {
+        const result = await window.axe.run(document);
+        return { violations: result.violations.map(v => ({id:v.id,impact:v.impact,description:v.description,nodes:v.nodes.map(n=>n.target)})), overflow: document.documentElement.scrollWidth > innerWidth };
+      });
+      await page.screenshot({path:`output/playwright/fab-phase3-recovery/${theme}-${width}.png`,fullPage:true});
+      results.push({theme,width,...audit});
+    }
+  }
+  return {schema:'fab-recovery-browser/v1',environment:'ISOLATED_COMPONENT_FIXTURE',results};
+}
+)(page);
+```
+### Events
+- New console entries: .playwright-cli/console-2026-09-05T22-59-31-724Z.log#L12-L15

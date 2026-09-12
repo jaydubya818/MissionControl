@@ -67,9 +67,7 @@ export function AutomationDefinitions({
       const args = {
         projectId,
         automationDefinitionId: action.definition._id,
-        actorId: "operator",
         reason: reason.trim(),
-        policyVersion: "automation-v1",
       };
       if (action.type === "activate") await activate(args);
       else if (action.type === "pause") await pause(args);
@@ -99,7 +97,7 @@ export function AutomationDefinitions({
     <div className="space-y-4">
       <div aria-live="polite">
         {message ? (
-          <p role={message.tone === "error" ? "alert" : "status"} className={message.tone === "ok" ? "text-sm text-emerald-300" : "text-sm text-red-300"}>
+          <p role={message.tone === "error" ? "alert" : "status"} className={message.tone === "ok" ? "text-sm text-ok" : "text-sm text-err"}>
             {message.text}
           </p>
         ) : null}
@@ -159,17 +157,17 @@ export function AutomationDefinitions({
                 <td className="px-3 py-3 text-muted-foreground">{definition.reliabilityState}</td>
                 <td className="px-3 py-3">
                   <div className="text-foreground">{definition.autonomyLevel}</div>
-                  <div className={definition.isMutating ? "text-red-200" : "text-emerald-300"}>{definition.isMutating ? "Mutating" : "Read-only"}</div>
+                  <div className={definition.isMutating ? "text-err" : "text-ok"}>{definition.isMutating ? "Mutating" : "Read-only"}</div>
                 </td>
                 <td className="px-3 py-3">
                   <div className="text-foreground">{definition.workflow?.name ?? definition.workflowId}</div>
                   <div className="mt-1 text-xs text-muted-foreground">{definition.workflowId}@{definition.workflowVersion}</div>
-                  {!definition.workflowActive || definition.workflowVersionMismatch ? <div className="mt-1 text-xs text-amber-200">{!definition.workflowActive ? "Workflow inactive" : "Version mismatch"}</div> : null}
+                  {!definition.workflowActive || definition.workflowVersionMismatch ? <div className="mt-1 text-xs text-warn">{!definition.workflowActive ? "Workflow inactive" : "Version mismatch"}</div> : null}
                 </td>
                 <td className="px-3 py-3 text-muted-foreground">
                   <div>{humanizeCron(definition.triggerConfig?.cron)}</div>
                   <div className="mt-1 text-xs">{definition.triggerConfig?.cron} · {definition.triggerConfig?.timezone}</div>
-                  {definition.scheduleConflict ? <div className="mt-1 text-xs text-amber-200">Schedule conflict</div> : null}
+                  {definition.scheduleConflict ? <div className="mt-1 text-xs text-warn">Schedule conflict</div> : null}
                 </td>
                 <td className="max-w-[220px] px-3 py-3 text-muted-foreground">{definition.scope}<div className="mt-1 text-xs">{definition.repositoryIds?.join(", ") || "No repository"}</div></td>
                 <td className="px-3 py-3">{definition.riskLevel}</td>

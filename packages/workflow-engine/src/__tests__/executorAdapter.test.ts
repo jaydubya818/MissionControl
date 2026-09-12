@@ -1,13 +1,29 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  DEEPSEEK_V1_RUNTIME_ARTIFACT,
   GENERIC_HARNESS_CONTRACT_VERSION,
   NO_HARNESS_AUTHORITY,
   runHarnessExecution,
+  HarnessCleanupError,
   type ExecutorRequest,
   type HarnessExecutorAdapter,
 } from "../executorAdapter.js";
 
 describe("Generic Harness Contract V1", () => {
+  it("preserves a collected response when cleanup fails without returning success", async () => {
+    const result = { executionId: "synthetic", status: "COMPLETED" as const, output: "synthetic retained bytes" };
+    const cause = new Error("Synthetic cleanup failure");
+    const adapter = { prepare: async () => ({}), execute: async () => ({}), collectResult: async () => result,
+      cleanup: async () => { throw cause; } } as unknown as HarnessExecutorAdapter;
+    try {
+      await runHarnessExecution(adapter, {} as ExecutorRequest, { emit: () => {} });
+      throw new Error("Expected cleanup failure");
+    } catch (error) {
+      expect(error).toBeInstanceOf(HarnessCleanupError);
+      expect((error as HarnessCleanupError).result).toBe(result);
+      expect((error as HarnessCleanupError).cleanupCause).toBe(cause);
+    }
+  });
   it("requires the complete execution-only lifecycle surface", () => {
     const request: ExecutorRequest = {
       executionId: "execution-1",
@@ -43,6 +59,7 @@ describe("Generic Harness Contract V1", () => {
         version: "v1",
         displayName: "DeepSeek Harness fixture",
         provider: "fixture",
+        runtimeArtifact: DEEPSEEK_V1_RUNTIME_ARTIFACT,
         executionBackends: ["persistent-worker"],
         authority: NO_HARNESS_AUTHORITY,
         supportsCancel: true,

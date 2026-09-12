@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  CODEX_V1_RUNTIME_ARTIFACT,
   CODEX_V1_HARNESS_MANIFEST,
   DEEPSEEK_V1_HARNESS_MANIFEST,
+  DEEPSEEK_V1_RUNTIME_ARTIFACT,
   boundedProviderMetadata,
   harnessCapabilityManifestDigest,
   harnessCapabilityRequirementsSatisfied,
   harnessManifestIssues,
   harnessNormalizedResultIssues,
+  harnessExecutionRequestDigest,
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
   type HarnessNormalizedResult,
 } from "../index.js";
 
@@ -71,6 +76,51 @@ describe("generic harness contract", () => {
     ])).toBe(true);
   });
 
+  it("requires canonical, kind-specific runtime artifact digests", () => {
+    expect(harnessRuntimeArtifactIssues(CODEX_V1_RUNTIME_ARTIFACT)).toEqual([]);
+    expect(CODEX_V1_RUNTIME_ARTIFACT).not.toHaveProperty("closureSha256");
+    expect(harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT)).toBe("sha256:dbd2a09c812ba8b2a5b5425f5386b0c65b2a399e40813374597d20bcfcd855fc");
+    expect(harnessRuntimeArtifactIssues(DEEPSEEK_V1_RUNTIME_ARTIFACT)).toEqual([]);
+    expect(DEEPSEEK_V1_RUNTIME_ARTIFACT.closureSha256).toBe("f340dda4710952d53ea3611ace0d04959c1410aeeb9f6464254c644e4aedfa83");
+
+    const executableWithImage = {
+      ...CODEX_V1_RUNTIME_ARTIFACT,
+      imageDigest: `sha256:${"a".repeat(64)}`,
+    };
+    expect(harnessRuntimeArtifactIssues(executableWithImage)).toContain("runtime-artifact-image-not-allowed");
+    expect(() => harnessRuntimeArtifactDigest(executableWithImage)).toThrow(/runtime artifact is invalid/);
+
+    const containerWithExecutable = {
+      ...CODEX_V1_RUNTIME_ARTIFACT,
+      kind: "CONTAINER_IMAGE" as const,
+      executableSha256: "b".repeat(64),
+      imageDigest: `sha256:${"a".repeat(64)}`,
+    };
+    expect(harnessRuntimeArtifactIssues(containerWithExecutable)).toContain("runtime-artifact-executable-not-allowed");
+
+    expect(harnessRuntimeArtifactIssues({
+      ...CODEX_V1_RUNTIME_ARTIFACT,
+      executableSha256: "A".repeat(64),
+    })).toContain("runtime-artifact-executable-digest-noncanonical");
+    expect(harnessRuntimeArtifactIssues({
+      ...containerWithExecutable,
+      executableSha256: null,
+      imageDigest: `sha256:${"A".repeat(64)}`,
+    })).toContain("runtime-artifact-image-digest-noncanonical");
+    expect(harnessRuntimeArtifactIssues({
+      ...CODEX_V1_RUNTIME_ARTIFACT,
+      closureSha256: "A".repeat(64),
+    })).toContain("runtime-artifact-closure-digest-noncanonical");
+    expect(harnessRuntimeArtifactIssues({
+      ...CODEX_V1_RUNTIME_ARTIFACT,
+      closureSha256: "not-a-digest",
+    })).toContain("runtime-artifact-closure-digest-invalid");
+    expect(harnessRuntimeArtifactIssues({
+      ...CODEX_V1_RUNTIME_ARTIFACT,
+      provider: "openai",
+    })).toContain("runtime-artifact-fields-invalid");
+  });
+
   it("accepts unavailable telemetry as null and rejects fabricated invalid values", () => {
     const result = normalizedResult();
     expect(harnessNormalizedResultIssues(result)).toEqual([]);
@@ -101,5 +151,35 @@ describe("generic harness contract", () => {
     });
     expect(() => boundedProviderMetadata({ nested: { secret: true } })).toThrow(/scalar/);
     expect(() => boundedProviderMetadata(Object.fromEntries(Array.from({ length: 51 }, (_, index) => [`K${index}`, index])))).toThrow(/50/);
+  });
+
+  it("binds exact model-route identity into requests and validates additive result provenance", () => {
+    const baseRequest = {
+      executionId: "attempt-1",
+      repositoryRoot: "/tmp/repository",
+      workingDirectory: "/tmp/repository",
+      prompt: "Implement it.",
+      provider: "openai",
+      model: "gpt-5.6-terra",
+      allowedPaths: ["src/**"],
+      timeoutMs: 60_000,
+      isolation: "WORKSPACE_WRITE" as const,
+    };
+    const exactRequest = {
+      ...baseRequest,
+      modelRouteDigest: `sha256:${"b".repeat(64)}`,
+      providerRoute: "openai",
+      reasoningConfig: { effort: "high" },
+    };
+    expect(harnessExecutionRequestDigest(exactRequest)).not.toBe(harnessExecutionRequestDigest(baseRequest));
+
+    const result = normalizedResult();
+    result.provenance.modelRouteDigest = exactRequest.modelRouteDigest;
+    result.provenance.providerRoute = exactRequest.providerRoute;
+    result.provenance.reasoningConfig = exactRequest.reasoningConfig;
+    expect(harnessNormalizedResultIssues(result)).toEqual([]);
+
+    result.provenance.reasoningConfig = { temperature: 3 };
+    expect(harnessNormalizedResultIssues(result)).toContain("result-provenance-invalid");
   });
 });

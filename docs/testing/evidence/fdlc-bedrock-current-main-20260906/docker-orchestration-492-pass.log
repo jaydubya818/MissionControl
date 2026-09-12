@@ -1,0 +1,188 @@
+
+ RUN  v3.2.7 /Users/jaywest/.codex/worktrees/f4c3/MissionControl/.worktrees/codex/fdlc-bedrock-current-main-20260906/apps/orchestration-server
+
+ ✓ src/__tests__/automationAdapter.test.ts (11 tests) 973ms
+   ✓ Automation adapter safety > executes TypeScript and Python artifacts through fixed argv adapters  679ms
+ ✓ src/__tests__/deepseekHarnessExecutorAdapter.test.ts (10 tests) 1275ms
+   ✓ DeepSeekHarnessExecutorAdapter > cancels the dedicated owned executor process group  335ms
+ ✓ src/__tests__/factoryAttemptWorkerRemote.test.ts (2 tests) 975ms
+   ✓ FactoryAttemptWorker remote Sandbox backend > runs beneath the canonical worker lease, verifies on the host, cleans up, and only then publishes one PR  972ms
+ ✓ src/__tests__/codexExecutorAdapter.test.ts (15 tests) 1793ms
+   ✓ CodexV1ExecutorAdapter > cancels the dedicated owned executor process group  418ms
+   ✓ CodexV1ExecutorAdapter > closes the Codex CLI stdin pipe so an explicit prompt can start  536ms
+ ✓ src/__tests__/factoryGitRuntime.test.ts (5 tests) 2060ms
+   ✓ Factory Git runtime > creates and reconciles the exact worktree branch across retries  592ms
+   ✓ Factory Git runtime > prepares frozen dependencies without changing source state  301ms
+   ✓ Factory Git runtime > never loads candidate pnpm hooks or lifecycle scripts during offline preparation  725ms
+   ✓ Factory Git runtime > binds planning to a detached exact SHA and rejects any repository change  310ms
+ ✓ src/__tests__/sandboxSupervisor.test.ts (5 tests) 1821ms
+   ✓ sandbox supervisor candidate capture > includes staged, unstaged, and newly created files, and excludes ignored ones  321ms
+   ✓ sandbox supervisor candidate capture > reads V2 model/backend bindings and rejects a tampered runtime artifact before execution  340ms
+   ✓ sandbox supervisor candidate capture > admits V3 only with a current exact Execution Profile before running the executor  344ms
+   ✓ sandbox supervisor candidate capture > keeps the standalone remote supervisor equivalent to the in-process one  562ms
+ ✓ src/__tests__/hardLiabilityLedger.test.ts (23 tests) 886ms
+ ✓ src/__tests__/githubAppPublisher.test.ts (6 tests) 165ms
+ ✓ src/__tests__/localInferenceBoundary.test.ts (1 test) 694ms
+   ✓ local inference catalog boundary > rejects legacy HTTP synchronization until a signed workspace command exists  693ms
+stderr | src/__tests__/durableCodexWorker.test.ts > durable Codex worker Git boundary > retains a non-terminal lease when the worker shuts down
+[codex-worker] Worker stopped for run-restart; durable worktree and non-terminal lease retained for recovery.
+
+ ✓ src/__tests__/durableCodexWorker.test.ts (7 tests) 2318ms
+   ✓ durable Codex worker Git boundary > creates and recovers the exact linked worktree without resetting partial changes  525ms
+   ✓ durable Codex worker Git boundary > blocks verification commands that change Git history  447ms
+   ✓ durable Codex worker Git boundary > rechecks approved file scope after verification commands mutate the worktree  747ms
+   ✓ durable Codex worker Git boundary > retains a non-terminal lease when the worker shuts down  393ms
+ ✓ src/__tests__/factoryHostReporter.test.ts (9 tests) 230ms
+ ✓ src/__tests__/factoryVerificationAuthority.test.ts (8 tests) 794ms
+ ✓ src/__tests__/dockerSandboxProvider.test.ts (21 tests) 2346ms
+   ✓ recovers teardown after provider restart, rejects stale identity and tolerates already-absent teardown  1472ms
+   ✓ recovers a REQUESTED journal after the Docker create reply is lost, without adopting another lease  870ms
+ ✓ src/__tests__/gatewayProxy.test.ts (15 tests) 123ms
+ ✓ src/__tests__/governedMcpBroker.test.ts (16 tests) 224ms
+ ✓ src/__tests__/remoteSandboxRuntime.test.ts (24 tests) 2541ms
+   ✓ sandbox supervisor > pins the source, runs a bounded executor, and writes a content-addressed binary patch  402ms
+   ✓ sandbox supervisor > reconstructs one terminal Codex JSONL result with exact context and atomic persistence  463ms
+   ✓ sandbox supervisor > preserves diagnostics but no final result when the supervisor crashes after execution  339ms
+   ✓ sandbox supervisor > redacts an Attempt credential before truncating crash diagnostics  321ms
+   ✓ sandbox supervisor > bounds executor output in memory while preserving full byte counts and stream digests  403ms
+   ✓ sandbox supervisor > terminates the executor process group and preserves a typed cancellation bundle  459ms
+ ✓ src/__tests__/factoryVerification.test.ts (2 tests) 89ms
+ ✓ src/__tests__/missionPlanningContract.test.ts (8 tests) 60ms
+ ✓ src/__tests__/factoryGovernedMcpContext.test.ts (2 tests) 105ms
+ ✓ src/__tests__/bedrockInferenceBridge.test.ts (26 tests) 71ms
+ ✓ src/__tests__/dockerBedrockAdmission.test.ts (8 tests) 89ms
+ ✓ src/__tests__/missionPlanningWorker.test.ts (9 tests) 66ms
+ ✓ src/__tests__/bedrockAdapter.test.ts (61 tests) 96ms
+ ✓ src/__tests__/localInference.test.ts (1 test) 3ms
+ ✓ src/__tests__/fabRuntimeIdentity.test.ts (2 tests) 24ms
+ ✓ src/__tests__/factoryWorkspaceOwnership.test.ts (14 tests) 3204ms
+   ✓ Factory workspace ownership > removes only an exact, clean, published, terminated worktree  362ms
+   ✓ Factory workspace ownership > reconciles a recovery transfer interrupted at before-destination-write  307ms
+ ✓ src/__tests__/bedrockProfileComposition.test.ts (5 tests) 32ms
+ ✓ src/__tests__/exeDevSandboxProvider.test.ts (14 tests) 10ms
+ ✓ src/__tests__/githubAppRuntime.test.ts (10 tests) 11ms
+ ✓ src/__tests__/bedrockQualifiedTransport.test.ts (7 tests) 41ms
+ ✓ src/__tests__/serviceCommandClient.test.ts (3 tests) 3ms
+ ✓ src/__tests__/governedInferenceGateway.test.ts (10 tests) 9ms
+ ✓ src/__tests__/sandboxCredentials.test.ts (3 tests) 6ms
+ ✓ src/__tests__/bedrockReconciliation.test.ts (16 tests) 9ms
+ ✓ src/__tests__/factoryPathScope.test.ts (3 tests) 3ms
+ ✓ src/__tests__/remoteStructuredResult.test.ts (17 tests) 4ms
+ ✓ src/__tests__/factoryHarnessComposition.test.ts (5 tests) 7ms
+ ✓ src/__tests__/sandboxReconciler.test.ts (3 tests) 4ms
+ ✓ src/__tests__/orchestrationSecurity.test.ts (9 tests) 3ms
+ ✓ src/__tests__/auth.test.ts (6 tests) 2ms
+ ✓ src/__tests__/harnessAdapterRegistry.test.ts (7 tests) 5ms
+ ↓ src/__tests__/governedContextBridge.integration.test.ts (1 test | 1 skipped)
+ ✓ src/__tests__/factoryObservability.test.ts (2 tests) 2ms
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > persists the policy-v2 candidate checkpoint before a GitHub credential publication failure
+[factory-worker] Attempt factory-run-1 failed: GitHub App runtime credentials are not configured.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > denies local recovery when the clean worktree no longer matches the durable source checkpoint
+[factory-worker] Attempt factory-run-1 failed: Local candidate recovery workspace does not match the durable source Attempt checkpoint.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 profile bytes are substituted after admission
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails before adapter construction when V3 claim evidence is missing or substituted
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > rejects a V3 qualification already stale at the server claim instant
+[factory-worker] Attempt factory-run-1 failed: Claimed Factory V3 Execution Profile binding is invalid (profile or admission lease mismatch).
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different runtime executable
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when legacy V1 normalized provenance reports a different runtime executable
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different provider route
+[factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+
+ ✓ src/__tests__/fabExecutorAdapter.test.ts (13 tests) 8825ms
+   ✓ Fab canonical MC harness conformance > requires durable request evidence before dispatch and records in-process lifecycle  655ms
+   ✓ Fab canonical MC harness conformance > registers an execution-only manifest and rejects scope, model, root and containment mismatch  349ms
+   ✓ Fab canonical MC harness conformance > denies missing or lost MC authority before any inference  325ms
+   ✓ Fab canonical MC harness conformance > produces real checked edits, canonical evidence and candidate linkage without acceptance authority  1757ms
+   ✓ Fab canonical MC harness conformance > rejects injected path or authority ../escape.mjs  980ms
+   ✓ Fab canonical MC harness conformance > rejects injected path or authority .env  783ms
+   ✓ Fab canonical MC harness conformance > rejects injected path or authority src/credentials.json  754ms
+   ✓ Fab canonical MC harness conformance > rejects injected path or authority self-approval  760ms
+   ✓ Fab canonical MC harness conformance > denies duplicate execution after prepare/crash/reconnect and local resume without MC  313ms
+   ✓ Fab canonical MC harness conformance > preserves an actual killed worker's uncertain model request and refuses its replay  627ms
+   ✓ Fab canonical MC harness conformance > cancels during model execution and prevents successful handoff  328ms
+   ✓ Fab canonical MC harness conformance > cancels during check execution and prevents successful handoff  680ms
+   ✓ Fab canonical MC harness conformance > fails closed when lease authority is lost after an observed tool  513ms
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > fences publication at intent-expiry
+[factory-worker] Attempt factory-run-1 failed: Publication permit is missing or expired for candidate 0e54bd3aabe6.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > fences publication at lease-loss-after-push
+[factory-worker] Attempt factory-run-1 failed: Attempt authority was lost or cancelled.
+
+ ✓ src/__tests__/systemFactoryQualification.test.ts (4 tests) 10868ms
+   ✓ Mission Control full-system Factory qualification V2 > proves exact governed lineage, failures, recovery, authority, and learning on an isolated fixture  10853ms
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > reconciles lost-provider-response after permit expiry without provider writes or model replay
+[factory-worker] Attempt factory-run-1 failed: Fixture provider outcome uncertain after request
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > reconciles lost-terminal-response after permit expiry without provider writes or model replay
+[factory-worker] Attempt factory-run-1 failed: Controlled terminal response loss after workspace cleanup
+
+ ✓ src/__tests__/dockerBedrockBridge.test.ts (1 test) 15252ms
+   ✓ runs exact Codex Bedrock V3 through no-network Docker and bounded tool cycle  15252ms
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > denies publication when MC's final authority check rejects the lease
+[factory-worker] Attempt factory-run-1 failed: Control plane did not authorize pull-request publication.
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect
+[factory-worker] Attempt factory-run-1 failed: Fixture provider outcome uncertain after request
+
+stderr | src/__tests__/factoryAttemptWorker.test.ts > Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect
+[factory-worker] Attempt factory-run-1 failed: Workspace ownership tuple mismatch; workspace was preserved.
+
+ ✓ src/__tests__/factoryAttemptWorker.test.ts (36 tests) 18216ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > turns governed issue intent into a verified, evidence-linked pull request  770ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > injects profile-bound governed MCP output as untrusted pre-harness context  803ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > completes a non-mutating candidate as durable evidence without provider publication  507ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > executes an independently registered harness identity through the unchanged governed lifecycle  545ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > uses only the frozen V2 provider/model route and ignores a mutable claim model override  518ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > constructs the worker from the exact frozen V3 Execution Profile  317ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > uses the server claim instant for V3 expiry so an admitted lease may finish  314ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > completes the durable worker golden path and cleans only its proven worktree  309ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > does not create a pull request when the control plane rejects the verification packet  315ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > pauses for human review and resumes publication without rerunning Codex or verification  421ms
+   ✓ FactoryAttemptWorker verification-first lifecycle > persists a verification mismatch, blocks publication, and recovers with a new immutable Attempt  536ms
+   ✓ Fab governed golden path using the canonical MC worker > fences publication at intent-expiry  1376ms
+   ✓ Fab governed golden path using the canonical MC worker > fences publication at lease-loss-after-push  1333ms
+   ✓ Fab governed golden path using the canonical MC worker > reconciles lost-provider-response after permit expiry without provider writes or model replay  1482ms
+   ✓ Fab governed golden path using the canonical MC worker > reconciles lost-terminal-response after permit expiry without provider writes or model replay  1369ms
+   ✓ Fab governed golden path using the canonical MC worker > pauses without a PR, verifies a v2 subject separately, then transfers the owned workspace for approved draft publication  1439ms
+   ✓ Fab governed golden path using the canonical MC worker > links a real Fab candidate to a separate exact-subject verifier, approval and fixture publication  1351ms
+   ✓ Fab governed golden path using the canonical MC worker > denies publication when MC's final authority check rejects the lease  1192ms
+   ✓ Fab governed golden path using the canonical MC worker > preserves uncertain publication and refuses duplicate build/publication on reconnect  1255ms
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: cancel and cleanup
+[factory-worker] Attempt factory-run-remote failed: This operation was aborted
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: timeout and cleanup
+[factory-worker] Attempt factory-run-remote failed: Docker execution exceeded its frozen deadline; late results are fenced.
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: startup-failure and cleanup
+[factory-worker] Attempt factory-run-remote failed: Remote sandbox cleanup failed.
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: budget-denial and cleanup
+[factory-worker] Attempt factory-run-remote failed: Inference dispatch denied: no qualified hard-budget broker path.
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: cleanup-failure and cleanup
+[factory-worker] Attempt factory-run-remote failed: Remote sandbox cleanup failed.
+
+ ✓ src/__tests__/dockerFactoryWorker.test.ts (7 tests) 37281ms
+   ✓ dispatches through the real Factory worker into hardened Docker: result and cleanup  22810ms
+   ✓ dispatches through the real Factory worker into hardened Docker: cancel and cleanup  1091ms
+   ✓ dispatches through the real Factory worker into hardened Docker: timeout and cleanup  5356ms
+   ✓ dispatches through the real Factory worker into hardened Docker: startup-failure and cleanup  307ms
+   ✓ dispatches through the real Factory worker into hardened Docker: budget-denial and cleanup  580ms
+   ✓ dispatches through the real Factory worker into hardened Docker: cleanup-failure and cleanup  413ms
+   ✓ reconciles Docker after actual worker process death  6722ms
+
+ Test Files  47 passed | 1 skipped (48)
+      Tests  492 passed | 1 skipped (493)
+   Start at  22:27:31
+   Duration  38.32s (transform 2.01s, setup 0ms, collect 9.72s, tests 113.62s, environment 4ms, prepare 2.64s)

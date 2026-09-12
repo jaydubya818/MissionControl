@@ -1,0 +1,10 @@
+{
+  "committedHead": "971d664d81259b005ab986bd2e14cc1a049b98bb",
+  "backendReportHead": "90dc744f5298cb3b83f15121221a1c8a0bdba055",
+  "backendScope": "Uncommitted source at execution, exactly matched to this committed head by SHA-256",
+  "hashes": {
+    "convex/inferenceGateway.ts": "610201941c860aa7126dcb01916e036ba5ea8ef592e862724f3f57f2fa00e1f6",
+    "convex/schema.ts": "a638c1c608afc8e586e9292c3c313db4d1fa015119a06692c773858a5c1b4e5a",
+    "packages/shared/src/governedInference.ts": "5c07438ed08a87f5edfc3145855ff42c0e4dc1c656bf7111635b4cbfd97eb2e5"
+  }
+}

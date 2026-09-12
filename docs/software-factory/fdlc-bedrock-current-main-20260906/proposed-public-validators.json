@@ -1,0 +1,66 @@
+[
+  {
+    "file": "convex/factory/providerLiability.ts",
+    "operation": "registerPriceVersion",
+    "kind": "mutation",
+    "args": "args: {\n    projectId: v.id(\"projects\"),\n    price: providerPriceValidator,\n    registrationKey: v.string(),\n  }",
+    "returns": "No explicit returns validator (existing handler contract retained)",
+    "sourceRef": "683b9f04f1a235a8c007057d73cbe03a9c72e846"
+  },
+  {
+    "file": "convex/factory/providerLiability.ts",
+    "operation": "createReservation",
+    "kind": "mutation",
+    "args": "args: {\n    projectId: v.id(\"projects\"),\n    workOrderId: v.id(\"workOrders\"),\n    executionProfileId: v.id(\"factoryExecutionProfiles\"),\n    priceId: v.id(\"factoryProviderPrices\"),\n    maximumNanoUsd: v.number(),\n    expiresAt: v.number(),\n    maximumRequests: v.number(),\n    idempotencyKey: v.string(),\n  }",
+    "returns": "No explicit returns validator (existing handler contract retained)",
+    "sourceRef": "683b9f04f1a235a8c007057d73cbe03a9c72e846"
+  },
+  {
+    "file": "convex/factory/providerLiability.ts",
+    "operation": "getReservation",
+    "kind": "query",
+    "args": "args: { reservationId: v.id(\"factoryProviderReservations\") }",
+    "returns": "No explicit returns validator (existing handler contract retained)",
+    "sourceRef": "683b9f04f1a235a8c007057d73cbe03a9c72e846"
+  },
+  {
+    "file": "convex/factory/providerLiability.ts",
+    "operation": "reconcileUsage",
+    "kind": "mutation",
+    "args": "args: {\n    reservationId: v.id(\"factoryProviderReservations\"),\n    usage: providerUsageValidator,\n    evidenceReference: v.string(),\n  }",
+    "returns": "No explicit returns validator (existing handler contract retained)",
+    "sourceRef": "683b9f04f1a235a8c007057d73cbe03a9c72e846"
+  },
+  {
+    "file": "convex/serviceCommands.ts",
+    "operation": "reserveProviderRequest",
+    "kind": "action",
+    "args": "args: { envelope, payloadJson: v.string() }",
+    "returns": "No explicit returns validator (existing handler contract retained)",
+    "sourceRef": "683b9f04f1a235a8c007057d73cbe03a9c72e846"
+  },
+  {
+    "file": "convex/serviceCommands.ts",
+    "operation": "recordProviderUsage",
+    "kind": "action",
+    "args": "args: { envelope, payloadJson: v.string() }",
+    "returns": "No explicit returns validator (existing handler contract retained)",
+    "sourceRef": "683b9f04f1a235a8c007057d73cbe03a9c72e846"
+  },
+  {
+    "file": "convex/workOrders.ts",
+    "operation": "readiness",
+    "kind": "query",
+    "args": "args: {\n    workOrderId: v.id(\"workOrders\"),\n    factoryDefinitionVersionId: v.optional(v.id(\"factoryDefinitionVersions\")),\n    expectedRevision: v.optional(v.number()),\n    refreshToken: v.optional(v.number()),\n  }",
+    "returns": "No explicit returns validator (existing handler contract retained)",
+    "sourceRef": "683b9f04f1a235a8c007057d73cbe03a9c72e846"
+  },
+  {
+    "file": "convex/factory/configuration.ts",
+    "operation": "createSandboxProfile",
+    "kind": "mutation",
+    "args": "args: {\n    projectId: v.id(\"projects\"),\n     provider: v.optional(v.union(v.literal(\"EXE_DEV\"), v.literal(\"DOCKER\"))),\n    dockerQualification: v.optional(v.any()), profileKey: v.string(),\n    providerProfile: v.string(),\n    providerProfileVersion: v.string(),\n    machineImage: v.string(),\n    cpu: v.number(),\n    memoryMb: v.number(),\n    diskGb: v.number(),\n    maxRuntimeMs: v.number(),\n    resultPollIntervalMs: v.number(),\n    resultRetentionMs: v.number(),\n    networkEgress: v.union(v.literal(\"UNRESTRICTED\"), v.literal(\"RESTRICTED_ALLOWLIST\")),\n    egressAllowlist: v.array(v.string()),\n    spendLimitUsd: v.number(),\n    spendEnforcement: v.union(v.literal(\"PROVIDER_KEY_LIMIT\"), v.literal(\"OBSERVATION_ONLY\")),\n    previewMode: v.union(v.literal(\"DISABLED\"), v.literal(\"PRIVATE_PROXY\")),\n    previewPort: v.optional(v.number()),\n    readinessEvidence: v.object({\n      providerReachable: v.boolean(),\n      capacityAvailable: v.boolean(),\n      automaticCredentialCount: v.number(),\n      egressEnforcementProven: v.boolean(),\n      evidenceReference: v.string(),\n    }),\n    certification: v.optional(v.object({\n      liveCertified: v.literal(true),\n      evidencePacketReference: v.string(),\n      evidencePacketDigest: v.string(),\n      egressPolicyDigest: v.string(),\n      credentialRevocationBoundMs: v.number(),\n      supportedWorkloadClasses: v.array(v.string()),\n      supportedRiskClasses: v.array(sandboxRiskClass),\n      workloadTimeouts: v.array(v.object({ workloadClass: v.string(), maxRuntimeMs: v.number() })),\n      security: v.any(),\n    })),\n  }",
+    "returns": "No explicit returns validator (existing handler contract retained)",
+    "sourceRef": "683b9f04f1a235a8c007057d73cbe03a9c72e846"
+  }
+]

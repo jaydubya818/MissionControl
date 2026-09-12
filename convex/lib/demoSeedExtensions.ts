@@ -25,7 +25,16 @@ import {
 } from "./missionSpecDemo";
 import { compileApprovedPlanQualityContract } from "./qualityContract";
 import { compileMissionWorkOrderContract } from "./missionWorkOrderContract";
+import { missionIntentContributionDigest } from "./missionIntentContributions";
 import { createWorkOrderRecord } from "./workOrderCreate";
+import {
+  MISSION_CONTROL_GOLDEN_SUITE_V1,
+  buildEvalBaseline,
+  canonicalDigest,
+  evaluateSuiteRun,
+  evalSuiteDigest,
+  type EvalRunReceipt,
+} from "@mission-control/shared";
 
 export type DemoSeedContext = {
   tenantId: Id<"tenants">;
@@ -38,6 +47,142 @@ export type DemoSeedContext = {
 
 const REPO_SLUG = "jaydubya818/MissionControl";
 
+async function seedSharedIntentContributions(ctx: MutationCtx, input: DemoSeedContext, missionId: Id<"missions">) {
+  const { tenantId, projectId, now } = input;
+  const mission = await ctx.db.get(missionId);
+  if (!mission?.currentSpecRevisionId) return;
+  const revisions = await ctx.db.query("missionSpecRevisions")
+    .withIndex("by_mission_revision", (q) => q.eq("missionId", missionId))
+    .order("desc").take(3);
+  const current = revisions.find((item) => item._id === mission.currentSpecRevisionId);
+  const prior = revisions.find((item) => item._id !== mission.currentSpecRevisionId);
+  if (!current || !prior) return;
+
+  const specs = [
+    {
+      idempotencyKey: "mc-demo:intent:qa-stale:r1",
+      contributionKey: "QA-AC-001",
+      revisionNumber: 1,
+      spec: prior,
+      contributorRole: "QA" as const,
+      targetSection: "ACCEPTANCE_EXPECTATIONS" as const,
+      targetItemId: "AC-001",
+      title: "Prove permission denial",
+      body: "An unauthorized builder is denied without changing the Mission Spec.",
+      evidenceExpectation: "Authorization test and browser-visible denied state.",
+      proposedBy: "qa-partner@example.com",
+      proposedActorType: "HUMAN" as const,
+      proposedActorSource: "DEVELOPMENT_FALLBACK" as const,
+      proposedAt: now - 18 * 60_000,
+    },
+    {
+      idempotencyKey: "mc-demo:intent:product-conflict:r1",
+      contributionKey: "PRODUCT-OUTCOME-001",
+      revisionNumber: 1,
+      spec: current,
+      contributorRole: "PRODUCT" as const,
+      targetSection: "OUTCOME" as const,
+      title: "Reduce governed planning time",
+      body: "A first-time builder reaches a planning-ready exact Spec in under fifteen minutes.",
+      evidenceExpectation: "Observed time from Mission creation to finalized Spec.",
+      proposedBy: "product-partner@example.com",
+      proposedActorType: "HUMAN" as const,
+      proposedActorSource: "DEVELOPMENT_FALLBACK" as const,
+      proposedAt: now - 12 * 60_000,
+    },
+    {
+      idempotencyKey: "mc-demo:intent:design-conflict:r1",
+      contributionKey: "DESIGN-OUTCOME-001",
+      revisionNumber: 1,
+      spec: current,
+      contributorRole: "DESIGN" as const,
+      targetSection: "OUTCOME" as const,
+      title: "Make decision state immediately legible",
+      body: "The current contribution state and next safe action are understandable without knowing the harness.",
+      evidenceExpectation: "Keyboard and narrow-width browser evidence with state labels.",
+      proposedBy: "design-agent",
+      proposedActorType: "AGENT" as const,
+      proposedActorSource: "SERVICE_COMMAND" as const,
+      proposedAt: now - 10 * 60_000,
+    },
+    {
+      idempotencyKey: "mc-demo:intent:engineering-accepted:r1",
+      contributionKey: "ENGINEERING-RECOVERY-001",
+      revisionNumber: 1,
+      spec: current,
+      contributorRole: "ENGINEERING" as const,
+      targetSection: "CONSTRAINTS" as const,
+      title: "Preserve recovery lineage",
+      body: "A rejected or stale contribution remains inspectable and can be revised against the current Spec.",
+      evidenceExpectation: "Refresh proves immutable history and a recoverable revise action.",
+      proposedBy: "engineering-partner@example.com",
+      proposedActorType: "HUMAN" as const,
+      proposedActorSource: "DEVELOPMENT_FALLBACK" as const,
+      proposedAt: now - 8 * 60_000,
+      accepted: true,
+    },
+  ];
+  for (const spec of specs) {
+    let contribution = await ctx.db.query("missionIntentContributions")
+      .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", spec.idempotencyKey)).first();
+    const digestInput = {
+      contributionKey: spec.contributionKey,
+      revisionNumber: spec.revisionNumber,
+      missionSpecRevisionId: String(spec.spec._id),
+      missionSpecDigest: spec.spec.digest,
+      contributorRole: spec.contributorRole,
+      targetSection: spec.targetSection,
+      targetItemId: spec.targetItemId,
+      title: spec.title,
+      body: spec.body,
+      evidenceExpectation: spec.evidenceExpectation,
+      proposedBy: spec.proposedBy,
+      proposedActorType: spec.proposedActorType,
+      proposedActorSource: spec.proposedActorSource,
+    };
+    if (!contribution) {
+      const contributionId = await ctx.db.insert("missionIntentContributions", {
+        tenantId, projectId, missionId,
+        missionSpecRevisionId: spec.spec._id,
+        missionSpecDigest: spec.spec.digest,
+        idempotencyKey: spec.idempotencyKey,
+        contributionKey: spec.contributionKey,
+        revisionNumber: spec.revisionNumber,
+        contributorRole: spec.contributorRole,
+        targetSection: spec.targetSection,
+        targetItemId: spec.targetItemId,
+        title: spec.title,
+        body: spec.body,
+        evidenceExpectation: spec.evidenceExpectation,
+        digest: missionIntentContributionDigest(digestInput),
+        proposedBy: spec.proposedBy,
+        proposedActorType: spec.proposedActorType,
+        proposedActorSource: spec.proposedActorSource,
+        proposedAt: spec.proposedAt,
+      });
+      contribution = await ctx.db.get(contributionId);
+    }
+    if (spec.accepted) {
+      if (!contribution) throw new Error("Shared intent demo contribution was not created");
+      const existingDecision = await ctx.db.query("missionIntentContributionDecisions")
+        .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", "mc-demo:intent-decision:engineering-accepted:r1")).first();
+      if (existingDecision) continue;
+      await ctx.db.insert("missionIntentContributionDecisions", {
+        tenantId, projectId, missionId, contributionId: contribution._id,
+        contributionDigest: missionIntentContributionDigest(digestInput),
+        missionSpecRevisionId: spec.spec._id,
+        missionSpecDigest: spec.spec.digest,
+        idempotencyKey: "mc-demo:intent-decision:engineering-accepted:r1",
+        decision: "ACCEPTED",
+        reason: "Recovery and preserved history are required by the shared-intent contract.",
+        decidedBy: "mission-control-operator@example.com",
+        decidedActorSource: "DEVELOPMENT_FALLBACK",
+        decidedAt: now - 6 * 60_000,
+      });
+    }
+  }
+}
+
 async function seedSpecIntakeGoldenPath(ctx: MutationCtx, input: DemoSeedContext) {
   const { tenantId, projectId, now, withSeedMeta } = input;
   const missionKey = "mc-demo:mission:spec-intake-golden-path";
@@ -45,7 +190,10 @@ async function seedSpecIntakeGoldenPath(ctx: MutationCtx, input: DemoSeedContext
     .query("missions")
     .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", missionKey))
     .first();
-  if (existingMission) return { created: false, missionId: existingMission._id };
+  if (existingMission) {
+    await seedSharedIntentContributions(ctx, input, existingMission._id);
+    return { created: false, missionId: existingMission._id };
+  }
 
   const [project, repository, codeScope, workflow] = await Promise.all([
     ctx.db.get(projectId),
@@ -359,6 +507,7 @@ async function seedSpecIntakeGoldenPath(ctx: MutationCtx, input: DemoSeedContext
   await ctx.scheduler.runAfter(0, internal.missionSpecs.indexSpecInFactoryMemory, { revisionId: revision1Id });
   await ctx.scheduler.runAfter(0, internal.missionSpecs.indexSpecInFactoryMemory, { revisionId: revision2Id });
   await ctx.scheduler.runAfter(0, internal.missionSpecs.indexSpecInFactoryMemory, { revisionId: revision3Id });
+  await seedSharedIntentContributions(ctx, input, missionId);
   return {
     created: true,
     missionId,
@@ -647,6 +796,277 @@ async function seedSkillAutomationScenarios(ctx: any, input: DemoSeedContext, pa
   return created;
 }
 
+function demoGoldenEvalActual() {
+  const candidateSha = "9ba871d9efad9b224b2f2cd432fbfb5cfbc9d461";
+  return {
+    lineage: {
+      finalizedSpecRevisionId: "mission-spec-demo-r2",
+      boundSpecRemainedRevision: "mission-spec-demo-r2",
+      currentSpecRevisionId: "mission-spec-demo-r3",
+      finalizedSpecDigest: hashForIndex(131),
+      qualityContractDigest: hashForIndex(132),
+      planApproval: { submittedBy: "demo-plan-author", approvedBy: "demo-plan-approver" },
+      workOrderRevision: 1,
+      acceptanceActor: "human operator",
+      qualityGateState: "ELIGIBLE",
+      verificationSubjectId: "verification-subject:demo-current",
+      verificationPlanId: "verification-plan:demo-current",
+      verificationPlanDigest: hashForIndex(133),
+      receiptId: "receipt:demo-current",
+      evidenceIds: ["evidence:intent", "evidence:tests", "evidence:security", "evidence:browser"],
+      providerHeadSha: candidateSha,
+      sourceAttemptIds: ["attempt:source-failed", "attempt:source-current"],
+      candidateShas: ["1111111111111111111111111111111111111111", candidateSha],
+      verificationAttemptIds: ["attempt:verification-failed", "attempt:verification-current"],
+    },
+    authority: {
+      workOrderAcceptedEventWriters: ["workOrders.ts"],
+      learningHasAcceptanceMutation: false,
+      observabilityHasAcceptanceMutation: false,
+      planSelfApprovalGuard: true,
+      sandboxHasGithubAuthority: false,
+    },
+    performance: {
+      durationMs: 8_883,
+      sourceRetries: 1,
+      modelCalls: 0,
+      tokens: null,
+      costUsd: 0,
+    },
+    failureInjection: {
+      staleLease: "PASS",
+      harnessManifestDigestMismatchBlocked: "PASS",
+      exactCurrentVerification: "PASS",
+    },
+    harnessLineage: {
+      execution: { adapter: "codex", version: "v1", capabilityManifestSha256: hashForIndex(134) },
+      genericAdmission: { exactAdmission: { eligible: true } },
+    },
+    observability: {
+      sandboxLifecycleEvents: [
+        "SANDBOX_REQUESTED",
+        "SANDBOX_STARTED",
+        "SANDBOX_CREDENTIAL_REVOKED",
+        "SANDBOX_TERMINATED",
+      ],
+    },
+    learning: {
+      review: { actorType: "HUMAN" },
+      promotionRecommendation: { autoPromote: false },
+      releasedWorkOrderIds: [],
+      submittedPlanStatus: "PROPOSED",
+    },
+    fixture: { finalCandidateSha: candidateSha },
+  };
+}
+
+async function persistDemoEvalRun(ctx: any, input: {
+  tenantId: Id<"tenants">;
+  projectId: Id<"projects">;
+  suiteId: Id<"evalSuites">;
+  baselineId?: Id<"evalBaselines">;
+  caseIds: Map<string, Id<"evalSuiteCases">>;
+  receipt: EvalRunReceipt;
+  startedAt: number;
+  finishedAt: number;
+}) {
+  const existing = await ctx.db
+    .query("evalControlRuns")
+    .withIndex("by_project_idempotency", (q: any) => q
+      .eq("projectId", input.projectId)
+      .eq("idempotencyKey", input.receipt.idempotencyKey))
+    .first();
+  if (existing) return false;
+  const receipt = JSON.parse(JSON.stringify(input.receipt)) as EvalRunReceipt;
+  const runId = await ctx.db.insert("evalControlRuns", {
+    tenantId: input.tenantId,
+    projectId: input.projectId,
+    suiteId: input.suiteId,
+    baselineId: input.baselineId,
+    runKey: receipt.runId,
+    idempotencyKey: receipt.idempotencyKey,
+    status: receipt.runStatus,
+    verdict: receipt.verdict,
+    publishable: receipt.publishable,
+    releaseBlocking: false,
+    acceptanceAuthority: false,
+    provenance: receipt.provenance,
+    startedAt: input.startedAt,
+    finishedAt: input.finishedAt,
+    receiptDigest: receipt.receiptDigest,
+    createdBy: "seedMissionControlDemo",
+    createdAt: input.finishedAt,
+  });
+  for (const result of receipt.results) {
+    await ctx.db.insert("evalCaseResults", {
+      tenantId: input.tenantId,
+      projectId: input.projectId,
+      runId,
+      suiteCaseId: input.caseIds.get(result.caseKey),
+      caseKey: result.caseKey,
+      verdict: result.verdict,
+      result,
+      createdAt: input.finishedAt,
+    });
+  }
+  await ctx.db.insert("evalRunReceipts", {
+    tenantId: input.tenantId,
+    projectId: input.projectId,
+    suiteId: input.suiteId,
+    runId,
+    receiptDigest: receipt.receiptDigest,
+    verdict: receipt.verdict,
+    publishable: receipt.publishable,
+    releaseBlocking: false,
+    acceptanceAuthority: false,
+    receipt,
+    createdAt: input.finishedAt,
+  });
+  return true;
+}
+
+async function seedEvalControlPlane(ctx: any, input: DemoSeedContext) {
+  const { tenantId, projectId, now } = input;
+  const suite = MISSION_CONTROL_GOLDEN_SUITE_V1;
+  let suiteDoc = await ctx.db
+    .query("evalSuites")
+    .withIndex("by_project_key_version", (q: any) => q
+      .eq("projectId", projectId)
+      .eq("key", suite.key)
+      .eq("version", suite.version))
+    .first();
+  let suiteCreated = 0;
+  if (!suiteDoc) {
+    const suiteId = await ctx.db.insert("evalSuites", {
+      tenantId,
+      projectId,
+      schemaVersion: suite.schemaVersion,
+      key: suite.key,
+      name: suite.name,
+      description: suite.description,
+      version: suite.version,
+      suiteDigest: evalSuiteDigest(suite),
+      invalidRatioLimit: suite.invalidRatioLimit,
+      active: true,
+      createdBy: "seedMissionControlDemo",
+      createdAt: now - 3 * 86_400_000,
+    });
+    suiteDoc = await ctx.db.get(suiteId);
+    suiteCreated = 1;
+    for (const [ordinal, testCase] of suite.cases.entries()) {
+      await ctx.db.insert("evalSuiteCases", {
+        tenantId,
+        projectId,
+        suiteId,
+        key: testCase.key,
+        name: testCase.name,
+        severity: testCase.severity,
+        definition: testCase,
+        ordinal,
+        createdAt: now - 3 * 86_400_000,
+      });
+    }
+  }
+  if (!suiteDoc) throw new Error("Eval control-plane demo suite could not be created.");
+  const cases = await ctx.db.query("evalSuiteCases").withIndex("by_suite", (q: any) => q.eq("suiteId", suiteDoc._id)).collect();
+  const caseIds = new Map<string, Id<"evalSuiteCases">>(cases.map((testCase: any) => [testCase.key, testCase._id]));
+  const actual = demoGoldenEvalActual();
+  const suiteDigest = evalSuiteDigest(suite);
+  const provenance = {
+    repository: REPO_SLUG,
+    revision: "9ba871d9efad9b224b2f2cd432fbfb5cfbc9d461",
+    adapter: {
+      id: "system-factory-scenario-evidence",
+      version: "1.0.0",
+      digest: canonicalDigest("mission-control/eval-adapter", { id: "system-factory-scenario-evidence", version: "1.0.0" }),
+    },
+    runtime: { name: "node", version: "20.19.0" },
+    datasetDigest: suiteDigest,
+    resolvedConfigDigest: canonicalDigest("mission-control/eval-config", { suiteDigest, seed: "mc-demo" }),
+    seed: "mc-demo",
+    artifacts: [{ path: "docs/testing/evidence/system-factory-e2e-v2/scenario-evidence.json", digest: hashForIndex(135) }],
+  };
+  const outcomes = suite.cases.map((testCase) => ({
+    caseKey: testCase.key,
+    status: "SCORED" as const,
+    actual,
+    evidenceRefs: ["docs/testing/evidence/system-factory-e2e-v2/scenario-evidence.json"],
+    ...(testCase.key === "economics-attribution" ? { durationMs: 8_883, costUsd: 0 } : {}),
+  }));
+  const baselineSource = evaluateSuiteRun({
+    suite,
+    runId: "mc-demo:eval:baseline-source",
+    idempotencyKey: "mc-demo:eval:baseline-source",
+    runStatus: "COMPLETED",
+    provenance,
+    outcomes,
+    startedAt: new Date(now - 2 * 86_400_000).toISOString(),
+    finishedAt: new Date(now - 2 * 86_400_000 + 8_883).toISOString(),
+  });
+  let baselineDoc = await ctx.db
+    .query("evalBaselines")
+    .withIndex("by_project_baseline", (q: any) => q.eq("projectId", projectId).eq("baselineId", "mc-demo:golden-v1-main"))
+    .first();
+  if (!baselineDoc) {
+    const baseline = buildEvalBaseline({
+      baselineId: "mc-demo:golden-v1-main",
+      suite,
+      receipt: baselineSource,
+      createdAt: new Date(now - 2 * 86_400_000).toISOString(),
+    });
+    const baselineDocId = await ctx.db.insert("evalBaselines", {
+      tenantId,
+      projectId,
+      suiteId: suiteDoc._id,
+      baselineId: baseline.baselineId,
+      baselineDigest: baseline.baselineDigest,
+      suiteDigest: baseline.suiteDigest,
+      sourceReceiptDigest: baseline.sourceReceiptDigest,
+      baseline,
+      active: true,
+      promotionReason: "Seeded deterministic System Qualification V2 reference receipt",
+      createdBy: "seedMissionControlDemo",
+      createdAt: now - 2 * 86_400_000,
+    });
+    baselineDoc = await ctx.db.get(baselineDocId);
+  }
+  if (!baselineDoc) throw new Error("Eval control-plane demo baseline could not be created.");
+  const currentStarted = now - 15 * 60_000;
+  const current = evaluateSuiteRun({
+    suite,
+    baseline: baselineDoc.baseline,
+    runId: "mc-demo:eval:current",
+    idempotencyKey: "mc-demo:eval:current",
+    runStatus: "COMPLETED",
+    provenance,
+    outcomes,
+    startedAt: new Date(currentStarted).toISOString(),
+    finishedAt: new Date(currentStarted + 8_883).toISOString(),
+  });
+  const invalidStarted = now - 26 * 60 * 60_000;
+  const invalid = evaluateSuiteRun({
+    suite,
+    baseline: baselineDoc.baseline,
+    runId: "mc-demo:eval:harness-invalid",
+    idempotencyKey: "mc-demo:eval:harness-invalid",
+    runStatus: "COMPLETED",
+    provenance,
+    outcomes: outcomes.map((entry, index) => index === 0 ? {
+      caseKey: entry.caseKey,
+      status: "ERROR" as const,
+      failureOrigin: "HARNESS" as const,
+      error: "Scenario evidence adapter exited before returning exact-intent lineage.",
+      evidenceRefs: [],
+    } : entry),
+    startedAt: new Date(invalidStarted).toISOString(),
+    finishedAt: new Date(invalidStarted + 1_240).toISOString(),
+  });
+  let runsCreated = 0;
+  if (await persistDemoEvalRun(ctx, { tenantId, projectId, suiteId: suiteDoc._id, baselineId: baselineDoc._id, caseIds, receipt: invalid, startedAt: invalidStarted, finishedAt: invalidStarted + 1_240 })) runsCreated += 1;
+  if (await persistDemoEvalRun(ctx, { tenantId, projectId, suiteId: suiteDoc._id, baselineId: baselineDoc._id, caseIds, receipt: current, startedAt: currentStarted, finishedAt: currentStarted + 8_883 })) runsCreated += 1;
+  return { suites: suiteCreated, runs: runsCreated };
+}
+
 export async function seedDemoExtensions(ctx: any, input: DemoSeedContext) {
   const { tenantId, projectId, now, withSeedMeta } = input;
   const counts = {
@@ -666,6 +1086,8 @@ export async function seedDemoExtensions(ctx: any, input: DemoSeedContext) {
     factoryRelationships: 0,
     factoryContextPackages: 0,
     specIntakeGoldenPaths: 0,
+    evalSuites: 0,
+    evalControlRuns: 0,
   };
 
   const agents = await ctx.db
@@ -1225,6 +1647,7 @@ export async function seedDemoExtensions(ctx: any, input: DemoSeedContext) {
     "eval.framework",
     "missions.plan-release-v1",
     "missions.spec-intake-v1",
+    "missions.shared-builder-intent-v1",
     "factory-memory.hybrid",
     "factory-memory.relationships",
     "factory-memory.agentic-retrieval",
@@ -1264,6 +1687,10 @@ export async function seedDemoExtensions(ctx: any, input: DemoSeedContext) {
 
   const specIntakeGoldenPath = await seedSpecIntakeGoldenPath(ctx, input);
   counts.specIntakeGoldenPaths = specIntakeGoldenPath.missionId ? 1 : 0;
+
+  const evalControlPlaneCounts = await seedEvalControlPlane(ctx, input);
+  counts.evalSuites = evalControlPlaneCounts.suites;
+  counts.evalControlRuns = evalControlPlaneCounts.runs;
 
   const factoryMemoryCounts = await seedFactoryMemoryGoldenPath(ctx, {
     tenantId,

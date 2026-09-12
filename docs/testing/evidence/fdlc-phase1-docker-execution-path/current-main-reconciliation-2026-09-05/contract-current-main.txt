@@ -1,0 +1,9 @@
+Runtime contract guard: PASS
+Accepted 7 public Convex contract change(s) with version v42 → v43.
+- factory/providerLiability:createReservation: added
+- factory/providerLiability:getReservation: added
+- factory/providerLiability:reconcileUsage: added
+- factory/providerLiability:registerPriceVersion: added
+- serviceCommands:recordProviderUsage: added
+- serviceCommands:reserveProviderRequest: added
+- workOrders:readiness: added

@@ -1,0 +1,75 @@
+{
+  "schema": "shared-builder-intent-todo062-qualification/v1",
+  "status": "PASS",
+  "maturity": "PREVIEW_QUALIFIED_SYNTHETIC_DEMO",
+  "generatedAt": "2026-09-05T21:15:00.000-07:00",
+  "baseline": "906b08f5cfb912711b90c6e2b6ca6808e120e42e",
+  "runtimeContract": "v45",
+  "externalCalls": 0,
+  "modelCalls": 0,
+  "productionMutations": 0,
+  "customerRecords": 0,
+  "agentCapabilities": [
+    "intent.contributions.inspect",
+    "intent.contributions.draft"
+  ],
+  "agentDecisionCapability": false,
+  "humanDecisionRequired": true,
+  "exactLineage": [
+    "Mission",
+    "Mission Spec revision + digest",
+    "contribution revision + digest",
+    "human decision",
+    "future Mission Spec revision",
+    "Plan",
+    "Quality Contract"
+  ],
+  "projectedStates": {
+    "engineering-stale": "STALE",
+    "design-current": "ACCEPTED",
+    "design-old": "SUPERSEDED",
+    "product-conflict": "CONFLICT",
+    "qa-current": "CONFLICT"
+  },
+  "negativeControls": [
+    "stale Spec identity denied",
+    "concurrent contribution revision denied",
+    "conflicting target acceptance denied",
+    "stale contribution decision denied",
+    "agent decision operation absent",
+    "feature disabled writes denied",
+    "cross-workspace Mission scope denied",
+    "replayed signed command denied and receipted",
+    "contribution path cannot mutate Spec, Plan, execution, evidence, acceptance, routing, or Factory Version stores"
+  ],
+  "browser": {
+    "engine": "Chromium",
+    "viewports": [
+      "1440x900",
+      "390x844"
+    ],
+    "themes": [
+      "dark",
+      "light"
+    ],
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "denied",
+      "conflict",
+      "stale",
+      "success",
+      "resumption"
+    ],
+    "keyboard": "PASS",
+    "horizontalOverflow": "PASS",
+    "seriousOrCriticalAccessibilityViolations": 0,
+    "screenshots": [
+      "screenshots/01-shared-intent-1440-dark.png",
+      "screenshots/02-shared-intent-390-light.png",
+      "screenshots/03-permission-denied-1440-dark.png",
+      "screenshots/04-shared-intent-states-1440-dark.png"
+    ]
+  }
+}

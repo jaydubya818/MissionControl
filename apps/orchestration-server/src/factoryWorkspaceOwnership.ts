@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { lstat, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rename, unlink, writeFile, readdir, realpath, open } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { hardenedGitArgs, hardenedGitEnvironment } from "./hardenedGit.js";
 import { assertCanonicalWorktreeBoundary, assertWorktreeBoundary } from "./factoryPathScope.js";
 import { canonicalGithubRepositoryFromRemote, isExactGithubPullRequestUrl } from "./factoryRepositoryIdentity.js";
 
@@ -25,10 +26,14 @@ export interface FactoryWorkspaceOwner {
 
 export interface FactoryWorkspaceOwnershipManifest extends FactoryWorkspaceOwner {
   version: "factory-workspace-ownership/v1";
+  /** Protected transfer receipts reconcile interrupted handoffs; never active lease authority. */
+  priorOwners?: Array<Pick<FactoryWorkspaceOwner, "workerId" | "workerSessionId" | "workerGeneration" | "leaseId">>;
+  recoverySource?: { owner: FactoryWorkspaceOwner; candidateSha: string };
   process: {
-    kind?: "LOCAL_PROCESS" | "REMOTE_SANDBOX";
+    kind?: "LOCAL_PROCESS" | "REMOTE_SANDBOX" | "IN_PROCESS_AGENT";
     state: "NOT_STARTED" | "RUNNING" | "TERMINATED" | "UNKNOWN";
     pid?: number;
+    executionId?: string;
     externalProcessId?: string;
     providerResourceId?: string;
     resourceAbsentAt?: number;
@@ -40,6 +45,11 @@ export interface FactoryWorkspaceOwnershipManifest extends FactoryWorkspaceOwner
     headSha: string;
     pullRequestUrl: string;
     recordedAt: number;
+  };
+  offlineResponse?: {
+    serviceId: string; projectId: string; repositoryId: string;
+    packet: unknown; packetSha256: string; capturedAt: number; deliveredAt?: number;
+    lastDeliveryError?: string; lastDeliveryAttemptAt?: number;
   };
   cleanup: {
     status: "PENDING" | "PRESERVED" | "COMPLETED";
@@ -87,6 +97,23 @@ export async function recordFactoryExecutorStarted(owner: FactoryWorkspaceOwner,
       ...manifest,
       process: { kind: "LOCAL_PROCESS", state: "RUNNING", pid, startedAt: Date.now() },
     };
+  });
+}
+
+export async function recordFactoryInvocationStarted(owner: FactoryWorkspaceOwner, executionId: string) {
+  if (!executionId.trim()) throw new Error("In-process invocation requires an execution identity.");
+  return await updateOwnedManifest(owner, (manifest) => {
+    if (manifest.process.state !== "NOT_STARTED") throw new Error("Invocation ownership was already established; workspace was preserved.");
+    return { ...manifest, process: { kind: "IN_PROCESS_AGENT", state: "RUNNING", executionId, startedAt: Date.now() } };
+  });
+}
+
+export async function recordFactoryInvocationCompleted(owner: FactoryWorkspaceOwner, executionId: string) {
+  return await updateOwnedManifest(owner, (manifest) => {
+    if (manifest.process.kind !== "IN_PROCESS_AGENT" || manifest.process.state !== "RUNNING" || manifest.process.executionId !== executionId) {
+      throw new Error("Invocation completion does not match owned execution; workspace was preserved.");
+    }
+    return { ...manifest, process: { ...manifest.process, state: "TERMINATED", terminatedAt: Date.now() } };
   });
 }
 
@@ -186,16 +213,25 @@ export async function transferFactoryPublicationWorkspace(input: {
   const previousPath = await ownershipManifestPath(input.previousOwner);
   const nextPath = await ownershipManifestPath(input.nextOwner);
   if (previousPath !== nextPath) throw new Error("Workspace transfer cannot change Attempt identity or protected manifest path.");
-  const manifest = await requireOwnedManifest(input.previousOwner);
+  const manifest = await readManifest(previousPath);
+  if (!manifest) throw new Error("Publication workspace has no protected ownership proof.");
+  assertStaticWorkspaceIdentity(manifest, input.previousOwner);
+  const sameLeaseOwner = (owner: Pick<FactoryWorkspaceOwner, "workerId" | "workerSessionId" | "workerGeneration" | "leaseId">, expected: FactoryWorkspaceOwner) =>
+    owner.workerId === expected.workerId && owner.workerSessionId === expected.workerSessionId
+      && owner.workerGeneration === expected.workerGeneration && owner.leaseId === expected.leaseId;
+  if (!sameLeaseOwner(manifest, input.previousOwner)
+    && !manifest.priorOwners?.some(owner => sameLeaseOwner(owner, input.previousOwner))) {
+    throw new Error("Publication transfer has no protected receipt for the canonical checkpoint owner.");
+  }
   if (manifest.process.state !== "TERMINATED" || !gitSha(input.checkpointCandidateSha)) {
     throw new Error("Only a terminated workspace with an exact publication checkpoint can transfer sessions.");
   }
   assertStaticWorkspaceIdentity(input.previousOwner, input.nextOwner);
-  if (input.previousOwner.workerId !== input.nextOwner.workerId
+  if (manifest.workerId !== input.nextOwner.workerId
     || input.previousOwner.leaseId === input.nextOwner.leaseId
-    || input.nextOwner.workerGeneration < input.previousOwner.workerGeneration
-    || (input.previousOwner.workerSessionId !== input.nextOwner.workerSessionId
-      && input.nextOwner.workerGeneration <= input.previousOwner.workerGeneration)) {
+    || input.nextOwner.workerGeneration < manifest.workerGeneration
+    || (manifest.workerSessionId !== input.nextOwner.workerSessionId
+      && input.nextOwner.workerGeneration <= manifest.workerGeneration)) {
     throw new Error("Publication workspace transfer requires the same stable worker, a new lease, and monotonic generation.");
   }
   const boundary = await assertCanonicalWorktreeBoundary(
@@ -211,8 +247,11 @@ export async function transferFactoryPublicationWorkspace(input: {
   if (branch !== input.previousOwner.branch || head !== input.checkpointCandidateSha || status) {
     throw new Error("Publication workspace transfer proof does not match the clean checkpoint candidate.");
   }
+  if (sameLeaseOwner(manifest, input.nextOwner)) return manifest;
+  if ((manifest.priorOwners?.length ?? 0) >= 32) throw new Error("Publication workspace exceeded its bounded transfer history; operator reconciliation is required.");
   const transferred: FactoryWorkspaceOwnershipManifest = {
     ...manifest,
+    priorOwners: [...(manifest.priorOwners ?? []), { workerId: manifest.workerId, workerSessionId: manifest.workerSessionId, workerGeneration: manifest.workerGeneration, leaseId: manifest.leaseId }],
     workerId: input.nextOwner.workerId,
     workerSessionId: input.nextOwner.workerSessionId,
     workerGeneration: input.nextOwner.workerGeneration,
@@ -220,6 +259,84 @@ export async function transferFactoryPublicationWorkspace(input: {
     updatedAt: Date.now(),
   };
   await writeManifest(nextPath, transferred);
+  return transferred;
+}
+
+/**
+ * Rekeys a clean, terminated workspace from one failed Attempt to one explicit
+ * linked recovery Attempt. Generic publication recovery remains same-Attempt.
+ */
+export async function transferFactoryRecoveryWorkspace(input: {
+  previousOwner: FactoryWorkspaceOwner;
+  nextOwner: FactoryWorkspaceOwner;
+  checkpointCandidateSha: string;
+}) {
+  validateOwner(input.previousOwner);
+  validateOwner(input.nextOwner);
+  const previousPath = await ownershipManifestPath(input.previousOwner);
+  const nextPath = await ownershipManifestPath(input.nextOwner);
+  if (previousPath === nextPath) throw new Error("Cross-Attempt recovery requires a new protected manifest identity.");
+  const destination = await readManifest(nextPath);
+  const source = await readManifest(previousPath);
+  // A receipt identifies the original failed Attempt even after a lost ack or
+  // another lease for the same recovery Attempt. It is not active authority.
+  if (source) assertExactOwner(source, input.previousOwner);
+  let manifest = source;
+  if (destination?.recoverySource) {
+    assertExactOwner(destination.recoverySource.owner, input.previousOwner);
+    assertStaticWorkspaceIdentity(destination, input.nextOwner);
+    if (destination.recoverySource.candidateSha !== input.checkpointCandidateSha) {
+      throw new Error("Recovery transfer receipt does not match the exact candidate checkpoint.");
+    }
+    manifest = destination;
+  } else if (destination) {
+    // Reconcile the legacy rename-before-write crash window, but only when
+    // the protected destination still contains the exact original owner.
+    if (source) throw new Error("Recovery workspace has conflicting protected ownership manifests.");
+    assertExactOwner(destination, input.previousOwner);
+    manifest = destination;
+  }
+  if (!manifest) throw new Error("Protected recovery workspace ownership manifest is missing.");
+  if (manifest.process.state !== "TERMINATED" || !gitSha(input.checkpointCandidateSha)) {
+    throw new Error("Only a terminated workspace with an exact candidate checkpoint can transfer to a recovery Attempt.");
+  }
+  assertRecoveryWorkspaceIdentity(input.previousOwner, input.nextOwner);
+  if (manifest.workerId !== input.nextOwner.workerId
+    || input.previousOwner.leaseId === input.nextOwner.leaseId
+    || input.nextOwner.workerGeneration < manifest.workerGeneration
+    || (manifest.workerSessionId !== input.nextOwner.workerSessionId
+      && input.nextOwner.workerGeneration <= manifest.workerGeneration)) {
+    throw new Error("Recovery workspace transfer requires the same stable worker, a new lease, and monotonic generation.");
+  }
+  const boundary = await assertCanonicalWorktreeBoundary(
+    input.previousOwner.checkoutRoot,
+    input.previousOwner.worktree,
+    { requireWorktree: true },
+  );
+  const [branch, head, status] = await Promise.all([
+    git(boundary.worktree, ["branch", "--show-current"]),
+    git(boundary.worktree, ["rev-parse", "HEAD"]),
+    git(boundary.worktree, ["status", "--porcelain=v1", "--untracked-files=all"]),
+  ]);
+  if (branch !== input.previousOwner.branch || head !== input.checkpointCandidateSha || status) {
+    throw new Error("Recovery workspace transfer proof does not match the clean checkpoint candidate.");
+  }
+  const transferred: FactoryWorkspaceOwnershipManifest = {
+    ...manifest,
+    recoverySource: { owner: input.previousOwner, candidateSha: input.checkpointCandidateSha },
+    priorOwners: undefined,
+    workflowRunId: input.nextOwner.workflowRunId,
+    executionManifestDigest: input.nextOwner.executionManifestDigest,
+    workerId: input.nextOwner.workerId,
+    workerSessionId: input.nextOwner.workerSessionId,
+    workerGeneration: input.nextOwner.workerGeneration,
+    leaseId: input.nextOwner.leaseId,
+    updatedAt: Date.now(),
+  };
+  // Commit the complete new identity atomically before removing the terminated
+  // source proof. Any interruption leaves at least one exact recoverable record.
+  await writeManifest(nextPath, transferred);
+  if (source) await unlink(previousPath);
   return transferred;
 }
 
@@ -295,6 +412,66 @@ export async function loadFactoryWorkspaceOwnership(owner: FactoryWorkspaceOwner
   return await readManifest(await ownershipManifestPath(owner));
 }
 
+export async function retainFactoryOfflineResponse(owner: FactoryWorkspaceOwner,
+  input: { serviceId: string; projectId: string; repositoryId: string; packet: unknown }) {
+  const json = JSON.stringify(input.packet);
+  if (!input.serviceId || !input.projectId || !input.repositoryId || Buffer.byteLength(json) > 128_000) {
+    throw new Error("Offline response journal scope or size is invalid.");
+  }
+  const packetSha256 = createHash("sha256").update(json).digest("hex");
+  return await updateOwnedManifest(owner, manifest => {
+    if (manifest.offlineResponse) {
+      if (manifest.offlineResponse.packetSha256 !== packetSha256 || manifest.offlineResponse.serviceId !== input.serviceId
+        || manifest.offlineResponse.projectId !== input.projectId || manifest.offlineResponse.repositoryId !== input.repositoryId) {
+        throw new Error("Conflicting offline response for this exact workspace lease.");
+      }
+      return manifest;
+    }
+    return { ...manifest, offlineResponse: { ...input, packetSha256, capturedAt: Date.now() }, updatedAt: Date.now() };
+  });
+}
+
+export async function markFactoryOfflineResponseDelivered(owner: FactoryWorkspaceOwner, packetSha256: string) {
+  return await updateOwnedManifest(owner, manifest => {
+    if (!manifest.offlineResponse || manifest.offlineResponse.packetSha256 !== packetSha256) throw new Error("Offline delivery identity mismatch.");
+    return { ...manifest, offlineResponse: { ...manifest.offlineResponse, deliveredAt: Date.now() }, updatedAt: Date.now() };
+  });
+}
+
+export async function recordFactoryOfflineDeliveryFailure(owner: FactoryWorkspaceOwner, packetSha256: string, reason: string) {
+  return await updateOwnedManifest(owner, manifest => {
+    if (!manifest.offlineResponse || manifest.offlineResponse.packetSha256 !== packetSha256) throw new Error("Offline delivery identity mismatch.");
+    return { ...manifest, offlineResponse: { ...manifest.offlineResponse,
+      lastDeliveryError: reason.slice(0, 500), lastDeliveryAttemptAt: Date.now() }, updatedAt: Date.now() };
+  });
+}
+
+export async function pendingFactoryOfflineResponses(input: {
+  checkoutRoot: string; projectId: string; repositoryId: string; serviceId: string;
+}) {
+  const checkoutRoot = await realpath(input.checkoutRoot);
+  const root = path.join(checkoutRoot, ".mission-control", "worker-state", "workspaces");
+  await ensureProtectedDirectory(root, checkoutRoot);
+  const results: FactoryWorkspaceOwnershipManifest[] = [];
+  for (const name of (await readdir(root)).filter(name => /^[a-f0-9]{64}\.json$/.test(name)).sort()) {
+    const manifest = await readManifest(path.join(root, name));
+    const evidence = manifest?.offlineResponse;
+    if (!manifest || !evidence || evidence.deliveredAt !== undefined || evidence.serviceId !== input.serviceId
+      || evidence.projectId !== input.projectId || evidence.repositoryId !== input.repositoryId) continue;
+    validateOwner(manifest);
+    if (await realpath(manifest.checkoutRoot) !== checkoutRoot
+      || await ownershipManifestPath(manifest) !== path.join(root, name)
+      || createHash("sha256").update(JSON.stringify(evidence.packet)).digest("hex") !== evidence.packetSha256) {
+      throw new Error("Offline response journal identity was altered.");
+    }
+    results.push(manifest);
+    results.sort((a, b) => (a.offlineResponse!.lastDeliveryAttemptAt ?? 0)
+      - (b.offlineResponse!.lastDeliveryAttemptAt ?? 0));
+    if (results.length > 20) results.pop();
+  }
+  return results;
+}
+
 async function updateOwnedManifest(
   owner: FactoryWorkspaceOwner,
   update: (manifest: FactoryWorkspaceOwnershipManifest) => FactoryWorkspaceOwnershipManifest,
@@ -342,7 +519,7 @@ async function ensureProtectedDirectory(directory: string, checkoutRoot: string)
 async function readManifest(manifestPath: string): Promise<FactoryWorkspaceOwnershipManifest | undefined> {
   const file = await lstat(manifestPath).catch(() => null);
   if (!file) return undefined;
-  if (file.isSymbolicLink() || !file.isFile() || (file.mode & 0o077) !== 0) {
+  if (file.isSymbolicLink() || !file.isFile() || (file.mode & 0o077) !== 0 || file.size > 256_000) {
     throw new Error("Workspace ownership manifest must be a regular owner-only protected file.");
   }
   const parsed = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -353,7 +530,11 @@ async function readManifest(manifestPath: string): Promise<FactoryWorkspaceOwner
 async function writeManifest(manifestPath: string, manifest: FactoryWorkspaceOwnershipManifest) {
   const temporaryPath = `${manifestPath}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(temporaryPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
+  const file = await open(temporaryPath, "r");
+  try { await file.sync(); } finally { await file.close(); }
   await rename(temporaryPath, manifestPath);
+  const directory = await open(path.dirname(manifestPath), "r");
+  try { await directory.sync(); } finally { await directory.close(); }
 }
 
 function validateOwner(owner: FactoryWorkspaceOwner) {
@@ -372,7 +553,7 @@ function validateOwner(owner: FactoryWorkspaceOwner) {
   assertWorktreeBoundary(owner.checkoutRoot, owner.worktree);
 }
 
-function assertExactOwner(manifest: FactoryWorkspaceOwnershipManifest, owner: FactoryWorkspaceOwner) {
+function assertExactOwner(manifest: FactoryWorkspaceOwner, owner: FactoryWorkspaceOwner) {
   const fields: Array<keyof FactoryWorkspaceOwner> = [
     "repositoryIdentity", "workflowRunId", "workerId", "workerSessionId", "workerGeneration",
     "leaseId", "branch", "worktree", "checkoutRoot", "executionManifestDigest", "baseSha", "sandboxId",
@@ -392,6 +573,17 @@ function assertStaticWorkspaceIdentity(previous: FactoryWorkspaceOwner, next: Fa
   }
 }
 
+function assertRecoveryWorkspaceIdentity(previous: FactoryWorkspaceOwner, next: FactoryWorkspaceOwner) {
+  const staticFields: Array<keyof FactoryWorkspaceOwner> = [
+    "repositoryIdentity", "branch", "worktree", "checkoutRoot", "baseSha", "sandboxId",
+  ];
+  if (staticFields.some((field) => previous[field] !== next[field])
+    || previous.workflowRunId === next.workflowRunId
+    || previous.executionManifestDigest === next.executionManifestDigest) {
+    throw new Error("Recovery workspace transfer requires one new Attempt identity and an otherwise exact workspace binding.");
+  }
+}
+
 function worktreeListHasExactOwner(output: string, worktree: string, branch: string) {
   return output.split("\n\n").some((block) => {
     const lines = block.split("\n");
@@ -400,13 +592,13 @@ function worktreeListHasExactOwner(output: string, worktree: string, branch: str
 }
 
 async function git(cwd: string, args: string[]) {
-  const result = await execFileAsync("git", args, { cwd, env: process.env, maxBuffer: 20 * 1024 * 1024 });
+  const result = await execFileAsync("git", hardenedGitArgs(args), { cwd, env: hardenedGitEnvironment(), maxBuffer: 20 * 1024 * 1024 });
   return result.stdout.trim();
 }
 
 async function gitSucceeds(cwd: string, args: string[]) {
   try {
-    await execFileAsync("git", args, { cwd, env: process.env, maxBuffer: 2 * 1024 * 1024 });
+    await execFileAsync("git", hardenedGitArgs(args), { cwd, env: hardenedGitEnvironment(), maxBuffer: 2 * 1024 * 1024 });
     return true;
   } catch {
     return false;

@@ -1,0 +1,4 @@
+Runtime contract guard: PASS
+Accepted 2 public Convex contract change(s) with version v42 → v43.
+- factory/attempts:retryCandidateVerification: added
+- factory/attempts:retryPublicationReconciliation: added

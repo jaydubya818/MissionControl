@@ -1,0 +1,360 @@
+{
+  "schema": "governed-mcp-phase3-broker-scenario/v1",
+  "generatedAt": "2026-09-06T05:36:41.940Z",
+  "evidenceClassification": "LOCAL_BROKER_SCENARIO_NOT_CONTROL_PLANE_PERSISTENCE",
+  "implementationSha": "4434cc56448075f4804787325a9586c6290b2215",
+  "baseline": "3ae9d86eeff1966862a6959664ec1fe2e6e7240a",
+  "runtimeContractVersion": 41,
+  "admission": "QUALIFICATION_FIXTURE",
+  "realServiceAdmitted": false,
+  "transport": "STDIO",
+  "protocolVersion": "2025-11-25",
+  "sdk": {
+    "package": "@modelcontextprotocol/sdk",
+    "version": "1.26.0"
+  },
+  "toolVersion": {
+    "id": "qualification-tool-version",
+    "digest": "sha256:7de45ff549953aa804fb8b13e976a69c47a23e2169992284a034a1d3d0e7107b",
+    "snapshot": {
+      "schema": "governed-mcp/v1",
+      "server": {
+        "key": "mission-control-readonly-qualification-fixture",
+        "version": "1.0.0",
+        "implementationDigest": "sha256:8d67b2b5bdbf71cb0aaeb339d4bc996f3915d0f0eec6751601d5d992748dd70d"
+      },
+      "sdk": {
+        "package": "@modelcontextprotocol/sdk",
+        "version": "1.26.0"
+      },
+      "protocolVersion": "2025-11-25",
+      "transport": {
+        "kind": "STDIO",
+        "destination": "LOCAL_PROCESS",
+        "entrypoint": "apps/orchestration-server/src/mcpQualificationFixture.mjs",
+        "redirects": false
+      },
+      "operation": {
+        "name": "read_factory_doctrine_excerpt",
+        "description": "Read one public Mission Control authority-boundary doctrine excerpt.",
+        "sideEffect": "READ_ONLY",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "section"
+          ],
+          "properties": {
+            "section": {
+              "type": "string",
+              "enum": [
+                "authority-boundary"
+              ]
+            }
+          }
+        },
+        "inputSchemaDigest": "c1d92d6f44abf63ac23a9732b13e968091a91bcc05f5777044ae7c200c50b409",
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "section",
+            "excerpt",
+            "classification"
+          ],
+          "properties": {
+            "section": {
+              "type": "string",
+              "const": "authority-boundary"
+            },
+            "excerpt": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "classification": {
+              "type": "string",
+              "const": "PUBLIC_FIXTURE"
+            }
+          }
+        },
+        "outputSchemaDigest": "db88401b958bd7196825c053ed5c9c5e0ef70b0232f1143fbc167715f6a455e1",
+        "maxRequestBytes": 256,
+        "maxResponseBytes": 2048,
+        "timeoutMs": 2000
+      },
+      "dataClassification": "PUBLIC_FIXTURE",
+      "credentialClass": "NONE",
+      "lifecycle": {
+        "oneProcessPerCall": true,
+        "oneRequestPerProcess": true,
+        "terminateAfterCall": true
+      },
+      "admission": "QUALIFICATION_FIXTURE",
+      "authority": {
+        "discovery": false,
+        "write": false,
+        "policyMutation": false,
+        "acceptance": false,
+        "routing": false
+      }
+    }
+  },
+  "toolGrant": {
+    "id": "qualification-grant",
+    "digest": "sha256:3689b88480a58be6983f023e97c6f2d58875252d19beb0d1c886f553a6b9200e",
+    "snapshot": {
+      "schema": "governed-mcp-tool-grant/v1",
+      "grantKey": "phase3-doctrine-read",
+      "version": 1,
+      "projectId": "qualification-project",
+      "toolVersionId": "qualification-tool-version",
+      "toolVersionDigest": "sha256:7de45ff549953aa804fb8b13e976a69c47a23e2169992284a034a1d3d0e7107b",
+      "toolVersionSnapshot": {
+        "schema": "governed-mcp/v1",
+        "server": {
+          "key": "mission-control-readonly-qualification-fixture",
+          "version": "1.0.0",
+          "implementationDigest": "sha256:8d67b2b5bdbf71cb0aaeb339d4bc996f3915d0f0eec6751601d5d992748dd70d"
+        },
+        "sdk": {
+          "package": "@modelcontextprotocol/sdk",
+          "version": "1.26.0"
+        },
+        "protocolVersion": "2025-11-25",
+        "transport": {
+          "kind": "STDIO",
+          "destination": "LOCAL_PROCESS",
+          "entrypoint": "apps/orchestration-server/src/mcpQualificationFixture.mjs",
+          "redirects": false
+        },
+        "operation": {
+          "name": "read_factory_doctrine_excerpt",
+          "description": "Read one public Mission Control authority-boundary doctrine excerpt.",
+          "sideEffect": "READ_ONLY",
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "section"
+            ],
+            "properties": {
+              "section": {
+                "type": "string",
+                "enum": [
+                  "authority-boundary"
+                ]
+              }
+            }
+          },
+          "inputSchemaDigest": "c1d92d6f44abf63ac23a9732b13e968091a91bcc05f5777044ae7c200c50b409",
+          "outputSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "section",
+              "excerpt",
+              "classification"
+            ],
+            "properties": {
+              "section": {
+                "type": "string",
+                "const": "authority-boundary"
+              },
+              "excerpt": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "classification": {
+                "type": "string",
+                "const": "PUBLIC_FIXTURE"
+              }
+            }
+          },
+          "outputSchemaDigest": "db88401b958bd7196825c053ed5c9c5e0ef70b0232f1143fbc167715f6a455e1",
+          "maxRequestBytes": 256,
+          "maxResponseBytes": 2048,
+          "timeoutMs": 2000
+        },
+        "dataClassification": "PUBLIC_FIXTURE",
+        "credentialClass": "NONE",
+        "lifecycle": {
+          "oneProcessPerCall": true,
+          "oneRequestPerProcess": true,
+          "terminateAfterCall": true
+        },
+        "admission": "QUALIFICATION_FIXTURE",
+        "authority": {
+          "discovery": false,
+          "write": false,
+          "policyMutation": false,
+          "acceptance": false,
+          "routing": false
+        }
+      },
+      "operation": "read_factory_doctrine_excerpt",
+      "credentialClass": "NONE",
+      "destination": "LOCAL_PROCESS",
+      "issuedAt": 1788673000873,
+      "expiresAt": 1788673061873,
+      "maxCallsPerAttempt": 1,
+      "revocationMode": "DENY_NEW_CALLS"
+    }
+  },
+  "lineage": {
+    "workOrderId": "qualification-work-order",
+    "attemptId": "qualification-attempt",
+    "attemptLeaseId": "qualification-lease",
+    "executionProfile": {
+      "id": "qualification-profile",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "factoryVersion": {
+      "applicable": false,
+      "reason": "Local broker scenario; authoritative Factory qualification is recorded separately."
+    }
+  },
+  "broker": {
+    "id": "mission-control-governed-tool-broker",
+    "version": "1.0.0",
+    "authority": "HOST_BROKER"
+  },
+  "server": {
+    "key": "mission-control-readonly-qualification-fixture",
+    "version": "1.0.0",
+    "implementationDigest": "sha256:8d67b2b5bdbf71cb0aaeb339d4bc996f3915d0f0eec6751601d5d992748dd70d",
+    "protocolVersion": "2025-11-25",
+    "transport": {
+      "kind": "STDIO",
+      "destination": "LOCAL_PROCESS",
+      "entrypoint": "apps/orchestration-server/src/mcpQualificationFixture.mjs",
+      "redirects": false
+    }
+  },
+  "schemaDigests": {
+    "input": "c1d92d6f44abf63ac23a9732b13e968091a91bcc05f5777044ae7c200c50b409",
+    "output": "db88401b958bd7196825c053ed5c9c5e0ef70b0232f1143fbc167715f6a455e1"
+  },
+  "output": {
+    "digest": "4537a06d6a101deb9f7f9caaa849016026d5c96129de54c88c4f2643209b1c66",
+    "classification": "PUBLIC_FIXTURE",
+    "poisoningDetected": false
+  },
+  "brokerScenarioReceipts": [
+    {
+      "schema": "governed-mcp-tool-call-receipt/v1",
+      "callId": "qualification:1788673001873",
+      "projectId": "qualification-project",
+      "workOrderId": "qualification-work-order",
+      "workflowRunId": "qualification-attempt",
+      "attemptId": "qualification-attempt",
+      "attemptLeaseId": "qualification-lease",
+      "workerId": "qualification-worker",
+      "workerSessionId": "qualification-session",
+      "workerGeneration": 1,
+      "executionProfileId": "qualification-profile",
+      "executionProfileDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "toolGrantId": "qualification-grant",
+      "toolGrantDigest": "sha256:3689b88480a58be6983f023e97c6f2d58875252d19beb0d1c886f553a6b9200e",
+      "toolVersionId": "qualification-tool-version",
+      "toolVersionDigest": "sha256:7de45ff549953aa804fb8b13e976a69c47a23e2169992284a034a1d3d0e7107b",
+      "operation": "read_factory_doctrine_excerpt",
+      "requestBytes": 32,
+      "retryCount": 0,
+      "costStatus": "UNKNOWN",
+      "serverImplementationDigest": "sha256:8d67b2b5bdbf71cb0aaeb339d4bc996f3915d0f0eec6751601d5d992748dd70d",
+      "expectedServerVersion": "1.0.0",
+      "expectedInputSchemaDigest": "c1d92d6f44abf63ac23a9732b13e968091a91bcc05f5777044ae7c200c50b409",
+      "authority": "HOST_BROKER",
+      "phase": "AUTHORIZATION",
+      "sequence": 1,
+      "status": "ALLOWED",
+      "reason": "EXACT_AUTHORITY_MATCH",
+      "requestDigest": "9415efcc2a5c8fca4e45fb491b0195a6b7537776ac7aaffb8294e13344eebf5d",
+      "occurredAt": 1788673001873
+    },
+    {
+      "schema": "governed-mcp-tool-call-receipt/v1",
+      "callId": "qualification:1788673001873",
+      "projectId": "qualification-project",
+      "workOrderId": "qualification-work-order",
+      "workflowRunId": "qualification-attempt",
+      "attemptId": "qualification-attempt",
+      "attemptLeaseId": "qualification-lease",
+      "workerId": "qualification-worker",
+      "workerSessionId": "qualification-session",
+      "workerGeneration": 1,
+      "executionProfileId": "qualification-profile",
+      "executionProfileDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "toolGrantId": "qualification-grant",
+      "toolGrantDigest": "sha256:3689b88480a58be6983f023e97c6f2d58875252d19beb0d1c886f553a6b9200e",
+      "toolVersionId": "qualification-tool-version",
+      "toolVersionDigest": "sha256:7de45ff549953aa804fb8b13e976a69c47a23e2169992284a034a1d3d0e7107b",
+      "operation": "read_factory_doctrine_excerpt",
+      "requestBytes": 32,
+      "retryCount": 0,
+      "costStatus": "UNKNOWN",
+      "serverImplementationDigest": "sha256:8d67b2b5bdbf71cb0aaeb339d4bc996f3915d0f0eec6751601d5d992748dd70d",
+      "expectedServerVersion": "1.0.0",
+      "expectedInputSchemaDigest": "c1d92d6f44abf63ac23a9732b13e968091a91bcc05f5777044ae7c200c50b409",
+      "authority": "HOST_BROKER",
+      "phase": "COMPLETION",
+      "sequence": 2,
+      "status": "SUCCEEDED",
+      "reason": "BOUNDED_READ_COMPLETED",
+      "requestDigest": "9415efcc2a5c8fca4e45fb491b0195a6b7537776ac7aaffb8294e13344eebf5d",
+      "outputDigest": "4537a06d6a101deb9f7f9caaa849016026d5c96129de54c88c4f2643209b1c66",
+      "outputBytes": 210,
+      "poisoningDetected": false,
+      "redactionApplied": false,
+      "occurredAt": 1788673001938,
+      "durationMs": 65
+    },
+    {
+      "schema": "governed-mcp-tool-call-receipt/v1",
+      "callId": "qualification:1788673001873",
+      "projectId": "qualification-project",
+      "workOrderId": "qualification-work-order",
+      "workflowRunId": "qualification-attempt",
+      "attemptId": "qualification-attempt",
+      "attemptLeaseId": "qualification-lease",
+      "workerId": "qualification-worker",
+      "workerSessionId": "qualification-session",
+      "workerGeneration": 1,
+      "executionProfileId": "qualification-profile",
+      "executionProfileDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "toolGrantId": "qualification-grant",
+      "toolGrantDigest": "sha256:3689b88480a58be6983f023e97c6f2d58875252d19beb0d1c886f553a6b9200e",
+      "toolVersionId": "qualification-tool-version",
+      "toolVersionDigest": "sha256:7de45ff549953aa804fb8b13e976a69c47a23e2169992284a034a1d3d0e7107b",
+      "operation": "read_factory_doctrine_excerpt",
+      "requestBytes": 32,
+      "retryCount": 0,
+      "costStatus": "UNKNOWN",
+      "serverImplementationDigest": "sha256:8d67b2b5bdbf71cb0aaeb339d4bc996f3915d0f0eec6751601d5d992748dd70d",
+      "expectedServerVersion": "1.0.0",
+      "expectedInputSchemaDigest": "c1d92d6f44abf63ac23a9732b13e968091a91bcc05f5777044ae7c200c50b409",
+      "authority": "HOST_BROKER",
+      "phase": "AUTHORIZATION",
+      "sequence": 1,
+      "status": "DENIED",
+      "reason": "REPLAY_DENIED",
+      "requestDigest": "9415efcc2a5c8fca4e45fb491b0195a6b7537776ac7aaffb8294e13344eebf5d",
+      "occurredAt": 1788673001938
+    }
+  ],
+  "negativeProof": {
+    "replay": "REPLAY_DENIED",
+    "credentialsExposed": false,
+    "discoveryUsedForAuthority": false,
+    "networkUsed": false,
+    "writeOperationExposed": false
+  },
+  "limitations": [
+    "Local qualification fixture only",
+    "No external service",
+    "No network transport",
+    "No credentials",
+    "No write operations",
+    "No broad harness MCP support"
+  ]
+}

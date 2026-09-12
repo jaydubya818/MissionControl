@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { normalizeNarrativeText } from "@/lib/displayText";
 
 type ReviewLevel = "BASIC" | "INTERMEDIATE" | "ADVANCED";
 
@@ -193,7 +194,7 @@ export function ReviewEvidencePackage({
           <StatusIcon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <div>
             <div className="text-sm font-medium text-foreground">Review evidence package</div>
-            <p className="mt-1 text-sm text-muted-foreground">{review.summary}</p>
+            <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">{normalizeNarrativeText(review.summary)}</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -217,8 +218,8 @@ export function ReviewEvidencePackage({
           <h3 id="review-intent-heading" className="mt-1 text-base font-medium text-foreground">
             {intelligence.intent.mission?.title ?? intelligence.intent.workOrder.title}
           </h3>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-muted-foreground">
-            {intelligence.intent.mission?.objective ?? intelligence.intent.workOrder.desiredOutcome}
+          <p className="mt-1 max-w-4xl whitespace-pre-line text-sm leading-6 text-muted-foreground">
+            {normalizeNarrativeText(intelligence.intent.mission?.objective ?? intelligence.intent.workOrder.desiredOutcome)}
           </p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
             {intelligence.intent.spec ? <span className="rounded border border-[var(--panel-line)] px-2 py-1">Spec r{intelligence.intent.spec.revisionNumber ?? "?"}</span> : null}
@@ -230,7 +231,7 @@ export function ReviewEvidencePackage({
 
       <div className="mt-4 rounded-lg border border-[var(--panel-line)] bg-background/30 px-3 py-3">
         <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Next action</div>
-        <p className="mt-1 text-sm text-foreground">{review.nextAction}</p>
+        <p className="mt-1 whitespace-pre-line text-sm text-foreground">{normalizeNarrativeText(review.nextAction)}</p>
       </div>
 
       {onRecordJudgment && intelligence ? (
@@ -413,7 +414,7 @@ export function ReviewEvidencePackage({
           <PackageList label="Changed files" values={review.changedFiles} empty="No structured file lineage." mono />
           <div className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3">
             <div className="text-xs font-medium text-foreground">Rollback guidance</div>
-            <p className="mt-2 text-xs text-muted-foreground">{review.rollbackApproach ?? "No rollback guidance recorded."}</p>
+            <p className="mt-2 whitespace-pre-line text-xs text-muted-foreground">{normalizeNarrativeText(review.rollbackApproach ?? "No rollback guidance recorded.")}</p>
           </div>
         </div>
       </div>

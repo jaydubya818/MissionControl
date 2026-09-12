@@ -1,0 +1,63 @@
+Editorial integrity report
+Documents: 66
+Source words: 355693
+Public-content words: 352279
+Main chapters: 44 / 293212 words / median 6553
+Main chapters over 8,000 / 10,000 words: 12 / 5
+Stage pages: 8 / 7043 words
+Glossary entries: 624 / duplicate definitions: 0
+Core-term candidates: 50
+Vague source attributions: 25
+Excluded published terms: 0
+Longest chapters:
+  12847  06-improve/42-mission-control-as-a-living-case-study.md
+  11750  05-operate/38-enterprise-adoption-and-the-infrastructure-landscape.md
+  10617  02-design/07-governance-policy-and-risk-proportional-approval.md
+  10211  03-build/13-control-plane-orchestrator-and-execution-plane.md
+  10180  02-design/05-authoritative-records.md
+  9705  03-build/18-agent-architecture.md
+  9637  06-improve/39-production-feedback-review-and-the-agentic-merge-queue.md
+  8762  03-build/26-autonomous-engineering-workflows.md
+  8573  06-improve/41-meta-loops-and-the-closed-loop-factory.md
+  8519  04-prove/33-security.md
+  8163  03-build/11-the-agent-factory.md
+  8036  02-design/04-the-human-agent-operating-model.md
+Largest Retain this sections:
+  7 bullets / 374 words  05-operate/38-enterprise-adoption-and-the-infrastructure-landscape.md
+  7 bullets / 355 words  02-design/04-the-human-agent-operating-model.md
+  7 bullets / 355 words  02-design/07-governance-policy-and-risk-proportional-approval.md
+  7 bullets / 298 words  02-design/06-intent-and-specification-engineering.md
+  7 bullets / 291 words  03-build/26-autonomous-engineering-workflows.md
+  7 bullets / 280 words  03-build/13-control-plane-orchestrator-and-execution-plane.md
+  6 bullets / 253 words  05-operate/36-resilience-incidents-and-the-control-tower.md
+  7 bullets / 252 words  03-build/17-development-environments-sandboxes-and-compute.md
+  7 bullets / 250 words  04-prove/33-security.md
+  7 bullets / 247 words  03-build/18-agent-architecture.md
+  7 bullets / 245 words  04-prove/27-quality-and-evidence-architecture.md
+  6 bullets / 237 words  02-design/05-authoritative-records.md
+Editorial integrity failures (25):
+- main chapters must contain 230,000–240,000 words; found 293212
+- median main chapter must contain no more than 6,500 words; found 6553
+- 02-design/05-authoritative-records.md exceeds 10,000 words (10180)
+- 02-design/07-governance-policy-and-risk-proportional-approval.md exceeds 10,000 words (10617)
+- 03-build/13-control-plane-orchestrator-and-execution-plane.md exceeds 10,000 words (10211)
+- 05-operate/38-enterprise-adoption-and-the-infrastructure-landscape.md exceeds 10,000 words (11750)
+- 06-improve/42-mission-control-as-a-living-case-study.md exceeds 10,000 words (12847)
+- public corpus must contain 300,000–315,000 words; found 352279
+- 05-operate/38-enterprise-adoption-and-the-infrastructure-landscape.md Retain this exceeds 220 words (374)
+- 02-design/04-the-human-agent-operating-model.md Retain this exceeds 220 words (355)
+- 02-design/07-governance-policy-and-risk-proportional-approval.md Retain this exceeds 220 words (355)
+- 02-design/06-intent-and-specification-engineering.md Retain this exceeds 220 words (298)
+- 03-build/26-autonomous-engineering-workflows.md Retain this exceeds 220 words (291)
+- 03-build/13-control-plane-orchestrator-and-execution-plane.md Retain this exceeds 220 words (280)
+- 05-operate/36-resilience-incidents-and-the-control-tower.md Retain this exceeds 220 words (253)
+- 03-build/17-development-environments-sandboxes-and-compute.md Retain this exceeds 220 words (252)
+- 04-prove/33-security.md Retain this exceeds 220 words (250)
+- 03-build/18-agent-architecture.md Retain this exceeds 220 words (247)
+- 04-prove/27-quality-and-evidence-architecture.md Retain this exceeds 220 words (245)
+- 02-design/05-authoritative-records.md Retain this exceeds 220 words (237)
+- 05-operate/35-observability-telemetry-and-forensics.md Retain this exceeds 220 words (233)
+- 04-prove/31-quality-contracts-proof-packages-and-certificates.md Retain this exceeds 220 words (231)
+- 05-operate/37-control-surfaces-event-contracts-and-storage.md Retain this exceeds 220 words (225)
+- 05-operate/34-the-factory-as-a-platform.md Retain this exceeds 220 words (221)
+- vague source attributions remain: 01-understand/01-why-software-engineering-is-changing.md:263, 02-design/04-the-human-agent-operating-model.md:429, 02-design/05-authoritative-records.md:514, 02-design/06-intent-and-specification-engineering.md:372, 02-design/07-governance-policy-and-risk-proportional-approval.md:562, 02-design/08-economics-metrics-and-human-attention.md:296, 03-build/11-the-agent-factory.md:525, 03-build/11-the-agent-factory.md:526, 03-build/13-control-plane-orchestrator-and-execution-plane.md:566, 03-build/15-coding-harnesses-and-agent-protocols.md:385, 03-build/18-agent-architecture.md:535, 03-build/19-data-knowledge-and-semantic-engineering.md:348, 03-build/22-routing-and-the-escalation-ladder.md:315, 03-build/23-agent-and-loop-engineering.md:300, 03-build/26-autonomous-engineering-workflows.md:404, 03-build/26-autonomous-engineering-workflows.md:405, 04-prove/27-quality-and-evidence-architecture.md:403, 04-prove/29-evaluation-engineering.md:329, 05-operate/34-the-factory-as-a-platform.md:330, 05-operate/38-enterprise-adoption-and-the-infrastructure-landscape.md:562, 06-improve/39-production-feedback-review-and-the-agentic-merge-queue.md:873, 06-improve/41-meta-loops-and-the-closed-loop-factory.md:880, appendix/changelog.md:145, appendix/research/initial-canon.md:135, appendix/research/initial-canon.md:140

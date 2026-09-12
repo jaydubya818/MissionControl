@@ -6,6 +6,7 @@
  */
 
 import { v } from "convex/values";
+import { isLocalQualificationRepository } from "./lib/localRepositoryAdmission";
 import { mutation, query } from "./_generated/server";
 import { buildFactoryProjectSeed } from "./lib/factoryProjectSeed";
 import { deriveVerificationStatus } from "./lib/workOrders";
@@ -323,6 +324,9 @@ export const listRepositories = query({
           return {
             repositoryId: connection._id,
             source: "CONNECTION" as const,
+            repositoryMode: connection.repositoryMode ?? "GITHUB",
+            publicationAuthority: isLocalQualificationRepository(connection) ? "NONE" as const : undefined,
+            admissionDigest: connection.localAdmissionDigest,
             repository: connection.repository,
             displayName: connection.displayName,
             defaultBranch: connection.defaultBranch,
@@ -780,6 +784,9 @@ export const setDefaultRepository = mutation({
   handler: async (ctx, args) => {
     const selected = await ctx.db.get(args.repositoryId);
     if (!selected) return { success: false, error: "Repository connection not found" };
+    if (isLocalQualificationRepository(selected)) {
+      throw new Error("Local qualification cannot become a GitHub compatibility default.");
+    }
     const project = await ctx.db.get(selected.projectId);
     if (!project) return { success: false, error: "Workspace not found" };
     await enforceProjectAccess(ctx, project, COMPANY_PERMISSIONS.MANAGE_REPOSITORIES);
@@ -1023,6 +1030,21 @@ export const remove = mutation({
         success: false,
         error:
           "Project has agents. Use force=true to delete anyway (not recommended).",
+      };
+    }
+
+    // Incident Command evidence is retained and must never be orphaned by a
+    // force-delete. Archival/tombstoning is a separate governed capability.
+    const [incident, dispatchControl, controlReceipt, controlAuthorization] = await Promise.all([
+      ctx.db.query("factoryIncidents").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).first(),
+      ctx.db.query("repositoryDispatchControls").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).first(),
+      ctx.db.query("factoryIncidentControlReceipts").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).first(),
+      ctx.db.query("factoryIncidentControlAuthorizations").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).first(),
+    ]);
+    if (incident || dispatchControl || controlReceipt || controlAuthorization) {
+      return {
+        success: false,
+        error: "Project has retained Incident Command history and cannot be deleted. Governed archival is required.",
       };
     }
 

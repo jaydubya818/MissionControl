@@ -292,7 +292,7 @@ MC operatorControls.PAUSE →
 
 | Phase | What's Added | What's Changed | What's Kept |
 |-------|--------------|----------------|-------------|
-| **0** | FORK_BOUNDARY.md, MIGRATION_PLAN.md | Nothing | Everything |
+| **0** | FORK_BOUNDARY.md, docs/history/MIGRATION_PLAN.md | Nothing | Everything |
 | **1** | tenants, environments, operators, roles, permissions, roleAssignments | projects (add tenantId); all MC tables (add optional tenantId) | MC tables functional |
 | **2** | registry/ (templates, versions, instances, identities), governance/ (policyEnvelopes, approvalRecords, changeRecords, deployments, roles, permissions, roleAssignments) | Nothing | MC agents, policies, approvals |
 | **3** | lib/agentResolver.ts, compat functions | agentInstances (add legacyAgentId) | MC agents (dual-write) |
@@ -331,4 +331,4 @@ Per ARM PRD v2.1 Technical Review, these are out of scope:
 
 ---
 
-**Next**: See [MIGRATION_PLAN.md](MIGRATION_PLAN.md) for phase-by-phase implementation checklist.
+**Next**: See [the archived migration plan](docs/history/MIGRATION_PLAN.md) for the original phase-by-phase implementation checklist.

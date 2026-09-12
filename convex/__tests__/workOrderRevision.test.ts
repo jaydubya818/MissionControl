@@ -12,6 +12,7 @@ const baseWorkOrder = {
   desiredOutcome: "Inspect runs",
   workflowId: "feature-dev",
   repository: "jaydubya818/MissionControl",
+  codeScopeIds: ["scope-ui"],
   branchStrategy: "isolated",
   priority: 2,
   riskLevel: "MEDIUM",
@@ -56,6 +57,47 @@ describe("work order revision helpers", () => {
     expect(impact.riskReassessment).toBe("INCREASED");
     expect(impact.requiresReapproval).toBe(true);
     expect(impact.impactedApprovalTypes).toEqual(["RISK_REVIEW"]);
+  });
+
+  it("requires reapproval without reverification when the cumulative cost cap changes", () => {
+    const current = snapshotRevisionFields({
+      ...baseWorkOrder,
+      requiredApprovals: ["SCOPE_APPROVAL", "RISK_REVIEW"],
+      metadata: {
+        ...baseWorkOrder.metadata,
+        implementationPolicy: { maxCostUsd: 24, maxAttempts: 3, timeoutMinutes: 60 },
+      },
+    });
+    const next = buildRevisionSnapshot({
+      current,
+      patch: {
+        metadata: {
+          ...current.metadata,
+          implementationPolicy: { ...current.metadata.implementationPolicy, maxCostUsd: 48 },
+        },
+      },
+    });
+    const impact = evaluateRevisionImpact({ current, next, currentState: "READY" });
+
+    expect(impact.changedFields).toEqual(["metadata"]);
+    expect(impact.materiality).toBe("REAPPROVAL");
+    expect(impact.requiresReapproval).toBe(true);
+    expect(impact.requiresReverification).toBe(false);
+    expect(impact.impactedApprovalTypes).toEqual(["RISK_REVIEW", "SCOPE_APPROVAL"]);
+  });
+
+  it("requires reapproval and reverification when the executable code scope changes", () => {
+    const current = snapshotRevisionFields(baseWorkOrder);
+    const next = buildRevisionSnapshot({
+      current,
+      patch: { codeScopeIds: ["scope-planning", "scope-ui"] },
+    });
+    const impact = evaluateRevisionImpact({ current, next, currentState: "BLOCKED" });
+
+    expect(next.codeScopeIds).toEqual(["scope-planning", "scope-ui"]);
+    expect(impact.changedFields).toContain("codeScopeIds");
+    expect(impact.requiresReapproval).toBe(true);
+    expect(impact.requiresReverification).toBe(true);
   });
 
   it("forces full reopen when a done work order materially changes", () => {

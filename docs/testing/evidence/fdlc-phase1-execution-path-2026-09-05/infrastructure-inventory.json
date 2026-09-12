@@ -1,0 +1,42 @@
+{
+  "observedAt": "2026-09-05T16:55:55.088031+00:00",
+  "engine": {
+    "Version": "29.7.2",
+    "Os": "linux",
+    "Arch": "arm64",
+    "KernelVersion": "7.0.12-linuxkit",
+    "GitCommit": "6a43e3d"
+  },
+  "images": [
+    {
+      "requested": "mc-context-isolation:offline-candidate",
+      "Id": "sha256:cb09d022acc4661c1818b34de3d5bce6a0886f1f1cf61c87d6ddc2d772f9a7fc",
+      "RepoDigests": [
+        "mc-context-isolation@sha256:cb09d022acc4661c1818b34de3d5bce6a0886f1f1cf61c87d6ddc2d772f9a7fc"
+      ],
+      "Architecture": "arm64",
+      "Os": "linux"
+    },
+    {
+      "requested": "ghcr.io/jaydubya818/mission-control-remote-sandbox:restricted-final-blocker-20260820-41a66f1d6f7b",
+      "Id": "sha256:41a66f1d6f7b90618a6c58fb9a1a336ef69ab2794fc1322233e4a5d9788782b8",
+      "RepoDigests": [
+        "mc-remote-final-blocker@sha256:41a66f1d6f7b90618a6c58fb9a1a336ef69ab2794fc1322233e4a5d9788782b8",
+        "ghcr.io/jaydubya818/mission-control-remote-sandbox@sha256:41a66f1d6f7b90618a6c58fb9a1a336ef69ab2794fc1322233e4a5d9788782b8"
+      ],
+      "Architecture": "amd64",
+      "Os": "linux"
+    }
+  ],
+  "remoteDoctor": {
+    "status": "ready",
+    "authenticated": true,
+    "vmCount": 0,
+    "maxVms": 50,
+    "automaticIntegrations": [],
+    "billingPlanReadable": true,
+    "billingUsageReadable": true,
+    "scope": "Earlier read-only sandbox-doctor --json observation in this turn; not allocation or isolation qualification"
+  },
+  "otherVMCLIs": "limactl,colima,qemu-system-aarch64,tart,orb not found on current PATH; not a claim no VM exists elsewhere"
+}

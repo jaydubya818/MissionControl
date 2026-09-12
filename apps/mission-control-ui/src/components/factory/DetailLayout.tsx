@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Breadcrumbs, type Crumb } from "./Breadcrumbs";
 import { cn } from "../../lib/utils";
+import { normalizeNarrativeText } from "../../lib/displayText";
 
 export interface MetadataEntry {
   label: string;
@@ -50,7 +51,10 @@ export function DetailTabs({
   onChange: (id: string) => void;
 }): JSX.Element {
   return (
-    <div role="tablist" className="flex items-center gap-1 overflow-x-auto border-b border-line">
+    <div
+      role="tablist"
+      className="grid grid-cols-2 gap-1 rounded-xl border border-line bg-surface-1 p-1 sm:flex sm:items-center sm:overflow-x-auto sm:rounded-none sm:border-x-0 sm:border-t-0 sm:bg-transparent sm:p-0"
+    >
       {tabs.map((tab) => {
         const active = tab.id === activeId;
         return (
@@ -61,10 +65,10 @@ export function DetailTabs({
             aria-selected={active}
             onClick={() => onChange(tab.id)}
             className={cn(
-              "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] transition-colors duration-150",
+              "flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[13px] transition-colors duration-150 sm:-mb-px sm:min-h-0 sm:justify-start sm:rounded-none sm:border-x-0 sm:border-t-0 sm:py-2.5",
               active
-                ? "border-registry-accent text-ink font-medium"
-                : "border-transparent text-ink-muted hover:text-ink-secondary"
+                ? "border-registry-accent/40 bg-registry-accent-soft font-medium text-ink sm:border-b-registry-accent sm:bg-transparent"
+                : "border-transparent text-ink-muted hover:bg-surface-2 hover:text-ink-secondary sm:hover:bg-transparent"
             )}
           >
             {tab.icon}
@@ -109,16 +113,16 @@ export function DetailLayout({
   children,
 }: DetailLayoutProps): JSX.Element {
   return (
-    <div className="mx-auto flex max-w-[1200px] flex-col gap-5 px-4 py-5 sm:px-6">
+    <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 py-4 sm:gap-5 sm:px-6 sm:py-5">
       {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs items={breadcrumbs} />}
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:gap-6">
         <div className="min-w-0">
-          <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">
+          <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-ink sm:text-[26px]">
             {title}
           </h1>
           {description && (
-            <p className="mt-1.5 max-w-[70ch] text-[14px] leading-relaxed text-ink-secondary">
-              {description}
+            <p className="mt-1.5 max-w-[70ch] whitespace-pre-line text-[14px] leading-relaxed text-ink-secondary">
+              {normalizeNarrativeText(description)}
             </p>
           )}
         </div>
@@ -155,7 +159,7 @@ export function PageHeader({
           {title}
         </h1>
         {description ? (
-          <p className="mt-1.5 text-[14px] leading-relaxed text-ink-secondary">{description}</p>
+          <p className="mt-1.5 whitespace-pre-line text-[14px] leading-relaxed text-ink-secondary">{normalizeNarrativeText(description)}</p>
         ) : null}
       </div>
       {actions ? <div className="w-full shrink-0 sm:w-auto">{actions}</div> : null}

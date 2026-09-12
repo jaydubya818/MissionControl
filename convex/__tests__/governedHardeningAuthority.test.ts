@@ -30,7 +30,11 @@ describe("Governed Hardening authority invariants", () => {
     const workOrders = read("convex/workOrders.ts");
     expect(workOrders).toContain('if (args.actorType !== "HUMAN")');
     expect(workOrders).toContain("FACTORY_PERMISSIONS.APPROVE");
-    expect(workOrders).toContain("const acceptActorId = factoryAccess.actorId");
+    expect(workOrders).toContain("localDemoOperatorAcceptanceEnabled()");
+    expect(workOrders).toContain('? "development:local-operator"');
+    const companyAccess = read("convex/lib/companyAccess.ts");
+    expect(companyAccess).toContain('process.env.MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT === "1"');
+    expect(companyAccess).toContain('process.env.MC_ALLOW_LOCAL_OPERATOR_GOVERNED_ACCEPTANCE === "1"');
 
     const orchestration = read("apps/orchestration-server/src/index.ts");
     const verificationRouteStart = orchestration.indexOf("automation-verification");
@@ -55,7 +59,7 @@ describe("Governed Hardening authority invariants", () => {
     expect(read("convex/factory/learning.ts")).toContain("acceptanceAuthority: false");
     const routing = read("convex/lib/executionRouting.ts");
     expect(routing).toContain("resolveExecutionRoute");
-    expect(routing).toContain("modelRouteProductionEligible");
+    expect(routing).toContain("frozenFactoryModelRouteEligible");
     expect(routing).toContain("sandboxProfileProductionEligible");
     expect(routing).toContain("factoryWorkerEligibility");
   });
@@ -104,5 +108,18 @@ describe("Governed Hardening authority invariants", () => {
     expect(runs).toContain('markVerificationAttemptSuperseded(run, "CANCELED", now)');
     expect(runs).toContain("markVerificationAttemptSuperseded(run, args.status");
     expect(runs).toContain("verificationSupersededAt");
+  });
+
+  it("preserves failed Attempt history by creating a linked local-candidate recovery Attempt", () => {
+    const attempts = read("convex/factory/attempts.ts");
+    const recoveryStart = attempts.indexOf("export const recoverLocalCandidate");
+    const recoveryEnd = attempts.indexOf("export const retryVerification", recoveryStart);
+    const recovery = attempts.slice(recoveryStart, recoveryEnd);
+    expect(recovery).toContain("failedAttempt.failureCode !== LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE");
+    expect(recovery).toContain('withIndex("by_run_type"');
+    expect(recovery).toContain('artifactType", "CODE_DIFF"');
+    expect(recovery).toContain('ctx.db.insert("workflowRuns", recoveryAttempt)');
+    expect(recovery).toContain("sourceAttemptId: failedAttempt._id");
+    expect(recovery).not.toContain('ctx.db.patch(failedAttempt._id, {\n      status: "PENDING"');
   });
 });

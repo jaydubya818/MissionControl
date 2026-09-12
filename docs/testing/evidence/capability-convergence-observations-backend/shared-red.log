@@ -1,0 +1,77 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-observations/packages/model-router
+
+ ❯ src/__tests__/governed-inference.test.ts (15 tests | 4 failed) 15ms
+   ✓ governed inference reservation and intent > freezes a finite exact-route reservation 2ms
+   ✓ governed inference reservation and intent > rejects fallback loops, missing rates, duplicates, stale leases, and overflow 2ms
+   ✓ governed inference reservation and intent > lets cancellation win before claim and never redispatches ambiguous claims 1ms
+   ✓ immutable provider receipts and pricing > prices cache dimensions from the frozen price book 1ms
+   ✓ immutable provider receipts and pricing > keeps missing usage and ambiguous delivery unknown 1ms
+   × immutable provider receipts and pricing > retains provider and resolved-model drift with unknown pricing 3ms
+     → Provider alias or resolution drift detected.
+   × immutable provider receipts and pricing > retains usage with UNKNOWN cost for overflow 1ms
+     → Inference cost exceeds safe integer accounting bounds.
+   × immutable provider receipts and pricing > retains usage with UNKNOWN cost for missingRate 0ms
+     → Inference cost exceeds safe integer accounting bounds.
+   × immutable provider receipts and pricing > retains usage with UNKNOWN cost for batchRate 0ms
+     → Inference cost exceeds safe integer accounting bounds.
+   ✓ immutable provider receipts and pricing > fails closed instead of rounding unsafe financial arithmetic 0ms
+   ✓ outcome economics > requires independent verification before human acceptance and preserves absent later stages 1ms
+   ✓ outcome economics > attributes failed primary and fallback spend to one selected-route outcome 1ms
+   ✓ outcome economics > never lets unknown cost improve a route 1ms
+   ✓ outcome economics > freezes newer provider reconciliation into projection cost and lineage 1ms
+   ✓ outcome economics > keeps comparisons advisory and fails closed for an unqualified route 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/governed-inference.test.ts > immutable provider receipts and pricing > retains provider and resolved-model drift with unknown pricing
+Error: Provider alias or resolution drift detected.
+ ❯ physicalInferenceReceipt ../shared/src/governedInference.ts:484:11
+ ❯ src/__tests__/governed-inference.test.ts:191:12
+    189|   it("retains provider and resolved-model drift with unknown pricing",…
+    190|     const { held, intent } = claimedIntent();
+    191|     expect(physicalInferenceReceipt({
+       |            ^
+    192|       receiptId: "bad", intent, reservation: held, priceBook: book(), …
+    193|       delivery: "DELIVERED", status: "FAILED", usage: {}, startedAt: 4…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/__tests__/governed-inference.test.ts > immutable provider receipts and pricing > retains usage with UNKNOWN cost for overflow
+ FAIL  src/__tests__/governed-inference.test.ts > immutable provider receipts and pricing > retains usage with UNKNOWN cost for missingRate
+Error: Inference cost exceeds safe integer accounting bounds.
+ ❯ safeMicrousd ../shared/src/governedInference.ts:226:38
+ ❯ calculateInferenceCost ../shared/src/governedInference.ts:448:24
+ ❯ src/__tests__/governed-inference.test.ts:206:12
+    204|     if (fault === "missingRate") delete priceBook.rates[0].cacheWriteM…
+    205|     const usage = { inputTokens: Number.MAX_SAFE_INTEGER, outputTokens…
+    206|     expect(calculateInferenceCost({ usage, routeDigest: route.routeDig…
+       |            ^
+    207|     const receipt = physicalInferenceReceipt({ receiptId: "observation…
+    208|       delivery: "DELIVERED", status: "SUCCEEDED", usage, startedAt: 40…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/__tests__/governed-inference.test.ts > immutable provider receipts and pricing > retains usage with UNKNOWN cost for batchRate
+Error: Inference cost exceeds safe integer accounting bounds.
+ ❯ safeMicrousd ../shared/src/governedInference.ts:226:38
+ ❯ calculateInferenceCost ../shared/src/governedInference.ts:445:53
+ ❯ src/__tests__/governed-inference.test.ts:206:12
+    204|     if (fault === "missingRate") delete priceBook.rates[0].cacheWriteM…
+    205|     const usage = { inputTokens: Number.MAX_SAFE_INTEGER, outputTokens…
+    206|     expect(calculateInferenceCost({ usage, routeDigest: route.routeDig…
+       |            ^
+    207|     const receipt = physicalInferenceReceipt({ receiptId: "observation…
+    208|       delivery: "DELIVERED", status: "SUCCEEDED", usage, startedAt: 40…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 11 passed (15)
+   Start at  00:39:37
+   Duration  292ms (transform 56ms, setup 0ms, collect 83ms, tests 15ms, environment 0ms, prepare 32ms)
+
+undefined
+/private/tmp/fdlc-program-observations/packages/model-router:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/__tests__/governed-inference.test.ts

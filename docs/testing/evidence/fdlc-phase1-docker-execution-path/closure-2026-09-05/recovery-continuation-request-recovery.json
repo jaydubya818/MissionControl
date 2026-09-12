@@ -1,0 +1,29 @@
+{
+  "fixtureOnly": true,
+  "providerCalls": 0,
+  "recovered": {
+    "providerResourceId": "a2febd82a81063ead8f959f456e0e0d78abf69de72dd0b8c8867779adac323a0",
+    "resourceName": "mc-attempt-1234567890abcdef",
+    "requestedAt": 1788634458876,
+    "confirmedAbsentAt": 1788634458960,
+    "resourceAbsent": true,
+    "allocationRecoveryProof": {
+      "schema": "factory-docker-request-recovery/v1",
+      "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+      "attemptLeaseId": "lease-7",
+      "manifestDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "absent": {
+    "resourceName": "mc-attempt-1234567890abcdef",
+    "requestedAt": 1788634458960,
+    "confirmedAbsentAt": 1788634458992,
+    "resourceAbsent": true,
+    "allocationRecoveryProof": {
+      "schema": "factory-docker-request-recovery/v1",
+      "image": "mission-control/factory-docker-qualification@sha256:32951f1bd7974c9f6e7d37e75b5356ba0196120448b8b10b47bb34fc2dbe34e2",
+      "attemptLeaseId": "lease-7",
+      "manifestDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
+}

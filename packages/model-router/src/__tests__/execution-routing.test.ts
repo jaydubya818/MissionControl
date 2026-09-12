@@ -134,6 +134,25 @@ describe("execution routing V1", () => {
     expect(result.candidates[0].rejectionCodes).toContain("PRODUCTION_CERTIFICATION_MISSING");
   });
 
+  it("admits only the exact explicitly selected tuple in qualification mode", () => {
+    const exact = candidate("exact", {
+      tuple: { ...candidate("exact").tuple, harness: { ...candidate("exact").tuple.harness, maturity: "EXPERIMENTAL" } },
+      eligibility: { ...candidate("exact").eligibility, productionCertified: false, qualificationCertified: true },
+    });
+    const other = candidate("other", {
+      tuple: { ...candidate("other").tuple, harness: { ...candidate("other").tuple.harness, maturity: "EXPERIMENTAL" } },
+      eligibility: { ...candidate("other").eligibility, productionCertified: false, qualificationCertified: true },
+    });
+    const routing = input([exact, other]);
+    routing.admissionMode = "QUALIFICATION";
+    routing.fallbackTupleKey = "exact";
+    const result = resolveExecutionRoute(routing);
+    expect(result.appliedTupleKey).toBe("exact");
+    expect(result.candidates.find((item) => item.tuple.tupleKey === "exact")?.eligible).toBe(true);
+    expect(result.candidates.find((item) => item.tuple.tupleKey === "other")?.rejectionCodes)
+      .toContain("PRODUCTION_CERTIFICATION_MISSING");
+  });
+
   it("fails model and provider availability closed before scoring", () => {
     const unavailable = candidate("unavailable", {
       eligibility: { ...candidate("unavailable").eligibility, modelAvailable: false },
@@ -156,6 +175,14 @@ describe("execution routing V1", () => {
     const result = resolveExecutionRoute(input([unknownCost]));
     expect(result.status).toBe("EXHAUSTED");
     expect(result.candidates[0].rejectionCodes).toContain("BUDGET_ESTIMATE_UNKNOWN");
+  });
+
+  it("fails a known estimate closed when it exceeds the remaining approved budget", () => {
+    const routing = input([candidate("over-budget")]);
+    routing.policy.maximumEstimatedCostUsd = 0.1;
+    const result = resolveExecutionRoute(routing);
+    expect(result.status).toBe("EXHAUSTED");
+    expect(result.candidates[0].rejectionCodes).toContain("BUDGET_EXCEEDED");
   });
 
   it("preserves missing telemetry as unknown and falls back conservatively", () => {

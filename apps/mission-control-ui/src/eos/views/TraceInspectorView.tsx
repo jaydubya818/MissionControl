@@ -42,6 +42,7 @@ import {
   type TraceObservationNode,
   type TraceObservationRecord,
 } from "../traceViewModel";
+import { EvalControlPlanePanel } from "../components/EvalControlPlanePanel";
 
 export interface TraceInspectorViewProps {
   onNavigate: (view: string) => void;
@@ -209,7 +210,10 @@ function TraceInspectorContent({ projectId }: TraceInspectorViewProps): JSX.Elem
           <Loader2 size={16} className="animate-spin" aria-hidden /> Loading trace data…
         </div>
       ) : domainTab === "evals" ? (
-        <EvalLibrary analytics={dashboard.evalAnalytics} />
+        <>
+          <EvalControlPlanePanel projectId={projectId} />
+          <EvalLibrary analytics={dashboard.evalAnalytics} />
+        </>
       ) : domainTab === "datasets" ? (
         <DatasetLibrary datasets={dashboard.datasets} experiments={dashboard.experiments} />
       ) : (
@@ -568,6 +572,7 @@ function EvalLibrary({ analytics }: { analytics: EvalAnalyticsRecord[] }) {
           <div className="border-b border-line px-4 py-3"><h2 className="text-[14px] font-semibold text-ink">Evaluator library</h2><p className="mt-0.5 text-[11.5px] text-ink-muted">Quality measures are versioned, computed over a bounded recent score window, and remain separate from WorkOrder verification evidence.</p></div>
           <div
             className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info-accent/40"
+            role="region"
             tabIndex={0}
             aria-label="Evaluation library results"
           ><table className="w-full min-w-[880px] text-left"><thead className="border-b border-line bg-surface-2 text-[10.5px] uppercase tracking-[0.07em] text-ink-muted"><tr>{["Evaluator", "Type", "Target", "Version", "State", "Recent executions", "Average", "Failure rate", "Last run"].map((label) => <th key={label} className="px-4 py-2.5 font-medium">{label}</th>)}</tr></thead><tbody className="divide-y divide-line">{analytics.map((definition) => <tr key={definition._id} className="text-[12px]"><td className="px-4 py-3"><div className="font-medium text-ink">{definition.name}</div><div className="font-mono text-[10px] text-ink-muted">{definition.key}</div></td><td className="px-4 py-3 text-ink-secondary">{humanize(definition.evaluatorType)}</td><td className="px-4 py-3 text-ink-secondary">{humanize(definition.scope)}</td><td className="px-4 py-3 font-mono text-ink">v{definition.version}</td><td className="px-4 py-3"><StatusBadge tone={definition.enabled ? "success" : "neutral"}>{definition.enabled ? "Enabled" : "Disabled"}</StatusBadge></td><td className="px-4 py-3 font-mono text-ink">{definition.executionCount.toLocaleString()}</td><td className="px-4 py-3 font-mono text-ink">{definition.averageScore === undefined ? "—" : definition.averageScore.toFixed(2)}</td><td className="px-4 py-3 font-mono text-ink">{formatPercent(definition.failureRate)}</td><td className="px-4 py-3 font-mono text-[10.5px] text-ink-muted">{definition.lastRunAt ? new Date(definition.lastRunAt).toLocaleString() : "Never"}</td></tr>)}</tbody></table></div>

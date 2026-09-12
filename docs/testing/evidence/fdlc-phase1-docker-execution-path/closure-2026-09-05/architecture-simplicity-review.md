@@ -1,0 +1,42 @@
+# Independent architecture and simplicity review — 2026-09-05
+
+Review scope: current uncommitted closure source, after main reconciliation. Skills: architecture-strategist and code-simplicity-reviewer. This reviewer did not implement the reviewed source, mutate it, run provider calls, or dispatch WorkOrders. Source and existing tests were inspected; no fresh behavioral test result is claimed here. Findings describe the source at review time and require a follow-up addendum after fixes.
+
+## Assessment
+
+**CHANGES_REQUIRED** for exact Execution Profile integration. The architecture is otherwise appropriately bounded for offline qualification: FactoryAttemptWorker retains Attempt ownership, RemoteSandboxRuntime owns lifecycle/cleanup, DockerSandboxProvider implements the existing provider interface, and the new Convex reservation handlers reuse current workspace permission, Execution Profile admission, worker registration and service-command authority. There is no new orchestrator or alternative Factory Version.
+
+The Docker provider explicitly rejects any producing command with `BUDGET_DENIED`. The immutable qualification script and local fake provider exchange are not a real governed inference broker. New Convex monetary records provide transactional storage structure; they do not make an unselected provider route or unqualified price model admissible. This review is not GO for WO1, provider liability, or complete runtime lifecycle.
+
+## Required integration fix
+
+**P1 — Docker loses the admission timestamp required by current v3 manifests.** `apps/orchestration-server/src/dockerSandboxProvider.ts:156` constructs the supervisor config without `profileAdmittedAt`. `SandboxStartRequest` already carries this field and `RemoteSandboxRuntime` forwards it. `infra/docker-factory/supervisor.mjs:167–169` rejects a v3 profile manifest without a nonnegative integer admission timestamp, and line 523 calls that check with `config.profileAdmittedAt`. Consequently the current exact Execution Profile path fails inside Docker even when outer admission succeeds. Older-manifest offline tests cannot prove this path.
+
+Fix: forward `profileAdmittedAt: request.profileAdmittedAt` into the existing config. Retain current manifest validation; do not invent a new clock or timestamp inside the provider. Add a governed v3 config propagation regression and a missing/invalid timestamp negative control. A real-container v3 test should accompany any claim of exact Execution Profile execution compatibility.
+
+## Qualification gaps that must remain explicit
+
+1. **Image identity conflation needs explicit proof or separation.** Docker allocate line 85 compares `image.Id` to the suffix of the `repository@sha256` reference and separately requires that exact reference in `RepoDigests`; container policy similarly compares `actual.Image` to that suffix. Docker image configuration identity and distribution manifest identity are different concepts. If this candidate intentionally uses a local imported config-digest alias, document that exact mechanism and captured daemon behavior without treating it as general registry identity qualification. For a normal registry artifact, freeze the distribution reference and resolved configuration ID separately, require exact RepoDigests membership, and compare container `Image` with the resolved configuration ID. Do not weaken either check to accept mutable tags.
+2. **Database concurrency behavior needs database evidence.** `reserveRequestInternal` correctly reads and patches the same reservation row within one Convex transaction. The inspected handler test invokes the actual handler with a mock database sequentially; it proves handler wiring and exhausted balance rejection, not simultaneous Convex conflict/retry behavior. Retain the earlier filesystem-ledger concurrency fixture as historical offline evidence. Before claiming authoritative reservation concurrency, add actual Convex transactional evidence for two simultaneous requests each consuming X when remaining balance is X, with exactly one durable hold admitted.
+3. **Registered price assertions are not source qualification.** The current price type deliberately supports one narrow RESPONSES/USD envelope and requires declared inclusive reasoning/cache and no other billing dimensions. Validation checks structure and exact snapshot digest, not the truth of external billing claims. Keep live sends denied until provider-confirmed price/input/output semantics and route qualification exist. A future broker must use the governed snapshot and serialized bytes it actually sends; it must not accept workload-supplied measurements as proof.
+
+## Simplicity and maintainability
+
+The current narrow provider is preferable to a general Docker options framework. Fixed mount/resource/network/environment policies, explicit terminal codes and disabled inference are relevant controls, not redundant defensive code. The four small liability functions separate pure arithmetic from Convex persistence appropriately. Integer amounts, bounded holds (100), append-only usage events, immutable price rows, registration keys and current lease checks have concrete purposes.
+
+Two nonblocking improvements can be made without redesign:
+
+- `RemoteSandboxRuntime` imports `DockerBoundaryError` from a concrete provider module solely to map terminal failures, and separately branches on `kind === "DOCKER"` for timeout diagnostics. When another provider needs the same vocabulary, move a small typed boundary-failure contract into `sandboxProvider.ts`; do not add a new plugin/error hierarchy now. The current dependency is localized and not itself a safety blocker.
+- Several Docker methods and validator predicates compress many independent decisions onto single lines. Format these into existing project style so identity checks and cleanup ordering can be reviewed reliably. Preserve the checks; no arbitrary LOC reduction is recommended for trust-boundary code.
+
+The legacy `hardLiabilityLedger.ts` is an offline storage adapter and has no non-test production imports in the inspected source. Keep that distinction visible and avoid wiring a filesystem and Convex ledger as two independent monetary authorities. The new core conservatively retains each request's maximum hold even after token-usage settlement (`Math.max(maximumNanoUsd, accountedNanoUsd)`); this reduces reusable balance but avoids treating estimated monetary usage as released final liability. Document the behavior rather than simplifying it to release uncertain spend.
+
+Complexity: medium, mainly explicit safety validation. Estimated safe deletion: zero lines identified as clearly unnecessary. Recommended action: fix timestamp propagation, qualify the identified integration boundaries, and make minor formatting improvements; no broad refactor or new abstractions.
+
+## Same-session follow-up inspection
+
+The parent implementation fixed both concrete identity/configuration issues. Reinspection confirms `DockerProviderIdentity.imageId` now represents the configuration ID separately from `image` (the immutable repository reference). Allocate compares `image.Id` to that explicit ID and requires exact `RepoDigests` membership separately; container inspection uses the explicit configuration ID. The supervisor config now forwards `profileAdmittedAt` directly from the request. These close the identified source defects without broadening inference authority.
+
+The reviewer read `liability-occ.json`: an isolated disposable Convex backend admitted one of two concurrent budget creations and one of two simultaneous full-balance requests, leaving one durable 30 nano-USD hold. Its stated scope is the same pure reservation function and production index/read-write pattern, not full admission. That is materially stronger concurrency evidence than the earlier mock handler test and must retain this accurate scope.
+
+Updated disposition: **architecture and simplicity GO for the reviewed bounded offline implementation**, with no remaining blocking source finding identified in this review. This is not production or WO1 GO. Before relying on these corrected paths, include targeted timestamp propagation/missing timestamp and distinct image configuration/manifest identity regression coverage in the affected qualification rerun. Full exact-profile container compatibility and live provider authority remain outside the proven scope. The original review findings above are preserved as historical review evidence.

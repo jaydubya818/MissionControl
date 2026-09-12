@@ -1,6 +1,6 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { constants } from "node:fs";
-import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
@@ -21,9 +21,12 @@ import {
 } from "@mission-control/workflow-engine";
 import {
   CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
   boundedProviderMetadata,
   harnessCapabilityManifestDigest,
   harnessExecutionRequestDigest,
+  harnessRuntimeArtifactDigest,
+  modelRouteReasoningConfigIssues,
 } from "@mission-control/workflow-engine";
 import { captureHarnessRepositoryBaseline, collectHarnessRepositoryResult } from "./harnessRepository.js";
 
@@ -61,6 +64,8 @@ type ProcessRunner = (args: {
   onExit?: (pid: number, exitCode?: number) => Promise<void> | void;
 }) => Promise<ProcessCompletion>;
 
+type ExecutableDigestResolver = (executable: string) => Promise<string | null>;
+
 interface CodexPreparedExecution {
   request: ExecutorRequest;
   context: HarnessExecutionContext;
@@ -86,6 +91,13 @@ interface CodexExecutionHandle {
 }
 
 const PROCESS_TERMINATION_GRACE_MS = 5_000;
+export const CODEX_WORKSPACE_PERMISSION_PROFILE = "mission-planner-contained";
+export const CODEX_WORKSPACE_PERMISSION_CONFIG = [
+  `default_permissions="${CODEX_WORKSPACE_PERMISSION_PROFILE}"`,
+  `permissions.${CODEX_WORKSPACE_PERMISSION_PROFILE}.description="Repository-contained read-only planning"`,
+  `permissions.${CODEX_WORKSPACE_PERMISSION_PROFILE}.filesystem={":minimal"="read",glob_scan_max_depth=8,":workspace_roots"={"."="read",".env"="deny",".env.*"="deny","**/.env"="deny","**/.env.*"="deny"}}`,
+  `permissions.${CODEX_WORKSPACE_PERMISSION_PROFILE}.network.enabled=false`,
+] as const;
 const CODEX_PINNED_NATIVE_DIGESTS: Record<string, string> = {
   "darwin-arm64": "ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02",
 };
@@ -97,7 +109,7 @@ const REMOTE_OPENROUTER_CONFIG_OVERRIDES = [
   'model_providers.mission-control-openrouter.wire_api="responses"',
   "model_providers.mission-control-openrouter.supports_websockets=false",
 ] as const;
-const FACTORY_RESULT_SCHEMA = {
+export const FACTORY_RESULT_SCHEMA = {
   type: "object",
   additionalProperties: false,
   required: ["schema", "status", "summary", "completedAcceptanceCriterionIds", "incompleteAcceptanceCriterionIds", "unknownAcceptanceCriterionIds", "verificationCommands", "knownRisks", "nextAction"],
@@ -118,6 +130,7 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
   constructor(
     private readonly executable = process.env.CODEX_EXECUTABLE ?? "codex",
     private readonly runner: ProcessRunner = runCodexProcess,
+    private readonly resolveExecutableDigest: ExecutableDigestResolver = executableDigest,
   ) {}
 
   capabilities(): ExecutorCapabilities {
@@ -128,6 +141,7 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       displayName: "Codex CLI",
       provider: "openai",
       capabilityManifest: CODEX_V1_HARNESS_MANIFEST,
+      runtimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
       executionBackends: ["persistent-worker", "remote-sandbox"],
       authority: NO_HARNESS_AUTHORITY,
       supportsCancel: true,
@@ -163,6 +177,26 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       issues.push({ field: "timeoutMs", message: "Timeout must be between one second and eight hours." });
     }
     if (request.provider && request.provider !== "openai") issues.push({ field: "provider", message: "codex/v1 uses the OpenAI provider route." });
+    if (request.structuredOutput) {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$/.test(request.structuredOutput.schemaId)) {
+        issues.push({ field: "structuredOutput.schemaId", message: "Structured-output schema identity is invalid." });
+      }
+      try {
+        const encoded = JSON.stringify(request.structuredOutput.jsonSchema);
+        if (!encoded || Buffer.byteLength(encoded) > 256_000) {
+          issues.push({ field: "structuredOutput.jsonSchema", message: "Structured-output schema must be valid JSON no larger than 256 KB." });
+        }
+      } catch {
+        issues.push({ field: "structuredOutput.jsonSchema", message: "Structured-output schema must be JSON serializable." });
+      }
+    }
+    issues.push(...exactModelRouteIssues(request, "openai"));
+    if (request.reasoningConfig?.temperature !== undefined) {
+      issues.push({ field: "reasoningConfig.temperature", message: "codex/v1 cannot translate temperature exactly; omit it or use a qualified adapter that supports it." });
+    }
+    if (request.reasoningConfig?.maxTokens !== undefined) {
+      issues.push({ field: "reasoningConfig.maxTokens", message: "codex/v1 cannot translate maxTokens exactly; omit it or use a qualified adapter that supports it." });
+    }
     return issues;
   }
 
@@ -179,10 +213,18 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
     request: ExecutorRequest,
     context: HarnessExecutionContext,
   ): Promise<CodexPreparedExecution> {
+    const executableSha256 = await this.resolveExecutableDigest(this.executable);
+    if (executableSha256 !== CODEX_V1_RUNTIME_ARTIFACT.executableSha256) {
+      throw new Error("Codex executable does not match the frozen runtime-artifact identity.");
+    }
     const outputDirectory = await mkdtemp(path.join(tmpdir(), "mc-codex-v1-"));
     try {
       const outputSchemaPath = path.join(outputDirectory, "factory-result.schema.json");
-      await writeFile(outputSchemaPath, JSON.stringify(FACTORY_RESULT_SCHEMA), { mode: 0o600 });
+      await writeFile(
+        outputSchemaPath,
+        JSON.stringify(request.structuredOutput?.jsonSchema ?? FACTORY_RESULT_SCHEMA),
+        { mode: 0o600 },
+      );
       return {
         request: {
           ...request,
@@ -196,7 +238,7 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
         outputSchemaPath,
         baselineCommit: await captureHarnessRepositoryBaseline(request.repositoryRoot).catch(() => null),
         requestSha256: harnessExecutionRequestDigest(request),
-        executableSha256: await executableDigest(this.executable),
+        executableSha256,
       };
     } catch (error) {
       await rm(outputDirectory, { recursive: true, force: true });
@@ -223,6 +265,10 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
         harness: "codex-cli/0.146.0",
         isolation: prepared.request.isolation,
         allowedPaths: prepared.request.allowedPaths,
+        filesystemReadScope: prepared.request.filesystemReadScope ?? null,
+        permissionProfile: prepared.request.filesystemReadScope === "WORKSPACE_ONLY"
+          ? CODEX_WORKSPACE_PERMISSION_PROFILE
+          : null,
       });
       if (prepared.configurationIssues.length) {
         const error = prepared.configurationIssues.map((issue) => `${issue.field}: ${issue.message}`).join(" ");
@@ -337,9 +383,21 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       provenance: {
         provider: handle.prepared.request.provider ?? null,
         model: handle.prepared.request.model ?? null,
+        ...(handle.prepared.request.modelRouteDigest !== undefined
+          ? { modelRouteDigest: handle.prepared.request.modelRouteDigest }
+          : {}),
+        ...(handle.prepared.request.providerRoute !== undefined
+          ? { providerRoute: handle.prepared.request.providerRoute }
+          : {}),
+        ...(handle.prepared.request.reasoningConfig !== undefined
+          ? { reasoningConfig: structuredClone(handle.prepared.request.reasoningConfig) }
+          : {}),
         capabilityManifestSha256: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
         effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
         executableSha256: handle.prepared.executableSha256,
+        runtimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
+        runtimeArtifactDigest: harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT),
+        imageDigest: null,
         requestSha256: handle.prepared.requestSha256,
         providerMetadata: boundedProviderMetadata({
           protocol: "codex-jsonl",
@@ -370,7 +428,7 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       exitCode: completion.exitCode,
       signal: completion.signal,
       output: completion.output,
-      structuredOutput: structuredOutputSummary(completion.output),
+      structuredOutput: structuredOutputSummary(completion.output, handle.prepared.request.structuredOutput?.schemaId),
       error: normalizedStatus === "COMPLETED" ? null : redact(completion.diagnostics || completion.stderr || (completion.exitCode === 0
         ? "Codex protocol ended without a successful turn.completed event."
         : `Codex execution ${normalizedStatus.toLowerCase()}.`)),
@@ -416,6 +474,10 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
   }
 
   createRemoteInvocation(request: ExecutorRequest, context: { repositoryRoot: string; resultPath: string }) {
+    const issues = this.validateRemoteConfiguration(request);
+    if (issues.length > 0) {
+      throw new Error(issues.map((issue) => `${issue.field}: ${issue.message}`).join(" "));
+    }
     const remoteRequest = { ...request, repositoryRoot: context.repositoryRoot, workingDirectory: context.repositoryRoot };
     const outputSchemaPath = path.posix.join(path.posix.dirname(context.resultPath), "factory-result.schema.json");
     return {
@@ -426,12 +488,31 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       args: commandArguments(remoteRequest, context.resultPath, outputSchemaPath, REMOTE_OPENROUTER_CONFIG_OVERRIDES, "danger-full-access"),
       resultPath: context.resultPath,
       outputSchemaPath,
-      outputSchema: structuredClone(FACTORY_RESULT_SCHEMA),
+      outputSchema: structuredClone(request.structuredOutput?.jsonSchema ?? FACTORY_RESULT_SCHEMA),
       model: request.model,
+      modelRouteDigest: request.modelRouteDigest,
+      provider: request.provider,
+      providerRoute: request.providerRoute,
+      reasoningConfig: request.reasoningConfig === undefined ? undefined : structuredClone(request.reasoningConfig),
       prompt: request.prompt,
       allowedPaths: request.allowedPaths,
       timeoutMs: request.timeoutMs,
     };
+  }
+
+  validateRemoteConfiguration(request: ExecutorRequest): ExecutorConfigurationIssue[] {
+    return [
+      ...exactModelRouteIssues(request, "openrouter"),
+      ...(request.provider !== undefined && request.provider !== "openai"
+        ? [{ field: "provider", message: "codex/v1 remote execution supports only OpenAI-compatible models through OpenRouter." }]
+        : []),
+      ...(request.reasoningConfig?.temperature !== undefined
+        ? [{ field: "reasoningConfig.temperature", message: "codex/v1 cannot translate temperature exactly; omit it or use a qualified adapter that supports it." }]
+        : []),
+      ...(request.reasoningConfig?.maxTokens !== undefined
+        ? [{ field: "reasoningConfig.maxTokens", message: "codex/v1 cannot translate maxTokens exactly; omit it or use a qualified adapter that supports it." }]
+        : []),
+    ];
   }
 
   async health(): Promise<ExecutorHealth> {
@@ -448,31 +529,48 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
       if (!expectedSha256 || executableSha256 !== expectedSha256) {
         return { status: "UNAVAILABLE", checkedAt: Date.now(), adapter: "codex", version: "v1", details: "Codex native executable does not match the evaluated platform digest." };
       }
+      await verifyWorkspacePermissionProfile(this.executable);
       return { status: "READY", checkedAt: Date.now(), adapter: "codex", version: "v1" };
-    } catch {
-      return { status: "UNAVAILABLE", checkedAt: Date.now(), adapter: "codex", version: "v1", details: "Codex executable is unavailable or not executable." };
+    } catch (error) {
+      return {
+        status: "UNAVAILABLE",
+        checkedAt: Date.now(),
+        adapter: "codex",
+        version: "v1",
+        details: redact(error instanceof Error ? error.message : "Codex executable is unavailable or not executable."),
+      };
     }
   }
 }
 
-function commandArguments(
+export function commandArguments(
   request: ExecutorRequest,
   outputPath: string,
   outputSchemaPath?: string,
   configOverrides: readonly string[] = [],
   sandboxMode?: "read-only" | "workspace-write" | "danger-full-access",
 ): string[] {
+  const workspaceContained = request.filesystemReadScope === "WORKSPACE_ONLY" && sandboxMode === undefined;
+  const effectiveOverrides = workspaceContained
+    ? [...configOverrides, ...CODEX_WORKSPACE_PERMISSION_CONFIG]
+    : configOverrides;
   return [
     "-a",
     "never",
-    ...configOverrides.flatMap((value) => ["-c", value]),
+    ...[
+      ...effectiveOverrides,
+      ...codexReasoningConfigOverrides(request),
+    ].flatMap((value) => ["-c", value]),
     "exec",
+    ...(workspaceContained ? ["--strict-config"] : []),
     "--json",
     "--ephemeral",
     "--ignore-user-config",
     "--ignore-rules",
-    "--sandbox",
-    sandboxMode ?? (request.isolation === "READ_ONLY" ? "read-only" : "workspace-write"),
+    ...(workspaceContained ? [] : [
+      "--sandbox",
+      sandboxMode ?? (request.isolation === "READ_ONLY" ? "read-only" : "workspace-write"),
+    ]),
     "--color",
     "never",
     "-C",
@@ -484,12 +582,84 @@ function commandArguments(
     [
       request.prompt,
       "",
-      "Repository mutation is limited to these approved repository-relative boundaries:",
+      request.isolation === "READ_ONLY"
+        ? "Repository reads are limited to these approved repository-relative boundaries:"
+        : "Repository mutation is limited to these approved repository-relative boundaries:",
       ...request.allowedPaths.map((candidate) => `- ${candidate}`),
       ...(request.deniedPaths?.length ? ["Denied repository-relative boundaries:", ...request.deniedPaths.map((candidate) => `- ${candidate}`)] : []),
       "Do not expose credentials in output, artifacts, or logs.",
     ].join("\n"),
   ];
+}
+
+export async function verifyWorkspacePermissionProfile(executable: string): Promise<void> {
+  const root = await mkdtemp(path.join(tmpdir(), "mc-codex-containment-"));
+  const workspace = path.join(root, "workspace");
+  const allowedFile = path.join(workspace, "allowed.txt");
+  const outsideFile = path.join(root, "outside.txt");
+  const forbiddenWrite = path.join(workspace, "forbidden-write.txt");
+  try {
+    await mkdir(workspace);
+    await writeFile(allowedFile, "allowed\n", { mode: 0o600 });
+    await writeFile(outsideFile, "outside\n", { mode: 0o600 });
+    const profileOverrides = CODEX_WORKSPACE_PERMISSION_CONFIG.filter((value) => !value.startsWith("default_permissions="));
+    await execFileResult(executable, [
+      "sandbox",
+      "-P",
+      CODEX_WORKSPACE_PERMISSION_PROFILE,
+      ...profileOverrides.flatMap((value) => ["-c", value]),
+      "-C",
+      workspace,
+      "--",
+      "/bin/sh",
+      "-c",
+      'test -r "$1" && ! test -r "$2" && ! touch "$3" 2>/dev/null',
+      "mission-planning-containment",
+      allowedFile,
+      outsideFile,
+      forbiddenWrite,
+    ]);
+  } catch (error) {
+    throw new Error(`Codex workspace permission profile failed its read/write containment probe: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+function codexReasoningConfigOverrides(request: ExecutorRequest): string[] {
+  return request.reasoningConfig?.effort === undefined
+    ? []
+    : [`model_reasoning_effort=${JSON.stringify(request.reasoningConfig.effort)}`];
+}
+
+function exactModelRouteIssues(
+  request: ExecutorRequest,
+  expectedProviderRoute: "openai" | "openrouter",
+): ExecutorConfigurationIssue[] {
+  const exactRoutePresent = request.modelRouteDigest !== undefined
+    || request.providerRoute !== undefined
+    || request.reasoningConfig !== undefined;
+  if (!exactRoutePresent) return [];
+  const issues: ExecutorConfigurationIssue[] = [];
+  if (!request.modelRouteDigest || !/^sha256:[a-f0-9]{64}$/i.test(request.modelRouteDigest)) {
+    issues.push({ field: "modelRouteDigest", message: "An exact sha256 model-route digest is required when route controls are present." });
+  }
+  if (!request.provider?.trim()) {
+    issues.push({ field: "provider", message: "An exact model provider is required when route controls are present." });
+  }
+  if (!request.model?.trim()) {
+    issues.push({ field: "model", message: "An exact model identifier is required when route controls are present." });
+  }
+  if (request.providerRoute !== expectedProviderRoute) {
+    issues.push({
+      field: "providerRoute",
+      message: `codex/v1 ${expectedProviderRoute === "openrouter" ? "remote" : "persistent"} execution admits only the ${expectedProviderRoute} provider route.`,
+    });
+  }
+  if (modelRouteReasoningConfigIssues(request.reasoningConfig).length > 0) {
+    issues.push({ field: "reasoningConfig", message: "The exact model-route reasoning configuration is invalid." });
+  }
+  return issues;
 }
 
 async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<ProcessCompletion> {
@@ -619,7 +789,7 @@ async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<Proc
 export function codexChildEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const allowed = ["PATH", "HOME", "TMPDIR", "USER", "SHELL", "TERM", "LANG", "LC_ALL", "CODEX_HOME"];
   return {
-    ...Object.fromEntries(allowed.flatMap((name) => env[name] ? [[name, env[name]]] : [])),
+    ...Object.fromEntries(allowed.flatMap((name) =>  ( env[name] ? [[name, env[name]]] : [] ) )),
     CI: "true",
     GIT_TERMINAL_PROMPT: "0",
     GCM_INTERACTIVE: "never",
@@ -688,10 +858,13 @@ function finiteInteger(value: unknown): number | null {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
-function structuredOutputSummary(output: string) {
+function structuredOutputSummary(output: string, expectedSchema?: string) {
   try {
-    const value = JSON.parse(output) as { summary?: unknown };
-    return { schema: "factory-result/v1", summary: typeof value.summary === "string" ? value.summary.slice(0, 4_000) : null };
+    const value = JSON.parse(output) as { schema?: unknown; summary?: unknown };
+    return {
+      schema: typeof value.schema === "string" ? value.schema : expectedSchema ?? null,
+      summary: typeof value.summary === "string" ? value.summary.slice(0, 4_000) : null,
+    };
   } catch {
     return { schema: null, summary: null };
   }
@@ -708,6 +881,18 @@ function redact(value: string): string {
 async function executableVersion(executable: string) {
   return await new Promise<string>((resolve, reject) => {
     execFile(executable, ["--version"], { timeout: 5_000 }, (error, stdout) => error ? reject(error) : resolve(stdout.trim()));
+  });
+}
+
+async function execFileResult(executable: string, argv: string[]) {
+  return await new Promise<void>((resolve, reject) => {
+    execFile(executable, argv, { timeout: 10_000 }, (error, _stdout, stderr) => {
+      if (error) {
+        reject(new Error(redact(stderr || error.message)));
+        return;
+      }
+      resolve();
+    });
   });
 }
 

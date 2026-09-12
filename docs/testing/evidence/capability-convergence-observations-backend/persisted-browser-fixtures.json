@@ -1,0 +1,23 @@
+{
+  "backendUrl": "http://127.0.0.1:53870",
+  "fixtures": [
+    {
+      "name": "aggregate-cost-unknown",
+      "workflowRunId": "ms715y1ctnfxr1ck35k0xd20a98dxmyy",
+      "expected": {
+        "spendingStopped": true,
+        "unknownAggregate": true,
+        "historicalProjection": false
+      }
+    },
+    {
+      "name": "spending-fence-with-older-projection",
+      "workflowRunId": "ms7c11zzqfavkwent80t8vcp8s8dwdt2",
+      "expected": {
+        "spendingStopped": true,
+        "unknownAggregate": false,
+        "historicalProjection": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+apps/orchestration-server test:  ✓ src/__tests__/exeDevSandboxProvider.test.ts (13 tests) 9ms
+apps/orchestration-server test:  ✓ src/__tests__/missionPlanningWorker.test.ts (7 tests) 5ms
+apps/orchestration-server test:  ✓ src/__tests__/githubAppRuntime.test.ts (7 tests) 9ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryVerificationAuthority.test.ts (8 tests) 482ms
+apps/orchestration-server test:  ✓ src/__tests__/sandboxReconciler.test.ts (3 tests) 3ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryHostReporter.test.ts (9 tests) 226ms
+apps/orchestration-server test:  ✓ src/__tests__/harnessAdapterRegistry.test.ts (7 tests) 5ms
+apps/orchestration-server test:  ✓ src/__tests__/sandboxCredentials.test.ts (3 tests) 5ms
+apps/orchestration-server test:  ✓ src/__tests__/githubAppPublisher.test.ts (6 tests) 179ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryAttemptWorkerRemote.test.ts (2 tests) 663ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker remote Sandbox backend > runs beneath the canonical worker lease, verifies on the host, cleans up, and only then publishes one PR  661ms
+apps/orchestration-server test:  ✓ src/__tests__/auth.test.ts (6 tests) 2ms
+apps/orchestration-server test:  ✓ src/__tests__/deepseekHarnessExecutorAdapter.test.ts (10 tests) 939ms
+apps/orchestration-server test:    ✓ DeepSeekHarnessExecutorAdapter > cancels the dedicated owned executor process group  316ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryObservability.test.ts (2 tests) 3ms
+apps/orchestration-server test:  ✓ src/__tests__/sandboxSupervisor.test.ts (4 tests) 978ms
+apps/orchestration-server test:    ✓ sandbox supervisor candidate capture > keeps the standalone remote supervisor equivalent to the in-process one  333ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryVerification.test.ts (2 tests) 79ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryHarnessComposition.test.ts (5 tests) 7ms
+apps/orchestration-server test:  ✓ src/__tests__/orchestrationSecurity.test.ts (9 tests) 3ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryPathScope.test.ts (3 tests) 2ms
+apps/orchestration-server test:  ✓ src/__tests__/serviceCommandClient.test.ts (3 tests) 2ms
+apps/orchestration-server test:  ✓ src/__tests__/localInference.test.ts (1 test) 3ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryGitRuntime.test.ts (4 tests) 1237ms
+apps/orchestration-server test:    ✓ Factory Git runtime > creates and reconciles the exact worktree branch across retries  651ms
+apps/orchestration-server test:    ✓ Factory Git runtime > prepares frozen dependencies without changing source state  302ms
+apps/orchestration-server test:  ✓ src/__tests__/localInferenceBoundary.test.ts (1 test) 195ms
+apps/orchestration-server test:  ✓ src/__tests__/factoryWorkspaceOwnership.test.ts (8 tests) 1381ms
+apps/orchestration-server test:  ✓ src/__tests__/codexExecutorAdapter.test.ts (14 tests) 1467ms
+apps/orchestration-server test:    ✓ CodexV1ExecutorAdapter > cancels the dedicated owned executor process group  623ms
+apps/orchestration-server test:    ✓ CodexV1ExecutorAdapter > closes the Codex CLI stdin pipe so an explicit prompt can start  317ms
+apps/orchestration-server test: stderr | src/__tests__/durableCodexWorker.test.ts > durable Codex worker Git boundary > retains a non-terminal lease when the worker shuts down
+apps/orchestration-server test: [codex-worker] Worker stopped for run-restart; durable worktree and non-terminal lease retained for recovery.
+apps/orchestration-server test:  ✓ src/__tests__/durableCodexWorker.test.ts (7 tests) 1580ms
+apps/orchestration-server test:    ✓ durable Codex worker Git boundary > creates and recovers the exact linked worktree without resetting partial changes  395ms
+apps/orchestration-server test:    ✓ durable Codex worker Git boundary > blocks verification commands that change Git history  428ms
+apps/orchestration-server test:    ✓ durable Codex worker Git boundary > rechecks approved file scope after verification commands mutate the worktree  393ms
+apps/orchestration-server test:  ✓ src/__tests__/remoteSandboxRuntime.test.ts (23 tests) 1649ms
+apps/orchestration-server test:    ✓ sandbox supervisor > reconstructs one terminal Codex JSONL result with exact context and atomic persistence  330ms
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different runtime executable
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when legacy V1 normalized provenance reports a different runtime executable
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+apps/orchestration-server test: stderr | src/__tests__/factoryAttemptWorker.test.ts > FactoryAttemptWorker verification-first lifecycle > fails closed when V2 normalized provenance reports a different provider route
+apps/orchestration-server test: [factory-worker] Attempt factory-run-1 failed: Harness normalized result does not match the frozen Attempt identity.
+apps/orchestration-server test:  ✓ src/__tests__/factoryAttemptWorker.test.ts (17 tests) 3861ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > turns governed issue intent into a verified, evidence-linked pull request  557ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > completes a non-mutating candidate as durable evidence without provider publication  447ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > executes an independently registered harness identity through the unchanged governed lifecycle  380ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > uses only the frozen V2 provider/model route and ignores a mutable claim model override  309ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > completes the durable worker golden path and cleans only its proven worktree  314ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > pauses for human review and resumes publication without rerunning Codex or verification  358ms
+apps/orchestration-server test:    ✓ FactoryAttemptWorker verification-first lifecycle > persists a verification mismatch, blocks publication, and recovers with a new immutable Attempt  514ms
+apps/orchestration-server test:  ❯ src/__tests__/systemFactoryQualification.test.ts (1 test | 1 failed) 4627ms
+apps/orchestration-server test:    × Mission Control full-system Factory qualification V2 > proves exact governed lineage, failures, recovery, authority, and learning on an isolated fixture 4620ms
+apps/orchestration-server test:      → expected false to be true // Object.is equality
+apps/orchestration-server test:  ❯ src/__tests__/automationAdapter.test.ts (11 tests | 2 failed) 60772ms
+apps/orchestration-server test:    ✓ Automation adapter safety > keeps artifacts inside the approved repository 1ms
+apps/orchestration-server test:    ✓ Automation adapter safety > allows argv without shell operators and blocks injection 0ms
+apps/orchestration-server test:    ✓ Automation adapter safety > redacts named and common credential shapes 0ms
+apps/orchestration-server test:    ✓ Automation adapter safety > verifies immutable artifact hashes 0ms
+apps/orchestration-server test:    ✓ Automation adapter safety > materializes and executes a bounded shell artifact 18ms
+apps/orchestration-server test:    ✓ Automation adapter safety > terminates a read-only adapter at the frozen timeout 37ms
+apps/orchestration-server test:    ✓ Automation adapter safety > cancels a running read-only adapter through its abort signal 29ms
+apps/orchestration-server test:    ✓ Automation adapter safety > rejects a repository artifact that differs from the approved hash 7ms
+apps/orchestration-server test:    × Automation adapter safety > executes TypeScript and Python artifacts through fixed argv adapters 561ms
+apps/orchestration-server test:      → node:net:1987
+apps/orchestration-server test:       const error = new UVExceptionWithHostPort(rval, 'listen', address, port);
+apps/orchestration-server test:                     ^
+apps/orchestration-server test: Error: listen EPERM: operation not permitted /var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/tsx-501/32836.pipe
+apps/orchestration-server test:     at Server.setupListenHandle [as _listen2] (node:net:1987:21)
+apps/orchestration-server test:     at listenInCluster (node:net:2066:12)
+apps/orchestration-server test:     at Server.listen (node:net:2188:5)
+apps/orchestration-server test:     at file:///Users/jaywest/.codex/worktrees/f4c3/MissionControl/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31537
+apps/orchestration-server test:     at new Promise (<anonymous>)
+apps/orchestration-server test:     at createIpcServer (file:///Users/jaywest/.codex/worktrees/f4c3/MissionControl/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31515)
+apps/orchestration-server test:     at async file:///Users/jaywest/.codex/worktrees/f4c3/MissionControl/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:55:459 {
+apps/orchestration-server test:   code: 'EPERM',
+apps/orchestration-server test:   errno: -1,
+apps/orchestration-server test:   syscall: 'listen',
+apps/orchestration-server test:   address: '/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/tsx-501/32836.pipe',
+apps/orchestration-server test:   port: -1
+apps/orchestration-server test: }
+apps/orchestration-server test: Node.js v24.18.1
+apps/orchestration-server test: : expected 'failed' to be 'passed' // Object.is equality
+apps/orchestration-server test:    × Automation adapter safety > runs read-only API checks and enforces the expected status 60003ms
+apps/orchestration-server test:      → Test timed out in 60000ms.
+apps/orchestration-server test: If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+apps/orchestration-server test:    ✓ Automation adapter safety > executes skill pipelines sequentially and stops on failure 115ms
+apps/orchestration-server test: Failed

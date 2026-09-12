@@ -1,0 +1,113 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-dispatch
+
+ ❯ convex/__tests__/inferenceDispatch.test.ts (29 tests | 5 failed) 35ms
+   ✓ classification dispatch claim > atomically persists a bounded allowance with the unique claim and exact identities 5ms
+   ✓ classification dispatch claim > denies revision before claiming 1ms
+   ✓ classification dispatch claim > denies currentAttempt before claiming 1ms
+   ✓ classification dispatch claim > denies approval before claiming 1ms
+   ✓ classification dispatch claim > denies profile before claiming 1ms
+   ✓ classification dispatch claim > denies profileDigest before claiming 1ms
+   ✓ classification dispatch claim > denies route before claiming 1ms
+   ✓ classification dispatch claim > denies hostGeneration before claiming 1ms
+   ✓ classification dispatch claim > denies missingRegistration before claiming 1ms
+   ✓ classification dispatch claim > denies factoryBudget before claiming 1ms
+   ✓ classification dispatch claim > denies workOrderBudget before claiming 1ms
+   ✓ classification dispatch claim > denies priceRetired before claiming 1ms
+   ✓ classification dispatch claim > denies priceDigest before claiming 1ms
+   ✓ classification dispatch claim > denies priceExpiry before claiming 1ms
+   ✓ classification dispatch claim > denies unpricedCache before claiming 2ms
+   ✓ classification dispatch claim > denies inputBound before claiming 1ms
+   ✓ classification dispatch claim > denies outputBound before claiming 1ms
+   ✓ classification dispatch claim > denies cacheBound before claiming 1ms
+   ✓ classification dispatch claim > denies payload before claiming 1ms
+   ✓ classification dispatch claim > denies requestOutput before claiming 1ms
+   ✓ classification dispatch claim > denies policy before claiming 1ms
+   ✓ classification dispatch claim > denies repository before claiming 1ms
+   ✓ classification dispatch claim > denies aggregate before claiming 1ms
+   ✓ classification dispatch claim > denies disabled before claiming 0ms
+   × classification dispatch claim > denies factoryConfiguration before claiming 6ms
+     → promise resolved "{ claimed: true, …(3) }" instead of rejecting
+   × classification dispatch claim > denies infiniteFactoryBudget before claiming 1ms
+     → promise resolved "{ claimed: true, …(3) }" instead of rejecting
+   × classification dispatch claim > denies infiniteWorkOrderBudget before claiming 1ms
+     → promise resolved "{ claimed: true, …(3) }" instead of rejecting
+   × classification dispatch claim > denies routeOutput before claiming 1ms
+     → promise resolved "{ claimed: true, …(3) }" instead of rejecting
+   × classification dispatch claim > denies routeTemperature before claiming 1ms
+     → promise resolved "{ claimed: true, …(3) }" instead of rejecting
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies factoryConfiguration before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies infiniteFactoryBudget before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies infiniteWorkOrderBudget before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies routeOutput before claiming
+ FAIL  convex/__tests__/inferenceDispatch.test.ts > classification dispatch claim > denies routeTemperature before claiming
+AssertionError: promise resolved "{ claimed: true, …(3) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "claimed": true,
++   "dispatchAllowance": {
++     "attemptId": "attempt",
++     "claimId": "dispatch-claim",
++     "digest": "sha256:cf46a793f60e90c4defd21f323bf71f5c8926ca7c4db5aa178a9081cf03c6261",
++     "executionProfileDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
++     "executionProfileId": "profile",
++     "intentDigest": "sha256:5d6f0c494db504be559b8a0476742b8f6a767a83de67c983db8031aa78169eb9",
++     "intentId": "inferencePhysicalIntents-db-1",
++     "intentLogicalId": "canonical-intent",
++     "issuedAt": 1788678099425,
++     "leaseId": "lease",
++     "logicalRequestKey": "request-1",
++     "maxCostMicrousd": 300000,
++     "maximumCacheReadTokens": 128000,
++     "maximumInputTokens": 128000,
++     "maximumOutputTokens": 1024,
++     "maximumPhysicalCalls": 1,
++     "payloadBytes": 200,
++     "priceBookDigest": "sha256:038b926c548fa50c8dab6cf85968aa2e8bf7649cc52b50345d082c9379d95087",
++     "projectId": "project",
++     "repositoryId": "repo",
++     "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
++     "reservationDigest": "sha256:dea020f97ca132ff684f2f3336cc8efa61a1bccc0f99d9e41fdc56883ffee7cb",
++     "reservationId": "inferenceReservations-db-1",
++     "reservationLogicalId": "project:registration-1",
++     "route": {
++       "adapter": "mission-control-openai-chat-completions",
++       "adapterVersion": "1.0.0",
++       "endpoint": "https://api.openai.com/v1/chat/completions",
++       "modelId": "gpt-4o-mini-2024-07-18",
++       "provider": "openai",
++       "providerRoute": "openai-chat-completions",
++       "routeDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++     },
++     "schema": "classify-inference-dispatch/v1",
++     "taskId": "task",
++     "validUntil": 1788678129425,
++     "workOrderId": "order",
++   },
++   "intentId": "inferencePhysicalIntents-db-1",
++   "reservationDigest": "sha256:dea020f97ca132ff684f2f3336cc8efa61a1bccc0f99d9e41fdc56883ffee7cb",
+  }
+
+ ❯ convex/__tests__/inferenceDispatch.test.ts:137:27
+    135|     const expectedError = fault === "unpricedCache" ? "unpriced token …
+    136|       : fault === "aggregate" ? "Aggregate inference reservations exce…
+    137|     await expect(f.claim()).rejects.toThrow(expectedError);
+       |                           ^
+    138|     expect((await f.db.get(f.args.intentId))!.state).toBe("PERSISTED");
+    139|     expect((await f.db.get(f.args.intentId))!.dispatchAllowance).toBeU…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 24 passed (29)
+   Start at  00:01:39
+   Duration  363ms (transform 85ms, setup 0ms, collect 135ms, tests 35ms, environment 0ms, prepare 38ms)

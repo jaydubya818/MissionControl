@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { normalizeNarrativeText } from "@/lib/displayText";
 
 interface PageHeaderProps {
   title: string;
@@ -24,7 +25,7 @@ export function PageHeader({
 }: PageHeaderProps): JSX.Element {
   return (
     <header className="relative shrink-0 border-b border-line bg-app">
-      <div className="relative px-6 py-5">
+      <div className="relative px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
             <div className="min-w-0">
@@ -37,14 +38,14 @@ export function PageHeader({
                 ) : null}
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">
+                    <h1 className="text-[23px] font-semibold leading-tight tracking-tight text-ink sm:text-[26px]">
                       {title}
                     </h1>
                     {status}
                   </div>
                   {description ? (
-                    <p className="mt-1.5 max-w-3xl text-[14px] leading-relaxed text-ink-secondary">
-                      {description}
+                    <p className="mt-1.5 max-w-3xl whitespace-pre-line text-[14px] leading-relaxed text-ink-secondary">
+                      {normalizeNarrativeText(description)}
                     </p>
                   ) : null}
                 </div>

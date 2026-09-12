@@ -5,6 +5,8 @@ import {
 } from "@mission-control/shared";
 
 export type ServiceCapability =
+  | "provider-liability.reserve"
+  | "provider-liability.settle"
   | "github.installation.bind"
   | "github.pr-evidence.ingest"
   | "workorders.dispatch"
@@ -12,6 +14,11 @@ export type ServiceCapability =
   | "attempts.claim"
   | "attempts.renew"
   | "attempts.report"
+  | "mcp.receipts.append"
+  | "inference.intents.persist"
+  | "inference.intents.claim"
+  | "inference.receipts.append"
+  | "inference.reconciliations.append"
   | "attempts.authorize-publication"
   | "verification:claim"
   | "verification:renew"
@@ -20,10 +27,19 @@ export type ServiceCapability =
   | "review.residual-analysis.record"
   | "sandboxes.list-reconcile"
   | "sandboxes.report-reconcile"
+  | "hosts.report"
+  | "models.report-exact-route-health"
   | "executions.claim"
   | "executions.heartbeat"
   | "executions.report"
-  | "executions.finalize";
+  | "executions.finalize"
+  | "planning.claim"
+  | "planning.renew"
+  | "planning.report"
+  | "intent.contributions.inspect"
+  | "intent.contributions.draft"
+  | "incidents.detect"
+  | "incidents.propose";
 
 export function createSignedServiceCommand(args: {
   capability: ServiceCapability;

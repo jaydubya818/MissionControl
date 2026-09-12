@@ -13,6 +13,7 @@ export interface FactoryDispatchPreflightInput {
   workflowMatches: boolean;
   workflowContractReady: boolean;
   executorReady: boolean;
+  executionProfileReady: boolean;
   codeScopesReady: boolean;
   agentManifestsReady: boolean;
   policyReady: boolean;
@@ -29,6 +30,24 @@ export interface FactoryDispatchPreflightResult {
   ok: boolean;
   blocker?: string;
   remediation?: string;
+}
+
+/** Distinct repository contract. Callers must load the exact deployment-owned
+ * admission and bind its digest to the immutable Factory version first. */
+export interface LocalQualificationDispatchInput extends Omit<FactoryDispatchPreflightInput, "githubReady"> {
+  repositoryAdmission: {
+    mode: "LOCAL_SYNTHETIC_QUALIFICATION";
+    digest: string;
+    frozenDigest: string;
+    current: boolean;
+    publicationAuthority: "NONE";
+    productionAuthority: "NONE";
+  };
+}
+
+export function evaluateLocalQualificationDispatchPreflight(input: LocalQualificationDispatchInput): FactoryDispatchPreflightResult {
+  const failed = factoryLocalQualificationDispatchChecks(input).find((check) => !check.passed);
+  return failed ? { ok: false, blocker: failed.code, remediation: failed.reason } : { ok: true };
 }
 
 const FACTORY_HOST_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
@@ -99,6 +118,7 @@ const checks: Array<{
   { key: "workflowMatches", blocker: "workflow-version-mismatch", remediation: "Use the workflow frozen in the Factory version." },
   { key: "workflowContractReady", blocker: "workflow-contract-unsafe", remediation: "Replace heuristic completion and provider authority with structured handoffs." },
   { key: "executorReady", blocker: "executor-not-ready", remediation: "Use an exact harness adapter/version advertised by the canonical worker." },
+  { key: "executionProfileReady", blocker: "execution-profile-not-current", remediation: "Select or requalify the exact Execution Profile frozen by this Factory version." },
   { key: "codeScopesReady", blocker: "code-scopes-not-ready", remediation: "Create a Factory version with active repository code scopes." },
   { key: "agentManifestsReady", blocker: "agent-manifests-not-ready", remediation: "Bind every workflow agent to an approved agent version." },
   { key: "policyReady", blocker: "policy-not-ready", remediation: "Activate the Factory policy envelope." },
@@ -109,17 +129,38 @@ const checks: Array<{
   { key: "worktreeProvided", blocker: "worktree-required", remediation: "Allocate an attempt-specific repository worktree." },
 ];
 
-export function evaluateFactoryDispatchPreflight(input: FactoryDispatchPreflightInput): FactoryDispatchPreflightResult {
-  if (!input.factoryRequired && !input.versionProvided) return { ok: true };
-  for (const check of checks) {
-    if (!input[check.key]) return { ok: false, blocker: check.blocker, remediation: check.remediation };
-  }
+export function factoryDispatchChecks(input: FactoryDispatchPreflightInput) {
+  if (!input.factoryRequired && !input.versionProvided) return [];
+  const results = checks.map((check) => ({
+    code: check.blocker,
+    label: check.key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase()),
+    passed: Boolean(input[check.key]),
+    reason: check.remediation,
+  }));
   if (input.mutating && input.activeRepositoryMutation) {
-    return {
-      ok: false,
-      blocker: "repository-mutation-already-active",
-      remediation: "Wait for, cancel, or reconcile the active mutating attempt for this repository.",
-    };
+    results.push({ code: "repository-mutation-already-active", label: "Repository mutation capacity", passed: false,
+      reason: "Wait for, cancel, or reconcile the active mutating attempt for this repository." });
   }
-  return { ok: true };
+  return results;
+}
+
+export function factoryLocalQualificationDispatchChecks(input: LocalQualificationDispatchInput) {
+  const a = input.repositoryAdmission;
+  const admissionReady = a?.mode === "LOCAL_SYNTHETIC_QUALIFICATION"
+    && a.current
+    && /^sha256:[a-f0-9]{64}$/.test(a.digest)
+    && a.digest === a.frozenDigest
+    && a.publicationAuthority === "NONE"
+    && a.productionAuthority === "NONE";
+  return [{
+    code: "local-repository-admission-invalid",
+    label: "Local repository admission",
+    passed: admissionReady,
+    reason: "Re-admit the exact synthetic repository and immutable Factory composition.",
+  }, ...factoryDispatchChecks({ ...input, githubReady: true }).filter((check) => check.code !== "github-app-not-ready")];
+}
+
+export function evaluateFactoryDispatchPreflight(input: FactoryDispatchPreflightInput): FactoryDispatchPreflightResult {
+  const failed = factoryDispatchChecks(input).find((check) => !check.passed);
+  return failed ? { ok: false, blocker: failed.code, remediation: failed.reason } : { ok: true };
 }

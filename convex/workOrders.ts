@@ -1,6 +1,11 @@
+import { assertQualificationActivation } from "./lib/factoryQualificationScope";
+import { reserveOfflineAttemptBudget } from "./lib/offlineAttemptBudget";
+import { NO_INFERENCE_CONSTRAINT } from "./lib/offlineExecutionPolicy";
+import { deterministicFactoryVersionIssues } from "./lib/factoryWorkflowContract";
+import { factoryVersionExecutionProfileProjection } from "./lib/executionProfileAdmission";
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { appendChangeRecord } from "./lib/armAudit";
@@ -8,6 +13,7 @@ import { logTaskEvent } from "./lib/taskEvents";
 import { deriveVerificationStatus, currentWorkflowStepLabel, totalWorkflowRetries } from "./lib/workOrders";
 import {
   ACTIVE_RUN_STATUSES,
+  codeScopeApprovalPoliciesForDispatch,
   dispatchInvalidatesVerificationReceipts,
   latestRequiredRemoteRetryRun,
   nextStateForRunStatus,
@@ -42,13 +48,27 @@ import { validateMissionWorkOrderDispatch } from "./lib/missionGovernance";
 import {
   genericHarnessV1RecoveryReady,
   evaluateFactoryDispatchPreflight,
+  evaluateLocalQualificationDispatchPreflight,
+  factoryDispatchChecks,
+  factoryLocalQualificationDispatchChecks,
   factoryVersionApprovesWorkOrderScopes,
   selectCurrentFactoryHost,
 } from "./lib/factoryDispatch";
+import {
+  assertLocalRepositoryHost,
+  isLocalQualificationRepository,
+  loadLocalRepositoryAdmission,
+} from "./lib/localRepositoryAdmission";
+import { planReadiness, summarizeWorkOrderReadiness, type ReadinessCheck } from "./lib/workOrderReadiness";
 import { validFactoryBudget, validFactoryExecutionBinding, validFactoryExecutorBinding } from "./lib/factoryConfiguration";
 import { factoryWorkerEligibility } from "./lib/factoryWorkerRuntime";
-import { factoryHarnessCapabilityRequirements, resolveFrozenHarnessBinding } from "./lib/harnessCapabilities";
+import {
+  factoryHarnessCapabilityRequirements,
+  resolveFrozenHarnessBinding,
+  resolveHarnessAdapterRuntimeArtifact,
+} from "./lib/harnessCapabilities";
 import { computeCanonicalHash } from "./lib/genomeHash";
+import { liabilityDigest } from "./lib/providerLiability";
 import { evaluateGithubAppCapabilities, githubInstallationIsStale } from "./lib/githubAppReadiness";
 import { canonicalRepositoryKey } from "./lib/workspaceRepositories";
 import {
@@ -69,6 +89,7 @@ import {
 import { isAutomationSelfApproval } from "./lib/automationGovernance";
 import {
   factoryHumanReviewOutcome,
+  factoryReviewReceiptMatchesSource,
   isFactoryHumanReviewCheckpoint,
   isSourceVerificationFreshForPublication,
   validateHumanReviewApprovalContext,
@@ -76,20 +97,34 @@ import {
 import { reconcileTerminalWorkflowSteps } from "./lib/workflowRunState";
 import { loadTaskProjections } from "./lib/taskProjection";
 import { snapshotWorkflowDefinition } from "./lib/workflowSnapshot";
-import { buildWorkOrderTaskAuthority } from "./lib/taskAuthority";
+import {
+  advanceWorkOrderTaskAuthorityForRetry,
+  buildWorkOrderTaskAuthority,
+} from "./lib/taskAuthority";
 import { buildFactoryExecutionManifest, factorySandboxResourceName } from "./lib/executionManifest";
 import { loadFactoryAttemptReviewReadModel } from "./lib/factoryReviewReadModel";
 import { factoryWorkflowContractIssues } from "./lib/factoryWorkflowContract";
-import { modelRouteProductionEligible } from "./lib/modelRouteAdmission";
+import {
+  factoryWorkflowModelRouteMatches,
+  frozenFactoryModelRouteEligible,
+  resolveFactoryWorkflowModelRoute,
+} from "./lib/factoryModelRoute";
 import { sandboxProfileProductionEligible } from "./lib/sandboxProfileAdmission";
 import {
   evaluateRepositoryRemoteExecutionPolicy,
   normalizeRepositoryDataClassification,
 } from "./lib/repositoryExecutionPolicy";
+import {
+  loadExecutionProfileAdmission,
+  executionProfileScopeBlockers,
+} from "./lib/executionProfileAdmission";
+import { executionProfileProjectionBlockers } from "./lib/executionProfile";
 import { createWorkOrderRecord } from "./lib/workOrderCreate";
+import { requireRepositoryDispatchAdmission } from "./factory/incidentControls";
 import {
   appendCurrentVerificationQualityGateDecision,
   getCurrentVerificationResult,
+  getCurrentVerificationRoutingOutcome,
 } from "./lib/currentVerification";
 import {
   nextTaskAttemptNumbers,
@@ -97,7 +132,22 @@ import {
   validateTaskAttemptSelection,
   validateTaskAttemptStart,
 } from "./lib/taskAttemptScheduler";
-import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS, requireWorkspaceAccess, requireWorkspacePermission } from "./lib/companyAccess";
+import {
+  evaluateTaskPreExecutionRecovery,
+  evaluateTasklessPreExecutionRecovery,
+  isRecognizedPreExecutionValidationFailure,
+  TASKLESS_MANIFEST_VALIDATION_FAILURE,
+  FAB_CONFIGURATION_VALIDATION_FAILURE,
+  type TaskPreExecutionRecoveryProof,
+  type TasklessPreExecutionRecoveryProof,
+} from "./lib/preExecutionRecovery";
+import {
+  COMPANY_PERMISSIONS,
+  FACTORY_PERMISSIONS,
+  localDemoOperatorAcceptanceEnabled,
+  requireWorkspaceAccess,
+  requireWorkspacePermission,
+} from "./lib/companyAccess";
 import { assertAuthorizedDeliveryRecord, canAccessDeliveryRecord, requireAuthorizedDeliveryScope } from "./lib/deliveryAuthorization";
 import { combineCodeScopePolicies, validateDispatchScope } from "./lib/softwareFactoryControlPlane";
 import {
@@ -118,6 +168,28 @@ import {
 } from "./lib/continuousResearchEvidence";
 import { buildExecutionRoutingPreview, executionRoutingRequested } from "./lib/executionRouting";
 import { findModelCatalogEntry, loadModelCatalogForProject } from "./lib/modelCatalogScope";
+
+function factoryExecutionBackend(manifest: any): string | undefined {
+  return manifest?.version === "factory-execution-manifest/v2"
+    || manifest?.version === "factory-execution-manifest/v3"
+    ? manifest.executionBackend
+    : manifest?.harness?.executionBackend;
+}
+
+const EXECUTION_PROFILE_BINDING_FIELDS = [
+  "executionProfileId",
+  "executionProfileKey",
+  "executionProfileVersion",
+  "executionProfileDigest",
+  "executionProfileSnapshot",
+  "executionProfileQualificationDigest",
+  "executionProfileQualificationSnapshot",
+] as const;
+
+function hasAnyExecutionProfileBinding(record: Record<string, any> | null | undefined) {
+  return Boolean(record)
+    && EXECUTION_PROFILE_BINDING_FIELDS.some((field) => record![field] !== undefined);
+}
 
 function generateRunId(): string {
   return Math.random().toString(36).substring(2, 10);
@@ -337,6 +409,7 @@ async function persistExecutionRoutingDecision(
     taskId: task?._id ? String(task._id) : undefined,
     riskLevel: workOrder.riskLevel,
     evidenceCutoffAt: preview.cutoffAt,
+    budgetAuthorization: preview.budgetAuthorization,
     result: preview.result,
   };
   const decisionDigest = `sha256:${computeCanonicalHash(snapshot)}`;
@@ -574,6 +647,7 @@ const revisionPatch = v.object({
   context: v.optional(v.string()),
   workflowId: v.optional(v.string()),
   repository: v.optional(v.string()),
+  codeScopeIds: v.optional(v.array(v.id("repositoryCodeScopes"))),
   branchStrategy: v.optional(v.string()),
   priority: v.optional(v.union(v.literal(1), v.literal(2), v.literal(3), v.literal(4))),
   riskLevel: v.optional(workOrderRisk),
@@ -723,8 +797,15 @@ async function applyFactoryHumanReviewDecision(ctx: any, input: {
         missionId: input.sourceReceipt.missionId,
         workOrderId: input.workOrder._id,
         receiptScope: "WORK_ORDER",
-        workflowRunId: input.run._id,
+        workflowRunId: input.sourceReceipt.workflowRunId,
         verificationRunId: input.sourceReceipt.verificationRunId,
+        ...(input.run.verificationSubject?.version === 2 ? {
+          sourceAttemptId: input.sourceReceipt.sourceAttemptId, verificationAttemptId: input.sourceReceipt.verificationAttemptId,
+          verificationSubjectId: input.sourceReceipt.verificationSubjectId, verificationSubjectDigest: input.sourceReceipt.verificationSubjectDigest,
+          verificationContractDigest: input.sourceReceipt.verificationContractDigest, verificationPlanId: input.sourceReceipt.verificationPlanId,
+          verificationPlanDigest: input.sourceReceipt.verificationPlanDigest, independenceValid: input.sourceReceipt.independenceValid,
+          decisionInputDigest: input.sourceReceipt.decisionInputDigest,
+        } : {}),
         idempotencyKey,
         verifier: `human:${input.approver ?? "operator"}`,
         status: "PASSED",
@@ -1130,10 +1211,88 @@ function describeAcceptanceReadiness(workOrder: any, acceptance: ReturnType<type
   return "Ready for explicit acceptance.";
 }
 
+async function reconcileApprovedMissionPlanDecisions(ctx: any, workOrder: any) {
+  if (!workOrder.missionId || !workOrder.missionPlanId || (workOrder.currentRevisionNumber ?? 1) !== 1) return;
+
+  const [mission, plan, policy, existingApprovals] = await Promise.all([
+    ctx.db.get(workOrder.missionId),
+    ctx.db.get(workOrder.missionPlanId),
+    resolveGovernancePolicy(ctx, workOrder),
+    listApprovalDecisionsForWorkOrder(ctx, workOrder._id),
+  ]);
+  if (!mission || !plan
+    || plan.status !== "APPROVED"
+    || mission.currentPlanId !== plan._id
+    || plan.missionId !== mission._id
+    || plan.revisionNumber !== workOrder.missionPlanRevision
+    || plan.planningRepositorySha !== workOrder.planningRepositorySha
+    || typeof plan.approvedAt !== "number"
+    || !plan.approvedBy) return;
+
+  const approvalTypes = requiredApprovalTypes({
+    riskLevel: workOrder.riskLevel,
+    requiredApprovals: workOrder.requiredApprovals,
+    isMutating: workOrder.isMutating,
+  });
+  for (const approvalType of approvalTypes) {
+    const idempotencyKey = `mission-plan:${String(plan._id)}:r${plan.revisionNumber}:work-order:${String(workOrder._id)}:approval:${approvalType}`;
+    const existingProjection = await ctx.db.query("approvalDecisions")
+      .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", idempotencyKey))
+      .first();
+    if (existingProjection) continue;
+
+    const approvalDecisionId = await ctx.db.insert("approvalDecisions", {
+      tenantId: workOrder.tenantId,
+      projectId: workOrder.projectId,
+      workOrderId: workOrder._id,
+      idempotencyKey,
+      approvalType,
+      requestedAction: `Execute the exact contract released by approved Mission Plan r${plan.revisionNumber}`,
+      riskLevel: workOrder.riskLevel,
+      requestedBy: plan.approvedBy,
+      approver: plan.approvedBy,
+      status: "APPROVED",
+      decision: "APPROVE",
+      reason: `Satisfied by exact Mission Plan approval: ${plan.decisionReason ?? "approved"}`,
+      workOrderRevisionNumber: 1,
+      expiresAt: approvalExpiresAt(workOrder.riskLevel, policy, plan.approvedAt),
+      createdAt: plan.approvedAt,
+      decidedAt: plan.approvedAt,
+      metadata: {
+        source: "mission-plan-approval",
+        missionId: mission._id,
+        missionPlanId: plan._id,
+        missionPlanRevision: plan.revisionNumber,
+        planningRepositorySha: plan.planningRepositorySha,
+      },
+    });
+
+    for (const pending of existingApprovals.filter((approval: any) =>
+      approval.approvalType === approvalType
+      && approval.status === "PENDING"
+      && (approval.workOrderRevisionNumber ?? 1) === 1
+    )) {
+      await supersedeApprovalDecision(ctx, pending, approvalDecisionId);
+    }
+    await logWorkOrderEvent(ctx, {
+      tenantId: workOrder.tenantId,
+      projectId: workOrder.projectId,
+      workOrderId: workOrder._id,
+      eventType: "APPROVAL_APPROVED",
+      actorType: "SYSTEM",
+      actorId: plan.approvedBy,
+      summary: `Mission Plan approval satisfied ${approvalType}`,
+      idempotencyKey: `${idempotencyKey}:event`,
+      metadata: { approvalDecisionId, missionPlanId: plan._id, missionPlanRevision: plan.revisionNumber },
+    });
+  }
+}
+
 async function refreshWorkOrderGovernance(ctx: any, workOrderId: any) {
   const workOrder = await ctx.db.get(workOrderId);
   if (!workOrder) throw new Error("WorkOrder not found");
 
+  await reconcileApprovedMissionPlanDecisions(ctx, workOrder);
   await expireGovernanceRecordsForWorkOrder(ctx, workOrder);
 
   const refreshedWorkOrder = await ctx.db.get(workOrderId);
@@ -1159,12 +1318,14 @@ async function refreshWorkOrderGovernance(ctx: any, workOrderId: any) {
   const computedApprovalStatus = deriveApprovalStatus({
     riskLevel: refreshedWorkOrder.riskLevel as any,
     requiredApprovals: refreshedWorkOrder.requiredApprovals,
+    isMutating: refreshedWorkOrder.isMutating,
     approvals: approvalDecisions,
     now: Date.now(),
   });
   const acceptance = evaluateAcceptance({
     riskLevel: refreshedWorkOrder.riskLevel as any,
     requiredApprovals: refreshedWorkOrder.requiredApprovals,
+    isMutating: refreshedWorkOrder.isMutating,
     approvalDecisions,
     acceptanceCriteria,
     verificationReceipts,
@@ -1250,6 +1411,7 @@ function summarizeRun(run: any) {
     taskAttemptNumber: run.metadata?.taskAttemptNumber,
     taskRetryNumber: run.metadata?.taskRetryNumber,
     workOrderRevisionNumber: run.workOrderRevisionNumber,
+    attemptPurpose: run.attemptPurpose ?? "IMPLEMENTATION",
     status: run.status,
     runtime: run.runtime,
     model: run.model,
@@ -1262,7 +1424,11 @@ function summarizeRun(run: any) {
     checkpointSummary: run.checkpointSummary,
     factoryContinuationStatus: run.factoryContinuation?.status,
     factoryApprovalDecisionId: run.factoryContinuation?.approvalDecisionId,
-    candidateRevision: run.factoryContinuation?.candidateRevision,
+    candidateRevision: run.factoryContinuation?.candidateRevision ?? (run.verificationSubject?.kind === "GIT_CANDIDATE" ? run.verificationSubject.candidateSha : undefined),
+    verificationSubjectVersion: run.verificationSubject?.version,
+    verificationSubjectDigest: run.verificationSubject?.digest,
+    publicationBindingDigest: run.subjectPublicationBinding?.digest,
+    verificationSupersededAt: run.metadata?.verificationSupersededAt,
     startedAt: run.startedAt,
     completedAt: run.completedAt,
   };
@@ -1471,6 +1637,7 @@ async function applyRevisionToWorkOrder(ctx: any, args: {
     context: nextSnapshot.context,
     workflowId: nextSnapshot.workflowId,
     repository: nextSnapshot.repository,
+    codeScopeIds: nextSnapshot.codeScopeIds,
     branchStrategy: nextSnapshot.branchStrategy,
     priority: nextSnapshot.priority,
     riskLevel: nextSnapshot.riskLevel,
@@ -1656,6 +1823,7 @@ export const get = query({
     const acceptance = evaluateAcceptance({
       riskLevel: workOrder.riskLevel as any,
       requiredApprovals: workOrder.requiredApprovals,
+      isMutating: workOrder.isMutating,
       approvalDecisions,
       acceptanceCriteria: workOrder.acceptanceCriteria as any,
       verificationReceipts,
@@ -1813,6 +1981,7 @@ export const governanceValidity = query({
     const acceptance = evaluateAcceptance({
       riskLevel: workOrder.riskLevel as any,
       requiredApprovals: workOrder.requiredApprovals,
+      isMutating: workOrder.isMutating,
       approvalDecisions,
       acceptanceCriteria: workOrder.acceptanceCriteria as any,
       verificationReceipts,
@@ -1987,7 +2156,7 @@ type DispatchContextOptions = {
 
 async function remoteRetryEvaluationState(ctx: MutationCtx, priorRun: any, existingRuns: any[]) {
   const lineage = existingRuns.filter((run) =>
-    (run.executionManifest as any)?.harness?.executionBackend === "remote-sandbox"
+    factoryExecutionBackend(run.executionManifest) === "remote-sandbox"
     && run.factoryDefinitionVersionId === priorRun.factoryDefinitionVersionId
     && (priorRun.parentTaskId ? run.parentTaskId === priorRun.parentTaskId : !run.parentTaskId)
     && (run.attemptPurpose ?? "IMPLEMENTATION") === (priorRun.attemptPurpose ?? "IMPLEMENTATION")
@@ -2014,6 +2183,194 @@ async function remoteRetryEvaluationState(ctx: MutationCtx, priorRun: any, exist
     observedModelSpendUsd,
     activeProviderResources: allocations.filter((allocation) => allocation.state !== "TERMINATED").length,
   };
+}
+
+async function materializeTasklessRecoveryTask(
+  ctx: MutationCtx,
+  input: {
+    workOrder: Doc<"workOrders">;
+    sourceRun: Doc<"workflowRuns">;
+    actorId?: string;
+    proof: TasklessPreExecutionRecoveryProof;
+  },
+) {
+  const now = Date.now();
+  const idempotencyKey = `taskless-recovery:${String(input.sourceRun._id)}`;
+  const existing = await ctx.db
+    .query("tasks")
+    .withIndex("by_idempotency", (query) => query.eq("idempotencyKey", idempotencyKey))
+    .first();
+  if (existing) {
+    if (existing.workOrderId !== input.workOrder._id) {
+      throw new Error("Pre-execution recovery Task is bound to another Work Order.");
+    }
+    return existing;
+  }
+
+  const authorityScope = buildWorkOrderTaskAuthority(input.workOrder);
+  const taskId = await ctx.db.insert("tasks", {
+    tenantId: input.workOrder.tenantId,
+    projectId: input.workOrder.projectId,
+    idempotencyKey,
+    workOrderId: input.workOrder._id,
+    planningRepositorySha: input.workOrder.planningRepositorySha,
+    title: `Execute ${input.workOrder.title}`,
+    description: input.workOrder.desiredOutcome,
+    type: "ENGINEERING",
+    status: "INBOX",
+    stateEnteredAt: now,
+    priority: input.workOrder.riskLevel === "CRITICAL" ? 1 : 2,
+    assigneeIds: [],
+    reviewCycles: 0,
+    actualCost: 0,
+    labels: ["governed-work-order", "factory-execution", "pre-execution-recovery"],
+    createdBy: "SYSTEM",
+    createdByRef: "control-plane:pre-execution-recovery",
+    metadata: {
+      authorityScope,
+      governanceOrigin: "GOVERNED_WORK_ORDER",
+      executionOwner: "FACTORY",
+      materializationReason: "TASKLESS_PRE_EXECUTION_RECOVERY",
+      recoveryOfWorkflowRunId: input.sourceRun._id,
+      recoveryOfRunId: input.sourceRun.runId,
+      recoveryProof: input.proof,
+      relationshipCreatedAt: now,
+      relationshipActorType: "HUMAN",
+      relationshipActorId: input.actorId,
+      relationshipIdempotencyKey: idempotencyKey,
+    },
+  });
+
+  await ctx.db.insert("activities", {
+    tenantId: input.workOrder.tenantId,
+    projectId: input.workOrder.projectId,
+    actorType: "SYSTEM",
+    actorId: "control-plane:pre-execution-recovery",
+    action: "TASK_CREATED",
+    description: `Canonical execution Task created for Work Order ${input.workOrder.title}`,
+    targetType: "TASK",
+    targetId: taskId,
+    taskId,
+    metadata: {
+      workOrderId: input.workOrder._id,
+      authorizedBy: input.actorId,
+      recoveryProof: input.proof,
+    },
+  });
+  await logTaskEvent(ctx, {
+    taskId,
+    projectId: input.workOrder.projectId,
+    eventType: "TASK_CREATED",
+    actorType: "SYSTEM",
+    actorId: "control-plane:pre-execution-recovery",
+    relatedId: String(input.workOrder._id),
+    afterState: {
+      status: "INBOX",
+      type: "ENGINEERING",
+      priority: input.workOrder.riskLevel === "CRITICAL" ? 1 : 2,
+      workOrderId: input.workOrder._id,
+      missionId: input.workOrder.missionId,
+    },
+    metadata: { authorizedBy: input.actorId, recoveryProof: input.proof },
+  });
+
+  await ctx.db.patch(taskId, { status: "READY", stateEnteredAt: now });
+  await ctx.db.insert("taskTransitions", {
+    tenantId: input.workOrder.tenantId,
+    projectId: input.workOrder.projectId,
+    idempotencyKey: `${idempotencyKey}:ready`,
+    taskId,
+    fromStatus: "INBOX",
+    toStatus: "READY",
+    actorType: "SYSTEM",
+    actorUserId: input.actorId,
+    validationResult: { valid: true },
+    reason: "Factory-owned Task materialized for proven pre-execution recovery",
+  });
+  await logTaskEvent(ctx, {
+    taskId,
+    projectId: input.workOrder.projectId,
+    eventType: "TASK_TRANSITION",
+    actorType: "SYSTEM",
+    actorId: "control-plane:pre-execution-recovery",
+    relatedId: String(input.sourceRun._id),
+    beforeState: { status: "INBOX" },
+    afterState: { status: "READY" },
+    metadata: { authorizedBy: input.actorId, recoveryProof: input.proof },
+  });
+
+  const task = await ctx.db.get(taskId);
+  if (!task) throw new Error("Pre-execution recovery Task could not be materialized.");
+  return task;
+}
+
+async function reconcilePreExecutionReservation(
+  ctx: MutationCtx,
+  input: {
+    workOrder: Doc<"workOrders">;
+    sourceRun: Doc<"workflowRuns">;
+    actorId?: string;
+    proof: TasklessPreExecutionRecoveryProof | TaskPreExecutionRecoveryProof;
+  },
+) {
+  const authorization = input.sourceRun.executionCostAuthorization;
+  if (!authorization) {
+    if ((input.proof.code === "EXECUTION_PROFILE_REJECTED_BEFORE_EXECUTOR"
+      || input.proof.code === "FAB_CONFIGURATION_REJECTED_BEFORE_PROVIDER"
+      || input.proof.code === "FAB_PROVIDER_ADMISSION_REJECTED_BEFORE_INFERENCE")
+      && input.proof.releasedReservationUsd === 0
+      && input.proof.externalProviderLiability) return;
+    throw new Error("Pre-execution recovery has no frozen cost authorization.");
+  }
+  const reason = input.proof.code === "STORED_MANIFEST_DIGEST_MISMATCH_BEFORE_EXECUTOR"
+    ? "Server evidence proves the stored manifest failed validation before executor invocation; actual execution spend is zero."
+    : input.proof.code === "EXECUTION_PROFILE_REJECTED_BEFORE_EXECUTOR"
+      ? "Server evidence proves the exact Execution Profile was rejected before executor invocation; actual execution spend is zero."
+      : input.proof.code === "FAB_CONFIGURATION_REJECTED_BEFORE_PROVIDER"
+        ? "Server evidence and the canonical provider reservation prove Fab rejected the admitted request before provider activity; actual execution spend is zero."
+      : input.proof.code === "FAB_PROVIDER_ADMISSION_REJECTED_BEFORE_INFERENCE"
+        ? "Server lifecycle evidence and the canonical provider reservation prove provider admission failed before inference; actual execution spend is zero."
+      : "Server evidence proves a valid stored manifest was rejected before executor invocation because the claim envelope omitted its frozen executor identity; actual execution spend is zero.";
+  await ctx.db.patch(input.sourceRun._id, {
+    spentUsd: 0,
+    reservedCostUsd: 0,
+    executionCostAuthorization: {
+      ...authorization,
+      reservedCostUsd: 0,
+      actualCost: { status: "MEASURED", usd: 0, reason },
+      varianceUsd: -authorization.estimatedCostUsd,
+    },
+  });
+  await logWorkOrderEvent(ctx, {
+    tenantId: input.workOrder.tenantId,
+    projectId: input.workOrder.projectId,
+    workOrderId: input.workOrder._id,
+    workflowRunId: input.sourceRun._id,
+    eventType: "STATE_SYNCED",
+    fromState: input.workOrder.state,
+    toState: input.workOrder.state,
+    actorType: "HUMAN",
+    actorId: input.actorId,
+    summary: `Released $${input.proof.releasedReservationUsd.toFixed(2)} from pre-execution run ${input.sourceRun.runId}`,
+    idempotencyKey: `pre-execution-recovery:${String(input.sourceRun._id)}:cost-reconciled`,
+    metadata: {
+      recoveryProof: input.proof,
+      previousActualCostStatus: authorization.actualCost.status,
+      actualCostUsd: 0,
+      reservationReleasedUsd: input.proof.releasedReservationUsd,
+    },
+  });
+  await ctx.db.insert("activities", {
+    tenantId: input.workOrder.tenantId,
+    projectId: input.workOrder.projectId,
+    actorType: "HUMAN",
+    actorId: input.actorId,
+    action: "PRE_EXECUTION_ATTEMPT_RECOVERED",
+    description: `Reconciled proven zero-spend run ${input.sourceRun.runId} before retry`,
+    targetType: "WORK_ORDER",
+    targetId: input.workOrder._id,
+    metadata: { workflowRunId: input.sourceRun._id, recoveryProof: input.proof },
+  });
 }
 
 async function dispatchWorkOrder(
@@ -2072,7 +2429,7 @@ async function dispatchWorkOrder(
       throw new Error("Superseded WorkOrders cannot be dispatched");
     }
 
-    const canonicalChildTasks = await ctx.db
+    let canonicalChildTasks = await ctx.db
       .query("tasks")
       .withIndex("by_work_order", (query) =>
         query.eq("workOrderId", args.workOrderId)
@@ -2085,19 +2442,288 @@ async function dispatchWorkOrder(
       .query("workflowRuns")
       .withIndex("by_work_order", (q) => q.eq("workOrderId", args.workOrderId))
       .collect();
+    let tasklessPreExecutionRecovery:
+      | { task: Doc<"tasks">; proof: TasklessPreExecutionRecoveryProof }
+      | undefined;
+    if (args.retryOfWorkflowRunId
+      && !args.taskId
+      && canonicalChildTasks.length === 0
+      && isRecognizedPreExecutionValidationFailure(retryOfRun?.failureReason)) {
+      if (args.actorType !== "HUMAN") {
+        throw new Error("Pre-execution recovery requires an authenticated human dispatch.");
+      }
+      const [events, artifacts, sandboxAllocations, sandboxCredentialGrants] = await Promise.all([
+        ctx.db.query("runEvents")
+          .withIndex("by_run_sequence", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("runArtifacts")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("sandboxAllocations")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("sandboxCredentialGrants")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+      ]);
+      const latestRun = [...existingRuns].sort((left, right) =>
+        right.startedAt - left.startedAt || String(right._id).localeCompare(String(left._id))
+      )[0];
+      const providerReservations = await ctx.db.query("factoryProviderReservations")
+        .withIndex("by_work_order", (query) => query.eq("workOrderId", workOrder._id))
+        .collect();
+      const providerReservation = providerReservations.length === 1 ? providerReservations[0] : null;
+      const providerUsageEvents = providerReservation
+        ? await ctx.db.query("factoryProviderUsageEvents")
+          .withIndex("by_reservation", (query) => query.eq("reservationId", providerReservation._id))
+          .collect()
+        : [];
+      const providerScope = providerReservation?.snapshot.scope;
+      const sourceProviderHolds = providerReservation?.snapshot.holds.filter(
+        (hold) => hold.attemptId === String(retryOfRun._id),
+      ) ?? [];
+      const sourceProviderUsageEvents = providerUsageEvents.filter((event) =>
+        sourceProviderHolds.some((hold) => hold.requestId === event.usage.requestId),
+      );
+      const settledZeroProviderHolds = sourceProviderHolds.filter((hold) => {
+        const usageEvent = sourceProviderUsageEvents.find(
+          (event) => event.usage.requestId === hold.requestId,
+        );
+        return hold.state === "SETTLED"
+          && hold.classification === "ACTUAL"
+          && hold.accountedNanoUsd === 0
+          && typeof hold.providerRequestId === "string"
+          && usageEvent?.usage.classification === "ACTUAL"
+          && usageEvent.usage.inputTokens === 0
+          && usageEvent.usage.outputTokens === 0
+          && usageEvent.usage.providerRequestId === hold.providerRequestId;
+      });
+      const externalProviderLiability = providerReservation ? {
+        reservationId: String(providerReservation._id),
+        reservationDigest: providerReservation.creationDigest,
+        maximumNanoUsd: providerReservation.snapshot.maximumNanoUsd,
+        scopeMatches: providerScope?.projectId === String(workOrder.projectId)
+          && providerScope.repositoryId === String(workOrder.repositoryId)
+          && providerScope.workOrderId === String(workOrder._id)
+          && providerScope.workOrderRevision === (workOrder.currentRevisionNumber ?? 1)
+          && providerScope.executionProfileId === String(retryOfRun.executionProfileId)
+          && providerScope.executionProfileDigest === retryOfRun.executionProfileDigest
+          && providerScope.modelRouteDigest === (retryOfRun.executionManifest as any)?.modelRoute?.routeDigest,
+        integrityValid: liabilityDigest({
+          ...providerReservation.snapshot,
+          frozen: false,
+          holds: [],
+        }) === providerReservation.creationDigest,
+        current: providerReservation.snapshot.expiresAt > Date.now()
+          && providerReservation.snapshot.frozen === false,
+        providerRequestCount: sourceProviderHolds.length,
+        usageEventCount: sourceProviderUsageEvents.length,
+        settledZeroProviderRequestCount: settledZeroProviderHolds.length,
+        settledZeroUsageEventCount: sourceProviderUsageEvents.filter((event) =>
+          event.usage.classification === "ACTUAL"
+          && event.usage.inputTokens === 0
+          && event.usage.outputTokens === 0
+        ).length,
+        providerRequestId: settledZeroProviderHolds.length === 1
+          ? settledZeroProviderHolds[0].providerRequestId
+          : undefined,
+      } : undefined;
+      const recovery = evaluateTasklessPreExecutionRecovery({
+        run: retryOfRun,
+        currentWorkOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
+        isLatestWorkOrderRun: latestRun?._id === retryOfRun._id,
+        recomputedManifestDigest: retryOfRun.executionManifest
+          ? `sha256:${computeCanonicalHash(retryOfRun.executionManifest)}`
+          : undefined,
+        events,
+        artifactCount: artifacts.length,
+        sandboxAllocationCount: sandboxAllocations.length,
+        sandboxCredentialGrantCount: sandboxCredentialGrants.length,
+        externalProviderLiability,
+      });
+      if ("reason" in recovery) {
+        throw new Error(`Pre-execution recovery is not allowed (${recovery.reason}).`);
+      }
+      const task = await materializeTasklessRecoveryTask(ctx, {
+        workOrder,
+        sourceRun: retryOfRun,
+        actorId,
+        proof: recovery.proof,
+      });
+      await reconcilePreExecutionReservation(ctx, {
+        workOrder,
+        sourceRun: retryOfRun,
+        actorId,
+        proof: recovery.proof,
+      });
+      tasklessPreExecutionRecovery = { task, proof: recovery.proof };
+      canonicalChildTasks = [task];
+    }
     const retryTask = retryOfRun?.parentTaskId
       ? canonicalChildTasks.find(
           (task) => task._id === retryOfRun.parentTaskId
         )
       : null;
+    let taskPreExecutionRecovery:
+      | { task: Doc<"tasks">; proof: TaskPreExecutionRecoveryProof }
+      | undefined;
+    if (!tasklessPreExecutionRecovery
+      && args.retryOfWorkflowRunId
+      && !args.taskId
+      && retryTask
+      && (retryOfRun?.failureReason === TASKLESS_MANIFEST_VALIDATION_FAILURE
+        || retryOfRun?.failureReason === FAB_CONFIGURATION_VALIDATION_FAILURE
+        || (retryOfRun?.failureReason === "Fab execution blocked, failed or cancelled; inspect its redacted evidence."
+          && retryOfRun.executorAdapter === "fab"
+          && retryOfRun.executorVersion === "v1"))) {
+      if (args.actorType !== "HUMAN") {
+        throw new Error("Pre-execution recovery requires an authenticated human dispatch.");
+      }
+      const [events, artifacts, sandboxAllocations, sandboxCredentialGrants] = await Promise.all([
+        ctx.db.query("runEvents")
+          .withIndex("by_run_sequence", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("runArtifacts")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("sandboxAllocations")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+        ctx.db.query("sandboxCredentialGrants")
+          .withIndex("by_run", (query) => query.eq("workflowRunId", retryOfRun._id))
+          .collect(),
+      ]);
+      const latestRun = [...existingRuns].sort((left, right) =>
+        right.startedAt - left.startedAt || String(right._id).localeCompare(String(left._id))
+      )[0];
+      const providerReservations = await ctx.db.query("factoryProviderReservations")
+        .withIndex("by_work_order", (query) => query.eq("workOrderId", workOrder._id))
+        .collect();
+      const providerReservation = providerReservations.length === 1 ? providerReservations[0] : null;
+      const providerUsageEvents = providerReservation
+        ? await ctx.db.query("factoryProviderUsageEvents")
+          .withIndex("by_reservation", (query) => query.eq("reservationId", providerReservation._id))
+          .collect()
+        : [];
+      const providerScope = providerReservation?.snapshot.scope;
+      const sourceProviderHolds = providerReservation?.snapshot.holds.filter(
+        (hold) => hold.attemptId === String(retryOfRun._id),
+      ) ?? [];
+      const sourceProviderUsageEvents = providerUsageEvents.filter((event) =>
+        sourceProviderHolds.some((hold) => hold.requestId === event.usage.requestId),
+      );
+      const settledZeroProviderHolds = sourceProviderHolds.filter((hold) => {
+        const usageEvent = sourceProviderUsageEvents.find(
+          (event) => event.usage.requestId === hold.requestId,
+        );
+        return hold.state === "SETTLED"
+          && hold.classification === "ACTUAL"
+          && hold.accountedNanoUsd === 0
+          && typeof hold.providerRequestId === "string"
+          && usageEvent?.usage.classification === "ACTUAL"
+          && usageEvent.usage.inputTokens === 0
+          && usageEvent.usage.outputTokens === 0
+          && usageEvent.usage.providerRequestId === hold.providerRequestId;
+      });
+      const externalProviderLiability = providerReservation ? {
+        reservationId: String(providerReservation._id),
+        reservationDigest: providerReservation.creationDigest,
+        maximumNanoUsd: providerReservation.snapshot.maximumNanoUsd,
+        scopeMatches: providerScope?.projectId === String(workOrder.projectId)
+          && providerScope.repositoryId === String(workOrder.repositoryId)
+          && providerScope.workOrderId === String(workOrder._id)
+          && providerScope.workOrderRevision === (workOrder.currentRevisionNumber ?? 1)
+          && providerScope.executionProfileId === String(retryOfRun.executionProfileId)
+          && providerScope.executionProfileDigest === retryOfRun.executionProfileDigest
+          && providerScope.modelRouteDigest === (retryOfRun.executionManifest as any)?.modelRoute?.routeDigest,
+        integrityValid: liabilityDigest({
+          ...providerReservation.snapshot,
+          frozen: false,
+          holds: [],
+        }) === providerReservation.creationDigest,
+        current: providerReservation.snapshot.expiresAt > Date.now()
+          && providerReservation.snapshot.frozen === false,
+        providerRequestCount: sourceProviderHolds.length,
+        usageEventCount: sourceProviderUsageEvents.length,
+        settledZeroProviderRequestCount: settledZeroProviderHolds.length,
+        settledZeroUsageEventCount: sourceProviderUsageEvents.filter((event) =>
+          event.usage.classification === "ACTUAL"
+          && event.usage.inputTokens === 0
+          && event.usage.outputTokens === 0
+        ).length,
+        providerRequestId: settledZeroProviderHolds.length === 1
+          ? settledZeroProviderHolds[0].providerRequestId
+          : undefined,
+      } : undefined;
+      const recovery = evaluateTaskPreExecutionRecovery({
+        run: retryOfRun,
+        currentTaskId: String(retryTask._id),
+        currentWorkOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
+        isLatestWorkOrderRun: latestRun?._id === retryOfRun._id,
+        recomputedManifestDigest: retryOfRun.executionManifest
+          ? `sha256:${computeCanonicalHash(retryOfRun.executionManifest)}`
+          : undefined,
+        events,
+        artifactCount: artifacts.length,
+        sandboxAllocationCount: sandboxAllocations.length,
+        sandboxCredentialGrantCount: sandboxCredentialGrants.length,
+        externalProviderLiability,
+      });
+      if ("reason" in recovery) {
+        throw new Error(`Pre-execution recovery is not allowed (${recovery.reason}).`);
+      }
+      await reconcilePreExecutionReservation(ctx, {
+        workOrder,
+        sourceRun: retryOfRun,
+        actorId,
+        proof: recovery.proof,
+      });
+      taskPreExecutionRecovery = { task: retryTask, proof: recovery.proof };
+    }
+    const preExecutionRecovery = tasklessPreExecutionRecovery ?? taskPreExecutionRecovery;
     const effectiveTaskId =
       args.taskId ??
+      tasklessPreExecutionRecovery?.task._id ??
       retryTask?._id;
-    const selectedTask = effectiveTaskId
+    let selectedTask = effectiveTaskId
       ? await ctx.db.get(effectiveTaskId)
       : null;
     if (effectiveTaskId && !selectedTask) {
       throw new Error("The selected Task no longer exists.");
+    }
+    if (selectedTask && workOrder.planningRepositorySha
+      && selectedTask.planningRepositorySha !== workOrder.planningRepositorySha) {
+      throw new Error("Dispatch blocked: Task planning revision does not match the approved Plan repository SHA.");
+    }
+    if (selectedTask && retryOfRun && args.actorType === "HUMAN") {
+      const metadata = selectedTask.metadata && typeof selectedTask.metadata === "object"
+        ? selectedTask.metadata as Record<string, unknown>
+        : {};
+      const authorityScope = advanceWorkOrderTaskAuthorityForRetry({
+        scope: metadata.authorityScope,
+        workOrder,
+      });
+      if (authorityScope) {
+        const priorAuthorityScope = metadata.authorityScope;
+        const nextMetadata = { ...metadata, authorityScope };
+        await ctx.db.patch(selectedTask._id, { metadata: nextMetadata });
+        await logTaskEvent(ctx, {
+          taskId: selectedTask._id,
+          projectId: selectedTask.projectId,
+          eventType: "POLICY_DECISION",
+          actorType: "HUMAN",
+          actorId,
+          relatedId: String(retryOfRun._id),
+          beforeState: { authorityScope: priorAuthorityScope },
+          afterState: { authorityScope },
+          metadata: {
+            decision: "ADVANCE_WORK_ORDER_REVISION_FOR_RETRY",
+            workOrderId: workOrder._id,
+            retryOfWorkflowRunId: retryOfRun._id,
+          },
+        });
+        selectedTask = { ...selectedTask, metadata: nextMetadata };
+      }
     }
     const taskSelection = validateTaskAttemptSelection({
       workOrderId: workOrder._id,
@@ -2128,7 +2754,7 @@ async function dispatchWorkOrder(
     }
 
     const remoteRetryState = retryOfRun?.executionManifest
-      && (retryOfRun.executionManifest as any)?.harness?.executionBackend === "remote-sandbox"
+      && factoryExecutionBackend(retryOfRun.executionManifest) === "remote-sandbox"
       ? await remoteRetryEvaluationState(ctx, retryOfRun, existingRuns)
       : undefined;
     if (remoteRetryState
@@ -2176,6 +2802,9 @@ async function dispatchWorkOrder(
       ownerMemberId: args.ownerMemberId ?? refreshedWorkOrder.ownerMemberId,
       executionEnvironment: args.executionEnvironment ?? refreshedWorkOrder.executionEnvironment ?? "POLICY_SELECTED" as const,
     };
+    if (refreshedWorkOrder.projectId) {
+      await requireRepositoryDispatchAdmission(ctx, refreshedWorkOrder.projectId, effectiveScope.repositoryId, refreshedWorkOrder.repository);
+    }
     const hasStableScope = Boolean(
       refreshedWorkOrder.scopeEnforcementVersion ||
       effectiveScope.repositoryId ||
@@ -2243,7 +2872,11 @@ async function dispatchWorkOrder(
           verificationPolicy: scope.verificationPolicy,
           approvalPolicy: scope.approvalPolicy,
         })));
-        effectiveRequiredApprovals = [...new Set([...effectiveRequiredApprovals, ...scopePolicyRequirements.approvalPolicies])].sort();
+        const codeScopeApprovalPolicies = codeScopeApprovalPoliciesForDispatch({
+          isMutating: refreshedWorkOrder.isMutating ?? true,
+          approvalPolicies: scopePolicyRequirements.approvalPolicies,
+        });
+        effectiveRequiredApprovals = [...new Set([...effectiveRequiredApprovals, ...codeScopeApprovalPolicies])].sort();
         const validatedScope = validateDispatchScope({
           projectId: refreshedWorkOrder.projectId,
           repository: repository ? { id: repository._id, projectId: repository.projectId, status: repository.status, repository: repository.repository } : null,
@@ -2331,6 +2964,9 @@ async function dispatchWorkOrder(
     // receipt and binding were written.
     refreshedWorkOrder = await ctx.db.get(args.workOrderId);
     if (!refreshedWorkOrder) throw new Error("WorkOrder not found after dispatch scope binding");
+    if (refreshedWorkOrder.projectId) {
+      await requireRepositoryDispatchAdmission(ctx, refreshedWorkOrder.projectId, refreshedWorkOrder.repositoryId, refreshedWorkOrder.repository);
+    }
 
     const resolvedWorkflowId = args.workflowId ?? refreshedWorkOrder.workflowId;
     if (!resolvedWorkflowId) {
@@ -2353,6 +2989,11 @@ async function dispatchWorkOrder(
       priorRun: retryOfRun,
       lineage: existingRuns,
     });
+    if (preExecutionRecovery
+      && args.factoryDefinitionVersionId
+      && String(args.factoryDefinitionVersionId) !== preExecutionRecovery.proof.factoryDefinitionVersionId) {
+      throw new Error("Pre-execution recovery must reuse the failed Attempt's frozen Factory Version.");
+    }
     const retryFactoryDefinitionVersionId = resolveRemoteRetryFactoryVersion({
       retryingRemote: Boolean(remoteRetryState),
       priorFactoryDefinitionVersionId: remoteRetryState
@@ -2360,14 +3001,18 @@ async function dispatchWorkOrder(
         : retryOfRun?.factoryDefinitionVersionId
           ? String(retryOfRun.factoryDefinitionVersionId)
           : undefined,
-      requestedFactoryDefinitionVersionId: args.factoryDefinitionVersionId
-        ? String(args.factoryDefinitionVersionId)
-        : undefined,
+      requestedFactoryDefinitionVersionId: preExecutionRecovery
+        ? preExecutionRecovery.proof.factoryDefinitionVersionId
+        : args.factoryDefinitionVersionId
+          ? String(args.factoryDefinitionVersionId)
+          : undefined,
     }) as Id<"factoryDefinitionVersions"> | undefined;
     // Execution routing is additive for V1. Legacy dispatches do not enter the
     // Factory tuple control plane unless an exact baseline (or explicit pin)
     // already exists, preserving the default-off rollout contract.
-    const executionRoutingPreview = !remoteRetryState && executionRoutingRequested({
+    const explicitlySelectedFactory = retryFactoryDefinitionVersionId ? await ctx.db.get(retryFactoryDefinitionVersionId) : null;
+    const offlineSelected = explicitlySelectedFactory?.executionBackend === "isolated-container";
+    const executionRoutingPreview = !offlineSelected && !remoteRetryState && executionRoutingRequested({
       factoryDefinitionVersionId: retryFactoryDefinitionVersionId,
       executionRoutingPin: refreshedWorkOrder.executionRoutingPin,
     })
@@ -2398,7 +3043,9 @@ async function dispatchWorkOrder(
       const taskAttemptStart = validateTaskAttemptStart({
         taskId: selectedTask._id,
         attempts: taskAttempts,
-        retryOfRun,
+        // The historical Task-less run remains Work Order retry causation, but
+        // it is not retroactively counted as an Attempt under the new Task.
+        retryOfRun: tasklessPreExecutionRecovery ? null : retryOfRun,
         retryReason: args.retryReason,
       });
       if ("reason" in taskAttemptStart) {
@@ -2459,11 +3106,19 @@ async function dispatchWorkOrder(
       missionForDispatch = mission;
     }
 
+    const dispatchApprovalStatus = deriveApprovalStatus({
+      riskLevel: refreshedWorkOrder.riskLevel,
+      requiredApprovals: effectiveRequiredApprovals,
+      isMutating: refreshedWorkOrder.isMutating,
+      approvals: await listApprovalDecisionsForWorkOrder(ctx, refreshedWorkOrder._id),
+      now: Date.now(),
+    });
     const dispatchable = validateDispatchable({
       state: refreshedWorkOrder.state,
       riskLevel: refreshedWorkOrder.riskLevel,
-      approvalStatus: refreshedWorkOrder.approvalStatus,
+      approvalStatus: dispatchApprovalStatus,
       requiredApprovals: effectiveRequiredApprovals,
+      isMutating: refreshedWorkOrder.isMutating,
       hasWorkflowId: !!resolvedWorkflowId,
       activeRunStatuses: existingRuns.map((run) => run.status as any),
     });
@@ -2471,7 +3126,7 @@ async function dispatchWorkOrder(
       throw new Error(`WorkOrder is not dispatchable (${("reason" in dispatchable ? dispatchable.reason : "unknown")})`);
     }
 
-    const routing = executionRoutingPreview
+    const routing = factoryBinding?.executionBackend === "isolated-container" ? null : executionRoutingPreview
       ? await persistExecutionRoutingDecision(ctx, {
           preview: executionRoutingPreview,
           workOrder: refreshedWorkOrder,
@@ -2498,6 +3153,9 @@ async function dispatchWorkOrder(
           routingDecisionId: routing.decisionId,
         },
       });
+      if (preExecutionRecovery) {
+        throw new Error("Pre-execution recovery rolled back because no safe model route satisfies this Work Order.");
+      }
       return {
         created: false,
         run: null,
@@ -2551,6 +3209,8 @@ async function dispatchWorkOrder(
         worktree: args.worktree,
         retryOfWorkflowRunId: args.retryOfWorkflowRunId,
         retryReason: retryRequest?.reason,
+        tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+        taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
         ...options.metadata,
       },
     });
@@ -2558,29 +3218,40 @@ async function dispatchWorkOrder(
     const now = Date.now();
     const workflowSnapshot = snapshotWorkflowDefinition(workflow);
     const attemptNumbers = selectedTask
-      ? nextTaskAttemptNumbers(taskAttempts, !!retryOfRun)
+      ? nextTaskAttemptNumbers(
+          taskAttempts,
+          Boolean(retryOfRun && !tasklessPreExecutionRecovery),
+        )
       : null;
     const authorityScope = buildWorkOrderTaskAuthority(refreshedWorkOrder);
     const taskInput =
       selectedTask?.description?.trim() ||
       selectedTask?.title ||
       refreshedWorkOrder.desiredOutcome;
-    const executionManifest = factoryBinding
-      ? buildFactoryExecutionManifest({
+    const executionManifestInput = factoryBinding
+      ? ({
           runId,
           missionId: refreshedWorkOrder.missionId ? String(refreshedWorkOrder.missionId) : undefined,
           missionPlanId: refreshedWorkOrder.missionPlanId ? String(refreshedWorkOrder.missionPlanId) : undefined,
           missionPlanVersion: missionPlanForDispatch?.revisionNumber,
+          ...(factoryBinding.executionBackend === "isolated-container" ? { missionPlanDigest: `sha256:${computeCanonicalHash(missionPlanForDispatch)}`, budgetReservationId: runId } : {}),
+          planningRepositorySha: refreshedWorkOrder.planningRepositorySha,
           qualityContractDigest: refreshedWorkOrder.qualityContractDigest,
           workOrderId: String(refreshedWorkOrder._id),
           workOrderRevisionNumber: refreshedWorkOrder.currentRevisionNumber ?? 1,
           workOrderRevisionId: refreshedWorkOrder.currentRevisionId ? String(refreshedWorkOrder.currentRevisionId) : undefined,
           taskId: selectedTask ? String(selectedTask._id) : undefined,
+          task: selectedTask ? {
+            title: selectedTask.title,
+            description: selectedTask.description,
+          } : undefined,
           factoryDefinitionVersionId: String(factoryBinding.version._id),
           factoryConfigurationDigest: factoryBinding.version.configurationDigest,
           factoryPurpose: factoryBinding.version.purpose ?? "SOFTWARE",
           repositoryId: String(factoryBinding.repository._id),
+          providerRepositoryId: factoryBinding.repository.providerRepositoryId,
           repository: factoryBinding.repository.repository,
+          repositoryAdmissionDigest: factoryBinding.version.repositoryAdmissionDigest,
           repositoryDataClassification: factoryBinding.repositoryDataClassification,
           defaultBranch: factoryBinding.repository.defaultBranch,
           baseSha: factoryBinding.baseSha,
@@ -2588,14 +3259,24 @@ async function dispatchWorkOrder(
           worktree: factoryBinding.worktree,
           executor: resolveFrozenHarnessBinding(factoryBinding.version),
           executionBackend: factoryBinding.executionBackend,
-          modelRoute: {
+          modelRoute: factoryBinding.executionBackend === "isolated-container" ? undefined : {
             catalogId: String(factoryBinding.modelRoute._id),
             routeDigest: factoryBinding.modelRoute.routeDigest,
             routeSnapshot: factoryBinding.modelRoute.routeSnapshot,
             qualificationDigest: factoryBinding.modelRoute.qualificationDigest,
+            qualificationSnapshot: factoryBinding.modelRoute.qualificationSnapshot,
           },
+          executionProfile: factoryBinding.executionProfile ? {
+            profileId: String(factoryBinding.version.executionProfileId),
+            profileKey: factoryBinding.version.executionProfileKey,
+            version: factoryBinding.version.executionProfileVersion,
+            profileDigest: factoryBinding.version.executionProfileDigest,
+            profileSnapshot: factoryBinding.version.executionProfileSnapshot,
+            qualificationDigest: factoryBinding.version.executionProfileQualificationDigest,
+            qualificationSnapshot: factoryBinding.version.executionProfileQualificationSnapshot,
+          } : undefined,
           sandboxProfile: {
-            isolation: "WORKSPACE_WRITE",
+            isolation: factoryBinding.version.purpose === "VERIFICATION" ? "READ_ONLY" as const : "WORKSPACE_WRITE" as const,
             requiredCapabilities: factoryBinding.requiredSandboxCapabilities,
           },
           sandbox: factoryBinding.executionBackend === "remote-sandbox" ? {
@@ -2607,20 +3288,20 @@ async function dispatchWorkOrder(
             profileId: String(factoryBinding.sandboxProfile._id),
             profileDigest: factoryBinding.sandboxProfile.profileDigest,
             profileSnapshot: factoryBinding.sandboxProfile.immutableSnapshot,
-            supervisorVersion: "mission-control-supervisor/v1",
+            supervisorVersion: "mission-control-supervisor/v1" as const,
             resultContract: {
-              schema: "factory-sandbox-result/v1",
-              independentHostValidationRequired: true,
+              schema: "factory-sandbox-result/v1" as const,
+              independentHostValidationRequired: true as const,
             },
             credentialGrants: [{
-              kind: "INFERENCE",
-              secretValueIncluded: false,
-              githubAuthority: "NONE",
-              providerAuthority: "NONE",
+              kind: "INFERENCE" as const,
+              secretValueIncluded: false as const,
+              githubAuthority: "NONE" as const,
+              providerAuthority: "NONE" as const,
             }],
             teardown: {
-              credentialsRevokedBeforePublication: true,
-              resourceAbsenceRequiredBeforePublication: true,
+              credentialsRevokedBeforePublication: true as const,
+              resourceAbsenceRequiredBeforePublication: true as const,
             },
           } : undefined,
           workflow: workflowSnapshot as any,
@@ -2671,6 +3352,67 @@ async function dispatchWorkOrder(
           },
         })
       : null;
+    const executionManifest = executionManifestInput ? (() => {
+      if (factoryBinding.executionBackend === "isolated-container") {
+        const { modelRoute: _modelRoute, routedModel: _routedModel, sandbox: _sandbox, ...offlineInput } = executionManifestInput;
+        return buildFactoryExecutionManifest({ ...offlineInput, executionProfile: offlineInput.executionProfile!,
+          missionPlanDigest: `sha256:${computeCanonicalHash(missionPlanForDispatch)}`, budgetReservationId: runId });
+      }
+      return buildFactoryExecutionManifest({ ...executionManifestInput, modelRoute: executionManifestInput.modelRoute! });
+    })() : null;
+    const routingBudgetAuthorization = (routing?.executionRoutingSnapshot as any)?.budgetAuthorization;
+    const routeCostPolicy = factoryBinding?.modelRoute?.costPolicySnapshot as Record<string, any> | undefined;
+    const estimatedCostUsd = routingBudgetAuthorization?.estimatedReservationUsd;
+    const remainingBeforeReservationUsd = routingBudgetAuthorization?.remainingBeforeReservationUsd;
+    const hardLimitUsd = factoryBinding && typeof estimatedCostUsd === "number"
+      ? Math.min(
+          factoryBinding.version.budget.maxCostUsd,
+          typeof remainingBeforeReservationUsd === "number"
+            ? remainingBeforeReservationUsd
+            : factoryBinding.version.budget.maxCostUsd,
+        )
+      : undefined;
+    const executionCostAuthorization = factoryBinding?.executionBackend === "isolated-container"
+      ? await reserveOfflineAttemptBudget(ctx, { runId, version: factoryBinding.version, workOrder: refreshedWorkOrder,
+          mission: missionForDispatch, policy: factoryBinding.policy, now })
+      : factoryBinding
+      && typeof estimatedCostUsd === "number"
+      && typeof hardLimitUsd === "number"
+      && hardLimitUsd >= estimatedCostUsd
+      && routeCostPolicy
+      && factoryBinding.modelRoute.costPolicyDigest
+      ? {
+          schema: "work-order-cost-authorization/v1" as const,
+          estimatedCostUsd,
+          reservedCostUsd: estimatedCostUsd,
+          hardLimitUsd,
+          priorCommittedUsd: routingBudgetAuthorization.priorCommittedUsd ?? 0,
+          remainingBeforeReservationUsd: hardLimitUsd,
+          budgetSource: routingBudgetAuthorization.budgetSource,
+          estimationInputs: {
+            plannedEstimateUsd: routingBudgetAuthorization.plannedEstimateUsd,
+            approvedWorkOrderCapUsd: routingBudgetAuthorization.approvedWorkOrderCapUsd,
+            missionBudgetRemainingUsd: routingBudgetAuthorization.missionBudgetRemainingUsd,
+            explicitRoutingBudgetRemainingUsd: routingBudgetAuthorization.explicitRoutingBudgetRemainingUsd,
+            routingPolicyBudgetLimitUsd: routingBudgetAuthorization.routingPolicyBudgetLimitUsd,
+            factoryVersionMaxCostUsd: factoryBinding.version.budget.maxCostUsd,
+            factoryVersionMaxAttempts: factoryBinding.version.budget.maxAttempts,
+            factoryVersionMaxRuntimeMinutes: factoryBinding.version.budget.maxRuntimeMinutes,
+            routeCostPolicy,
+          },
+          routeCostPolicyDigest: factoryBinding.modelRoute.costPolicyDigest,
+          actualCost: routeCostPolicy.actualCostTelemetry === "UNAVAILABLE"
+            ? {
+                status: "UNAVAILABLE" as const,
+                reason: routeCostPolicy.unknownActualCostReason,
+              }
+            : {
+                status: "UNAVAILABLE" as const,
+                reason: "Measured actual-cost telemetry has not been reported for this Attempt.",
+              },
+          authorizedAt: now,
+        }
+      : undefined;
     const runDocId = await ctx.db.insert("workflowRuns", {
       tenantId: refreshedWorkOrder.tenantId,
       runId,
@@ -2686,9 +3428,17 @@ async function dispatchWorkOrder(
       verificationContractDigest: refreshedWorkOrder.verificationContractDigest,
       factoryDefinitionVersionId: factoryBinding?.version._id,
       factoryConfigurationDigest: factoryBinding?.version.configurationDigest,
+      executionProfileId: factoryBinding?.version.executionProfileId,
+      executionProfileKey: factoryBinding?.version.executionProfileKey,
+      executionProfileVersion: factoryBinding?.version.executionProfileVersion,
+      executionProfileDigest: factoryBinding?.version.executionProfileDigest,
+      executionProfileSnapshot: factoryBinding?.version.executionProfileSnapshot,
+      executionProfileQualificationDigest: factoryBinding?.version.executionProfileQualificationDigest,
+      executionProfileQualificationSnapshot: factoryBinding?.version.executionProfileQualificationSnapshot,
       factoryPurpose: factoryBinding?.version.purpose ?? "SOFTWARE",
       attemptPurpose: refreshedWorkOrder.kind === "AUTOMATION" ? "AUTOMATION" : "IMPLEMENTATION",
       qualityContractDigest: refreshedWorkOrder.qualityContractDigest,
+      planningRepositorySha: refreshedWorkOrder.planningRepositorySha,
       repositoryId: factoryBinding?.repository._id,
       hostBindingId: factoryBinding?.host._id,
       policyEnvelopeId: factoryBinding?.version.policyEnvelopeId,
@@ -2722,6 +3472,8 @@ async function dispatchWorkOrder(
           ? {
               retryOfRunId: retryOfRun.runId,
               retryReason: retryRequest?.reason,
+              tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+              taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
             }
           : {}),
       },
@@ -2730,6 +3482,10 @@ async function dispatchWorkOrder(
       initialInput: taskInput,
       runtime: args.runtime,
       model: routedModel,
+      budgetUsd: executionCostAuthorization?.hardLimitUsd,
+      spentUsd: executionCostAuthorization ? 0 : undefined,
+      reservedCostUsd: executionCostAuthorization?.reservedCostUsd,
+      executionCostAuthorization,
       routingDecisionId: routing?.decisionId,
       routingDecisionDigest: routing?.decisionDigest,
       executionRoutingSnapshot: routing?.executionRoutingSnapshot,
@@ -2756,6 +3512,8 @@ async function dispatchWorkOrder(
         retryOfWorkflowRunId: args.retryOfWorkflowRunId,
         retryOfRunId: retryOfRun?.runId,
         retryReason: retryRequest?.reason,
+        tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+        taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
         routingMode: routing?.mode,
         routingSource: routing?.result.source,
         routingPolicyVersion: routing?.policyVersion,
@@ -2768,6 +3526,11 @@ async function dispatchWorkOrder(
         scopeReceiptId,
         factoryDefinitionVersionId: factoryBinding?.version._id,
         factoryConfigurationDigest: factoryBinding?.version.configurationDigest,
+        executionProfileId: factoryBinding?.version.executionProfileId,
+        executionProfileKey: factoryBinding?.version.executionProfileKey,
+        executionProfileVersion: factoryBinding?.version.executionProfileVersion,
+        executionProfileDigest: factoryBinding?.version.executionProfileDigest,
+        executionProfileQualificationDigest: factoryBinding?.version.executionProfileQualificationDigest,
         repositoryId: factoryBinding?.repository._id,
         hostBindingId: factoryBinding?.host._id,
         branch: factoryBinding?.branch,
@@ -2802,6 +3565,8 @@ async function dispatchWorkOrder(
         retryOfWorkflowRunId: args.retryOfWorkflowRunId,
         retryOfRunId: retryOfRun?.runId,
         retryReason: retryRequest?.reason,
+        tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+        taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
         ...options.metadata,
       },
     });
@@ -2883,6 +3648,8 @@ async function dispatchWorkOrder(
         retryOfWorkflowRunId: args.retryOfWorkflowRunId,
         retryOfRunId: retryOfRun?.runId,
         retryReason: retryRequest?.reason,
+        tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+        taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
       },
     });
 
@@ -2907,6 +3674,8 @@ async function dispatchWorkOrder(
           retryOfRunId: retryOfRun.runId,
           retryReason: retryRequest?.reason,
           recoveryRunId: runId,
+          tasklessPreExecutionRecovery: tasklessPreExecutionRecovery?.proof,
+          taskPreExecutionRecovery: taskPreExecutionRecovery?.proof,
         },
       });
     }
@@ -2919,7 +3688,7 @@ async function dispatchWorkOrder(
         actorType: args.actorType,
         actorId,
         relatedId: runDocId,
-        beforeState: retryOfRun
+        beforeState: retryOfRun && !tasklessPreExecutionRecovery
           ? {
               workflowRunId: retryOfRun._id,
               status: retryOfRun.status,
@@ -3164,9 +3933,166 @@ export const dispatchResearchEvidenceInternal = internalMutation({
   },
 });
 
+/** Read-only WorkOrder projection. Dispatch/claim remain the authority. */
+export const readiness = query({
+  args: {
+    workOrderId: v.id("workOrders"),
+    factoryDefinitionVersionId: v.optional(v.id("factoryDefinitionVersions")),
+    expectedRevision: v.optional(v.number()),
+    refreshToken: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const workOrder = await ctx.db.get(args.workOrderId);
+    if (!workOrder?.projectId) throw new Error("WorkOrder is unavailable or unauthorized.");
+    const access = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId);
+    assertAuthorizedDeliveryRecord(access, workOrder);
+    await requireWorkspacePermission(ctx, workOrder.projectId, FACTORY_PERMISSIONS.VIEW);
+    const now = Date.now();
+    const [mission, plan, workflow, runs, approvals] = await Promise.all([
+      workOrder.missionId ? ctx.db.get(workOrder.missionId) : null,
+      workOrder.missionPlanId ? ctx.db.get(workOrder.missionPlanId) : null,
+      workOrder.workflowId ? ctx.db.query("workflows").withIndex("by_workflow_id", (q) => q.eq("workflowId", workOrder.workflowId!)).first() : null,
+      ctx.db.query("workflowRuns").withIndex("by_work_order", (q) => q.eq("workOrderId", workOrder._id)).collect(),
+      ctx.db.query("approvalDecisions").withIndex("by_work_order", (q) => q.eq("workOrderId", workOrder._id)).collect(),
+    ]);
+    const revision = workOrder.currentRevisionNumber ?? 1;
+    const checks: ReadinessCheck[] = planReadiness({
+      missionId: workOrder.missionId, currentPlanId: mission?.currentPlanId,
+      plan, workOrderPlanRevision: workOrder.missionPlanRevision, releasedAt: workOrder.releasedAt,
+    });
+    const check = (code: string, label: string, passed: boolean, reason: string) => {
+      checks.push({ code, label, status: passed ? "PASS" : "BLOCKED", boundary: "ADMISSION", reason });
+    };
+    check("work-order-revision", "WorkOrder revision current", args.expectedRevision !== undefined && args.expectedRevision === revision,
+      `Refresh this WorkOrder and inspect revision ${revision}; readiness is bound to that revision.`);
+    check("risk", "Risk classification", ["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(workOrder.riskLevel),
+      "Classify the WorkOrder risk before selecting an execution tuple.");
+    check("workflow", "Workflow available", Boolean(workflow?.active), "Activate the approved workflow for this WorkOrder.");
+    const currentApprovals = approvals.filter((approval) => approval.workOrderRevisionNumber === revision);
+    const scopedRecords = await Promise.all((workOrder.codeScopeIds ?? []).map((id) => ctx.db.get(id)));
+    const scopePolicies = combineCodeScopePolicies(scopedRecords.filter((scope) => scope !== null));
+    const requiredApprovals = [...new Set([...(workOrder.requiredApprovals ?? []),
+      ...codeScopeApprovalPoliciesForDispatch({ isMutating: workOrder.isMutating !== false, approvalPolicies: scopePolicies.approvalPolicies })])];
+    const approval = deriveApprovalStatus({ ...workOrder, requiredApprovals, approvals: currentApprovals, now });
+    const dispatchable = validateDispatchable({
+      ...workOrder, requiredApprovals, approvalStatus: approval, hasWorkflowId: Boolean(workflow?.active),
+      activeRunStatuses: runs.map((run) => run.status),
+    });
+    check("dispatch-state", "WorkOrder state and approvals", dispatchable.ok,
+      dispatchable.ok ? "Current state and revision-bound approvals permit admission inspection."
+        : `Dispatch blocked: ${"reason" in dispatchable ? dispatchable.reason : "unknown"}. Required revision-bound approvals: ${requiredApprovalTypes({ ...workOrder, requiredApprovals }).join(", ") || "none"}. Inspect current approvals and Attempts.`);
+    if (mission && plan) {
+      const blueprintId = (workOrder.metadata as { missionBlueprintId?: string } | undefined)?.missionBlueprintId;
+      const blueprint = plan.workOrderBlueprints.find((item) => item.id === blueprintId);
+      const siblings = await ctx.db.query("workOrders").withIndex("by_mission", (q) => q.eq("missionId", mission._id)).collect();
+      const predecessors = await Promise.all((blueprint?.dependsOnBlueprintIds ?? []).map(async (id) => {
+        const dependency = siblings.find((item) => (item.metadata as { missionBlueprintId?: string } | undefined)?.missionBlueprintId === id);
+        if (!dependency || dependency.state !== "DONE") return false;
+        const handoff = await ctx.db.query("missionHandoffs").withIndex("by_work_order", (q) => q.eq("workOrderId", dependency._id)).order("desc").first();
+        return handoff?.outcome === "COMPLETE" && !handoff.incompleteAssertionIds.length && !handoff.unknownAssertionIds.length;
+      }));
+      const gate = validateMissionWorkOrderDispatch({
+        missionState: mission.state, workOrderRole: workOrder.missionRole,
+        planApproved: plan.status === "APPROVED" && mission.currentPlanId === plan._id,
+        executionPolicy: mission.executionPolicy, workOrderReleased: Boolean(workOrder.releasedAt),
+        isMutating: workOrder.isMutating !== false,
+        hasActiveMutatingWorkOrder: siblings.some((item) => item._id !== workOrder._id && item.isMutating && ["DISPATCHED", "IN_PROGRESS"].includes(item.state)),
+        predecessorHandoffValid: Boolean(blueprint) && predecessors.every(Boolean),
+        budgetRemaining: mission.budgetUsd === undefined || mission.spentUsd < mission.budgetUsd,
+        correctiveIterationsRemaining: mission.correctiveIterations < mission.maxCorrectiveIterations,
+      });
+      check("mission-controls", "Mission dependencies, budget and recovery", gate.ok,
+        gate.ok ? "Current Mission dispatch controls pass." : `Mission dispatch blocked: ${gate.reason}.`);
+    }
+    const version = args.factoryDefinitionVersionId ? await ctx.db.get(args.factoryDefinitionVersionId) : null;
+    if (version && (version.projectId !== workOrder.projectId || version.repositoryId !== workOrder.repositoryId)) {
+      throw new Error("Factory version is unavailable or outside this WorkOrder scope.");
+    }
+    check("factory-selected", "Exact Factory Version", Boolean(version), "Select the exact Factory Version to inspect.");
+    let hostId: string | null = null;
+    if (version && workflow) {
+      try {
+        const inspection = await resolveFactoryDispatchBinding(ctx, {
+          args: { workOrderId: workOrder._id, factoryDefinitionVersionId: version._id,
+            actorType: "HUMAN", idempotencyKey: "readiness-inspection", attemptRunId: "readiness-inspection" },
+          workOrder, workflow, inspect: true,
+        });
+        for (const fact of inspection?.checks ?? []) check(fact.code, fact.label ?? fact.code.replace(/-/g, " "), fact.passed, fact.reason);
+        hostId = inspection?.hostId ?? null;
+      } catch (error) {
+        check("factory-inspection", "Factory binding inspection", false,
+          error instanceof Error ? error.message : "Factory inspection failed; dispatch is not ready.");
+      }
+      try {
+        const routing = await buildExecutionRoutingPreview(ctx, { workOrder, workflow, fallbackFactoryDefinitionVersionId: version._id, cutoffAt: now });
+        const candidate = routing?.result.candidates.find((item) => item.tuple.factoryDefinitionVersionId === String(version._id));
+        check("exact-tuple", "Model / harness / runtime / backend qualification", Boolean(candidate?.eligible),
+          candidate?.eligible ? "Exact tuple passes current WorkOrder routing eligibility."
+            : candidate?.rejectionReasons.join(" ") || "No qualified tuple matches this WorkOrder and Factory Version.");
+        for (const [index, code] of (candidate?.rejectionCodes ?? []).entries()) {
+          check(`route:${code}`, code.replace(/_/g, " ").toLowerCase(), false, candidate!.rejectionReasons[index]);
+        }
+        check("selected-route", "Applied route", routing?.selectedFactoryDefinitionVersionId === version._id,
+          "The current routing decision must apply this exact selected Factory Version; inspect any pin or fallback mismatch.");
+      } catch (error) {
+        check("routing-inspection", "Routing and cost authority", false,
+          error instanceof Error ? error.message : "Routing inspection failed; cost authority is unknown.");
+      }
+    }
+    if (workOrder.repositoryId) {
+      const [repository, team, owner, host] = await Promise.all([
+        ctx.db.get(workOrder.repositoryId),
+        workOrder.owningTeamId ? ctx.db.get(workOrder.owningTeamId) : null,
+        workOrder.ownerMemberId ? ctx.db.get(workOrder.ownerMemberId) : null,
+        hostId ? ctx.db.query("workspaceHostBindings").withIndex("by_project_host", (q) => q.eq("projectId", workOrder.projectId!).eq("hostId", hostId!)).first() : null,
+      ]);
+      const scope = validateDispatchScope({
+        projectId: workOrder.projectId,
+        repository: repository ? { ...repository, id: repository._id } : null,
+        team: team ? { ...team, id: team._id } : null,
+        owner: owner ? { ...owner, id: owner._id } : null,
+        host,
+        codeScopes: scopedRecords.filter((record) => record !== null).map((record) => ({ ...record, id: record._id })),
+        executionEnvironment: workOrder.executionEnvironment ?? "LOCAL",
+      });
+      check("delivery-scope", "Repository, team, owner and environment", scope.allowed && scopedRecords.every(Boolean),
+        `Resolve current delivery scope: ${scope.reasonCodes.join(", ") || "missing code scope"}.`);
+      try {
+        if (!workOrder.tenantId) throw new Error("Company scope is missing.");
+        const operator = await requireWorkspaceAccess(ctx, workOrder.tenantId, workOrder.projectId,
+          { permission: COMPANY_PERMISSIONS.DISPATCH_WORK });
+        const broadAccess = operator.membership.canManageCompany || operator.roleNames.some((name) => /workspace lead|product manager|company|owner|admin/i.test(name));
+        const membership = operator.teamMemberships?.find((item) => item.teamId === workOrder.owningTeamId);
+        check("operator-authority", "Current human dispatch authority", broadAccess || Boolean(membership
+          && (membership.role !== "DEVELOPER" || operator.memberProfiles?.some((profile) => profile._id === workOrder.ownerMemberId))),
+          "Current operator requires dispatch permission and the appropriate team or WorkOrder ownership.");
+      } catch {
+        check("operator-authority", "Current human dispatch authority", false, "Current operator lacks authorized company/workspace dispatch access.");
+      }
+    }
+    for (const [code, label, reason] of [
+      ["repository-preparation", "Attempt repository prepared", "The admitted worker must allocate an isolated worktree at the exact base SHA and verify source integrity before implementation."],
+      ["dependencies", "Attempt dependencies present", "No preparation receipt exists for a future Attempt. Worker dependency preparation must succeed before implementation; a prior Attempt's receipt is not current proof."],
+      ["verifier-preparation", "Independent verifier prepared", "Selected Factory verifier registration and separate exact-candidate worktree/dependency preparation must pass at their respective admission boundaries."],
+    ]) checks.push({ code, label, reason, status: "DEFERRED", boundary: code === "verifier-preparation" ? "VERIFICATION" : "PRE_EXECUTION" });
+    checks.push({ code: "candidate-evidence", label: "Exact-candidate evidence current", status: "DEFERRED", boundary: "VERIFICATION",
+      reason: "A new Attempt requires independent evidence for its exact candidate. Existing evidence cannot certify a future change; acceptance remains separately gated." });
+    return {
+      ...summarizeWorkOrderReadiness(checks), evaluatedAt: now,
+      workOrderId: workOrder._id, workOrderRevision: revision,
+      planId: plan?._id ?? null, planRevision: plan?.revisionNumber ?? null,
+      factoryVersionId: version?._id ?? null, configurationDigest: version?.configurationDigest ?? null,
+      modelRouteDigest: version?.modelRouteDigest ?? null,
+      harnessDigest: version?.harnessCapabilityManifestDigest ?? null,
+      runtimeArtifactDigest: version?.harnessRuntimeArtifactDigest ?? null,
+      executionBackend: version?.executionBackend ?? null, hostId,
+    };
+  },
+});
+
 async function resolveFactoryDispatchBinding(
-  ctx: MutationCtx,
-  input: { args: DispatchArgs & { attemptRunId: string }; workOrder: any; workflow: any }
+  ctx: MutationCtx | QueryCtx,
+  input: { args: DispatchArgs & { attemptRunId: string }; workOrder: any; workflow: any; inspect?: boolean }
 ): Promise<any | null> {
   const { args, workOrder, workflow } = input;
   if (!args.factoryDefinitionVersionId) {
@@ -3178,6 +4104,7 @@ async function resolveFactoryDispatchBinding(
       assessmentCurrent: false, digestMatches: false, repositoryReady: false,
       repositoryPolicyReady: false, remoteEgressPolicyReady: false,
       githubReady: false, workflowMatches: false, executorReady: false,
+      executionProfileReady: false,
       workflowContractReady: false,
       codeScopesReady: false, agentManifestsReady: false,
       policyReady: false, verifiersReady: false, hostReady: false,
@@ -3191,6 +4118,9 @@ async function resolveFactoryDispatchBinding(
   const now = Date.now();
   const version = await ctx.db.get(args.factoryDefinitionVersionId);
   if (!version) throw new Error("Factory dispatch blocked (factory-version-not-found): Select an available Factory version.");
+  if (version.projectId !== workOrder.projectId || version.repositoryId !== workOrder.repositoryId) {
+    throw new Error("Factory dispatch blocked (factory-scope-mismatch): Select a Factory version for this WorkOrder repository and workspace.");
+  }
   const [definition, repository, policy, installation, assessments, bindings, verifiers, codeScopes, agentVersions, sandboxProfile, modelRoute] = await Promise.all([
     ctx.db.get(version.factoryDefinitionId),
     ctx.db.get(version.repositoryId),
@@ -3210,12 +4140,42 @@ async function resolveFactoryDispatchBinding(
     agentVersion ? ctx.db.get(agentVersion.templateId) : null
   ));
   const selectedExecutionBackend = version.executionBackend ?? "persistent-worker";
+  const offline = selectedExecutionBackend === "isolated-container";
+  const selectedIsolation = version.purpose === "VERIFICATION" ? "READ_ONLY" : "WORKSPACE_WRITE";
+  const offlineSnapshot = version.executionProfileSnapshot as any;
+  if (offline) {
+    assertQualificationActivation({ definition, version,
+      environment: version.environmentId ? await ctx.db.get(version.environmentId) : null,
+      configuredEnvironmentId: process.env.MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID, now });
+    if (args.model !== undefined || args.authorizedModelOverride !== undefined || workOrder.executionRoutingPin !== undefined
+      || !workOrder.missionId || !workOrder.missionPlanId || workOrder.riskLevel !== "LOW"
+      || workOrder.verificationContract?.schemaVersion !== 2 || workOrder.verificationContract?.enforcementMode !== "ENFORCED"
+      || (workOrder.dataBoundaries?.length ?? 0) !== 0 || deterministicFactoryVersionIssues(version, workflow).length) {
+      throw new Error("Offline WorkOrder admission requires a governed deterministic Mission plan with no inference override.");
+    }
+  }
   const frozenHarness = resolveFrozenHarnessBinding(version);
-  const primaryAgentIndex = (version.agentBindings ?? []).findIndex((binding) => binding.workflowAgentId === workflow.steps?.[0]?.agent);
-  const primaryModel = agentVersions[primaryAgentIndex >= 0 ? primaryAgentIndex : 0]?.genome.modelConfig;
+  const versionProfileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+  const adapterRuntimeArtifact = resolveHarnessAdapterRuntimeArtifact(
+    version.executor,
+    versionProfileSnapshot?.harness?.source === "EXTERNAL_FROZEN"
+      ? frozenHarness.runtimeArtifact
+      : undefined,
+  );
+  const primaryModel = (() => {
+    try {
+      return resolveFactoryWorkflowModelRoute({
+        workflow,
+        agentBindings: version.agentBindings ?? [],
+        agentVersions,
+      });
+    } catch {
+      return null;
+    }
+  })();
   const requiredSandboxCapabilities = selectedExecutionBackend === "remote-sandbox"
-    ? ["git-worktree", "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
-    : ["git-worktree", "workspace-write"];
+    ? ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", "remote-sandbox", "sandbox-provider:exe-dev"]
+    : ["git-worktree", selectedIsolation === "READ_ONLY" ? "read-only" : "workspace-write", ...(offline ? offlineSnapshot?.requiredSandboxCapabilities ?? [] : [])];
   const eligibleBindings = repository ? bindings.filter((binding) => {
     if (args.executorHostId && binding.hostId !== args.executorHostId) return false;
     return factoryWorkerEligibility({
@@ -3241,13 +4201,17 @@ async function resolveFactoryDispatchBinding(
           version: frozenHarness.version,
           capabilityManifestSha256: frozenHarness.capabilityManifestSha256,
           effectiveConfigSha256: frozenHarness.effectiveConfigSha256,
+          runtimeArtifactSha256: adapterRuntimeArtifact.runtimeArtifactSha256,
+          requireFactoryVersionRuntimeArtifactBinding: Boolean(version.harnessRuntimeArtifactDigest),
         },
+        executionRuntimeArtifactSha256: frozenHarness.runtimeArtifactSha256,
         provider: primaryModel?.provider ?? null,
         model: primaryModel?.modelId ?? null,
-        harnessCapabilities: factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
-        isolation: "WORKSPACE_WRITE",
+        harnessCapabilities: offline ? offlineSnapshot?.requiredHarnessCapabilities ?? [] : factoryHarnessCapabilityRequirements("WORKSPACE_WRITE"),
+        isolation: selectedIsolation,
         sandboxCapabilities: requiredSandboxCapabilities,
         executionBackend: selectedExecutionBackend,
+        ...(offline ? { inferenceConstraint: NO_INFERENCE_CONSTRAINT } : {}),
         factoryDefinitionVersionId: String(version._id),
         factoryConfigurationDigest: version.configurationDigest,
         modelRouteDigest: version.modelRouteDigest,
@@ -3260,6 +4224,26 @@ async function resolveFactoryDispatchBinding(
   const host = repository
     ? selectCurrentFactoryHost(eligibleBindings, repository.repository, now, args.executorHostId)
     : null;
+  const localRepositoryAdmission = repository && isLocalQualificationRepository(repository)
+    ? await loadLocalRepositoryAdmission(ctx, repository, now, version)
+    : null;
+  let localHostObservationReady = true;
+  if (localRepositoryAdmission) {
+    try {
+      assertLocalRepositoryHost(localRepositoryAdmission.admission, localRepositoryAdmission.digest, host, now);
+    } catch {
+      localHostObservationReady = false;
+    }
+  }
+  const planningRevisionDrift = Boolean(host && workOrder.planningRepositorySha
+    && host.baseCommit !== workOrder.planningRepositorySha);
+  if (!input.inspect && host && workOrder.planningRepositorySha
+    && host.baseCommit !== workOrder.planningRepositorySha) {
+    throw new Error(
+      `Factory dispatch blocked (planning-revision-drift): the approved Plan researched ${workOrder.planningRepositorySha}, `
+      + `but the canonical worker now reports ${host.baseCommit ?? "no immutable base SHA"}. Generate and approve a new Plan revision.`,
+    );
+  }
   const sandboxProfileReady = selectedExecutionBackend !== "remote-sandbox" || Boolean(
     sandboxProfile
     && sandboxProfile.projectId === version.projectId
@@ -3279,21 +4263,63 @@ async function resolveFactoryDispatchBinding(
     dataBoundaryCount: workOrder.dataBoundaries?.length ?? 0,
   });
   const modelRouteReady = Boolean(
-    modelRoute
+    selectedExecutionBackend !== "isolated-container"
+    && modelRoute
+    && primaryModel
     && modelRoute._id === version.modelCatalogId
-    && modelRoute.routeDigest === version.modelRouteDigest
-    && modelRoute.qualificationDigest === version.modelQualificationDigest
-    && JSON.stringify(modelRoute.routeSnapshot) === JSON.stringify(version.modelRouteSnapshot)
-    && JSON.stringify(modelRoute.qualificationSnapshot) === JSON.stringify(version.modelQualificationSnapshot)
-    && modelRouteProductionEligible(modelRoute)
+    && factoryWorkflowModelRouteMatches({
+      workflow,
+      agentBindings: version.agentBindings ?? [],
+      agentVersions,
+    }, version.modelRouteSnapshot as any)
+    && frozenFactoryModelRouteEligible({
+      route: modelRoute,
+      version,
+      harness: frozenHarness,
+      executionBackend: selectedExecutionBackend,
+    })
   );
+  const profileFieldsPresent = hasAnyExecutionProfileBinding(version);
+  const executionProfileAdmission = version.executionProfileId
+    ? await loadExecutionProfileAdmission(ctx, version.executionProfileId, now)
+    : null;
+  const executionProfile = executionProfileAdmission?.profile ?? null;
+  const profileSnapshot = version.executionProfileSnapshot as Record<string, any> | undefined;
+  const workloadClass = (version.purpose ?? "SOFTWARE") === "VERIFICATION"
+    ? "VERIFICATION"
+    : (version.purpose ?? "SOFTWARE") === "INTELLIGENT_AUTOMATION"
+      ? "AUTOMATION"
+      : "SOFTWARE_CHANGE";
+  const executionProfileReady = !profileFieldsPresent || Boolean(
+    executionProfile
+    && executionProfileAdmission?.eligible
+    && executionProfile.projectId === version.projectId
+    && executionProfileProjectionBlockers({
+      profileId: String(executionProfile._id),
+      profileSnapshot: executionProfile.immutableSnapshot,
+      profileDigest: executionProfile.profileDigest,
+      qualificationSnapshot: executionProfile.qualificationSnapshot,
+      qualificationDigest: executionProfile.qualificationDigest!,
+      projection: factoryVersionExecutionProfileProjection(version)!,
+    }).length === 0
+    && executionProfileScopeBlockers(executionProfile, {
+      workloadClass,
+      riskClass: version.riskBoundary,
+      isolation: selectedIsolation,
+    }).length === 0
+  );
+  const offlineBindingReady = offline && executionProfileReady && Boolean(executionProfile)
+    && validFactoryExecutionBinding({ ...version, executionBackend: "isolated-container",
+      offlineAdmission: { profile: executionProfile!, sandboxProfile, projection: factoryVersionExecutionProfileProjection(version)!,
+        workflow, repositoryDataClassification, now, projectId: String(version.projectId), tenantId: String(version.tenantId ?? ""),
+        purpose: version.purpose ?? "SOFTWARE", agentBindings: version.agentBindings ?? [], deterministicOperation: version.deterministicOperation } });
   const activeStatuses = ["PENDING", "RUNNING", "PAUSED"] as const;
   const activeRuns = repository
     ? (await Promise.all(activeStatuses.map((status) => ctx.db.query("workflowRuns")
         .withIndex("by_repository_status", (q) => q.eq("repositoryId", repository._id).eq("status", status))
         .collect()))).flat()
     : [];
-  const result = evaluateFactoryDispatchPreflight({
+  const preflightInput = {
     factoryRequired: Boolean(workOrder.missionId || workOrder.repositoryId),
     versionProvided: true,
     definitionActive: definition?.status === "ACTIVE",
@@ -3308,6 +4334,7 @@ async function resolveFactoryDispatchBinding(
     workflowMatches: version.workflowId === workflow._id,
     workflowContractReady: factoryWorkflowContractIssues(workflow).length === 0,
     executorReady: validFactoryExecutorBinding(version.executor),
+    executionProfileReady,
     codeScopesReady: Boolean(
       version.codeScopeIds?.length
       && repository
@@ -3327,7 +4354,7 @@ async function resolveFactoryDispatchBinding(
         && Boolean(agentVersion.genome.modelConfig.modelId.trim())
       )
       && agentTemplates.every((template) => template?.active)
-      && modelRouteReady
+      && (offline ? offlineBindingReady : modelRouteReady)
     ),
     policyReady: Boolean(policy?.active && (!policy.projectId || policy.projectId === workOrder.projectId)),
     verifiersReady: verifiers.length > 0 && verifiers.every((item) => item?.active && item.projectId === workOrder.projectId),
@@ -3339,19 +4366,53 @@ async function resolveFactoryDispatchBinding(
       && host.baseBranch === repository?.defaultBranch
       && typeof host.baseCommit === "string"
       && /^[a-f0-9]{40,64}$/i.test(host.baseCommit)
+      && localHostObservationReady
     ),
     budgetReady: validFactoryBudget(version.budget),
-    recoveryReady: genericHarnessV1RecoveryReady(version.recovery) && sandboxProfileReady && validFactoryExecutionBinding({
+    recoveryReady: genericHarnessV1RecoveryReady(version.recovery) && sandboxProfileReady && (offline ? offlineBindingReady : validFactoryExecutionBinding({
       executionBackend: selectedExecutionBackend,
       sandboxProfileId: version.sandboxProfileId ? String(version.sandboxProfileId) : undefined,
       sandboxProfileDigest: version.sandboxProfileDigest,
       riskBoundary: version.riskBoundary,
       recovery: version.recovery,
-    }),
+    })),
     worktreeProvided: Boolean(args.worktree?.trim() || host?.checkoutRoot?.trim()),
     mutating: workOrder.isMutating !== false,
     activeRepositoryMutation: activeRuns.some((run) => run.isMutating !== false),
-  });
+  };
+  if (input.inspect) return {
+    checks: [...(localRepositoryAdmission
+      ? factoryLocalQualificationDispatchChecks({
+          ...preflightInput,
+          repositoryAdmission: {
+            mode: localRepositoryAdmission.admission.mode,
+            digest: localRepositoryAdmission.digest,
+            frozenDigest: version.repositoryAdmissionDigest ?? "",
+            current: localHostObservationReady,
+            publicationAuthority: localRepositoryAdmission.admission.publicationAuthority,
+            productionAuthority: localRepositoryAdmission.admission.productionAuthority,
+          },
+        })
+      : factoryDispatchChecks(preflightInput)), {
+      code: "planning-revision-drift", passed: !planningRevisionDrift,
+      reason: "Worker base must match the approved planning SHA; drift requires a new researched and approved Plan.",
+    }],
+    hostId: host?.hostId,
+    baseSha: host?.baseCommit,
+  };
+  const result = localRepositoryAdmission
+    ? evaluateLocalQualificationDispatchPreflight({
+        ...preflightInput,
+        repositoryAdmission: {
+          mode: localRepositoryAdmission.admission.mode,
+          digest: localRepositoryAdmission.digest,
+          frozenDigest: version.repositoryAdmissionDigest ?? "",
+          current: localHostObservationReady,
+          publicationAuthority: localRepositoryAdmission.admission.publicationAuthority,
+          productionAuthority: localRepositoryAdmission.admission.productionAuthority,
+        },
+      })
+    : evaluateFactoryDispatchPreflight(preflightInput);
   if (!result.ok) throw new Error(`Factory dispatch blocked (${result.blocker}): ${result.remediation}`);
   if (!repository || !host) throw new Error("Factory dispatch blocked (binding-missing): Reassess Factory readiness.");
   if (!host.baseCommit || host.baseBranch !== repository.defaultBranch) {
@@ -3359,14 +4420,16 @@ async function resolveFactoryDispatchBinding(
   }
   return {
     version,
+    policy,
     repository,
     repositoryDataClassification,
     host,
-    baseSha: host.baseCommit,
+    baseSha: workOrder.planningRepositorySha ?? host.baseCommit,
     executionBackend: selectedExecutionBackend,
     requiredSandboxCapabilities,
     sandboxProfile,
     modelRoute,
+    executionProfile,
     branch: args.branch?.trim() || `mc/${String(workOrder._id).slice(-12)}-${args.attemptRunId}`,
     worktree: args.worktree?.trim() || `${host.checkoutRoot.replace(/\/+$/, "")}/.mission-control/worktrees/${String(workOrder._id).slice(-12)}-${args.attemptRunId}`,
     allowedTools: Array.isArray(workflow.metadata?.allowedTools) ? workflow.metadata.allowedTools.filter((item: unknown): item is string => typeof item === "string") : [],
@@ -3643,6 +4706,7 @@ export const approvalQueue = query({
       const acceptance = workOrder ? evaluateAcceptance({
         riskLevel: workOrder.riskLevel as any,
         requiredApprovals: workOrder.requiredApprovals,
+        isMutating: workOrder.isMutating,
         approvalDecisions,
         acceptanceCriteria: workOrder.acceptanceCriteria as any,
         verificationReceipts: receipts,
@@ -3843,12 +4907,18 @@ export const decideApprovalDecision = mutation({
         ? await ctx.db.get(run.factoryContinuation.verificationReceiptId)
         : null;
       if (!sourceReceipt
-        || sourceReceipt.workflowRunId !== run._id
+        || !factoryReviewReceiptMatchesSource(run as any, sourceReceipt)
         || sourceReceipt.workOrderId !== workOrder._id
-        || sourceReceipt.verdict !== "REQUIRES_HUMAN_REVIEW"
-        || sourceReceipt.status !== "PENDING"
+        || !((sourceReceipt.verdict === "REQUIRES_HUMAN_REVIEW" && sourceReceipt.status === "PENDING")
+          || (run.verificationSubject?.version === 2 && sourceReceipt.verdict === "VERIFIED" && sourceReceipt.status === "PASSED"))
         || sourceReceipt.candidateRevision !== run.factoryContinuation?.candidateRevision) {
         throw new Error("Human-review checkpoint is missing its exact verification receipt");
+      }
+      if (run.verificationSubject?.version === 2) {
+        const current = await getCurrentVerificationRoutingOutcome(ctx, workOrder, Date.now(), "PREPUBLICATION");
+        if (!current.eligible || current.sourceAttemptId !== String(run._id) || current.verificationReceiptId !== String(sourceReceipt._id)) {
+          throw new Error("Human review requires the latest exact independent pre-publication evidence.");
+        }
       }
       if (!isSourceVerificationFreshForPublication({ validUntil: sourceReceipt.validUntil })) {
         const staleReason = "Human-review evidence expired before publication could be safely authorized";
@@ -4227,15 +5297,19 @@ export const accept = mutation({
       workOrder.projectId,
       FACTORY_PERMISSIONS.APPROVE,
     );
-    if (factoryAccess.membership.mode === "DEMO") {
+    const localDemoAcceptance = factoryAccess.membership.mode === "DEMO"
+      && localDemoOperatorAcceptanceEnabled();
+    if (factoryAccess.membership.mode === "DEMO" && !localDemoAcceptance) {
       throw new Error("Anonymous demo authority cannot accept governed work.");
     }
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
-    if (!deliveryAccess) {
+    if (!deliveryAccess && !localDemoAcceptance) {
       throw new Error("WorkOrder acceptance is unavailable until an authenticated operator is provisioned.");
     }
-    assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
-    const acceptActorId = factoryAccess.actorId;
+    if (deliveryAccess) assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
+    const acceptActorId = localDemoAcceptance
+      ? "development:local-operator"
+      : factoryAccess.actorId;
     const existingEvent = await ctx.db
       .query("workOrderEvents")
       .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", `${args.idempotencyKey}:accepted`))
@@ -4345,6 +5419,7 @@ export const accept = mutation({
       const approvalStatus = deriveApprovalStatus({
         riskLevel: workOrder.riskLevel as any,
         requiredApprovals: workOrder.requiredApprovals,
+        isMutating: workOrder.isMutating,
         approvals: approvalDecisions,
         now,
       });
@@ -4355,6 +5430,7 @@ export const accept = mutation({
       const acceptance = evaluateAcceptance({
         riskLevel: workOrder.riskLevel as any,
         requiredApprovals: workOrder.requiredApprovals,
+        isMutating: workOrder.isMutating,
         approvalDecisions,
         acceptanceCriteria: workOrder.acceptanceCriteria as any,
         verificationReceipts,
@@ -4565,8 +5641,14 @@ export const requestWorkOrderRevision = mutation({
       : [];
 
     const revisions = await listRevisionsForWorkOrder(ctx, workOrder._id);
+    for (const pendingRevision of revisions.filter((revision: any) => revision.status === "PENDING_APPROVAL")) {
+      await ctx.db.patch(pendingRevision._id, { status: "SUPERSEDED" });
+    }
     const previousRevisionId = revisions[0]?._id;
-    const revisionNumber = (workOrder.currentRevisionNumber ?? 1) + 1;
+    const revisionNumber = Math.max(
+      workOrder.currentRevisionNumber ?? 1,
+      ...revisions.map((revision: any) => revision.revisionNumber ?? 0),
+    ) + 1;
     const revisionId = await ctx.db.insert("workOrderRevisions", {
       tenantId: workOrder.tenantId,
       projectId: workOrder.projectId,
@@ -4634,6 +5716,11 @@ export const approveWorkOrderRevision = mutation({
     }
     const workOrder = await ctx.db.get(revision.workOrderId);
     if (!workOrder) throw new Error("WorkOrder not found");
+    const revisions = await listRevisionsForWorkOrder(ctx, workOrder._id);
+    const newestPendingRevision = revisions.find((candidate: any) => candidate.status === "PENDING_APPROVAL");
+    if (newestPendingRevision?._id !== revision._id) {
+      throw new Error("Only the latest pending WorkOrderRevision can be approved");
+    }
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
     assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
 
@@ -4841,6 +5928,7 @@ export const supersedeWorkOrder = mutation({
     const acceptance = evaluateAcceptance({
       riskLevel: original.riskLevel as any,
       requiredApprovals: original.requiredApprovals,
+      isMutating: original.isMutating,
       approvalDecisions: approvals,
       acceptanceCriteria: original.acceptanceCriteria as any,
       verificationReceipts: receipts,
@@ -4916,9 +6004,11 @@ export const expireGovernanceRecords = mutation({
       const result = await expireGovernanceRecordsForWorkOrder(ctx, workOrder);
       expiredApprovals += result.expiredApprovals;
       staleReceipts += result.staleReceipts;
-      if (result.expiredApprovals > 0 || result.staleReceipts > 0) {
-        await refreshWorkOrderGovernance(ctx, workOrder._id);
-      }
+      // This mutation backs the operator's explicit "Refresh governance"
+      // action. Reconcile current authority even when no record expired so
+      // newly approved Mission Plans and other durable decisions project
+      // into the WorkOrder immediately.
+      await refreshWorkOrderGovernance(ctx, workOrder._id);
     }
 
     return { expiredApprovals, staleReceipts, workOrdersTouched: workOrders.length };

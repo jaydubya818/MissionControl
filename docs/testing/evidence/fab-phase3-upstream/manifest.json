@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "fab-phase3-upstream-reconciliation/v1",
+  "baselineMain": "6d7146d5205aef729aee2960aed2a4ed8e8ab95c",
+  "mergeCommit": "4b95edd96d6ac3cd52eece0adfd06c1a8e275972",
+  "qualifiedImplementation": "f5ed5d10ac58ba4472eddd882a06406fd96d9830",
+  "nonDocumentationChanges": [],
+  "documentationCheck": "PASS",
+  "runtimeContract": "PASS",
+  "branchWhitespace": "PASS",
+  "fullSuite": "NOT_REPEATED_FOR_DOCUMENTATION_ONLY_MERGE",
+  "maturity": "Experimental",
+  "liveProviderCalls": 0,
+  "classification": "LOCAL_SOURCE_RECONCILIATION",
+  "files": {
+    "README.md": "32bf73f64748b2767f25c9e487d3dd683ab5f98bced7766f76e0b87cffc2c22a",
+    "documentation-check.txt": "294c26409c1bdc1f25efaea79fde9c83900441b81e7dda71a070ac3ce8912b8c",
+    "runtime-contract.txt": "ef44b9a079088cbf67b8756f06f0c26902c4061537b4503d347a10d627a9ca2a"
+  }
+}

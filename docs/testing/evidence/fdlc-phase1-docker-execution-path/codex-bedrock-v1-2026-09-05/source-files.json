@@ -1,0 +1,178 @@
+{
+  "scope": "uncommitted offline implementation bytes; not a commit identity",
+  "baseHead": "c9d7620beb7e2cb779584e700e0fc46cf8e2c77e",
+  "files": [
+    {
+      "path": "apps/orchestration-server/package.json",
+      "sha256": "d1ed0187ac238d13fc54c0a74020b3ef66fc72f8397ad4c3b65ee28136ed2100"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/bedrockInferenceBridge.test.ts",
+      "sha256": "85510e356b7fd1470f85732d1a05a68653806cd5972bfc9341ea318b30a9e85e"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/bedrockProfileComposition.test.ts",
+      "sha256": "d92d09acd5d98f9909f3c22d406e4aaf0a6841b440416c5042950924cc893db5"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/bedrockQualifiedTransport.test.ts",
+      "sha256": "807493fd48cdf5526d927a121973ad9ed8557b97d80ea1a62fb742c7db9ca5f0"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/dockerBedrockAdmission.test.ts",
+      "sha256": "e3607124b866a8a594881147972590d45448f1ede5db57d72f3dd40678afc5de"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/dockerBedrockBridge.test.ts",
+      "sha256": "4afb4fb06f70f3ae81879dcd0c1dddf93593afe7857c7389ee24152555b52b28"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/factoryAttemptWorker.test.ts",
+      "sha256": "7cd2a2f04cc5f3f42a861e843a009766434749e8f07ebc79d12498f90d2e2a01"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/fixtures/bedrockBridgeFixture.ts",
+      "sha256": "a77b12c32a83e77b0645c43373ff701262760f65a5e910bf813bf1b478784382"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/fixtures/bedrockProfileFixture.ts",
+      "sha256": "8a5539f534aec6579e5d504f336b6795fa65171ea5264f4670844a4d8c567882"
+    },
+    {
+      "path": "apps/orchestration-server/src/__tests__/governedMcpBroker.test.ts",
+      "sha256": "bba315df4ea44af15031bf409b764d88269fc4e921cb76c981c742ee49cf57fd"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockAdapter.ts",
+      "sha256": "64aa59c0902771b8b6c68a090977a5c34952170b02d6d8ed1536f2ca77c17cac"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockFactoryComposition.ts",
+      "sha256": "07d63e170841580c1c6073695ce2e63f9774b132703c84ebc2b99e318cb41798"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockInferenceBridge.ts",
+      "sha256": "c0c750cc36f17e9cee3759f9f0a93021d41e0c6692d9a1514d989c03c809d15b"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockQualifiedTransport.ts",
+      "sha256": "d50c85eeb566c060b2aa041fa841955e554cb33fe711e84339d8e0a02d42ba81"
+    },
+    {
+      "path": "apps/orchestration-server/src/bedrockResponsesProtocol.ts",
+      "sha256": "34c4cabc31e2d3e938d3d91650080ddf26b13e2fcfc75fa4b106536b597745a4"
+    },
+    {
+      "path": "apps/orchestration-server/src/codexBedrockExecutorAdapter.ts",
+      "sha256": "777eb2ddb96a0dd65b2a9c49421706c948aa2b827f0f11198fa83f291a7fa1ce"
+    },
+    {
+      "path": "apps/orchestration-server/src/codexExecutorAdapter.ts",
+      "sha256": "1c72e63b0e4c33947729a3ecde0a53d961498615232d40362fdaccc6d36396b6"
+    },
+    {
+      "path": "apps/orchestration-server/src/dockerBedrockIdentity.ts",
+      "sha256": "293442425d96404ec973ce763e9615bcf956e1d4715e9932b9b632f67d5a885a"
+    },
+    {
+      "path": "apps/orchestration-server/src/dockerSandboxProvider.ts",
+      "sha256": "7032e904d0cd81ade5d1afc7c09f695a06702ffecf37df0f2a71d79558935c16"
+    },
+    {
+      "path": "apps/orchestration-server/src/factoryAttemptWorker.ts",
+      "sha256": "332b7bd68c12cdce1e0be83386493b158f7c86206785acde80ebf9c724558c2a"
+    },
+    {
+      "path": "apps/orchestration-server/src/factoryHarnessComposition.ts",
+      "sha256": "98f8e22aec28b292a498d1a2b0264753b83e57848aeaf9695afb99638e53a0c5"
+    },
+    {
+      "path": "apps/orchestration-server/src/index.ts",
+      "sha256": "e6aa4a39a21916432b094060c80fa1ca7da9253632fc6f49cbd00fc777676433"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxCredentials.ts",
+      "sha256": "bc7d47a4f9ff0f2da88c7af07081ffbf52559d90b257dabc3271afd76c868fc9"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxProvider.ts",
+      "sha256": "557721afb28fd7512a13cbc6c4cc11f7a439f62ba02f7f2a1e0c6c1077534870"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxReconciler.ts",
+      "sha256": "127b1465a252308d0fd2ba55c9d8a90a4fc7246d2b0308bf877c67e857ec3d45"
+    },
+    {
+      "path": "apps/orchestration-server/src/sandboxSupervisor.ts",
+      "sha256": "4c28dcccc73207cdd358edd632beb3cf1e96493ea01638900edfc8dc670180a4"
+    },
+    {
+      "path": "apps/orchestration-server/src/standaloneRemoteSupervisorSource.ts",
+      "sha256": "dd86d40a322781f15a44f66f4395c02b8740b5deb34538b43f32f60ac7a71e60"
+    },
+    {
+      "path": "convex/__tests__/providerLiabilityHandlers.test.ts",
+      "sha256": "aaef117895d8026541ef4af7c35baf4db02e13a395aeb4822945df2e4bfb0681"
+    },
+    {
+      "path": "convex/_generated/api.d.ts",
+      "sha256": "21b6ef4915a6f8ba284f8221fb2fce4c4890d033bd9ec124d945fe25eb43a080"
+    },
+    {
+      "path": "convex/factory/configuration.ts",
+      "sha256": "c8c7241d331e0dc67946743f45d961a2d33ee67c745f0c907403824d451c439c"
+    },
+    {
+      "path": "convex/factory/providerLiability.ts",
+      "sha256": "9141e23fb67fae6b737a9d878beec254e8c3b4680fedd6c2338e1fc75ab7f772"
+    },
+    {
+      "path": "convex/lib/bedrockBridgeIdentity.ts",
+      "sha256": "986a38dff8d16719d092ed2e946b968b299094585e880ee4950ee625a32d5f04"
+    },
+    {
+      "path": "convex/lib/dockerSandboxAdmission.ts",
+      "sha256": "1b8bd5a857384dcbd822cad3b53587442da7faa9a14a0ff2ea9033d1fcdc4381"
+    },
+    {
+      "path": "convex/lib/executionProfile.ts",
+      "sha256": "7828e369f31271c9b3614acd6aa29cde3e76a0aa9f952fa0e3835bc20e0f63e8"
+    },
+    {
+      "path": "convex/lib/sandboxProfileAdmission.ts",
+      "sha256": "43609968ba98294d4b8697dc58808b903580ac935cd779ffd8d5f8159bc3e428"
+    },
+    {
+      "path": "convex/schema.ts",
+      "sha256": "775e3c89292b699cb14d185691f7160884d16dd845a0396286e67da1ecfc2e55"
+    },
+    {
+      "path": "infra/docker-bedrock/Dockerfile",
+      "sha256": "38577ff43016ae09eb0d03bfd421324e0d0ac272d5d8c1ebc27cb0ec19b5248c"
+    },
+    {
+      "path": "infra/docker-bedrock/bridge.mjs",
+      "sha256": "43b7561647c9609cb38fa0c5949c290b43f529ee28b4c9a2fa018fd62d9de2aa"
+    },
+    {
+      "path": "infra/docker-bedrock/supervisor.mjs",
+      "sha256": "7674c7d9177e98cd0c52ad0c225110786b9f191dc3cbaaf825dc63c2de17464c"
+    },
+    {
+      "path": "package.json",
+      "sha256": "a9d770b8c2c6d3a8331f3705893271432b24f975dee5ae1f2954e5eb135dd74d"
+    },
+    {
+      "path": "packages/workflow-engine/src/harnessManifests.ts",
+      "sha256": "308c7bcfa24b5f58b31db8f56097822fee79bd6bb8b4102c33eb173081319ddd"
+    },
+    {
+      "path": "packages/workflow-engine/src/index.ts",
+      "sha256": "66d4deb1df4b3258f74fc5ee2fe5d9b9aa4a9e67d761e72dbf790df0e7012b53"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "cca97958daea813fe6f332df80f2004d175dd2d98b56b77531ff527b13d4355b"
+    }
+  ]
+}

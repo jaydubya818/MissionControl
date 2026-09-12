@@ -1,0 +1,11 @@
+{
+  "loopback-only.mjs": "337176ed2b3c7c055b66788b2f334b99399f853770821c406bc9467d7e63ace8",
+  "run.mjs": "4d84f1b6dff629d429f02b81d32efdeaefe75822bc78d204d11a283688fe1279",
+  "undefined-roundtrip-baseline.log": "ef159f4df11e35ff9e72400d42e0de8eb66bdef34a92c59824420d0f5703809c",
+  "focused-tests.log": "b09a5fc61fb965a73939d7164b871d2759c8a0e7b4cc81fafda6785ba3002cde",
+  "report.json": "63dbd421b0f217bcd9c606848592c54a4ceb73e98feab63e2580fb66bbc6e861",
+  "initial-storage-failure.json": "efa0a7e4c66917370a0cbb2c8a9641ab99bdca223ffe4299b0b5f2b30d6c794b",
+  "codegen-run-with-fixture-deploy-conflict.json": "98c5fda7efccbce899976f1d5e5c7e2f9ef25302d1e87e3f1e990c2923d91aeb",
+  "README.md": "8d9e3545184df5f55d100cb62c27bad06b8584223f9d7afbe271fd3e1462a657",
+  "root-codegen.log": "6970088c4552fef4e2f066f4a537d76c96bb5a593e9f2ea10319f7db73e35038"
+}

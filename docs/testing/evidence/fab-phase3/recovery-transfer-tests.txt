@@ -1,0 +1,9 @@
+
+ RUN  v3.2.7 /private/tmp/fab-phase3-mission-control/apps/orchestration-server
+
+ ✓ src/__tests__/factoryWorkspaceOwnership.test.ts (14 tests) 1810ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  16:40:42
+   Duration  2.09s (transform 35ms, setup 0ms, collect 39ms, tests 1.81s, environment 0ms, prepare 39ms)

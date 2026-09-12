@@ -1,3 +1,4 @@
+import { DockerBoundaryError } from "./dockerSandboxProvider.js";
 import type {
   SandboxAllocation,
   SandboxAllocationRequest,
@@ -19,6 +20,13 @@ import {
   type RemoteFailure,
   type RemoteFailureStage,
 } from "./remoteExecutionPolicy.js";
+import { canonicalHash } from "@mission-control/shared";
+import {
+  harnessCapabilityManifestDigest,
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
+} from "@mission-control/workflow-engine";
+import { validV3ExecutionProfileBinding } from "./sandboxSupervisor.js";
 
 export type SandboxLifecycleEventType =
   | "SANDBOX_REQUESTED"
@@ -63,6 +71,8 @@ export interface RemoteSandboxExecutionRequest {
   attemptLeaseId: string;
   executionManifest: Record<string, unknown>;
   manifestDigest: string;
+  /** Authoritative server lease heartbeat time returned by claim/reclaim. */
+  profileAdmittedAt?: number;
   sourceSha: string;
   profile: SandboxProfileSnapshot;
   repositoryBundle: Buffer;
@@ -107,6 +117,9 @@ export class RemoteSandboxRuntime {
     request: RemoteSandboxExecutionRequest,
     options?: { deferCleanup?: boolean },
   ): Promise<RemoteSandboxExecutionResult | RemoteSandboxCandidateSession> {
+    validateRemoteExecutionRuntimeArtifact(request);
+    validateV2RemoteExecutionRequest(request);
+    validateV3RemoteExecutionProfile(request);
     const profileValidation = await this.provider.validateProfile(request.profile);
     if (!profileValidation.dispatchable) {
       throw new RemoteSandboxExecutionError(remoteFailure(
@@ -196,21 +209,26 @@ export class RemoteSandboxRuntime {
       allocation = await this.waitUntilReady(allocation, request, emit);
 
       failureStage = "CREDENTIAL";
-      grant = await this.credentialBroker.mint({
-        projectId: request.projectId,
-        workflowRunId: request.workflowRunId,
-        attemptId: request.attemptId,
-        attemptLeaseId: request.attemptLeaseId,
-        model: request.executor.model,
-        maxCostUsd: request.profile.spend.maxUsd,
-        expiresAt: this.now() + request.profile.runtime.maxRuntimeMs + 30_000,
-      });
-      const { secret: _secret, ...persistableGrant } = grant;
-      await this.journal.recordCredentialIssued(persistableGrant);
+      assertActive(request.signal);
+      if (request.profile.credentials.inference !== "NONE") {
+        grant = await this.credentialBroker.mint({
+          projectId: request.projectId,
+          workflowRunId: request.workflowRunId,
+          attemptId: request.attemptId,
+          attemptLeaseId: request.attemptLeaseId,
+          model: request.executor.model,
+          maxCostUsd: request.profile.spend.maxUsd,
+          expiresAt: this.now() + request.profile.runtime.maxRuntimeMs + 30_000,
+        });
+        const { secret: _secret, ...persistableGrant } = grant;
+        await this.journal.recordCredentialIssued(persistableGrant);
+      }
+      assertActive(request.signal);
       failureStage = "START";
       const start = await this.provider.start({
         allocation,
         executionManifest: request.executionManifest,
+        profileAdmittedAt: request.profileAdmittedAt,
         workOrderId: request.workOrderId,
         workOrderRevisionNumber: request.workOrderRevisionNumber,
         workflowRunId: executionWorkflowRunId,
@@ -223,10 +241,10 @@ export class RemoteSandboxRuntime {
         repositoryArchive: request.repositoryBundle,
         supervisorSource: request.supervisorSource,
         executor: request.executor,
-        environment: {
+        environment: grant ? {
           OPENAI_API_KEY: grant.secret,
           OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
-        },
+        } : {},
       });
       allocation = { ...allocation, state: "RUNNING", startedAt: start.startedAt };
       await this.resourceObserver?.started({ allocation, processId: start.processId });
@@ -253,7 +271,9 @@ export class RemoteSandboxRuntime {
     } catch (error) {
       const typedError = error instanceof RemoteSandboxExecutionError
         ? error
-        : new RemoteSandboxExecutionError(classifyRemoteError(error, failureStage), error);
+        : error instanceof DockerBoundaryError
+          ? new RemoteSandboxExecutionError(remoteFailure("NON_RETRYABLE_RESULT", `DOCKER_${error.terminalState}`, failureStage, error.message), error)
+          : new RemoteSandboxExecutionError(classifyRemoteError(error, failureStage), error);
       primaryError = typedError;
       if (allocation && request.signal?.aborted) {
         await emit("SANDBOX_CANCELLATION_REQUESTED", { reason: "Attempt cancellation or lease loss" }).catch(() => undefined);
@@ -365,6 +385,12 @@ export class RemoteSandboxRuntime {
       const diagnostics = this.provider.fetchDiagnostics
         ? await this.provider.fetchDiagnostics(current)
         : null;
+      if (this.provider.kind === "DOCKER" && diagnostics?.terminalState === "TIMEOUT") {
+        throw new RemoteSandboxExecutionError(remoteFailure(
+          "NON_RETRYABLE_RESULT", "DOCKER_TIMEOUT", "EXECUTOR",
+          "Docker execution exceeded its frozen deadline; late results are fenced.",
+        ));
+      }
       if (diagnostics?.supervisorProcessRunning === false) {
         // The supervisor atomically renames the bundle immediately before it
         // exits. The first result read can race that rename while the following
@@ -446,14 +472,200 @@ function safeMessage(error: unknown) {
 
 function harnessIdentity(manifest: Record<string, unknown>): SandboxResultBundle["harness"] {
   const harness = (manifest as any)?.harness;
+  const route = remoteManifestRoute(manifest);
   return {
     adapter: String(harness?.adapter ?? ""),
     version: String(harness?.version ?? ""),
     harnessId: String(harness?.harnessId ?? ""),
     harnessVersion: String(harness?.harnessVersion ?? ""),
-    provider: String(harness?.provider ?? ""),
-    model: String(harness?.model ?? ""),
+    provider: route?.provider ?? "",
+    model: route?.model ?? "",
+    ...(route?.modelRouteDigest === undefined ? {} : {
+      modelRouteDigest: route.modelRouteDigest,
+      providerRoute: route.providerRoute,
+      ...(route.reasoningConfig === undefined ? {} : { reasoningConfig: structuredClone(route.reasoningConfig) }),
+    }),
   };
+}
+
+function remoteManifestRoute(manifest: Record<string, unknown>): {
+  provider: string;
+  model: string;
+  modelRouteDigest?: string;
+  providerRoute?: string;
+  reasoningConfig?: SandboxResultBundle["harness"]["reasoningConfig"];
+} | undefined {
+  const value = manifest as any;
+  const provider = decomposedManifest(value)
+    ? value?.modelRoute?.routeSnapshot?.provider
+    : value?.harness?.provider;
+  const model = decomposedManifest(value)
+    ? value?.modelRoute?.routeSnapshot?.modelId
+    : value?.harness?.model;
+  if (!boundedIdentity(provider, 100) || !boundedIdentity(model, 200)) return undefined;
+  if (!decomposedManifest(value)) return { provider, model };
+  const modelRouteDigest = value?.modelRoute?.routeDigest;
+  const providerRoute = value?.modelRoute?.routeSnapshot?.providerRoute;
+  if (!/^sha256:[a-f0-9]{64}$/i.test(modelRouteDigest ?? "") || !boundedIdentity(providerRoute, 100)) return undefined;
+  const reasoningConfig = value?.modelRoute?.routeSnapshot?.reasoningConfig;
+  return {
+    provider,
+    model,
+    modelRouteDigest,
+    providerRoute,
+    ...(reasoningConfig === undefined ? {} : { reasoningConfig: structuredClone(reasoningConfig) }),
+  };
+}
+
+function validateRemoteExecutionRuntimeArtifact(request: RemoteSandboxExecutionRequest) {
+  const manifest = request.executionManifest as any;
+  const profileImageDigest = exactSandboxProfileImageDigest(request.profile);
+  let artifact: { kind: string; executableSha256: string | null; imageDigest: string | null } | undefined;
+  if (decomposedManifest(manifest)) {
+    const candidate = manifest?.harness?.runtimeArtifact;
+    if (candidate
+      && harnessRuntimeArtifactIssues(candidate).length === 0
+      && harnessRuntimeArtifactDigest(candidate) === manifest?.harness?.runtimeArtifactDigest) {
+      artifact = candidate;
+    }
+  } else if (manifest?.version === "factory-execution-manifest/v1") {
+    const runtime = manifest?.harness?.modelRouteSnapshot?.runtimeIdentity;
+    if (runtime?.kind === "CODEX_CLI" && /^sha256:[a-f0-9]{64}$/i.test(runtime.imageDigest ?? "")) {
+      artifact = {
+        kind: "CONTAINER_IMAGE",
+        executableSha256: null,
+        imageDigest: runtime.imageDigest.toLowerCase(),
+      };
+    }
+  }
+  if (!profileImageDigest
+    || !artifact
+    || artifact.kind !== "CONTAINER_IMAGE"
+    || artifact.executableSha256 !== null
+    || artifact.imageDigest?.toLowerCase() !== profileImageDigest) {
+    throw new RemoteSandboxExecutionError(remoteFailure(
+      "NON_RETRYABLE_RESULT",
+      "RUNTIME_ARTIFACT_PROFILE_MISMATCH",
+      "PROFILE",
+      "Remote execution runtime artifact does not match the exact immutable Sandbox Profile image.",
+    ));
+  }
+}
+
+function exactSandboxProfileImageDigest(profile: SandboxProfileSnapshot) {
+  const securityDigest = profile.security?.image?.digest;
+  const referenceDigest = profile.machine.image.match(/(?:^|@)(sha256:[a-f0-9]{64})$/i)?.[1];
+  if (securityDigest && /^sha256:[a-f0-9]{64}$/i.test(securityDigest)) {
+    if (!referenceDigest || referenceDigest.toLowerCase() !== securityDigest.toLowerCase()) return undefined;
+    return securityDigest.toLowerCase();
+  }
+  return referenceDigest?.toLowerCase();
+}
+
+function validateV2RemoteExecutionRequest(request: RemoteSandboxExecutionRequest) {
+  const manifest = request.executionManifest as any;
+  if (!decomposedManifest(manifest)) return;
+  const harness = manifest.harness;
+  const route = remoteManifestRoute(request.executionManifest);
+  const capabilityManifest = harness?.capabilityManifest;
+  const qualification = manifest?.modelRoute?.qualificationSnapshot;
+  const compatibility = qualification?.compatibility;
+  const routeSnapshot = manifest?.modelRoute?.routeSnapshot;
+  const valid = request.manifestDigest === `sha256:${canonicalHash(manifest)}`
+    && manifest.executionBackend === "remote-sandbox"
+    && harness?.executionBackend === undefined
+    && harness?.provider === undefined
+    && harness?.model === undefined
+    && route !== undefined
+    && validV2RemoteModelRoute(routeSnapshot)
+    && manifest.modelRoute.routeDigest === `sha256:${canonicalHash({ namespace: "factory-model-route/v2", value: routeSnapshot })}`
+    && qualification?.schema === "factory-model-route-qualification/v2"
+    && qualification.routeDigest === manifest.modelRoute.routeDigest
+    && manifest.modelRoute.qualificationDigest === `sha256:${canonicalHash({ namespace: "factory-model-route-qualification/v2", value: qualification })}`
+    && /^[a-f0-9]{40}$/i.test(harness?.harnessCommit ?? "")
+    && capabilityManifest
+    && capabilityManifest.identity?.adapterId === harness.adapter
+    && capabilityManifest.identity?.adapterVersion === harness.version
+    && capabilityManifest.identity?.harnessId === harness.harnessId
+    && capabilityManifest.identity?.harnessVersion === harness.harnessVersion
+    && capabilityManifest.identity?.harnessCommit === harness.harnessCommit
+    && harnessCapabilityManifestDigest(capabilityManifest) === harness.capabilityManifestSha256
+    && capabilityManifest.effectiveConfigSha256 === harness.effectiveConfigSha256
+    && harnessRuntimeArtifactIssues(harness.runtimeArtifact).length === 0
+    && harnessRuntimeArtifactDigest(harness.runtimeArtifact) === harness.runtimeArtifactDigest
+    && compatibility?.adapter === harness.adapter
+    && compatibility?.version === harness.version
+    && compatibility?.capabilityManifestDigest === harness.capabilityManifestSha256
+    && compatibility?.effectiveConfigSha256 === harness.effectiveConfigSha256
+    && compatibility?.runtimeArtifactDigest === harness.runtimeArtifactDigest
+    && compatibility?.executionBackend === manifest.executionBackend
+    && qualification.authority?.executionOnly === true
+    && qualification.authority?.routing === false
+    && qualification.authority?.verification === false
+    && qualification.authority?.acceptance === false
+    && qualification.authority?.publication === false
+    && qualification.authority?.merge === false
+    && request.executor.model === route?.model
+    && request.executor.provider === route?.provider
+    && request.executor.modelRouteDigest === route?.modelRouteDigest
+    && request.executor.providerRoute === route?.providerRoute
+    && route?.providerRoute === "openrouter"
+    && canonicalHash(request.executor.reasoningConfig ?? null) === canonicalHash(route?.reasoningConfig ?? null)
+    && manifest.causation?.workOrderId === request.workOrderId
+    && manifest.causation?.workOrderRevisionNumber === request.workOrderRevisionNumber
+    && manifest.causation?.workflowRunId === request.attemptId
+    && manifest.sandbox?.profileDigest === sandboxProfileDigest(request.profile);
+  if (!valid) {
+    throw new RemoteSandboxExecutionError(remoteFailure(
+      "NON_RETRYABLE_RESULT",
+      "MANIFEST_EXECUTION_BINDING_INVALID",
+      "PROFILE",
+      "Remote execution request does not match its frozen decomposed model, harness, runtime artifact, and backend bindings.",
+    ));
+  }
+}
+
+function validateV3RemoteExecutionProfile(request: RemoteSandboxExecutionRequest) {
+  const manifest = request.executionManifest as any;
+  if (manifest?.version !== "factory-execution-manifest/v3") return;
+  if (!validV3ExecutionProfileBinding(manifest, request.profileAdmittedAt)) {
+    throw new RemoteSandboxExecutionError(remoteFailure(
+      "NON_RETRYABLE_RESULT",
+      "EXECUTION_PROFILE_BINDING_INVALID",
+      "PROFILE",
+      "Remote execution requires a current exact Execution Profile and qualification receipt.",
+    ));
+  }
+}
+
+function decomposedManifest(manifest: any) {
+  return manifest?.version === "factory-execution-manifest/v2"
+    || manifest?.version === "factory-execution-manifest/v3";
+}
+
+function validV2RemoteModelRoute(route: any) {
+  if (!route || route.schema !== "factory-model-route/v2"
+    || Object.keys(route).some((key) => !["schema", "provider", "providerRoute", "modelId", "reasoningConfig"].includes(key))
+    || Object.hasOwn(route, "capabilityIdentity")
+    || Object.hasOwn(route, "runtimeIdentity")
+    || !boundedIdentity(route.provider, 100)
+    || route.provider !== route.provider.toLowerCase()
+    || !boundedIdentity(route.providerRoute, 100)
+    || route.providerRoute !== route.providerRoute.toLowerCase()
+    || !boundedIdentity(route.modelId, 200)) return false;
+  if (route.reasoningConfig === undefined) return true;
+  const reasoning = route.reasoningConfig;
+  return reasoning && typeof reasoning === "object" && !Array.isArray(reasoning)
+    && Object.keys(reasoning).length > 0
+    && Object.keys(reasoning).every((key) => ["effort", "temperature", "maxTokens"].includes(key))
+    && (reasoning.effort === undefined || (boundedIdentity(reasoning.effort, 64) && reasoning.effort === reasoning.effort.toLowerCase()))
+    && (reasoning.temperature === undefined || (typeof reasoning.temperature === "number" && Number.isFinite(reasoning.temperature) && reasoning.temperature >= 0 && reasoning.temperature <= 2))
+    && (reasoning.maxTokens === undefined || (Number.isSafeInteger(reasoning.maxTokens) && reasoning.maxTokens >= 1 && reasoning.maxTokens <= 10_000_000));
+}
+
+function boundedIdentity(value: unknown, maximum: number): value is string {
+  return typeof value === "string" && value === value.trim() && value.length > 0
+    && value.length <= maximum && !/[\0\r\n]/.test(value);
 }
 
 function manifestWorkflowRunId(manifest: Record<string, unknown>) {

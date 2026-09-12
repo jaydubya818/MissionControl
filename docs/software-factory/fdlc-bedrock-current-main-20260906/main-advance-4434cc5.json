@@ -1,0 +1,124 @@
+{
+  "from": "f749b06c8ef39c5bd22c9e0ad76334482ec35b33",
+  "to": "4434cc56448075f4804787325a9586c6290b2215",
+  "mainRuntime": 46,
+  "candidateRuntime": 47,
+  "publicDeltaUnchanged": "6 additions, 1 changed, 0 removals",
+  "classification": [
+    {
+      "file": "convex/__tests__/inferenceGateway.test.ts",
+      "classification": "SEMANTIC_MERGE",
+      "reason": "Preserve main WorkOrder cumulative allocation and test coverage; add Bedrock composed-authority exclusion without duplicate monetary limits."
+    },
+    {
+      "file": "convex/inferenceGateway.ts",
+      "classification": "SEMANTIC_MERGE",
+      "reason": "Preserve main WorkOrder cumulative allocation and test coverage; add Bedrock composed-authority exclusion without duplicate monetary limits."
+    },
+    {
+      "file": "docs/product/software-factory-capability-maturity.md",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/software-factory/capability-convergence-program.md",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/README.md",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/automated-checks.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/backend-concurrency/loopback-only.mjs",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/backend-concurrency/qualification-review.md",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/backend-concurrency/report.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/backend-concurrency/run.mjs",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/backend-concurrency/verification-note.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/baseline-regression.log",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/critical-browser.log",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/deployment-guard-baseline.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/eval-receipt.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/full-test-summary.log",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/initial-qualification-results.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/local-gates.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/offline-worker-setup.log",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/reservation-handler-tests.log",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/capability-convergence-reservation-final/scenario-evidence.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "docs/testing/evidence/governed-mcp-phase3/runs/f4c5c8d269cb-2026-09-06T05-21-15-975Z/broker-scenario.json",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    },
+    {
+      "file": "todos/063-in-progress-p1-outcome-economics-routing.md",
+      "classification": "PRESERVE_CURRENT_MAIN",
+      "reason": "Preserve newer ecosystem program/evidence and maturity truth."
+    }
+  ]
+}

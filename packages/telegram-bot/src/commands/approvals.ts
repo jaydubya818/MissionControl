@@ -87,11 +87,19 @@ export async function handleApprove(ctx: BotContext) {
     
     const approvalIdSuffix = args[0];
     
-    // Find approval by ID suffix
+    // Find approval by ID suffix, scoped to the caller's selected workspace.
+    // Without a projectId, approvals.listPending returns every project's pending
+    // approvals and approvals.approve skips its workspace check, so an unscoped
+    // lookup here would let a suffix match decide another workspace's approval.
     const projectId = ctx.from?.id ? userProjects.get(ctx.from.id) : null;
-    const approvals = await ctx.convex.query(api.approvals.listPending, 
-      projectId ? { projectId, limit: 100 } : { limit: 100 }
-    );
+    if (!projectId) {
+      await ctx.reply("⚠️ No project selected. Use /switch <slug> first.");
+      return;
+    }
+    const approvals = await ctx.convex.query(api.approvals.listPending, {
+      projectId,
+      limit: 100,
+    });
     
     const approval = approvals.find((a: any) => a._id.endsWith(approvalIdSuffix));
     
@@ -102,6 +110,7 @@ export async function handleApprove(ctx: BotContext) {
     
     const result = await ctx.convex.mutation(api.approvals.approve, {
       approvalId: approval._id,
+      projectId,
       decidedByUserId: ctx.from?.username || ctx.from?.id.toString() || "operator",
       reason: "Approved via Telegram",
     });
@@ -131,11 +140,19 @@ export async function handleDeny(ctx: BotContext) {
     const approvalIdSuffix = args[0];
     const reason = args.slice(1).join(" ");
     
-    // Find approval by ID suffix
+    // Find approval by ID suffix, scoped to the caller's selected workspace.
+    // Without a projectId, approvals.listPending returns every project's pending
+    // approvals, so an unscoped lookup here would let a suffix match deny
+    // another workspace's approval.
     const projectId = ctx.from?.id ? userProjects.get(ctx.from.id) : null;
-    const approvals = await ctx.convex.query(api.approvals.listPending, 
-      projectId ? { projectId, limit: 100 } : { limit: 100 }
-    );
+    if (!projectId) {
+      await ctx.reply("⚠️ No project selected. Use /switch <slug> first.");
+      return;
+    }
+    const approvals = await ctx.convex.query(api.approvals.listPending, {
+      projectId,
+      limit: 100,
+    });
     
     const approval = approvals.find((a: any) => a._id.endsWith(approvalIdSuffix));
     
@@ -144,6 +161,8 @@ export async function handleDeny(ctx: BotContext) {
       return;
     }
     
+    // approvals.deny takes no projectId argument, so the scoped listPending
+    // lookup above is the only thing keeping this decision inside the workspace.
     const result = await ctx.convex.mutation(api.approvals.deny, {
       approvalId: approval._id,
       decidedByUserId: ctx.from?.username || ctx.from?.id.toString() || "operator",

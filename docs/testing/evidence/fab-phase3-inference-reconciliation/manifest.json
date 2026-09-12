@@ -1,0 +1,15 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "README.md": "f84f67e6b08ad82fb2c7958fefed751c699a5cb77e69d8696587b43ec36d3960",
+    "automated-checks.json": "201c590f3d8a500b2d1d00a3eab2b57c23bd6235c7c316b486c08559ac9af44f",
+    "eval-receipt.json": "e77874c783628ab4e50ea28d9f188abf698d9a3435fc1f3d075ad36a2f3b3dd1",
+    "mc-inference-accounting.txt": "05a7544c5b68a938443ddf6c7fcb84566a45ec471cc6c8798e4d9a6b151ce302",
+    "mc-inference-browser.txt": "28d7954e7b3a283a132336094b17d94e2a2d90350114b0feed9d66e4debc91e1",
+    "mc-inference-runtime.json": "780907e4e63b083855d0e0809c7e0d1f645e347dd8793a26c62e9dd5aa3b3043",
+    "mc-inference-system.txt": "88d788ba99dfae2569cec6235c05fe3e102bc7763b9a11fa93e7847d9a4ac6d2",
+    "mc-upstream-install.txt": "c0a155dfbb890743b63c533075096d5e8e7c2ddf5bfb08628cfa83123f249f52",
+    "qualification.json": "5689d6527a5bb2f3213506fed6a9adbedc9f221140ca05773c3b05059ab12496",
+    "scenario-evidence.json": "355dbfff9f1a349d37b078d7b324489b4bf1f113dbe1cfebab48578c0d54dfe0"
+  }
+}

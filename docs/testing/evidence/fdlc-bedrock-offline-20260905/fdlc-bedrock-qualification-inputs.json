@@ -1,0 +1,28 @@
+{
+  "schema": "fdlc-bedrock-qualification-inputs/v2",
+  "provider": "AWS Bedrock",
+  "region": "us-east-1",
+  "modelId": "anthropic.claude-sonnet-4-6",
+  "foundationModelArn": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
+  "environmentClass": "QUALIFICATION_ONLY",
+  "awsAccountId": null,
+  "projectEnvironmentId": null,
+  "roleArn": null,
+  "authoritativeConfigurationLocation": null,
+  "awsIdentityApprovalReference": null,
+  "inferenceProfileId": "us.anthropic.claude-sonnet-4-6",
+  "allowLocalAwsCredentialDiscovery": false,
+  "allowModelCalls": false,
+  "allowWorkOrderExecution": false,
+  "allowReadinessIssuance": false,
+  "allowMergeOrPublication": false,
+  "inferenceProfileArn": null,
+  "topology": "US_GEOGRAPHIC_CROSS_REGION",
+  "globalInference": false,
+  "allowedDestinationRegions": [
+    "us-east-1",
+    "us-east-2",
+    "us-west-2"
+  ],
+  "topologyApprovalReference": "Product Owner attachment 4b8efee4-c054-4a32-8221-ff510e409636 sections 2 and 7"
+}

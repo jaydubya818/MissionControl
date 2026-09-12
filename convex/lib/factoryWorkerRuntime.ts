@@ -1,10 +1,19 @@
-import type { HarnessCapabilityManifest, HarnessCapabilityRequirement } from "@mission-control/workflow-engine/harness-contract";
+import type {
+  HarnessCapabilityManifest,
+  HarnessCapabilityRequirement,
+  HarnessRuntimeArtifactIdentity,
+} from "@mission-control/workflow-engine/harness-contract";
 import {
   harnessCapabilityManifestDigest,
   harnessCapabilityRequirementsSatisfied,
   harnessManifestIssues,
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
   harnessSupportsModel,
+  ISOLATED_INVOCATION_MANIFEST,
+  ISOLATED_INVOCATION_ADAPTER_ARTIFACT,
 } from "@mission-control/workflow-engine/harness-contract";
+import { isNoInferenceConstraint, type NO_INFERENCE_CONSTRAINT } from "./offlineExecutionPolicy";
 
 export const FACTORY_WORKER_HEARTBEAT_MAX_AGE_MS = 2 * 60_000;
 
@@ -15,6 +24,8 @@ export interface FactoryWorkerExecutorCapability {
   version: string;
   capabilityManifestSha256?: string;
   effectiveConfigSha256?: string;
+  runtimeArtifact?: HarnessRuntimeArtifactIdentity;
+  runtimeArtifactSha256?: string;
   capabilityManifest?: HarnessCapabilityManifest;
   supportsCancel: boolean;
   supportsResume: boolean;
@@ -38,20 +49,24 @@ export interface FactoryWorkerRuntimeSnapshot {
   lastHeartbeatAt: number;
 }
 
-export interface FactoryWorkerVersionBinding {
+interface FactoryWorkerVersionBindingCommon {
   factoryDefinitionVersionId: string;
   factoryConfigurationDigest: string;
   adapter: string;
   version: string;
-  provider: string;
-  model: string;
   capabilityManifestSha256: string;
   effectiveConfigSha256: string;
+  runtimeArtifactSha256?: string;
   executionBackend: string;
-  modelRouteDigest: string;
   sandboxProfileDigest?: string;
   repositoryId: string;
 }
+
+export type FactoryWorkerVersionBinding = FactoryWorkerVersionBindingCommon & (
+  | { provider: string; model: string; modelRouteDigest: string; inferenceConstraint?: never }
+  | { executionBackend: "isolated-container"; provider?: never; model?: never; modelRouteDigest?: never;
+      inferenceConstraint: typeof NO_INFERENCE_CONSTRAINT; runtimeArtifactSha256: string; sandboxProfileDigest: string }
+);
 
 export interface FactoryWorkerCandidate {
   workerId: string;
@@ -71,7 +86,12 @@ export interface FactoryWorkerRequirements {
     version: string;
     capabilityManifestSha256: string;
     effectiveConfigSha256: string;
+    runtimeArtifactSha256?: string;
+    requireFactoryVersionRuntimeArtifactBinding?: boolean;
   };
+  /** Exact artifact that executes the Attempt. For remote execution this is
+   * the immutable sandbox image, not the worker-host adapter executable. */
+  executionRuntimeArtifactSha256?: string;
   provider: string | null;
   model: string | null;
   harnessCapabilities: HarnessCapabilityRequirement[];
@@ -81,7 +101,53 @@ export interface FactoryWorkerRequirements {
   factoryDefinitionVersionId?: string;
   factoryConfigurationDigest?: string;
   modelRouteDigest?: string;
+  inferenceConstraint?: typeof NO_INFERENCE_CONSTRAINT;
   sandboxProfileDigest?: string;
+}
+
+export function factoryWorkerVersionBindingMatches(input: {
+  binding: FactoryWorkerVersionBinding;
+  requirements: {
+    factoryDefinitionVersionId: string;
+    factoryConfigurationDigest: string;
+    adapter: string;
+    version: string;
+    provider?: string;
+    model?: string;
+    capabilityManifestSha256: string;
+    effectiveConfigSha256: string;
+    runtimeArtifactSha256: string;
+    requireRuntimeArtifactBinding: boolean;
+    executionBackend: string;
+    modelRouteDigest?: string;
+    inferenceConstraint?: typeof NO_INFERENCE_CONSTRAINT;
+    sandboxProfileDigest?: string;
+    repositoryId: string;
+  };
+}) {
+  const { binding, requirements } = input;
+  const offline = requirements.executionBackend === "isolated-container";
+  if (offline ? (!isNoInferenceConstraint(requirements.inferenceConstraint)
+      || !isNoInferenceConstraint(binding.inferenceConstraint)
+      || requirements.provider !== undefined || requirements.model !== undefined || requirements.modelRouteDigest !== undefined
+      || binding.provider !== undefined || binding.model !== undefined || binding.modelRouteDigest !== undefined
+      || !requirements.requireRuntimeArtifactBinding || !requirements.sandboxProfileDigest)
+    : (requirements.inferenceConstraint !== undefined || binding.inferenceConstraint !== undefined
+      || !requirements.provider || !requirements.model || !requirements.modelRouteDigest)) return false;
+  return binding.factoryDefinitionVersionId === requirements.factoryDefinitionVersionId
+    && binding.factoryConfigurationDigest === requirements.factoryConfigurationDigest
+    && binding.adapter === requirements.adapter
+    && binding.version === requirements.version
+    && binding.provider === requirements.provider
+    && binding.model === requirements.model
+    && binding.capabilityManifestSha256 === requirements.capabilityManifestSha256
+    && binding.effectiveConfigSha256 === requirements.effectiveConfigSha256
+    && (binding.runtimeArtifactSha256 === requirements.runtimeArtifactSha256
+      || (!requirements.requireRuntimeArtifactBinding && binding.runtimeArtifactSha256 === undefined))
+    && binding.executionBackend === requirements.executionBackend
+    && binding.modelRouteDigest === requirements.modelRouteDigest
+    && binding.sandboxProfileDigest === requirements.sandboxProfileDigest
+    && binding.repositoryId === requirements.repositoryId;
 }
 
 export function nextFactoryWorkerGeneration(
@@ -131,10 +197,27 @@ export function factoryWorkerEligibility(input: {
     || harnessManifestIssues(executor.capabilityManifest).length > 0
     || executor.capabilityManifest.identity.adapterId !== executor.adapter
     || executor.capabilityManifest.identity.adapterVersion !== executor.version
-    || harnessCapabilityManifestDigest(executor.capabilityManifest) !== executor.capabilityManifestSha256) {
+    || harnessCapabilityManifestDigest(executor.capabilityManifest) !== executor.capabilityManifestSha256
+    || executor.capabilityManifest.effectiveConfigSha256 !== executor.effectiveConfigSha256) {
     return { eligible: false as const, reason: "worker-harness-manifest-mismatch" };
   }
-  if (!harnessSupportsModel(executor.capabilityManifest, requirements.provider, requirements.model)) {
+  if (!executor.runtimeArtifact
+    || harnessRuntimeArtifactIssues(executor.runtimeArtifact).length > 0
+    || !/^sha256:[a-f0-9]{64}$/i.test(executor.runtimeArtifactSha256 ?? "")
+    || harnessRuntimeArtifactDigest(executor.runtimeArtifact) !== executor.runtimeArtifactSha256) {
+    return { eligible: false as const, reason: "worker-runtime-artifact-invalid" };
+  }
+  if (requirements.executor.runtimeArtifactSha256 !== undefined
+    && (!/^sha256:[a-f0-9]{64}$/i.test(requirements.executor.runtimeArtifactSha256)
+      || executor.runtimeArtifactSha256 !== requirements.executor.runtimeArtifactSha256)) {
+    return { eligible: false as const, reason: "worker-runtime-artifact-mismatch" };
+  }
+  const offline = requirements.executionBackend === "isolated-container";
+  if (offline ? (!isNoInferenceConstraint(requirements.inferenceConstraint)
+      || requirements.provider !== null || requirements.model !== null || requirements.modelRouteDigest !== undefined
+      || harnessCapabilityManifestDigest(executor.capabilityManifest) !== harnessCapabilityManifestDigest(ISOLATED_INVOCATION_MANIFEST)
+      || executor.runtimeArtifactSha256 !== harnessRuntimeArtifactDigest(ISOLATED_INVOCATION_ADAPTER_ARTIFACT))
+    : (requirements.inferenceConstraint !== undefined || !harnessSupportsModel(executor.capabilityManifest, requirements.provider, requirements.model))) {
     return { eligible: false as const, reason: "worker-harness-model-unsupported" };
   }
   if (!harnessCapabilityRequirementsSatisfied(executor.capabilityManifest, requirements.harnessCapabilities)) {
@@ -161,25 +244,34 @@ export function factoryWorkerEligibility(input: {
   const exactBindingValues = [
     requirements.factoryDefinitionVersionId,
     requirements.factoryConfigurationDigest,
-    requirements.modelRouteDigest,
+    ...(offline ? [] : [requirements.modelRouteDigest]),
+    requirements.executionRuntimeArtifactSha256,
   ];
   if (exactBindingValues.some(Boolean) && !exactBindingValues.every(Boolean)) {
     return { eligible: false as const, reason: "worker-version-requirements-incomplete" };
   }
   if (requirements.factoryDefinitionVersionId) {
     const exactBinding = runtime.factoryVersionBindings?.find((binding) =>
-      binding.factoryDefinitionVersionId === requirements.factoryDefinitionVersionId
-      && binding.factoryConfigurationDigest === requirements.factoryConfigurationDigest
-      && binding.adapter === requirements.executor.adapter
-      && binding.version === requirements.executor.version
-      && binding.provider === requirements.provider
-      && binding.model === requirements.model
-      && binding.capabilityManifestSha256 === requirements.executor.capabilityManifestSha256
-      && binding.effectiveConfigSha256 === requirements.executor.effectiveConfigSha256
-      && binding.executionBackend === requirements.executionBackend
-      && binding.modelRouteDigest === requirements.modelRouteDigest
-      && binding.sandboxProfileDigest === requirements.sandboxProfileDigest
-      && binding.repositoryId === requirements.repositoryId
+      factoryWorkerVersionBindingMatches({
+        binding,
+        requirements: {
+          factoryDefinitionVersionId: requirements.factoryDefinitionVersionId!,
+          factoryConfigurationDigest: requirements.factoryConfigurationDigest!,
+          adapter: requirements.executor.adapter,
+          version: requirements.executor.version,
+          provider: offline ? undefined : requirements.provider!,
+          model: offline ? undefined : requirements.model!,
+          capabilityManifestSha256: requirements.executor.capabilityManifestSha256,
+          effectiveConfigSha256: requirements.executor.effectiveConfigSha256,
+          runtimeArtifactSha256: requirements.executionRuntimeArtifactSha256!,
+          requireRuntimeArtifactBinding: requirements.executor.requireFactoryVersionRuntimeArtifactBinding === true,
+          executionBackend: requirements.executionBackend!,
+          modelRouteDigest: requirements.modelRouteDigest!,
+          inferenceConstraint: requirements.inferenceConstraint,
+          sandboxProfileDigest: requirements.sandboxProfileDigest,
+          repositoryId: requirements.repositoryId,
+        },
+      })
     );
     if (!exactBinding) return { eligible: false as const, reason: "worker-factory-version-mismatch" };
   }
@@ -228,6 +320,10 @@ export function factoryWorkerRegistrationIssues(input: {
       || !boundedIdentity(executor.version, 100)
       || !/^sha256:[a-f0-9]{64}$/i.test(executor.capabilityManifestSha256 ?? "")
       || !/^[a-f0-9]{64}$/i.test(executor.effectiveConfigSha256 ?? "")
+      || !executor.runtimeArtifact
+      || harnessRuntimeArtifactIssues(executor.runtimeArtifact).length > 0
+      || !/^sha256:[a-f0-9]{64}$/i.test(executor.runtimeArtifactSha256 ?? "")
+      || harnessRuntimeArtifactDigest(executor.runtimeArtifact) !== executor.runtimeArtifactSha256
       || !executor.capabilityManifest
       || harnessManifestIssues(executor.capabilityManifest).length > 0
       || executor.capabilityManifest.identity.adapterId !== executor.adapter
@@ -253,12 +349,15 @@ export function factoryWorkerRegistrationIssues(input: {
       || !/^factory-v1-[a-f0-9]{8}$/i.test(binding.factoryConfigurationDigest)
       || !boundedIdentity(binding.adapter, 100)
       || !boundedIdentity(binding.version, 100)
-      || !boundedIdentity(binding.provider, 100)
-      || !boundedIdentity(binding.model, 200)
+      || (binding.executionBackend === "isolated-container"
+        ? (!isNoInferenceConstraint(binding.inferenceConstraint) || binding.provider !== undefined || binding.model !== undefined || binding.modelRouteDigest !== undefined
+          || !binding.runtimeArtifactSha256 || !binding.sandboxProfileDigest)
+        : (binding.inferenceConstraint !== undefined || !boundedIdentity(binding.provider ?? "", 100)
+          || !boundedIdentity(binding.model ?? "", 200) || !/^sha256:[a-f0-9]{64}$/i.test(binding.modelRouteDigest ?? "")))
       || !/^sha256:[a-f0-9]{64}$/i.test(binding.capabilityManifestSha256)
       || !/^[a-f0-9]{64}$/i.test(binding.effectiveConfigSha256)
+      || (binding.runtimeArtifactSha256 !== undefined && !/^sha256:[a-f0-9]{64}$/i.test(binding.runtimeArtifactSha256))
       || !boundedIdentity(binding.executionBackend, 100)
-      || !/^sha256:[a-f0-9]{64}$/i.test(binding.modelRouteDigest)
       || (binding.sandboxProfileDigest !== undefined && !/^sha256:[a-f0-9]{64}$/i.test(binding.sandboxProfileDigest))
       || !boundedIdentity(binding.repositoryId, 200)
     )

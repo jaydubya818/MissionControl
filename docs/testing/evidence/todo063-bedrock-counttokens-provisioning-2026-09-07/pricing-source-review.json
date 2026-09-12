@@ -1,0 +1,29 @@
+{
+  "reviewedAt": "2026-09-07T19:15:00Z",
+  "publisher": "Anthropic",
+  "document": "Claude Platform Pricing",
+  "effectiveDate": "2026-05-27",
+  "sourceUrl": "https://www-cdn.anthropic.com/files/4zrzovbb/website/3684c2faafb97418665782cea0001f439f74b1d2.pdf",
+  "sourceSha256": "dc372a994199f77b1e140e775875fd610591c69f31aa8e7ff8394908647b71ad",
+  "page": 5,
+  "route": {
+    "provider": "AWS Bedrock",
+    "model": "Claude Sonnet 4.6",
+    "tier": "Standard In-Region & Geo Cross Region",
+    "inferenceProfile": "us.anthropic.claude-sonnet-4-6"
+  },
+  "usdPerMillionTokens": {
+    "input": 3.3,
+    "output": 16.5,
+    "cacheWrite5m": 4.125,
+    "cacheWrite1h": 6.6,
+    "cacheHitOrRefresh": 0.33
+  },
+  "qualificationTreatment": {
+    "cache": "DISABLED_BY_REQUEST_SCHEMA",
+    "extendedReasoning": "DISABLED_BY_REQUEST_SCHEMA",
+    "moneyClassification": "ESTIMATED",
+    "revalidationDeadline": "2026-10-07T00:00:00Z"
+  },
+  "note": "Durable reviewed-fact extraction. The exact remote source bytes were independently fetched and matched sourceSha256; the repository retains the digest and extracted facts rather than redistributing the publisher PDF."
+}

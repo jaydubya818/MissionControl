@@ -1,0 +1,32 @@
+{
+  "status": "PASS",
+  "head": "ef73e7f7759026a97e8f6788b39aa5c261b4af34",
+  "checks": {
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "unitTests": 12,
+    "renderedHtmlTests": 14,
+    "vinextBuild": "PASS",
+    "nextBuild": "PASS",
+    "browser": {
+      "vinext": {
+        "checks": 62,
+        "flows": 9,
+        "links": 20
+      },
+      "next": {
+        "checks": 62,
+        "flows": 9,
+        "links": 20
+      }
+    },
+    "sourceHashMatchesPR": true,
+    "productionGuard": "PASS"
+  },
+  "sourceSha256": {
+    "data/mission-control.ts": "d654097dc76400d80fe63eb8468e2263df01eee4e843f15cd7fea977b817b070",
+    "docs/MISSION_CONTROL_PUBLIC_CAPABILITIES.md": "7beeb1468f34d254856e9d12fbfda9e1279ef562b8c4a98f741bce1c38f28fe1"
+  },
+  "providerCalls": 0,
+  "productionChanges": 0
+}

@@ -1,0 +1,191 @@
+
+ RUN  v3.2.7 /private/tmp/fdlc-program-observations/apps/orchestration-server
+
+ ❯ src/__tests__/bedrockInferenceBridge.test.ts (35 tests | 9 failed) 61ms
+   ✓ governed Bedrock bridge offline > admits before send and settles exact provider identity 6ms
+   ✓ governed Bedrock bridge offline > prevents transmission when canonical admission fails 1ms
+   ✓ governed Bedrock bridge offline > does not replay a duplicate request 3ms
+   ✓ governed Bedrock bridge offline > fences concurrent requests while admission is pending 2ms
+   ✓ governed Bedrock bridge offline > rejects excessive output before send 1ms
+   ✓ governed Bedrock bridge offline > cancellation after admission prevents send and retains hold 3ms
+   ✓ governed Bedrock bridge offline > lost reply retains full liability across bridge replacement 2ms
+   × governed Bedrock bridge offline > preserves ACTUAL usage when settlement fails before persistence 5ms
+     → expected "spy" to be called 1 times, but got 2 times
+   × governed Bedrock bridge offline > surfaces an exact accounting replay after the settlement commits but its reply is lost 2ms
+     → expected "spy" to be called 1 times, but got 2 times
+   × governed Bedrock bridge offline > retains an isolated frozen settlement payload when an accounting client mutates its input 3ms
+     → expected undefined to match object { generation: 1, usage: { …(2) } }
+   × governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response undefined 4ms
+     → expected Error: BEDROCK_SETTLEMENT_NOT_ACCEPTED to match object { Object (name, code, ...) }
+   × governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response null 2ms
+     → expected Error: BEDROCK_SETTLEMENT_NOT_ACCEPTED to match object { Object (name, code, ...) }
+   × governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response {} 2ms
+     → promise resolved "{ content: [ { …(2) } ], …(4) }" instead of rejecting
+   × governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response "acknowledged" 2ms
+     → promise resolved "{ content: [ { …(2) } ], …(4) }" instead of rejecting
+   × governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response {"incident":true,"duplicate":false} 2ms
+     → expected Error: BEDROCK_SETTLEMENT_NOT_ACCEPTED to match object { Object (name, code, ...) }
+   × governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response {"incident":false,"duplicate":true} 2ms
+     → expected Error: BEDROCK_SETTLEMENT_NOT_ACCEPTED to match object { Object (name, code, ...) }
+   ✓ governed Bedrock bridge offline > timeout retains liability even for uncooperative fixture 13ms
+   ✓ governed Bedrock bridge offline > rejects substituted proof requestId 1ms
+   ✓ governed Bedrock bridge offline > rejects substituted proof requestDigest 1ms
+   ✓ governed Bedrock bridge offline > rejects substituted proof priceDigest 1ms
+   ✓ governed Bedrock bridge offline > rejects substituted proof bridgeIdentityDigest 1ms
+   ✓ governed Bedrock bridge offline > does not retrofit V1 manifest 1ms
+   ✓ governed Bedrock bridge offline > prohibits persistent local execution 0ms
+   ✓ governed Bedrock bridge offline > rejects insufficient canonical balance 1ms
+   ✓ Codex local protocol translation > propagates output cap 0ms
+   ✓ Codex local protocol translation > rejects unsupported protocol {"model":"gpt-5"} 0ms
+   ✓ Codex local protocol translation > rejects unsupported protocol {"previous_response_id":"x"} 0ms
+   ✓ Codex local protocol translation > rejects unsupported protocol {"reasoning":{"effort":"high"}} 0ms
+   ✓ Codex local protocol translation > rejects unsupported protocol {"tools":[{"type":"web_search"}]} 0ms
+   ✓ Codex local protocol translation > rejects unsupported protocol {"input":[{"role":"user","content":[{"type":"input_image","image_url":"x"}]}]} 0ms
+   ✓ Codex local protocol translation > rejects unsupported protocol {"max_output_tokens":21} 0ms
+   ✓ Codex local protocol translation > rejects unsupported protocol {"store":true} 0ms
+   ✓ Codex local protocol translation > rejects unsupported protocol {"include":["unsupported.output"]} 0ms
+   ✓ Codex local protocol translation > translates exact function tool cycle 0ms
+   ✓ Codex local protocol translation > translates text custom tool explicitly 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/bedrockInferenceBridge.test.ts > governed Bedrock bridge offline > preserves ACTUAL usage when settlement fails before persistence
+AssertionError: expected "spy" to be called 1 times, but got 2 times
+ ❯ src/__tests__/bedrockInferenceBridge.test.ts:130:20
+    128|     const failure = await bridge.infer("one", request, new AbortContro…
+    129|
+    130|     expect(settle).toHaveBeenCalledTimes(1);
+       |                    ^
+    131|     expect(failure).toMatchObject({
+    132|       name: "BedrockSettlementError", code: "BEDROCK_SETTLEMENT_NOT_AC…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  src/__tests__/bedrockInferenceBridge.test.ts > governed Bedrock bridge offline > surfaces an exact accounting replay after the settlement commits but its reply is lost
+AssertionError: expected "spy" to be called 1 times, but got 2 times
+ ❯ src/__tests__/bedrockInferenceBridge.test.ts:160:20
+    158|     const failure = await f.create().infer("one", request, new AbortCo…
+    159|
+    160|     expect(settle).toHaveBeenCalledTimes(1);
+       |                    ^
+    161|     expect(failure).toMatchObject({ code: "BEDROCK_SETTLEMENT_NOT_ACCE…
+    162|     expect(f.reservation.holds[0]).toMatchObject({ state: "SETTLED", r…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  src/__tests__/bedrockInferenceBridge.test.ts > governed Bedrock bridge offline > retains an isolated frozen settlement payload when an accounting client mutates its input
+AssertionError: expected undefined to match object { generation: 1, usage: { …(2) } }
+
+- Expected:
+{
+  "generation": 1,
+  "usage": {
+    "classification": "ACTUAL",
+    "inputTokens": 10,
+  },
+}
+
++ Received:
+undefined
+
+ ❯ src/__tests__/bedrockInferenceBridge.test.ts:177:39
+    175|     const failure = await f.create().infer("one", request, new AbortCo…
+    176|
+    177|     expect(failure.settlementPayload).toMatchObject({ generation: 1, u…
+       |                                       ^
+    178|     expect(Object.isFrozen(failure.settlementPayload)).toBe(true);
+    179|     expect(Object.isFrozen(failure.settlementPayload.usage)).toBe(true…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  src/__tests__/bedrockInferenceBridge.test.ts > governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response undefined
+ FAIL  src/__tests__/bedrockInferenceBridge.test.ts > governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response null
+ FAIL  src/__tests__/bedrockInferenceBridge.test.ts > governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response {"incident":true,"duplicate":false}
+ FAIL  src/__tests__/bedrockInferenceBridge.test.ts > governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response {"incident":false,"duplicate":true}
+AssertionError: expected Error: BEDROCK_SETTLEMENT_NOT_ACCEPTED to match object { Object (name, code, ...) }
+
+- Expected
++ Received
+
+- {
+-   "code": "BEDROCK_SETTLEMENT_NOT_ACCEPTED",
+-   "name": "BedrockSettlementError",
+-   "settlementPayload": {
+-     "usage": {
+-       "classification": "ACTUAL",
+-       "providerRequestId": "fixture-provider-1",
+-     },
+-   },
++ Error {
++   "message": "BEDROCK_SETTLEMENT_NOT_ACCEPTED",
+  }
+
+ ❯ src/__tests__/bedrockInferenceBridge.test.ts:190:7
+    188|       f.authority.settle = settle;
+    189|       const bridge = f.create();
+    190|       await expect(bridge.infer("one", request, new AbortController().…
+       |       ^
+    191|         name: "BedrockSettlementError", code: "BEDROCK_SETTLEMENT_NOT_…
+    192|         settlementPayload: { usage: { classification: "ACTUAL", provid…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  src/__tests__/bedrockInferenceBridge.test.ts > governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response {}
+ FAIL  src/__tests__/bedrockInferenceBridge.test.ts > governed Bedrock bridge offline > preserves known usage for an unaccepted settlement response "acknowledged"
+AssertionError: promise resolved "{ content: [ { …(2) } ], …(4) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "content": [
++     {
++       "text": "fixture complete",
++       "type": "text",
++     },
++   ],
++   "evidence": {
++     "authority": "NONE",
++     "automaticRetries": 0,
++     "evidenceClass": "OFFLINE_FIXTURE",
++     "latencyMs": 1,
++     "provider": "aws-bedrock",
++     "providerReturnedModel": null,
++     "requestDigest": "sha256:b45ba387778d5aec6c51ab89de48037a1faf79fe20f1e4506e083adcff218edd",
++     "requestId": "one",
++     "requestedInferenceProfile": "us.anthropic.claude-sonnet-4-6",
++     "schema": "factory-bedrock-inference-evidence/v1",
++     "underlyingModel": "anthropic.claude-sonnet-4-6",
++   },
++   "providerRequestId": "fixture-provider-1",
++   "stopReason": "end_turn",
++   "usage": {
++     "cacheReadInputTokens": 0,
++     "cacheWriteInputTokens": 0,
++     "inputTokens": 10,
++     "outputTokens": 5,
++     "reasoning": "DISABLED",
++   },
+  }
+
+ ❯ src/__tests__/bedrockInferenceBridge.test.ts:190:78
+    188|       f.authority.settle = settle;
+    189|       const bridge = f.create();
+    190|       await expect(bridge.infer("one", request, new AbortController().…
+       |                                                                              ^
+    191|         name: "BedrockSettlementError", code: "BEDROCK_SETTLEMENT_NOT_…
+    192|         settlementPayload: { usage: { classification: "ACTUAL", provid…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  9 failed | 26 passed (35)
+   Start at  00:34:56
+   Duration  599ms (transform 187ms, setup 0ms, collect 336ms, tests 61ms, environment 0ms, prepare 34ms)
+
+undefined
+/private/tmp/fdlc-program-observations/apps/orchestration-server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/__tests__/bedrockInferenceBridge.test.ts

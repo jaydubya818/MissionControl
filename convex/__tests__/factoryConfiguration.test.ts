@@ -2,11 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   factoryConfigurationDigest,
   validFactoryBudget,
+  validFactoryExecutionProfileBinding,
   validFactoryExecutorBinding,
   validFactoryExecutionBinding,
   type FactoryConfigurationInput,
 } from "../lib/factoryConfiguration";
-import { CODEX_V1_HARNESS_MANIFEST, harnessCapabilityManifestDigest } from "@mission-control/workflow-engine";
+import {
+  CODEX_V1_HARNESS_MANIFEST,
+  CODEX_V1_RUNTIME_ARTIFACT,
+  harnessCapabilityManifestDigest,
+  harnessRuntimeArtifactDigest,
+} from "@mission-control/workflow-engine";
 
 const configuration: FactoryConfigurationInput = {
   purpose: "SOFTWARE",
@@ -16,6 +22,8 @@ const configuration: FactoryConfigurationInput = {
   harnessCapabilityManifest: CODEX_V1_HARNESS_MANIFEST,
   harnessCapabilityManifestDigest: harnessCapabilityManifestDigest(CODEX_V1_HARNESS_MANIFEST),
   harnessEffectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
+  harnessRuntimeArtifact: CODEX_V1_RUNTIME_ARTIFACT,
+  harnessRuntimeArtifactDigest: harnessRuntimeArtifactDigest(CODEX_V1_RUNTIME_ARTIFACT),
   modelCatalogId: "model-route-1",
   modelRouteDigest: `sha256:${"a".repeat(64)}`,
   executionBackend: "persistent-worker",
@@ -52,6 +60,15 @@ describe("Factory configuration", () => {
       factoryConfigurationDigest({
         ...configuration,
         harnessEffectiveConfigSha256: "f".repeat(64),
+      })
+    );
+    expect(factoryConfigurationDigest(configuration)).not.toBe(
+      factoryConfigurationDigest({
+        ...configuration,
+        harnessRuntimeArtifact: {
+          ...CODEX_V1_RUNTIME_ARTIFACT,
+          executableSha256: "f".repeat(64),
+        },
       })
     );
     expect(factoryConfigurationDigest(configuration)).not.toBe(
@@ -141,5 +158,31 @@ describe("Factory configuration", () => {
     };
     expect(factoryConfigurationDigest(remote)).not.toBe(factoryConfigurationDigest(configuration));
     expect(factoryConfigurationDigest({ ...remote, sandboxProfileDigest: "sha256:profile-2" })).not.toBe(factoryConfigurationDigest(remote));
+  });
+
+  it("binds an all-or-nothing exact Execution Profile identity into the Factory digest", () => {
+    const profile = {
+      executionProfileId: "execution-profile-1",
+      executionProfileVersion: 1,
+      executionProfileDigest: `sha256:${"c".repeat(64)}`,
+      executionProfileQualificationDigest: `sha256:${"d".repeat(64)}`,
+    };
+    expect(validFactoryExecutionProfileBinding(profile)).toBe(true);
+    expect(factoryConfigurationDigest({ ...configuration, ...profile })).not.toBe(
+      factoryConfigurationDigest(configuration),
+    );
+    expect(factoryConfigurationDigest({ ...configuration, ...profile })).not.toBe(
+      factoryConfigurationDigest({
+        ...configuration,
+        ...profile,
+        executionProfileQualificationDigest: `sha256:${"e".repeat(64)}`,
+      }),
+    );
+    expect(validFactoryExecutionProfileBinding({})).toBe(true);
+    expect(validFactoryExecutionProfileBinding({
+      executionProfileId: profile.executionProfileId,
+      executionProfileVersion: profile.executionProfileVersion,
+      executionProfileDigest: profile.executionProfileDigest,
+    })).toBe(false);
   });
 });

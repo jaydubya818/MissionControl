@@ -54,6 +54,16 @@ describe("WorkOrder executable specification", () => {
     expect(result.riskReasons).toEqual(["Operator-selected medium risk."]);
   });
 
+  it("does not promote prose that explicitly denies sensitive authority", () => {
+    const result = classifyWorkOrderRisk({
+      ...valid,
+      riskLevel: "LOW",
+      context: "Qualification-only local repository; no inference, transmission, publication, or production authority.",
+    });
+    expect(result.riskLevel).toBe("LOW");
+    expect(result.riskReasons).toEqual(["Operator-selected low risk."]);
+  });
+
   it("requires an explicit approval when the contract reserves human review", () => {
     const result = validateWorkOrderSpecification({
       ...valid,

@@ -1,6 +1,16 @@
 export const AUTOMATION_POLICY_VERSION = "automation-v1";
 export const AUTOMATION_CADENCE_MS = 7 * 24 * 60 * 60 * 1000;
+/** Historical value retained so existing decisions keep their original audit meaning. */
 export const AUTOMATION_ACTOR_IDENTITY_SOURCE = "CLIENT_ASSERTED_TRUSTED_OPERATOR" as const;
+export const AUTOMATION_AUTHENTICATED_ACTOR_IDENTITY_SOURCE = "AUTHENTICATED_OPERATOR" as const;
+export const AUTOMATION_DEMO_ACTOR_IDENTITY_SOURCE = "LOCAL_DEMO_OPERATOR" as const;
+export const AUTOMATION_SYSTEM_ACTOR_IDENTITY_SOURCE = "SYSTEM" as const;
+
+export function automationOperatorIdentitySource(mode: "AUTHENTICATED" | "DEMO") {
+  return mode === "AUTHENTICATED"
+    ? AUTOMATION_AUTHENTICATED_ACTOR_IDENTITY_SOURCE
+    : AUTOMATION_DEMO_ACTOR_IDENTITY_SOURCE;
+}
 
 export type AutomationStatus = "DRAFT" | "DISABLED" | "ACTIVE" | "PAUSED" | "SUSPENDED" | "RETIRED" | "ARCHIVED";
 

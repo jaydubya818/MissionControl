@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { evaluateCurrentVerificationEligibility } from "../verificationCurrentness.js";
+import { evaluateCurrentVerificationEligibility, evaluatePrepublicationVerification, type CurrentVerificationInput } from "../verificationCurrentness.js";
 import { verificationContractDigest } from "../verificationIdentity.js";
 import {
   createAutomationVerificationSubject,
   createGitVerificationSubject,
-  type GitVerificationSubject,
+  createPrepublicationGitVerificationSubject,
+  createGitSubjectPublicationBinding,
+  type GithubVerificationSubject,
   type VerificationSubject,
 } from "../verificationSubject.js";
 
@@ -20,7 +22,7 @@ const decisionInputDigest = `sha256:${"f".repeat(64)}`;
 function gitSubject(
   sourceAttemptId = "source-a",
   candidateSha = "a".repeat(40),
-  pullRequestOverrides: Partial<GitVerificationSubject["pullRequest"]> = {},
+  pullRequestOverrides: Partial<GithubVerificationSubject["pullRequest"]> = {},
 ) {
   return createGitVerificationSubject({
     version: 1,
@@ -44,6 +46,22 @@ function gitSubject(
       draftAtPublication: true,
       ...pullRequestOverrides,
     },
+  });
+}
+
+function localGitSubject() {
+  return createGitVerificationSubject({
+    version: 1,
+    kind: "GIT_CANDIDATE",
+    workOrderId: "wo-1",
+    workOrderRevisionNumber: 1,
+    verificationContractDigest: contractDigest,
+    sourceAttemptId: "source-a",
+    repositoryId: "repo-1",
+    provider: "LOCAL_GIT",
+    candidateSha: "a".repeat(40),
+    treeSha: "b".repeat(40),
+    localRef: { baseRef: "main", headRef: "candidate", headSha: "a".repeat(40) },
   });
 }
 
@@ -117,7 +135,7 @@ function fixture(subject: VerificationSubject = gitSubject(), sourceReadyAt = 10
       ...tuple,
       recordedAt: 350,
     }],
-    providerHeads: subject.kind === "GIT_CANDIDATE" ? [{
+    providerHeads: subject.kind === "GIT_CANDIDATE" && subject.version === 1 && subject.provider === "GITHUB" ? [{
       provider: "GITHUB" as const,
       repositoryId: subject.repositoryId,
       installationId: "installation-1",
@@ -137,6 +155,45 @@ function fixture(subject: VerificationSubject = gitSubject(), sourceReadyAt = 10
 }
 
 describe("exact-current verification acceptance eligibility", () => {
+  it("verifies a pre-publication subject without making it acceptance eligible, then requires exact publication and provider currentness", () => {
+    const legacy = gitSubject();
+    const { subjectId: _id, digest: _digest, pullRequest, ...identity } = legacy;
+    const subject = createPrepublicationGitVerificationSubject({ ...identity, version: 2, baseSha: "c".repeat(40),
+      rawDiffSha256: `sha256:${"4".repeat(64)}`, baseRef: pullRequest.baseRef, headRef: pullRequest.headRef });
+    const data: CurrentVerificationInput = fixture(subject);
+    data.sourceAttempts[0].status = "PAUSED";
+    expect(evaluatePrepublicationVerification(data).eligible).toBe(true);
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
+    data.sourceAttempts[0].status = "COMPLETED";
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
+    data.sourceAttempts[0].subjectPublicationBinding = createGitSubjectPublicationBinding(subject, {
+      publicationPermitId: "permit", publicationPermitLeaseId: "lease", approvalDecisionId: "approval", verificationReceiptId: "receipt-a", pullRequest,
+    });
+    data.verificationReceipts[0].humanReviewValid = true;
+    data.providerHeads = fixture(legacy).providerHeads;
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(true);
+    for (const changed of [{ headSha: "f".repeat(40) }, { state: "CLOSED" as const }, { expiresAt: now }, { providerPullRequestId: "another-pr" }]) {
+      expect(evaluateCurrentVerificationEligibility({ ...data, providerHeads: [{ ...data.providerHeads[0], ...changed }] }).eligible).toBe(false);
+    }
+    expect(evaluateCurrentVerificationEligibility({ ...data, verificationReceipts: [{ ...data.verificationReceipts[0], humanReviewValid: false }] }).eligible).toBe(false);
+    expect(evaluatePrepublicationVerification({ ...data, verificationAttempts: [...data.verificationAttempts,
+      { ...data.verificationAttempts[0], id: "new-verifier", createdAt: 900, status: "FAILED" }] }).eligible).toBe(false);
+  });
+
+  it("allows pending human review only as pre-publication evidence, never as acceptance", () => {
+    const { subjectId: _id, digest: _digest, pullRequest, ...identity } = gitSubject();
+    const subject = createPrepublicationGitVerificationSubject({ ...identity, version: 2, baseSha: "c".repeat(40), rawDiffSha256: `sha256:${"4".repeat(64)}`,
+      baseRef: pullRequest.baseRef, headRef: pullRequest.headRef });
+    const data: CurrentVerificationInput = fixture(subject);
+    data.sourceAttempts[0].status = "PAUSED";
+    data.verificationResults[0].verdict = "REQUIRES_HUMAN_REVIEW";
+    data.verificationReceipts[0].status = "PENDING";
+    data.verificationReceipts[0].verdict = "REQUIRES_HUMAN_REVIEW";
+    expect(evaluatePrepublicationVerification(data).eligible).toBe(true);
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
+    data.verificationReceipts[0].validUntil = now;
+    expect(evaluatePrepublicationVerification(data).eligible).toBe(false);
+  });
   it("allows only the exact current software tuple with GitHub PR lineage", () => {
     const result = evaluateCurrentVerificationEligibility(fixture());
     expect(result, result.reasons.join(" ")).toMatchObject({
@@ -147,6 +204,61 @@ describe("exact-current verification acceptance eligibility", () => {
       sourceAttemptId: "source-a",
       verificationAttemptId: "verify-a",
     });
+  });
+
+  it("keeps an independently verified unpublished local candidate non-accepting without a trusted projection", () => {
+    const result = evaluateCurrentVerificationEligibility(fixture(localGitSubject()));
+    expect(result, result.reasons.join(" ")).toMatchObject({
+      eligible: false,
+      current: false,
+      verifiedOutcome: "SUCCESS",
+    });
+    expect(result.reasons[0]).toContain("not acceptance-eligible");
+  });
+
+  function observedLocalFixture() {
+    const subject = localGitSubject();
+    const data = fixture(subject);
+    const executionManifestDigest = `sha256:${"1".repeat(64)}`;
+    const executionProfileDigest = `sha256:${"2".repeat(64)}`;
+    return { ...data, projectId: "project", tenantId: "tenant",
+      verificationAttempts: data.verificationAttempts.map(item => ({ ...item, executionManifestDigest, executionProfileDigest })),
+      localCandidateObservations: [{ ...data.verificationAttempts[0].verificationAttemptBinding,
+        evidenceEnvelopeId: data.verificationEvidence[0].id, projectId: "project", tenantId: "tenant", repositoryId: "repo-1",
+        verificationAttemptId: "verify-a", verificationRunId: data.verificationResults[0].id,
+        verificationPlanDigest: planDigest, executionManifestDigest, executionProfileDigest,
+        candidateSha: subject.candidateSha, treeSha: subject.treeSha, observedAt: now - 1, expiresAt: now + 1000,
+      }],
+    };
+  }
+
+  it("requires complete independent lineage plus a current exact local observation", () => {
+    const data = observedLocalFixture();
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(true);
+    expect(evaluateCurrentVerificationEligibility({ ...data, verificationAttempts: [] }).eligible).toBe(false);
+    expect(evaluateCurrentVerificationEligibility({ ...data, verificationEvidence: [] }).eligible).toBe(false);
+    for (const status of ["PENDING", "RUNNING", "FAILED", "CANCELED"]) {
+      expect(evaluateCurrentVerificationEligibility({ ...data,
+        verificationAttempts: data.verificationAttempts.map(item => ({ ...item, status })) }).eligible).toBe(false);
+    }
+  });
+
+  it.each(["projectId", "tenantId", "repositoryId", "verificationAttemptId", "verificationRunId",
+    "verificationPlanDigest", "executionManifestDigest", "executionProfileDigest", "candidateSha", "treeSha",
+    "evidenceEnvelopeId", "workOrderId", "verificationSubjectDigest"] as const)("denies changed local observation %s", field => {
+    const data = observedLocalFixture();
+    data.localCandidateObservations[0][field] = "different";
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
+  });
+
+  it("denies expired, future and excessive-lifetime observations and never falls back to an older pass", () => {
+    for (const change of [{ expiresAt: now }, { observedAt: now + 1 }, { expiresAt: now + 60_001 }]) {
+      const data = observedLocalFixture(); Object.assign(data.localCandidateObservations[0], change);
+      expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
+    }
+    const data = observedLocalFixture();
+    data.localCandidateObservations.push({ ...data.localCandidateObservations[0], observedAt: now, candidateSha: "d".repeat(40) });
+    expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(false);
   });
 
   it("classifies an exact independent Policy V2 failure without making it acceptance-eligible", () => {

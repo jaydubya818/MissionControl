@@ -1,0 +1,14 @@
+{
+  "schema": "fdlc-qualification-aws-config-audit/v1",
+  "awsEnvironmentVariableNames": [],
+  "standardAwsConfigExists": false,
+  "standardAwsCredentialsFileExists": false,
+  "worktreeAndMainEnvAwsQualificationKeys": [],
+  "trackedAwsBedrockConfigurationMatches": [],
+  "githubDedicatedQualificationEnvironmentFound": false,
+  "githubAwsBedrockQualificationVariableNames": [],
+  "productionEnvironmentSecretsRead": false,
+  "ambientAwsIdentityUsed": false,
+  "awsApiCalls": 0,
+  "finding": "No dedicated qualification account/project or role binding found in inspected approved configuration locations."
+}

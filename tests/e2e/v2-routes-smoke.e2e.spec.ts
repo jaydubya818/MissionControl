@@ -12,7 +12,7 @@ const ROUTES: Array<{ route: string; heading: string; text?: string | RegExp }> 
   { route: "agents", heading: "Agent Registry" },
   { route: "atc", heading: "Air Traffic Control" },
   { route: "audit", heading: "ARM Audit" },
-  { route: "telemetry", heading: "ARM Telemetry" },
+  { route: "telemetry", heading: "Factory Incidents" },
   { route: "automations", heading: "Automations" },
   { route: "automation-runs", heading: "Automations" },
   { route: "skills", heading: "Discover skills" },

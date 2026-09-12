@@ -4,11 +4,25 @@ import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { canonicalDigest, canonicalHash } from "@mission-control/shared";
+import {
+  harnessCapabilityManifestDigest,
+  harnessRuntimeArtifactDigest,
+  harnessRuntimeArtifactIssues,
+} from "@mission-control/workflow-engine";
 import { createPatchDescriptor, createSandboxResultBundle, encodeSandboxResultBundle, type SandboxResultBundle } from "./sandboxResultBundle.js";
 import { SANDBOX_SUPERVISOR_VERSION, redactSandboxTail, redactSandboxText } from "./sandboxProvider.js";
 import { factoryResultContextIssues, resolveRemoteStructuredResult, type RemoteOutputFileObservation } from "./remoteStructuredResult.js";
 import { remoteFailure } from "./remoteExecutionPolicy.js";
 import { standaloneRemoteSupervisorSource } from "./standaloneRemoteSupervisorSource.js";
+import {
+  executionProfileDigest,
+  executionProfileIssues,
+  executionProfileProjectionBlockers,
+  executionProfileQualificationDigest,
+  executionProfileQualificationIssues,
+  executionProfileQualificationMatches,
+  type ExecutionProfileProjection,
+} from "../../../convex/lib/executionProfile.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -19,10 +33,12 @@ export interface SandboxSupervisorInput {
   workOrderRevisionNumber: number;
   workflowRunId: string;
   manifestDigest: string;
+  /** Server-issued lease heartbeat time at claim/reclaim admission. */
+  profileAdmittedAt?: number;
   profileDigest: string;
   sourceSha: string;
   environmentDescriptor: {
-    provider: "EXE_DEV" | "FAKE";
+    provider: "EXE_DEV" | "FAKE" | "DOCKER";
     image: string;
   };
   repositoryRoot: string;
@@ -33,6 +49,15 @@ export interface SandboxSupervisorInput {
     args: string[];
     timeoutMs: number;
     resultPath?: string;
+    model?: string;
+    provider?: string;
+    modelRouteDigest?: string;
+    providerRoute?: string;
+    reasoningConfig?: {
+      effort?: string;
+      temperature?: number;
+      maxTokens?: number;
+    };
   };
   environment: Record<string, string>;
   faultInjection?: { crashAfterDiagnostics?: boolean };
@@ -209,7 +234,8 @@ function validateSupervisorInput(input: SandboxSupervisorInput) {
   if (!input.attemptId || !input.workOrderId || !Number.isSafeInteger(input.workOrderRevisionNumber) || input.workOrderRevisionNumber < 1 || !input.workflowRunId || !input.manifestDigest || !input.profileDigest || !/^[a-f0-9]{40,64}$/i.test(input.sourceSha)) throw new Error("Supervisor identity is invalid.");
   const manifest: any = input.executionManifest;
   const credentialGrants = manifest?.sandbox?.credentialGrants;
-  if (manifest?.version !== "factory-execution-manifest/v1"
+  const route = supervisorModelRoute(manifest);
+  if (!["factory-execution-manifest/v1", "factory-execution-manifest/v2", "factory-execution-manifest/v3"].includes(manifest?.version)
     || input.manifestDigest !== `sha256:${canonicalHash(manifest)}`
     || manifest?.causation?.workOrderId !== input.workOrderId
     || manifest?.causation?.workOrderRevisionNumber !== input.workOrderRevisionNumber
@@ -218,17 +244,25 @@ function validateSupervisorInput(input: SandboxSupervisorInput) {
     || manifest?.sandbox?.profileDigest !== input.profileDigest
     || manifest?.sandbox?.supervisorVersion !== SANDBOX_SUPERVISOR_VERSION
     || manifest?.harness?.pullRequestAuthority !== "CONTROL_PLANE_ONLY"
-    || manifest?.harness?.executionBackend !== "remote-sandbox"
+    || supervisorExecutionBackend(manifest) !== "remote-sandbox"
     || !Array.isArray(manifest?.intent?.acceptanceCriterionIds)
     || manifest.intent.acceptanceCriterionIds.some((id: unknown) => typeof id !== "string" || !id)
     || new Set(manifest.intent.acceptanceCriterionIds).size !== manifest.intent.acceptanceCriterionIds.length
-    || ["adapter", "version", "harnessId", "harnessVersion", "provider", "model"]
+    || ["adapter", "version", "harnessId", "harnessVersion"]
       .some((field) => typeof manifest?.harness?.[field] !== "string" || !manifest.harness[field])
+    || !route
     || !Array.isArray(credentialGrants)
     || credentialGrants.some((grant: any) => grant?.secretValueIncluded !== false || grant?.githubAuthority !== "NONE" || grant?.providerAuthority !== "NONE")) {
     throw new Error("Frozen execution manifest is invalid or exceeds sandbox authority.");
   }
-  if (!["EXE_DEV", "FAKE"].includes(input.environmentDescriptor?.provider) || !input.environmentDescriptor?.image) throw new Error("Supervisor environment identity is invalid.");
+  if (decomposedManifest(manifest) && !validV2SupervisorBindings(manifest, input.executor, input.environment)) {
+    throw new Error("Frozen decomposed execution manifest has invalid model, harness, or runtime bindings.");
+  }
+  if (manifest.version === "factory-execution-manifest/v3"
+    && !validV3ExecutionProfileBinding(manifest, input.profileAdmittedAt)) {
+    throw new Error("Frozen V3 execution manifest has an invalid, expired, or substituted Execution Profile binding.");
+  }
+  if (!["EXE_DEV", "FAKE", "DOCKER"].includes(input.environmentDescriptor?.provider) || !input.environmentDescriptor?.image) throw new Error("Supervisor environment identity is invalid.");
   if (!path.isAbsolute(input.repositoryRoot) || !path.isAbsolute(input.outputPath)
     || (input.diagnosticsPath !== undefined && !path.isAbsolute(input.diagnosticsPath))) throw new Error("Supervisor paths must be absolute.");
   if (!input.executor.command || !Array.isArray(input.executor.args) || !Number.isSafeInteger(input.executor.timeoutMs) || input.executor.timeoutMs < 1_000 || input.executor.timeoutMs > 8 * 60 * 60 * 1_000) throw new Error("Supervisor executor contract is invalid.");
@@ -248,7 +282,7 @@ function summarizeNumstat(value: string) {
 }
 
 async function runExecutor(input: SandboxSupervisorInput, signal?: AbortSignal) {
-  return await new Promise<{ exitCode: number | null; stdout: string; stderr: string; timedOut: boolean; canceled: boolean }>((resolve, reject) => {
+  return await new Promise<{ exitCode: number | null; stdout: string; stderr: string; timedOut: boolean; canceled: boolean  ; }>((resolve, reject) => {
     const child = spawn(input.executor.command, input.executor.args, {
       cwd: input.repositoryRoot,
       env: { PATH: process.env.PATH, HOME: process.env.HOME, ...input.environment },
@@ -304,14 +338,318 @@ export async function atomicWriteFile(outputPath: string, content: Buffer) {
 }
 
 function harnessIdentity(manifest: any): SandboxResultBundle["harness"] {
+  const route = supervisorModelRoute(manifest);
   return {
     adapter: manifest.harness.adapter,
     version: manifest.harness.version,
     harnessId: manifest.harness.harnessId,
     harnessVersion: manifest.harness.harnessVersion,
-    provider: manifest.harness.provider,
-    model: manifest.harness.model,
+    provider: route?.provider ?? "",
+    model: route?.model ?? "",
+    ...(route?.modelRouteDigest === undefined ? {} : {
+      modelRouteDigest: route.modelRouteDigest,
+      providerRoute: route.providerRoute,
+      ...(route.reasoningConfig === undefined ? {} : { reasoningConfig: structuredClone(route.reasoningConfig) }),
+    }),
   };
+}
+
+function supervisorExecutionBackend(manifest: any) {
+  return decomposedManifest(manifest)
+    ? manifest?.executionBackend
+    : manifest?.harness?.executionBackend;
+}
+
+function supervisorModelRoute(manifest: any):  | {
+  provider: string;
+  model: string;
+  modelRouteDigest?: string;
+  providerRoute?: string;
+  reasoningConfig?: SandboxResultBundle["harness"]["reasoningConfig"];
+} | undefined {
+  const provider = decomposedManifest(manifest)
+    ? manifest?.modelRoute?.routeSnapshot?.provider
+    : manifest?.harness?.provider;
+  const model = decomposedManifest(manifest)
+    ? manifest?.modelRoute?.routeSnapshot?.modelId
+    : manifest?.harness?.model;
+  if (!boundedIdentity(provider, 100) || !boundedIdentity(model, 200)) return undefined;
+  if (!decomposedManifest(manifest)) return { provider, model };
+  const modelRouteDigest = manifest?.modelRoute?.routeDigest;
+  const providerRoute = manifest?.modelRoute?.routeSnapshot?.providerRoute;
+  if (!/^sha256:[a-f0-9]{64}$/i.test(modelRouteDigest ?? "") || !boundedIdentity(providerRoute, 100)) return undefined;
+  const reasoningConfig = manifest?.modelRoute?.routeSnapshot?.reasoningConfig;
+  return {
+    provider,
+    model,
+    modelRouteDigest,
+    providerRoute,
+    ...(reasoningConfig === undefined ? {} : { reasoningConfig: structuredClone(reasoningConfig) }),
+  };
+}
+
+function validV2SupervisorBindings(
+  manifest: any,
+  executor: SandboxSupervisorInput["executor"],
+  environment: Record<string, string>,
+) {
+  const harness = manifest?.harness;
+  const route = manifest?.modelRoute?.routeSnapshot;
+  const capabilityManifest = harness?.capabilityManifest;
+  if (!harness || !validV2SupervisorRoute(route)
+    || harness.provider !== undefined
+    || harness.model !== undefined
+    || harness.executionBackend !== undefined
+    || manifest.modelRoute.routeDigest !== `sha256:${canonicalHash({ namespace: "factory-model-route/v2", value: route })}`
+    || !/^[a-f0-9]{40}$/i.test(harness.harnessCommit ?? "")
+    || !capabilityManifest
+    || capabilityManifest?.identity?.adapterId !== harness.adapter
+    || capabilityManifest?.identity?.adapterVersion !== harness.version
+    || capabilityManifest?.identity?.harnessId !== harness.harnessId
+    || capabilityManifest?.identity?.harnessVersion !== harness.harnessVersion
+    || capabilityManifest?.identity?.harnessCommit !== harness.harnessCommit
+    || harnessCapabilityManifestDigest(capabilityManifest) !== harness.capabilityManifestSha256
+    || capabilityManifest?.effectiveConfigSha256 !== harness.effectiveConfigSha256
+    || harnessRuntimeArtifactIssues(harness.runtimeArtifact).length > 0
+    || harnessRuntimeArtifactDigest(harness.runtimeArtifact) !== harness.runtimeArtifactDigest) return false;
+  const qualification = manifest.modelRoute.qualificationSnapshot;
+  const compatibility = qualification?.compatibility;
+  const exactRouteMatches = executor.provider === route.provider
+    && executor.model === route.modelId
+    && executor.modelRouteDigest === manifest.modelRoute.routeDigest
+    && executor.providerRoute === route.providerRoute
+    &&  (harness.adapter === "codex" && harness.version === "bedrock-v1"
+      ? manifest.version === "factory-execution-manifest/v3" &&
+        route.provider === "aws-bedrock" &&
+        route.modelId === "anthropic.claude-sonnet-4-6" &&
+        /^bedrock-us:[a-f0-9]{64}$/.test(route.providerRoute) &&
+        Object.keys(environment).length === 0 &&
+        manifest.sandbox?.profileSnapshot?.provider === "DOCKER" &&
+        manifest.retryPolicy?.maxAttempts === 1
+      : route.providerRoute === "openrouter"
+    && environment.OPENAI_BASE_URL === "https://openrouter.ai/api/v1"
+     ) && canonicalHash(executor.reasoningConfig ?? null) === canonicalHash(route.reasoningConfig ?? null);
+  return  ( exactRouteMatches
+    && qualification?.schema === "factory-model-route-qualification/v2"
+    && qualification.routeDigest === manifest.modelRoute.routeDigest
+    && manifest.modelRoute.qualificationDigest === `sha256:${canonicalHash({ namespace: "factory-model-route-qualification/v2", value: qualification })}`
+    && compatibility?.adapter === harness.adapter
+    && compatibility?.version === harness.version
+    && compatibility?.capabilityManifestDigest === harness.capabilityManifestSha256
+    && compatibility?.effectiveConfigSha256 === harness.effectiveConfigSha256
+    && compatibility?.runtimeArtifactDigest === harness.runtimeArtifactDigest
+    && compatibility?.executionBackend === manifest.executionBackend
+    && qualification.authority?.executionOnly === true
+    && qualification.authority?.routing === false
+    && qualification.authority?.verification === false
+    && qualification.authority?.acceptance === false
+    && qualification.authority?.publication === false
+    && qualification.authority?.merge === false ) ;
+}
+
+/** V3 is the V2 decomposed execution tuple plus one exact, qualified profile
+ * receipt. This is pure so the host runtime can apply the same pre-allocation
+ * guard before uploading the standalone supervisor. */
+export function validV3ExecutionProfileBinding(manifest: any, profileAdmittedAt: unknown) {
+  if (manifest?.version !== "factory-execution-manifest/v3") return false;
+  if (!Number.isSafeInteger(profileAdmittedAt) || (profileAdmittedAt as number) < 0) return false;
+  const binding = manifest.executionProfile;
+  if (!binding || typeof binding !== "object" || Array.isArray(binding)
+    || Object.keys(binding).some((key) => ![
+      "profileId",
+      "profileKey",
+      "version",
+      "profileDigest",
+      "profileSnapshot",
+      "qualificationDigest",
+      "qualificationSnapshot",
+    ].includes(key))
+    || !boundedIdentity(binding.profileId, 200)
+    || !boundedIdentity(binding.profileKey, 100)
+    || !Number.isSafeInteger(binding.version)
+    || binding.version < 1
+    || !/^sha256:[a-f0-9]{64}$/.test(binding.profileDigest ?? "")
+    || !/^sha256:[a-f0-9]{64}$/.test(binding.qualificationDigest ?? "")
+    || executionProfileIssues(binding.profileSnapshot).length > 0
+    || executionProfileQualificationIssues(binding.qualificationSnapshot).length > 0) return false;
+
+  let profileDigest: string;
+  let qualificationDigest: string;
+  try {
+    profileDigest = executionProfileDigest(binding.profileSnapshot);
+    qualificationDigest = executionProfileQualificationDigest(binding.qualificationSnapshot);
+  } catch {
+    return false;
+  }
+  const profile = binding.profileSnapshot as Record<string, any>;
+  const qualification = binding.qualificationSnapshot as Record<string, any>;
+  if (profileDigest !== binding.profileDigest
+    || qualificationDigest !== binding.qualificationDigest
+    || binding.profileKey !== profile.profileKey
+    || binding.version !== profile.version
+    || !Number.isFinite(qualification.approvedAt)
+    || qualification.approvedAt > (profileAdmittedAt as number)
+    || !Number.isFinite(qualification.validUntil)
+    || qualification.validUntil <= (profileAdmittedAt as number)
+    || !executionProfileQualificationMatches({
+      profileId: binding.profileId,
+      profileSnapshot: profile,
+      profileDigest: binding.profileDigest,
+      qualificationSnapshot: qualification,
+    })) return false;
+
+  const harness = manifest.harness;
+  const sandbox = manifest.sandbox;
+  const selectedIsolation = harness?.isolation;
+  const expectedHarnessRequirements = selectedExecutionHarnessRequirements(selectedIsolation);
+  const expectedSandboxCapabilities = selectedExecutionSandboxCapabilities(
+    manifest.executionBackend,
+    selectedIsolation,
+    profile.sandboxProfile?.profileSnapshot,
+  );
+  const projection: ExecutionProfileProjection = {
+    profileId: binding.profileId,
+    profileKey: binding.profileKey,
+    profileVersion: binding.version,
+    profileDigest: binding.profileDigest,
+    profileSnapshot: profile,
+    qualificationDigest: binding.qualificationDigest,
+    qualificationSnapshot: qualification,
+    executor: { adapter: harness?.adapter, version: harness?.version },
+    harnessCapabilityManifest: harness?.capabilityManifest,
+    harnessCapabilityManifestDigest: harness?.capabilityManifestSha256,
+    harnessEffectiveConfigSha256: harness?.effectiveConfigSha256,
+    harnessRuntimeArtifact: harness?.runtimeArtifact,
+    harnessRuntimeArtifactDigest: harness?.runtimeArtifactDigest,
+    executionBackend: manifest.executionBackend,
+    modelCatalogId: manifest.modelRoute?.catalogId,
+    modelRouteSnapshot: manifest.modelRoute?.routeSnapshot,
+    modelRouteDigest: manifest.modelRoute?.routeDigest,
+    modelQualificationSnapshot: manifest.modelRoute?.qualificationSnapshot,
+    modelQualificationDigest: manifest.modelRoute?.qualificationDigest,
+    ...(sandbox?.profileId ? { sandboxProfileId: sandbox.profileId } : {}),
+    ...(sandbox?.profileSnapshot !== undefined ? { sandboxProfileSnapshot: sandbox.profileSnapshot } : {}),
+    ...(sandbox?.profileDigest ? { sandboxProfileDigest: sandbox.profileDigest } : {}),
+    isolationModes: profile.isolationModes,
+    requiredHarnessCapabilities: profile.requiredHarnessCapabilities,
+    requiredSandboxCapabilities: profile.requiredSandboxCapabilities,
+  };
+  return  ( executionProfileProjectionBlockers({
+    profileId: binding.profileId,
+    profileSnapshot: profile,
+    profileDigest: binding.profileDigest,
+    qualificationSnapshot: qualification,
+    qualificationDigest: binding.qualificationDigest,
+    projection,
+  }).length === 0
+    && profile.executionBackend === "remote-sandbox"
+    && profile.sandboxProfile !== undefined
+    && profile.isolationModes.includes(selectedIsolation)
+    && sameHarnessRequirements(harness?.requiredHarnessCapabilities, expectedHarnessRequirements)
+    && selectedHarnessRequirementsAllowed(
+      profile.requiredHarnessCapabilities,
+      expectedHarnessRequirements,
+    )
+    && sameStringSet(harness?.requiredCapabilities, expectedSandboxCapabilities)
+    && selectedSandboxCapabilitiesAllowed(
+      profile.requiredSandboxCapabilities,
+      expectedSandboxCapabilities,
+    ) ) ;
+}
+
+function decomposedManifest(manifest: any) {
+  return  ( manifest?.version === "factory-execution-manifest/v2"
+    || manifest?.version === "factory-execution-manifest/v3" ) ;
+}
+
+function selectedHarnessRequirementsAllowed(allowed: unknown, selected: unknown) {
+  return  ( Array.isArray(allowed)
+    && Array.isArray(selected)
+    && selected.length > 0
+    && selected.every((requirement) => allowed.some((candidate) =>
+      candidate?.capability === requirement?.capability
+      && candidate?.minimumSupport === requirement?.minimumSupport
+     ) ));
+}
+
+function selectedExecutionHarnessRequirements(isolation: unknown) {
+  if (isolation !== "READ_ONLY" && isolation !== "WORKSPACE_WRITE") return [];
+  return [
+    { capability: "filesystem.read", minimumSupport: "SUPPORTED" },
+    ...(isolation === "WORKSPACE_WRITE"
+      ? [{ capability: "filesystem.write", minimumSupport: "SUPPORTED" }]
+      : []),
+    { capability: "filesystem.pathAllowlist", minimumSupport: "PARTIAL" },
+    { capability: "shell.available", minimumSupport: "PARTIAL" },
+    { capability: "shell.processTreeCancellation", minimumSupport: "PARTIAL" },
+    { capability: "git.status", minimumSupport: "SUPPORTED" },
+    { capability: "git.diff", minimumSupport: "SUPPORTED" },
+    { capability: "tools.structuredOutput", minimumSupport: "PARTIAL" },
+    { capability: "headless.support", minimumSupport: "PARTIAL" },
+    { capability: "cancellation.support", minimumSupport: "PARTIAL" },
+  ];
+}
+
+function selectedExecutionSandboxCapabilities(
+  executionBackend: unknown,
+  isolation: unknown,
+  sandboxProfileSnapshot: unknown,
+) {
+  if (isolation !== "READ_ONLY" && isolation !== "WORKSPACE_WRITE") return [];
+  const capabilities = ["git-worktree", isolation === "READ_ONLY" ? "read-only" : "workspace-write"];
+  if (executionBackend === "remote-sandbox") {
+    const provider = (sandboxProfileSnapshot as Record<string, any> | undefined)?.provider;
+    capabilities.push("remote-sandbox", `sandbox-provider:${String(provider ?? "").toLowerCase().replace(/_/g, "-")}`);
+  }
+  return capabilities.sort();
+}
+
+function sameHarnessRequirements(left: unknown, right: unknown) {
+  if (!Array.isArray(left) || !Array.isArray(right)) return false;
+  const normalize = (requirements: any[]) => requirements
+    .map((requirement) => `${requirement?.capability}:${requirement?.minimumSupport}`)
+    .sort();
+  return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+}
+
+function sameStringSet(left: unknown, right: unknown) {
+  return  ( Array.isArray(left)
+    && Array.isArray(right)
+    && left.every((item) => typeof item === "string")
+    && right.every((item) => typeof item === "string")
+    && JSON.stringify([...left].sort()) === JSON.stringify([...right].sort()) ) ;
+}
+
+function selectedSandboxCapabilitiesAllowed(allowed: unknown, selected: unknown) {
+  return  ( Array.isArray(allowed)
+    && Array.isArray(selected)
+    && selected.length > 0
+    && selected.every((capability) => typeof capability === "string" && allowed.includes(capability ) ));
+}
+
+function validV2SupervisorRoute(route: any) {
+  if (!route || route.schema !== "factory-model-route/v2"
+    || Object.keys(route).some((key) => !["schema", "provider", "providerRoute", "modelId", "reasoningConfig"].includes(key))
+    || Object.hasOwn(route, "capabilityIdentity")
+    || Object.hasOwn(route, "runtimeIdentity")
+    || !boundedIdentity(route.provider, 100)
+    || route.provider !== route.provider.toLowerCase()
+    || !boundedIdentity(route.providerRoute, 100)
+    || route.providerRoute !== route.providerRoute.toLowerCase()
+    || !boundedIdentity(route.modelId, 200)) return false;
+  if (route.reasoningConfig === undefined) return true;
+  const reasoning = route.reasoningConfig;
+  return  ( reasoning && typeof reasoning === "object" && !Array.isArray(reasoning)
+    && Object.keys(reasoning).length > 0
+    && Object.keys(reasoning).every((key) => ["effort", "temperature", "maxTokens"].includes(key))
+    && (reasoning.effort === undefined || (boundedIdentity(reasoning.effort, 64) && reasoning.effort === reasoning.effort.toLowerCase()))
+    && (reasoning.temperature === undefined || (typeof reasoning.temperature === "number" && Number.isFinite(reasoning.temperature) && reasoning.temperature >= 0 && reasoning.temperature <= 2))
+    && (reasoning.maxTokens === undefined || (Number.isSafeInteger(reasoning.maxTokens) && reasoning.maxTokens >= 1 && reasoning.maxTokens <= 10_000_000)) ) ;
+}
+
+function boundedIdentity(value: unknown, maximum: number): value is string {
+  return  ( typeof value === "string" && value === value.trim() && value.length > 0
+    && value.length <= maximum && !/[\0\r\n]/.test(value ) );
 }
 
 function codexUsage(stdout: string) {

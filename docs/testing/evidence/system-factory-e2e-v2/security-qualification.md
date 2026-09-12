@@ -73,25 +73,16 @@ The findings below use the repository security-review format: rule, severity, lo
 
 ### DEP-RR-1124268 — Moderate — React Router backslash open redirect bypass
 
-- Location: `react-router` 6.30.4 via `mission-control-ui > react-router-dom`.
+- Location: `react-router` 6.30.6 via `mission-control-ui > react-router-dom`.
 - Evidence: production audit advisory 1124268; patched only in React Router 7.18+.
 - Impact: unexpected external navigation if attacker-supplied strings reach router navigation.
 - Fix: dedicated React Router 7 migration plan, not a hidden framework major in hardening.
 - Mitigation: declarative client-only routing, internal route maps, no router external redirect, protocol validation for docs links; owner review 2026-09-15, expiry 2026-11-15.
 - False-positive notes: the advisory is valid; Mission Control does not satisfy its attacker-controlled target precondition today.
 
-### DEP-RR-1124270 — Moderate — React Router DOM open redirect to XSS
-
-- Location: direct `react-router-dom` 6.30.4 production dependency.
-- Evidence: production audit advisory 1124270 has no patched v6 recommendation.
-- Impact: external redirect/XSS when an application already supplies an open redirect target.
-- Fix: migrate to a patched Router 7 pair under the dedicated plan.
-- Mitigation: no router-driven external redirect path; docs/evidence URLs are scheme-controlled and external anchors isolate openers; same review/expiry.
-- False-positive notes: valid latent library risk, presently unreachable by product routing behavior.
-
 ### DEP-RR-1124272 — Moderate — SSR hydration constructor injection
 
-- Location: `react-router` 6.30.4 via `react-router-dom`.
+- Location: `react-router` 6.30.6 via `react-router-dom`.
 - Evidence: production audit advisory 1124272 explicitly limits impact to Framework/Data Mode manual SSR hydration.
 - Impact: attacker-triggered constructor behavior and outbound traffic through crafted hydrated errors.
 - Fix: Router 7 migration.

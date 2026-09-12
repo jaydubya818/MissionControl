@@ -41,6 +41,12 @@ configuration digest, backend, sandbox capabilities, slots, readiness, and
 session before polling.
 Registration failure is fail-closed: Attempt execution does not start.
 
+An Execution Profile is a control-plane identity, not a worker plugin or
+advertisement. The worker continues to advertise exact installed components and
+its exact Factory Version binding. For a profile-bound version, admission
+reconciles that binding with the frozen profile and qualification identity; the
+worker does not discover, install, or select a profile independently.
+
 Keep one stable `CODEX_WORKER_HOST_ID` per real worker installation. Do not
 reuse one ID concurrently on two machines. Each process restart deliberately
 creates a new session and server-derived generation.
@@ -49,11 +55,14 @@ creates a new session and server-derived generation.
 
 1. Dispatch freezes the exact base SHA, executor/version, backend, sandbox
    requirements, repository scope, model route, timeout, context, Factory
-   Version, quality contract, and verification contract.
+   Version, quality contract, verification contract, and, for new Factory
+   Versions, the exact Execution Profile version, digest, and qualification
+   receipt in `factory-execution-manifest/v3`.
 2. `attempts.claim` atomically checks the current registration, heartbeat,
    readiness/draining state, repository access, executor, isolation, required
    harness capabilities, exact capability/configuration digests, provider/model,
-   sandbox capabilities, backend, and server-counted active leases. Capacity is
+   sandbox capabilities, backend, current profile qualification and exact
+   Factory Version/profile binding, and server-counted active leases. Capacity is
    counted across all repositories and sessions for the stable worker ID; the
    reported `currentRuns` value is observational only.
 3. A successful claim writes a unique lease ID plus worker ID, session, and
@@ -64,6 +73,12 @@ creates a new session and server-derived generation.
    re-checks the current server registration in the same transaction.
 5. Heartbeats update current lease/registration state. They are not emitted as
    high-volume durable events.
+
+A revoked or expired profile blocks dispatch and first claim. If revocation
+occurs after a valid lease is issued, the Attempt continues under that exact
+frozen identity until the bounded lease completes or normal cancellation and
+recovery policy intervenes. Profile state is not re-resolved inside adapter
+execution, and a retry must pass current admission as a new Attempt.
 
 ## Local ownership files
 
@@ -155,9 +170,10 @@ create ownership.
 
 ## Optional experimental DeepSeek Harness
 
-Codex remains the default production adapter. DeepSeek Harness is disabled by
-default and is admitted only on the persistent-worker backend when all of the
-following are set and healthy:
+No harness is a runtime default. Set `CODEX_FACTORY_WORKER_ENABLED=true` to
+register Codex. DeepSeek Harness can be the only registered adapter; it is
+disabled by default and is admitted only on the persistent-worker backend when
+all of the following are set and healthy:
 
 ```text
 DEEPSEEK_HARNESS_EXECUTOR_ENABLED=1
@@ -168,14 +184,114 @@ CODEX_WORKER_REPOSITORY_ID=<workspaceRepositories ID>
 
 The checkout must be version `0.1.0-rc.5` at commit
 `47f943859bef60e4160492346772ded9b24f765a`, clean for tracked files, and contain
-the evaluated built CLI digest. The provider prerequisite is the existing
+the evaluated built CLI digest. Its runtime artifact also freezes the canonical
+digest of the complete installed tree (all paths, object types, regular-file
+bytes, and internal symlink targets except root Git metadata). The worker
+recomputes that closure during health and again during prepare before spawn;
+an added or modified dependency, an escaping/dangling symlink, a symlink into
+excluded `.git` metadata, or a special file makes the adapter unavailable.
+POSIX mode bits are intentionally excluded because the CLI is launched through
+`process.execPath` rather than by its executable bit; unreadable files still
+fail verification. On the qualified 1.5 GB installation this full check takes
+several seconds per prepare, an accepted fail-closed cost for the experimental
+adapter. The provider prerequisite is the existing
 loopback Ollama `0.32.6` model `qwen3.5:35b-a3b-q8_0` at digest
 `655d273ede3adc056594f511c120d616d92bf4c4d5bcfe580f3cfa29abe8109d`.
 Mission Control does not clone, build, install, download, start, or authenticate
 these prerequisites. A failed pin or provider probe prevents worker
 registration and execution.
 
-## Backend-first rollout
+## Execution Profile v40 rollout
+
+1. Deploy the `v40` Convex backend and authoritative generated API types before
+   any caller requires profile-bound Factory Version creation.
+2. Register and qualify an immutable `factory-execution-profile/v1` version;
+   confirm its exact route, route qualification, harness manifest, effective
+   configuration, runtime artifact, backend, optional Sandbox Profile,
+   isolation, capability, lifecycle, and all-denied authority bindings.
+3. Create a new Factory Version from that exact profile and verify its
+   compatibility projections and configuration digest. Do not backfill or
+   rewrite historical execution-manifest V1/V2 records.
+4. Confirm readiness, dispatch, first claim, and host evidence all expose the
+   same profile row ID, key, version, profile digest, qualification digest, and
+   exact component identities. Wrong, missing, stale, revoked, unsupported, or
+   substituted identities must fail before harness execution.
+5. Roll back by stopping new profile-bound Factory Version creation and
+   admission. Drain before worker rollback; already leased Attempts retain their
+   frozen identity, while retries require current admission. Do not infer or
+   substitute a profile.
+
+Phase 2 does not change adapter installation, worker registry composition,
+dynamic tools, subagent policy, or harness implementation. The earlier generic
+harness rollout remains documented below for operators maintaining those
+worker versions.
+
+## Governed read-only MCP v42
+
+Phase 3 adds one profile-specific host capability; it does not enable MCP in a
+harness. Register the exact qualification Tool Version, qualify its reviewed
+digest, create one expiring Tool Grant, and register/qualify a new Execution
+Profile that freezes that grant. Never attach the grant to an existing profile
+or historical Attempt.
+
+Before enabling that profile, run the authoritative Factory qualification with
+the reviewed baseline:
+
+```sh
+MC_QUALIFICATION_BASE_SHA=<reviewed-main-sha> pnpm run qualify:factory:v2
+```
+
+The worker executes the exact `read_factory_doctrine_excerpt` fixture before
+harness startup. Convex must commit an `ALLOWED` receipt while the Attempt
+lease, fencing generation, profile, grant, Tool Version, qualification expiry,
+and one-call budget are current. Only then may the local stdio process start.
+The harness receives bounded context labeled untrusted; it receives no MCP
+endpoint or credential.
+
+Operator remediation is deliberately narrow:
+
+- missing capability: select a separately qualified profile with the exact
+  grant, or continue with `NO_TOOL_CAPABILITY` when the WorkOrder does not need it;
+- revoked/expired grant or stale qualification: register and qualify a new
+  immutable version—never mutate the old receipt/profile;
+- server/schema/implementation mismatch: stop and requalify new exact bytes;
+- unavailable/timeout/poisoned output: inspect the Attempt receipt; do not
+  widen destinations, retry budget, or tool scope;
+- stale worker/canceled Attempt: the denial or late completion remains audit
+  evidence, but a retry requires a new current Attempt lease.
+
+Rollback is grant revocation plus removal of the MCP-qualified profile from new
+Factory Version selection. Revocation denies new calls and preserves historical
+receipts. This path is `QUALIFICATION_FIXTURE`, not a real admitted MCP service.
+
+Phase 4 admits one additional exact path: Context7 `query-docs` at
+`mcp.context7.com:443`, release `@upstash/context7-mcp@4.0.5`, with no
+credential and one fixed public React documentation query. The broker requires
+the observed server version and input-schema digest to equal the frozen Tool
+Version before the request is sent. It records separate authorization and
+completion receipts and supplies only a bounded, untrusted normalized text
+envelope to the harness. Every HTTPS connection is pinned to an address from
+the broker's validated public-DNS result, and initialize, catalog validation,
+and the tool call share one end-to-end deadline. Redirects, private or reserved
+address results, duplicate advertised operations, retries, dynamic discovery
+authority, writes, acceptance, routing, and policy mutation remain denied.
+
+If publication credentials are unavailable after the candidate commit exists,
+an operator may recover only the exact failed policy-v2 publication Attempt
+when its durable code-diff and prior workspace-ownership evidence match. The
+failed Attempt remains terminal and unchanged. Recovery creates a new linked,
+fenced Attempt that transfers the already-owned workspace, attests the existing
+commit and allowed-path diff, and emits `LOCAL_GIT` candidate evidence without
+rerunning the harness or MCP call. It cannot publish, and even independently
+verified `LOCAL_GIT` evidence is not acceptance-current without a trusted
+publication projection.
+
+The isolated Phase 4 launcher permits raw SQLite snapshot copying only after
+the source backend's configured ports are confirmed stopped and no WAL/SHM
+sidecars exist. It fails closed rather than copying a potentially torn live
+database.
+
+## Original generic-harness v27 rollout
 
 1. Deploy the `v27` Convex backend before an updated orchestration worker. The
    stored manifest fields are optional, so existing Factory versions and host
@@ -185,9 +301,10 @@ registration and execution.
    `workspaceHostBindings.report` change and `v26 -> v27`.
 3. Deploy workers one host at a time. Each worker reports its exact capability
    and configuration digests and waits for registration before polling.
-4. Confirm Codex readiness and admission before explicitly enabling DeepSeek on
-   any host. DeepSeek registration must fail closed if its pin, built artifact,
-   Ollama runtime, or model digest differs.
+4. Confirm readiness and admission for every adapter explicitly enabled on the
+   host. DeepSeek does not require Codex, and its registration must fail closed
+   if its pin, built artifact, complete installation closure, Ollama runtime,
+   or model digest differs.
 5. Drain before rollback. Stale registrations stop new claims, and workspaces
    remain preserved for inspection. Clearing
    `DEEPSEEK_HARNESS_EXECUTOR_ENABLED` removes only the experimental adapter.
@@ -197,7 +314,13 @@ registration and execution.
 Monitor:
 
 - registration failures or stale host heartbeats;
-- claim rejections by capability, readiness, backend, or capacity reason;
+- profile qualification expiry/revocation and readiness blockers;
+- claim rejections by profile/qualification digest, component identity,
+  capability, readiness, backend, or capacity reason;
+- execution evidence whose profile identity disagrees with the Attempt or
+  Factory Version;
+- governed MCP denials, grant expiry/revocation, server/schema substitution,
+  replay, secret withholding, timeout, and `lateOrStale` completion evidence;
 - `FACTORY_WORKER_LOST` run failures;
 - runtime disposition `LOST`, `FAILED`, or `CANCELLED`;
 - lifecycle metadata `PROCESS_TERMINATED`,

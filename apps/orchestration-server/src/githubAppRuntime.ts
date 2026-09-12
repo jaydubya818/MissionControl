@@ -84,6 +84,26 @@ export async function mintInstallationToken(input: {
   return { token: result.token, expiresAt };
 }
 
+/** Exact read-only recovery. Absence or disagreement never causes a write. */
+export async function reconcilePublishedPullRequest(input: {
+  repository: string; providerRepositoryId: string; branch: string; base: string; headSha: string; token: string; fetchImpl?: typeof fetch;
+}) {
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(input.repository)) throw new Error("Invalid reconciliation repository.");
+  const [owner] = input.repository.split("/");
+  const headers = { Authorization: `Bearer ${input.token}` };
+  const ref = await githubJson<any>(`https://api.github.com/repos/${input.repository}/git/ref/heads/${encodeURIComponent(input.branch)}`, { method: "GET", headers }, input.fetchImpl);
+  if (ref?.object?.type !== "commit" || ref.object.sha !== input.headSha) throw new Error("Remote branch does not prove the exact published candidate.");
+  const pulls = await githubJson<any[]>(`https://api.github.com/repos/${input.repository}/pulls?state=all&head=${encodeURIComponent(`${owner}:${input.branch}`)}&per_page=100`, { method: "GET", headers }, input.fetchImpl);
+  if (pulls.length !== 1) throw new Error("Publication remains uncertain: exactly one remote pull request is required; no write was retried.");
+  const pull = pulls[0];
+  if (pull.state !== "open" || pull.draft !== true || !pull.node_id
+    || String(pull.head?.repo?.id) !== input.providerRepositoryId || String(pull.base?.repo?.id) !== input.providerRepositoryId
+    || pull.html_url !== `https://github.com/${input.repository}/pull/${pull.number}`) {
+    throw new Error("Remote pull request is not the exact open draft in the authorized repository.");
+  }
+  return normalizePullRequest(pull, input, true);
+}
+
 export async function createOrReusePullRequest(input: {
   repository: string;
   branch: string;
@@ -93,6 +113,8 @@ export async function createOrReusePullRequest(input: {
   token: string;
   headSha: string;
   draft?: boolean;
+  signal?: AbortSignal;
+  assertWriteAllowed?: () => Promise<void>;
   fetchImpl?: typeof fetch;
   sleepImpl?: (milliseconds: number) => Promise<void>;
   headPropagationAttempts?: number;
@@ -102,7 +124,7 @@ export async function createOrReusePullRequest(input: {
   if (!owner || input.repository.split("/").length !== 2) throw new Error("GitHub repository must use owner/name format.");
   const listOpenPullRequests = () => githubJson<Array<any>>(
     `https://api.github.com/repos/${input.repository}/pulls?state=open&head=${encodeURIComponent(`${owner}:${input.branch}`)}&per_page=10`,
-    { method: "GET", headers: { Authorization: `Bearer ${input.token}` } },
+    { method: "GET", headers: { Authorization: `Bearer ${input.token}` }, signal: input.signal },
     input.fetchImpl
   );
   const existing = await listOpenPullRequests();
@@ -111,10 +133,13 @@ export async function createOrReusePullRequest(input: {
     return await normalizeReusedPullRequestAfterPush(exact, input, listOpenPullRequests);
   }
   if (existing.length > 0) throw new Error("An open pull request exists for the branch with a different base branch.");
+  await input.assertWriteAllowed?.();
+  input.signal?.throwIfAborted();
   const created = await githubJson<any>(
     `https://api.github.com/repos/${input.repository}/pulls`,
     {
       method: "POST",
+      signal: input.signal,
       headers: { Authorization: `Bearer ${input.token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         title: input.title.slice(0, 240),

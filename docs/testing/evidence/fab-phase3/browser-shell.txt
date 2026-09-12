@@ -1,0 +1,4 @@
+
+Running 15 tests using 3 workers
+···············
+  15 passed (16.7s)

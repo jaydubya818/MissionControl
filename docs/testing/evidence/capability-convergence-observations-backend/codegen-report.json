@@ -1,0 +1,37 @@
+{
+  "status": "PASS",
+  "runRoot": "/private/tmp/fdlc-observation-codegen-BoyBl6",
+  "startedAt": "2026-09-06T08:24:33.102Z",
+  "sourcePath": "/private/tmp/fdlc-program-observations/convex/inferenceGateway.ts",
+  "sourceSha256": "144c9ba6e43ed129c0fda387ea3ebf4fc327d2e393fdea0e82e48f5f7f7a7392",
+  "sourceBranchHead": "8bf19fcb7e46f4b80a862054d22fbd7ca7ed436f",
+  "backendBinary": "/Users/jaywest/.cache/convex/binaries/precompiled-2026-08-25-7cce8fb/convex-local-backend",
+  "backendSha256": "3fefa471e11eab56aabf86039ddf825ed1b4dbadadec2df6b88b6ffd9d604400",
+  "convexVersion": "1.42.3",
+  "gatewayBundleSha256": "fe548add56ea5965c0e3415c861c6f41863c1048ec73844ffdd942bc4259f5e0",
+  "reservationTableSha256": "44353f3bf19bfbf3c2ce432395895dc7325f61478121b7d05f729d1c1d97ffc3",
+  "routeValidatorSha256": "0dd9289ebcf4d1fdcc7a7f18214bd15dff76eed1f20b5994ffccfa2c5aa3ae43",
+  "backendUrl": "http://127.0.0.1:53762",
+  "sitePort": 53763,
+  "schemaSourceSha256": "569dfe7e465d3cab84f1d8a8aba3057ac6368f42f9b2c2cbaf592eb1b52b7d61",
+  "sharedSourceSha256": "c69204c1719e4883093301023de25705125f4f675d2d2097a81fae14cc7d6d34",
+  "scope": "Unmodified production inference gateway and shared canonical constructors, fixture-only authorization shim, exact inference table schemas and indexes, synthetic related schemas and records, real local Convex backend. No external provider calls, real billing, full-app authorization, full application schema deployment, or real human acceptance proof.",
+  "dispatchSharedSha256": "42222b3778434cf71780b56879604b2b5768002e34594cfdd4f6ba1d8c0384c8",
+  "profileGuardSha256": "3b7ade9e198b9d1d6b7e9bfe5553c47d6ad2d6ae8270850e6aedeca0cf0370b9",
+  "tests": [
+    {
+      "name": "root code generation on disposable loopback backend",
+      "passed": true
+    }
+  ],
+  "cleanup": {
+    "backendExitCode": null,
+    "backendSignal": "SIGTERM",
+    "cloudPortClosed": true,
+    "sitePortClosed": true,
+    "originalDatabasesUsed": false,
+    "ephemeralKeyPersisted": false,
+    "sourceUnchanged": true
+  },
+  "completedAt": "2026-09-06T08:24:44.455Z"
+}

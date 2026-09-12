@@ -31,6 +31,7 @@ import {
   requireWorkspacePermission,
 } from "../lib/companyAccess";
 import { requireFactoryActionWithAudit } from "../lib/factoryActionAuthorization";
+import { assertRepositoryPublicationAllowed } from "../lib/localRepositoryAdmission";
 
 const MAX_EVIDENCE_BYTES = 64 * 1024;
 const FETCH_TIMEOUT_MS = 10_000;
@@ -1434,7 +1435,10 @@ async function ensureReleaseFromMergedPr(ctx: any, evaluation: Doc<"harnessPrChe
   const existing = await ctx.db.query("factoryReleases")
     .withIndex("by_pr_evaluation", (q: any) => q.eq("prEvaluationId", evaluation._id))
     .first();
-  if (existing) return { created: false as const, release: existing };
+  if (existing) {
+    assertRepositoryPublicationAllowed(await ctx.db.get(existing.repositoryId));
+    return { created: false as const, release: existing };
+  }
   const mergeIdentityIssue = factoryReleaseMergeIdentityIssue({
     prState: evaluation.prState,
     verifiedLineage: isVerifiedPrLineage(evaluation),
@@ -1462,6 +1466,7 @@ async function ensureReleaseFromMergedPr(ctx: any, evaluation: Doc<"harnessPrChe
   if (!repositoryId) return { created: false as const, reason: "repository-binding-missing" };
   const repository = await ctx.db.get(repositoryId);
   if (!repository) return { created: false as const, reason: "repository-binding-mismatch" };
+  assertRepositoryPublicationAllowed(repository);
   const factoryVersion = workflowRun.factoryDefinitionVersionId
     ? await ctx.db.get(workflowRun.factoryDefinitionVersionId)
     : null;
@@ -1546,6 +1551,7 @@ async function ensureReleaseFromMergedPr(ctx: any, evaluation: Doc<"harnessPrChe
 async function requireRelease(ctx: any, releaseId: Id<"factoryReleases">): Promise<Doc<"factoryReleases">> {
   const release = await ctx.db.get(releaseId);
   if (!release) throw new Error("Factory release is unavailable or unauthorized.");
+  assertRepositoryPublicationAllowed(await ctx.db.get(release.repositoryId));
   return release;
 }
 

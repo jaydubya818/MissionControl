@@ -1,0 +1,49 @@
+{
+  "schema": "todo063-bedrock-quota-readback/v1",
+  "status": "TODO_063_WAITING_FOR_AWS_SUPPORT",
+  "capturedAt": "2026-09-07T23:15:56Z",
+  "source": {
+    "pullRequest": 194,
+    "headCommit": "e31fc8fbf8af569ebd528f49cfe348a2aff068d9",
+    "runtimeContract": 56,
+    "ciRun": 34168276122,
+    "ciConclusion": "SUCCESS"
+  },
+  "identity": {
+    "accountId": "083665737366",
+    "region": "us-east-1",
+    "roleArn": "arn:aws:sts::083665737366:assumed-role/AWSReservedSSO_FDLCQualificationTFOperator_338e027890ecd783/jaydubya818@gmail.com"
+  },
+  "quota": {
+    "serviceCode": "bedrock",
+    "quotaCode": "L-B29C9321",
+    "quotaName": "Model invocation max tokens per day for Anthropic Claude Sonnet 4.6 (doubled for cross-region calls)",
+    "appliedCapacity": 0,
+    "adjustable": false,
+    "globalQuota": false,
+    "resumeCondition": "Applied capacity is greater than zero"
+  },
+  "supportCase": {
+    "caseId": "178882125400227",
+    "lastRecordedStatus": "UNASSIGNED",
+    "currentStatusReadback": "DENIED_TO_QUALIFICATION_ROLE"
+  },
+  "provider": {
+    "route": "us.anthropic.claude-sonnet-4-6",
+    "physicalRequestsThisCheckpoint": 0,
+    "freshSingleRequestAuthorizationConsumed": false
+  },
+  "temporaryReadPermission": {
+    "action": "servicequotas:GetServiceQuota",
+    "temporaryProvisioningRequestId": "8a2bd8d7-19d5-48c5-be5f-d73cfded5e0c",
+    "temporaryProvisioningStatus": "SUCCEEDED",
+    "restoredProvisioningRequestId": "e9af016a-cb92-4bf9-bec8-c4c7e19b6cc5",
+    "restoredProvisioningStatus": "SUCCEEDED",
+    "restoredPolicyCanonicalDigest": "sha256:10d419e08c2d47a47bed468e76ad7e8ff15b88b63ff762d6487519a05fd3e3b2",
+    "temporaryStatementsPresentAfterRestore": false,
+    "restoredStatementCount": 24
+  },
+  "releaseDecision": "HOLD_EXTERNAL_AWS_CAPACITY",
+  "fabPhase3Complete": false,
+  "productionQualified": false
+}
