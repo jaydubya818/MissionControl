@@ -123,7 +123,7 @@ export function AtcBoardView({
       />
 
       <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-4 overflow-hidden px-6 pb-6 pt-4">
-        {/* Command bar */}
+        {agents.length > 0 && (
         <div className="flex shrink-0 items-center justify-between gap-4 overflow-x-auto flex-nowrap">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-2 text-[13.5px] text-ink-secondary">
@@ -142,6 +142,7 @@ export function AtcBoardView({
             {agents.length} total · {busyCount} busy
           </span>
         </div>
+        )}
 
         {/* Agent grid */}
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
