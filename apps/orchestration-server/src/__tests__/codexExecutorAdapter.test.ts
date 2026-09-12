@@ -125,6 +125,17 @@ describe("CodexV1ExecutorAdapter", () => {
     }
   });
 
+  it("admits the ChatGPT-auth credential route on persistent Codex", () => {
+    const adapter = new CodexV1ExecutorAdapter("/tmp/codex", vi.fn() as any);
+    expect(adapter.validateConfiguration({
+      ...request,
+      modelRouteDigest: `sha256:${"a".repeat(64)}`,
+      provider: "openai",
+      providerRoute: "codex-chatgpt-auth",
+      reasoningConfig: { effort: "high" },
+    }).filter((issue) => issue.field === "providerRoute")).toEqual([]);
+  });
+
   it("fails closed instead of silently ignoring unsupported exact route controls", () => {
     const adapter = new CodexV1ExecutorAdapter("/tmp/codex", vi.fn() as any);
     expect(adapter.validateConfiguration({
