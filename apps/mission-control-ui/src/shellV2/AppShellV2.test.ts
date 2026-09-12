@@ -59,5 +59,6 @@ describe("v2 route synchronization", () => {
     expect(shouldAutoCollapseChat("mission-detail", false)).toBe(false);
     expect(shouldAutoCollapseChat("control-work-orders", false)).toBe(true);
     expect(shouldAutoCollapseChat("control-work-orders", true)).toBe(true);
+    expect(shouldAutoCollapseChat("tasks", false)).toBe(true);
   });
 });

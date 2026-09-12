@@ -28,12 +28,13 @@ const CONSTRAINED_DESKTOP_QUERY = "(min-width: 900px) and (max-width: 1279px)";
 const DENSE_OPERATOR_VIEWS = new Set<MainView>([
   "mission-detail",
   "control-work-orders",
+  "tasks",
   "harness-code-review-wizard",
   "harness-change-review",
 ]);
 
 export function shouldAutoCollapseChat(activeView: MainView, constrainedDesktop: boolean) {
-  if (activeView === "control-work-orders") return true;
+  if (activeView === "control-work-orders" || activeView === "tasks") return true;
   return constrainedDesktop && DENSE_OPERATOR_VIEWS.has(activeView);
 }
 
