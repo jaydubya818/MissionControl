@@ -381,13 +381,15 @@ export async function buildExecutionRoutingPreview(
   const candidates: ExecutionRoutingCandidate[] = [];
   for (const version of versions) {
     const definition = definitions.find((item) => item._id === version.factoryDefinitionId) ?? null;
-    const [assessments, agentVersions, sandboxProfile] = await Promise.all([
+    const [assessments, agentVersions, sandboxProfile, factoryWorkflow] = await Promise.all([
       ctx.db.query("factoryReadinessAssessments")
         .withIndex("by_version", (query) => query.eq("factoryDefinitionVersionId", version._id))
         .collect(),
       Promise.all((version.agentBindings ?? []).map((binding) => ctx.db.get(binding.agentVersionId))),
       version.sandboxProfileId ? ctx.db.get(version.sandboxProfileId) : null,
+      ctx.db.get(version.workflowId),
     ]);
+    const executionWorkflow = factoryWorkflow ?? workflow;
     const assessment = assessments.sort((left, right) => right.assessedAt - left.assessedAt)[0];
     let frozenHarness: ReturnType<typeof resolveFrozenHarnessBinding> | null = null;
     let adapterRuntimeArtifact: ReturnType<typeof resolveHarnessAdapterRuntimeArtifact> | null = null;
@@ -405,7 +407,7 @@ export async function buildExecutionRoutingPreview(
     }
     const primaryModel = (() => {
       try {
-        return resolveFactoryWorkflowModelRoute({ workflow, agentBindings: version.agentBindings ?? [], agentVersions });
+        return resolveFactoryWorkflowModelRoute({ workflow: executionWorkflow, agentBindings: version.agentBindings ?? [], agentVersions });
       } catch {
         return null;
       }
@@ -500,7 +502,7 @@ export async function buildExecutionRoutingPreview(
       && frozenHarness
       && primaryModel
       && factoryWorkflowModelRouteMatches({
-        workflow,
+        workflow: executionWorkflow,
         agentBindings: version.agentBindings ?? [],
         agentVersions,
       }, version.modelRouteSnapshot as any)
