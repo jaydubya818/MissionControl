@@ -94,6 +94,9 @@ const WORK_ORDER_DETAIL_TABS: Array<{ id: WorkOrderDetailTab; label: string }> =
 ];
 
 const SECTION_DETAIL_TAB: Record<string, WorkOrderDetailTab> = {
+  "Current progress": "overview",
+  Dependencies: "overview",
+  "Verification attempt comparison": "audit",
   Outcome: "overview",
   "Required attention": "overview",
   "Independent verification": "review",
@@ -417,7 +420,9 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
     selected?.currentVerification?.reasons ?? []
   );
   const attemptInFlight = Boolean(selected?.executionRuns.some((run) => ["PENDING", "RUNNING", "PAUSED"].includes(run.status)));
-  const nextActionText = attemptInFlight
+  const nextActionText = selected?.progress.acceptance.accepted
+    ? "Accepted — no further action required."
+    : attemptInFlight
     ? "This run is in progress. Watch it here — don’t dispatch again."
     : humanizeOperatorCopy(
       pendingRevision
@@ -834,6 +839,74 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                 ) : null}
 
                 <WorkOrderDetailTabContext.Provider value={detailTab}>
+                <Section title="Current progress">
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <ProgressFact label="State" value={prettyLabel(selected.progress.lifecycleState)} />
+                    <ProgressFact label="Current gate" value={prettyLabel(selected.progress.progress.currentGate)} />
+                    <ProgressFact label="Tasks" value={`${selected.progress.tasks.accepted} / ${selected.progress.tasks.total} completed`} />
+                    <ProgressFact label="Acceptance" value={selected.progress.acceptance.accepted ? "Accepted" : selected.progress.acceptance.eligible ? "Eligible" : "Not eligible"} />
+                  </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Latest execution</div>
+                      <div className="mt-1 text-sm font-medium text-foreground">{prettyLabel(selected.progress.attempt.executionStatus)}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">Runtime: {prettyLabel(selected.progress.attempt.runtimeStatus)}</div>
+                    </div>
+                    <div className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Latest verification</div>
+                      <div className={`mt-1 text-sm font-medium ${selected.progress.verification.verdict === "VERIFIED" ? "text-success" : selected.progress.verification.verdict ? "text-warning" : "text-muted-foreground"}`}>
+                        {prettyLabel(selected.progress.verification.verdict ?? "Not evaluated")}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {selected.progress.verification.verifiedChecks} passed · {selected.progress.verification.failedChecks} failed · {selected.progress.verification.blockedChecks} blocked/not evaluated
+                      </div>
+                    </div>
+                  </div>
+                  {selected.progress.acceptance.blockingReason ? (
+                    <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 p-3" role="status">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-warning">Blocker</div>
+                      <p className="mt-1 text-sm text-foreground">{selected.progress.acceptance.blockingReason}</p>
+                    </div>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => setDetailTab("tasks")}>Tasks & Attempts</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setDetailTab("review")}>Verification evidence</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setDetailTab("audit")}>Historical attempts</Button>
+                  </div>
+                </Section>
+
+                <Section title="Dependencies">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className={selected.progress.dependencies.unsatisfied > 0 ? "border-warning/30 text-warning" : "border-success/30 text-success"}>
+                      {selected.progress.dependencies.satisfied} satisfied
+                    </Badge>
+                    <Badge variant="outline">{selected.progress.dependencies.unsatisfied} unsatisfied</Badge>
+                    <Badge variant="outline">{selected.dependents.length} dependents</Badge>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    {(selected.dependencies ?? []).map((dependency) => (
+                      <div key={dependency._id} className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3 text-xs">
+                        <div className="font-medium text-foreground">Requires {dependency.predecessor?.title ?? dependency.dependsOnWorkOrderId}</div>
+                        <div className="mt-1 text-muted-foreground">{prettyLabel(dependency.dependencyType)} · revision {dependency.requiredRevisionNumber ?? "current"}</div>
+                      </div>
+                    ))}
+                    {(selected.dependents ?? []).map((dependency) => (
+                      <button
+                        key={dependency._id}
+                        type="button"
+                        className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3 text-left text-xs hover:border-registry-accent/30"
+                        onClick={() => dependency.workOrder?._id && selectWorkOrder(dependency.workOrder._id)}
+                      >
+                        <div className="font-medium text-foreground">Dependent: {dependency.workOrder?.title ?? dependency.workOrderId}</div>
+                        <div className="mt-1 text-muted-foreground">Unlocks only when this exact revision satisfies {prettyLabel(dependency.dependencyType)}</div>
+                      </button>
+                    ))}
+                    {(selected.dependencies?.length ?? 0) === 0 && (selected.dependents?.length ?? 0) === 0 ? (
+                      <p className="text-sm text-muted-foreground">No Factory Run dependency edges are recorded for this WorkOrder.</p>
+                    ) : null}
+                  </div>
+                </Section>
+
                 <Section title="Outcome">
                   <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/85">{normalizeNarrativeText(selected.workOrder.desiredOutcome)}</p>
                   {selected.workOrder.context ? (
@@ -856,6 +929,54 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                     });
                   }}
                 />
+
+                <Section title="Verification attempt comparison">
+                  {(selected.verificationHistory ?? []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No independent verification Attempts have been recorded.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[720px] text-left text-xs">
+                        <thead className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+                          <tr>
+                            <th className="pb-2 pr-3">Attempt</th>
+                            <th className="pb-2 pr-3">Candidate</th>
+                            <th className="pb-2 pr-3">Producer</th>
+                            <th className="pb-2 pr-3">Verifier</th>
+                            <th className="pb-2 pr-3">Execution</th>
+                            <th className="pb-2 pr-3">Verdict</th>
+                            <th className="pb-2 pr-3">Outcome</th>
+                            <th className="pb-2">Evidence</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selected.verificationHistory.map((row) => (
+                            <tr key={row.verificationRunId} className="border-t border-[var(--panel-line)] align-top">
+                              <td className="py-2 pr-3 font-mono">{row.attemptId}</td>
+                              <td className="py-2 pr-3 font-mono">{row.candidateCommit ? row.candidateCommit.slice(0, 10) : "—"}</td>
+                              <td className="py-2 pr-3 font-mono">{row.producerIdentity?.invocationId ?? row.producerIdentity?.attemptId ?? "—"}</td>
+                              <td className="py-2 pr-3 font-mono">{row.verifierIdentity?.invocationId ?? row.verifierIdentity?.attemptId ?? "—"}</td>
+                              <td className="py-2 pr-3">{prettyLabel(row.executionResult)}</td>
+                              <td className="py-2 pr-3">{prettyLabel(row.verificationVerdict)}</td>
+                              <td className="py-2 pr-3">{prettyLabel(row.terminalOutcome ?? (row.verificationVerdict === "VERIFIED" ? "Verified" : "Non-terminal"))}</td>
+                              <td className="py-2">
+                                <div>{row.evidenceResults.length} checks</div>
+                                {row.evidenceResults.length ? (
+                                  <div className="mt-1 flex max-w-[260px] flex-wrap gap-1">
+                                    {row.evidenceResults.map((evidence) => (
+                                      <Badge key={`${row.verificationRunId}:${evidence.checkId}`} variant="outline" className="text-[9px]">
+                                        {prettyLabel(evidence.result)}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Section>
 
                 {selected.reviewPackage ? (
                   <Section title="Candidate decision">
@@ -2178,6 +2299,15 @@ function MetaRow({ label, value, className = "" }: { label: string; value?: stri
     <div className={`flex min-w-0 items-start justify-between gap-3 ${className}`}>
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
       <dd className="min-w-0 break-words text-right text-foreground/85 [overflow-wrap:anywhere]">{value ?? "—"}</dd>
+    </div>
+  );
+}
+
+function ProgressFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-[var(--panel-line)] bg-background/30 p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-foreground">{value}</div>
     </div>
   );
 }

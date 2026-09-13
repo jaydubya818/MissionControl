@@ -35,6 +35,7 @@ import { ExperienceLevelSelector } from "./ExperienceLevelSelector";
 import { FactoryPhaseInspector } from "./FactoryPhaseInspector";
 import { FactoryRecipeCatalog } from "./FactoryRecipeCatalog";
 import { FactoryRunSwimlane } from "./FactoryRunSwimlane";
+import { FactoryRunMembershipPanel, type FactoryRunMembershipModel } from "./FactoryRunMembershipPanel";
 import {
   FACTORY_RECIPES,
   getFactoryRecipe,
@@ -110,6 +111,10 @@ export function ProgressiveFactoryView({
     api.projects.listRepositories,
     projectId ? { projectId } : "skip",
   );
+  const governedFactoryRuns = useQuery(
+    api.factoryRuns.list,
+    projectId && overviewActive ? { projectId, limit: 10 } : "skip",
+  ) as FactoryRunMembershipModel[] | undefined;
   const factoryDefinitions = useQuery(
     api["factory/configuration"].list,
     projectId && overviewActive && level === "advanced" ? { projectId } : "skip",
@@ -235,6 +240,19 @@ export function ProgressiveFactoryView({
             detail="Human approval and acceptance"
             icon={ShieldCheck}
           />
+        </section>
+
+        <section className="space-y-3" aria-labelledby="governed-factory-runs-title">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-info-accent">Governed inventory</div>
+            <h2 id="governed-factory-runs-title" className="mt-1 text-[17px] font-semibold text-ink">Factory Runs and explicit membership</h2>
+            <p className="mt-1 text-[12px] text-ink-secondary">Counts include only the immutable WorkOrder membership snapshot for each run.</p>
+          </div>
+          {governedFactoryRuns === undefined ? (
+            <div className="h-36 animate-pulse rounded-xl bg-surface-2" aria-label="Loading Factory Runs" />
+          ) : (
+            <FactoryRunMembershipPanel runs={governedFactoryRuns} />
+          )}
         </section>
 
         <section
