@@ -747,7 +747,9 @@ export class FactoryAttemptWorker {
 
       if (manifestExecutionBackend(manifest) !== "isolated-container") {
         await (this.dependencies.prepareFactoryDependencies ?? prepareFactoryDependencies)({ worktree: claim.worktree });
-        if (manifest.harness.adapter === "codex") await materializeFactorySkillz(claim.worktree);
+        if (manifestExecutionBackend(manifest) === "persistent-worker" && manifest.harness.adapter === "codex") {
+          await materializeFactorySkillz(claim.worktree);
+        }
       }
 
       let mappedEvents: any[] = [];
@@ -980,7 +982,7 @@ export class FactoryAttemptWorker {
         structuredResult = parseFactoryResult(normalizedResult.output);
       }
       }
-      if (manifestExecutionBackend(manifest) !== "isolated-container" && manifest.harness.adapter === "codex") {
+      if (manifestExecutionBackend(manifest) === "persistent-worker" && manifest.harness.adapter === "codex") {
         await dematerializeFactorySkillz(claim.worktree);
       }
       if (structuredResult.status !== "COMPLETED") {

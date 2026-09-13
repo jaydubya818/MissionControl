@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { WorkOrderVerificationSpec } from "@mission-control/workflow-engine/verification";
@@ -147,6 +147,42 @@ describe("Factory independent command verification", () => {
     });
     expect(result.completedAt - result.startedAt).toBeLessThan(1_000);
   });
+
+  it("classifies a missing configured offline store as verifier infrastructure", async () => {
+    const spec = specification("DEPENDENCY_SCAN", ["pnpm", "install", "--frozen-lockfile", "--offline"]);
+    spec.changeBudget.allowedCommandClasses = ["DEPENDENCY_SCAN"];
+    spec.verificationContract.checks[0].command = {
+      executable: "corepack",
+      args: ["pnpm", "install", "--frozen-lockfile", "--offline"],
+      commandClass: "DEPENDENCY_SCAN",
+      timeoutMs: 600_000,
+    };
+    const repositoryRoot = await mkdtemp(path.join(tmpdir(), "mc-factory-verification-store-"));
+    cleanup.push(repositoryRoot);
+    await writeFile(path.join(repositoryRoot, "package.json"), JSON.stringify({ packageManager: "pnpm@9.0.0" }));
+    await writeFile(path.join(repositoryRoot, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+    const previousStore = process.env.MISSION_CONTROL_FACTORY_PNPM_STORE_DIR;
+    delete process.env.MISSION_CONTROL_FACTORY_PNPM_STORE_DIR;
+    try {
+      const result = await executeIndependentVerification({
+        workflowRunId: "run-store", workOrderId: "wo-store", workOrderRevisionNumber: 1,
+        title: "Verify store", specification: spec, repositoryRoot,
+        candidate: { sourceRevision: "base", candidateRevision: "head", changedFiles: ["src/a.ts"], deletedFiles: [], linesAdded: 2, linesDeleted: 1, diff: "+export const a = 1;" },
+      });
+      expect(result.verdict).toBe("BLOCKED");
+      expect(result.checks.find((check) => check.checkId === "command")).toMatchObject({
+        status: "NOT_EVALUATED",
+        metadata: {
+          dependencyAdmission: true,
+          failureClass: "VERIFICATION_ENVIRONMENT_FAILURE",
+          reasonCode: "DEPENDENCY_STORE_INCOMPLETE",
+        },
+      });
+    } finally {
+      if (previousStore === undefined) delete process.env.MISSION_CONTROL_FACTORY_PNPM_STORE_DIR;
+      else process.env.MISSION_CONTROL_FACTORY_PNPM_STORE_DIR = previousStore;
+    }
+  }, 12_000);
 
   it("terminates the owned subprocess tree and records a machine-readable timeout", async () => {
     const args = ["-e", [

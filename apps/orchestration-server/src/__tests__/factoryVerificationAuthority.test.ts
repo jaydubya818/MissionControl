@@ -134,8 +134,9 @@ describe("a candidate cannot certify itself", () => {
       changedFiles: ["package.json", "src/feature.ts"],
     });
 
-    // The command itself genuinely passed — that is the whole problem.
-    expect(result.checks.find((check) => check.checkId === "command")?.status).toBe("PASS");
+    // Authority is a causal prerequisite, so candidate-controlled execution is
+    // never reached after the immutable contract surface has been rewritten.
+    expect(result.checks.find((check) => check.checkId === "command")?.status).toBe("BLOCKED_BY_DEPENDENCY");
     // And the run is still not verified.
     expect(result.verdict).toBe("BLOCKED");
     expect(authorityCheck(result)?.status).toBe("FAIL");

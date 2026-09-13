@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, copyFile, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import {
   classifyAuthorityMutations,
   resolveCheckIndependence,
@@ -29,6 +29,7 @@ const NEVER_EXECUTE = new Set(["DESTRUCTIVE", "PRODUCTION_ACCESS", "SECRETS_ACCE
 const FROZEN_OFFLINE_PNPM_INSTALL_ARGS = ["pnpm", "install", "--frozen-lockfile", "--offline"] as const;
 const VERIFICATION_TERMINATION_GRACE_MS = 500;
 const DEPENDENCY_ADMISSION_TIMEOUT_MS = 5_000;
+const DEPENDENCY_STORE_ADMISSION_TIMEOUT_MS = 10_000;
 
 export async function executeIndependentVerification(input: {
   workflowRunId: string;
@@ -331,6 +332,61 @@ async function preflightFrozenOfflinePnpm(
       summary: `Offline dependency admission resolved pnpm ${observedVersion || "<unknown>"}; the candidate requires ${versionMatch[1]}.`,
       output,
     };
+    const configuredStore = env.npm_config_store_dir;
+    if (!configuredStore || !isAbsolute(configuredStore)) return {
+      ok: false,
+      status: "NOT_EVALUATED",
+      reasonCode: "DEPENDENCY_STORE_INCOMPLETE",
+      summary: "Offline dependency admission requires an explicit absolute Mission Control pnpm store.",
+      output: "Set MISSION_CONTROL_FACTORY_PNPM_STORE_DIR to a pre-seeded pnpm content-addressable store.",
+    };
+    try {
+      await access(configuredStore);
+    } catch (error) {
+      return {
+        ok: false,
+        status: "NOT_EVALUATED",
+        reasonCode: "DEPENDENCY_STORE_INCOMPLETE",
+        summary: "The configured offline pnpm store is unavailable.",
+        output: error instanceof Error ? error.message : String(error),
+      };
+    }
+    const probeRoot = join(env.HOME ?? tmpdir(), "dependency-store-probe");
+    await mkdir(probeRoot, { recursive: true });
+    await Promise.all([
+      copyFile(join(repositoryRoot, "package.json"), join(probeRoot, "package.json")),
+      copyFile(join(repositoryRoot, "pnpm-lock.yaml"), join(probeRoot, "pnpm-lock.yaml")),
+    ]);
+    const storeProbe = await runOwnedVerificationCommand({
+      executable: "corepack",
+      args: ["pnpm", "fetch", "--offline", "--frozen-lockfile", "--ignore-scripts", "--store-dir", configuredStore],
+      cwd: probeRoot,
+      env,
+      timeoutMs: DEPENDENCY_STORE_ADMISSION_TIMEOUT_MS,
+      signal: controller.signal,
+    });
+    const storeOutput = `${storeProbe.stdout}\n${storeProbe.stderr}`.trim();
+    if (storeProbe.timedOut) return {
+      ok: false,
+      status: "TIMED_OUT",
+      reasonCode: "DEPENDENCY_STORE_PROBE_TIMEOUT",
+      summary: `Offline pnpm store completeness could not be established within ${DEPENDENCY_STORE_ADMISSION_TIMEOUT_MS}ms.`,
+      output: storeOutput,
+    };
+    if (storeProbe.aborted) return {
+      ok: false,
+      status: "NOT_EVALUATED",
+      reasonCode: "DEPENDENCY_ADMISSION_CANCELLED",
+      summary: "Offline dependency-store admission was cancelled.",
+      output: storeOutput,
+    };
+    if (storeProbe.spawnError || storeProbe.exitCode !== 0) return {
+      ok: false,
+      status: "NOT_EVALUATED",
+      reasonCode: "DEPENDENCY_STORE_INCOMPLETE",
+      summary: "The offline pnpm store does not contain every package artifact required by the frozen lockfile.",
+      output: storeOutput || storeProbe.spawnError || `pnpm fetch exited ${storeProbe.exitCode ?? "unknown"}`,
+    };
     return { ok: true };
   } finally {
     signal?.removeEventListener("abort", abort);
@@ -459,6 +515,8 @@ function normalizeSpecification(input: { workOrderId: string; workOrderRevisionN
  */
 function sanitizedEnvironment(scratchHome: string, allowTrustedCorepackCache = false) {
   const allowed = ["PATH", "TMPDIR", "LANG", "LC_ALL", "CI", "NODE_ENV", "CARGO_HOME", "WASM_PACK_CACHE"];
+  const configuredStore = process.env.MISSION_CONTROL_FACTORY_PNPM_STORE_DIR;
+  const admittedStore = configuredStore && isAbsolute(configuredStore) ? configuredStore : undefined;
   return {
     ...Object.fromEntries(allowed.flatMap((key) => (process.env[key] ? [[key, process.env[key]!]] : []))),
     HOME: scratchHome,
@@ -467,6 +525,7 @@ function sanitizedEnvironment(scratchHome: string, allowTrustedCorepackCache = f
     NPM_CONFIG_IGNORE_SCRIPTS: "true",
     npm_config_ignore_pnpmfile: "true",
     NPM_CONFIG_IGNORE_PNPMFILE: "true",
+    ...(admittedStore ? { npm_config_store_dir: admittedStore, NPM_CONFIG_STORE_DIR: admittedStore } : {}),
     COREPACK_ENABLE_NETWORK: "0",
     COREPACK_ENABLE_AUTO_PIN: "0",
     COREPACK_DEFAULT_TO_LATEST: "0",
