@@ -249,11 +249,13 @@ Inactivity timeout and absolute timeout are separate policies. Dependency admiss
 
 Dependencies are typed. At minimum:
 
-- `ACCEPTED_OUTPUT`: requires the exact predecessor revision to be ACCEPTED.
-- `VERIFIED_EVIDENCE`: requires a current VERIFIED receipt but not acceptance, only when explicitly allowed by plan policy.
-- `ORDER_ONLY`: requires terminal completion of the predecessor action and conveys no product validity.
+- `ACCEPTED_OUTPUT_REQUIRED`: requires the exact predecessor revision to be accepted. This is the governed default.
+- `EXECUTION_COMPLETE`: requires a terminal predecessor execution and conveys no product validity.
+- `ARTIFACT_AVAILABLE`: requires a durable predecessor artifact and conveys no acceptance.
+- `OPTIONAL`: records lineage without blocking dispatch.
+- `INFORMATIONAL`: records context without blocking dispatch.
 
-The safe default is `ACCEPTED_OUTPUT`. A new predecessor revision invalidates satisfaction until that revision is accepted. Dispatch uses the Factory Run membership snapshot and never scans unrelated project WorkOrders.
+The safe default is `ACCEPTED_OUTPUT_REQUIRED`. A new predecessor revision invalidates satisfaction until that revision is accepted. Dispatch uses the latest explicit Factory Run membership snapshot for the WorkOrder and never scans unrelated project WorkOrders.
 
 ## Terminal outcome classifier
 
@@ -261,17 +263,48 @@ The classifier is a pure, idempotent projection over immutable receipts and curr
 
 | Terminal class | Meaning |
 |---|---|
-| ACCEPTED_SUCCESS | Current candidate was verified and accepted for the exact WorkOrder revision. |
-| PRODUCT_FAILURE | Candidate-bearing evidence disproved a required product assertion. |
-| VERIFICATION_FAILURE | The verifier ran but its own check/evaluator failed independently of product behavior. |
-| FACTORY_FAILURE | Mission Control executor, worker, lease, persistence, or orchestration failed. |
-| VERIFICATION_ENVIRONMENT_FAILURE | Required deterministic evaluation environment could not be established. |
-| CONTRACT_FAILURE | The approved contract was internally inconsistent or had no admissible verifier. |
-| BLOCKED | Governance, authority, dependency, or policy prevents advancement and requires a named action. |
+| ACCEPTED | Current candidate was verified and accepted for the exact WorkOrder revision. |
+| PRODUCT_FAILED | Candidate-bearing evidence disproved a required product assertion. |
+| FACTORY_FAILED | Mission Control executor, worker, contract, lease, persistence, or orchestration failed independently of product behavior. |
+| BLOCKED | Governance, authority, dependency, policy, or an unavailable deterministic environment prevents advancement and requires a named action. |
 | CANCELLED | An authorized operator or policy explicitly cancelled execution. |
 | SUPERSEDED | A newer immutable revision or candidate replaced this subject for current advancement. |
+| nonterminal (`null`) | The governed lifecycle still has active or pending work. |
 
 Terminal does not mean successful, and `COMPLETED` is not a terminal class. Every class carries a reason code, causal entity IDs, remediation, and the actor or subsystem responsible for the classification.
+
+Classification precedence is superseded, cancelled, exact-revision accepted, qualifying product failure, factory/contract failure, environment blockage, dependency/policy blockage, then nonterminal. A completed `NOT_VERIFIED` verifier without executed candidate-failure evidence is factory-owned; it is never silently converted into `PRODUCT_FAILED`.
+
+## Durable Factory Run model
+
+`factoryRuns` identifies the governed run and exact source Plan revision. `factoryRunWorkOrders` is an append-only membership snapshot containing the member WorkOrder, bound revision, sequence, actor, timestamp, and shared membership digest. `workOrderDependencies` stores run-scoped typed edges and the required predecessor revision. No mutation or deletion API exists for membership rows; a materially different set creates a new Factory Run identity.
+
+`factoryReconciliations` is an append-only record of the durable facts observed at a crash boundary. Repeating the same fact digest is idempotent. Stale reconciliation may project `runtimeDisposition: LOST` on an active Attempt, but it does not delete the Attempt or rewrite it as a different historical execution.
+
+## Offline pnpm admission
+
+Before the approved frozen offline install, Mission Control now checks the exact `packageManager` pin, lockfile presence, locally runnable Corepack/pnpm version, and an explicit absolute `MISSION_CONTROL_FACTORY_PNPM_STORE_DIR`. It then runs a ten-second, network-disabled `pnpm fetch --offline --frozen-lockfile --ignore-scripts` against a scratch copy of the candidate manifest and lockfile. Missing store artifacts are classified `DEPENDENCY_STORE_INCOMPLETE` under `VERIFICATION_ENVIRONMENT_FAILURE`.
+
+This is the strongest practical pnpm check without executing candidate install scripts or mutating the candidate. Repositories using lockfile-referenced local patches or nonstandard workspace hooks may require a richer scratch projection in a future version; failure remains a factory/environment blockage rather than a product verdict.
+
+## Operational controls
+
+- `PAUSED`: new Factory claims are denied; already claimed producer and verifier work may continue.
+- `DRAINING`: new Factory claims are denied; active work retains its controller and reaches a bounded terminal report before worker exit.
+- `KILLED`/stop: new claims are denied and active work is interrupted according to the worker safe-stop policy; cancellation and reconciliation remain durable.
+- selected cancellation: `workflowRuns.requestCancellation` persists the request and an audit event; an active worker observes it through lease renewal and terminates only that governed Attempt.
+
+Native Fab containment qualification must run on macOS outside an existing Codex sandbox:
+
+```bash
+env -u CODEX_SANDBOX pnpm --filter @mission-control/orchestration-server exec vitest run src/__tests__/factoryAttemptWorker.test.ts
+```
+
+The disposable post-Relay qualification is run with:
+
+```bash
+pnpm run qualify:post-relay-hardening
+```
 
 ## Required operator projections
 

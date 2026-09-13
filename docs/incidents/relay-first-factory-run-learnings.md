@@ -24,31 +24,31 @@ Boundary: improve Mission Control only; never rewrite or resume the closed Relay
 
 | Improvement | State after this pass | Remaining proof/work |
 |---|---|---|
-| Show Attempt execution and verifier verdict separately | Implemented locally | Browser-qualify all terminal combinations against real seeded data. |
-| Mark stored RUNNING Attempts stale when lease/runtime ownership is absent | Implemented locally | Add automatic reconciliation and historical taskless Attempt presentation. |
-| Scope the task board to the selected WorkOrder | Implemented in the current worktree | Qualify deep links and refresh behavior end to end. |
-| Surface current revision approval and next governed action | Implemented in the current worktree | Prove stale revisions never outrank the current revision. |
-| Unified WorkOrder progress summary | Open | Show task counts, active Attempt, lease health, candidate, verdict, gate, blocker, dependencies, and next action together. |
-| Factory Run progress page | Open | Use explicit membership; show total/accepted/remaining, frontier, blockers, latest verdict, and critical path. |
-| Historical evidence comparison | Open | Compare immutable receipts by revision, subject, producer, verifier, and applicability. |
-| Error and recovery affordances | Partial | Drive actions from machine reason codes; never offer retry when revision/subject authority is stale. |
+| Show Attempt execution and verifier verdict separately | Qualified | Live browser evidence covers completed execution with verified, blocked, not-verified, and factory-failed verification history. |
+| Mark stored RUNNING Attempts stale when lease/runtime ownership is absent | Qualified for deterministic reconciliation | Automate reconciliation scheduling for legacy taskless Attempts in a later milestone. |
+| Scope the task board to the selected WorkOrder | Qualified | Deep links and refresh retained the selected synthetic WorkOrder. |
+| Surface current revision approval and next governed action | Qualified | Accepted WorkOrders explicitly show that no further action is required. |
+| Unified WorkOrder progress summary | Qualified | One backend projection supplies task, Attempt, candidate, verification, acceptance, dependency, blocker, and next-action truth. |
+| Factory Run progress page | Qualified | Live browser evidence shows exactly three explicit members, 3 accepted, zero contamination, completed critical path, and empty frontier. |
+| Historical evidence comparison | Qualified | Immutable rows compare candidate, producer, verifier, execution, verdict, terminal outcome, and evidence statuses. |
+| Error and recovery affordances | Improved and qualified for represented states | Continue replacing generic legacy recovery text with machine reason-code actions. |
 
 ## Backend and orchestration improvements
 
 | Improvement | State after this pass | Remaining proof/work |
 |---|---|---|
-| Canonical status vocabulary across engine, persistence, and UI | Implemented locally for verification and Attempt projection | Implement the aggregate terminal outcome classifier. |
-| Check dependency DAG and causal blocking | Implemented locally | Add larger real-repository qualification contracts. |
-| Bounded verifier process-tree cleanup | Implemented and regression-tested | Run host qualification outside nested sandbox boundaries. |
-| Fast exact pnpm/Corepack admission | Partial | Add deterministic package-level offline-store completeness inspection. |
-| Immutable exact-candidate verification continuation | Implemented in current changes | Complete generation-based compare-and-swap coverage. |
-| Original producer lineage for independence | Implemented in current changes | Qualify long chains and migration of older taskless Attempts. |
-| Worker drain versus stop | Implemented and regression-tested | Add crash/restart and final-report race integration tests. |
-| Candidate cleanliness after factory context injection | Implemented and regression-tested | Generalize factory-owned ephemeral context registration if more files are introduced. |
-| Failure-cause preservation | Improved | Standardize machine reason code, owner, remediation, and causal entity IDs on every terminal branch. |
-| Factory Run membership aggregate | Open | Add schema, immutable membership snapshot, scoped queries, and reconciliation. |
-| Acceptance-bound downstream dispatch | Open | Add typed dependencies and exact accepted-revision checks. |
-| Evidence immutability enforcement | Partial | Prevent historical envelope mutation and add supersession/applicability records. |
+| Canonical status vocabulary across engine, persistence, and UI | Qualified | Aggregate outcomes are centralized and verification detail remains separate. |
+| Check dependency DAG and causal blocking | Qualified | Add larger real-repository qualification contracts only after the next workload is explicitly authorized. |
+| Bounded verifier process-tree cleanup | Qualified | Native macOS Fab containment passed 39/39 outside the nested sandbox. |
+| Fast exact pnpm/Corepack admission | Qualified to the strongest practical boundary | Exact pnpm version, lockfile, explicit external store, and offline frozen fetch are checked; pnpm does not expose a cheaper complete content-addressable inventory proof. |
+| Immutable exact-candidate verification continuation | Qualified | Same candidate and producer lineage survived a distinct verifier retry with old evidence unchanged. |
+| Original producer lineage for independence | Qualified for the synthetic chain | Migration of older taskless Attempts remains deferred. |
+| Worker drain versus stop | Qualified | Claims stop during pause/drain; active work continues during drain; kill aborts and selected cancellation remains durable. |
+| Candidate cleanliness after factory context injection | Qualified | Host-only skills are now limited to persistent workers and removed before candidate capture; remote result materialization stays clean. |
+| Failure-cause preservation | Qualified for new lifecycle paths | Continue standardizing legacy terminal branches as they are touched. |
+| Factory Run membership aggregate | Qualified | Immutable membership and dependency rows drive summaries and UI without broad project inference. |
+| Acceptance-bound downstream dispatch | Qualified | Governed dependencies default to exact-revision `ACCEPTED_OUTPUT_REQUIRED`. |
+| Evidence immutability enforcement | Qualified for append-only qualification and retry history | A repository-wide historical-envelope mutation API audit remains a future defense-in-depth task. |
 
 ## Testing and qualification improvements
 
@@ -71,11 +71,10 @@ Boundary: improve Mission Control only; never rewrite or resume the closed Relay
 - Publish an operator checklist for pause, drain, stop, cancel, retry, supersede, and recovery.
 - Do not expand product scope while the golden path cannot explain its own current state and recovery action.
 
-## Open hardening sequence
+## Remaining follow-up sequence
 
-1. Implement first-class Factory Run membership and progress aggregation.
-2. Implement acceptance-bound typed dependencies and dispatch admission.
-3. Implement the canonical terminal outcome classifier and idempotent cross-entity reconciliation.
-4. Complete WorkOrder progress and historical evidence UX.
-5. Add package-level offline cache admission and host qualification.
-6. Run a new, bounded greenfield factory qualification. Do not reuse or alter the Relay incident run.
+1. Automate scheduling of deterministic reconciliation for legacy taskless Attempts.
+2. Extend machine reason-code recovery actions across untouched legacy terminal branches.
+3. Audit historical evidence mutation APIs repository-wide and add explicit applicability/supersession records.
+4. Run Docker-backed containment and the governed-context integration suite on a host with those explicit prerequisites.
+5. Start no new product workload until the operator explicitly authorizes it.

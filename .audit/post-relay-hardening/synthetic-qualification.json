@@ -1,0 +1,126 @@
+{
+  "repositoryKind": "disposable-git",
+  "memberCount": 3,
+  "memberWorkOrderIds": [
+    "WO-Q001",
+    "WO-Q002",
+    "WO-Q003"
+  ],
+  "candidates": [
+    {
+      "workOrderId": "WO-Q001",
+      "commit": "9976f0c4248eed75093ea2204709924587148182",
+      "tree": "ec20c5bbf2dc6f17c9b2859be04ad79a0a4ea03c"
+    },
+    {
+      "workOrderId": "WO-Q002",
+      "commit": "6eba0b4096d00a4751b2ce1b3542469fbe7fb2e0",
+      "tree": "f6ca13db4783fb9e05101f4416b1c847878db9e9"
+    },
+    {
+      "workOrderId": "WO-Q003",
+      "commit": "6e482f72e1ab4014ab7e3ad48efa34c80fdc8e3d",
+      "tree": "690cef857cd2c93c360e55b692a1056ec933df59"
+    }
+  ],
+  "dispatchOrder": [
+    "WO-Q001",
+    "WO-Q002",
+    "WO-Q003"
+  ],
+  "happyPath": {
+    "counts": {
+      "total": 3,
+      "accepted": 3,
+      "active": 0,
+      "blocked": 0,
+      "failed": 0
+    },
+    "outcome": {
+      "outcome": "ACCEPTED",
+      "reasonCode": "EXACT_REVISION_ACCEPTED",
+      "summary": "The exact current revision is verified and accepted."
+    },
+    "memberWorkOrderIds": [
+      "WO-Q001",
+      "WO-Q002",
+      "WO-Q003"
+    ],
+    "dispatchFrontier": [],
+    "criticalPathWorkOrderId": null
+  },
+  "failureScenarios": {
+    "timeout": {
+      "check": "TIMED_OUT",
+      "downstream": "BLOCKED_BY_DEPENDENCY",
+      "outcome": {
+        "outcome": "FACTORY_FAILED",
+        "reasonCode": "FACTORY_FAILURE",
+        "summary": "Factory infrastructure or the governed contract failed independently of product behavior."
+      }
+    },
+    "environment": {
+      "outcome": "BLOCKED",
+      "reasonCode": "VERIFICATION_ENVIRONMENT_UNAVAILABLE",
+      "summary": "The required verification environment could not be established."
+    },
+    "product": {
+      "outcome": "PRODUCT_FAILED",
+      "reasonCode": "CANDIDATE_ASSERTION_FAILED",
+      "summary": "Candidate-bearing evidence disproved a required product assertion."
+    },
+    "crash": {
+      "disposition": "STALE",
+      "reasonCode": "EXECUTOR_OWNER_LOST",
+      "preserveAttempt": true,
+      "createNewAttempt": true,
+      "actions": [
+        "MARK_EXISTING_ATTEMPT_STALE",
+        "CREATE_GOVERNED_RECOVERY_ATTEMPT"
+      ]
+    },
+    "verifierCrash": {
+      "disposition": "STALE",
+      "reasonCode": "VERIFIER_OWNER_LOST",
+      "preserveAttempt": true,
+      "createNewAttempt": true,
+      "actions": [
+        "MARK_EXISTING_ATTEMPT_STALE",
+        "CREATE_GOVERNED_RECOVERY_ATTEMPT"
+      ]
+    },
+    "drain": {
+      "claim": {
+        "allow": false,
+        "abortActive": false,
+        "durableCancellationRequired": false
+      },
+      "active": {
+        "allow": true,
+        "abortActive": false,
+        "durableCancellationRequired": false
+      },
+      "workerExit": "STOPPED"
+    },
+    "dependencyGate": {
+      "satisfied": false,
+      "blocking": true,
+      "dependencyType": "ACCEPTED_OUTPUT_REQUIRED",
+      "reasonCode": "ACCEPTED_OUTPUT_REQUIRED",
+      "summary": "Predecessor revision 1 must be accepted before dispatch."
+    }
+  },
+  "exactCandidateRetry": {
+    "sameCandidate": true,
+    "distinctVerifiers": true,
+    "oldEvidenceUnchanged": true
+  },
+  "restart": {
+    "readyWorkOrderPreserved": true,
+    "attemptsPreserved": true,
+    "candidatesPreserved": true,
+    "duplicateProducerCreated": false,
+    "duplicateCandidateCreated": false,
+    "unauthorizedRetryCreated": false
+  }
+}
