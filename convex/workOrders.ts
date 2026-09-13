@@ -68,6 +68,7 @@ import {
   resolveHarnessAdapterRuntimeArtifact,
 } from "./lib/harnessCapabilities";
 import { computeCanonicalHash } from "./lib/genomeHash";
+import { buildWorkOrderProgress, compareVerificationHistory, evaluateFactoryDependency } from "./lib/factoryLifecycle";
 import { liabilityDigest } from "./lib/providerLiability";
 import { evaluateGithubAppCapabilities, githubInstallationIsStale } from "./lib/githubAppReadiness";
 import { canonicalRepositoryKey } from "./lib/workspaceRepositories";
@@ -1814,7 +1815,7 @@ export const get = query({
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId);
     assertAuthorizedDeliveryRecord(deliveryAccess, workOrder);
 
-    const [executionRuns, events, approvalDecisions, verificationReceipts, revisions, reopenDecisions, supersession, policy, childTaskRows, verificationRuns, evidenceEnvelopes, qualityGateDecisions] = await Promise.all([
+    const [executionRuns, events, approvalDecisions, verificationReceipts, revisions, reopenDecisions, supersession, policy, childTaskRows, verificationRuns, evidenceEnvelopes, qualityGateDecisions, workOrderDependencies, dependentEdges, factoryRunMemberships] = await Promise.all([
       ctx.db
         .query("workflowRuns")
         .withIndex("by_work_order", (q) => q.eq("workOrderId", args.workOrderId))
@@ -1851,6 +1852,18 @@ export const get = query({
         .withIndex("by_work_order", (q) => q.eq("workOrderId", args.workOrderId))
         .order("desc")
         .collect(),
+      ctx.db
+        .query("workOrderDependencies")
+        .withIndex("by_work_order", (q) => q.eq("workOrderId", args.workOrderId))
+        .collect(),
+      ctx.db
+        .query("workOrderDependencies")
+        .withIndex("by_depends_on", (q) => q.eq("dependsOnWorkOrderId", args.workOrderId))
+        .collect(),
+      ctx.db
+        .query("factoryRunWorkOrders")
+        .withIndex("by_work_order", (q) => q.eq("workOrderId", args.workOrderId))
+        .collect(),
     ]);
 
     const legacyTask = workOrder.legacyTaskId ? await ctx.db.get(workOrder.legacyTaskId) : null;
@@ -1878,6 +1891,32 @@ export const get = query({
       childTaskRows,
       workOrder.projectId
     );
+    const predecessorWorkOrders = await Promise.all(workOrderDependencies.map((dependency) => ctx.db.get(dependency.dependsOnWorkOrderId)));
+    const dependentWorkOrders = await Promise.all(dependentEdges.map((dependency) => ctx.db.get(dependency.workOrderId)));
+    const dependencies = workOrderDependencies.map((dependency, index) => ({
+      ...dependency,
+      predecessor: predecessorWorkOrders[index],
+      executionTerminal: false,
+      artifactAvailable: false,
+    }));
+    const progress = buildWorkOrderProgress({
+      workOrder,
+      tasks: childTaskRows,
+      attempts: executionRuns,
+      verificationRuns,
+      evidence: evidenceEnvelopes,
+      acceptance: {
+        eligible: acceptance.eligible,
+        accepted: workOrder.state === "DONE" && workOrder.acceptedRevisionNumber === (workOrder.currentRevisionNumber ?? 1),
+        reasons: acceptance.blockingReasons,
+      },
+      dependencies,
+    });
+    const verificationHistory = compareVerificationHistory({
+      verificationRuns,
+      attempts: executionRuns,
+      evidence: evidenceEnvelopes,
+    });
 
     return {
       workOrder,
@@ -1899,6 +1938,11 @@ export const get = query({
       currentVerification,
       reviewPackage: reviewReadModel?.reviewPackage ?? null,
       childTasks,
+      progress,
+      verificationHistory,
+      dependencies: workOrderDependencies.map((dependency, index) => ({ ...dependency, predecessor: predecessorWorkOrders[index] })),
+      dependents: dependentEdges.map((dependency, index) => ({ ...dependency, workOrder: dependentWorkOrders[index] })),
+      factoryRunMemberships,
     };
   },
 });
@@ -2408,6 +2452,37 @@ async function reconcilePreExecutionReservation(
   });
 }
 
+async function loadFactoryRunDependencyBlockers(ctx: any, workOrder: any) {
+  const membership = await ctx.db.query("factoryRunWorkOrders")
+    .withIndex("by_work_order", (q: any) => q.eq("workOrderId", workOrder._id))
+    .order("desc")
+    .first();
+  if (!membership) return [];
+  const dependencies = await ctx.db.query("workOrderDependencies")
+    .withIndex("by_run_work_order", (q: any) => q.eq("factoryRunId", membership.factoryRunId).eq("workOrderId", workOrder._id))
+    .collect();
+  return (await Promise.all(dependencies.map(async (dependency: any) => {
+    const predecessor = await ctx.db.get(dependency.dependsOnWorkOrderId);
+    const [runs, artifact] = await Promise.all([
+      dependency.dependencyType === "EXECUTION_COMPLETE"
+        ? ctx.db.query("workflowRuns").withIndex("by_work_order", (q: any) => q.eq("workOrderId", dependency.dependsOnWorkOrderId)).collect()
+        : Promise.resolve([]),
+      dependency.dependencyType === "ARTIFACT_AVAILABLE"
+        ? ctx.db.query("runArtifacts").withIndex("by_work_order", (q: any) => q.eq("workOrderId", dependency.dependsOnWorkOrderId)).first()
+        : Promise.resolve(null),
+    ]);
+    const evaluation = evaluateFactoryDependency({
+      dependency,
+      predecessor,
+      executionTerminal: runs.some((run: any) => ["COMPLETED", "FAILED", "CANCELED"].includes(run.status)),
+      artifactAvailable: Boolean(artifact),
+    });
+    return evaluation.blocking && !evaluation.satisfied
+      ? { dependency, predecessor, evaluation }
+      : null;
+  }))).filter(Boolean);
+}
+
 async function dispatchWorkOrder(
   ctx: MutationCtx,
   args: DispatchArgs,
@@ -2462,6 +2537,11 @@ async function dispatchWorkOrder(
 
     if (workOrder.state === "SUPERSEDED") {
       throw new Error("Superseded WorkOrders cannot be dispatched");
+    }
+    const dependencyBlockers = await loadFactoryRunDependencyBlockers(ctx, workOrder);
+    if (dependencyBlockers.length > 0) {
+      const blocker = dependencyBlockers[0] as any;
+      throw new Error(`WorkOrder is not dispatchable (${blocker.evaluation.reasonCode}: ${blocker.evaluation.summary})`);
     }
 
     let canonicalChildTasks = await ctx.db
@@ -4024,6 +4104,15 @@ export const readiness = query({
     check("dispatch-state", "WorkOrder state and approvals", dispatchable.ok,
       dispatchable.ok ? "Current state and revision-bound approvals permit admission inspection."
         : `Dispatch blocked: ${"reason" in dispatchable ? dispatchable.reason : "unknown"}. Required revision-bound approvals: ${requiredApprovalTypes({ ...workOrder, requiredApprovals }).join(", ") || "none"}. Inspect current approvals and Attempts.`);
+    const typedDependencyBlockers = await loadFactoryRunDependencyBlockers(ctx, workOrder);
+    check(
+      "factory-run-dependencies",
+      "Factory Run accepted-output dependencies",
+      typedDependencyBlockers.length === 0,
+      typedDependencyBlockers.length === 0
+        ? "Every blocking dependency in the explicit Factory Run membership snapshot is satisfied."
+        : (typedDependencyBlockers[0] as any).evaluation.summary,
+    );
     if (mission && plan) {
       const blueprintId = (workOrder.metadata as { missionBlueprintId?: string } | undefined)?.missionBlueprintId;
       const blueprint = plan.workOrderBlueprints.find((item) => item.id === blueprintId);

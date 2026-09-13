@@ -106,6 +106,7 @@ import {
 } from "../lib/localRepositoryAdmission";
 import { deterministicFactoryOperation } from "../lib/factoryWorkflowContract";
 import { mapOfflineVerification } from "../lib/offlineVerification";
+import { getEffectiveOperatorControl } from "../lib/operatorControls";
 
 const EVENT_TYPES = new Set([
   "RUN_STARTED", "STEP_STARTED", "STEP_COMPLETED", "TOOL_CALLED",
@@ -559,6 +560,14 @@ export const claimInternal = internalMutation({
       || !run.executionManifest || !run.executionManifestDigest
     ) {
       throw new Error("Factory attempt is missing its immutable execution binding.");
+    }
+    const operatorControl = await getEffectiveOperatorControl(ctx.db, run.projectId);
+    if (operatorControl.mode !== "NORMAL") {
+      return {
+        claimed: false as const,
+        reason: `operator-${operatorControl.mode.toLowerCase()}`,
+        disposition: operatorControl.mode === "KILLED" ? "CANCELLED" as const : "BLOCKED" as const,
+      };
     }
     const [version, repository, workOrder, host, installation] = await Promise.all([
       ctx.db.get(run.factoryDefinitionVersionId),

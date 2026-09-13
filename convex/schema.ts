@@ -2192,6 +2192,90 @@ export const schemaTablesPartOne = {
     .index("by_mission_revision", ["missionId", "revisionNumber"])
     .index("by_idempotency", ["idempotencyKey"]),
 
+  factoryRuns: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    missionId: v.optional(v.id("missions")),
+    missionPlanId: v.optional(v.id("missionPlans")),
+    sourcePlanRevision: v.number(),
+    runKey: v.string(),
+    title: v.string(),
+    state: v.union(
+      v.literal("PLANNED"), v.literal("RUNNING"), v.literal("PAUSED"),
+      v.literal("DRAINING"), v.literal("ACCEPTED"), v.literal("PRODUCT_FAILED"),
+      v.literal("FACTORY_FAILED"), v.literal("BLOCKED"), v.literal("CANCELLED"),
+      v.literal("SUPERSEDED"),
+    ),
+    terminalReasonCode: v.optional(v.string()),
+    terminalSummary: v.optional(v.string()),
+    membershipDigest: v.string(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_mission", ["missionId"])
+    .index("by_run_key", ["runKey"]),
+
+  factoryRunWorkOrders: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    factoryRunId: v.id("factoryRuns"),
+    workOrderId: v.id("workOrders"),
+    workOrderRevisionNumber: v.number(),
+    sourcePlanRevision: v.number(),
+    sequence: v.number(),
+    addedAt: v.number(),
+    addedBy: v.string(),
+    membershipDigest: v.string(),
+  })
+    .index("by_run", ["factoryRunId"])
+    .index("by_run_work_order", ["factoryRunId", "workOrderId"])
+    .index("by_work_order", ["workOrderId"]),
+
+  workOrderDependencies: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    factoryRunId: v.id("factoryRuns"),
+    workOrderId: v.id("workOrders"),
+    dependsOnWorkOrderId: v.id("workOrders"),
+    dependencyType: v.union(
+      v.literal("ACCEPTED_OUTPUT_REQUIRED"), v.literal("EXECUTION_COMPLETE"),
+      v.literal("ARTIFACT_AVAILABLE"), v.literal("OPTIONAL"), v.literal("INFORMATIONAL"),
+    ),
+    requiredRevisionNumber: v.optional(v.number()),
+    sourcePlanRevision: v.number(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_run", ["factoryRunId"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_depends_on", ["dependsOnWorkOrderId"])
+    .index("by_run_work_order", ["factoryRunId", "workOrderId"]),
+
+  factoryReconciliations: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.id("projects"),
+    factoryRunId: v.optional(v.id("factoryRuns")),
+    workOrderId: v.id("workOrders"),
+    workflowRunId: v.id("workflowRuns"),
+    crashPoint: v.union(
+      v.literal("LEASED_BEFORE_EXECUTOR"), v.literal("PRODUCER_RUNNING"),
+      v.literal("CANDIDATE_CAPTURED_BEFORE_FINALIZATION"), v.literal("VERIFIER_RUNNING"),
+      v.literal("VERDICT_PERSISTED_BEFORE_RECONCILIATION"), v.literal("ACCEPTANCE_TRANSITION"),
+    ),
+    disposition: v.union(v.literal("STALE"), v.literal("RECOVERABLE"), v.literal("BLOCKED"), v.literal("TERMINAL")),
+    reasonCode: v.string(),
+    actions: v.array(v.string()),
+    factsDigest: v.string(),
+    recordedAt: v.number(),
+  })
+    .index("by_attempt", ["workflowRunId"])
+    .index("by_work_order", ["workOrderId"])
+    .index("by_factory_run", ["factoryRunId"]),
+
   // Receipt for an authenticated Factory Engineer package import. The source
   // package remains immutable upstream; Mission Control persists only the
   // authenticated identity, approval lineage, local mapping, and draft refs.
