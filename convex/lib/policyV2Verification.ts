@@ -147,7 +147,10 @@ export function compilePolicyV2VerificationPlan(input: {
   });
 }
 
-const CHECK_STATUSES = new Set(["PASS", "FAIL", "SKIPPED", "NOT_CONFIGURED", "ERROR"]);
+const CHECK_STATUSES = new Set([
+  "PASS", "FAIL", "SKIPPED", "NOT_CONFIGURED", "ERROR", "TIMED_OUT",
+  "BLOCKED_BY_DEPENDENCY", "NOT_EVALUATED",
+]);
 
 /**
  * Converts a verifier transport packet into the canonical persistence shape.
@@ -207,10 +210,14 @@ export function normalizePolicyV2VerificationResults(input: {
       return check?.status !== "PASS" || check.evidenceIds.length === 0;
     });
     if (requiredCheckIds.length === 0) missingEvidence.push("no-required-check");
+    const unevaluated = requiredCheckIds.some((checkId) => {
+      const status = checksById.get(checkId)?.status;
+      return ["NOT_CONFIGURED", "ERROR", "TIMED_OUT", "BLOCKED_BY_DEPENDENCY", "NOT_EVALUATED"].includes(status ?? "NOT_EVALUATED");
+    });
     return {
       criterionId: criterion.id,
       title: String(criterion.title ?? criterion.description ?? criterion.id),
-      status: missingEvidence.length === 0 ? "EVIDENCED" as const : "MISSING" as const,
+      status: missingEvidence.length === 0 ? "EVIDENCED" as const : unevaluated ? "NOT_EVALUATED" as const : "MISSING" as const,
       requiredEvidenceCount: requiredCheckIds.length,
       usableEvidenceCount: usableChecks.length,
       missingEvidence,

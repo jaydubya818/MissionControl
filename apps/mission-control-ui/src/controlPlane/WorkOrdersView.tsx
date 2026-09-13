@@ -121,12 +121,12 @@ function prettyLabel(value: string | undefined | null) {
   return value.replace(/_/g, " ");
 }
 
-function projectedTaskStatus(task: { status: string; attempt?: { currentAttemptStatus?: string | null } }) {
-  const attemptStatus = task.attempt?.currentAttemptStatus;
-  if (["PENDING", "RUNNING", "PAUSED"].includes(attemptStatus ?? "")) return "IN_PROGRESS";
-  if (attemptStatus === "COMPLETED") return "REVIEW";
-  if (attemptStatus === "FAILED") return "BLOCKED";
-  if (attemptStatus === "CANCELED") return "CANCELED";
+function projectedTaskStatus(task: { status: string; attempt?: { currentAttemptStatus?: string | null; currentAttemptExecutionState?: string | null } }) {
+  const attemptStatus = task.attempt?.currentAttemptExecutionState ?? task.attempt?.currentAttemptStatus;
+  if (["PENDING", "QUEUED", "RUNNING", "PAUSED"].includes(attemptStatus ?? "")) return "IN_PROGRESS";
+  if (["COMPLETED", "COMPLETED_SUCCESS"].includes(attemptStatus ?? "")) return "REVIEW";
+  if (["FAILED", "COMPLETED_FAILURE", "BLOCKED", "STALE"].includes(attemptStatus ?? "")) return "BLOCKED";
+  if (["CANCELED", "CANCELLED"].includes(attemptStatus ?? "")) return "CANCELED";
   return task.status;
 }
 
@@ -372,7 +372,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
       total: rows.length,
       active: rows.filter((row) => ["READY", "DISPATCHED", "IN_PROGRESS", "AWAITING_APPROVAL", "AWAITING_VERIFICATION", "REOPENED"].includes(row.state)).length,
       blocked: rows.filter((row) => row.state === "BLOCKED").length,
-      attention: rows.filter((row) => !!row.requiredHumanAction || ["PENDING", "REVISION_REQUESTED"].includes(row.approvalStatus) || ["FAIL", "STALE"].includes(row.verificationStatus)).length,
+      attention: countByQuickFilter(rows, "needs_attention"),
     };
   }, [workOrders]);
 
@@ -406,6 +406,12 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
         && ["APPROVED", "CONDITIONAL", "NOT_REQUIRED"].includes(selected.workOrder.approvalStatus)
       : selected.acceptanceSummary?.eligible);
 
+  const pendingRevision = useMemo(
+    () => [...(selected?.revisions ?? [])]
+      .filter((revision) => revision.status === "PENDING_APPROVAL")
+      .sort((left, right) => right.revisionNumber - left.revisionNumber)[0] ?? null,
+    [selected]
+  );
   const acceptanceReadinessPresentation = deriveAcceptanceReadinessPresentation(
     canAcceptSelected,
     selected?.currentVerification?.reasons ?? []
@@ -414,12 +420,14 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   const nextActionText = attemptInFlight
     ? "This run is in progress. Watch it here — don’t dispatch again."
     : humanizeOperatorCopy(
-      canAcceptSelected
-        ? acceptanceReadinessPresentation.heading
-        : acceptanceReadinessPresentation.reasons[0]
-          ?? acceptanceReadinessPresentation.summary
-          ?? selected?.workOrder.requiredHumanAction
-          ?? "Review the current work order.",
+      pendingRevision
+        ? `Approve revision r${pendingRevision.revisionNumber} to make its contract current.`
+        : canAcceptSelected
+          ? acceptanceReadinessPresentation.heading
+          : acceptanceReadinessPresentation.reasons[0]
+            ?? acceptanceReadinessPresentation.summary
+            ?? selected?.workOrder.requiredHumanAction
+            ?? "Review the current work order.",
     );
 
   const latestReceiptMap = useMemo(
@@ -437,12 +445,6 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
   );
   const revisionSplit = useMemo(
     () => splitCurrentAndHistoricalRevisions((selected?.revisions ?? []) as any[], selected?.workOrder.currentRevisionId),
-    [selected]
-  );
-  const pendingRevision = useMemo(
-    () => [...(selected?.revisions ?? [])]
-      .filter((revision) => revision.status === "PENDING_APPROVAL")
-      .sort((left, right) => right.revisionNumber - left.revisionNumber)[0] ?? null,
     [selected]
   );
   const latestVerificationAttempt = useMemo(
@@ -630,6 +632,11 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                       <div className="flex shrink-0 flex-col items-end gap-1">
                         <Badge variant="outline" className={STATE_STYLES[item.state] ?? ""}>{prettyLabel(item.state)}</Badge>
                         <Badge variant="outline" className={RISK_STYLES[item.riskLevel] ?? ""}>{item.riskLevel}</Badge>
+                        {item.pendingRevision ? (
+                          <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning">
+                            r{item.pendingRevision.revisionNumber} approval
+                          </Badge>
+                        ) : null}
                       </div>
                     </div>
                   </button>
@@ -708,7 +715,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                   </div>
                 </div>
 
-                <div className={`rounded-xl border p-4 ${canAcceptSelected ? "border-success/30 bg-success/10" : selected.workOrder.requiredHumanAction ? "border-warning/30 bg-warning/10" : "border-[var(--panel-line)] bg-background/30"}`}>
+                <div className={`rounded-xl border p-4 ${canAcceptSelected ? "border-success/30 bg-success/10" : pendingRevision || selected.workOrder.requiredHumanAction ? "border-warning/30 bg-warning/10" : "border-[var(--panel-line)] bg-background/30"}`}>
                   <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Next action</div>
@@ -987,7 +994,9 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                           </div>
                           <div className="mt-2 text-xs text-muted-foreground">
                             Current Attempt: {task.attempt.currentAttemptNumber || "None"}
-                            {task.attempt.currentAttemptStatus ? ` (${task.attempt.currentAttemptStatus})` : ""}
+                            {(task.attempt.currentAttemptExecutionState ?? task.attempt.currentAttemptStatus)
+                              ? ` (${task.attempt.currentAttemptExecutionState ?? task.attempt.currentAttemptStatus})`
+                              : ""}
                             {" · "}Retries: {task.attempt.retryCount}
                           </div>
                         </div>

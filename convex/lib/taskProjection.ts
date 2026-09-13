@@ -12,7 +12,13 @@ type ProjectionTask = Pick<
 
 type ProjectionRun = Pick<
   Doc<"workflowRuns">,
-  "_id" | "parentTaskId" | "status" | "startedAt" | "steps"
+  "_id" | "parentTaskId" | "status" | "startedAt" | "steps" | "attemptPurpose" | "verificationAttemptBinding"
+  | "lease" | "runtimeDisposition" | "runtimeDispositionReason"
+>;
+
+type ProjectionReceipt = Pick<
+  Doc<"verificationReceipts">,
+  "_id" | "_creationTime" | "workflowRunId" | "verificationAttemptId" | "receiptScope" | "status" | "verdict" | "recordedAt"
 >;
 
 export function deriveTaskGovernanceStatus(
@@ -57,15 +63,40 @@ export function governanceTransitionError(
     : null;
 }
 
-export function buildAttemptProjection(runs: ProjectionRun[]) {
+export function buildAttemptProjection(
+  runs: ProjectionRun[],
+  receipts: ProjectionReceipt[] = [],
+  now = Date.now(),
+) {
   const ordered = [...runs].sort(
     (left, right) => left.startedAt - right.startedAt
   );
   const current = ordered.length > 0 ? ordered[ordered.length - 1] : null;
+  const verificationReceipt = current?.attemptPurpose === "VERIFICATION"
+    ? [...receipts]
+        .filter((receipt) => receipt.receiptScope === "WORK_ORDER"
+          && (receipt.verificationAttemptId === current._id || receipt.workflowRunId === current._id))
+        .sort((left, right) => (right.recordedAt ?? right._creationTime) - (left.recordedAt ?? left._creationTime))[0] ?? null
+    : null;
+  const sourceAttemptId = current?.attemptPurpose === "VERIFICATION"
+    ? current.verificationAttemptBinding?.sourceAttemptId
+    : undefined;
+  const sourceAttemptIndex = sourceAttemptId
+    ? ordered.findIndex((run) => run._id === sourceAttemptId)
+    : -1;
+  const sourceAttempt = sourceAttemptIndex >= 0 ? ordered[sourceAttemptIndex] : null;
+  const execution = current ? attemptExecutionTruth(current, now) : null;
   return {
     currentAttemptId: current?._id ?? null,
     currentAttemptNumber: current ? ordered.length : 0,
     currentAttemptStatus: current?.status ?? null,
+    currentAttemptExecutionState: execution?.state ?? null,
+    currentAttemptExecutionReason: execution?.reason ?? null,
+    currentAttemptPurpose: current?.attemptPurpose ?? "IMPLEMENTATION",
+    currentVerificationStatus: verificationReceipt?.status ?? null,
+    currentVerificationVerdict: verificationReceipt?.verdict ?? null,
+    currentSourceAttemptNumber: sourceAttempt ? sourceAttemptIndex + 1 : null,
+    currentSourceAttemptStatus: sourceAttempt?.status ?? null,
     attemptCount: ordered.length,
     retryCount: Math.max(0, ordered.length - 1),
     internalStepRetryCount: ordered.reduce(
@@ -77,11 +108,27 @@ export function buildAttemptProjection(runs: ProjectionRun[]) {
   };
 }
 
+function attemptExecutionTruth(run: ProjectionRun, now: number) {
+  if (run.status === "PENDING") return { state: "QUEUED", reason: null };
+  if (run.status === "RUNNING") {
+    if (run.runtimeDisposition === "LOST") return { state: "STALE", reason: run.runtimeDispositionReason ?? "The executor is no longer owned." };
+    if (!run.lease) return { state: "STALE", reason: "The Attempt is marked RUNNING but has no active lease." };
+    if (run.lease.expiresAt <= now) return { state: "STALE", reason: "The Attempt lease expired without a terminal report." };
+    return { state: "RUNNING", reason: null };
+  }
+  if (run.status === "COMPLETED") return { state: "COMPLETED_SUCCESS", reason: null };
+  if (run.status === "FAILED") return { state: "COMPLETED_FAILURE", reason: run.runtimeDispositionReason ?? null };
+  if (run.status === "CANCELED") return { state: "CANCELLED", reason: null };
+  if (run.status === "PAUSED") return { state: "BLOCKED", reason: run.runtimeDispositionReason ?? null };
+  return { state: run.status, reason: run.runtimeDispositionReason ?? null };
+}
+
 export function projectTask(
   task: Doc<"tasks">,
   workOrder: Doc<"workOrders"> | null,
   mission: Doc<"missions"> | null,
-  runs: Doc<"workflowRuns">[]
+  runs: Doc<"workflowRuns">[],
+  receipts: Doc<"verificationReceipts">[] = []
 ) {
   const governanceStatus = deriveTaskGovernanceStatus(task, workOrder);
   const metadata = task.metadata as
@@ -107,7 +154,7 @@ export function projectTask(
         governanceStatus === "GOVERNED" || governanceStatus === "UNGOVERNED",
     },
     attempt: {
-      ...buildAttemptProjection(runs),
+      ...buildAttemptProjection(runs, receipts),
       legacyRetryAmbiguous:
         runs.length === 0 && metadata?.workflowAttempt?.attemptNumber != null,
     },
@@ -121,7 +168,7 @@ export async function loadTaskProjections(
 ) {
   if (tasks.length === 0) return [];
 
-  const [workOrders, missions, workflowRuns] = await Promise.all([
+  const [workOrders, missions, workflowRuns, verificationReceipts] = await Promise.all([
     projectId
       ? ctx.db
           .query("workOrders")
@@ -146,6 +193,14 @@ export async function loadTaskProjections(
           )
           .collect()
       : ctx.db.query("workflowRuns").collect(),
+    projectId
+      ? ctx.db
+          .query("verificationReceipts")
+          .withIndex("by_project", (query: any) =>
+            query.eq("projectId", projectId)
+          )
+          .collect()
+      : ctx.db.query("verificationReceipts").collect(),
   ]);
 
   const workOrderMap = new Map(
@@ -164,6 +219,16 @@ export async function loadTaskProjections(
     taskRuns.push(run);
     runsByTask.set(run.parentTaskId, taskRuns);
   }
+  const receiptsByAttempt = new Map<Id<"workflowRuns">, Doc<"verificationReceipts">[]>();
+  for (const receipt of verificationReceipts as Doc<"verificationReceipts">[]) {
+    if (receipt.receiptScope !== "WORK_ORDER") continue;
+    const attemptIds = new Set([receipt.workflowRunId, receipt.verificationAttemptId].filter(Boolean) as Id<"workflowRuns">[]);
+    for (const attemptId of attemptIds) {
+      const attemptReceipts = receiptsByAttempt.get(attemptId) ?? [];
+      attemptReceipts.push(receipt);
+      receiptsByAttempt.set(attemptId, attemptReceipts);
+    }
+  }
 
   return tasks.map((task) => {
     const workOrder = task.workOrderId
@@ -172,6 +237,11 @@ export async function loadTaskProjections(
     const mission = workOrder?.missionId
       ? missionMap.get(workOrder.missionId) ?? null
       : null;
-    return projectTask(task, workOrder, mission, runsByTask.get(task._id) ?? []);
+    const taskRuns = runsByTask.get(task._id) ?? [];
+    const taskReceipts = Array.from(new Map(
+      taskRuns.flatMap((run) => receiptsByAttempt.get(run._id) ?? [])
+        .map((receipt) => [receipt._id, receipt])
+    ).values());
+    return projectTask(task, workOrder, mission, taskRuns, taskReceipts);
   });
 }

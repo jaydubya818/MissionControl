@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { DOCKER_BEDROCK_CANDIDATE_IDENTITY } from "./dockerBedrockIdentity.js";
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, rm, rmdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { realpath } from "node:fs/promises";
@@ -86,6 +86,15 @@ export async function materializeFactorySkillz(worktree: string) {
   }
 }
 
+export async function dematerializeFactorySkillz(worktree: string) {
+  const skillsDirectory = resolve(worktree, ".mission-control/skills");
+  for (const name of FACTORY_SKILLZ) {
+    await rm(resolve(skillsDirectory, name), { recursive: true, force: true });
+  }
+  await rmdir(skillsDirectory).catch(() => undefined);
+  await rmdir(resolve(worktree, ".mission-control")).catch(() => undefined);
+}
+
 
 class FactoryWorkerFailure extends Error {
   constructor(readonly code: string, message: string) {
@@ -139,6 +148,7 @@ export interface FrozenHarnessExecutionManifest {
 
 export interface FactoryAttemptWorkerStatus {
   enabled: boolean;
+  lifecycle: "RUNNING" | "DRAINING" | "STOPPED";
   activeRunIds: string[];
   completedCount: number;
   failedCount: number;
@@ -252,6 +262,7 @@ export class FactoryAttemptWorker {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private polling = false;
   private stopped = false;
+  private draining = false;
   private completedCount = 0;
   private failedCount = 0;
   private lastPollAt: number | null = null;
@@ -286,10 +297,24 @@ export class FactoryAttemptWorker {
 
   async stop() {
     this.stopped = true;
+    this.draining = false;
     if (this.pollTimer) clearInterval(this.pollTimer);
     this.pollTimer = null;
     for (const controller of this.active.values()) controller.abort();
     await Promise.allSettled([...this.activeTasks]);
+  }
+
+  /** Stop claiming new work and allow every currently owned Attempt to reach
+   * its bounded terminal report before the worker exits. Unlike stop(), drain
+   * never revokes an active controller. */
+  async drain() {
+    if (this.stopped) return;
+    this.draining = true;
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    this.pollTimer = null;
+    await Promise.allSettled([...this.activeTasks]);
+    this.stopped = true;
+    this.draining = false;
   }
 
   status(): FactoryAttemptWorkerStatus {
@@ -301,6 +326,7 @@ export class FactoryAttemptWorker {
     }
     return {
       enabled: this.enabled,
+      lifecycle: this.stopped ? "STOPPED" : this.draining ? "DRAINING" : "RUNNING",
       activeRunIds: [...this.active.keys()],
       completedCount: this.completedCount,
       failedCount: this.failedCount,
@@ -313,7 +339,7 @@ export class FactoryAttemptWorker {
   }
 
   async tick() {
-    if (!this.enabled || this.polling || this.stopped) return;
+    if (!this.enabled || this.polling || this.stopped || this.draining) return;
     this.polling = true;
     this.lastPollAt = Date.now();
     try {
@@ -324,7 +350,7 @@ export class FactoryAttemptWorker {
         this.client.query(ConvexQueries.workflowRuns.list as any, factoryRunQueryArgs("RUNNING", this.scope)),
       ]) as [any[], any[]];
       for (const run of [...pending, ...running]) {
-        if (this.stopped || this.active.size >= (this.identity?.maxConcurrentRuns ?? 1)) break;
+        if (this.stopped || this.draining || this.active.size >= (this.identity?.maxConcurrentRuns ?? 1)) break;
         const executionBackend = manifestExecutionBackend(run?.executionManifest);
         if (!isBoundFactoryAttempt(run)
           || !this.adapters.supports({ adapter: run.executorAdapter, version: run.executorVersion }, executionBackend)
@@ -547,9 +573,13 @@ export class FactoryAttemptWorker {
       assertHarnessAdapterIdentity(manifest, adapterRegistration);
       if (verificationAttempt) {
         const completed = await this.executeVerificationAttempt({ claim, manifest, report, controller });
-        if (completed === false) this.failedCount += 1;
-        else this.completedCount += 1;
-        this.lastError = null;
+        if (completed === false) {
+          this.failedCount += 1;
+          this.lastError = "Verification Attempt did not complete successfully; inspect its terminal evidence.";
+        } else {
+          this.completedCount += 1;
+          this.lastError = null;
+        }
         return;
       }
       const workspaceOwner = workspaceOwnerFromClaim(claim, manifest);
@@ -717,7 +747,7 @@ export class FactoryAttemptWorker {
 
       if (manifestExecutionBackend(manifest) !== "isolated-container") {
         await (this.dependencies.prepareFactoryDependencies ?? prepareFactoryDependencies)({ worktree: claim.worktree });
-        await materializeFactorySkillz(claim.worktree);
+        if (manifest.harness.adapter === "codex") await materializeFactorySkillz(claim.worktree);
       }
 
       let mappedEvents: any[] = [];
@@ -738,11 +768,13 @@ export class FactoryAttemptWorker {
         if (!await current()) throw new Error("Offline Attempt authority expired before invocation.");
         const parsed = await this.executeAndRetainOfflineInvocation({ claim, adapter, invocation, controller, workspaceOwner });
         if (parsed.result.status !== "SUCCESS") {
+          const failureReason = `Offline execution ${parsed.result.status}; retained exact runtime response for this lease.`;
           if (await current()) await report({ terminal: {
             status: parsed.result.status === "CANCELED" ? "CANCELED" : "FAILED",
-            failureReason: `Offline execution ${parsed.result.status}; retained exact runtime response for this lease.`,
+            failureReason,
           } });
           this.failedCount += 1;
+          this.lastError = failureReason;
           return;
         }
         if (!await current()) throw new Error("Offline Attempt authority expired before candidate materialization.");
@@ -833,16 +865,18 @@ export class FactoryAttemptWorker {
         structuredResult = validateFactoryResult(remoteSession.bundle.structuredResult);
         executionArtifacts.push(sandboxResultArtifact(claim, remoteSession.bundle));
         if (remoteSession.bundle.status !== "COMPLETED") {
+          const failureReason = remoteSession.bundle.failure?.summary ?? `Remote sandbox supervisor reported ${remoteSession.bundle.status}.`;
           await cleanupRemote();
           await report({
             artifacts: [structuredResultArtifact(claim, structuredResult), ...executionArtifacts],
             terminal: {
               status: remoteSession.bundle.status === "CANCELED" ? "CANCELED" : "FAILED",
-              failureReason: remoteSession.bundle.failure?.summary ?? `Remote sandbox supervisor reported ${remoteSession.bundle.status}.`,
+              failureReason,
               remoteFailure: remoteSession.bundle.failure,
             },
           });
           this.failedCount += 1;
+          this.lastError = failureReason;
           return;
         }
         await (this.dependencies.materializeRemoteCandidate ?? materializeRemoteCandidate)({
@@ -933,16 +967,21 @@ export class FactoryAttemptWorker {
         });
         executionArtifacts.push(harnessResultArtifact(claim, normalizedResult));
         if (result.status !== "COMPLETED") {
+          const failureReason = result.error ?? `${adapterCapabilities.displayName} execution failed.`;
           await report({
             events: mappedEvents,
             observations: traceObservations,
-            terminal: { status: result.status === "CANCELED" ? "CANCELED" : "FAILED", failureReason: result.error ?? `${adapterCapabilities.displayName} execution failed.` },
+            terminal: { status: result.status === "CANCELED" ? "CANCELED" : "FAILED", failureReason },
           });
           this.failedCount += 1;
+          this.lastError = failureReason;
           return;
         }
         structuredResult = parseFactoryResult(normalizedResult.output);
       }
+      }
+      if (manifestExecutionBackend(manifest) !== "isolated-container" && manifest.harness.adapter === "codex") {
+        await dematerializeFactorySkillz(claim.worktree);
       }
       if (structuredResult.status !== "COMPLETED") {
         const failureReason = `Execution harness reported ${structuredResult.status}: ${structuredResult.nextAction}`;
@@ -958,6 +997,7 @@ export class FactoryAttemptWorker {
           },
         });
         this.failedCount += 1;
+        this.lastError = failureReason;
         return;
       }
 
@@ -989,6 +1029,7 @@ export class FactoryAttemptWorker {
           },
         });
         this.failedCount += 1;
+        this.lastError = failureReason;
         return;
       }
       if (scopeResult.changedFiles.length === 0) {
@@ -1005,6 +1046,7 @@ export class FactoryAttemptWorker {
           },
         });
         this.failedCount += 1;
+        this.lastError = failureReason;
         return;
       }
 
@@ -1118,6 +1160,7 @@ export class FactoryAttemptWorker {
             },
           });
           this.failedCount += 1;
+          this.lastError = reason;
           return;
         }
         const verificationReport = await report({
@@ -1142,6 +1185,7 @@ export class FactoryAttemptWorker {
             remoteFailure: remoteTerminalFailure(remoteSession, "INDEPENDENT_VERIFICATION_FAILED", "RESULT_VALIDATION", reason),
           } });
           this.failedCount += 1;
+          this.lastError = reason;
           return;
         }
       }

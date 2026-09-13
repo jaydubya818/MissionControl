@@ -1,3 +1,6 @@
+import { useQuery } from "convex/react";
+import { useSearchParams } from "react-router-dom";
+import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { MainView } from "../TopNav";
 import { Sidebar } from "../Sidebar";
@@ -13,9 +16,10 @@ import { GoalsView } from "../GoalsView";
 import { AutomationsView } from "../automations/AutomationsView";
 import { PageHeader } from "../components/PageHeader";
 import { TaskboardStats } from "../components/TaskboardStats";
+import { resolveTaskWorkOrderScope } from "../components/taskWorkOrderScope";
 import { Button } from "@/components/ui/button";
 import { LoopDetectionPanel } from "../LoopDetectionPanel";
-import { FileUp, Plus, PauseCircle, ShieldCheck, Users } from "lucide-react";
+import { FileUp, Plus, PauseCircle, ShieldCheck, TriangleAlert, Users, X } from "lucide-react";
 
 export interface OpsSectionProps {
   currentView: MainView;
@@ -64,6 +68,25 @@ export function OpsSection({
   onNavigate,
   onNewTask,
 }: OpsSectionProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedWorkOrderId = currentView === "tasks" ? searchParams.get("workOrder") : null;
+  const scopedWorkOrders = useQuery(
+    api.workOrders.list,
+    requestedWorkOrderId && projectId ? { projectId, limit: 500 } : "skip",
+  );
+  const taskWorkOrderScope = resolveTaskWorkOrderScope(
+    requestedWorkOrderId,
+    scopedWorkOrders,
+  );
+  const scopedWorkOrderId = taskWorkOrderScope.status === "FOUND"
+    ? taskWorkOrderScope.workOrder._id as Id<"workOrders">
+    : null;
+  const clearWorkOrderScope = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("workOrder");
+    setSearchParams(next, { replace: true });
+  };
+
   if (currentView === "tasks") {
     return (
       <div className="flex h-full min-h-0 w-full flex-1 overflow-hidden">
@@ -134,21 +157,61 @@ export function OpsSection({
               </div>
             }
           />
-          <TaskboardStats projectId={projectId} />
-          <KanbanFilters
-            projectId={projectId}
-            currentUserId="operator"
-            filters={kanbanFilters}
-            onFiltersChange={onFiltersChange}
-          />
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <Kanban
-              projectId={projectId}
-              onSelectTask={onTaskSelect}
-              filters={kanbanFilters}
-            />
-            <LoopDetectionPanel projectId={projectId} onTaskSelect={onTaskSelect} />
-          </div>
+          {taskWorkOrderScope.status === "FOUND" ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-info/25 bg-info/10 px-4 py-2 text-xs" role="status">
+              <span className="font-medium text-ink">Scoped to {taskWorkOrderScope.workOrder.title}</span>
+              <span className="text-ink-muted">Only Tasks linked to this WorkOrder are shown.</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-auto h-7 gap-1.5 px-2 text-xs"
+                onClick={clearWorkOrderScope}
+              >
+                <X className="h-3.5 w-3.5" aria-hidden />
+                Clear WorkOrder filter
+              </Button>
+            </div>
+          ) : null}
+          {taskWorkOrderScope.status === "LOADING" ? (
+            <div className="flex flex-1 flex-col gap-3 p-6" aria-label="Loading WorkOrder task scope">
+              <div className="h-4 w-48 animate-pulse rounded bg-surface-2" />
+              <div className="h-4 w-72 animate-pulse rounded bg-surface-2" />
+              <div className="h-32 w-full animate-pulse rounded-xl bg-surface-2" />
+            </div>
+          ) : taskWorkOrderScope.status === "UNAVAILABLE" ? (
+            <div className="m-4 flex flex-1 flex-col items-center justify-center rounded-xl border border-warning/35 bg-warning/10 p-8 text-center" role="alert">
+              <TriangleAlert className="h-6 w-6 text-warning" aria-hidden />
+              <h2 className="mt-3 text-sm font-semibold text-ink">WorkOrder unavailable</h2>
+              <p className="mt-1 max-w-lg text-xs text-ink-secondary">
+                This WorkOrder does not exist in the selected workspace or is no longer accessible. No unfiltered Tasks were shown.
+              </p>
+              <Button type="button" variant="outline" size="sm" className="mt-4" onClick={clearWorkOrderScope}>
+                Clear WorkOrder filter
+              </Button>
+            </div>
+          ) : (
+            <>
+              <TaskboardStats projectId={projectId} workOrderId={scopedWorkOrderId} />
+              <KanbanFilters
+                projectId={projectId}
+                currentUserId="operator"
+                filters={kanbanFilters}
+                onFiltersChange={onFiltersChange}
+              />
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <Kanban
+                  projectId={projectId}
+                  workOrderId={scopedWorkOrderId}
+                  onSelectTask={onTaskSelect}
+                  filters={kanbanFilters}
+                />
+                {!scopedWorkOrderId ? (
+                  <LoopDetectionPanel projectId={projectId} onTaskSelect={onTaskSelect} />
+                ) : null}
+              </div>
+            </>
+          )}
         </section>
         <LiveFeed
           projectId={projectId}

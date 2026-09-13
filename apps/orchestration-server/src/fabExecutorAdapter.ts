@@ -210,9 +210,12 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
         await agent.run(p.session.approvalDigest, signal);
       }
       await checkpoint();
-    } catch {
+    } catch (error) {
       p.session.status = signal.aborted ? "cancelled" : "blocked";
-      p.session.unresolved = ["Execution stopped or authority became unavailable; MC reconciliation is required."];
+      const failure = p.redactor.text(error instanceof Error ? error.message : String(error));
+      p.session.unresolved = [signal.aborted
+        ? `Execution stopped because authority or the execution deadline became unavailable: ${failure}`
+        : `Execution failed before a candidate was produced: ${failure}`];
     }
     if (p.releaseModel) {
       try { const receipt = await p.releaseModel(); emit("ARTIFACT_PRODUCED", "openrouter_credential_revoked", receipt); }
@@ -229,7 +232,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
       unknownAcceptanceCriterionIds: p.attempt.acceptanceCriteria.map(item => item.id), verificationCommands: p.session.config.checks.map(check => check.argv.join(" ")),
       knownRisks: [...p.session.unresolved, "Fab producer checks are not independent acceptance evidence."], nextAction: "MC must capture and independently verify the exact candidate, then apply its approval/publication policy." }));
     const finishedAt = Date.now();
-    return { executionId: p.request.executionId, status, output, ...(completed ? {} : { error: "Fab execution blocked, failed or cancelled; inspect its redacted evidence." }), normalizedResult: {
+    return { executionId: p.request.executionId, status, output, ...(completed ? {} : { error: p.session.unresolved.join(" ") }), normalizedResult: {
       schemaVersion: "harness-result/v1", executionId: p.request.executionId, status, harness: this.manifest.identity,
       provenance: { provider: p.request.provider ?? p.model.provider, model: p.model.model,
         ...(p.request.modelRouteDigest ? { modelRouteDigest: p.request.modelRouteDigest, providerRoute: p.request.providerRoute } : {}),

@@ -42,6 +42,26 @@ const ITEMS: WorkOrderQueueItem[] = [
   },
 ];
 
+const REVISION_ITEM: WorkOrderQueueItem = {
+  _id: "wo-revision",
+  title: "Revision pending",
+  desiredOutcome: "Use the current contract",
+  state: "READY",
+  riskLevel: "CRITICAL",
+  verificationStatus: "STALE",
+  approvalStatus: "NOT_REQUIRED",
+  latestExecutionRun: null,
+  pendingRevision: {
+    _id: "revision-3",
+    revisionNumber: 3,
+    changeSummary: "Use the pnpm verification contract.",
+    reason: "The previous verifier used a different package manager.",
+    requiresReapproval: true,
+    requiresReverification: true,
+    requiresFullReopen: false,
+  },
+};
+
 describe("work order queue model", () => {
   it("filters by repository and verification status", () => {
     const filtered = filterWorkOrders(ITEMS, {
@@ -81,7 +101,7 @@ describe("work order queue model", () => {
   });
 
   it("derives the next operator action", () => {
-    expect(deriveNextAction(ITEMS[0])).toBe("Review approval");
+    expect(deriveNextAction(ITEMS[0])).toBe("Inspect run");
     expect(deriveNextAction(ITEMS[1])).toBe("Review outcome");
   });
 
@@ -89,6 +109,18 @@ describe("work order queue model", () => {
     expect(humanizeOperatorCopy("No current source Attempt published a candidate-ready Verification Subject.")).toBe(
       "Nothing verified yet. Wait for this run to finish and leave evidence.",
     );
+  });
+
+  it("prioritizes a pending revision approval over stale evidence", () => {
+    expect(deriveNextAction(REVISION_ITEM)).toBe("Approve revision r3");
+    expect(summarizeRequiredAttention(REVISION_ITEM)).toBe(
+      "Approve revision r3: Use the pnpm verification contract.",
+    );
+  });
+
+  it("counts pending revisions in approval and attention filters", () => {
+    expect(countByQuickFilter([REVISION_ITEM], "awaiting_approval")).toBe(1);
+    expect(countByQuickFilter([REVISION_ITEM], "needs_attention")).toBe(1);
   });
 
   it("never claims acceptance is allowed while the composite acceptance gate is blocked", () => {

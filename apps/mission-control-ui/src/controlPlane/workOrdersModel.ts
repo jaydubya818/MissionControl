@@ -14,6 +14,15 @@ export interface WorkOrderQueueItem {
   blockingIssue?: string;
   requiredHumanAction?: string;
   metadata?: Record<string, any>;
+  pendingRevision?: {
+    _id: string;
+    revisionNumber: number;
+    changeSummary: string;
+    reason: string;
+    requiresReapproval: boolean;
+    requiresReverification: boolean;
+    requiresFullReopen: boolean;
+  } | null;
   latestExecutionRun?: {
     status: string;
     workflowId: string;
@@ -51,11 +60,11 @@ export const DEFAULT_WORK_ORDER_FILTERS: WorkOrderQueueFilters = {
 function matchesQuickFilter(item: WorkOrderQueueItem, quickFilter: WorkOrderQuickFilter) {
   switch (quickFilter) {
     case "needs_attention":
-      return Boolean(item.requiredHumanAction) || ["PENDING", "REVISION_REQUESTED", "CONDITIONAL"].includes(item.approvalStatus) || ["FAIL", "STALE"].includes(item.verificationStatus) || item.state === "BLOCKED";
+      return Boolean(item.pendingRevision) || Boolean(item.requiredHumanAction) || ["PENDING", "REVISION_REQUESTED", "CONDITIONAL"].includes(item.approvalStatus) || ["FAIL", "STALE"].includes(item.verificationStatus) || item.state === "BLOCKED";
     case "blocked":
       return item.state === "BLOCKED";
     case "awaiting_approval":
-      return item.state === "AWAITING_APPROVAL" || ["PENDING", "REVISION_REQUESTED", "CONDITIONAL"].includes(item.approvalStatus);
+      return Boolean(item.pendingRevision) || item.state === "AWAITING_APPROVAL" || ["PENDING", "REVISION_REQUESTED", "CONDITIONAL"].includes(item.approvalStatus);
     case "ready_to_dispatch":
       return ["READY", "REOPENED"].includes(item.state) && !item.latestExecutionRun;
     case "all":
@@ -81,12 +90,16 @@ export function filterWorkOrders(
 }
 
 export function summarizeRequiredAttention(item: WorkOrderQueueItem): string {
+  if (item.pendingRevision) {
+    return `Approve revision r${item.pendingRevision.revisionNumber}: ${item.pendingRevision.changeSummary}`;
+  }
   return item.requiredHumanAction ?? item.blockingIssue ?? "None";
 }
 
 export function deriveNextAction(item: WorkOrderQueueItem): string {
   if (item.latestExecutionRun && ["PENDING", "RUNNING", "PAUSED"].includes(item.latestExecutionRun.status)) return "Inspect run";
   if (item.state === "DISPATCHED" || item.state === "IN_PROGRESS") return "Inspect run";
+  if (item.pendingRevision) return `Approve revision r${item.pendingRevision.revisionNumber}`;
   if (item.state === "BLOCKED") return "Resolve blocker";
   if (item.state === "AWAITING_APPROVAL" || ["PENDING", "REVISION_REQUESTED", "CONDITIONAL"].includes(item.approvalStatus)) {
     return "Review approval";

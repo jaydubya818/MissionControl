@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   ChangeBudgetVerifier,
   NegativeConstraintVerifier,
@@ -134,20 +134,57 @@ describe("VerificationEngine", () => {
     expect(result.checks.find((check) => check.checkId === "unit")?.status).toBe("FAIL");
   });
 
-  it("returns NOT_CONFIGURED and never verifies when a required verifier is missing", async () => {
+  it("blocks when a required verifier is not configured", async () => {
     const spec = workOrder({ verificationContract: { schemaVersion: 1, enforcementMode: "ENFORCED", requireHumanReview: false, checks: [{
       id: "independent", name: "Independent review", category: "INDEPENDENT_REVIEW", verifierId: "unavailable-independent-agent", mandatory: true,
       acceptanceCriterionIds: ["ac-1"], evidenceCategory: "REVIEW_RESULT",
     }] } });
     const result = await new VerificationEngine(baseVerifiers()).execute({ workflowRunId: "run-1", workOrder: spec, candidate });
-    expect(result.verdict).toBe("NOT_VERIFIED");
+    expect(result.verdict).toBe("BLOCKED");
     expect(result.checks.find((check) => check.checkId === "independent")?.status).toBe("NOT_CONFIGURED");
   });
 
-  it.each(["SKIPPED", "ERROR"] as const)("does not convert mandatory %s into PASS", async (status) => {
+  it("does not convert a mandatory SKIPPED check into PASS", async () => {
+    const status = "SKIPPED" as const;
     const verifier: Verifier = { ...passingTestVerifier, execute: async (context, check) => ({ ...(await passingTestVerifier.execute(context, check)), status, evidence: [] }) };
     const result = await new VerificationEngine(baseVerifiers(verifier)).execute({ workflowRunId: "run-1", workOrder: workOrder(), candidate });
     expect(result.verdict).toBe("NOT_VERIFIED");
+  });
+
+  it.each(["ERROR", "TIMED_OUT", "NOT_EVALUATED"] as const)("blocks when a mandatory check is %s instead of claiming product failure", async (status) => {
+    const verifier: Verifier = { ...passingTestVerifier, execute: async (context, check) => ({ ...(await passingTestVerifier.execute(context, check)), status, evidence: [] }) };
+    const result = await new VerificationEngine(baseVerifiers(verifier)).execute({ workflowRunId: "run-1", workOrder: workOrder(), candidate });
+    expect(result.verdict).toBe("BLOCKED");
+    expect(result.coverage).toEqual([expect.objectContaining({ criterionId: "ac-1", status: "NOT_EVALUATED" })]);
+    expect(result.verdictReasons.join(" ")).toContain("was not evaluated");
+  });
+
+  it("does not execute dependent checks after their prerequisite fails", async () => {
+    const execute = vi.fn(async (context, check) => ({
+      ...(await passingTestVerifier.execute(context, check)),
+      status: check.id === "dependencies" ? "ERROR" as const : "PASS" as const,
+      evidence: [],
+    }));
+    const verifier: Verifier = { ...passingTestVerifier, execute };
+    const spec = workOrder({ verificationContract: {
+      schemaVersion: 1,
+      enforcementMode: "ENFORCED",
+      requireHumanReview: false,
+      checks: [
+        { id: "dependencies", name: "Dependency admission", category: "DEPENDENCY", verifierId: "deterministic-test", mandatory: true, acceptanceCriterionIds: [], evidenceCategory: "COMMAND_LOG" },
+        { id: "unit", name: "Unit tests", category: "UNIT_TEST", verifierId: "deterministic-test", mandatory: true, acceptanceCriterionIds: ["ac-1"], evidenceCategory: "TEST_RESULT", dependsOnCheckIds: ["dependencies"] },
+      ],
+    } });
+
+    const result = await new VerificationEngine(baseVerifiers(verifier)).execute({ workflowRunId: "run-1", workOrder: spec, candidate });
+
+    expect(execute.mock.calls.map(([, check]) => check.id)).toEqual(["dependencies"]);
+    expect(result.checks.find((check) => check.checkId === "unit")).toMatchObject({
+      status: "BLOCKED_BY_DEPENDENCY",
+      metadata: { causalCheckIds: ["dependencies"], failureClass: "DEPENDENCY_FAILURE" },
+    });
+    expect(result.coverage).toEqual([expect.objectContaining({ criterionId: "ac-1", status: "NOT_EVALUATED" })]);
+    expect(result.verdict).toBe("BLOCKED");
   });
 
   it("blocks suspicious verification weakening", async () => {

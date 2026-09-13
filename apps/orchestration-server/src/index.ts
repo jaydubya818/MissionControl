@@ -1880,10 +1880,10 @@ export function startServer() {
   });
 
   process.on("SIGTERM", async () => {
-    console.log("\n[orchestration] SIGTERM received, shutting down...");
+    console.log("\n[orchestration] SIGTERM received, draining Factory work before shutdown...");
     if (tickTimer) clearInterval(tickTimer);
+    await Promise.all([factoryAttemptWorker.drain(), missionPlanningWorker.stop(), accountingRuntime.stop()]);
     factoryHostReporter?.stop();
-    await Promise.all([factoryAttemptWorker.stop(), missionPlanningWorker.stop(), accountingRuntime.stop()]);
     await Promise.all(factoryHarnessRegistry.registrations().map(({ adapter }) =>
       (adapter as { dispose?: () => Promise<void> }).dispose?.()));
     process.exit(0);

@@ -34,10 +34,18 @@ describe("verification packet recomputation", () => {
     expect(recomputeVerificationPacket(workOrder, packet())).toMatchObject({ verdict: "VERIFIED", requirementsPassed: 1, requirementsFailed: 0 });
   });
 
-  it("does not trust a supplied verdict when mandatory evidence is missing", () => {
+  it("blocks when a mandatory verifier did not report", () => {
     const result = recomputeVerificationPacket(workOrder, packet({ verdict: "VERIFIED", checks: [] }));
-    expect(result.verdict).toBe("NOT_VERIFIED");
+    expect(result.verdict).toBe("BLOCKED");
     expect(result.verdictReasons.join(" ")).toMatch(/did not report|lacks required evidence/);
+  });
+
+  it("does not verify a passing check that lacks its required evidence", () => {
+    const supplied = packet();
+    supplied.checks[0].evidence = [];
+    const result = recomputeVerificationPacket(workOrder, supplied);
+    expect(result.verdict).toBe("NOT_VERIFIED");
+    expect(result.verdictReasons.join(" ")).toMatch(/lacks required evidence/);
   });
 
   it("rejects evidence mapped outside the approved criterion contract", () => {

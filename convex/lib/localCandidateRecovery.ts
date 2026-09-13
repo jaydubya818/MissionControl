@@ -100,3 +100,74 @@ export function buildLocalCandidateRecoveryRows(input: {
     },
   };
 }
+
+export interface UnboundVerificationCandidateContinuation {
+  binding: "REQUIRES_INSERTED_ATTEMPT_ID";
+  workflowRun: any;
+}
+
+export function buildUnboundVerificationCandidateContinuation(input: {
+  failedAttempt: any;
+  continuationRunId: string;
+  requestedAt: number;
+  actorId: string;
+  reason: string;
+  failedVerificationAttemptId: string;
+  failedVerificationRunId: string;
+}): UnboundVerificationCandidateContinuation {
+  const executionManifest = {
+    ...input.failedAttempt.executionManifest,
+    causation: {
+      ...input.failedAttempt.executionManifest?.causation,
+      workflowRunId: input.continuationRunId,
+    },
+  };
+  const continuation: any = { ...input.failedAttempt };
+  for (const key of ATTEMPT_LOCAL_FIELDS) delete continuation[key];
+  Object.assign(continuation, {
+    runId: input.continuationRunId,
+    executionManifest,
+    executionManifestDigest: `sha256:${computeCanonicalHash(executionManifest)}`,
+    isMutating: false,
+    status: "COMPLETED",
+    currentStepIndex: 1,
+    totalSteps: 1,
+    steps: [{
+      stepId: "candidate-reattestation",
+      status: "DONE",
+      kind: "GATE",
+      isolation: "READ_ONLY",
+      failurePolicy: "BLOCK",
+      retryCount: 0,
+      completedAt: input.requestedAt,
+    }],
+    context: { source: "verification-candidate-continuation", sourceAttemptId: input.failedAttempt._id },
+    initialInput: `Re-attest the exact candidate from failed source Attempt ${input.failedAttempt.runId}.`,
+    checkpointSummary: "Exact unchanged candidate re-attested without executor replay.",
+    checkpointAt: input.requestedAt,
+    runtimeDisposition: "RECOVERABLE",
+    runtimeDispositionReason: input.reason,
+    runtimeReconciledAt: input.requestedAt,
+    startedAt: input.requestedAt,
+    completedAt: input.requestedAt,
+    metadata: {
+      verificationCandidateContinuation: {
+        sourceAttemptId: input.failedAttempt._id,
+        sourceExecutionManifestDigest: input.failedAttempt.executionManifestDigest,
+        failedVerificationAttemptId: input.failedVerificationAttemptId,
+        failedVerificationRunId: input.failedVerificationRunId,
+        candidateSha: input.failedAttempt.headSha,
+        treeSha: input.failedAttempt.treeSha,
+        sourceRevision: input.failedAttempt.executionBaseSha,
+        requestedAt: input.requestedAt,
+        requestedBy: input.actorId,
+        reason: input.reason,
+        executorReplay: false,
+      },
+    },
+  });
+  return {
+    binding: "REQUIRES_INSERTED_ATTEMPT_ID",
+    workflowRun: continuation,
+  };
+}

@@ -10,11 +10,20 @@ import {
 
 interface TaskboardStatsProps {
   projectId: Id<"projects"> | null;
+  workOrderId?: Id<"workOrders"> | null;
   className?: string;
 }
 
-export function TaskboardStats({ projectId, className }: TaskboardStatsProps) {
-  const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
+export function TaskboardStats({ projectId, workOrderId, className }: TaskboardStatsProps) {
+  const allTasks = useQuery(
+    api.tasks.listAll,
+    workOrderId ? "skip" : projectId ? { projectId } : {},
+  );
+  const scopedTasks = useQuery(
+    api.tasks.listByWorkOrder,
+    workOrderId && projectId ? { projectId, workOrderId } : "skip",
+  );
+  const tasks = workOrderId ? scopedTasks : allTasks;
 
   if (tasks === undefined) return null;
 

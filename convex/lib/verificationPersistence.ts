@@ -1,4 +1,7 @@
-const CHECK_STATUSES = new Set(["PASS", "FAIL", "SKIPPED", "NOT_CONFIGURED", "ERROR"]);
+const CHECK_STATUSES = new Set([
+  "PASS", "FAIL", "SKIPPED", "NOT_CONFIGURED", "ERROR", "TIMED_OUT",
+  "BLOCKED_BY_DEPENDENCY", "NOT_EVALUATED",
+]);
 const EVIDENCE_CATEGORIES = new Set([
   "TEST_RESULT", "BUILD_RESULT", "STATIC_ANALYSIS", "SECURITY_SCAN", "COMMAND_LOG",
   "FILE_DIFF", "SCREENSHOT", "BROWSER_RESULT", "PERFORMANCE_RESULT", "REVIEW_RESULT",
@@ -74,13 +77,23 @@ export function recomputeVerificationPacket(workOrder: any, packet: any) {
   const blocking = checks.filter((check: any) => check.status === "FAIL"
     && ["CHANGE_BUDGET", "POLICY"].includes(check.category)
     && check.metadata?.blocking === true);
-  const mandatoryFailures = checks.filter((check: any) => check.mandatory && check.status !== "PASS");
+  const mandatoryUnevaluated = checks.filter((check: any) => check.mandatory
+    && ["NOT_CONFIGURED", "ERROR", "TIMED_OUT", "BLOCKED_BY_DEPENDENCY", "NOT_EVALUATED"].includes(check.status));
+  const mandatoryFailures = checks.filter((check: any) => check.mandatory
+    && !["PASS", "NOT_CONFIGURED", "ERROR", "TIMED_OUT", "BLOCKED_BY_DEPENDENCY", "NOT_EVALUATED"].includes(check.status));
   const uncovered = coverage.filter((criterion: any) => criterion.status === "MISSING");
+  const unevaluatedCoverage = coverage.filter((criterion: any) => criterion.status === "NOT_EVALUATED");
   let verdict: "VERIFIED" | "NOT_VERIFIED" | "BLOCKED" | "REQUIRES_HUMAN_REVIEW";
   let verdictReasons: string[];
   if (blocking.length) {
     verdict = "BLOCKED";
     verdictReasons = blocking.flatMap((check: any) => check.violations.length ? check.violations : [check.summary]);
+  } else if (mandatoryUnevaluated.length || unevaluatedCoverage.length) {
+    verdict = "BLOCKED";
+    verdictReasons = [
+      ...mandatoryUnevaluated.map((check: any) => `${check.name}: ${check.status} — ${check.summary}`),
+      ...unevaluatedCoverage.map((criterion: any) => `${criterion.criterionId} was not evaluated (${criterion.missingEvidence.join(", ")}).`),
+    ];
   } else if (mandatoryFailures.length || uncovered.length) {
     verdict = "NOT_VERIFIED";
     verdictReasons = [
@@ -170,10 +183,14 @@ function calculateCoverage(criteria: any[], checks: any[], evidence: NormalizedE
         ? []
         : [`${requirement.category ?? "ANY"}: ${matches.length}/${requirement.minimumCount}${requirement.independent ? " independent" : ""}`];
     });
+    const mappedChecks = checks.filter((check: any) => (check.acceptanceCriterionIds ?? []).includes(criterion.id));
+    const unevaluated = mappedChecks.some((check: any) => [
+      "NOT_CONFIGURED", "ERROR", "TIMED_OUT", "BLOCKED_BY_DEPENDENCY", "NOT_EVALUATED",
+    ].includes(check.status));
     return {
       criterionId: criterion.id,
       title: criterion.title,
-      status: missingEvidence.length ? "MISSING" as const : "EVIDENCED" as const,
+      status: missingEvidence.length ? (unevaluated ? "NOT_EVALUATED" as const : "MISSING" as const) : "EVIDENCED" as const,
       requiredEvidenceCount: requirements.reduce((sum: number, item: any) => sum + item.minimumCount, 0),
       usableEvidenceCount: candidateEvidence.length,
       missingEvidence,

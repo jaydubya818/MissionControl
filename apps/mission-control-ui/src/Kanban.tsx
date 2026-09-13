@@ -49,6 +49,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { PlanningModal } from "./PlanningModal";
+import { presentTaskAttempt } from "./components/taskAttemptPresentation";
 
 type TaskStatus = Doc<"tasks">["status"];
 
@@ -111,6 +112,13 @@ type Task = {
   attempt: {
     currentAttemptNumber: number;
     currentAttemptStatus: string | null;
+    currentAttemptExecutionState?: string | null;
+    currentAttemptExecutionReason?: string | null;
+    currentAttemptPurpose: string;
+    currentVerificationStatus: string | null;
+    currentVerificationVerdict: string | null;
+    currentSourceAttemptNumber: number | null;
+    currentSourceAttemptStatus: string | null;
     attemptCount: number;
     retryCount: number;
     legacyRetryAmbiguous: boolean;
@@ -153,10 +161,12 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
 
 export function Kanban({ 
   projectId,
+  workOrderId,
   onSelectTask,
   filters,
 }: { 
   projectId: Id<"projects"> | null;
+  workOrderId?: Id<"workOrders"> | null;
   onSelectTask: (id: Id<"tasks">) => void;
   filters?: {
     agents: string[];
@@ -172,7 +182,15 @@ export function Kanban({
     toStatus: TaskStatus;
   } | null>(null);
   
-  const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
+  const allTasks = useQuery(
+    api.tasks.listAll,
+    workOrderId ? "skip" : projectId ? { projectId } : {},
+  );
+  const scopedTasks = useQuery(
+    api.tasks.listByWorkOrder,
+    workOrderId && projectId ? { projectId, workOrderId } : "skip",
+  );
+  const tasks = workOrderId ? scopedTasks : allTasks;
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : {});
   const allowedMap = useQuery(api.tasks.getAllowedTransitionsForHuman);
   const transitionTask = useMutation(api.tasks.transition);
@@ -473,6 +491,9 @@ function Card({
 
   const src = task.source ? (SOURCE_CONFIG[task.source] || SOURCE_CONFIG.UNKNOWN) : null;
   const workflowAttempt = task.metadata?.workflowAttempt;
+  const attemptPresentation = task.attempt.attemptCount > 0
+    ? presentTaskAttempt(task.attempt)
+    : null;
 
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -547,10 +568,13 @@ function Card({
               {workflowAttempt.retryNumber ? ` · Retry ${workflowAttempt.retryNumber}` : ""}
             </StatusBadge>
           ) : null}
-          {task.attempt.attemptCount > 0 ? (
-            <StatusBadge tone="info">
-              Attempt {task.attempt.currentAttemptNumber} · {task.attempt.currentAttemptStatus}
+          {attemptPresentation ? (
+            <StatusBadge tone={attemptPresentation.tone}>
+              {attemptPresentation.label}
             </StatusBadge>
+          ) : null}
+          {attemptPresentation?.sourceLabel && task.attempt.currentSourceAttemptStatus !== "COMPLETED" ? (
+            <StatusBadge tone="error">{attemptPresentation.sourceLabel}</StatusBadge>
           ) : null}
           {task.attempt.retryCount > 0 ? (
             <StatusBadge tone="warning">

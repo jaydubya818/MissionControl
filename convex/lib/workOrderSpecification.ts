@@ -17,6 +17,7 @@ export function validateWorkOrderSpecification(input: any) {
   validateUniqueIds(requiredRisks, "required verification risk", issues);
   const requirementIds = new Set(requirements.map((item: any) => item.id));
   const criterionIds = new Set(criteria.map((item: any) => item.id));
+  const checkIds = new Set(checks.map((item: any) => item.id));
   for (const requirement of requirements) {
     if (!requirement.title?.trim() || !requirement.description?.trim()) issues.push(`Requirement ${requirement.id || "<missing>"} needs a title and description.`);
   }
@@ -36,7 +37,12 @@ export function validateWorkOrderSpecification(input: any) {
     if (check.command && (!check.command.executable?.trim() || !Number.isSafeInteger(check.command.timeoutMs) || check.command.timeoutMs < 1_000 || check.command.timeoutMs > 30 * 60_000)) {
       issues.push(`Verification check ${check.id} has an invalid command or timeout.`);
     }
+    for (const dependencyId of check.dependsOnCheckIds ?? []) {
+      if (dependencyId === check.id) issues.push(`Verification check ${check.id} cannot depend on itself.`);
+      else if (!checkIds.has(dependencyId)) issues.push(`Verification check ${check.id} references unknown dependency ${dependencyId}.`);
+    }
   }
+  validateCheckDependencyCycles(checks, issues);
   const mandatoryCheckIds = new Set(checks.filter((check: any) => check.mandatory).map((check: any) => check.id));
   for (const risk of requiredRisks) {
     if (!risk.description?.trim()) issues.push(`Required verification risk ${risk.id || "<missing>"} needs a description.`);
@@ -103,4 +109,26 @@ function validateUniqueIds(items: any[], label: string, issues: string[]) {
     else if (ids.has(id)) issues.push(`Duplicate ${label} ID: ${id}.`);
     else ids.add(id);
   }
+}
+
+function validateCheckDependencyCycles(checks: any[], issues: string[]) {
+  const byId = new Map(checks.map((check) => [check.id, check]));
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (checkId: string, path: string[]) => {
+    if (visiting.has(checkId)) {
+      const cycleStart = path.indexOf(checkId);
+      issues.push(`Verification check dependency cycle: ${[...path.slice(Math.max(0, cycleStart)), checkId].join(" -> ")}.`);
+      return;
+    }
+    if (visited.has(checkId)) return;
+    visiting.add(checkId);
+    const check = byId.get(checkId);
+    for (const dependencyId of check?.dependsOnCheckIds ?? []) {
+      if (byId.has(dependencyId)) visit(dependencyId, [...path, checkId]);
+    }
+    visiting.delete(checkId);
+    visited.add(checkId);
+  };
+  for (const checkId of byId.keys()) visit(checkId, []);
 }

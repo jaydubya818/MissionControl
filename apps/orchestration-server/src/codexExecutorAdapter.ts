@@ -73,6 +73,7 @@ interface CodexPreparedExecution {
   outputDirectory: string;
   outputPath: string;
   outputSchemaPath: string;
+  modelCatalogPath: string | null;
   baselineCommit: string | null;
   requestSha256: string;
   executableSha256: string | null;
@@ -91,6 +92,7 @@ interface CodexExecutionHandle {
 }
 
 const PROCESS_TERMINATION_GRACE_MS = 5_000;
+const PROCESS_EXIT_DRAIN_GRACE_MS = 250;
 export const CODEX_WORKSPACE_PERMISSION_PROFILE = "mission-planner-contained";
 export const CODEX_WORKSPACE_PERMISSION_CONFIG = [
   `default_permissions="${CODEX_WORKSPACE_PERMISSION_PROFILE}"`,
@@ -225,6 +227,10 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
         JSON.stringify(request.structuredOutput?.jsonSchema ?? FACTORY_RESULT_SCHEMA),
         { mode: 0o600 },
       );
+      const modelCatalogPath = await prepareCompatibleModelCatalog(
+        outputDirectory,
+        request.model,
+      );
       return {
         request: {
           ...request,
@@ -236,6 +242,7 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
         outputDirectory,
         outputPath: path.join(outputDirectory, "result.txt"),
         outputSchemaPath,
+        modelCatalogPath,
         baselineCommit: await captureHarnessRepositoryBaseline(request.repositoryRoot).catch(() => null),
         requestSha256: harnessExecutionRequestDigest(request),
         executableSha256,
@@ -305,7 +312,14 @@ export class CodexV1ExecutorAdapter implements HarnessExecutorAdapter<CodexPrepa
         })
       : this.runner({
       executable: this.executable,
-      argv: commandArguments(prepared.request, prepared.outputPath, prepared.outputSchemaPath),
+      argv: commandArguments(
+        prepared.request,
+        prepared.outputPath,
+        prepared.outputSchemaPath,
+        prepared.modelCatalogPath
+          ? [`model_catalog_json=${JSON.stringify(prepared.modelCatalogPath)}`]
+          : [],
+      ),
       cwd: prepared.request.workingDirectory,
       timeoutMs: prepared.request.timeoutMs,
       signal: controller.signal,
@@ -665,6 +679,33 @@ function exactModelRouteIssues(
   return issues;
 }
 
+async function prepareCompatibleModelCatalog(
+  outputDirectory: string,
+  requestedModel: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string | null> {
+  if (!requestedModel) return null;
+  const codexHome = env.CODEX_HOME ?? (env.HOME ? path.join(env.HOME, ".codex") : undefined);
+  if (!codexHome) return null;
+  const cache = await readFile(path.join(codexHome, "models_cache.json"), "utf8")
+    .then((contents) => JSON.parse(contents) as unknown)
+    .catch(() => null);
+  if (!isRecord(cache) || !Array.isArray(cache.models)) return null;
+  const cachedModel = cache.models.find((candidate) => isRecord(candidate) && candidate.slug === requestedModel);
+  if (!isRecord(cachedModel)) return null;
+  const modelCatalogPath = path.join(outputDirectory, "model-catalog.json");
+  await writeFile(modelCatalogPath, JSON.stringify({
+    models: [{
+      ...cachedModel,
+      base_instructions: typeof cachedModel.base_instructions === "string" ? cachedModel.base_instructions : "",
+      supports_parallel_tool_calls: typeof cachedModel.supports_parallel_tool_calls === "boolean"
+        ? cachedModel.supports_parallel_tool_calls
+        : false,
+    }],
+  }), { mode: 0o600 });
+  return modelCatalogPath;
+}
+
 async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<ProcessCompletion> {
   return await new Promise((resolve, reject) => {
     let child: ChildProcess;
@@ -674,11 +715,13 @@ async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<Proc
     let ownedProcessGroupId: number | undefined;
     let startedNotification: Promise<void> = Promise.resolve();
     let forcedTermination: ReturnType<typeof setTimeout> | undefined;
+    let exitDrain: ReturnType<typeof setTimeout> | undefined;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const startedAt = Date.now();
     const cleanup = () => {
       args.signal.removeEventListener("abort", requestTermination);
       if (forcedTermination) clearTimeout(forcedTermination);
+      if (exitDrain) clearTimeout(exitDrain);
       if (timeout) clearTimeout(timeout);
     };
     const signalOwnedProcessTree = (signal: NodeJS.Signals) => {
@@ -743,6 +786,13 @@ async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<Proc
     let stdout = "";
     let stderr = "";
     let spawnError: Error | undefined;
+    let ownedExitCode: number | null = null;
+    let ownedExitSignal: NodeJS.Signals | null = null;
+    let ownedExitObserved = false;
+    const errorForExit = (code: number | null, signal: NodeJS.Signals | null) => spawnError ?? (code === 0 ? undefined : Object.assign(
+      new Error(signal ? `Codex exited after ${signal}.` : `Codex exited with status ${code ?? 1}.`),
+      { code: code ?? 1, signal },
+    ));
     const appendBounded = (current: string, chunk: Buffer) => {
       const next = current + chunk.toString("utf8");
       if (Buffer.byteLength(next) > 20 * 1024 * 1024) {
@@ -761,12 +811,30 @@ async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<Proc
     child.stdout?.on("data", (chunk: Buffer) => { stdout = appendBounded(stdout, chunk); });
     child.stderr?.on("data", (chunk: Buffer) => { stderr = appendBounded(stderr, chunk); });
     child.once("error", (error) => { spawnError = error; });
+    child.once("exit", (code, signal) => {
+      ownedExitObserved = true;
+      ownedExitCode = code;
+      ownedExitSignal = signal;
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = undefined;
+      }
+      exitDrain = setTimeout(() => {
+        if (settledValue) return;
+        try {
+          signalOwnedProcessTree("SIGTERM");
+        } catch (error) {
+          lifecycleError ??= error;
+        }
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+        void complete(errorForExit(code, signal), stdout, stderr, signal).catch(reject);
+      }, PROCESS_EXIT_DRAIN_GRACE_MS);
+    });
     child.once("close", (code, signal) => {
-      const error = spawnError ?? (code === 0 ? undefined : Object.assign(
-        new Error(signal ? `Codex exited after ${signal}.` : `Codex exited with status ${code ?? 1}.`),
-        { code: code ?? 1, signal },
-      ));
-      void complete(error, stdout, stderr, signal).catch(reject);
+      const completionCode = ownedExitObserved ? ownedExitCode : code;
+      const completionSignal = ownedExitObserved ? ownedExitSignal : signal;
+      void complete(errorForExit(completionCode, completionSignal), stdout, stderr, completionSignal).catch(reject);
     });
     if (typeof child.pid === "number") {
       ownedProcessGroupId = process.platform === "win32" ? undefined : child.pid;
@@ -842,6 +910,10 @@ function parseCodexJsonl(stdout: string) {
     }
   }
   return { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, sessionCount, turnCompleted, terminalError, toolCalls: toolEvents.length, toolEvents };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function lastAgentOutput(stdout: string) {

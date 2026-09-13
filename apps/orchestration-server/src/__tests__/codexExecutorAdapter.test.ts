@@ -228,6 +228,53 @@ describe("CodexV1ExecutorAdapter", () => {
     expect(child).not.toHaveProperty("OPENAI_API_KEY");
   });
 
+  it("uses a request-scoped compatible model catalog without copying credentials", async () => {
+    const repositoryRoot = await gitRepository();
+    const codexHome = await mkdtemp(path.join(tmpdir(), "mc-codex-home-"));
+    const authPath = path.join(codexHome, "auth.json");
+    await writeFile(authPath, '{"token":"must-not-be-copied"}', { mode: 0o600 });
+    await writeFile(path.join(codexHome, "models_cache.json"), JSON.stringify({
+      client_version: "0.153.3",
+      models: [{
+        slug: request.model,
+        display_name: "Factory model",
+        model_messages: { instructions_template: "Act as Codex." },
+      }],
+    }), { mode: 0o600 });
+    vi.stubEnv("CODEX_HOME", codexHome);
+    const runner = vi.fn(async ({ argv }: { argv: string[] }) => {
+      const override = argv.find((argument) => argument.startsWith("model_catalog_json="));
+      expect(override).toBeDefined();
+      const catalogPath = JSON.parse(override!.slice("model_catalog_json=".length)) as string;
+      const catalog: unknown = JSON.parse(await readFile(catalogPath, "utf8"));
+      expect(catalog).toEqual({
+        models: [{
+          slug: request.model,
+          display_name: "Factory model",
+          model_messages: { instructions_template: "Act as Codex." },
+          base_instructions: "",
+          supports_parallel_tool_calls: false,
+        }],
+      });
+      expect(JSON.stringify(catalog)).not.toContain("must-not-be-copied");
+      return completion();
+    });
+
+    try {
+      const adapter = new CodexV1ExecutorAdapter("/tmp/codex", runner as any, resolvePinnedExecutableDigest);
+      await executeAdapter(adapter, {
+        ...request,
+        repositoryRoot,
+        workingDirectory: repositoryRoot,
+      }, { emit: () => undefined });
+      expect(await readFile(authPath, "utf8")).toBe('{"token":"must-not-be-copied"}');
+    } finally {
+      vi.unstubAllEnvs();
+      await rm(repositoryRoot, { recursive: true, force: true });
+      await rm(codexHome, { recursive: true, force: true });
+    }
+  });
+
   it("uses a strict workspace permission profile for repository-contained planning", () => {
     const args = commandArguments({
       ...request,
@@ -436,6 +483,57 @@ printf '%s\n' '{"type":"thread.started"}' '{"type":"turn.completed","usage":{"in
       await rm(repositoryRoot, { recursive: true, force: true });
     }
   });
+
+  it.skipIf(process.platform === "win32")("settles after the owned child exits when a descendant keeps stdio open", async () => {
+    const repositoryRoot = await gitRepository();
+    const executable = path.join(repositoryRoot, "codex-open-stdio-stub.sh");
+    const descendantPidPath = path.join(repositoryRoot, "descendant.pid");
+    await writeFile(executable, `#!/bin/sh
+output=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then
+    shift
+    output="$1"
+  fi
+  shift
+done
+sleep 60 &
+printf '%s' "$!" > "${descendantPidPath}"
+printf '%s' 'output captured before owned exit' > "$output"
+printf '%s\n' '{"type":"thread.started"}' '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'
+printf '%s\n' 'stderr captured before owned exit' >&2
+exit 7
+`);
+    await chmod(executable, 0o700);
+
+    try {
+      const adapter = new CodexV1ExecutorAdapter(executable, undefined, resolvePinnedExecutableDigest);
+      const started = vi.fn();
+      const terminated = vi.fn();
+      const startedAt = Date.now();
+      const result = await executeAdapter(adapter, {
+        ...request,
+        repositoryRoot,
+        workingDirectory: repositoryRoot,
+        timeoutMs: 5_000,
+      }, { emit: () => undefined, processObserver: { started, terminated } });
+
+      expect(Date.now() - startedAt).toBeLessThan(2_000);
+      expect(result).toMatchObject({
+        status: "FAILED",
+        output: "output captured before owned exit",
+        error: "stderr captured before owned exit\n",
+      });
+      expect(started).toHaveBeenCalledOnce();
+      expect(terminated).toHaveBeenCalledWith(expect.objectContaining({ exitCode: 7 }));
+      const descendantPid = Number(await readFile(descendantPidPath, "utf8"));
+      await vi.waitFor(async () => {
+        expect(await processCanExecute(descendantPid)).toBe(false);
+      }, { timeout: 2_000 });
+    } finally {
+      await rm(repositoryRoot, { recursive: true, force: true });
+    }
+  }, 8_000);
 
   it("rejects executable drift before invoking the harness runner", async () => {
     const repositoryRoot = await gitRepository();

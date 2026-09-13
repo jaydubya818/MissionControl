@@ -28,7 +28,8 @@ export const evidenceCategoryValidator = v.union(
 
 export const verificationCheckStatusValidator = v.union(
   v.literal("PASS"), v.literal("FAIL"), v.literal("SKIPPED"),
-  v.literal("NOT_CONFIGURED"), v.literal("ERROR"),
+  v.literal("NOT_CONFIGURED"), v.literal("ERROR"), v.literal("TIMED_OUT"),
+  v.literal("BLOCKED_BY_DEPENDENCY"), v.literal("NOT_EVALUATED"),
 );
 
 export const verificationVerdictValidator = v.union(
@@ -144,6 +145,7 @@ export const verificationCheckValidator = v.object({
   mandatory: v.boolean(),
   acceptanceCriterionIds: v.array(v.string()),
   evidenceCategory: evidenceCategoryValidator,
+  dependsOnCheckIds: v.optional(v.array(v.string())),
   command: v.optional(v.object({
     executable: v.string(),
     args: v.array(v.string()),
@@ -460,7 +462,7 @@ export const verificationCheckResultValidator = v.object({
 export const criterionCoverageValidator = v.object({
   criterionId: v.string(),
   title: v.string(),
-  status: v.union(v.literal("EVIDENCED"), v.literal("MISSING")),
+  status: v.union(v.literal("EVIDENCED"), v.literal("MISSING"), v.literal("NOT_EVALUATED")),
   requiredEvidenceCount: v.number(),
   usableEvidenceCount: v.number(),
   missingEvidence: v.array(v.string()),

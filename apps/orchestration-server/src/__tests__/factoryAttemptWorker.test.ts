@@ -101,6 +101,85 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     )).toThrow("Factory execution is enabled, but no harness adapters were explicitly configured.");
   });
 
+  it("drains active Attempts without aborting them and refuses new claims", async () => {
+    const run = {
+      _id: "run-drain-1",
+      runId: "factory-run-drain-1",
+      projectId: "project-1",
+      repositoryId: "repository-1",
+      factoryDefinitionVersionId: "factory-version-1",
+      executionManifestDigest: "sha256:manifest",
+      executorAdapter: "codex",
+      executorVersion: "v1",
+      executionManifest: { harness: { adapter: "codex", version: "v1" } },
+      status: "PENDING",
+    };
+    const client = {
+      query: vi.fn(async (_query: unknown, args: any) => args.status === "PENDING" ? [run] : []),
+      action: vi.fn(),
+    } as any;
+    let release!: () => void;
+    const terminal = new Promise<void>((resolve) => { release = resolve; });
+    const worker = new FactoryAttemptWorker(
+      client,
+      new CodexV1ExecutorAdapter("codex-fixture", vi.fn() as any),
+      true,
+      60_000,
+    );
+    const execute = vi.fn(async (_run: unknown, controller: AbortController) => {
+      await terminal;
+      expect(controller.signal.aborted).toBe(false);
+    });
+    (worker as any).execute = execute;
+
+    await worker.tick();
+    expect(worker.status()).toMatchObject({ lifecycle: "RUNNING", activeRunIds: ["run-drain-1"] });
+    const draining = worker.drain();
+    expect(worker.status().lifecycle).toBe("DRAINING");
+    await worker.tick();
+    expect(execute).toHaveBeenCalledTimes(1);
+    release();
+    await draining;
+
+    expect(worker.status()).toMatchObject({ lifecycle: "STOPPED", activeRunIds: [] });
+  });
+
+  it("stop interrupts active Attempts instead of masquerading as drain", async () => {
+    const run = {
+      _id: "run-stop-1",
+      runId: "factory-run-stop-1",
+      projectId: "project-1",
+      repositoryId: "repository-1",
+      factoryDefinitionVersionId: "factory-version-1",
+      executionManifestDigest: "sha256:manifest",
+      executorAdapter: "codex",
+      executorVersion: "v1",
+      executionManifest: { harness: { adapter: "codex", version: "v1" } },
+      status: "PENDING",
+    };
+    const client = {
+      query: vi.fn(async (_query: unknown, args: any) => args.status === "PENDING" ? [run] : []),
+      action: vi.fn(),
+    } as any;
+    const worker = new FactoryAttemptWorker(
+      client,
+      new CodexV1ExecutorAdapter("codex-fixture", vi.fn() as any),
+      true,
+      60_000,
+    );
+    const execute = vi.fn(async (_run: unknown, controller: AbortController) => {
+      await new Promise<void>((resolve) => controller.signal.addEventListener("abort", () => resolve(), { once: true }));
+      expect(controller.signal.aborted).toBe(true);
+    });
+    (worker as any).execute = execute;
+
+    await worker.tick();
+    await worker.stop();
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(worker.status()).toMatchObject({ lifecycle: "STOPPED", activeRunIds: [] });
+  });
+
   it("does not claim or fall back when the frozen harness identity is unsupported", async () => {
     const unsupported = {
       _id: "workflow-run-unsupported",
@@ -709,7 +788,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
       expect(dependencies.executeIndependentVerification).not.toHaveBeenCalled();
       expect(reports[0].packet.verification).toMatchObject({ verdict: "BLOCKED", checks: expect.arrayContaining([
         expect.objectContaining({ verifierId: "factory-verification-authority", status: "FAIL" }),
-        expect.objectContaining({ verifierId: "factory-command/v1", status: "NOT_CONFIGURED" }),
+        expect.objectContaining({ verifierId: "factory-command/v1", status: "BLOCKED_BY_DEPENDENCY" }),
       ]) });
     }
     await worker.stop();
@@ -1619,7 +1698,10 @@ async function runSeparateFabVerifier(input: Parameters<typeof executeIndependen
   return verification;
 }
 
-describe("Fab governed golden path using the canonical MC worker", () => {
+// Fab intentionally has no unsafe fallback when macOS sandbox-exec cannot nest.
+// The contained qualification suite must run outside an existing Codex sandbox.
+const describeFabQualification = process.env.CODEX_SANDBOX ? describe.skip : describe;
+describeFabQualification("Fab governed golden path using the canonical MC worker", () => {
   for (const boundary of ["intent-expiry", "lease-loss-after-push"] as const) it(`fences publication at ${boundary}`, async () => {
     const f = await runFixture("REQUIRES_HUMAN_REVIEW", { fab: true, durable: true, prepublication: true,
       expireDuringPublicationIntent: boundary === "intent-expiry", loseLeaseAfterPush: boundary === "lease-loss-after-push" });

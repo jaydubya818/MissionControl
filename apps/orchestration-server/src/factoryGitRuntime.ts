@@ -43,6 +43,16 @@ export async function captureVerificationDocument(input: {
 }
 
 type DependencyInstaller = (worktree: string) => Promise<void>;
+type PnpmInstallExecutor = (args: string[], env: NodeJS.ProcessEnv) => Promise<void>;
+
+function dependencyInstallErrorDetail(error: unknown) {
+  if (typeof error === "object" && error !== null) {
+    const failure = error as { stderr?: unknown; stdout?: unknown; message?: unknown };
+    const detail = failure.stderr ?? failure.stdout ?? failure.message;
+    if (detail !== undefined) return String(detail).trim();
+  }
+  return error === undefined || error === null ? "" : String(error).trim();
+}
 
 export async function ensureFactoryWorktree(input: {
   checkoutRoot: string;
@@ -96,7 +106,9 @@ export async function ensureFactoryWorktree(input: {
  * its model budget only to discover that deterministic verification cannot
  * start.
  *
- * Installation is offline, lockfile-frozen, and lifecycle-script-free. The
+ * An explicitly configured operator store is tried offline first. Without an
+ * operator store there is nothing useful to probe offline, so preparation goes
+ * directly to one lockfile-frozen, lifecycle-script-free online install. The
  * Git status must be byte-for-byte unchanged so dependency preparation cannot
  * become an undeclared source mutation.
  */
@@ -116,11 +128,19 @@ export async function prepareFactoryDependencies(
   return { status: "PREPARED" as const, packageManager: "pnpm" as const };
 }
 
-async function installFrozenPnpmDependencies(worktree: string) {
+export async function installFrozenPnpmDependencies(
+  worktree: string,
+  options: {
+    configuredStore?: string | null;
+    executePnpm?: PnpmInstallExecutor;
+  } = {},
+) {
   const scratchHome = await mkdtemp(path.join(tmpdir(), "mc-dependency-preparation-"));
   try {
     // Operator configuration, never discovered from candidate npm configuration.
-    const configuredStore = process.env.MISSION_CONTROL_FACTORY_PNPM_STORE_DIR;
+    const configuredStore = options.configuredStore === undefined
+      ? process.env.MISSION_CONTROL_FACTORY_PNPM_STORE_DIR
+      : options.configuredStore ?? undefined;
     if (configuredStore && !path.isAbsolute(configuredStore)) throw new Error("MISSION_CONTROL_FACTORY_PNPM_STORE_DIR must be absolute.");
     const storeDirectory = configuredStore ? await realpath(configuredStore) : path.join(scratchHome, "store");
     const corepackHome = process.env.COREPACK_HOME
@@ -153,30 +173,31 @@ async function installFrozenPnpmDependencies(worktree: string) {
       npm_config_ignore_scripts: "true",
       NPM_CONFIG_IGNORE_SCRIPTS: "true",
     };
-    try {
-      await execFileAsync("pnpm", ["--offline", ...installArgs], {
+    const executePnpm = options.executePnpm ?? (async (args: string[], executionEnv: NodeJS.ProcessEnv) => {
+      await execFileAsync("pnpm", args, {
         cwd: worktree,
-        env: { ...env, COREPACK_ENABLE_NETWORK: "0" },
+        env: executionEnv,
         timeout: 300_000,
         maxBuffer: 4 * 1024 * 1024,
       });
-    } catch (offlineError: any) {
-      // First scaffold: lockfile exists, local store does not. One online frozen
-      // install fills the store without rewriting source or running lifecycle scripts.
-      await execFileAsync("pnpm", installArgs, {
-        cwd: worktree,
-        env: { ...env, COREPACK_ENABLE_NETWORK: "1" },
-        timeout: 300_000,
-        maxBuffer: 4 * 1024 * 1024,
-      }).catch((onlineError: any) => {
-        const offline = `${offlineError?.stderr ?? offlineError?.message ?? ""}`.trim();
-        const online = `${onlineError?.stderr ?? onlineError?.stdout ?? onlineError?.message ?? ""}`.trim();
-        throw new Error(`Factory dependency preparation failed${online ? `: ${online.slice(-2_000)}` : offline ? `: ${offline.slice(-2_000)}` : "."}`);
-      });
+    });
+    let offlineError: unknown;
+    if (configuredStore) {
+      try {
+        await executePnpm(["--offline", ...installArgs], { ...env, COREPACK_ENABLE_NETWORK: "0" });
+        return;
+      } catch (error: unknown) {
+        offlineError = error;
+      }
     }
-  } catch (error: any) {
+    await executePnpm(installArgs, { ...env, COREPACK_ENABLE_NETWORK: "1" }).catch((onlineError: unknown) => {
+      const offline = dependencyInstallErrorDetail(offlineError);
+      const online = dependencyInstallErrorDetail(onlineError);
+      throw new Error(`Factory dependency preparation failed${online ? `: ${online.slice(-2_000)}` : offline ? `: ${offline.slice(-2_000)}` : "."}`);
+    });
+  } catch (error: unknown) {
     if (error instanceof Error && error.message.startsWith("Factory dependency preparation failed")) throw error;
-    const detail = `${error?.stderr ?? error?.stdout ?? error?.message ?? "unknown error"}`.trim();
+    const detail = dependencyInstallErrorDetail(error) || "unknown error";
     throw new Error(`Factory dependency preparation failed${detail ? `: ${detail.slice(-2_000)}` : "."}`);
   } finally {
     await rm(scratchHome, { recursive: true, force: true });
@@ -331,7 +352,13 @@ export async function assertFactoryCandidateUnchanged(worktree: string, expected
     runGit(worktree, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]),
   ]);
   if (head.stdout.trim() !== expectedHead) throw new Error("Verification changed the candidate commit. Pull-request creation was blocked.");
-  if (status.stdout.length > 0) throw new Error("Verification left repository changes behind. Evidence must be produced from the exact clean candidate commit.");
+  if (status.stdout.length > 0) {
+    const dirtyPaths = splitNull(status.stdout)
+      .map((entry) => entry.slice(3).trim())
+      .filter(Boolean)
+      .slice(0, 20);
+    throw new Error(`Verification left repository changes behind${dirtyPaths.length ? `: ${dirtyPaths.join(", ")}` : ""}. Evidence must be produced from the exact clean candidate commit.`);
+  }
 }
 
 export async function commitFactoryChanges(input: {

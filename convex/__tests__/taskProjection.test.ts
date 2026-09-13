@@ -33,13 +33,14 @@ function workOrder(overrides: Record<string, unknown> = {}) {
   } as any;
 }
 
-function run(startedAt: number, status = "COMPLETED", retries = 0) {
+function run(startedAt: number, status = "COMPLETED", retries = 0, overrides: Record<string, unknown> = {}) {
   return {
     _id: `run-${startedAt}`,
     parentTaskId: "task-a",
     startedAt,
     status,
     steps: [{ retryCount: retries }],
+    ...overrides,
   } as any;
 }
 
@@ -122,13 +123,57 @@ describe("Task Attempt projection", () => {
     const projection = buildAttemptProjection([
       run(10),
       run(20, "FAILED", 1),
-      run(30, "RUNNING"),
-    ]);
+      run(30, "RUNNING", 0, { lease: { expiresAt: 10_000 } }),
+    ], [], 1_000);
     expect(projection.attemptCount).toBe(3);
     expect(projection.currentAttemptNumber).toBe(3);
     expect(projection.currentAttemptStatus).toBe("RUNNING");
+    expect(projection.currentAttemptExecutionState).toBe("RUNNING");
     expect(projection.retryCount).toBe(2);
     expect(projection.internalStepRetryCount).toBe(1);
+  });
+
+  it.each([
+    ["missing lease", {}, "The Attempt is marked RUNNING but has no active lease."],
+    ["expired lease", { lease: { expiresAt: 999 } }, "The Attempt lease expired without a terminal report."],
+    ["lost executor", { lease: { expiresAt: 10_000 }, runtimeDisposition: "LOST", runtimeDispositionReason: "Worker session disappeared." }, "Worker session disappeared."],
+  ])("projects RUNNING with %s as STALE", (_label, overrides, reason) => {
+    const projection = buildAttemptProjection([run(30, "RUNNING", 0, overrides)], [], 1_000);
+    expect(projection).toMatchObject({
+      currentAttemptStatus: "RUNNING",
+      currentAttemptExecutionState: "STALE",
+      currentAttemptExecutionReason: reason,
+    });
+  });
+
+  it("projects a completed Verification Attempt verdict without hiding failed source lineage", () => {
+    const projection = buildAttemptProjection([
+      run(10, "COMPLETED", 0, { attemptPurpose: "IMPLEMENTATION" }),
+      run(20, "FAILED", 0, { attemptPurpose: "IMPLEMENTATION" }),
+      run(30, "COMPLETED", 0, {
+        attemptPurpose: "VERIFICATION",
+        verificationAttemptBinding: { sourceAttemptId: "run-20" },
+      }),
+    ], [{
+      _id: "receipt-30",
+      _creationTime: 31,
+      workflowRunId: "run-30",
+      verificationAttemptId: "run-30",
+      receiptScope: "WORK_ORDER",
+      status: "FAILED",
+      verdict: "NOT_VERIFIED",
+      recordedAt: 31,
+    } as any]);
+
+    expect(projection).toMatchObject({
+      currentAttemptNumber: 3,
+      currentAttemptStatus: "COMPLETED",
+      currentAttemptPurpose: "VERIFICATION",
+      currentVerificationStatus: "FAILED",
+      currentVerificationVerdict: "NOT_VERIFIED",
+      currentSourceAttemptNumber: 2,
+      currentSourceAttemptStatus: "FAILED",
+    });
   });
 
   it("flags legacy retry metadata rather than creating duplicate Task cards", () => {

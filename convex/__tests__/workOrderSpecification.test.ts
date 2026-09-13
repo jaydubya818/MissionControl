@@ -36,6 +36,26 @@ describe("WorkOrder executable specification", () => {
     expect(result.issues.join(" ")).toMatch(/unknown requirement missing|unknown criterion missing/);
   });
 
+  it("rejects unknown and cyclic verification dependencies before dispatch", () => {
+    const unknown = validateWorkOrderSpecification({
+      ...valid,
+      verificationContract: { ...valid.verificationContract, checks: [{
+        ...valid.verificationContract.checks[0],
+        dependsOnCheckIds: ["missing"],
+      }] },
+    });
+    expect(unknown.issues.join(" ")).toContain("references unknown dependency missing");
+
+    const cyclic = validateWorkOrderSpecification({
+      ...valid,
+      verificationContract: { ...valid.verificationContract, checks: [
+        { ...valid.verificationContract.checks[0], id: "a", dependsOnCheckIds: ["b"] },
+        { ...valid.verificationContract.checks[0], id: "b", dependsOnCheckIds: ["a"] },
+      ] },
+    });
+    expect(cyclic.issues.join(" ")).toContain("Verification check dependency cycle");
+  });
+
   it("upgrades explainable risk for payments and infrastructure", () => {
     expect(classifyWorkOrderRisk({ ...valid, desiredOutcome: "Change escrow payout behavior" })).toMatchObject({ riskLevel: "CRITICAL" });
     expect(classifyWorkOrderRisk({ ...valid, desiredOutcome: "Change authentication session rules" })).toMatchObject({ riskLevel: "HIGH" });

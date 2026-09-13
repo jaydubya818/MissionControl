@@ -4,7 +4,15 @@ import {
   type VerificationAuthorityPolicy,
 } from "./verificationAuthority.js";
 
-export type VerificationCheckStatus = "PASS" | "FAIL" | "SKIPPED" | "NOT_CONFIGURED" | "ERROR";
+export type VerificationCheckStatus =
+  | "PASS"
+  | "FAIL"
+  | "SKIPPED"
+  | "NOT_CONFIGURED"
+  | "ERROR"
+  | "TIMED_OUT"
+  | "BLOCKED_BY_DEPENDENCY"
+  | "NOT_EVALUATED";
 export type VerificationVerdict = "VERIFIED" | "NOT_VERIFIED" | "BLOCKED" | "REQUIRES_HUMAN_REVIEW";
 
 export type VerificationCategory =
@@ -102,6 +110,8 @@ export interface VerificationCheckSpec {
   mandatory: boolean;
   acceptanceCriterionIds: string[];
   evidenceCategory: EvidenceCategory;
+  /** Check identities that must PASS before this check is eligible to run. */
+  dependsOnCheckIds?: string[];
   command?: {
     executable: string;
     args: string[];
@@ -193,7 +203,7 @@ export interface VerificationCheckResult {
 export interface CriterionCoverage {
   criterionId: string;
   title: string;
-  status: "EVIDENCED" | "MISSING";
+  status: "EVIDENCED" | "MISSING" | "NOT_EVALUATED";
   requiredEvidenceCount: number;
   usableEvidenceCount: number;
   missingEvidence: string[];
@@ -271,20 +281,98 @@ export class VerificationEngine {
       ? addSystemChecks(contract.checks, context.workOrder)
       : [notConfiguredContractCheck(context.workOrder.acceptanceCriteria.map((criterion) => criterion.id))];
     const results: VerificationCheckResult[] = [];
-    for (const check of checks) {
+    const resultById = new Map<string, VerificationCheckResult>();
+    const checkIds = new Set(checks.map((check) => check.id));
+    const duplicateCheckIds = checks.filter((check, index) => checks.findIndex((candidate) => candidate.id === check.id) !== index);
+    if (duplicateCheckIds.length) {
+      throw new Error(`Verification contract contains duplicate check identities: ${[...new Set(duplicateCheckIds.map((check) => check.id))].join(", ")}.`);
+    }
+
+    const systemCheckIds = checks
+      .filter((check) => [VERIFICATION_AUTHORITY_CHECK.verifierId, CHANGE_BUDGET_CHECK.verifierId, NEGATIVE_CONSTRAINTS_CHECK.verifierId].includes(check.verifierId))
+      .map((check) => check.id);
+    const pending = [...checks];
+    while (pending.length) {
+      const nextIndex = pending.findIndex((check) => {
+        const dependencies = effectiveDependencies(check, systemCheckIds);
+        return dependencies.some((dependencyId) => !checkIds.has(dependencyId))
+          || dependencies.every((dependencyId) => resultById.has(dependencyId));
+      });
+      if (nextIndex < 0) {
+        for (const check of pending.splice(0)) {
+          const result = resultForStatus(check, "NOT_EVALUATED", "Verification check was not evaluated because its dependency graph contains a cycle.", Date.now(), {
+            blocking: true,
+            failureClass: "CONTRACT_FAILURE",
+            reasonCode: "VERIFICATION_DEPENDENCY_CYCLE",
+            causalCheckIds: check.dependsOnCheckIds ?? [],
+          });
+          results.push(result);
+          resultById.set(check.id, result);
+        }
+        break;
+      }
+      const [check] = pending.splice(nextIndex, 1);
+      const dependencies = effectiveDependencies(check, systemCheckIds);
+      const missingDependencies = dependencies.filter((dependencyId) => !checkIds.has(dependencyId));
+      if (missingDependencies.length) {
+        const result = resultForStatus(check, "NOT_EVALUATED", `Verification check references unknown dependencies: ${missingDependencies.join(", ")}.`, Date.now(), {
+          blocking: true,
+          failureClass: "CONTRACT_FAILURE",
+          reasonCode: "VERIFICATION_DEPENDENCY_UNKNOWN",
+          causalCheckIds: missingDependencies,
+        });
+        results.push(result);
+        resultById.set(check.id, result);
+        continue;
+      }
+      const blockingDependencies = dependencies
+        .map((dependencyId) => resultById.get(dependencyId)!)
+        .filter((result) => result.status !== "PASS");
+      if (blockingDependencies.length) {
+        const causalCheckIds = blockingDependencies.map((result) => result.checkId);
+        const result = resultForStatus(check, "BLOCKED_BY_DEPENDENCY", `Not run because prerequisite checks did not pass: ${causalCheckIds.join(", ")}.`, Date.now(), {
+          blocking: true,
+          failureClass: "DEPENDENCY_FAILURE",
+          reasonCode: "VERIFICATION_PREREQUISITE_FAILED",
+          causalCheckIds,
+        });
+        results.push(result);
+        resultById.set(check.id, result);
+        continue;
+      }
       if (context.signal?.aborted) {
-        results.push(resultForStatus(check, "ERROR", "Verification was canceled before this check ran."));
+        const result = resultForStatus(check, "NOT_EVALUATED", "Verification was canceled before this check ran.", Date.now(), {
+          blocking: true,
+          failureClass: "FACTORY_FAILURE",
+          reasonCode: "VERIFICATION_CANCELLED_BEFORE_CHECK",
+        });
+        results.push(result);
+        resultById.set(check.id, result);
         continue;
       }
       const verifier = this.verifiers.find((candidate) => candidate.supports(check));
       if (!verifier) {
-        results.push(resultForStatus(check, "NOT_CONFIGURED", `Required verifier ${check.verifierId} is not configured.`));
+        const result = resultForStatus(check, "NOT_CONFIGURED", `Required verifier ${check.verifierId} is not configured.`, Date.now(), {
+          blocking: true,
+          failureClass: "CONTRACT_FAILURE",
+          reasonCode: "VERIFIER_NOT_CONFIGURED",
+        });
+        results.push(result);
+        resultById.set(check.id, result);
         continue;
       }
       try {
-        results.push(normalizeResult(check, await verifier.execute(context, check)));
+        const result = normalizeResult(check, await verifier.execute(context, check));
+        results.push(result);
+        resultById.set(check.id, result);
       } catch (error) {
-        results.push(resultForStatus(check, "ERROR", error instanceof Error ? error.message : String(error)));
+        const result = resultForStatus(check, "ERROR", error instanceof Error ? error.message : String(error), Date.now(), {
+          blocking: true,
+          failureClass: "VERIFICATION_FAILURE",
+          reasonCode: "VERIFIER_EXECUTION_ERROR",
+        });
+        results.push(result);
+        resultById.set(check.id, result);
       }
     }
     const coverage = calculateCriterionCoverage(context.workOrder.acceptanceCriteria, results);
@@ -444,8 +532,11 @@ export function calculateCriterionCoverage(criteria: AcceptanceCriterionSpec[], 
         missingEvidence.push(`${requirement.category ?? "ANY"}: ${matches.length}/${requirement.minimumCount}${qualifiers ? ` ${qualifiers}` : ""}`);
       }
     }
+    const mappedChecks = checks.filter((check) => check.acceptanceCriterionIds.includes(criterion.id));
+    const unevaluated = mappedChecks.some((check) => ["NOT_CONFIGURED", "ERROR", "TIMED_OUT", "BLOCKED_BY_DEPENDENCY", "NOT_EVALUATED"].includes(check.status));
     return {
-      criterionId: criterion.id, title: criterion.title, status: missingEvidence.length ? "MISSING" : "EVIDENCED",
+      criterionId: criterion.id, title: criterion.title,
+      status: missingEvidence.length ? (unevaluated ? "NOT_EVALUATED" : "MISSING") : "EVIDENCED",
       requiredEvidenceCount: required.reduce((sum, item) => sum + item.minimumCount, 0), usableEvidenceCount: criterionEvidence.length,
       missingEvidence, evidenceKeys: criterionEvidence.map((evidence) => evidence.evidenceKey),
     };
@@ -455,6 +546,15 @@ export function calculateCriterionCoverage(criteria: AcceptanceCriterionSpec[], 
 export function evaluateVerificationOutcome(input: { checks: VerificationCheckResult[]; coverage: CriterionCoverage[]; requireHumanReview: boolean }): { verdict: VerificationVerdict; verdictReasons: string[] } {
   const blocking = input.checks.filter((check) => check.status === "FAIL" && (check.category === "CHANGE_BUDGET" || check.category === "POLICY") && check.metadata?.blocking === true);
   if (blocking.length) return { verdict: "BLOCKED", verdictReasons: blocking.flatMap((check) => check.violations.length ? check.violations : [check.summary]) };
+  const unevaluated = input.checks.filter((check) => check.mandatory
+    && ["NOT_CONFIGURED", "ERROR", "TIMED_OUT", "BLOCKED_BY_DEPENDENCY", "NOT_EVALUATED"].includes(check.status));
+  const unevaluatedCoverage = input.coverage.filter((criterion) => criterion.status === "NOT_EVALUATED");
+  if (unevaluated.length || unevaluatedCoverage.length) {
+    return { verdict: "BLOCKED", verdictReasons: [
+      ...unevaluated.map((check) => `${check.name}: ${check.status} — ${check.summary}`),
+      ...unevaluatedCoverage.map((criterion) => `${criterion.criterionId} was not evaluated (${criterion.missingEvidence.join(", ")}).`),
+    ] };
+  }
   const mandatoryFailures = input.checks.filter((check) => check.mandatory && check.status !== "PASS");
   const uncovered = input.coverage.filter((criterion) => criterion.status !== "EVIDENCED");
   if (mandatoryFailures.length || uncovered.length) {
@@ -498,10 +598,21 @@ function normalizeResult(check: VerificationCheckSpec, result: VerificationCheck
   };
 }
 
-function resultForStatus(check: VerificationCheckSpec, status: VerificationCheckStatus, summary: string, startedAt = Date.now()): VerificationCheckResult {
+function resultForStatus(
+  check: VerificationCheckSpec,
+  status: VerificationCheckStatus,
+  summary: string,
+  startedAt = Date.now(),
+  metadata?: Record<string, unknown>,
+): VerificationCheckResult {
   const completedAt = Date.now();
   return { checkId: check.id, name: check.name, category: check.category, verifierId: check.verifierId, mandatory: check.mandatory, status, summary,
-    acceptanceCriterionIds: check.acceptanceCriterionIds, startedAt, completedAt, durationMs: Math.max(0, completedAt - startedAt), evidence: [], violations: [] };
+    acceptanceCriterionIds: check.acceptanceCriterionIds, startedAt, completedAt, durationMs: Math.max(0, completedAt - startedAt), evidence: [], violations: [], metadata };
+}
+
+function effectiveDependencies(check: VerificationCheckSpec, systemCheckIds: string[]) {
+  if (systemCheckIds.includes(check.id)) return check.dependsOnCheckIds ?? [];
+  return [...new Set([...systemCheckIds, ...(check.dependsOnCheckIds ?? [])])];
 }
 
 function evaluateNegativeConstraint(constraint: NegativeConstraint, change: CandidateChange) {

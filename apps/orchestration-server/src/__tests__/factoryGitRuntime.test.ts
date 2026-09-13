@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -13,6 +13,7 @@ import {
   ensurePlanningWorktree,
   ensureVerificationWorktree,
   inspectCandidateChange,
+  installFrozenPnpmDependencies,
   listChangedFiles,
   prepareFactoryDependencies,
   releasePlanningWorktree,
@@ -143,6 +144,43 @@ describe("Factory Git runtime", () => {
     await writeFile(path.join(root, ".gitignore"), "node_modules/\n");
     await git(root, ["add", "."]); await git(root, ["commit", "-m", "Synthetic preparation fixture"]);
     await expect(prepareFactoryDependencies({ worktree: root })).resolves.toMatchObject({ status: "PREPARED" });
+  });
+
+  it("skips the offline pnpm attempt when no operator store is configured", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "mc-dependency-no-store-")); cleanup.push(root);
+    const calls: Array<{ args: string[]; env: NodeJS.ProcessEnv }> = [];
+
+    await installFrozenPnpmDependencies(root, {
+      configuredStore: null,
+      executePnpm: async (args, env) => { calls.push({ args, env }); },
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.args).not.toContain("--offline");
+    expect(calls[0]?.env.COREPACK_ENABLE_NETWORK).toBe("1");
+    expect(calls[0]?.args.find((arg) => arg.startsWith("--store-dir="))).toContain("mc-dependency-preparation-");
+  });
+
+  it("keeps offline-first behavior for an explicit operator store", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "mc-dependency-explicit-store-")); cleanup.push(root);
+    const store = await mkdtemp(path.join(tmpdir(), "mc-pnpm-store-")); cleanup.push(store);
+    const canonicalStore = await realpath(store);
+    const calls: Array<{ args: string[]; env: NodeJS.ProcessEnv }> = [];
+
+    await installFrozenPnpmDependencies(root, {
+      configuredStore: store,
+      executePnpm: async (args, env) => {
+        calls.push({ args, env });
+        if (calls.length === 1) throw Object.assign(new Error("offline cache miss"), { stderr: "offline cache miss" });
+      },
+    });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.args[0]).toBe("--offline");
+    expect(calls[0]?.env.COREPACK_ENABLE_NETWORK).toBe("0");
+    expect(calls[1]?.args).not.toContain("--offline");
+    expect(calls[1]?.env.COREPACK_ENABLE_NETWORK).toBe("1");
+    expect(calls.every((call) => call.args.includes(`--store-dir=${canonicalStore}`))).toBe(true);
   });
 
   it("rejects a worktree root symlink that escapes the canonical checkout", async () => {
