@@ -1,6 +1,6 @@
 ---
 name: before-and-after
-description: Captures before/after screenshots of web pages or elements for visual comparison. Use when user says "take before and after", "screenshot comparison", "visual diff", "PR screenshots", "compare old and new", or needs to document UI changes. Accepts two URLs (file://, http://, https://) or two image paths.
+description: Capture before/after screenshots of pages, elements, or images. Use when UI changes need visual comparison or pull-request evidence.
 license: LICENSE
 compatibility: Requires Node.js for capture. Upload and PR integration require network access and authenticated provider tooling.
 metadata:

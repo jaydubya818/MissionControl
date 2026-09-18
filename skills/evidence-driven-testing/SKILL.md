@@ -1,13 +1,6 @@
 ---
 name: evidence-driven-testing
-description: >
-  Records visual proof while testing UI behavior — the agent tests the app
-  hands-on via computer use while a screen recording with structured
-  test/assertion annotations captures the session — then posts the video and a
-  results summary to the requested destination. Use when changed runtime
-  behavior needs observable verification, including
-  headless environments (scripted screenshots and probes) and non-UI changes
-  (measured numbers, output pairs).
+description: Capture observable runtime proof with video, screenshots, or measured output. Use when a change needs evidence beyond test reports.
 compatibility: Requires Python 3 and FFmpeg for recording, or Node.js 20+ and Chromium for headless capture. Desktop capture also needs OS screen-recording access. Publishing evidence requires network access and authorized destination tooling.
 metadata:
   author: michaelshimeles
@@ -50,7 +43,7 @@ session folder.
 `EVIDENCE` below means the path to `scripts/evidence.py` inside this skill's
 folder (wherever the skill is installed, e.g.
 `~/.claude/skills/evidence-driven-testing/scripts/evidence.py` or
-`~/.codex/skills/evidence-driven-testing/scripts/evidence.py`). It needs only
+`~/.agents/skills/evidence-driven-testing/scripts/evidence.py`). It needs only
 Python 3 and FFmpeg.
 
 - **Check first**: `python3 $EVIDENCE doctor` — verifies `ffmpeg`, `ffprobe`,

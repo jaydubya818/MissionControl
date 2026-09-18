@@ -1,15 +1,15 @@
 ---
 name: typescript-best-practices
-description: "TypeScript best practices. Use when reading or editing any .ts or .tsx file. Use it only when the current task clearly matches this focused workflow."
+description: "Use when TypeScript needs focused type-safety, API, or error-handling guidance."
 license: MIT
 metadata:
-  author: lauren-tan-pstack
+  author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.29"
-  source-commit: 458050195fdb347955a63812e6d749f164a8f62d
+  source-version: "0.9.30"
+  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
   owner: software-factory
   risk: low
-  capabilities: pstack,engineering-workflow
+  capabilities: jstack,engineering-workflow
 ---
 
 # TypeScript best practices

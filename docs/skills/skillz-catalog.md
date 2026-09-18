@@ -1,8 +1,8 @@
 # Skillz catalog
 
-Mission Control vendors the complete 61-skill catalog from
-[`jaydubya818/skillz`](https://github.com/jaydubya818/skillz) at commit
-`08b88b09d41703e6ce864bed8a351bb089462110`.
+Mission Control vendors the complete 61-skill catalog from the public
+[`jaydubya818/skillz` v2.2.0 release](https://github.com/jaydubya818/skillz/releases/tag/v2.2.0)
+at commit `0e05992144bb71237fdd46e1a0aa4bf2cb9d5739`.
 
 The imported directories live under `skills/`, alongside Mission Control's
 native API integration skills. This is the authoritative location for local
@@ -27,7 +27,7 @@ legacy flat format.
 The source repository is a mixed-license collection. Per-skill license files
 and notices are preserved inside the imported directories. Review the source
 repository's
-[`LICENSES.md`](https://github.com/jaydubya818/skillz/blob/08b88b09d41703e6ce864bed8a351bb089462110/LICENSES.md)
+[`LICENSES.md`](https://github.com/jaydubya818/skillz/blob/v2.2.0/LICENSES.md)
 before redistributing an individual skill outside this collection.
 
 ## Verification
