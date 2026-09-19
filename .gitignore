@@ -73,3 +73,7 @@ vendor/fab/runtime/
 
 # Also ignore linked workspace dependency directories used by isolated worktrees.
 **/node_modules
+
+# Python bytecode (was previously tracked by mistake)
+__pycache__/
+*.py[cod]
