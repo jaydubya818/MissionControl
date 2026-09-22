@@ -28,11 +28,13 @@ const CONSTRAINED_DESKTOP_QUERY = "(min-width: 900px) and (max-width: 1279px)";
 const DENSE_OPERATOR_VIEWS = new Set<MainView>([
   "mission-detail",
   "control-work-orders",
+  "tasks",
   "harness-code-review-wizard",
   "harness-change-review",
 ]);
 
 export function shouldAutoCollapseChat(activeView: MainView, constrainedDesktop: boolean) {
+  if (activeView === "control-work-orders" || activeView === "tasks") return true;
   return constrainedDesktop && DENSE_OPERATOR_VIEWS.has(activeView);
 }
 
@@ -116,10 +118,10 @@ export function AppShellV2({
   const columns = useResizableColumns();
   const { statusLabel } = useHarnessAnimation(projectId ?? undefined);
 
-  const eosPreview = useFlag("eos.command-center-preview");
-  const showControlStubs = useFlag("ui.control.stubs");
-  const showPreviewRoutes = useFlag("ui.navigation.previews");
-  const showDemoRoutes = useFlag("ui.navigation.demo-routes");
+  const eosPreview = useFlag("eos.command-center-preview", projectId ?? undefined);
+  const showControlStubs = useFlag("ui.control.stubs", projectId ?? undefined);
+  const showPreviewRoutes = useFlag("ui.navigation.previews", projectId ?? undefined);
+  const showDemoRoutes = useFlag("ui.navigation.demo-routes", projectId ?? undefined);
   const baseNavGroups = eosPreview ? EOS_NAV_GROUPS : NAV_GROUPS;
   const filteredGroups = filterNavGroups(baseNavGroups, {
     showControlStubs,

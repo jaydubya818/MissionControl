@@ -85,6 +85,8 @@ export function summarizeRequiredAttention(item: WorkOrderQueueItem): string {
 }
 
 export function deriveNextAction(item: WorkOrderQueueItem): string {
+  if (item.latestExecutionRun && ["PENDING", "RUNNING", "PAUSED"].includes(item.latestExecutionRun.status)) return "Inspect run";
+  if (item.state === "DISPATCHED" || item.state === "IN_PROGRESS") return "Inspect run";
   if (item.state === "BLOCKED") return "Resolve blocker";
   if (item.state === "AWAITING_APPROVAL" || ["PENDING", "REVISION_REQUESTED", "CONDITIONAL"].includes(item.approvalStatus)) {
     return "Review approval";
@@ -92,10 +94,26 @@ export function deriveNextAction(item: WorkOrderQueueItem): string {
   if (item.verificationStatus === "STALE") return "Refresh evidence";
   if (item.verificationStatus === "FAIL") return "Fix verification";
   if (item.verificationStatus === "PENDING") return item.latestExecutionRun ? "Record receipt" : "Dispatch";
-  if (item.latestExecutionRun && ["PENDING", "RUNNING", "PAUSED"].includes(item.latestExecutionRun.status)) return "Inspect run";
   if (["READY", "REOPENED"].includes(item.state)) return "Dispatch";
   if (item.state === "DONE") return "Review outcome";
   return "Inspect details";
+}
+
+export function humanizeOperatorCopy(text: string): string {
+  const trimmed = text.trim();
+  const replacements: Array<[RegExp, string]> = [
+    [/no current source attempt published a candidate-ready verification subject\.?/i, "Nothing verified yet. Wait for this run to finish and leave evidence."],
+    [/why this workorder is blocked from acceptance/i, "Not ready to accept yet"],
+    [/acceptance remains blocked until all required approvals, independent evidence, github app pr lineage, and exact-head ci requirements are complete\.?/i, "Approvals, evidence, and CI still have to finish before you can accept."],
+    [/ready for explicit human acceptance/i, "Ready for you to accept"],
+  ];
+  for (const [pattern, plain] of replacements) {
+    if (pattern.test(trimmed)) return plain;
+  }
+  return trimmed
+    .replace(/\bWorkOrder\b/g, "work order")
+    .replace(/\bAttempt\b/g, "run")
+    .replace(/\bVerification Subject\b/g, "verified result");
 }
 
 export function countByQuickFilter(items: WorkOrderQueueItem[], quickFilter: WorkOrderQuickFilter) {

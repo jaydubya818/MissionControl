@@ -6,8 +6,17 @@ export interface FrozenCodeScope {
   excludedPaths: string[];
 }
 
+const FACTORY_OWNED_PATHS = [".mission-control/**"];
+export const FACTORY_OWNED_GIT_EXCLUSION = ":(exclude).mission-control/**";
+
+export function isFactoryOwnedPath(file: string) {
+  return FACTORY_OWNED_PATHS.some((pattern) => matchesRepositoryPattern(file, pattern));
+}
+
 export function validateChangedFileScope(changedFiles: string[], scope: FrozenCodeScope) {
-  const normalized = Array.from(new Set(changedFiles.map(normalizeRepositoryPath).filter(Boolean))).sort();
+  const normalized = Array.from(new Set(
+    changedFiles.map(normalizeRepositoryPath).filter((file) => file && !isFactoryOwnedPath(file)),
+  )).sort();
   const outsideScope = normalized.filter((file) =>
     !scope.allowedPaths.some((pattern) => matchesRepositoryPattern(file, pattern))
     || scope.excludedPaths.some((pattern) => matchesRepositoryPattern(file, pattern))

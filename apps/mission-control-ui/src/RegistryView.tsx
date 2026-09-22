@@ -238,11 +238,11 @@ export function RegistryViewContent({
           <div>
             <div className="registry-kicker">Context registry</div>
             <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">
-              {activeTab === "catalog" ? "Discover skills" : "Registry"}
+              {activeTab === "catalog" ? "Context Catalog" : "Registry"}
             </h1>
             <p className="mt-1.5 max-w-2xl text-[14px] text-ink-secondary">
               {activeTab === "catalog"
-                ? "Discover and install skills to enhance your AI agent's capabilities."
+                ? "Skills and context packages the factory can load. Install does not grant publish, merge, or spend."
                 : "Governed context packages with structural reviews, evals, and rollout visibility."}
             </p>
           </div>

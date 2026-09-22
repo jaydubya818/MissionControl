@@ -4,6 +4,7 @@
  */
 
 import { useQuery } from "convex/react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Card } from "@/components/ui/card";
@@ -61,6 +62,8 @@ export function AtcBoardView({
   onNavigateToTasks,
 }: AtcBoardViewProps) {
   const { privacyMode } = usePrivacy();
+  const [searchParams] = useSearchParams();
+  const company = searchParams.get("company");
   const agents = useQuery(api.agents.listAll, projectId ? { projectId } : "skip");
   const tasks = useQuery(api.tasks.listAll, projectId ? { projectId } : "skip");
   const runs = useQuery(
@@ -71,7 +74,7 @@ export function AtcBoardView({
   if (agents === undefined || tasks === undefined || runs === undefined) {
     return (
       <section className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <PageHeader title="Air Traffic Control" />
+        <PageHeader title="Queue" />
         <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-3">
           <div className="h-3.5 w-48 animate-pulse rounded bg-surface-2" />
           <div className="h-3.5 w-72 animate-pulse rounded bg-surface-2" />
@@ -115,12 +118,12 @@ export function AtcBoardView({
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-app">
       <PageHeader
-        title="Air Traffic Control"
-        description="Real-time agent status. Idle agents are highlighted — assign work from Tasks."
+        title="Queue"
+        description="Live factory agents for this workspace. Relay delivery still runs as Work Orders."
       />
 
       <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-4 overflow-hidden px-6 pb-6 pt-4">
-        {/* Command bar */}
+        {agents.length > 0 && (
         <div className="flex shrink-0 items-center justify-between gap-4 overflow-x-auto flex-nowrap">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-2 text-[13.5px] text-ink-secondary">
@@ -139,6 +142,7 @@ export function AtcBoardView({
             {agents.length} total · {busyCount} busy
           </span>
         </div>
+        )}
 
         {/* Agent grid */}
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -214,8 +218,16 @@ export function AtcBoardView({
         {agents.length === 0 && (
           <EmptyState
             icon={Radio}
-            title="No agents in this project"
-            description="Register agents to see them here."
+            title="No queued agents"
+            description="Factory delivery for Relay runs as Work Orders. This queue stays empty until a factory agent is registered to the workspace."
+            action={
+              <a
+                href={`/v2/control-work-orders?workspace=${encodeURIComponent(String(projectId ?? ""))}${company ? `&company=${encodeURIComponent(company)}` : ""}`}
+                className="inline-flex h-9 items-center justify-center rounded-md bg-registry-accent px-4 text-[13px] font-medium text-white hover:opacity-90"
+              >
+                Open Work Orders
+              </a>
+            }
           />
         )}
       </div>

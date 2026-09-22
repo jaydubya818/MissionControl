@@ -4,7 +4,12 @@ import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/pr
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { assertCanonicalWorktreeBoundary, assertWorktreeBoundary } from "./factoryPathScope.js";
+import {
+  assertCanonicalWorktreeBoundary,
+  assertWorktreeBoundary,
+  FACTORY_OWNED_GIT_EXCLUSION,
+  isFactoryOwnedPath,
+} from "./factoryPathScope.js";
 import { ensureFactoryWorkspaceOwnership, type FactoryWorkspaceOwner } from "./factoryWorkspaceOwnership.js";
 import { isolatedInvocationIssues, invocationResultMatches, type IsolatedInvocation, type IsolatedInvocationResult } from "@mission-control/workflow-engine/harness-contract";
 import { validateChangedFileScope } from "@mission-control/workflow-engine";
@@ -12,6 +17,18 @@ import { deterministicDocumentPath } from "@mission-control/workflow-engine/harn
 import { hardenedGitArgs, hardenedGitEnvironment } from "./hardenedGit.js";
 
 const execFileAsync = promisify(execFile);
+
+async function factoryCandidateStatus(worktree: string) {
+  return runGit(worktree, [
+    "status",
+    "--porcelain=v1",
+    "-z",
+    "--untracked-files=all",
+    "--",
+    ".",
+    FACTORY_OWNED_GIT_EXCLUSION,
+  ]);
+}
 
 /** Read the immutable Git blob, never the mutable worktree file or a lossy
  * UTF-8 projection. No filters, replacement objects, hooks or provider calls. */
@@ -129,9 +146,8 @@ async function installFrozenPnpmDependencies(worktree: string) {
     if (storeDirectory === candidateRoot || storeDirectory.startsWith(`${candidateRoot}${path.sep}`)) {
       throw new Error("The offline dependency store must be outside the candidate worktree.");
     }
-    await execFileAsync("pnpm", [
+    const installArgs = [
       "install",
-      "--offline",
       "--frozen-lockfile",
       "--ignore-scripts",
       "--ignore-pnpmfile",
@@ -141,27 +157,44 @@ async function installFrozenPnpmDependencies(worktree: string) {
       "--config.side-effects-cache=false",
       `--store-dir=${storeDirectory}`,
       "--reporter=silent",
-    ], {
-      cwd: worktree,
-      env: {
-        PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
-        HOME: scratchHome,
-        TMPDIR: scratchHome,
-        COREPACK_ENABLE_NETWORK: "0",
-        COREPACK_ENABLE_PROJECT_SPEC: "0",
-        COREPACK_ENABLE_AUTO_PIN: "0",
-        COREPACK_DEFAULT_TO_LATEST: "0",
-        COREPACK_HOME: corepackHome,
-        CI: "1",
-        npm_config_ignore_scripts: "true",
-        NPM_CONFIG_IGNORE_SCRIPTS: "true",
-      },
-      timeout: 300_000,
-      maxBuffer: 4 * 1024 * 1024,
-    });
+    ];
+    const env = {
+      PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+      HOME: scratchHome,
+      TMPDIR: scratchHome,
+      COREPACK_ENABLE_PROJECT_SPEC: "0",
+      COREPACK_ENABLE_AUTO_PIN: "0",
+      COREPACK_DEFAULT_TO_LATEST: "0",
+      COREPACK_HOME: corepackHome,
+      CI: "1",
+      npm_config_ignore_scripts: "true",
+      NPM_CONFIG_IGNORE_SCRIPTS: "true",
+    };
+    try {
+      await execFileAsync("pnpm", ["--offline", ...installArgs], {
+        cwd: worktree,
+        env: { ...env, COREPACK_ENABLE_NETWORK: "0" },
+        timeout: 300_000,
+        maxBuffer: 4 * 1024 * 1024,
+      });
+    } catch (offlineError: any) {
+      // First scaffold: lockfile exists, local store does not. One online frozen
+      // install fills the store without rewriting source or running lifecycle scripts.
+      await execFileAsync("pnpm", installArgs, {
+        cwd: worktree,
+        env: { ...env, COREPACK_ENABLE_NETWORK: "1" },
+        timeout: 300_000,
+        maxBuffer: 4 * 1024 * 1024,
+      }).catch((onlineError: any) => {
+        const offline = `${offlineError?.stderr ?? offlineError?.message ?? ""}`.trim();
+        const online = `${onlineError?.stderr ?? onlineError?.stdout ?? onlineError?.message ?? ""}`.trim();
+        throw new Error(`Factory dependency preparation failed${online ? `: ${online.slice(-2_000)}` : offline ? `: ${offline.slice(-2_000)}` : "."}`);
+      });
+    }
   } catch (error: any) {
+    if (error instanceof Error && error.message.startsWith("Factory dependency preparation failed")) throw error;
     const detail = `${error?.stderr ?? error?.stdout ?? error?.message ?? "unknown error"}`.trim();
-    throw new Error(`Factory dependency preparation failed in frozen offline mode${detail ? `: ${detail.slice(-2_000)}` : "."}`);
+    throw new Error(`Factory dependency preparation failed${detail ? `: ${detail.slice(-2_000)}` : "."}`);
   } finally {
     await rm(scratchHome, { recursive: true, force: true });
   }
@@ -175,7 +208,9 @@ export async function listChangedFiles(worktree: string, baseSha?: string) {
       ? runGit(worktree, ["diff", "--name-only", "-z", `${baseSha}...HEAD`])
       : Promise.resolve({ stdout: "", stderr: "" }),
   ]);
-  return Array.from(new Set([...splitNull(tracked.stdout), ...splitNull(untracked.stdout), ...splitNull(committed.stdout)])).sort();
+  return Array.from(new Set([...splitNull(tracked.stdout), ...splitNull(untracked.stdout), ...splitNull(committed.stdout)]))
+    .filter((file) => !isFactoryOwnedPath(file))
+    .sort();
 }
 
 export async function inspectCandidateChange(worktree: string, baseRevisionOrDefaultBranch: string, exactBaseRevision?: string) {
@@ -312,7 +347,7 @@ export async function releasePlanningWorktree(input: {
 export async function assertFactoryCandidateUnchanged(worktree: string, expectedHead: string) {
   const [head, status] = await Promise.all([
     runGit(worktree, ["rev-parse", "HEAD"]),
-    runGit(worktree, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]),
+    factoryCandidateStatus(worktree),
   ]);
   if (head.stdout.trim() !== expectedHead) throw new Error("Verification changed the candidate commit. Pull-request creation was blocked.");
   if (status.stdout.length > 0) throw new Error("Verification left repository changes behind. Evidence must be produced from the exact clean candidate commit.");
@@ -324,7 +359,7 @@ export async function commitFactoryChanges(input: {
   title: string;
 }) {
   if (input.changedFiles.length === 0) throw new Error("Factory attempt produced no changed files.");
-  const dirty = (await runGit(input.worktree, ["status", "--porcelain=v1", "-z", "--untracked-files=all"])).stdout.length > 0;
+  const dirty = (await factoryCandidateStatus(input.worktree)).stdout.length > 0;
   if (!dirty) return await currentHead(input.worktree);
   await runGit(input.worktree, ["add", "--all", "--", ...input.changedFiles]);
   if (await gitSucceeds(input.worktree, ["diff", "--cached", "--quiet"])) {
@@ -419,7 +454,7 @@ export async function materializeRemoteCandidate(input: {
   if (!/^[a-f0-9]{40,64}$/i.test(input.sourceSha)) throw new Error("Remote candidate source SHA is invalid.");
   const [head, status] = await Promise.all([
     currentHead(input.worktree),
-    runGit(input.worktree, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]),
+    factoryCandidateStatus(input.worktree),
   ]);
   if (head !== input.sourceSha) throw new Error("Host worktree moved after the remote sandbox source was frozen.");
   if (status.stdout.length > 0) throw new Error("Host worktree is not clean before remote result materialization.");

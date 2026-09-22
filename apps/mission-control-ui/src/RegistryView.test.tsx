@@ -39,7 +39,7 @@ const ENTRIES: RegistryEntry[] = [
 describe("RegistryViewContent", () => {
   it("renders discover header, categories, and all rows", () => {
     const { container } = render(<RegistryViewContent entries={ENTRIES} />);
-    expect(screen.getByRole("heading", { name: "Discover skills" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Context Catalog" })).toBeInTheDocument();
     expect(screen.getByText("Testing & QA")).toBeInTheDocument();
     expect(screen.getAllByText("mission-control-heartbeat").length).toBeGreaterThan(0);
     expect(screen.getByText("unscored-draft")).toBeInTheDocument();

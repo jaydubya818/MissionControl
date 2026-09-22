@@ -21,8 +21,8 @@ interface KnowledgeSectionProps {
 }
 
 export function KnowledgeSection({ currentView, projectId, onTaskSelect, onNavigate }: KnowledgeSectionProps) {
-  const eosPreview = useFlag("eos.command-center-preview");
-  const showPreviewRoutes = useFlag("ui.navigation.previews");
+  const eosPreview = useFlag("eos.command-center-preview", projectId ?? undefined);
+  const contextRegistry = useFlag("context.registry", projectId ?? undefined);
   if (currentView === "docs") return <DocsView />;
   if (currentView === "design-system") return <DesignSystemView />;
   if (isRegistryView(currentView)) {
@@ -31,7 +31,7 @@ export function KnowledgeSection({ currentView, projectId, onTaskSelect, onNavig
       <RegistryView
         initialTab={tab}
         projectId={projectId}
-        showWorkspaceTabs={showPreviewRoutes}
+        showWorkspaceTabs={contextRegistry}
         onNavigate={(view) => onNavigate?.(view)}
       />
     );

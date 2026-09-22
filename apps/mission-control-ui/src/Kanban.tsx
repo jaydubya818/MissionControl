@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
@@ -176,6 +177,11 @@ export function Kanban({
   const allowedMap = useQuery(api.tasks.getAllowedTransitionsForHuman);
   const transitionTask = useMutation(api.tasks.transition);
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const company = searchParams.get("company");
+  const workOrdersHref = projectId
+    ? `/v2/control-work-orders?workspace=${encodeURIComponent(String(projectId))}${company ? `&company=${encodeURIComponent(company)}` : ""}`
+    : "/v2/control-work-orders";
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -296,6 +302,31 @@ export function Kanban({
           </div>
         )}
         
+        {tasks && tasks.length === 0 ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-app/85 p-6">
+            <div className="max-w-md rounded-xl border border-line bg-surface-1 p-6 text-center shadow-sm">
+              <h2 className="text-[15px] font-semibold text-ink">No tasks in this workspace</h2>
+              <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
+                Factory delivery for Relay runs as Work Orders. This board stays empty until a Work Order is decomposed into child tasks.
+              </p>
+              <a
+                href={workOrdersHref}
+                className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-registry-accent px-4 text-[13px] font-medium text-white hover:opacity-90"
+              >
+                Open Work Orders
+              </a>
+            </div>
+          </div>
+        ) : tasks && filteredTasks.length === 0 ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-app/85 p-6">
+            <div className="max-w-md rounded-xl border border-line bg-surface-1 p-6 text-center shadow-sm">
+              <h2 className="text-[15px] font-semibold text-ink">No tasks match these filters</h2>
+              <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
+                Clear the agent, priority, or type filters to see the rest of the board.
+              </p>
+            </div>
+          </div>
+        ) : null}
         <div className="flex min-h-0 flex-1 items-stretch gap-3 overflow-x-auto p-4">
           {COLUMNS.map((col) => (
             <Column

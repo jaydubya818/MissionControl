@@ -650,10 +650,13 @@ function exactModelRouteIssues(
   if (!request.model?.trim()) {
     issues.push({ field: "model", message: "An exact model identifier is required when route controls are present." });
   }
-  if (request.providerRoute !== expectedProviderRoute) {
+  const admittedRoutes = expectedProviderRoute === "openrouter"
+    ? ["openrouter"]
+    : ["openai", "codex-chatgpt-auth"];
+  if (!admittedRoutes.includes(request.providerRoute ?? "")) {
     issues.push({
       field: "providerRoute",
-      message: `codex/v1 ${expectedProviderRoute === "openrouter" ? "remote" : "persistent"} execution admits only the ${expectedProviderRoute} provider route.`,
+      message: `codex/v1 ${expectedProviderRoute === "openrouter" ? "remote" : "persistent"} execution admits only the ${admittedRoutes.join(" or ")} provider route.`,
     });
   }
   if (modelRouteReasoningConfigIssues(request.reasoningConfig).length > 0) {

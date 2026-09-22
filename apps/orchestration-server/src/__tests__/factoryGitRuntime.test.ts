@@ -68,6 +68,9 @@ describe("Factory Git runtime", () => {
       .toBe("Test <test@example.com>");
     const candidate = await inspectCandidateChange(worktree, baseSha);
     expect(candidate).toMatchObject({ sourceRevision: baseSha, candidateRevision: firstHead, changedFiles: ["apps/ui/App.tsx"], linesAdded: 1, linesDeleted: 1 });
+    await mkdir(path.join(worktree, ".mission-control", "skills", "delivery"), { recursive: true });
+    await writeFile(path.join(worktree, ".mission-control", "skills", "delivery", "SKILL.md"), "# Delivery\n");
+    await expect(assertFactoryCandidateUnchanged(worktree, firstHead)).resolves.toBeUndefined();
     await expect(assertFactoryCandidateUnchanged(worktree, firstHead)).resolves.toBeUndefined();
 
     await writeFile(path.join(repository, "README.md"), "moving default branch\n");
