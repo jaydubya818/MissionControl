@@ -183,6 +183,7 @@ owner: team
   it.each([
     ["Use this skill when the agent needs to do a thing during long-running orchestration sessions."],
     ["Use when the agent needs to do a thing during long-running orchestration sessions today."],
+    ["Remove filler and generic AI phrasing from human-facing text. Use before sending or committing prose you edited."],
     ["Handles budget management for agents. Use for recording spend and reacting to budget limits."],
     ["Invoke when a task requires human sign-off before an irreversible action is executed anywhere."],
     ["Apply when a task needs a focused engineering principle before implementation decisions are made."],

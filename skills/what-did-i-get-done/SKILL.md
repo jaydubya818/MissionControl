@@ -1,15 +1,15 @@
 ---
 name: what-did-i-get-done
-description: "Summarize authored commits over a user-specified time period into a concise update Use this skill when the user asks for what did i get done or the task clearly matches this workflow."
+description: "Use when authored work needs a concise summary for a concrete time window."
 license: MIT
 metadata:
-  author: lauren-tan-pstack
+  author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.29"
-  source-commit: 458050195fdb347955a63812e6d749f164a8f62d
+  source-version: "0.9.30"
+  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
   owner: software-factory
   risk: low
-  capabilities: pstack,engineering-research
+  capabilities: jstack,engineering-research
 ---
 
 # What did I get done

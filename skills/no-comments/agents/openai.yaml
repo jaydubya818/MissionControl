@@ -1,4 +1,4 @@
 interface:
   display_name: "No Comments"
   short_description: "Review comments and encode accepted constraints"
-  default_prompt: "Use $no-comments to handle this task with the pstack workflow and return a verified result."
+  default_prompt: "Use $no-comments to handle this task with the Jstack workflow and return a verified result."

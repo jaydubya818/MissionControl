@@ -1,6 +1,6 @@
 ---
 name: greploop
-description: Address Greptile feedback on a PR, MR, or shelved changelist through bounded review and fix cycles. Use when the task includes a Greptile review loop. Supports the alternate @greptile-apps trigger for large PRs.
+description: Run bounded Greptile review-and-fix cycles on a PR, MR, or shelved change. Use when Greptile is an explicit delivery gate.
 license: MIT
 compatibility: GitHub automation requires Python 3.10+ and authenticated gh. GitLab requires glab; Perforce requires p4 and the site's review integration. Greptile must be installed.
 metadata:

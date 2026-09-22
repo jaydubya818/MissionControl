@@ -6,7 +6,7 @@ import { join } from "node:path";
 // clear message instead of an opaque `import.meta.dir is undefined` crash under node.
 if (typeof Bun === "undefined") {
   console.error(
-    "pstack poteto-mode tooling requires bun (https://bun.sh). Install bun, then re-run."
+    "Jstack poteto-mode tooling requires bun (https://bun.sh). Install bun, then re-run."
   );
   process.exit(1);
 }

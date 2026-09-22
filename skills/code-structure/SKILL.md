@@ -1,6 +1,6 @@
 ---
 name: code-structure
-description: Use when multiple workflows duplicate the same operational logic, when deciding what belongs in actions vs shared services, or when refactoring repeated operational blocks across domain flows. Use when adding new features that share mechanics with existing ones.
+description: Separate orchestration from reusable mechanics while preserving transactions. Use when workflows duplicate operational logic.
 metadata:
   author: michaelshimeles
   version: "2.0.0"
