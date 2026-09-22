@@ -1,4 +1,4 @@
 interface:
   display_name: "Reflect"
   short_description: "Turn approved session learnings into durable improvements"
-  default_prompt: "Use $reflect to handle this task with the pstack workflow and return a verified result."
+  default_prompt: "Use $reflect to handle this task with the Jstack workflow and return a verified result."

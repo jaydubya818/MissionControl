@@ -1,20 +1,20 @@
 ---
 name: architect
-description: "Sketch types, signatures, and module structure before code, then stay in the loop while implementation fills in. Use for /architect, 'architect this', 'design this', or non-trivial work where jumping to code would lock in the wrong shape."
+description: "Use when a non-trivial change needs types and module boundaries designed before code."
 license: MIT
 metadata:
-  author: lauren-tan-pstack
+  author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.29"
-  source-commit: 458050195fdb347955a63812e6d749f164a8f62d
+  source-version: "0.9.30"
+  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
   owner: software-factory
   risk: medium
-  capabilities: pstack,multi-agent-workflow
+  capabilities: jstack,multi-agent-workflow
 ---
 
 # Architect
 
-On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.
+On Codex, Cursor, or another non-Claude runtime, read the [runtime mapping](../poteto-mode/references/harness-tools.md), including its per-skill notes, before following this skill.
 
 Design before implementing. Sketch types, function signatures, class shapes, and module boundaries with `not implemented` bodies and pseudocode. Synthesize across multiple model perspectives, then fill in code against the chosen sketch. If implementation proves the sketch wrong, throw it out and redesign.
 
@@ -94,6 +94,6 @@ The caller's usage is written first and the type sketch derived from it. One fil
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults originate from the upstream `plugins/pstack/models.json`. Refresh them through `scripts/vendor_jstack.py` after reviewing the upstream change. A matching role line in `~/.claude/jstack-models.md` overrides each at runtime; see `/setup-jstack`.
 
-- architect runners: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`
+- architect runners: `claude-opus-5`, `claude-fable-5-1`, `claude-sonnet-5`

@@ -1,15 +1,15 @@
 ---
 name: blast-radius
-description: "Find what a change could break somewhere else before it ships, beyond the diff, and prove the one fact it's safe because of by running real code instead of writing it up. Use for 'blast radius of X', 'what could this break', reviewing a small diff you don't trust, or a brief that asserts something about existing code ('make X public', 'X already handles Y') before you design against that assertion."
+description: "Use when a change needs downstream risks traced and its key safety assumption proved."
 license: MIT
 metadata:
-  author: lauren-tan-pstack
+  author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.29"
-  source-commit: 458050195fdb347955a63812e6d749f164a8f62d
+  source-version: "0.9.30"
+  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
   owner: software-factory
   risk: low
-  capabilities: pstack,verification
+  capabilities: jstack,verification
 ---
 
 # Blast radius

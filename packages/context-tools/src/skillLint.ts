@@ -62,7 +62,7 @@ const DESCRIPTION_MIN_CHARS = 80;
 const DESCRIPTION_MAX_CHARS = 500;
 const BODY_MAX_LINES = 500;
 
-const ACTIVATION_RE = /\b(use (this skill )?when|use for|invoke when|apply when|trigger|activates? when)\b/i;
+const ACTIVATION_RE = /\b(use (this skill )?when|use (this skill )?before|use for|invoke when|apply when|trigger|activates? when)\b/i;
 
 const DANGEROUS_RE = /rm -rf|curl[^|]*\|\s*(ba)?sh|sudo\s|chmod 777/;
 

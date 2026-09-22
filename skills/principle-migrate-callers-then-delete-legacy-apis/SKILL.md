@@ -1,15 +1,15 @@
 ---
 name: principle-migrate-callers-then-delete-legacy-apis
-description: "Apply when introducing a new internal API while old callers still exist. Migrate callers and delete the old API in the same wave instead of preserving compatibility layers."
+description: "Apply when replacing an internal API without leaving ambiguous dual paths."
 license: MIT
 metadata:
-  author: lauren-tan-pstack
+  author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.29"
-  source-commit: 458050195fdb347955a63812e6d749f164a8f62d
+  source-version: "0.9.30"
+  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
   owner: software-factory
   risk: low
-  capabilities: pstack,engineering-principle
+  capabilities: jstack,engineering-principle
 user-invocable: false
 ---
 

@@ -1,15 +1,15 @@
 ---
 name: principle-minimize-reader-load
-description: "Apply when reviewing or shaping code that's hard to trace. Count layers between question and answer, and hidden state in the reader's head; collapse one-caller wrappers and shrink mutable scope."
+description: "Apply when layers, wrappers, or hidden state make simple behavior hard to follow."
 license: MIT
 metadata:
-  author: lauren-tan-pstack
+  author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.29"
-  source-commit: 458050195fdb347955a63812e6d749f164a8f62d
+  source-version: "0.9.30"
+  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
   owner: software-factory
   risk: low
-  capabilities: pstack,engineering-principle
+  capabilities: jstack,engineering-principle
 user-invocable: false
 ---
 

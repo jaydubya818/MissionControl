@@ -1,15 +1,15 @@
 ---
 name: show-me-your-work
-description: "Keep a reviewable decision trail for long-running or unattended work: a TSV log with one row per decision (what, why, evidence, result). Local by default; commit it when a reviewer needs the trail to trust the result. Use for /show-me-your-work, autonomous or multi-phase runs, or work a human reviews after stepping away."
+description: "Use when long-running work needs an auditable decision and evidence log."
 license: MIT
 metadata:
-  author: lauren-tan-pstack
+  author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.29"
-  source-commit: 458050195fdb347955a63812e6d749f164a8f62d
+  source-version: "0.9.30"
+  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
   owner: software-factory
   risk: low
-  capabilities: pstack,engineering-workflow
+  capabilities: jstack,engineering-workflow
 ---
 
 # Show me your work

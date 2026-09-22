@@ -1,15 +1,15 @@
 ---
 name: fix-ci
-description: "Find failing PR checks, inspect logs or external check links, and apply focused fixes Use this skill when the user asks for fix ci or the task clearly matches this workflow."
+description: "Use when failing pull-request checks need a root-cause fix and a verified rerun."
 license: MIT
 metadata:
-  author: lauren-tan-pstack
+  author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.29"
-  source-commit: 458050195fdb347955a63812e6d749f164a8f62d
+  source-version: "0.9.30"
+  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
   owner: software-factory
   risk: medium
-  capabilities: pstack,pull-request-workflow
+  capabilities: jstack,pull-request-workflow
 ---
 
 # Fix CI
