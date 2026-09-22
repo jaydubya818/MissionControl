@@ -69,38 +69,38 @@ The findings below use the repository security-review format: rule, severity, lo
 - Mitigation: full tests, build, runtime guard, orchestration smoke, and browser qualification passed against the frozen graph.
 - False-positive notes: actual reachability varied, but exact safe patches were lower risk than accepting them.
 
-## Accepted dependency findings
+## Resolved dependency findings
 
 ### DEP-RR-1124268 — Moderate — React Router backslash open redirect bypass
 
-- Location: `react-router` 6.30.6 via `mission-control-ui > react-router-dom`.
+- Location: formerly `react-router` 6.30.6 via `mission-control-ui > react-router-dom`.
 - Evidence: production audit advisory 1124268; patched only in React Router 7.18+.
 - Impact: unexpected external navigation if attacker-supplied strings reach router navigation.
-- Fix: dedicated React Router 7 migration plan, not a hidden framework major in hardening.
-- Mitigation: declarative client-only routing, internal route maps, no router external redirect, protocol validation for docs links; owner review 2026-09-15, expiry 2026-11-15.
+- Fix: upgraded `react-router-dom` and `react-router` to patched version 7.18.2 on 2026-09-21.
+- Verification: production audit is clear and the complete UI unit suite passes.
 - False-positive notes: the advisory is valid; Mission Control does not satisfy its attacker-controlled target precondition today.
 
 ### DEP-RR-1124272 — Moderate — SSR hydration constructor injection
 
-- Location: `react-router` 6.30.6 via `react-router-dom`.
+- Location: formerly `react-router` 6.30.6 via `react-router-dom`.
 - Evidence: production audit advisory 1124272 explicitly limits impact to Framework/Data Mode manual SSR hydration.
 - Impact: attacker-triggered constructor behavior and outbound traffic through crafted hydrated errors.
-- Fix: Router 7 migration.
-- Mitigation: Vite client-only SPA, declarative BrowserRouter, no SSR, RouterProvider data mode, StaticRouter, or serialized router-error hydration; same review/expiry.
+- Fix: upgraded `react-router-dom` and `react-router` to patched version 7.18.2 on 2026-09-21.
+- Verification: production audit is clear and the complete UI unit suite passes.
 - False-positive notes: the advisory is real, but the affected execution mode is absent.
 
 ### DEP-TURBO-1121861 — Moderate — Turbo login callback CSRF/session fixation
 
-- Location: root dev-only `turbo` 1.13.4, used by `clean` only.
+- Location: formerly root dev-only `turbo` 1.13.4, used by `clean` only.
 - Evidence: full-graph audit advisory 1121861; absent from production audit, build runtime, Vercel, and CI commands.
 - Impact: Turbo login callback session manipulation if that service is started.
-- Fix: dedicated Turbo 2.9.14+ tooling migration.
-- Mitigation: no Turbo login callback; pnpm-only repository; owner review 2026-09-15, expiry 2026-11-15.
+- Fix: upgraded Turbo to 2.9.14 on 2026-09-21.
+- Verification: the full dependency audit no longer reports this advisory.
 - False-positive notes: valid tool advisory, but the affected service is not used.
 
 ## Low tracked findings
 
-- `DEP-TURBO-1119389`: Yarn Berry detection code execution; repository uses pnpm 9/frozen lockfile and Turbo is development-only. Resolve with the Turbo major migration.
+- `DEP-TURBO-1119389` was resolved by the Turbo 2.9.14 upgrade.
 - `DEP-AISDK-1119676`: unpatched resource consumption in `@ai-sdk/provider-utils`, reachable only through manually invoked Taskmaster CLI; absent from runtime, CI, bundle, and production audit. Re-evaluate when upstream patches.
 
 ## Credential and authority proof
