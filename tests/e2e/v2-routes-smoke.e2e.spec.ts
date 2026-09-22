@@ -10,7 +10,7 @@ const ROUTES: Array<{ route: string; heading: string; text?: string | RegExp }> 
   { route: "control-approvals", heading: "Decision Center" },
   { route: "factory", heading: "From intent to verified change" },
   { route: "agents", heading: "Agent Registry" },
-  { route: "atc", heading: "Air Traffic Control" },
+  { route: "atc", heading: "Queue" },
   { route: "audit", heading: "ARM Audit" },
   { route: "telemetry", heading: "Factory Incidents" },
   { route: "automations", heading: "Automations" },

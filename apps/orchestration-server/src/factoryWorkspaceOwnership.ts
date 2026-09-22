@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { lstat, mkdir, readFile, rename, unlink, writeFile, readdir, realpath, open } from "node:fs/promises";
+import { lstat, mkdir, readFile, rename, rm, unlink, writeFile, readdir, realpath, open } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { hardenedGitArgs, hardenedGitEnvironment } from "./hardenedGit.js";
-import { assertCanonicalWorktreeBoundary, assertWorktreeBoundary } from "./factoryPathScope.js";
+import {
+  assertCanonicalWorktreeBoundary,
+  assertWorktreeBoundary,
+  FACTORY_OWNED_GIT_EXCLUSION,
+} from "./factoryPathScope.js";
 import { canonicalGithubRepositoryFromRemote, isExactGithubPullRequestUrl } from "./factoryRepositoryIdentity.js";
 
 const execFileAsync = promisify(execFile);
@@ -242,7 +246,7 @@ export async function transferFactoryPublicationWorkspace(input: {
   const [branch, head, status] = await Promise.all([
     git(boundary.worktree, ["branch", "--show-current"]),
     git(boundary.worktree, ["rev-parse", "HEAD"]),
-    git(boundary.worktree, ["status", "--porcelain=v1", "--untracked-files=all"]),
+    git(boundary.worktree, ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", FACTORY_OWNED_GIT_EXCLUSION]),
   ]);
   if (branch !== input.previousOwner.branch || head !== input.checkpointCandidateSha || status) {
     throw new Error("Publication workspace transfer proof does not match the clean checkpoint candidate.");
@@ -316,7 +320,7 @@ export async function transferFactoryRecoveryWorkspace(input: {
   const [branch, head, status] = await Promise.all([
     git(boundary.worktree, ["branch", "--show-current"]),
     git(boundary.worktree, ["rev-parse", "HEAD"]),
-    git(boundary.worktree, ["status", "--porcelain=v1", "--untracked-files=all"]),
+    git(boundary.worktree, ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", FACTORY_OWNED_GIT_EXCLUSION]),
   ]);
   if (branch !== input.previousOwner.branch || head !== input.checkpointCandidateSha || status) {
     throw new Error("Recovery workspace transfer proof does not match the clean checkpoint candidate.");
@@ -374,7 +378,7 @@ export async function cleanupOwnedFactoryWorkspace(input: {
     const [branch, head, status, remote, worktreeList, baseIsAncestor] = await Promise.all([
       git(boundary.worktree, ["branch", "--show-current"]),
       git(boundary.worktree, ["rev-parse", "HEAD"]),
-      git(boundary.worktree, ["status", "--porcelain=v1", "--untracked-files=all"]),
+      git(boundary.worktree, ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", FACTORY_OWNED_GIT_EXCLUSION]),
       git(boundary.checkoutRoot, ["remote", "get-url", "origin"]),
       git(boundary.checkoutRoot, ["worktree", "list", "--porcelain"]),
       gitSucceeds(boundary.worktree, ["merge-base", "--is-ancestor", input.owner.baseSha, input.expectedHeadSha]),
@@ -396,6 +400,7 @@ export async function cleanupOwnedFactoryWorkspace(input: {
       input.owner.worktree,
       { requireWorktree: true },
     );
+    await rm(path.join(boundary.worktree, ".mission-control", "skills"), { recursive: true, force: true });
     await git(boundary.checkoutRoot, ["worktree", "remove", boundary.worktree]);
   } catch (error) {
     return await preserve(`cleanup-remove-refused:${safeReason(error)}`);

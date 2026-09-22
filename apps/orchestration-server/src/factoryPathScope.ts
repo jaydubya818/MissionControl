@@ -7,6 +7,7 @@ export interface FrozenCodeScope {
 }
 
 const FACTORY_OWNED_PATHS = [".mission-control/**"];
+export const FACTORY_OWNED_GIT_EXCLUSION = ":(exclude).mission-control/**";
 
 export function isFactoryOwnedPath(file: string) {
   return FACTORY_OWNED_PATHS.some((pattern) => matchesRepositoryPattern(file, pattern));

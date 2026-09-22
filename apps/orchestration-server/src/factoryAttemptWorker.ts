@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
 import { DOCKER_BEDROCK_CANDIDATE_IDENTITY } from "./dockerBedrockIdentity.js";
-import { copyFile, mkdir } from "node:fs/promises";
+import { access, appendFile, copyFile, mkdir, readFile, realpath } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { realpath } from "node:fs/promises";
+import { promisify } from "node:util";
 import type { ConvexHttpClient } from "convex/browser";
 import type {
   ExecutorEvent,
@@ -73,11 +74,41 @@ export const FACTORY_ATTEMPT_LEASE_DURATION_MS = 120_000;
 export const LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE = "GITHUB_APP_RUNTIME_CREDENTIALS_MISSING";
 const HEARTBEAT_INTERVAL_MS = 20_000;
 const MAX_RESULT_BYTES = 64_000;
+const execFileAsync = promisify(execFile);
 
 const FACTORY_SKILLZ = ["mission-control-delivery", "poteto-mode"] as const;
 
+async function findFactorySkillsRoot() {
+  let current = dirname(fileURLToPath(import.meta.url));
+  while (true) {
+    const candidate = resolve(current, "skills");
+    try {
+      await Promise.all(FACTORY_SKILLZ.map((name) => access(resolve(candidate, name, "SKILL.md"))));
+      return candidate;
+    } catch {
+      const parent = dirname(current);
+      if (parent === current) throw new Error("Factory Skillz could not be located from the orchestration runtime.");
+      current = parent;
+    }
+  }
+}
+
 export async function materializeFactorySkillz(worktree: string) {
-  const skillsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../skills");
+  const skillsRoot = await findFactorySkillsRoot();
+  const excludeOutput = await execFileAsync("git", ["rev-parse", "--git-path", "info/exclude"], {
+    cwd: worktree,
+    encoding: "utf8",
+  });
+  const excludePath = resolve(worktree, excludeOutput.stdout.trim());
+  const excludeRule = ".mission-control/skills/";
+  const existingExcludes = await readFile(excludePath, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  });
+  if (!existingExcludes.split(/\r?\n/).includes(excludeRule)) {
+    await mkdir(dirname(excludePath), { recursive: true });
+    await appendFile(excludePath, `${existingExcludes && !existingExcludes.endsWith("\n") ? "\n" : ""}${excludeRule}\n`);
+  }
   for (const name of FACTORY_SKILLZ) {
     const source = resolve(skillsRoot, name, "SKILL.md");
     const destination = resolve(worktree, ".mission-control/skills", name, "SKILL.md");

@@ -81,7 +81,7 @@ describe("work order queue model", () => {
   });
 
   it("derives the next operator action", () => {
-    expect(deriveNextAction(ITEMS[0])).toBe("Review approval");
+    expect(deriveNextAction(ITEMS[0])).toBe("Inspect run");
     expect(deriveNextAction(ITEMS[1])).toBe("Review outcome");
   });
 
