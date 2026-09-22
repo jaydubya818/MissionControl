@@ -1,11 +1,10 @@
 # React Router 7 security migration
 
-Status: approved follow-up; not part of Release & Dependency Hardening V1
+Status: completed 2026-09-21
 
 Owner: Mission Control repository owner
 
-Review date: 2026-09-15
-Risk acceptance expiry: 2026-11-15
+Completed version: React Router 7.18.2
 
 ## Objective
 
@@ -22,6 +21,13 @@ React Router 7 is a major-version migration. The current advisories' required pr
 3. Preserve `/v2/*` deep-link, refresh, back/forward, feature-flag, and unknown-route behavior.
 4. Run the runtime-contract guard, UI typecheck/build, the complete route smoke suite, critical accessibility suite, and the System Qualification browser matrix.
 5. Remove advisory acceptances 1124268 and 1124272 only after `pnpm audit --prod` proves they are absent.
+
+## Completion evidence
+
+- `react-router-dom` and its `react-router` dependency are pinned to the patched 7.18.2 release.
+- The production dependency audit reports zero low, moderate, high, or critical advisories.
+- The full dependency audit reports zero moderate, high, or critical advisories.
+- The complete UI unit suite passes without compatibility changes.
 
 ## Acceptance criteria
 

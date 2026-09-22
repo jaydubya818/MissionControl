@@ -1,0 +1,4 @@
+interface:
+  display_name: "Setup Jstack"
+  short_description: "Configure per-role model choices for Jstack workflows"
+  default_prompt: "Use $setup-jstack to handle this task with the Jstack workflow and return a verified result."

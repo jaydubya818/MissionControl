@@ -1,10 +1,6 @@
 ---
 name: mission-control-delivery
-description: >-
-  Use this skill when executing software work governed by Mission Control or a
-  similar software factory. Preserve Mission, WorkOrder, Task, Attempt,
-  evidence, pull-request, and release lineage while keeping authority and
-  approval boundaries explicit.
+description: Preserve Mission-to-release lineage, evidence, and authority boundaries. Use when Mission Control or a similar software factory governs the work.
 compatibility: Works in Claude Code, Codex, and Agent Skills-compatible harnesses. Mission Control mutations require separately installed integration skills or tools and explicit task authority.
 metadata:
   author: software-factory

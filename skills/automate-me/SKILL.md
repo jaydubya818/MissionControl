@@ -1,20 +1,20 @@
 ---
 name: automate-me
-description: "Use for \"automate me\", \"create/update/refresh my -mode skill\", \"turn/capture my preferences or working style into a skill\", or wanting agents to follow how the user works. Drafts or revises a personal -mode skill via plugin-dev:skill-development + unslop, optionally pulling fresh evidence from recent transcripts."
+description: "Use when the user wants working preferences captured in a reusable mode skill."
 license: MIT
 metadata:
-  author: lauren-tan-pstack
+  author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.29"
-  source-commit: 458050195fdb347955a63812e6d749f164a8f62d
+  source-version: "0.9.30"
+  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
   owner: software-factory
   risk: medium
-  capabilities: pstack,engineering-workflow
+  capabilities: jstack,engineering-workflow
 ---
 
 # Automate me
 
-On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.
+On Codex, Cursor, or another non-Claude runtime, read the [runtime mapping](../poteto-mode/references/harness-tools.md), including its per-skill notes, before following this skill.
 
 A guided flow for turning the user's working conventions into a skill agents will follow. Creating or editing a user-scoped skill requires the user's explicit choice of user scope; otherwise keep the output project-local. The output is one `-mode` skill tailored to them (e.g. `jay-mode`, `priya-mode`).
 

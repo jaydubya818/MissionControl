@@ -1,6 +1,6 @@
 ---
 name: new-feature
-description: Use this skill when starting a feature, fix, or documentation change that will edit a Git repository. Isolate edits in a new worktree unless the harness already assigned one to the same task. Read-only reviews and investigations do not need a worktree.
+description: Create or use a task-owned Git worktree for repository edits. Use for features, fixes, or documentation changes; skip read-only work.
 compatibility: Requires Git. Pull-request overlap checks also require authenticated repository-host tooling such as gh or glab.
 metadata:
   author: michaelshimeles

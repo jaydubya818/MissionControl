@@ -1,27 +1,27 @@
 ---
-name: setup-pstack
-description: "Configure which models pstack uses per role. Detects your available Claude models and writes a per-role override file that the user can include from their CLAUDE.md. Use for /setup-pstack, \"configure pstack models\", or changing pstack's model choices."
+name: setup-jstack
+description: "Use when the user wants to configure Jstack's per-role Claude models."
 license: MIT
 metadata:
-  author: lauren-tan-pstack
+  author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.29"
-  source-commit: 458050195fdb347955a63812e6d749f164a8f62d
+  source-version: "0.9.30"
+  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
   owner: software-factory
   risk: medium
-  capabilities: pstack,engineering-workflow
+  capabilities: jstack,engineering-workflow
 ---
 
-# Setup pstack
+# Setup Jstack
 
-On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.
+On Codex, Cursor, or another non-Claude runtime, read the [runtime mapping](../poteto-mode/references/harness-tools.md), including its per-skill notes, before following this skill.
 
-Write `~/.claude/pstack-models.md`, a per-role model override sheet you include from your global `CLAUDE.md`. Each pstack skill names a default model inline; the override sheet is the layer that adapts those defaults to the models you actually have access to.
+Write `~/.claude/jstack-models.md`, a per-role model override sheet you include from your global `CLAUDE.md`. Each Jstack skill names a default model inline; the override sheet is the layer that adapts those defaults to the models you actually have access to.
 
 Claude Code has no auto-applied "rules" mechanism like Cursor's `.mdc`. Inclusion is explicit: the user adds a line to `~/.claude/CLAUDE.md` (or their project `CLAUDE.md`) such as:
 
 ```text
-@~/.claude/pstack-models.md
+@~/.claude/jstack-models.md
 ```
 
 so the file is loaded as context for every session.
@@ -34,7 +34,7 @@ Enumerate the model slugs you can pass to an `Agent` subagent in this session â€
 
 ### 2. Load current state
 
-The default role-to-model mapping is the rule shape shown in step 5 below. If `~/.claude/pstack-models.md` already exists, read it and treat its values as the current choices. Otherwise start from those defaults.
+The default role-to-model mapping is the rule shape shown in step 5 below. If `~/.claude/jstack-models.md` already exists, read it and treat its values as the current choices. Otherwise start from those defaults.
 
 ### 3. Map and confirm
 
@@ -46,35 +46,35 @@ Every real slug written must be in the detected set; `inherit-parent` and `auto`
 
 ### 5. Write the override sheet
 
-Write `~/.claude/pstack-models.md` with the shape below. Overwrite the whole file so re-runs stay idempotent.
+Write `~/.claude/jstack-models.md` with the shape below. Overwrite the whole file so re-runs stay idempotent.
 
 ```markdown
-# pstack model configuration
+# Jstack model configuration
 
-Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out.
+Per-role model overrides for Jstack skills. Each Jstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out.
 
 feature, refactoring: claude-opus-5
-bug-fix: claude-fable-5
-perf-issue: claude-fable-5
-hillclimb: claude-fable-5
+bug-fix: claude-fable-5-1
+perf-issue: claude-fable-5-1
+hillclimb: claude-fable-5-1
 judgment and prose: claude-opus-5
-strongest judgment: claude-fable-5
+strongest judgment: claude-fable-5-1
 how explorer: claude-opus-5
 how explainer: claude-opus-5
 why investigators: claude-opus-5
 why synthesizer: claude-opus-5
 reflect tooling: claude-opus-5
 reflect judgment, divergent, synthesizer: claude-opus-5
-arena runners: claude-opus-5, claude-fable-5, claude-sonnet-5
-arena cross-judge pool: claude-opus-5, claude-fable-5, claude-sonnet-5
+arena runners: claude-opus-5, claude-fable-5-1, claude-sonnet-5
+arena cross-judge pool: claude-opus-5, claude-fable-5-1, claude-sonnet-5
 swarm workers: claude-opus-5
-architect runners: claude-opus-5, claude-fable-5, claude-sonnet-5
-interrogate reviewers: claude-opus-5, claude-fable-5, claude-sonnet-5
+architect runners: claude-opus-5, claude-fable-5-1, claude-sonnet-5
+interrogate reviewers: claude-opus-5, claude-fable-5-1, claude-sonnet-5
 ```
 
 ### 6. Wire it in
 
-If `~/.claude/CLAUDE.md` does not already include `~/.claude/pstack-models.md`, append the `@~/.claude/pstack-models.md` line so it loads on every session. If the user prefers project scope, add the include to the project's `CLAUDE.md` instead.
+If `~/.claude/CLAUDE.md` does not already include `~/.claude/jstack-models.md`, append the `@~/.claude/jstack-models.md` line so it loads on every session. If the user prefers project scope, add the include to the project's `CLAUDE.md` instead.
 
 ### 7. Confirm
 
@@ -82,8 +82,8 @@ Tell the user where the override was written and how it loads (via the `@` inclu
 
 ## Models
 
-Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).
+Defaults originate from the upstream `plugins/pstack/models.json`. Refresh them through `scripts/vendor_jstack.py` after reviewing the upstream change.
 
-- Available Claude models: Opus 5 (`claude-opus-5`), Opus 4.8 (`claude-opus-4-8`), Opus 4.6 (`claude-opus-4-6`), Fable 5 (`claude-fable-5`), Sonnet 5 (`claude-sonnet-5`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`)
-- Default panel: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`
+- Available Claude models: Opus 5 (`claude-opus-5`), Opus 4.8 (`claude-opus-4-8`), Opus 4.6 (`claude-opus-4-6`), Fable 5.1 (`claude-fable-5-1`), Sonnet 5 (`claude-sonnet-5`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`)
+- Default panel: `claude-opus-5`, `claude-fable-5-1`, `claude-sonnet-5`
 - Single-role default: `claude-opus-5`

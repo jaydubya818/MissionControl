@@ -1,6 +1,6 @@
 ---
 name: greploop-apps
-description: Run the greploop workflow with the @greptile-apps trigger when the normal trigger refuses a large PR. Requires the greploop skill installed alongside this entrypoint.
+description: Run greploop through @greptile-apps when the normal trigger rejects a large PR. Use only with the companion greploop skill.
 license: MIT
 metadata:
   author: greptileai
