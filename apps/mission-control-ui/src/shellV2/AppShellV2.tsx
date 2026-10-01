@@ -9,6 +9,12 @@ import { useResizableColumns } from "./useResizableColumns";
 import { groupForView, itemForView, allNavViews, NAV_GROUPS } from "./navConfig";
 import { EOS_NAV_GROUPS } from "./eosNavConfig";
 import { filterNavGroups } from "./navFilter";
+import {
+  countHiddenByLevel,
+  filterNavGroupsByLevel,
+  isViewAboveLevel,
+} from "./navLevel";
+import { useFactoryExperienceLevel } from "../factoryExperience/useFactoryExperienceLevel";
 import { isRouteVisible, routeBadge } from "./routeCapabilities";
 import { useNavGroupsWithCounts } from "./useNavGroupsWithCounts";
 import { useFlag } from "../hooks/useFlag";
@@ -129,7 +135,23 @@ export function AppShellV2({
     showPreviewRoutes,
     showDemoRoutes,
   });
-  const navGroups = useNavGroupsWithCounts(filteredGroups, projectId);
+  // Progressive navigation applies to the V2 operator IA only; the legacy nav
+  // keeps its full list so existing workflows are not disturbed.
+  const [experienceLevel, setExperienceLevel] = useFactoryExperienceLevel();
+  const levelGroups = eosPreview
+    ? filterNavGroupsByLevel(filteredGroups, experienceLevel, {
+        keepVisible: [activeView as string],
+      })
+    : filteredGroups;
+  const navGroups = useNavGroupsWithCounts(levelGroups, projectId);
+  const navLevelProps = eosPreview
+    ? {
+        level: experienceLevel,
+        onChange: setExperienceLevel,
+        hiddenCount: countHiddenByLevel(filteredGroups, experienceLevel),
+        aboveLevelNotice: isViewAboveLevel(activeView as string, experienceLevel),
+      }
+    : undefined;
   const validViews = [
     ...new Set([
       ...baseNavGroups.flatMap((g) => g.items.map((i) => i.view as string)),
@@ -285,6 +307,7 @@ export function AppShellV2({
                 companySwitcher={companySwitcher}
                 footer={footer}
                 onHide={() => setMobileNavOpen(false)}
+                navLevel={navLevelProps}
               />
             </div>
           </div>
@@ -301,6 +324,7 @@ export function AppShellV2({
             companySwitcher={companySwitcher}
             footer={footer}
             onHide={() => columns.setNavHidden(true)}
+            navLevel={navLevelProps}
           />
           <ResizerHandle
             onResize={columns.onNavResize}

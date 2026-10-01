@@ -78,7 +78,7 @@ export function FactoryLearningView({
       await action();
       setMessage({ tone: "success", text: success });
     } catch (error) {
-      setMessage({ tone: "error", text: error instanceof Error ? error.message : "The Factory Learning action failed." });
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "The Factory Improvement action failed." });
     } finally {
       setBusy(null);
     }
@@ -87,7 +87,7 @@ export function FactoryLearningView({
   if (dashboard === undefined) {
     return (
       <div className="mx-auto flex max-w-[1600px] items-center justify-center gap-2 px-6 py-24 text-[13px] text-ink-muted">
-        <Loader2 size={16} className="animate-spin" /> Loading Factory Learning evidence…
+        <Loader2 size={16} className="animate-spin" /> Loading Factory Improvement evidence…
       </div>
     );
   }
@@ -105,7 +105,7 @@ export function FactoryLearningView({
           </div>
           <h2 className="mt-1 text-[18px] font-semibold text-ink">Evidence before change</h2>
           <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-ink-secondary">
-            Deterministic signals become reviewable proposals. Factory Learning cannot accept work, change active configuration, or promote an experiment without a human decision.
+            Deterministic signals become reviewable proposals. Factory Improvement cannot accept work, change active configuration, or promote an experiment without a human decision.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

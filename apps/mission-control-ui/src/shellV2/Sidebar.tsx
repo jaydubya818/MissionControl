@@ -3,8 +3,71 @@ import { ChevronDown, ChevronLeft, Command, Search } from "lucide-react";
 import type { MainView } from "../TopNav";
 import { NAV_GROUPS, type NavGroup, type NavItem } from "./navConfig";
 import { cn } from "../lib/utils";
+import type { FactoryExperienceLevel } from "../factoryExperience/recipeCatalog";
+import { NAV_LEVEL_LABELS } from "./navLevel";
 
 export const SIDEBAR_V2_WIDTH = 256;
+
+const NAV_LEVELS: FactoryExperienceLevel[] = ["basic", "intermediate", "advanced"];
+
+interface NavLevelSwitcherProps {
+  level: FactoryExperienceLevel;
+  onChange: (level: FactoryExperienceLevel) => void;
+  hiddenCount: number;
+  aboveLevelNotice?: boolean;
+}
+
+/** Segmented control that sets how much of the product the sidebar shows. */
+export function NavLevelSwitcher({
+  level,
+  onChange,
+  hiddenCount,
+  aboveLevelNotice,
+}: NavLevelSwitcherProps): JSX.Element {
+  return (
+    <div className="border-t border-line px-3 py-2" data-testid="nav-level-switcher">
+      <div
+        id="nav-level-label"
+        className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted"
+      >
+        Navigation detail
+      </div>
+      <div
+        role="radiogroup"
+        aria-labelledby="nav-level-label"
+        className="grid grid-cols-3 gap-px rounded-lg border border-line bg-surface-1 p-0.5"
+      >
+        {NAV_LEVELS.map((option) => (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={level === option}
+            onClick={() => onChange(option)}
+            className={cn(
+              "rounded-md px-1.5 py-1 text-[11px] transition-colors duration-150",
+              level === option
+                ? "bg-registry-accent-soft font-semibold text-ink"
+                : "text-ink-secondary hover:text-ink"
+            )}
+          >
+            {NAV_LEVEL_LABELS[option]}
+          </button>
+        ))}
+      </div>
+      {hiddenCount > 0 ? (
+        <p className="mt-1.5 px-1 text-[11px] leading-snug text-ink-muted">
+          {hiddenCount} more {hiddenCount === 1 ? "view is" : "views are"} available at a higher level.
+        </p>
+      ) : null}
+      {aboveLevelNotice ? (
+        <p className="mt-1 px-1 text-[11px] leading-snug text-ink-muted" role="status">
+          This page is shown because you opened it directly; it normally appears at a higher level.
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 interface SidebarItemProps {
   item: NavItem;
@@ -120,6 +183,8 @@ interface SidebarProps {
   companySwitcher?: ReactNode;
   footer?: ReactNode;
   onHide?: () => void;
+  /** When provided, shows the progressive-navigation level control. */
+  navLevel?: NavLevelSwitcherProps;
 }
 
 export function Sidebar({
@@ -132,6 +197,7 @@ export function Sidebar({
   companySwitcher,
   footer,
   onHide,
+  navLevel,
 }: SidebarProps): JSX.Element {
   const navGroups = groups ?? NAV_GROUPS;
   const activeGroupId = (navGroups.find((g) => g.items.some((i) => i.view === activeView)) ?? navGroups[0]).id;
@@ -211,6 +277,8 @@ export function Sidebar({
           />
         ))}
       </div>
+
+      {navLevel ? <NavLevelSwitcher {...navLevel} /> : null}
 
       {footer && <div className="border-t border-line px-3 py-3">{footer}</div>}
     </nav>
