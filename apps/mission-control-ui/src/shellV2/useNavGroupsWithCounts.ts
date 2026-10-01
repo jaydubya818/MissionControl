@@ -1,3 +1,4 @@
+import { PENDING_APPROVALS_LIMIT } from "../lib/approvalCount";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -19,7 +20,7 @@ export function useNavGroupsWithCounts(
   );
   const approvals = useQuery(
     api.approvals.listPending,
-    projectId ? { projectId, limit: 100 } : "skip"
+    projectId ? { projectId, limit: PENDING_APPROVALS_LIMIT } : "skip"
   );
 
   if (!stats) return groups;
