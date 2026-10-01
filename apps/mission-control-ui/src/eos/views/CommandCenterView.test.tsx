@@ -256,4 +256,29 @@ describe("CommandCenterView", () => {
     expect(mocks.approveApproval).not.toHaveBeenCalled();
     expect(mocks.transitionTask).not.toHaveBeenCalled();
   });
+
+  it("leads Basic operators with one next action and collapses the full operations view", async () => {
+    window.localStorage.removeItem("mc.factory.experience-level");
+    const { onNavigate } = renderCommandCenter();
+    await screen.findByText("Connected");
+
+    const startHere = screen.getByTestId("start-here");
+    expect(startHere).toHaveTextContent(/Review \d+ pending approvals?/);
+    expect(startHere).toBeInTheDocument();
+    expect(screen.getByTestId("full-operations-view")).not.toHaveAttribute("open");
+    expect(screen.getByRole("list", { name: "How work flows through the factory" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Take me there" }));
+    expect(onNavigate).toHaveBeenCalledWith("control-approvals");
+  });
+
+  it("opens the full operations view and drops Start here at Advanced", async () => {
+    window.localStorage.setItem("mc.factory.experience-level", "advanced");
+    renderCommandCenter();
+    await screen.findByText("Connected");
+
+    expect(screen.queryByTestId("start-here")).not.toBeInTheDocument();
+    expect(screen.getByTestId("full-operations-view")).toHaveAttribute("open");
+    window.localStorage.removeItem("mc.factory.experience-level");
+  });
 });
