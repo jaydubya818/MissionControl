@@ -31,6 +31,12 @@ export const verificationCheckStatusValidator = v.union(
   v.literal("NOT_CONFIGURED"), v.literal("ERROR"),
 );
 
+// Storage accepts historical failures; packet admission still uses canonical statuses.
+export const persistedVerificationCheckStatusValidator = v.union(
+  verificationCheckStatusValidator,
+  v.literal("TIMED_OUT"), v.literal("BLOCKED_BY_DEPENDENCY"), v.literal("NOT_EVALUATED"),
+);
+
 export const verificationVerdictValidator = v.union(
   v.literal("VERIFIED"), v.literal("NOT_VERIFIED"), v.literal("BLOCKED"),
   v.literal("REQUIRES_HUMAN_REVIEW"),
@@ -446,7 +452,7 @@ export const verificationCheckResultValidator = v.object({
   category: verificationCategoryValidator,
   verifierId: v.string(),
   mandatory: v.boolean(),
-  status: verificationCheckStatusValidator,
+  status: persistedVerificationCheckStatusValidator,
   summary: v.string(),
   acceptanceCriterionIds: v.array(v.string()),
   startedAt: v.number(),

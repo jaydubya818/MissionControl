@@ -38,3 +38,17 @@ primary checkout is on `sofie/factory-skillz-and-dispatch`, not `main`, and has
 uncommitted UI, orchestration, Convex, documentation, and scratch files. Current
 remote main matches the initial assigned worktree's HEAD. The first preservation
 commit is `d141b50`.
+
+## Observed compatibility repair
+
+An isolated copy of the Research Lab database could not deploy current main's
+schema. A read-only SQLite census of current evidence rows found three retained
+noncanonical failure results: `TIMED_OUT` (1), `BLOCKED_BY_DEPENDENCY` (1), and
+`NOT_EVALUATED` (1). The same historical values occur in persisted check results.
+
+Preserve these records with a storage-only status validator shared by evidence
+and persisted verification checks. Keep canonical input validators and server
+packet normalization unchanged. Only `PASS` evidence can satisfy coverage. Add
+regression cases that reject each historical value in newly submitted packets.
+Validate against a disposable source-database copy; never rewrite or erase the
+original evidence to make deployment pass.

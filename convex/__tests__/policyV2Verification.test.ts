@@ -53,6 +53,25 @@ const workOrder = {
 };
 
 describe("policy-v2 Verification Plan compilation", () => {
+  it.each(["TIMED_OUT", "BLOCKED_BY_DEPENDENCY", "NOT_EVALUATED"])("rejects historical %s results from new verification packets", (status) => {
+    const plan = compilePolicyV2VerificationPlan({
+      now: 100,
+      workOrder,
+      sourceAttempt: { _id: "source-attempt-1" },
+      verificationAttemptId: "verification-attempt-1",
+      verificationSubject: subject,
+      factoryDefinitionId: "verification-factory",
+      factoryDefinitionVersionId: "verification-factory-v1",
+      executorInvocationId: "verification:invocation-1",
+    });
+    expect(() => normalizePolicyV2VerificationResults({
+      workOrder,
+      plan,
+      packetChecks: [{ checkId: "check:test", status }],
+      evidenceIdsByCheck: new Map([["check:test", ["historical-timeout"]]]),
+    })).toThrow("Verifier reported an invalid status for check:test.");
+  });
+
   it("freezes the exact subject, required behavior, required risk, and evidence denominator", () => {
     const plan = compilePolicyV2VerificationPlan({
       now: 100,
