@@ -15,6 +15,9 @@ test("home dashboard loads and shows main sections", async ({ page }) => {
 
   // Home section: quick navigation or status
   await expect(page.getByRole("heading", { name: "Command Center" })).toBeVisible({ timeout: 10000 });
+  // Basic level leads with one next action; the detailed overview sits behind a disclosure.
+  await expect(page.getByTestId("start-here")).toBeVisible({ timeout: 10000 });
+  await page.getByText(/Show the full operations view/).click();
   await expect(page.getByRole("heading", { name: "Factory overview", exact: true })).toBeVisible({ timeout: 10000 });
 });
 
@@ -41,6 +44,9 @@ test("mobile shell keeps navigation and chat off canvas", async ({ page }) => {
 
   await page.getByRole("button", { name: "Open navigation" }).click();
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  // Basic navigation hides Intermediate destinations such as Tasks until the level is raised.
+  await expect(page.getByRole("button", { name: /Tasks/ })).toHaveCount(0);
+  await page.getByRole("radio", { name: "Intermediate" }).click();
   await page.getByRole("button", { name: /Tasks/ }).click();
   await expect(page).toHaveURL(/\/v2\/tasks(?:\?.*)?$/);
   await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(0);

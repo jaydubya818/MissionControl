@@ -22,6 +22,8 @@ import { cn } from "../../lib/utils";
 import { buildAttentionItems, exceptionCounts } from "../../lib/attentionQueue";
 import { loadGatewayStatus } from "../../lib/gatewayStatus";
 import { useFlag } from "../../hooks/useFlag";
+import { useFactoryExperienceLevel } from "../../factoryExperience/useFactoryExperienceLevel";
+import { FLOW_STEPS, nextBestAction } from "./commandCenterGuide";
 import {
   EosSection,
   HealthSignalCard,
@@ -491,6 +493,69 @@ function FactoryReadinessCard({
 // Main view
 // ─────────────────────────────────────────────────────────────────────────────
 
+function StartHerePanel({
+  counts,
+  onNavigate,
+}: {
+  counts: { approvals: number; blocked: number; failed: number; alerts: number; workItems: number };
+  onNavigate: (view: string) => void;
+}): JSX.Element {
+  const action = nextBestAction(counts);
+  const stats: Array<[string, number, string]> = [
+    ["Needs your decision", counts.approvals, "control-approvals"],
+    ["Blocked", counts.blocked, "tasks"],
+    ["Failed", counts.failed, "tasks"],
+  ];
+  return (
+    <section className={cn(CARD_CLASS, "flex flex-col gap-5 p-5")} aria-label="Start here" data-testid="start-here">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="max-w-xl">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">Start here</div>
+          <h2 className="mt-1 text-[20px] font-semibold text-ink">{action.label}</h2>
+          <p className="mt-1 text-[13px] text-ink-secondary">{action.reason}</p>
+          <button
+            type="button"
+            onClick={() => onNavigate(action.view)}
+            className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg bg-act px-3 text-[13px] font-medium text-act-ink transition-opacity duration-150 hover:opacity-90"
+          >
+            Take me there
+            <ArrowRight size={14} strokeWidth={1.75} aria-hidden />
+          </button>
+        </div>
+        <dl className="grid grid-cols-3 gap-3">
+          {stats.map(([label, value, view]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => onNavigate(view)}
+              className="rounded-lg border border-line px-4 py-3 text-left transition-colors duration-150 hover:border-line-strong"
+            >
+              <dd className="text-[24px] font-semibold tabular-nums text-ink">{value}</dd>
+              <dt className="text-[12px] text-ink-secondary">{label}</dt>
+            </button>
+          ))}
+        </dl>
+      </div>
+      <ol className="grid grid-cols-1 gap-2 sm:grid-cols-4" aria-label="How work flows through the factory">
+        {FLOW_STEPS.map((step, index) => (
+          <li key={step.label}>
+            <button
+              type="button"
+              onClick={() => onNavigate(step.view)}
+              className="flex h-full w-full flex-col rounded-lg bg-surface-2 px-3 py-2 text-left transition-colors duration-150 hover:bg-surface-3"
+            >
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+                {index + 1}. {step.label}
+              </span>
+              <span className="mt-0.5 text-[12px] text-ink-secondary">{step.hint}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 export function CommandCenterView({
   projectId,
   onNavigate,
@@ -498,6 +563,8 @@ export function CommandCenterView({
   const [gatewayConfigured, setGatewayConfigured] = useState<boolean | null>(null);
   const showDemoContent = useFlag("ui.navigation.demo-routes");
   const showOperatingControlPlane = useFlag("control-plane.role-lenses");
+  const [level] = useFactoryExperienceLevel();
+  const isBasic = level === "basic";
 
   useEffect(() => {
     let cancelled = false;
@@ -599,6 +666,37 @@ export function CommandCenterView({
           }
         />
 
+        {isBasic ? (
+          <StartHerePanel
+            counts={{
+              approvals: (approvals ?? []).length,
+              blocked: blockedTasksList.length,
+              failed: failedTasksList.length,
+              alerts: alertsList.length,
+              workItems: (tasks ?? []).length,
+            }}
+            onNavigate={onNavigate}
+          />
+        ) : null}
+
+        {attentionLoading ? (
+          <LoadingRows count={4} />
+        ) : (
+          <AttentionQueuePanel
+            items={attentionItems}
+            scannedAt={scannedAt}
+            counts={exceptions}
+            onOpenApprovals={() => onNavigate("audit")}
+            onOpenTasks={() => onNavigate("tasks")}
+            onOpenAlerts={() => onNavigate("telemetry")}
+          />
+        )}
+
+        <details key={level} open={!isBasic} className="group flex flex-col gap-6" data-testid="full-operations-view">
+          <summary className="cursor-pointer select-none rounded-lg border border-line px-4 py-3 text-[13px] font-medium text-ink-secondary hover:border-line-strong hover:text-ink">
+            {isBasic ? "Show the full operations view (health, workforce, capacity, automations)" : "Full operations view"}
+          </summary>
+          <div className="mt-6 flex flex-col gap-6">
         {showDemoContent ? <PageProvenanceNote /> : null}
 
         {showOperatingControlPlane ? (
@@ -627,19 +725,6 @@ export function CommandCenterView({
             Open docs → Run the demo
           </button>
         </section> : null}
-
-        {attentionLoading ? (
-          <LoadingRows count={4} />
-        ) : (
-          <AttentionQueuePanel
-            items={attentionItems}
-            scannedAt={scannedAt}
-            counts={exceptions}
-            onOpenApprovals={() => onNavigate("audit")}
-            onOpenTasks={() => onNavigate("tasks")}
-            onOpenAlerts={() => onNavigate("telemetry")}
-          />
-        )}
 
         {!automationData ? <LoadingRows count={2} /> : <AutomationPostureCard data={automationData} onNavigate={onNavigate} />}
 
@@ -725,6 +810,8 @@ export function CommandCenterView({
             </EosSection>
           </div>
         </div>
+          </div>
+        </details>
       </div>
     </div>
   );
