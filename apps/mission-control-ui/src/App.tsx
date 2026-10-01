@@ -25,6 +25,7 @@ import { selectAccessibleCompany } from "./workspace/companySelection";
 import { useAuthRuntime } from "./auth/AuthRuntimeContext";
 import { BootstrapOwner } from "./auth/BootstrapOwner";
 import { shouldBypassRuntimeCompatibility } from "./lib/runtimeCompatibility";
+import { PENDING_APPROVALS_LIMIT } from "./lib/approvalCount";
 
 const DashboardOverview = lazy(() =>
   import("./DashboardOverview").then((module) => ({ default: module.DashboardOverview }))
@@ -778,7 +779,7 @@ export default function App() {
   );
   const pendingApprovals = useQuery(
     api.approvals.listPending,
-    projectId ? { projectId, limit: 10 } : "skip"
+    projectId ? { projectId, limit: PENDING_APPROVALS_LIMIT } : "skip"
   );
 
   // ── Effects ──────────────────────────────────────────────────────────────

@@ -22,6 +22,7 @@ import { cn } from "../../lib/utils";
 import { buildAttentionItems, exceptionCounts } from "../../lib/attentionQueue";
 import { loadGatewayStatus } from "../../lib/gatewayStatus";
 import { useFlag } from "../../hooks/useFlag";
+import { PENDING_APPROVALS_LIMIT } from "../../lib/approvalCount";
 import { useFactoryExperienceLevel } from "../../factoryExperience/useFactoryExperienceLevel";
 import { FLOW_STEPS, nextBestAction } from "./commandCenterGuide";
 import {
@@ -580,6 +581,10 @@ export function CommandCenterView({
 
   // ── Live Convex data ───────────────────────────────────────────────────────
   const approvals = useQuery(api.approvals.listPending, { projectId, limit: 25 });
+  const approvalTotal = useQuery(api.approvals.listPending, {
+    projectId,
+    limit: PENDING_APPROVALS_LIMIT,
+  });
   const tasks = useQuery(api.tasks.listAll, { projectId });
   const openAlerts = useQuery(api.alerts.listOpen, { projectId, limit: 10 });
   const agents = useQuery(api.agents.listAll, { projectId });
@@ -669,7 +674,7 @@ export function CommandCenterView({
         {isBasic ? (
           <StartHerePanel
             counts={{
-              approvals: (approvals ?? []).length,
+              approvals: (approvalTotal ?? approvals ?? []).length,
               blocked: blockedTasksList.length,
               failed: failedTasksList.length,
               alerts: alertsList.length,
