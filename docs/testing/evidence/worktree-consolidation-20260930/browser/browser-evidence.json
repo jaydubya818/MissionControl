@@ -1,0 +1,96 @@
+{
+  "appUrl": "http://localhost:5204",
+  "workspaceId": "sn7dtgyn9pt0gq43x2wpw5mwxn8b7adt",
+  "prWorkspaceId": "sn76etsp1y10t230g4jjtxqnsn8bygtw",
+  "prWorkOrderId": "yh741dqfydd6kxw2dsj7ynjfzn8caqp8",
+  "surfaces": [
+    "mission-creation-detail-dark-1440",
+    "approved-plan-light-1440",
+    "spec-r1-r2-r3-lineage-dark-1440",
+    "frozen-plan-spec-r2-light-1440",
+    "workorder-verification-dark-1024",
+    "execution-run-inspector",
+    "pr-currentness-light-1440",
+    "factory-memory-context-light-1024",
+    "observability-evals-dark-1024",
+    "factory-learning-dark-390",
+    "mission-direct-light-390"
+  ],
+  "screenshots": [
+    "screenshots/01-mission-created-detail-1440-dark.png",
+    "screenshots/02-approved-plan-1440-light.png",
+    "screenshots/03-spec-lineage-1440-dark.png",
+    "screenshots/04-frozen-plan-spec-r2-1440-light.png",
+    "screenshots/05-workorder-verification-1024-dark.png",
+    "screenshots/06-pr-currentness-1440-light.png",
+    "screenshots/07-factory-memory-context-1024-light.png",
+    "screenshots/08-observability-evals-1024-dark.png",
+    "screenshots/09-factory-learning-390-dark.png",
+    "screenshots/10-mission-direct-390-light.png"
+  ],
+  "accessibility": [
+    {
+      "surface": "mission-detail",
+      "passes": 24,
+      "incomplete": 0,
+      "violations": []
+    },
+    {
+      "surface": "spec-lineage",
+      "passes": 26,
+      "incomplete": 1,
+      "violations": []
+    },
+    {
+      "surface": "workorder-pr-currentness",
+      "passes": 21,
+      "incomplete": 1,
+      "violations": []
+    },
+    {
+      "surface": "factory-memory",
+      "passes": 21,
+      "incomplete": 0,
+      "violations": []
+    },
+    {
+      "surface": "observability-evals",
+      "passes": 21,
+      "incomplete": 1,
+      "violations": []
+    },
+    {
+      "surface": "factory-learning",
+      "passes": 18,
+      "incomplete": 0,
+      "violations": []
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failedRequests": [],
+  "matrix": {
+    "viewports": [
+      "1440x900",
+      "1024x768",
+      "390x844"
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "experienceLevels": [
+      "Basic",
+      "Intermediate",
+      "Advanced"
+    ],
+    "navigation": [
+      "direct URL",
+      "refresh",
+      "back",
+      "forward",
+      "keyboard focus"
+    ]
+  },
+  "missionUrl": "http://localhost:5204/v2/missions/gs7m1w21jfqj13c7zw4xzr20zd8cm661?workspace=sn7dtgyn9pt0gq43x2wpw5mwxn8b7adt"
+}
