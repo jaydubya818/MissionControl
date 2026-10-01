@@ -10,7 +10,7 @@ const PR_WORK_ORDER_ID = process.env.SYSTEM_FACTORY_PR_WORK_ORDER_ID ?? "";
 const SEEDED_MISSION_TITLE = "Mission UI verification";
 const SPEC_MISSION_TITLE = "Spec Intake Golden Path — immutable revision proof";
 const QUALIFICATION_MISSION_TITLE = "System Factory Qualification V2 Browser Mission";
-const EVIDENCE_DIR = path.resolve("docs/testing/evidence/system-factory-e2e-v2");
+const EVIDENCE_DIR = path.resolve(process.env.SYSTEM_FACTORY_EVIDENCE_DIR ?? "docs/testing/evidence/system-factory-e2e-v2");
 const SCREENSHOT_DIR = path.join(EVIDENCE_DIR, "screenshots");
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
@@ -251,6 +251,7 @@ test("Mission Control qualifies as one progressive governed factory in the real 
   await acceptanceBlocker.scrollIntoViewIfNeeded();
   await captureScreenshot(page, evidence, "05-workorder-verification-1024-dark");
 
+  await page.getByRole("tab", { name: /^Tasks & runs/ }).click();
   await page.getByRole("button", { name: "Inspect run", exact: true }).first().click();
   await expect(page.getByRole("dialog", { name: "Execution Run Inspector" })).toBeVisible();
   await expect(page.getByText("Independent verification", { exact: true }).last()).toBeVisible();
@@ -260,6 +261,7 @@ test("Mission Control qualifies as one progressive governed factory in the real 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${APP_URL}/v2/control-work-orders?workspace=${PR_WORKSPACE_ID}&workOrder=${PR_WORK_ORDER_ID}`);
   await setTheme(page, "light");
+  await page.getByRole("tab", { name: /^Review/ }).click();
   await expect(page.getByText("V1 current-main governed canary", { exact: true }).last()).toBeVisible();
   const prCurrentness = page.getByText("Pull request and exact-head CI", { exact: true });
   await expect(prCurrentness).toBeVisible();
