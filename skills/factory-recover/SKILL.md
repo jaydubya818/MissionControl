@@ -1,9 +1,10 @@
 ---
 name: factory-recover
-installer-group: factory
+metadata:
+  installer-group: factory
 description: >-
   Experimental workflow for finding and resuming interrupted coding runs. Use
-  after an agent host restart or an interrupted automation.
+  when resuming after an agent host restart or an interrupted automation.
 ---
 
 # Factory Recover

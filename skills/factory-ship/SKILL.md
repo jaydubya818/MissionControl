@@ -1,6 +1,7 @@
 ---
 name: factory-ship
-installer-group: factory
+metadata:
+  installer-group: factory
 description: >-
   Experimental workflow for publishing and completing configured software
   delivery work. Use when the user or an enabled factory policy asks to ship.

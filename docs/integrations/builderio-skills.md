@@ -61,7 +61,9 @@ are available on the next turn.
 
 Source: https://github.com/BuilderIO/skills/tree/fd8f20a879b507cf09feba08663a1edf7a949353
 
-Skill files are copied without edits. Each installed skill includes the upstream
+Skill bodies preserve upstream instructions. Repository copies move the custom
+`installer-group` field into `metadata` and clarify two activation descriptions
+to satisfy Mission Control lint. Codex user copies retain the upstream form. Each installed skill includes the upstream
 MIT `LICENSE`. `docs/factory/` contains the upstream companion documentation.
 Review changes before updating the pinned revision; do not refresh from a moving
 branch silently.
@@ -76,3 +78,7 @@ folders were verified. The repository skill linter was not run because this
 worktree lacks the built `packages/context-tools/dist/index.js` dependency.
 No application code or UI changed; runtime behavior of the workflows remains
 unqualified until each is exercised against configured sources.
+
+On consolidation, the built repository linter detected unsupported upstream
+frontmatter. After the compatibility adaptation, all repository skills passed
+with zero errors. The initial byte-match result applies to the original import.

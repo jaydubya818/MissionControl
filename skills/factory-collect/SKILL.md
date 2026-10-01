@@ -1,6 +1,7 @@
 ---
 name: factory-collect
-installer-group: factory
+metadata:
+  installer-group: factory
 description: >-
   Experimental workflow for collecting and triaging product feedback,
   product telemetry, runtime errors, and issue reports. Use when scanning

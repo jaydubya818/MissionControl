@@ -1,6 +1,7 @@
 ---
 name: factory-watchdog
-installer-group: factory
+metadata:
+  installer-group: factory
 description: >-
   Experimental workflow for monitoring explicitly authorized delivery tasks
   and reporting stalled work. Use for scheduled ship follow-through.

@@ -1,6 +1,7 @@
 ---
 name: factory-human-digest
-installer-group: factory
+metadata:
+  installer-group: factory
 description: >-
   Experimental workflow for summarizing work that still needs human judgment
   across configured pull requests, issues, feedback, errors, and delivery

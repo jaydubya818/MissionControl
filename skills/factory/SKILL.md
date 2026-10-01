@@ -1,6 +1,7 @@
 ---
 name: factory
-installer-group: factory
+metadata:
+  installer-group: factory
 description: >-
   Experimental workflow for configuring an autonomous software delivery
   factory. Use when choosing feedback sources, schedules, worktree behavior,

@@ -1,6 +1,7 @@
 ---
 name: factory-lookback
-installer-group: factory
+metadata:
+  installer-group: factory
 description: >-
   Experimental workflow for auditing recurring feedback, telemetry, errors,
   and brittle delivery paths to find systemic fixes. Use for periodic or

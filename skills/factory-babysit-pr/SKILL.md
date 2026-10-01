@@ -1,9 +1,10 @@
 ---
 name: factory-babysit-pr
-installer-group: factory
+metadata:
+  installer-group: factory
 description: >-
   Experimental workflow for babysitting one explicitly authorized pull or
-  merge request. Use to monitor its live review state and checks, fix actionable
+  merge request. Use when monitoring its live review state and checks, fix actionable
   in-scope findings, and apply separate reply, approval, merge, and soak gates.
 ---
 

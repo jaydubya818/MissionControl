@@ -1,6 +1,7 @@
 ---
 name: factory-review-prs
-installer-group: factory
+metadata:
+  installer-group: factory
 description: >-
   Experimental workflow for reviewing configured repositories' pull requests.
   Use for manual or scheduled PR triage, approval, or merge decisions.
