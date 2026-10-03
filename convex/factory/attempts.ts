@@ -3,10 +3,13 @@ import { NO_INFERENCE_CONSTRAINT, isNoInferenceConstraint } from "../lib/offline
 import { v } from "convex/values";
 import { dockerRequestRecoveryMatches } from "../lib/dockerAllocationRecovery";
 import { internalAction, internalMutation, internalQuery, mutation } from "../_generated/server";
+import type { MutationCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import {
   activeLeaseMatches,
   candidateSourceCanBeVerified,
+  completedNotVerifiedRetryIssues,
   deriveFactoryPublicationLineage,
   evaluateAttemptClaim,
   expiredFactoryLeaseIdIsReplay,
@@ -88,7 +91,7 @@ import {
 import { executionProfileProjectionBlockers } from "../lib/executionProfile";
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "../lib/companyAccess";
 import { assertAuthorizedDeliveryRecord } from "../lib/deliveryAuthorization";
-import { buildLocalCandidateRecoveryRows } from "../lib/localCandidateRecovery";
+import { buildLocalCandidateRecoveryRows, buildVerificationCandidateContinuation } from "../lib/localCandidateRecovery";
 import { assertQualificationActivation } from "../lib/factoryQualificationScope";
 import { offlineAttemptSourceCurrentnessIssues } from "../lib/factoryAttempt";
 import { validateOfflineAttemptEvidence } from "../lib/offlineAttemptEvidence";
@@ -2177,6 +2180,7 @@ export const reportVerificationInternal = internalMutation({
       throw new Error("Verification result no longer belongs to the current candidate Attempt.");
     }
     frozenFactorySourceRevision(sourceAttempt, sourceAttempt.executionBaseSha);
+    const producerAttempt = await resolveVerificationCandidateProducerAttempt(ctx, sourceAttempt);
     const definition = await ctx.db.get(factoryVersion.factoryDefinitionId);
     if (!definition || definition.purpose !== "VERIFICATION") {
       throw new Error("Verification Attempt Factory definition is not purpose-bound to VERIFICATION.");
@@ -2210,8 +2214,8 @@ export const reportVerificationInternal = internalMutation({
       sourceAttempt: {
         id: String(sourceAttempt._id),
         attemptPurpose: sourceAttempt.attemptPurpose,
-        executorInvocationId: sourceAttempt.executorInvocationId,
-        leaseId: sourceAttempt.executionClaimId,
+        executorInvocationId: producerAttempt.executorInvocationId,
+        leaseId: producerAttempt.executionClaimId,
         worktree: sourceAttempt.worktree,
       },
       verificationAttempt: {
@@ -2518,8 +2522,9 @@ export const reportVerificationInternal = internalMutation({
       && ["VERIFIED", "REQUIRES_HUMAN_REVIEW"].includes(decision.verdict ?? "")) {
       await pauseForHumanReview(ctx, { run: sourceAttempt, workOrder, verificationRunId: verificationRun._id,
         verificationReceiptId: receiptId, sourceRevision: sourceAttempt.executionBaseSha!, candidateRevision: packet.candidateRevision });
-    } else if (sourceAttempt.verificationSubject?.version === 2 && sourceAttempt.status === "PAUSED"
-      && sourceAttempt.executionPhase === "AWAITING_VERIFICATION") {
+    } else if (sourceAttempt.verificationSubject?.version === 2
+      && ((sourceAttempt.status === "PAUSED" && sourceAttempt.executionPhase === "AWAITING_VERIFICATION")
+        || (sourceAttempt.status === "COMPLETED" && sourceAttempt.metadata?.verificationCandidateContinuation))) {
       const failureReason = `Candidate failed independent verification (${decision.verdict ?? "NO_VERDICT"}): ${decision.reasons.join(" ")}`.slice(0, 2000);
       await ctx.db.patch(sourceAttempt._id, { status: "FAILED", executionPhase: "TERMINAL", completedAt: now, failureReason,
         runtimeDisposition: "FAILED", runtimeDispositionReason: failureReason, runtimeReconciledAt: now,
@@ -2979,9 +2984,9 @@ export const retryVerification = mutation({
   handler: retryVerificationHandler,
 });
 
-export async function retryVerificationHandler(ctx: any, args: {
-  workOrderId: any; failedVerificationAttemptId: any; reason: string;
-}, scheduleVerification = schedulePolicyV2VerificationAttempt) {
+export async function retryVerificationHandler(ctx: MutationCtx, args: {
+  workOrderId: Id<"workOrders">; failedVerificationAttemptId: Id<"workflowRuns">; reason: string;
+}, scheduleVerification: typeof schedulePolicyV2VerificationAttempt = schedulePolicyV2VerificationAttempt) {
     const reason = args.reason.trim();
     if (reason.length < 10 || reason.length > 1_000) {
       throw new Error("Verification recovery requires a reason between 10 and 1,000 characters.");
@@ -2999,39 +3004,106 @@ export async function retryVerificationHandler(ctx: any, args: {
     assertAuthorizedDeliveryRecord(access, workOrder);
     if (!failedAttempt
       || failedAttempt.workOrderId !== workOrder._id
+      || failedAttempt.projectId !== workOrder.projectId
+      || failedAttempt.tenantId !== workOrder.tenantId
       || failedAttempt.attemptPurpose !== "VERIFICATION"
-      || !["FAILED", "CANCELED"].includes(failedAttempt.status)
-      || !failedAttempt.metadata?.verificationSupersededAt
       || !failedAttempt.verificationAttemptBinding?.sourceAttemptId) {
-      throw new Error("Only a terminal superseded Verification Attempt can be retried.");
+      throw new Error("Only an exact terminal Verification Attempt can be retried.");
     }
     const attempts = await ctx.db.query("workflowRuns")
-      .withIndex("by_work_order_attempt_purpose", (q) => q.eq("workOrderId", workOrder._id).eq("attemptPurpose", "VERIFICATION"))
+      .withIndex("by_work_order_attempt_purpose", (q: any) => q.eq("workOrderId", workOrder._id).eq("attemptPurpose", "VERIFICATION"))
       .collect();
     const subjectDigest = failedAttempt.verificationAttemptBinding.verificationSubjectDigest;
-    const existing = attempts.find((attempt) => attempt._id !== failedAttempt._id
+    const existing = attempts.find((attempt: any) => attempt._id !== failedAttempt._id
+      && attempt.metadata?.retryOfWorkflowRunId === failedAttempt._id
+      && !attempt.metadata?.verificationSupersededAt);
+    if (existing) {
+      if (existing.projectId !== workOrder.projectId || existing.tenantId !== workOrder.tenantId) {
+        throw new Error("Verification recovery Attempt is outside the authorized workspace.");
+      }
+      return { created: false as const, workflowRun: existing };
+    }
+    const conflictingSameSubject = attempts.find((attempt: any) => attempt._id !== failedAttempt._id
       && attempt.verificationAttemptBinding?.verificationSubjectDigest === subjectDigest
       && !attempt.metadata?.verificationSupersededAt);
-    if (existing) return { created: false as const, workflowRun: existing };
+    if (conflictingSameSubject) {
+      throw new Error("Verification recovery found another unsuperseded Attempt for this exact subject.");
+    }
     const latest = [...attempts].sort((left, right) => right.startedAt - left.startedAt
       || String(right._id).localeCompare(String(left._id)))[0];
     if (latest?._id !== failedAttempt._id) {
       throw new Error("Verification recovery must reference the latest Attempt for this WorkOrder.");
     }
-    const sourceAttempt = await ctx.db.get(failedAttempt.verificationAttemptBinding.sourceAttemptId);
-    if (!sourceAttempt
+    const [sourceAttempt, verificationRun, candidateSources] = await Promise.all([
+      ctx.db.get(failedAttempt.verificationAttemptBinding.sourceAttemptId),
+      ctx.db.query("verificationRuns").withIndex("by_run", (q: any) => q.eq("workflowRunId", failedAttempt._id)).first(),
+      ctx.db.query("workflowRuns").withIndex("by_work_order", (q: any) => q.eq("workOrderId", workOrder._id)).collect(),
+    ]);
+    const currentSourceAttempt = candidateSources
+      .filter((attempt: any) => attempt.attemptPurpose === "IMPLEMENTATION" && Number.isFinite(attempt.candidateReadyAt))
+      .sort((left: any, right: any) => (right.candidateReadyAt ?? 0) - (left.candidateReadyAt ?? 0)
+        || right.startedAt - left.startedAt || String(right._id).localeCompare(String(left._id)))[0];
+    const infrastructureRetry = ["FAILED", "CANCELED"].includes(failedAttempt.status)
+      && Boolean(failedAttempt.metadata?.verificationSupersededAt);
+    const rejectedCandidateRetry = Boolean(sourceAttempt && verificationRun
+      && completedNotVerifiedRetryIssues({ workOrder, verificationAttempt: failedAttempt,
+        verificationRun, sourceAttempt, currentSourceAttempt }).length === 0);
+    const competingActiveSource = candidateSources.some((attempt: any) => attempt._id !== sourceAttempt?._id
+      && attempt.attemptPurpose === "IMPLEMENTATION" && ["PENDING", "RUNNING", "PAUSED"].includes(attempt.status));
+    const currentExecutionMatchesRejectedSubject = !workOrder.currentExecutionRunId
+      || workOrder.currentExecutionRunId === failedAttempt._id
+      || workOrder.currentExecutionRunId === sourceAttempt?._id;
+    if (!sourceAttempt || (!infrastructureRetry && !rejectedCandidateRetry)
       || sourceAttempt.workOrderId !== workOrder._id
-      || !candidateSourceCanBeVerified(sourceAttempt)
+      || sourceAttempt.projectId !== workOrder.projectId
+      || sourceAttempt.tenantId !== workOrder.tenantId
+      || (verificationRun && (verificationRun.projectId !== workOrder.projectId || verificationRun.tenantId !== workOrder.tenantId))
       || sourceAttempt.attemptPurpose !== "IMPLEMENTATION"
       || sourceAttempt.workOrderRevisionNumber !== (workOrder.currentRevisionNumber ?? 1)
-      || sourceAttempt.verificationSubject?.digest !== subjectDigest) {
+      || sourceAttempt.verificationSubject?.digest !== subjectDigest
+      || competingActiveSource
+      || (rejectedCandidateRetry && !currentExecutionMatchesRejectedSubject)
+      || (infrastructureRetry && !candidateSourceCanBeVerified(sourceAttempt))) {
       throw new Error("Verification recovery source is no longer the exact current candidate.");
     }
-    const result = await scheduleVerification(ctx, workOrder, sourceAttempt);
+    const now = Date.now();
+    const actorId = access.membership.operatorId ? String(access.membership.operatorId) : "demo:company-administrator";
+    let verificationSource = sourceAttempt;
+    if (rejectedCandidateRetry && !failedAttempt.metadata?.verificationSupersededAt) {
+      await ctx.db.patch(failedAttempt._id, { metadata: { ...(failedAttempt.metadata ?? {}),
+        verificationSupersededAt: now, verificationSupersededReason: reason,
+        verificationSupersededBy: `human:${actorId}` } });
+    }
+    if (rejectedCandidateRetry) {
+      const subject = sourceAttempt.verificationSubject;
+      if (subject?.kind !== "GIT_CANDIDATE" || !sourceAttempt.executionManifestDigest
+        || !sourceAttempt.executionBaseSha || !sourceAttempt.headSha || !sourceAttempt.treeSha
+        || subject.candidateSha !== sourceAttempt.headSha || subject.treeSha !== sourceAttempt.treeSha) {
+        throw new Error("Rejected-candidate retry requires an exact durable Git candidate identity.");
+      }
+      const continuationRunId = Math.random().toString(36).slice(2, 10);
+      const continuation = buildVerificationCandidateContinuation({ failedAttempt: sourceAttempt,
+        continuationRunId, requestedAt: now, actorId, reason,
+        failedVerificationAttemptId: String(failedAttempt._id), failedVerificationRunId: String(verificationRun!._id) });
+      const continuationId = await ctx.db.insert("workflowRuns", continuation);
+      const { subjectId: _subjectId, digest: _digest, ...subjectInput } = subject;
+      const continuedSubject = subject.version === 2
+        ? createPrepublicationGitVerificationSubject({ ...subjectInput, sourceAttemptId: String(continuationId) } as any)
+        : createGitVerificationSubject({ ...subjectInput, sourceAttemptId: String(continuationId) } as any);
+      await ctx.db.patch(continuationId, { verificationSubject: continuedSubject as any, candidateReadyAt: now,
+        executionBaseSha: sourceAttempt.executionBaseSha, headSha: sourceAttempt.headSha, treeSha: sourceAttempt.treeSha });
+      const insertedContinuation = await ctx.db.get(continuationId);
+      if (!insertedContinuation) throw new Error("Candidate continuation was not durably created.");
+      verificationSource = insertedContinuation;
+      await insertEvent(ctx, verificationSource, { idempotencyKey: `verification-candidate-continuation:${String(sourceAttempt._id)}:${String(continuationId)}`,
+        eventType: "CANDIDATE_READY", workflowStep: "candidate-reattestation", actor: `human:${actorId}`,
+        status: "COMPLETED", startedAt: now, endedAt: now, commandSummary: reason,
+        metadata: { sourceAttemptId: sourceAttempt._id, failedVerificationAttemptId: failedAttempt._id,
+          failedVerificationRunId: verificationRun!._id, candidateSha: sourceAttempt.headSha,
+          treeSha: sourceAttempt.treeSha, sourceRevision: sourceAttempt.executionBaseSha, executorReplay: false } });
+    }
+    const result = await scheduleVerification(ctx, workOrder, verificationSource);
     if (result.created) {
-      const actorId = access.membership.operatorId
-        ? String(access.membership.operatorId)
-        : "demo:company-administrator";
       await ctx.db.patch(result.workflowRun._id, {
         metadata: {
           ...(result.workflowRun.metadata ?? {}),
@@ -3039,6 +3111,7 @@ export async function retryVerificationHandler(ctx: any, args: {
           retryOfRunId: failedAttempt.runId,
           retryReason: reason,
           recoveryActorId: actorId,
+          sourceContinuationAttemptId: rejectedCandidateRetry ? verificationSource._id : undefined,
         },
       });
       await insertEvent(ctx, result.workflowRun, {
@@ -3047,16 +3120,52 @@ export async function retryVerificationHandler(ctx: any, args: {
         workflowStep: "independent-verification",
         actor: `human:${actorId}`,
         status: "PENDING",
-        startedAt: Date.now(),
+        startedAt: now,
         commandSummary: reason,
         metadata: {
           retryOfWorkflowRunId: failedAttempt._id,
           retryOfRunId: failedAttempt.runId,
-          verificationSubjectDigest: subjectDigest,
+          verificationSubjectDigest: result.workflowRun.verificationAttemptBinding?.verificationSubjectDigest,
+          retryOfVerificationSubjectDigest: subjectDigest,
         },
       });
     }
     return result;
+}
+
+async function resolveVerificationCandidateProducerAttempt(ctx: any, sourceAttempt: any) {
+  const seen = new Set<string>();
+  let current = sourceAttempt;
+  for (let depth = 0; depth < 16; depth += 1) {
+    const currentId = String(current?._id ?? "");
+    if (!currentId || seen.has(currentId)) {
+      throw new Error("Verification candidate continuation contains a cyclic producer lineage.");
+    }
+    seen.add(currentId);
+    const continuation = current.metadata?.verificationCandidateContinuation;
+    if (!continuation) return current;
+    const parent = await ctx.db.get(continuation.sourceAttemptId);
+    if (!parent
+      || parent.attemptPurpose !== "IMPLEMENTATION"
+      || parent.workOrderId !== current.workOrderId
+      || parent.projectId !== current.projectId
+      || parent.tenantId !== current.tenantId
+      || parent.workOrderRevisionNumber !== current.workOrderRevisionNumber
+      || parent.verificationContractDigest !== current.verificationContractDigest
+      || continuation.sourceExecutionManifestDigest !== parent.executionManifestDigest
+      || parent.repositoryId !== current.repositoryId
+      || parent.executionBaseSha !== current.executionBaseSha
+      || parent.headSha !== current.headSha
+      || parent.treeSha !== current.treeSha
+      || parent.worktree !== current.worktree
+      || continuation.candidateSha !== current.headSha
+      || continuation.treeSha !== current.treeSha
+      || continuation.sourceRevision !== current.executionBaseSha) {
+      throw new Error("Verification candidate continuation no longer matches its immutable producer lineage.");
+    }
+    current = parent;
+  }
+  throw new Error("Verification candidate continuation producer lineage exceeds the supported depth.");
 }
 
 export const resumeVerification = mutation({

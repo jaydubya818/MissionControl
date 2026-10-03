@@ -1341,6 +1341,13 @@ async function refreshWorkOrderGovernance(ctx: any, workOrderId: any) {
       && !runMatchesCurrentRevision(latestRun.workOrderRevisionNumber, refreshedWorkOrder.currentRevisionNumber)
     ) {
       nextState = "BLOCKED";
+    } else if (
+      refreshedWorkOrder.state === "BLOCKED"
+      && computedVerificationStatus === "FAIL"
+      && latestRun?.attemptPurpose === "VERIFICATION"
+      && latestRun.status === "COMPLETED"
+    ) {
+      nextState = "BLOCKED";
     } else if (latestRun) {
       nextState = nextStateForRunStatus({
         currentState: refreshedWorkOrder.state as any,
@@ -4551,7 +4558,12 @@ export const syncExecutionOutcome = internalMutation({
       throw new Error("WorkOrder and workflowRun project mismatch");
     }
 
-    const nextState = nextStateForRunStatus({
+    const verificationRun = run.attemptPurpose === "VERIFICATION" && run.status === "COMPLETED"
+      ? await ctx.db.query("verificationRuns").withIndex("by_run", (q: any) => q.eq("workflowRunId", run._id)).first()
+      : null;
+    const verificationRejected = verificationRun?.status === "COMPLETED"
+      && ["NOT_VERIFIED", "BLOCKED"].includes(verificationRun.verdict ?? "");
+    const nextState = verificationRejected ? "BLOCKED" : nextStateForRunStatus({
       currentState: workOrder.state as any,
       runStatus: run.status as any,
       verificationStatus: workOrder.verificationStatus as any,
@@ -4569,10 +4581,13 @@ export const syncExecutionOutcome = internalMutation({
     } else if (run.status === "CANCELED") {
       nextPatch.requiredHumanAction = "Work order canceled. Re-open or replace if value is still desired.";
     } else if (run.status === "COMPLETED") {
-      nextPatch.blockingIssue = undefined;
-      nextPatch.requiredHumanAction = nextState === "AWAITING_VERIFICATION"
-        ? "Record completion evidence against acceptance criteria."
+      nextPatch.verificationStatus = verificationRejected ? "FAIL" : workOrder.verificationStatus;
+      nextPatch.blockingIssue = verificationRejected
+        ? `Independent verification completed with ${verificationRun?.verdict}. Review the retained evidence before retrying or revising this WorkOrder.`
         : undefined;
+      nextPatch.requiredHumanAction = verificationRejected
+        ? "Review verification evidence, then retry the exact candidate or revise the WorkOrder."
+        : nextState === "AWAITING_VERIFICATION" ? "Record completion evidence against acceptance criteria." : undefined;
       if (nextState === "DONE") {
         nextPatch.currentExecutionRunId = undefined;
       }
@@ -4593,7 +4608,8 @@ export const syncExecutionOutcome = internalMutation({
       toState: nextState,
       actorType: "SYSTEM",
       summary: args.summary ?? `Synchronized work order state from workflow run status ${run.status}`,
-      metadata: { workflowRunStatus: run.status, failureReason: run.failureReason },
+      metadata: { workflowRunStatus: run.status, failureReason: run.failureReason,
+        verificationVerdict: verificationRun?.verdict },
     });
 
     await refreshWorkOrderGovernance(ctx, workOrder._id);
