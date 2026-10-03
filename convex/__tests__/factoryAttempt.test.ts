@@ -3,6 +3,7 @@ import { createGitVerificationSubject } from "@mission-control/workflow-engine/v
 import {
   activeLeaseMatches,
   classifyFactoryAttemptReconciliation,
+  completedNotVerifiedRetryIssues,
   deriveFactoryPublicationLineage,
   evaluateAttemptClaim,
   expiredFactoryLeaseIdIsReplay,
@@ -21,6 +22,44 @@ const workerB = { workerId: "worker-b", sessionId: "session-b", generation: 3 };
 const verificationContractDigest = `sha256:${"d".repeat(64)}`;
 
 describe("Factory attempt leases", () => {
+  it("permits completed NOT_VERIFIED retry only for the exact current candidate tuple", () => {
+    const candidateSha = "b".repeat(40);
+    const sourceSha = "a".repeat(40);
+    const subject = createGitVerificationSubject({ version: 1, kind: "GIT_CANDIDATE",
+      workOrderId: "work-order-1", workOrderRevisionNumber: 4, verificationContractDigest,
+      sourceAttemptId: "source-1", repositoryId: "repository-1", provider: "GITHUB",
+      providerRepositoryId: "provider-repository-1", candidateSha, treeSha: "c".repeat(40),
+      pullRequest: { providerPullRequestId: "provider-pr-1", number: 1,
+        url: "https://github.com/acme/repo/pull/1", baseRef: "main", headRef: "mc/work-order-1",
+        headSha: candidateSha, draftAtPublication: true } });
+    const workOrder = { _id: "work-order-1", currentRevisionNumber: 4, verificationContractDigest };
+    const sourceAttempt = { _id: "source-1", workOrderId: "work-order-1", workOrderRevisionNumber: 4,
+      verificationContractDigest, attemptPurpose: "IMPLEMENTATION", status: "FAILED", executionPhase: "TERMINAL",
+      candidateReadyAt: 100, executionBaseSha: sourceSha, verificationSubject: subject };
+    const verificationAttempt = { _id: "verifier-1", workOrderId: "work-order-1", workOrderRevisionNumber: 4,
+      verificationContractDigest, attemptPurpose: "VERIFICATION", status: "COMPLETED",
+      verificationAttemptBinding: { sourceAttemptId: "source-1", workOrderId: "work-order-1",
+        workOrderRevisionNumber: 4, verificationContractDigest, verificationSubjectDigest: subject.digest,
+        verificationSubject: subject } };
+    const verificationRun = { _id: "verification-run-1", workflowRunId: "verifier-1", workOrderId: "work-order-1",
+      sourceAttemptId: "source-1", workOrderRevisionNumber: 4, verificationContractDigest,
+      verificationSubjectId: subject.subjectId, verificationSubjectDigest: subject.digest, sourceRevision: sourceSha,
+      candidateRevision: candidateSha, status: "COMPLETED", verdict: "NOT_VERIFIED" };
+    const exact = { workOrder, verificationAttempt, verificationRun, sourceAttempt, currentSourceAttempt: sourceAttempt };
+    expect(completedNotVerifiedRetryIssues(exact)).toEqual([]);
+    expect(completedNotVerifiedRetryIssues({ ...exact,
+      verificationRun: { ...verificationRun, verdict: "VERIFIED" } })).toContain("VERDICT_NOT_RETRYABLE");
+    expect(completedNotVerifiedRetryIssues({ ...exact,
+      verificationRun: { ...verificationRun, verdict: "BLOCKED" } })).toEqual([]);
+    expect(completedNotVerifiedRetryIssues({ ...exact,
+      currentSourceAttempt: { ...sourceAttempt, _id: "newer-source" } })).toContain("SOURCE_NOT_CURRENT");
+    expect(completedNotVerifiedRetryIssues({ ...exact,
+      workOrder: { ...workOrder, currentRevisionNumber: 5 } })).toContain("REVISION_NOT_CURRENT");
+    expect(completedNotVerifiedRetryIssues({ ...exact,
+      verificationRun: { ...verificationRun, candidateRevision: "d".repeat(40) } }))
+      .toContain("VERIFICATION_RUN_IDENTITY_MISMATCH");
+  });
+
   it("rejects an intermediate worker-selected base that could hide verification authority changes", () => {
     const base = "a".repeat(40); const intermediate = "b".repeat(40);
     const run = { executionManifest: { repository: { baseSha: base } } };

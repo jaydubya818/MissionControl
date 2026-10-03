@@ -238,6 +238,41 @@ export function factoryAttemptSourceBindingMatches(input: {
   );
 }
 
+export function completedNotVerifiedRetryIssues(input: {
+  workOrder: any; verificationAttempt: any; verificationRun: any;
+  sourceAttempt: any; currentSourceAttempt: any;
+}): string[] {
+  const { workOrder, verificationAttempt, verificationRun, sourceAttempt, currentSourceAttempt } = input;
+  const binding = verificationAttempt?.verificationAttemptBinding;
+  const subject = binding?.verificationSubject;
+  const candidateRevision = subject?.kind === "GIT_CANDIDATE" ? subject.candidateSha : subject?.outputSnapshotContentHash;
+  const issues: string[] = [];
+  if (verificationAttempt?.attemptPurpose !== "VERIFICATION" || verificationAttempt?.status !== "COMPLETED") issues.push("VERIFIER_NOT_COMPLETED");
+  if (verificationRun?.workflowRunId !== verificationAttempt?._id || verificationRun?.status !== "COMPLETED"
+    || !["NOT_VERIFIED", "BLOCKED"].includes(verificationRun?.verdict ?? "")) issues.push("VERDICT_NOT_RETRYABLE");
+  if (!subject || !verifyVerificationSubjectIdentity(subject) || binding?.verificationSubjectDigest !== subject.digest
+    || binding?.sourceAttemptId !== sourceAttempt?._id) issues.push("SUBJECT_BINDING_INVALID");
+  const currentRevision = workOrder?.currentRevisionNumber ?? 1;
+  if (verificationAttempt?.workOrderId !== workOrder?._id || binding?.workOrderId !== workOrder?._id
+    || subject?.workOrderId !== String(workOrder?._id ?? "") || sourceAttempt?.workOrderId !== workOrder?._id
+    || verificationRun?.workOrderId !== workOrder?._id) issues.push("WORK_ORDER_MISMATCH");
+  if (verificationAttempt?.workOrderRevisionNumber !== currentRevision || binding?.workOrderRevisionNumber !== currentRevision
+    || subject?.workOrderRevisionNumber !== currentRevision || sourceAttempt?.workOrderRevisionNumber !== currentRevision
+    || verificationRun?.workOrderRevisionNumber !== currentRevision) issues.push("REVISION_NOT_CURRENT");
+  if (!workOrder?.verificationContractDigest || verificationAttempt?.verificationContractDigest !== workOrder.verificationContractDigest
+    || binding?.verificationContractDigest !== workOrder.verificationContractDigest
+    || subject?.verificationContractDigest !== workOrder.verificationContractDigest
+    || sourceAttempt?.verificationContractDigest !== workOrder.verificationContractDigest
+    || verificationRun?.verificationContractDigest !== workOrder.verificationContractDigest) issues.push("CONTRACT_MISMATCH");
+  if (sourceAttempt?.attemptPurpose !== "IMPLEMENTATION" || sourceAttempt?.status !== "FAILED"
+    || sourceAttempt?.executionPhase !== "TERMINAL" || !Number.isFinite(sourceAttempt?.candidateReadyAt)
+    || sourceAttempt?.verificationSubject?.digest !== subject?.digest || sourceAttempt?._id !== currentSourceAttempt?._id) issues.push("SOURCE_NOT_CURRENT");
+  if (verificationRun?.sourceAttemptId !== sourceAttempt?._id || verificationRun?.verificationSubjectDigest !== subject?.digest
+    || verificationRun?.verificationSubjectId !== subject?.subjectId || verificationRun?.sourceRevision !== sourceAttempt?.executionBaseSha
+    || verificationRun?.candidateRevision !== candidateRevision) issues.push("VERIFICATION_RUN_IDENTITY_MISMATCH");
+  return issues;
+}
+
 export function candidateSourceCanBeVerified(source: { status?: string; executionPhase?: string; verificationSubject?: any }) {
   return source.status === "COMPLETED" || (source.status === "PAUSED" && source.executionPhase === "AWAITING_VERIFICATION"
     && source.verificationSubject?.kind === "GIT_CANDIDATE" && source.verificationSubject.version === 2

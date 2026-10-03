@@ -624,8 +624,11 @@ export class FactoryAttemptWorker {
         });
       }
       if (claim.publicationCheckpoint && workspaceOwner && claim.previousLease?.workerId) {
-        await (this.dependencies.transferFactoryPublicationWorkspace ?? transferFactoryPublicationWorkspace)({
-          previousOwner: workspaceOwnerFromLease(claim, manifest, claim.previousLease),
+        const transferWorkspace = claim.publicationCheckpoint.workspaceSource
+          ? this.dependencies.transferFactoryRecoveryWorkspace ?? transferFactoryRecoveryWorkspace
+          : this.dependencies.transferFactoryPublicationWorkspace ?? transferFactoryPublicationWorkspace;
+        await transferWorkspace({
+          previousOwner: workspaceOwnerFromLease(claim, manifest, claim.previousLease, claim.publicationCheckpoint.workspaceSource),
           nextOwner: workspaceOwner,
           checkpointCandidateSha: claim.publicationCheckpoint.candidateRevision,
         });
