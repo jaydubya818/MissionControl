@@ -437,6 +437,67 @@ printf '%s\n' '{"type":"thread.started"}' '{"type":"turn.completed","usage":{"in
     }
   });
 
+  it.skipIf(process.platform === "win32").each([
+    { exitCode: 0, ignoreTerm: false },
+    { exitCode: 7, ignoreTerm: false },
+    { exitCode: 7, ignoreTerm: true },
+  ])("preserves owned exit $exitCode with inherited pipes (ignore TERM: $ignoreTerm)", async ({ exitCode, ignoreTerm }) => {
+    const repositoryRoot = await gitRepository();
+    const executable = path.join(repositoryRoot, "codex-open-stdio-stub.sh");
+    const descendantPidPath = path.join(repositoryRoot, "descendant.pid");
+    await writeFile(executable, `#!/bin/sh
+output=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then
+    shift
+    output="$1"
+  fi
+  shift
+done
+${ignoreTerm ? "trap '' TERM" : ""}
+sleep 60 &
+printf '%s' "$!" > "${descendantPidPath}"
+printf '%s' 'output captured before owned exit' > "$output"
+printf '%s\n' '{"type":"thread.started"}' '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'
+printf '%s\n' 'stderr captured before owned exit' >&2
+exit ${exitCode}
+`);
+    await chmod(executable, 0o700);
+
+    try {
+      const adapter = new CodexV1ExecutorAdapter(executable, undefined, resolvePinnedExecutableDigest);
+      const started = vi.fn();
+      const terminated = vi.fn();
+      const startedAt = Date.now();
+      const result = await executeAdapter(adapter, {
+        ...request,
+        repositoryRoot,
+        workingDirectory: repositoryRoot,
+        timeoutMs: 12_000,
+      }, { emit: () => undefined, processObserver: { started, terminated } });
+
+      expect(Date.now() - startedAt).toBeLessThan(ignoreTerm ? 9_000 : 3_000);
+      expect(result).toMatchObject({
+        status: exitCode === 0 ? "COMPLETED" : "FAILED",
+        output: "output captured before owned exit",
+        error: exitCode === 0 ? undefined : "stderr captured before owned exit\n",
+      });
+      expect(started).toHaveBeenCalledOnce();
+      expect(terminated).toHaveBeenCalledOnce();
+      expect(terminated).toHaveBeenCalledWith(expect.objectContaining({ exitCode }));
+      const descendantPid = Number(await readFile(descendantPidPath, "utf8"));
+      await vi.waitFor(async () => {
+        expect(await processCanExecute(descendantPid)).toBe(false);
+      }, { timeout: 2_000 });
+    } finally {
+      const pid = Number(await readFile(descendantPidPath, "utf8").catch(() => ""));
+      if (Number.isSafeInteger(pid) && pid > 0) {
+        try { process.kill(pid, "SIGKILL"); } catch { /* already reaped */ }
+      }
+      await rm(repositoryRoot, { recursive: true, force: true });
+    }
+  }, 20_000);
+
   it("rejects executable drift before invoking the harness runner", async () => {
     const repositoryRoot = await gitRepository();
     const executable = path.join(repositoryRoot, "unqualified-codex-stub.sh");
