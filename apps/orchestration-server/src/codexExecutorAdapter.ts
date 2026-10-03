@@ -91,6 +91,7 @@ interface CodexExecutionHandle {
 }
 
 const PROCESS_TERMINATION_GRACE_MS = 5_000;
+const PROCESS_EXIT_DRAIN_GRACE_MS = 250;
 export const CODEX_WORKSPACE_PERMISSION_PROFILE = "mission-planner-contained";
 export const CODEX_WORKSPACE_PERMISSION_CONFIG = [
   `default_permissions="${CODEX_WORKSPACE_PERMISSION_PROFILE}"`,
@@ -674,11 +675,14 @@ async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<Proc
     let ownedProcessGroupId: number | undefined;
     let startedNotification: Promise<void> = Promise.resolve();
     let forcedTermination: ReturnType<typeof setTimeout> | undefined;
+    let exitDrain: ReturnType<typeof setTimeout> | undefined;
+    let ownedExit: { code: number | null; signal: NodeJS.Signals | null } | undefined;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const startedAt = Date.now();
     const cleanup = () => {
       args.signal.removeEventListener("abort", requestTermination);
       if (forcedTermination) clearTimeout(forcedTermination);
+      if (exitDrain) clearTimeout(exitDrain);
       if (timeout) clearTimeout(timeout);
     };
     const signalOwnedProcessTree = (signal: NodeJS.Signals) => {
@@ -709,12 +713,24 @@ async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<Proc
         } catch (error) {
           lifecycleError ??= error;
         }
+        if (ownedExit) {
+          child.stdout?.destroy();
+          child.stderr?.destroy();
+          finishFromExit(ownedExit.code, ownedExit.signal);
+        }
       }, PROCESS_TERMINATION_GRACE_MS);
       forcedTermination.unref?.();
     };
     const complete = async (error: CodexProcessError | undefined, stdout: string, stderr: string, signal: NodeJS.Signals | null) => {
       if (settledValue) return;
       settledValue = true;
+      if (terminationRequested) {
+        try {
+          signalOwnedProcessTree("SIGKILL");
+        } catch (error) {
+          lifecycleError ??= error;
+        }
+      }
       cleanup();
       try {
         await startedNotification;
@@ -743,6 +759,13 @@ async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<Proc
     let stdout = "";
     let stderr = "";
     let spawnError: Error | undefined;
+    const finishFromExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      const error = spawnError ?? (code === 0 ? undefined : Object.assign(
+        new Error(signal ? `Codex exited after ${signal}.` : `Codex exited with status ${code ?? 1}.`),
+        { code: code ?? 1, signal },
+      ));
+      void complete(error, stdout, stderr, signal).catch(reject);
+    };
     const appendBounded = (current: string, chunk: Buffer) => {
       const next = current + chunk.toString("utf8");
       if (Buffer.byteLength(next) > 20 * 1024 * 1024) {
@@ -761,12 +784,13 @@ async function runCodexProcess(args: Parameters<ProcessRunner>[0]): Promise<Proc
     child.stdout?.on("data", (chunk: Buffer) => { stdout = appendBounded(stdout, chunk); });
     child.stderr?.on("data", (chunk: Buffer) => { stderr = appendBounded(stderr, chunk); });
     child.once("error", (error) => { spawnError = error; });
+    child.once("exit", (code, signal) => {
+      ownedExit = { code, signal };
+      if (timeout) clearTimeout(timeout);
+      exitDrain = setTimeout(requestTermination, PROCESS_EXIT_DRAIN_GRACE_MS);
+    });
     child.once("close", (code, signal) => {
-      const error = spawnError ?? (code === 0 ? undefined : Object.assign(
-        new Error(signal ? `Codex exited after ${signal}.` : `Codex exited with status ${code ?? 1}.`),
-        { code: code ?? 1, signal },
-      ));
-      void complete(error, stdout, stderr, signal).catch(reject);
+      finishFromExit(ownedExit ? ownedExit.code : code, ownedExit ? ownedExit.signal : signal);
     });
     if (typeof child.pid === "number") {
       ownedProcessGroupId = process.platform === "win32" ? undefined : child.pid;
