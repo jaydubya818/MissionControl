@@ -133,11 +133,19 @@ export async function prepareFactoryDependencies(
   return { status: "PREPARED" as const, packageManager: "pnpm" as const };
 }
 
-async function installFrozenPnpmDependencies(worktree: string) {
+export async function installFrozenPnpmDependencies(
+  worktree: string,
+  options: {
+    configuredStore?: string | null;
+    executePnpm?: (args: string[], env: NodeJS.ProcessEnv) => Promise<void>;
+  } = {},
+) {
   const scratchHome = await mkdtemp(path.join(tmpdir(), "mc-dependency-preparation-"));
   try {
     // Operator configuration, never discovered from candidate npm configuration.
-    const configuredStore = process.env.MISSION_CONTROL_FACTORY_PNPM_STORE_DIR;
+    const configuredStore = options.configuredStore === undefined
+      ? process.env.MISSION_CONTROL_FACTORY_PNPM_STORE_DIR
+      : options.configuredStore ?? undefined;
     if (configuredStore && !path.isAbsolute(configuredStore)) throw new Error("MISSION_CONTROL_FACTORY_PNPM_STORE_DIR must be absolute.");
     const storeDirectory = configuredStore ? await realpath(configuredStore) : path.join(scratchHome, "store");
     const corepackHome = process.env.COREPACK_HOME
@@ -170,22 +178,20 @@ async function installFrozenPnpmDependencies(worktree: string) {
       npm_config_ignore_scripts: "true",
       NPM_CONFIG_IGNORE_SCRIPTS: "true",
     };
-    try {
-      await execFileAsync("pnpm", ["--offline", ...installArgs], {
+    const executePnpm = options.executePnpm ?? (async (args: string[], executionEnv: NodeJS.ProcessEnv) => {
+      await execFileAsync("pnpm", args, {
         cwd: worktree,
-        env: { ...env, COREPACK_ENABLE_NETWORK: "0" },
+        env: executionEnv,
         timeout: 300_000,
         maxBuffer: 4 * 1024 * 1024,
       });
+    });
+    try {
+      await executePnpm(["--offline", ...installArgs], { ...env, COREPACK_ENABLE_NETWORK: "0" });
     } catch (offlineError: any) {
       // First scaffold: lockfile exists, local store does not. One online frozen
       // install fills the store without rewriting source or running lifecycle scripts.
-      await execFileAsync("pnpm", installArgs, {
-        cwd: worktree,
-        env: { ...env, COREPACK_ENABLE_NETWORK: "1" },
-        timeout: 300_000,
-        maxBuffer: 4 * 1024 * 1024,
-      }).catch((onlineError: any) => {
+      await executePnpm(installArgs, { ...env, COREPACK_ENABLE_NETWORK: "1" }).catch((onlineError: any) => {
         const offline = `${offlineError?.stderr ?? offlineError?.message ?? ""}`.trim();
         const online = `${onlineError?.stderr ?? onlineError?.stdout ?? onlineError?.message ?? ""}`.trim();
         throw new Error(`Factory dependency preparation failed${online ? `: ${online.slice(-2_000)}` : offline ? `: ${offline.slice(-2_000)}` : "."}`);
