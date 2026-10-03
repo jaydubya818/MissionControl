@@ -113,8 +113,10 @@ export async function ensureFactoryWorktree(input: {
  * its model budget only to discover that deterministic verification cannot
  * start.
  *
- * Installation is offline, lockfile-frozen, and lifecycle-script-free. The
- * Git status must be byte-for-byte unchanged so dependency preparation cannot
+ * An operator store is tried offline first, with one online fallback. Without
+ * a configured store, installation goes directly online. Every attempt is
+ * lockfile-frozen and lifecycle-script-free. Git status must be byte-for-byte
+ * unchanged so dependency preparation cannot
  * become an undeclared source mutation.
  */
 export async function prepareFactoryDependencies(
@@ -186,17 +188,19 @@ export async function installFrozenPnpmDependencies(
         maxBuffer: 4 * 1024 * 1024,
       });
     });
-    try {
-      await executePnpm(["--offline", ...installArgs], { ...env, COREPACK_ENABLE_NETWORK: "0" });
-    } catch (offlineError: any) {
-      // First scaffold: lockfile exists, local store does not. One online frozen
-      // install fills the store without rewriting source or running lifecycle scripts.
-      await executePnpm(installArgs, { ...env, COREPACK_ENABLE_NETWORK: "1" }).catch((onlineError: any) => {
-        const offline = `${offlineError?.stderr ?? offlineError?.message ?? ""}`.trim();
-        const online = `${onlineError?.stderr ?? onlineError?.stdout ?? onlineError?.message ?? ""}`.trim();
-        throw new Error(`Factory dependency preparation failed${online ? `: ${online.slice(-2_000)}` : offline ? `: ${offline.slice(-2_000)}` : "."}`);
-      });
+    let offlineDetail = "";
+    if (configuredStore) {
+      try {
+        await executePnpm(["--offline", ...installArgs], { ...env, COREPACK_ENABLE_NETWORK: "0" });
+        return;
+      } catch (offlineError: any) {
+        offlineDetail = `${offlineError?.stderr ?? offlineError?.message ?? ""}`.trim();
+      }
     }
+    await executePnpm(installArgs, { ...env, COREPACK_ENABLE_NETWORK: "1" }).catch((onlineError: any) => {
+      const detail = `${onlineError?.stderr ?? onlineError?.stdout ?? onlineError?.message ?? ""}`.trim() || offlineDetail;
+      throw new Error(`Factory dependency preparation failed${detail ? `: ${detail.slice(-2_000)}` : "."}`);
+    });
   } catch (error: any) {
     if (error instanceof Error && error.message.startsWith("Factory dependency preparation failed")) throw error;
     const detail = `${error?.stderr ?? error?.stdout ?? error?.message ?? "unknown error"}`.trim();

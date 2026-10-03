@@ -32,7 +32,7 @@ functions. Production callers retain the default executor.
 - Dependency preparation: first bounded repair.
 - Codex process exit handling and cached model adaptation: review separately.
 - Verification command policy and completed-verifier retry: require independent
-  authorization and lineage review before recovery.
+  review of authorization and lineage before recovery.
 - Task projections and reporting: check project isolation and parent inheritance.
 - Command Center, taskboard, navigation, and docs: compare with newer main UI;
   preserve current approval-count and navigation fixes.
