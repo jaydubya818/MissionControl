@@ -26,6 +26,7 @@ import {
   pushFactoryBranch,
 } from "../factoryGitRuntime.js";
 import { executeIndependentVerification } from "../factoryVerification.js";
+import { transferFactoryRecoveryWorkspace } from "../factoryWorkspaceOwnership.js";
 import { canonicalHash } from "@mission-control/shared";
 import {
   CODEX_V1_HARNESS_MANIFEST,
@@ -898,6 +899,7 @@ async function runFixture(
   let verifiedCandidate: { sourceRevision: string; candidateRevision: string } | null = null;
   let persistedFactoryResult: any = null;
   let checkpointLease: any;
+  let publicationWorkspaceSource: { workflowRunId: string; executionManifestDigest: string } | undefined;
   let prepublicationSubject: any;
   let consumedPermit: any;
   let reconciliationOnly = false;
@@ -928,6 +930,7 @@ async function runFixture(
             ...(options.durable ? { previousLease: checkpointLease, lease: { ...checkpointLease, leaseId: payload.leaseId, claimedAt: Date.now(), heartbeatAt: Date.now(), expiresAt: Date.now() + 120_000 } } : {}),
             publicationCheckpoint: {
               reconciliationOnly,
+              workspaceSource: publicationWorkspaceSource,
               ...(reconciliationOnly ? { publicationPermit: { id: consumedPermit.publicationPermitId, leaseId: consumedPermit.leaseId, validUntil: Date.now() - 1 }, publicationBinding } : {}),
               ...verifiedCandidate,
               authorizationValidUntil: reconciliationOnly ? Date.now() - 1 : Date.now() + 10 * 60_000,
@@ -1077,7 +1080,9 @@ async function runFixture(
   });
   const reconcilePublication = vi.fn(async (input) => ({ number: 42, url: "https://github.com/sellerfi/mission-control-fixture/pull/42",
     nodeId: "PR_fixture", headSha: input.headSha, draft: true, reused: true }));
-  const transferRecovery = vi.fn(async () => undefined);
+  const transferRecovery = vi.fn(async (input: Parameters<typeof transferFactoryRecoveryWorkspace>[0]) => {
+    if (publicationWorkspaceSource) return await transferFactoryRecoveryWorkspace(input);
+  });
   const dependencies: FactoryAttemptWorkerDependencies = {
     ensureFactoryWorktree: options.localCandidateRecovery ? vi.fn(async () => undefined) as any : ensureFactoryWorktree,
     ensureVerificationWorktree,
@@ -1145,7 +1150,20 @@ async function runFixture(
         title: manifest.intent.title, specification: manifest.workOrderSpecification,
         repositoryRoot: worktree, candidate: await inspectCandidateChange(worktree, baseSha) }, verifierPackets, prepublicationSubject);
     },
-    resumeAfterApproval: () => { lifecycle = "RESUME"; },
+    resumeAfterApproval: (asContinuation = false) => {
+      if (asContinuation) {
+        publicationWorkspaceSource = { workflowRunId: claim.workflowRunId, executionManifestDigest: claim.executionManifestDigest };
+        run._id = "retry-continuation";
+        run.runId = "retry-continuation-run";
+        claim.workflowRunId = run._id;
+        claim.runId = run.runId;
+        claim.executionManifest = { ...manifest, causation: { ...manifest.causation, workflowRunId: run.runId } };
+        claim.executionManifestDigest = `sha256:${canonicalHash(claim.executionManifest)}`;
+        const { subjectId, digest, ...subjectInput } = prepublicationSubject;
+        prepublicationSubject = createPrepublicationGitVerificationSubject({ ...subjectInput, sourceAttemptId: run._id });
+      }
+      lifecycle = "RESUME";
+    },
     queueReconciliation: () => { reconciliationOnly = true; lifecycle = "RESUME"; },
   };
 }
@@ -1647,7 +1665,7 @@ describe("Fab governed golden path using the canonical MC worker", () => {
     expect(f.createPullRequest).toHaveBeenCalledOnce(); expect(f.pushFactoryBranch).toHaveBeenCalledOnce();
     expect(f.authorizePublication).toHaveBeenCalledOnce(); expect(f.fabModelCalls()).toBe(4);
   });
-  it("pauses without a PR, verifies a v2 subject separately, then transfers the owned workspace for approved draft publication", async () => {
+  it.each([false, true])("pauses without a PR, verifies a v2 subject, then publishes with candidate continuation=%s", async (asContinuation) => {
     const f = await runFixture("REQUIRES_HUMAN_REVIEW", { fab: true, durable: true, prepublication: true });
     await waitForWorker(() => expect(f.reports.some(packet => packet.candidateReady?.version === 2)).toBe(true));
     await waitForWorker(() => expect(f.worker.status().activeRunIds).toEqual([]));
@@ -1663,10 +1681,11 @@ describe("Fab governed golden path using the canonical MC worker", () => {
     expect(f.verifierPackets[0].plan.verificationSubject).not.toHaveProperty("pullRequest");
     expect(f.verifierPackets[0].independence.passed).toBe(true);
     await f.worker.stop();
-    f.resumeAfterApproval();
+    f.resumeAfterApproval(asContinuation);
     const restarted = f.createRestartedWorker();
     await restarted.tick();
-    await waitForWorker(() => expect(restarted.status().completedCount).toBe(1));
+    await waitForWorker(() => expect(restarted.status().completedCount + restarted.status().failedCount).toBe(1));
+    expect(restarted.status()).toMatchObject({ completedCount: 1, lastError: null });
     expect(f.createPullRequest).toHaveBeenCalledOnce();
     expect(f.createPullRequest.mock.calls[0][0]).toMatchObject({ draft: true, headSha: candidate.candidateSha });
     expect(f.fabModelCalls()).toBe(4);

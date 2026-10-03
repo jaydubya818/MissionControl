@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createGitVerificationSubject, createPrepublicationGitVerificationSubject } from "@mission-control/workflow-engine/verification-subject";
-import { retryVerification, retryVerificationHandler, reportVerificationInternal } from "../factory/attempts";
+import { retryVerification, retryVerificationHandler, reportVerificationInternal, claimInternal, authorizePublicationInternal } from "../factory/attempts";
 import { syncExecutionOutcome, decideApprovalDecision } from "../workOrders";
 
 import { verificationIsolationBindingDigest, CODEX_V1_HARNESS_MANIFEST, CODEX_V1_RUNTIME_ARTIFACT, harnessCapabilityManifestDigest, harnessRuntimeArtifactDigest } from "@mission-control/workflow-engine";
 import { exactModelRouteSnapshot, exactModelRouteDigest, exactModelRouteQualificationSnapshot, modelRouteQualificationDigest } from "../lib/modelRouteAdmission";
 
 import { effectivePolicyV2VerificationChecks } from "../lib/policyV2Verification";
+import { computeCanonicalHash } from "../lib/genomeHash";
 
 type Row = Record<string, any>;
 const CONTRACT = `sha256:${"d".repeat(64)}`;
@@ -189,7 +190,7 @@ async function configuredFixture() {
   const route = exactModelRouteSnapshot({ provider: "openai", providerRoute: "openai", modelId: "fixture-explicit-model" });
   const routeDigest = exactModelRouteDigest(route);
   const qualification = exactModelRouteQualificationSnapshot({ routeDigest, evidenceReference: "synthetic-retry-test",
-    evidenceDigest: `sha256:${"8".repeat(64)}`, workloadClasses: ["VERIFICATION"], riskClasses: ["GREEN"],
+    evidenceDigest: `sha256:${"8".repeat(64)}`, workloadClasses: ["VERIFICATION", "SOFTWARE_CHANGE"], riskClasses: ["GREEN"],
     promotedBy: "fixture-operator", promotedAt: 1, compatibility: { adapter: "codex", version: "v1",
       capabilityManifestDigest: capabilityDigest, effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256,
       runtimeArtifactDigest: artifactDigest, executionBackend: "persistent-worker" } });
@@ -197,6 +198,7 @@ async function configuredFixture() {
   const scope = { tenantId: "tenant-1", projectId: "project-1", repositoryId: "repository-1" };
   await f.db.insert("workspaceRepositories", { _id: "repository-1", ...scope, provider: "GITHUB", providerRepositoryId: "provider-repository-1",
     repository: "synthetic/retry", defaultBranch: "main", status: "READY", dataClassification: "PUBLIC" });
+  await f.db.insert("githubAppInstallations", { ...scope, installationId: "fixture-installation", status: "CONNECTED" });
   await f.db.insert("modelCatalog", { _id: "model-1", ...scope, routeSnapshot: route, routeDigest,
     qualificationSnapshot: qualification, qualificationDigest, enabled: true,
     qualificationStatus: "EVIDENCE_QUALIFIED", admissionStatus: "PRODUCTION_PILOT_ELIGIBLE" });
@@ -231,6 +233,26 @@ async function configuredFixture() {
     acceptanceCriteria: [{ id: "criterion-1", title: "Synthetic behavior passes", requiredEvidence: [{ category: "TEST_RESULT", minimumCount: 1, independent: true }] }],
     verificationContract: { schemaVersion: 2, enforcementMode: "ENFORCED", requiredRisks: [], checks: [{ id: "unit", name: "Unit check",
       category: "UNIT_TEST", verifierId: "factory-command/v1", mandatory: true, acceptanceCriterionIds: ["criterion-1"], evidenceCategory: "TEST_RESULT" }] } });
+  const manifest = { version: "factory-execution-manifest/v1", causation: { workflowRunId: "source-run" },
+    repository: { baseSha: SOURCE_SHA, worktree: "/fixture/source", dataClassification: "PUBLIC" },
+    harness: { adapter: "codex", version: "v1", capabilityManifestSha256: capabilityDigest,
+      effectiveConfigSha256: CODEX_V1_HARNESS_MANIFEST.effectiveConfigSha256, executionBackend: "persistent-worker",
+      modelCatalogId: "model-1", modelRouteDigest: routeDigest, modelRouteSnapshot: route, modelQualificationDigest: qualificationDigest },
+    workflow: { steps: [{ kind: "EXECUTE", modelRoute: route.modelId, modelConfiguration: { provider: route.provider } }] } };
+  await f.db.insert("factoryDefinitions", { _id: "software-definition", ...scope, status: "ACTIVE", purpose: "SOFTWARE", activeVersionId: "software-version" });
+  await f.db.insert("factoryDefinitionVersions", { ...await f.db.get("version-1"), _id: "software-version", factoryDefinitionId: "software-definition", purpose: "SOFTWARE" });
+  await f.db.patch("source-1", { factoryDefinitionVersionId: "software-version", factoryConfigurationDigest: "config-1",
+    hostBindingId: "host-1", executorAdapter: "codex", executorVersion: "v1",
+    executionManifest: manifest, executionManifestDigest: `sha256:${computeCanonicalHash(manifest)}`,
+    checkpointLease: { leaseId: "builder-lease", ownerId: "builder", workerId: "worker-1", workerSessionId: "builder-session",
+      workerGeneration: 1, claimedAt: 10, heartbeatAt: 20, expiresAt: 30 } });
+  await f.db.patch("host-1", { baseCommit: SOURCE_SHA });
+  await f.db.insert("runArtifacts", { ...scope, workOrderId: "work-order-1", workflowRunId: "source-1",
+    artifactType: "STRUCTURED_OUTPUT", idempotencyKey: "factory:source-run:structured-result",
+    metadata: { result: { summary: "Synthetic candidate result" } } });
+  await f.db.insert("runArtifacts", { ...scope, workOrderId: "work-order-1", workflowRunId: "source-1",
+    artifactType: "CODE_DIFF", idempotencyKey: `factory:source-run:code-diff:${CANDIDATE_SHA}`,
+    metadata: { headSha: CANDIDATE_SHA, treeSha: "c".repeat(40), sourceRevision: SOURCE_SHA, changedFiles: ["src/feature.ts"] } });
   return f;
 }
 
@@ -297,8 +319,21 @@ describe("retry evidence and authority boundaries", () => {
     await f.db.patch("role-1", { permissions: ["workorders.dispatch", "approvals.decide"] });
     const approval = await f.invoke(decideApprovalDecision, decision);
     expect(approval).toMatchObject({ status: "APPROVED" });
-    expect(await f.db.get(continuation._id)).toMatchObject({ status: "PENDING", factoryContinuation: { status: "READY_TO_PUBLISH" } });
-
+    expect(await f.db.get(continuation._id)).toMatchObject({ status: "PENDING", isMutating: true, factoryContinuation: { status: "READY_TO_PUBLISH" } });
+    await f.db.patch("host-1", { workerRuntime: undefined });
+    const claim = await f.invoke(claimInternal, { workflowRunId: continuation._id, ownerId: "publisher", leaseId: "publication-lease", leaseDurationMs: 120_000 });
+    expect(claim).toMatchObject({ claimed: true, previousLease: { leaseId: "builder-lease" }, publicationCheckpoint: {
+      candidateRevision: CANDIDATE_SHA, changedFiles: ["src/feature.ts"], structuredResult: { summary: "Synthetic candidate result" },
+      workspaceSource: { workflowRunId: "source-1", executionManifestDigest: (await f.db.get("source-1")).executionManifestDigest },
+    } });
+    expect(await f.invoke(authorizePublicationInternal, { workflowRunId: continuation._id, ownerId: "publisher",
+      leaseId: "publication-lease", candidateRevision: CANDIDATE_SHA })).toMatchObject({ authorized: true, candidateRevision: CANDIDATE_SHA });
+    const publishing = await f.db.get(continuation._id);
+    await f.db.patch(continuation._id, { lease: { ...publishing.lease, expiresAt: Date.now() - 1 } });
+    const reclaimed = await f.invoke(claimInternal, { workflowRunId: continuation._id, ownerId: "publisher",
+      leaseId: "reclaimed-publication-lease", leaseDurationMs: 120_000 });
+    expect(reclaimed).toMatchObject({ claimed: true, reclaimed: true, previousLease: { leaseId: "builder-lease" },
+      publicationCheckpoint: { workspaceSource: { workflowRunId: "source-1" } } });
   });
 
   it("preserves two failed candidates and evidence across repeated verification retries", async () => {

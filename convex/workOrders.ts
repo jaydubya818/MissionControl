@@ -879,6 +879,7 @@ async function applyFactoryHumanReviewDecision(ctx: any, input: {
       failureReason: undefined,
       checkpointAt: now,
       checkpointSummary: `Human review approved; candidate ${input.sourceReceipt.candidateRevision.slice(0, 12)} is ready to publish`,
+      ...(input.run.metadata?.verificationCandidateContinuation ? { isMutating: true } : {}),
       executionPhase: "PUBLISHING",
       factoryContinuation: {
         ...input.run.factoryContinuation,
@@ -1298,11 +1299,19 @@ async function refreshWorkOrderGovernance(ctx: any, workOrderId: any) {
   const refreshedWorkOrder = await ctx.db.get(workOrderId);
   if (!refreshedWorkOrder) throw new Error("WorkOrder not found");
 
-  const [approvalDecisions, verificationReceipts, latestRun] = await Promise.all([
+  const [approvalDecisions, verificationReceipts, observedLatestRun, currentRun] = await Promise.all([
     listApprovalDecisionsForWorkOrder(ctx, workOrderId),
     listVerificationReceiptsForWorkOrder(ctx, workOrderId),
     latestExecutionRunForWorkOrder(ctx, workOrderId),
+    refreshedWorkOrder.currentExecutionRunId ? ctx.db.get(refreshedWorkOrder.currentExecutionRunId) : null,
   ]);
+  const latestRun = currentRun?.workOrderId === workOrderId
+    && currentRun.projectId === refreshedWorkOrder.projectId
+    && currentRun.tenantId === refreshedWorkOrder.tenantId
+    && runMatchesCurrentRevision(currentRun.workOrderRevisionNumber, refreshedWorkOrder.currentRevisionNumber)
+    && ACTIVE_RUN_STATUSES.includes(currentRun.status)
+    && ["AWAITING_HUMAN_REVIEW", "READY_TO_PUBLISH", "PUBLICATION_AUTHORIZED"].includes(currentRun.factoryContinuation?.status)
+    ? currentRun : observedLatestRun;
 
   const latestReceipts = latestReceiptByCriterion(verificationReceipts);
   const acceptanceCriteria = refreshedWorkOrder.acceptanceCriteria.map((criterion: any) => ({

@@ -866,6 +866,8 @@ export const claimInternal = internalMutation({
     let publicationCheckpoint: any;
     if (["READY_TO_PUBLISH", "PUBLICATION_AUTHORIZED"].includes(run.factoryContinuation?.status ?? "")) {
       const continuation = run.factoryContinuation!;
+      const publicationSource = run.metadata?.verificationCandidateContinuation
+        ? await resolveVerificationCandidateProducerAttempt(ctx, run) : run;
       const reconciliationOnly = run.verificationSubject?.version === 2 && continuation.status === "PUBLICATION_AUTHORIZED";
       if (run.verificationSubject?.version === 2 && !reconciliationOnly) {
         const current = await getCurrentVerificationRoutingOutcome(ctx, workOrder, now, "PREPUBLICATION");
@@ -879,10 +881,10 @@ export const claimInternal = internalMutation({
         ctx.db.get(continuation.verificationReceiptId),
         continuation.resolvedVerificationReceiptId ? ctx.db.get(continuation.resolvedVerificationReceiptId) : null,
         ctx.db.query("runArtifacts")
-          .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", `factory:${run.runId}:structured-result`))
+          .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", `factory:${publicationSource.runId}:structured-result`))
           .first(),
         ctx.db.query("runArtifacts")
-          .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", `factory:${run.runId}:code-diff:${continuation.candidateRevision}`))
+          .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", `factory:${publicationSource.runId}:code-diff:${continuation.candidateRevision}`))
           .first(),
         ctx.db.query("approvalDecisions")
           .withIndex("by_work_order_revision", (q) => q
@@ -924,8 +926,8 @@ export const claimInternal = internalMutation({
 
       const structuredResult = structuredArtifact?.metadata?.result;
       const changedFiles = codeDiffArtifact?.metadata?.changedFiles;
-      if (structuredArtifact?.workflowRunId !== run._id
-        || codeDiffArtifact?.workflowRunId !== run._id
+      if (structuredArtifact?.workflowRunId !== publicationSource._id
+        || codeDiffArtifact?.workflowRunId !== publicationSource._id
         || codeDiffArtifact?.metadata?.headSha !== continuation.candidateRevision
         || !structuredResult || typeof structuredResult.summary !== "string"
         || !Array.isArray(changedFiles) || changedFiles.some((file: unknown) => typeof file !== "string")) {
@@ -940,6 +942,9 @@ export const claimInternal = internalMutation({
       }
       publicationCheckpoint = {
         reconciliationOnly,
+        ...(publicationSource._id !== run._id ? { workspaceSource: {
+          workflowRunId: String(publicationSource._id), executionManifestDigest: publicationSource.executionManifestDigest,
+        } } : {}),
         ...(run.subjectPublicationBinding ? { publicationBinding: run.subjectPublicationBinding } : {}),
         candidateRevision: continuation.candidateRevision,
         sourceRevision: continuation.sourceRevision,

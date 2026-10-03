@@ -14,7 +14,13 @@ independent verification and fresh human approval before publication.
   real scheduler/report/approval functions, and simulated transaction rollback.
   They cover v2 subject rebinding, authorization, tenant/project separation,
   stale revision/contract/candidate rejection, concurrency, idempotency,
-  scheduling failure, repeated failures, producer lineage, and human approval.
+  scheduling failure, repeated failures, producer lineage, human approval,
+  publication claim, permit issuance, and lease recovery.
+- All 766 orchestration tests pass, with 11 existing skips. The worker fixture
+  uses real Git and protected ownership files to publish from a new continuation.
+  It transfers the original workspace through the existing recovery mechanism,
+  reuses the saved result, and makes no additional fake-model calls. Provider
+  writes are stubbed. The ordinary same-attempt publication case also passes.
 - Convex and UI TypeScript checks pass.
 - All 19 factory qualification stages pass. The attached receipt records the
   initial test commit because qualification started with the recovered patch
@@ -31,11 +37,16 @@ independent verification and fresh human approval before publication.
 ## Limits
 
 The handler fixture is not a deployed Convex transaction test. Browser testing
-proves reachability and the rejection state, not successful publication. No live
-model, executor replay, pull-request publication by the factory, or production
-database mutation was performed. A fresh paid end-to-end factory run still needs
+proves reachability and the rejection state. Successful publication is tested
+through the local worker fixture, not a real provider. No live model, executor
+replay, actual pull-request publication by the factory, or production database
+mutation was performed. A fresh paid end-to-end factory run still needs
 an approved Mission/WorkOrder, target repository, and current model-spend limit.
 The historical September 6 qualification budget was not reused.
 
 The primary checkout and its saved edits were preserved. Work was sequenced into
 verifiable units: regression, backend recovery, then UI reachability and evidence.
+Final publication review found and fixed missing original result lookup, lost
+current-attempt selection during governance refresh, and cross-attempt workspace
+handoff. Approval restores mutating status so terminal success still requires
+the consumed publication permit and PR binding.
