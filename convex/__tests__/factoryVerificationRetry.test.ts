@@ -329,6 +329,18 @@ describe("retry evidence and authority boundaries", () => {
     expect(f.tables).toEqual(before);
   });
 
+  it.each([
+    { projectId: "other-project" }, { tenantId: "other-tenant" },
+    { executionManifestDigest: "changed-manifest" }, { treeSha: "f".repeat(40) },
+  ])("rejects changed original producer lineage before accepting retry evidence: %j", async (changes) => {
+    const f = await configuredFixture();
+    const retry = await f.invoke(retryVerification, retryArgs);
+    await f.db.patch("source-1", changes);
+    await expect(reportVerdict(f, retry.workflowRun, "PASS")).rejects.toThrow(/immutable producer lineage/);
+    expect(f.tables.approvalDecisions ?? []).toHaveLength(0);
+    expect(await f.db.get("source-1")).toMatchObject({ status: "FAILED" });
+  });
+
   it.each(["anonymous", "missing-dispatch", "other-owner", "disabled-operator"])("denies %s callers before writes", async (fault) => {
     vi.stubEnv("MC_ALLOW_ANONYMOUS_COMPANY_CONTEXT", "0");
     const f = await configuredFixture();

@@ -450,8 +450,12 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
     [selected]
   );
   const failedVerificationAttempt = latestVerificationAttempt
-    && ["FAILED", "CANCELED"].includes(latestVerificationAttempt.status)
-    && latestVerificationAttempt.verificationSupersededAt
+    && ((["FAILED", "CANCELED"].includes(latestVerificationAttempt.status)
+      && latestVerificationAttempt.verificationSupersededAt)
+      || (latestVerificationAttempt.status === "COMPLETED"
+        && !latestVerificationAttempt.verificationSupersededAt
+        && selected?.verificationRuns.some((run) => run.workflowRunId === latestVerificationAttempt._id
+          && run.status === "COMPLETED" && ["NOT_VERIFIED", "BLOCKED"].includes(run.verdict ?? ""))))
     ? latestVerificationAttempt
     : null;
   const activeVerificationAttempt = useMemo(
@@ -808,7 +812,7 @@ export function WorkOrdersView({ projectId }: { projectId: Id<"projects"> | null
                             await retryVerificationAttempt({
                               workOrderId: selected.workOrder._id,
                               failedVerificationAttemptId: failedVerificationAttempt._id,
-                              reason: `Retry exact candidate after resolving verifier infrastructure failure from ${failedVerificationAttempt.runId}.`,
+                              reason: `Request fresh independent verification of the exact candidate from ${failedVerificationAttempt.runId}.`,
                             });
                           } catch (err) {
                             setGovernanceError(err instanceof Error ? err.message : "Failed to retry independent verification");
