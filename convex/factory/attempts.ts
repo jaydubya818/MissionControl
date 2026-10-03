@@ -2976,7 +2976,12 @@ export const retryVerification = mutation({
     failedVerificationAttemptId: v.id("workflowRuns"),
     reason: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: retryVerificationHandler,
+});
+
+export async function retryVerificationHandler(ctx: any, args: {
+  workOrderId: any; failedVerificationAttemptId: any; reason: string;
+}, scheduleVerification = schedulePolicyV2VerificationAttempt) {
     const reason = args.reason.trim();
     if (reason.length < 10 || reason.length > 1_000) {
       throw new Error("Verification recovery requires a reason between 10 and 1,000 characters.");
@@ -3022,7 +3027,7 @@ export const retryVerification = mutation({
       || sourceAttempt.verificationSubject?.digest !== subjectDigest) {
       throw new Error("Verification recovery source is no longer the exact current candidate.");
     }
-    const result = await schedulePolicyV2VerificationAttempt(ctx, workOrder, sourceAttempt);
+    const result = await scheduleVerification(ctx, workOrder, sourceAttempt);
     if (result.created) {
       const actorId = access.membership.operatorId
         ? String(access.membership.operatorId)
@@ -3052,8 +3057,7 @@ export const retryVerification = mutation({
       });
     }
     return result;
-  },
-});
+}
 
 export const resumeVerification = mutation({
   args: {
