@@ -438,13 +438,15 @@ printf '%s\n' '{"type":"thread.started"}' '{"type":"turn.completed","usage":{"in
   });
 
   it.skipIf(process.platform === "win32").each([
-    { exitCode: 0, ignoreTerm: false },
-    { exitCode: 7, ignoreTerm: false },
-    { exitCode: 7, ignoreTerm: true },
-  ])("preserves owned exit $exitCode with inherited pipes (ignore TERM: $ignoreTerm)", async ({ exitCode, ignoreTerm }) => {
+    { exitCode: 0, ignoreTerm: false, closePipesOnTerm: false },
+    { exitCode: 7, ignoreTerm: false, closePipesOnTerm: false },
+    { exitCode: 7, ignoreTerm: true, closePipesOnTerm: false },
+    { exitCode: 7, ignoreTerm: false, closePipesOnTerm: true },
+  ])("preserves owned exit $exitCode with inherited pipes (ignore TERM: $ignoreTerm, close pipes: $closePipesOnTerm)", async ({ exitCode, ignoreTerm, closePipesOnTerm }) => {
     const repositoryRoot = await gitRepository();
     const executable = path.join(repositoryRoot, "codex-open-stdio-stub.sh");
     const descendantPidPath = path.join(repositoryRoot, "descendant.pid");
+    const readyPath = path.join(repositoryRoot, "descendant.ready");
     await writeFile(executable, `#!/bin/sh
 output=""
 while [ "$#" -gt 0 ]; do
@@ -455,8 +457,11 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 ${ignoreTerm ? "trap '' TERM" : ""}
-sleep 60 &
+${closePipesOnTerm
+  ? `"${process.execPath}" -e 'const fs = require("node:fs"); process.on("SIGTERM", () => { fs.closeSync(1); fs.closeSync(2); }); fs.writeFileSync("${readyPath}", "ready"); setInterval(() => {}, 1000);' &`
+  : "sleep 60 &"}
 printf '%s' "$!" > "${descendantPidPath}"
+${closePipesOnTerm ? `while [ ! -f "${readyPath}" ]; do sleep 0.01; done` : ""}
 printf '%s' 'output captured before owned exit' > "$output"
 printf '%s\n' '{"type":"thread.started"}' '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'
 printf '%s\n' 'stderr captured before owned exit' >&2
@@ -497,6 +502,43 @@ exit ${exitCode}
       await rm(repositoryRoot, { recursive: true, force: true });
     }
   }, 20_000);
+
+  it.skipIf(process.platform === "win32").each(["timeout", "cancel", "output-limit"] as const)(
+    "cleans real processes after %s", async (mode) => {
+      const repositoryRoot = await gitRepository();
+      const executable = path.join(repositoryRoot, "codex-lifecycle-stub.js");
+      await writeFile(executable, `#!${process.execPath}
+${mode === "output-limit" ? "process.stdout.write('x'.repeat(21 * 1024 * 1024));" : "process.on('SIGTERM', () => {});"}
+setInterval(() => {}, 1000);
+`);
+      await chmod(executable, 0o700);
+      const started = vi.fn();
+      const terminated = vi.fn();
+      const adapter = new CodexV1ExecutorAdapter(executable, undefined, resolvePinnedExecutableDigest);
+      const prepared = await adapter.prepare({ ...request, repositoryRoot, workingDirectory: repositoryRoot,
+        timeoutMs: mode === "timeout" ? 1_000 : 15_000,
+      }, { emit: () => undefined, processObserver: { started, terminated } });
+      const handle = await adapter.execute(prepared);
+      try {
+        if (mode === "cancel") {
+          await vi.waitFor(() => expect(started).toHaveBeenCalledOnce());
+          await adapter.cancel(handle);
+        }
+        const result = await adapter.collectResult(handle);
+        expect(result.normalizedResult?.status).toBe(mode === "timeout" ? "TIMED_OUT" : mode === "cancel" ? "CANCELED" : "FAILED");
+        if (mode === "timeout") expect(result.error).toContain("timed out after 1000ms");
+        if (mode === "output-limit") expect(result.error).toContain("20 MB runtime limit");
+        expect(started).toHaveBeenCalledOnce();
+        expect(terminated).toHaveBeenCalledOnce();
+        await vi.waitFor(async () => expect(await processCanExecute(started.mock.calls[0][0].pid)).toBe(false));
+      } finally {
+        const pid = started.mock.calls[0]?.[0]?.pid;
+        if (pid) { try { process.kill(-pid, "SIGKILL"); } catch { /* already reaped */ } }
+        await adapter.cleanup(handle);
+        await rm(repositoryRoot, { recursive: true, force: true });
+      }
+    }, 20_000,
+  );
 
   it("rejects executable drift before invoking the harness runner", async () => {
     const repositoryRoot = await gitRepository();
