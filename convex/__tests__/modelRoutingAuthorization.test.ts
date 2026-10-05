@@ -274,6 +274,52 @@ describe("Model Routing authorization", () => {
     });
   });
 
+  it.each([
+    ["APPROVED", "APPROVED", 4.49, true],
+    ["NOT_REQUIRED", "APPROVED", 4.49, true],
+    ["PENDING", "APPROVED", 4.49, false],
+    ["REJECTED", "APPROVED", 4.49, false],
+    ["NOT_REQUIRED", "DRAFT", 4.49, false],
+    ["NOT_REQUIRED", "APPROVED", 5, false],
+  ])("checks full-cap authority for WorkOrder %s, plan %s, cap %s", async (approvalStatus, planStatus, actualCap, allowed) => {
+    const state = createContext({ permissions: ["factory.read", "factory.automation.manage", "factory.approve"] });
+    const id = await functionHandler(registerExactRoute)(state.ctx, {
+      projectId: state.projectId, provider: "openrouter", providerRoute: "openrouter",
+      modelId: "openai/gpt-4.1-mini", displayName: "Documentation pilot", tier: "BALANCED",
+      capabilities: ["text"], supportsTools: true, contextWindow: 200_000,
+    });
+    const route = state.tables.modelCatalog.find(row => row._id === id);
+    state.tables.workspaceRepositories = [{ _id: "repository-cost", projectId: state.projectId }];
+    state.tables.missionPlans = [{ _id: "plan-cost", status: planStatus, revisionNumber: 1, estimatedCostUsd: 4.49 }];
+    state.tables.workOrders = [{
+      _id: "work-order-cost", projectId: state.projectId, approvalStatus,
+      repositoryId: "repository-cost", currentRevisionNumber: 1, missionPlanId: "plan-cost", kind: "SOFTWARE_CHANGE",
+      metadata: { estimatedCostUsd: 4.49, implementationPolicy: { maxCostUsd: actualCap, timeoutMinutes: 10, maxAttempts: 1 } },
+    }];
+    const operation = functionHandler(promoteExactRoute)(state.ctx, {
+      modelCatalogId: id, expectedRouteDigest: route.routeDigest,
+      evidenceReference: "evidence://bounded-pilot", evidenceDigest: `sha256:${"1".repeat(64)}`,
+      workloadClasses: ["SOFTWARE_CHANGE"], riskClasses: ["GREEN"], repositoryIds: ["repository-cost"],
+      compatibility: { adapter: "fab", version: "v1", capabilityManifestDigest: `sha256:${"2".repeat(64)}`,
+        effectiveConfigSha256: "3".repeat(64), runtimeArtifactDigest: `sha256:${"4".repeat(64)}`, executionBackend: "persistent-worker" },
+      costPolicy: {
+        schema: "factory-model-route-cost-policy/v1", method: "FULL_APPROVED_WORK_ORDER_CAP_RESERVATION",
+        currency: "USD", estimatedCostPerRunUsd: 4.49, reservationMode: "FULL_ESTIMATE", actualCostTelemetry: "MEASURED",
+        evidence: { reference: "evidence://bounded-pilot", digest: `sha256:${"1".repeat(64)}` },
+        source: { kind: "APPROVED_WORK_ORDER", workOrderId: "work-order-cost", workOrderRevisionNumber: 1,
+          missionPlanId: "plan-cost", missionPlanRevision: 1, planEstimatedCostUsd: 4.49,
+          workOrderEstimatedCostUsd: 4.49, hardLimitUsd: 4.49, maxRuntimeMinutes: 10, maxAttempts: 1 },
+      },
+    });
+    if (allowed) {
+      await expect(operation).resolves.toHaveProperty("qualificationDigest");
+      expect(state.tables.modelCatalog.find(row => row._id === id).estimatedCostPerRunUsd).toBe(4.49);
+    } else {
+      await expect(operation).rejects.toThrow("cost policy does not match the approved WorkOrder authority");
+      expect(state.tables.modelCatalog.find(row => row._id === id).admissionStatus).toBe("DISABLED");
+    }
+  });
+
   it("reuses only unqualified route drafts and preserves independent immutable qualifications", async () => {
     const state = createContext({
       permissions: ["factory.read", "factory.automation.manage", "factory.approve"],
