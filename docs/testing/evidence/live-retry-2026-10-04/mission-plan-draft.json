@@ -86,12 +86,15 @@
         "runbook",
         "restart",
         "draft-publication"
-      ]
+      ],
+      "workflowId": "live-verification-retry-runbook-v1"
     }
   ],
   "metadata": {
     "authorization": "Operator-approved single documentation pilot",
     "componentEvidence": "docs/testing/evidence/live-retry-2026-10-04",
     "executionAdmission": "PENDING_EXACT_WORKER_CONFIGURATION_QUALIFICATION"
-  }
+  },
+  "planId": "gn7htsghr19e1yeschmc1hmbgh8fqp4d",
+  "expectedDraftVersion": 1
 }

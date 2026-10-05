@@ -1,0 +1,667 @@
+{
+  "assessments": [],
+  "definition": {
+    "_creationTime": 1791175020339.697,
+    "_id": "md7ks0e4ch2t38t8z11yen1rsx8fpw38",
+    "createdAt": 1791175020339,
+    "createdBy": "demo:company-administrator",
+    "latestVersion": 1,
+    "name": "Runbook independent verifier",
+    "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+    "purpose": "VERIFICATION",
+    "repositoryId": "k17wswvrva7ky172eej2w1nj858cbzt7",
+    "status": "DRAFT",
+    "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+    "updatedAt": 1791175020347
+  },
+  "versions": [
+    {
+      "_creationTime": 1791175020347.047,
+      "_id": "m97wsq92tpqeq0zemd3mces3kn8fp4cj",
+      "agentBindings": [
+        {
+          "agentVersionId": "k576x0ds5edtx56cv3j831dz598fpp8e",
+          "workflowAgentId": "verifier"
+        }
+      ],
+      "budget": {
+        "maxAttempts": 1,
+        "maxCostUsd": 0.01,
+        "maxRuntimeMinutes": 1
+      },
+      "codeScopeIds": [
+        "jx7jr1rmgavhzsmxwrx8xw4ajh8fp3vb"
+      ],
+      "configurationDigest": "factory-v1-8dee7bb1",
+      "createdAt": 1791175020347,
+      "createdBy": "demo:company-administrator",
+      "environmentId": "p173wbyt3bz4153f59a5636n8s8fqrtf",
+      "executionBackend": "persistent-worker",
+      "executionProfileDigest": "sha256:f6777ed8d4db09e69ec7c35bed06bda56b9f59839e321e6c6f3b56f3568e9740",
+      "executionProfileId": "w17ha56nc0vrqap07zb8311n598fpzab",
+      "executionProfileKey": "live-retry-command-verifier-v1",
+      "executionProfileQualificationDigest": "sha256:9a9edb0b637e2bdfe7faa3e146a23286d095989406b58ffe38cc20806c3d4bed",
+      "executionProfileQualificationSnapshot": {
+        "approvedAt": 1791175020291,
+        "approvedBy": "demo:company-administrator",
+        "authority": {
+          "acceptance": false,
+          "merge": false,
+          "policyMutation": false,
+          "publication": false,
+          "routing": false,
+          "verification": false,
+          "workerLeases": false
+        },
+        "components": {
+          "executionBackend": "persistent-worker",
+          "harness": {
+            "adapter": "codex",
+            "capabilityManifestDigest": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+            "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081",
+            "version": "v1"
+          },
+          "isolationModes": [
+            "READ_ONLY"
+          ],
+          "modelRoute": {
+            "catalogId": "g17y2nrfmekfw9n13x823tk6wd8fpcnm",
+            "qualificationDigest": "sha256:2d395ed8d8642e6acfd2177b6a5006a4167eecaa9844858cd532e8dbf960b331",
+            "routeDigest": "sha256:c61677b3682e398da5a7e16c9f56bb30686f9563b409ddf11ad44d1e305fdb8c"
+          },
+          "requiredHarnessCapabilities": [
+            {
+              "capability": "cancellation.support",
+              "minimumSupport": "PARTIAL"
+            },
+            {
+              "capability": "filesystem.pathAllowlist",
+              "minimumSupport": "PARTIAL"
+            },
+            {
+              "capability": "filesystem.read",
+              "minimumSupport": "SUPPORTED"
+            },
+            {
+              "capability": "git.diff",
+              "minimumSupport": "SUPPORTED"
+            },
+            {
+              "capability": "git.status",
+              "minimumSupport": "SUPPORTED"
+            },
+            {
+              "capability": "headless.support",
+              "minimumSupport": "PARTIAL"
+            },
+            {
+              "capability": "shell.available",
+              "minimumSupport": "PARTIAL"
+            },
+            {
+              "capability": "shell.processTreeCancellation",
+              "minimumSupport": "PARTIAL"
+            },
+            {
+              "capability": "tools.structuredOutput",
+              "minimumSupport": "PARTIAL"
+            }
+          ],
+          "requiredSandboxCapabilities": [
+            "git-worktree",
+            "read-only"
+          ],
+          "runtimeArtifactDigest": "sha256:dbd2a09c812ba8b2a5b5425f5386b0c65b2a399e40813374597d20bcfcd855fc"
+        },
+        "evidence": {
+          "digest": "sha256:6fc55d6967a89cdb6fdcb5cae612d626be78eb4ccfe8e81c25cc2d4678424064",
+          "reference": "/Users/jaywest/.codex/worktrees/f854/MissionControl/docs/testing/evidence/live-retry-2026-10-04/verifier-qualification.json"
+        },
+        "profile": {
+          "digest": "sha256:f6777ed8d4db09e69ec7c35bed06bda56b9f59839e321e6c6f3b56f3568e9740",
+          "id": "w17ha56nc0vrqap07zb8311n598fpzab",
+          "key": "live-retry-command-verifier-v1",
+          "version": 1
+        },
+        "schema": "factory-execution-profile-qualification/v1",
+        "scope": {
+          "riskClasses": [
+            "GREEN"
+          ],
+          "workloadClasses": [
+            "VERIFICATION"
+          ]
+        },
+        "validUntil": 1791261420290
+      },
+      "executionProfileSnapshot": {
+        "authority": {
+          "acceptance": false,
+          "merge": false,
+          "policyMutation": false,
+          "publication": false,
+          "routing": false,
+          "verification": false,
+          "workerLeases": false
+        },
+        "executionBackend": "persistent-worker",
+        "harness": {
+          "adapter": "codex",
+          "capabilityManifest": {
+            "admission": {
+              "executionBackends": [
+                "persistent-worker",
+                "remote-sandbox"
+              ],
+              "maturity": "PRODUCTION",
+              "prohibitedAuthorities": [
+                "worker-leases",
+                "verification-subjects",
+                "verification-plans",
+                "evidence-authority",
+                "github-publication",
+                "acceptance"
+              ],
+              "requiredExternalControls": [
+                "canonical-worker-lease",
+                "mission-control-sandbox-policy",
+                "repository-scope-reconciliation",
+                "independent-verification",
+                "publication-permit"
+              ]
+            },
+            "browser": {
+              "interactiveBrowser": "UNSUPPORTED",
+              "webFetch": "UNSUPPORTED",
+              "webSearch": "UNSUPPORTED"
+            },
+            "cancellation": {
+              "idempotentCleanup": true,
+              "mode": "PROCESS_SIGNAL",
+              "support": "PARTIAL"
+            },
+            "context": {
+              "compaction": "SUPPORTED",
+              "fork": "UNSUPPORTED",
+              "instructionFiles": "SUPPORTED",
+              "persistentSessions": "UNSUPPORTED",
+              "resume": "UNSUPPORTED"
+            },
+            "credentials": {
+              "classes": [
+                "codex-chatgpt-auth"
+              ],
+              "passedToToolProcesses": false,
+              "redaction": "PARTIAL"
+            },
+            "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081",
+            "filesystem": {
+              "changedFileCapture": "SUPPORTED",
+              "pathAllowlist": "PARTIAL",
+              "read": "SUPPORTED",
+              "write": "SUPPORTED"
+            },
+            "git": {
+              "branch": "SUPPORTED",
+              "commit": "SUPPORTED",
+              "diff": "SUPPORTED",
+              "remotePublication": "UNSUPPORTED",
+              "status": "SUPPORTED"
+            },
+            "headless": {
+              "mode": "CLI_JSONL",
+              "support": "SUPPORTED"
+            },
+            "identity": {
+              "adapterId": "codex",
+              "adapterVersion": "v1",
+              "harnessCommit": "e363b08c9175ac1cbe5893615dd2cb9ddf95043b",
+              "harnessId": "codex-cli",
+              "harnessVersion": "0.146.0"
+            },
+            "limitations": [
+              "Exact model-request and harness-retry counts are not exposed and remain null.",
+              "Cost is not reported under saved ChatGPT authentication and remains null.",
+              "Cancellation uses process signaling rather than an acknowledged in-agent protocol.",
+              "Repository path allowlists are reconciled after execution by Mission Control.",
+              "Only openai/gpt-5.6-terra was exercised in the standalone two-harness conformance run; other model IDs use the existing controlled pass-through route."
+            ],
+            "models": {
+              "modelSelection": "SUPPORTED",
+              "providerSelection": "UNSUPPORTED",
+              "reasoningControls": "SUPPORTED",
+              "supported": [
+                {
+                  "contextWindowTokens": null,
+                  "modalities": [
+                    "text"
+                  ],
+                  "modelId": "gpt-5.6-terra",
+                  "provider": "openai",
+                  "selection": "ADVERTISED"
+                },
+                {
+                  "contextWindowTokens": null,
+                  "modalities": [
+                    "text"
+                  ],
+                  "modelId": "*",
+                  "provider": "openai",
+                  "selection": "PASSTHROUGH"
+                }
+              ]
+            },
+            "network": {
+              "destinations": [
+                "OpenAI Codex service"
+              ],
+              "packageInstall": false,
+              "providerApi": true,
+              "runtimeEgressControl": "PARTIAL"
+            },
+            "sandbox": {
+              "externalSandboxRecommended": true,
+              "isolationModes": [
+                "READ_ONLY",
+                "WORKSPACE_WRITE"
+              ],
+              "requirements": [
+                "owned-process-group",
+                "repository-worktree",
+                "post-execution-path-audit"
+              ]
+            },
+            "schemaVersion": "harness-capability-manifest/v1",
+            "scope": "ADAPTER_EFFECTIVE",
+            "shell": {
+              "available": "SUPPORTED",
+              "commandTimeout": "SUPPORTED",
+              "credentialEnvironmentScrub": "PARTIAL",
+              "processTreeCancellation": "PARTIAL"
+            },
+            "streaming": {
+              "durableReplay": "UNSUPPORTED",
+              "events": "SUPPORTED",
+              "modelDeltas": "UNSUPPORTED"
+            },
+            "subagents": {
+              "available": "PARTIAL",
+              "background": "PARTIAL",
+              "eventVisibility": "PARTIAL",
+              "parallel": "PARTIAL"
+            },
+            "telemetry": {
+              "cost": "UNSUPPORTED",
+              "modelRequests": "UNSUPPORTED",
+              "retries": "UNSUPPORTED",
+              "tokens": "SUPPORTED",
+              "toolCalls": "SUPPORTED"
+            },
+            "tools": {
+              "mcp": "UNSUPPORTED",
+              "native": "SUPPORTED",
+              "structuredOutput": "SUPPORTED",
+              "telemetry": "SUPPORTED"
+            }
+          },
+          "capabilityManifestDigest": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+          "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081",
+          "version": "v1"
+        },
+        "isolationModes": [
+          "READ_ONLY"
+        ],
+        "lifecycle": {
+          "cancellationMode": "PROCESS_SIGNAL",
+          "componentSubstitution": "DENIED",
+          "contractVersion": "generic-harness-contract/v1",
+          "idempotentCleanup": true,
+          "inFlightRevocationPolicy": "LEASED_ATTEMPT_MAY_COMPLETE",
+          "retryCreatesNewAttempt": true
+        },
+        "modelRoute": {
+          "catalogId": "g17y2nrfmekfw9n13x823tk6wd8fpcnm",
+          "qualificationDigest": "sha256:2d395ed8d8642e6acfd2177b6a5006a4167eecaa9844858cd532e8dbf960b331",
+          "qualificationSnapshot": {
+            "authority": {
+              "acceptance": false,
+              "executionOnly": true,
+              "merge": false,
+              "publication": false,
+              "routing": false,
+              "verification": false
+            },
+            "compatibility": {
+              "adapter": "codex",
+              "capabilityManifestDigest": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+              "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081",
+              "executionBackend": "persistent-worker",
+              "runtimeArtifactDigest": "sha256:dbd2a09c812ba8b2a5b5425f5386b0c65b2a399e40813374597d20bcfcd855fc",
+              "version": "v1"
+            },
+            "evidence": {
+              "digest": "sha256:6fc55d6967a89cdb6fdcb5cae612d626be78eb4ccfe8e81c25cc2d4678424064",
+              "reference": "/Users/jaywest/.codex/worktrees/f854/MissionControl/docs/testing/evidence/live-retry-2026-10-04/verifier-qualification.json"
+            },
+            "promotedAt": 1791175020255,
+            "promotedBy": "demo:company-administrator",
+            "routeDigest": "sha256:c61677b3682e398da5a7e16c9f56bb30686f9563b409ddf11ad44d1e305fdb8c",
+            "schema": "factory-model-route-qualification/v2",
+            "scope": {
+              "repositoryIds": [
+                "k17wswvrva7ky172eej2w1nj858cbzt7"
+              ],
+              "riskClasses": [
+                "GREEN"
+              ],
+              "workloadClasses": [
+                "VERIFICATION"
+              ]
+            }
+          },
+          "routeDigest": "sha256:c61677b3682e398da5a7e16c9f56bb30686f9563b409ddf11ad44d1e305fdb8c",
+          "routeSnapshot": {
+            "modelId": "gpt-5.6-terra",
+            "provider": "openai",
+            "providerRoute": "codex-chatgpt-auth",
+            "schema": "factory-model-route/v2"
+          }
+        },
+        "profileKey": "live-retry-command-verifier-v1",
+        "requiredHarnessCapabilities": [
+          {
+            "capability": "cancellation.support",
+            "minimumSupport": "PARTIAL"
+          },
+          {
+            "capability": "filesystem.pathAllowlist",
+            "minimumSupport": "PARTIAL"
+          },
+          {
+            "capability": "filesystem.read",
+            "minimumSupport": "SUPPORTED"
+          },
+          {
+            "capability": "git.diff",
+            "minimumSupport": "SUPPORTED"
+          },
+          {
+            "capability": "git.status",
+            "minimumSupport": "SUPPORTED"
+          },
+          {
+            "capability": "headless.support",
+            "minimumSupport": "PARTIAL"
+          },
+          {
+            "capability": "shell.available",
+            "minimumSupport": "PARTIAL"
+          },
+          {
+            "capability": "shell.processTreeCancellation",
+            "minimumSupport": "PARTIAL"
+          },
+          {
+            "capability": "tools.structuredOutput",
+            "minimumSupport": "PARTIAL"
+          }
+        ],
+        "requiredSandboxCapabilities": [
+          "git-worktree",
+          "read-only"
+        ],
+        "runtimeArtifact": {
+          "digest": "sha256:dbd2a09c812ba8b2a5b5425f5386b0c65b2a399e40813374597d20bcfcd855fc",
+          "snapshot": {
+            "executableSha256": "ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02",
+            "imageDigest": null,
+            "kind": "EXECUTABLE",
+            "name": "codex",
+            "schemaVersion": "harness-runtime-artifact/v1",
+            "version": "0.146.0"
+          }
+        },
+        "schema": "factory-execution-profile/v1",
+        "version": 1
+      },
+      "executionProfileVersion": 1,
+      "executor": {
+        "adapter": "codex",
+        "version": "v1"
+      },
+      "factoryDefinitionId": "md7ks0e4ch2t38t8z11yen1rsx8fpw38",
+      "harnessCapabilityManifest": {
+        "admission": {
+          "executionBackends": [
+            "persistent-worker",
+            "remote-sandbox"
+          ],
+          "maturity": "PRODUCTION",
+          "prohibitedAuthorities": [
+            "worker-leases",
+            "verification-subjects",
+            "verification-plans",
+            "evidence-authority",
+            "github-publication",
+            "acceptance"
+          ],
+          "requiredExternalControls": [
+            "canonical-worker-lease",
+            "mission-control-sandbox-policy",
+            "repository-scope-reconciliation",
+            "independent-verification",
+            "publication-permit"
+          ]
+        },
+        "browser": {
+          "interactiveBrowser": "UNSUPPORTED",
+          "webFetch": "UNSUPPORTED",
+          "webSearch": "UNSUPPORTED"
+        },
+        "cancellation": {
+          "idempotentCleanup": true,
+          "mode": "PROCESS_SIGNAL",
+          "support": "PARTIAL"
+        },
+        "context": {
+          "compaction": "SUPPORTED",
+          "fork": "UNSUPPORTED",
+          "instructionFiles": "SUPPORTED",
+          "persistentSessions": "UNSUPPORTED",
+          "resume": "UNSUPPORTED"
+        },
+        "credentials": {
+          "classes": [
+            "codex-chatgpt-auth"
+          ],
+          "passedToToolProcesses": false,
+          "redaction": "PARTIAL"
+        },
+        "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081",
+        "filesystem": {
+          "changedFileCapture": "SUPPORTED",
+          "pathAllowlist": "PARTIAL",
+          "read": "SUPPORTED",
+          "write": "SUPPORTED"
+        },
+        "git": {
+          "branch": "SUPPORTED",
+          "commit": "SUPPORTED",
+          "diff": "SUPPORTED",
+          "remotePublication": "UNSUPPORTED",
+          "status": "SUPPORTED"
+        },
+        "headless": {
+          "mode": "CLI_JSONL",
+          "support": "SUPPORTED"
+        },
+        "identity": {
+          "adapterId": "codex",
+          "adapterVersion": "v1",
+          "harnessCommit": "e363b08c9175ac1cbe5893615dd2cb9ddf95043b",
+          "harnessId": "codex-cli",
+          "harnessVersion": "0.146.0"
+        },
+        "limitations": [
+          "Exact model-request and harness-retry counts are not exposed and remain null.",
+          "Cost is not reported under saved ChatGPT authentication and remains null.",
+          "Cancellation uses process signaling rather than an acknowledged in-agent protocol.",
+          "Repository path allowlists are reconciled after execution by Mission Control.",
+          "Only openai/gpt-5.6-terra was exercised in the standalone two-harness conformance run; other model IDs use the existing controlled pass-through route."
+        ],
+        "models": {
+          "modelSelection": "SUPPORTED",
+          "providerSelection": "UNSUPPORTED",
+          "reasoningControls": "SUPPORTED",
+          "supported": [
+            {
+              "contextWindowTokens": null,
+              "modalities": [
+                "text"
+              ],
+              "modelId": "gpt-5.6-terra",
+              "provider": "openai",
+              "selection": "ADVERTISED"
+            },
+            {
+              "contextWindowTokens": null,
+              "modalities": [
+                "text"
+              ],
+              "modelId": "*",
+              "provider": "openai",
+              "selection": "PASSTHROUGH"
+            }
+          ]
+        },
+        "network": {
+          "destinations": [
+            "OpenAI Codex service"
+          ],
+          "packageInstall": false,
+          "providerApi": true,
+          "runtimeEgressControl": "PARTIAL"
+        },
+        "sandbox": {
+          "externalSandboxRecommended": true,
+          "isolationModes": [
+            "READ_ONLY",
+            "WORKSPACE_WRITE"
+          ],
+          "requirements": [
+            "owned-process-group",
+            "repository-worktree",
+            "post-execution-path-audit"
+          ]
+        },
+        "schemaVersion": "harness-capability-manifest/v1",
+        "scope": "ADAPTER_EFFECTIVE",
+        "shell": {
+          "available": "SUPPORTED",
+          "commandTimeout": "SUPPORTED",
+          "credentialEnvironmentScrub": "PARTIAL",
+          "processTreeCancellation": "PARTIAL"
+        },
+        "streaming": {
+          "durableReplay": "UNSUPPORTED",
+          "events": "SUPPORTED",
+          "modelDeltas": "UNSUPPORTED"
+        },
+        "subagents": {
+          "available": "PARTIAL",
+          "background": "PARTIAL",
+          "eventVisibility": "PARTIAL",
+          "parallel": "PARTIAL"
+        },
+        "telemetry": {
+          "cost": "UNSUPPORTED",
+          "modelRequests": "UNSUPPORTED",
+          "retries": "UNSUPPORTED",
+          "tokens": "SUPPORTED",
+          "toolCalls": "SUPPORTED"
+        },
+        "tools": {
+          "mcp": "UNSUPPORTED",
+          "native": "SUPPORTED",
+          "structuredOutput": "SUPPORTED",
+          "telemetry": "SUPPORTED"
+        }
+      },
+      "harnessCapabilityManifestDigest": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+      "harnessEffectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081",
+      "harnessRuntimeArtifact": {
+        "executableSha256": "ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02",
+        "imageDigest": null,
+        "kind": "EXECUTABLE",
+        "name": "codex",
+        "schemaVersion": "harness-runtime-artifact/v1",
+        "version": "0.146.0"
+      },
+      "harnessRuntimeArtifactDigest": "sha256:dbd2a09c812ba8b2a5b5425f5386b0c65b2a399e40813374597d20bcfcd855fc",
+      "modelCatalogId": "g17y2nrfmekfw9n13x823tk6wd8fpcnm",
+      "modelQualificationDigest": "sha256:2d395ed8d8642e6acfd2177b6a5006a4167eecaa9844858cd532e8dbf960b331",
+      "modelQualificationSnapshot": {
+        "authority": {
+          "acceptance": false,
+          "executionOnly": true,
+          "merge": false,
+          "publication": false,
+          "routing": false,
+          "verification": false
+        },
+        "compatibility": {
+          "adapter": "codex",
+          "capabilityManifestDigest": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+          "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081",
+          "executionBackend": "persistent-worker",
+          "runtimeArtifactDigest": "sha256:dbd2a09c812ba8b2a5b5425f5386b0c65b2a399e40813374597d20bcfcd855fc",
+          "version": "v1"
+        },
+        "evidence": {
+          "digest": "sha256:6fc55d6967a89cdb6fdcb5cae612d626be78eb4ccfe8e81c25cc2d4678424064",
+          "reference": "/Users/jaywest/.codex/worktrees/f854/MissionControl/docs/testing/evidence/live-retry-2026-10-04/verifier-qualification.json"
+        },
+        "promotedAt": 1791175020255,
+        "promotedBy": "demo:company-administrator",
+        "routeDigest": "sha256:c61677b3682e398da5a7e16c9f56bb30686f9563b409ddf11ad44d1e305fdb8c",
+        "schema": "factory-model-route-qualification/v2",
+        "scope": {
+          "repositoryIds": [
+            "k17wswvrva7ky172eej2w1nj858cbzt7"
+          ],
+          "riskClasses": [
+            "GREEN"
+          ],
+          "workloadClasses": [
+            "VERIFICATION"
+          ]
+        }
+      },
+      "modelRouteDigest": "sha256:c61677b3682e398da5a7e16c9f56bb30686f9563b409ddf11ad44d1e305fdb8c",
+      "modelRouteSnapshot": {
+        "modelId": "gpt-5.6-terra",
+        "provider": "openai",
+        "providerRoute": "codex-chatgpt-auth",
+        "schema": "factory-model-route/v2"
+      },
+      "policyEnvelopeId": "sd7aya62d3xr6a24n9rhmyz1z98fqpkg",
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "purpose": "VERIFICATION",
+      "recovery": {
+        "cancel": true,
+        "pause": false,
+        "resume": false,
+        "retry": true
+      },
+      "repositoryDataClassification": "PUBLIC",
+      "repositoryId": "k17wswvrva7ky172eej2w1nj858cbzt7",
+      "riskBoundary": "GREEN",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "verifierIds": [
+        "z57cvx2g7yjd07gazqfx4s5kbh8fq7z1"
+      ],
+      "version": 1,
+      "workflowId": "yx7015711wmnym6ehkgyt3wxms8fpsg9"
+    }
+  ]
+}

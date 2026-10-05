@@ -1,0 +1,18 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {parseConfig} from '@fdlc/fab';
+import {HarnessAdapterRegistry} from '../src/harnessAdapterRegistry.js';
+import {FabExecutorAdapter} from '../src/fabExecutorAdapter.js';
+import {openRouterModelRouteBinding} from '../src/openRouterModelRouteBinding.js';
+const dir=process.cwd()+'/docs/testing/evidence/live-retry-2026-10-04/';
+const plan=JSON.parse(readFileSync(dir+'mission-plan-draft.json','utf8'));
+const repository='/Users/jaywest/.codex/worktrees/live-retry-runbook/MissionControl';
+const check=plan.workOrderBlueprints[0].implementationPolicy.independentVerification;
+const config=parseConfig({version:1,repository,provider:'openrouter',model:'openai/gpt-4.1-mini',credential:{id:'live-retry-runbook-broker-v1',owner:`local:${process.getuid?.()}`,provider:'openrouter',scope:{kind:'repository',root:repository},source:{kind:'broker'}},writableFiles:['docs/operations/verification-retry-runbook.md'],checks:[{id:'runbook-structure',argv:[process.execPath,...check.args]}],acceptanceCriteria:['Document eligible NOT_VERIFIED/BLOCKED verification retries, unchanged candidate/revision/contract, retained failed evidence, independent verification, fresh approval, and failure/recovery.'],maxTurns:8,timeoutMs:600000,checkTimeoutMs:10000});
+const route=openRouterModelRouteBinding({modelId:config.model,maxCostUsd:4.49,maximumOutputTokens:4096});
+const adapter=new FabExecutorAdapter({config,stateDirectory:'/private/tmp/mc-live-retry-worker-state',openRouterRouteBinding:route});
+const registry=new HarnessAdapterRegistry([adapter]);const registration=registry.requireRegistration({adapter:'fab',version:'v1'});
+const request={executionId:'configuration-validation-only',repositoryRoot:repository,workingDirectory:repository,provider:'openrouter',providerRoute:'openrouter',modelRouteDigest:route.routeDigest,model:config.model,prompt:'Configuration validation only; no execution.',allowedPaths:config.writableFiles,deniedPaths:[],timeoutMs:600000,isolation:'WORKSPACE_WRITE' as const};
+if(adapter.validateConfiguration(request).length)throw Error('Exact configuration rejected');
+const negatives=[{allowedPaths:['src/**']},{repositoryRoot:'/private/tmp/unrelated'},{isolation:'READ_ONLY' as const},{model:'other'}].map(change=>({change,issues:adapter.validateConfiguration({...request,...change})}));if(negatives.some(x=>!x.issues.length))throw Error('Unsafe configuration admitted');
+writeFileSync(dir+'worker-config.json',JSON.stringify(config,null,2)+'\n');writeFileSync(dir+'worker-route.json',JSON.stringify({version:1,provider:'openrouter',endpoint:'https://openrouter.ai/api/v1/chat/completions',protocol:'openrouter-chat-completions/non-streaming',modelId:config.model,maxCostUsd:4.49,maximumOutputTokens:4096},null,2)+'\n');
+writeFileSync(dir+'worker-configuration-checks.json',JSON.stringify({observedAt:new Date().toISOString(),status:'PASS',inferenceCalls:0,registration,negatives},null,2)+'\n');console.log('Exact worker configuration validated; four invalid configurations rejected; no inference.');

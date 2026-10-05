@@ -501,6 +501,20 @@ when deployed clients and backend functions cannot safely interoperate.
 Current public client/backend runtime contract: **v60**. Version 60 adds the
 authenticated repository code-scope update used by pinned Factory dispatch.
 
+### Local Research Lab retry qualification
+
+Zero allowed retries permits one initial execution with no retry Attempts.
+Commit `33e3612` fixes that Mission dispatch boundary while preserving positive
+retry-limit behavior. It is applied only to local Research Lab.
+
+Post-commit qualification passed 1,491 Convex tests and 766 orchestration tests.
+A real zero-retry dispatch created and executed exactly one Attempt. Duplicate
+dispatch and worker restart created no additional Attempt. The producer failed
+at its turn limit without a candidate, so end-to-end qualification remains
+incomplete. No broader deployment is approved. See the
+[retry qualification status and limitations](docs/operations/live-retry-dispatch-review.md)
+and [retained evidence](docs/testing/evidence/live-retry-2026-10-04/README.md).
+
 ### Factory Deployed Engineer qualification environment
 
 The bounded FDLC Deploy / Factory Deployed Engineer qualification environment is **ready but not activated**. Its safe identifiers are:

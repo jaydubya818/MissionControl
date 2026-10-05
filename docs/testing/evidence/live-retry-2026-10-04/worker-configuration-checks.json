@@ -1,0 +1,598 @@
+{
+  "observedAt": "2026-10-05T04:19:22.737Z",
+  "status": "PASS",
+  "inferenceCalls": 0,
+  "registration": {
+    "adapter": {
+      "options": {
+        "config": {
+          "version": 1,
+          "repository": "/Users/jaywest/.codex/worktrees/live-retry-runbook/MissionControl",
+          "provider": "openrouter",
+          "model": "openai/gpt-4.1-mini",
+          "credential": {
+            "id": "live-retry-runbook-broker-v1",
+            "owner": "local:501",
+            "provider": "openrouter",
+            "scope": {
+              "kind": "repository",
+              "root": "/Users/jaywest/.codex/worktrees/live-retry-runbook/MissionControl"
+            },
+            "source": {
+              "kind": "broker"
+            }
+          },
+          "writableFiles": [
+            "docs/operations/verification-retry-runbook.md"
+          ],
+          "checks": [
+            {
+              "id": "runbook-structure",
+              "argv": [
+                "/opt/homebrew/Cellar/node@24/24.18.1/bin/node",
+                "-e",
+                "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+              ]
+            }
+          ],
+          "acceptanceCriteria": [
+            "Document eligible NOT_VERIFIED/BLOCKED verification retries, unchanged candidate/revision/contract, retained failed evidence, independent verification, fresh approval, and failure/recovery."
+          ],
+          "maxTurns": 8,
+          "timeoutMs": 600000,
+          "checkTimeoutMs": 10000
+        },
+        "stateDirectory": "/private/tmp/mc-live-retry-worker-state",
+        "openRouterRouteBinding": {
+          "providerRoute": "openrouter",
+          "routeDigest": "sha256:7298d9ef168f087e078859f97cab4f50f7f234ed5368b80fdab553fad0cba856",
+          "modelId": "openai/gpt-4.1-mini",
+          "maxCostUsd": 4.49,
+          "maximumOutputTokens": 4096
+        }
+      },
+      "manifest": {
+        "schemaVersion": "harness-capability-manifest/v1",
+        "scope": "ADAPTER_EFFECTIVE",
+        "identity": {
+          "harnessId": "fab",
+          "harnessVersion": "0.1.0-experimental.9",
+          "harnessCommit": "3f0bee56bd4b7dffcb56655ee66a5ae0f39a6cb2",
+          "adapterId": "fab",
+          "adapterVersion": "v1"
+        },
+        "effectiveConfigSha256": "aff31b93cbb787c9b2d8dc4463081c91836496d50ee2e1d193452e0f8f42cb24",
+        "models": {
+          "providerSelection": "SUPPORTED",
+          "modelSelection": "SUPPORTED",
+          "supported": [
+            {
+              "provider": "openrouter",
+              "modelId": "openai/gpt-4.1-mini",
+              "selection": "PASSTHROUGH",
+              "contextWindowTokens": null,
+              "modalities": [
+                "text"
+              ]
+            }
+          ],
+          "reasoningControls": "UNSUPPORTED"
+        },
+        "filesystem": {
+          "read": "SUPPORTED",
+          "write": "SUPPORTED",
+          "pathAllowlist": "SUPPORTED",
+          "changedFileCapture": "SUPPORTED"
+        },
+        "shell": {
+          "available": "PARTIAL",
+          "commandTimeout": "SUPPORTED",
+          "processTreeCancellation": "SUPPORTED",
+          "credentialEnvironmentScrub": "SUPPORTED"
+        },
+        "git": {
+          "status": "SUPPORTED",
+          "diff": "SUPPORTED",
+          "commit": "UNSUPPORTED",
+          "branch": "UNSUPPORTED",
+          "remotePublication": "UNSUPPORTED"
+        },
+        "browser": {
+          "webSearch": "UNSUPPORTED",
+          "webFetch": "UNSUPPORTED",
+          "interactiveBrowser": "UNSUPPORTED"
+        },
+        "tools": {
+          "native": "SUPPORTED",
+          "mcp": "UNSUPPORTED",
+          "structuredOutput": "SUPPORTED",
+          "telemetry": "SUPPORTED"
+        },
+        "subagents": {
+          "available": "UNSUPPORTED",
+          "parallel": "UNSUPPORTED",
+          "background": "UNSUPPORTED",
+          "eventVisibility": "UNSUPPORTED"
+        },
+        "streaming": {
+          "events": "SUPPORTED",
+          "modelDeltas": "UNSUPPORTED",
+          "durableReplay": "UNSUPPORTED"
+        },
+        "context": {
+          "persistentSessions": "SUPPORTED",
+          "resume": "UNSUPPORTED",
+          "fork": "UNSUPPORTED",
+          "compaction": "UNSUPPORTED",
+          "instructionFiles": "PARTIAL"
+        },
+        "headless": {
+          "support": "SUPPORTED",
+          "mode": "API"
+        },
+        "cancellation": {
+          "support": "SUPPORTED",
+          "mode": "IN_PROCESS_AGENT",
+          "idempotentCleanup": true
+        },
+        "sandbox": {
+          "isolationModes": [
+            "WORKSPACE_WRITE"
+          ],
+          "externalSandboxRecommended": true,
+          "requirements": [
+            "macOS Seatbelt for checks",
+            "Operator-controlled checkout; no hostile same-UID process"
+          ]
+        },
+        "network": {
+          "providerApi": true,
+          "packageInstall": false,
+          "runtimeEgressControl": "PARTIAL",
+          "destinations": [
+            "openrouter.ai"
+          ]
+        },
+        "credentials": {
+          "classes": [
+            "explicit-user-BYOK-reference"
+          ],
+          "passedToToolProcesses": false,
+          "redaction": "PARTIAL"
+        },
+        "telemetry": {
+          "tokens": "PARTIAL",
+          "cost": "SUPPORTED",
+          "toolCalls": "SUPPORTED",
+          "modelRequests": "SUPPORTED",
+          "retries": "SUPPORTED"
+        },
+        "admission": {
+          "maturity": "EXPERIMENTAL",
+          "executionBackends": [
+            "persistent-worker"
+          ],
+          "requiredExternalControls": [
+            "MC Attempt lease checkpoints",
+            "Separate verification Attempt",
+            "MC approval and publication"
+          ],
+          "prohibitedAuthorities": [
+            "worker-leases",
+            "verification-subjects",
+            "verification-plans",
+            "evidence-authority",
+            "github-publication",
+            "acceptance"
+          ]
+        },
+        "limitations": [
+          "Qualification is route-specific and must be current.",
+          "No whole-agent OS sandbox or remote backend.",
+          "Fixed files/checks and bounded UTF-8 snapshots only.",
+          "Uncertain invocation replay denied; MC must reconcile or issue a new Attempt."
+        ]
+      },
+      "environment": {},
+      "runtimeArtifact": {
+        "schemaVersion": "harness-runtime-artifact/v1",
+        "kind": "EXECUTABLE",
+        "name": "fab-node-runtime",
+        "version": "0.1.0-experimental.9+node.24.18.1.darwin.arm64",
+        "executableSha256": "c737851f0133bee398fa36d3a1b06e99eb4d27bd3ff877cbd5ca611a67d5a768",
+        "closureSha256": "3f93f2e4933177059a261ed04dd6279b13aa3b831064697d322065d11343159e",
+        "imageDigest": null
+      }
+    },
+    "capabilities": {
+      "contractVersion": "generic-harness-contract/v1",
+      "adapter": "fab",
+      "version": "v1",
+      "displayName": "Fab (Experimental)",
+      "provider": "openrouter",
+      "capabilityManifest": {
+        "schemaVersion": "harness-capability-manifest/v1",
+        "scope": "ADAPTER_EFFECTIVE",
+        "identity": {
+          "harnessId": "fab",
+          "harnessVersion": "0.1.0-experimental.9",
+          "harnessCommit": "3f0bee56bd4b7dffcb56655ee66a5ae0f39a6cb2",
+          "adapterId": "fab",
+          "adapterVersion": "v1"
+        },
+        "effectiveConfigSha256": "aff31b93cbb787c9b2d8dc4463081c91836496d50ee2e1d193452e0f8f42cb24",
+        "models": {
+          "providerSelection": "SUPPORTED",
+          "modelSelection": "SUPPORTED",
+          "supported": [
+            {
+              "provider": "openrouter",
+              "modelId": "openai/gpt-4.1-mini",
+              "selection": "PASSTHROUGH",
+              "contextWindowTokens": null,
+              "modalities": [
+                "text"
+              ]
+            }
+          ],
+          "reasoningControls": "UNSUPPORTED"
+        },
+        "filesystem": {
+          "read": "SUPPORTED",
+          "write": "SUPPORTED",
+          "pathAllowlist": "SUPPORTED",
+          "changedFileCapture": "SUPPORTED"
+        },
+        "shell": {
+          "available": "PARTIAL",
+          "commandTimeout": "SUPPORTED",
+          "processTreeCancellation": "SUPPORTED",
+          "credentialEnvironmentScrub": "SUPPORTED"
+        },
+        "git": {
+          "status": "SUPPORTED",
+          "diff": "SUPPORTED",
+          "commit": "UNSUPPORTED",
+          "branch": "UNSUPPORTED",
+          "remotePublication": "UNSUPPORTED"
+        },
+        "browser": {
+          "webSearch": "UNSUPPORTED",
+          "webFetch": "UNSUPPORTED",
+          "interactiveBrowser": "UNSUPPORTED"
+        },
+        "tools": {
+          "native": "SUPPORTED",
+          "mcp": "UNSUPPORTED",
+          "structuredOutput": "SUPPORTED",
+          "telemetry": "SUPPORTED"
+        },
+        "subagents": {
+          "available": "UNSUPPORTED",
+          "parallel": "UNSUPPORTED",
+          "background": "UNSUPPORTED",
+          "eventVisibility": "UNSUPPORTED"
+        },
+        "streaming": {
+          "events": "SUPPORTED",
+          "modelDeltas": "UNSUPPORTED",
+          "durableReplay": "UNSUPPORTED"
+        },
+        "context": {
+          "persistentSessions": "SUPPORTED",
+          "resume": "UNSUPPORTED",
+          "fork": "UNSUPPORTED",
+          "compaction": "UNSUPPORTED",
+          "instructionFiles": "PARTIAL"
+        },
+        "headless": {
+          "support": "SUPPORTED",
+          "mode": "API"
+        },
+        "cancellation": {
+          "support": "SUPPORTED",
+          "mode": "IN_PROCESS_AGENT",
+          "idempotentCleanup": true
+        },
+        "sandbox": {
+          "isolationModes": [
+            "WORKSPACE_WRITE"
+          ],
+          "externalSandboxRecommended": true,
+          "requirements": [
+            "macOS Seatbelt for checks",
+            "Operator-controlled checkout; no hostile same-UID process"
+          ]
+        },
+        "network": {
+          "providerApi": true,
+          "packageInstall": false,
+          "runtimeEgressControl": "PARTIAL",
+          "destinations": [
+            "openrouter.ai"
+          ]
+        },
+        "credentials": {
+          "classes": [
+            "explicit-user-BYOK-reference"
+          ],
+          "passedToToolProcesses": false,
+          "redaction": "PARTIAL"
+        },
+        "telemetry": {
+          "tokens": "PARTIAL",
+          "cost": "SUPPORTED",
+          "toolCalls": "SUPPORTED",
+          "modelRequests": "SUPPORTED",
+          "retries": "SUPPORTED"
+        },
+        "admission": {
+          "maturity": "EXPERIMENTAL",
+          "executionBackends": [
+            "persistent-worker"
+          ],
+          "requiredExternalControls": [
+            "MC Attempt lease checkpoints",
+            "Separate verification Attempt",
+            "MC approval and publication"
+          ],
+          "prohibitedAuthorities": [
+            "worker-leases",
+            "verification-subjects",
+            "verification-plans",
+            "evidence-authority",
+            "github-publication",
+            "acceptance"
+          ]
+        },
+        "limitations": [
+          "Qualification is route-specific and must be current.",
+          "No whole-agent OS sandbox or remote backend.",
+          "Fixed files/checks and bounded UTF-8 snapshots only.",
+          "Uncertain invocation replay denied; MC must reconcile or issue a new Attempt."
+        ]
+      },
+      "runtimeArtifact": {
+        "schemaVersion": "harness-runtime-artifact/v1",
+        "kind": "EXECUTABLE",
+        "name": "fab-node-runtime",
+        "version": "0.1.0-experimental.9+node.24.18.1.darwin.arm64",
+        "executableSha256": "c737851f0133bee398fa36d3a1b06e99eb4d27bd3ff877cbd5ca611a67d5a768",
+        "closureSha256": "3f93f2e4933177059a261ed04dd6279b13aa3b831064697d322065d11343159e",
+        "imageDigest": null
+      },
+      "executionBackends": [
+        "persistent-worker"
+      ],
+      "authority": {
+        "worker": "NONE",
+        "verification": "NONE",
+        "publication": "NONE",
+        "acceptance": "NONE",
+        "memory": "NONE",
+        "observability": "NONE",
+        "learning": "NONE"
+      },
+      "supportsCancel": true,
+      "supportsResume": false,
+      "supportsRepositoryMutation": true,
+      "isolationModes": [
+        "WORKSPACE_WRITE"
+      ],
+      "emittedEvents": [
+        "EXECUTION_STARTED",
+        "TOOL_CALLED",
+        "ARTIFACT_PRODUCED",
+        "EXECUTION_COMPLETED",
+        "EXECUTION_FAILED",
+        "EXECUTION_CANCELED"
+      ]
+    },
+    "manifest": {
+      "schemaVersion": "harness-capability-manifest/v1",
+      "scope": "ADAPTER_EFFECTIVE",
+      "identity": {
+        "harnessId": "fab",
+        "harnessVersion": "0.1.0-experimental.9",
+        "harnessCommit": "3f0bee56bd4b7dffcb56655ee66a5ae0f39a6cb2",
+        "adapterId": "fab",
+        "adapterVersion": "v1"
+      },
+      "effectiveConfigSha256": "aff31b93cbb787c9b2d8dc4463081c91836496d50ee2e1d193452e0f8f42cb24",
+      "models": {
+        "providerSelection": "SUPPORTED",
+        "modelSelection": "SUPPORTED",
+        "supported": [
+          {
+            "provider": "openrouter",
+            "modelId": "openai/gpt-4.1-mini",
+            "selection": "PASSTHROUGH",
+            "contextWindowTokens": null,
+            "modalities": [
+              "text"
+            ]
+          }
+        ],
+        "reasoningControls": "UNSUPPORTED"
+      },
+      "filesystem": {
+        "read": "SUPPORTED",
+        "write": "SUPPORTED",
+        "pathAllowlist": "SUPPORTED",
+        "changedFileCapture": "SUPPORTED"
+      },
+      "shell": {
+        "available": "PARTIAL",
+        "commandTimeout": "SUPPORTED",
+        "processTreeCancellation": "SUPPORTED",
+        "credentialEnvironmentScrub": "SUPPORTED"
+      },
+      "git": {
+        "status": "SUPPORTED",
+        "diff": "SUPPORTED",
+        "commit": "UNSUPPORTED",
+        "branch": "UNSUPPORTED",
+        "remotePublication": "UNSUPPORTED"
+      },
+      "browser": {
+        "webSearch": "UNSUPPORTED",
+        "webFetch": "UNSUPPORTED",
+        "interactiveBrowser": "UNSUPPORTED"
+      },
+      "tools": {
+        "native": "SUPPORTED",
+        "mcp": "UNSUPPORTED",
+        "structuredOutput": "SUPPORTED",
+        "telemetry": "SUPPORTED"
+      },
+      "subagents": {
+        "available": "UNSUPPORTED",
+        "parallel": "UNSUPPORTED",
+        "background": "UNSUPPORTED",
+        "eventVisibility": "UNSUPPORTED"
+      },
+      "streaming": {
+        "events": "SUPPORTED",
+        "modelDeltas": "UNSUPPORTED",
+        "durableReplay": "UNSUPPORTED"
+      },
+      "context": {
+        "persistentSessions": "SUPPORTED",
+        "resume": "UNSUPPORTED",
+        "fork": "UNSUPPORTED",
+        "compaction": "UNSUPPORTED",
+        "instructionFiles": "PARTIAL"
+      },
+      "headless": {
+        "support": "SUPPORTED",
+        "mode": "API"
+      },
+      "cancellation": {
+        "support": "SUPPORTED",
+        "mode": "IN_PROCESS_AGENT",
+        "idempotentCleanup": true
+      },
+      "sandbox": {
+        "isolationModes": [
+          "WORKSPACE_WRITE"
+        ],
+        "externalSandboxRecommended": true,
+        "requirements": [
+          "macOS Seatbelt for checks",
+          "Operator-controlled checkout; no hostile same-UID process"
+        ]
+      },
+      "network": {
+        "providerApi": true,
+        "packageInstall": false,
+        "runtimeEgressControl": "PARTIAL",
+        "destinations": [
+          "openrouter.ai"
+        ]
+      },
+      "credentials": {
+        "classes": [
+          "explicit-user-BYOK-reference"
+        ],
+        "passedToToolProcesses": false,
+        "redaction": "PARTIAL"
+      },
+      "telemetry": {
+        "tokens": "PARTIAL",
+        "cost": "SUPPORTED",
+        "toolCalls": "SUPPORTED",
+        "modelRequests": "SUPPORTED",
+        "retries": "SUPPORTED"
+      },
+      "admission": {
+        "maturity": "EXPERIMENTAL",
+        "executionBackends": [
+          "persistent-worker"
+        ],
+        "requiredExternalControls": [
+          "MC Attempt lease checkpoints",
+          "Separate verification Attempt",
+          "MC approval and publication"
+        ],
+        "prohibitedAuthorities": [
+          "worker-leases",
+          "verification-subjects",
+          "verification-plans",
+          "evidence-authority",
+          "github-publication",
+          "acceptance"
+        ]
+      },
+      "limitations": [
+        "Qualification is route-specific and must be current.",
+        "No whole-agent OS sandbox or remote backend.",
+        "Fixed files/checks and bounded UTF-8 snapshots only.",
+        "Uncertain invocation replay denied; MC must reconcile or issue a new Attempt."
+      ]
+    },
+    "capabilityManifestSha256": "sha256:7a6ee25ba6ea51c142de52a33bc02807e9822f69c30edddd9b1f7bf0f561bdc9",
+    "effectiveConfigSha256": "aff31b93cbb787c9b2d8dc4463081c91836496d50ee2e1d193452e0f8f42cb24",
+    "runtimeArtifact": {
+      "schemaVersion": "harness-runtime-artifact/v1",
+      "kind": "EXECUTABLE",
+      "name": "fab-node-runtime",
+      "version": "0.1.0-experimental.9+node.24.18.1.darwin.arm64",
+      "executableSha256": "c737851f0133bee398fa36d3a1b06e99eb4d27bd3ff877cbd5ca611a67d5a768",
+      "closureSha256": "3f93f2e4933177059a261ed04dd6279b13aa3b831064697d322065d11343159e",
+      "imageDigest": null
+    },
+    "runtimeArtifactSha256": "sha256:d7dbf9aeff9e6b240ee2c6053e41bbe81591b8a884c5d403bd16969df95b6235"
+  },
+  "negatives": [
+    {
+      "change": {
+        "allowedPaths": [
+          "src/**"
+        ]
+      },
+      "issues": [
+        {
+          "field": "allowedPaths",
+          "message": "Fab writable files exceed the MC frozen scope."
+        }
+      ]
+    },
+    {
+      "change": {
+        "repositoryRoot": "/private/tmp/unrelated"
+      },
+      "issues": [
+        {
+          "field": "repositoryRoot",
+          "message": "Fab requires the configured repository or its canonical Mission Control Attempt worktree."
+        }
+      ]
+    },
+    {
+      "change": {
+        "isolation": "READ_ONLY"
+      },
+      "issues": [
+        {
+          "field": "isolation",
+          "message": "Fab has no whole-agent OS read boundary; WORKSPACE_ONLY and read-only execution are unsupported."
+        }
+      ]
+    },
+    {
+      "change": {
+        "model": "other"
+      },
+      "issues": [
+        {
+          "field": "model",
+          "message": "Fab requires the exact explicitly selected provider/model."
+        },
+        {
+          "field": "providerRoute",
+          "message": "Fab requires the exact host-bound OpenRouter model route."
+        }
+      ]
+    }
+  ]
+}

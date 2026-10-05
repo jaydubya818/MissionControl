@@ -1,0 +1,8 @@
+{
+  "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+  "reservedAt": "2026-10-05T04:39:06.210Z",
+  "maximumProviderLiabilityUsd": 4.49,
+  "priorReservedLiabilityUsd": 0.51,
+  "programCeilingUsd": 5,
+  "maxProducerAttempts": 1
+}

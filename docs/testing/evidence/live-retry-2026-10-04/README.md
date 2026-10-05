@@ -1,5 +1,13 @@
 # Capped route qualification continuation
 
+Latest checkpoint: the plan is approved, its WorkOrder is released, and both
+factories passed readiness. Dispatch exposed a corrective-iteration boundary
+bug before creating an Attempt. The tested fix awaits operator approval after
+automatic approval review rejected its deployment. See
+[the review packet](../../../operations/live-retry-dispatch-review.md).
+The component qualification and earlier preparation record below remain evidence
+of those earlier stages.
+
 Component qualification passed on October 4, 2026, America/Los_Angeles
 (October 5 UTC). The governed documentation WorkOrder has not started.
 
@@ -34,31 +42,56 @@ The authorized total remains $5. `budget.json` allocates $0.01 to the credential
 probe, $0.50 to component qualification, and $4.49 to the documentation Mission.
 The first two allocations remain conservatively reserved even though both keys
 were revoked and reported model cost is much lower. No further component
-inference is enabled. The Mission allocation has not been dispatched.
+inference is enabled. The Mission allocation was used by one failed Attempt. Its full reservation remains retained.
 
-## Canonical preparation
+## Canonical local qualification
 
-The normal Research Lab APIs created a disabled exact model-route entry and an
-active code scope limited to `docs/operations/verification-retry-runbook.md`.
-Their IDs are in `canonical-preparation.json`. No execution profile was promoted,
-factory activated, approval recorded, or unrelated workspace changed.
+Fix commit `33e3612` was applied only to Research Lab at port 3214 after explicit
+operator approval. Post-commit results are in `postcommit-convex-tests.txt`
+and `postcommit-orchestration-tests.txt`. They record 1,491 Convex tests and
+766 orchestration tests passing, with 11 existing orchestration skips.
 
-Mission creation initially required a configured owner and team. The operator
-then explicitly approved adding Jay West and Factory Operations. Both records
-and the active LEAD membership now exist and have been read back successfully.
+The approved Mission is now backed by one failed producer Attempt. WorkOrder
+revision 2 records the local qualification boundary and NO_PRODUCTION_ACCESS
+through normal APIs. `routing-blocker.json` preserves the initial production
+certification rejection; `qualification-routing-preview.json` records the
+supported qualification route. The original Task was canceled before execution
+when its revision became stale. Its replacement is in the canonical checkpoint.
 
-Mission `gs7qk5q10e4v3v5td71pedhrvx8fqmvg` is now in PLANNING, owned by Jay West
-and Factory Operations. Plan `gn7htsghr19e1yeschmc1hmbgh8fqp4d` is DRAFT.
-`mission-plan-draft.json` captures the submitted draft, including its one-file,
-300-line, one-attempt limits and $4.49 allocation. Its documentation check checks
-required topics and unfinished placeholders; semantic review is separately
-required. No plan approval, WorkOrder release, dispatch, or publication occurred.
+The final evidence files are:
 
-Next, freeze and review the actual worker configuration
-and its qualification scope before admission. Then resume the governed run,
-independent verification, human publication decision, restart proof, and draft PR.
-The synthetic fixture's configuration is not automatically interchangeable with
-the documentation worker's configuration.
+- `dispatch.json` and `producer-attempt.json`, one initial Attempt with zero
+  retries, claimed and failed at TURN_LIMIT.
+- `duplicate-dispatch-proof.json`, repeated dispatch returns the same Attempt.
+- `producer-runtime-summary.json`, eight model calls, no changed files or
+  candidate, and provider-reported model cost of $0.0102412.
+- `producer-inspector.json`, retained canonical events, review blockers, and
+  current failure state. The runtime state path and hash are in the summary.
+- `producer-credential-revocation.json`, scoped credential deletion followed by
+  HTTP 401 within 15 seconds.
+- `before-restart.json` and `restart-no-replay-proof.json`, failed Attempt and
+  runtime state remain unchanged after worker restart and polling.
+
+The Mission runbook golden path did not complete. Independent verification,
+successful-candidate recovery, human publication approval, and draft PR were not
+reached. The pilot worker is stopped. No broader deployment, GitHub push, or
+merge occurred.
+
+The failed Attempt's canonical spend is zero with actual cost unavailable.
+Its runtime reports $0.0102412. Combined reported model cost is $0.014032;
+the full conservative $5 allocation remains reserved. Do not interpret the
+canonical zero as free execution or available retry budget.
+
+See [operations status](../../../operations/live-retry-dispatch-review.md) for
+corrected retry semantics, the qualification matrix, open issues, and the earlier
+coordinator startup side effect. Historical pre-fix regression outputs in this
+directory are retained as historical evidence, not current passing results.
 
 Provider credential fields were checked against the current
 [OpenRouter key creation reference](https://openrouter.ai/docs/api/api-reference/api-keys/create-a-new-api-key).
+
+The `worker-entry.mts.txt`, `prepare-worker.mts.txt`, and
+`prepare-verifier.mts.txt` files preserve the one-off preparation sources. They
+are evidence, not general-purpose launch commands. The temporary worker launcher
+is no longer runnable without restoring its reviewed entry file. Do not restart
+this pilot or create another Attempt without the required execution authority.

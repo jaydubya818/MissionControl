@@ -1,0 +1,2672 @@
+{
+  "acceptanceSummary": {
+    "approvalStatus": "APPROVED",
+    "blockingReasons": [
+      "Missing receipts: draft-publication, restart, runbook"
+    ],
+    "eligible": false,
+    "expiredApprovalTypes": [],
+    "failedCriteriaIds": [],
+    "missingApprovalTypes": [],
+    "missingCriteriaIds": [
+      "draft-publication",
+      "restart",
+      "runbook"
+    ],
+    "revokedApprovalTypes": [],
+    "staleCriteriaIds": [],
+    "waivedCriteriaIds": [],
+    "waiverWithoutApprovalCriteriaIds": []
+  },
+  "approvalDecisions": [
+    {
+      "_creationTime": 1791179795305.94,
+      "_id": "ks7b8vcy0sp796hcj9a66frc498fpp0n",
+      "approvalType": "HUMAN_REVIEW",
+      "approver": "operator",
+      "createdAt": 1791179795305,
+      "decidedAt": 1791179808894,
+      "decision": "APPROVE",
+      "expiresAt": 1792389395305,
+      "idempotencyKey": "live-retry-local-qualification-approval-20261004",
+      "metadata": {
+        "authorization": "Operator explicitly approved local Research Lab qualification after retry fix, 2026-10-04. Recorded through Codex using the local DEMO operator session. No production access, broader deployment or candidate publication approval."
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "reason": "Operator explicitly approved local Research Lab qualification after retry fix, 2026-10-04. Recorded through Codex using the local DEMO operator session. No production access, broader deployment or candidate publication approval.",
+      "requestedAction": "Allow one bounded local qualification Attempt on the exact experimental factory version; no publication approval.",
+      "riskLevel": "LOW",
+      "status": "APPROVED",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+      "workOrderRevisionNumber": 2
+    },
+    {
+      "_creationTime": 1791179795281.1172,
+      "_id": "ks7f1tdn5ph9etg2rmaek0mt698fq9xr",
+      "approvalType": "CHANGE_REVIEW",
+      "approver": "operator",
+      "createdAt": 1791179795281,
+      "decidedAt": 1791179879395,
+      "decision": "APPROVE",
+      "expiresAt": 1792389395281,
+      "metadata": {
+        "source": "revision-application"
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "reason": "Record operator approval of local-only qualification configuration. Revision 2 adds explicit NO_PRODUCTION_ACCESS and qualification designation; existing scope and cost cap preserved. No candidate publication approval.",
+      "requestedAction": "Approve revision 2",
+      "riskLevel": "LOW",
+      "status": "APPROVED",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+      "workOrderRevisionNumber": 2
+    }
+  ],
+  "childTasks": [
+    {
+      "_creationTime": 1791179855063.388,
+      "_id": "wh79y470dxfj65et3r6rcz214s8fq02p",
+      "actualCost": 0,
+      "assigneeIds": [],
+      "attempt": {
+        "attemptCount": 1,
+        "currentAttemptId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt",
+        "currentAttemptNumber": 1,
+        "currentAttemptStatus": "FAILED",
+        "internalStepRetryCount": 0,
+        "legacyRetryAmbiguous": false,
+        "retryCount": 0
+      },
+      "createdBy": "HUMAN",
+      "createdByRef": "development:local-operator",
+      "idempotencyKey": "live-retry-task-revision2-20261004",
+      "identifier": "SFRL-134",
+      "metadata": {
+        "authorityScope": {
+          "authorityRef": "work-order:yh786ydmsxnztmr4dm7654xwjd8fq2kp:revision:2:desired-outcome",
+          "kind": "WORK_ORDER_DESIRED_OUTCOME",
+          "objective": "Write only docs/operations/verification-retry-runbook.md, with accurate retry prerequisites, evidence retention, independent verification, fresh approval and failure/recovery instructions.",
+          "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+          "workOrderRevisionNumber": 2
+        },
+        "authorization": "Operator-approved single documentation pilot",
+        "governanceOrigin": "GOVERNED_WORK_ORDER",
+        "relationshipCreatedAt": 1791179855063
+      },
+      "parentDelivery": {
+        "codeScopeIds": [
+          "jx7jr1rmgavhzsmxwrx8xw4ajh8fp3vb"
+        ],
+        "executionEnvironment": "LOCAL",
+        "governanceStatus": "GOVERNED",
+        "missionId": "gs7qk5q10e4v3v5td71pedhrvx8fqmvg",
+        "missionTitle": "Publish the verification retry operator runbook",
+        "relationshipValid": true,
+        "repository": "jaydubya818/MissionControl",
+        "repositoryId": "k17wswvrva7ky172eej2w1nj858cbzt7",
+        "riskLevel": "LOW",
+        "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+        "workOrderState": "BLOCKED",
+        "workOrderTitle": "Write the verification retry operator runbook",
+        "workflowId": "live-verification-retry-runbook-v1"
+      },
+      "presentationStatus": "READY",
+      "priority": 3,
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "reviewCycles": 0,
+      "source": "DASHBOARD",
+      "stateEnteredAt": 1791179855099,
+      "status": "READY",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "title": "Write the verification retry operator runbook",
+      "type": "DOCS",
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    },
+    {
+      "_creationTime": 1791175146164.895,
+      "_id": "wh729nzcc229w6v149wm3w4yxh8fqe5m",
+      "actualCost": 0,
+      "assigneeIds": [],
+      "attempt": {
+        "attemptCount": 0,
+        "currentAttemptId": null,
+        "currentAttemptNumber": 0,
+        "currentAttemptStatus": null,
+        "internalStepRetryCount": 0,
+        "legacyRetryAmbiguous": false,
+        "retryCount": 0
+      },
+      "completedAt": 1791179849262,
+      "createdBy": "HUMAN",
+      "createdByRef": "development:local-operator",
+      "idempotencyKey": "live-retry-task-20261004",
+      "identifier": "SFRL-133",
+      "metadata": {
+        "authorityScope": {
+          "authorityRef": "work-order:yh786ydmsxnztmr4dm7654xwjd8fq2kp:revision:1:desired-outcome",
+          "kind": "WORK_ORDER_DESIRED_OUTCOME",
+          "objective": "Write only docs/operations/verification-retry-runbook.md, with accurate retry prerequisites, evidence retention, independent verification, fresh approval and failure/recovery instructions.",
+          "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+          "workOrderRevisionNumber": 1
+        },
+        "authorization": "Operator-approved single documentation pilot",
+        "governanceOrigin": "GOVERNED_WORK_ORDER",
+        "relationshipCreatedAt": 1791175146164
+      },
+      "parentDelivery": {
+        "codeScopeIds": [
+          "jx7jr1rmgavhzsmxwrx8xw4ajh8fp3vb"
+        ],
+        "executionEnvironment": "LOCAL",
+        "governanceStatus": "GOVERNED",
+        "missionId": "gs7qk5q10e4v3v5td71pedhrvx8fqmvg",
+        "missionTitle": "Publish the verification retry operator runbook",
+        "relationshipValid": true,
+        "repository": "jaydubya818/MissionControl",
+        "repositoryId": "k17wswvrva7ky172eej2w1nj858cbzt7",
+        "riskLevel": "LOW",
+        "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+        "workOrderState": "BLOCKED",
+        "workOrderTitle": "Write the verification retry operator runbook",
+        "workflowId": "live-verification-retry-runbook-v1"
+      },
+      "presentationStatus": "CANCELED",
+      "priority": 3,
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "reviewCycles": 0,
+      "source": "DASHBOARD",
+      "stateEnteredAt": 1791179849262,
+      "status": "CANCELED",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "title": "Write the verification retry operator runbook",
+      "type": "DOCS",
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    }
+  ],
+  "currentVerification": {
+    "current": false,
+    "eligible": false,
+    "reasons": [
+      "No current source Attempt has published a candidate-ready Verification Subject."
+    ]
+  },
+  "events": [
+    {
+      "_creationTime": 1791179965881.1199,
+      "_id": "y57c4qhznsxm1rg45bsgwn4w8n8fq62d",
+      "actorType": "SYSTEM",
+      "eventType": "RUN_FAILED",
+      "fromState": "DISPATCHED",
+      "metadata": {
+        "failureReason": "Fab execution blocked, failed or cancelled; inspect its redacted evidence.",
+        "workflowRunStatus": "FAILED"
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "summary": "Factory attempt inc68pnu failed",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "timestamp": 1791179965881,
+      "toState": "BLOCKED",
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+      "workflowRunId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+    },
+    {
+      "_creationTime": 1791179882573.3423,
+      "_id": "y577b95sqrvpsg4k5r82hk6rq98fqn58",
+      "actorId": "demo:company-administrator",
+      "actorType": "HUMAN",
+      "eventType": "DISPATCHED",
+      "fromState": "READY",
+      "idempotencyKey": "live-retry-dispatch-20261004:dispatched",
+      "metadata": {
+        "runId": "inc68pnu",
+        "taskAttemptNumber": 1,
+        "taskId": "wh79y470dxfj65et3r6rcz214s8fq02p",
+        "taskRetryNumber": 0
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "summary": "Execution run inc68pnu created for live-verification-retry-runbook-v1",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "timestamp": 1791179882573,
+      "toState": "DISPATCHED",
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+      "workflowRunId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+    },
+    {
+      "_creationTime": 1791179882573.3406,
+      "_id": "y570tt6d9kccfwwkj1zr1yfk4n8fqq8w",
+      "actorId": "demo:company-administrator",
+      "actorType": "HUMAN",
+      "eventType": "DISPATCH_REQUESTED",
+      "fromState": "READY",
+      "idempotencyKey": "live-retry-dispatch-20261004:request",
+      "metadata": {
+        "model": "openai/gpt-4.1-mini",
+        "routingDecisionId": "g57jaj4g3d29j3phm3dba214vs8fpa71",
+        "routingMode": "SHADOW",
+        "taskAttemptNumber": 1,
+        "taskId": "wh79y470dxfj65et3r6rcz214s8fq02p"
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "summary": "Dispatch requested for workflow live-verification-retry-runbook-v1",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "timestamp": 1791179882573,
+      "toState": "DISPATCHED",
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    },
+    {
+      "_creationTime": 1791179879395.886,
+      "_id": "y57bvfawp94t2vpdf6tr0w8m9s8fqe5j",
+      "actorId": "operator",
+      "actorType": "HUMAN",
+      "eventType": "APPROVAL_APPROVED",
+      "metadata": {
+        "approvalDecisionId": "ks7f1tdn5ph9etg2rmaek0mt698fq9xr",
+        "reason": "Record operator approval of local-only qualification configuration. Revision 2 adds explicit NO_PRODUCTION_ACCESS and qualification designation; existing scope and cost cap preserved. No candidate publication approval."
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "summary": "Approval CHANGE_REVIEW approved",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "timestamp": 1791179879395,
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    },
+    {
+      "_creationTime": 1791179808894.862,
+      "_id": "y57553r7zrh4yr8vb7macmhv1n8fqqqf",
+      "actorId": "operator",
+      "actorType": "HUMAN",
+      "eventType": "APPROVAL_APPROVED",
+      "metadata": {
+        "approvalDecisionId": "ks7b8vcy0sp796hcj9a66frc498fpp0n",
+        "reason": "Operator explicitly approved local Research Lab qualification after retry fix, 2026-10-04. Recorded through Codex using the local DEMO operator session. No production access, broader deployment or candidate publication approval."
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "summary": "Approval HUMAN_REVIEW approved",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "timestamp": 1791179808894,
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    },
+    {
+      "_creationTime": 1791179795305.9402,
+      "_id": "y573ek1ej99c71fe8f6b7vadqn8fp3j0",
+      "actorType": "HUMAN",
+      "eventType": "APPROVAL_REQUESTED",
+      "idempotencyKey": "live-retry-local-qualification-approval-20261004:event",
+      "metadata": {
+        "approvalDecisionId": "ks7b8vcy0sp796hcj9a66frc498fpp0n",
+        "requestedAction": "Allow one bounded local qualification Attempt on the exact experimental factory version; no publication approval."
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "summary": "Approval requested: HUMAN_REVIEW",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "timestamp": 1791179795305,
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    },
+    {
+      "_creationTime": 1791179795281.1177,
+      "_id": "y5730z2ye0vyafmbhrz4kmacmx8fqgmz",
+      "actorType": "HUMAN",
+      "eventType": "REVISION_APPLIED",
+      "fromState": "READY",
+      "metadata": {
+        "changedFields": [
+          "negativeConstraints",
+          "metadata"
+        ],
+        "materiality": "BOTH",
+        "revisionId": "y974aqfgmr7g9cxc9thgce9g4h8fqeat"
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "summary": "Applied revision 2",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "timestamp": 1791179795281,
+      "toState": "AWAITING_APPROVAL",
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    },
+    {
+      "_creationTime": 1791179795281.1174,
+      "_id": "y575m3k1tf2rmqpc8akpgvq4t98fp53h",
+      "actorType": "SYSTEM",
+      "eventType": "APPROVAL_REQUESTED",
+      "metadata": {
+        "approvalDecisionId": "ks7f1tdn5ph9etg2rmaek0mt698fq9xr",
+        "approvalType": "CHANGE_REVIEW",
+        "revisionNumber": 2
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "summary": "Approval requested: CHANGE_REVIEW for revision 2",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "timestamp": 1791179795281,
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    },
+    {
+      "_creationTime": 1791179795281.117,
+      "_id": "y577zr8yd8hp1qp0pw6n75448d8fp1ej",
+      "actorType": "HUMAN",
+      "eventType": "REVISION_APPROVED",
+      "metadata": {
+        "revisionId": "y974aqfgmr7g9cxc9thgce9g4h8fqeat"
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "summary": "Revision 2 approved",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "timestamp": 1791179795281,
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    },
+    {
+      "_creationTime": 1791179795264.7183,
+      "_id": "y578w6mfmhy0752knfy71266qx8fqvy4",
+      "actorType": "HUMAN",
+      "eventType": "REVISION_REQUESTED",
+      "idempotencyKey": "live-retry-local-qualification-revision-20261004:event",
+      "metadata": {
+        "changedFields": [
+          "negativeConstraints",
+          "metadata"
+        ],
+        "materiality": "BOTH",
+        "revisionId": "y974aqfgmr7g9cxc9thgce9g4h8fqeat"
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "summary": "Revision 2 requested",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "timestamp": 1791179795264,
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    },
+    {
+      "_creationTime": 1791174029324.7844,
+      "_id": "y572c3qav8jaetqr82kqank0xd8fqb62",
+      "actorId": "development:local-operator",
+      "actorType": "HUMAN",
+      "eventType": "WORK_ORDER_CREATED",
+      "idempotencyKey": "mission-plan:gn7htsghr19e1yeschmc1hmbgh8fqp4d:release:v1:work-order:verification-retry-runbook:created",
+      "metadata": {
+        "changeBudgetAssigned": true,
+        "qualityContractDigest": "sha256:aecbdf1f972c53509b7b33a85ee9756e10e4f03495dc6f542582d9627b530ac6",
+        "repository": "jaydubya818/MissionControl",
+        "riskLevel": "LOW",
+        "riskReasons": [
+          "Operator-selected low risk."
+        ],
+        "specificationVersion": 1,
+        "workflowId": "live-verification-retry-runbook-v1"
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "summary": "Created work order Write the verification retry operator runbook",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "timestamp": 1791174029324,
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    }
+  ],
+  "evidenceEnvelopes": [],
+  "executionRuns": [
+    {
+      "_id": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt",
+      "attemptPurpose": "IMPLEMENTATION",
+      "checkpointSummary": "Dispatch accepted; awaiting executor binding.",
+      "completedAt": 1791179965881,
+      "currentStepLabel": "write-runbook",
+      "executionPhase": "TERMINAL",
+      "failureReason": "Fab execution blocked, failed or cancelled; inspect its redacted evidence.",
+      "humanInterventions": 0,
+      "model": "openai/gpt-4.1-mini",
+      "parentTaskId": "wh79y470dxfj65et3r6rcz214s8fq02p",
+      "retryCount": 0,
+      "runId": "inc68pnu",
+      "startedAt": 1791179882573,
+      "status": "FAILED",
+      "taskAttemptNumber": 1,
+      "taskRetryNumber": 0,
+      "workOrderRevisionNumber": 2,
+      "workflowId": "live-verification-retry-runbook-v1",
+      "worktree": "/Users/jaywest/.codex/worktrees/live-retry-runbook/MissionControl/.mission-control/worktrees/54xwjd8fq2kp-inc68pnu"
+    }
+  ],
+  "governancePolicy": {
+    "active": true,
+    "approvalExpiringSoonHours": 24,
+    "approvalValidityHoursByRisk": {
+      "CRITICAL": 24,
+      "HIGH": 72,
+      "LOW": 336,
+      "MEDIUM": 168
+    },
+    "evidenceExpiringSoonHours": 24,
+    "fullReopenOnAcceptedWorkOrderChange": true,
+    "name": "Default software-factory policy",
+    "requireReapprovalAfterMaterialChange": true,
+    "requireReverificationAfterCodeChange": true,
+    "requireReverificationAfterEnvironmentChange": true,
+    "requireReverificationAfterWorkflowChange": true,
+    "scope": "GLOBAL",
+    "verificationValidityHours": 168
+  },
+  "governanceStatus": {
+    "blockingReasons": [
+      "Missing receipts: draft-publication, restart, runbook"
+    ],
+    "currentRevisionId": "y974aqfgmr7g9cxc9thgce9g4h8fqeat",
+    "currentRevisionNumber": 2,
+    "expiredApprovals": [],
+    "expiringApprovals": [],
+    "expiringReceipts": [],
+    "latestAcceptedRevision": null,
+    "requiredReapproval": false,
+    "requiredReverification": true,
+    "staleReceipts": []
+  },
+  "legacyTask": null,
+  "project": {
+    "_creationTime": 1785221984061.684,
+    "_id": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+    "defaultPolicy": "Governed research",
+    "description": "Governed research workspace for software-factory, dark-factory, and agentic engineering practices.",
+    "githubBranch": "main",
+    "githubRepo": "jaydubya818/MissionControl",
+    "name": "Software Factory Research Lab",
+    "nextTaskNumber": 134,
+    "owner": "Research Director",
+    "purpose": "Continuously research, analyze, compare, and test emerging software-factory, dark-factory, and agentic software-engineering practices using Mission Control as the governed execution and validation platform.",
+    "repositoryStatus": "READY",
+    "repositoryValidatedAt": 1791174443275,
+    "slug": "software-factory-research-lab",
+    "status": "ACTIVE",
+    "taskPrefix": "SFRL",
+    "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n"
+  },
+  "qualityGateDecisions": [],
+  "reopenDecisions": [],
+  "reviewPackage": {
+    "blockers": [
+      "Attempt is failed.",
+      "GitHub App installation identity is missing from the Factory publication lineage.",
+      "Server-owned WorkOrder verification receipt is missing.",
+      "Review-ready pull request and exact base/head SHA lineage are missing.",
+      "Exact GitHub-sourced Attempt, repository, branch, and head CI evidence is missing.",
+      "Structured changed-file lineage is missing.",
+      "Publication ends at a draft PR with human approval: evidence is missing.",
+      "Worker restart preserves evidence without producer replay: evidence is missing.",
+      "The runbook accurately explains verification retries: evidence is missing."
+    ],
+    "changedFiles": [],
+    "ci": {
+      "evaluationId": null,
+      "headSha": null,
+      "lenses": [],
+      "prState": "UNKNOWN",
+      "runUrl": null,
+      "status": "MISSING"
+    },
+    "criteria": [
+      {
+        "evidenceEnvelopeIds": [],
+        "evidenceLocation": null,
+        "id": "draft-publication",
+        "integrityIssue": null,
+        "receiptId": null,
+        "result": null,
+        "status": "MISSING",
+        "title": "Publication ends at a draft PR with human approval",
+        "validUntil": null,
+        "verificationMethod": "MANUAL",
+        "verifier": null
+      },
+      {
+        "evidenceEnvelopeIds": [],
+        "evidenceLocation": null,
+        "id": "restart",
+        "integrityIssue": null,
+        "receiptId": null,
+        "result": null,
+        "status": "MISSING",
+        "title": "Worker restart preserves evidence without producer replay",
+        "validUntil": null,
+        "verificationMethod": "TEST",
+        "verifier": null
+      },
+      {
+        "evidenceEnvelopeIds": [],
+        "evidenceLocation": null,
+        "id": "runbook",
+        "integrityIssue": null,
+        "receiptId": null,
+        "result": null,
+        "status": "MISSING",
+        "title": "The runbook accurately explains verification retries",
+        "validUntil": null,
+        "verificationMethod": "MANUAL",
+        "verifier": null
+      }
+    ],
+    "deviations": [],
+    "failedChecks": [],
+    "gate": {
+      "candidateRevision": null,
+      "integrityIssue": "Canonical server-derived verifier independence is missing.",
+      "reasons": [],
+      "receiptId": null,
+      "recordedAt": null,
+      "sourceRevision": null,
+      "status": "MISSING",
+      "validUntil": null,
+      "verdict": null,
+      "verificationRunId": null,
+      "verifier": null
+    },
+    "identity": {
+      "baseSha": "5308727463ec737589bf8072ee9f5de0af1bba7a",
+      "branch": "mc/54xwjd8fq2kp-inc68pnu",
+      "executionManifestDigest": "sha256:3948f8ba9c7e24e040c15efe3f89c33662c3a4124c0e38be2b41a28b07d7f049",
+      "githubAppInstallationId": null,
+      "headSha": null,
+      "pullRequestNumber": null,
+      "pullRequestUrl": null,
+      "repository": "jaydubya818/MissionControl",
+      "repositoryId": "k17wswvrva7ky172eej2w1nj858cbzt7",
+      "runId": "inc68pnu",
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+      "workOrderRevisionNumber": 2
+    },
+    "nextAction": "Attempt is failed.",
+    "recovery": {
+      "attempts": 1,
+      "staleRecoveries": 0
+    },
+    "reviewIntelligence": {
+      "authority": {
+        "acceptanceMutation": "workOrders.accept",
+        "advisoryFindings": "ADVISORY",
+        "deterministicEvidence": "CANONICAL_VERIFICATION",
+        "reviewApproval": "NOT_ACCEPTANCE",
+        "reviewPackage": "PROJECTION"
+      },
+      "changes": {
+        "changedFiles": [],
+        "rawDiffUrl": null,
+        "semanticGroups": [],
+        "summary": null
+      },
+      "criterionMatrix": [
+        {
+          "criterion": {
+            "description": "The approved candidate is published as a draft PR; no merge occurs. Evidence: Human publication decision, GitHub draft flag, branch/head SHA and PR URL",
+            "id": "draft-publication",
+            "requirementIds": [
+              "requirement:draft-publication"
+            ],
+            "title": "Publication ends at a draft PR with human approval"
+          },
+          "current": false,
+          "evidence": [],
+          "integrityIssue": null,
+          "lineage": {
+            "candidateRevision": null,
+            "evidenceSetDigest": null,
+            "missionPlanId": "gn7htsghr19e1yeschmc1hmbgh8fqp4d",
+            "missionPlanRevisionNumber": 1,
+            "missionSpecDigest": null,
+            "missionSpecRevisionId": null,
+            "qualityContractDigest": "sha256:aecbdf1f972c53509b7b33a85ee9756e10e4f03495dc6f542582d9627b530ac6",
+            "qualityGateDecisionId": null,
+            "verificationPlanDigest": null,
+            "verificationPlanId": null,
+            "verificationRunId": null,
+            "verificationSubjectDigest": null,
+            "verificationSubjectId": null,
+            "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+            "workOrderRevisionNumber": 2,
+            "workflowRunId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+          },
+          "method": "MANUAL",
+          "planAssertions": [],
+          "receiptId": null,
+          "result": "MISSING",
+          "specRequirements": [
+            {
+              "id": "requirement:draft-publication",
+              "priority": "MUST",
+              "title": "Publication ends at a draft PR with human approval"
+            }
+          ],
+          "verificationChecks": [],
+          "verifier": null
+        },
+        {
+          "criterion": {
+            "description": "After a controlled restart, candidate SHA and evidence remain unchanged and the completed producer is not dispatched again. Evidence: Before/after worker session IDs, canonical Attempt states and inference receipts",
+            "id": "restart",
+            "requirementIds": [
+              "requirement:restart"
+            ],
+            "title": "Worker restart preserves evidence without producer replay"
+          },
+          "current": false,
+          "evidence": [],
+          "integrityIssue": null,
+          "lineage": {
+            "candidateRevision": null,
+            "evidenceSetDigest": null,
+            "missionPlanId": "gn7htsghr19e1yeschmc1hmbgh8fqp4d",
+            "missionPlanRevisionNumber": 1,
+            "missionSpecDigest": null,
+            "missionSpecRevisionId": null,
+            "qualityContractDigest": "sha256:aecbdf1f972c53509b7b33a85ee9756e10e4f03495dc6f542582d9627b530ac6",
+            "qualityGateDecisionId": null,
+            "verificationPlanDigest": null,
+            "verificationPlanId": null,
+            "verificationRunId": null,
+            "verificationSubjectDigest": null,
+            "verificationSubjectId": null,
+            "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+            "workOrderRevisionNumber": 2,
+            "workflowRunId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+          },
+          "method": "TEST",
+          "planAssertions": [],
+          "receiptId": null,
+          "result": "MISSING",
+          "specRequirements": [
+            {
+              "id": "requirement:restart",
+              "priority": "MUST",
+              "title": "Worker restart preserves evidence without producer replay"
+            }
+          ],
+          "verificationChecks": [],
+          "verifier": null
+        },
+        {
+          "criterion": {
+            "description": "A reviewer confirms eligibility, unchanged candidate/revision/contract, retained failed evidence, independent verification, fresh approval, and recovery states against current source. Evidence: Exact candidate SHA, separate verifier Attempt and semantic review evidence",
+            "id": "runbook",
+            "requirementIds": [
+              "requirement:runbook"
+            ],
+            "title": "The runbook accurately explains verification retries"
+          },
+          "current": false,
+          "evidence": [],
+          "integrityIssue": null,
+          "lineage": {
+            "candidateRevision": null,
+            "evidenceSetDigest": null,
+            "missionPlanId": "gn7htsghr19e1yeschmc1hmbgh8fqp4d",
+            "missionPlanRevisionNumber": 1,
+            "missionSpecDigest": null,
+            "missionSpecRevisionId": null,
+            "qualityContractDigest": "sha256:aecbdf1f972c53509b7b33a85ee9756e10e4f03495dc6f542582d9627b530ac6",
+            "qualityGateDecisionId": null,
+            "verificationPlanDigest": null,
+            "verificationPlanId": null,
+            "verificationRunId": null,
+            "verificationSubjectDigest": null,
+            "verificationSubjectId": null,
+            "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+            "workOrderRevisionNumber": 2,
+            "workflowRunId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+          },
+          "method": "MANUAL",
+          "planAssertions": [],
+          "receiptId": null,
+          "result": "MISSING",
+          "specRequirements": [
+            {
+              "id": "requirement:runbook",
+              "priority": "MUST",
+              "title": "The runbook accurately explains verification retries"
+            }
+          ],
+          "verificationChecks": [],
+          "verifier": null
+        }
+      ],
+      "decisions": [],
+      "digest": "sha256:93653a72a24d21d8152872b0315eb085382725fc99490658673e27ee44045e3c",
+      "exactLineage": {
+        "candidateRevision": null,
+        "current": false,
+        "currentPullRequestHeadSha": null,
+        "currentnessReasons": [
+          "No current source Attempt has published a candidate-ready Verification Subject."
+        ],
+        "evidenceSetDigest": null,
+        "harnessIdentity": {
+          "adapter": "fab",
+          "capabilityManifest": {
+            "admission": {
+              "executionBackends": [
+                "persistent-worker"
+              ],
+              "maturity": "EXPERIMENTAL",
+              "prohibitedAuthorities": [
+                "worker-leases",
+                "verification-subjects",
+                "verification-plans",
+                "evidence-authority",
+                "github-publication",
+                "acceptance"
+              ],
+              "requiredExternalControls": [
+                "MC Attempt lease checkpoints",
+                "Separate verification Attempt",
+                "MC approval and publication"
+              ]
+            },
+            "browser": {
+              "interactiveBrowser": "UNSUPPORTED",
+              "webFetch": "UNSUPPORTED",
+              "webSearch": "UNSUPPORTED"
+            },
+            "cancellation": {
+              "idempotentCleanup": true,
+              "mode": "IN_PROCESS_AGENT",
+              "support": "SUPPORTED"
+            },
+            "context": {
+              "compaction": "UNSUPPORTED",
+              "fork": "UNSUPPORTED",
+              "instructionFiles": "PARTIAL",
+              "persistentSessions": "SUPPORTED",
+              "resume": "UNSUPPORTED"
+            },
+            "credentials": {
+              "classes": [
+                "explicit-user-BYOK-reference"
+              ],
+              "passedToToolProcesses": false,
+              "redaction": "PARTIAL"
+            },
+            "effectiveConfigSha256": "aff31b93cbb787c9b2d8dc4463081c91836496d50ee2e1d193452e0f8f42cb24",
+            "filesystem": {
+              "changedFileCapture": "SUPPORTED",
+              "pathAllowlist": "SUPPORTED",
+              "read": "SUPPORTED",
+              "write": "SUPPORTED"
+            },
+            "git": {
+              "branch": "UNSUPPORTED",
+              "commit": "UNSUPPORTED",
+              "diff": "SUPPORTED",
+              "remotePublication": "UNSUPPORTED",
+              "status": "SUPPORTED"
+            },
+            "headless": {
+              "mode": "API",
+              "support": "SUPPORTED"
+            },
+            "identity": {
+              "adapterId": "fab",
+              "adapterVersion": "v1",
+              "harnessCommit": "3f0bee56bd4b7dffcb56655ee66a5ae0f39a6cb2",
+              "harnessId": "fab",
+              "harnessVersion": "0.1.0-experimental.9"
+            },
+            "limitations": [
+              "Qualification is route-specific and must be current.",
+              "No whole-agent OS sandbox or remote backend.",
+              "Fixed files/checks and bounded UTF-8 snapshots only.",
+              "Uncertain invocation replay denied; MC must reconcile or issue a new Attempt."
+            ],
+            "models": {
+              "modelSelection": "SUPPORTED",
+              "providerSelection": "SUPPORTED",
+              "reasoningControls": "UNSUPPORTED",
+              "supported": [
+                {
+                  "contextWindowTokens": null,
+                  "modalities": [
+                    "text"
+                  ],
+                  "modelId": "openai/gpt-4.1-mini",
+                  "provider": "openrouter",
+                  "selection": "PASSTHROUGH"
+                }
+              ]
+            },
+            "network": {
+              "destinations": [
+                "openrouter.ai"
+              ],
+              "packageInstall": false,
+              "providerApi": true,
+              "runtimeEgressControl": "PARTIAL"
+            },
+            "sandbox": {
+              "externalSandboxRecommended": true,
+              "isolationModes": [
+                "WORKSPACE_WRITE"
+              ],
+              "requirements": [
+                "macOS Seatbelt for checks",
+                "Operator-controlled checkout; no hostile same-UID process"
+              ]
+            },
+            "schemaVersion": "harness-capability-manifest/v1",
+            "scope": "ADAPTER_EFFECTIVE",
+            "shell": {
+              "available": "PARTIAL",
+              "commandTimeout": "SUPPORTED",
+              "credentialEnvironmentScrub": "SUPPORTED",
+              "processTreeCancellation": "SUPPORTED"
+            },
+            "streaming": {
+              "durableReplay": "UNSUPPORTED",
+              "events": "SUPPORTED",
+              "modelDeltas": "UNSUPPORTED"
+            },
+            "subagents": {
+              "available": "UNSUPPORTED",
+              "background": "UNSUPPORTED",
+              "eventVisibility": "UNSUPPORTED",
+              "parallel": "UNSUPPORTED"
+            },
+            "telemetry": {
+              "cost": "SUPPORTED",
+              "modelRequests": "SUPPORTED",
+              "retries": "SUPPORTED",
+              "tokens": "PARTIAL",
+              "toolCalls": "SUPPORTED"
+            },
+            "tools": {
+              "mcp": "UNSUPPORTED",
+              "native": "SUPPORTED",
+              "structuredOutput": "SUPPORTED",
+              "telemetry": "SUPPORTED"
+            }
+          },
+          "capabilityManifestSha256": "sha256:7a6ee25ba6ea51c142de52a33bc02807e9822f69c30edddd9b1f7bf0f561bdc9",
+          "completionContract": "factory-result/v1",
+          "effectiveConfigSha256": "aff31b93cbb787c9b2d8dc4463081c91836496d50ee2e1d193452e0f8f42cb24",
+          "harnessCommit": "3f0bee56bd4b7dffcb56655ee66a5ae0f39a6cb2",
+          "harnessId": "fab",
+          "harnessVersion": "0.1.0-experimental.9",
+          "isolation": "WORKSPACE_WRITE",
+          "pullRequestAuthority": "CONTROL_PLANE_ONLY",
+          "requiredCapabilities": [
+            "git-worktree",
+            "workspace-write"
+          ],
+          "requiredHarnessCapabilities": [
+            {
+              "capability": "filesystem.read",
+              "minimumSupport": "SUPPORTED"
+            },
+            {
+              "capability": "filesystem.write",
+              "minimumSupport": "SUPPORTED"
+            },
+            {
+              "capability": "filesystem.pathAllowlist",
+              "minimumSupport": "PARTIAL"
+            },
+            {
+              "capability": "shell.available",
+              "minimumSupport": "PARTIAL"
+            },
+            {
+              "capability": "shell.processTreeCancellation",
+              "minimumSupport": "PARTIAL"
+            },
+            {
+              "capability": "git.status",
+              "minimumSupport": "SUPPORTED"
+            },
+            {
+              "capability": "git.diff",
+              "minimumSupport": "SUPPORTED"
+            },
+            {
+              "capability": "tools.structuredOutput",
+              "minimumSupport": "PARTIAL"
+            },
+            {
+              "capability": "headless.support",
+              "minimumSupport": "PARTIAL"
+            },
+            {
+              "capability": "cancellation.support",
+              "minimumSupport": "PARTIAL"
+            }
+          ],
+          "runtimeArtifact": {
+            "closureSha256": "3f93f2e4933177059a261ed04dd6279b13aa3b831064697d322065d11343159e",
+            "executableSha256": "c737851f0133bee398fa36d3a1b06e99eb4d27bd3ff877cbd5ca611a67d5a768",
+            "imageDigest": null,
+            "kind": "EXECUTABLE",
+            "name": "fab-node-runtime",
+            "schemaVersion": "harness-runtime-artifact/v1",
+            "version": "0.1.0-experimental.9+node.24.18.1.darwin.arm64"
+          },
+          "runtimeArtifactDigest": "sha256:d7dbf9aeff9e6b240ee2c6053e41bbe81591b8a884c5d403bd16969df95b6235",
+          "timeoutMs": 600000,
+          "version": "v1"
+        },
+        "missionPlanId": "gn7htsghr19e1yeschmc1hmbgh8fqp4d",
+        "missionSpecDigest": null,
+        "missionSpecRevisionId": null,
+        "providerPullRequestId": null,
+        "providerRepositoryId": null,
+        "pullRequestProvider": null,
+        "pullRequestUrl": null,
+        "qualityContractDigest": "sha256:aecbdf1f972c53509b7b33a85ee9756e10e4f03495dc6f542582d9627b530ac6",
+        "qualityGateDecisionId": null,
+        "reviewPackageDigest": "sha256:2d095d5bcda3571fc0cc4c501434b126a5cfc9ebde2eac532f35184985a5b61e",
+        "treeSha": null,
+        "verificationPlanDigest": null,
+        "verificationPlanId": null,
+        "verificationRunId": null,
+        "verificationSubjectCandidateSha": null,
+        "verificationSubjectDigest": null,
+        "verificationSubjectId": null,
+        "verificationSubjectPrHeadSha": null,
+        "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+        "workOrderRevisionNumber": 2,
+        "workerIdentity": "service:orchestration-server|executor:fab/v1|host:local-mac:live-retry-runbook",
+        "workflowRunId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+      },
+      "failedOrRecovered": [
+        {
+          "attemptPurpose": "IMPLEMENTATION",
+          "eventType": "ATTEMPT_FAILED",
+          "recordedAt": 1791179965881,
+          "retryOfRunId": null,
+          "runId": "inc68pnu",
+          "sequenceNumber": 1,
+          "status": "FAILED",
+          "summary": "inc68pnu",
+          "workflowRunId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+        },
+        {
+          "eventType": "RUN_FAILED",
+          "recordedAt": null,
+          "sequenceNumber": 63,
+          "status": "FAILED",
+          "summary": "Fab failed",
+          "workflowRunId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+        },
+        {
+          "eventType": "RUN_FAILED",
+          "recordedAt": null,
+          "sequenceNumber": 64,
+          "status": "FAILED",
+          "summary": "Fab execution blocked, failed or cancelled; inspect its redacted evidence.",
+          "workflowRunId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+        }
+      ],
+      "historicalDecisionCount": 0,
+      "historicalJudgmentCount": 0,
+      "intent": {
+        "definitionOfDone": [
+          {
+            "id": "draft-publication",
+            "title": "Publication ends at a draft PR with human approval"
+          },
+          {
+            "id": "restart",
+            "title": "Worker restart preserves evidence without producer replay"
+          },
+          {
+            "id": "runbook",
+            "title": "The runbook accurately explains verification retries"
+          }
+        ],
+        "mission": {
+          "id": "gs7qk5q10e4v3v5td71pedhrvx8fqmvg",
+          "objective": "Produce docs/operations/verification-retry-runbook.md through one governed WorkOrder, independently verify its exact candidate, prove restart without producer replay, and publish a draft PR.",
+          "title": "Publish the verification retry operator runbook"
+        },
+        "plan": {
+          "id": "gn7htsghr19e1yeschmc1hmbgh8fqp4d",
+          "revisionNumber": 1,
+          "status": "APPROVED",
+          "summary": "One documentation-only WorkOrder. Produce a concise verification-retry runbook, verify the exact candidate, retain failed evidence, obtain human draft-publication approval, and prove worker restart without producer replay."
+        },
+        "qualityContractDigest": "sha256:aecbdf1f972c53509b7b33a85ee9756e10e4f03495dc6f542582d9627b530ac6",
+        "spec": null,
+        "workOrder": {
+          "desiredOutcome": "Write only docs/operations/verification-retry-runbook.md, with accurate retry prerequisites, evidence retention, independent verification, fresh approval and failure/recovery instructions.",
+          "id": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+          "revisionNumber": 2,
+          "title": "Write the verification retry operator runbook"
+        }
+      },
+      "judgments": [],
+      "projectionVersion": 1,
+      "residualAnalyses": [],
+      "residualRisks": []
+    },
+    "reviewerFocus": [
+      "Operator-selected low risk."
+    ],
+    "riskLevel": "LOW",
+    "risks": [],
+    "rollbackApproach": "Stop execution, revoke any live credential, retain evidence and the candidate branch, and close an unwanted draft PR only on operator instruction. Never merge.",
+    "status": "BLOCKED",
+    "summary": "2 blocking issue(s) require resolution before merge review."
+  },
+  "revisions": [
+    {
+      "_creationTime": 1791179795264.718,
+      "_id": "y974aqfgmr7g9cxc9thgce9g4h8fqeat",
+      "changeSummary": "Record approved local-only qualification boundary",
+      "changedFields": [
+        "negativeConstraints",
+        "metadata"
+      ],
+      "createdAt": 1791179795264,
+      "effectiveAt": 1791179795281,
+      "idempotencyKey": "live-retry-local-qualification-revision-20261004",
+      "impactedAcceptanceCriteria": [],
+      "impactedApprovals": [
+        "CHANGE_REVIEW"
+      ],
+      "impactedVerificationReceiptIds": [],
+      "materiality": "BOTH",
+      "metadata": {
+        "authorization": "Operator explicitly approved local Research Lab qualification after retry fix, 2026-10-04. Recorded through Codex using the local DEMO operator session. No production access, broader deployment or candidate publication approval."
+      },
+      "nextSnapshot": {
+        "acceptanceCriteria": [
+          {
+            "description": "The approved candidate is published as a draft PR; no merge occurs. Evidence: Human publication decision, GitHub draft flag, branch/head SHA and PR URL",
+            "id": "draft-publication",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:draft-publication"
+            ],
+            "title": "Publication ends at a draft PR with human approval",
+            "verificationMethod": "MANUAL"
+          },
+          {
+            "description": "After a controlled restart, candidate SHA and evidence remain unchanged and the completed producer is not dispatched again. Evidence: Before/after worker session IDs, canonical Attempt states and inference receipts",
+            "id": "restart",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:restart"
+            ],
+            "title": "Worker restart preserves evidence without producer replay",
+            "verificationMethod": "TEST"
+          },
+          {
+            "description": "A reviewer confirms eligibility, unchanged candidate/revision/contract, retained failed evidence, independent verification, fresh approval, and recovery states against current source. Evidence: Exact candidate SHA, separate verifier Attempt and semantic review evidence",
+            "id": "runbook",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:runbook"
+            ],
+            "title": "The runbook accurately explains verification retries",
+            "verificationMethod": "MANUAL"
+          }
+        ],
+        "assignedSquad": "Factory Operations",
+        "autonomyLevel": "LEVEL_2",
+        "branchStrategy": "isolated-draft-pr",
+        "changeBudget": {
+          "allowDependencyChanges": false,
+          "allowInfrastructureChanges": false,
+          "allowMigrations": false,
+          "allowSchemaChanges": false,
+          "allowedCommandClasses": [
+            "TEST"
+          ],
+          "allowedPaths": [
+            "docs/operations/verification-retry-runbook.md"
+          ],
+          "deniedPaths": [
+            ".env*",
+            ".github/workflows/**"
+          ],
+          "maxFilesChanged": 1,
+          "maxLinesChanged": 300,
+          "prohibitedCommandClasses": [
+            "DESTRUCTIVE",
+            "PRODUCTION_ACCESS",
+            "SECRETS_ACCESS",
+            "PUBLISH",
+            "INFRASTRUCTURE",
+            "MIGRATION"
+          ]
+        },
+        "codeScopeIds": [
+          "jx7jr1rmgavhzsmxwrx8xw4ajh8fp3vb"
+        ],
+        "constraints": [
+          "Change only docs/operations/verification-retry-runbook.md",
+          "Component qualification is not canonical verification or approval",
+          "Do not infer approval or successful verification from component qualification",
+          "No merge or deployment",
+          "No merge, deployment, automatic retry or unrelated changes",
+          "Only docs/operations/verification-retry-runbook.md may change",
+          "Total program cap $5; qualification reserves $0.51 and this Mission reserves $4.49"
+        ],
+        "dependencies": [],
+        "desiredOutcome": "Write only docs/operations/verification-retry-runbook.md, with accurate retry prerequisites, evidence retention, independent verification, fresh approval and failure/recovery instructions.",
+        "kind": "SOFTWARE_CHANGE",
+        "metadata": {
+          "approvedWorkflowVersion": 1,
+          "estimatedCostUsd": 4.49,
+          "implementationPolicy": {
+            "allowedCommands": [
+              "Read scoped repository source",
+              "Write the allowed runbook file",
+              "Run the frozen independent documentation check"
+            ],
+            "independentVerification": {
+              "args": [
+                "-e",
+                "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+              ],
+              "category": "CONTRACT_TEST",
+              "commandClass": "TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "executable": "node",
+              "timeoutMs": 10000
+            },
+            "maxAttempts": 1,
+            "maxCostUsd": 4.49,
+            "maxFilesChanged": 1,
+            "maxLinesChanged": 300,
+            "stopCondition": "Stop after candidate capture for independent verification; block on unknown cost, stale authority or exhausted budget.",
+            "timeoutMinutes": 10
+          },
+          "independentVerification": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "subject": "IMMUTABLE_CANDIDATE_SHA",
+            "verifierId": "factory-command/v1"
+          },
+          "missionBlueprintId": "verification-retry-runbook",
+          "planApprovalRequirements": [
+            "Human approval of the exact candidate before draft publication"
+          ],
+          "qualification": "local-research-lab-retry-dispatch-20261004",
+          "rollbackApproach": "Stop execution, revoke any live credential, retain evidence and the candidate branch, and close an unwanted draft PR only on operator instruction. Never merge.",
+          "scopePolicyRequirements": {
+            "approvalPolicies": [],
+            "owningTeamIds": [],
+            "requiredReviewers": [],
+            "requiresCrossTeamReview": false,
+            "verificationPolicies": [
+              "Independent verification of the exact candidate before human publication approval."
+            ]
+          },
+          "specVerificationExpectationIds": []
+        },
+        "negativeConstraints": [
+          {
+            "description": "The candidate and evidence may not contain plaintext credentials or secrets.",
+            "id": "mission:no-plaintext-secrets",
+            "type": "NO_PLAINTEXT_SECRETS"
+          },
+          {
+            "description": "The executor may not weaken or rewrite its frozen independent verification contract.",
+            "id": "mission:verification-contract-protected",
+            "type": "NO_VERIFICATION_CONFIG_CHANGES"
+          },
+          {
+            "description": "Local Research Lab qualification only. No shared or production environment access or deployment.",
+            "id": "local-only-qualification",
+            "type": "NO_PRODUCTION_ACCESS"
+          }
+        ],
+        "positiveConstraints": [
+          "Component qualification is not canonical verification or approval",
+          "No merge, deployment, automatic retry or unrelated changes",
+          "Only docs/operations/verification-retry-runbook.md may change"
+        ],
+        "priority": 3,
+        "repository": "jaydubya818/MissionControl",
+        "requestedBy": "development:local-operator",
+        "requiredApprovals": [],
+        "requirements": [
+          {
+            "category": "FUNCTIONAL",
+            "description": "The runbook accurately explains verification retries",
+            "id": "requirement:runbook",
+            "priority": "MUST",
+            "title": "The runbook accurately explains verification retries",
+            "type": "FUNCTIONAL"
+          },
+          {
+            "category": "FUNCTIONAL",
+            "description": "Worker restart preserves evidence without producer replay",
+            "id": "requirement:restart",
+            "priority": "MUST",
+            "title": "Worker restart preserves evidence without producer replay",
+            "type": "FUNCTIONAL"
+          },
+          {
+            "category": "FUNCTIONAL",
+            "description": "Publication ends at a draft PR with human approval",
+            "id": "requirement:draft-publication",
+            "priority": "MUST",
+            "title": "Publication ends at a draft PR with human approval",
+            "type": "FUNCTIONAL"
+          }
+        ],
+        "riskLevel": "LOW",
+        "riskReasons": [
+          "Operator-selected low risk."
+        ],
+        "sourceOfTruthRefs": [],
+        "title": "Write the verification retry operator runbook",
+        "verificationContract": {
+          "checks": [
+            {
+              "acceptanceCriterionIds": [
+                "runbook",
+                "restart",
+                "draft-publication"
+              ],
+              "category": "CONTRACT_TEST",
+              "command": {
+                "args": [
+                  "-e",
+                  "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+                ],
+                "commandClass": "TEST",
+                "executable": "node",
+                "timeoutMs": 10000
+              },
+              "evidenceCategory": "TEST_RESULT",
+              "id": "mission:independent-verification",
+              "mandatory": true,
+              "name": "Mission independent candidate verification",
+              "verifierId": "factory-command/v1"
+            }
+          ],
+          "enforcementMode": "ENFORCED",
+          "independence": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "required": true
+          },
+          "requireHumanReview": false,
+          "requiredRisks": [
+            {
+              "description": "The published candidate may differ from the exact immutable subject independently verified for acceptance.",
+              "id": "mission:exact-candidate-integrity",
+              "requiredEvidenceIds": [
+                "mission:independent-verification"
+              ],
+              "severity": "LOW",
+              "source": "HUMAN_APPROVED"
+            }
+          ],
+          "schemaVersion": 2
+        },
+        "verificationContractDigest": "sha256:55c5c81a127c550e0ab53d8781efab9fb148b6fe42fba5b239bf3508ec21a80a",
+        "workflowId": "live-verification-retry-runbook-v1"
+      },
+      "previousRevisionId": "y971w2rp3sbp96c3mvbesbs1kn8fq52s",
+      "previousSnapshot": {
+        "acceptanceCriteria": [
+          {
+            "description": "The approved candidate is published as a draft PR; no merge occurs. Evidence: Human publication decision, GitHub draft flag, branch/head SHA and PR URL",
+            "id": "draft-publication",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:draft-publication"
+            ],
+            "title": "Publication ends at a draft PR with human approval",
+            "verificationMethod": "MANUAL"
+          },
+          {
+            "description": "After a controlled restart, candidate SHA and evidence remain unchanged and the completed producer is not dispatched again. Evidence: Before/after worker session IDs, canonical Attempt states and inference receipts",
+            "id": "restart",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:restart"
+            ],
+            "title": "Worker restart preserves evidence without producer replay",
+            "verificationMethod": "TEST"
+          },
+          {
+            "description": "A reviewer confirms eligibility, unchanged candidate/revision/contract, retained failed evidence, independent verification, fresh approval, and recovery states against current source. Evidence: Exact candidate SHA, separate verifier Attempt and semantic review evidence",
+            "id": "runbook",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:runbook"
+            ],
+            "title": "The runbook accurately explains verification retries",
+            "verificationMethod": "MANUAL"
+          }
+        ],
+        "assignedSquad": "Factory Operations",
+        "autonomyLevel": "LEVEL_2",
+        "branchStrategy": "isolated-draft-pr",
+        "changeBudget": {
+          "allowDependencyChanges": false,
+          "allowInfrastructureChanges": false,
+          "allowMigrations": false,
+          "allowSchemaChanges": false,
+          "allowedCommandClasses": [
+            "TEST"
+          ],
+          "allowedPaths": [
+            "docs/operations/verification-retry-runbook.md"
+          ],
+          "deniedPaths": [
+            ".env*",
+            ".github/workflows/**"
+          ],
+          "maxFilesChanged": 1,
+          "maxLinesChanged": 300,
+          "prohibitedCommandClasses": [
+            "DESTRUCTIVE",
+            "PRODUCTION_ACCESS",
+            "SECRETS_ACCESS",
+            "PUBLISH",
+            "INFRASTRUCTURE",
+            "MIGRATION"
+          ]
+        },
+        "codeScopeIds": [
+          "jx7jr1rmgavhzsmxwrx8xw4ajh8fp3vb"
+        ],
+        "constraints": [
+          "Change only docs/operations/verification-retry-runbook.md",
+          "Component qualification is not canonical verification or approval",
+          "Do not infer approval or successful verification from component qualification",
+          "No merge or deployment",
+          "No merge, deployment, automatic retry or unrelated changes",
+          "Only docs/operations/verification-retry-runbook.md may change",
+          "Total program cap $5; qualification reserves $0.51 and this Mission reserves $4.49"
+        ],
+        "dependencies": [],
+        "desiredOutcome": "Write only docs/operations/verification-retry-runbook.md, with accurate retry prerequisites, evidence retention, independent verification, fresh approval and failure/recovery instructions.",
+        "kind": "SOFTWARE_CHANGE",
+        "metadata": {
+          "approvedWorkflowVersion": 1,
+          "estimatedCostUsd": 4.49,
+          "implementationPolicy": {
+            "allowedCommands": [
+              "Read scoped repository source",
+              "Write the allowed runbook file",
+              "Run the frozen independent documentation check"
+            ],
+            "independentVerification": {
+              "args": [
+                "-e",
+                "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+              ],
+              "category": "CONTRACT_TEST",
+              "commandClass": "TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "executable": "node",
+              "timeoutMs": 10000
+            },
+            "maxAttempts": 1,
+            "maxCostUsd": 4.49,
+            "maxFilesChanged": 1,
+            "maxLinesChanged": 300,
+            "stopCondition": "Stop after candidate capture for independent verification; block on unknown cost, stale authority or exhausted budget.",
+            "timeoutMinutes": 10
+          },
+          "independentVerification": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "subject": "IMMUTABLE_CANDIDATE_SHA",
+            "verifierId": "factory-command/v1"
+          },
+          "missionBlueprintId": "verification-retry-runbook",
+          "planApprovalRequirements": [
+            "Human approval of the exact candidate before draft publication"
+          ],
+          "rollbackApproach": "Stop execution, revoke any live credential, retain evidence and the candidate branch, and close an unwanted draft PR only on operator instruction. Never merge.",
+          "scopePolicyRequirements": {
+            "approvalPolicies": [],
+            "owningTeamIds": [],
+            "requiredReviewers": [],
+            "requiresCrossTeamReview": false,
+            "verificationPolicies": [
+              "Independent verification of the exact candidate before human publication approval."
+            ]
+          },
+          "specVerificationExpectationIds": []
+        },
+        "negativeConstraints": [
+          {
+            "description": "The local Factory may not access production services or provider control planes.",
+            "id": "mission:no-production-access",
+            "type": "NO_PRODUCTION_ACCESS"
+          },
+          {
+            "description": "The candidate and evidence may not contain plaintext credentials or secrets.",
+            "id": "mission:no-plaintext-secrets",
+            "type": "NO_PLAINTEXT_SECRETS"
+          },
+          {
+            "description": "The executor may not weaken or rewrite its frozen independent verification contract.",
+            "id": "mission:verification-contract-protected",
+            "type": "NO_VERIFICATION_CONFIG_CHANGES"
+          }
+        ],
+        "positiveConstraints": [
+          "Component qualification is not canonical verification or approval",
+          "No merge, deployment, automatic retry or unrelated changes",
+          "Only docs/operations/verification-retry-runbook.md may change"
+        ],
+        "priority": 3,
+        "repository": "jaydubya818/MissionControl",
+        "requestedBy": "development:local-operator",
+        "requiredApprovals": [],
+        "requirements": [
+          {
+            "category": "FUNCTIONAL",
+            "description": "The runbook accurately explains verification retries",
+            "id": "requirement:runbook",
+            "priority": "MUST",
+            "title": "The runbook accurately explains verification retries",
+            "type": "FUNCTIONAL"
+          },
+          {
+            "category": "FUNCTIONAL",
+            "description": "Worker restart preserves evidence without producer replay",
+            "id": "requirement:restart",
+            "priority": "MUST",
+            "title": "Worker restart preserves evidence without producer replay",
+            "type": "FUNCTIONAL"
+          },
+          {
+            "category": "FUNCTIONAL",
+            "description": "Publication ends at a draft PR with human approval",
+            "id": "requirement:draft-publication",
+            "priority": "MUST",
+            "title": "Publication ends at a draft PR with human approval",
+            "type": "FUNCTIONAL"
+          }
+        ],
+        "riskLevel": "LOW",
+        "riskReasons": [
+          "Operator-selected low risk."
+        ],
+        "sourceOfTruthRefs": [],
+        "title": "Write the verification retry operator runbook",
+        "verificationContract": {
+          "checks": [
+            {
+              "acceptanceCriterionIds": [
+                "runbook",
+                "restart",
+                "draft-publication"
+              ],
+              "category": "CONTRACT_TEST",
+              "command": {
+                "args": [
+                  "-e",
+                  "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+                ],
+                "commandClass": "TEST",
+                "executable": "node",
+                "timeoutMs": 10000
+              },
+              "evidenceCategory": "TEST_RESULT",
+              "id": "mission:independent-verification",
+              "mandatory": true,
+              "name": "Mission independent candidate verification",
+              "verifierId": "factory-command/v1"
+            }
+          ],
+          "enforcementMode": "ENFORCED",
+          "independence": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "required": true
+          },
+          "requireHumanReview": false,
+          "requiredRisks": [
+            {
+              "description": "The published candidate may differ from the exact immutable subject independently verified for acceptance.",
+              "id": "mission:exact-candidate-integrity",
+              "requiredEvidenceIds": [
+                "mission:independent-verification"
+              ],
+              "severity": "LOW",
+              "source": "HUMAN_APPROVED"
+            }
+          ],
+          "schemaVersion": 2
+        },
+        "verificationContractDigest": "sha256:55c5c81a127c550e0ab53d8781efab9fb148b6fe42fba5b239bf3508ec21a80a",
+        "workflowId": "live-verification-retry-runbook-v1"
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "reason": "Operator explicitly approved local Research Lab qualification after retry fix, 2026-10-04. Recorded through Codex using the local DEMO operator session. No production access, broader deployment or candidate publication approval.",
+      "requestedChanges": {
+        "metadata": {
+          "approvedWorkflowVersion": 1,
+          "estimatedCostUsd": 4.49,
+          "implementationPolicy": {
+            "allowedCommands": [
+              "Read scoped repository source",
+              "Write the allowed runbook file",
+              "Run the frozen independent documentation check"
+            ],
+            "independentVerification": {
+              "args": [
+                "-e",
+                "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+              ],
+              "category": "CONTRACT_TEST",
+              "commandClass": "TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "executable": "node",
+              "timeoutMs": 10000
+            },
+            "maxAttempts": 1,
+            "maxCostUsd": 4.49,
+            "maxFilesChanged": 1,
+            "maxLinesChanged": 300,
+            "stopCondition": "Stop after candidate capture for independent verification; block on unknown cost, stale authority or exhausted budget.",
+            "timeoutMinutes": 10
+          },
+          "independentVerification": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "subject": "IMMUTABLE_CANDIDATE_SHA",
+            "verifierId": "factory-command/v1"
+          },
+          "missionBlueprintId": "verification-retry-runbook",
+          "planApprovalRequirements": [
+            "Human approval of the exact candidate before draft publication"
+          ],
+          "qualification": "local-research-lab-retry-dispatch-20261004",
+          "rollbackApproach": "Stop execution, revoke any live credential, retain evidence and the candidate branch, and close an unwanted draft PR only on operator instruction. Never merge.",
+          "scopePolicyRequirements": {
+            "approvalPolicies": [],
+            "owningTeamIds": [],
+            "requiredReviewers": [],
+            "requiresCrossTeamReview": false,
+            "verificationPolicies": [
+              "Independent verification of the exact candidate before human publication approval."
+            ]
+          },
+          "specVerificationExpectationIds": []
+        },
+        "negativeConstraints": [
+          {
+            "description": "The candidate and evidence may not contain plaintext credentials or secrets.",
+            "id": "mission:no-plaintext-secrets",
+            "type": "NO_PLAINTEXT_SECRETS"
+          },
+          {
+            "description": "The executor may not weaken or rewrite its frozen independent verification contract.",
+            "id": "mission:verification-contract-protected",
+            "type": "NO_VERIFICATION_CONFIG_CHANGES"
+          },
+          {
+            "description": "Local Research Lab qualification only. No shared or production environment access or deployment.",
+            "id": "local-only-qualification",
+            "type": "NO_PRODUCTION_ACCESS"
+          }
+        ]
+      },
+      "requiresFullReopen": false,
+      "requiresReapproval": true,
+      "requiresReverification": true,
+      "revisionNumber": 2,
+      "riskReassessment": "UNCHANGED",
+      "status": "APPLIED",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "verificationContractDigest": "sha256:55c5c81a127c550e0ab53d8781efab9fb148b6fe42fba5b239bf3508ec21a80a",
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    },
+    {
+      "_creationTime": 1791174029324.784,
+      "_id": "y971w2rp3sbp96c3mvbesbs1kn8fq52s",
+      "approvedBy": "development:local-operator",
+      "changeSummary": "Initial work order created",
+      "changedFields": [
+        "title",
+        "desiredOutcome",
+        "workflowId",
+        "repository",
+        "riskLevel",
+        "requirements",
+        "acceptanceCriteria",
+        "changeBudget",
+        "verificationContract"
+      ],
+      "createdAt": 1791174029324,
+      "effectiveAt": 1791174029324,
+      "idempotencyKey": "mission-plan:gn7htsghr19e1yeschmc1hmbgh8fqp4d:release:v1:work-order:verification-retry-runbook:revision:1",
+      "impactedAcceptanceCriteria": [],
+      "impactedApprovals": [],
+      "impactedVerificationReceiptIds": [],
+      "materiality": "NO_ACTION",
+      "metadata": {
+        "initial": true
+      },
+      "nextSnapshot": {
+        "acceptanceCriteria": [
+          {
+            "description": "The approved candidate is published as a draft PR; no merge occurs. Evidence: Human publication decision, GitHub draft flag, branch/head SHA and PR URL",
+            "id": "draft-publication",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:draft-publication"
+            ],
+            "title": "Publication ends at a draft PR with human approval",
+            "verificationMethod": "MANUAL"
+          },
+          {
+            "description": "After a controlled restart, candidate SHA and evidence remain unchanged and the completed producer is not dispatched again. Evidence: Before/after worker session IDs, canonical Attempt states and inference receipts",
+            "id": "restart",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:restart"
+            ],
+            "title": "Worker restart preserves evidence without producer replay",
+            "verificationMethod": "TEST"
+          },
+          {
+            "description": "A reviewer confirms eligibility, unchanged candidate/revision/contract, retained failed evidence, independent verification, fresh approval, and recovery states against current source. Evidence: Exact candidate SHA, separate verifier Attempt and semantic review evidence",
+            "id": "runbook",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:runbook"
+            ],
+            "title": "The runbook accurately explains verification retries",
+            "verificationMethod": "MANUAL"
+          }
+        ],
+        "autonomyLevel": "LEVEL_2",
+        "branchStrategy": "isolated-draft-pr",
+        "changeBudget": {
+          "allowDependencyChanges": false,
+          "allowInfrastructureChanges": false,
+          "allowMigrations": false,
+          "allowSchemaChanges": false,
+          "allowedCommandClasses": [
+            "TEST"
+          ],
+          "allowedPaths": [
+            "docs/operations/verification-retry-runbook.md"
+          ],
+          "deniedPaths": [
+            ".env*",
+            ".github/workflows/**"
+          ],
+          "maxFilesChanged": 1,
+          "maxLinesChanged": 300,
+          "prohibitedCommandClasses": [
+            "DESTRUCTIVE",
+            "PRODUCTION_ACCESS",
+            "SECRETS_ACCESS",
+            "PUBLISH",
+            "INFRASTRUCTURE",
+            "MIGRATION"
+          ]
+        },
+        "codeScopeIds": [],
+        "constraints": [
+          "Change only docs/operations/verification-retry-runbook.md",
+          "Component qualification is not canonical verification or approval",
+          "Do not infer approval or successful verification from component qualification",
+          "No merge or deployment",
+          "No merge, deployment, automatic retry or unrelated changes",
+          "Only docs/operations/verification-retry-runbook.md may change",
+          "Total program cap $5; qualification reserves $0.51 and this Mission reserves $4.49"
+        ],
+        "dependencies": [],
+        "desiredOutcome": "Write only docs/operations/verification-retry-runbook.md, with accurate retry prerequisites, evidence retention, independent verification, fresh approval and failure/recovery instructions.",
+        "kind": "SOFTWARE_CHANGE",
+        "metadata": {
+          "approvedWorkflowVersion": 1,
+          "estimatedCostUsd": 4.49,
+          "implementationPolicy": {
+            "allowedCommands": [
+              "Read scoped repository source",
+              "Write the allowed runbook file",
+              "Run the frozen independent documentation check"
+            ],
+            "independentVerification": {
+              "args": [
+                "-e",
+                "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+              ],
+              "category": "CONTRACT_TEST",
+              "commandClass": "TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "executable": "node",
+              "timeoutMs": 10000
+            },
+            "maxAttempts": 1,
+            "maxCostUsd": 4.49,
+            "maxFilesChanged": 1,
+            "maxLinesChanged": 300,
+            "stopCondition": "Stop after candidate capture for independent verification; block on unknown cost, stale authority or exhausted budget.",
+            "timeoutMinutes": 10
+          },
+          "independentVerification": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "subject": "IMMUTABLE_CANDIDATE_SHA",
+            "verifierId": "factory-command/v1"
+          },
+          "planApprovalRequirements": [
+            "Human approval of the exact candidate before draft publication"
+          ],
+          "rollbackApproach": "Stop execution, revoke any live credential, retain evidence and the candidate branch, and close an unwanted draft PR only on operator instruction. Never merge.",
+          "specVerificationExpectationIds": []
+        },
+        "negativeConstraints": [
+          {
+            "description": "The local Factory may not access production services or provider control planes.",
+            "id": "mission:no-production-access",
+            "type": "NO_PRODUCTION_ACCESS"
+          },
+          {
+            "description": "The candidate and evidence may not contain plaintext credentials or secrets.",
+            "id": "mission:no-plaintext-secrets",
+            "type": "NO_PLAINTEXT_SECRETS"
+          },
+          {
+            "description": "The executor may not weaken or rewrite its frozen independent verification contract.",
+            "id": "mission:verification-contract-protected",
+            "type": "NO_VERIFICATION_CONFIG_CHANGES"
+          }
+        ],
+        "positiveConstraints": [
+          "Component qualification is not canonical verification or approval",
+          "No merge, deployment, automatic retry or unrelated changes",
+          "Only docs/operations/verification-retry-runbook.md may change"
+        ],
+        "priority": 3,
+        "repository": "jaydubya818/MissionControl",
+        "requestedBy": "development:local-operator",
+        "requiredApprovals": [],
+        "requirements": [
+          {
+            "category": "FUNCTIONAL",
+            "description": "The runbook accurately explains verification retries",
+            "id": "requirement:runbook",
+            "priority": "MUST",
+            "title": "The runbook accurately explains verification retries",
+            "type": "FUNCTIONAL"
+          },
+          {
+            "category": "FUNCTIONAL",
+            "description": "Worker restart preserves evidence without producer replay",
+            "id": "requirement:restart",
+            "priority": "MUST",
+            "title": "Worker restart preserves evidence without producer replay",
+            "type": "FUNCTIONAL"
+          },
+          {
+            "category": "FUNCTIONAL",
+            "description": "Publication ends at a draft PR with human approval",
+            "id": "requirement:draft-publication",
+            "priority": "MUST",
+            "title": "Publication ends at a draft PR with human approval",
+            "type": "FUNCTIONAL"
+          }
+        ],
+        "riskLevel": "LOW",
+        "riskReasons": [],
+        "sourceOfTruthRefs": [],
+        "title": "Write the verification retry operator runbook",
+        "verificationContract": {
+          "checks": [
+            {
+              "acceptanceCriterionIds": [
+                "runbook",
+                "restart",
+                "draft-publication"
+              ],
+              "category": "CONTRACT_TEST",
+              "command": {
+                "args": [
+                  "-e",
+                  "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+                ],
+                "commandClass": "TEST",
+                "executable": "node",
+                "timeoutMs": 10000
+              },
+              "evidenceCategory": "TEST_RESULT",
+              "id": "mission:independent-verification",
+              "mandatory": true,
+              "name": "Mission independent candidate verification",
+              "verifierId": "factory-command/v1"
+            }
+          ],
+          "enforcementMode": "ENFORCED",
+          "independence": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "required": true
+          },
+          "requireHumanReview": false,
+          "requiredRisks": [
+            {
+              "description": "The published candidate may differ from the exact immutable subject independently verified for acceptance.",
+              "id": "mission:exact-candidate-integrity",
+              "requiredEvidenceIds": [
+                "mission:independent-verification"
+              ],
+              "severity": "LOW",
+              "source": "HUMAN_APPROVED"
+            }
+          ],
+          "schemaVersion": 2
+        },
+        "verificationContractDigest": "sha256:55c5c81a127c550e0ab53d8781efab9fb148b6fe42fba5b239bf3508ec21a80a",
+        "workflowId": "live-verification-retry-runbook-v1"
+      },
+      "previousSnapshot": {
+        "acceptanceCriteria": [
+          {
+            "description": "The approved candidate is published as a draft PR; no merge occurs. Evidence: Human publication decision, GitHub draft flag, branch/head SHA and PR URL",
+            "id": "draft-publication",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:draft-publication"
+            ],
+            "title": "Publication ends at a draft PR with human approval",
+            "verificationMethod": "MANUAL"
+          },
+          {
+            "description": "After a controlled restart, candidate SHA and evidence remain unchanged and the completed producer is not dispatched again. Evidence: Before/after worker session IDs, canonical Attempt states and inference receipts",
+            "id": "restart",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:restart"
+            ],
+            "title": "Worker restart preserves evidence without producer replay",
+            "verificationMethod": "TEST"
+          },
+          {
+            "description": "A reviewer confirms eligibility, unchanged candidate/revision/contract, retained failed evidence, independent verification, fresh approval, and recovery states against current source. Evidence: Exact candidate SHA, separate verifier Attempt and semantic review evidence",
+            "id": "runbook",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:runbook"
+            ],
+            "title": "The runbook accurately explains verification retries",
+            "verificationMethod": "MANUAL"
+          }
+        ],
+        "autonomyLevel": "LEVEL_2",
+        "branchStrategy": "isolated-draft-pr",
+        "changeBudget": {
+          "allowDependencyChanges": false,
+          "allowInfrastructureChanges": false,
+          "allowMigrations": false,
+          "allowSchemaChanges": false,
+          "allowedCommandClasses": [
+            "TEST"
+          ],
+          "allowedPaths": [
+            "docs/operations/verification-retry-runbook.md"
+          ],
+          "deniedPaths": [
+            ".env*",
+            ".github/workflows/**"
+          ],
+          "maxFilesChanged": 1,
+          "maxLinesChanged": 300,
+          "prohibitedCommandClasses": [
+            "DESTRUCTIVE",
+            "PRODUCTION_ACCESS",
+            "SECRETS_ACCESS",
+            "PUBLISH",
+            "INFRASTRUCTURE",
+            "MIGRATION"
+          ]
+        },
+        "codeScopeIds": [],
+        "constraints": [
+          "Change only docs/operations/verification-retry-runbook.md",
+          "Component qualification is not canonical verification or approval",
+          "Do not infer approval or successful verification from component qualification",
+          "No merge or deployment",
+          "No merge, deployment, automatic retry or unrelated changes",
+          "Only docs/operations/verification-retry-runbook.md may change",
+          "Total program cap $5; qualification reserves $0.51 and this Mission reserves $4.49"
+        ],
+        "dependencies": [],
+        "desiredOutcome": "Write only docs/operations/verification-retry-runbook.md, with accurate retry prerequisites, evidence retention, independent verification, fresh approval and failure/recovery instructions.",
+        "kind": "SOFTWARE_CHANGE",
+        "metadata": {
+          "approvedWorkflowVersion": 1,
+          "estimatedCostUsd": 4.49,
+          "implementationPolicy": {
+            "allowedCommands": [
+              "Read scoped repository source",
+              "Write the allowed runbook file",
+              "Run the frozen independent documentation check"
+            ],
+            "independentVerification": {
+              "args": [
+                "-e",
+                "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+              ],
+              "category": "CONTRACT_TEST",
+              "commandClass": "TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "executable": "node",
+              "timeoutMs": 10000
+            },
+            "maxAttempts": 1,
+            "maxCostUsd": 4.49,
+            "maxFilesChanged": 1,
+            "maxLinesChanged": 300,
+            "stopCondition": "Stop after candidate capture for independent verification; block on unknown cost, stale authority or exhausted budget.",
+            "timeoutMinutes": 10
+          },
+          "independentVerification": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "subject": "IMMUTABLE_CANDIDATE_SHA",
+            "verifierId": "factory-command/v1"
+          },
+          "planApprovalRequirements": [
+            "Human approval of the exact candidate before draft publication"
+          ],
+          "rollbackApproach": "Stop execution, revoke any live credential, retain evidence and the candidate branch, and close an unwanted draft PR only on operator instruction. Never merge.",
+          "specVerificationExpectationIds": []
+        },
+        "negativeConstraints": [
+          {
+            "description": "The local Factory may not access production services or provider control planes.",
+            "id": "mission:no-production-access",
+            "type": "NO_PRODUCTION_ACCESS"
+          },
+          {
+            "description": "The candidate and evidence may not contain plaintext credentials or secrets.",
+            "id": "mission:no-plaintext-secrets",
+            "type": "NO_PLAINTEXT_SECRETS"
+          },
+          {
+            "description": "The executor may not weaken or rewrite its frozen independent verification contract.",
+            "id": "mission:verification-contract-protected",
+            "type": "NO_VERIFICATION_CONFIG_CHANGES"
+          }
+        ],
+        "positiveConstraints": [
+          "Component qualification is not canonical verification or approval",
+          "No merge, deployment, automatic retry or unrelated changes",
+          "Only docs/operations/verification-retry-runbook.md may change"
+        ],
+        "priority": 3,
+        "repository": "jaydubya818/MissionControl",
+        "requestedBy": "development:local-operator",
+        "requiredApprovals": [],
+        "requirements": [
+          {
+            "category": "FUNCTIONAL",
+            "description": "The runbook accurately explains verification retries",
+            "id": "requirement:runbook",
+            "priority": "MUST",
+            "title": "The runbook accurately explains verification retries",
+            "type": "FUNCTIONAL"
+          },
+          {
+            "category": "FUNCTIONAL",
+            "description": "Worker restart preserves evidence without producer replay",
+            "id": "requirement:restart",
+            "priority": "MUST",
+            "title": "Worker restart preserves evidence without producer replay",
+            "type": "FUNCTIONAL"
+          },
+          {
+            "category": "FUNCTIONAL",
+            "description": "Publication ends at a draft PR with human approval",
+            "id": "requirement:draft-publication",
+            "priority": "MUST",
+            "title": "Publication ends at a draft PR with human approval",
+            "type": "FUNCTIONAL"
+          }
+        ],
+        "riskLevel": "LOW",
+        "riskReasons": [],
+        "sourceOfTruthRefs": [],
+        "title": "Write the verification retry operator runbook",
+        "verificationContract": {
+          "checks": [
+            {
+              "acceptanceCriterionIds": [
+                "runbook",
+                "restart",
+                "draft-publication"
+              ],
+              "category": "CONTRACT_TEST",
+              "command": {
+                "args": [
+                  "-e",
+                  "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+                ],
+                "commandClass": "TEST",
+                "executable": "node",
+                "timeoutMs": 10000
+              },
+              "evidenceCategory": "TEST_RESULT",
+              "id": "mission:independent-verification",
+              "mandatory": true,
+              "name": "Mission independent candidate verification",
+              "verifierId": "factory-command/v1"
+            }
+          ],
+          "enforcementMode": "ENFORCED",
+          "independence": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "required": true
+          },
+          "requireHumanReview": false,
+          "requiredRisks": [
+            {
+              "description": "The published candidate may differ from the exact immutable subject independently verified for acceptance.",
+              "id": "mission:exact-candidate-integrity",
+              "requiredEvidenceIds": [
+                "mission:independent-verification"
+              ],
+              "severity": "LOW",
+              "source": "HUMAN_APPROVED"
+            }
+          ],
+          "schemaVersion": 2
+        },
+        "verificationContractDigest": "sha256:55c5c81a127c550e0ab53d8781efab9fb148b6fe42fba5b239bf3508ec21a80a",
+        "workflowId": "live-verification-retry-runbook-v1"
+      },
+      "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "reason": "Initial creation",
+      "requestedBy": "development:local-operator",
+      "requestedChanges": {
+        "acceptanceCriteria": [
+          {
+            "description": "The approved candidate is published as a draft PR; no merge occurs. Evidence: Human publication decision, GitHub draft flag, branch/head SHA and PR URL",
+            "id": "draft-publication",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:draft-publication"
+            ],
+            "title": "Publication ends at a draft PR with human approval",
+            "verificationMethod": "MANUAL"
+          },
+          {
+            "description": "After a controlled restart, candidate SHA and evidence remain unchanged and the completed producer is not dispatched again. Evidence: Before/after worker session IDs, canonical Attempt states and inference receipts",
+            "id": "restart",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:restart"
+            ],
+            "title": "Worker restart preserves evidence without producer replay",
+            "verificationMethod": "TEST"
+          },
+          {
+            "description": "A reviewer confirms eligibility, unchanged candidate/revision/contract, retained failed evidence, independent verification, fresh approval, and recovery states against current source. Evidence: Exact candidate SHA, separate verifier Attempt and semantic review evidence",
+            "id": "runbook",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "requirement:runbook"
+            ],
+            "title": "The runbook accurately explains verification retries",
+            "verificationMethod": "MANUAL"
+          }
+        ],
+        "autonomyLevel": "LEVEL_2",
+        "branchStrategy": "isolated-draft-pr",
+        "changeBudget": {
+          "allowDependencyChanges": false,
+          "allowInfrastructureChanges": false,
+          "allowMigrations": false,
+          "allowSchemaChanges": false,
+          "allowedCommandClasses": [
+            "TEST"
+          ],
+          "allowedPaths": [
+            "docs/operations/verification-retry-runbook.md"
+          ],
+          "deniedPaths": [
+            ".env*",
+            ".github/workflows/**"
+          ],
+          "maxFilesChanged": 1,
+          "maxLinesChanged": 300,
+          "prohibitedCommandClasses": [
+            "DESTRUCTIVE",
+            "PRODUCTION_ACCESS",
+            "SECRETS_ACCESS",
+            "PUBLISH",
+            "INFRASTRUCTURE",
+            "MIGRATION"
+          ]
+        },
+        "codeScopeIds": [],
+        "constraints": [
+          "Change only docs/operations/verification-retry-runbook.md",
+          "Component qualification is not canonical verification or approval",
+          "Do not infer approval or successful verification from component qualification",
+          "No merge or deployment",
+          "No merge, deployment, automatic retry or unrelated changes",
+          "Only docs/operations/verification-retry-runbook.md may change",
+          "Total program cap $5; qualification reserves $0.51 and this Mission reserves $4.49"
+        ],
+        "dependencies": [],
+        "desiredOutcome": "Write only docs/operations/verification-retry-runbook.md, with accurate retry prerequisites, evidence retention, independent verification, fresh approval and failure/recovery instructions.",
+        "kind": "SOFTWARE_CHANGE",
+        "metadata": {
+          "approvedWorkflowVersion": 1,
+          "estimatedCostUsd": 4.49,
+          "implementationPolicy": {
+            "allowedCommands": [
+              "Read scoped repository source",
+              "Write the allowed runbook file",
+              "Run the frozen independent documentation check"
+            ],
+            "independentVerification": {
+              "args": [
+                "-e",
+                "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+              ],
+              "category": "CONTRACT_TEST",
+              "commandClass": "TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "executable": "node",
+              "timeoutMs": 10000
+            },
+            "maxAttempts": 1,
+            "maxCostUsd": 4.49,
+            "maxFilesChanged": 1,
+            "maxLinesChanged": 300,
+            "stopCondition": "Stop after candidate capture for independent verification; block on unknown cost, stale authority or exhausted budget.",
+            "timeoutMinutes": 10
+          },
+          "independentVerification": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "subject": "IMMUTABLE_CANDIDATE_SHA",
+            "verifierId": "factory-command/v1"
+          },
+          "planApprovalRequirements": [
+            "Human approval of the exact candidate before draft publication"
+          ],
+          "rollbackApproach": "Stop execution, revoke any live credential, retain evidence and the candidate branch, and close an unwanted draft PR only on operator instruction. Never merge.",
+          "specVerificationExpectationIds": []
+        },
+        "negativeConstraints": [
+          {
+            "description": "The local Factory may not access production services or provider control planes.",
+            "id": "mission:no-production-access",
+            "type": "NO_PRODUCTION_ACCESS"
+          },
+          {
+            "description": "The candidate and evidence may not contain plaintext credentials or secrets.",
+            "id": "mission:no-plaintext-secrets",
+            "type": "NO_PLAINTEXT_SECRETS"
+          },
+          {
+            "description": "The executor may not weaken or rewrite its frozen independent verification contract.",
+            "id": "mission:verification-contract-protected",
+            "type": "NO_VERIFICATION_CONFIG_CHANGES"
+          }
+        ],
+        "positiveConstraints": [
+          "Component qualification is not canonical verification or approval",
+          "No merge, deployment, automatic retry or unrelated changes",
+          "Only docs/operations/verification-retry-runbook.md may change"
+        ],
+        "priority": 3,
+        "repository": "jaydubya818/MissionControl",
+        "requestedBy": "development:local-operator",
+        "requiredApprovals": [],
+        "requirements": [
+          {
+            "category": "FUNCTIONAL",
+            "description": "The runbook accurately explains verification retries",
+            "id": "requirement:runbook",
+            "priority": "MUST",
+            "title": "The runbook accurately explains verification retries",
+            "type": "FUNCTIONAL"
+          },
+          {
+            "category": "FUNCTIONAL",
+            "description": "Worker restart preserves evidence without producer replay",
+            "id": "requirement:restart",
+            "priority": "MUST",
+            "title": "Worker restart preserves evidence without producer replay",
+            "type": "FUNCTIONAL"
+          },
+          {
+            "category": "FUNCTIONAL",
+            "description": "Publication ends at a draft PR with human approval",
+            "id": "requirement:draft-publication",
+            "priority": "MUST",
+            "title": "Publication ends at a draft PR with human approval",
+            "type": "FUNCTIONAL"
+          }
+        ],
+        "riskLevel": "LOW",
+        "riskReasons": [],
+        "sourceOfTruthRefs": [],
+        "title": "Write the verification retry operator runbook",
+        "verificationContract": {
+          "checks": [
+            {
+              "acceptanceCriterionIds": [
+                "runbook",
+                "restart",
+                "draft-publication"
+              ],
+              "category": "CONTRACT_TEST",
+              "command": {
+                "args": [
+                  "-e",
+                  "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+                ],
+                "commandClass": "TEST",
+                "executable": "node",
+                "timeoutMs": 10000
+              },
+              "evidenceCategory": "TEST_RESULT",
+              "id": "mission:independent-verification",
+              "mandatory": true,
+              "name": "Mission independent candidate verification",
+              "verifierId": "factory-command/v1"
+            }
+          ],
+          "enforcementMode": "ENFORCED",
+          "independence": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "required": true
+          },
+          "requireHumanReview": false,
+          "requiredRisks": [
+            {
+              "description": "The published candidate may differ from the exact immutable subject independently verified for acceptance.",
+              "id": "mission:exact-candidate-integrity",
+              "requiredEvidenceIds": [
+                "mission:independent-verification"
+              ],
+              "severity": "LOW",
+              "source": "HUMAN_APPROVED"
+            }
+          ],
+          "schemaVersion": 2
+        },
+        "verificationContractDigest": "sha256:55c5c81a127c550e0ab53d8781efab9fb148b6fe42fba5b239bf3508ec21a80a",
+        "workflowId": "live-verification-retry-runbook-v1"
+      },
+      "requiresFullReopen": false,
+      "requiresReapproval": false,
+      "requiresReverification": false,
+      "revisionNumber": 1,
+      "riskReassessment": "UNCHANGED",
+      "status": "APPLIED",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+      "verificationContractDigest": "sha256:55c5c81a127c550e0ab53d8781efab9fb148b6fe42fba5b239bf3508ec21a80a",
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    }
+  ],
+  "supersession": null,
+  "verificationReceipts": [],
+  "verificationRuns": [],
+  "workOrder": {
+    "_creationTime": 1791174029324.7837,
+    "_id": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+    "acceptanceCriteria": [
+      {
+        "description": "The approved candidate is published as a draft PR; no merge occurs. Evidence: Human publication decision, GitHub draft flag, branch/head SHA and PR URL",
+        "id": "draft-publication",
+        "requiredEvidence": [
+          {
+            "category": "TEST_RESULT",
+            "independent": true,
+            "minimumCount": 1
+          }
+        ],
+        "requirementIds": [
+          "requirement:draft-publication"
+        ],
+        "status": "PENDING",
+        "title": "Publication ends at a draft PR with human approval",
+        "verificationMethod": "MANUAL"
+      },
+      {
+        "description": "After a controlled restart, candidate SHA and evidence remain unchanged and the completed producer is not dispatched again. Evidence: Before/after worker session IDs, canonical Attempt states and inference receipts",
+        "id": "restart",
+        "requiredEvidence": [
+          {
+            "category": "TEST_RESULT",
+            "independent": true,
+            "minimumCount": 1
+          }
+        ],
+        "requirementIds": [
+          "requirement:restart"
+        ],
+        "status": "PENDING",
+        "title": "Worker restart preserves evidence without producer replay",
+        "verificationMethod": "TEST"
+      },
+      {
+        "description": "A reviewer confirms eligibility, unchanged candidate/revision/contract, retained failed evidence, independent verification, fresh approval, and recovery states against current source. Evidence: Exact candidate SHA, separate verifier Attempt and semantic review evidence",
+        "id": "runbook",
+        "requiredEvidence": [
+          {
+            "category": "TEST_RESULT",
+            "independent": true,
+            "minimumCount": 1
+          }
+        ],
+        "requirementIds": [
+          "requirement:runbook"
+        ],
+        "status": "PENDING",
+        "title": "The runbook accurately explains verification retries",
+        "verificationMethod": "MANUAL"
+      }
+    ],
+    "approvalStatus": "APPROVED",
+    "assignedSquad": "Factory Operations",
+    "autonomyLevel": "LEVEL_2",
+    "blockingIssue": "Fab execution blocked, failed or cancelled; inspect its redacted evidence.",
+    "branchStrategy": "isolated-draft-pr",
+    "changeBudget": {
+      "allowDependencyChanges": false,
+      "allowInfrastructureChanges": false,
+      "allowMigrations": false,
+      "allowSchemaChanges": false,
+      "allowedCommandClasses": [
+        "TEST"
+      ],
+      "allowedPaths": [
+        "docs/operations/verification-retry-runbook.md"
+      ],
+      "deniedPaths": [
+        ".env*",
+        ".github/workflows/**"
+      ],
+      "maxFilesChanged": 1,
+      "maxLinesChanged": 300,
+      "prohibitedCommandClasses": [
+        "DESTRUCTIVE",
+        "PRODUCTION_ACCESS",
+        "SECRETS_ACCESS",
+        "PUBLISH",
+        "INFRASTRUCTURE",
+        "MIGRATION"
+      ]
+    },
+    "codeScopeIds": [
+      "jx7jr1rmgavhzsmxwrx8xw4ajh8fp3vb"
+    ],
+    "constraints": [
+      "Change only docs/operations/verification-retry-runbook.md",
+      "Component qualification is not canonical verification or approval",
+      "Do not infer approval or successful verification from component qualification",
+      "No merge or deployment",
+      "No merge, deployment, automatic retry or unrelated changes",
+      "Only docs/operations/verification-retry-runbook.md may change",
+      "Total program cap $5; qualification reserves $0.51 and this Mission reserves $4.49"
+    ],
+    "createdAt": 1791174029324,
+    "currentRevisionId": "y974aqfgmr7g9cxc9thgce9g4h8fqeat",
+    "currentRevisionNumber": 2,
+    "dependencies": [],
+    "desiredOutcome": "Write only docs/operations/verification-retry-runbook.md, with accurate retry prerequisites, evidence retention, independent verification, fresh approval and failure/recovery instructions.",
+    "executionEnvironment": "LOCAL",
+    "idempotencyKey": "mission-plan:gn7htsghr19e1yeschmc1hmbgh8fqp4d:release:v1:work-order:verification-retry-runbook",
+    "isMutating": true,
+    "kind": "SOFTWARE_CHANGE",
+    "metadata": {
+      "approvedWorkflowVersion": 1,
+      "estimatedCostUsd": 4.49,
+      "implementationPolicy": {
+        "allowedCommands": [
+          "Read scoped repository source",
+          "Write the allowed runbook file",
+          "Run the frozen independent documentation check"
+        ],
+        "independentVerification": {
+          "args": [
+            "-e",
+            "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+          ],
+          "category": "CONTRACT_TEST",
+          "commandClass": "TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "executable": "node",
+          "timeoutMs": 10000
+        },
+        "maxAttempts": 1,
+        "maxCostUsd": 4.49,
+        "maxFilesChanged": 1,
+        "maxLinesChanged": 300,
+        "stopCondition": "Stop after candidate capture for independent verification; block on unknown cost, stale authority or exhausted budget.",
+        "timeoutMinutes": 10
+      },
+      "independentVerification": {
+        "minimumBoundary": "SEPARATE_ATTEMPT",
+        "subject": "IMMUTABLE_CANDIDATE_SHA",
+        "verifierId": "factory-command/v1"
+      },
+      "missionBlueprintId": "verification-retry-runbook",
+      "planApprovalRequirements": [
+        "Human approval of the exact candidate before draft publication"
+      ],
+      "qualification": "local-research-lab-retry-dispatch-20261004",
+      "rollbackApproach": "Stop execution, revoke any live credential, retain evidence and the candidate branch, and close an unwanted draft PR only on operator instruction. Never merge.",
+      "scopePolicyRequirements": {
+        "approvalPolicies": [],
+        "owningTeamIds": [],
+        "requiredReviewers": [],
+        "requiresCrossTeamReview": false,
+        "verificationPolicies": [
+          "Independent verification of the exact candidate before human publication approval."
+        ]
+      },
+      "specVerificationExpectationIds": []
+    },
+    "missionId": "gs7qk5q10e4v3v5td71pedhrvx8fqmvg",
+    "missionPlanId": "gn7htsghr19e1yeschmc1hmbgh8fqp4d",
+    "missionPlanRevision": 1,
+    "missionRole": "WORKER",
+    "missionSequence": 1,
+    "modelRoutingDecisionId": "g57jaj4g3d29j3phm3dba214vs8fpa71",
+    "negativeConstraints": [
+      {
+        "description": "The candidate and evidence may not contain plaintext credentials or secrets.",
+        "id": "mission:no-plaintext-secrets",
+        "type": "NO_PLAINTEXT_SECRETS"
+      },
+      {
+        "description": "The executor may not weaken or rewrite its frozen independent verification contract.",
+        "id": "mission:verification-contract-protected",
+        "type": "NO_VERIFICATION_CONFIG_CHANGES"
+      },
+      {
+        "description": "Local Research Lab qualification only. No shared or production environment access or deployment.",
+        "id": "local-only-qualification",
+        "type": "NO_PRODUCTION_ACCESS"
+      }
+    ],
+    "ownerMemberId": "rx7dzve8axhw1vy9rj6447h9ah8fpmzp",
+    "owningTeamId": "kh7m6t6fmwg6h06qh7bhevvt5d8fqgdn",
+    "positiveConstraints": [
+      "Component qualification is not canonical verification or approval",
+      "No merge, deployment, automatic retry or unrelated changes",
+      "Only docs/operations/verification-retry-runbook.md may change"
+    ],
+    "priority": 3,
+    "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+    "qualityContractDigest": "sha256:aecbdf1f972c53509b7b33a85ee9756e10e4f03495dc6f542582d9627b530ac6",
+    "releasedAt": 1791174029324,
+    "repository": "jaydubya818/MissionControl",
+    "repositoryId": "k17wswvrva7ky172eej2w1nj858cbzt7",
+    "requestedBy": "development:local-operator",
+    "requiredApprovals": [
+      "CHANGE_REVIEW"
+    ],
+    "requiredHumanAction": "Missing verification receipts for draft-publication, restart, runbook",
+    "requirements": [
+      {
+        "category": "FUNCTIONAL",
+        "description": "The runbook accurately explains verification retries",
+        "id": "requirement:runbook",
+        "priority": "MUST",
+        "title": "The runbook accurately explains verification retries",
+        "type": "FUNCTIONAL"
+      },
+      {
+        "category": "FUNCTIONAL",
+        "description": "Worker restart preserves evidence without producer replay",
+        "id": "requirement:restart",
+        "priority": "MUST",
+        "title": "Worker restart preserves evidence without producer replay",
+        "type": "FUNCTIONAL"
+      },
+      {
+        "category": "FUNCTIONAL",
+        "description": "Publication ends at a draft PR with human approval",
+        "id": "requirement:draft-publication",
+        "priority": "MUST",
+        "title": "Publication ends at a draft PR with human approval",
+        "type": "FUNCTIONAL"
+      }
+    ],
+    "riskLevel": "LOW",
+    "riskReasons": [
+      "Operator-selected low risk."
+    ],
+    "scopeEnforcementVersion": 1,
+    "sourceOfTruthRefs": [],
+    "specificationValidatedAt": 1791179795281,
+    "specificationVersion": 2,
+    "state": "BLOCKED",
+    "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+    "title": "Write the verification retry operator runbook",
+    "updatedAt": 1791179965881,
+    "verificationContract": {
+      "checks": [
+        {
+          "acceptanceCriterionIds": [
+            "runbook",
+            "restart",
+            "draft-publication"
+          ],
+          "category": "CONTRACT_TEST",
+          "command": {
+            "args": [
+              "-e",
+              "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+            ],
+            "commandClass": "TEST",
+            "executable": "node",
+            "timeoutMs": 10000
+          },
+          "evidenceCategory": "TEST_RESULT",
+          "id": "mission:independent-verification",
+          "mandatory": true,
+          "name": "Mission independent candidate verification",
+          "verifierId": "factory-command/v1"
+        }
+      ],
+      "enforcementMode": "ENFORCED",
+      "independence": {
+        "minimumBoundary": "SEPARATE_ATTEMPT",
+        "required": true
+      },
+      "requireHumanReview": false,
+      "requiredRisks": [
+        {
+          "description": "The published candidate may differ from the exact immutable subject independently verified for acceptance.",
+          "id": "mission:exact-candidate-integrity",
+          "requiredEvidenceIds": [
+            "mission:independent-verification"
+          ],
+          "severity": "LOW",
+          "source": "HUMAN_APPROVED"
+        }
+      ],
+      "schemaVersion": 2
+    },
+    "verificationContractDigest": "sha256:55c5c81a127c550e0ab53d8781efab9fb148b6fe42fba5b239bf3508ec21a80a",
+    "verificationStatus": "PENDING",
+    "workflowId": "live-verification-retry-runbook-v1"
+  }
+}

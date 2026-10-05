@@ -1,0 +1,86 @@
+{
+  "id": "5171c185-d430-020c-0f65-bd2e25bedec3",
+  "baseline": "5308727463ec737589bf8072ee9f5de0af1bba7a",
+  "branch": "mc/54xwjd8fq2kp-inc68pnu",
+  "status": "failed",
+  "createdAt": "2026-10-05T05:58:58.692Z",
+  "updatedAt": "2026-10-05T05:59:09.891Z",
+  "usage": {
+    "inputTokens": 70759,
+    "outputTokens": 159,
+    "cachedTokens": 61056,
+    "cacheWriteTokens": null,
+    "reasoningTokens": 0,
+    "costUsd": 0.0102412
+  },
+  "modelCalls": 8,
+  "retries": 0,
+  "filesRead": [],
+  "filesModified": [],
+  "candidateRevision": null,
+  "unresolved": [
+    "Turn budget reached without a complete outcome."
+  ],
+  "governed": {
+    "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+    "attemptId": "inc68pnu",
+    "executionId": "inc68pnu:sha256:3948f8ba9c7e24e040c15efe3f89c33662c3a4124c0e38be2b41a28b07d7f049",
+    "executorIdentity": "local-mac:live-retry-runbook:31718463-84af-439a-9a51-80f65b453483:4",
+    "environmentReference": "local-worktree:inc68pnu",
+    "credentialReference": "live-retry-runbook-broker-v1",
+    "sourceRevision": "5308727463ec737589bf8072ee9f5de0af1bba7a",
+    "candidateRevision": null,
+    "startedAt": "2026-10-05T05:58:58.692Z",
+    "completedAt": "2026-10-05T05:59:25.767Z"
+  },
+  "sourcePath": "/Users/jaywest/.mission-control/live-retry-20261004/fab-state/5171c185-d430-020c-0f65-bd2e25bedec3.json",
+  "sourceSha256": "7e66e7763d9e60f76c8c16f05e1ac0f7a27a796ecdedcf2e55e12ac4ce19a5c9",
+  "toolCalls": [
+    {
+      "name": "read_file",
+      "arguments": {
+        "path": "docs/operations/verification-retry-runbook.md"
+      }
+    },
+    {
+      "name": "search_code",
+      "arguments": {
+        "query": "verification retry"
+      }
+    },
+    {
+      "name": "search_code",
+      "arguments": {
+        "query": "retry"
+      }
+    },
+    {
+      "name": "read_file",
+      "arguments": {
+        "path": ".mission-control/skills/mission-control-delivery/SKILL.md"
+      }
+    },
+    {
+      "name": "read_file",
+      "arguments": {
+        "path": ".mission-control/skills/poteto-mode/SKILL.md"
+      }
+    },
+    {
+      "name": "read_file",
+      "arguments": {
+        "path": "docs/operations/README.md"
+      }
+    },
+    {
+      "name": "read_file",
+      "arguments": {
+        "path": "docs/README.md"
+      }
+    },
+    {
+      "name": "list_files",
+      "arguments": {}
+    }
+  ]
+}

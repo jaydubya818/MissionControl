@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl
+
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  21:41:26
+   Duration  114ms (transform 17ms, setup 0ms, import 23ms, tests 3ms, environment 0ms)
+

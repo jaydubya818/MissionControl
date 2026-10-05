@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl
+
+ ❯ convex/__tests__/modelRoutingAuthorization.test.ts (22 tests | 1 failed) 15ms
+     × checks full-cap authority for WorkOrder NOT_REQUIRED, plan APPROVED, cap 4.49 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  convex/__tests__/modelRoutingAuthorization.test.ts > Model Routing authorization > checks full-cap authority for WorkOrder NOT_REQUIRED, plan APPROVED, cap 4.49
+AssertionError: promise rejected "Error: Exact model route cost policy does…" instead of resolving
+ ❯ convex/__tests__/modelRoutingAuthorization.test.ts:315:29
+    313|     });
+    314|     if (allowed) {
+    315|       await expect(operation).resolves.toHaveProperty("qualificationDi…
+       |                             ^
+    316|       expect(state.tables.modelCatalog.find(row => row._id === id).est…
+    317|     } else {
+
+Caused by: Error: Exact model route cost policy does not match the approved WorkOrder authority.
+ ❯ handler convex/modelCatalog.ts:384:15
+ ❯ convex/__tests__/modelRoutingAuthorization.test.ts:315:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 passed (22)
+   Start at  21:23:17
+   Duration  580ms (transform 370ms, setup 0ms, import 459ms, tests 15ms, environment 0ms)
+

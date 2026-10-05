@@ -1,0 +1,31 @@
+{
+  "schema": "live-retry-bounded-pilot-qualification/v1",
+  "scope": {
+    "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+    "repositoryId": "k17wswvrva7ky172eej2w1nj858cbzt7",
+    "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp",
+    "workload": "SOFTWARE_CHANGE",
+    "risk": "GREEN",
+    "allowedPaths": [
+      "docs/operations/verification-retry-runbook.md"
+    ],
+    "maxAttempts": 1,
+    "maxCostUsd": 4.49
+  },
+  "limitations": [
+    "Live component test used a synthetic fixture, not this WorkOrder",
+    "Documentation configuration passed validation and negative scope tests, not live document execution",
+    "No whole-agent OS read containment",
+    "Independent verification, restart, and publication remain unproven"
+  ],
+  "files": {
+    "worker-config.json": "sha256:50794f710a799441e3c30d63ff53b095964aa44bff304873b8289a579de69993",
+    "worker-route.json": "sha256:fc1449610441ecd01d46b324dcbcdf3a2fd3fac9329ff97472cfa7ca0100a5af",
+    "worker-configuration-checks.json": "sha256:3b1b11ae737d679f625004a151abfd9c228eff9fc2980df8ff6146ed29c5c145",
+    "live-result.json": "sha256:f9e7a7489b605019be38a4acb0ce2aa87d760e9f96ce0ef818c0d7838f8a1806",
+    "credential-revocation.json": "sha256:6213b7f4b32acdae3e26f4cc9c6072e8f417e4ffbf70524d5cac8a0f269086bc",
+    "offline-tests.txt": "sha256:3995185b525310f0fd54665e3e5d7efd480bb4ca0d32103096a0b32a14faafb4",
+    "source-digests.json": "sha256:a28bb02648fd8c97e3c7bf8ddfd64f49c31d92e018f5bf27ff11cd6b34b9b407",
+    "budget.json": "sha256:d9a779199d24ff751eda7b6d123efe7d83b1a1d6332e4053b230a9f378b01360"
+  }
+}
