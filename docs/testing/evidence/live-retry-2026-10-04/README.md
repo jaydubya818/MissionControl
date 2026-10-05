@@ -43,12 +43,18 @@ active code scope limited to `docs/operations/verification-retry-runbook.md`.
 Their IDs are in `canonical-preparation.json`. No execution profile was promoted,
 factory activated, approval recorded, or unrelated workspace changed.
 
-Mission creation was rejected because delivery requires a configured owner and
-team. Research Lab's active org-member query returned no members. The operator
-has been asked whether to add Jay West with a Factory Operations team or specify
-another owner/team. No identity or membership was invented to pass this gate.
+Mission creation initially required a configured owner and team. The operator
+then explicitly approved adding Jay West and Factory Operations. Both records
+and the active LEAD membership now exist and have been read back successfully.
 
-After ownership is resolved, freeze and review the actual worker configuration
+Mission `gs7qk5q10e4v3v5td71pedhrvx8fqmvg` is now in PLANNING, owned by Jay West
+and Factory Operations. Plan `gn7htsghr19e1yeschmc1hmbgh8fqp4d` is DRAFT.
+`mission-plan-draft.json` captures the submitted draft, including its one-file,
+300-line, one-attempt limits and $4.49 allocation. Its documentation check checks
+required topics and unfinished placeholders; semantic review is separately
+required. No plan approval, WorkOrder release, dispatch, or publication occurred.
+
+Next, freeze and review the actual worker configuration
 and its qualification scope before admission. Then resume the governed run,
 independent verification, human publication decision, restart proof, and draft PR.
 The synthetic fixture's configuration is not automatically interchangeable with

@@ -8,8 +8,16 @@
     "success": true
   },
   "codeScopeId": "jx7jr1rmgavhzsmxwrx8xw4ajh8fp3vb",
-  "missionCreated": false,
-  "missionCreationBlocker": "Mission delivery scope requires an owner, team, repository, and code scope",
+  "missionCreated": true,
   "existingActiveResearchLabOrgMembers": 0,
-  "ownerTeamDecision": "PENDING_OPERATOR_INPUT"
+  "ownerTeamDecision": "APPROVED_BY_OPERATOR",
+  "ownerMemberId": "rx7dzve8axhw1vy9rj6447h9ah8fpmzp",
+  "owningTeamId": "kh7m6t6fmwg6h06qh7bhevvt5d8fqgdn",
+  "teamMembershipId": "kn7jbyb3mja3vv7sz4578cvzkh8fqnx6",
+  "ownerTeamEstablishedAt": "2026-10-05T04:13:54.749Z",
+  "missionId": "gs7qk5q10e4v3v5td71pedhrvx8fqmvg",
+  "missionState": "PLANNING",
+  "planId": "gn7htsghr19e1yeschmc1hmbgh8fqp4d",
+  "planStatus": "DRAFT",
+  "ownershipReadbackVerifiedAt": "2026-10-05T04:16:12.512Z"
 }
