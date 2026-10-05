@@ -1,0 +1,15 @@
+{
+  "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+  "repositoryId": "k17wswvrva7ky172eej2w1nj858cbzt7",
+  "modelCatalogId": "g17vsp03wznkp08cxw6rpd641x8fppc0",
+  "scopeResult": {
+    "overlaps": [],
+    "scopeId": "jx7jr1rmgavhzsmxwrx8xw4ajh8fp3vb",
+    "success": true
+  },
+  "codeScopeId": "jx7jr1rmgavhzsmxwrx8xw4ajh8fp3vb",
+  "missionCreated": false,
+  "missionCreationBlocker": "Mission delivery scope requires an owner, team, repository, and code scope",
+  "existingActiveResearchLabOrgMembers": 0,
+  "ownerTeamDecision": "PENDING_OPERATOR_INPUT"
+}

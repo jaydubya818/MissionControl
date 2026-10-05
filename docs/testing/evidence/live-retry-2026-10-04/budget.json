@@ -1,0 +1,29 @@
+{
+  "schema": "live-retry-qualification-budget/v1",
+  "authorizedTotalUsd": 5,
+  "allocations": [
+    {
+      "id": "credential-revocation-probe",
+      "maximumLiabilityUsd": 0.01,
+      "inferencePermitted": false,
+      "status": "REVOKED_NO_INFERENCE"
+    },
+    {
+      "id": "live-component-qualification",
+      "maximumLiabilityUsd": 0.5,
+      "inferencePermitted": false,
+      "status": "COMPONENT_PASS_CREDENTIAL_REVOKED",
+      "reportedCostUsd": 0.0037907999999999996
+    },
+    {
+      "id": "governed-documentation-workorder",
+      "maximumLiabilityUsd": 4.49,
+      "inferencePermitted": false,
+      "status": "NOT_DISPATCHED"
+    }
+  ],
+  "allocationTotalUsd": 5,
+  "rule": "Do not reuse allocations or infer released liability from a failed or unknown outcome. Component inference remains disabled until credential checks pass.",
+  "reportedSpendUsd": 0.0037907999999999996,
+  "retainedConservativeExposureUsd": 0.51
+}

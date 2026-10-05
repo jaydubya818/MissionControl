@@ -1,0 +1,10 @@
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl
+
+Preparing worktree (detached HEAD eea77ba)
+
+ Test Files  3 passed (3)
+      Tests  25 passed (25)
+   Start at  20:19:20
+   Duration  8.79s (transform 319ms, setup 0ms, import 464ms, tests 8.43s, environment 0ms)
+

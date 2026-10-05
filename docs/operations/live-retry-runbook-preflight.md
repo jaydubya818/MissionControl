@@ -1,5 +1,11 @@
 # Live retry runbook: execution preflight
 
+October 4 continuation: component qualification now passes, with reported model
+cost of $0.0037908. The disabled model route and single-file scope are registered.
+Mission creation is waiting on the operator's owner/team selection. See
+[`live-retry-2026-10-04`](../testing/evidence/live-retry-2026-10-04/README.md) for
+the current evidence and limits. The October 3 observations below are historical.
+
 Observed October 3, 2026 against the preserved local Research Lab backend
 (`http://127.0.0.1:3214`). Source base: `5308727463ec737589bf8072ee9f5de0af1bba7a`.
 

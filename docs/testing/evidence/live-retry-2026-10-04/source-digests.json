@@ -1,0 +1,7 @@
+{
+  "apps/orchestration-server/src/fabExecutorAdapter.ts": "sha256:4a79201c17cce14333aa7653d6e04a09f38ac45f70d27fef28a125dbad520d3c",
+  "apps/orchestration-server/src/fabOpenRouterBroker.ts": "sha256:a156947172caefc5a7fc44d9ca78eff726d3ec08a5dd6d8eacc4de71784b01c8",
+  "apps/orchestration-server/src/sandboxCredentials.ts": "sha256:bc7d47a4f9ff0f2da88c7af07081ffbf52559d90b257dabc3271afd76c868fc9",
+  "apps/orchestration-server/src/fabRuntimePin.ts": "sha256:cbbf6a6316044ccc264ad935856d2d405e53212eda98cdeb5c9bc4f9bf607e66",
+  "vendor/fab/fdlc-fab-0.1.0-experimental.9.tgz": "sha256:8a1ace50873b03f1fddf7d0f7d81fe425c6dbab25cf7acd4b23d5c148a654d32"
+}
