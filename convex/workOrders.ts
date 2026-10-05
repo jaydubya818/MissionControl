@@ -44,7 +44,7 @@ import {
   verificationValidUntil,
 } from "./lib/workOrderRevision";
 import { planAcceptedWorkOrderParentSync } from "./lib/workOrderParentSync";
-import { validateMissionWorkOrderDispatch } from "./lib/missionGovernance";
+import { missionIterationAuthorized, validateMissionWorkOrderDispatch } from "./lib/missionGovernance";
 import {
   genericHarnessV1RecoveryReady,
   evaluateFactoryDispatchPreflight,
@@ -3124,7 +3124,7 @@ async function dispatchWorkOrder(
         hasActiveMutatingWorkOrder,
         predecessorHandoffValid,
         budgetRemaining: mission.budgetUsd === undefined || mission.spentUsd < mission.budgetUsd,
-        correctiveIterationsRemaining: mission.correctiveIterations < mission.maxCorrectiveIterations,
+        correctiveIterationsRemaining: missionIterationAuthorized(mission.correctiveIterations, mission.maxCorrectiveIterations),
       });
       if (!missionDispatch.ok) throw new Error(`Mission WorkOrder is not dispatchable (${missionDispatch.reason})`);
       missionForDispatch = mission;

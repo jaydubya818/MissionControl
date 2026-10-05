@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canTransitionMission,
+  missionIterationAuthorized,
   evaluateMissionAcceptance,
   evaluateMissionDeliveryProgress,
   validateMissionHandoff,
@@ -8,6 +9,16 @@ import {
 } from "../lib/missionGovernance";
 
 describe("mission governance", () => {
+  it.each([[0, 0, true], [1, 0, false], [0, 1, true], [1, 1, false], [1, 2, true], [2, 2, false], [-1, 0, false], [0, -1, false]] as const)(
+    "dispatches only an authorized iteration (%s corrections, limit %s)", (iterations, limit, allowed) => {
+      expect(validateMissionWorkOrderDispatch({
+        missionState: "IN_PROGRESS", planApproved: true, executionPolicy: "SERIAL_MUTATIONS",
+        workOrderReleased: true, isMutating: true, hasActiveMutatingWorkOrder: false,
+        predecessorHandoffValid: true, budgetRemaining: true,
+        correctiveIterationsRemaining: missionIterationAuthorized(iterations, limit),
+      })).toEqual(allowed ? { ok: true } : { ok: false, reason: "corrective-iteration-limit" });
+    },
+  );
   it("only allows declared lifecycle transitions", () => {
     expect(canTransitionMission("AWAITING_PLAN_APPROVAL", "READY")).toBe(true);
     expect(canTransitionMission("DRAFT", "DONE")).toBe(false);
