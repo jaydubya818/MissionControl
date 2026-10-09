@@ -503,6 +503,12 @@ authenticated repository code-scope update used by pinned Factory dispatch.
 
 ### Local Research Lab retry qualification
 
+October 8 follow-up reconciled the failed Attempt's observed cost to $0.0102412
+without releasing its reservation. The pinned Fab runtime cannot snapshot this
+repository, so it now rejects that setup before credential minting. A compatible
+executor must be qualified before another run. See the
+[follow-up evidence](docs/testing/evidence/retry-followup-2026-10-08/README.md).
+
 Zero allowed retries permits one initial execution with no retry Attempts.
 Commit `33e3612` fixes that Mission dispatch boundary while preserving positive
 retry-limit behavior. It is applied only to local Research Lab.

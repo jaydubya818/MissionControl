@@ -1,0 +1,27 @@
+{
+  "inferenceCalls": 0,
+  "results": [
+    {
+      "path": "skills/mission-control-delivery/SKILL.md",
+      "status": "READABLE",
+      "bytes": 4527,
+      "sha256": "253795de557f13efb8be9451a6e438fedccadb09e6a143c5dd48694060eceea4"
+    },
+    {
+      "path": "skills/poteto-mode/SKILL.md",
+      "status": "READABLE",
+      "bytes": 22360,
+      "sha256": "5ff397ee697dac4a8e42d69649c838ff10b4e8987ea18a74d33ee09e0b7e5cee"
+    },
+    {
+      "path": ".mission-control/skills/mission-control-delivery/SKILL.md",
+      "status": "PATH_DENIED",
+      "message": "Private, generated and credential paths are unavailable."
+    },
+    {
+      "snapshot": "REPOSITORY_LIMIT",
+      "message": "Contained checks currently support at most 300 text files.",
+      "trackedVisibleFiles": 3932
+    }
+  ]
+}

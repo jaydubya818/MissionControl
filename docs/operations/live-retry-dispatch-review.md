@@ -1,5 +1,10 @@
 # Local Research Lab retry qualification
 
+October 8 update: observed spend is now reconciled locally. Full qualification
+remains blocked by the pinned Fab runtime's repository-size limit. See the
+[follow-up findings and evidence](../testing/evidence/retry-followup-2026-10-08/README.md).
+The October 4 status below is retained as history.
+
 Status on 2026-10-04 Pacific time: the retry-dispatch regression is fixed locally.
 The live documentation qualification failed. Broader deployment is not approved.
 

@@ -1,0 +1,14 @@
+
+> @mission-control/orchestration-server@0.9.0 test /Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server
+> vitest run
+
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server
+
+Preparing worktree (detached HEAD 4ac8f6d)
+
+ Test Files  64 passed | 3 skipped (67)
+      Tests  768 passed | 11 skipped (779)
+   Start at  22:20:36
+   Duration  22.04s (transform 4.90s, setup 0ms, import 10.99s, tests 100.55s, environment 4ms)
+

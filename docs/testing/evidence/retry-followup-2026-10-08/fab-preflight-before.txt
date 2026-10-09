@@ -1,0 +1,198 @@
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server
+
+ ❯ src/__tests__/fabExecutorAdapter.test.ts (21 tests | 1 failed | 20 skipped) 587ms
+     × rejects repositories beyond the runtime snapshot limit before creating a model 587ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/fabExecutorAdapter.test.ts > Fab canonical MC harness conformance > rejects repositories beyond the runtime snapshot limit before creating a model
+AssertionError: promise resolved "{ request: { …(10) }, …(11) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "attempt": {
++     "acceptanceCriteria": [
++       {
++         "id": "ac-1",
++         "title": "Value equals 2.",
++       },
++     ],
++     "assertActive": [Function Mock],
++     "attemptId": "attempt-1",
++     "environmentReference": "local-worktree:attempt-1",
++     "executionProfileDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
++     "executionProfileId": "profile-1",
++     "executorIdentity": "worker-1:session-1:1",
++     "generation": 1,
++     "harnessDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++     "leaseId": "lease-1",
++     "modelRouteDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
++     "projectId": "project-1",
++     "repositoryId": "repo-1",
++     "runtimeDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
++     "sourceRevision": "7aeb3f56b128a98e4a6822e132ba07e0f1e54967",
++     "workOrderId": "wo-1",
++     "workOrderRevision": 1,
++     "workflowRunId": "attempt-1",
++   },
++   "context": {
++     "attempt": {
++       "acceptanceCriteria": [
++         {
++           "id": "ac-1",
++           "title": "Value equals 2.",
++         },
++       ],
++       "assertActive": [Function Mock],
++       "attemptId": "attempt-1",
++       "environmentReference": "local-worktree:attempt-1",
++       "executionProfileDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
++       "executionProfileId": "profile-1",
++       "executorIdentity": "worker-1:session-1:1",
++       "generation": 1,
++       "harnessDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++       "leaseId": "lease-1",
++       "modelRouteDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
++       "projectId": "project-1",
++       "repositoryId": "repo-1",
++       "runtimeDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
++       "sourceRevision": "7aeb3f56b128a98e4a6822e132ba07e0f1e54967",
++       "workOrderId": "wo-1",
++       "workOrderRevision": 1,
++       "workflowRunId": "attempt-1",
++     },
++     "emit": [Function Mock],
++   },
++   "controller": AbortController {},
++   "events": [],
++   "model": undefined,
++   "redactor": Redactor {},
++   "releaseModel": undefined,
++   "request": {
++     "allowedPaths": [
++       "src/**",
++     ],
++     "deniedPaths": [],
++     "executionId": "fixture-attempt:manifest",
++     "isolation": "WORKSPACE_WRITE",
++     "model": "fixture-explicit-model",
++     "prompt": "Set the value to 2",
++     "provider": "openai",
++     "repositoryRoot": "/private/tmp/fab-governed-1hYWgj/repo",
++     "timeoutMs": 10000,
++     "workingDirectory": "/private/tmp/fab-governed-1hYWgj/repo",
++   },
++   "session": {
++     "acceptance": "not_evaluated",
++     "approvalDigest": null,
++     "baseline": "7aeb3f56b128a98e4a6822e132ba07e0f1e54967",
++     "branch": "master",
++     "candidateDigest": null,
++     "candidateRevision": null,
++     "checks": [],
++     "config": {
++       "acceptanceCriteria": [
++         "Value equals 2.",
++       ],
++       "checkTimeoutMs": 5000,
++       "checks": [
++         {
++           "argv": [
++             "/opt/homebrew/Cellar/node@24/24.18.1/bin/node",
++             "--input-type=module",
++             "-e",
++             "import {value} from './src/value.mjs'; if(value!==2) throw new Error('incorrect value')",
++           ],
++           "id": "test",
++         },
++       ],
++       "credential": {
++         "id": "fixture-key-ref",
++         "owner": "local:501",
++         "provider": "openai",
++         "scope": {
++           "kind": "repository",
++           "root": "/private/tmp/fab-governed-1hYWgj/repo",
++         },
++         "source": {
++           "kind": "environment",
++           "variable": "FAB_GOVERNED_TEST_KEY",
++         },
++       },
++       "maxTurns": 8,
++       "model": "fixture-explicit-model",
++       "provider": "openai",
++       "repository": "/private/tmp/fab-governed-1hYWgj/repo",
++       "timeoutMs": 10000,
++       "version": 1,
++       "writableFiles": [
++         "src/value.mjs",
++       ],
++     },
++     "createdAt": "2026-10-09T05:20:22.315Z",
++     "diff": "",
++     "events": [],
++     "filesModified": [],
++     "filesRead": [],
++     "governed": {
++       "attemptId": "attempt-1",
++       "candidateRevision": null,
++       "completedAt": null,
++       "credentialReference": "fixture-key-ref",
++       "environmentReference": "local-worktree:attempt-1",
++       "executionId": "fixture-attempt:manifest",
++       "executorIdentity": "worker-1:session-1:1",
++       "sourceRevision": "7aeb3f56b128a98e4a6822e132ba07e0f1e54967",
++       "startedAt": "2026-10-09T05:20:22.315Z",
++       "workOrderId": "wo-1",
++     },
++     "id": "1009ab9f-d484-e014-3415-bbef43f7d101",
++     "independent": false,
++     "messages": [],
++     "modelCalls": 0,
++     "plan": null,
++     "retries": 0,
++     "status": "planning",
++     "summary": null,
++     "task": "Set the value to 2",
++     "unresolved": [],
++     "updatedAt": "2026-10-09T05:20:22.315Z",
++     "usage": {
++       "cachedTokens": null,
++       "costUsd": null,
++       "inputTokens": null,
++       "outputTokens": null,
++     },
++     "version": 1,
++   },
++   "started": false,
++   "startedAt": 1791523222347,
++   "store": SessionStore {
++     "directory": "/private/tmp/fab-governed-1hYWgj/large",
++   },
+  }
+
+ ❯ src/__tests__/fabExecutorAdapter.test.ts:69:55
+     67|     const modelFactory = vi.fn();
+     68|     const adapter = new FabExecutorAdapter({ config: f.config, stateDi…
+     69|     await expect(adapter.prepare(f.request, f.context)).rejects.toThro…
+       |                                                       ^
+     70|     expect(modelFactory).not.toHaveBeenCalled();
+     71|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  22:20:21
+   Duration  1.02s (transform 216ms, setup 0ms, import 325ms, tests 587ms, environment 0ms)
+
+undefined
+/Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/__tests__/fabExecutorAdapter.test.ts -t rejects repositories beyond
