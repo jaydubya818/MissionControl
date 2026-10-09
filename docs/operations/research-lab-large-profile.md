@@ -20,10 +20,12 @@ larger profile at another backend or substituting its image is rejected. This
 URL check constrains composition; it does not authenticate the backend or grant
 canonical admission.
 
-The current canonical Docker admission contract still rejects the new profile
-key and memory size. Its local-only admission and promotion need a reviewed
-change and scope-bound evidence before any real dispatch. This implementation
-does not weaken that gate or register synthetic fixture records.
+Commit `69fbe37` adds canonical validation for this local profile and was applied
+to the verified Research Lab backend after export. Registration, promotion and
+eligibility require exact server-owned cloud/site URLs, project, tenant, image
+and an evidence scope valid for at most 24 hours. Production and publication
+remain denied. No profile record has been registered or promoted; real dispatch
+still requires scope-bound evidence and operator approval.
 
 ## Result reporting
 
@@ -35,12 +37,11 @@ validate the complete result against the frozen Attempt and acceptance criteria.
 
 ## Price and budget review
 
-Reviewed October 9. Anthropic lists Sonnet 4.6 standard input/output rates of
-$3/$15 per million tokens and a 10% regional premium for Bedrock. This implies
-$3.30/$16.50 for the proposed US route. This is a derived candidate rate, not a
-new approved price record. The AWS page retrieved for this review did not expose
-the exact model's dynamic rate row. See [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing)
-and [AWS pricing](https://aws.amazon.com/bedrock/pricing/).
+Reviewed October 9. The rendered [AWS pricing table](https://aws.amazon.com/bedrock/pricing/)
+confirms Sonnet 4.6 at $3.30/$16.50 per million input/output tokens in the Geo
+and In-region Cross-region Inference section, selected US East (N. Virginia).
+This confirms the earlier derived candidate rates; it does not activate a new
+approved price record. See the retained pricing observation.
 
 The [AWS model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-sonnet-4-6.html)
 now lists CountTokens support. Existing exact-route evidence says UNSUPPORTED.
@@ -62,3 +63,16 @@ profile. Resolve canonical local admission and exact-route price/capability
 evidence first, then request a fresh activation decision.
 
 See [tests, result and draft configuration](../testing/evidence/terminal-profile-2026-10-09/README.md).
+
+## Local admission qualification
+
+The implementation passed 1,501 Convex tests, 813 orchestration tests and both
+typechecks. Four opt-in full-repository Docker lifecycle cases passed with
+synthetic responses: success, failure, cancellation and timeout. All containers
+were confirmed absent after cleanup. See [current evidence and remaining gates](../testing/evidence/local-admission-2026-10-09/README.md).
+
+Exact AWS route verification is blocked by the approved profile's expired SSO
+session. Restore `fdlc-qualification` authentication and run the guarded read-only
+check before changing CountTokens or price qualification. Full live producer,
+independent verification, billing reconciliation and broader approval remain
+incomplete. The old reservation, failure and credential revocation are preserved.

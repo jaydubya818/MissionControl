@@ -106,3 +106,15 @@ also found that AWS now documents CountTokens for the model, whereas the saved
 exact-route contract says unsupported. Requalify the route before using a lower
 reserve. See [selection and draft live budget](research-lab-large-profile.md)
 and [retained evidence](../testing/evidence/terminal-profile-2026-10-09/README.md).
+
+## Canonical local validation and application, October 9
+
+Commit `69fbe37` adds expiring, environment/project/tenant-bound admission for
+Research Lab's pinned larger profile. The local backend was backed up, identity
+verified and code applied. No profile registration or paid activation occurred.
+The full suites passed (1,501 Convex; 813 orchestration), as did both typechecks
+and four full-repository synthetic Docker lifecycle cases. AWS pricing was
+observed directly; exact-route capability verification awaits SSO refresh.
+See [evidence and remaining gates](../testing/evidence/local-admission-2026-10-09/README.md).
+Full qualification and billing reconciliation remain incomplete. The $4.49 hold,
+prior failure, revoked credential and stopped pilot worker remain unchanged.

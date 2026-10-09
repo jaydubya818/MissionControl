@@ -535,9 +535,12 @@ and the full-tree test now reports SUCCESS. Canonical local admission and live
 approval gates remain. See [larger-profile
 evidence](docs/testing/evidence/large-repository-docker-2026-10-09/README.md).
 
-The October 9 follow-up passed 797 orchestration tests, seven Docker lifecycle
-cases and the full-repository SUCCESS check. The larger profile is explicitly
-selectable in local worker composition but has no canonical live admission.
+The latest October 9 follow-up passed 1,501 Convex tests, 813 orchestration tests,
+both typechecks and four full-repository Docker lifecycle cases with synthetic
+responses. Canonical local admission validation is implemented and applied only
+to Research Lab; no profile is registered or activated. Exact AWS route checks
+await SSO refresh, and live qualification remains incomplete. See the
+[local application and qualification evidence](docs/testing/evidence/local-admission-2026-10-09/README.md).
 See [configuration, current price review and draft budget](docs/operations/research-lab-large-profile.md).
 
 ### Factory Deployed Engineer qualification environment

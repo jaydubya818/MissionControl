@@ -1,0 +1,9 @@
+{
+  "schema": "research-lab-bedrock-readonly-check/v1",
+  "checkedAt": "2026-10-09T19:12:41.649Z",
+  "modelId": "anthropic.claude-sonnet-4-6",
+  "inferenceProfileId": "us.anthropic.claude-sonnet-4-6",
+  "paidInferenceCalls": 0,
+  "status": "WAITING_FOR_SSO",
+  "errorClass": "WAITING_FOR_SSO"
+}
