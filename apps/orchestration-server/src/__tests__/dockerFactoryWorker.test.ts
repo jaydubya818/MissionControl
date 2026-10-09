@@ -104,7 +104,8 @@ it.runIf(process.env.MC_DOCKER_QUALIFICATION === '1' && !process.env.MC_DOCKER_D
  const allocationFile=path.join(root,'allocation.json');
  let allocation:any;
  try {
-  const child=await exec('pnpm',['exec','vitest','run','src/__tests__/dockerFactoryWorker.test.ts','-t','hardened Docker: result'],{env:{...process.env,MC_DOCKER_DEATH_CHILD:allocationFile,MC_DOCKER_EVIDENCE:''},timeout:30000,maxBuffer:1024*1024}).then(()=>({failed:false}),()=>({failed:true}));
+  const configArgs=process.env.MC_DOCKER_QUALIFICATION_CONFIG ? ['--config',process.env.MC_DOCKER_QUALIFICATION_CONFIG] : [];
+  const child=await exec('pnpm',['exec','vitest','run',...configArgs,'src/__tests__/dockerFactoryWorker.test.ts','-t','hardened Docker: result'],{env:{...process.env,MC_DOCKER_DEATH_CHILD:allocationFile,MC_DOCKER_EVIDENCE:''},timeout:30000,maxBuffer:1024*1024}).then(()=>({failed:false}),()=>({failed:true}));
   expect(child.failed).toBe(true);
   allocation=JSON.parse(await readFile(allocationFile,'utf8'));
   let running=true;
