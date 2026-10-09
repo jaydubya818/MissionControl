@@ -1,0 +1,13 @@
+- [x] Read poteto-mode Principles and mission-control-delivery.
+- [x] Phase A: Frame. Exact sources, authorized scope, completion predicate and trust boundaries.
+- [x] Phase B: Design the workflow. Compare canonical Attempt envelope with inference-record reuse; independent reviewers support Attempt authority.
+- [ ] Phase C: Run the loop. Implement, test, review and preserve each unit.
+- [ ] Accounting: red abuse cases, canonical schema/admission/settlement, actual database races, review, commit/push/SHA.
+- [ ] Gate: canonical policy-v2 ingestion/currentness, stale evidence/failure tests, review/checkpoint.
+- [ ] Recovery: durable controller readback, restart/fault tests, no redispatch, review/checkpoint.
+- [ ] Phase D: Keep the audit trail. Append each decision/checkpoint to decisions.tsv.
+- [ ] Phase E: Verify and hand back. Fresh clones, CI, regression identity, independent review and required report.
+- [x] Blocking first steps: exact base and canonical source discovery before implementation.
+- [x] Independent workstreams: security/architecture review only; implementation remains sequential per user tool mapping.
+- [x] Shared mutable state: a single writer owns this clone; canonical shared budget reads/writes use one transaction.
+- [x] Smallest safe decomposition: accounting then gate then recovery. Opening PR/merge skipped; user requested isolated commits/pushes, no dependency adoption.

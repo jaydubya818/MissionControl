@@ -12,6 +12,8 @@ import {
 
 import { VerificationEngine, ChangeBudgetVerifier, NegativeConstraintVerifier } from "@mission-control/workflow-engine/verification";
 import { legacyQualityGateStateForVerdict } from "../lib/qualityGateDecision";
+import { enterpriseProject, scopeExposure, settleUndispatchedEnterpriseAttempt, assertEnterpriseAttemptExecution } from "../lib/enterpriseAttemptAccounting";
+import { reserveOfflineAttemptBudget } from "../lib/offlineAttemptBudget";
 
 const denied = () => new Error("COMPATIBILITY_UNAVAILABLE");
 const sha = (value: string) => /^sha256:[a-f0-9]{64}$/.test(value);
@@ -101,6 +103,7 @@ export const initializeBudget = mutation({
   handler: async (ctx, args) => {
     const auth = await access(ctx, args.projectId, true);
     const m = await scopedMission(ctx, args.projectId, args.missionId);
+    if (await enterpriseProject(ctx, args.projectId)) throw Error("CANONICAL_ATTEMPT_AUTHORITY_REQUIRED");
     if (m.owner !== auth.actorId) throw denied();
     const ceilingMicrousd = (m.budgetUsd ?? -1) * 1_000_000;
     assertMicrousd(ceilingMicrousd);
@@ -114,9 +117,13 @@ export const initializeBudget = mutation({
 });
 async function budgetFor(ctx: QueryCtx | MutationCtx, projectId: Id<"projects">, id: Id<"missions">) {
   const m = await scopedMission(ctx, projectId, id);
+  if (await enterpriseProject(ctx, projectId)) {
+    if (m.owner !== (await access(ctx, projectId)).actorId) throw denied();
+    return { mission: m, budget: null, canonical: true as const };
+  }
   if (m.enterpriseFixtureBudget?.ownerActorId !== (await access(ctx, projectId)).actorId) throw denied();
   if (!m.enterpriseFixtureBudget || m.enterpriseFixtureBudget.ceilingMicrousd !== (m.budgetUsd ?? -1) * 1_000_000 || m.spentUsd !== 0) throw denied();
-  return { mission: m, budget: m.enterpriseFixtureBudget };
+  return { mission: m, budget: m.enterpriseFixtureBudget, canonical: false as const };
 }
 export const reserveNativeFixture = mutation({
   args: { projectId: v.id("projects"), missionId: v.id("missions"), id: v.string(), digest: v.string(), maximumMicrousd: v.number(), expiresAt: v.number() },
@@ -124,6 +131,7 @@ export const reserveNativeFixture = mutation({
     await access(ctx, args.projectId, true);
     if (!sha(args.digest) || !/^[A-Za-z0-9_-]{1,100}$/.test(args.id)) throw denied();
     const { budget } = await budgetFor(ctx, args.projectId, args.missionId);
+    if (!budget) throw Error("CANONICAL_ATTEMPT_AUTHORITY_REQUIRED");
     const updated = reserveFixtureAllowance(budget, { id: `native:${args.id}`, digest: args.digest, maximumMicrousd: args.maximumMicrousd, expiresAt: args.expiresAt, kind: "NATIVE" }, Date.now());
     await ctx.db.patch(args.missionId, { enterpriseFixtureBudget: updated });
   },
@@ -163,7 +171,8 @@ export const admitTrial = mutation({
     await validateLineage(ctx, b, mission);
     if (registration.config.executionProvider) {
       const plan = await ctx.db.get(b.missionPlanId as Id<"missionPlans">);
-      if (mission.owner !== auth.actorId || b.ownerScope !== auth.actorId || plan?.metadata?.enterpriseDelegationApproval?.bindingDigest !== factoryDelegationBindingDigest(b)) throw denied();
+      const approval = plan?.metadata?.enterpriseDelegationApprovals?.[b.delegationId] ?? plan?.metadata?.enterpriseDelegationApproval;
+      if (mission.owner !== auth.actorId || b.ownerScope !== auth.actorId || approval?.bindingDigest !== factoryDelegationBindingDigest(b)) throw denied();
     }
     const digest = factoryDelegationBindingDigest(b);
     const existing = await ctx.db.query("factoryDelegationTrials").withIndex("by_project_delegation", q => q.eq("projectId", args.projectId).eq("delegationId", b.delegationId)).unique();
@@ -177,8 +186,24 @@ export const admitTrial = mutation({
     ]) if (duplicate) throw new Error("PARTNER_IDENTITY_ALREADY_BOUND");
     const trials = await ctx.db.query("factoryDelegationTrials").withIndex("by_factory", q => q.eq("factoryDefinitionId", factory._id)).take(101);
     if (trials.length > 100 || trials.filter(t => !t.closed).length >= registration.config.capacity) throw new Error("CAPACITY_UNAVAILABLE");
-    const updated = reserveFixtureAllowance(budget, { id: b.delegationId, digest, kind: "DELEGATED", maximumMicrousd: b.maxSpendMicrousd, expiresAt: b.expiresAt }, now);
-    await ctx.db.patch(mission._id, { enterpriseFixtureBudget: updated });
+    if (budget) {
+      const updated = reserveFixtureAllowance(budget, { id: b.delegationId, digest, kind: "DELEGATED", maximumMicrousd: b.maxSpendMicrousd, expiresAt: b.expiresAt }, now);
+      await ctx.db.patch(mission._id, { enterpriseFixtureBudget: updated });
+    } else {
+      const run = await ctx.db.get(b.workflowRunId as Id<"workflowRuns">);
+      const workOrder = await ctx.db.get(b.workOrderId as Id<"workOrders">);
+      const version = await ctx.db.get(registration.config.definitionVersionId);
+      const policy = version?.policyEnvelopeId ? await ctx.db.get(version.policyEnvelopeId) : null;
+      if (!run || !version || registration.config.executionProvider !== "LOCAL_DOCKER_QUALIFICATION"
+        || run.executionCostAuthorization || run.enterpriseSettlement
+        || version.budget.maxCostUsd * 1_000_000 !== b.maxSpendMicrousd) throw denied();
+      const authorization = await reserveOfflineAttemptBudget(ctx, { runId: run.runId, version, workOrder, mission, policy, now,
+        delegation: { id: b.delegationId, factoryId: b.factoryId, factoryVersion: b.factoryVersion, provider: "local-docker",
+          modelPolicyDigest: b.modelPolicyDigest, executionProfileDigest: b.executionProfileDigest,
+          bindingDigest: digest, expiresAt: b.expiresAt, maximumMicrousd: b.maxSpendMicrousd } });
+      await ctx.db.patch(run._id, { executionCostAuthorization: authorization, reservedCostUsd: b.maxSpendMicrousd / 1_000_000,
+        spentUsd: 0, policyEnvelopeId: version.policyEnvelopeId, factoryDefinitionVersionId: version._id });
+    }
     return await ctx.db.insert("factoryDelegationTrials", { tenantId: mission.tenantId!, projectId: args.projectId,
       missionId: mission._id, factoryDefinitionId: factory._id, delegationId: b.delegationId, partnerRequestId: b.partnerRequestId, partnerWorkId: b.partnerWorkId, binding: b,
       bindingDigest: digest, registrationDigest: registration.digest, state: "RESERVED", observationRevision: 0,
@@ -201,7 +226,13 @@ export const readTrial = query({
 });
 export const getBudget = query({
   args: { projectId: v.id("projects"), missionId: v.id("missions") },
-  handler: async (ctx, args) => { await access(ctx, args.projectId); return (await budgetFor(ctx, args.projectId, args.missionId)).budget; },
+  handler: async (ctx, args) => {
+    await access(ctx, args.projectId);
+    const { budget, mission } = await budgetFor(ctx, args.projectId, args.missionId);
+    if (budget) return budget;
+    const runs = await ctx.db.query("workflowRuns").withIndex("by_mission", q => q.eq("missionId", mission._id)).collect();
+    return { mode: "CANONICAL_ATTEMPTS", exposureMicrousd: scopeExposure(runs), ceilingMicrousd: mission.budgetUsd! * 1_000_000 };
+  },
 });
 export const claimTrial = mutation({
   args: { projectId: v.id("projects"), trialId: v.id("factoryDelegationTrials") },
@@ -217,7 +248,8 @@ export const claimTrial = mutation({
     const b = parseFactoryDelegationBinding(t.binding);
     assertFactoryDelegationBindingMatches(b, b, now);
     await validateLineage(ctx, b, mission);
-    await ctx.db.patch(t.missionId, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, t.delegationId, { type: "SEND", now }) });
+    if (budget) await ctx.db.patch(t.missionId, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, t.delegationId, { type: "SEND", now }) });
+    else await assertEnterpriseAttemptExecution(ctx, await ctx.db.get(b.workflowRunId as Id<"workflowRuns">), "local-docker");
     await ctx.db.patch(t._id, { state: "UNKNOWN", updatedAt: now });
     return true;
   },
@@ -230,7 +262,8 @@ export const cancelTrial = mutation({
     if (t.closed) return;
     const unsent = t.state === "RESERVED";
     const terminal = ["COMPLETED", "FAILED", "CANCELLED"].includes(t.state);
-    await ctx.db.patch(t.missionId, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, t.delegationId, { type: "CANCEL", now: Date.now() }) });
+    if (budget) await ctx.db.patch(t.missionId, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, t.delegationId, { type: "CANCEL", now: Date.now() }) });
+    else if (unsent) await settleUndispatchedEnterpriseAttempt(ctx, await ctx.db.get(t.binding.workflowRunId), Date.now());
     await ctx.db.patch(t._id, { cancelRequested: true, closed: unsent, state: unsent ? "CANCELLED" : terminal ? t.state : "STOPPING", updatedAt: Date.now() });
   },
 });
@@ -255,6 +288,7 @@ export const observeTrial = internalMutation({
       const factory = await scopedFactory(ctx, args.projectId, t.factoryDefinitionId);
       if (factory.enterpriseRegistration?.config.executionProvider) throw denied();
       const { budget } = await budgetFor(ctx, args.projectId, t.missionId);
+      if (!budget) throw Error("CANONICAL_SETTLEMENT_PROOF_REQUIRED");
       await ctx.db.patch(t.missionId, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, t.delegationId,
         { type: "RECONCILE", ...args.settlement, settlementDigest: args.receiptDigest }) });
     }
@@ -272,7 +306,8 @@ export const expireTrial = mutation({
     const b = parseFactoryDelegationBinding(t.binding), now = Date.now();
     if (b.expiresAt > now) throw denied();
     const { budget } = await budgetFor(ctx, args.projectId, t.missionId);
-    await ctx.db.patch(t.missionId, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, t.delegationId, { type: "EXPIRE", now }) });
+    if (budget) await ctx.db.patch(t.missionId, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, t.delegationId, { type: "EXPIRE", now }) });
+    else if (t.state === "RESERVED") await settleUndispatchedEnterpriseAttempt(ctx, await ctx.db.get(b.workflowRunId as Id<"workflowRuns">), now);
     if (t.state === "RESERVED") await ctx.db.patch(t._id, { state: "CANCELLED", closed: true, updatedAt: now });
   },
 });
@@ -287,7 +322,7 @@ async function executionAuthority(ctx: QueryCtx | MutationCtx, projectId: Id<"pr
   const plan = await ctx.db.get(binding.missionPlanId as Id<"missionPlans">);
   const workOrder = await ctx.db.get(binding.workOrderId as Id<"workOrders">);
   const revision = await ctx.db.get(binding.workOrderRevisionId as Id<"workOrderRevisions">);
-  const approval = plan?.metadata?.enterpriseDelegationApproval;
+  const approval = plan?.metadata?.enterpriseDelegationApprovals?.[binding.delegationId] ?? plan?.metadata?.enterpriseDelegationApproval;
   const registration = eligible(await scopedFactory(ctx, projectId, trial.factoryDefinitionId), Date.now());
   if (!approval || plan?.status !== "APPROVED" || plan.decidedActorSource !== "AUTHENTICATED"
     || plan.approvedBy !== auth.actorId || !plan.approvedAt || mission.owner !== auth.actorId
@@ -372,6 +407,7 @@ export const ingestExecutionResult = internalMutation({
       mode: "SHADOW", reasons: outcome.verdictReasons, blockingFindingIds: [], requiredApprovalIds: [], evaluatedAt: now,
       metadata: { qualificationOnly: true, artifactId, verdict: outcome.verdict, checks: outcome.checks, coverage: outcome.coverage, authoritativeAcceptance: false } });
     const { budget } = await budgetFor(ctx, args.projectId, mission._id);
+    if (!budget) throw Error("CANONICAL_SETTLEMENT_PROOF_REQUIRED");
     await ctx.db.patch(mission._id, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, binding.delegationId,
       { type: "RECONCILE", actualMicrousd: args.actualMicrousd, cleanupConfirmed: true, settlementDigest: args.resultDigest }) });
     await ctx.db.patch(trial._id, { resultInputDigest: inputDigest, qualityGateDecisionId: gateId, closed: true, updatedAt: now });
@@ -399,6 +435,7 @@ export const reconcileTerminalExecution = internalMutation({
       return;
     }
     const { budget } = await budgetFor(ctx, args.projectId, trial.missionId);
+    if (!budget) throw Error("CANONICAL_SETTLEMENT_PROOF_REQUIRED");
     await ctx.db.patch(trial.missionId, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, binding.delegationId,
       { type: "RECONCILE", actualMicrousd: 0, cleanupConfirmed: true, settlementDigest: args.resultDigest }) });
     await ctx.db.patch(trial._id, { resultInputDigest: inputDigest, closed: true, updatedAt: Date.now() });

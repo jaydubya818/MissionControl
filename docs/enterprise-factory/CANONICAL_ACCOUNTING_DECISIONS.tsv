@@ -1,0 +1,3 @@
+ts	phase	decision	why	evidence	result
+2026-10-09T22:24:51.620946+00:00	design	Extend canonical Attempt resource authority; keep provider ledgers subordinate	Docker is not token inference and UNKNOWN must survive scope changes	CANONICAL_ACCOUNTING_PLAN.md	implementation pending
+2026-10-09T22:39:49.192651+00:00	accounting	Canonical Attempt reservations; reject unsupported legacy liabilities	Independent review found legacy-counter and paid-send bypasses	13 database groups;91 focused tests;exact Bedrock baseline	PARTIAL checkpoint; executed settlement/gate/recovery pending

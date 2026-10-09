@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { ConvexHttpClient } from "convex/browser";
 
-export async function startFixtureDatabase(repo) {
+export async function startFixtureDatabase(repo, { canonicalAccounting = false } = {}) {
   const binary = process.env.MC_COMPATIBILITY_CONVEX_BINARY;
   if (!binary) throw Error("MC_COMPATIBILITY_CONVEX_BINARY must identify a local Convex backend binary");
   const root = await mkdtemp(join(tmpdir(), "mc-enterprise-1b-"));
@@ -55,12 +55,19 @@ export async function startFixtureDatabase(repo) {
     await copyClosure("convex/schema.ts");
     await copyClosure("convex/factory/enterpriseCompatibility.ts");
     await copyFile(join(repo, "scripts/enterprise-compatibility/seed.js"), join(root, "convex/fixtureSeed.js"));
+    if (canonicalAccounting) {
+      await copyClosure("convex/lib/offlineAttemptBudget.ts");
+      await copyClosure("convex/lib/companyAccess.ts");
+      await copyFile(join(repo, "scripts/enterprise-compatibility/accounting-fixture.js"), join(root, "convex/accountingFixture.js"));
+    }
     await start();
     const cli = join(repo, "node_modules/convex/bin/main.js");
     try {
       execFileSync(process.execPath, [cli, "dev", "--once", "--typecheck", "disable", "--url", url, "--admin-key", key],
         { cwd: root, env, encoding: "utf8", timeout: 60000, stdio: "pipe" });
       execFileSync(process.execPath, [cli, "env", "set", "MC_ENTERPRISE_COMPATIBILITY_FIXTURES", "1", "--url", url, "--admin-key", key],
+        { cwd: root, env, encoding: "utf8", timeout: 20000, stdio: "pipe" });
+      if (canonicalAccounting) execFileSync(process.execPath, [cli, "env", "set", "MC_ENTERPRISE_CANONICAL_ACCOUNTING", "1", "--url", url, "--admin-key", key],
         { cwd: root, env, encoding: "utf8", timeout: 20000, stdio: "pipe" });
     } catch (error) { throw Error(String(error.stderr ?? error).replaceAll(key, "[ephemeral-key]")); }
     function client(subject) {

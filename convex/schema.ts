@@ -1,4 +1,5 @@
 import { fixtureRegistration, fixtureBudget, trialState } from "./lib/enterpriseCompatibilityValidators";
+import { enterpriseReservationValidator, enterpriseSettlementValidator } from "./lib/enterpriseAccountingValidators";
 import { providerPriceValidator, providerReservationValidator, providerUsageValidator } from "./lib/providerLiabilityValidators";
 /**
  * Convex Database Schema — V0
@@ -1020,6 +1021,7 @@ export const schemaTablesPartOne = {
   // PROJECTS (Multi-Project Workspaces)
   // -------------------------------------------------------------------------
   projects: defineTable({
+    enterpriseAccountingMode: v.optional(v.literal("ISOLATED_DETERMINISTIC")),
     // ARM: Tenant scope (optional for migration; will be required after backfill)
     tenantId: v.optional(v.id("tenants")),
     
@@ -5483,6 +5485,7 @@ export const schemaTablesPartTwo = {
       authorizedAt: v.number(),
     }), v.object({
       schema: v.literal("work-order-offline-cost-authorization/v1"),
+      enterprise: v.optional(enterpriseReservationValidator),
       policyEnvelopeId: v.string(),
       policyEnvelopeDigest: v.string(),
       workOrderPolicyDigest: v.string(),
@@ -5514,6 +5517,7 @@ export const schemaTablesPartTwo = {
       varianceUsd: v.optional(v.number()),
       authorizedAt: v.number(),
     }))),
+    enterpriseSettlement: v.optional(enterpriseSettlementValidator),
     stopCondition: v.optional(v.string()),
     scheduledWindow: v.optional(v.object({
       startsAt: v.number(),

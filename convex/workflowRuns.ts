@@ -1,3 +1,4 @@
+import { enterpriseProject, scopeExposure, settleUndispatchedEnterpriseAttempt } from "./lib/enterpriseAttemptAccounting";
 /**
  * Workflow Runs — Convex Functions
  * 
@@ -413,6 +414,7 @@ async function dailyWorkflowCommitmentUsd(ctx: any, projectId: any, now: number)
     .query("workflowRuns")
     .withIndex("by_project", (q: any) => q.eq("projectId", projectId))
     .collect();
+  if (await enterpriseProject(ctx, projectId)) return scopeExposure(runs, now) / 1_000_000;
   return runs
     .filter((run: any) => run.startedAt >= startOfDay.getTime())
     .reduce(
@@ -776,6 +778,7 @@ export const claimExecution = mutation({
       .first();
     if (!run) throw new Error(`Workflow run not found: ${args.runId}`);
     if (!run.projectId) return { claimed: false as const, reason: "workspace-required" };
+    if (await enterpriseProject(ctx, run.projectId)) return { claimed: false as const, reason: "enterprise-factory-authority-required" };
     if (run.factoryDefinitionVersionId || run.executionManifestDigest) {
       return { claimed: false as const, reason: "factory-worker-owned" };
     }
@@ -1656,6 +1659,12 @@ export const requestCancellation = mutation({
         status: run.status,
         reason: "Publication is already authorized and must reconcile the exact provider write before cancellation can be evaluated.",
       };
+    }
+    const enterprise = run.executionCostAuthorization?.schema === "work-order-offline-cost-authorization/v1"
+      ? run.executionCostAuthorization.enterprise : undefined;
+    if (enterprise?.provider === "isolated-container" && run.status === "PENDING" && !run.lease
+      && run.executionClaimedAt === undefined && !run.executionClaimId) {
+      await settleUndispatchedEnterpriseAttempt(ctx, run, now);
     }
     await ctx.db.patch(run._id, {
       cancellationRequestedAt: run.cancellationRequestedAt ?? now,

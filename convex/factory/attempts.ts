@@ -1,3 +1,4 @@
+import { assertEnterpriseAttemptExecution } from "../lib/enterpriseAttemptAccounting";
 import { resolveCurrentAttemptExecutionProfile, executionProfileProjectionFromFactoryVersion, hasAnyExecutionProfileBinding } from "../lib/attemptExecutionProfile";
 import { NO_INFERENCE_CONSTRAINT, isNoInferenceConstraint } from "../lib/offlineExecutionPolicy";
 import { v } from "convex/values";
@@ -545,6 +546,7 @@ export const claimInternal = internalMutation({
     const now = Date.now();
     const run = await ctx.db.get(args.workflowRunId);
     if (!run) throw new Error("Factory attempt not found.");
+    await assertEnterpriseAttemptExecution(ctx, run, "isolated-container");
     if (args.requiredAttemptPurpose && (run.attemptPurpose ?? "IMPLEMENTATION") !== args.requiredAttemptPurpose) {
       throw new Error(`Attempt capability is not valid for ${run.attemptPurpose ?? "IMPLEMENTATION"}.`);
     }

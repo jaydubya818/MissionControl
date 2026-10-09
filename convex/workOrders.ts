@@ -1,3 +1,4 @@
+import { denyEnterprisePaidAuthority } from "./lib/enterpriseAttemptAccounting";
 import { assertQualificationActivation } from "./lib/factoryQualificationScope";
 import { reserveOfflineAttemptBudget } from "./lib/offlineAttemptBudget";
 import { NO_INFERENCE_CONSTRAINT } from "./lib/offlineExecutionPolicy";
@@ -2330,6 +2331,9 @@ async function reconcilePreExecutionReservation(
   },
 ) {
   const authorization = input.sourceRun.executionCostAuthorization;
+  if (authorization?.schema === "work-order-offline-cost-authorization/v1" && authorization.enterprise) {
+    throw new Error("Enterprise exposure requires canonical settlement evidence.");
+  }
   if (!authorization) {
     if ((input.proof.code === "EXECUTION_PROFILE_REJECTED_BEFORE_EXECUTOR"
       || input.proof.code === "FAB_CONFIGURATION_REJECTED_BEFORE_PROVIDER"
@@ -3396,6 +3400,7 @@ async function dispatchWorkOrder(
             : factoryBinding.version.budget.maxCostUsd,
         )
       : undefined;
+    if (factoryBinding?.executionBackend !== "isolated-container") await denyEnterprisePaidAuthority(ctx, refreshedWorkOrder.projectId!);
     const executionCostAuthorization = factoryBinding?.executionBackend === "isolated-container"
       ? await reserveOfflineAttemptBudget(ctx, { runId, version: factoryBinding.version, workOrder: refreshedWorkOrder,
           mission: missionForDispatch, policy: factoryBinding.policy, now })

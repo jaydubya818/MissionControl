@@ -1,3 +1,4 @@
+import { denyEnterprisePaidAuthority } from "./lib/enterpriseAttemptAccounting";
 import { v, type Infer } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
 import { internalMutation, mutation, query } from "./_generated/server";
@@ -312,6 +313,7 @@ export const createReservation = mutation({
   },
   handler: async (ctx, args) => {
     if (!gatewayAdmissionEnabled()) throw new Error("GOVERNED_INFERENCE_GATEWAY_DISABLED");
+    await denyEnterprisePaidAuthority(ctx, args.projectId);
     const access = await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
     const aggregate = await ctx.db.query("factoryProviderReservations").withIndex("by_work_order", q => q.eq("workOrderId", args.workOrderId)).first();
     if (aggregate) throw new Error("WorkOrder aggregate liability requires the composed admission path.");
@@ -421,6 +423,7 @@ export async function persistIntentInTransaction(ctx: MutationCtx, args: Infer<t
       throw new Error("Inference reservation is unavailable, unscoped, or inactive.");
     }
     assertInferenceSpendingAllowed(await ctx.db.get(reservation.workOrderId));
+    await denyEnterprisePaidAuthority(ctx, reservation.projectId);
     const logicalRequestKey = bounded(args.logicalRequestKey, 500, "Logical request key");
     if (reservation.logicalRequestKey !== logicalRequestKey) throw new Error("Inference reservation logical request scope is substituted.");
     const reservationSnapshot = reservationValue(reservation);
@@ -613,6 +616,7 @@ export async function claimIntentInTransaction(ctx: MutationCtx, args: Infer<typ
     if (!reservation || !run || reservation.workflowRunId !== args.workflowRunId || run._id !== args.workflowRunId) {
       throw new Error("Inference claim Attempt scope is unavailable or substituted.");
     }
+    await denyEnterprisePaidAuthority(ctx, reservation.projectId);
     assertInferenceSpendingAllowed(await ctx.db.get(reservation.workOrderId));
     if ((args.cancelRequested || run.cancellationRequestedAt)
       && reservation.leaseId === args.leaseId && run.lease?.leaseId === args.leaseId) {
