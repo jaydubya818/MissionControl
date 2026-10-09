@@ -523,8 +523,9 @@ and [retained evidence](docs/testing/evidence/live-retry-2026-10-04/README.md).
 
 Replacement executor checks passed 153 focused tests, including eight local
 Docker cases with synthetic provider responses. The governed Codex Bedrock
-candidate is ready for further testing; full-repository Docker execution and
-live qualification remain incomplete. No paid inference or image promotion
+candidate passed the small fixture; the full repository was subsequently
+rejected by its input-size limit. Full-repository execution and live qualification
+remain incomplete. See [full-tree failure and next decision](docs/testing/evidence/full-repository-docker-2026-10-08/README.md). No paid inference or image promotion
 occurred. See [candidate evidence and next gates](docs/testing/evidence/executor-selection-2026-10-08/README.md).
 
 ### Factory Deployed Engineer qualification environment

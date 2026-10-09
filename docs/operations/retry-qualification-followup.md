@@ -61,3 +61,21 @@ qualify the full repository in the container, obtain current exact-route price
 evidence, bind an approved budget to the current WorkOrder revision, and request
 a fresh approval for that concrete configuration. The old price approval has
 expired. The old reservation is not available to fund a replacement.
+
+## Full repository container check
+
+Test the complete tracked tree of the preserved producer baseline
+`5308727463ec737589bf8072ee9f5de0af1bba7a` using synthetic responses only.
+Use a disposable snapshot repository whose Git tree matches that baseline,
+without copying local credentials, untracked files, or dependency directories.
+Retain archive size and container diagnostics. Do not raise the candidate's
+32 MiB invocation bound or 128 MiB workspace limit to make the check pass.
+A failure at either bound blocks live activation of this candidate.
+
+The full-tree check failed at the Docker adapter's input admission boundary.
+Even compression level 6 produces a 178.76 MiB base64 payload before overhead,
+against a 32 MiB limit. The 208.61 MiB tracked tree also exceeds the 128 MiB
+workspace. No model was invoked. See [full repository evidence and profile
+proposal](../testing/evidence/full-repository-docker-2026-10-08/README.md).
+Do not proceed to price approval or live execution until packaging and capacity
+are resolved through a separately reviewed local qualification configuration.
