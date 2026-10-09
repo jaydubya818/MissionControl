@@ -19,3 +19,4 @@ export * from "./missionPlannerIdentity.js";
 export * from "./evalControlPlane.js";
 export * from "./missionControlGoldenSuite.js";
 export * from "./factoryDeploymentPackage.js";
+export * from "./factoryDelegationBinding.js";
