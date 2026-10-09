@@ -29,6 +29,7 @@ export function offlineAttemptClaimWindowExpired(input: {
 export async function reserveOfflineAttemptBudget(ctx: MutationCtx, input: {
   runId: string; version: any; workOrder: any; mission: any; policy: any; now: number;
   delegation?: Parameters<typeof reserveEnterpriseAttempt>[1]["delegation"];
+  tariff?: Parameters<typeof reserveEnterpriseAttempt>[1]["tariff"];
 }) {
   const { version, workOrder, mission, policy } = input;
   const enterprise = await reserveEnterpriseAttempt(ctx, input);

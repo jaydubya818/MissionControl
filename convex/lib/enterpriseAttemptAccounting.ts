@@ -1,6 +1,7 @@
 import { computeCanonicalHash } from "./genomeHash";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { verifyEngineeringTariff, factoryDelegationBindingDigest, type EngineeringTariff, type FactoryDelegationBinding } from "@mission-control/shared";
 
 export type EnterpriseReservation = {
   schema: "enterprise-attempt-reservation/v1";
@@ -13,10 +14,12 @@ export type EnterpriseReservation = {
   missionCeilingMicrousd: number; workOrderCeilingMicrousd: number;
   dailyCeilingMicrousd: number; policyCeilingMicrousd: number;
   digest: string;
+  tariff?: EngineeringTariff;
 };
 export type EnterpriseSettlement = {
   reservationDigest: string; proofDigest: string; settledAt: number;
-  chargedMicrousd: number; basis: "PROVEN_NOT_DISPATCHED";
+  chargedMicrousd: number; basis: "PROVEN_NOT_DISPATCHED" | "DETERMINISTIC_ENGINEERING_ZERO_CHARGE";
+  tariffDigest?: string; resourceCost?: "UNMEASURED";
   digest: string;
 };
 
@@ -66,8 +69,12 @@ export function attemptExposure(run: any, dailyAt?: number): number {
   if (!receipt) return reservation.ceilingMicrousd;
   const { digest, ...body } = receipt;
   if (computeCanonicalHash(body) !== digest || receipt.reservationDigest !== reservation.digest
-    || receipt.basis !== "PROVEN_NOT_DISPATCHED" || receipt.chargedMicrousd !== 0
+    || !["PROVEN_NOT_DISPATCHED", "DETERMINISTIC_ENGINEERING_ZERO_CHARGE"].includes(receipt.basis) || receipt.chargedMicrousd !== 0
     || receipt.settledAt < reservation.authorizedAt || !receipt.proofDigest) throw Error("ENTERPRISE_SETTLEMENT_INVALID");
+  if (receipt.basis === "DETERMINISTIC_ENGINEERING_ZERO_CHARGE"
+    && (!reservation.tariff || receipt.tariffDigest !== reservation.tariff.digest || receipt.resourceCost !== "UNMEASURED")) {
+    throw Error("ENTERPRISE_SETTLEMENT_INVALID");
+  }
   return dailyAt === undefined || receipt.settledAt >= Math.floor(dailyAt / 86400000) * 86400000
     ? integer(receipt.chargedMicrousd) : 0;
 }
@@ -97,6 +104,7 @@ export async function assertEnterpriseAttemptExecution(ctx: QueryCtx | MutationC
 
 export async function reserveEnterpriseAttempt(ctx: MutationCtx, input: {
   runId: string; workOrder: any; mission: any; version: any; policy: any; now: number;
+  tariff?: EngineeringTariff;
   delegation?: { id: string; factoryId: string; factoryVersion: string; provider: "local-docker";
     modelPolicyDigest: string; executionProfileDigest: string; bindingDigest: string; expiresAt: number; maximumMicrousd: number };
 }) {
@@ -134,6 +142,7 @@ export async function reserveEnterpriseAttempt(ctx: MutationCtx, input: {
     expiresAt: delegation?.expiresAt ?? now + version.budget.maxRuntimeMinutes * 60000,
     missionCeilingMicrousd: microusd(mission.budgetUsd), workOrderCeilingMicrousd: microusd(approved?.maxCostUsd),
     dailyCeilingMicrousd: microusd(controls.dailyBudgetUsd!), policyCeilingMicrousd: microusd(policy.rules.maxResourceCostUsd),
+    ...(input.tariff ? { tariff: input.tariff } : {}),
   };
   const reservation = validateReservation({ ...body, digest: reservationDigest(body) });
   if (reservation.expiresAt <= now || reservation.expiresAt > now + version.budget.maxRuntimeMinutes * 60000
@@ -203,4 +212,26 @@ export async function settleUndispatchedEnterpriseAttempt(ctx: MutationCtx, run:
   await ctx.db.patch(run._id, { status: "CANCELED", cancellationRequestedAt: now,
     reservedCostUsd: 0, enterpriseSettlement: settlement });
   return settlement;
+}
+
+export async function settleExecutedEnterpriseAttempt(ctx: MutationCtx, run: any, binding: FactoryDelegationBinding,
+  proof: { bindingDigest: string; resultDigest: string; cleanupConfirmed: true; tariffDigest?: string }, now: number) {
+  const reservation = validateReservation(run.executionCostAuthorization?.enterprise);
+  attemptExposure(run);
+  if (!reservation.tariff || reservation.provider !== "local-docker" || proof.cleanupConfirmed !== true
+    || proof.tariffDigest !== reservation.tariff.digest || proof.bindingDigest !== reservation.bindingDigest
+    || proof.bindingDigest !== factoryDelegationBindingDigest(binding) || !/^sha256:[a-f0-9]{64}$/.test(proof.resultDigest)) {
+    throw Error("ENTERPRISE_SETTLEMENT_PROOF_REQUIRED");
+  }
+  verifyEngineeringTariff(binding, reservation.tariff, reservation.authorizedAt);
+  if (run.enterpriseSettlement) {
+    if (run.enterpriseSettlement.proofDigest !== proof.resultDigest
+      || run.enterpriseSettlement.tariffDigest !== proof.tariffDigest) throw Error("ENTERPRISE_SETTLEMENT_CONFLICT");
+    return run.enterpriseSettlement;
+  }
+  const body = { reservationDigest: reservation.digest, proofDigest: proof.resultDigest, settledAt: now, chargedMicrousd: 0,
+    basis: "DETERMINISTIC_ENGINEERING_ZERO_CHARGE" as const, tariffDigest: reservation.tariff.digest, resourceCost: "UNMEASURED" as const };
+  const receipt = { ...body, digest: computeCanonicalHash(body) };
+  await ctx.db.patch(run._id, { enterpriseSettlement: receipt, reservedCostUsd: 0, spentUsd: 0 });
+  return receipt;
 }

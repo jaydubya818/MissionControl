@@ -37,7 +37,8 @@ async function delegation(s) {
   const registry = await db.owner.query('factory/enterpriseCompatibility:getRegistry', { projectId: s.projectId, factoryDefinitionId: s.factoryDefinitionId });
   if (registry.revision === 1) await mutation(s, 'assess', { factoryDefinitionId: s.factoryDefinitionId, expectedRevision: 1, health: 'HEALTHY', evidenceDigest: hash, validUntil: now + 600000, revoke: false });
   const plan = await inspect(s.missionPlanId);
-  await fault(s.missionPlanId, { metadata: { ...plan.metadata, enterpriseDelegationApprovals: { ...plan.metadata?.enterpriseDelegationApprovals,
+  await fault(s.missionPlanId, { status: 'APPROVED', decidedActorSource: 'AUTHENTICATED', approvedBy: s.operatorId, approvedAt: now,
+    metadata: { ...plan.metadata, enterpriseDelegationApprovals: { ...plan.metadata?.enterpriseDelegationApprovals,
     [id]: { bindingDigest: factoryDelegationBindingDigest(b), ownerActorId: s.operatorId } } } });
   return { missionId: s.missionId, factoryDefinitionId: s.factoryDefinitionId, binding: b };
 }

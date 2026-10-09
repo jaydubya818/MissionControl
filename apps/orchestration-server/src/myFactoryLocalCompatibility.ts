@@ -1,9 +1,11 @@
-import { canonicalDigest, factoryDelegationBindingDigest, type FactoryDelegationBinding } from "@mission-control/shared";
+import { canonicalDigest, factoryDelegationBindingDigest, verifyEngineeringTariff, type EngineeringTariff, type FactoryDelegationBinding } from "@mission-control/shared";
 
 export const LOCAL_PROVIDER_QUALIFICATION_SHA = "e498c31db8b749fa91b0544ecd1d1a661b971c2c";
 type LocalVerifier = { sourceSha: string; verifyResult(input: unknown, expected: Record<string, unknown>): { manifest: any; keyValidForCurrentUse: boolean } };
+type LocalResultExpectation = { workOrderId: string; runId: string; keys: unknown[]; now: number;
+  tariff?: EngineeringTariff; admittedAt?: number };
 export function verifyLocalTerminalResult(input: unknown, binding: FactoryDelegationBinding,
-  verifier: LocalVerifier, expected: { workOrderId: string; runId: string; keys: unknown[]; now: number }) {
+  verifier: LocalVerifier, expected: LocalResultExpectation) {
   if (verifier.sourceSha !== LOCAL_PROVIDER_QUALIFICATION_SHA) throw Error("LOCAL_COMPATIBILITY_SOURCE_DENIED");
   const { manifest: m, keyValidForCurrentUse } = verifier.verifyResult(input, { ...expected,
     factoryId: binding.factoryId, factoryVersion: binding.factoryVersion, requestId: binding.partnerRequestId,
@@ -21,12 +23,13 @@ export function verifyLocalTerminalResult(input: unknown, binding: FactoryDelega
     || m.localExecution.producerDestroyed !== true || m.localExecution.verifierDestroyed !== true) {
     throw Error("LOCAL_DELEGATION_RESULT_DENIED");
   }
-  return { manifest: m, bindingDigest: factoryDelegationBindingDigest(binding), resultDigest: `sha256:${(input as { manifestDigest: string }).manifestDigest}`,
+  const tariff = expected.tariff ? verifyEngineeringTariff(binding, expected.tariff, expected.admittedAt ?? NaN) : undefined;
+  return { manifest: m, ...(tariff ? { tariffDigest: tariff.digest } : {}), bindingDigest: factoryDelegationBindingDigest(binding), resultDigest: `sha256:${(input as { manifestDigest: string }).manifestDigest}`,
     partnerRunId: expected.runId, partnerWorkOrderId: expected.workOrderId, state: m.status, cleanupConfirmed: true as const, actualMicrousd: 0 as const };
 }
 export function verifyLocalDelegationResult(input: unknown, binding: FactoryDelegationBinding,
-  verifier: LocalVerifier, expected: { workOrderId: string; runId: string; keys: unknown[]; now: number }) {
-  const { manifest: m } = verifyLocalTerminalResult(input, binding, verifier, expected);
+  verifier: LocalVerifier, expected: LocalResultExpectation) {
+  const { manifest: m, tariffDigest } = verifyLocalTerminalResult(input, binding, verifier, expected);
   const v = m.verification;
   if (m.status !== "COMPLETED" || !m.candidate || !v || v.outcome !== "PASS") throw Error("LOCAL_DELEGATION_RESULT_DENIED");
   const patch = (input as { artifacts: { id: string; base64: string }[] }).artifacts.find(a => a.id === m.candidate.patchArtifactId);
@@ -40,7 +43,7 @@ export function verifyLocalDelegationResult(input: unknown, binding: FactoryDele
   const candidateChange = { sourceRevision: binding.baseCommit, candidateRevision: m.candidate.commit, changedFiles, deletedFiles: [], diff,
     linesAdded: diff.split("\n").filter(line => line.startsWith("+") && !line.startsWith("+++")).length,
     linesDeleted: diff.split("\n").filter(line => line.startsWith("-") && !line.startsWith("---")).length };
-  return { candidateChange, bindingDigest: factoryDelegationBindingDigest(binding), resultDigest: `sha256:${(input as { manifestDigest: string }).manifestDigest}`,
+  return { candidateChange, ...(tariffDigest ? { tariffDigest } : {}), bindingDigest: factoryDelegationBindingDigest(binding), resultDigest: `sha256:${(input as { manifestDigest: string }).manifestDigest}`,
     partnerRunId: expected.runId, partnerWorkOrderId: expected.workOrderId, candidateCommit: m.candidate.commit, candidateTree: m.candidate.tree,
     evidenceDigest: `sha256:${m.evidenceDigest}`, artifactDigest: `sha256:${m.artifactDigest}`, checks: v.checks,
     producerSessionId: v.producerSessionId, verifierSessionId: v.providerSessionId, cleanupConfirmed: true as const, actualMicrousd: 0 as const };

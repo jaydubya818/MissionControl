@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { bindEngineeringTariff, verifyEngineeringTariff } from "../enterpriseEngineeringTariff";
 import {
   FACTORY_DELEGATION_BINDING_SCHEMA,
   assertFactoryDelegationBindingMatches,
@@ -52,6 +53,25 @@ const fixture = () => ({
 });
 
 describe("immutable factory delegation binding", () => {
+  it("commits the pre-approved engineering tariff into the exact signed delegation chain", () => {
+    const original = parseFactoryDelegationBinding(fixture());
+    const { binding, tariff } = bindEngineeringTariff(original, now);
+    expect(binding.executionManifestDigest).not.toBe(original.executionManifestDigest);
+    expect(factoryDelegationBindingDigest(binding)).not.toBe(factoryDelegationBindingDigest(original));
+    expect(verifyEngineeringTariff(binding, tariff, now + 1)).toEqual(tariff);
+    for (const patch of [{ ownerScope: "other" }, { executionProfileDigest: `sha256:${"f".repeat(64)}` },
+      { workflowRunId: "other" }, { maxSpendMicrousd: 1 }, { factoryVersion: "f".repeat(64) },
+      { executionManifestDigest: original.executionManifestDigest }]) {
+      expect(() => verifyEngineeringTariff({ ...binding, ...patch }, tariff, now + 1)).toThrow();
+    }
+    for (const patch of [{ approvedBy: "other" }, { approvedAt: now + 2 }, { expiresAt: now + 3 },
+      { digest: `sha256:${"f".repeat(64)}` }]) {
+      expect(() => verifyEngineeringTariff(binding, { ...tariff, ...patch }, now + 1)).toThrow();
+    }
+    for (const time of [NaN, now - 1, now + 1000]) expect(() => verifyEngineeringTariff(binding, tariff, time)).toThrow();
+    // Reconciliation uses original admission time even after authority expires.
+    expect(verifyEngineeringTariff(binding, tariff, now + 1).basis).toBe("DETERMINISTIC_ENGINEERING_ZERO_CHARGE");
+  });
   it("retains distinct enterprise and partner identities without admitting execution", () => {
     const binding = parseFactoryDelegationBinding(fixture());
     expect(binding.workOrderId).toBe("enterprise-work-order");

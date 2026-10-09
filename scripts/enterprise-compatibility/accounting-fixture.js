@@ -26,12 +26,16 @@ export const configure = mutation({ handler: async (ctx, { seed: s, daily = 100,
 } });
 export const cloneWork = mutation({ handler: async (ctx, { seed: s }) => {
   await owner(ctx, s.projectId, s.missionId);
-  const copy = async (table, id, patch) => { const { _id, _creationTime, ...row } = await ctx.db.get(id); return ctx.db.insert(table, { ...row, ...patch }); };
+  const copy = async (table, id, patch) => { const { _id, _creationTime, ...row } = await ctx.db.get(id);
+    const copy = { ...row, ...patch }; for (const key of Object.keys(copy)) if (copy[key] === undefined) delete copy[key];
+    return ctx.db.insert(table, copy); };
   const workOrderId = await copy("workOrders", s.workOrderId, {});
   const workOrderRevisionId = await copy("workOrderRevisions", s.workOrderRevisionId, { workOrderId });
   await ctx.db.patch(workOrderId, { currentRevisionId: workOrderRevisionId });
   const taskId = await copy("tasks", s.taskId, { workOrderId });
-  const workflowRunId = await copy("workflowRuns", s.workflowRunId, { workOrderId, workOrderRevisionId, parentTaskId: taskId, runId: "run-" + workOrderId });
+  const workflowRunId = await copy("workflowRuns", s.workflowRunId, { workOrderId, workOrderRevisionId, parentTaskId: taskId, runId: "run-" + workOrderId,
+    executionCostAuthorization: undefined, enterpriseSettlement: undefined, lease: undefined, executionClaimId: undefined,
+    executionClaimedAt: undefined, status: "PENDING", spentUsd: 0, reservedCostUsd: 0, metadata: {} });
   return { ...s, workOrderId, workOrderRevisionId, taskId, workflowRunId };
 } });
 export const reserveNative = mutation({ handler: async (ctx, { seed: s }) => {

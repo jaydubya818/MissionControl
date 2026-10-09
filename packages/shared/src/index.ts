@@ -21,3 +21,4 @@ export * from "./missionControlGoldenSuite.js";
 export * from "./factoryDeploymentPackage.js";
 export * from "./factoryDelegationBinding.js";
 export * from "./delegatedFixtureAccounting.js";
+export * from "./enterpriseEngineeringTariff.js";

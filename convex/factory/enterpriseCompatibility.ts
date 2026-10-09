@@ -8,11 +8,12 @@ import {
   canonicalDigest, canonicalHash, parseFactoryDelegationBinding, factoryDelegationBindingDigest,
   assertFactoryDelegationBindingMatches, reserveFixtureAllowance, transitionFixtureAllowance,
   assertMicrousd, type FactoryDelegationBinding,
+  verifyEngineeringTariff,
 } from "@mission-control/shared";
 
 import { VerificationEngine, ChangeBudgetVerifier, NegativeConstraintVerifier } from "@mission-control/workflow-engine/verification";
 import { legacyQualityGateStateForVerdict } from "../lib/qualityGateDecision";
-import { enterpriseProject, scopeExposure, settleUndispatchedEnterpriseAttempt, assertEnterpriseAttemptExecution } from "../lib/enterpriseAttemptAccounting";
+import { enterpriseProject, scopeExposure, settleUndispatchedEnterpriseAttempt, settleExecutedEnterpriseAttempt, assertEnterpriseAttemptExecution } from "../lib/enterpriseAttemptAccounting";
 import { reserveOfflineAttemptBudget } from "../lib/offlineAttemptBudget";
 
 const denied = () => new Error("COMPATIBILITY_UNAVAILABLE");
@@ -194,10 +195,15 @@ export const admitTrial = mutation({
       const workOrder = await ctx.db.get(b.workOrderId as Id<"workOrders">);
       const version = await ctx.db.get(registration.config.definitionVersionId);
       const policy = version?.policyEnvelopeId ? await ctx.db.get(version.policyEnvelopeId) : null;
+      const plan = await ctx.db.get(b.missionPlanId as Id<"missionPlans">);
+      const approval = plan?.metadata?.enterpriseDelegationApprovals?.[b.delegationId] ?? plan?.metadata?.enterpriseDelegationApproval;
+      if (plan?.status !== "APPROVED" || plan.decidedActorSource !== "AUTHENTICATED" || plan.approvedBy !== auth.actorId
+        || !plan.approvedAt || approval?.ownerActorId !== auth.actorId || approval.revokedAt !== undefined) throw denied();
+      const tariff = approval.tariff ? verifyEngineeringTariff(b, approval.tariff, now) : undefined;
       if (!run || !version || registration.config.executionProvider !== "LOCAL_DOCKER_QUALIFICATION"
         || run.executionCostAuthorization || run.enterpriseSettlement
         || version.budget.maxCostUsd * 1_000_000 !== b.maxSpendMicrousd) throw denied();
-      const authorization = await reserveOfflineAttemptBudget(ctx, { runId: run.runId, version, workOrder, mission, policy, now,
+      const authorization = await reserveOfflineAttemptBudget(ctx, { runId: run.runId, version, workOrder, mission, policy, now, tariff,
         delegation: { id: b.delegationId, factoryId: b.factoryId, factoryVersion: b.factoryVersion, provider: "local-docker",
           modelPolicyDigest: b.modelPolicyDigest, executionProfileDigest: b.executionProfileDigest,
           bindingDigest: digest, expiresAt: b.expiresAt, maximumMicrousd: b.maxSpendMicrousd } });
@@ -359,7 +365,7 @@ export const ingestExecutionResult = internalMutation({
     candidateCommit: v.string(), candidateTree: v.string(), evidenceDigest: v.string(), artifactDigest: v.string(),
     checks: v.array(v.object({ id: v.string(), result: v.union(v.literal("PASS"), v.literal("FAIL")) })),
     producerSessionId: v.string(), verifierSessionId: v.string(), cleanupConfirmed: v.literal(true),
-    actualMicrousd: v.literal(0) },
+    actualMicrousd: v.literal(0), tariffDigest: v.optional(v.string()) },
   handler: async (ctx, args) => {
     await access(ctx, args.projectId, true);
     const prior = await trialFor(ctx, args.projectId, args.trialId);
@@ -407,9 +413,9 @@ export const ingestExecutionResult = internalMutation({
       mode: "SHADOW", reasons: outcome.verdictReasons, blockingFindingIds: [], requiredApprovalIds: [], evaluatedAt: now,
       metadata: { qualificationOnly: true, artifactId, verdict: outcome.verdict, checks: outcome.checks, coverage: outcome.coverage, authoritativeAcceptance: false } });
     const { budget } = await budgetFor(ctx, args.projectId, mission._id);
-    if (!budget) throw Error("CANONICAL_SETTLEMENT_PROOF_REQUIRED");
-    await ctx.db.patch(mission._id, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, binding.delegationId,
+    if (budget) await ctx.db.patch(mission._id, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, binding.delegationId,
       { type: "RECONCILE", actualMicrousd: args.actualMicrousd, cleanupConfirmed: true, settlementDigest: args.resultDigest }) });
+    else await settleExecutedEnterpriseAttempt(ctx, run, binding, args, now);
     await ctx.db.patch(trial._id, { resultInputDigest: inputDigest, qualityGateDecisionId: gateId, closed: true, updatedAt: now });
     return gateId;
   },
@@ -418,7 +424,7 @@ export const ingestExecutionResult = internalMutation({
 export const reconcileTerminalExecution = internalMutation({
   args: { projectId: v.id("projects"), trialId: v.id("factoryDelegationTrials"), bindingDigest: v.string(),
     resultDigest: v.string(), partnerRunId: v.string(), partnerWorkOrderId: v.string(),
-    state: v.union(v.literal("COMPLETED"), v.literal("FAILED"), v.literal("CANCELLED")), cleanupConfirmed: v.literal(true), actualMicrousd: v.literal(0) },
+    state: v.union(v.literal("COMPLETED"), v.literal("FAILED"), v.literal("CANCELLED")), cleanupConfirmed: v.literal(true), actualMicrousd: v.literal(0), tariffDigest: v.optional(v.string()) },
   handler: async (ctx, args) => {
     await access(ctx, args.projectId, true);
     const trial = await trialFor(ctx, args.projectId, args.trialId);
@@ -435,9 +441,9 @@ export const reconcileTerminalExecution = internalMutation({
       return;
     }
     const { budget } = await budgetFor(ctx, args.projectId, trial.missionId);
-    if (!budget) throw Error("CANONICAL_SETTLEMENT_PROOF_REQUIRED");
-    await ctx.db.patch(trial.missionId, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, binding.delegationId,
+    if (budget) await ctx.db.patch(trial.missionId, { enterpriseFixtureBudget: transitionFixtureAllowance(budget, binding.delegationId,
       { type: "RECONCILE", actualMicrousd: 0, cleanupConfirmed: true, settlementDigest: args.resultDigest }) });
+    else await settleExecutedEnterpriseAttempt(ctx, await ctx.db.get(binding.workflowRunId as Id<"workflowRuns">), binding, args, Date.now());
     await ctx.db.patch(trial._id, { resultInputDigest: inputDigest, closed: true, updatedAt: Date.now() });
   },
 });

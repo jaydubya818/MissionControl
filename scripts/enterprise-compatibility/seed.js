@@ -65,7 +65,7 @@ export const seed = mutation({ args: {}, handler: async ctx => {
 
 
 export const approveExecution = internalMutation({ handler: async (ctx, args) => {
-  const { binding: b, bindingDigest, checkIdsDigest, quality, verificationSpec } = args;
+  const { binding: b, bindingDigest, checkIdsDigest, quality, verificationSpec, deferClaim, tariff } = args;
   const identity = await ctx.auth.getUserIdentity();
   if (identity?.subject !== "fixture-owner") throw Error("FIXTURE_OWNER_REQUIRED");
   const mission = await ctx.db.get(b.missionId), plan = await ctx.db.get(b.missionPlanId), run = await ctx.db.get(b.workflowRunId);
@@ -73,13 +73,14 @@ export const approveExecution = internalMutation({ handler: async (ctx, args) =>
   await ctx.db.patch(mission._id, { owner: b.ownerScope, activeWorkOrderId: b.workOrderId, state: "IN_PROGRESS" });
   await ctx.db.patch(plan._id, { status: "APPROVED", approvedBy: b.ownerScope, approvedAt: Date.now(), decidedActorSource: "AUTHENTICATED",
     qualityContractDigest: quality.digest, qualityContractProjection: quality.projection,
-    metadata: { enterpriseDelegationApproval: { bindingDigest, checkIdsDigest, verificationSpec, ownerActorId: b.ownerScope, leaseId: "fixture-lease", criterionTitle: "Project slug protected behavior" } } });
+    metadata: { enterpriseDelegationApproval: { bindingDigest, checkIdsDigest, verificationSpec, ...(tariff ? { tariff } : {}), ownerActorId: b.ownerScope, leaseId: "fixture-lease", criterionTitle: "Project slug protected behavior" } } });
   await ctx.db.patch(b.workOrderId, { approvalStatus: "APPROVED", repository: b.repository, currentExecutionRunId: run._id, qualityContractDigest: b.qualityContractDigest,
     acceptanceCriteria: verificationSpec.acceptanceCriteria.map(c => ({ ...c, status: "PENDING" })), negativeConstraints: verificationSpec.negativeConstraints, changeBudget: verificationSpec.changeBudget, verificationContract: verificationSpec.verificationContract });
   await ctx.db.patch(b.workOrderRevisionId, { status: "APPLIED" });
-  await ctx.db.patch(run._id, { status: "RUNNING", metadata: { enterpriseDelegationId: b.delegationId },
-    lease: { leaseId: "fixture-lease", ownerId: b.ownerScope, workerGeneration: b.authorityGeneration,
-      claimedAt: Date.now(), heartbeatAt: Date.now(), expiresAt: b.deadline + 60000 } });
+  await ctx.db.patch(run._id, { status: deferClaim ? "PENDING" : "RUNNING", executionManifestDigest: b.executionManifestDigest,
+    metadata: { enterpriseDelegationId: b.delegationId },
+    ...(deferClaim ? {} : { lease: { leaseId: "fixture-lease", ownerId: b.ownerScope, workerGeneration: b.authorityGeneration,
+      claimedAt: Date.now(), heartbeatAt: Date.now(), expiresAt: b.deadline + 60000 } }) });
 } });
 export const fault = internalMutation({ handler: async (ctx, args) => {
   if ((await ctx.auth.getUserIdentity())?.subject !== "fixture-owner") throw Error("FIXTURE_OWNER_REQUIRED");
