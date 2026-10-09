@@ -528,6 +528,12 @@ rejected by its input-size limit. Full-repository execution and live qualificati
 remain incomplete. See [full-tree failure and next decision](docs/testing/evidence/full-repository-docker-2026-10-08/README.md). No paid inference or image promotion
 occurred. See [candidate evidence and next gates](docs/testing/evidence/executor-selection-2026-10-08/README.md).
 
+The approved October 9 local capacity experiment passed the full-tree synthetic
+edit and patch capture with 256 MiB input, 1 GiB workspace and 2 GiB RAM. It also
+passed 67 boundary checks. Runtime defaults remain unchanged; a terminal-status
+reporting discrepancy and live approval gates remain. See [larger-profile
+evidence](docs/testing/evidence/large-repository-docker-2026-10-09/README.md).
+
 ### Factory Deployed Engineer qualification environment
 
 The bounded FDLC Deploy / Factory Deployed Engineer qualification environment is **ready but not activated**. Its safe identifiers are:

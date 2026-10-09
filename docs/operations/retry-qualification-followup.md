@@ -79,3 +79,16 @@ workspace. No model was invoked. See [full repository evidence and profile
 proposal](../testing/evidence/full-repository-docker-2026-10-08/README.md).
 Do not proceed to price approval or live execution until packaging and capacity
 are resolved through a separately reviewed local qualification configuration.
+
+## Approved larger-profile experiment, October 9
+
+The operator approved a separate local-only experiment at 256 MiB input, 1 GiB
+workspace and 2 GiB RAM. The full tracked tree passed the synthetic two-request
+edit and patch capture in 19.90 seconds; 67 boundary checks also passed. Actual
+containment matched the approved settings and cleanup confirmed absence.
+No production source limits, image pins, canonical Attempts or budget changed.
+See [capacity evidence](../testing/evidence/large-repository-docker-2026-10-09/README.md).
+
+Full qualification remains incomplete. The provider reports WORKLOAD_FAILURE
+for a successfully captured COMPLETED result, an existing reporting discrepancy.
+Resolve it and qualify an explicitly selected profile before live activation.

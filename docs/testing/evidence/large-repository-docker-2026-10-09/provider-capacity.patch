@@ -1,0 +1,48 @@
+--- apps/orchestration-server/src/dockerSandboxProvider.ts
++++ apps/orchestration-server/src/.large-profile-provider.ts
+@@ -89,7 +89,7 @@
+     const errors: string[] = [];
+     if (profile.schema !== "factory-sandbox-profile/v1" || profile.provider !== this.kind
+       || profile.providerProfile !== this.providerId || profile.providerProfileVersion !== "1"
+-      || profile.machine.image !== this.identity.image || profile.machine.cpu !== 1 || profile.machine.memoryMb !== 512
++      || profile.machine.image !== this.identity.image || profile.machine.cpu !== 1 || profile.machine.memoryMb !== 2048
+       || profile.supervisor.transport !== "DOCKER_STDIN" || profile.supervisor.version !== "mission-control-supervisor/v1"
+       || profile.credentials.inference !== "NONE" || profile.credentials.githubAuthority !== "NONE"
+       || profile.credentials.providerAuthority !== "NONE" || profile.credentials.repositoryAccess !== "CONTROL_PLANE_SNAPSHOT"
+@@ -117,9 +117,9 @@
+     const id = (await this.docker(["create", "--pull=never", "--platform=linux/amd64", "--name", request.resourceName,
+       "--label", `mc.provider=${this.providerId}`, "--label", `mc.lease=${request.attemptLeaseId}`,
+       "--label", `mc.manifest=${request.manifestDigest}`, "--user=10001:10001", "--read-only", "--network=none",
+-      "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=1", "--memory=512m", "--memory-swap=512m", "--pids-limit=64",
++      "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=1", "--memory=2048m", "--memory-swap=2048m", "--pids-limit=64",
+       "--ipc=private", "--cgroupns=private", "--log-driver=none",
+-      "--tmpfs", `${ROOT}:rw,nosuid,nodev,noexec,size=134217728,uid=10001,gid=10001,mode=0700`,
++      "--tmpfs", `${ROOT}:rw,nosuid,nodev,noexec,size=1073741824,uid=10001,gid=10001,mode=0700`,
+       "--tmpfs", "/tmp:rw,nosuid,nodev,noexec,size=16777216,uid=10001,gid=10001,mode=0700",
+       "--env", `MC_DEADLINE_AT=${request.requestedAt + request.profile.runtime.maxRuntimeMs}`,
+       "--env", `HOME=${ROOT}/home`, "--env", "TMPDIR=/tmp", "--env", "LANG=C",
+@@ -238,7 +238,7 @@
+       record.inferenceAbort = new AbortController();
+     } const config = dockerSupervisorConfig(request);
+     const envelope = Buffer.from(JSON.stringify({ schema : bridge ? "factory-docker-duplex/v1" : DOCKER_INVOCATION_SCHEMA, deadlineAt: record.request.requestedAt + record.request.profile.runtime.maxRuntimeMs, leaseId: record.request.attemptLeaseId, config, repository: request.repositoryArchive.toString("base64") }));
+-    if (envelope.length > 32 * 1024 * 1024) throw new DockerBoundaryError("INVALID_REQUEST", "Docker invocation exceeds bounded input.");
++    if (envelope.length > 256 * 1024 * 1024) throw new DockerBoundaryError("INVALID_REQUEST", "Docker invocation exceeds bounded input.");
+     await this.assertContainer(request.allocation);
+     if (record.canceled) throw new DockerBoundaryError("FENCED", "Lease canceled before start.");
+     const child = spawn(this.identity.dockerPath, this.args(["start", "--attach", "--interactive", request.allocation.providerResourceId]), { env: { PATH: "/usr/bin:/bin", HOME: homedir() }, stdio: "pipe" });
+@@ -386,13 +386,13 @@
+     || c?.Labels?.["mc.provider"] !== providerId || !h?.ReadonlyRootfs || h.Privileged || h.NetworkMode !== "none"
+     || JSON.stringify(h.CapDrop) !== '["ALL"]' || (h.CapAdd?.length ?? 0) !== 0
+     || JSON.stringify(h.SecurityOpt) !== '["no-new-privileges"]' || h.PidMode !== "" || h.IpcMode !== "private"
+-    || h.CgroupnsMode !== "private" || h.NanoCpus !== 1_000_000_000 || h.Memory !== 536870912 || h.MemorySwap !== 536870912 || h.PidsLimit !== 64
++    || h.CgroupnsMode !== "private" || h.NanoCpus !== 1_000_000_000 || h.Memory !== 2147483648 || h.MemorySwap !== 2147483648 || h.PidsLimit !== 64
+     || (h.Binds?.length ?? 0) !== 0 || (h.Devices?.length ?? 0) !== 0 || (h.VolumesFrom?.length ?? 0) !== 0
+     || (c.Env ?? []).some((entry: string) => !["PATH", "NODE_VERSION", "YARN_VERSION", "HOME", "TMPDIR", "LANG", "MC_DEADLINE_AT"].includes(entry.split("=")[0]))
+     || Object.keys(h.PortBindings ?? {}).length !== 0 || (actual.Mounts ?? []).some((m: any) => m.Type !== "tmpfs")
+     || JSON.stringify(c.Entrypoint) !== '["node"]' || JSON.stringify(c.Cmd) !== '["/opt/factory/bridge.mjs"]'
+     || Object.keys(tmpfs).length !== 2
+-    || tmpfs[ROOT] !== "rw,nosuid,nodev,noexec,size=134217728,uid=10001,gid=10001,mode=0700"
++    || tmpfs[ROOT] !== "rw,nosuid,nodev,noexec,size=1073741824,uid=10001,gid=10001,mode=0700"
+     || tmpfs["/tmp"] !== "rw,nosuid,nodev,noexec,size=16777216,uid=10001,gid=10001,mode=0700") throw new DockerBoundaryError("POLICY_DENIED", "Docker inspection does not match frozen containment policy.");
+ }
+ 

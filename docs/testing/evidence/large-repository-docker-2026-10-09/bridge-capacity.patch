@@ -1,0 +1,11 @@
+--- infra/docker-bedrock/bridge.mjs
++++ /private/tmp/mc-large-profile-20261009/build/docker-bedrock/bridge.mjs
+@@ -10,7 +10,7 @@
+ let timer=setTimeout(()=>process.exit(124),deadline-Date.now());
+ const remaining=()=>{const n=deadline-Date.now();if(n<=0)throw new Error('Deadline expired');return n};
+ let frameBytes=0;
+-process.stdin.on('data',chunk=>{for(const byte of chunk){if(byte===10)frameBytes=0;else if(++frameBytes>48*1024*1024)process.exit(125)}});
++process.stdin.on('data',chunk=>{for(const byte of chunk){if(byte===10)frameBytes=0;else if(++frameBytes>256*1024*1024)process.exit(125)}});
+ const lines=createInterface({input:process.stdin,crlfDelay:Infinity})[Symbol.asyncIterator]();
+ const first=await lines.next();if(first.done)throw new Error('Bootstrap required');
+ const {schema,config,repository,deadlineAt}=JSON.parse(first.value);
