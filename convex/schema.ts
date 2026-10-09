@@ -1,3 +1,4 @@
+import { fixtureRegistration, fixtureBudget, trialState } from "./lib/enterpriseCompatibilityValidators";
 import { providerPriceValidator, providerReservationValidator, providerUsageValidator } from "./lib/providerLiabilityValidators";
 /**
  * Convex Database Schema — V0
@@ -1250,7 +1251,21 @@ export const schemaTablesPartOne = {
       "usage.providerRequestId",
     ]) ,
 
+  factoryDelegationTrials: defineTable({
+    tenantId: v.id("tenants"), projectId: v.id("projects"), missionId: v.id("missions"),
+    factoryDefinitionId: v.id("factoryDefinitions"), delegationId: v.string(),
+    partnerRequestId: v.string(), partnerWorkId: v.string(),
+    binding: v.any(), bindingDigest: v.string(), registrationDigest: v.string(),
+    state: trialState, observationRevision: v.number(), observationDigest: v.optional(v.string()),
+    partnerWorkOrderId: v.optional(v.string()), partnerRunId: v.optional(v.string()),
+    cancelRequested: v.boolean(), closed: v.boolean(), createdAt: v.number(), updatedAt: v.number(),
+  }).index("by_project_delegation", ["projectId", "delegationId"])
+    .index("by_factory", ["factoryDefinitionId"])
+    .index("by_project_request", ["projectId", "partnerRequestId"])
+    .index("by_project_work", ["projectId", "partnerWorkId"]),
+
   factoryDefinitions: defineTable({
+    enterpriseRegistration: v.optional(fixtureRegistration),
     tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),
     repositoryId: v.id("workspaceRepositories"),
@@ -2023,6 +2038,7 @@ export const schemaTablesPartOne = {
   // SOFTWARE FACTORY: WORK ORDERS
   // -------------------------------------------------------------------------
   missions: defineTable({
+    enterpriseFixtureBudget: v.optional(fixtureBudget),
     tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     idempotencyKey: v.optional(v.string()),

@@ -60,6 +60,7 @@ import type * as factory_executionProfiles from "../factory/executionProfiles.js
 import type * as factory_githubCi from "../factory/githubCi.js";
 import type * as factory_governedMcp from "../factory/governedMcp.js";
 import type * as factory_health from "../factory/health.js";
+import type * as factory_enterpriseCompatibility from "../factory/enterpriseCompatibility.js";
 import type * as factory_incidentControlObserver from "../factory/incidentControlObserver.js";
 import type * as factory_incidentControls from "../factory/incidentControls.js";
 import type * as factory_incidents from "../factory/incidents.js";
@@ -409,6 +410,7 @@ declare const fullApi: ApiFromModules<{
   "factory/githubCi": typeof factory_githubCi;
   "factory/governedMcp": typeof factory_governedMcp;
   "factory/health": typeof factory_health;
+  "factory/enterpriseCompatibility": typeof factory_enterpriseCompatibility;
   "factory/incidentControlObserver": typeof factory_incidentControlObserver;
   "factory/incidentControls": typeof factory_incidentControls;
   "factory/incidents": typeof factory_incidents;

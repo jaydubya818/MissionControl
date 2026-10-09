@@ -20,3 +20,4 @@ export * from "./evalControlPlane.js";
 export * from "./missionControlGoldenSuite.js";
 export * from "./factoryDeploymentPackage.js";
 export * from "./factoryDelegationBinding.js";
+export * from "./delegatedFixtureAccounting.js";

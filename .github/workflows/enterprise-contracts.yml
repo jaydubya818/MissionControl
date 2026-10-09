@@ -22,6 +22,7 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm --filter @mission-control/shared test
       - run: pnpm run typecheck
+      - run: pnpm exec tsc --noEmit --project convex/tsconfig.json
       - name: Native factory regressions
         run: >-
           pnpm exec vitest run
@@ -31,4 +32,22 @@ jobs:
           convex/__tests__/factoryRuntimeGoldenPath.test.ts
           convex/__tests__/missionWorkOrderContract.test.ts
           convex/__tests__/missionGovernance.test.ts
+          convex/__tests__/providerLiability.test.ts
+      - name: Adapter authentication contracts
+        run: pnpm --filter @mission-control/orchestration-server exec vitest run src/__tests__/myFactoryCompatibilityAdapter.test.ts
+      - name: Pin compatibility source and local database runtime
+        run: |
+          git init --bare "$RUNNER_TEMP/myfactory.git"
+          git --git-dir="$RUNNER_TEMP/myfactory.git" fetch --depth=1 https://github.com/jaydubya818/MyFactory.git fa48a820ba185eb9b891130c78166463b61cba74
+          test "$(git --git-dir="$RUNNER_TEMP/myfactory.git" rev-parse FETCH_HEAD)" = fa48a820ba185eb9b891130c78166463b61cba74
+          curl --fail --location --output "$RUNNER_TEMP/convex.zip" https://github.com/get-convex/convex-backend/releases/download/precompiled-2026-09-28-5c7cb5b/convex-local-backend-x86_64-unknown-linux-gnu.zip
+          echo "5b4adbe9fc2f9985c66eb12b19dadedf2700d8796c839ddba09802196099f241  $RUNNER_TEMP/convex.zip" | sha256sum --check
+          unzip "$RUNNER_TEMP/convex.zip" -d "$RUNNER_TEMP/convex"
+          chmod +x "$RUNNER_TEMP/convex/convex-local-backend"
+      - name: Real database and loopback compatibility qualification
+        env:
+          MC_MYFACTORY_COMPATIBILITY_GIT: ${{ runner.temp }}/myfactory.git
+          MC_COMPATIBILITY_CONVEX_BINARY: ${{ runner.temp }}/convex/convex-local-backend
+        run: node --import tsx scripts/enterprise-compatibility/qualify.mjs
+      - run: node scripts/check-convex-authorization.mjs
       - run: node scripts/skill-lint.mjs
