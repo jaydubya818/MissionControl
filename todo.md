@@ -15,3 +15,14 @@
 - [x] Canonical native/delegated reservations and delegated executed settlement qualified and preserved.
 - [ ] Native executed settlement: blocked on exact pinned runtime image; reservation retained.
 - [ ] Final recovery remote source, fresh-clone and hosted CI evidence pending.
+
+## Native runtime successor
+- [x] Final bounded source/workflow provenance check; original image UNAVAILABLE.
+- [x] Design reviewed for native reservations, retained-proof settlement and separate verifier authority.
+- [ ] Build separately versioned runtime with exact source/context/toolchain/image/archive provenance.
+- [ ] Register and qualify v3 without changing historical v1/v2 identities.
+- [ ] Native execution and executed settlement through canonical APIs and real storage.
+- [ ] Concurrency, duplicates, lost acknowledgments, cancellation, expiry, UNKNOWN, restart and stale writers.
+- [ ] Native enterprise gate and deterministic hybrid Mission with canonical acceptance/handoffs.
+- [ ] Independent security/architecture review, fresh clone, hosted CI, exact Bedrock baseline.
+- [ ] Commit/push/remote SHA checkpoints and required report.
