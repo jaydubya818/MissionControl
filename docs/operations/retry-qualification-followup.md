@@ -36,3 +36,28 @@ limit also prevents checks and candidate capture for this repository. The
 adapter now rejects that incompatible setup before credential minting.
 See [retained results](../testing/evidence/retry-followup-2026-10-08/README.md).
 A new compatible executor configuration is a separate qualification decision.
+
+## Replacement executor qualification, October 8
+
+Continue with no-inference repository preflight and offline Docker qualification.
+Retain the failed Attempt, revoked credential, stopped pilot worker, and $4.49
+reservation. Do not deploy a replacement or mint a live execution credential.
+
+The selected candidate for further qualification is Codex Bedrock through the
+governed Docker bridge. Native Codex repository preparation works, but ambient
+login does not establish an enforceable provider spend cap. New Docker image
+digests are candidates only; production identity constants remain unchanged.
+
+Two test harness corrections are required. Admission fixture holds must bind
+the configured Attempt and lease. The worker-death child must inherit the
+explicit candidate test configuration. The two-request synthetic bridge test
+must reserve both full-context input and maximum output liabilities, including
+liability retained after settlement. No runtime admission or spend check changes.
+
+Results and reproducible candidate configuration are retained in the
+[executor selection evidence](../testing/evidence/executor-selection-2026-10-08/README.md).
+Full qualification remains incomplete. Before any live replacement Attempt,
+qualify the full repository in the container, obtain current exact-route price
+evidence, bind an approved budget to the current WorkOrder revision, and request
+a fresh approval for that concrete configuration. The old price approval has
+expired. The old reservation is not available to fund a replacement.

@@ -521,6 +521,12 @@ incomplete. No broader deployment is approved. See the
 [retry qualification status and limitations](docs/operations/live-retry-dispatch-review.md)
 and [retained evidence](docs/testing/evidence/live-retry-2026-10-04/README.md).
 
+Replacement executor checks passed 153 focused tests, including eight local
+Docker cases with synthetic provider responses. The governed Codex Bedrock
+candidate is ready for further testing; full-repository Docker execution and
+live qualification remain incomplete. No paid inference or image promotion
+occurred. See [candidate evidence and next gates](docs/testing/evidence/executor-selection-2026-10-08/README.md).
+
 ### Factory Deployed Engineer qualification environment
 
 The bounded FDLC Deploy / Factory Deployed Engineer qualification environment is **ready but not activated**. Its safe identifiers are:
