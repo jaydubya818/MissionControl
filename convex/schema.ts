@@ -5518,6 +5518,7 @@ export const schemaTablesPartTwo = {
       authorizedAt: v.number(),
     }))),
     enterpriseSettlement: v.optional(enterpriseSettlementValidator),
+    enterpriseAccountingParent: v.optional(v.object({ workflowRunId: v.id("workflowRuns"), reservationDigest: v.string(), bindingDigest: v.string(), resultDigest: v.string() })),
     stopCondition: v.optional(v.string()),
     scheduledWindow: v.optional(v.object({
       startsAt: v.number(),

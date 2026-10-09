@@ -43,8 +43,18 @@ export function verifyLocalDelegationResult(input: unknown, binding: FactoryDele
   const candidateChange = { sourceRevision: binding.baseCommit, candidateRevision: m.candidate.commit, changedFiles, deletedFiles: [], diff,
     linesAdded: diff.split("\n").filter(line => line.startsWith("+") && !line.startsWith("+++")).length,
     linesDeleted: diff.split("\n").filter(line => line.startsWith("-") && !line.startsWith("---")).length };
-  return { candidateChange, ...(tariffDigest ? { tariffDigest } : {}), bindingDigest: factoryDelegationBindingDigest(binding), resultDigest: `sha256:${(input as { manifestDigest: string }).manifestDigest}`,
+  return { candidateChange, executionStartedAt: Date.parse(m.execution.capturedAt), ...(tariffDigest ? { tariffDigest } : {}), bindingDigest: factoryDelegationBindingDigest(binding), resultDigest: `sha256:${(input as { manifestDigest: string }).manifestDigest}`,
     partnerRunId: expected.runId, partnerWorkOrderId: expected.workOrderId, candidateCommit: m.candidate.commit, candidateTree: m.candidate.tree,
     evidenceDigest: `sha256:${m.evidenceDigest}`, artifactDigest: `sha256:${m.artifactDigest}`, checks: v.checks,
     producerSessionId: v.producerSessionId, verifierSessionId: v.providerSessionId, cleanupConfirmed: true as const, actualMicrousd: 0 as const };
+}
+
+export function verifyLocalCustodyObservation(observation: any, result: any, binding: FactoryDelegationBinding, now: number) {
+  if (!observation || observation.bindingDigest !== factoryDelegationBindingDigest(binding)
+    || observation.resultDigest !== result.resultDigest
+    || observation.candidateCommit !== result.candidateCommit || observation.candidateTree !== result.candidateTree
+    || !Number.isSafeInteger(observation.observedAt) || observation.observedAt > now
+    || !Number.isSafeInteger(observation.expiresAt) || observation.expiresAt <= now
+    || observation.expiresAt > observation.observedAt + 60_000) throw Error("LOCAL_CUSTODY_OBSERVATION_DENIED");
+  return observation;
 }

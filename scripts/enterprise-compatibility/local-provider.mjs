@@ -10,7 +10,7 @@ import {canonicalDigest,factoryDelegationBindingDigest,fixtureExposure,bindEngin
 import {compileApprovedPlanQualityContract} from '../../convex/lib/qualityContract.ts';
 import {startFixtureDatabase} from './database.mjs';
 import {compatibility} from './fixtures.mjs';
-import {verifyLocalDelegationResult,verifyLocalTerminalResult,LOCAL_PROVIDER_QUALIFICATION_SHA} from '../../apps/orchestration-server/src/myFactoryLocalCompatibility.ts';
+import {verifyLocalDelegationResult,verifyLocalTerminalResult,verifyLocalCustodyObservation,LOCAL_PROVIDER_QUALIFICATION_SHA} from '../../apps/orchestration-server/src/myFactoryLocalCompatibility.ts';
 import {signFixtureEnvelope,verifyFixtureEnvelope,COMPATIBILITY_PROTOCOL} from '../../apps/orchestration-server/src/myFactoryCompatibilityAdapter.ts';
 const root=resolve(process.env.MC_LOCAL_MYFACTORY_ROOT),repo=process.cwd();
 const canonicalAccounting=process.env.MC_CANONICAL_ACCOUNTING_QUALIFICATION==='1';
@@ -25,7 +25,7 @@ const checks=[],journeys=[];let db,pg,f,server;
 const check=async(name,fn)=>{await fn();checks.push(name);console.log('PASS '+name);};
 const hash='sha256:'+'a'.repeat(64);
 async function cleanup(){if(server){server.closeAllConnections();server.close();server=null;}await db?.stop();db=null;await pg?.stop();pg=null;await f?.stop();f=null;}
-async function setup({expiresIn,withoutTariff=false}={}){
+async function setup({expiresIn,withoutTariff=false,policyFailure=false}={}){
  db=await startFixtureDatabase(repo,{canonicalAccounting});f=await localFixture(root);await qualifyHost(f);pg=await startPostgres(root);
  const s=db.seed,now=Date.now(),request=f.request;
  if(canonicalAccounting)await db.owner.mutation('accountingFixture:configure',{seed:s});
@@ -48,8 +48,9 @@ async function setup({expiresIn,withoutTariff=false}={}){
  const verificationSpec={id:s.workOrderId,revisionNumber:1,title:'Project slug protected behavior',riskLevel:'LOW',riskReasons:[],requiredApprovals:['HUMAN_REVIEW'],
  acceptanceCriteria:[{id:'delegated-behavior',title:'Project slug protected behavior',requiredEvidence:[{category:'TEST_RESULT',minimumCount:checkIds.length,independent:true,independenceLevel:'INDEPENDENT_REQUIRED'}]}],
  negativeConstraints:[{id:'no-test-removal',type:'NO_TEST_REMOVAL',description:'Preserve tests'},{id:'no-config-change',type:'NO_VERIFICATION_CONFIG_CHANGES',description:'Preserve verification'}],
- changeBudget:{maxFilesChanged:1,maxLinesChanged:100,allowedPaths:request.input.allowedPaths,deniedPaths:[],allowedCommandClasses:['TEST'],prohibitedCommandClasses:['PRODUCTION_ACCESS','SECRETS_ACCESS','PUBLISH'],allowDependencyChanges:false,allowSchemaChanges:false,allowMigrations:false,allowInfrastructureChanges:false},
- verificationContract:{schemaVersion:1,enforcementMode:'OBSERVE_ONLY',requireHumanReview:true,checks:checkIds.map(id=>({id,name:id,category:'UNIT_TEST',verifierId:'delegated-local',mandatory:true,acceptanceCriterionIds:['delegated-behavior'],evidenceCategory:'TEST_RESULT'}))}};
+ changeBudget:{maxFilesChanged:policyFailure?0:1,maxLinesChanged:100,allowedPaths:request.input.allowedPaths,deniedPaths:[],allowedCommandClasses:['TEST'],prohibitedCommandClasses:['PRODUCTION_ACCESS','SECRETS_ACCESS','PUBLISH'],allowDependencyChanges:false,allowSchemaChanges:false,allowMigrations:false,allowInfrastructureChanges:false},
+ requirements:[{id:'slug-behavior',title:'Protected slug behavior',type:'FUNCTIONAL',description:'Protected slug behavior',priority:'MUST'}],
+ verificationContract:{schemaVersion:canonicalAccounting?2:1,enforcementMode:canonicalAccounting?'ENFORCED':'OBSERVE_ONLY',...(canonicalAccounting?{requiredRisks:[],independence:{required:true,minimumBoundary:'SEPARATE_ATTEMPT'}}:{}),requireHumanReview:true,checks:checkIds.map(id=>({id,name:id,category:'UNIT_TEST',verifierId:'delegated-local',mandatory:true,acceptanceCriterionIds:['delegated-behavior'],evidenceCategory:'TEST_RESULT'}))}};
  b.budgetReservationId=b.delegationId;
  const tariff=canonicalAccounting&&!withoutTariff?bindEngineeringTariff(b,Date.now()):null;
  if(tariff)Object.assign(b,tariff.binding);
@@ -87,13 +88,20 @@ async function transport(c){
   const e=verifyFixtureEnvelope(signed,key,'REQUEST',{bindingDigest:c.bindingDigest,operation,requestDigest:null},Date.now());let payload;
   if(operation==='ADMIT'){if(partner.digest(e.payload)!==c.b.partnerRequestDigest)throw Error('EXACT_REQUEST');await c.authority();payload=await c.factory.control.prepare(e.payload);admissions++;if(drop){drop=false;req.socket.destroy();return;}}
   else if(operation==='STATUS')payload=await c.factory.control.read(c.b.partnerRequestId);
-  else if(operation==='RESULT')payload=await c.factory.control.result(c.b.partnerRequestId);
+  else if(operation==='RESULT'){
+   payload=await c.factory.control.result(c.b.partnerRequestId);
+   if(canonicalAccounting&&payload.state==='COMPLETED'&&payload.result){
+    const source=await c.factory.control.source(c.b.partnerRequestId),observedAt=Date.now();
+    payload.observation={bindingDigest:c.bindingDigest,resultDigest:'sha256:'+payload.result.manifestDigest,
+     candidateCommit:source.candidateCommit,candidateTree:source.candidateTree,observedAt,expiresAt:observedAt+60000};
+   }
+  }
   else throw Error('OPERATION');
   const reply=signFixtureEnvelope({...e,keyId:responseKey.id,payload,requestDigest:canonicalDigest('factory-fixture-request/v1',signed)},responseKey,'RESPONSE');res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(reply));
  }catch{res.writeHead(403);res.end('{}');}});server.listen(0,'127.0.0.1');await once(server,'listening');
  const call=async(operation,payload)=>{const envelope={protocol:COMPATIBILITY_PROTOCOL,keyId:key.id,tenantId:key.tenantId,projectId:key.projectId,factoryId:key.factoryId,bindingDigest:c.bindingDigest,operation,nonce:randomUUID(),expiresAt:Date.now()+30000,payload,requestDigest:null};
   const signed=signFixtureEnvelope(envelope,key,'REQUEST');const response=await fetch('http://127.0.0.1:'+server.address().port,{method:'POST',body:JSON.stringify(signed),redirect:'error',signal:AbortSignal.timeout(10000)});assert.equal(response.status,200);
-  return verifyFixtureEnvelope(await response.json(),responseKey,'RESPONSE',{bindingDigest:c.bindingDigest,operation,requestDigest:canonicalDigest('factory-fixture-request/v1',signed)},Date.now()).payload;};
+  const authenticatedResponse=await response.json();return {...verifyFixtureEnvelope(authenticatedResponse,responseKey,'RESPONSE',{bindingDigest:c.bindingDigest,operation,requestDigest:canonicalDigest('factory-fixture-request/v1',signed)},Date.now()).payload,authenticatedResponse};};
  return{call,get admissions(){return admissions;}};
 }
 async function observe(c,p,state=p.state){await c.mut('observeTrial',{trialId:c.trialId,revision:state==='PREPARED'?1:2,state,partnerWorkOrderId:p.workOrderId,partnerRunId:p.runId,receiptDigest:canonicalDigest('local-observation/v1',{state,run:p.runId})});}
@@ -139,12 +147,13 @@ try{
  const r=await wire.call('RESULT',{requestId:f.request.requestId});await observe(c,prepared,r.state);
  const expected={workOrderId:prepared.workOrderId,runId:prepared.runId,keys:[f.signing.key],now:Date.now(),...(c.tariff?{tariff:c.tariff,admittedAt:c.admittedAt}:{})};
  const projection=verifyLocalDelegationResult(r.result,c.b,partner,expected);
+ if(canonicalAccounting){projection.custodyObservation=verifyLocalCustodyObservation(r.observation,projection,c.b,Date.now());projection.authenticatedResponse=r.authenticatedResponse;}
  await check('wrong candidate, wrong provider and stale result writer denied',async()=>{
   const swapped=structuredClone(r.result);swapped.artifacts[0].base64=Buffer.from('wrong').toString('base64');assert.throws(()=>verifyLocalDelegationResult(swapped,c.b,partner,expected));
   assert.throws(()=>verifyLocalDelegationResult(r.result,{...c.b,factoryVersion:'f'.repeat(64)},partner,expected));
   const wo=await c.inspect(c.s.workOrderId);await c.fault(c.s.workOrderId,{currentRevisionNumber:2});await assert.rejects(c.mut('ingestExecutionResult',{trialId:c.trialId,...projection}));await c.fault(c.s.workOrderId,{currentRevisionNumber:wo.currentRevisionNumber});
  });
- await check('real execution evidence enters enterprise shadow gate and settles once',async()=>{
+ await check('real execution evidence enters enterprise gate and settles once',async()=>{
   if(canonicalAccounting){
    await assert.rejects(c.mut('ingestExecutionResult',{trialId:c.trialId,...projection,tariffDigest:hash}));
    const {tariffDigest,...missingTariff}=projection;await assert.rejects(c.mut('ingestExecutionResult',{trialId:c.trialId,...missingTariff}));
@@ -152,16 +161,60 @@ try{
   }
 
   const gateIds=await Promise.all(Array.from({length:4},()=>c.mut('ingestExecutionResult',{trialId:c.trialId,...projection})));assert.equal(new Set(gateIds).size,1);
-  const gate=await c.inspect(gateIds[0]);assert.equal(gate.state,'AWAITING_HUMAN');assert.equal(gate.metadata.authoritativeAcceptance,false);
-  for(const id of ['factory-verification-authority','factory-change-budget','factory-negative-constraints'])assert.equal(gate.metadata.checks.find(c=>c.checkId===id)?.status,'PASS');
+  const gate=await c.inspect(gateIds[0]);assert.equal(gate.state,'AWAITING_HUMAN');assert.equal(gate.mode,canonicalAccounting?'ENFORCED':'SHADOW');
+  if(canonicalAccounting){const current=await c.query('currentIsolatedQualityGate',{trialId:c.trialId});assert.equal(current.isolated.current,true,JSON.stringify(current));assert.equal(current.isolated.eligible,false);assert.equal(current.production.current,false);}
+  else assert.equal(gate.metadata.authoritativeAcceptance,false);
+  if(!canonicalAccounting)for(const id of ['factory-verification-authority','factory-change-budget','factory-negative-constraints'])assert.equal(gate.metadata.checks.find(c=>c.checkId===id)?.status,'PASS');
   assert.equal(exposure(await c.query('getBudget',{missionId:c.s.missionId})),20);
   await assert.rejects(c.mut('ingestExecutionResult',{trialId:c.trialId,...projection,resultDigest:hash}));
   const settlement=(await c.inspect(c.s.workflowRunId)).enterpriseSettlement;
   if(canonicalAccounting){assert.equal(settlement.basis,'DETERMINISTIC_ENGINEERING_ZERO_CHARGE');assert.equal(settlement.resourceCost,'UNMEASURED');assert.equal(settlement.tariffDigest,c.tariff.digest);}
   journeys.push({state:r.state,resultDigest:r.result.manifestDigest,factoryVersion:f.version(),sourceDigest:f.sourceDigest,hostQualification:f.hostQualification,gateState:gate.state,execution:c.factory.evidence,...(settlement?{settlement}:{}),paidOperations:0});
  });
+ if(canonicalAccounting)await check('currentness rejects changed authority and stale retained evidence while production stays fenced',async()=>{
+  const current=()=>c.query('currentIsolatedQualityGate',{trialId:c.trialId});
+  const first=await current(),receipt=await c.inspect(first.isolated.verificationReceiptId);
+  const envelope=await c.inspect(receipt.evidenceEnvelopeIds[0]),artifact=await c.inspect(envelope.artifactIds[0]);
+  const plan=await c.inspect(c.s.missionPlanId),wo=await c.inspect(c.s.workOrderId),factory=await c.inspect(c.s.factoryDefinitionId);
+  const source=await c.inspect(c.s.workflowRunId);
+  const variants=[
+   [c.s.workOrderId,{currentExecutionRunId:first.isolated.verificationAttemptId}],
+   [c.s.workOrderId,{currentRevisionNumber:2}],
+   [c.s.workOrderId,{verificationContract:{...wo.verificationContract,requireHumanReview:false}}],
+   [c.s.missionPlanId,{approvedBy:'wrong-owner'}],[c.s.missionPlanId,{revisionNumber:2}],
+   [c.s.missionPlanId,{decidedActorSource:'DEVELOPMENT_FALLBACK'}],
+   [c.s.factoryDefinitionId,{enterpriseRegistration:{...factory.enterpriseRegistration,health:'UNHEALTHY'}}],
+   [artifact._id,{contentHash:hash}],
+   [artifact._id,{metadata:{...artifact.metadata,authenticatedResponse:null}}],
+   [artifact._id,{metadata:{...artifact.metadata,authenticatedResponse:{...artifact.metadata.authenticatedResponse,signature:'f'.repeat(64)}}}],
+   [envelope._id,{metadata:{...envelope.metadata,custodyObservation:{...envelope.metadata.custodyObservation,expiresAt:Date.now()-1}}}],
+   [c.s.workflowRunId,{verificationSubject:{...source.verificationSubject,candidateSha:'f'.repeat(40)}}],
+  ];
+  for(const [id,patch] of variants){
+   const before=await c.inspect(id);await c.fault(id,patch);
+   assert.equal((await current()).isolated.current,false,JSON.stringify(patch));
+   await c.fault(id,Object.fromEntries(Object.keys(patch).map(k=>[k,before[k]])));
+  }
+  for(const client of [db.peer,db.other,db.anonymous])await assert.rejects(c.query('currentIsolatedQualityGate',{trialId:c.trialId},client));
+  assert.equal((await current()).isolated.current,true);assert.equal((await current()).production.eligible,false);
+ });
  await cleanup();
- for(const mode of ['cancel','failed','late-completed','expired',...(canonicalAccounting?['no-tariff']:[])]){
+ if(canonicalAccounting){
+  const c=await setup({policyFailure:true});await c.mut('claimTrial',{trialId:c.trialId});
+  const p=await c.factory.control.prepare(f.request),identity=c.factory.identity(p);await observe(c,p);
+  await c.factory.control.dispatch(identity);await c.factory.execute(identity);
+  const wire=await transport(c),r=await wire.call('RESULT',{requestId:c.b.partnerRequestId});await observe(c,p,r.state);
+  const projection=verifyLocalDelegationResult(r.result,c.b,partner,{workOrderId:p.workOrderId,runId:p.runId,keys:[f.signing.key],now:Date.now(),tariff:c.tariff,admittedAt:c.admittedAt});
+  projection.custodyObservation=verifyLocalCustodyObservation(r.observation,projection,c.b,Date.now());projection.authenticatedResponse=r.authenticatedResponse;
+  await check('Factory PASS cannot override an enterprise policy failure',async()=>{
+   const gate=await c.inspect(await c.mut('ingestExecutionResult',{trialId:c.trialId,...projection}));
+   assert.equal(gate.state,'INELIGIBLE');const result=await c.query('currentIsolatedQualityGate',{trialId:c.trialId});
+   assert.equal(result.isolated.eligible,false);assert.equal(result.isolated.verifiedOutcome,'FAILURE');
+   assert.equal(exposure(await c.query('getBudget',{missionId:c.s.missionId})),0);
+   journeys.push({mode:'enterprise-policy-failed',factoryOutcome:'PASS',gateState:gate.state,paidOperations:0});
+  });await cleanup();
+ }
+ for(const mode of (process.env.MC_GATE_ONLY==='1'?[]:['cancel','failed','late-completed','expired',...(canonicalAccounting?['no-tariff']:[])])){
   const c=await setup(mode==='expired'?{expiresIn:30000}:mode==='no-tariff'?{withoutTariff:true}:{});await c.mut('claimTrial',{trialId:c.trialId});const p=await c.factory.control.prepare(f.request),i=c.factory.identity(p);await observe(c,p);
   if(mode==='cancel'){await c.mut('cancelTrial',{trialId:c.trialId});await c.factory.store.stop('missioncontrol-local',i);await c.factory.reconcile();}
   else{await c.factory.control.dispatch(i);if(mode==='failed')c.factory.provider.materialize=async()=>{throw Error('DETERMINISTIC_STARTUP_FAILURE');};await c.factory.execute(i);}

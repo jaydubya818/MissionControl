@@ -1,3 +1,4 @@
+import { verificationContractDigest } from "@mission-control/workflow-engine/verification-identity";
 import { internalMutationGeneric as internalMutation, mutationGeneric as mutation } from "convex/server";
 import schema from "./schema";
 
@@ -75,6 +76,7 @@ export const approveExecution = internalMutation({ handler: async (ctx, args) =>
     qualityContractDigest: quality.digest, qualityContractProjection: quality.projection,
     metadata: { enterpriseDelegationApproval: { bindingDigest, checkIdsDigest, verificationSpec, ...(tariff ? { tariff } : {}), ownerActorId: b.ownerScope, leaseId: "fixture-lease", criterionTitle: "Project slug protected behavior" } } });
   await ctx.db.patch(b.workOrderId, { approvalStatus: "APPROVED", repository: b.repository, currentExecutionRunId: run._id, qualityContractDigest: b.qualityContractDigest,
+    requiredApprovals: verificationSpec.requiredApprovals, riskReasons: verificationSpec.riskReasons, requirements: verificationSpec.requirements ?? [], verificationContractDigest: verificationContractDigest(verificationSpec.verificationContract, b.qualityContractDigest),
     acceptanceCriteria: verificationSpec.acceptanceCriteria.map(c => ({ ...c, status: "PENDING" })), negativeConstraints: verificationSpec.negativeConstraints, changeBudget: verificationSpec.changeBudget, verificationContract: verificationSpec.verificationContract });
   await ctx.db.patch(b.workOrderRevisionId, { status: "APPLIED" });
   await ctx.db.patch(run._id, { status: deferClaim ? "PENDING" : "RUNNING", executionManifestDigest: b.executionManifestDigest,

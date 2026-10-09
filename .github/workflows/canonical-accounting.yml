@@ -23,6 +23,8 @@ jobs:
       - run: pnpm --filter @mission-control/shared test
       - run: pnpm run typecheck
       - run: pnpm exec tsc --noEmit --project convex/tsconfig.json
+      - name: Canonical verification currentness and independence
+        run: pnpm --filter @mission-control/workflow-engine test
       - name: Native factory regressions
         run: >-
           pnpm exec vitest run

@@ -208,3 +208,36 @@ export function tupleMatches(actual: VerificationIdentityTuple, expected: Verifi
 function normalizePath(path: string) {
   return path.replace(/\\/g, "/").replace(/\/+$/, "");
 }
+
+export function deriveSignedFactoryVerificationIndependence(input: {
+  expected: VerificationIndependenceInput["expected"];
+  subject: VerificationSubject;
+  sourceAttemptId: string;
+  verificationAttemptId: string;
+  verificationRun: VerificationIndependenceInput["verificationRun"];
+  factoryVersion: string; expectedFactoryVersion: string;
+  bindingDigest: string; expectedBindingDigest: string;
+  resultDigest: string; producerAllocation: string; verifierAllocation: string;
+  candidateCommit: string; candidateTree: string; cleanupConfirmed: boolean;
+  authorityStatus: string; isolatedQualification: boolean;
+}): VerificationIndependenceResult {
+  const reasons: string[] = [], e = input.expected, s = input.subject, r = input.verificationRun;
+  if (!input.isolatedQualification) reasons.push("Signed local Factory evidence is restricted to isolated qualification.");
+  if (input.sourceAttemptId !== e.sourceAttemptId || input.verificationAttemptId !== e.verificationAttemptId
+    || input.sourceAttemptId === input.verificationAttemptId || r.id !== e.verificationRunId
+    || r.workflowRunId !== e.verificationAttemptId || !tupleMatches(r, e)
+    || r.verificationPlanId !== e.verificationPlanId || r.verificationPlanDigest !== e.verificationPlanDigest
+    || r.verificationSubjectId !== e.verificationSubjectId) reasons.push("Signed Factory verification lineage differs from the evaluation plan.");
+  if (!tupleMatches({ ...s, verificationSubjectDigest: s.digest }, e) || s.subjectId !== e.verificationSubjectId
+    || s.kind !== "GIT_CANDIDATE" || s.provider !== "LOCAL_GIT"
+    || s.candidateSha !== input.candidateCommit || s.treeSha !== input.candidateTree) reasons.push("Signed Factory candidate differs from the immutable subject.");
+  if (input.factoryVersion !== input.expectedFactoryVersion || !/^[a-f0-9]{64}$/.test(input.factoryVersion)
+    || input.bindingDigest !== input.expectedBindingDigest || !/^sha256:[a-f0-9]{64}$/.test(input.bindingDigest)
+    || !/^sha256:[a-f0-9]{64}$/.test(input.resultDigest)) reasons.push("Signed Factory authority identity is incomplete or substituted.");
+  if (!/^sbx_[A-Za-z0-9_-]+$/.test(input.producerAllocation) || !/^sbx_[A-Za-z0-9_-]+$/.test(input.verifierAllocation)
+    || input.producerAllocation === input.verifierAllocation || !input.cleanupConfirmed) reasons.push("Independent Factory allocations and cleanup are not proven.");
+  if (input.authorityStatus !== "PASS") reasons.push("Verification-definition authority is not proven.");
+  return { policyVersion: "verification-independence/v1", sourceAttemptId: e.sourceAttemptId,
+    verificationAttemptId: e.verificationAttemptId, passed: reasons.length === 0,
+    reasons: reasons.length ? reasons : ["Authenticated Factory Result proves separate producer/verifier allocations and exact isolated candidate lineage; no native lease is asserted."] };
+}

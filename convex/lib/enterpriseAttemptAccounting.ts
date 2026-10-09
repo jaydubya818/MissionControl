@@ -79,7 +79,25 @@ export function attemptExposure(run: any, dailyAt?: number): number {
     ? integer(receipt.chargedMicrousd) : 0;
 }
 
-export function scopeExposure(runs: any[], dailyAt?: number) { return sum(runs.map(run => attemptExposure(run, dailyAt))); }
+export function scopeExposure(runs: any[], dailyAt?: number) {
+  return sum(runs.map(run => {
+    const link = run.enterpriseAccountingParent;
+    if (!link) return attemptExposure(run, dailyAt);
+    const parent = runs.find(candidate => candidate._id === link.workflowRunId);
+    const reservation = parent?.executionCostAuthorization?.enterprise;
+    if (!parent || parent === run || parent.enterpriseAccountingParent || !reservation
+      || reservation.provider !== "local-docker" || reservation.digest !== link.reservationDigest
+      || reservation.bindingDigest !== link.bindingDigest || !/^sha256:[a-f0-9]{64}$/.test(link.resultDigest)
+      || run.tenantId !== parent.tenantId || run.projectId !== parent.projectId || run.missionId !== parent.missionId
+      || run.workOrderId !== parent.workOrderId || run.workOrderRevisionId !== parent.workOrderRevisionId
+      || run.attemptPurpose !== "VERIFICATION" || run.status !== "COMPLETED" || run.lease || run.executionCostAuthorization
+      || run.executionClaimedAt !== undefined || run.spentUsd !== 0 || run.reservedCostUsd !== 0
+      || run.metadata?.signedFactoryResultDigest !== link.resultDigest
+      || run.verificationAttemptBinding?.sourceAttemptId !== parent._id) throw Error("ENTERPRISE_ACCOUNTING_PARENT_INVALID");
+    attemptExposure(parent, dailyAt);
+    return 0;
+  }));
+}
 
 export async function enterpriseProject(ctx: QueryCtx | MutationCtx, projectId: Id<"projects">) {
   const project = await ctx.db.get(projectId);

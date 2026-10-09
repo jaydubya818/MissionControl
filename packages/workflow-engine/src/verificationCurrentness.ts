@@ -252,7 +252,8 @@ function evaluateVerification(input: CurrentVerificationInput, purpose: "ACCEPTA
   if (result.independenceValid !== true) return denied("Exact Verification Result lacks server-derived independence.", context);
   if (!result.verificationPlanId || !result.verificationPlanDigest) return denied("Exact Verification Result lacks frozen Verification Plan identity.", context);
   if (!result.decisionInputDigest) return denied("Exact Verification Result lacks a canonical decision-input digest.", context);
-  const requiresHumanReview = prepublication && result.verdict === "REQUIRES_HUMAN_REVIEW";
+  const localHumanReview = subject.kind === "GIT_CANDIDATE" && subject.provider === "LOCAL_GIT";
+  const requiresHumanReview = (prepublication || localHumanReview) && result.verdict === "REQUIRES_HUMAN_REVIEW";
   const verifiedOutcome = result.verdict === "VERIFIED" || requiresHumanReview
     ? "SUCCESS" as const
     : result.verdict === "NOT_VERIFIED" || result.verdict === "BLOCKED"
@@ -275,7 +276,7 @@ function evaluateVerification(input: CurrentVerificationInput, purpose: "ACCEPTA
   const receiptMatchesOutcome = verifiedOutcome === "SUCCESS"
     ? requiresHumanReview
       ? (receipt.status === "PASSED" && receipt.verdict === "VERIFIED" && receipt.humanReviewValid === true)
-        || (purpose === "PREPUBLICATION" && receipt.status === "PENDING" && receipt.verdict === "REQUIRES_HUMAN_REVIEW")
+        || ((purpose === "PREPUBLICATION" || localHumanReview) && receipt.status === "PENDING" && receipt.verdict === "REQUIRES_HUMAN_REVIEW")
       : receipt.status === "PASSED" && receipt.verdict === "VERIFIED"
     : receipt.status === "FAILED" && receipt.verdict === result.verdict;
   if (!receiptMatchesOutcome || receipt.independenceValid !== true) {
@@ -333,7 +334,7 @@ function evaluateVerification(input: CurrentVerificationInput, purpose: "ACCEPTA
       || observation.observedAt < verificationAttempt.createdAt
       || !Number.isSafeInteger(observation.expiresAt) || observation.expiresAt <= input.now
       || observation.expiresAt > observation.observedAt + 60_000) {
-      return denied("Verified local candidate has no trusted current verifier observation and is not acceptance-eligible.", {
+      return denied("Verified local candidate has stale or missing trusted current verifier observation and is not acceptance-eligible.", {
         ...evidenceContext, verifiedOutcome, verificationRecordedAt: receipt.recordedAt,
       });
     }
@@ -371,12 +372,14 @@ function evaluateVerification(input: CurrentVerificationInput, purpose: "ACCEPTA
   }
 
   return {
-    eligible: true,
+    eligible: !(requiresHumanReview && receipt.humanReviewValid !== true && purpose === "ACCEPTANCE"),
     current: true,
     verifiedOutcome,
     verificationRecordedAt: receipt.recordedAt,
     ...evidenceContext,
-    reasons: [purpose === "PREPUBLICATION"
+    reasons: [requiresHumanReview && purpose === "ACCEPTANCE" && receipt.humanReviewValid !== true
+      ? "Exact independent verification is current; human acceptance remains required."
+      : purpose === "PREPUBLICATION"
       ? "Exact independent pre-publication evidence is current; separate human approval and a publication permit remain required."
       : "Exact current Verification Result is completed, verified, independent, Quality-Contract-bound, evidence-bound, plan-bound, and provider-current."],
   };

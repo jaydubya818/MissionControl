@@ -50,6 +50,20 @@ describe("canonical enterprise Attempt accounting", () => {
     expect(() => attemptExposure({ status: "COMPLETED" })).toThrow();
     expect(() => attemptExposure({ reservedCostUsd: 0.00004, spentUsd: 0.00006, startedAt: 1 }, 864000000)).toThrow("LEGACY_AUTHORITY_UNQUALIFIED");
   });
+  it("counts an imported verifier only under its exact parent reservation", () => {
+    const parent = { ...run(), _id: "parent" };
+    const child = { ...parent, _id: "child", runId: "observation", status: "COMPLETED", attemptPurpose: "VERIFICATION",
+      executionCostAuthorization: undefined, verificationAttemptBinding: { sourceAttemptId: "parent" },
+      metadata: { signedFactoryResultDigest: "sha256:" + "a".repeat(64) },
+      enterpriseAccountingParent: { workflowRunId: "parent", reservationDigest: parent.executionCostAuthorization.enterprise.digest,
+        bindingDigest: "binding", resultDigest: "sha256:" + "a".repeat(64) } };
+    expect(scopeExposure([parent, child])).toBe(80);
+    for (const patch of [{ tenantId: "other" }, { status: "PENDING" }, { spentUsd: 1 }, { lease: {} },
+      { executionCostAuthorization: parent.executionCostAuthorization }, { verificationAttemptBinding: { sourceAttemptId: "wrong" } }]) {
+      expect(() => scopeExposure([parent, { ...child, ...patch }])).toThrow("ENTERPRISE_ACCOUNTING_PARENT_INVALID");
+    }
+    expect(() => scopeExposure([child])).toThrow("ENTERPRISE_ACCOUNTING_PARENT_INVALID");
+  });
   it("fences preexisting inference send authority even with the qualification environment disabled", async () => {
     const rows: Record<string, any> = {
       project: { enterpriseAccountingMode: "ISOLATED_DETERMINISTIC" },

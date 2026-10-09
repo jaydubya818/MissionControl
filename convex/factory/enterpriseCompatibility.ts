@@ -1,3 +1,5 @@
+import { ingestEnterpriseQualityGate } from "../lib/enterpriseQualityGate";
+import { getCurrentVerificationRoutingOutcome } from "../lib/currentVerification";
 import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
@@ -337,8 +339,8 @@ async function executionAuthority(ctx: QueryCtx | MutationCtx, projectId: Id<"pr
     || approval.bindingDigest !== trial.bindingDigest || approval.ownerActorId !== auth.actorId
     || plan.qualityContractDigest !== binding.qualityContractDigest
     || `sha256:${canonicalHash(plan.qualityContractProjection)}` !== binding.qualityContractDigest
-    || canonicalDigest("enterprise-verification-fields/v1", { acceptanceCriteria: workOrder?.acceptanceCriteria.map(({ status, ...criterion }) => criterion), negativeConstraints: workOrder?.negativeConstraints, changeBudget: workOrder?.changeBudget, verificationContract: workOrder?.verificationContract })
-      !== canonicalDigest("enterprise-verification-fields/v1", { acceptanceCriteria: approval.verificationSpec?.acceptanceCriteria, negativeConstraints: approval.verificationSpec?.negativeConstraints, changeBudget: approval.verificationSpec?.changeBudget, verificationContract: approval.verificationSpec?.verificationContract })
+    || canonicalDigest("enterprise-verification-fields/v1", { requirements: workOrder?.requirements ?? [], acceptanceCriteria: workOrder?.acceptanceCriteria.map(({ status, ...criterion }) => criterion), negativeConstraints: workOrder?.negativeConstraints, changeBudget: workOrder?.changeBudget, verificationContract: workOrder?.verificationContract })
+      !== canonicalDigest("enterprise-verification-fields/v1", { requirements: approval.verificationSpec?.requirements ?? [], acceptanceCriteria: approval.verificationSpec?.acceptanceCriteria, negativeConstraints: approval.verificationSpec?.negativeConstraints, changeBudget: approval.verificationSpec?.changeBudget, verificationContract: approval.verificationSpec?.verificationContract })
     || approval.revokedAt !== undefined || trial.cancelRequested || trial.closed
     || workOrder?.approvalStatus !== "APPROVED" || revision?.status !== "APPLIED"
     || workOrder.currentExecutionRunId !== run?._id
@@ -365,11 +367,17 @@ export const ingestExecutionResult = internalMutation({
     candidateCommit: v.string(), candidateTree: v.string(), evidenceDigest: v.string(), artifactDigest: v.string(),
     checks: v.array(v.object({ id: v.string(), result: v.union(v.literal("PASS"), v.literal("FAIL")) })),
     producerSessionId: v.string(), verifierSessionId: v.string(), cleanupConfirmed: v.literal(true),
-    actualMicrousd: v.literal(0), tariffDigest: v.optional(v.string()) },
+    actualMicrousd: v.literal(0), tariffDigest: v.optional(v.string()),
+    executionStartedAt: v.optional(v.number()), authenticatedResponse: v.optional(v.any()), custodyObservation: v.optional(v.object({ bindingDigest: v.string(), resultDigest: v.string(),
+      candidateCommit: v.string(), candidateTree: v.string(), observedAt: v.number(), expiresAt: v.number() })) },
   handler: async (ctx, args) => {
     await access(ctx, args.projectId, true);
     const prior = await trialFor(ctx, args.projectId, args.trialId);
-    const inputDigest = canonicalDigest("enterprise-delegation-result/v1", args);
+    const { authenticatedResponse: _delivery, custodyObservation, ...resultIdentity } = args;
+    const inputDigest = canonicalDigest("enterprise-delegation-result/v1", { ...resultIdentity,
+      ...(custodyObservation ? { custodyIdentity: { bindingDigest: custodyObservation.bindingDigest,
+        resultDigest: custodyObservation.resultDigest, candidateCommit: custodyObservation.candidateCommit,
+        candidateTree: custodyObservation.candidateTree } } : {}) });
     if (prior.resultInputDigest) {
       if (prior.resultInputDigest !== inputDigest) throw denied();
       return prior.qualityGateDecisionId;
@@ -405,7 +413,9 @@ export const ingestExecutionResult = internalMutation({
       idempotencyKey: binding.delegationId, artifactType: "VERIFICATION_EVIDENCE", name: "Authenticated delegated Factory Result",
       contentHash: args.resultDigest, producer: binding.factoryId, createdAt: now,
       metadata: { ...args, protocol: "MYFACTORY_RESULT_V1", factoryVersion: binding.factoryVersion, humanAcceptance: "PENDING", publication: "NOT_AUTHORIZED" } });
-    const gateId = await ctx.db.insert("qualityGateDecisions", { tenantId: mission.tenantId, projectId: args.projectId,
+    const gateId = await enterpriseProject(ctx, args.projectId)
+      ? await ingestEnterpriseQualityGate(ctx, { workOrder, run, binding, trial, args, outcome, artifactId, now })
+      : await ctx.db.insert("qualityGateDecisions", { tenantId: mission.tenantId, projectId: args.projectId,
       missionId: mission._id, workOrderId: workOrder._id, workflowRunId: run._id, idempotencyKey: binding.delegationId,
       workOrderRevisionNumber: binding.workOrderRevisionNumber, candidateRevision: args.candidateCommit,
       qualityContractDigest: binding.qualityContractDigest, executionManifestDigest: binding.executionManifestDigest,
@@ -445,5 +455,17 @@ export const reconcileTerminalExecution = internalMutation({
       { type: "RECONCILE", actualMicrousd: 0, cleanupConfirmed: true, settlementDigest: args.resultDigest }) });
     else await settleExecutedEnterpriseAttempt(ctx, await ctx.db.get(binding.workflowRunId as Id<"workflowRuns">), binding, args, Date.now());
     await ctx.db.patch(trial._id, { resultInputDigest: inputDigest, closed: true, updatedAt: Date.now() });
+  },
+});
+
+export const currentIsolatedQualityGate = query({
+  args: { projectId: v.id("projects"), trialId: v.id("factoryDelegationTrials") },
+  handler: async (ctx, args) => {
+    await access(ctx, args.projectId);
+    const trial = await trialFor(ctx, args.projectId, args.trialId);
+    await budgetFor(ctx, args.projectId, trial.missionId);
+    const workOrder = await ctx.db.get(trial.binding.workOrderId as Id<"workOrders">);
+    return { isolated: await getCurrentVerificationRoutingOutcome(ctx, workOrder, Date.now(), "ACCEPTANCE", true),
+      production: await getCurrentVerificationRoutingOutcome(ctx, workOrder), publication: "DISABLED", humanAcceptance: "PENDING" };
   },
 });
