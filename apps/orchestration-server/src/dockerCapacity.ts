@@ -1,9 +1,12 @@
-export const RESEARCH_LAB_DOCKER_PROFILE =
-  "factory/docker-bedrock-research-lab/v1";
-export const RESEARCH_LAB_DOCKER_IMAGE =
-  "mission-control/local-large-repository@sha256:7a36977d9b1449d2dae436e4b184326f0ef48b5873019c583911f6d95d9afda8";
-export const RESEARCH_LAB_DOCKER_IMAGE_ID =
-  "sha256:7a36977d9b1449d2dae436e4b184326f0ef48b5873019c583911f6d95d9afda8";
+import {
+  RESEARCH_LAB_DOCKER_IMAGE,
+  RESEARCH_LAB_DOCKER_IMAGE_ID,
+} from "../../../convex/lib/researchLabDockerScope.js";
+export {
+  RESEARCH_LAB_DOCKER_IMAGE,
+  RESEARCH_LAB_DOCKER_IMAGE_ID,
+  RESEARCH_LAB_DOCKER_PROFILE,
+} from "../../../convex/lib/researchLabDockerScope.js";
 const standard = Object.freeze({
   memoryMb: 512,
   workspaceBytes: 134217728,
