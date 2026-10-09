@@ -11,9 +11,16 @@ export async function reconcileFabObservedCost(ctx: MutationCtx, run: Doc<"workf
   const evidence = fabObservedCost(run, events);
   const spentUsd = Math.max(run.spentUsd ?? 0, evidence.observedUsd);
   const deltaUsd = spentUsd - (run.spentUsd ?? 0);
-  if (deltaUsd > 0) {
-    await ctx.db.patch(run._id, { spentUsd });
-    if (run.missionId) {
+  const authorization = run.executionCostAuthorization;
+  const reason = "Observed provider telemetry retained; completeness and billing settlement are unconfirmed. The full reservation remains.";
+  const clarifyUnknownCost = evidence.eventIds.length > 0 && authorization?.actualCost.status === "UNAVAILABLE"
+    && authorization.actualCost.reason !== reason;
+  if (deltaUsd > 0 || clarifyUnknownCost) {
+    await ctx.db.patch(run._id, {
+      spentUsd,
+      ...(clarifyUnknownCost ? { executionCostAuthorization: { ...authorization!, actualCost: { status: "UNAVAILABLE" as const, reason } } } : {}),
+    });
+    if (deltaUsd > 0 && run.missionId) {
       const mission = await ctx.db.get(run.missionId);
       if (!mission || mission.projectId !== run.projectId || mission.tenantId !== run.tenantId) {
         throw new Error("Attempt cost cannot cross Mission scope.");
