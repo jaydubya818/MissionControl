@@ -92,3 +92,17 @@ See [capacity evidence](../testing/evidence/large-repository-docker-2026-10-09/R
 Full qualification remains incomplete. The provider reports WORKLOAD_FAILURE
 for a successfully captured COMPLETED result, an existing reporting discrepancy.
 Resolve it and qualify an explicitly selected profile before live activation.
+
+## Terminal correction and explicit local selection, October 9
+
+Commit `093cc1d` fixes the diagnostic mismatch while retaining complete result
+validation. The full repository passed with SUCCESS diagnostics. Seven Docker
+lifecycle cases, 104 focused checks and the full 797-test orchestration suite
+passed; typechecking passed. The larger candidate now has explicit loopback-only
+composition selection. Standard limits and pins are unchanged.
+
+Canonical admission for the new profile is still closed. Current source review
+also found that AWS now documents CountTokens for the model, whereas the saved
+exact-route contract says unsupported. Requalify the route before using a lower
+reserve. See [selection and draft live budget](research-lab-large-profile.md)
+and [retained evidence](../testing/evidence/terminal-profile-2026-10-09/README.md).

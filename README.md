@@ -530,9 +530,15 @@ occurred. See [candidate evidence and next gates](docs/testing/evidence/executor
 
 The approved October 9 local capacity experiment passed the full-tree synthetic
 edit and patch capture with 256 MiB input, 1 GiB workspace and 2 GiB RAM. It also
-passed 67 boundary checks. Runtime defaults remain unchanged; a terminal-status
-reporting discrepancy and live approval gates remain. See [larger-profile
+passed 67 boundary checks. Runtime defaults remain unchanged. The terminal-status discrepancy was fixed
+and the full-tree test now reports SUCCESS. Canonical local admission and live
+approval gates remain. See [larger-profile
 evidence](docs/testing/evidence/large-repository-docker-2026-10-09/README.md).
+
+The October 9 follow-up passed 797 orchestration tests, seven Docker lifecycle
+cases and the full-repository SUCCESS check. The larger profile is explicitly
+selectable in local worker composition but has no canonical live admission.
+See [configuration, current price review and draft budget](docs/operations/research-lab-large-profile.md).
 
 ### Factory Deployed Engineer qualification environment
 
