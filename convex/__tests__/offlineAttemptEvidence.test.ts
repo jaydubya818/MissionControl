@@ -4,7 +4,8 @@ import { reportInternal, reportVerificationInternal } from "../factory/attempts"
 import { sha256Hex } from "@mission-control/shared";
 import { COMPOSITION_SCHEMA, INVOCATION_SCHEMA, INVOCATION_RESULT_SCHEMA, SYNTHETIC_WORKLOAD_DIGEST,
   ISOLATED_CONTAINER_POLICY, ISOLATED_CONTAINER_POLICY_DIGEST, invocationDigest, invocationResult, canonicalIsolatedInvocation,
-  RENDER_MARKDOWN_OPERATION_DIGEST, type IsolatedInvocation } from "@mission-control/workflow-engine/harness-contract";
+  RENDER_MARKDOWN_OPERATION_DIGEST, SUCCESSOR_ISOLATED_IMAGE_BINDING, SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG,
+  type IsolatedInvocation } from "@mission-control/workflow-engine/harness-contract";
 import { VERIFY_DOCUMENT_OPERATION, VERIFY_DOCUMENT_OPERATION_DIGEST } from "../../packages/workflow-engine/src/deterministicVerification";
 import { validateOfflineAttemptEvidence } from "../lib/offlineAttemptEvidence";
 
@@ -28,6 +29,35 @@ function fixture() {
 }
 
 describe("offline response evidence consistency (not execution authority)", () => {
+  it.each([false, true])("requires registered successor image evidence without v2 downgrade, classic=%s", classic => {
+    const packet: any = fixture(); const binding = SUCCESSOR_ISOLATED_IMAGE_BINDING;
+    packet.request.composition.runtimeImage = binding.manifestDigest;
+    packet.request.composition.bridge.digest = SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG.bridgeImplementationDigest;
+    packet.request.composition.backend.digest = SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG.backendImplementationDigest;
+    packet.request.compositionDigest = invocationDigest(packet.request.composition);
+    packet.result = invocationResult(packet.request, "SUCCESS", 1, 2);
+    const bytes = Buffer.from(JSON.stringify(packet.result));
+    Object.assign(packet.evidence, { schema: "factory-isolated-execution-evidence/v3",
+      container: { name: "mc-invoke-00000000-0000-4000-8000-000000000001", id: "b".repeat(64) },
+      runtimeImage: { ...binding, selectedReference: classic ? binding.configDigest : binding.manifestDigest,
+        observedImageId: classic ? binding.configDigest : binding.manifestDigest,
+        descriptorDigest: classic ? null : binding.manifestDigest, descriptorConfigDigest: classic ? null : binding.configDigest },
+      containerImageId: binding.configDigest, stdoutBase64: bytes.toString("base64"),
+      capturedStdoutSha256: `sha256:${sha256Hex(bytes)}`, validatedRuntimeResult: packet.result });
+    expect(validateOfflineAttemptEvidence(packet, packet.request).runtimeResult).toEqual(packet.result);
+    for (const mutate of [
+      (p: any) => { p.evidence.schema = "factory-isolated-execution-evidence/v2"; delete p.evidence.runtimeImage; delete p.evidence.containerImageId; },
+      (p: any) => { p.evidence.runtimeImage.sourceSha = "f".repeat(40); },
+      (p: any) => { p.evidence.runtimeImage.configDigest = `sha256:${"f".repeat(64)}`; },
+      (p: any) => { p.evidence.runtimeImage.selectedReference = "runtime:latest"; },
+      (p: any) => { p.evidence.containerImageId = `sha256:${"f".repeat(64)}`; },
+      (p: any) => { p.evidence.containerImageId = null; },
+      (p: any) => { p.evidence.runtimeImage = null; },
+    ]) {
+      const changed = structuredClone(packet); mutate(changed);
+      expect(() => validateOfflineAttemptEvidence(changed, changed.request)).toThrow();
+    }
+  });
   it("binds the captured Docker resource and rejects success without an observed ID", () => {
     const packet: any = fixture();
     packet.evidence.schema = "factory-isolated-execution-evidence/v2";

@@ -6,11 +6,11 @@ import { loadIsolatedInvocationBackend } from "../loadIsolatedInvocationBackend.
 const directories: string[] = [];
 afterEach(async () => { for (const path of directories.splice(0)) await rm(path, { recursive: true, force: true }); });
 describe("exact isolated backend loading", () => {
-  it("rejects substituted code before its top-level code can execute", async () => {
+  it.each(["2", "3"] as const)("rejects substituted v%s code before its top-level code can execute", async version => {
     const directory = await mkdtemp(join(tmpdir(), "isolated-loader-test-")); directories.push(directory);
     const path = join(directory, "backend.mjs");
     await writeFile(path, "throw new Error('UNTRUSTED_MODULE_EXECUTED');");
-    await expect(loadIsolatedInvocationBackend(path)).rejects.toThrow("does not match the registered implementation");
+    await expect(loadIsolatedInvocationBackend(path, version)).rejects.toThrow("does not match the registered implementation");
   });
   it("rejects symlinks and unbounded bundles before import", async () => {
     const directory = await mkdtemp(join(tmpdir(), "isolated-loader-test-")); directories.push(directory);

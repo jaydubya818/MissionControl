@@ -19,8 +19,7 @@ import {
   harnessSupportsModel,
   findKnownHarnessManifest,
   findKnownHarnessRuntimeArtifact,
-  ISOLATED_INVOCATION_EFFECTIVE_CONFIG,
-  LEGACY_ISOLATED_INVOCATION_EFFECTIVE_CONFIG,
+  findKnownIsolatedHarness,
 } from "@mission-control/workflow-engine/harness-contract";
 import { computeCanonicalHash } from "./genomeHash.js";
 import { OFFLINE_EXECUTION_PROFILE_SCHEMA, NO_INFERENCE_CONSTRAINT, offlineExecutionPolicyIssues, offlinePolicyDigest, type OfflineExecutionPolicy } from "./offlineExecutionPolicy.js";
@@ -1013,10 +1012,8 @@ function sandboxBindingIssues(input: unknown, profile: Record<string, any>): str
     if (isolatedSandboxIssues(input.profileSnapshot).length) return ["isolated-sandbox-invalid"];
     const snapshot = input.profileSnapshot;
     const policy = profile.offlinePolicy;
-    const registered = profile.harness?.version === "1"
-      ? LEGACY_ISOLATED_INVOCATION_EFFECTIVE_CONFIG
-      : ISOLATED_INVOCATION_EFFECTIVE_CONFIG;
-    if (profile.harness?.adapter !== "isolated-invocation" || !["1", "2"].includes(profile.harness?.version)
+    const registered = findKnownIsolatedHarness(profile.harness?.version)?.config;
+    if (profile.harness?.adapter !== "isolated-invocation" || !registered
       || policy?.bridge?.id !== "isolated-invocation" || policy?.bridge?.version !== "1"
       || policy?.backend?.id !== "docker-chroot-offline" || policy?.backend?.version !== "1"
       || policy?.bridge?.implementationDigest !== registered.bridgeImplementationDigest

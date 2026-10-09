@@ -64,7 +64,7 @@ import type { SandboxResultBundle } from "./sandboxResultBundle.js";
 import { standaloneSandboxSupervisorSource } from "./sandboxSupervisor.js";
 import { reconcileSandboxOrphans, type SandboxCleanupHealth } from "./sandboxReconciler.js";
 import { loadGovernedMcpContext } from "./factoryGovernedMcpContext.js";
-import { canonicalIsolatedInvocation, invocationResult, ISOLATED_INVOCATION_ADAPTER_ARTIFACT } from "@mission-control/workflow-engine/harness-contract";
+import { canonicalIsolatedInvocation, invocationResult, findKnownIsolatedHarness } from "@mission-control/workflow-engine/harness-contract";
 import { executionProfileQualificationMatches, executionProfileQualificationDigest,
   executionProfileProjectionBlockers } from "../../../convex/lib/executionProfile.js";
 import { validateOfflineAttemptEvidence } from "../../../convex/lib/offlineAttemptEvidence.js";
@@ -1900,8 +1900,9 @@ function assertHarnessAdapterIdentity(
     throw new Error("Registered harness adapter does not support the frozen execution backend.");
   }
   const expectedRuntimeArtifact = manifestExecutionRuntimeArtifact(manifest);
+  const isolated = findKnownIsolatedHarness(manifest.harness.version);
   if (executionBackend === "isolated-container"
-    && registration.runtimeArtifactSha256 !== harnessRuntimeArtifactDigest(ISOLATED_INVOCATION_ADAPTER_ARTIFACT)) {
+    && (!isolated || registration.runtimeArtifactSha256 !== harnessRuntimeArtifactDigest(isolated.adapter))) {
     throw new Error("Registered offline backend artifact does not match the admitted implementation.");
   }
   if (executionBackend === "persistent-worker"

@@ -11,8 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadIsolatedInvocationBackend } from "./loadIsolatedInvocationBackend.js";
 import { pinHostExecutable } from "./pinnedHostExecutable.js";
-import { ISOLATED_INVOCATION_MANIFEST, ISOLATED_INVOCATION_ADAPTER_ARTIFACT, ISOLATED_INVOCATION_EFFECTIVE_CONFIG,
-  ISOLATED_INVOCATION_RUNTIME_ARTIFACT, ISOLATED_CONTAINER_POLICY_DIGEST, COMPOSITION_SCHEMA,
+import { findKnownIsolatedHarness, SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG, inspectIsolatedRuntimeImage,
+  ISOLATED_CONTAINER_POLICY_DIGEST, COMPOSITION_SCHEMA,
   INVOCATION_SCHEMA, INVOCATION_RESULT_SCHEMA, type IsolatedInvocation } from "@mission-control/workflow-engine/harness-contract";
 
 export interface FactoryHarnessEnablement {
@@ -61,9 +61,18 @@ export function configuredFactoryHarnessAdapters(
 export async function createIsolatedFactoryHarness(input: {
   backendBundlePath: string;
   dockerExecutable: string;
+  version?: "2" | "3";
   authority: (request: IsolatedInvocation, phase: "DISPATCH" | "RESULT") => Promise<boolean>;
 }): Promise<HarnessRuntimeAdapter> {
-  const pinned = await pinHostExecutable(input.dockerExecutable, ISOLATED_INVOCATION_EFFECTIVE_CONFIG.dockerExecutableSha256);
+  const version = input.version ?? "2";
+  const registered = findKnownIsolatedHarness(version);
+  if (!registered || !["2", "3"].includes(version)) throw new Error("Unsupported registered isolated harness version");
+  const config = registered.config;
+  const dockerDigest = version === "3"
+    ? (SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG.dockerExecutableSha256ByPlatform as Record<string, string>)[`${process.platform}/${process.arch}`]
+    : config.dockerExecutableSha256;
+  if (!dockerDigest) throw new Error("Unqualified Docker host platform");
+  const pinned = await pinHostExecutable(input.dockerExecutable, dockerDigest);
   try {
   const verifyDocker = async () => {
     const handle = await open(pinned.executable, constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -72,23 +81,23 @@ export async function createIsolatedFactoryHarness(input: {
       if (!stat.isFile() || stat.size < 1 || stat.size > 256_000_000) throw new Error("Docker CLI artifact is invalid.");
       const bytes = await handle.readFile();
       if (bytes.length !== stat.size || createHash("sha256").update(bytes).digest("hex")
-        !== ISOLATED_INVOCATION_EFFECTIVE_CONFIG.dockerExecutableSha256) {
+        !== dockerDigest) {
         throw new Error("Docker CLI does not match the qualified host artifact.");
       }
     } finally { await handle.close(); }
   };
   await verifyDocker();
-  const Backend = await loadIsolatedInvocationBackend(input.backendBundlePath);
+  const Backend = await loadIsolatedInvocationBackend(input.backendBundlePath, version);
   const composition = { schema: COMPOSITION_SCHEMA, profileClass: "isolated-offline-control/v1" as const,
-    bridge: { id: "isolated-invocation", version: "1", digest: ISOLATED_INVOCATION_EFFECTIVE_CONFIG.bridgeImplementationDigest },
-    backend: { id: "docker-chroot-offline", version: "1", digest: ISOLATED_INVOCATION_EFFECTIVE_CONFIG.backendImplementationDigest },
-    runtimeImage: ISOLATED_INVOCATION_RUNTIME_ARTIFACT.imageDigest!, isolationDigest: ISOLATED_CONTAINER_POLICY_DIGEST,
+    bridge: { id: "isolated-invocation", version: "1", digest: config.bridgeImplementationDigest },
+    backend: { id: "docker-chroot-offline", version: "1", digest: config.backendImplementationDigest },
+    runtimeImage: registered.runtime.imageDigest!, isolationDigest: ISOLATED_CONTAINER_POLICY_DIGEST,
     invocationSchema: INVOCATION_SCHEMA, resultSchema: INVOCATION_RESULT_SCHEMA };
   class RegisteredIsolatedBackend extends Backend {
     async dispose() { await pinned.dispose(); }
     capabilities() {
-      return { ...super.capabilities(), version: "2", capabilityManifest: structuredClone(ISOLATED_INVOCATION_MANIFEST),
-        runtimeArtifact: structuredClone(ISOLATED_INVOCATION_ADAPTER_ARTIFACT), executionBackends: ["isolated-container" as const] };
+      return { ...super.capabilities(), version, capabilityManifest: structuredClone(registered!.manifest),
+        runtimeArtifact: structuredClone(registered!.adapter), executionBackends: ["isolated-container" as const] };
     }
     async health() {
       let directory: string | undefined;
@@ -97,22 +106,35 @@ export async function createIsolatedFactoryHarness(input: {
       try {
         await verifyDocker();
         directory = await mkdtemp(join(tmpdir(), "mc-offline-health-"));
-        await promisify(execFile)(pinned.executable, ["--host", ISOLATED_INVOCATION_EFFECTIVE_CONFIG.dockerHost,
-          "--config", directory, "image", "inspect", composition.runtimeImage],
-        { timeout: 10_000, maxBuffer: 128_000, env: { PATH: "/usr/local/bin:/usr/bin:/bin" } });
-        ready = true;
+        for (const reference of registered!.imageBinding
+          ? [registered!.imageBinding.manifestDigest, registered!.imageBinding.configDigest] : [composition.runtimeImage]) {
+          let stdout: string;
+          try {
+            ({ stdout } = await promisify(execFile)(pinned.executable, ["--host", config.dockerHost,
+              "--config", directory, "image", "inspect", reference],
+            { timeout: 10_000, maxBuffer: 128_000, env: { PATH: "/usr/local/bin:/usr/bin:/bin" } }));
+          } catch (error) {
+            const failure = error as { code?: unknown; stderr?: unknown };
+            if (registered!.imageBinding && failure.code === 1 && typeof failure.stderr === "string"
+              && failure.stderr.trim() === `Error response from daemon: No such image: ${reference}`) continue;
+            throw error;
+          }
+          if (registered!.imageBinding) inspectIsolatedRuntimeImage(registered!.imageBinding, reference, JSON.parse(stdout));
+          ready = true; break;
+        }
+        if (!ready) throw new Error("Exact image unavailable");
       } catch { details = "Exact offline host artifact or local runtime image is unavailable."; }
       finally {
         if (directory) try { await rm(directory, { recursive: true, force: true }); }
         catch { ready = false; details = "Private Docker health configuration cleanup failed."; }
       }
       return { status: ready ? "READY" as const : "UNAVAILABLE" as const, checkedAt: Date.now(),
-        adapter: "isolated-invocation", version: "2", details };
+        adapter: "isolated-invocation", version, details };
     }
   }
   return new RegisteredIsolatedBackend(composition, async (request, phase) => {
     await verifyDocker();
     return input.authority(request, phase);
-  }, pinned.executable);
+  }, pinned.executable, registered.imageBinding);
   } catch (error) { await pinned.dispose(); throw error; }
 }

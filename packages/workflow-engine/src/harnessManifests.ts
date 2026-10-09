@@ -352,18 +352,61 @@ export const ISOLATED_INVOCATION_MANIFEST: HarnessCapabilityManifest = {
   },
 };
 
+/** A separately built successor. These are not replacements for unavailable
+ * historical artifacts, and registry membership alone grants no admission. */
+export const SUCCESSOR_ISOLATED_IMAGE_BINDING = Object.freeze({
+  manifestDigest: "sha256:bddbcca962226a60fe962ccd5812b04b480064004b97e04a97f7166bc3be233a",
+  configDigest: "sha256:dadde9fff32581d2ebad5eda80c675f4e69a0805c7dbd3952119735db0a6da0b",
+  sourceSha: "912e26ebd2b08c2c58f7cbfc1b903c1d52c4851e", os: "linux" as const, architecture: "amd64" as const,
+});
+export const SUCCESSOR_ISOLATED_RUNTIME_ARTIFACT: HarnessRuntimeArtifactIdentity = {
+  ...ISOLATED_INVOCATION_RUNTIME_ARTIFACT, version: "3", imageDigest: SUCCESSOR_ISOLATED_IMAGE_BINDING.manifestDigest,
+};
+export const SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG = {
+  ...ISOLATED_INVOCATION_EFFECTIVE_CONFIG,
+  bridgeImplementationDigest: "sha256:c914e0511e5781b0cd6822a312d2a129f5327e29d95adbf552aadcb4a011ffbd",
+  backendImplementationDigest: "sha256:5b2a8f9beae65b309dd1852da4e2e1a524b92104d9a1d477192c1b2e8111f652",
+  runtimeImageBinding: SUCCESSOR_ISOLATED_IMAGE_BINDING,
+  dockerExecutableSha256ByPlatform: {
+    "darwin/arm64": "4357f91be750f42d984cd76f92dc7be198c57c31bc50b9a28ee88119e9d1c92e",
+    "linux/x64": "e45381109c685311cf84c5e33a1aca7da81d6b55c0f9aed74091fc08c3a94f13",
+  },
+};
+export const SUCCESSOR_ISOLATED_ADAPTER_ARTIFACT: HarnessRuntimeArtifactIdentity = {
+  ...ISOLATED_INVOCATION_ADAPTER_ARTIFACT, version: "3",
+  executableSha256: SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG.backendImplementationDigest.slice(7),
+};
+export const SUCCESSOR_ISOLATED_MANIFEST: HarnessCapabilityManifest = {
+  ...ISOLATED_INVOCATION_MANIFEST,
+  identity: { harnessId: "isolated-invocation", harnessVersion: "3", adapterId: "isolated-invocation", adapterVersion: "3",
+    harnessCommit: SUCCESSOR_ISOLATED_IMAGE_BINDING.sourceSha },
+  effectiveConfigSha256: canonicalHash(SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG),
+};
+
+export function findKnownIsolatedHarness(version: string) {
+  if (version === "1") return { config: LEGACY_ISOLATED_INVOCATION_EFFECTIVE_CONFIG, manifest: LEGACY_ISOLATED_INVOCATION_MANIFEST,
+    runtime: LEGACY_ISOLATED_INVOCATION_RUNTIME_ARTIFACT, adapter: LEGACY_ISOLATED_INVOCATION_ADAPTER_ARTIFACT, imageBinding: undefined };
+  if (version === "2") return { config: ISOLATED_INVOCATION_EFFECTIVE_CONFIG, manifest: ISOLATED_INVOCATION_MANIFEST,
+    runtime: ISOLATED_INVOCATION_RUNTIME_ARTIFACT, adapter: ISOLATED_INVOCATION_ADAPTER_ARTIFACT, imageBinding: undefined };
+  if (version === "3") return { config: SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG, manifest: SUCCESSOR_ISOLATED_MANIFEST,
+    runtime: SUCCESSOR_ISOLATED_RUNTIME_ARTIFACT, adapter: SUCCESSOR_ISOLATED_ADAPTER_ARTIFACT, imageBinding: SUCCESSOR_ISOLATED_IMAGE_BINDING };
+  return undefined;
+}
+
 export const KNOWN_HARNESS_MANIFESTS = [
   CODEX_BEDROCK_V1_HARNESS_MANIFEST,
   CODEX_V1_HARNESS_MANIFEST,
   DEEPSEEK_V1_HARNESS_MANIFEST,
   LEGACY_ISOLATED_INVOCATION_MANIFEST,
   ISOLATED_INVOCATION_MANIFEST,
+  SUCCESSOR_ISOLATED_MANIFEST,
 ] as const;
 
 const KNOWN_HARNESS_RUNTIME_ARTIFACTS = [
   { adapterId: "codex", adapterVersion: "bedrock-v1", artifact: CODEX_V1_RUNTIME_ARTIFACT },
   { adapterId: "isolated-invocation", adapterVersion: "1", artifact: LEGACY_ISOLATED_INVOCATION_RUNTIME_ARTIFACT },
   { adapterId: "isolated-invocation", adapterVersion: "2", artifact: ISOLATED_INVOCATION_RUNTIME_ARTIFACT },
+  { adapterId: "isolated-invocation", adapterVersion: "3", artifact: SUCCESSOR_ISOLATED_RUNTIME_ARTIFACT },
   { adapterId: "codex", adapterVersion: "v1", artifact: CODEX_V1_RUNTIME_ARTIFACT },
   { adapterId: "deepseek-harness", adapterVersion: "0.2.0", artifact: DEEPSEEK_V1_RUNTIME_ARTIFACT },
 ] as const;
