@@ -15,6 +15,8 @@ export const fixtureRegistrationConfig = v.object({
   capacity: v.number(),
   admissionPolicy: v.literal("FIXTURE_ONLY"),
   compatibility: compatibilityIdentity,
+  localProviderSourceSha: v.optional(v.string()),
+  executionProvider: v.optional(v.literal("LOCAL_DOCKER_QUALIFICATION")),
 });
 export const fixtureRegistration = v.object({
   config: fixtureRegistrationConfig,
@@ -27,7 +29,7 @@ export const fixtureRegistration = v.object({
   revokedAt: v.optional(v.number()),
 });
 export const fixtureBudget = v.object({
-  mode: v.literal("FIXTURE_ONLY"), ceilingMicrousd: v.number(),
+  mode: v.literal("FIXTURE_ONLY"), ownerActorId: v.optional(v.string()), ceilingMicrousd: v.number(),
   holds: v.array(v.object({
     id: v.string(), digest: v.string(), kind: v.union(v.literal("NATIVE"), v.literal("DELEGATED")),
     maximumMicrousd: v.number(), expiresAt: v.number(),

@@ -1,4 +1,4 @@
-import { mutationGeneric as mutation } from "convex/server";
+import { internalMutationGeneric as internalMutation, mutationGeneric as mutation } from "convex/server";
 import schema from "./schema";
 
 export const seed = mutation({ args: {}, handler: async ctx => {
@@ -32,6 +32,8 @@ export const seed = mutation({ args: {}, handler: async ctx => {
   const operatorId = await insert("operators", { tenantId, authId: "fixture-owner", email: "owner@example.test", active: true });
   const roleId = await insert("roles", { tenantId, name: "Owner", permissions: ["company.manage"] });
   await insert("roleAssignments", { operatorId, roleId });
+  const peerOperatorId = await insert("operators", { tenantId, authId: "fixture-peer", email: "peer@example.test", active: true });
+  await insert("roleAssignments", { operatorId: peerOperatorId, roleId });
   const repositoryId = await insert("workspaceRepositories", { tenantId, projectId });
   const workflowId = await insert("workflows", {});
   const factoryDefinitionId = await insert("factoryDefinitions", { tenantId, projectId, repositoryId, status: "DRAFT", name: "MyFactory compatibility" });
@@ -39,7 +41,7 @@ export const seed = mutation({ args: {}, handler: async ctx => {
     configurationDigest: "factory-v1-fixture" });
   const nativeFactoryId = await insert("factoryDefinitions", { tenantId, projectId, repositoryId, status: "DRAFT", name: "Native compatibility" });
   const nativeVersionId = await insert("factoryDefinitionVersions", { tenantId, projectId, factoryDefinitionId: nativeFactoryId, repositoryId, workflowId, configurationDigest: "factory-v1-native-fixture" });
-  const missionId = await insert("missions", { tenantId, projectId, spentUsd: 0, budgetUsd: 0.0001, metadata: { enterpriseCompatibilityFixture: true } });
+  const missionId = await insert("missions", { tenantId, projectId, owner: operatorId, spentUsd: 0, budgetUsd: 0.0001, metadata: { enterpriseCompatibilityFixture: true } });
   await insert("projectConstitutionRevisions", { projectId });
   const missionSpecRevisionId = await insert("missionSpecRevisions", { tenantId, projectId, missionId });
   const missionPlanId = await insert("missionPlans", { tenantId, projectId, missionId, summary: "Fixture plan", workOrderBlueprints: [] });
@@ -58,5 +60,29 @@ export const seed = mutation({ args: {}, handler: async ctx => {
   const otherRoleId = await insert("roles", { tenantId: otherTenantId, name: "Owner", permissions: ["company.manage"] });
   await insert("roleAssignments", { operatorId: otherOperatorId, roleId: otherRoleId });
   return { tenantId, projectId, repositoryId, factoryDefinitionId, definitionVersionId, nativeFactoryId, nativeVersionId,
-    missionId, missionSpecRevisionId, missionPlanId, workOrderId, workOrderRevisionId, taskId, workflowRunId, otherProjectId };
+    missionId, missionSpecRevisionId, missionPlanId, workOrderId, workOrderRevisionId, taskId, workflowRunId, otherProjectId, operatorId };
 } });
+
+
+export const approveExecution = internalMutation({ handler: async (ctx, args) => {
+  const { binding: b, bindingDigest, checkIdsDigest, quality, verificationSpec } = args;
+  const identity = await ctx.auth.getUserIdentity();
+  if (identity?.subject !== "fixture-owner") throw Error("FIXTURE_OWNER_REQUIRED");
+  const mission = await ctx.db.get(b.missionId), plan = await ctx.db.get(b.missionPlanId), run = await ctx.db.get(b.workflowRunId);
+  if (plan.metadata?.enterpriseDelegationApproval) throw Error("APPROVAL_IMMUTABLE");
+  await ctx.db.patch(mission._id, { owner: b.ownerScope, activeWorkOrderId: b.workOrderId, state: "IN_PROGRESS" });
+  await ctx.db.patch(plan._id, { status: "APPROVED", approvedBy: b.ownerScope, approvedAt: Date.now(), decidedActorSource: "AUTHENTICATED",
+    qualityContractDigest: quality.digest, qualityContractProjection: quality.projection,
+    metadata: { enterpriseDelegationApproval: { bindingDigest, checkIdsDigest, verificationSpec, ownerActorId: b.ownerScope, leaseId: "fixture-lease", criterionTitle: "Project slug protected behavior" } } });
+  await ctx.db.patch(b.workOrderId, { approvalStatus: "APPROVED", repository: b.repository, currentExecutionRunId: run._id, qualityContractDigest: b.qualityContractDigest,
+    acceptanceCriteria: verificationSpec.acceptanceCriteria.map(c => ({ ...c, status: "PENDING" })), negativeConstraints: verificationSpec.negativeConstraints, changeBudget: verificationSpec.changeBudget, verificationContract: verificationSpec.verificationContract });
+  await ctx.db.patch(b.workOrderRevisionId, { status: "APPLIED" });
+  await ctx.db.patch(run._id, { status: "RUNNING", metadata: { enterpriseDelegationId: b.delegationId },
+    lease: { leaseId: "fixture-lease", ownerId: b.ownerScope, workerGeneration: b.authorityGeneration,
+      claimedAt: Date.now(), heartbeatAt: Date.now(), expiresAt: b.deadline + 60000 } });
+} });
+export const fault = internalMutation({ handler: async (ctx, args) => {
+  if ((await ctx.auth.getUserIdentity())?.subject !== "fixture-owner") throw Error("FIXTURE_OWNER_REQUIRED");
+  await ctx.db.patch(args.id, { ...args.patch, ...Object.fromEntries((args.unset ?? []).map(key => [key, undefined])) });
+} });
+export const inspect = internalMutation({ handler: async (ctx, args) => ctx.db.get(args.id) });

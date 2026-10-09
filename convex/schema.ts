@@ -1256,6 +1256,7 @@ export const schemaTablesPartOne = {
     factoryDefinitionId: v.id("factoryDefinitions"), delegationId: v.string(),
     partnerRequestId: v.string(), partnerWorkId: v.string(),
     binding: v.any(), bindingDigest: v.string(), registrationDigest: v.string(),
+    resultInputDigest: v.optional(v.string()), qualityGateDecisionId: v.optional(v.id("qualityGateDecisions")),
     state: trialState, observationRevision: v.number(), observationDigest: v.optional(v.string()),
     partnerWorkOrderId: v.optional(v.string()), partnerRunId: v.optional(v.string()),
     cancelRequested: v.boolean(), closed: v.boolean(), createdAt: v.number(), updatedAt: v.number(),

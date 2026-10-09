@@ -70,7 +70,7 @@ export async function startFixtureDatabase(repo) {
     }
     const owner = client("fixture-owner"), other = client("fixture-other");
     const seed = await owner.mutation("fixtureSeed:seed", {});
-    return { root, seed, owner, other, anonymous: new ConvexHttpClient(url), stop,
+    return { root, seed, owner, other, peer: client("fixture-peer"), anonymous: new ConvexHttpClient(url), stop,
       restart: async () => { await stop(); await start(); }, copied: [...copied] };
   } catch (error) { await stop(); throw error; }
 }

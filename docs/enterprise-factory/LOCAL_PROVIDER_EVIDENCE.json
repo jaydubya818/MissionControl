@@ -1,0 +1,125 @@
+{
+  "myFactorySourceSha": "e498c31db8b749fa91b0544ecd1d1a661b971c2c",
+  "checks": [
+    "concurrent enterprise admission reserves exactly one delegated allowance",
+    "cross-tenant and same-tenant cross-owner reads and mutations denied",
+    "budget owner remains fenced after current Plan removal or approval replacement",
+    "native and delegated concurrent budget contention is bounded",
+    "stale WorkOrder, stale Attempt, revoked Plan and stale lease deny execution",
+    "frozen Quality Contract cannot lose mandatory verification checks",
+    "one controller claim survives lost admission acknowledgment and restart",
+    "wrong candidate, wrong provider and stale result writer denied",
+    "real execution evidence enters enterprise shadow gate and settles once",
+    "cancel terminal proof reconciles after fencing without granting execution",
+    "failed terminal proof reconciles after fencing without granting execution",
+    "late-completed terminal proof reconciles after fencing without granting execution",
+    "expired terminal proof reconciles after fencing without granting execution"
+  ],
+  "journeys": [
+    {
+      "state": "COMPLETED",
+      "resultDigest": "e58c09c5c1bfb937e0145de3f1a2d002316d6fa1a31896e86360887768c0167f",
+      "factoryVersion": "4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95",
+      "sourceDigest": "93944614be94c6d824f8640d0bda26a7822528dd0d960c02e7db474d15e7f929",
+      "hostQualification": {
+        "runtimeSha256": "8e5dda1d476303b6094a34bc04bcc4b1e5622fc5c3fd40d75063281d45b79691",
+        "policySha256": "6b5419dd57095b9f639ad09d88c1183da18c7353bb45e0a8c97f3593290383b0",
+        "checks": {
+          "uid": 1000,
+          "rootDenied": true,
+          "absent": true,
+          "noCredentials": true,
+          "caps": true,
+          "seccomp": true,
+          "noNewPrivileges": true,
+          "networkBlocked": true,
+          "resourceLimits": true,
+          "crossWorkFilesystem": true,
+          "processTreeCleanup": true,
+          "separatePidNamespace": true,
+          "deadlineInitProtected": true
+        }
+      },
+      "gateState": "AWAITING_HUMAN",
+      "execution": {
+        "producerAllocations": 1,
+        "verifierAllocations": 1,
+        "productiveExecutions": 1,
+        "containers": [
+          {
+            "id": "f632ee2b9e6cdff9e1f95cd8fd084ee8a690a2b4ebc0ff510c2dc25f19aa8f61",
+            "runId": "ae4b90a1-a0d9-47bf-a5b4-54e0dd4eb388",
+            "kind": "producer"
+          },
+          {
+            "id": "ff6caebd9f740b01a07f4b2b480e840c469319518752b9d78be7b5b7c30b1b7c",
+            "runId": "ae4b90a1-a0d9-47bf-a5b4-54e0dd4eb388",
+            "kind": "verifier"
+          }
+        ],
+        "runtime": {
+          "engine": "29.7.2",
+          "kernel": "7.0.12-linuxkit",
+          "architecture": "aarch64",
+          "os": "Docker Desktop",
+          "securityOptions": [
+            "name=seccomp,profile=builtin",
+            "name=cgroupns"
+          ],
+          "imageId": "sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0",
+          "image": "public.ecr.aws/docker/library/node@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0",
+          "architectureImage": "arm64"
+        },
+        "policy": {
+          "version": 1,
+          "network": "none",
+          "user": "1000:1000",
+          "initUser": "0:0",
+          "rootFilesystem": "read-only",
+          "capabilities": [],
+          "noNewPrivileges": true,
+          "seccomp": "docker-default",
+          "pidNamespace": "private",
+          "ipc": "private",
+          "hostMounts": false,
+          "ports": false,
+          "memoryMb": 256,
+          "pids": 64,
+          "vcpus": 1,
+          "swapMb": 256,
+          "timeoutMs": 180000,
+          "tmpfsMb": 96
+        }
+      },
+      "paidOperations": 0
+    },
+    {
+      "mode": "cancel",
+      "state": "CANCELLED",
+      "resultDigest": "7938c746e4456157f532ae55261a5306b954ed99904c0e17c3bdc3222c2c8bb5",
+      "paidOperations": 0
+    },
+    {
+      "mode": "failed",
+      "state": "FAILED",
+      "resultDigest": "96bc383bb5171ad07a5105ddac5671e5cba463b2066474acc7879d42d269de8f",
+      "paidOperations": 0
+    },
+    {
+      "mode": "late-completed",
+      "state": "COMPLETED",
+      "resultDigest": "87ca91250b3d2966c5d779fb9ac90632fb6e7fead957fb7668addf66115f674e",
+      "paidOperations": 0
+    },
+    {
+      "mode": "expired",
+      "state": "COMPLETED",
+      "resultDigest": "a82a974c7e62dddf947dc09c91e8676fa0a342117bb6db1ae5cd2c3334580f58",
+      "paidOperations": 0
+    }
+  ],
+  "paidOperations": 0,
+  "productionIntegration": "NOT_RUN",
+  "executableProductionGrants": 0,
+  "externalAlphaChanges": 0
+}

@@ -1,0 +1,77 @@
+name: Local provider composed qualification
+
+on:
+  push:
+    branches: [codex/local-provider-qualification]
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm --filter @mission-control/shared test
+      - run: pnpm run typecheck
+      - run: pnpm exec tsc --noEmit --project convex/tsconfig.json
+      - name: Native factory regressions
+        run: >-
+          pnpm exec vitest run
+          convex/__tests__/factoryAttempt.test.ts
+          convex/__tests__/factoryConfiguration.test.ts
+          convex/__tests__/factoryDispatch.test.ts
+          convex/__tests__/factoryRuntimeGoldenPath.test.ts
+          convex/__tests__/missionWorkOrderContract.test.ts
+          convex/__tests__/missionGovernance.test.ts
+          convex/__tests__/providerLiability.test.ts
+      - name: Adapter authentication contracts
+        run: pnpm --filter @mission-control/orchestration-server exec vitest run src/__tests__/myFactoryCompatibilityAdapter.test.ts
+      - name: Pin compatibility source and local database runtime
+        run: |
+          git init --bare "$RUNNER_TEMP/myfactory.git"
+          git --git-dir="$RUNNER_TEMP/myfactory.git" fetch --depth=1 https://github.com/jaydubya818/MyFactory.git fa48a820ba185eb9b891130c78166463b61cba74
+          test "$(git --git-dir="$RUNNER_TEMP/myfactory.git" rev-parse FETCH_HEAD)" = fa48a820ba185eb9b891130c78166463b61cba74
+          curl --fail --location --output "$RUNNER_TEMP/convex.zip" https://github.com/get-convex/convex-backend/releases/download/precompiled-2026-09-28-5c7cb5b/convex-local-backend-x86_64-unknown-linux-gnu.zip
+          echo "5b4adbe9fc2f9985c66eb12b19dadedf2700d8796c839ddba09802196099f241  $RUNNER_TEMP/convex.zip" | sha256sum --check
+          unzip "$RUNNER_TEMP/convex.zip" -d "$RUNNER_TEMP/convex"
+          chmod +x "$RUNNER_TEMP/convex/convex-local-backend"
+      - name: Pinned execution provenance boundary
+        env:
+          MC_MYFACTORY_COMPATIBILITY_GIT: ${{ runner.temp }}/myfactory.git
+        run: node --import tsx scripts/enterprise-compatibility/execution-boundary.mjs
+      - name: Bedrock accepted failure-set comparison
+        run: node scripts/enterprise-compatibility/bedrock-regression.mjs
+      - name: Real database and loopback compatibility qualification
+        env:
+          MC_MYFACTORY_COMPATIBILITY_GIT: ${{ runner.temp }}/myfactory.git
+          MC_COMPATIBILITY_CONVEX_BINARY: ${{ runner.temp }}/convex/convex-local-backend
+        run: node --import tsx scripts/enterprise-compatibility/qualify.mjs
+      - run: node scripts/check-repository-secrets.mjs
+      - run: node scripts/check-convex-authorization.mjs
+      - run: node scripts/skill-lint.mjs
+      - name: Prepare isolated local-provider source and containers
+        run: |
+          git init "$RUNNER_TEMP/myfactory-local"
+          git -C "$RUNNER_TEMP/myfactory-local" fetch --depth=1 https://github.com/jaydubya818/MyFactory.git e498c31db8b749fa91b0544ecd1d1a661b971c2c
+          git -C "$RUNNER_TEMP/myfactory-local" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/myfactory-local" rev-parse HEAD)" = e498c31db8b749fa91b0544ecd1d1a661b971c2c
+          npm ci --prefix "$RUNNER_TEMP/myfactory-local" --ignore-scripts --no-audit --no-fund
+          git --git-dir="$RUNNER_TEMP/myfactory.git" fetch --depth=1 https://github.com/jaydubya818/MyFactory.git 5cd13fa1f307a0c0f42f6317d966bb3179ad77c9
+          docker pull public.ecr.aws/docker/library/node@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0
+          docker pull public.ecr.aws/docker/library/postgres:17
+          docker tag public.ecr.aws/docker/library/postgres:17 postgres:17
+      - name: Real MissionControl to MyFactory local-provider journey
+        env:
+          MC_LOCAL_MYFACTORY_ROOT: ${{ runner.temp }}/myfactory-local
+          MYFACTORY_FIXTURE_GIT: ${{ runner.temp }}/myfactory.git
+          MC_COMPATIBILITY_CONVEX_BINARY: ${{ runner.temp }}/convex/convex-local-backend
+        run: node --import tsx scripts/enterprise-compatibility/local-provider.mjs
