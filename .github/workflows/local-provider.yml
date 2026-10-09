@@ -65,7 +65,8 @@ jobs:
           git -C "$RUNNER_TEMP/myfactory-local" checkout --detach FETCH_HEAD
           test "$(git -C "$RUNNER_TEMP/myfactory-local" rev-parse HEAD)" = e498c31db8b749fa91b0544ecd1d1a661b971c2c
           npm ci --prefix "$RUNNER_TEMP/myfactory-local" --ignore-scripts --no-audit --no-fund
-          git --git-dir="$RUNNER_TEMP/myfactory.git" fetch --depth=1 https://github.com/jaydubya818/MyFactory.git 5cd13fa1f307a0c0f42f6317d966bb3179ad77c9
+          git --git-dir="$RUNNER_TEMP/myfactory.git" fetch --no-tags https://github.com/jaydubya818/MyFactory.git 5cd13fa1f307a0c0f42f6317d966bb3179ad77c9
+          test "$(git --git-dir="$RUNNER_TEMP/myfactory.git" rev-parse FETCH_HEAD)" = 5cd13fa1f307a0c0f42f6317d966bb3179ad77c9
           docker pull public.ecr.aws/docker/library/node@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0
           docker pull public.ecr.aws/docker/library/postgres:17
           docker tag public.ecr.aws/docker/library/postgres:17 postgres:17
