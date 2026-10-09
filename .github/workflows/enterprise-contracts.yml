@@ -44,6 +44,12 @@ jobs:
           echo "5b4adbe9fc2f9985c66eb12b19dadedf2700d8796c839ddba09802196099f241  $RUNNER_TEMP/convex.zip" | sha256sum --check
           unzip "$RUNNER_TEMP/convex.zip" -d "$RUNNER_TEMP/convex"
           chmod +x "$RUNNER_TEMP/convex/convex-local-backend"
+      - name: Pinned execution provenance boundary
+        env:
+          MC_MYFACTORY_COMPATIBILITY_GIT: ${{ runner.temp }}/myfactory.git
+        run: node --import tsx scripts/enterprise-compatibility/execution-boundary.mjs
+      - name: Bedrock accepted failure-set comparison
+        run: node scripts/enterprise-compatibility/bedrock-regression.mjs
       - name: Real database and loopback compatibility qualification
         env:
           MC_MYFACTORY_COMPATIBILITY_GIT: ${{ runner.temp }}/myfactory.git
