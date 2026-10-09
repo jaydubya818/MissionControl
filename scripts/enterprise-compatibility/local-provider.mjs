@@ -11,6 +11,7 @@ import {compileApprovedPlanQualityContract} from '../../convex/lib/qualityContra
 import {startFixtureDatabase} from './database.mjs';
 import {compatibility} from './fixtures.mjs';
 import {verifyLocalDelegationResult,verifyLocalTerminalResult,verifyLocalCustodyObservation,LOCAL_PROVIDER_QUALIFICATION_SHA} from '../../apps/orchestration-server/src/myFactoryLocalCompatibility.ts';
+import {MyFactoryLocalRecovery} from '../../apps/orchestration-server/src/myFactoryLocalRecovery.ts';
 import {signFixtureEnvelope,verifyFixtureEnvelope,COMPATIBILITY_PROTOCOL} from '../../apps/orchestration-server/src/myFactoryCompatibilityAdapter.ts';
 const root=resolve(process.env.MC_LOCAL_MYFACTORY_ROOT),repo=process.cwd();
 const canonicalAccounting=process.env.MC_CANONICAL_ACCOUNTING_QUALIFICATION==='1';
@@ -25,8 +26,9 @@ const checks=[],journeys=[];let db,pg,f,server;
 const check=async(name,fn)=>{await fn();checks.push(name);console.log('PASS '+name);};
 const hash='sha256:'+'a'.repeat(64);
 async function cleanup(){if(server){server.closeAllConnections();server.close();server=null;}await db?.stop();db=null;await pg?.stop();pg=null;await f?.stop();f=null;}
-async function setup({expiresIn,withoutTariff=false,policyFailure=false}={}){
+async function setup({expiresIn,withoutTariff=false,policyFailure=false,verifierFailure=false}={}){
  db=await startFixtureDatabase(repo,{canonicalAccounting});f=await localFixture(root);await qualifyHost(f);pg=await startPostgres(root);
+ if(verifierFailure){f.policy=structuredClone(f.policy);f.policy.checks[0].expected={value:'intentionally-failing-protected-expectation'};f.configuration.local.verificationPolicySha256=partner.digest(f.policy);}
  const s=db.seed,now=Date.now(),request=f.request;
  if(canonicalAccounting)await db.owner.mutation('accountingFixture:configure',{seed:s});
  const b={schema:'factory-delegation-binding/v1',delegationId:'local-'+randomUUID(),tenantId:s.tenantId,projectId:s.projectId,
@@ -79,30 +81,37 @@ async function setup({expiresIn,withoutTariff=false,policyFailure=false}={}){
  const reservation=(await inspect(s.workflowRunId)).executionCostAuthorization?.enterprise;
  return{s,b,bindingDigest,mut,query,inspect,fault,base,trialId,authority,factory,tariff:tariff?.tariff,admittedAt:reservation?.authorizedAt};
 }
-async function transport(c){
+async function transport(c,{dropResult=false,corruptResult=false}={}){
  const key={id:'local-request',secret:randomBytes(32),tenantId:c.b.tenantId,projectId:c.b.projectId,factoryId:c.b.factoryId,validUntil:Date.now()+3600000,revoked:false};
- const responseKey={...key,id:'local-response',secret:randomBytes(32)};let drop=true,admissions=0;
+ const responseKey={...key,id:'local-response',secret:randomBytes(32)};let drop=true,admissions=0,resultDrops=0;
  server=createServer(async(req,res)=>{try{
   const chunks=[];let size=0;for await(const x of req){size+=x.length;if(size>2000000)throw Error('BOUND');chunks.push(x);}
   const signed=JSON.parse(Buffer.concat(chunks)),operation=signed.envelope.operation;
   const e=verifyFixtureEnvelope(signed,key,'REQUEST',{bindingDigest:c.bindingDigest,operation,requestDigest:null},Date.now());let payload;
   if(operation==='ADMIT'){if(partner.digest(e.payload)!==c.b.partnerRequestDigest)throw Error('EXACT_REQUEST');await c.authority();payload=await c.factory.control.prepare(e.payload);admissions++;if(drop){drop=false;req.socket.destroy();return;}}
   else if(operation==='STATUS')payload=await c.factory.control.read(c.b.partnerRequestId);
+  else if(operation==='CANCEL'){
+   const state=await c.factory.control.read(c.b.partnerRequestId);
+   if(!['COMPLETED','FAILED','CANCELLED'].includes(state.state)){await c.factory.store.stop('missioncontrol-local',state.identity??c.factory.identity(state));await c.factory.reconcile();}
+   payload=await c.factory.control.read(c.b.partnerRequestId);
+  }
   else if(operation==='RESULT'){
    payload=await c.factory.control.result(c.b.partnerRequestId);
-   if(canonicalAccounting&&payload.state==='COMPLETED'&&payload.result){
+   if(canonicalAccounting&&payload.result&&JSON.parse(Buffer.from(payload.result.encoded,'base64url').toString()).candidate){
     const source=await c.factory.control.source(c.b.partnerRequestId),observedAt=Date.now();
     payload.observation={bindingDigest:c.bindingDigest,resultDigest:'sha256:'+payload.result.manifestDigest,
      candidateCommit:source.candidateCommit,candidateTree:source.candidateTree,observedAt,expiresAt:observedAt+60000};
    }
   }
   else throw Error('OPERATION');
+  if(operation==='RESULT'&&corruptResult&&payload.result?.artifacts.length)payload.result.artifacts[0].base64=Buffer.from('substituted-candidate').toString('base64');
+  if(operation==='RESULT'&&dropResult&&resultDrops++===0){req.socket.destroy();return;}
   const reply=signFixtureEnvelope({...e,keyId:responseKey.id,payload,requestDigest:canonicalDigest('factory-fixture-request/v1',signed)},responseKey,'RESPONSE');res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(reply));
  }catch{res.writeHead(403);res.end('{}');}});server.listen(0,'127.0.0.1');await once(server,'listening');
  const call=async(operation,payload)=>{const envelope={protocol:COMPATIBILITY_PROTOCOL,keyId:key.id,tenantId:key.tenantId,projectId:key.projectId,factoryId:key.factoryId,bindingDigest:c.bindingDigest,operation,nonce:randomUUID(),expiresAt:Date.now()+30000,payload,requestDigest:null};
   const signed=signFixtureEnvelope(envelope,key,'REQUEST');const response=await fetch('http://127.0.0.1:'+server.address().port,{method:'POST',body:JSON.stringify(signed),redirect:'error',signal:AbortSignal.timeout(10000)});assert.equal(response.status,200);
   const authenticatedResponse=await response.json();return {...verifyFixtureEnvelope(authenticatedResponse,responseKey,'RESPONSE',{bindingDigest:c.bindingDigest,operation,requestDigest:canonicalDigest('factory-fixture-request/v1',signed)},Date.now()).payload,authenticatedResponse};};
- return{call,get admissions(){return admissions;}};
+ return{call,setCorruptResult:value=>{corruptResult=value;},endpoint:'http://127.0.0.1:'+server.address().port+'/compatibility',requestKey:key,responseKey,get admissions(){return admissions;},get resultDrops(){return resultDrops;}};
 }
 async function observe(c,p,state=p.state){await c.mut('observeTrial',{trialId:c.trialId,revision:state==='PREPARED'?1:2,state,partnerWorkOrderId:p.workOrderId,partnerRunId:p.runId,receiptDigest:canonicalDigest('local-observation/v1',{state,run:p.runId})});}
 try{
@@ -213,6 +222,69 @@ try{
    assert.equal(exposure(await c.query('getBudget',{missionId:c.s.missionId})),0);
    journeys.push({mode:'enterprise-policy-failed',factoryOutcome:'PASS',gateState:gate.state,paidOperations:0});
   });await cleanup();
+ }
+ if(canonicalAccounting&&process.env.MC_RECOVERY_QUALIFICATION==='1'){
+  for(const mode of ['restart-lost-ack','unknown','cancel-executing','expired','stale-writer','verifier-failure','candidate-mismatch'].filter(mode=>!process.env.MC_RECOVERY_CASE||mode===process.env.MC_RECOVERY_CASE)){
+   const c=await setup(mode==='unknown'?{expiresIn:2000}:mode==='expired'?{expiresIn:20000}:mode==='verifier-failure'?{verifierFailure:true}:{});
+   await c.mut('claimTrial',{trialId:c.trialId});const wire=await transport(c,{dropResult:mode==='restart-lost-ack',corruptResult:mode==='candidate-mismatch'});
+   let lostAck=mode==='restart-lost-ack',ingestions=0;
+   const makeRecovery=()=>new MyFactoryLocalRecovery({endpoint:wire.endpoint,requestKey:wire.requestKey,responseKey:wire.responseKey,
+    verifier:partner,keys:[f.signing.key],tariff:c.tariff,admittedAt:c.admittedAt,store:{
+     read:()=>c.query('readTrial',{trialId:c.trialId}),authority:c.authority,
+     observe:projection=>c.mut('observeTrial',{trialId:c.trialId,...projection}),
+     ingest:async projection=>{ingestions++;const id=await c.mut('ingestExecutionResult',{trialId:c.trialId,...projection});if(lostAck){lostAck=false;throw Error('LOST_RESULT_ACK');}return id;},
+     settle:projection=>c.mut('reconcileTerminalExecution',{trialId:c.trialId,...projection}),
+    }});
+   if(mode==='unknown'){
+    await check('autonomous recovery retains missing admission UNKNOWN across cancellation expiry and restart',async()=>{
+     assert.equal(await makeRecovery().reconcileOnce(),'UNKNOWN');await c.mut('cancelTrial',{trialId:c.trialId});
+     await new Promise(resolve=>setTimeout(resolve,Math.max(0,c.b.expiresAt-Date.now()+10)));await db.restart();
+     assert.equal(await makeRecovery().reconcileOnce(),'UNKNOWN');assert.equal(exposure(await c.query('getBudget',{missionId:c.s.missionId})),80);
+     assert.equal(wire.admissions,0);assert.equal(c.factory.evidence.productiveExecutions,0);
+    });journeys.push({mode,remainingExposure:80,admissions:wire.admissions,paidOperations:0});await cleanup();continue;
+   }
+   await assert.rejects(wire.call('ADMIT',f.request));
+   const p=await c.factory.control.read(c.b.partnerRequestId),identity=c.factory.identity(p);
+   await db.restart();c.factory=await createLocalFactory(f,pg.pool,c.authority);
+   assert.equal(await makeRecovery().reconcileOnce(),'OBSERVED');assert.equal(c.factory.evidence.productiveExecutions,0);
+   if(mode==='cancel-executing'){
+    let entered;const barrier=new Promise(r=>{entered=r;}),execute=c.factory.provider.execute;
+    c.factory.provider.execute=async(...args)=>{
+     const command=c.factory.node(args[0],"require('node:fs').writeFileSync('/tmp/recovery-command-running','1');setTimeout(()=>process.stdout.write('fault-delay'),30000)");
+     const completed=command.then(()=>null,error=>error);
+     while(await c.factory.node(args[0],"process.stdout.write(String(require('node:fs').existsSync('/tmp/recovery-command-running')))" )!=='true')await new Promise(r=>setTimeout(r,20));
+     entered();const error=await completed;if(error)throw error;return execute(...args);
+    };
+    await c.factory.control.dispatch(identity);const active=c.factory.execute(identity).catch(error=>error);await barrier;
+    await c.mut('cancelTrial',{trialId:c.trialId});await wire.call('CANCEL',{requestId:c.b.partnerRequestId});await active;
+   }else{await c.factory.control.dispatch(identity);await c.factory.execute(identity);}
+   const executed=c.factory.evidence;
+   const record=await c.factory.store.read('missioncontrol-local',c.b.partnerRequestId);
+   if(record.resource)await assert.rejects(c.factory.store.noteResource(record.run_id,record.resource.lease_owner,record.resource.lease_generation+1,{failure:'STALE_WRITER'}));
+   if(mode==='expired')await new Promise(resolve=>setTimeout(resolve,Math.max(0,c.b.expiresAt-Date.now()+10)));
+   if(mode==='stale-writer')await c.fault(c.s.workOrderId,{currentRevisionNumber:2});
+   c.factory=await createLocalFactory(f,pg.pool,c.authority);await db.restart();
+   if(mode==='candidate-mismatch'){
+    assert.equal(await makeRecovery().reconcileOnce(),'UNKNOWN');assert.equal(exposure(await c.query('getBudget',{missionId:c.s.missionId})),80);
+    wire.setCorruptResult(false);
+   }
+   const observations=[];
+   const duplicate=mode==='candidate-mismatch'?makeRecovery().run({signal:AbortSignal.timeout(15000),intervalMs:100}):null;
+   const result=await makeRecovery().run({signal:AbortSignal.timeout(15000),intervalMs:100,onObservation:s=>observations.push(s)});
+   await check('autonomous '+mode+' readback closes exactly once without redispatch',async()=>{
+    assert.equal(result,'CLOSED',JSON.stringify(observations));const trial=await c.query('readTrial',{trialId:c.trialId});
+    assert.equal(trial.closed,true);assert.equal(exposure(await c.query('getBudget',{missionId:c.s.missionId})),0);
+    assert.equal(wire.admissions,1);assert.equal(c.factory.evidence.productiveExecutions,0);
+    assert.equal(executed.productiveExecutions,mode==='cancel-executing'?0:1);
+    for(const value of await Promise.all([makeRecovery().reconcileOnce(),makeRecovery().reconcileOnce()]))assert.equal(value,'CLOSED');
+    if(duplicate){assert.equal(await duplicate,'CLOSED');assert.ok(ingestions>=1&&ingestions<=2);}
+    else assert.equal(ingestions,mode==='restart-lost-ack'||mode==='verifier-failure'?1:0);
+    if(mode==='restart-lost-ack'){assert.equal(lostAck,false);assert.ok(observations.includes('UNKNOWN'));assert.ok(wire.resultDrops>0);}
+    if(mode==='verifier-failure'){const gate=await c.inspect(trial.qualityGateDecisionId);assert.equal(gate.state,'INELIGIBLE');}
+    if(['expired','stale-writer','cancel-executing'].includes(mode))assert.equal(trial.qualityGateDecisionId,undefined);
+    journeys.push({mode,observations,admissions:wire.admissions,ingestions,executions:executed.productiveExecutions,restartedExecutions:c.factory.evidence.productiveExecutions,paidOperations:0});
+   });await cleanup();
+  }
  }
  for(const mode of (process.env.MC_GATE_ONLY==='1'?[]:['cancel','failed','late-completed','expired',...(canonicalAccounting?['no-tariff']:[])])){
   const c=await setup(mode==='expired'?{expiresIn:30000}:mode==='no-tariff'?{withoutTariff:true}:{});await c.mut('claimTrial',{trialId:c.trialId});const p=await c.factory.control.prepare(f.request),i=c.factory.identity(p);await observe(c,p);

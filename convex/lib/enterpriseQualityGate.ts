@@ -15,7 +15,7 @@ export async function ingestEnterpriseQualityGate(ctx: any, input: {
   const wire = args.authenticatedResponse?.envelope;
   if (!wire || wire.protocol !== "MISSIONCONTROL_MYFACTORY_FIXTURE_V1" || wire.operation !== "RESULT"
     || wire.tenantId !== b.tenantId || wire.projectId !== b.projectId || wire.factoryId !== b.factoryId
-    || wire.bindingDigest !== trial.bindingDigest || wire.payload?.state !== "COMPLETED"
+    || wire.bindingDigest !== trial.bindingDigest || wire.payload?.state !== args.factoryResultState
     || `sha256:${wire.payload?.result?.manifestDigest}` !== args.resultDigest
     || canonicalDigest("enterprise-custody-observation/v1", wire.payload?.observation)
       !== canonicalDigest("enterprise-custody-observation/v1", observation)

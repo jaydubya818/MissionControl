@@ -31,7 +31,8 @@ export function verifyLocalDelegationResult(input: unknown, binding: FactoryDele
   verifier: LocalVerifier, expected: LocalResultExpectation) {
   const { manifest: m, tariffDigest } = verifyLocalTerminalResult(input, binding, verifier, expected);
   const v = m.verification;
-  if (m.status !== "COMPLETED" || !m.candidate || !v || v.outcome !== "PASS") throw Error("LOCAL_DELEGATION_RESULT_DENIED");
+  if (!m.candidate || !v || !((m.status === "COMPLETED" && v.outcome === "PASS")
+    || (m.status === "FAILED" && v.outcome === "FAIL" && m.evidence.length > 0 && m.evidence.every((check: any) => check.status === "passed")))) throw Error("LOCAL_DELEGATION_RESULT_DENIED");
   const patch = (input as { artifacts: { id: string; base64: string }[] }).artifacts.find(a => a.id === m.candidate.patchArtifactId);
   if (!patch) throw Error("LOCAL_CANDIDATE_PATCH_MISSING");
   const diff = Buffer.from(patch.base64, "base64").toString("utf8");
@@ -43,7 +44,7 @@ export function verifyLocalDelegationResult(input: unknown, binding: FactoryDele
   const candidateChange = { sourceRevision: binding.baseCommit, candidateRevision: m.candidate.commit, changedFiles, deletedFiles: [], diff,
     linesAdded: diff.split("\n").filter(line => line.startsWith("+") && !line.startsWith("+++")).length,
     linesDeleted: diff.split("\n").filter(line => line.startsWith("-") && !line.startsWith("---")).length };
-  return { candidateChange, executionStartedAt: Date.parse(m.execution.capturedAt), ...(tariffDigest ? { tariffDigest } : {}), bindingDigest: factoryDelegationBindingDigest(binding), resultDigest: `sha256:${(input as { manifestDigest: string }).manifestDigest}`,
+  return { candidateChange, factoryResultState: m.status as "COMPLETED" | "FAILED", executionStartedAt: Date.parse(m.execution.capturedAt), ...(tariffDigest ? { tariffDigest } : {}), bindingDigest: factoryDelegationBindingDigest(binding), resultDigest: `sha256:${(input as { manifestDigest: string }).manifestDigest}`,
     partnerRunId: expected.runId, partnerWorkOrderId: expected.workOrderId, candidateCommit: m.candidate.commit, candidateTree: m.candidate.tree,
     evidenceDigest: `sha256:${m.evidenceDigest}`, artifactDigest: `sha256:${m.artifactDigest}`, checks: v.checks,
     producerSessionId: v.producerSessionId, verifierSessionId: v.providerSessionId, cleanupConfirmed: true as const, actualMicrousd: 0 as const };

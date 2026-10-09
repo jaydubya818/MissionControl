@@ -368,6 +368,7 @@ export const ingestExecutionResult = internalMutation({
     checks: v.array(v.object({ id: v.string(), result: v.union(v.literal("PASS"), v.literal("FAIL")) })),
     producerSessionId: v.string(), verifierSessionId: v.string(), cleanupConfirmed: v.literal(true),
     actualMicrousd: v.literal(0), tariffDigest: v.optional(v.string()),
+    factoryResultState: v.optional(v.union(v.literal("COMPLETED"), v.literal("FAILED"))),
     executionStartedAt: v.optional(v.number()), authenticatedResponse: v.optional(v.any()), custodyObservation: v.optional(v.object({ bindingDigest: v.string(), resultDigest: v.string(),
       candidateCommit: v.string(), candidateTree: v.string(), observedAt: v.number(), expiresAt: v.number() })) },
   handler: async (ctx, args) => {
@@ -384,7 +385,7 @@ export const ingestExecutionResult = internalMutation({
     }
     const { trial, binding, mission, run, workOrder, approval } = await executionAuthority(ctx, args.projectId, args.trialId);
     if (args.candidateChange.sourceRevision !== binding.baseCommit || args.candidateChange.candidateRevision !== args.candidateCommit
-      || trial.state !== "COMPLETED" || trial.bindingDigest !== args.bindingDigest
+      || trial.state !== (args.factoryResultState ?? "COMPLETED") || trial.bindingDigest !== args.bindingDigest
       || trial.partnerRunId !== args.partnerRunId || trial.partnerWorkOrderId !== args.partnerWorkOrderId
       || !sha(args.resultDigest) || !sha(args.evidenceDigest) || !sha(args.artifactDigest)
       || !/^[a-f0-9]{40}$/.test(args.candidateCommit) || !/^[a-f0-9]{40}$/.test(args.candidateTree)

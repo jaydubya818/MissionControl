@@ -87,6 +87,7 @@ jobs:
       - name: Canonical accounting with authenticated local execution settlement
         env:
           MC_CANONICAL_ACCOUNTING_QUALIFICATION: '1'
+          MC_RECOVERY_QUALIFICATION: '1'
           MC_LOCAL_MYFACTORY_ROOT: ${{ runner.temp }}/myfactory-local
           MYFACTORY_FIXTURE_GIT: ${{ runner.temp }}/myfactory.git
           MC_COMPATIBILITY_CONVEX_BINARY: ${{ runner.temp }}/convex/convex-local-backend

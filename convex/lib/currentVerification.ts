@@ -73,6 +73,8 @@ export async function getCurrentVerificationRoutingOutcome(
       const plan = binding && await ctx.db.get(binding.missionPlanId);
       const source = attempts.find((a: any) => a._id === binding?.workflowRunId);
       const reservation = source?.executionCostAuthorization?.enterprise;
+      const verifier = attempts.find((a: any) => a._id === envelope.verificationAttemptId);
+      const parent = verifier?.enterpriseAccountingParent;
       const artifact = envelope.artifactIds.length === 1 && await ctx.db.get(envelope.artifactIds[0]);
       const revision = binding && await ctx.db.get(binding.workOrderRevisionId);
       const approval = plan?.metadata?.enterpriseDelegationApprovals?.[binding.delegationId] ?? plan?.metadata?.enterpriseDelegationApproval;
@@ -85,6 +87,9 @@ export async function getCurrentVerificationRoutingOutcome(
         || artifact.metadata?.bindingDigest !== trial.bindingDigest || artifact.metadata?.factoryVersion !== binding.factoryVersion
         || canonicalDigest("enterprise-custody-observation/v1", artifact.metadata?.custodyObservation)
           !== canonicalDigest("enterprise-custody-observation/v1", envelope.metadata.custodyObservation)
+        || !parent || parent.workflowRunId !== source?._id || parent.reservationDigest !== reservation?.digest
+        || parent.bindingDigest !== trial.bindingDigest || parent.resultDigest !== envelope.metadata.resultDigest
+        || source.factoryDefinitionVersionId !== factory?.enterpriseRegistration?.config.definitionVersionId
         || !reservation || reservation.bindingDigest !== trial.bindingDigest || reservation.ownerId !== binding.ownerScope
         || reservation.factoryVersion !== binding.factoryVersion || reservation.provider !== "local-docker"
         || source.executionManifestDigest !== binding.executionManifestDigest
@@ -93,7 +98,7 @@ export async function getCurrentVerificationRoutingOutcome(
         || revision?.status !== "APPLIED" || workOrder.currentRevisionId !== binding.workOrderRevisionId
         || workOrder.missionPlanId !== binding.missionPlanId || workOrder.missionPlanRevision !== binding.missionPlanRevision
         || mission?.currentSpecRevisionId !== binding.missionSpecRevisionId
-        || trial.state !== "COMPLETED" || trial.cancelRequested || trial.bindingDigest !== envelope.metadata.bindingDigest
+        || !["COMPLETED", "FAILED"].includes(trial.state) || trial.cancelRequested || trial.bindingDigest !== envelope.metadata.bindingDigest
         || binding.factoryVersion !== envelope.metadata.factoryVersion || binding.workOrderId !== workOrder._id
         || binding.qualityContractDigest !== workOrder.qualityContractDigest || binding.expiresAt <= now
         || workOrder.currentExecutionRunId !== binding.workflowRunId || workOrder.approvalStatus !== "APPROVED"

@@ -102,6 +102,37 @@ function observation(value: unknown): TrialObservation {
     || !["COMPLETED", "FAILED", "CANCELLED"].includes(r.state))) throw fail();
   return { ...r, receiptDigest: canonicalDigest("factory-fixture-receipt/v1", value) };
 }
+export async function callFixtureTransport(options: { endpoint: string; requestKey: FixtureKey; responseKey: FixtureKey; now: () => number },
+  operation: Operation, binding: FactoryDelegationBinding, payload: unknown) {
+  const endpoint = new URL(options.endpoint);
+  if (endpoint.protocol !== "http:" || endpoint.hostname !== "127.0.0.1" || !endpoint.port || endpoint.username || endpoint.password
+    || endpoint.search || endpoint.hash || endpoint.pathname !== "/compatibility"
+    || options.requestKey.secret.byteLength < 32 || options.responseKey.secret.byteLength < 32
+    || ["tenantId", "projectId", "factoryId"].some(field => options.requestKey[field as "tenantId" | "projectId" | "factoryId"] !== options.responseKey[field as "tenantId" | "projectId" | "factoryId"])
+    || Buffer.from(options.requestKey.secret).equals(Buffer.from(options.responseKey.secret))) throw fail();
+    const now = options.now(), k = options.requestKey;
+    if (k.revoked || k.validUntil <= now || k.tenantId !== binding.tenantId || k.projectId !== binding.projectId || k.factoryId !== binding.factoryId) throw fail();
+    const envelope: FixtureEnvelope = { protocol: COMPATIBILITY_PROTOCOL, keyId: k.id, tenantId: binding.tenantId,
+      projectId: binding.projectId, factoryId: binding.factoryId, bindingDigest: factoryDelegationBindingDigest(binding),
+      operation, nonce: randomUUID(), expiresAt: Math.min(now + 30_000, k.validUntil), payload, requestDigest: null };
+    const signed = signFixtureEnvelope(envelope, k, "REQUEST");
+    const response = await fetch(endpoint, { method: "POST", redirect: "error", signal: AbortSignal.timeout(3000),
+      headers: { "content-type": "application/json" }, body: JSON.stringify(signed) });
+    if (!response.ok || !response.body) throw fail();
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = []; let size = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read(); if (done) break;
+        size += value.byteLength; if (size > 16 * 1024 * 1024) throw fail(); chunks.push(value);
+      }
+    } finally { await reader.cancel(); }
+    const raw = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    const result = verifyFixtureEnvelope(raw, options.responseKey, "RESPONSE",
+      { bindingDigest: envelope.bindingDigest, operation, requestDigest: canonicalDigest("factory-fixture-request/v1", signed) }, options.now());
+    return { payload: result.payload, authenticatedResponse: raw };
+}
+
 export class MyFactoryCompatibilityAdapter {
   private readonly endpoint: URL;
   constructor(private readonly options: { endpoint: string; requestKey: FixtureKey; responseKey: FixtureKey;
@@ -116,27 +147,9 @@ export class MyFactoryCompatibilityAdapter {
   }
   private now() { return this.options.now?.() ?? Date.now(); }
   private async call(operation: Operation, binding: FactoryDelegationBinding, payload: unknown): Promise<unknown> {
-    const now = this.now(), k = this.options.requestKey;
-    if (k.revoked || k.validUntil <= now || k.tenantId !== binding.tenantId || k.projectId !== binding.projectId || k.factoryId !== binding.factoryId) throw fail();
-    const envelope: FixtureEnvelope = { protocol: COMPATIBILITY_PROTOCOL, keyId: k.id, tenantId: binding.tenantId,
-      projectId: binding.projectId, factoryId: binding.factoryId, bindingDigest: factoryDelegationBindingDigest(binding),
-      operation, nonce: randomUUID(), expiresAt: Math.min(now + 30_000, k.validUntil), payload, requestDigest: null };
-    const signed = signFixtureEnvelope(envelope, k, "REQUEST");
-    const response = await fetch(this.endpoint, { method: "POST", redirect: "error", signal: AbortSignal.timeout(3000),
-      headers: { "content-type": "application/json" }, body: JSON.stringify(signed) });
-    if (!response.ok || !response.body) throw fail();
-    const reader = response.body.getReader();
-    const chunks: Uint8Array[] = []; let size = 0;
-    try {
-      for (;;) {
-        const { done, value } = await reader.read(); if (done) break;
-        size += value.byteLength; if (size > 16 * 1024 * 1024) throw fail(); chunks.push(value);
-      }
-    } finally { await reader.cancel(); }
-    const result = verifyFixtureEnvelope(JSON.parse(Buffer.concat(chunks).toString("utf8")), this.options.responseKey, "RESPONSE",
-      { bindingDigest: envelope.bindingDigest, operation, requestDigest: canonicalDigest("factory-fixture-request/v1", signed) }, this.now());
-    return result.payload;
+    return (await callFixtureTransport({ ...this.options, endpoint: this.endpoint.toString(), now: () => this.now() }, operation, binding, payload)).payload;
   }
+
   async admit(request: unknown): Promise<"OBSERVED" | "ALREADY_CLAIMED" | "UNKNOWN"> {
     const t = await this.options.store.read(), b = parseFactoryDelegationBinding(t.binding);
     if (this.now() < b.issuedAt || this.now() >= b.expiresAt || t.closed || t.cancelRequested) throw fail();
