@@ -1,3 +1,4 @@
+import { RESEARCH_LAB_DOCKER_PROFILE } from "./dockerCapacity.js";
 import type { ConvexHttpClient } from "convex/browser";
 import type { FactoryAttemptWorkerDependencies } from "./factoryAttemptWorker.js";
 import {
@@ -10,13 +11,20 @@ import { createAccountingSubmit } from "./accountingDeliveryWorker.js";
 import type { BedrockTransport } from "./bedrockAdapter.js";
 import { bedrockRouteSchema, type BedrockRoute } from "./bedrockRoute.js";
 import { DockerSandboxProvider } from "./dockerSandboxProvider.js";
-import { DOCKER_BEDROCK_CANDIDATE_IDENTITY } from "./dockerBedrockIdentity.js";
+import {
+  DOCKER_BEDROCK_CANDIDATE_IDENTITY,
+  RESEARCH_LAB_DOCKER_IDENTITY,
+} from "./dockerBedrockIdentity.js";
 import { bedrockModelRouteBinding } from "./bedrockModelRouteBinding.js";
-import { liabilityDigest, type ProviderPrice } from "../../../convex/lib/providerLiability.js";
+import {
+  liabilityDigest,
+  type ProviderPrice,
+} from "../../../convex/lib/providerLiability.js";
 
 /** Explicit host configuration. IDs select canonical records; they grant no
  * admission. No environment, AWS profile, or credential discovery occurs here. */
 export interface BedrockFactoryConfiguration {
+  localResearchLabProfile?: "large-repository/v1";
   route: BedrockRoute;
   reservationId: string;
   price: ProviderPrice;
@@ -32,18 +40,29 @@ export function bedrockFactoryProviderFactory(
 ): NonNullable<FactoryAttemptWorkerDependencies["createSandboxProvider"]> {
   const config = structuredClone(configuration);
   config.route = bedrockRouteSchema.parse(config.route);
+  const localLarge = config.localResearchLabProfile === "large-repository/v1";
+  if (config.localResearchLabProfile !== undefined && !localLarge)
+    throw new Error("RESEARCH_LAB_PROFILE_UNKNOWN");
   if (
-    !config.reservationId
+    localLarge &&
+    !["http://127.0.0.1:3214", "http://localhost:3214"].includes(client.url)
   )
-    throw new Error("BEDROCK_CONFIGURATION_REQUIRED");
+    throw new Error("RESEARCH_LAB_LOCAL_BACKEND_REQUIRED");
+  const identity = localLarge
+    ? RESEARCH_LAB_DOCKER_IDENTITY
+    : DOCKER_BEDROCK_CANDIDATE_IDENTITY;
+  const providerProfile = localLarge
+    ? RESEARCH_LAB_DOCKER_PROFILE
+    : "factory/docker-bedrock/v1";
+  if (!config.reservationId) throw new Error("BEDROCK_CONFIGURATION_REQUIRED");
   return (profile, context) => {
     if (
       profile.provider !== "DOCKER" ||
-      profile.providerProfile !== "factory/docker-bedrock/v1" ||
-      profile.machine.image !== DOCKER_BEDROCK_CANDIDATE_IDENTITY.image
+      profile.providerProfile !== providerProfile ||
+      profile.machine.image !== identity.image
     )
       throw new Error("BEDROCK_BACKEND_MISMATCH");
-    return new DockerSandboxProvider(DOCKER_BEDROCK_CANDIDATE_IDENTITY, {
+    return new DockerSandboxProvider(identity, {
       createBedrockBridge: () => {
         if (!context) throw new Error("RECOVERY_CANNOT_INVOKE");
         const { claim, manifest, leaseId } = context;
@@ -66,8 +85,16 @@ export function bedrockFactoryProviderFactory(
         const authority = canonicalBedrockBridgeAuthority(client, scope);
         // Keep UNKNOWN fallback and capture-failure best effort bounded too.
         if (accounting) {
-          const submit = createAccountingSubmit({ ...scope, backendUrl: client.url });
-          authority.settle = (payload) => submit(payload as BedrockSettlementPayload, 10000, new AbortController().signal);
+          const submit = createAccountingSubmit({
+            ...scope,
+            backendUrl: client.url,
+          });
+          authority.settle = (payload) =>
+            submit(
+              payload as BedrockSettlementPayload,
+              10000,
+              new AbortController().signal,
+            );
         }
         return new BedrockInferenceBridge(
           {
@@ -117,7 +144,9 @@ export function selectBedrockFactoryProvider(
 ): NonNullable<FactoryAttemptWorkerDependencies["createSandboxProvider"]> {
   return (profile, context) =>
     profile.provider === "DOCKER" &&
-    profile.providerProfile === "factory/docker-bedrock/v1"
+    ["factory/docker-bedrock/v1", RESEARCH_LAB_DOCKER_PROFILE].includes(
+      profile.providerProfile,
+    )
       ? bedrock(profile, context)
       : existing(profile, context);
 }
