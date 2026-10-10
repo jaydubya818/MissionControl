@@ -1,6 +1,8 @@
 import { afterEach, expect, it } from 'vitest';
 import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
+import { fstatSync } from 'node:fs';
+import { throws } from 'node:assert/strict';
 import { mkdtemp, rm, stat, appendFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -29,11 +31,11 @@ it('keeps the backend progressing during synchronous consumers and across restar
     const log = await openFixtureBackendLog(root), marker = join(root, `ready-${index}`);
     const backend = spawn(process.execPath, ['-e', producer, marker], { stdio: ['ignore', 'ignore', log.fd] }); children.push(backend);
     await once(backend, 'spawn'); await log.close(); // child owns its duplicated descriptor
+    throws(() => fstatSync(log.fd), { code: 'EBADF' });
     runFixtureCommand('PREPARE_FUNCTIONS', process.execPath, ['-e', waiter, marker, '4000'], { timeout: 5000, stdio: 'pipe' });
     const detail = await log.diagnostic(); expect(detail.bytes).toBe((index + 1) * 8 * 1024 * 1024);
     expect(detail.inspectedTailBytes).toBe(6000); expect(detail.markers).toEqual([]);
     expect((await stat(join(root, 'backend.stderr.log'))).mode & 0o777).toBe(0o600);
-    expect(() => execFileSync(process.execPath, ['-e', ''], { stdio: ['ignore', 'ignore', log.fd] })).toThrow();
     const exited = once(backend, 'exit'); backend.kill('SIGTERM'); await exited; await log.close();
   }
 });
