@@ -498,8 +498,9 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
-Current public client/backend runtime contract: **v60**. Version 60 adds the
-authenticated repository code-scope update used by pinned Factory dispatch.
+Current public client/backend runtime contract: **v61**. Version 61 adds authenticated observed-cost
+reconciliation for terminal Fab Attempts. SDK-qualified MCP snapshots now bind
+to version 1.31.0 and require fresh qualification before activation.
 
 ### Local Research Lab retry qualification
 
