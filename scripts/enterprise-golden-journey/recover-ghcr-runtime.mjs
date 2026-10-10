@@ -35,7 +35,13 @@ try {
         assert.equal(sha256(await readFile(join(metadata, name))), hash, name);
     }
     await cp(metadata, directory, { recursive: true });
+    const registryEvidence = run(docker, [
+      "buildx", "imagetools", "inspect", image, "--format", "{{json .Manifest}}",
+    ]);
+    const registryPath = join(directory, "registry-manifest.json");
+    await writeFile(registryPath, registryEvidence);
     const inspect = JSON.parse(run(docker, ["image", "inspect", image]))[0];
+    assert.equal(inspect.Id, lock.runtimeConfig);
     assert.equal(inspect.Os, "linux");
     assert.equal(inspect.Architecture, "amd64");
     assert.ok(inspect.RepoDigests.includes(image));
@@ -50,6 +56,9 @@ try {
       archive,
       directory,
       join(directory, "artifact"),
+      registryPath,
+      image,
+      lock.runtimeConfig,
     ]);
     const binding = JSON.parse(
       await readFile(join(directory, "artifact/image-binding.json"), "utf8"),
@@ -57,6 +66,8 @@ try {
     assert.equal(binding.manifestDigest, lock.runtimeImage);
     assert.equal(binding.configDigest, lock.runtimeConfig);
     assert.equal(binding.sourceSha, lock.runtimeSource);
+    assert.equal(binding.registryManifestVerified, true);
+    assert.equal(binding.archiveBytesVerified, true);
     report.binding = binding;
     report.status = "PASS";
     await rm(archive);
