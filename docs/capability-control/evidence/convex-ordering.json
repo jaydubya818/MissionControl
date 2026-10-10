@@ -20,6 +20,7 @@
     "real receiver restart preserves signed acknowledgment and revoked writer fence",
     "restored older policy rows cannot revive writers while independently retained host incarnation fences the database",
     "signed lifecycle acknowledgment is durable, exact-owner, retry-idempotent, and pending without native absence evidence",
+    "actual offline local container stopped by canonical provider, exact absence durably acknowledged, UNKNOWN reservation and incomplete owner inventory preserved",
     "superseded revoke reaches writers, Relay generic epoch does not revoke unrelated Work, legacy lineage remains pending",
     "durable enrollment prevents configuration-removal bypass"
   ],

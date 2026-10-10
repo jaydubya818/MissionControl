@@ -1,3 +1,4 @@
+import { qualifyLocalResource } from './local-resource.mjs';
 import { delegatedFixture } from './delegated-fixture.mjs';
 import { mkdtemp, cp, symlink, writeFile, readFile, rm, mkdir } from 'node:fs/promises';
 import { spawn, execFile as callback } from 'node:child_process';
@@ -295,6 +296,14 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   assert.equal((await fetch(`http://127.0.0.1:${sitePort}/capability-control/lifecycle`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ envelope: tampered }) })).status, 503);
   checks.push('signed lifecycle acknowledgment is durable, exact-owner, retry-idempotent, and pending without native absence evidence');
+  if (process.env.CAPABILITY_TEST_DOCKER_IMAGE) {
+    const resource = await qualifyLocalResource({ insert, mutate, query, tenantId, projectId, missionId: first.missionId,
+      workOrderId: first.workOrderId, authority, nativeFactory });
+    assert.equal((await verifyLifecycleReceipt(await lifecycle(revokeEnvelope), backendKey)).state, 'PENDING_BACKEND');
+    await writeFile(join(root, 'docs/capability-control/evidence/local-resource.json'), JSON.stringify(resource, null, 2) + '\n');
+    checks.push('actual offline local container stopped by canonical provider, exact absence durably acknowledged, UNKNOWN reservation and incomplete owner inventory preserved');
+  }
+
 
   const { _id: _runId, _creationTime: _created, ...legacy } = preservedRun;
   delete legacy.capabilityAuthorities;
@@ -306,6 +315,12 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   await mutate('workflowRuns:updateContext', { runId: 'later-capability-writer', context: { relayEpochOnly: true } });
   await fence('myeve', 9, 'disable', [{ capabilityId: 'work', operation: 'revoke', version: 8, policyId: 'myeve-8' }], 'memory');
   await assert.rejects(mutate('workflowRuns:updateContext', { runId: 'later-capability-writer', context: { lostRevoke: true } }), /AUTHORITY_FENCED/);
+  const supersededEnvelope = await signPolicyMessage({ ...identity, kind: 'FENCE', authority: 'myeve', version: 8,
+    policyId: 'myeve-8', capabilityId: 'work', operation: 'revoke' }, sourceKey);
+  const supersededAck = await verifyLifecycleReceipt(await lifecycle(supersededEnvelope), backendKey);
+  assert.equal(supersededAck.version, 8);
+  assert.equal(supersededAck.policyId, 'myeve-8');
+  assert.equal(supersededAck.state, 'PENDING_BACKEND');
   checks.push('superseded revoke reaches writers, Relay generic epoch does not revoke unrelated Work, legacy lineage remains pending');
 
   if (process.env.CAPABILITY_COMPOSED_RELAY_ROOT && process.env.CAPABILITY_COMPOSED_MYEVE_ROOT) {
