@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir, lstat, writeFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { verifyHostFactoryIdentity } from './host-factory-identity.mjs';
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const json = async path => JSON.parse(await readFile(path, 'utf8'));
 export const lock = await json(new URL('./source-lock.json', import.meta.url));
@@ -91,7 +92,9 @@ export function validateHybrid(j, records) {
   }
   assert.equal(new Set(candidates.map(c => c.workOrderId)).size, 3);
   const b = s.delegatedExecution.binding;
-  assert.equal(b.missionId, missionId); assert.equal(b.missionPlanId, planId); assert.equal(b.factoryVersion, lock.factoryVersion);
+  assert.equal(b.missionId, missionId); assert.equal(b.missionPlanId, planId);
+  assert.ok(s.delegatedExecution.verifiedExecutionIdentity, 'Missing verified signed Result execution identity');
+  verifyHostFactoryIdentity(j.delegatedHostQualification, lock, b, s.delegatedExecution.verifiedExecutionIdentity);
   assert.equal(b.baseCommit, lock.myFactoryFixtureSource);
   assert.deepEqual(b.allowedEffects, ['repository.read', 'sandbox.write', 'candidate.create', 'verification.request']);
   assert.equal(b.maxSpendMicrousd, 80);

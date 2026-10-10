@@ -42,5 +42,7 @@
   "composedDependencies": {
     "missionControl": "c0ba5a97087a50feb36bb1a788f9cf065890e328",
     "isolationBaseline": "6761c0c1c38be24907536f118e214fc962eea231"
-  }
+  },
+  "myFactorySourceDigest": "93944614be94c6d824f8640d0bda26a7822528dd0d960c02e7db474d15e7f929",
+  "myFactoryConfigurationTemplateDigest": "c380a977fb40801438f00cd1a83b6e901ce3a3f0a88188934f63a8f00d5ea703"
 }

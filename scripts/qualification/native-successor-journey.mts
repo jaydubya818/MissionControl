@@ -53,7 +53,10 @@ let ownerReview: any;
 let adapter: any, worker: FactoryAttemptWorker | undefined;
 try {
   const s = db.seed; state.seed = s;
-  if (mode === 'hybrid') hybridProvider = await prepareHybridProvider();
+  if (mode === 'hybrid') {
+    hybridProvider = await prepareHybridProvider();
+    state.delegatedHostQualification = hybridProvider.qualification;
+  }
   if (mode === 'hybrid' && process.env.MC_SOFIE_RESULT_CONSUMER_ROOT) {
     const consumer = await import(pathToFileURL(resolve(process.env.MC_SOFIE_RESULT_CONSUMER_ROOT, 'apps/eve/test/missioncontrol-result.integration.mjs')).href);
     resultConsumer = await consumer.prepareCompletedResultConsumer(db);
@@ -71,6 +74,8 @@ try {
   const gitEnv = { PATH: process.env.PATH!, HOME: parent, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0' };
   const git = (...args: string[]) => execFileSync('git', args, { cwd: root, env: gitEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   git('init', '-b', 'main');
+  git('config', '--local', 'user.name', 'Synthetic Qualification');
+  git('config', '--local', 'user.email', 'qualification@example.test');
   let sourceFiles = [{ path: '.gitignore', contentDigest: `sha256:${sha256Hex(ignore)}` }, { path: 'README.md', contentDigest: `sha256:${sha256Hex(content)}` }];
   if (mode === 'hybrid') {
     const { rm } = await import('node:fs/promises');

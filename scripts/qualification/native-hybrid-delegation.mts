@@ -3,6 +3,9 @@ import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { readFile } from 'node:fs/promises';
+import { lock } from '../enterprise-golden-journey/evidence.mjs';
+import { verifyHostFactoryIdentity } from '../enterprise-golden-journey/host-factory-identity.mjs';
 import { canonicalDigest, canonicalHash, factoryDelegationBindingDigest, bindEngineeringTariff } from '@mission-control/shared';
 import { LOCAL_PROVIDER_QUALIFICATION_SHA, verifyLocalDelegationResult, verifyLocalCustodyObservation } from '../../apps/orchestration-server/src/myFactoryLocalCompatibility.js';
 import { compatibility } from '../enterprise-compatibility/fixtures.mjs';
@@ -16,11 +19,29 @@ export async function prepareHybridProvider() {
   const partner = { ...await load('packages/hosted-routing/src/result.ts'), sourceSha: LOCAL_PROVIDER_QUALIFICATION_SHA };
   const { localFixture, qualifyHost, createLocalFactory } = await load('apps/cloud-control/test/fixtures/local-factory.mjs');
   const { startPostgres } = await load('apps/cloud-control/test/fixtures/local-postgres.mjs');
+  const { localSourceIdentity } = await load('apps/cloud-control/src/local-source-identity.mjs');
+  const { validateLocalConfiguration, validateLocalHostQualification } = await load('packages/hosted-routing/src/local-provenance.ts');
+  const { observeLocalRuntime, localPolicySha256, localHarnessSha256 } = await load('apps/cloud-control/src/local-execution-provider.mjs');
   const f = await localFixture(root);
+  const initialConfiguration = structuredClone(f.configuration);
   try {
     await qualifyHost(f);
-    assert.equal(f.version(), '4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95');
-    return { f, partner, createLocalFactory, startPostgres, root };
+    assert.equal(git('rev-parse', 'HEAD'), lock.myFactory); assert.equal(git('status', '--porcelain'), '');
+    assert.equal(f.sourceDigest, localSourceIdentity(root));
+    assert.deepEqual(f.configuration, { ...initialConfiguration, local: { ...initialConfiguration.local,
+      hostQualificationSha256: partner.digest(f.hostQualification) } });
+    assert.deepEqual(f.runtime, await observeLocalRuntime(lock.providerImage));
+    validateLocalConfiguration(f.configuration);
+    validateLocalHostQualification(f.configuration.local, f.hostQualification);
+    assert.equal(f.configuration.local.policySha256, localPolicySha256);
+    assert.equal(f.configuration.local.harnessSha256, localHarnessSha256);
+    assert.equal(f.configuration.local.implementationSha256, partner.sha256(await readFile(resolve(root, 'apps/cloud-control/src/local-execution-provider.mjs'))));
+    const qualification = { schema: 'golden-host-factory-qualification/v1', sourceSha: lock.myFactory,
+      historicalFactoryVersion: lock.factoryVersion, sourceDigest: f.sourceDigest, factoryVersion: f.version(),
+      configurationDigest: partner.digest(f.configuration), configurationCanonical: partner.canonical(f.configuration),
+      runtimeCanonical: partner.canonical(f.runtime.runtime), hostQualificationCanonical: partner.canonical(f.hostQualification) };
+    verifyHostFactoryIdentity(qualification, lock);
+    return { f, partner, createLocalFactory, startPostgres, root, qualification };
   } catch (error) { await f.stop(); throw error; }
 }
 
@@ -150,6 +171,13 @@ export async function executeHybridDelegation({ provider, db, workOrderId, repos
     const reserved = await inspect(run._id);
     const projection = verifyLocalDelegationResult(result.result, b, partner, { workOrderId: prepared.workOrderId, runId: prepared.runId,
       keys: [f.signing.key], now: Date.now(), tariff, admittedAt: reserved.executionCostAuthorization.enterprise.authorizedAt });
+    const verified = partner.verifyResult(result.result, { factoryId: b.factoryId, factoryVersion: b.factoryVersion,
+      requestId: b.partnerRequestId, workOrderId: prepared.workOrderId, runId: prepared.runId, keys: [f.signing.key], now: Date.now(),
+      localProvider: { provider: 'local-docker', ownerScope: b.ownerScope, delegationDigest: bindingDigest.slice(7) } }).manifest.execution;
+    const verifiedExecutionIdentity = { factoryVersion: verified.factoryVersion, sourceDigest: verified.sourceDigest,
+      configurationDigest: verified.configurationDigest, runtimeSha256: verified.configuration.local.runtimeSha256,
+      hostQualificationSha256: verified.configuration.local.hostQualificationSha256 };
+    verifyHostFactoryIdentity(provider.qualification, lock, b, verifiedExecutionIdentity);
     const delivery = { ...projection, custodyObservation: verifyLocalCustodyObservation(result.observation, projection, b, Date.now()), authenticatedResponse: result.authenticatedResponse };
     const gateId = await mut('ingestExecutionResult', { trialId, ...delivery });
     assert.equal(await mut('ingestExecutionResult', { trialId, ...delivery }), gateId);
@@ -161,6 +189,6 @@ export async function executeHybridDelegation({ provider, db, workOrderId, repos
     const final = await inspect(run._id); assert.ok(final.enterpriseSettlement); assert.equal(final.enterpriseSettlement.chargedMicrousd, 0);
     const artifacts = (await query('nativeFixture:inspect', { table: 'runArtifacts' })).filter((a: any) => a.workflowRunId === run._id);
     return { run: final, workOrderId, trialId, binding: b, gateId, candidateCommit: projection.candidateCommit, candidateTree: projection.candidateTree,
-      resultDigest: projection.resultDigest, artifactIds: artifacts.map((a: any) => a._id), factoryEvidence: factory.evidence, admissionRequests: wire.admissions, authorityControls: checks };
+      resultDigest: projection.resultDigest, verifiedExecutionIdentity, artifactIds: artifacts.map((a: any) => a._id), factoryEvidence: factory.evidence, admissionRequests: wire.admissions, authorityControls: checks };
   } finally { if (wire) { wire.server.closeAllConnections(); wire.server.close(); } await pg.stop(); }
 }
