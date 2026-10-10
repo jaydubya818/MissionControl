@@ -1,0 +1,20 @@
+{
+  "status": "PASS",
+  "database": "disposable real Convex SQLite backend",
+  "checks": [
+    "real Convex HTTP signed fences commit before exact ACK",
+    "native owner-authenticated challenge signs exact snapshot and incarnation",
+    "fleet admission cannot implicitly start an unadmitted Mission",
+    "authenticated exact-owner positive native Mission admission and idempotent retry",
+    "new fleet admission cannot erase unresolved legacy Mission control lineage",
+    "delegated challenge signs canonical dispatch fields and bounded budget without granting execution",
+    "child capability and native snapshot changes reject otherwise signed permits",
+    "disable fences stale permits, preserves admitted Mission, denies legacy WorkOrder bypass",
+    "cross-owner Mission replay denied",
+    "real Convex admission/fence race commits only in serial order",
+    "pause prevents reclaim; revoke fences native stale writers across later enable without clearing reservation or claiming resource stop",
+    "superseded revoke reaches writers, Relay generic epoch does not revoke unrelated Work, legacy lineage remains pending",
+    "durable enrollment prevents configuration-removal bypass"
+  ],
+  "paidExecution": "NOT_RUN"
+}

@@ -60,6 +60,7 @@ export const describe = internalQuery({
 export const create = action({
   args: request,
   handler: async (ctx, args) => {
+    if (!await ctx.auth.getUserIdentity()) throw Error('CAPABILITY_EXACT_OWNER_REQUIRED');
     const value = await ctx.runQuery(makeFunctionReference<'query'>('capabilityChallenges:describe'), args);
     const binding = capabilityBindings().find(item => item.ownerId === value.identity.ownerId
       && item.organizationId === value.identity.organizationId && item.installationId === value.identity.installationId

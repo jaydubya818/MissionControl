@@ -7,9 +7,17 @@ vi.mock('../lib/deliveryAuthorization', () => ({
 
 import { start } from '../missions';
 import { dispatchServiceInternal } from '../workOrders';
+import { create as createChallenge } from '../capabilityChallenges';
 
 afterEach(() => vi.unstubAllEnvs());
 const handler = (fn: unknown) => (fn as { _handler: (ctx: unknown, args: unknown) => Promise<unknown> })._handler;
+
+it('rejects anonymous challenge requests before querying owner policy', async () => {
+  const runQuery = vi.fn();
+  await expect(handler(createChallenge)({ auth: { getUserIdentity: async () => null }, runQuery }, {}))
+    .rejects.toThrow('CAPABILITY_EXACT_OWNER_REQUIRED');
+  expect(runQuery).not.toHaveBeenCalled();
+});
 
 it('real Mission and shared WorkOrder handlers cannot write execution before policy revalidation', async () => {
   vi.stubEnv('MC_CAPABILITY_CONTROL_ENABLED', 'true');
