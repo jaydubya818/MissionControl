@@ -1,0 +1,79 @@
+name: Native successor qualification
+
+on:
+  push:
+    branches: [codex/native-runtime-successor]
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm --filter @mission-control/shared test
+      - run: pnpm run typecheck
+      - run: pnpm exec tsc --noEmit --project convex/tsconfig.json
+      - name: Canonical verification currentness and independence
+        run: pnpm --filter @mission-control/workflow-engine test
+      - name: Native factory regressions
+        run: >-
+          pnpm exec vitest run
+          convex/__tests__/factoryAttempt.test.ts
+          convex/__tests__/factoryConfiguration.test.ts
+          convex/__tests__/factoryDispatch.test.ts
+          convex/__tests__/factoryRuntimeGoldenPath.test.ts
+          convex/__tests__/missionWorkOrderContract.test.ts
+          convex/__tests__/missionGovernance.test.ts
+          convex/__tests__/providerLiability.test.ts
+      - name: Native successor contracts and exact runtime identity enforcement
+        run: >-
+          pnpm exec vitest run
+          convex/__tests__/nativeEngineeringTariff.test.ts
+          convex/__tests__/qualificationGateScope.test.ts
+          convex/__tests__/offlineVerification.test.ts
+          convex/__tests__/offlineEvidenceIngress.test.ts
+          convex/__tests__/offlineAttemptEvidence.test.ts
+          convex/__tests__/offlineExecutionProfile.test.ts
+          apps/orchestration-server/src/__tests__/isolatedInvocationAdapter.test.ts
+          apps/orchestration-server/src/__tests__/factoryHarnessComposition.test.ts
+      - name: Adapter authentication contracts
+        run: pnpm --filter @mission-control/orchestration-server exec vitest run src/__tests__/myFactoryCompatibilityAdapter.test.ts
+      - name: Pin compatibility source and local database runtime
+        run: |
+          git init --bare "$RUNNER_TEMP/myfactory.git"
+          git --git-dir="$RUNNER_TEMP/myfactory.git" fetch --depth=1 https://github.com/jaydubya818/MyFactory.git fa48a820ba185eb9b891130c78166463b61cba74
+          test "$(git --git-dir="$RUNNER_TEMP/myfactory.git" rev-parse FETCH_HEAD)" = fa48a820ba185eb9b891130c78166463b61cba74
+          curl --fail --location --output "$RUNNER_TEMP/convex.zip" https://github.com/get-convex/convex-backend/releases/download/precompiled-2026-09-28-5c7cb5b/convex-local-backend-x86_64-unknown-linux-gnu.zip
+          echo "5b4adbe9fc2f9985c66eb12b19dadedf2700d8796c839ddba09802196099f241  $RUNNER_TEMP/convex.zip" | sha256sum --check
+          unzip "$RUNNER_TEMP/convex.zip" -d "$RUNNER_TEMP/convex"
+          chmod +x "$RUNNER_TEMP/convex/convex-local-backend"
+      - name: Canonical accounting contracts
+        run: pnpm exec vitest run convex/__tests__/enterpriseAttemptAccounting.test.ts convex/__tests__/offlineAttemptBudget.test.ts convex/__tests__/inferencePersistence.test.ts convex/__tests__/inferenceDispatch.test.ts
+      - name: Canonical accounting database races
+        env:
+          MC_COMPATIBILITY_CONVEX_BINARY: ${{ runner.temp }}/convex/convex-local-backend
+        run: node --import tsx scripts/enterprise-compatibility/accounting.mjs
+      - name: Pinned execution provenance boundary
+        env:
+          MC_MYFACTORY_COMPATIBILITY_GIT: ${{ runner.temp }}/myfactory.git
+        run: node --import tsx scripts/enterprise-compatibility/execution-boundary.mjs
+      - name: Bedrock accepted failure-set comparison
+        run: node scripts/enterprise-compatibility/bedrock-regression.mjs
+      - name: Real database and loopback compatibility qualification
+        env:
+          MC_MYFACTORY_COMPATIBILITY_GIT: ${{ runner.temp }}/myfactory.git
+          MC_COMPATIBILITY_CONVEX_BINARY: ${{ runner.temp }}/convex/convex-local-backend
+        run: node --import tsx scripts/enterprise-compatibility/qualify.mjs
+      - run: node scripts/check-repository-secrets.mjs
+      - run: node scripts/check-convex-authorization.mjs
+      - run: node scripts/skill-lint.mjs
