@@ -23,12 +23,17 @@ export async function qualifySofieBrowser({source,pool,input,owner,db}) {
   const server=spawn(process.execPath,[require.resolve('next/dist/bin/next'),'dev','--webpack','--hostname','127.0.0.1','--port',String(port)],{cwd:app,env,stdio:['ignore',log.fd,log.fd]});
   const report={schema:'composed-sofie-browser/v1',status:'IN_PROGRESS',checks:[],model:'DETERMINISTIC_FIXTURE',ownerAuthorizationUI:'NOT_IMPLEMENTED',paidOperations:0};
   let browser, page;
+  const posts=[];report.sessionRequests=posts;
+  const auditAccessibility=async()=>{
+    await page.addScriptTag({path:require.resolve('axe-core/axe.min.js')});
+    return page.evaluate(async()=>{const result=await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}});return {violations:result.violations.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.length})),passes:result.passes.length};});
+  };
   const check=async(name,fn)=>{await fn();report.checks.push(name);console.log('PASS browser '+name);};
   try {
     let ready=false;const deadline=Date.now()+120000;while(Date.now()<deadline){if(server.exitCode!==null)break;try{if((await fetch(`http://localhost:${port}/login`,{signal:AbortSignal.timeout(5000)})).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,500));}assert.ok(ready,'MyEve browser server ready');
     browser=await chromium.launch({headless:true});
     const context=await browser.newContext({viewport:{width:1280,height:900}});page=await context.newPage();
-    const posts=[];page.on('request',r=>{if(r.method()==='POST'&&new URL(r.url()).pathname.startsWith('/eve/v1/session'))posts.push(new URL(r.url()).pathname);});
+    page.on('request',r=>{if(r.method()==='POST'&&new URL(r.url()).pathname.startsWith('/eve/v1/session'))posts.push(new URL(r.url()).pathname);});
     await check('anonymous-owner-route-denied',async()=>{const response=await context.request.get(`http://localhost:${port}/api/threads`);assert.equal(response.status(),401);});
     await page.goto(`http://localhost:${port}/login?returnTo=/chat`);
     await page.getByLabel('Your access password').fill(password);
@@ -37,7 +42,7 @@ export async function qualifySofieBrowser({source,pool,input,owner,db}) {
     const login=await loginResponse;assert.equal(login.status(),200,'Owner login response must succeed');
     await page.waitForURL(url=>url.pathname==='/chat',{timeout:60000});
     await check('actual-password-login-issued-httpOnly-session',async()=>{assert.ok((await context.cookies()).some(c=>c.name==='myeve_session'&&c.httpOnly));});
-    await page.getByRole('button',{name:'New thread',exact:true}).click();
+    await page.getByRole('button',{name:'New conversation',exact:true}).click();
     const send=async(text)=>{await page.getByRole('textbox',{name:'Message Sofie',exact:true}).fill(text);await page.getByRole('button',{name:'Send',exact:true}).click();};
     await send('Read the completed enterprise Result and its Proof for this Mission.');
     await check('authenticated-Eve-session-invokes-real-enterprise-tool',async()=>{
@@ -56,13 +61,20 @@ export async function qualifySofieBrowser({source,pool,input,owner,db}) {
       const actions=await pool.query("SELECT count(*)::int AS count FROM action_requests WHERE owner_id=$1 AND trigger->>'kind'='owner_chat'",[owner]);
       report.ownerActions=actions.rows[0].count;
     });
-    await page.addScriptTag({path:require.resolve('axe-core/axe.min.js')});
-    report.accessibility=await page.evaluate(async()=>{const result=await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}});return {violations:result.violations.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.length})),passes:result.passes.length};});
+    report.accessibility=await auditAccessibility();report.accessibilitySurface='result-readback';
     await page.setViewportSize({width:390,height:844});await page.screenshot({path:join(output,'result-mobile.png'),fullPage:true});
     await check('mobile-horizontal-reflow',async()=>assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)));
     report.status=report.accessibility.violations.length || !report.completedResultVisible?'PARTIAL':'PASS';report.sessionRequests=posts;
     report.fullJourney='NOT_RUN';report.remaining=['No owner proposal authorization UI','Mission creation and acceptance are exercised via authenticated database clients, not browser UI','Deterministic model is not live Sofie model qualification'];
-  } catch(error){report.status='FAIL';report.error=String(error);if(page)await page.screenshot({path:join(output,'failure.png'),fullPage:true}).catch(()=>{});}
+  } catch(error){report.status='FAIL';report.error=String(error);if(page){
+      report.accessibilitySurface='failure-state';
+      report.accessibility=await auditAccessibility().catch(error=>({status:'NOT_RUN',error:String(error)}));
+      report.failureText=await page.locator('body').innerText().catch(()=>'');
+      await page.screenshot({path:join(output,'failure.png'),fullPage:true}).catch(()=>{});
+      await page.setViewportSize({width:390,height:844});
+      report.mobileReflow=await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1).catch(()=>false);
+      await page.screenshot({path:join(output,'failure-mobile.png'),fullPage:true}).catch(()=>{});
+    }}
   finally{await browser?.close();server.kill('SIGTERM');if(server.exitCode===null && server.signalCode===null) await new Promise(r=>server.once('exit',r));await log.close();await writeFile(join(output,'report.json'),JSON.stringify(report,null,2)+'\n');}
   return report;
 }
