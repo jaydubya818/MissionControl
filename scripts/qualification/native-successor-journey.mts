@@ -1,3 +1,5 @@
+import { pollQualificationWorker } from './qualification-worker-poll.mjs';
+import { prepareOwnerReviewFixture } from "./sofie-owner-review.mjs";
 import { SofieEnterpriseContractFixture } from '../enterprise-golden-journey/sofie-contract.mjs';
 import { pathToFileURL } from 'node:url';
 import { finalizeHybridSpec } from './native-hybrid-spec.mjs';
@@ -28,7 +30,8 @@ if (!buildArgument || !dockerExecutable || !outputArgument || !['prepare', 'exec
 const build = resolve(buildArgument), output = resolve(outputArgument), repo = process.cwd();
 await mkdir(output);
 const digest = (value: unknown) => `sha256:${sha256Hex(canonicalJson(value))}`;
-const savedEnvironment = Object.fromEntries(['MISSION_CONTROL_SERVICE_ID', 'MISSION_CONTROL_SERVICE_COMMAND_SECRET', 'MC_LOCAL_REPOSITORY_ADMISSION', 'CODEX_WORKER_CHECKOUT_ROOT'].map(k => [k, process.env[k]]));
+const savedEnvironment = Object.fromEntries(['MISSION_CONTROL_SERVICE_ID', 'MISSION_CONTROL_SERVICE_COMMAND_SECRET', 'MC_LOCAL_REPOSITORY_ADMISSION', 'CODEX_WORKER_CHECKOUT_ROOT',
+  'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL'].map(k => [k, process.env[k]]));
 process.env.MISSION_CONTROL_SERVICE_ID = 'native-successor-qualification';
 process.env.MISSION_CONTROL_SERVICE_COMMAND_SECRET = randomBytes(32).toString('hex');
 const db: any = await startFixtureDatabase(repo, { canonicalAccounting: true, nativeExecution: true });
@@ -48,10 +51,14 @@ async function step(name: string, operation: () => Promise<any>) {
 }
 let hybridProvider: any;
 let resultConsumer: any;
+let ownerReview: any;
 let adapter: any, worker: FactoryAttemptWorker | undefined;
 try {
   const s = db.seed; state.seed = s;
-  if (mode === 'hybrid') hybridProvider = await prepareHybridProvider();
+  if (mode === 'hybrid') {
+    hybridProvider = await prepareHybridProvider();
+    state.delegatedHostQualification = hybridProvider.qualification;
+  }
   if (mode === 'hybrid' && process.env.MC_SOFIE_RESULT_CONSUMER_ROOT) {
     const consumer = await import(pathToFileURL(resolve(process.env.MC_SOFIE_RESULT_CONSUMER_ROOT, 'apps/eve/test/missioncontrol-result.integration.mjs')).href);
     resultConsumer = await consumer.prepareCompletedResultConsumer(db);
@@ -69,6 +76,10 @@ try {
   const gitEnv = { PATH: process.env.PATH!, HOME: parent, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0' };
   const git = (...args: string[]) => execFileSync('git', args, { cwd: root, env: gitEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   git('init', '-b', 'main');
+  // The admitted repository config stays unchanged. Factory Git subprocesses
+  // explicitly admit these identity variables; restore them in final cleanup.
+  process.env.GIT_AUTHOR_NAME = process.env.GIT_COMMITTER_NAME = 'Synthetic Qualification';
+  process.env.GIT_AUTHOR_EMAIL = process.env.GIT_COMMITTER_EMAIL = 'qualification@example.test';
   let sourceFiles = [{ path: '.gitignore', contentDigest: `sha256:${sha256Hex(ignore)}` }, { path: 'README.md', contentDigest: `sha256:${sha256Hex(content)}` }];
   if (mode === 'hybrid') {
     const { rm } = await import('node:fs/promises');
@@ -95,6 +106,11 @@ try {
   await writeFile(join(parent, 'qualification-owner.json'), JSON.stringify({ schema: 'local-qualification-owner/v1', fixtureId, admissionDigest: localBinding.digest, root }), { mode: 0o600 });
   state.repositoryAdmission = admission;
   const repositoryId = await step('repository', () => mutate('localQualificationRepositories:register', {}));
+  if (hybridProvider) db.setEnvironment('MC_LOCAL_DELEGATION_QUALIFICATION', JSON.stringify({
+    schema: 'local-delegation-host-admission/v1', tenantId: admission.tenantId, projectId: admission.projectId,
+    operatorId: admission.operatorId, repositoryId, admissionDigest: localBinding.digest,
+    expiresAt: admission.expiresAt, qualification: hybridProvider.qualification,
+  }));
   const createAdapter = () => createIsolatedFactoryHarness({ backendBundlePath: join(build, 'bundles/backend.mjs'), dockerExecutable, version: '3',
     authority: async request => {
       if (request.lease.workerId !== hostId || request.lease.sessionId !== sessionId) return false;
@@ -135,6 +151,7 @@ try {
   let factoryVersionBindings: any[] = [];
   let lastHostReportAt = 0;
   async function reportHost() {
+    assert.equal(worker?.status().activeRunIds.length ?? 0, 0, 'Host attestation requires an idle qualification worker');
     lastHostReportAt = Date.now();
     const observed = await attestLocalQualificationRepository(localBinding);
     return mutate('workspaceHostBindings:report', { projectId: s.projectId, repositoryId, hostId, repository: `local-qualification/${fixtureId}`,
@@ -209,12 +226,13 @@ try {
   if (mode === 'prepare') console.log(JSON.stringify({ preparation: 'PASS', nativeExecution: 'NOT_RUN' }));
   else executionQualification: {
     const author = db.client('user_SyntheticPlanAuthorQualification');
+    if (mode === 'hybrid' && process.env.MC_OWNER_REVIEW_QUALIFICATION === '1') ownerReview = await prepareOwnerReviewFixture(db);
     const sofie = new SofieEnterpriseContractFixture({
-      createDraft: (args: any) => mutate('missions:createDraft', args),
+      createDraft: (args: any) => ownerReview ? ownerReview.createMission(args) : mutate('missions:createDraft', args),
       get: (missionId: string) => query('missions:get', { missionId }),
-      accept: (args: any) => mutate('missions:accept', args),
+      accept: (args: any) => ownerReview ? ownerReview.accept(args.missionId) : mutate('missions:accept', args),
     });
-    await step('sofieProposal', async () => sofie.propose('Build an Agentic HR platform.'));
+    await step('sofieProposal', async () => ownerReview ? ownerReview.propose() : sofie.propose('Build an Agentic HR platform.'));
     const missionArgs = { projectId: s.projectId, idempotencyKey: 'native-successor-mission',
       title: mode === 'hybrid' ? 'Build the Employee Core, Recruiting and Onboarding foundation.' : 'Native successor executed settlement', objective: mode === 'hybrid' ? 'Execute native and delegated WorkOrders and independently verify an exact downstream integration proof.' : 'Render and independently verify one exact unpublished synthetic document.',
       context: 'Isolated qualification only.', constraints: ['No paid inference', 'No publication', 'No production authority'],
@@ -367,14 +385,14 @@ try {
         await step('executionRecovery', async () => ({ lostExecutionAck, duplicateDeliveries, restarted,
           executionsBeforeRecovery: executions, verifierStateBeforeRecovery: 'PENDING', freshAdapter: true, freshRegistry: true }));
       }
-      if (Date.now() - lastHostReportAt >= 5000) await reportHost();
+      // This harness never starts autonomous polling; the awaited helper is
+      // the sole admission loop and attests only after all Git tasks finish.
       // Admit the producer once, then drain that controller without polling for
       // newly queued verification work. The fresh controller must admit it after
       // the lost ACK and restart; producer cleanup timing cannot change this cut.
-      if (mode !== 'recovery' || restarted || !recoveryInitialPollCompleted) {
-        await worker.tick();
-        recoveryInitialPollCompleted = true;
-      }
+      const poll = mode !== 'recovery' || restarted || !recoveryInitialPollCompleted;
+      await pollQualificationWorker({ worker, reportHost, refreshHost: Date.now() - lastHostReportAt >= 5000, poll });
+      if (poll) recoveryInitialPollCompleted = true;
       runs = await query('nativeFixture:inspect', { table: 'workflowRuns' });
       const verifier = runs.find(r => r.attemptPurpose === 'VERIFICATION');
       if (verifier && ['COMPLETED', 'FAILED', 'CANCELED'].includes(verifier.status) && worker.status().activeRunIds.length === 0) break;
@@ -420,13 +438,17 @@ try {
     const gateBefore = await step('gateBeforeSettlement', () => mutate('factory/enterpriseQualification:evaluate', { workOrderId: workOrder._id, idempotencyKey: 'native-before-settlement' }));
     if (gateBefore.current.eligible) throw Error('Native execution alone granted enterprise acceptance');
     await worker.stop();
-    await step('settlementControls', () => qualifySettlementControls({ db, runs, artifacts, mutate, query, step }));
+    await step('settlementControls', () => qualifySettlementControls({ db, runs, artifacts, mutate, query, step, adversarialControls: mode !== 'hybrid' }));
     await db.restart();
     const readback = await step('durableReadback', () => query('factory/nativeAccounting:readback', { workflowRunId: dispatch.run._id }));
     if (readback.projectExposureMicrousd !== 0) throw Error('Proven native allowance remained reserved');
     const gateAfter = await step('gateAfterSettlement', () => mutate('factory/enterpriseQualification:evaluate', { workOrderId: workOrder._id, idempotencyKey: 'native-after-settlement' }));
     if (!gateAfter.current.eligible || !gateAfter.current.current) throw Error('Native enterprise gate is not current: ' + JSON.stringify(gateAfter.current));
-    await step('gateControls', () => qualifyNativeGateControls({ db, workOrderId: workOrder._id, mutate, query }));
+    // Fault drills run on a separate fresh native execute fixture. Running them
+    // here consumes the immutable 60-second custody window for the linked owner journey.
+    await step('gateControls', () => mode === 'hybrid'
+      ? Promise.resolve({ status: 'NOT_RUN', requiredSuite: 'native-execution', reason: 'Separate fresh control fixture; no fault-drill PASS claimed for this Mission' })
+      : qualifyNativeGateControls({ db, workOrderId: workOrder._id, mutate, query }));
     const productionAcceptance = await step('productionAcceptanceDenied', () => mutate('workOrders:accept', { workOrderId: workOrder._id, actorType: 'HUMAN', idempotencyKey: 'native-production-denied' }));
     if (productionAcceptance.accepted) throw Error('Synthetic native evidence granted production acceptance');
     const acceptance = await step('isolatedAcceptance', () => mutate('workOrders:accept', { workOrderId: workOrder._id, actorType: 'HUMAN', idempotencyKey: 'native-isolated-accept', isolatedEnterpriseQualification: true }));
@@ -499,8 +521,7 @@ try {
       let integrationRuns: any[] = [];
       const integrationDeadline = Date.now() + 90000;
       while (Date.now() < integrationDeadline) {
-        if (Date.now() - lastHostReportAt >= 5000) await reportHost();
-        await worker.tick();
+        await pollQualificationWorker({ worker, reportHost, refreshHost: Date.now() - lastHostReportAt >= 5000 });
         integrationRuns = (await query('nativeFixture:inspect', { table: 'workflowRuns' })).filter((r: any) => r.workOrderId === integrationWO._id);
         const verifier = integrationRuns.find(r => r.attemptPurpose === 'VERIFICATION');
         if (verifier && ['COMPLETED', 'FAILED', 'CANCELED'].includes(verifier.status) && !worker.status().activeRunIds.length) break;
@@ -533,13 +554,16 @@ try {
       await step('missionReadIsolation', async () => ({ crossTenant: 'DENIED', anonymous: 'DENIED',
         sameTenantOtherOwner: 'DENIED', strictOwnerIsolation: 'PASS' }));
       const missionAcceptance = await step('hybridMissionAcceptance', () => sofie.accept(missionId, s.operatorId));
-      assert.equal(missionAcceptance.mission.state, 'DONE');
+      const ownerRejected = Boolean(ownerReview && process.env.MC_OWNER_REVIEW_DECISION === 'REJECT');
+      assert.equal(missionAcceptance.mission.state, ownerRejected ? 'BLOCKED' : 'DONE');
+      if (ownerRejected) await assert.rejects(() => mutate('missions:accept', { missionId, acceptedBy:s.operatorId, idempotencyKey:'reject-cannot-accept' }));
+      if (ownerReview) await step('linkedOwnerReview', async () => ownerReview.report());
       await db.restart();
       const finalAccounting = await step('hybridDurableAccounting', () => query('factory/nativeAccounting:readback', { workflowRunId: integrationDispatch.run._id }));
       assert.equal(finalAccounting.projectExposureMicrousd, 0);
       const durableMission = await step('sofieDurableReadback', () => sofie.readback(missionId));
-      assert.equal(durableMission.state, 'DONE');
-      assert.equal(durableMission.needsYou, null);
+      assert.equal(durableMission.state, ownerRejected ? 'BLOCKED' : 'DONE');
+      if (ownerRejected) assert.ok(durableMission.needsYou); else assert.equal(durableMission.needsYou, null);
       assert.equal(durableMission.workOrders.length, 3);
       assert.ok(durableMission.workOrders.every((wo: any) => wo.state === 'DONE'));
       assert.ok(durableMission.assertions.every((a: any) => a.status === 'PASS' && a.verificationReceiptId));
@@ -555,7 +579,8 @@ try {
         return { crossTenant: 'DENIED', sameTenantOtherOwner: 'DENIED', anonymous: 'DENIED', afterRestart: true };
       });
       state.sofieContract = 'PASS'; state.liveSofieIntegration = 'NOT_RUN';
-      state.hybridMission = 'PASS'; state.nativeDelegatedAccounting = 'PASS';
+      state.hybridMission = ownerRejected ? 'OWNER_REJECTED' : 'PASS'; state.nativeDelegatedAccounting = 'PASS';
+      if (ownerRejected) state.ownerResultRejection = 'PASS';
     }
 
     await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n');
@@ -566,32 +591,35 @@ try {
   state.failedWorkerStatus = worker?.status();
   state.failure = String(error); await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n'); throw error;
 } finally {
-  await worker?.stop(); await adapter?.dispose();
-  const records: any = {};
-  for (const table of ['workflowRuns', 'workOrders', 'runArtifacts', 'verificationReceipts', 'verificationRuns', 'qualityGateDecisions', 'evidenceEnvelopes', 'missionHandoffs', 'validationAssertions']) {
-    records[table] = await query('nativeFixture:inspect', { table }).catch(() => []);
+  try {
+    await worker?.stop(); await adapter?.dispose();
+    const records: any = {};
+    for (const table of ['workflowRuns', 'workOrders', 'runArtifacts', 'verificationReceipts', 'verificationRuns', 'qualityGateDecisions', 'evidenceEnvelopes', 'missionHandoffs', 'validationAssertions']) {
+      records[table] = await query('nativeFixture:inspect', { table }).catch(() => []);
+    }
+    await writeFile(join(output, 'durable-records.json'), JSON.stringify(records, null, 2) + '\n');
+    await resultConsumer?.stop();
+    await db.stop(); await hybridProvider?.f.stop();
+    const admitted = state.repositoryAdmission;
+    if (admitted) {
+      const parent = resolve(admitted.root, '..');
+      const marker = JSON.parse(await readFile(join(parent, 'qualification-owner.json'), 'utf8'));
+      assert.equal(marker.root, admitted.root); assert.equal(marker.fixtureId, admitted.fixtureId);
+      assert.match(parent, /^\/private\/tmp\/mc-local-qualification-[a-f0-9]{32}$/);
+      assert.equal((await lstat(parent)).isSymbolicLink(), false);
+      const archive = join(output, 'candidates.bundle');
+      execFileSync('git', ['-C', admitted.root, 'bundle', 'create', archive, '--all'], { stdio: 'pipe' });
+      state.candidateArchiveDigest = 'sha256:' + sha256Hex(await readFile(archive));
+      await rm(parent, { recursive: true });
+      state.repositoryCleanup = 'VERIFIED';
+    }
+    assert.match(db.root, /\/mc-enterprise-1b-[A-Za-z0-9]+$/);
+    assert.equal((await lstat(db.root)).isSymbolicLink(), false);
+    await db.destroy(); state.databaseCleanup = 'VERIFIED';
+    await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n');
+  } finally {
+    for (const [key, value] of Object.entries(savedEnvironment)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
   }
-  await writeFile(join(output, 'durable-records.json'), JSON.stringify(records, null, 2) + '\n');
-  await resultConsumer?.stop();
-  await db.stop(); await hybridProvider?.f.stop();
-  const admitted = state.repositoryAdmission;
-  if (admitted) {
-    const parent = resolve(admitted.root, '..');
-    const marker = JSON.parse(await readFile(join(parent, 'qualification-owner.json'), 'utf8'));
-    assert.equal(marker.root, admitted.root); assert.equal(marker.fixtureId, admitted.fixtureId);
-    assert.match(parent, /^\/private\/tmp\/mc-local-qualification-[a-f0-9]{32}$/);
-    assert.equal((await lstat(parent)).isSymbolicLink(), false);
-    const archive = join(output, 'candidates.bundle');
-    execFileSync('git', ['-C', admitted.root, 'bundle', 'create', archive, '--all'], { stdio: 'pipe' });
-    state.candidateArchiveDigest = 'sha256:' + sha256Hex(await readFile(archive));
-    await rm(parent, { recursive: true });
-    state.repositoryCleanup = 'VERIFIED';
-  }
-  assert.match(db.root, /\/mc-enterprise-1b-[A-Za-z0-9]+$/);
-  assert.equal((await lstat(db.root)).isSymbolicLink(), false);
-  await db.destroy(); state.databaseCleanup = 'VERIFIED';
-  await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n');
-  for (const [key, value] of Object.entries(savedEnvironment)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
 }
 // All worker, image and database cleanup has completed. Convex CLI child
 // transport handles must not keep a finished qualification command resident.

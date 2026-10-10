@@ -1,10 +1,11 @@
 name: CI — Mission Control
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main, master, 'feat/*', 'bugfix/*', 'sf/*']
+    branches: [main, master, 'feat/*', 'bugfix/*', 'sf/*', 'codex/checkpoint-h-authenticated-enterprise']
   pull_request:
-    branches: [main, master, 'sf/*']
+    branches: [main, master, 'sf/*', 'codex/enterprise-golden-journey']
 
 jobs:
   smoke:

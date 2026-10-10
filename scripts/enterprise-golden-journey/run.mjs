@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile, copyFile, open } from 'node:fs/promises';
 import { resolve, join, dirname } from 'node:path';
-import { lock, suites, json, sha256, sourceIdentity, seal, validateHybrid } from './evidence.mjs';
+import { lock, suites, json, sha256, sourceIdentity, seal, validateHybrid, validateNativeControls } from './evidence.mjs';
 
 const [suite, outputArgument] = process.argv.slice(2);
 assert.ok(suites.includes(suite), 'Known suite required'); assert.ok(outputArgument, 'Fresh output directory required');
@@ -47,16 +47,24 @@ async function partner() {
 }
 function docker() { return requireInput('MC_GOLDEN_DOCKER'); }
 async function runtime() {
-  const origin = requireInput('MC_GOLDEN_RUNTIME_BUILD'), build = join(output, 'runtime');
-  await mkdir(build);
-  for (const [name, expected] of Object.entries(lock.runtimeFiles)) {
-    const bytes = await readFile(join(origin, name)); assert.equal(sha256(bytes), expected, `Runtime dependency changed: ${name}`);
-    // The image archive is checked in place; retain the small build inputs per run.
-    if (name !== 'image.tar') { const dest = join(build, name); await mkdir(dirname(dest), { recursive: true }); await copyFile(join(origin, name), dest); }
+  const build = join(output, 'runtime');
+  if (env.MC_GOLDEN_RUNTIME_FROM_REGISTRY === '1') {
+    await command('runtime-artifact', process.execPath, ['scripts/enterprise-golden-journey/recover-ghcr-runtime.mjs', build]);
+    const recovery = await json(join(build, 'recovery.json'));
+    assert.equal(recovery.status, 'PASS', recovery.reason ?? 'Pinned registry runtime verification required');
+    assert.equal(recovery.binding.registryManifestVerified, true);
+    assert.equal(recovery.binding.archiveBytesVerified, true);
+  } else {
+    const origin = requireInput('MC_GOLDEN_RUNTIME_BUILD');
+    await mkdir(build);
+    for (const [name, expected] of Object.entries(lock.runtimeFiles)) {
+      const bytes = await readFile(join(origin, name)); assert.equal(sha256(bytes), expected, `Runtime dependency changed: ${name}`);
+      if (name !== 'image.tar') { const dest = join(build, name); await mkdir(dirname(dest), { recursive: true }); await copyFile(join(origin, name), dest); }
+    }
+    await command('runtime-artifact', process.execPath, ['scripts/qualification/inspect-native-successor.mjs', join(origin, 'image.tar'), build, join(build, 'artifact')]);
   }
-  await command('runtime-artifact', process.execPath, ['scripts/qualification/inspect-native-successor.mjs', join(origin, 'image.tar'), build, join(build, 'artifact')]);
   const identity = await json(join(build, 'artifact/image-binding.json'));
-  assert.equal(identity.manifestDigest, lock.runtimeImage); assert.equal(identity.sourceSha, lock.runtimeSource);
+  assert.equal(identity.manifestDigest, lock.runtimeImage); assert.equal(identity.configDigest, lock.runtimeConfig); assert.equal(identity.sourceSha, lock.runtimeSource);
   // Prove the retained bundles came from the pinned source, independently of metadata labels.
   const provenance = await json(join(build, 'provenance.json'));
   for (const artifact of Object.values(provenance.bundles.artifacts)) for (const [path, digest] of Object.entries(artifact.inputs)) {
@@ -94,7 +102,7 @@ try {
     await node('accounting', 'scripts/enterprise-compatibility/accounting.mjs', [], { MC_ACCOUNTING_EVIDENCE: join(output, 'accounting.json') });
     const evidence = await json(join(output, 'accounting.json')); assert.ok(evidence.checks.length >= 13);
   } else if (suite === 'native-execution') {
-    await database(); const build = await runtime(); await journey('execute', build);
+    await database(); const build = await runtime(); report.nativeControls = validateNativeControls(await journey('execute', build), source.sha);
   } else if (suite === 'delegated-execution') {
     await database(); await partner(); await node('delegated', 'scripts/enterprise-compatibility/local-provider.mjs', [], {
       MC_CANONICAL_ACCOUNTING_QUALIFICATION: '1', MC_LOCAL_PROVIDER_EVIDENCE: join(output, 'delegated.json') });

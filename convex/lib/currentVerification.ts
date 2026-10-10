@@ -3,7 +3,7 @@ import { enterpriseDelegationApproval, enterprisePlanApprovedByOwner, DELEGATION
 import { canonicalDigest, canonicalHash } from "@mission-control/shared";
 import { verificationContractDigest } from "@mission-control/workflow-engine/verification-identity";
 import { enterpriseProject } from "./enterpriseAttemptAccounting";
-import { nativeQualificationEvidenceIsCurrent } from "./nativeQualificationEvidence";
+import { createNativeQualificationEvidenceChecker } from "./nativeQualificationEvidence";
 import {
   evaluateCurrentVerificationEligibility,
   evaluatePrepublicationVerification,
@@ -70,8 +70,9 @@ export async function getCurrentVerificationRoutingOutcome(
   const isolatedEvidence: any[] = [];
   if (isolatedEnterpriseQualification) {
     if (!await enterpriseProject(ctx, workOrder.projectId)) throw Error("ENTERPRISE_GATE_SCOPE_DENIED");
+    const nativeEvidenceIsCurrent = createNativeQualificationEvidenceChecker(ctx, workOrder, attempts, now);
     for (const envelope of evidence) {
-      if (await nativeQualificationEvidenceIsCurrent(ctx, workOrder, envelope, attempts, now)) {
+      if (await nativeEvidenceIsCurrent(envelope)) {
         isolatedEvidence.push(envelope);
         continue;
       }

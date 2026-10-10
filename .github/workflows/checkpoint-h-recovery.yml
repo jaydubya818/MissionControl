@@ -1,0 +1,62 @@
+name: Checkpoint H owner recovery
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/checkpoint-h-authenticated-enterprise]
+permissions:
+  contents: read
+  packages: read
+jobs:
+  qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: '9.0.0'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: pnpm install --frozen-lockfile --ignore-scripts && pnpm run ci:prepare
+      - name: Registry and exported runtime integrity regressions
+        run: |
+          sudo install -d -m 1777 /private/tmp
+          pnpm exec vitest run scripts/qualification/registry-runtime-identity.test.mjs scripts/qualification/native-control-evidence.test.mjs scripts/qualification/qualification-worker-poll.test.mjs scripts/enterprise-golden-journey/qualified-docker.test.mjs scripts/enterprise-golden-journey/host-factory-identity.test.mjs
+          pnpm --filter @mission-control/orchestration-server exec vitest run src/__tests__/localQualificationRepository.test.ts src/__tests__/hardenedGit.test.ts
+      - run: pnpm exec tsc --noEmit -p convex/tsconfig.json && pnpm --filter mission-control-ui typecheck
+      - run: pnpm --filter mission-control-ui exec vitest run src/eos/views/SofieOwnerReview.test.tsx src/eos/views/MissionPortfolioView.test.tsx
+      - run: pnpm exec vitest run convex/__tests__
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Owner review component browser states
+        run: |
+          pnpm --filter mission-control-ui exec vite --config tests/checkpoint-h/vite.config.ts > "$RUNNER_TEMP/owner-ui.log" 2>&1 &
+          owner_ui_pid=$!
+          trap 'kill "$owner_ui_pid"' EXIT
+          for attempt in $(seq 1 60); do curl --silent --fail http://127.0.0.1:5188/ > /dev/null && break; sleep 1; done
+          node scripts/enterprise-golden-journey/owner-review-browser.mjs "$RUNNER_TEMP/checkpoint-h/ui-browser"
+      - name: Existing locked dependencies
+        run: node scripts/enterprise-golden-journey/prepare-hosted.mjs hybrid-mission
+      - name: Read-only private GHCR access
+        env:
+          GHCR_READ_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Recover and verify exact runtime
+        run: node scripts/enterprise-golden-journey/recover-ghcr-runtime.mjs "$RUNNER_TEMP/checkpoint-h/runtime"
+      - name: Qualify canonical owner decisions on one Mission
+        env:
+          MC_OWNER_REVIEW_QUALIFICATION: '1'
+          MC_COMPATIBILITY_PORT: '3476'
+        run: |
+          sudo install -d -m 1777 /private/tmp
+          node scripts/enterprise-golden-journey/run-owner-recovery.mjs "$RUNNER_TEMP/checkpoint-h"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: checkpoint-h-owner-evidence
+          path: ${{ runner.temp }}/checkpoint-h
+          if-no-files-found: error
+          retention-days: 90

@@ -48,12 +48,16 @@ export async function projectEnterpriseResult(ctx: MutationCtx, connection: Doc<
   if (!['AWAITING_ACCEPTANCE','DONE'].includes(mission.state)) reasons.push('MISSION_NOT_COMPLETE');
   let freshUntil = Math.min(now+60000, connection.expiresAt);
   const results: any[] = [];
-  for (const wo of workOrders) {
+  // Independent read-only gates share this authorized transaction and captured
+  // time. Await all before emitting any proof; preserve WorkOrder order below.
+  const gates = await Promise.all(workOrders.map(wo => {
     if (wo.missionPlanId !== plan._id || wo.missionPlanRevision !== plan.revisionNumber || wo.qualityContractDigest !== plan.qualityContractDigest
-      || !wo.currentRevisionId || wo.verificationContract?.schemaVersion !== 2 || wo.verificationContract.enforcementMode !== 'ENFORCED') {
-      reasons.push('WORK_ORDER_PLAN_OR_CONTRACT_CHANGED'); continue;
-    }
-    const gate = await getCurrentVerificationRoutingOutcome(ctx, wo, now, 'ACCEPTANCE', true, {ownerId:connection.ownerId,missionId,planId:plan._id,planDigest:scope.planDigest});
+      || !wo.currentRevisionId || wo.verificationContract?.schemaVersion !== 2 || wo.verificationContract.enforcementMode !== 'ENFORCED') return null;
+    return getCurrentVerificationRoutingOutcome(ctx, wo, now, 'ACCEPTANCE', true, {ownerId:connection.ownerId,missionId,planId:plan._id,planDigest:scope.planDigest});
+  }));
+  for (const [index, wo] of workOrders.entries()) {
+    const gate = gates[index];
+    if (!gate) { reasons.push('WORK_ORDER_PLAN_OR_CONTRACT_CHANGED'); continue; }
     if (!gate.eligible || !gate.current || gate.verifiedOutcome !== 'SUCCESS' || !gate.sourceAttemptId || !gate.verificationAttemptId || !gate.verificationReceiptId || !gate.evidenceSetDigest) {
       reasons.push('CURRENT_INDEPENDENT_VERIFICATION_REQUIRED: '+wo._id+': '+gate.reasons.join('; ').slice(0,350)); continue;
     }

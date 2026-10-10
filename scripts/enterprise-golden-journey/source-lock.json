@@ -13,6 +13,11 @@
   "runtimeSource": "912e26ebd2b08c2c58f7cbfc1b903c1d52c4851e",
   "runtimeImage": "sha256:bddbcca962226a60fe962ccd5812b04b480064004b97e04a97f7166bc3be233a",
   "runtimeConfig": "sha256:dadde9fff32581d2ebad5eda80c675f4e69a0805c7dbd3952119735db0a6da0b",
+  "dockerLinuxArchive": {
+    "url": "https://download.docker.com/linux/static/stable/x86_64/docker-29.7.2.tgz",
+    "archiveSha256": "803d433f226db4776e1768fd319fc6c6e4935a456acf84fcc0080818b854bc8f",
+    "executableSha256": "e45381109c685311cf84c5e33a1aca7da81d6b55c0f9aed74091fc08c3a94f13"
+  },
   "runtimePackageSha256": "415a938320694133ee3f4ffa0448cad9c38640c97b98a4e2a4a7daac4c4c6b3b",
   "runtimeFiles": {
     "image.tar": "4b93462b2a5c8ac6408d613b0f01a8729cd15834caea08ca555727105e1634d0",
@@ -32,10 +37,12 @@
     "sha256": "5b4adbe9fc2f9985c66eb12b19dadedf2700d8796c839ddba09802196099f241"
   },
   "dependencyLocks": {
-    "pnpm-lock.yaml": "42384eb6430bd901d1601d8a89544dafd1dd4cf5f7aaeb67aba3268612ce955b"
+    "pnpm-lock.yaml": "d631ff313f3064038730f8cddc45f4e32995e31189594fdd9947836d33044bae"
   },
   "composedDependencies": {
     "missionControl": "c0ba5a97087a50feb36bb1a788f9cf065890e328",
     "isolationBaseline": "6761c0c1c38be24907536f118e214fc962eea231"
-  }
+  },
+  "myFactorySourceDigest": "93944614be94c6d824f8640d0bda26a7822528dd0d960c02e7db474d15e7f929",
+  "myFactoryConfigurationTemplateDigest": "c380a977fb40801438f00cd1a83b6e901ce3a3f0a88188934f63a8f00d5ea703"
 }
