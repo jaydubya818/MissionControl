@@ -23,7 +23,8 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "main": false
+      "main": false,
+      "codex/live-retry-runbook-20261003": false
     }
   }
 }
