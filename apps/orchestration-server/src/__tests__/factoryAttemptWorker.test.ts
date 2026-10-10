@@ -64,7 +64,17 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     const terminal = fixture.reports.find((packet) => packet.terminal?.status === "FAILED");
     expect(terminal.artifacts).toEqual(expect.arrayContaining([
       expect.objectContaining({ metadata: expect.objectContaining({ schema: "harness-result/v1",
-        result: expect.objectContaining({ status: "FAILED", usage: expect.any(Object) }) }) }),
+        result: expect.objectContaining({ status: "FAILED",
+          events: expect.objectContaining({ modelRequests: 1 }),
+          usage: expect.objectContaining({ inputTokens: 10, outputTokens: 5, costUsd: null }) }) }) }),
+    ]));
+    expect(fixture.fabModelCalls()).toBe(1);
+    const sessionFiles = (await readdir(fixture.fabStateDirectory)).filter(name => name.endsWith(".json"));
+    expect(sessionFiles).toHaveLength(1);
+    const session = JSON.parse(await readFile(path.join(fixture.fabStateDirectory, sessionFiles[0]), "utf8")).session;
+    expect(session).toMatchObject({ status: "failed", modelCalls: 1, config: { maxTurns: 1 } });
+    expect(session.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "stage_failed", data: expect.objectContaining({ code: "TURN_LIMIT" }) }),
     ]));
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
     await fixture.worker.stop();
@@ -799,7 +809,9 @@ async function runFixture(
       credential: { id: "fab-governed-fixture", owner: `local:${process.getuid?.()}`, provider: "openai", scope: { kind: "repository", root: worktree }, source: { kind: "environment", variable: "FAB_GOVERNED_TEST_KEY" } },
       writableFiles: ["src/feature.ts"], acceptanceCriteria: manifest.workOrderSpecification.acceptanceCriteria.map((item: { title: string }) => item.title),
       checks: [{ id: "test", argv: [process.execPath, "--input-type=module", "-e", "import {verified} from './src/feature.ts'; if(!verified) throw new Error('incorrect candidate')"] }],
-      timeoutMs: 20000, checkTimeoutMs: 5000, maxTurns: 8 }),
+      timeoutMs: 20000, checkTimeoutMs: 5000,
+      // One real durable turn reaches the same exhaustion boundary without seven redundant Git/checkpoint cycles.
+      maxTurns: options.fabTurnLimit ? 1 : 8 }),
     stateDirectory: fabStateDirectory,
     modelFactory: async (config, redactor) => {
       const key = "fab-non-secret-factory-fixture-012345";
