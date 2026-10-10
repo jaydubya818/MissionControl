@@ -1,6 +1,7 @@
 import { denyEnterprisePaidAuthority } from "./lib/enterpriseAttemptAccounting";
 import { assertQualificationActivation } from "./lib/factoryQualificationScope";
 import { reserveOfflineAttemptBudget } from "./lib/offlineAttemptBudget";
+import { freezeNativeEngineeringTariff } from "./lib/nativeEngineeringTariff";
 import { NO_INFERENCE_CONSTRAINT } from "./lib/offlineExecutionPolicy";
 import { deterministicFactoryVersionIssues } from "./lib/factoryWorkflowContract";
 import { factoryVersionExecutionProfileProjection } from "./lib/executionProfileAdmission";
@@ -3401,7 +3402,7 @@ async function dispatchWorkOrder(
         )
       : undefined;
     if (factoryBinding?.executionBackend !== "isolated-container") await denyEnterprisePaidAuthority(ctx, refreshedWorkOrder.projectId!);
-    const executionCostAuthorization = factoryBinding?.executionBackend === "isolated-container"
+    let executionCostAuthorization = factoryBinding?.executionBackend === "isolated-container"
       ? await reserveOfflineAttemptBudget(ctx, { runId, version: factoryBinding.version, workOrder: refreshedWorkOrder,
           mission: missionForDispatch, policy: factoryBinding.policy, now })
       : factoryBinding
@@ -3442,6 +3443,9 @@ async function dispatchWorkOrder(
           authorizedAt: now,
         }
       : undefined;
+    if (executionCostAuthorization && executionManifest && factoryBinding?.executionBackend === "isolated-container") {
+      executionCostAuthorization = await freezeNativeEngineeringTariff(ctx, executionCostAuthorization as any, executionManifest.manifest, missionForDispatch);
+    }
     const runDocId = await ctx.db.insert("workflowRuns", {
       tenantId: refreshedWorkOrder.tenantId,
       runId,

@@ -7,8 +7,7 @@ import {
   harnessManifestIssues,
   harnessRuntimeArtifactDigest,
   harnessRuntimeArtifactIssues,
-  ISOLATED_INVOCATION_ADAPTER_ARTIFACT,
-  LEGACY_ISOLATED_INVOCATION_ADAPTER_ARTIFACT,
+  findKnownIsolatedHarness,
 } from "@mission-control/workflow-engine/harness-contract";
 
 export function resolveFrozenHarnessBinding(input: {
@@ -82,11 +81,9 @@ export function resolveHarnessAdapterRuntimeArtifact(
   executor: { adapter: string; version: string },
   externallyFrozenArtifact?: unknown,
 ) {
-  const knownArtifact = executor.adapter === "isolated-invocation" && executor.version === "2"
-    ? ISOLATED_INVOCATION_ADAPTER_ARTIFACT
-    : executor.adapter === "isolated-invocation" && executor.version === "1"
-      ? LEGACY_ISOLATED_INVOCATION_ADAPTER_ARTIFACT
-      : findKnownHarnessRuntimeArtifact(executor.adapter, executor.version);
+  const knownArtifact = executor.adapter === "isolated-invocation"
+    ? findKnownIsolatedHarness(executor.version)?.adapter
+    : findKnownHarnessRuntimeArtifact(executor.adapter, executor.version);
   const artifact = (externallyFrozenArtifact
     ?? knownArtifact) as HarnessRuntimeArtifactIdentity | undefined;
   if (!artifact || harnessRuntimeArtifactIssues(artifact).length > 0) {

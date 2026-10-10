@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { attemptExposure, microusd, reservationDigest, scopeExposure, type EnterpriseReservation } from "../lib/enterpriseAttemptAccounting";
+import { describe, expect, it, vi } from "vitest";
+import { attemptExposure, microusd, reservationDigest, scopeExposure, reserveEnterpriseAttempt, type EnterpriseReservation } from "../lib/enterpriseAttemptAccounting";
 import { computeCanonicalHash } from "../lib/genomeHash";
 import { persistIntentInTransaction, claimIntentInTransaction } from "../inferenceGateway";
 
@@ -16,6 +16,23 @@ function run() {
     status: "RUNNING", reservedCostUsd: 0, spentUsd: 0, executionCostAuthorization: { enterprise: { ...body, digest: reservationDigest(body) } } } as any;
 }
 describe("canonical enterprise Attempt accounting", () => {
+  it.each(['1', '2'])('preserves prior native v%s NOT_REQUIRED denial', async version => {
+    vi.stubEnv('MC_ENTERPRISE_CANONICAL_ACCOUNTING', '1');
+    const records: any = {
+      project: { _id: 'project', tenantId: 'tenant', enterpriseAccountingMode: 'ISOLATED_DETERMINISTIC' },
+      plan: { _id: 'plan', status: 'APPROVED', missionId: 'mission', projectId: 'project', tenantId: 'tenant', revisionNumber: 1,
+        decidedActorSource: 'AUTHENTICATED', approvedAt: 1 },
+    };
+    const ctx: any = { db: { get: async (id: string) => records[id] } };
+    try {
+      await expect(reserveEnterpriseAttempt(ctx, { runId: 'run', now: 2,
+        mission: { _id: 'mission', tenantId: 'tenant', projectId: 'project', owner: 'owner', spentUsd: 0, currentPlanId: 'plan' },
+        workOrder: { projectId: 'project', tenantId: 'tenant', missionId: 'mission', missionPlanId: 'plan', missionPlanRevision: 1,
+          approvalStatus: 'NOT_REQUIRED', currentRevisionId: 'revision' },
+        version: { executionBackend: 'isolated-container', executor: { adapter: 'isolated-invocation', version }, policyEnvelopeId: 'policy' },
+        policy: { _id: 'policy', projectId: 'project', tenantId: 'tenant', active: true } })).rejects.toThrow('ENTERPRISE_SCOPE_UNAVAILABLE');
+    } finally { vi.unstubAllEnvs(); }
+  });
   it("keeps immutable exposure through terminal states, counters being cleared and daily rollover", () => {
     for (const status of ["COMPLETED", "FAILED", "CANCELED", "PENDING"]) {
       const attempt = { ...run(), status };

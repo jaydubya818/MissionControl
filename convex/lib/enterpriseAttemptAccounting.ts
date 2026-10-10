@@ -2,6 +2,8 @@ import { computeCanonicalHash } from "./genomeHash";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { verifyEngineeringTariff, factoryDelegationBindingDigest, type EngineeringTariff, type FactoryDelegationBinding } from "@mission-control/shared";
+import { validateNativeEngineeringTariff, type NativeEngineeringTariff } from "./nativeEngineeringTariff";
+import { enterpriseMissionOwner } from "./enterpriseMissionOwner";
 
 export type EnterpriseReservation = {
   schema: "enterprise-attempt-reservation/v1";
@@ -15,12 +17,16 @@ export type EnterpriseReservation = {
   dailyCeilingMicrousd: number; policyCeilingMicrousd: number;
   digest: string;
   tariff?: EngineeringTariff;
+  nativeTariff?: NativeEngineeringTariff;
 };
 export type EnterpriseSettlement = {
   reservationDigest: string; proofDigest: string; settledAt: number;
   chargedMicrousd: number; basis: "PROVEN_NOT_DISPATCHED" | "DETERMINISTIC_ENGINEERING_ZERO_CHARGE";
   tariffDigest?: string; resourceCost?: "UNMEASURED";
   digest: string;
+  nativeUsage?: { schema: "enterprise-native-usage/v1"; attemptId: string; executionManifestDigest: string;
+    responseArtifactId: string; responseDigest: string; runtimeImage: string; containerId: string;
+    providerCalls: 0; resourceCost: "UNMEASURED" };
 };
 
 export function microusd(value: number): number {
@@ -47,6 +53,7 @@ export function validateReservation(value: EnterpriseReservation) {
   for (const key of ["tenantId", "projectId", "ownerId", "missionId", "workOrderId", "workOrderRevisionId",
     "attemptId", "delegationId", "factoryId", "factoryVersion", "idempotencyKey", "modelPolicyDigest",
     "executionProfileDigest", "bindingDigest"] as const) if (!value[key]) throw Error("ENTERPRISE_IDENTITY_INCOMPLETE");
+  if (value.nativeTariff) validateNativeEngineeringTariff(value);
   return value;
 }
 
@@ -72,15 +79,23 @@ export function attemptExposure(run: any, dailyAt?: number): number {
     || !["PROVEN_NOT_DISPATCHED", "DETERMINISTIC_ENGINEERING_ZERO_CHARGE"].includes(receipt.basis) || receipt.chargedMicrousd !== 0
     || receipt.settledAt < reservation.authorizedAt || !receipt.proofDigest) throw Error("ENTERPRISE_SETTLEMENT_INVALID");
   if (receipt.basis === "DETERMINISTIC_ENGINEERING_ZERO_CHARGE"
-    && (!reservation.tariff || receipt.tariffDigest !== reservation.tariff.digest || receipt.resourceCost !== "UNMEASURED")) {
+    && (receipt.tariffDigest !== (reservation.nativeTariff ?? reservation.tariff)?.digest || receipt.resourceCost !== "UNMEASURED"
+      || (!reservation.tariff && !reservation.nativeTariff))) {
     throw Error("ENTERPRISE_SETTLEMENT_INVALID");
+  }
+  if (receipt.basis === "DETERMINISTIC_ENGINEERING_ZERO_CHARGE" && reservation.nativeTariff) {
+    const usage = receipt.nativeUsage;
+    if (!usage || usage.schema !== "enterprise-native-usage/v1" || usage.attemptId !== run._id
+      || usage.executionManifestDigest !== reservation.nativeTariff.executionManifestDigest
+      || usage.responseDigest !== receipt.proofDigest || !usage.responseArtifactId || !/^[a-f0-9]{64}$/.test(usage.containerId)
+      || usage.runtimeImage !== reservation.nativeTariff.runtimeImage || usage.providerCalls !== 0 || usage.resourceCost !== "UNMEASURED") throw Error("ENTERPRISE_SETTLEMENT_INVALID");
   }
   return dailyAt === undefined || receipt.settledAt >= Math.floor(dailyAt / 86400000) * 86400000
     ? integer(receipt.chargedMicrousd) : 0;
 }
 
-export function scopeExposure(runs: any[], dailyAt?: number) {
-  return sum(runs.map(run => {
+export function scopeAttemptExposures(runs: any[], dailyAt?: number) {
+  return runs.map(run => {
     const link = run.enterpriseAccountingParent;
     if (!link) return attemptExposure(run, dailyAt);
     const parent = runs.find(candidate => candidate._id === link.workflowRunId);
@@ -96,8 +111,9 @@ export function scopeExposure(runs: any[], dailyAt?: number) {
       || run.verificationAttemptBinding?.sourceAttemptId !== parent._id) throw Error("ENTERPRISE_ACCOUNTING_PARENT_INVALID");
     attemptExposure(parent, dailyAt);
     return 0;
-  }));
+  });
 }
+export function scopeExposure(runs: any[], dailyAt?: number) { return sum(scopeAttemptExposures(runs, dailyAt)); }
 
 export async function enterpriseProject(ctx: QueryCtx | MutationCtx, projectId: Id<"projects">) {
   const project = await ctx.db.get(projectId);
@@ -114,6 +130,7 @@ export async function denyEnterprisePaidAuthority(ctx: QueryCtx | MutationCtx, p
 export async function assertEnterpriseAttemptExecution(ctx: QueryCtx | MutationCtx, run: any, provider: EnterpriseReservation["provider"]) {
   if (!run.projectId || !await enterpriseProject(ctx, run.projectId)) return;
   const reservation = validateReservation(run.executionCostAuthorization?.enterprise);
+  if (provider === "isolated-container" && run.executionManifest?.harness?.version === "3") validateNativeEngineeringTariff(reservation, run.executionManifest);
   if (reservation.provider !== provider || run.enterpriseSettlement || reservation.attemptId !== run.runId || reservation.tenantId !== run.tenantId
     || reservation.workOrderId !== run.workOrderId || reservation.missionId !== run.missionId
     || reservation.workOrderRevisionId !== run.workOrderRevisionId || reservation.expiresAt <= Date.now()
@@ -129,9 +146,17 @@ export async function reserveEnterpriseAttempt(ctx: MutationCtx, input: {
   const project = await enterpriseProject(ctx, input.workOrder.projectId);
   if (!project) return null;
   const { workOrder: wo, mission, version, policy, now, delegation } = input;
+  // Plan release can correctly yield NOT_REQUIRED for a WorkOrder with no
+  // additional approvals. Native admission still requires its approved Plan.
+  const successorNative = !delegation && version.executionBackend === "isolated-container"
+    && version.executor?.adapter === "isolated-invocation" && version.executor.version === "3";
+  const plan = successorNative && wo.approvalStatus === "NOT_REQUIRED" && wo.missionPlanId ? await ctx.db.get(wo.missionPlanId as Id<"missionPlans">) : null;
+  const approvedNativePlan = plan?.status === "APPROVED" && plan.missionId === mission?._id
+    && plan.projectId === project._id && plan.tenantId === project.tenantId && plan._id === mission?.currentPlanId
+    && plan.revisionNumber === wo.missionPlanRevision && plan.decidedActorSource === "AUTHENTICATED" && !!plan.approvedAt;
   if (!mission || mission.tenantId !== project.tenantId || wo.tenantId !== project.tenantId
     || mission.projectId !== project._id || wo.missionId !== mission._id || mission.spentUsd !== 0
-    || !mission.owner || wo.approvalStatus !== "APPROVED" || !wo.currentRevisionId
+    || !mission.owner || (wo.approvalStatus !== "APPROVED" && !approvedNativePlan) || !wo.currentRevisionId
     || !policy?.active || policy.projectId !== project._id || policy.tenantId !== project.tenantId
     || version.policyEnvelopeId !== policy._id) throw Error("ENTERPRISE_SCOPE_UNAVAILABLE");
   const [runs, controls, inference, provider] = await Promise.all([
@@ -147,7 +172,7 @@ export async function reserveEnterpriseAttempt(ctx: MutationCtx, input: {
   const approved = wo.metadata?.implementationPolicy;
   const body: Omit<EnterpriseReservation, "digest"> = {
     schema: "enterprise-attempt-reservation/v1", tenantId: String(project.tenantId), projectId: String(project._id),
-    ownerId: mission.owner, missionId: String(mission._id), workOrderId: String(wo._id),
+    ownerId: await enterpriseMissionOwner(ctx, mission), missionId: String(mission._id), workOrderId: String(wo._id),
     workOrderRevisionId: String(wo.currentRevisionId), workOrderRevisionNumber: wo.currentRevisionNumber,
     attemptId: input.runId, delegationId: delegation?.id ?? `native:${input.runId}`,
     factoryId: delegation?.factoryId ?? String(version.factoryDefinitionId),

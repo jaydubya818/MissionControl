@@ -97,6 +97,7 @@ import { offlineAttemptSourceCurrentnessIssues } from "../lib/factoryAttempt";
 import { validateOfflineAttemptEvidence } from "../lib/offlineAttemptEvidence";
 import { canonicalIsolatedInvocation, renderMarkdownCandidate } from "@mission-control/workflow-engine/harness-contract";
 import { offlineAttemptClaimWindowExpired, reserveOfflineAttemptBudget } from "../lib/offlineAttemptBudget";
+import { freezeNativeEngineeringTariff } from "../lib/nativeEngineeringTariff";
 import { buildWorkOrderTaskAuthority, workOrderTaskAuthorityIssue } from "../lib/taskAuthority";
 import {
   assertLocalRepositoryHost,
@@ -1380,7 +1381,7 @@ export const renewInternal = internalMutation({
   },
 });
 
-function validateStoredOfflineResponse(
+export function validateStoredOfflineResponse(
   artifact: any,
   request: Parameters<typeof validateOfflineAttemptEvidence>[1],
   run: any,
@@ -3577,7 +3578,10 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
           qualificationSnapshot: modelRoute!.qualificationSnapshot,
         },
       });
-  await ctx.db.patch(workflowRunId, { executionManifest: executionManifest.manifest, executionManifestDigest: executionManifest.digest });
+  const nativeAuthorization = executionCostAuthorization
+    ? await freezeNativeEngineeringTariff(ctx, executionCostAuthorization, executionManifest.manifest, mission) : undefined;
+  await ctx.db.patch(workflowRunId, { executionManifest: executionManifest.manifest, executionManifestDigest: executionManifest.digest,
+    ...(nativeAuthorization ? { executionCostAuthorization: nativeAuthorization } : {}) });
   const verificationRunId = await ctx.db.insert("verificationRuns", {
     tenantId: workOrder.tenantId,
     projectId: workOrder.projectId,

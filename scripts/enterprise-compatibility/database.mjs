@@ -1,12 +1,12 @@
 import { spawn, execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, writeFile, copyFile, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile, copyFile, symlink, cp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { ConvexHttpClient } from "convex/browser";
 
-export async function startFixtureDatabase(repo, { canonicalAccounting = false } = {}) {
+export async function startFixtureDatabase(repo, { canonicalAccounting = false, nativeExecution = false } = {}) {
   const binary = process.env.MC_COMPATIBILITY_CONVEX_BINARY;
   if (!binary) throw Error("MC_COMPATIBILITY_CONVEX_BINARY must identify a local Convex backend binary");
   const root = await mkdtemp(join(tmpdir(), "mc-enterprise-1b-"));
@@ -55,6 +55,15 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false }
     await copyClosure("convex/schema.ts");
     await copyClosure("convex/factory/enterpriseCompatibility.ts");
     await copyFile(join(repo, "scripts/enterprise-compatibility/seed.js"), join(root, "convex/fixtureSeed.js"));
+    if (nativeExecution) {
+      // Include canonical dynamic internal references used by real workers and
+      // scheduled verification. No recurring jobs, HTTP ingress or external auth.
+      await cp(join(repo, "convex"), join(root, "convex"), { recursive: true, filter: source =>
+        !source.includes("/__tests__") && !/\/(crons|http|auth.config)\.[jt]s$/.test(source) });
+      await copyClosure("convex/lib/serviceCommandAuth.ts");
+      await copyClosure("convex/lib/factoryMemory.ts");
+      await copyFile(join(repo, "scripts/qualification/native-fixture.js"), join(root, "convex/nativeFixture.js"));
+    }
     if (canonicalAccounting) {
       await copyClosure("convex/lib/offlineAttemptBudget.ts");
       await copyClosure("convex/lib/companyAccess.ts");
@@ -69,15 +78,23 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false }
         { cwd: root, env, encoding: "utf8", timeout: 20000, stdio: "pipe" });
       if (canonicalAccounting) execFileSync(process.execPath, [cli, "env", "set", "MC_ENTERPRISE_CANONICAL_ACCOUNTING", "1", "--url", url, "--admin-key", key],
         { cwd: root, env, encoding: "utf8", timeout: 20000, stdio: "pipe" });
+      if (nativeExecution) execFileSync(process.execPath, [cli, "env", "set", "MC_NATIVE_SUCCESSOR_QUALIFICATION", "1", "--url", url, "--admin-key", key],
+        { cwd: root, env, encoding: "utf8", timeout: 20000, stdio: "pipe" });
     } catch (error) { throw Error(String(error.stderr ?? error).replaceAll(key, "[ephemeral-key]")); }
     function client(subject) {
       const c = new ConvexHttpClient(url);
       c.setAdminAuth(key, { subject, issuer: "https://fixture.example.test", email: `${subject}@example.test` });
       return c;
     }
-    const owner = client("fixture-owner"), other = client("fixture-other");
-    const seed = await owner.mutation("fixtureSeed:seed", {});
+    const owner = client(nativeExecution ? "user_SyntheticHandoffQualification" : "fixture-owner"), other = client("fixture-other");
+    const seed = await owner.mutation(nativeExecution ? "nativeFixture:seed" : "fixtureSeed:seed", {});
     return { root, seed, owner, other, peer: client("fixture-peer"), anonymous: new ConvexHttpClient(url), stop,
+      ...(nativeExecution ? { client, setEnvironment(name, value) {
+        if (!["MC_LOCAL_REPOSITORY_ADMISSION", "MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID", "MISSION_CONTROL_SERVICE_ID", "MISSION_CONTROL_SERVICE_COMMAND_SECRET"].includes(name)) throw Error("Unapproved native fixture environment field");
+        try { execFileSync(process.execPath, [cli, "env", "set", name, value, "--url", url, "--admin-key", key],
+          { cwd: root, env, encoding: "utf8", timeout: 20000, stdio: "pipe" }); }
+        catch { throw Error(`Disposable environment setup failed: ${name}`); }
+      } } : {}),
       restart: async () => { await stop(); await start(); }, copied: [...copied] };
   } catch (error) { await stop(); throw error; }
 }

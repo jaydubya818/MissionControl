@@ -1,6 +1,6 @@
 import { computeCanonicalHash } from "./genomeHash.js";
 import type { MutationCtx } from "../_generated/server.js";
-import { reserveEnterpriseAttempt, scopeExposure, microusd } from "./enterpriseAttemptAccounting";
+import { reserveEnterpriseAttempt, scopeExposure, scopeAttemptExposures, microusd } from "./enterpriseAttemptAccounting";
 
 const money = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0;
 const profileDigest = (value: unknown): value is string => typeof value === "string" && /^sha256:[a-f0-9]{64}$/.test(value);
@@ -52,6 +52,8 @@ export async function reserveOfflineAttemptBudget(ctx: MutationCtx, input: {
     if (!money(run.reservedCostUsd) || !money(run.spentUsd)) throw new Error("Shared resource reservation includes an unsettled unknown cost.");
     return sum + Math.max(run.reservedCostUsd, run.spentUsd);
   }, 0);
+  const priorEnterpriseRuns = workOrderRuns.filter(run => run.runId !== input.runId);
+  const priorExposures = enterprise ? scopeAttemptExposures(priorEnterpriseRuns) : [];
   const base = offlineAttemptBudget({ runId: input.runId, factoryConfigurationDigest: version.configurationDigest,
     executionProfileDigest: version.executionProfileDigest, factoryBudget: version.budget,
     approvedWorkOrderCapUsd: approved.maxCostUsd,
@@ -64,8 +66,8 @@ export async function reserveOfflineAttemptBudget(ctx: MutationCtx, input: {
     // Producer and verifier share the approved WorkOrder envelope. A separate
     // purpose must not hide attempts or outstanding resource reservations.
     integerMoney: !!enterprise,
-    priorAttempts: enterprise ? workOrderRuns.filter(run => run.runId !== input.runId).map(run => ({ ...run,
-      reservedCostUsd: scopeExposure([run]) / 1_000_000, spentUsd: 0 })) : workOrderRuns, now: input.now });
+    priorAttempts: enterprise ? priorEnterpriseRuns.map((run, index) => ({ ...run,
+      reservedCostUsd: priorExposures[index] / 1_000_000, spentUsd: 0 })) : workOrderRuns, now: input.now });
   const { authorizationDigest: _baseDigest, ...authorization } = base;
   const frozen = { ...authorization, ...(enterprise ? { enterprise } : {}), policyEnvelopeId: policy._id as string, policyEnvelopeDigest: computeCanonicalHash(policy),
     workOrderPolicyDigest: computeCanonicalHash(approved) };
@@ -105,7 +107,7 @@ export function offlineAttemptBudget(input: {
     if (!money(run.reservedCostUsd) || !money(run.spentUsd)) throw new Error("Prior Attempt resource cost is unknown.");
     // Neither a terminal state nor a MEASURED label establishes trusted cost
     // provenance. Hold the reservation until a separate governed settlement
-    // path proves its release; this offline qualification does not add one.
+    // path proves its release from authenticated execution evidence.
     priorCommittedUsd = input.integerMoney
       ? (microusd(priorCommittedUsd) + Math.max(microusd(run.reservedCostUsd), microusd(run.spentUsd))) / 1_000_000
       : priorCommittedUsd + Math.max(run.reservedCostUsd, run.spentUsd);
