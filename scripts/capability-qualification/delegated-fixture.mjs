@@ -12,7 +12,10 @@ import { factoryVersionConfigurationDigest } from '../../convex/lib/factoryConfi
 import { qualificationEnvironmentDigest } from '../../convex/lib/factoryQualificationScope.ts';
 
 // Only the disposable runner supplies these administration functions. This creates no installed authority.
-export async function delegatedFixture({ insert, mutate, query, invoke, tenantId, projectId, ownerMemberId, operatorId, missionId, workOrderId, teamId }) {
+export async function delegatedFixture({ insert, mutate, query, invoke, tenantId, projectId, ownerMemberId, operatorId, missionId, workOrderId, teamId, namespace = '' }) {
+  if (namespace && !/^[a-z0-9-]{1,64}$/.test(namespace)) throw Error('Invalid isolated fixture namespace');
+  const scoped = value => namespace ? `${value}-${namespace}` : value;
+  const workflowKey = scoped('capability-delegated-offline');
   const now = Date.now(), until = now + 3600000, sha = `sha256:${'a'.repeat(64)}`;
   const patch = (id, value) => mutate('qualificationFixture:patch', { id, value });
   const read = id => query('qualificationFixture:read', { id });
@@ -30,7 +33,7 @@ export async function delegatedFixture({ insert, mutate, query, invoke, tenantId
   const policyEnvelopeId = await insert('policyEnvelopes', { tenantId, projectId, name: 'No provider operations', active: true, priority: 1,
     rules: { maxResourceCostUsd: 1, maxProviderCalls: 0, productionAuthority: 'NONE', publicationAuthority: 'NONE' }, createdAt: now, updatedAt: now });
   const verifierId = await insert('contextVerifiers', { projectId, label: 'Exact document bytes', invariant: 'Verify the exact synthetic document', globPatterns: ['docs/**'], active: true, createdAt: now, updatedAt: now });
-  const sandboxSnapshot = { schema: 'factory-sandbox-profile/v2', provider: 'LOCAL_CONTAINER', profileKey: 'capability-qualification', version: 1,
+  const sandboxSnapshot = { schema: 'factory-sandbox-profile/v2', provider: 'LOCAL_CONTAINER', profileKey: scoped('capability-qualification'), version: 1,
     imageDigest: artifact.imageDigest, bridgeDigest: config.bridgeImplementationDigest, backendDigest: config.backendImplementationDigest,
     isolationPolicy: ISOLATED_CONTAINER_POLICY, qualification: { evidenceReference: 'synthetic:capability-admission-only', evidenceDigest: sha, validUntil: until } };
   const admission = isolatedSandboxAdmission(sandboxSnapshot, operatorId, now);
@@ -50,7 +53,7 @@ export async function delegatedFixture({ insert, mutate, query, invoke, tenantId
     isolation: { profileId: sandboxId, profileDigest: sandboxDigest, evidenceDigest: sha, admissionDigest, qualifiedAt: now, validUntil: until },
     transmission: { schema: 'factory-transmission-policy/v1', mode: 'DENY_ALL', destinations: [], credentialClasses: [], maxOutboundBytes: 0 },
     budget: { schema: 'factory-provider-budget/v1', mode: 'NO_PROVIDER_EXECUTION', maxProviderCalls: 0, maxProviderLiabilityUsd: 0 }, capabilities: ['render-markdown', 'synthetic-receipt'] };
-  const profile = executionProfileSnapshot({ profileKey: 'capability-offline', version: 1,
+  const profile = executionProfileSnapshot({ profileKey: scoped('capability-offline'), version: 1,
     harness: { adapter: 'isolated-invocation', version: '2', capabilityManifest: manifest, capabilityManifestDigest: harnessCapabilityManifestDigest(manifest), effectiveConfigSha256: manifest.effectiveConfigSha256 },
     runtimeArtifact: { snapshot: artifact, digest: harnessRuntimeArtifactDigest(artifact) }, executionBackend: 'isolated-container', offlinePolicy,
     sandboxProfile: { profileId: sandboxId, profileDigest: sandboxDigest, profileSnapshot: sandboxSnapshot }, isolationModes: ['WORKSPACE_WRITE'] });
@@ -61,7 +64,7 @@ export async function delegatedFixture({ insert, mutate, query, invoke, tenantId
   const profileId = await insert('factoryExecutionProfiles', { tenantId, projectId, profileKey: profile.profileKey, version: 1, profileDigest: digest,
     immutableSnapshot: profile, executor, ...harness, executionBackend: 'isolated-container', sandboxProfileId: sandboxId, sandboxProfileDigest: sandboxDigest,
     isolationModes: profile.isolationModes, requiredHarnessCapabilities: profile.requiredHarnessCapabilities, requiredSandboxCapabilities: profile.requiredSandboxCapabilities,
-    registrationIdempotencyKey: 'synthetic-capability-registration', enabled: true, qualificationStatus: 'UNQUALIFIED', admissionStatus: 'DISABLED',
+    registrationIdempotencyKey: scoped('synthetic-capability-registration'), enabled: true, qualificationStatus: 'UNQUALIFIED', admissionStatus: 'DISABLED',
     createdBy: operatorId, createdAt: now, updatedAt: now });
   const qualification = executionProfileQualificationSnapshot({ profileId, profileSnapshot: profile, profileDigest: digest,
     workloadClasses: ['SOFTWARE_CHANGE'], riskClasses: ['GREEN'], evidenceReference: 'synthetic:capability-admission-only', evidenceDigest: sha,
@@ -71,7 +74,7 @@ export async function delegatedFixture({ insert, mutate, query, invoke, tenantId
     qualificationDigest, qualificationExpiresAt: until, promotedBy: operatorId, promotedAt: now });
   const operation = { reference: 'render-markdown/v1', digest: RENDER_MARKDOWN_OPERATION_DIGEST,
     input: { title: 'Qualification', paragraphs: ['No provider execution.'], outputPath: 'docs/qualification.md' } };
-  const workflowId = await insert('workflows', { projectId, workflowId: 'capability-delegated-offline', name: 'Capability offline', description: 'Synthetic admission only',
+  const workflowId = await insert('workflows', { projectId, workflowId: workflowKey, name: 'Capability offline', description: 'Synthetic admission only',
     contractVersion: 'factory-workflow-contract/v2', agents: [], steps: [{ id: 'render', kind: 'DETERMINISTIC', agent: '', input: JSON.stringify(operation),
       expects: 'Exact synthetic document', retryLimit: 0, timeoutMinutes: 1, outputSchema: { type: 'object', required: ['status'], properties: { status: { type: 'string' } } } }],
     active: true, version: 1, createdAt: now, updatedAt: now });
@@ -93,7 +96,7 @@ export async function delegatedFixture({ insert, mutate, query, invoke, tenantId
   await patch(factoryId, { status: 'ACTIVE', activeVersionId: versionId, qualificationActivation: { schema: 'factory-qualification-activation/v1', target: 'QUALIFICATION',
     environmentId, environmentDigest, factoryDefinitionVersionId: versionId, configurationDigest: version.configurationDigest,
     executionProfileDigest: digest, actorId: operatorId, assessmentId, evidenceReference: 'synthetic:admission-fixture', activatedAt: now, expiresAt: until } });
-  const hostId = 'synthetic-offline-host';
+  const hostId = scoped('synthetic-offline-host');
   await insert('workspaceHostBindings', { projectId, hostId, repositoryId, repository: 'synthetic/qualification', checkoutRoot: '/private/tmp/synthetic-no-execution',
     baseBranch: 'main', baseCommit: 'a'.repeat(40), dirty: false, status: 'READY', checkedAt: now, capacity: { maxConcurrentRuns: 1, currentRuns: 0 },
     workerRuntime: { sessionId: 'synthetic-only', generation: 1, hostRuntimeType: 'persistent-worker', executionBackends: ['isolated-container'],
@@ -110,7 +113,7 @@ export async function delegatedFixture({ insert, mutate, query, invoke, tenantId
       dependsOnBlueprintIds: [], assertionIds: [] }] });
   await patch(missionId, { currentPlanId: planId, budgetUsd: 0.03 });
   await patch(workOrderId, { missionPlanId: planId, missionPlanRevision: 1, repositoryId, codeScopeIds: [scopeId], ownerMemberId, owningTeamId: teamId,
-    planningRepositorySha: 'a'.repeat(40), executionEnvironment: 'LOCAL', isMutating: true, workflowId: 'capability-delegated-offline', metadata: { missionBlueprintId: 'synthetic-render', implementationPolicy: { allowedCommands: [], maxCostUsd: 0.03, maxAttempts: 3, timeoutMinutes: 1, stopCondition: 'Admission only' } },
+    planningRepositorySha: 'a'.repeat(40), executionEnvironment: 'LOCAL', isMutating: true, workflowId: workflowKey, metadata: { missionBlueprintId: 'synthetic-render', implementationPolicy: { allowedCommands: [], maxCostUsd: 0.03, maxAttempts: 3, timeoutMinutes: 1, stopCondition: 'Admission only' } },
     verificationContract: { schemaVersion: 2, enforcementMode: 'ENFORCED', checks: [], requiredRisks: [], requireHumanReview: true, independence: { required: true, minimumBoundary: 'SEPARATE_ATTEMPT' } } });
   const revisionId = await insert('workOrderRevisions', { tenantId, projectId, workOrderId, revisionNumber: 1,
     status: 'APPLIED', changedFields: [], changeSummary: 'Synthetic original authority', reason: 'Disposable admission fixture', approvedBy: operatorId,
@@ -119,7 +122,7 @@ export async function delegatedFixture({ insert, mutate, query, invoke, tenantId
     requestedChanges: {}, previousSnapshot: {}, nextSnapshot: await read(workOrderId) });
   await patch(workOrderId, { currentRevisionId: revisionId, currentRevisionNumber: 1 });
   const task = await mutate('tasks:create', { projectId, workOrderId, title: 'Render exact synthetic document', type: 'DOCS', priority: 3,
-    source: 'DASHBOARD', createdBy: 'HUMAN', createdByRef: 'synthetic-owner', idempotencyKey: 'capability-native-task' });
+    source: 'DASHBOARD', createdBy: 'HUMAN', createdByRef: 'synthetic-owner', idempotencyKey: scoped('capability-native-task') });
   await patch(task.task._id, { status: 'READY', planningRepositorySha: 'a'.repeat(40) });
-  return { versionId, profileId, sandboxId, repositoryId, hostId, taskId: task.task._id, configurationDigest: version.configurationDigest };
+  return { workflowKey, versionId, profileId, sandboxId, repositoryId, hostId, taskId: task.task._id, configurationDigest: version.configurationDigest };
 }
