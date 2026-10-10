@@ -1,0 +1,16 @@
+{
+  "name": "@mission-control/capability-control",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "node --import tsx --test test/*.test.mjs",
+    "typecheck": "tsc --noEmit --strict --target es2022 --module nodenext --allowImportingTsExtensions src/index.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": { "node": ">=20" }
+}

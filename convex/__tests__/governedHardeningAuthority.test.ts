@@ -118,7 +118,7 @@ describe("Governed Hardening authority invariants", () => {
     expect(recovery).toContain("failedAttempt.failureCode !== LOCAL_CANDIDATE_RECOVERY_FAILURE_CODE");
     expect(recovery).toContain('withIndex("by_run_type"');
     expect(recovery).toContain('artifactType", "CODE_DIFF"');
-    expect(recovery).toContain('ctx.db.insert("workflowRuns", recoveryAttempt)');
+    expect(recovery).toContain('ctx.db.insert("workflowRuns", { ...recoveryAttempt, capabilityAuthorities: failedAttempt.capabilityAuthorities })');
     expect(recovery).toContain("sourceAttemptId: failedAttempt._id");
     expect(recovery).not.toContain('ctx.db.patch(failedAttempt._id, {\n      status: "PENDING"');
   });

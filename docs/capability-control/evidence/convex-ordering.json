@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "database": "disposable real Convex SQLite backend",
+  "checks": [
+    "real Convex HTTP signed fences commit before exact ACK",
+    "native owner-authenticated challenge signs exact snapshot and incarnation",
+    "fleet admission cannot implicitly start an unadmitted Mission",
+    "host quarantine and independently configured incarnation deny restored admission before reference consumption",
+    "authenticated exact-owner positive native Mission admission and idempotent retry",
+    "new fleet admission cannot erase unresolved legacy Mission control lineage",
+    "delegated challenge signs canonical dispatch fields and bounded budget without granting execution",
+    "profile revocation and insufficient budget roll back all permit consumption; concurrent duplicate WorkOrder admission creates one Attempt",
+    "real positive delegated WorkOrder admission binds qualified offline Factory, exact Mission/Attempt, frozen policy and budget without provider authority",
+    "child capability and native snapshot changes reject otherwise signed permits",
+    "disable fences stale permits, preserves admitted Mission, denies legacy WorkOrder bypass",
+    "cross-owner Mission replay denied",
+    "real Convex admission/fence race commits only in serial order",
+    "pause prevents reclaim; revoke fences native stale writers across later enable without clearing reservation or claiming resource stop",
+    "lifecycle acknowledgment rejects a stale inventory between signed preparation and transaction commit",
+    "real receiver restart preserves signed acknowledgment and revoked writer fence",
+    "restored older policy rows cannot revive writers while independently retained host incarnation fences the database",
+    "signed lifecycle acknowledgment is durable, exact-owner, retry-idempotent, and pending without native absence evidence",
+    "actual offline local container stopped by canonical provider, exact absence durably acknowledged, UNKNOWN reservation and incomplete owner inventory preserved",
+    "superseded revoke reaches writers, Relay generic epoch does not revoke unrelated Work, legacy lineage remains pending",
+    "durable enrollment prevents configuration-removal bypass"
+  ],
+  "paidExecution": "NOT_RUN"
+}

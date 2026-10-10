@@ -21,7 +21,9 @@ Qualification requests do not enable caching, thinking, streaming, multimodal co
 service-tier overrides or arbitrary model fields. Unsupported response dimensions
 are rejected and preserve liability. Cache/reasoning pricing fields remain explicit.
 The original null `UNQUALIFIED` record remains historical; the exact Sonnet 4.6 US
-standard qualification rate is now frozen in `fdlc-bedrock-price-qualified.json`.
+standard qualification rate remains historical in `fdlc-bedrock-price-qualified.json`.
+The pricing-only successor `fdlc-bedrock-price-qualified-20261010-v2.json`
+revalidates the same rates and bounds until 2026-10-17 UTC; it grants no execution.
 Conversion rounds fractional nano-USD per-token rates upward. Because the strict
 request schema cannot emit cache controls and reasoning is disabled, those billing
 dimensions remain in the source contract but cannot increase this admitted request.

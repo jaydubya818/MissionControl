@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "image": "ghcr.io/jaydubya818/mission-control-remote-sandbox@sha256:41a66f1d6f7b90618a6c58fb9a1a336ef69ab2794fc1322233e4a5d9788782b8",
+  "imageId": "sha256:41a66f1d6f7b90618a6c58fb9a1a336ef69ab2794fc1322233e4a5d9788782b8",
+  "network": "NONE",
+  "credentials": "NONE",
+  "observedRunning": true,
+  "canonicalTermination": true,
+  "durableConvexAbsence": true,
+  "reservationPreserved": true,
+  "paidExecution": "NOT_RUN",
+  "remoteAdmission": "NOT_RUN"
+}

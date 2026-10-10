@@ -154,8 +154,10 @@ describe("governed read-only MCP broker", () => {
     expect(context7ToolVersion()).toEqual(controlPlaneContext7ToolVersion());
   });
 
-  it("reports the installed SDK identity and rejects coherent grants for the old SDK before transport", async () => {
+  it("reports the pinned and installed SDK identity and rejects coherent grants for the old SDK before transport", async () => {
+    const pinned = JSON.parse(await readFile(resolve(REPO_ROOT, "apps/orchestration-server/package.json"), "utf8"));
     const installed = JSON.parse(await readFile(resolve(REPO_ROOT, "apps/orchestration-server/node_modules/@modelcontextprotocol/sdk/package.json"), "utf8"));
+    expect(context7ToolVersion().sdk.version).toBe(pinned.dependencies["@modelcontextprotocol/sdk"]);
     expect(context7ToolVersion().sdk.version).toBe(installed.version);
     let calls = 0;
     const value = await fixture({ invoke: async () => { calls += 1; return successfulOutput; } });

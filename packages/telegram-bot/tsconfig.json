@@ -8,6 +8,7 @@
   "include": [
     "src/**/*",
     "../../convex/lib/**/*.ts",
+    "../../convex/capabilityPolicy.ts",
     "../../convex/factory/incidentControls.ts",
     "../../convex/inferenceGateway.ts"
   ],

@@ -498,9 +498,12 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
-Current public client/backend runtime contract: **v61**. Version 61 adds authenticated observed-cost
-reconciliation for terminal Fab Attempts. SDK-qualified MCP snapshots now bind
-to version 1.31.0 and require fresh qualification before activation.
+Current public client/backend runtime contract: **v63**. Version 63 adds receiver recovery quarantine and signed capability lifecycle acknowledgments. Version 61 on main adds
+observed-cost reconciliation for terminal Fab Attempts. Version 62 combines that
+contract with authenticated capability challenges and ordered policy proofs for
+Mission and WorkOrder admission. Clients and the backend must advance together.
+SDK-qualified MCP snapshots bind to version 1.31.0 and require fresh qualification
+before activation.
 
 ### Local Research Lab retry qualification
 

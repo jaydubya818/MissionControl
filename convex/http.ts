@@ -1,3 +1,5 @@
+import { signLifecycleReceipt } from './lib/capabilityLifecycleWire';
+import { prepareFenceAcknowledgment, capabilityBindings } from './capabilityPolicy';
 /**
  * Convex HTTP Routes — Stripe webhooks and external integrations
  *
@@ -5,6 +7,7 @@
  */
 
 import { httpRouter } from "convex/server";
+import { makeFunctionReference } from 'convex/server';
 import { httpAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
@@ -19,6 +22,54 @@ import {
 } from "./lib/githubAppAuth";
 
 const http = httpRouter();
+
+http.route({
+  path: '/capability-control/fence', method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = request.body?.getReader();
+      if (!body) return new Response('Missing body', { status: 400 });
+      let size = 0; const chunks: Uint8Array[] = [];
+      try { for (;;) { const { done, value } = await body.read(); if (done) break;
+        size += value.length; if (size > 32_768) throw Error('CAPABILITY_PROTOCOL_INVALID'); chunks.push(value); }
+      } finally { await body.cancel(); }
+      const bytes = new Uint8Array(size); let offset = 0;
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+      const { envelope } = JSON.parse(new TextDecoder().decode(bytes));
+      const prepared = await prepareFenceAcknowledgment(envelope);
+      const acknowledgment = await ctx.runMutation(makeFunctionReference<'mutation'>('capabilityPolicy:receiveFence'), { envelope, acknowledgment: prepared });
+      return Response.json(acknowledgment, { headers: { 'Cache-Control': 'no-store' } });
+    } catch { return Response.json({ code: 'CAPABILITY_FENCE_UNAVAILABLE' }, { status: 503 }); }
+  }),
+});
+
+http.route({
+  path: '/capability-control/lifecycle', method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = request.body?.getReader();
+      if (!body) return new Response('Missing body', { status: 400 });
+      let size = 0; const chunks: Uint8Array[] = [];
+      try { for (;;) { const { done, value } = await body.read(); if (done) break;
+        size += value.length; if (size > 32_768) throw Error('CAPABILITY_PROTOCOL_INVALID'); chunks.push(value); }
+      } finally { await body.cancel(); }
+      const bytes = new Uint8Array(size); let offset = 0;
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+      const { envelope } = JSON.parse(new TextDecoder().decode(bytes));
+      const prepared = await ctx.runQuery(makeFunctionReference<'query'>('capabilityLifecycle:prepare'), { envelope });
+      if (prepared.acknowledgment) return Response.json(prepared.acknowledgment, { headers: { 'Cache-Control': 'no-store' } });
+      const receipt = prepared.receipt;
+      const binding = capabilityBindings().find(item => item.ownerId === receipt.ownerId
+        && item.organizationId === receipt.organizationId && item.installationId === receipt.installationId
+        && item.backendId === receipt.backendId && item.incarnation === receipt.incarnation
+        && item.enrollmentVersion === receipt.enrollmentVersion);
+      if (!binding) throw Error('CAPABILITY_INSTALLATION_UNQUALIFIED');
+      const signed = await signLifecycleReceipt(receipt, binding.acknowledgmentKey);
+      const acknowledgment = await ctx.runMutation(makeFunctionReference<'mutation'>('capabilityLifecycle:acknowledge'), { envelope, acknowledgment: signed });
+      return Response.json(acknowledgment, { headers: { 'Cache-Control': 'no-store' } });
+    } catch { return Response.json({ code: 'CAPABILITY_LIFECYCLE_UNAVAILABLE' }, { status: 503 }); }
+  }),
+});
 
 /** Maximum accepted age of a Stripe signature timestamp. */
 const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 300;

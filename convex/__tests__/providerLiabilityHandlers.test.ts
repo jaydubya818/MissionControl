@@ -270,16 +270,16 @@ it.each([
 });
 function bedrockHandlerFixture(api: "CONVERSE" | "INVOKE_MODEL" = "CONVERSE") {
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date("2026-10-04T12:00:00Z"));
+  vi.setSystemTime(new Date("2026-10-10T12:00:00Z"));
   const f = fixture();
   Object.assign(f.price, {
     provider: "aws-bedrock",
     model: "anthropic.claude-sonnet-4-6",
     api,
-    effectiveAt: 1_779_840_000_000,
-    expiresAt: 1_791_331_200_000,
-    source: "https://www-cdn.anthropic.com/files/4zrzovbb/website/3684c2faafb97418665782cea0001f439f74b1d2.pdf",
-    evidenceDigest: "sha256:dc372a994199f77b1e140e775875fd610591c69f31aa8e7ff8394908647b71ad",
+    effectiveAt: 1791590400000,
+    expiresAt: 1792195200000,
+    source: "https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/bedrockfoundationmodels/USD/current/bedrockfoundationmodels.json",
+    evidenceDigest: "sha256:b21cfc4941e346275d9503700a094dc892f838172c41bc2e14c8284d91b1677a",
     inputNanoUsdPerToken: 3300,
     outputNanoUsdPerToken: 16500,
     maximumInputTokens: 1_000_000,
@@ -462,7 +462,7 @@ it("rejects a Bedrock API that does not match the frozen harness route", async (
 it("admits only the exact qualified InvokeModel price for the frozen Fab route", async () => {
   const f = bedrockHandlerFixture("INVOKE_MODEL");
   await expect(handler(reserveRequestInternal)(f.ctx, f.args)).resolves.toMatchObject({
-    priceDigest: "sha256:765d485cbf1c66e474e022f7dd34c4387269222763445bc8c9eefcd29e51523e",
+    priceDigest: "sha256:55a78f1da07b78d13f8099002f86034a06c8337024db66a756e19c860ff79713",
   });
   expect(f.rows.reservation.snapshot.holds).toHaveLength(1);
 });

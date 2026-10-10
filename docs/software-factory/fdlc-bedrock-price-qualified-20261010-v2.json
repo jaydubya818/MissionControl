@@ -1,0 +1,35 @@
+{
+  "schema": "fdlc-bedrock-price/v1",
+  "qualification": "APPROVED_QUALIFICATION",
+  "version": "aws-2026-10-10-sonnet-4-6-us-standard/v2",
+  "effectiveAt": 1791590400000,
+  "expiresAt": 1792195200000,
+  "currency": "USD",
+  "billingUnit": "MILLION_TOKENS",
+  "provenance": {
+    "url": "https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/bedrockfoundationmodels/USD/current/bedrockfoundationmodels.json",
+    "evidenceDigest": "sha256:b21cfc4941e346275d9503700a094dc892f838172c41bc2e14c8284d91b1677a"
+  },
+  "ratesNanoUsdPerMillion": {
+    "input": 3300000000,
+    "output": 16500000000,
+    "cacheRead": 330000000,
+    "cacheWrite5m": 4125000000,
+    "cacheWrite1h": 6600000000,
+    "reasoning": 16500000000
+  },
+  "cacheMode": "DISABLED",
+  "reasoningMode": "DISABLED",
+  "reasoningBilling": "INCLUDED_IN_OUTPUT",
+  "otherBillableDimensions": "NONE",
+  "maximumInputTokens": 1000000,
+  "maximumOutputTokens": 4096,
+  "maximumPayloadBytes": 262144,
+  "inputBoundEvidence": "Full 1,000,000-token Sonnet 4.6 context ceiling; CountTokens is UNSUPPORTED on the exact approved US profile, so every admitted request reserves the full context ceiling before transmission.",
+  "outputBoundEvidence": "Exact non-streaming Converse or InvokeModel request enforces 4096 output tokens; extended thinking, cache controls, retries and fallbacks are prohibited.",
+  "qualifiedProviderPriceDigest": "sha256:964a0d4c7d4d3fe75f69bd85ed44a7a6e60c9b2ba8f75aa3cc5f8289abd32592",
+  "qualifiedInvokeModelProviderPriceDigest": "sha256:55a78f1da07b78d13f8099002f86034a06c8337024db66a756e19c860ff79713",
+  "supersedes": "fdlc-bedrock-price-qualified.json",
+  "reviewPolicy": "Seven-day internal review deadline, not a provider guarantee.",
+  "executionAuthority": "NONE. No grants, registrations, budgets or Work snapshots are migrated."
+}

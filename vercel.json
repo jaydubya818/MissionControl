@@ -24,6 +24,7 @@
   "git": {
     "deploymentEnabled": {
       "main": false,
+      "codex/unified-capability-control-plane": false,
       "codex/live-retry-runbook-20261003": false
     }
   }
