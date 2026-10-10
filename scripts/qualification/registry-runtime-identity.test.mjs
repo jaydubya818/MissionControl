@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { verifyRegistryManifest } from './registry-runtime-identity.mjs';
+import { readRegistryManifest, verifyRegistryManifest } from './registry-runtime-identity.mjs';
 
 const hash = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex');
 const encoded = value => Buffer.from(JSON.stringify(value));
@@ -71,6 +71,23 @@ function fixture(options = {}) {
 }
 
 describe('pinned registry and Docker export runtime identity', () => {
+  it('acquires byte-exact raw manifest and descriptor from the hosted Buildx interface', () => {
+    const f = fixture();
+    const docker = join(f.root, 'docker');
+    writeFileSync(join(f.root, 'raw'), f.registryBytes);
+    writeFileSync(join(f.root, 'descriptor'), JSON.stringify(f.envelope.Descriptor));
+    writeFileSync(docker, `#!${process.execPath}\nimport { readFileSync } from 'node:fs';\nconst args=process.argv.slice(2);\nif (args.slice(0,3).join(' ') !== 'buildx imagetools inspect' || args[3] !== ${JSON.stringify(f.image)}) process.exit(2);\nconst file=args[4] === '--raw' ? 'raw' : args[4] === '--format' && args[5] === '{{json .Manifest}}' ? 'descriptor' : undefined;\nif (!file) process.exit(3);\nprocess.stdout.write(readFileSync(${JSON.stringify(f.root)} + '/' + file));\n`);
+    chmodSync(docker, 0o700);
+    const envelope = readRegistryManifest(docker, f.image);
+    const verified = verifyRegistryManifest(envelope, f.image, f.configDigest);
+    expect(verified.bytes.equals(f.registryBytes)).toBe(true);
+    expect(verified.manifestDigest).toBe(f.image.split('@')[1]);
+    writeFileSync(join(f.root, 'raw'), Buffer.concat([f.registryBytes, Buffer.from('\n')]));
+    expect(() => verifyRegistryManifest(readRegistryManifest(docker, f.image), f.image, f.configDigest)).toThrow('Registry manifest size mismatch');
+    writeFileSync(docker, `#!${process.execPath}\nprocess.exit(1);\n`);
+    expect(() => readRegistryManifest(docker, f.image)).toThrow();
+  });
+
   it.each([false, true])('verifies layer bytes for compressedExport=%s and preserves registry identity', compressedExport => {
     const f = fixture({ compressedExport });
     const result = f.run();

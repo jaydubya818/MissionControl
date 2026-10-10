@@ -47,16 +47,24 @@ async function partner() {
 }
 function docker() { return requireInput('MC_GOLDEN_DOCKER'); }
 async function runtime() {
-  const origin = requireInput('MC_GOLDEN_RUNTIME_BUILD'), build = join(output, 'runtime');
-  await mkdir(build);
-  for (const [name, expected] of Object.entries(lock.runtimeFiles)) {
-    const bytes = await readFile(join(origin, name)); assert.equal(sha256(bytes), expected, `Runtime dependency changed: ${name}`);
-    // The image archive is checked in place; retain the small build inputs per run.
-    if (name !== 'image.tar') { const dest = join(build, name); await mkdir(dirname(dest), { recursive: true }); await copyFile(join(origin, name), dest); }
+  const build = join(output, 'runtime');
+  if (env.MC_GOLDEN_RUNTIME_FROM_REGISTRY === '1') {
+    await command('runtime-artifact', process.execPath, ['scripts/enterprise-golden-journey/recover-ghcr-runtime.mjs', build]);
+    const recovery = await json(join(build, 'recovery.json'));
+    assert.equal(recovery.status, 'PASS', recovery.reason ?? 'Pinned registry runtime verification required');
+    assert.equal(recovery.binding.registryManifestVerified, true);
+    assert.equal(recovery.binding.archiveBytesVerified, true);
+  } else {
+    const origin = requireInput('MC_GOLDEN_RUNTIME_BUILD');
+    await mkdir(build);
+    for (const [name, expected] of Object.entries(lock.runtimeFiles)) {
+      const bytes = await readFile(join(origin, name)); assert.equal(sha256(bytes), expected, `Runtime dependency changed: ${name}`);
+      if (name !== 'image.tar') { const dest = join(build, name); await mkdir(dirname(dest), { recursive: true }); await copyFile(join(origin, name), dest); }
+    }
+    await command('runtime-artifact', process.execPath, ['scripts/qualification/inspect-native-successor.mjs', join(origin, 'image.tar'), build, join(build, 'artifact')]);
   }
-  await command('runtime-artifact', process.execPath, ['scripts/qualification/inspect-native-successor.mjs', join(origin, 'image.tar'), build, join(build, 'artifact')]);
   const identity = await json(join(build, 'artifact/image-binding.json'));
-  assert.equal(identity.manifestDigest, lock.runtimeImage); assert.equal(identity.sourceSha, lock.runtimeSource);
+  assert.equal(identity.manifestDigest, lock.runtimeImage); assert.equal(identity.configDigest, lock.runtimeConfig); assert.equal(identity.sourceSha, lock.runtimeSource);
   // Prove the retained bundles came from the pinned source, independently of metadata labels.
   const provenance = await json(join(build, 'provenance.json'));
   for (const artifact of Object.values(provenance.bundles.artifacts)) for (const [path, digest] of Object.entries(artifact.inputs)) {

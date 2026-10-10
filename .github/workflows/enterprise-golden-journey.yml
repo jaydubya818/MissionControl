@@ -6,6 +6,7 @@ on:
     branches: [main, codex/enterprise-golden-journey]
 permissions:
   contents: read
+  packages: read
 # Advisory until the complete cross-system journey and independent review pass.
 # No branch-protection mutation, publishing, deployment, model secrets or write token.
 jobs:

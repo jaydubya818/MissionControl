@@ -37,6 +37,7 @@ if (['delegated-execution', 'hybrid-mission'].includes(suite)) {
   run('docker', ['tag', lock.postgresImage, 'postgres:17']);
 }
 if (['native-execution', 'hybrid-mission', 'security-recovery'].includes(suite)) {
+  if (process.env.MC_GOLDEN_RUNTIME_FROM_REGISTRY === '1') process.exit(0);
   const url = process.env.MC_GOLDEN_RUNTIME_PACKAGE_URL;
   if (!url) { console.log('Exact native runtime distribution unavailable. Runner will report NOT_RUN.'); process.exit(0); }
   assert.equal(new URL(url).protocol, 'https:');

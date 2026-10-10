@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile, cp, rm } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { lock, sha256 } from "./evidence.mjs";
+import { readRegistryManifest } from "../qualification/registry-runtime-identity.mjs";
 const directory = resolve(process.argv[2]);
 const docker = process.env.MC_GOLDEN_DOCKER || "docker";
 const image =
@@ -35,11 +36,9 @@ try {
         assert.equal(sha256(await readFile(join(metadata, name))), hash, name);
     }
     await cp(metadata, directory, { recursive: true });
-    const registryEvidence = run(docker, [
-      "buildx", "imagetools", "inspect", image, "--format", "{{json .Manifest}}",
-    ]);
+    const registryEvidence = readRegistryManifest(docker, image);
     const registryPath = join(directory, "registry-manifest.json");
-    await writeFile(registryPath, registryEvidence);
+    await writeFile(registryPath, JSON.stringify(registryEvidence, null, 2) + "\n");
     const inspect = JSON.parse(run(docker, ["image", "inspect", image]))[0];
     assert.equal(inspect.Id, lock.runtimeConfig);
     assert.equal(inspect.Os, "linux");

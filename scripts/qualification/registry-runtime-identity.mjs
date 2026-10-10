@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 
 const digest = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex');
 const imageManifest = 'application/vnd.oci.image.manifest.v1+json';
 const imageConfig = 'application/vnd.oci.image.config.v1+json';
+
+export function readRegistryManifest(docker, image) {
+  const inspect = args => execFileSync(docker, ['buildx', 'imagetools', 'inspect', image, ...args], { maxBuffer: 16 * 1024 * 1024 });
+  const raw = inspect(['--raw']);
+  const descriptor = JSON.parse(inspect(['--format', '{{json .Manifest}}']));
+  return { Ref: image, Descriptor: descriptor, Raw: raw.toString('base64') };
+}
 
 function descriptor(value, mediaTypes) {
   assert.match(value?.digest ?? '', /^sha256:[a-f0-9]{64}$/, 'Invalid registry descriptor digest');
