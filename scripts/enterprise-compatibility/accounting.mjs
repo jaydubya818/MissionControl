@@ -12,7 +12,7 @@ const mutation = (s, name, args, client = db.owner) => client.mutation('factory/
 const fault = (id, patch) => db.owner.mutation('fixtureSeed:fault', { id, patch });
 const inspect = id => db.owner.mutation('fixtureSeed:inspect', { id });
 async function setup(limits) {
-  await db?.stop(); db = await startFixtureDatabase(process.cwd(), { canonicalAccounting: true });
+  await db?.destroy(); db = await startFixtureDatabase(process.cwd(), { canonicalAccounting: true });
   await call('configure', { seed: db.seed, ...limits });
   const a = await call('cloneWork', { seed: db.seed }), b = await call('cloneWork', { seed: db.seed });
   return [a, b];
@@ -66,6 +66,21 @@ try {
     const [a, b] = await setup({ mission: 1000, daily: 100 });
     const result = await Promise.allSettled([a, b].map(seed => call('reserveNative', { seed })));
     assert.equal(result.filter(r => r.status === 'fulfilled').length, 1);
+  });
+  await check('foreign-owner reservation remains in shared project admission', async () => {
+    const [a, b] = await setup({mission:1000,daily:100});
+    const foreign = await call('moveWorkToPeerMission',{seed:a});
+    await call('reserveNative',{seed:foreign},db.peer);
+    await assert.rejects(call('reserveNative',{seed:b}),/ENTERPRISE_BUDGET_EXHAUSTED/);
+    await assert.rejects(call('reserveNative',{seed:foreign},db.owner));
+    assert.equal(await call('exposure',{seed:b}),80);
+  });
+  for (const table of ['factoryProviderReservations','inferenceReservations']) await check('foreign '+table+' cannot disappear from shared authority exclusion',async()=>{
+    const [a,b]=await setup({mission:1000,daily:100});
+    const foreign=await call('moveWorkToPeerMission',{seed:a});
+    const id=await call('createForeignSharedAuthority',{seed:b,foreign,table});
+    assert.equal(await db.owner.query('accountingFixture:readVisible',{id}),null);
+    await assert.rejects(call('reserveNative',{seed:b}),/ENTERPRISE_SHARED_AUTHORITY_UNQUALIFIED/);
   });
   await check('concurrent duplicate reservation and unused settlement survive lost acknowledgment and restart', async () => {
     const [s] = await setup();
@@ -137,4 +152,4 @@ try {
     nativeEndToEnd: 'NOT_RUN', delegatedAdmission: 'existing enterpriseCompatibility.admitTrial', productionIntegration: 'NOT_RUN', paidOperations: 0 };
   if (process.env.MC_ACCOUNTING_EVIDENCE) await writeFile(process.env.MC_ACCOUNTING_EVIDENCE, JSON.stringify(report, null, 2) + '\n');
   console.log(JSON.stringify(report));
-} finally { await db?.stop(); }
+} finally { await db?.destroy(); }

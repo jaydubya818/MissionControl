@@ -16,7 +16,7 @@ function context() {
     query: () => ({ withIndex: () => ({ collect: async () => f.extraApproval ? [f.approval, f.extraApproval] : [f.approval] }) }) } };
 }
 const check = () => enterpriseDelegationApproval(context(), f.plan, f.binding, f.run);
-beforeEach(() => { f = structuredClone(retained); vi.useFakeTimers(); vi.setSystemTime(f.now); });
+beforeEach(() => { f = structuredClone(retained); f.mission.ownerOperatorId = f.operator._id; vi.useFakeTimers(); vi.setSystemTime(f.now); });
 afterEach(() => vi.useRealTimers());
 describe('canonical isolated delegation exact approval', () => {
   it('accepts the retained real database admission with its immutable source projection', async () => {
@@ -30,7 +30,7 @@ describe('canonical isolated delegation exact approval', () => {
     'allowance escalation': f => { f.binding.maxSpendMicrousd = 81; },
     'changed Plan': f => { f.plan.summary += ' changed'; },
     'different current Plan': f => { f.mission.currentPlanId = 'other'; },
-    'inactive owner member': f => { f.member.active = false; },
+    'inactive owner': f => { f.operator.active = false; },
     'foreign owner tenant': f => { f.operator.tenantId = 'other'; },
     'revoked registry': f => { f.factory.enterpriseRegistration.revokedAt = f.now; },
     'wrong FactoryVersion': f => { f.factory.enterpriseRegistration.config.factoryVersion = '0'.repeat(64); },

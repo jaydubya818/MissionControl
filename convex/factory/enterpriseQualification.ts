@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { mutation } from "../lib/missionScopedFunctions";
 import { requireEnterpriseQualificationOwner } from "../lib/enterpriseQualificationAccess";
 import { requireWorkspacePermission, FACTORY_PERMISSIONS } from "../lib/companyAccess";
 import { getCurrentVerificationRoutingOutcome, appendCurrentVerificationQualityGateDecision } from "../lib/currentVerification";

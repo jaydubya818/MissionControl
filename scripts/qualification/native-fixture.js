@@ -22,9 +22,11 @@ export const seed = mutation({ args: {}, handler: async ctx => {
   const operatorId = await createOperator("user_SyntheticHandoffQualification", "Qualification owner");
   const authorId = await createOperator("user_SyntheticPlanAuthorQualification", "Independent plan author");
   const peerId = await createOperator("fixture-peer", "Other owner");
+  const authorMemberId = await ctx.db.insert("orgMembers", { tenantId, projectId, operatorId: authorId, name: "Independent plan author", role: "Contributor", level: 0, active: true, metadata });
   const memberId = await ctx.db.insert("orgMembers", { tenantId, projectId, operatorId, name: "Qualification owner", role: "Owner", level: 0, active: true, systemRole: "OWNER", metadata });
   const teamId = await ctx.db.insert("scrumTeams", { tenantId, projectId, name: "Qualification", slug: "qualification", status: "ACTIVE", leadMemberId: memberId, createdAt: now, updatedAt: now });
   await ctx.db.insert("teamMemberships", { tenantId, projectId, teamId, memberId, operatorId, role: "LEAD", active: true, activeFrom: now, createdAt: now, updatedAt: now });
+  await ctx.db.insert("teamMemberships", { tenantId, projectId, teamId, memberId: authorMemberId, operatorId: authorId, role: "DEVELOPER", active: true, activeFrom: now, createdAt: now, updatedAt: now });
   const environmentId = await ctx.db.insert("environments", { tenantId, name: "Isolated deterministic fixture", type: "dev",
     metadata: { schema: "factory-qualification-environment/v1", synthetic: true, projectId } });
   for (const key of ["missions.plan-release-v1", "delivery.workorders", "company.context", "control-plane.repository-projection", "control-plane.dispatch-scope"]) {
@@ -36,7 +38,7 @@ export const seed = mutation({ args: {}, handler: async ctx => {
   const otherOperatorId = await ctx.db.insert("operators", { tenantId: otherTenantId, authId: "fixture-other", name: "Other tenant owner", email: "other@example.test", active: true, createdAt: now });
   const otherRoleId = await ctx.db.insert("roles", { tenantId: otherTenantId, name: "Owner", permissions: ["company.manage"] });
   await ctx.db.insert("roleAssignments", { operatorId: otherOperatorId, roleId: otherRoleId, assignedAt: now });
-  return { tenantId, projectId, operatorId, authorId, peerId, memberId, teamId, environmentId, otherProjectId };
+  return { tenantId, projectId, operatorId, authorId, peerId, authorMemberId, memberId, teamId, environmentId, otherProjectId };
 } });
 export const inspect = query({ args: { table: v.string() }, handler: async (ctx, { table }) => {
   await owner(ctx);

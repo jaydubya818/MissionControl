@@ -7,7 +7,7 @@
 
 import { v } from "convex/values";
 import { isLocalQualificationRepository } from "./lib/localRepositoryAdmission";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 import { buildFactoryProjectSeed } from "./lib/factoryProjectSeed";
 import { deriveVerificationStatus } from "./lib/workOrders";
 import {

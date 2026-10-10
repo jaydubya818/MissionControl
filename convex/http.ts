@@ -283,7 +283,7 @@ http.route({
     if (delivery.duplicate) {
       return new Response("OK (duplicate)", { status: 200 });
     }
-    if (!delivery.accepted) {
+    if (!delivery.accepted || !delivery.deliveryRecordId) {
       return new Response(delivery.error ?? "GitHub installation is not authorized", { status: 403 });
     }
 
@@ -293,7 +293,7 @@ http.route({
       error?: string
     ) => {
       await ctx.runMutation(internal.githubAppConnections.completeWebhookDelivery, {
-        deliveryRecordId: delivery.deliveryRecordId,
+        deliveryRecordId: delivery.deliveryRecordId!,
         status,
         result,
         error,

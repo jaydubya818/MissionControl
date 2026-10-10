@@ -4,7 +4,7 @@
 
 import { v } from "convex/values";
 import { api, internal } from "../_generated/api";
-import { internalMutation } from "../_generated/server";
+import { internalMutation } from "../lib/missionScopedFunctions";
 import { resolveFlag } from "../lib/flags";
 import { validateReceiptPacket } from "../lib/piBridgeEnvelope";
 

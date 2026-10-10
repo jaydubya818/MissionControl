@@ -1,0 +1,66 @@
+name: Enterprise Golden Journey
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main, codex/enterprise-golden-journey]
+permissions:
+  contents: read
+# Advisory until the complete cross-system journey and independent review pass.
+# No branch-protection mutation, publishing, deployment, model secrets or write token.
+jobs:
+  contracts:
+    uses: ./.github/workflows/enterprise-golden-suite.yml
+    with:
+      suite: contracts
+  database-concurrency:
+    uses: ./.github/workflows/enterprise-golden-suite.yml
+    with:
+      suite: database-concurrency
+  native-execution:
+    uses: ./.github/workflows/enterprise-golden-suite.yml
+    with:
+      suite: native-execution
+  delegated-execution:
+    uses: ./.github/workflows/enterprise-golden-suite.yml
+    with:
+      suite: delegated-execution
+  hybrid-mission:
+    uses: ./.github/workflows/enterprise-golden-suite.yml
+    with:
+      suite: hybrid-mission
+  sofie-integration:
+    uses: ./.github/workflows/enterprise-golden-suite.yml
+    with:
+      suite: sofie-integration
+  browser-journey:
+    uses: ./.github/workflows/enterprise-golden-suite.yml
+    with:
+      suite: browser-journey
+  security-recovery:
+    uses: ./.github/workflows/enterprise-golden-suite.yml
+    with:
+      suite: security-recovery
+  qualification:
+    if: always()
+    needs: [contracts, database-concurrency, native-execution, delegated-execution, hybrid-mission, sofie-integration, browser-journey, security-recovery]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: golden-evidence
+      - run: node scripts/enterprise-golden-journey/aggregate.mjs golden-evidence
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qualification
+          path: golden-evidence/qualification.json
+          if-no-files-found: error
+          retention-days: 90

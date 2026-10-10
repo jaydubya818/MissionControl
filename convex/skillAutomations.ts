@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 import type { Id } from "./_generated/dataModel";
 import { AUTOMATION_ACTOR_IDENTITY_SOURCE } from "./lib/automationGovernance";
 import { COMPANY_PERMISSIONS } from "./lib/companyAccess";

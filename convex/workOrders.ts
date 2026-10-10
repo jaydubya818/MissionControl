@@ -1,3 +1,4 @@
+import { serviceInternalMutation } from "./lib/missionScopedFunctions";
 import { canonicalDigest } from "@mission-control/shared";
 import { prepareCanonicalDelegation, DELEGATION_PREPARATION, LOCAL_DELEGATION_REPOSITORY } from "./lib/enterpriseDelegationAdmission";
 import { denyEnterprisePaidAuthority } from "./lib/enterpriseAttemptAccounting";
@@ -9,7 +10,7 @@ import { NO_INFERENCE_CONSTRAINT } from "./lib/offlineExecutionPolicy";
 import { deterministicFactoryVersionIssues } from "./lib/factoryWorkflowContract";
 import { factoryVersionExecutionProfileProjection } from "./lib/executionProfileAdmission";
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, reviewerMutation } from "./lib/missionScopedFunctions";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -4584,7 +4585,7 @@ export const setAuthorizedModelOverride = mutation({
   },
 });
 
-export const syncExecutionOutcome = internalMutation({
+export const syncExecutionOutcome = serviceInternalMutation(["attempts.report", "verification:report"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     eventType: v.union(
@@ -4821,6 +4822,7 @@ export const requestApprovalDecision = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    if (args.approvalType === "SERVICE_ATTEMPT_ACCESS") throw Error("USE_SCOPED_SERVICE_GRANT_API");
     const workOrder = await ctx.db.get(args.workOrderId);
     if (!workOrder) throw new Error("WorkOrder not found");
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId, COMPANY_PERMISSIONS.UPDATE_DELIVERY);
@@ -4916,6 +4918,7 @@ export const decideApprovalDecision = mutation({
   handler: async (ctx, args) => {
     const approvalDecision = await ctx.db.get(args.approvalDecisionId);
     if (!approvalDecision) throw new Error("ApprovalDecision not found");
+    if (approvalDecision.approvalType === "SERVICE_ATTEMPT_ACCESS") throw Error("USE_SCOPED_SERVICE_GRANT_API");
     if (args.projectId && approvalDecision.projectId !== args.projectId) {
       throw new Error("ApprovalDecision does not belong to the selected workspace");
     }
@@ -5091,6 +5094,7 @@ export const expireApprovalDecision = mutation({
   handler: async (ctx, args) => {
     const approvalDecision = await ctx.db.get(args.approvalDecisionId);
     if (!approvalDecision) throw new Error("ApprovalDecision not found");
+    if (approvalDecision.approvalType === "SERVICE_ATTEMPT_ACCESS") throw Error("USE_SCOPED_SERVICE_GRANT_API");
     const scopedWorkOrder = await ctx.db.get(approvalDecision.workOrderId);
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, scopedWorkOrder?.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
     if (scopedWorkOrder) assertAuthorizedDeliveryRecord(deliveryAccess, scopedWorkOrder);
@@ -5171,7 +5175,7 @@ export const expireFactoryHumanReviewCheckpointInternal = internalMutation({
   },
 });
 
-export const recordVerificationReceipt = mutation({
+export const recordVerificationReceipt = reviewerMutation({
   args: {
     workOrderId: v.id("workOrders"),
     workflowRunId: v.id("workflowRuns"),

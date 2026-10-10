@@ -3,7 +3,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation } from "./lib/missionScopedFunctions";
 import type { Id } from "./_generated/dataModel";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -99,7 +99,7 @@ export const evaluateRules = internalMutation({
           title: `Alert: ${rule.type.replace(/_/g, " ")}`,
           description: `Daily cost $${dailyCost.toFixed(2)} exceeded threshold $${rule.threshold.toFixed(2)}.`,
           status: "OPEN",
-          metadata: { ruleId: rule._id, dailyCost, threshold: rule.threshold },
+          metadata: { sourceRunIds: relevant.map(run => run._id), ruleId: rule._id, dailyCost, threshold: rule.threshold },
         });
       }
     }

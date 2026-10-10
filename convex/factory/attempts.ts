@@ -1,9 +1,11 @@
+import { serviceInternalMutation, serviceInternalQuery, serviceInternalAction } from "../lib/missionScopedFunctions";
+import { serviceAttemptEffects } from "../lib/missionServiceAuthority";
 import { assertEnterpriseAttemptExecution } from "../lib/enterpriseAttemptAccounting";
 import { resolveCurrentAttemptExecutionProfile, executionProfileProjectionFromFactoryVersion, hasAnyExecutionProfileBinding } from "../lib/attemptExecutionProfile";
 import { NO_INFERENCE_CONSTRAINT, isNoInferenceConstraint } from "../lib/offlineExecutionPolicy";
 import { v } from "convex/values";
 import { dockerRequestRecoveryMatches } from "../lib/dockerAllocationRecovery";
-import { internalAction, internalMutation, internalQuery, mutation } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery, mutation } from "../lib/missionScopedFunctions";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
@@ -226,7 +228,7 @@ function factoryExecutionStepMatchesModelRoute(step: any, routeSnapshot: Record<
   return step.modelConfiguration?.temperature === routeSnapshot.reasoningConfig?.temperature
     && step.modelConfiguration?.maxTokens === routeSnapshot.reasoningConfig?.maxTokens;
 }
-export const resolveScope = internalQuery({
+export const resolveScope = serviceInternalQuery(Object.keys(serviceAttemptEffects))({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
@@ -474,7 +476,7 @@ async function validateReadOnlyCandidateRecovery(ctx: any, run: any): Promise<bo
   return true;
 }
 
-export const claimInternal = internalMutation({
+export const claimInternal = serviceInternalMutation(["attempts.claim", "verification:claim"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     leaseId: v.string(),
@@ -1279,7 +1281,7 @@ export const authorizePublicationInternal = internalMutation({
   },
 });
 
-export const renewInternal = internalMutation({
+export const renewInternal = serviceInternalMutation(["attempts.renew", "verification:renew"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     leaseId: v.string(),
@@ -1324,7 +1326,7 @@ export const renewInternal = internalMutation({
 });
 
 
-export const reportInternal = internalMutation({
+export const reportInternal = serviceInternalMutation(["attempts.report"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     leaseId: v.string(),
@@ -1854,7 +1856,7 @@ export const reportInternal = internalMutation({
   },
 });
 
-export const reportVerificationInternal = internalMutation({
+export const reportVerificationInternal = serviceInternalMutation(["verification:report"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     leaseId: v.string(),
@@ -2418,7 +2420,7 @@ async function persistPrepublicationCandidate(ctx: any, run: any, candidate: any
   return { subject };
 }
 
-export const scheduleCandidateVerificationInternal = internalMutation({
+export const scheduleCandidateVerificationInternal = serviceInternalMutation(["attempts.report"])({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
     const source = await ctx.db.get(args.workflowRunId);
@@ -2432,7 +2434,7 @@ export const scheduleCandidateVerificationInternal = internalMutation({
   },
 });
 
-export const candidateVerificationDispatchFailedInternal = internalMutation({
+export const candidateVerificationDispatchFailedInternal = serviceInternalMutation(["attempts.report"])({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
     const source = await ctx.db.get(args.workflowRunId);
@@ -2448,7 +2450,7 @@ export const candidateVerificationDispatchFailedInternal = internalMutation({
 });
 
 // Separate transactions preserve the checkpoint and a useful failure state if dispatch fails.
-export const dispatchCandidateVerificationInternal = internalAction({
+export const dispatchCandidateVerificationInternal = serviceInternalAction(["attempts.report"])({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
     try { await ctx.runMutation(internal.factory.attempts.scheduleCandidateVerificationInternal, args); }
@@ -3043,7 +3045,7 @@ export const resumeVerification = mutation({
   },
 });
 
-export const scheduleVerificationInternal = internalMutation({
+export const scheduleVerificationInternal = serviceInternalMutation(["attempts.report"])({
   args: { sourceAttemptId: v.id("workflowRuns") },
   handler: async (ctx, args): Promise<any> => {
     const sourceAttempt = await ctx.db.get(args.sourceAttemptId);
@@ -3059,7 +3061,7 @@ export const scheduleVerificationInternal = internalMutation({
   },
 });
 
-export const syncCompletedVerificationOutcomeInternal = internalMutation({
+export const syncCompletedVerificationOutcomeInternal = serviceInternalMutation(["verification:report"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     verificationRunId: v.id("verificationRuns"),
@@ -4116,7 +4118,10 @@ async function insertEvent(ctx: any, run: any, event: any) {
   const existing = await ctx.db.query("runEvents")
     .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", event.idempotencyKey))
     .first();
-  if (existing) return { event: existing, created: false };
+  if (existing) {
+    if (existing.workflowRunId !== run._id) throw Error("EVENT_IDEMPOTENCY_SCOPE_CONFLICT");
+    return { event: existing, created: false };
+  }
   const eventId = await ctx.db.insert("runEvents", {
     tenantId: run.tenantId,
     projectId: run.projectId,

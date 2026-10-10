@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { reportInternal, reportVerificationInternal } from "../factory/attempts";

@@ -377,7 +377,7 @@ export function AgentSettingsPanel({
               <dl>
                 <DetailRow label="Daily" value={`$${agent.budgetDaily.toFixed(2)}`} />
                 <DetailRow label="Per run" value={`$${agent.budgetPerRun.toFixed(2)}`} />
-                <DetailRow label="Spent today" value={`$${agent.spendToday.toFixed(2)}`} />
+                <DetailRow label="Authorized run cost" value={`$${agent.spendToday.toFixed(2)}`} />
               </dl>
             </Section>
           </div>

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, action, internalQuery } from "./_generated/server";
+import { mutation, query, action, internalQuery } from "./lib/missionScopedFunctions";
 import { api, internal } from "./_generated/api";
 
 /**

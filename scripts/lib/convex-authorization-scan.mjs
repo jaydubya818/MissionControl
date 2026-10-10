@@ -21,6 +21,7 @@ import ts from "typescript";
 
 /** Calls that establish server-side authority. */
 const AUTHORIZATION_MARKERS = [
+  "requireMissionAccess",
   "requireCompanyAccess",
   "requireCompanyPermission",
   "requireCompanyAdministrator",

@@ -77,3 +77,6 @@ vendor/fab/runtime/
 # Python bytecode (was previously tracked by mistake)
 __pycache__/
 *.py[cod]
+
+# Append-only local Golden Journey evidence and browser outputs.
+/golden-evidence/

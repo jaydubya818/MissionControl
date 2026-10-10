@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation } from "../_generated/server";
+import { internalMutation } from "../lib/missionScopedFunctions";
 import { appendChangeRecord } from "../lib/armAudit";
 
 type GateStatus = "PASS" | "WARN" | "FAIL";

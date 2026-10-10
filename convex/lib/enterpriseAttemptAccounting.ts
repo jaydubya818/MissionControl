@@ -1,3 +1,4 @@
+import { missionAuthorityDatabase } from "./missionScopedFunctions";
 import { computeCanonicalHash } from "./genomeHash";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
@@ -160,10 +161,10 @@ export async function reserveEnterpriseAttempt(ctx: MutationCtx, input: {
     || !policy?.active || policy.projectId !== project._id || policy.tenantId !== project.tenantId
     || version.policyEnvelopeId !== policy._id) throw Error("ENTERPRISE_SCOPE_UNAVAILABLE");
   const [runs, controls, inference, provider] = await Promise.all([
-    ctx.db.query("workflowRuns").withIndex("by_project", q => q.eq("projectId", project._id)).collect(),
+    missionAuthorityDatabase(ctx).query("workflowRuns").withIndex("by_project", q => q.eq("projectId", project._id)).collect(),
     ctx.db.query("operatorControls").withIndex("by_project", q => q.eq("projectId", project._id)).order("desc").first(),
-    ctx.db.query("inferenceReservations").withIndex("by_project", q => q.eq("projectId", project._id)).first(),
-    ctx.db.query("factoryProviderReservations").withIndex("by_project_key", q => q.eq("projectId", project._id)).first(),
+    missionAuthorityDatabase(ctx).query("inferenceReservations").withIndex("by_project", q => q.eq("projectId", project._id)).first(),
+    missionAuthorityDatabase(ctx).query("factoryProviderReservations").withIndex("by_project_key", q => q.eq("projectId", project._id)).first(),
   ]);
   if (inference || provider || !controls || controls.tenantId !== project.tenantId || controls.mode !== "NORMAL") {
     throw Error("ENTERPRISE_SHARED_AUTHORITY_UNQUALIFIED");

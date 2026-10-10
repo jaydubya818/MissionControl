@@ -5,7 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { query } from "./lib/missionScopedFunctions";
 
 export const generateIncidentReport = query({
   args: { taskId: v.id("tasks") },

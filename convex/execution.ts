@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query, action } from "./lib/missionScopedFunctions";
 
 // Extension point: executeApi / executeUi / executeHybrid currently simulate steps.
 // To wire real runners (e.g. Playwright, API client), replace evaluateSteps with

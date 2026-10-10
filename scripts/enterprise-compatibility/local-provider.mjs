@@ -23,7 +23,7 @@ const {startPostgres}=await load('apps/cloud-control/test/fixtures/local-postgre
 const checks=[],journeys=[];let db,pg,f,server;
 const check=async(name,fn)=>{await fn();checks.push(name);console.log('PASS '+name);};
 const hash='sha256:'+'a'.repeat(64);
-async function cleanup(){if(server){server.closeAllConnections();server.close();server=null;}await db?.stop();db=null;await pg?.stop();pg=null;await f?.stop();f=null;}
+async function cleanup(){if(server){server.closeAllConnections();server.close();server=null;}await db?.destroy();db=null;await pg?.stop();pg=null;await f?.stop();f=null;}
 async function setup({expiresIn,withoutTariff=false,policyFailure=false,verifierFailure=false}={}){
  db=await startFixtureDatabase(repo,{canonicalAccounting});f=await localFixture(root);await qualifyHost(f);pg=await startPostgres(root);
  if(verifierFailure){f.policy=structuredClone(f.policy);f.policy.checks[0].expected={value:'intentionally-failing-protected-expectation'};f.configuration.local.verificationPolicySha256=partner.digest(f.policy);}

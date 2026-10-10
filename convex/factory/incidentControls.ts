@@ -1,7 +1,7 @@
 /** Bounded repository-dispatch actuator for Incident Command. */
 
 import { v } from "convex/values";
-import { mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
+import { mutation, query, type MutationCtx, type QueryCtx } from "../lib/missionScopedFunctions";
 import type { Doc, Id } from "../_generated/dataModel";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "../lib/companyAccess";
 import {

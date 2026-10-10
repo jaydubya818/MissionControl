@@ -5,7 +5,7 @@
  * Run with: npx convex run seed:seedV0
  */
 
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 
 export const seedV0 = mutation({
   args: {},

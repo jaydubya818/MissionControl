@@ -756,16 +756,14 @@ function AgentDetailContent({
               const daily = agent.budgetDaily ?? 0;
               const perRun = agent.budgetPerRun ?? 0;
               const spent = agent.spendToday ?? 0;
-              const remaining = daily - spent;
               const ratio = daily > 0 ? spent / daily : 0;
-              const ratioClass = ratio > 0.9 ? "text-err" : ratio > 0.7 ? "text-warn" : "text-ok";
               const barColor = ratio > 0.9 ? "bg-err" : ratio > 0.7 ? "bg-warn" : "bg-ok";
               return (
                 <>
                   <DetailRow label="Daily Budget" value={`$${daily.toFixed(2)}`} />
                   <DetailRow label="Per-Run Budget" value={`$${perRun.toFixed(2)}`} />
-                  <DetailRow label="Spent Today" value={`$${spent.toFixed(2)}`} />
-                  <DetailRow label="Remaining" value={`$${remaining.toFixed(2)}`} valueClassName={ratioClass} />
+                  <DetailRow label="Authorized run cost" value={`$${spent.toFixed(2)}`} />
+                  <DetailRow label="Budget enforcement" value="Checked at admission" />
                   <div className="mt-2">
                     <div className="w-full h-1 bg-surface-2 rounded-full overflow-hidden">
                       <div
@@ -786,7 +784,7 @@ function AgentDetailContent({
         <DetailRow label="Last Heartbeat" value={timeAgo(agent.lastHeartbeatAt)} />
         <DetailRow
           label="Error Streak"
-          value={String(agent.errorStreak)}
+          value={agent.errorStreak === undefined ? "Unavailable" : String(agent.errorStreak)}
           valueClassName={agent.errorStreak > 0 ? "text-err" : undefined}
         />
         {agent.lastError && (
@@ -1123,7 +1121,7 @@ function UnifiedOrgNode({ node, selectedId, onSelect }: UnifiedOrgNodeProps) {
             {node.budgetDaily !== undefined && (
               <div className="mt-3 pt-3 border-t border-line">
                 <div className="text-[12px] text-ink-muted mb-1.5">
-                  Budget: ${node.spendToday?.toFixed(2) || 0} / ${node.budgetDaily.toFixed(0)}
+                  Visible cost / limit: ${node.spendToday?.toFixed(2) || 0} / ${node.budgetDaily.toFixed(0)}
                 </div>
                 <div className="w-full h-1 bg-surface-2 rounded-full overflow-hidden">
                   <div

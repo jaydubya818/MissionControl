@@ -5,7 +5,7 @@ import { assertInferenceSpendingAllowed, fenceWorkOrderInferenceSpending } from 
   bedrockBridgeIdentityValidator,
   assertBedrockBridgeIdentity,
 } from "../lib/bedrockBridgeIdentity"; import { v, ConvexError } from "convex/values";
-import { mutation, query, internalMutation } from "../_generated/server";
+import { mutation, query, internalMutation } from "../lib/missionScopedFunctions";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import {

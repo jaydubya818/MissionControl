@@ -1,3 +1,4 @@
+import { SofieEnterpriseContractFixture } from '../enterprise-golden-journey/sofie-contract.mjs';
 import { finalizeHybridSpec } from './native-hybrid-spec.mjs';
 import { mkdir, readFile, writeFile, chmod, rm, lstat } from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -38,7 +39,9 @@ const ref = (name: string) => makeFunctionReference<any>(name);
 const mutate = (name: string, args: any, client = db.owner) => client.mutation(ref(name), args);
 const query = (name: string, args: any, client = db.owner) => client.query(ref(name), args);
 async function step(name: string, operation: () => Promise<any>) {
+  const started = performance.now();
   const value = await operation(); state.stages[name] = value;
+  (state.timingsMs ??= {})[name] = performance.now() - started;
   await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n');
   console.log(JSON.stringify({ stage: name, recorded: true })); return value;
 }
@@ -93,7 +96,7 @@ try {
       const command = createSignedServiceCommand({ capability: verifier ? 'verification:renew' : 'attempts.renew', projectId: s.projectId, repositoryId,
         payload: { workflowRunId: request.attemptId, leaseId: request.lease.leaseId, workerId: hostId, workerSessionId: sessionId,
           workerGeneration: request.lease.generation, leaseDurationMs: 60_000 } });
-      return (await db.owner.action(ref(verifier ? 'serviceCommands:renewVerificationAttempt' : 'serviceCommands:renewFactoryAttempt'), command))?.renewed === true;
+      return (await db.anonymous.action(ref(verifier ? 'serviceCommands:renewVerificationAttempt' : 'serviceCommands:renewFactoryAttempt'), command))?.renewed === true;
     } });
   adapter = await createAdapter();
   if ((await adapter.health()).status !== 'READY') throw Error('Registered successor is unavailable');
@@ -124,7 +127,9 @@ try {
     runtimeArtifactSha256: r.runtimeArtifactSha256, capabilityManifest: r.manifest!, supportsCancel: r.capabilities.supportsCancel,
     supportsResume: r.capabilities.supportsResume, isolationModes: [...r.capabilities.isolationModes] }));
   let factoryVersionBindings: any[] = [];
+  let lastHostReportAt = 0;
   async function reportHost() {
+    lastHostReportAt = Date.now();
     const observed = await attestLocalQualificationRepository(localBinding);
     return mutate('workspaceHostBindings:report', { projectId: s.projectId, repositoryId, hostId, repository: `local-qualification/${fixtureId}`,
       checkoutRoot: root, localQualificationObservation: observed, observedBranch: 'main', observedCommit: admission.baselineCommit,
@@ -166,7 +171,7 @@ try {
   const contextVerifierId = await step('contextVerifier', () => mutate('context/verifiers:create', { projectId: s.projectId, label: 'Exact native document bytes',
     invariant: 'Independent verification compares the immutable candidate with frozen expected bytes.', globPatterns: ['docs/qualification.md'], idempotencyKey: 'native-successor-verifier' }));
   const operation = { reference: RENDER_MARKDOWN_OPERATION, digest: RENDER_MARKDOWN_OPERATION_DIGEST,
-    input: { title: 'Native Successor Qualification', paragraphs: ['Independent verification precedes enterprise acceptance.'], outputPath: 'docs/qualification.md' } };
+    input: { title: mode === 'hybrid' ? 'Employee Identity API Contract v1' : 'Native Successor Qualification', paragraphs: mode === 'hybrid' ? ['Contract version: employee-core/v1.', 'Employee identity: employeeId and tenantId are required immutable strings. Cross-tenant identity reuse is forbidden.', 'GET /v1/employees/{employeeId} returns employeeId, tenantId, displayName and employmentStatus. Unknown identities return 404.', 'Recruiting and Onboarding reference employeeId and tenantId. Breaking changes require a new contract version.'] : ['Independent verification precedes enterprise acceptance.'], outputPath: 'docs/qualification.md' } };
   const verification = { reference: VERIFY_DOCUMENT_OPERATION, digest: VERIFY_DOCUMENT_OPERATION_DIGEST,
     input: { path: 'docs/qualification.md', expectedContentSha256: `sha256:${sha256Hex(renderMarkdownCandidate(operation).content)}` } };
   async function registerNativePair(prefix: string, operation: any, verification: any, contextVerifierId: string) {
@@ -198,13 +203,26 @@ try {
   if (mode === 'prepare') console.log(JSON.stringify({ preparation: 'PASS', nativeExecution: 'NOT_RUN' }));
   else executionQualification: {
     const author = db.client('user_SyntheticPlanAuthorQualification');
-    const missionResult = await step('mission', () => mutate('missions:createDraft', { projectId: s.projectId, idempotencyKey: 'native-successor-mission',
-      title: mode === 'hybrid' ? 'Deterministic native and delegated hybrid Mission' : 'Native successor executed settlement', objective: mode === 'hybrid' ? 'Execute native and delegated WorkOrders and independently verify an exact downstream integration proof.' : 'Render and independently verify one exact unpublished synthetic document.',
+    const sofie = new SofieEnterpriseContractFixture({
+      createDraft: (args: any) => mutate('missions:createDraft', args),
+      get: (missionId: string) => query('missions:get', { missionId }),
+      accept: (args: any) => mutate('missions:accept', args),
+    });
+    await step('sofieProposal', async () => sofie.propose('Build an Agentic HR platform.'));
+    const missionArgs = { projectId: s.projectId, idempotencyKey: 'native-successor-mission',
+      title: mode === 'hybrid' ? 'Build the Employee Core, Recruiting and Onboarding foundation.' : 'Native successor executed settlement', objective: mode === 'hybrid' ? 'Execute native and delegated WorkOrders and independently verify an exact downstream integration proof.' : 'Render and independently verify one exact unpublished synthetic document.',
       context: 'Isolated qualification only.', constraints: ['No paid inference', 'No publication', 'No production authority'],
       sourceOfTruthRefs: [{ kind: 'REPO', label: 'Admitted fixture', location: 'docs/qualification.md' }], owner: s.operatorId,
       ownerMemberId: s.memberId, owningTeamId: s.teamId, repositoryId, codeScopeIds: [scope.scopeId], executionEnvironment: 'LOCAL', budgetUsd: 0.1, maxReadOnlyConcurrency: 2, maxCorrectiveIterations: 1,
-      stopCondition: 'Stop after all approved WorkOrders are independently verified, accepted and settled; no publication.', metadata: { synthetic: true, qualificationOnly: true, ...(mode === 'hybrid' ? { enterpriseCompatibilityFixture: true } : {}) } }));
+      stopCondition: 'Stop after all approved WorkOrders are independently verified, accepted and settled; no publication.', metadata: { synthetic: true, qualificationOnly: true, ...(mode === 'hybrid' ? { enterpriseCompatibilityFixture: true } : {}) } };
+    await assert.rejects(() => sofie.authorizePlanning(false, missionArgs));
+    const missionResult = await step('mission', () => sofie.authorizePlanning(true, missionArgs));
+    const duplicateMission = await step('duplicateMission', () => sofie.authorizePlanning(true, missionArgs));
+    assert.equal(duplicateMission.mission._id, missionResult.mission._id);
+    assert.equal(duplicateMission.created, false);
     const missionId = missionResult.mission._id;
+    await mutate('softwareFactoryControlPlane:assignMissionMember', { tenantId: s.tenantId, projectId: s.projectId, missionId,
+      memberId: s.authorMemberId, teamId: s.teamId, role: 'CONTRIBUTOR' });
     if (mode === 'hybrid') await finalizeHybridSpec({ mutate, step, projectId: s.projectId, missionId, repositoryId, scopeId: scope.scopeId });
     const planDraft: any = { projectId: s.projectId, missionId, idempotencyKey: 'native-successor-plan',
       summary: 'Render frozen Markdown through the exact admitted runtime, independently compare the candidate Git blob, and settle authenticated execution proof.',
@@ -221,9 +239,12 @@ try {
       metadata: { synthetic: true, qualificationOnly: true, nativeEngineeringTariffPolicy: NATIVE_ENGINEERING_TARIFF_POLICY } };
     if (mode === 'hybrid') {
       const primary = planDraft.workOrderBlueprints[0];
+      primary.title = 'Shared HR Contracts';
+      primary.desiredOutcome = 'Versioned Employee identity and API contract document.';
+      state.referenceMission = { sharedHrContracts: 'EXECUTED_DOCUMENT', recruitingUi: 'NOT_RUN', integration: 'PROOF_DOCUMENT_ONLY', reason: 'Pinned MyFactory FactoryVersion qualifies only a protected slug utility. Recruiting UI needs a separately qualified fixture.' };
       planDraft.assertions.push(...['delegated-slug', 'integration-proof'].map(id => ({ ...planDraft.assertions[0], assertionId: id,
         title: id, outcome: id === 'delegated-slug' ? 'Protected MyFactory slug behavior passes.' : 'The proof document binds both exact completed predecessor handoffs.' })));
-      planDraft.workOrderBlueprints.push({ ...primary, id: 'delegated-slug', title: 'Qualified delegated slug change', sequence: 2,
+      planDraft.workOrderBlueprints.push({ ...primary, id: 'delegated-slug', title: 'Recruiting UI dependency qualification (slug fixture only)', sequence: 2,
         constraints: ['Only the approved MyFactory slug fixture path may change'], workflowId: 'native-successor-producer', desiredOutcome: 'Execute the preserved deterministic MyFactory slug fixture with signed independent verification.', assertionIds: ['delegated-slug'],
         implementationPolicy: { ...primary.implementationPolicy, timeoutMinutes: 3, maxLinesChanged: 100 } },
         { ...primary, id: 'integration-proof', title: 'Integrate exact predecessor proofs', sequence: 3, workflowId: 'native-successor-producer',
@@ -257,8 +278,51 @@ try {
     await step('reservedBeforeExecution', () => query('factory/nativeAccounting:readback', { workflowRunId: dispatch.run._id }));
     const duplicate = await step('duplicateDispatch', () => mutate('workOrders:dispatch', dispatchArgs));
     if (duplicate.created || duplicate.run._id !== dispatch.run._id) throw Error('Duplicate native admission');
+    const serviceGrants = new Map<string, string>();
+    const serviceCapabilities = new Set(['attempts.claim', 'attempts.renew', 'attempts.report', 'verification:claim', 'verification:renew', 'verification:report']);
+    const scopedServiceClient = new Proxy(db.owner, { get(target, name) {
+      if (name === 'action') return async (reference: any, command: any) => {
+        if (!serviceCapabilities.has(command?.envelope?.capability)) return target.action(reference, command);
+        const payload = JSON.parse(command.payloadJson);
+        if (!serviceGrants.has(payload.workflowRunId)) {
+          const verification = command.envelope.capability.startsWith('verification:');
+          const grantArgs = { workflowRunId: payload.workflowRunId,
+            serviceId: command.envelope.serviceId, capabilities: verification
+              ? ['verification:claim', 'verification:renew', 'verification:report'] : ['attempts.claim', 'attempts.renew', 'attempts.report'],
+            expiresAt: Date.now() + 600_000, reason: 'Explicit synthetic owner approval for this exact zero-charge qualification Attempt; no paid or publication authority.' };
+          await assert.rejects(() => db.anonymous.action(reference, command), /SERVICE_ATTEMPT_AUTHORITY_REQUIRED/);
+          await assert.rejects(() => mutate('missionServiceAuthority:grant', grantArgs, db.peer));
+          await assert.rejects(() => mutate('missionServiceAuthority:grant', grantArgs, db.other));
+          const grant = await mutate('missionServiceAuthority:grant', grantArgs);
+          const saved = await query('nativeFixture:inspectRecord', { id: grant });
+          for (const patch of [{ expiresAt: Date.now() - 1 }, { revokedAt: Date.now() },
+            ...['serviceId', 'ownerOperatorId', 'tenantId', 'missionId', 'workOrderId', 'workflowRunId', 'factoryId', 'factoryDefinitionVersionId', 'configurationDigest', 'executionManifestDigest', 'dependencyDigest'].map(key => ({ metadata: { ...saved.metadata, [key]: 'wrong-binding' } })),
+            { metadata: { ...saved.metadata, allowedEffects: [] } }]) {
+            await mutate('nativeFixture:fault', { id: grant, patch });
+            await assert.rejects(() => db.anonymous.action(reference, command), /SERVICE_ATTEMPT_AUTHORITY_REQUIRED/);
+            await mutate('nativeFixture:fault', { id: grant, patch: { metadata: saved.metadata, expiresAt: saved.expiresAt }, unset: ['revokedAt'] });
+          }
+          const delegatedWorkOrder = await query('nativeFixture:inspectRecord', { id: saved.workOrderId });
+          if (delegatedWorkOrder.dependencies?.length) {
+            const handoffs = (await query('nativeFixture:inspect', {table:'missionHandoffs'})).filter((h: any) => delegatedWorkOrder.dependencies.includes(h.workOrderId));
+            const deniedIds = handoffs.flatMap((h: any) => [h._id,h.workOrderId,h.workflowRunId,...h.artifactIds]);
+            const probe = await mutate('isolationFixture:serviceInputProbe', {claim:{serviceId:command.envelope.serviceId,workflowRunId:payload.workflowRunId,capability:command.envelope.capability,expiresAt:Date.now()+60000},ids:deniedIds});
+            assert.ok(probe.length && probe.every((r: any)=>!r.visible&&!r.writable));
+            await mutate('nativeFixture:fault',{id:saved.workOrderId,patch:{dependencies:[]}});
+            await assert.rejects(()=>db.anonymous.action(reference,command),/SERVICE_ATTEMPT_AUTHORITY_REQUIRED/);
+            await mutate('nativeFixture:fault',{id:saved.workOrderId,patch:{dependencies:delegatedWorkOrder.dependencies}});
+            (state.dependencyInputIsolation ??= []).push({attemptId:payload.workflowRunId,identityOnly:true,directResourcesDenied:probe.length,changedDependenciesDenied:true});
+          }
+          serviceGrants.set(payload.workflowRunId, grant);
+          (state.serviceIsolation ??= []).push({ attemptId: payload.workflowRunId, grantId: grant, credentialOnly: true,
+            noGrantDenied: true, peerOwnerDenied: true, crossTenantDenied: true, expiryDenied: true, revokedDenied: true, tupleMutantsDenied: true });
+        }
+        return db.anonymous.action(reference, command);
+      };
+      const value = target[name]; return typeof value === 'function' ? value.bind(target) : value;
+    } });
     let lostExecutionAck = false, duplicateDeliveries = 0, restarted = false, recoveryInitialPollCompleted = false;
-    const recoveryClient = new Proxy(db.owner, { get(target, name) {
+    const recoveryClient = new Proxy(scopedServiceClient, { get(target, name) {
       if (name === 'action') return async (reference: any, command: any) => {
         const result = await target.action(reference, command);
         const payload = command?.payloadJson ? JSON.parse(command.payloadJson) : {};
@@ -280,7 +344,7 @@ try {
     } });
     const makeWorker = (client: any) => new FactoryAttemptWorker(client, registry, true, 15000, { ...DEFAULT_DEPENDENCIES,
       loadGithubAppPrivateKey: () => undefined, getGithubAppId: () => undefined }, { projectId: s.projectId, repositoryId }, { workerId: hostId, sessionId, maxConcurrentRuns: 2 });
-    worker = makeWorker(mode === 'recovery' ? recoveryClient : db.owner);
+    worker = makeWorker(mode === 'recovery' ? recoveryClient : scopedServiceClient);
     const deadline = Date.now() + 90000;
     let runs: any[] = [];
     while (Date.now() < deadline) {
@@ -297,7 +361,7 @@ try {
         await step('executionRecovery', async () => ({ lostExecutionAck, duplicateDeliveries, restarted,
           executionsBeforeRecovery: executions, verifierStateBeforeRecovery: 'PENDING', freshAdapter: true, freshRegistry: true }));
       }
-      await reportHost();
+      if (Date.now() - lastHostReportAt >= 5000) await reportHost();
       // Admit the producer once, then drain that controller without polling for
       // newly queued verification work. The fresh controller must admit it after
       // the lost ACK and restart; producer cleanup timing cannot change this cut.
@@ -314,6 +378,7 @@ try {
     }
     await step('workerStatus', async () => worker!.status());
     await step('executedAttempts', async () => runs);
+    state.attemptDurationsMs = runs.filter(r => r.completedAt && r.executionClaimedAt).map(r => ({ attemptId: r._id, purpose: r.attemptPurpose, durationMs: r.completedAt - r.executionClaimedAt, basis: 'canonical executionClaimedAt to completedAt' }));
     const detail = await step('workOrderAfterVerification', () => query('workOrders:get', { workOrderId: workOrder._id }));
     const verifier = runs.find(r => r.attemptPurpose === 'VERIFICATION');
     if (mode === 'unknown' || mode === 'cancel') {
@@ -324,7 +389,7 @@ try {
       const readback = await step('unknownExposure', () => query('factory/nativeAccounting:readback', { workflowRunId: dispatch.run._id }));
       assert.equal(readback.attemptExposureMicrousd, reservation.ceilingMicrousd);
       await assert.rejects(() => mutate('factory/nativeAccounting:releaseUndispatched', { workflowRunId: dispatch.run._id, expectedReservationDigest: reservation.digest }));
-      await worker.stop(); await db.restart(); sessionId = randomUUID(); worker = makeWorker(db.owner);
+      await worker.stop(); await db.restart(); sessionId = randomUUID(); worker = makeWorker(scopedServiceClient);
       await reportHost(); await worker.tick();
       const recovered = await step('unknownAfterRestart', () => query('factory/nativeAccounting:readback', { workflowRunId: dispatch.run._id }));
       assert.equal(recovered.attemptExposureMicrousd, reservation.ceilingMicrousd); assert.equal(executions, 1);
@@ -410,15 +475,26 @@ try {
           actorUserId: 'user_SyntheticHandoffQualification', reason: 'Both exact predecessor handoffs are complete.', idempotencyKey: 'hybrid-integration-' + toStatus });
         assert.equal(transition.success, true);
       }
-      const integrationDispatch = await step('integrationDispatch', () => mutate('workOrders:dispatch', { ...dispatchScope,
+      const integrationDispatchArgs = { ...dispatchScope,
         workOrderId: integrationWO._id, taskId: integrationTask.task._id, workflowId: 'hybrid-integration-producer',
-        factoryDefinitionVersionId: integrationFactories.producer.versionId, idempotencyKey: 'hybrid-integration-dispatch' }));
+        factoryDefinitionVersionId: integrationFactories.producer.versionId, idempotencyKey: 'hybrid-integration-dispatch' };
+      const attemptsBeforeDependencyFault = (await query('nativeFixture:inspect', { table: 'workflowRuns' })).length;
+      for (const predecessor of [workOrder, byBlueprint('delegated-slug')]) {
+        const original = await query('nativeFixture:inspectRecord', { id: predecessor._id });
+        await mutate('nativeFixture:fault', { id: predecessor._id, patch: { state: 'BLOCKED' } });
+        try { await assert.rejects(() => mutate('workOrders:dispatch', integrationDispatchArgs), /predecessor-handoff-invalid/); }
+        finally { await mutate('nativeFixture:fault', { id: predecessor._id, patch: { state: original.state } }); }
+      }
+      assert.equal((await query('nativeFixture:inspect', { table: 'workflowRuns' })).length, attemptsBeforeDependencyFault);
+      await step('dependencyInvalidation', async () => ({ predecessors: 2, denied: 2, replacementAttempts: 0 }));
+      const integrationDispatch = await step('integrationDispatch', () => mutate('workOrders:dispatch', integrationDispatchArgs));
       assert.equal(integrationDispatch.created, true);
-      worker = makeWorker(db.owner);
+      worker = makeWorker(scopedServiceClient);
       let integrationRuns: any[] = [];
       const integrationDeadline = Date.now() + 90000;
       while (Date.now() < integrationDeadline) {
-        await reportHost(); await worker.tick();
+        if (Date.now() - lastHostReportAt >= 5000) await reportHost();
+        await worker.tick();
         integrationRuns = (await query('nativeFixture:inspect', { table: 'workflowRuns' })).filter((r: any) => r.workOrderId === integrationWO._id);
         const verifier = integrationRuns.find(r => r.attemptPurpose === 'VERIFICATION');
         if (verifier && ['COMPLETED', 'FAILED', 'CANCELED'].includes(verifier.status) && !worker.status().activeRunIds.length) break;
@@ -442,11 +518,36 @@ try {
         isolatedEnterpriseQualification: true, idempotencyKey: 'hybrid-integration-accept' }));
       assert.equal(accepted.accepted, true);
       await handoff(integrationWO._id, integrationDispatch.run._id, 'integration-proof', integrationArtifacts.filter((a: any) => a.workflowRunId === integrationDispatch.run._id).map((a: any) => a._id));
-      const missionAcceptance = await step('hybridMissionAcceptance', () => mutate('missions:accept', { missionId, acceptedBy: s.operatorId, idempotencyKey: 'hybrid-mission-accept' }));
+      const ownerReadback = await step('sofieNeedsYou', () => sofie.readback(missionId));
+      assert.equal(ownerReadback.state, 'AWAITING_ACCEPTANCE');
+      assert.equal(ownerReadback.acceptanceEligible, true);
+      assert.ok(ownerReadback.needsYou);
+      for (const client of [db.other, db.anonymous, db.peer]) assert.equal(await query('missions:get', { missionId }, client), null);
+      await step('missionReadIsolation', async () => ({ crossTenant: 'DENIED', anonymous: 'DENIED',
+        sameTenantOtherOwner: 'DENIED', strictOwnerIsolation: 'PASS' }));
+      const missionAcceptance = await step('hybridMissionAcceptance', () => sofie.accept(missionId, s.operatorId));
       assert.equal(missionAcceptance.mission.state, 'DONE');
       await db.restart();
       const finalAccounting = await step('hybridDurableAccounting', () => query('factory/nativeAccounting:readback', { workflowRunId: integrationDispatch.run._id }));
       assert.equal(finalAccounting.projectExposureMicrousd, 0);
+      const durableMission = await step('sofieDurableReadback', () => sofie.readback(missionId));
+      assert.equal(durableMission.state, 'DONE');
+      assert.equal(durableMission.needsYou, null);
+      assert.equal(durableMission.workOrders.length, 3);
+      assert.ok(durableMission.workOrders.every((wo: any) => wo.state === 'DONE'));
+      assert.ok(durableMission.assertions.every((a: any) => a.status === 'PASS' && a.verificationReceiptId));
+      await step('completedResultIsolation', async () => {
+        for (const client of [db.other, db.anonymous, db.peer]) {
+          assert.equal(await query('missions:get', { missionId }, client), null);
+          assert.equal(await query('workOrders:get', { workOrderId: integrationWO._id }, client), null);
+          assert.equal(await query('workflowRuns:getById', { id: integrationDispatch.run._id }, client), null);
+          assert.deepEqual(await query('workflowRuns:listArtifacts', { workflowRunId: integrationDispatch.run._id }, client), []);
+          assert.deepEqual(await query('workflowRuns:listEvents', { workflowRunId: integrationDispatch.run._id }, client), []);
+          await assert.rejects(() => query('factory/nativeAccounting:readback', { workflowRunId: integrationDispatch.run._id }, client));
+        }
+        return { crossTenant: 'DENIED', sameTenantOtherOwner: 'DENIED', anonymous: 'DENIED', afterRestart: true };
+      });
+      state.sofieContract = 'PASS'; state.liveSofieIntegration = 'NOT_RUN';
       state.hybridMission = 'PASS'; state.nativeDelegatedAccounting = 'PASS';
     }
 
@@ -480,7 +581,7 @@ try {
   }
   assert.match(db.root, /\/mc-enterprise-1b-[A-Za-z0-9]+$/);
   assert.equal((await lstat(db.root)).isSymbolicLink(), false);
-  await rm(db.root, { recursive: true }); state.databaseCleanup = 'VERIFIED';
+  await db.destroy(); state.databaseCleanup = 'VERIFIED';
   await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n');
   for (const [key, value] of Object.entries(savedEnvironment)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
 }

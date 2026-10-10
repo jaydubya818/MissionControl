@@ -6,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, action, internalAction } from "./_generated/server";
+import { mutation, query, action, internalAction } from "./lib/missionScopedFunctions";
 import { Doc, Id } from "./_generated/dataModel";
 import { workflowDefinitionChanged } from "./lib/workflowSnapshot";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";

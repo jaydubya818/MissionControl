@@ -3,7 +3,7 @@
  */
 
 import { v } from "convex/values";
-import { query } from "../_generated/server";
+import { query } from "../lib/missionScopedFunctions";
 
 export interface EvidenceFinding {
   id: string;

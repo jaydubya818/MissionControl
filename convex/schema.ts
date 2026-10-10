@@ -1695,6 +1695,11 @@ export const schemaTablesPartOne = {
   // are deliberately excluded; the digest and scoped identity are sufficient
   // for audit, idempotency, and incident investigation.
   serviceCommandReceipts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    missionId: v.optional(v.id("missions")),
+    workOrderId: v.optional(v.id("workOrders")),
+    workflowRunId: v.optional(v.id("workflowRuns")),
     serviceId: v.string(),
     capability: v.string(),
     commandId: v.string(),
@@ -2041,7 +2046,7 @@ export const schemaTablesPartOne = {
   // SOFTWARE FACTORY: WORK ORDERS
   // -------------------------------------------------------------------------
   missions: defineTable({
-    enterpriseFixtureBudget: v.optional(fixtureBudget),
+    ownerOperatorId: v.optional(v.id("operators")),    enterpriseFixtureBudget: v.optional(fixtureBudget),
     tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     idempotencyKey: v.optional(v.string()),
@@ -4634,6 +4639,7 @@ export const schemaTablesPartOne = {
     .index("by_work_order", ["workOrderId"]),
 
   inferenceRouteComparisons: defineTable({
+    missionIds: v.optional(v.array(v.id("missions"))),
     tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),
     leftRouteDigest: v.string(),
@@ -4659,6 +4665,7 @@ export const schemaTablesPartOne = {
   // AGENT PERFORMANCE (Learning System — Aggregated Metrics)
   // -------------------------------------------------------------------------
   agentPerformance: defineTable({
+    sourceTaskIds: v.optional(v.array(v.id("tasks"))),
     tenantId: v.optional(v.id("tenants")),
     agentId: v.id("agents"),
     projectId: v.optional(v.id("projects")),
@@ -4832,6 +4839,7 @@ export const schemaTablesPartTwo = {
     .index("by_fixture", ["fixtureKey"]),
 
   missionAssignments: defineTable({
+    operatorId: v.optional(v.id("operators")),
     tenantId: v.id("tenants"),
     projectId: v.id("projects"),
     missionId: v.id("missions"),
@@ -6191,6 +6199,7 @@ export const schemaTablesPartTwo = {
   // WORKFLOW METRICS (Aggregated Workflow Performance Stats)
   // -------------------------------------------------------------------------
   workflowMetrics: defineTable({
+    sourceWorkflowRunIds: v.optional(v.array(v.id("workflowRuns"))),
     // ARM: Tenant scope (optional, backfill later)
     tenantId: v.optional(v.id("tenants")),
     // Identity
@@ -8346,6 +8355,7 @@ export const schemaTablesPartTwo = {
   // HARNESS ENGINEERING: META LOOP SUGGESTIONS
   // -------------------------------------------------------------------------
   metaLoopSuggestions: defineTable({
+    sourceMissionIds: v.optional(v.array(v.id("missions"))),
     projectId: v.optional(v.id("projects")),
     kind: v.union(
       v.literal("VERIFIER"),

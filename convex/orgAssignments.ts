@@ -8,7 +8,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation } from "./lib/missionScopedFunctions";
 
 const orgPositionValidator = v.union(
   v.literal("CEO"),

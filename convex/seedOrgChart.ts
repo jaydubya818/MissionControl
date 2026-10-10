@@ -3,7 +3,7 @@
  * Run: npx convex run seedOrgChart:run
  */
 
-import { mutation } from "./_generated/server";
+import { mutation } from "./lib/missionScopedFunctions";
 import type { Id } from "./_generated/dataModel";
 
 export const run = mutation({

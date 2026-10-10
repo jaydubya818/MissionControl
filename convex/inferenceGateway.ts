@@ -1,7 +1,7 @@
 import { denyEnterprisePaidAuthority } from "./lib/enterpriseAttemptAccounting";
 import { v, type Infer } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./lib/missionScopedFunctions";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
 import {
   factoryOutcomeEvent,
@@ -1051,7 +1051,10 @@ export const freezeRouteComparison = mutation({
       blockers: comparison.blockers, automaticPromotionAuthorized: false as const, createdAt: now,
     };
     const comparisonDigest = canonicalDigest("inference-route-comparison/v1", snapshot);
+    const sourceWorkOrders = await Promise.all([...leftProjections, ...rightProjections].filter(inCohort).map(row => ctx.db.get(row.workOrderId)));
+    const missionIds = [...new Set(sourceWorkOrders.flatMap(row => row?.missionId ? [row.missionId] : []))];
     const id = await ctx.db.insert("inferenceRouteComparisons", {
+      missionIds,
       tenantId: access.project.tenantId, projectId: args.projectId,
       leftRouteDigest: args.leftRouteDigest, rightRouteDigest: args.rightRouteDigest,
       cohortDigest: args.cohortDigest, formulaVersion: OUTCOME_FORMULA_VERSION,

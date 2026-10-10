@@ -13,7 +13,7 @@ function fixture() {
   reservation.digest = reservationDigest(reservation);
   const plan: any = { _id: 'plan', tenantId: 'tenant', projectId: 'project', missionId: 'mission', status: 'APPROVED',
     approvedBy: 'owner-auth', approvedAt: 900, decidedActorSource: 'AUTHENTICATED', metadata: { nativeEngineeringTariffPolicy: NATIVE_ENGINEERING_TARIFF_POLICY } };
-  const mission: any = { _id: 'mission', currentPlanId: 'plan', owner: 'owner' };
+  const mission: any = { _id: 'mission', currentPlanId: 'plan', owner: 'owner', ownerOperatorId: 'owner', tenantId: 'tenant', projectId: 'project' };
   const operator: any = { _id: 'owner', tenantId: 'tenant', authId: 'owner-auth', active: true };
   const manifest: any = { version: 'factory-execution-manifest/v4', executionBackend: 'isolated-container', harness: { adapter: 'isolated-invocation', version: '3' },
     budgetReservationId: 'run', causation: { workflowRunId: 'run', workOrderId: 'wo', workOrderRevisionId: 'revision', workOrderRevisionNumber: 1,
@@ -41,7 +41,7 @@ describe('native admission-time engineering tariff', () => {
   it.each(['plan-owner', 'mission-owner', 'tenant', 'inactive', 'unapproved', 'policy', 'plan-revision', 'source', 'runtime', 'attempt'])('denies changed %s before execution', async field => {
     const f = fixture();
     if (field === 'plan-owner') f.plan.approvedBy = 'someone-else';
-    if (field === 'mission-owner') f.mission.owner = 'someone-else';
+    if (field === 'mission-owner') f.mission.ownerOperatorId = 'someone-else';
     if (field === 'tenant') f.operator.tenantId = 'other';
     if (field === 'inactive') f.operator.active = false;
     if (field === 'unapproved') f.plan.status = 'DRAFT';

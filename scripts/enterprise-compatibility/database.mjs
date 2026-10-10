@@ -1,15 +1,17 @@
 import { spawn, execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, writeFile, copyFile, symlink, cp } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile, copyFile, symlink, cp, rm, appendFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
-import { ConvexHttpClient } from "convex/browser";
+import { ConvexHttpClient, ConvexClient } from "convex/browser";
 
 export async function startFixtureDatabase(repo, { canonicalAccounting = false, nativeExecution = false } = {}) {
   const binary = process.env.MC_COMPATIBILITY_CONVEX_BINARY;
   if (!binary) throw Error("MC_COMPATIBILITY_CONVEX_BINARY must identify a local Convex backend binary");
   const root = await mkdtemp(join(tmpdir(), "mc-enterprise-1b-"));
+  const audit = status => process.env.MC_GOLDEN_DATABASE_AUDIT ? appendFile(process.env.MC_GOLDEN_DATABASE_AUDIT, JSON.stringify({ root, status }) + "\n") : Promise.resolve();
+  await audit("CREATED");
   const name = "enterprise-compatibility-fixture", secret = randomBytes(32).toString("hex");
   const key = execFileSync(binary, ["keygen", "admin-key", "--instance-name", name, "--instance-secret", secret], { encoding: "utf8" }).trim();
   const port = Number(process.env.MC_COMPATIBILITY_PORT ?? 3390);
@@ -32,6 +34,7 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
     throw Error("Disposable backend startup timeout");
   }
   async function stop() { if (backend && backend.exitCode === null && backend.signalCode === null) { backend.kill("SIGTERM"); await once(backend, "exit"); } }
+  async function destroy() { await stop(); await rm(root, { recursive: true }); await audit("DESTROYED"); }
   const copied = new Set();
   async function copyClosure(relative) {
     if (copied.has(relative)) return; copied.add(relative);
@@ -63,6 +66,7 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
       await copyClosure("convex/lib/serviceCommandAuth.ts");
       await copyClosure("convex/lib/factoryMemory.ts");
       await copyFile(join(repo, "scripts/qualification/native-fixture.js"), join(root, "convex/nativeFixture.js"));
+      await copyFile(join(repo, "scripts/enterprise-golden-journey/isolation-fixture.js"), join(root, "convex/isolationFixture.js"));
     }
     if (canonicalAccounting) {
       await copyClosure("convex/lib/offlineAttemptBudget.ts");
@@ -89,12 +93,17 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
     const owner = client(nativeExecution ? "user_SyntheticHandoffQualification" : "fixture-owner"), other = client("fixture-other");
     const seed = await owner.mutation(nativeExecution ? "nativeFixture:seed" : "fixtureSeed:seed", {});
     return { root, seed, owner, other, peer: client("fixture-peer"), anonymous: new ConvexHttpClient(url), stop,
-      ...(nativeExecution ? { client, setEnvironment(name, value) {
+      ...(nativeExecution ? { client, subscription(subject) {
+        const c = new ConvexClient(url);
+        c.setAdminAuth(key, { subject, issuer: "https://fixture.example.test", email: `${subject}@example.test` });
+        return c;
+      }, setEnvironment(name, value) {
         if (!["MC_LOCAL_REPOSITORY_ADMISSION", "MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID", "MISSION_CONTROL_SERVICE_ID", "MISSION_CONTROL_SERVICE_COMMAND_SECRET"].includes(name)) throw Error("Unapproved native fixture environment field");
         try { execFileSync(process.execPath, [cli, "env", "set", name, value, "--url", url, "--admin-key", key],
           { cwd: root, env, encoding: "utf8", timeout: 20000, stdio: "pipe" }); }
         catch { throw Error(`Disposable environment setup failed: ${name}`); }
       } } : {}),
+      destroy,
       restart: async () => { await stop(); await start(); }, copied: [...copied] };
-  } catch (error) { await stop(); throw error; }
+  } catch (error) { await destroy(); throw error; }
 }

@@ -407,7 +407,7 @@ function WorkforceList({
               <span className="hidden w-32 shrink-0 sm:block">
                 <ThinBar
                   fraction={agent.budgetDaily > 0 ? agent.spendToday / agent.budgetDaily : 0}
-                  label={`$${agent.spendToday.toFixed(2)}/$${agent.budgetDaily.toFixed(0)}`}
+                  label={`Visible $${agent.spendToday.toFixed(2)}/$${agent.budgetDaily.toFixed(0)}`}
                 />
               </span>
               <StatusBadge tone={AGENT_BADGE_TONE[agent.status] ?? "neutral"}>

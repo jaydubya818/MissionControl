@@ -1,3 +1,5 @@
+import schema from "./schema";
+import { internalMutation as scopedMutation, internalQuery as scopedQuery } from "./lib/missionScopedFunctions";
 import { internalMutationGeneric as mutation } from "convex/server";
 import { reserveOfflineAttemptBudget } from "./lib/offlineAttemptBudget";
 import { scopeExposure, settleUndispatchedEnterpriseAttempt, denyEnterprisePaidAuthority, assertEnterpriseAttemptExecution } from "./lib/enterpriseAttemptAccounting";
@@ -38,7 +40,7 @@ export const cloneWork = mutation({ handler: async (ctx, { seed: s }) => {
     executionClaimedAt: undefined, status: "PENDING", spentUsd: 0, reservedCostUsd: 0, metadata: {} });
   return { ...s, workOrderId, workOrderRevisionId, taskId, workflowRunId };
 } });
-export const reserveNative = mutation({ handler: async (ctx, { seed: s }) => {
+export const reserveNative = scopedMutation({ handler: async (ctx, { seed: s }) => {
   const mission = await owner(ctx, s.projectId, s.missionId);
   const run = await ctx.db.get(s.workflowRunId), workOrder = await ctx.db.get(s.workOrderId), version = await ctx.db.get(s.nativeVersionId);
   if (run?.workOrderId !== workOrder?._id || run.projectId !== s.projectId) throw Error("SCOPE");
@@ -68,3 +70,39 @@ export const claim = mutation({ handler: async (ctx, { seed: s }) => {
   return true;
 } });
 export const paid = mutation({ handler: async (ctx, { seed: s }) => { await owner(ctx, s.projectId, s.missionId); await denyEnterprisePaidAuthority(ctx, s.projectId); } });
+
+export const moveWorkToPeerMission = mutation({ handler: async (ctx, { seed: s }) => {
+  await owner(ctx, s.projectId, s.missionId);
+  const copy = async (table, id, patch) => { const { _id, _creationTime, ...row } = await ctx.db.get(id); return ctx.db.insert(table, {...row,...patch}); };
+  const missionId = await copy("missions", s.missionId, {owner:s.peerOperatorId,ownerOperatorId:s.peerOperatorId});
+  const missionSpecRevisionId = await copy("missionSpecRevisions", s.missionSpecRevisionId, {missionId});
+  const missionPlanId = await copy("missionPlans", s.missionPlanId, {missionId});
+  await ctx.db.patch(missionId,{currentPlanId:missionPlanId,currentSpecRevisionId:missionSpecRevisionId});
+  await ctx.db.patch(s.workOrderId,{missionId,missionPlanId});
+  await ctx.db.patch(s.workflowRunId,{missionId});
+  return {...s,missionId,missionSpecRevisionId,missionPlanId,operatorId:s.peerOperatorId};
+} });
+
+// Historical authority existence must block isolated admission even when its
+// owner's records are invisible to the admitting owner. No provider is called.
+export const createForeignSharedAuthority = mutation({ handler: async (ctx, { seed:s, foreign, table }) => {
+  await owner(ctx,s.projectId,s.missionId);
+  if (!["factoryProviderReservations","inferenceReservations"].includes(table)) throw Error("FIXTURE_TABLE");
+  const known={tenants:s.tenantId,projects:s.projectId,operators:s.operatorId,workOrders:foreign.workOrderId,tasks:foreign.taskId,workflowRuns:foreign.workflowRunId};
+  async function value(v) {
+    if(v.type==="literal")return v.value;
+    if(v.type==="string")return "historical-fixture";
+    if(v.type==="number")return 1;
+    if(v.type==="boolean")return false;
+    if(v.type==="null" || v.type==="any")return null;
+    if(v.type==="array")return [];
+    if(v.type==="record")return {};
+    if(v.type==="union")return value(v.value[0]);
+    if(v.type==="id")return known[v.tableName]??await insert(v.tableName);
+    if(v.type==="object")return Object.fromEntries(await Promise.all(Object.entries(v.value).filter(([,f])=>!f.optional).map(async([k,f])=>[k,await value(f.fieldType)])));
+    throw Error("FIXTURE_SCHEMA:"+v.type);
+  }
+  async function insert(name) { const row=await value(schema.tables[name].validator.json);const id=await ctx.db.insert(name,row);known[name]=id;return id; }
+  return insert(table);
+} });
+export const readVisible = scopedQuery({ handler: (ctx,{id})=>ctx.db.get(id) });

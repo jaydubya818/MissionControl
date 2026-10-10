@@ -1,5 +1,6 @@
+import { contributorMutation } from "./lib/missionScopedFunctions";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, reviewerMutation } from "./lib/missionScopedFunctions";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -684,8 +685,8 @@ export const createDraft = mutation({
     }
     const project = args.projectId ? await ctx.db.get(args.projectId) : null;
     if (args.projectId && !project) throw new Error("Workspace not found");
-    let requestingOperatorId;
-    let ownerMember: any = null;
+    let requestingOperatorId = deliveryAccess?.membership.operatorId;
+    let ownerMember: Doc<"orgMembers"> | null = null;
     let owningTeam: any = null;
     if (args.projectId && project?.tenantId && (args.ownerMemberId || args.owningTeamId || args.repositoryId || args.codeScopeIds?.length)) {
       const access = await requireWorkspaceAccess(ctx, project.tenantId, args.projectId, { permission: COMPANY_PERMISSIONS.ASSIGN_DELIVERY });
@@ -700,7 +701,11 @@ export const createDraft = mutation({
       ]);
       const repository = args.repositoryId ? await ctx.db.get(args.repositoryId) : null;
       const scopes = await Promise.all((args.codeScopeIds ?? []).map((scopeId) => ctx.db.get(scopeId)));
-      if (ownerMember && ownerMember.projectId !== args.projectId) throw new Error("Mission owner must belong to the active workspace.");
+      if (args.ownerMemberId) {
+        const ownerOperator = ownerMember?.operatorId && await ctx.db.get(ownerMember.operatorId);
+        if (!ownerMember?.active || ownerMember.projectId !== args.projectId || ownerMember.tenantId !== project.tenantId
+          || !ownerOperator?.active || ownerOperator.tenantId !== project.tenantId) throw Error("MISSION_MEMBER_OPERATOR_REQUIRED");
+      }
       if (owningTeam && owningTeam.projectId !== args.projectId) throw new Error("Mission team must belong to the active workspace.");
       if (repository && repository.projectId !== args.projectId) throw new Error("Mission repository must belong to the active workspace.");
       if (scopes.some((scope) => !scope || scope.projectId !== args.projectId || (repository && scope.repositoryId !== repository._id))) throw new Error("Mission code scopes must belong to the active workspace and repository.");
@@ -715,6 +720,7 @@ export const createDraft = mutation({
       tenantId: project?.tenantId, projectId: args.projectId, idempotencyKey: args.idempotencyKey,
       title: args.title, objective: args.objective, context: args.context, constraints: args.constraints,
       sourceOfTruthRefs: args.sourceOfTruthRefs, owner: ownerMember?.name ?? args.owner,
+      ownerOperatorId: requestingOperatorId,
       ownerMemberId: args.ownerMemberId, owningTeamId: args.owningTeamId, repositoryId: args.repositoryId,
       codeScopeIds: args.codeScopeIds ?? [], requestedByOperatorId: requestingOperatorId,
       executionEnvironment: args.executionEnvironment,
@@ -731,6 +737,7 @@ export const createDraft = mutation({
         projectId: project._id,
         missionId: mission._id,
         memberId: args.ownerMemberId,
+        operatorId: ownerMember?.operatorId,
         teamId: args.owningTeamId,
         role: "OWNER",
         activeFrom: now,
@@ -750,6 +757,10 @@ export const createDraft = mutation({
       idempotencyKey: args.idempotencyKey ? `${args.idempotencyKey}:created` : undefined,
       metadata: { actorSource: operator.actorSource },
     });
+    if (ownerMember && ownerMember.operatorId !== requestingOperatorId) {
+      await ctx.db.patch(missionId, { ownerOperatorId: ownerMember.operatorId });
+      mission.ownerOperatorId = ownerMember.operatorId;
+    }
     return { mission, created: true };
   },
 });
@@ -791,7 +802,7 @@ export const updateDraft = mutation({
       throw new Error(`Mission draft cannot be edited while ${mission.state}`);
     }
 
-    let ownerMember: any = null;
+    let ownerMember: Doc<"orgMembers"> | null = null;
     let assignmentAccess: any = null;
     if (args.ownerMemberId || args.owningTeamId || args.repositoryId || args.codeScopeIds?.length) {
       if (!mission.tenantId || !args.ownerMemberId || !args.owningTeamId || !args.repositoryId || !args.codeScopeIds?.length) {
@@ -813,7 +824,9 @@ export const updateDraft = mutation({
           .withIndex("by_team_member", (q) => q.eq("teamId", args.owningTeamId!).eq("memberId", args.ownerMemberId!))
           .first(),
       ]);
-      if (!member || !member.active || member.projectId !== args.projectId) throw new Error("Mission owner must be active in the selected workspace");
+      const memberOperator = member?.operatorId && await ctx.db.get(member.operatorId);
+      if (!member?.active || member.projectId !== args.projectId || member.tenantId !== mission.tenantId
+        || !memberOperator?.active || memberOperator.tenantId !== mission.tenantId) throw Error("MISSION_MEMBER_OPERATOR_REQUIRED");
       if (!team || team.status !== "ACTIVE" || team.projectId !== args.projectId) throw new Error("Mission team must be active in the selected workspace");
       if (!teamMembership?.active) throw new Error("Mission owner must be active in the selected team");
       if (!repository || repository.projectId !== args.projectId) throw new Error("Mission repository must belong to the selected workspace");
@@ -829,12 +842,11 @@ export const updateDraft = mutation({
       idempotencyKey: _idempotencyKey,
       ...draft
     } = args;
-    const normalizedDraft = ownerMember ? { ...draft, owner: ownerMember.name } : draft;
+    const normalizedDraft = ownerMember ? { ...draft, owner: ownerMember.name, ownerOperatorId: ownerMember.operatorId } : draft;
     const changedFields = changedMissionDraftFields(mission, normalizedDraft);
     if (changedFields.length === 0) return { mission, updated: false };
 
     const now = Date.now();
-    await ctx.db.patch(mission._id, { ...normalizedDraft, updatedAt: now });
     if (ownerMember && args.owningTeamId && assignmentAccess) {
       const assignments = await ctx.db.query("missionAssignments")
         .withIndex("by_mission_role", (q) => q.eq("missionId", mission._id).eq("role", "OWNER"))
@@ -850,6 +862,7 @@ export const updateDraft = mutation({
       const matching = assignments.find((item) => item.memberId === ownerMember._id && item.teamId === args.owningTeamId);
       if (matching) {
         await ctx.db.patch(matching._id, {
+          operatorId: ownerMember.operatorId,
           active: true,
           activeUntil: undefined,
           updatedAt: now,
@@ -861,6 +874,7 @@ export const updateDraft = mutation({
           projectId: args.projectId,
           missionId: mission._id,
           memberId: ownerMember._id,
+          operatorId: ownerMember.operatorId,
           teamId: args.owningTeamId,
           role: "OWNER",
           activeFrom: now,
@@ -872,8 +886,7 @@ export const updateDraft = mutation({
         });
       }
     }
-    const updated = await ctx.db.get(mission._id);
-    if (!updated) throw new Error("Mission draft update failed");
+    const updated = { ...mission, ...normalizedDraft, updatedAt: now };
     const operator = await resolveOperator(ctx);
     await logMissionEvent(ctx, {
       mission: updated,
@@ -884,11 +897,12 @@ export const updateDraft = mutation({
       idempotencyKey: args.idempotencyKey,
       metadata: { actorSource: operator.actorSource, changedFields },
     });
+    await ctx.db.patch(mission._id, { ...normalizedDraft, updatedAt: now });
     return { mission: updated, updated: true };
   },
 });
 
-export const savePlanDraft = mutation({
+export const savePlanDraft = contributorMutation({
   args: {
     projectId: v.id("projects"),
     missionId: v.id("missions"),
@@ -1040,7 +1054,7 @@ export const abandonPlanDraft = mutation({
   },
 });
 
-export const submitPlan = mutation({
+export const submitPlan = contributorMutation({
   args: { projectId: v.id("projects"), missionId: v.id("missions"), planId: v.id("missionPlans"), idempotencyKey: v.string() },
   handler: async (ctx, args) => {
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, args.projectId, COMPANY_PERMISSIONS.UPDATE_DELIVERY);
@@ -1425,7 +1439,7 @@ export const start = mutation({
   },
 });
 
-export const recordValidationResult = mutation({
+export const recordValidationResult = reviewerMutation({
   args: {
     missionId: v.id("missions"), validationAssertionId: v.id("validationAssertions"), workflowRunId: v.id("workflowRuns"),
     status: v.union(v.literal("PASS"), v.literal("FAIL"), v.literal("WAIVED"), v.literal("STALE"), v.literal("UNKNOWN")),

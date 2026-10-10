@@ -1,0 +1,48 @@
+name: Enterprise Golden Journey suite
+on:
+  workflow_call:
+    inputs:
+      suite:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm run ci:prepare
+      - name: Resolve exact dependencies and fixtures
+        env:
+          GOLDEN_SUITE: ${{ inputs.suite }}
+          MC_GOLDEN_RUNTIME_PACKAGE_URL: ${{ vars.MC_GOLDEN_RUNTIME_PACKAGE_URL }}
+        run: node scripts/enterprise-golden-journey/prepare-hosted.mjs "$GOLDEN_SUITE"
+      - if: inputs.suite == 'browser-journey'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run qualification
+        env:
+          GOLDEN_SUITE: ${{ inputs.suite }}
+        run: node scripts/enterprise-golden-journey/run.mjs "$GOLDEN_SUITE" "golden-evidence/$GOLDEN_SUITE"
+      - name: Record setup failure or interruption
+        if: always()
+        env:
+          GOLDEN_SUITE: ${{ inputs.suite }}
+        run: node scripts/enterprise-golden-journey/setup-failure.mjs "$GOLDEN_SUITE" "golden-evidence/$GOLDEN_SUITE"
+      - name: Preserve evidence including failed runs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ inputs.suite }}
+          path: golden-evidence/${{ inputs.suite }}
+          if-no-files-found: error
+          retention-days: 90

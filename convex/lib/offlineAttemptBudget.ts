@@ -1,3 +1,4 @@
+import { missionAuthorityDatabase } from "./missionScopedFunctions";
 import { computeCanonicalHash } from "./genomeHash.js";
 import type { MutationCtx } from "../_generated/server.js";
 import { reserveEnterpriseAttempt, scopeExposure, scopeAttemptExposures, microusd } from "./enterpriseAttemptAccounting";
@@ -44,9 +45,9 @@ export async function reserveOfflineAttemptBudget(ctx: MutationCtx, input: {
     throw new Error("Offline resource reservation requires explicit current Mission, policy and approved WorkOrder limits.");
   }
   const [missionRuns, projectRuns, workOrderRuns] = await Promise.all([
-    ctx.db.query("workflowRuns").withIndex("by_mission", q => q.eq("missionId", mission._id)).collect(),
-    ctx.db.query("workflowRuns").withIndex("by_project", q => q.eq("projectId", workOrder.projectId)).collect(),
-    ctx.db.query("workflowRuns").withIndex("by_work_order", q => q.eq("workOrderId", workOrder._id)).collect(),
+    missionAuthorityDatabase(ctx).query("workflowRuns").withIndex("by_mission", q => q.eq("missionId", mission._id)).collect(),
+    missionAuthorityDatabase(ctx).query("workflowRuns").withIndex("by_project", q => q.eq("projectId", workOrder.projectId)).collect(),
+    missionAuthorityDatabase(ctx).query("workflowRuns").withIndex("by_work_order", q => q.eq("workOrderId", workOrder._id)).collect(),
   ]);
   const committed = (runs: any[]) => enterprise ? scopeExposure(runs.filter(run => run.runId !== input.runId)) / 1_000_000 : runs.reduce((sum, run) => {
     if (!money(run.reservedCostUsd) || !money(run.spentUsd)) throw new Error("Shared resource reservation includes an unsettled unknown cost.");

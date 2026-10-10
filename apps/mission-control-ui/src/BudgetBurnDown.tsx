@@ -29,8 +29,8 @@ function getSpendClasses(ratio: number): { text: string; bg: string } {
 function getStatusLabel(ratio: number): string {
   if (ratio >= 1) return "Exceeded";
   if (ratio >= 0.8) return "Warning";
-  if (ratio >= 0.5) return "On track";
-  return "Healthy";
+  if (ratio >= 0.5) return "Visible cost";
+  return "Visible cost";
 }
 
 function getStatusTone(ratio: number): StatusBadgeProps["tone"] {
@@ -85,7 +85,7 @@ export function BudgetBurnDown({ projectId }: BudgetBurnDownProps) {
   if (!budgetData) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
-        <PageHeader title="Budget burn-down" description="Daily budget consumption across all agents" />
+        <PageHeader title="Budget burn-down" description="Authorized Run costs today (UTC). Shared budget limits are enforced separately." />
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-6 py-6">
           <div className="h-4 w-48 animate-pulse rounded bg-surface-2" />
           <div className="h-24 animate-pulse rounded-xl bg-surface-2" />
@@ -98,20 +98,20 @@ export function BudgetBurnDown({ projectId }: BudgetBurnDownProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app">
-      <PageHeader title="Budget burn-down" description="Daily budget consumption across all agents" />
+      <PageHeader title="Budget burn-down" description="Authorized Run costs today (UTC). Shared budget limits are enforced separately." />
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-6 py-6">
         {/* Aggregate Summary */}
         <MetricRow className="xl:grid-cols-6">
           <MetricBlock label="Total budget" value={`$${budgetData.totalBudget.toFixed(2)}`} />
           <MetricBlock
-            label="Total spent"
+            label="Authorized run cost"
             value={
               <span className={totalClasses.text}>${budgetData.totalSpent.toFixed(2)}</span>
             }
           />
           <MetricBlock
-            label="Remaining"
-            value={`$${Math.max(0, budgetData.totalBudget - budgetData.totalSpent).toFixed(2)}`}
+            label="Budget enforcement"
+            value="At admission"
           />
           <MetricBlock label="Active agents" value={budgetData.activeCount} />
           {budgetData.overBudgetCount > 0 && (
@@ -134,7 +134,7 @@ export function BudgetBurnDown({ projectId }: BudgetBurnDownProps) {
         <div className="rounded-xl border border-line bg-surface-1 p-4">
           <div className="mb-2 flex items-center justify-between">
             <span className="text-[13px] font-semibold text-ink">
-              Overall: {(budgetData.totalRatio * 100).toFixed(0)}% consumed
+              Visible cost: {(budgetData.totalRatio * 100).toFixed(0)}% of limits
             </span>
             <span className="font-mono text-[12.5px] text-ink-muted">
               ${budgetData.totalSpent.toFixed(2)} / ${budgetData.totalBudget.toFixed(2)}
@@ -184,7 +184,7 @@ export function BudgetBurnDown({ projectId }: BudgetBurnDownProps) {
               </div>
               <div className="mt-1.5 flex justify-between">
                 <span className="text-[12px] text-ink-muted">
-                  Remaining: ${agent.remaining.toFixed(2)}
+                  Shared limit enforced at admission
                 </span>
                 <span className="text-[12px] text-ink-muted">
                   {(agent.ratio * 100).toFixed(0)}% used

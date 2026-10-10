@@ -1,0 +1,37 @@
+{
+  "schema": "enterprise-golden-source-lock/v1",
+  "controllerBaseline": "08daed6f5745dce00d18da4218a26fdc5b827666",
+  "canonicalMain": {
+    "missionControl": "5308727463ec737589bf8072ee9f5de0af1bba7a",
+    "myFactory": "030b1a51017f3159436b93817ed2d5bf6ae18288",
+    "myEve": "2ef364024bc1cdd3e10ec28f3d340119c6f87d41"
+  },
+  "myFactory": "e498c31db8b749fa91b0544ecd1d1a661b971c2c",
+  "myFactoryFixtureSource": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
+  "myEve": "2ef364024bc1cdd3e10ec28f3d340119c6f87d41",
+  "factoryVersion": "4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95",
+  "runtimeSource": "912e26ebd2b08c2c58f7cbfc1b903c1d52c4851e",
+  "runtimeImage": "sha256:bddbcca962226a60fe962ccd5812b04b480064004b97e04a97f7166bc3be233a",
+  "runtimeConfig": "sha256:dadde9fff32581d2ebad5eda80c675f4e69a0805c7dbd3952119735db0a6da0b",
+  "runtimePackageSha256": "415a938320694133ee3f4ffa0448cad9c38640c97b98a4e2a4a7daac4c4c6b3b",
+  "runtimeFiles": {
+    "image.tar": "4b93462b2a5c8ac6408d613b0f01a8729cd15834caea08ca555727105e1634d0",
+    "image.txt": "fa67ef5d28e2a82b03820f8cca626aaccf20cab8e18b1fd97e74cad218fd657a",
+    "provenance.json": "37d13acd209f04ce12f5beda2f222ba753632f14e4aee3c19d6f816c05daa7fd",
+    "bundles/backend.mjs": "5b2a8f9beae65b309dd1852da4e2e1a524b92104d9a1d477192c1b2e8111f652",
+    "bundles/bridge.mjs": "c914e0511e5781b0cd6822a312d2a129f5327e29d95adbf552aadcb4a011ffbd",
+    "bundles/build.json": "8eecc1e370d29875a87c751ea2b60d14694f4b3432c46a9b19d2f1355d21fc23",
+    "context/Dockerfile": "2714450e74ab0c6ed85f0f44a31a702531a6b14e7278ae643c58f84f724367a7",
+    "context/bridge.mjs": "c914e0511e5781b0cd6822a312d2a129f5327e29d95adbf552aadcb4a011ffbd",
+    "context/invocation-binding.json": "d945b45a2734d1d7ac72934f71b7355c4ecc94ffe612833cfd302ed38e2e9284"
+  },
+  "postgresImage": "postgres@sha256:d74eeac9a635390a49bc21bd49fccd973de707e2a53a76ac49b552b8712ec46f",
+  "providerImage": "public.ecr.aws/docker/library/node@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0",
+  "convexLinuxArchive": {
+    "url": "https://github.com/get-convex/convex-backend/releases/download/precompiled-2026-09-28-5c7cb5b/convex-local-backend-x86_64-unknown-linux-gnu.zip",
+    "sha256": "5b4adbe9fc2f9985c66eb12b19dadedf2700d8796c839ddba09802196099f241"
+  },
+  "dependencyLocks": {
+    "pnpm-lock.yaml": "42384eb6430bd901d1601d8a89544dafd1dd4cf5f7aaeb67aba3268612ce955b"
+  }
+}

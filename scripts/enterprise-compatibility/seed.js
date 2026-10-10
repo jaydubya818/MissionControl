@@ -42,7 +42,7 @@ export const seed = mutation({ args: {}, handler: async ctx => {
     configurationDigest: "factory-v1-fixture" });
   const nativeFactoryId = await insert("factoryDefinitions", { tenantId, projectId, repositoryId, status: "DRAFT", name: "Native compatibility" });
   const nativeVersionId = await insert("factoryDefinitionVersions", { tenantId, projectId, factoryDefinitionId: nativeFactoryId, repositoryId, workflowId, configurationDigest: "factory-v1-native-fixture" });
-  const missionId = await insert("missions", { tenantId, projectId, owner: operatorId, spentUsd: 0, budgetUsd: 0.0001, metadata: { enterpriseCompatibilityFixture: true } });
+  const missionId = await insert("missions", { tenantId, projectId, owner: operatorId, ownerOperatorId: operatorId, spentUsd: 0, budgetUsd: 0.0001, metadata: { enterpriseCompatibilityFixture: true } });
   await insert("projectConstitutionRevisions", { projectId });
   const missionSpecRevisionId = await insert("missionSpecRevisions", { tenantId, projectId, missionId });
   const missionPlanId = await insert("missionPlans", { tenantId, projectId, missionId, summary: "Fixture plan", workOrderBlueprints: [] });
@@ -61,7 +61,7 @@ export const seed = mutation({ args: {}, handler: async ctx => {
   const otherRoleId = await insert("roles", { tenantId: otherTenantId, name: "Owner", permissions: ["company.manage"] });
   await insert("roleAssignments", { operatorId: otherOperatorId, roleId: otherRoleId });
   return { tenantId, projectId, repositoryId, factoryDefinitionId, definitionVersionId, nativeFactoryId, nativeVersionId,
-    missionId, missionSpecRevisionId, missionPlanId, workOrderId, workOrderRevisionId, taskId, workflowRunId, otherProjectId, operatorId };
+    missionId, missionSpecRevisionId, missionPlanId, workOrderId, workOrderRevisionId, taskId, workflowRunId, otherProjectId, operatorId, peerOperatorId };
 } });
 
 

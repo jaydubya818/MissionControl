@@ -5,7 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, action, internalAction, internalMutation } from "./_generated/server";
+import { mutation, query, action, internalAction, internalMutation } from "./lib/missionScopedFunctions";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { appendOpEvent, appendChangeRecord } from "./lib/armAudit";

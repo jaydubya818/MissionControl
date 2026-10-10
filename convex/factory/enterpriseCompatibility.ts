@@ -6,7 +6,7 @@ import { internal } from "../_generated/api";
 import { ingestEnterpriseQualityGate } from "../lib/enterpriseQualityGate";
 import { getCurrentVerificationRoutingOutcome } from "../lib/currentVerification";
 import { v } from "convex/values";
-import { mutation, query, internalMutation, internalQuery } from "../_generated/server";
+import { mutation, query, internalMutation, internalQuery } from "../lib/missionScopedFunctions";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id, Doc } from "../_generated/dataModel";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "../lib/companyAccess";

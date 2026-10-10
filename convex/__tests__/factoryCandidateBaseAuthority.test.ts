@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { describe, expect, it } from "vitest";
 import { authorizePublicationInternal, claimInternal, reportInternal, reportVerificationInternal, candidateVerificationDispatchFailedInternal } from "../factory/attempts";
 import { compilePolicyV2VerificationPlan, effectivePolicyV2VerificationChecks } from "../lib/policyV2Verification";

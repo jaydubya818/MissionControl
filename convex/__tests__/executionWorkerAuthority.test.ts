@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { describe, expect, it, vi } from "vitest";
 import { claimInternal, heartbeatInternal, finalizeInternal, reportInternal } from "../executionWorker";
 

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { api } from "./_generated/api";
-import { internalMutation, mutation } from "./_generated/server";
+import { internalMutation, mutation } from "./lib/missionScopedFunctions";
 import type { Id } from "./_generated/dataModel";
 import {
   AUTOMATION_POLICY_VERSION,

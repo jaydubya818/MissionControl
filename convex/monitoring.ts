@@ -5,7 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 
 // ============================================================================
 // ERROR LOGGING
@@ -56,9 +56,11 @@ export const logError = mutation({
         taskId: args.taskId,
         status: "OPEN",
         metadata: {
+          missionProvenanceVersion: 1,
           errorType: args.errorType,
           stack: args.stack,
           context: args.context,
+          runId: args.runId,
         },
       });
     }
@@ -131,6 +133,8 @@ export const logPerformance = mutation({
         description: `${args.operation} took ${(args.durationMs / 1000).toFixed(1)}s`,
         status: "OPEN",
         metadata: {
+          ...args.metadata,
+          missionProvenanceVersion: 1,
           operation: args.operation,
           durationMs: args.durationMs,
         },

@@ -5,7 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation } from "./lib/missionScopedFunctions";
 import { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 
@@ -26,6 +26,7 @@ export const getWorkflowMetrics = query({
       .query("workflowMetrics")
       .withIndex("by_workflow", (q) => q.eq("workflowId", args.workflowId));
     
+    if (args.projectId) query = query.filter(q => q.eq(q.field("projectId"), args.projectId));
     const metrics = await query.order("desc").first();
     
     return metrics;
@@ -207,6 +208,7 @@ export const updateMetrics = internalMutation({
     const metricsData = {
       workflowId: args.workflowId,
       projectId: args.projectId,
+      sourceWorkflowRunIds: runs.map(run => run._id),
       periodStart,
       periodEnd: now,
       totalRuns,

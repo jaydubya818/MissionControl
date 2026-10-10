@@ -543,7 +543,7 @@ function GitHubAppReadinessPanel({
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap justify-between gap-2 text-[11px] text-ink-muted">
-                    <span>{delivery.result ?? delivery.error ?? "Processing result not recorded."}</span>
+                    <span>{delivery.status === "PROCESSED" ? "Delivery processed." : delivery.status === "IGNORED" ? "No processing required." : delivery.status === "FAILED" ? "Delivery processing failed." : "Processing delivery…"}</span>
                     <time dateTime={new Date(delivery.receivedAt).toISOString()}>{new Date(delivery.receivedAt).toLocaleString()}</time>
                   </div>
                 </li>

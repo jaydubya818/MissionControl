@@ -1,3 +1,4 @@
+import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 /**
  * Policy — Convex Functions
  * 
@@ -7,7 +8,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 import type { Doc } from "./_generated/dataModel";
 import { classifyRisk, requiresApproval } from "./lib/riskClassifier";
 import { evaluateOperatorGate, getEffectiveOperatorControl } from "./lib/operatorControls";
@@ -250,7 +251,7 @@ export const explainTaskPolicy = query({
       .first();
 
     const primaryAssigneeId = task.assigneeIds?.[0];
-    const assignee = primaryAssigneeId ? await ctx.db.get(primaryAssigneeId) : null;
+    const assignee = primaryAssigneeId ? await missionAuthorityDatabase(ctx).get(primaryAssigneeId) : null;
 
     const triggeredRules: string[] = [];
     const requiredApprovals: Array<{ type: string; reason: string }> = [];
@@ -289,7 +290,7 @@ export const explainTaskPolicy = query({
         // Only escalate to NEEDS_APPROVAL if we haven't already DENY'd
         if (decision !== "DENY") {
           decision = "NEEDS_APPROVAL";
-          reason = `Estimated cost ($${estimatedCost.toFixed(2)}) exceeds remaining agent budget ($${budgetRemaining.toFixed(2)})`;
+          reason = "Estimated cost exceeds the available agent budget";
         }
         requiredApprovals.push({
           type: "BUDGET_EXCEEDED",
@@ -424,7 +425,7 @@ export const evaluate = query({
     }
     
     // Get agent
-    const agent = await ctx.db.get(args.agentId);
+    const agent = await missionAuthorityDatabase(ctx).get(args.agentId);
     if (!agent) {
       return { 
         decision: "DENY", 
@@ -502,11 +503,10 @@ export const evaluate = query({
     if (estimatedCost > budgetRemaining) {
       return {
         decision: "NEEDS_APPROVAL",
-        reason: `Budget exceeded: need $${estimatedCost.toFixed(2)}, have $${budgetRemaining.toFixed(2)} remaining`,
+        reason: "Estimated cost exceeds the available agent budget",
         approval: {
           type: "BUDGET_EXCEEDED",
           estimatedCost,
-          budgetRemaining,
         },
       };
     }
@@ -651,7 +651,7 @@ export const evaluateWithARM = mutation({
       : null;
 
     const legacyAgentId = args.agentId ?? resolved?.legacyAgentId;
-    const legacyAgent = legacyAgentId ? await ctx.db.get(legacyAgentId) : null;
+    const legacyAgent = legacyAgentId ? await missionAuthorityDatabase(ctx).get(legacyAgentId) : null;
     const resolvedInstance = resolved?.instanceId ? await ctx.db.get(resolved.instanceId) : null;
     const effectiveTenantId = legacyAgent?.tenantId ?? resolvedInstance?.tenantId;
     const risk = args.toolName

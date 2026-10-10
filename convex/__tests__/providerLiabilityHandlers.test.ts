@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   registerPriceVersion,
@@ -269,6 +270,7 @@ it.each([
   expect(ctx.db.insert).not.toHaveBeenCalled();
 });
 function bedrockHandlerFixture(api: "CONVERSE" | "INVOKE_MODEL" = "CONVERSE") {
+  vi.useFakeTimers(); vi.setSystemTime(new Date("2026-07-01T00:00:00Z"));
   const f = fixture();
   Object.assign(f.price, {
     provider: "aws-bedrock",

@@ -6,7 +6,7 @@ import { enterpriseProject, scopeExposure, settleUndispatchedEnterpriseAttempt }
  */
 
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 import { appendOpEvent } from "./lib/armAudit";
 import { resolveAgentRef } from "./lib/agentResolver";

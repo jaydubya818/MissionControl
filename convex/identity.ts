@@ -6,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation, action } from "./lib/missionScopedFunctions";
 import { api } from "./_generated/api";
 import { resolveAgentRef } from "./lib/agentResolver";
 import { appendChangeRecord } from "./lib/armAudit";
