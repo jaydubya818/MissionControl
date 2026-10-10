@@ -43,6 +43,9 @@ export const inspect = query({ args: { table: v.string() }, handler: async (ctx,
   if (!["workflowRuns", "workOrders", "runArtifacts", "runEvents", "factoryWorkers", "verificationReceipts", "verificationRuns", "qualityGateDecisions", "evidenceEnvelopes", "serviceCommandReceipts"].includes(table)) throw Error("FIXTURE_TABLE_DENIED");
   return ctx.db.query(table).collect();
 } });
+export const inspectRecord = query({ args: { id: v.string() }, handler: async (ctx, { id }) => {
+  await owner(ctx); return ctx.db.get(id);
+} });
 export const fault = internalMutation({ handler: async (ctx, { id, patch, unset = [] }) => {
   await owner(ctx);
   await ctx.db.patch(id, { ...patch, ...Object.fromEntries(unset.map(key => [key, undefined])) });

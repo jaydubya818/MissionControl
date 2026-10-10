@@ -1,6 +1,7 @@
 import { canonicalDigest, canonicalHash } from "@mission-control/shared";
 import { verificationContractDigest } from "@mission-control/workflow-engine/verification-identity";
 import { enterpriseProject } from "./enterpriseAttemptAccounting";
+import { nativeQualificationEvidenceIsCurrent } from "./nativeQualificationEvidence";
 import {
   evaluateCurrentVerificationEligibility,
   evaluatePrepublicationVerification,
@@ -26,8 +27,9 @@ export async function getCurrentVerificationResult(
   ctx: any,
   workOrder: any,
   now = Date.now(),
+  isolatedEnterpriseQualification = false,
 ): Promise<CurrentVerificationResult> {
-  const current = await getCurrentVerificationRoutingOutcome(ctx, workOrder, now);
+  const current = await getCurrentVerificationRoutingOutcome(ctx, workOrder, now, "ACCEPTANCE", isolatedEnterpriseQualification);
   const {
     verifiedOutcome: _verifiedOutcome,
     verificationRecordedAt: _verificationRecordedAt,
@@ -64,6 +66,10 @@ export async function getCurrentVerificationRoutingOutcome(
   if (isolatedEnterpriseQualification) {
     if (!await enterpriseProject(ctx, workOrder.projectId)) throw Error("ENTERPRISE_GATE_SCOPE_DENIED");
     for (const envelope of evidence) {
+      if (await nativeQualificationEvidenceIsCurrent(ctx, workOrder, envelope, attempts, now)) {
+        isolatedEvidence.push(envelope);
+        continue;
+      }
       if (envelope.provenance !== "SYNTHETIC" || envelope.metadata?.authority !== "ISOLATED_ENTERPRISE_QUALIFICATION"
         || envelope.projectId !== workOrder.projectId || envelope.tenantId !== workOrder.tenantId) continue;
       const trial = await ctx.db.get(envelope.metadata.trialId);
@@ -229,7 +235,7 @@ export async function getCurrentVerificationRoutingOutcome(
     })),
     localCandidateObservations: isolatedEvidence.map((envelope: any) => {
       const attempt = attempts.find((a: any) => a._id === envelope.verificationAttemptId);
-      const observation = envelope.metadata.custodyObservation;
+      const observation = envelope.metadata.nativeCandidateObservation ?? envelope.metadata.custodyObservation;
       return { ...normalizeTuple(envelope)!, evidenceEnvelopeId: String(envelope._id),
         projectId: String(envelope.projectId), tenantId: String(envelope.tenantId), repositoryId: String(attempt?.repositoryId),
         verificationAttemptId: String(envelope.verificationAttemptId), verificationRunId: String(envelope.verificationRunId),
@@ -273,14 +279,15 @@ export async function appendCurrentVerificationQualityGateDecision(
   current: CurrentVerificationResult,
   idempotencyKey: string,
   now = Date.now(),
+  qualificationScope?: "ISOLATED_ENTERPRISE_QUALIFICATION",
 ) {
-  const projectionKey = `${idempotencyKey}:policy-v2-quality-gate`;
+  const projectionKey = `${idempotencyKey}${qualificationScope ? ":isolated-enterprise" : ""}:policy-v2-quality-gate`;
   const existing = await ctx.db.query("qualityGateDecisions")
     .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", projectionKey))
     .first();
   if (existing) {
-    if (existing.workOrderId !== workOrder._id) {
-      throw new Error("Quality Gate idempotency key is already bound to another WorkOrder.");
+    if (existing.workOrderId !== workOrder._id || existing.metadata?.qualificationScope !== qualificationScope) {
+      throw new Error("Quality Gate idempotency key is already bound to another WorkOrder or authority scope.");
     }
     return existing;
   }
@@ -304,6 +311,7 @@ export async function appendCurrentVerificationQualityGateDecision(
     eligible: current.eligible,
     current: current.current,
     reasons: current.reasons,
+    ...(qualificationScope ? { qualificationScope } : {}),
   };
   const qualityGateDecisionId = await ctx.db.insert("qualityGateDecisions", {
     tenantId: workOrder.tenantId,
@@ -336,6 +344,7 @@ export async function appendCurrentVerificationQualityGateDecision(
     metadata: {
       projectionSource: "POLICY_V2_CURRENT_VERIFICATION",
       authoritative: false,
+      ...(qualificationScope ? { qualificationScope, qualificationOnly: true, productionAuthority: "NONE" } : {}),
       canonicalDecision: decisionInput,
     },
   });

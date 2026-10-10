@@ -13,6 +13,7 @@ import { createSignedServiceCommand } from '../../apps/orchestration-server/src/
 import { offlineSandboxDigest } from '../../convex/lib/localQualificationSandbox.js';
 import { NATIVE_ENGINEERING_TARIFF_POLICY } from '../../convex/lib/nativeEngineeringTariff.js';
 import { qualifySettlementControls } from './native-settlement-controls.mjs';
+import { qualifyNativeGateControls } from './native-gate-controls.mjs';
 import { ISOLATED_CONTAINER_POLICY, SUCCESSOR_ISOLATED_RUNTIME_ARTIFACT, SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG,
   RENDER_MARKDOWN_OPERATION, RENDER_MARKDOWN_OPERATION_DIGEST, VERIFY_DOCUMENT_OPERATION, VERIFY_DOCUMENT_OPERATION_DIGEST,
   renderMarkdownCandidate } from '@mission-control/workflow-engine/harness-contract';
@@ -216,13 +217,23 @@ try {
       throw Error('Native producer/verifier execution incomplete: ' + JSON.stringify(runs.map(r => ({ id: r._id, purpose: r.attemptPurpose, status: r.status, error: r.error }))));
     }
     const artifacts = await step('retainedArtifacts', () => query('nativeFixture:inspect', { table: 'runArtifacts' }));
+    await step('verificationEvidence', () => query('nativeFixture:inspect', { table: 'evidenceEnvelopes' }));
+    const gateBefore = await step('gateBeforeSettlement', () => mutate('factory/enterpriseQualification:evaluate', { workOrderId: workOrder._id, idempotencyKey: 'native-before-settlement' }));
+    if (gateBefore.current.eligible) throw Error('Native execution alone granted enterprise acceptance');
     await worker.stop();
     await step('settlementControls', () => qualifySettlementControls({ db, runs, artifacts, mutate, query, step }));
     await db.restart();
     const readback = await step('durableReadback', () => query('factory/nativeAccounting:readback', { workflowRunId: dispatch.run._id }));
     if (readback.projectExposureMicrousd !== 0) throw Error('Proven native allowance remained reserved');
+    const gateAfter = await step('gateAfterSettlement', () => mutate('factory/enterpriseQualification:evaluate', { workOrderId: workOrder._id, idempotencyKey: 'native-after-settlement' }));
+    if (!gateAfter.current.eligible || !gateAfter.current.current) throw Error('Native enterprise gate is not current: ' + JSON.stringify(gateAfter.current));
+    await step('gateControls', () => qualifyNativeGateControls({ db, workOrderId: workOrder._id, mutate, query }));
+    const productionAcceptance = await step('productionAcceptanceDenied', () => mutate('workOrders:accept', { workOrderId: workOrder._id, actorType: 'HUMAN', idempotencyKey: 'native-production-denied' }));
+    if (productionAcceptance.accepted) throw Error('Synthetic native evidence granted production acceptance');
+    const acceptance = await step('isolatedAcceptance', () => mutate('workOrders:accept', { workOrderId: workOrder._id, actorType: 'HUMAN', idempotencyKey: 'native-isolated-accept', isolatedEnterpriseQualification: true }));
+    if (!acceptance.accepted) throw Error('Isolated canonical acceptance failed: ' + JSON.stringify(acceptance));
     state.nativeExecution = 'PASS'; state.nativeSettlement = 'PASS'; state.independentVerifierAttemptId = verifier._id;
-    state.enterpriseQualityGate = detail.currentVerification?.result ?? 'PENDING_COMPOSED_QUALIFICATION';
+    state.enterpriseQualityGate = 'PASS_ISOLATED_QUALIFICATION';
     await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n');
     console.log(JSON.stringify({ nativeExecution: 'PASS', nativeSettlement: 'PASS', producerAttemptId: dispatch.run._id, verifierAttemptId: verifier._id }));
   }

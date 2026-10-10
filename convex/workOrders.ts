@@ -1,4 +1,5 @@
 import { denyEnterprisePaidAuthority } from "./lib/enterpriseAttemptAccounting";
+import { requireEnterpriseQualificationOwner } from "./lib/enterpriseQualificationAccess";
 import { assertQualificationActivation } from "./lib/factoryQualificationScope";
 import { reserveOfflineAttemptBudget } from "./lib/offlineAttemptBudget";
 import { freezeNativeEngineeringTariff } from "./lib/nativeEngineeringTariff";
@@ -5324,10 +5325,12 @@ export const accept = mutation({
     actorType: v.union(v.literal("HUMAN"), v.literal("SYSTEM"), v.literal("AGENT")),
     actorId: v.optional(v.string()),
     idempotencyKey: v.string(),
+    isolatedEnterpriseQualification: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const workOrder = await ctx.db.get(args.workOrderId);
     if (!workOrder) throw new Error("WorkOrder not found");
+    if (args.isolatedEnterpriseQualification) await requireEnterpriseQualificationOwner(ctx, workOrder);
     if (args.actorType !== "HUMAN") {
       throw new Error("WorkOrder acceptance is reserved for an authenticated human operator.");
     }
@@ -5401,7 +5404,7 @@ export const accept = mutation({
     const policyV2Enforced = workOrder.verificationContract?.schemaVersion === 2
       && workOrder.verificationContract.enforcementMode === "ENFORCED";
     const currentVerification = policyV2Enforced
-      ? await getCurrentVerificationResult(ctx, workOrder, now)
+      ? await getCurrentVerificationResult(ctx, workOrder, now, args.isolatedEnterpriseQualification === true)
       : null;
     const currentVerificationAudit = currentVerification
       ? await appendCurrentVerificationQualityGateDecision(
@@ -5410,6 +5413,7 @@ export const accept = mutation({
           currentVerification,
           args.idempotencyKey,
           now,
+          args.isolatedEnterpriseQualification ? "ISOLATED_ENTERPRISE_QUALIFICATION" : undefined,
         )
       : null;
     const currentVerificationMetadata = currentVerification
@@ -5499,6 +5503,9 @@ export const accept = mutation({
     await ctx.db.patch(workOrder._id, {
       state: "DONE",
       acceptedRevisionNumber: workOrder.currentRevisionNumber ?? 1,
+      ...(args.isolatedEnterpriseQualification ? { metadata: { ...workOrder.metadata,
+        isolatedEnterpriseAcceptance: { acceptedAt: now, ownerActorId: acceptActorId,
+          qualityGateDecisionId: currentVerificationAudit?._id, productionAuthority: "NONE", publicationAuthority: "NONE" } } } : {}),
       currentExecutionRunId: undefined,
       blockingIssue: undefined,
       requiredHumanAction: undefined,
