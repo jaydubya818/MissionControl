@@ -198,16 +198,12 @@ export async function prepareOwnerReviewFixture(db) {
       missionId,
       expectedPlanDigest: args.expectedPlanDigest,
     });
-    assert.equal(
-      (
-        await command({
-          operation: "enterprise.result",
-          missionId,
-          expectedPlanDigest: args.expectedPlanDigest,
-        })
-      ).response.status,
-      "AVAILABLE",
-    );
+    const signedResult = (await command({
+      operation: "enterprise.result",
+      missionId,
+      expectedPlanDigest: args.expectedPlanDigest,
+    })).response;
+    assert.equal(signedResult.status, "AVAILABLE", JSON.stringify(signedResult));
     await assert.rejects(() =>
       mutate("sofieOwnerReview:decideResult", {
         ...args,

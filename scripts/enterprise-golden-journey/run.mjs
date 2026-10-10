@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile, copyFile, open } from 'node:fs/promises';
 import { resolve, join, dirname } from 'node:path';
-import { lock, suites, json, sha256, sourceIdentity, seal, validateHybrid } from './evidence.mjs';
+import { lock, suites, json, sha256, sourceIdentity, seal, validateHybrid, validateNativeControls } from './evidence.mjs';
 
 const [suite, outputArgument] = process.argv.slice(2);
 assert.ok(suites.includes(suite), 'Known suite required'); assert.ok(outputArgument, 'Fresh output directory required');
@@ -102,7 +102,7 @@ try {
     await node('accounting', 'scripts/enterprise-compatibility/accounting.mjs', [], { MC_ACCOUNTING_EVIDENCE: join(output, 'accounting.json') });
     const evidence = await json(join(output, 'accounting.json')); assert.ok(evidence.checks.length >= 13);
   } else if (suite === 'native-execution') {
-    await database(); const build = await runtime(); await journey('execute', build);
+    await database(); const build = await runtime(); report.nativeControls = validateNativeControls(await journey('execute', build), source.sha);
   } else if (suite === 'delegated-execution') {
     await database(); await partner(); await node('delegated', 'scripts/enterprise-compatibility/local-provider.mjs', [], {
       MC_CANONICAL_ACCOUNTING_QUALIFICATION: '1', MC_LOCAL_PROVIDER_EVIDENCE: join(output, 'delegated.json') });

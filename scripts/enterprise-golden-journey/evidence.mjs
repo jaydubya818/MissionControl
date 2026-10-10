@@ -1,3 +1,4 @@
+export { validateNativeControls } from '../qualification/native-control-evidence.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile, readdir, lstat, writeFile } from 'node:fs/promises';

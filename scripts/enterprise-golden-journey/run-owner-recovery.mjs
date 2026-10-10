@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
-import { validateHybrid, lock, sha256 } from "./evidence.mjs";
+import { validateHybrid, validateNativeControls, lock, sha256 } from "./evidence.mjs";
 const output = resolve(process.argv[2]),
   build = join(output, "runtime");
 const report = {
@@ -49,6 +49,16 @@ try {
       join(build, "artifact/image-binding.json"),
       "3",
     ]);
+    // Security fault drills use their own fresh fixture before the linked owner
+    // journey, whose immutable custody evidence remains limited to 60 seconds.
+    run([
+      "scripts/qualification/native-successor-journey.mts", build,
+      process.env.MC_GOLDEN_DOCKER, join(output, "native-controls"), "execute",
+    ]);
+    report.nativeControls = validateNativeControls(
+      JSON.parse(await readFile(join(output, "native-controls/journey.json"), "utf8")),
+      report.sourceSha,
+    );
     run([
       "scripts/qualification/native-successor-journey.mts",
       build,

@@ -436,13 +436,17 @@ try {
     const gateBefore = await step('gateBeforeSettlement', () => mutate('factory/enterpriseQualification:evaluate', { workOrderId: workOrder._id, idempotencyKey: 'native-before-settlement' }));
     if (gateBefore.current.eligible) throw Error('Native execution alone granted enterprise acceptance');
     await worker.stop();
-    await step('settlementControls', () => qualifySettlementControls({ db, runs, artifacts, mutate, query, step }));
+    await step('settlementControls', () => qualifySettlementControls({ db, runs, artifacts, mutate, query, step, adversarialControls: mode !== 'hybrid' }));
     await db.restart();
     const readback = await step('durableReadback', () => query('factory/nativeAccounting:readback', { workflowRunId: dispatch.run._id }));
     if (readback.projectExposureMicrousd !== 0) throw Error('Proven native allowance remained reserved');
     const gateAfter = await step('gateAfterSettlement', () => mutate('factory/enterpriseQualification:evaluate', { workOrderId: workOrder._id, idempotencyKey: 'native-after-settlement' }));
     if (!gateAfter.current.eligible || !gateAfter.current.current) throw Error('Native enterprise gate is not current: ' + JSON.stringify(gateAfter.current));
-    await step('gateControls', () => qualifyNativeGateControls({ db, workOrderId: workOrder._id, mutate, query }));
+    // Fault drills run on a separate fresh native execute fixture. Running them
+    // here consumes the immutable 60-second custody window for the linked owner journey.
+    await step('gateControls', () => mode === 'hybrid'
+      ? Promise.resolve({ status: 'NOT_RUN', requiredSuite: 'native-execution', reason: 'Separate fresh control fixture; no fault-drill PASS claimed for this Mission' })
+      : qualifyNativeGateControls({ db, workOrderId: workOrder._id, mutate, query }));
     const productionAcceptance = await step('productionAcceptanceDenied', () => mutate('workOrders:accept', { workOrderId: workOrder._id, actorType: 'HUMAN', idempotencyKey: 'native-production-denied' }));
     if (productionAcceptance.accepted) throw Error('Synthetic native evidence granted production acceptance');
     const acceptance = await step('isolatedAcceptance', () => mutate('workOrders:accept', { workOrderId: workOrder._id, actorType: 'HUMAN', idempotencyKey: 'native-isolated-accept', isolatedEnterpriseQualification: true }));
