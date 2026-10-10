@@ -92,3 +92,20 @@ export const serviceInputProbe = fixtureMutation({args:{claim:v.any(),ids:v.arra
  }
  return results;
 }});
+
+export const transactionCacheProbe = fixtureMutation({args:{scope:v.any(),local:v.any(),foreign:v.any()},handler:async(ctx,{scope:s,local,foreign})=>{
+ await owner(ctx);
+ // Build a cyclic provenance graph before creating either request-local view.
+ await ctx.db.patch(local.documentId,{metadata:{missionId:local.missionId,parent:foreign.documentId}});
+ await ctx.db.patch(foreign.documentId,{metadata:{missionId:foreign.missionId,parent:local.documentId}});
+ for(const ids of [[local.documentId,foreign.documentId],[foreign.documentId,local.documentId]]) {
+  const cyclic=missionScopedContext(ctx);
+  for(const id of ids) if(await cyclic.db.get(id)!==null) throw Error('CYCLIC_FOREIGN_LINEAGE_VISIBLE');
+ }
+ const scoped=missionScopedContext(ctx);
+ if(!await scoped.db.get(local.artifactId)) throw Error('CACHE_WARM_FAILED');
+ // Owner-authorized transfer changes an ancestor in this same transaction.
+ await scoped.db.patch(local.missionId,{ownerOperatorId:s.peerId});
+ if(await scoped.db.get(local.artifactId)!==null) throw Error('STALE_TRANSACTION_AUTHORIZATION');
+ return {ancestorWriteInvalidation:true,cyclicForeignReadOrderIndependent:true};
+}});

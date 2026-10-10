@@ -1,3 +1,6 @@
+import { SOFIE_APPLICATION } from '../../packages/shared/src/sofieEnterprise';
+import { getFunctionName } from 'convex/server';
+import { authorizeSofieApplicationCommand, requireSofieApplicationAuthority, type SofieApplicationAuthority } from './sofieEnterpriseAuthority';
 import { serviceInputLineageRow } from "./missionServiceInputs";
 import { v } from "convex/values";
 import { requireServiceAttemptAuthority, type ServiceAttemptClaim, type ServiceAttemptAuthority } from "./missionServiceAuthority";
@@ -19,11 +22,25 @@ export function missionAuthorityDatabase(ctx: Context): Context["db"] {
 }
 
 /** The raw context is used only to resolve authority; handlers receive the filtered database. */
-export function missionScopedContext<T extends Context>(ctx: T, writeCapability: MissionCapability = "OWNER", service?: ServiceAttemptAuthority, serviceClaim?: ServiceAttemptClaim): T {
+export function missionScopedContext<T extends Context>(ctx: T, writeCapability: MissionCapability = "OWNER", service?: ServiceAttemptAuthority, serviceClaim?: ServiceAttemptClaim, application?: SofieApplicationAuthority): T {
   const raw = ctx.db;
+  let createdMissionId: string | undefined;
   const lineage = missionLineage(raw);
   const rowCache = new Map<string, Promise<any>>();
   const decisions = new Map<string, Promise<boolean>>();
+  const resourceDecisions = new Map<string, Promise<boolean>>();
+  const completedReads = new Map<string, readonly string[]>();
+  let authorizationEpoch = 0;
+  let pendingWrites = 0;
+  let writeQueue: Promise<unknown> = Promise.resolve();
+  // Existing handlers issue Promise.all writes. Serialize at this boundary so
+  // each sibling validates current authority after the previous write finishes.
+  const serializedWrite = <R>(operation: () => Promise<R>): Promise<R> => {
+    const result = writeQueue.then(operation);
+    writeQueue = result.then(() => undefined, () => undefined);
+    return result;
+  };
+  const references = new WeakMap<Row, string[]>();
   const read = (id: string) => {
     if (!rowCache.has(id)) rowCache.set(id, raw.get(id as any));
     return rowCache.get(id)!;
@@ -32,10 +49,61 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     if (key === "get") return (id: string) => read(id);
     const value = Reflect.get(target, key); return typeof value === "function" ? value.bind(target) : value;
   } }) };
-  const invalidate = (id: string) => { rowCache.delete(id); decisions.clear(); };
-  async function allowed(row: Row | null, capability: MissionCapability, seen = new Set<string>(), table?: string): Promise<boolean> {
+  const invalidate = (id: string) => { rowCache.clear(); decisions.clear(); resourceDecisions.clear(); completedReads.clear(); authorizationEpoch++; };
+  function allowed(row: Row | null, capability: MissionCapability, seen = new Set<string>(), table?: string, epoch = authorizationEpoch): Promise<boolean> {
+    if (epoch !== authorizationEpoch || pendingWrites) return Promise.resolve(false);
+    if (capability !== "READ" || !row?._id) return evaluateAllowed(row, capability, seen, table, epoch);
+    const key = row._id + ":" + (table ?? lineage.tableOf(row._id) ?? "");
+    // Reuse only a fully checked root closure, never a partial recursive walk.
+    const completed = completedReads.get(key);
+    if (completed) {
+      for (const id of completed) seen.add(id);
+      return Promise.resolve(seen.size <= 256);
+    }
+    if (seen.size) return evaluateAllowed(row, capability, seen, table, epoch);
+    if (!resourceDecisions.has(key)) {
+      resourceDecisions.set(key, evaluateAllowed(row, capability, seen, table, epoch).then(result => {
+        // Writes invalidate the entire traversal generation, including recursive
+        // policy reads. An older traversal cannot publish into a newer generation.
+        if (epoch !== authorizationEpoch) return false;
+        if (result) completedReads.set(key, [...seen]);
+        return result;
+      }));
+    }
+    return resourceDecisions.get(key)!;
+  }
+  async function evaluateAllowed(row: Row | null, capability: MissionCapability, seen: Set<string>, table: string | undefined, epoch: number): Promise<boolean> {
+    if (epoch !== authorizationEpoch) return false;
     if (!row) return true;
     table ??= row._id ? lineage.tableOf(row._id) ?? undefined : undefined;
+    if (application && capability !== "READ") {
+      const op = application.request.operation;
+      if (table === "serviceCommandReceipts") {
+        if (row.commandId !== application.envelope.commandId || row.serviceId !== application.envelope.serviceId
+          || row.claimedProjectId !== application.connection.projectId || row.claimedRepositoryId !== application.envelope.repositoryId
+          || row.payloadDigest !== application.envelope.payloadDigest || row.capability !== op) return false;
+      } else if (table === "enterpriseMissionProposals") {
+        if (op !== "enterprise.propose" && !(op === "enterprise.submit" && row._id === application.proposal?._id)) return false;
+      } else if (table === "missionEvents") {
+        if (op !== "enterprise.submit" || row.missionId !== createdMissionId || row.eventType !== "MISSION_CREATED") return false;
+      } else return false;
+    }
+    if (table === "enterpriseAppConnections" || table === "enterpriseMissionProposals") {
+      if (application) {
+        if (row.ownerId !== application.connection.ownerId || row.tenantId !== application.connection.tenantId
+          || row.projectId !== application.connection.projectId
+          || (table === "enterpriseAppConnections" ? row._id !== application.connection._id : row.connectionId !== application.connection._id)) return false;
+      } else {
+        const identity = await ctx.auth.getUserIdentity();
+        const owner = await read(row.ownerId);
+        if (!identity || !owner?.active || owner.authId !== identity.subject || owner.tenantId !== row.tenantId) return false;
+      }
+    }
+    if (table === "serviceCommandReceipts" && row.serviceId === SOFIE_APPLICATION) {
+      const connectionId = row.claimedRepositoryId?.replace(/^connection:/, "");
+      const connection = connectionId ? await read(connectionId) : null;
+      if (!connection || !await allowed(connection, "READ", seen, "enterpriseAppConnections", epoch)) return false;
+    }
     // These policy parents are read by the bounded service handlers, never returned as resources.
     if (service && ["missionPlans", "missionSpecRevisions"].includes(table ?? "")) {
       if (capability !== "READ" && seen.size === 0) return false;
@@ -50,7 +118,11 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
       if (!(generatedVerifier && service.allowedEffects.includes("verification.request")) && !verificationInput) return false;
     }
     if (table === "missions") {
+      if (application) return capability === "READ" && row._id === (application.missionId ?? createdMissionId)
+        && row.ownerOperatorId === application.connection.ownerId && row.tenantId === application.connection.tenantId
+        && row.projectId === application.connection.projectId;
       if (service) return row._id === service.missionId && row.ownerOperatorId === service.ownerOperatorId;
+      if (epoch !== authorizationEpoch) return false;
       const key = row._id + ":" + capability;
       if (!decisions.has(key)) decisions.set(key, canAccessMission(policyCtx, row as any, capability));
       return decisions.get(key)!;
@@ -75,7 +147,7 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
       for (const externalId of endpoints) {
         const nodes = await raw.query("knowledgeGraphNodes").withIndex("by_external", q => q.eq("source", row.source).eq("externalId", externalId))
           .filter(q => q.eq(q.field("projectId"), row.projectId)).take(2);
-        if (nodes.length !== 1 || !await allowed(nodes[0], capability, seen, "knowledgeGraphNodes")) return false;
+        if (nodes.length !== 1 || !await allowed(nodes[0], capability, seen, "knowledgeGraphNodes", epoch)) return false;
       }
     }
     const lineageRow = service && table === "workOrders" && row._id === service.workOrderId
@@ -83,22 +155,26 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
       : service && table === "workOrderRevisions" && row.workOrderId === service.workOrderId
         ? { ...row, ...Object.fromEntries(["requestedChanges", "previousSnapshot", "nextSnapshot"].map(key => [key, { ...row[key], dependencies: [] }])) }
         : row;
-    for (const id of lineage.references(service ? serviceInputLineageRow(lineageRow, table, service) : lineageRow, table)) {
-      if (seen.has(id)) continue;
+    const referenceRow = service ? serviceInputLineageRow(lineageRow, table, service) : lineageRow;
+    if (!references.has(referenceRow)) references.set(referenceRow, lineage.references(referenceRow, table));
+    for (const id of references.get(referenceRow)!) {
       const parent = await read(id);
+      // Edge consistency is checked even when a completed closure visited its parent.
       if (!parent || (row.tenantId && parent.tenantId && row.tenantId !== parent.tenantId)
-        || (row.projectId && parent.projectId && row.projectId !== parent.projectId)
-        || !await allowed(parent, service && row._id === service.workflowRunId && row.verificationAttemptBinding?.sourceAttemptId === id ? "READ" : capability, seen)) return false;
+        || (row.projectId && parent.projectId && row.projectId !== parent.projectId)) return false;
+      if (seen.has(id)) continue;
+      if (!await allowed(parent, application ? "READ" : service && row._id === service.workflowRunId && row.verificationAttemptBinding?.sourceAttemptId === id ? "READ" : capability, seen, undefined, epoch)) return false;
     }
     return true;
   }
-  async function assertWrite(row: Row, table?: string) {
-    if (!await allowed(row, writeCapability, new Set(), table)) throw Error("MISSION_UNAVAILABLE");
+  async function assertWrite(row: Row, table: string | undefined, epoch: number) {
+    if (!await allowed(row, writeCapability, new Set(), table, epoch) || epoch !== authorizationEpoch || pendingWrites) throw Error("MISSION_UNAVAILABLE");
   }
   // Agent identities are shared; their live Task/error and accounting fields are not.
   // spendToday is a compatibility alias for the explicitly named visible subtotal.
   // Enforcement and additive accounting must use missionAuthorityDatabase instead.
-  async function projectRead(row: Row | null, table?: string): Promise<any> {
+  async function projectRead(row: Row | null, table: string | undefined, epoch: number): Promise<any> {
+    if (epoch !== authorizationEpoch || pendingWrites) return null;
     if (!row) return row;
     table ??= lineage.tableOf(row._id) ?? undefined;
     if (table === "alerts" && row.type === "BUDGET_EXCEEDED" && row.agentId) {
@@ -108,34 +184,45 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     const start = new Date(); start.setUTCHours(0, 0, 0, 0);
     let authorizedRunSpendToday = 0;
     for await (const run of raw.query("runs").withIndex("by_agent", q => q.eq("agentId", row._id))) {
-      if (run.startedAt >= start.getTime() && (run.taskId || run.workflowRunId) && await allowed(run, "READ")) authorizedRunSpendToday += run.costUsd;
+      if (run.startedAt >= start.getTime() && (run.taskId || run.workflowRunId) && await allowed(run, "READ", new Set(), undefined, epoch)) authorizedRunSpendToday += run.costUsd;
     }
     const currentTask = row.currentTaskId ? await read(row.currentTaskId) : null;
     const { lastError: _lastError, errorStreak: _errorStreak, currentTaskId: _currentTaskId, ...identity } = row;
+    if (epoch !== authorizationEpoch || pendingWrites) return null;
     return { ...identity, spendToday: authorizedRunSpendToday, authorizedRunSpendToday,
       spendScope: "AUTHORIZED_RUNS_UTC_DAY",
-      ...(currentTask && await allowed(currentTask, "READ") ? { currentTaskId: currentTask._id } : {}) };
+      ...(currentTask && await allowed(currentTask, "READ", new Set(), undefined, epoch) ? { currentTaskId: currentTask._id } : {}) };
   }
   function scopedQuery(query: any, table: string): any {
     async function* rows() {
-      for await (const row of query) if (await allowed(row, "READ", new Set(), table)) yield await projectRead(row, table);
+      const epoch = authorizationEpoch;
+      for await (const row of query) {
+        if (await allowed(row, "READ", new Set(), table, epoch)) {
+          const projected = await projectRead(row, table, epoch);
+          if (epoch === authorizationEpoch && !pendingWrites && projected) yield projected;
+        }
+      }
     }
     return new Proxy(query, { get(target, key) {
       if (key === Symbol.asyncIterator) return rows;
-      if (key === "collect") return async () => { const result: Row[] = []; for await (const row of rows()) result.push(row); return result; };
+      if (key === "collect") return async () => { const epoch = authorizationEpoch; const result: Row[] = []; for await (const row of rows()) result.push(row); return epoch === authorizationEpoch && !pendingWrites ? result : []; };
       if (key === "take") return async (count: number) => {
+        const epoch = authorizationEpoch;
         if (!Number.isSafeInteger(count) || count < 0) throw Error("Invalid query limit");
         const result: Row[] = []; if (!count) return result;
-        for await (const row of rows()) { result.push(row); if (result.length === count) break; } return result;
+        for await (const row of rows()) { result.push(row); if (result.length === count) break; } return epoch === authorizationEpoch && !pendingWrites ? result : [];
       };
       if (key === "first" || key === "unique") return async () => {
+        const epoch = authorizationEpoch;
         const result: Row[] = []; for await (const row of rows()) { result.push(row); if (key === "first" || result.length === 2) break; }
+        if (epoch !== authorizationEpoch || pendingWrites) return null;
         if (result.length > 1) throw Error("Query is not unique"); return result[0] ?? null;
       };
       if (key === "paginate") return async (options: any) => {
+        const epoch = authorizationEpoch;
         const page = await target.paginate(options);
-        const visible = []; for (const row of page.page) if (await allowed(row, "READ", new Set(), table)) visible.push(await projectRead(row, table));
-        return { ...page, page: visible };
+        const visible = []; for (const row of page.page) if (await allowed(row, "READ", new Set(), table, epoch)) visible.push(await projectRead(row, table, epoch));
+        return { ...page, page: epoch === authorizationEpoch && !pendingWrites ? visible.filter(Boolean) : [] };
       };
       if (["withIndex", "withSearchIndex", "filter", "order", "fullTableScan"].includes(String(key))) {
         return (...args: any[]) => scopedQuery(target[key](...args), table);
@@ -146,31 +233,51 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
   const db = new Proxy(raw, { get(target: any, key) {
     if (key === "query") return (table: string) => scopedQuery(target.query(table), table);
     if (key === "get") return async (...args: any[]) => {
+      const epoch = authorizationEpoch;
       const row = await read(args[args.length - 1]);
-      if (await allowed(row, "READ")) return projectRead(row);
+      if (await allowed(row, "READ", new Set(), undefined, epoch)) {
+        const projected = await projectRead(row, undefined, epoch);
+        if (epoch === authorizationEpoch && !pendingWrites) return projected;
+      }
       return null;
     };
-    if (key === "insert") return async (table: string, row: Row) => {
+    if (key === "insert") return (table: string, row: Row) => serializedWrite(async () => {
+      const epoch = authorizationEpoch;
       if (table === "missions") {
         if (service) throw Error("MISSION_OWNER_REQUIRED");
-        if (!await canAccessMission(ctx, row as any, "OWNER")) throw Error("MISSION_OWNER_REQUIRED");
-      } else await assertWrite(row, table);
-      const result = await target.insert(table, row); invalidate(result); return result;
-    };
-    if (key === "patch" || key === "replace" || key === "delete") return async (...args: any[]) => {
+        if (application) {
+          if (application.request.operation !== "enterprise.submit" || application.missionId || createdMissionId
+            || row.ownerOperatorId !== application.connection.ownerId || row.tenantId !== application.connection.tenantId
+            || row.projectId !== application.connection.projectId || row.state !== "DRAFT" || row.budgetUsd !== 0
+            || row.metadata?.proposalId !== application.proposal?._id || row.metadata?.proposalDigest !== application.proposal?.digest
+            || row.ownerMemberId || row.owningTeamId) throw Error("MISSION_OWNER_REQUIRED");
+        } else if (!await canAccessMission(ctx, row as any, "OWNER")) throw Error("MISSION_OWNER_REQUIRED");
+      } else await assertWrite(row, table, epoch);
+      if (epoch !== authorizationEpoch || pendingWrites) throw Error("MISSION_UNAVAILABLE");
+      pendingWrites++; invalidate("");
+      try {
+        const result = await target.insert(table, row);
+        if (application && table === "missions") createdMissionId = result;
+        return result;
+      } finally { pendingWrites--; invalidate(""); }
+    });
+    if (key === "patch" || key === "replace" || key === "delete") return (...args: any[]) => serializedWrite(async () => {
+      const epoch = authorizationEpoch;
       const idIndex = args.length === (key === "delete" ? 2 : 3) ? 1 : 0;
       const old = await target.get(args[idIndex]);
       if (!old) throw Error("MISSION_UNAVAILABLE");
-      await assertWrite(old);
+      await assertWrite(old, undefined, epoch);
       if (key !== "delete") {
         const next = key === "patch" ? { ...old, ...args[idIndex + 1] } : { ...args[idIndex + 1], _id: old._id };
         // A caller may not attach a visible record to a foreign Mission.
         if (raw.normalizeId("missions", old._id)) {
           if (next.tenantId !== old.tenantId || next.projectId !== old.projectId) throw Error("MISSION_SCOPE_IMMUTABLE");
-        } else await assertWrite(next);
+        } else await assertWrite(next, undefined, epoch);
       }
-      const result = await target[key](...args); invalidate(args[idIndex]); return result;
-    };
+      if (epoch !== authorizationEpoch || pendingWrites) throw Error("MISSION_UNAVAILABLE");
+      pendingWrites++; invalidate(args[idIndex]);
+      try { return await target[key](...args); } finally { pendingWrites--; invalidate(args[idIndex]); }
+    });
     if (key === "table") return (table: string) => ({
       get: (id: string) => (db as any).get(table, id), query: () => (db as any).query(table),
       insert: (value: Row) => (db as any).insert(table, value),
@@ -180,16 +287,16 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     });
     const value = Reflect.get(target, key); return typeof value === "function" ? value.bind(target) : value;
   } });
-  async function assertArguments(args: Row) {
+  async function assertArguments(args: Row, epoch = authorizationEpoch) {
     for (const [key, value] of Object.entries(args)) {
       if (typeof value === "string" && (key === "id" || /Ids?$/.test(key))) {
         let record;
         try { record = await read(value); } catch { continue; }
-        if (record && !await allowed(record, service ? "READ" : writeCapability)) throw Error("MISSION_UNAVAILABLE");
+        if (record && !await allowed(record, service ? "READ" : writeCapability, new Set(), undefined, epoch)) throw Error("MISSION_UNAVAILABLE");
       } else if (value && typeof value === "object") {
         if (Array.isArray(value)) {
-          for (const item of value) await assertArguments(typeof item === "object" ? item : { id: item });
-        } else await assertArguments(value);
+          for (const item of value) await assertArguments(typeof item === "object" ? item : { id: item }, epoch);
+        } else await assertArguments(value, epoch);
       }
     }
   }
@@ -294,3 +401,29 @@ export const serviceInternalAction = (capabilities: readonly string[]): typeof r
     return definition.handler(scoped, args);
   },
 })) as typeof rawInternalAction;
+
+/** Only signed Sofie commands can reach the one application transaction. */
+export const sofieApplicationAction: typeof rawAction = ((definition: any) => rawAction({ ...definition,
+  handler: async (ctx: any, args: any) => {
+    await authorizeSofieApplicationCommand(args);
+    const scoped = { ...ctx,
+      runMutation: (reference: any, input: any) => {
+        if (getFunctionName(reference) !== "sofieEnterprise:apply" || JSON.stringify(input) !== JSON.stringify(args)) throw Error("ENTERPRISE_ACCESS_DENIED");
+        return ctx.runMutation(reference, input);
+      },
+      runQuery: () => { throw Error("ENTERPRISE_ACCESS_DENIED"); },
+      runAction: () => { throw Error("ENTERPRISE_ACCESS_DENIED"); },
+    };
+    return definition.handler(scoped, args);
+  },
+})) as typeof rawAction;
+
+export const sofieApplicationMutation: typeof rawInternalMutation = ((definition: any) => rawInternalMutation({ ...definition,
+  handler: async (ctx: MutationCtx, args: any) => {
+    const authority = await requireSofieApplicationAuthority(ctx, args);
+    const scoped = missionScopedContext(ctx, "OWNER", undefined, undefined, authority);
+    // This authority cannot be carried into another function or scheduled operation.
+    Object.assign(scoped, { runMutation: undefined, runQuery: undefined, scheduler: undefined });
+    return definition.handler(scoped, args);
+  },
+})) as typeof rawInternalMutation;

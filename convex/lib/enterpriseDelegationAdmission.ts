@@ -1,6 +1,7 @@
 import { snapshotWorkflowDefinition } from "./workflowSnapshot";
 import { factoryVersionConfigurationDigest } from "./factoryConfiguration";
 import { canonicalDigest, canonicalHash, factoryDelegationBindingDigest, verifyEngineeringTariff } from "@mission-control/shared";
+import { enterpriseProject } from './enterpriseAttemptAccounting';
 import { enterpriseMissionOwner } from "./enterpriseMissionOwner";
 import { requireEnterpriseQualificationOwner } from "./enterpriseQualificationAccess";
 import { loadLocalRepositoryAdmission } from "./localRepositoryAdmission";
@@ -23,6 +24,10 @@ export async function enterprisePlanApprovedByOwner(ctx: any, plan: any, ownerId
  * executor. Existing admitTrial creates the one delegated reservation later. */
 export async function prepareCanonicalDelegation(ctx: any, workOrder: any, versionId: any) {
   await requireEnterpriseQualificationOwner(ctx, workOrder);
+  return inspectCanonicalDelegation(ctx, workOrder, versionId);
+}
+
+async function inspectCanonicalDelegation(ctx: any, workOrder: any, versionId: any) {
   const version = versionId && await ctx.db.get(versionId);
   const definition = version && await ctx.db.get(version.factoryDefinitionId);
   const repository = await ctx.db.get(workOrder.repositoryId);
@@ -53,13 +58,30 @@ export async function prepareCanonicalDelegation(ctx: any, workOrder: any, versi
   return { version, definition, repository, registration, plan, ownerId, admission, policy };
 }
 
-export async function enterpriseDelegationApproval(ctx: any, plan: any, binding: any, run?: any) {
+export type EnterpriseResultReadScope = { ownerId:string; missionId:string; planId:string; planDigest:string };
+
+export async function enterpriseDelegationApproval(ctx: any, plan: any, binding: any, run?: any, resultReadScope?: EnterpriseResultReadScope) {
   run ??= await ctx.db.get(binding.workflowRunId);
+  if (resultReadScope && run?.executionManifest?.schema !== DELEGATION_PREPARATION) throw Error("ENTERPRISE_RESULT_SCOPE_REQUIRED");
   if (run?.executionManifest?.schema !== DELEGATION_PREPARATION) {
     return plan?.metadata?.enterpriseDelegationApprovals?.[binding.delegationId] ?? plan?.metadata?.enterpriseDelegationApproval;
   }
   const wo = await ctx.db.get(binding.workOrderId);
-  const current = await prepareCanonicalDelegation(ctx, wo, run.factoryDefinitionVersionId);
+  // Only the authenticated Result projection supplies this read-only owner scope.
+  // Execution callers retain the normal authenticated owner admission by default.
+  if (resultReadScope !== undefined) {
+    const mission = wo && await ctx.db.get(wo.missionId);
+    if (process.env.MC_NATIVE_SUCCESSOR_QUALIFICATION !== '1' || !wo || !mission
+      || mission.projectId !== wo.projectId || mission.tenantId !== wo.tenantId
+      || wo.verificationContract?.schemaVersion !== 2 || wo.verificationContract.enforcementMode !== 'ENFORCED'
+      || !await enterpriseProject(ctx, wo.projectId) || await enterpriseMissionOwner(ctx, mission) !== resultReadScope.ownerId
+      || binding.ownerScope !== resultReadScope.ownerId || mission._id !== resultReadScope.missionId
+      || binding.missionId !== resultReadScope.missionId || plan?._id !== resultReadScope.planId || binding.missionPlanId !== resultReadScope.planId
+      || `sha256:${canonicalHash(plan)}` !== resultReadScope.planDigest) throw Error('ENTERPRISE_RESULT_OWNER_REQUIRED');
+  }
+  const current = resultReadScope === undefined
+    ? await prepareCanonicalDelegation(ctx, wo, run.factoryDefinitionVersionId)
+    : await inspectCanonicalDelegation(ctx, wo, run.factoryDefinitionVersionId);
   const workflow = await ctx.db.get(current.version.workflowId);
   const preparation = run.executionManifest;
   const composition = current.version.executionProfileSnapshot?.configuration;

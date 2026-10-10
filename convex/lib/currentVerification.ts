@@ -1,5 +1,5 @@
 import { enterpriseMissionOwner } from "./enterpriseMissionOwner";
-import { enterpriseDelegationApproval, enterprisePlanApprovedByOwner, DELEGATION_PREPARATION } from "./enterpriseDelegationAdmission";
+import { enterpriseDelegationApproval, enterprisePlanApprovedByOwner, DELEGATION_PREPARATION, type EnterpriseResultReadScope } from "./enterpriseDelegationAdmission";
 import { canonicalDigest, canonicalHash } from "@mission-control/shared";
 import { verificationContractDigest } from "@mission-control/workflow-engine/verification-identity";
 import { enterpriseProject } from "./enterpriseAttemptAccounting";
@@ -51,7 +51,10 @@ export async function getCurrentVerificationRoutingOutcome(
   now = Date.now(),
   purpose: "ACCEPTANCE" | "PREPUBLICATION" = "ACCEPTANCE",
   isolatedEnterpriseQualification = false,
+  resultReadScope?: EnterpriseResultReadScope,
 ): Promise<CurrentVerificationRoutingOutcome> {
+  if (resultReadScope && (!isolatedEnterpriseQualification || purpose !== 'ACCEPTANCE'
+    || workOrder.missionId !== resultReadScope.missionId || workOrder.missionPlanId !== resultReadScope.planId)) throw Error('ENTERPRISE_RESULT_SCOPE_REQUIRED');
   const [attempts, results, receipts, evidence, providerHeads, repository, installations, approvals] = await Promise.all([
     ctx.db.query("workflowRuns").withIndex("by_work_order", (q: any) => q.eq("workOrderId", workOrder._id)).collect(),
     ctx.db.query("verificationRuns").withIndex("by_work_order", (q: any) => q.eq("workOrderId", workOrder._id)).collect(),
@@ -85,7 +88,7 @@ export async function getCurrentVerificationRoutingOutcome(
       const parent = verifier?.enterpriseAccountingParent;
       const artifact = envelope.artifactIds.length === 1 && await ctx.db.get(envelope.artifactIds[0]);
       const revision = binding && await ctx.db.get(binding.workOrderRevisionId);
-      const approval = binding && await enterpriseDelegationApproval(ctx, plan, binding, source).catch(() => null);
+      const approval = binding && await enterpriseDelegationApproval(ctx, plan, binding, source, resultReadScope).catch(() => null);
       if (!trial || trial.projectId !== workOrder.projectId || trial.tenantId !== workOrder.tenantId
         || !artifact || artifact.projectId !== workOrder.projectId || artifact.tenantId !== workOrder.tenantId
         || artifact.workflowRunId !== source?._id || artifact.contentHash !== envelope.metadata.resultDigest

@@ -214,6 +214,11 @@ try {
  } finally {untimed();await timedClient.close();}
  await db.restart();
  await check('restart retains isolation',async()=>assert.equal(await db.peer.query('missions:get',{missionId:f.missionId}),null));
+ await check('transaction-local cache invalidates ancestor writes and denies cyclic foreign lineage',async()=>{
+  const local=await db.owner.mutation('isolationFixture:seed',{scope:s});
+  const foreign=await db.owner.mutation('isolationFixture:seed',{scope:{...s,operatorId:s.peerId}});
+  assert.deepEqual(await db.owner.mutation('isolationFixture:transactionCacheProbe',{scope:s,local,foreign}),{ancestorWriteInvalidation:true,cyclicForeignReadOrderIndependent:true});
+ });
  if(process.env.MC_ISOLATION_EVIDENCE) await writeFile(process.env.MC_ISOLATION_EVIDENCE,JSON.stringify({status:'PASS',checks},null,2)+'\n');
 } finally { await db.destroy(); }
 

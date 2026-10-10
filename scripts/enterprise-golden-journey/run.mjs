@@ -107,8 +107,9 @@ try {
     await node('sandbox-security', 'scripts/qualification/native-sandbox-security.mts', [docker(), join(output, 'sandbox-security')]);
     for (const mode of ['recovery', 'unknown', 'cancel']) await journey(mode, build);
   } else if (suite === 'sofie-integration') {
+    await database(); await node('sofie-intake', 'scripts/enterprise-readiness/qualify.mts', [join(output, 'intake')]);
     await command('sofie-contract', process.execPath, ['--test', 'scripts/enterprise-golden-journey/sofie-contract.test.mjs', 'scripts/enterprise-golden-journey/boundary.test.mjs']);
-    report.fixtureBoundaries.push('Sofie consumer contract fixture. Canonical readback exercised in hybrid-mission. Live MyEve adapter absent.');
+    report.fixtureBoundaries.push('Signed Sofie intake through real canonical database and synthetic authenticated owner; browser and MyEve completed-Result execution are separately qualified.');
     report.liveSofieIntegration = 'NOT_RUN';
   } else if (suite === 'browser-journey') {
     await command('playwright', 'pnpm', ['exec', 'playwright', 'test', '-c', 'scripts/enterprise-golden-journey/playwright.config.ts'], { MC_GOLDEN_BROWSER_OUTPUT: join(output, 'browser') });

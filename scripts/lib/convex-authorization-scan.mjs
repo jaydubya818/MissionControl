@@ -41,6 +41,7 @@ const AUTHORIZATION_MARKERS = [
   "ctx.auth.getUserIdentity",
   // Signed service-command boundary (convex/serviceCommands.ts).
   "authorizeServiceCommand",
+  "authorizeSofieApplicationCommand",
   "claimScoped",
 ];
 

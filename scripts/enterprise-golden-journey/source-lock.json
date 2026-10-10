@@ -8,7 +8,7 @@
   },
   "myFactory": "e498c31db8b749fa91b0544ecd1d1a661b971c2c",
   "myFactoryFixtureSource": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
-  "myEve": "2ef364024bc1cdd3e10ec28f3d340119c6f87d41",
+  "myEve": "9f1c83b0989abaedc168b740ddcf57582cf15a92",
   "factoryVersion": "4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95",
   "runtimeSource": "912e26ebd2b08c2c58f7cbfc1b903c1d52c4851e",
   "runtimeImage": "sha256:bddbcca962226a60fe962ccd5812b04b480064004b97e04a97f7166bc3be233a",
@@ -33,5 +33,9 @@
   },
   "dependencyLocks": {
     "pnpm-lock.yaml": "42384eb6430bd901d1601d8a89544dafd1dd4cf5f7aaeb67aba3268612ce955b"
+  },
+  "composedDependencies": {
+    "missionControl": "c0ba5a97087a50feb36bb1a788f9cf065890e328",
+    "isolationBaseline": "6761c0c1c38be24907536f118e214fc962eea231"
   }
 }

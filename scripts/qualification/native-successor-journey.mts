@@ -1,4 +1,5 @@
 import { SofieEnterpriseContractFixture } from '../enterprise-golden-journey/sofie-contract.mjs';
+import { pathToFileURL } from 'node:url';
 import { finalizeHybridSpec } from './native-hybrid-spec.mjs';
 import { mkdir, readFile, writeFile, chmod, rm, lstat } from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -46,10 +47,15 @@ async function step(name: string, operation: () => Promise<any>) {
   console.log(JSON.stringify({ stage: name, recorded: true })); return value;
 }
 let hybridProvider: any;
+let resultConsumer: any;
 let adapter: any, worker: FactoryAttemptWorker | undefined;
 try {
   const s = db.seed; state.seed = s;
   if (mode === 'hybrid') hybridProvider = await prepareHybridProvider();
+  if (mode === 'hybrid' && process.env.MC_SOFIE_RESULT_CONSUMER_ROOT) {
+    const consumer = await import(pathToFileURL(resolve(process.env.MC_SOFIE_RESULT_CONSUMER_ROOT, 'apps/eve/test/missioncontrol-result.integration.mjs')).href);
+    resultConsumer = await consumer.prepareCompletedResultConsumer(db);
+  }
   db.setEnvironment('MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID', s.environmentId);
   db.setEnvironment('MISSION_CONTROL_SERVICE_ID', process.env.MISSION_CONTROL_SERVICE_ID);
   db.setEnvironment('MISSION_CONTROL_SERVICE_COMMAND_SECRET', process.env.MISSION_CONTROL_SERVICE_COMMAND_SECRET);
@@ -518,6 +524,7 @@ try {
         isolatedEnterpriseQualification: true, idempotencyKey: 'hybrid-integration-accept' }));
       assert.equal(accepted.accepted, true);
       await handoff(integrationWO._id, integrationDispatch.run._id, 'integration-proof', integrationArtifacts.filter((a: any) => a.workflowRunId === integrationDispatch.run._id).map((a: any) => a._id));
+      if (resultConsumer) await step('completedEnterpriseResultConsumer', () => resultConsumer.qualify(missionId));
       const ownerReadback = await step('sofieNeedsYou', () => sofie.readback(missionId));
       assert.equal(ownerReadback.state, 'AWAITING_ACCEPTANCE');
       assert.equal(ownerReadback.acceptanceEligible, true);
@@ -565,6 +572,7 @@ try {
     records[table] = await query('nativeFixture:inspect', { table }).catch(() => []);
   }
   await writeFile(join(output, 'durable-records.json'), JSON.stringify(records, null, 2) + '\n');
+  await resultConsumer?.stop();
   await db.stop(); await hybridProvider?.f.stop();
   const admitted = state.repositoryAdmission;
   if (admitted) {

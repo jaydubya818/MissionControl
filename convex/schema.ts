@@ -2045,6 +2045,23 @@ export const schemaTablesPartOne = {
   // -------------------------------------------------------------------------
   // SOFTWARE FACTORY: WORK ORDERS
   // -------------------------------------------------------------------------
+  enterpriseAppConnections: defineTable({
+    resultScope: v.optional(v.object({ missionId:v.id("missions"), planId:v.id("missionPlans"), planRevision:v.number(), planDigest:v.string() })),
+    tenantId: v.id("tenants"), projectId: v.id("projects"), ownerId: v.id("operators"),
+    ownerMemberId: v.id("orgMembers"), owningTeamId: v.id("scrumTeams"),
+    applicationId: v.literal("myeve-sofie-readiness-v1"), keyId: v.string(),
+    expiresAt: v.number(), revokedAt: v.optional(v.number()), createdAt: v.number(),
+  }).index("by_owner", ["ownerId"]),
+
+  enterpriseMissionProposals: defineTable({
+    connectionId: v.id("enterpriseAppConnections"), tenantId: v.id("tenants"), projectId: v.id("projects"),
+    ownerId: v.id("operators"), intentKey: v.string(), digest: v.string(),
+    proposal: v.object({ title: v.string(), objective: v.string(), workstreams: v.array(v.string()),
+      milestones: v.array(v.string()), stopCondition: v.string(), budgetMicrousd: v.literal(0) }),
+    createdAt: v.number(), expiresAt: v.number(), authorizedAt: v.optional(v.number()),
+    authorizedDigest: v.optional(v.string()), revokedAt: v.optional(v.number()), missionId: v.optional(v.id("missions")),
+  }).index("by_connection_intent", ["connectionId", "intentKey"]),
+
   missions: defineTable({
     ownerOperatorId: v.optional(v.id("operators")),    enterpriseFixtureBudget: v.optional(fixtureBudget),
     tenantId: v.optional(v.id("tenants")),

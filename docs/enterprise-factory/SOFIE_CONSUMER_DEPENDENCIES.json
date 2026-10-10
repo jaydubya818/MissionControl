@@ -1,0 +1,92 @@
+{
+  "schema": "enterprise-dependency-observation/v2",
+  "observedAt": "2026-10-10T03:11:15.850458+00:00",
+  "automaticAdoption": false,
+  "repositories": [
+    {
+      "repository": "MissionControl",
+      "mainSha": "5308727463ec737589bf8072ee9f5de0af1bba7a",
+      "pullRequests": []
+    },
+    {
+      "repository": "MyEveBot",
+      "mainSha": "2ef364024bc1cdd3e10ec28f3d340119c6f87d41",
+      "pullRequests": [
+        {
+          "number": 65,
+          "state": "open",
+          "merged": false,
+          "headSha": "e1a0876e44d464b1b503928af94d549b4202588f",
+          "base": "main",
+          "url": "https://github.com/jaydubya818/MyEveBot/pull/65"
+        },
+        {
+          "number": 67,
+          "state": "open",
+          "merged": false,
+          "headSha": "8338309582d6806829dec1ae1beef301d6b52425",
+          "base": "codex/external-alpha-work-authority",
+          "url": "https://github.com/jaydubya818/MyEveBot/pull/67"
+        }
+      ]
+    },
+    {
+      "repository": "MyFactory",
+      "mainSha": "030b1a51017f3159436b93817ed2d5bf6ae18288",
+      "pullRequests": [
+        {
+          "number": 12,
+          "state": "open",
+          "merged": false,
+          "headSha": "fa48a820ba185eb9b891130c78166463b61cba74",
+          "base": "codex/external-alpha-private-source-clean",
+          "url": "https://github.com/jaydubya818/MyFactory/pull/12"
+        }
+      ]
+    },
+    {
+      "repository": "skillz",
+      "mainSha": "4942dde4b2a442df3ee45879bb22734c658426df",
+      "pullRequests": [
+        {
+          "number": 6,
+          "state": "open",
+          "merged": false,
+          "headSha": "d57ff77b8522f897fc6ae392cf59b3141295ba82",
+          "base": "main",
+          "url": "https://github.com/jaydubya818/skillz/pull/6"
+        },
+        {
+          "number": 7,
+          "state": "open",
+          "merged": false,
+          "headSha": "c7c53a261552297d9398b00e822d7cfaf7c63fff",
+          "base": "codex/myskills-platform",
+          "url": "https://github.com/jaydubya818/skillz/pull/7"
+        }
+      ]
+    },
+    {
+      "repository": "relay",
+      "mainSha": "a90625776193031ca2303ba2e2162249d1245479",
+      "pullRequests": [
+        {
+          "number": 34,
+          "state": "open",
+          "merged": false,
+          "headSha": "25def56c72128201002dff0f0f179ad5e3074e6d",
+          "base": "main",
+          "url": "https://github.com/jaydubya818/relay/pull/34"
+        }
+      ]
+    }
+  ],
+  "decisions": {
+    "MissionControl": "Readiness branch plus qualified isolation recovery required; main has not adopted enterprise contracts. Do not consume dirty Golden Journey checkout.",
+    "MyEveBot": "Consumer is developed from exact main 2ef3640 in a new inactive branch. Shared-accounting PR67 and owner-policy PR65 remain open. Production owner-session bridge and completed enterprise Result remain unqualified.",
+    "MyFactory": "PR12 unchanged and open; accepted local e498c31 compatibility remains the only qualified integration pin. No Vercel V2 changes.",
+    "skillz": "PR7 advanced six commits to c7c53a2. Its qualification/checkpoint7/acceptance-hold.json records no new accepted profiles, execution_eligible=false and marketplace_activation=DISABLED. Source-only observation; do not adopt or infer consumer compatibility.",
+    "relay": "Main and PR34 unchanged. Signing envelope exists; MissionControl transport composition remains NOT_QUALIFIED and unused by direct loopback consumer."
+  },
+  "mySkillsHoldSource": "https://github.com/jaydubya818/skillz/blob/c7c53a261552297d9398b00e822d7cfaf7c63fff/qualification/checkpoint7/acceptance-hold.json"
+}

@@ -15,7 +15,7 @@ async function checkout(name, sha, path) {
 }
 // Resolve pinned source revisions even when the live integration is unavailable.
 await checkout('MyEveBot', lock.myEve, join(temp, 'golden-myeve'));
-if (['contracts', 'sofie-integration', 'browser-journey'].includes(suite)) process.exit(0);
+if (['contracts', 'browser-journey'].includes(suite)) process.exit(0);
 const archive = join(temp, 'convex.zip'), convex = join(temp, 'convex');
 run('curl', ['--fail', '--location', '--proto', '=https', '--output', archive, lock.convexLinuxArchive.url]);
 assert.equal(sha256(await readFile(archive)), lock.convexLinuxArchive.sha256);
