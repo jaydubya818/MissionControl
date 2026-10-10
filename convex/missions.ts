@@ -1,4 +1,4 @@
-import { requireCapabilityAdmission } from "./lib/capabilityAdmission";
+import { requireCapabilityAdmission, capabilityPermitsValidator } from "./lib/capabilityAdmission";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
@@ -1391,7 +1391,7 @@ export const approvePlan = mutation({
 });
 
 export const start = mutation({
-  args: { missionId: v.id("missions"), actorId: v.optional(v.string()), idempotencyKey: v.string() },
+  args: { missionId: v.id("missions"), actorId: v.optional(v.string()), idempotencyKey: v.string(), capabilityPermits: v.optional(capabilityPermitsValidator) },
   handler: async (ctx, args) => {
     const scopedMission = await ctx.db.get(args.missionId);
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, scopedMission?.projectId, COMPANY_PERMISSIONS.DISPATCH_WORK);
@@ -1411,8 +1411,13 @@ export const start = mutation({
         throw new Error("Mission ownership must have exactly one matching active OWNER assignment before start");
       }
     }
-    await requireCapabilityAdmission(ctx, mission, mission.state === "IN_PROGRESS");
+    const capabilityAdmission = await requireCapabilityAdmission(ctx, mission, mission.state === "IN_PROGRESS", {
+      workId: mission._id, missionId: mission._id, generation: mission.updatedAt, capabilityId: 'enterprise.missions', nativeSnapshot: mission, args, permits: args.capabilityPermits,
+    });
     if (mission.state === "IN_PROGRESS") return { mission, created: false };
+    if (capabilityAdmission && (mission.budgetUsd === undefined || !Number.isFinite(mission.budgetUsd)
+      || Math.ceil(mission.budgetUsd * 1_000_000) > capabilityAdmission.budgetMicros))
+      throw Error('CAPABILITY_NATIVE_BUDGET_REQUIRED');
     const releasedWorkOrder = await ctx.db
       .query("workOrders")
       .withIndex("by_mission", (q) => q.eq("missionId", mission._id))

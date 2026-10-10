@@ -1,4 +1,5 @@
 import { providerPriceValidator, providerReservationValidator, providerUsageValidator } from "./lib/providerLiabilityValidators";
+import { capabilityPolicyTables } from './lib/capabilityPolicySchema';
 /**
  * Convex Database Schema — V0
  *
@@ -7506,6 +7507,7 @@ export const schemaTablesPartTwo = {
   // EVAL CONTROL PLANE (diagnostic evidence; never acceptance authority)
   // -------------------------------------------------------------------------
   ...evalControlPlaneTables,
+  ...capabilityPolicyTables,
 
   // -------------------------------------------------------------------------
   // FACTORY LEARNING (advisory projections; never acceptance authority)

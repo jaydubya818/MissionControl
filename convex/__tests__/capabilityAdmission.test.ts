@@ -7,8 +7,8 @@ describe('isolated capability admission containment', () => {
   const record = { tenantId: 'tenant-a', projectId: 'project-a', ownerMemberId: 'owner-a' };
   const context = (subject = 'auth-a', tenantId = 'tenant-a') => ({
     auth: { getUserIdentity: async () => ({ subject }) },
-    db: { get: async (id: string) => id === 'owner-a'
-      ? { operatorId: 'operator-a', tenantId, projectId: 'project-a' }
+    db: { query: () => ({ withIndex: () => ({ unique: async () => null }) }), get: async (id: string) => id === 'owner-a'
+      ? { active: true, operatorId: 'operator-a', tenantId, projectId: 'project-a' }
       : { active: true, authId: 'auth-a', tenantId: 'tenant-a' } },
   });
   function enroll() {

@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "database": "disposable real Convex SQLite backend",
+  "checks": [
+    "real Convex HTTP signed fences commit before exact ACK",
+    "fleet admission cannot implicitly start an unadmitted Mission",
+    "authenticated exact-owner positive native Mission admission and idempotent retry",
+    "child capability and native snapshot changes reject otherwise signed permits",
+    "disable fences stale permits, preserves admitted Mission, denies legacy WorkOrder bypass",
+    "cross-owner Mission replay denied",
+    "real Convex admission/fence race commits only in serial order",
+    "durable enrollment prevents configuration-removal bypass"
+  ],
+  "paidExecution": "NOT_RUN"
+}

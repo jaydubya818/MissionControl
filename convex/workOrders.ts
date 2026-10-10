@@ -1,4 +1,4 @@
-import { requireWorkOrderCapabilityAdmission } from "./lib/capabilityAdmission";
+import { requireWorkOrderCapabilityAdmission, capabilityPermitsValidator, type CapabilityPermits } from "./lib/capabilityAdmission";
 import { assertQualificationActivation } from "./lib/factoryQualificationScope";
 import { reserveOfflineAttemptBudget } from "./lib/offlineAttemptBudget";
 import { NO_INFERENCE_CONSTRAINT } from "./lib/offlineExecutionPolicy";
@@ -2120,6 +2120,7 @@ export const create = mutation({
 });
 
 const dispatchArgs = {
+    capabilityPermits: v.optional(capabilityPermitsValidator),
     workOrderId: v.id("workOrders"),
     taskId: v.optional(v.id("tasks")),
     workflowId: v.optional(v.string()),
@@ -2144,6 +2145,7 @@ const dispatchArgs = {
 };
 
 type DispatchArgs = {
+  capabilityPermits?: CapabilityPermits;
   workOrderId: Id<"workOrders">;
   taskId?: Id<"tasks">;
   workflowId?: string;
@@ -2443,7 +2445,7 @@ async function dispatchWorkOrder(
       return { created: false, run: existingRun, reason: "idempotent-replay" };
     }
 
-    await requireWorkOrderCapabilityAdmission(ctx, workOrder);
+    const capabilityAdmission = await requireWorkOrderCapabilityAdmission(ctx, workOrder, false, args);
 
     if (workOrder.state === "SUPERSEDED") {
       throw new Error("Superseded WorkOrders cannot be dispatched");
@@ -3441,6 +3443,10 @@ async function dispatchWorkOrder(
           authorizedAt: now,
         }
       : undefined;
+    if (capabilityAdmission && (!factoryBinding || !executionCostAuthorization
+      || !Number.isFinite(executionCostAuthorization.hardLimitUsd)
+      || Math.ceil(executionCostAuthorization.hardLimitUsd * 1_000_000) > capabilityAdmission.budgetMicros))
+      throw Error('CAPABILITY_NATIVE_AUTHORITY_OR_BUDGET_REQUIRED');
     const runDocId = await ctx.db.insert("workflowRuns", {
       tenantId: refreshedWorkOrder.tenantId,
       runId,

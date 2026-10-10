@@ -1070,6 +1070,11 @@ export const start = mutation({
     worktree: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    if (args.workOrderId) throw new Error("WorkOrder runs require canonical WorkOrder dispatch.");
+    const enrolled = args.projectId
+      ? await ctx.db.query('capabilityEnrolledOwners').withIndex('by_project', q => q.eq('projectId', args.projectId!)).first()
+      : await ctx.db.query('capabilityEnrolledOwners').first();
+    if (enrolled) throw new Error('CAPABILITY_CANONICAL_DISPATCH_REQUIRED');
     // Get workflow definition
     const workflow = await ctx.db
       .query("workflows")

@@ -18,10 +18,10 @@ it('real Mission and shared WorkOrder handlers cannot write execution before pol
   const mission = { _id: 'mission-a', tenantId: 'tenant-a', projectId: 'project-a', ownerMemberId: 'member-a', state: 'READY' };
   const order = { _id: 'order-a', tenantId: 'tenant-a', projectId: 'project-a', missionId: mission._id };
   const rows: Record<string, unknown> = { 'mission-a': mission, 'order-a': order,
-    'member-a': { operatorId: 'operator-a', tenantId: 'tenant-a' },
+    'member-a': { active: true, operatorId: 'operator-a', tenantId: 'tenant-a' },
     'operator-a': { authId: 'auth-a', active: true, tenantId: 'tenant-a' } };
   const writes = vi.fn();
-  const query = { withIndex: () => query, first: async () => null };
+  const query = { withIndex: () => query, first: async () => null, unique: async () => null };
   const ctx = { auth: { getUserIdentity: async () => ({ subject: 'auth-a' }) },
     db: { get: async (id: string) => rows[id] ?? null, query: () => query, patch: writes, insert: writes } };
   await expect(handler(start)(ctx, { missionId: mission._id, idempotencyKey: 'start' })).rejects.toThrow('POLICY_REVALIDATION_UNAVAILABLE');
