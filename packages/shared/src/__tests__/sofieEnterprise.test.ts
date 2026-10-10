@@ -7,6 +7,12 @@ describe('Sofie enterprise preparation',()=>{
   it('keeps bounded repository work in MyFactory',()=>expect(assessSoftwareInitiative({software:true,workstreams:1,enterpriseGovernance:false,boundedRepositoryChange:true}).tier).toBe(2));
   it('keeps direct and multi-agent coordination native without enterprise governance',()=>expect(assessSoftwareInitiative({software:true,workstreams:5,enterpriseGovernance:false,boundedRepositoryChange:false}).tier).toBe(1));
   it('does not route ordinary non-software work to MissionControl',()=>expect(assessSoftwareInitiative({software:false,workstreams:5,enterpriseGovernance:true,boundedRepositoryChange:false}).tier).toBe(1));
+  it('inspects exactly one proposal selector without accepting authority',()=>{
+    for(const selector of [{intentKey:'intent',proposalId:null},{intentKey:null,proposalId:'proposal'}])
+      expect(validateEnterpriseRequest({operation:'enterprise.inspect',connectionId:'c',...selector}).operation).toBe('enterprise.inspect');
+    for(const selector of [{intentKey:null,proposalId:null},{intentKey:'intent',proposalId:'proposal'},{intentKey:'intent',proposalId:null,authorized:true}])
+      expect(()=>validateEnterpriseRequest({operation:'enterprise.inspect',connectionId:'c',...selector})).toThrow();
+  });
   it('parses an inspectable zero-authority proposal',()=>expect(validateEnterpriseRequest(request)).toEqual(request));
   it.each([
     {...request,ownerId:'spoof'}, {...request,proposal:{...proposal,budgetMicrousd:1}}, {...request,proposal:{...proposal,workstreams:['Only one']}},

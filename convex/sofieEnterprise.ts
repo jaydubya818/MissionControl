@@ -56,7 +56,7 @@ export const connect = mutation({
     const id = await ctx.db.insert('enterpriseAppConnections', { ...args, tenantId: project.tenantId!, ownerId: access.membership.operatorId,
       applicationId: SOFIE_APPLICATION, keyId, createdAt: Date.now() });
     await currentConnection(ctx, id);
-    return { connectionId: id, applicationId: SOFIE_APPLICATION, capabilities: ['enterprise.propose', 'enterprise.submit', 'enterprise.read'], executionAuthority: 'NONE' };
+    return { connectionId: id, applicationId: SOFIE_APPLICATION, capabilities: ['enterprise.propose', 'enterprise.submit', 'enterprise.read', 'enterprise.inspect'], executionAuthority: 'NONE' };
   },
 });
 
@@ -113,7 +113,19 @@ export const apply = internalMutation({
     if (receipt && (receipt.serviceId !== SOFIE_APPLICATION || receipt.payloadDigest !== args.envelope.payloadDigest
       || receipt.claimedProjectId !== project._id || receipt.claimedRepositoryId !== args.envelope.repositoryId || receipt.capability !== request.operation)) return denied();
     let response: any;
-    if (request.operation === 'enterprise.propose') {
+    if (request.operation === 'enterprise.inspect') {
+      const proposal = request.proposalId
+        ? await ctx.db.get(request.proposalId as Id<'enterpriseMissionProposals'>)
+        : await ctx.db.query('enterpriseMissionProposals').withIndex('by_connection_intent', q => q.eq('connectionId', connection._id).eq('intentKey', request.intentKey!)).unique();
+      if (request.proposalId && !proposal) return denied();
+      if (proposal && (proposal.connectionId !== connection._id || proposal.ownerId !== owner._id || proposal.projectId !== project._id
+        || proposal.tenantId !== connection.tenantId || proposal.revokedAt !== undefined || proposal.expiresAt <= Date.now()
+        || proposal.digest !== enterpriseDigest({connectionId:proposal.connectionId,tenantId:proposal.tenantId,projectId:proposal.projectId,
+          ownerId:proposal.ownerId,intentKey:proposal.intentKey,proposal:proposal.proposal}))) return denied();
+      response = { proposal: proposal ? { id:proposal._id, intentKey:proposal.intentKey, digest:proposal.digest,
+        authorized:proposal.authorizedAt !== undefined && proposal.authorizedDigest === proposal.digest,
+        missionId:proposal.missionId ?? null } : null, executionAuthority:'NONE' };
+    } else if (request.operation === 'enterprise.propose') {
       const binding = { connectionId: connection._id, tenantId: connection.tenantId, projectId: project._id, ownerId: owner._id,
         intentKey: request.intentKey, proposal: request.proposal };
       const digest = enterpriseDigest(binding);

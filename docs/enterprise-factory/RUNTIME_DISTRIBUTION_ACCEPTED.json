@@ -1,0 +1,15 @@
+{
+  "status": "CLOSED_OWNER_ACCEPTED",
+  "reference": "ghcr.io/jaydubya818/missioncontrol-native-runtime@sha256:bddbcca962226a60fe962ccd5812b04b480064004b97e04a97f7166bc3be233a",
+  "sourceSha": "912e26ebd2b08c2c58f7cbfc1b903c1d52c4851e",
+  "architecture": "linux/amd64",
+  "runtime": 3,
+  "harness": 3,
+  "visibility": "PRIVATE",
+  "retentionLockEnforcement": "OPEN_FOLLOWUP",
+  "historicalImage": "UNAVAILABLE",
+  "historicalDigest": "sha256:4c0e7e776c25f393ba9eb2e29319dbc38dc4c1d0f8a91e307aeb1a31849269db",
+  "evidenceArchive": "Workspace docs/enterprise-factory/evidence/private-runtime-publication; preserved unchanged",
+  "publicationReceiptSha256": "3810dbe2ee6fa345284126a640736146fe8f1c01c12b6e4b19205c3ee9f15c61",
+  "acceptedReportSha256": "b7e928911d22ba80fb849c08a53a753164fb74762825f16d10c421df73061a91"
+}

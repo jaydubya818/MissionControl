@@ -59,6 +59,13 @@ try {
   });
   await check('changed-intent-payload-denied',()=>assert.rejects(()=>send(sign({...propose,proposal:{...proposal,title:'Changed'}}))));
   const proposalId=prepared.response.proposalId,proposalDigest=prepared.response.digest;
+  const inspectProposal={operation:'enterprise.inspect',connectionId,intentKey:null,proposalId};
+  await check('read-only-inspection-before-approval',async()=>{
+    const observation=await send(sign(inspectProposal));assert.equal(observation.response.proposal.authorized,false);assert.equal(observation.response.proposal.missionId,null);
+    assert.equal((await send(sign({...inspectProposal,intentKey:propose.intentKey,proposalId:null}))).response.proposal.id,proposalId);
+    assert.equal((await send(sign({...inspectProposal,intentKey:'missing',proposalId:null}))).response.proposal,null);
+    await assert.rejects(()=>send(sign({...inspectProposal,proposalId:s.otherProjectId})));
+  });
   const submit={operation:'enterprise.submit',connectionId,proposalId,proposalDigest};
   await check('unapproved-submit-denied',()=>assert.rejects(()=>send(sign(submit))));
   const decision={projectId:s.projectId,connectionId,proposalId,expectedDigest:proposalDigest,decision:'AUTHORIZE_DRAFT'};
@@ -66,6 +73,7 @@ try {
     await check(name+'-approval-denied',()=>assert.rejects(()=>mutate('sofieEnterprise:decide',decision,client)));
   await check('changed-proposal-approval-denied',()=>assert.rejects(()=>mutate('sofieEnterprise:decide',{...decision,expectedDigest:'sha256:'+'0'.repeat(64)})));
   result.authorization=await mutate('sofieEnterprise:decide',decision);
+  await check('read-only-inspection-after-approval',async()=>assert.equal((await send(sign(inspectProposal))).response.proposal.authorized,true));
   let submitted:any;
   await check('concurrent-single-canonical-mission',async()=>{
     const replies=await Promise.all(Array.from({length:6},()=>send(sign(submit))));assert.equal(replies.filter(r=>r.response.created).length,1);
@@ -106,7 +114,7 @@ try {
   await fault(s.operatorId,{active:false});await check('inactive-owner-denied',()=>assert.rejects(()=>send(sign(read))));await fault(s.operatorId,{active:true});
   await check('key-rotation-denies-old-connection',async()=>{db.setEnvironment('MC_SOFIE_APPLICATION_KEY_ID','readiness-key-2');await assert.rejects(()=>send(sign(read)));db.setEnvironment('MC_SOFIE_APPLICATION_KEY_ID','readiness-key-1')});
   await mutate('sofieEnterprise:decide',{...decision,decision:'REVOKE'});
-  await check('revoked-proposal-denies-read-and-retry',async()=>{await assert.rejects(()=>send(sign(read)));await assert.rejects(()=>send(sign(submit)))});
+  await check('revoked-proposal-denies-read-and-retry',async()=>{await assert.rejects(()=>send(sign(inspectProposal)));await assert.rejects(()=>send(sign(read)));await assert.rejects(()=>send(sign(submit)))});
   await mutate('sofieEnterprise:decide',{projectId:s.projectId,connectionId,decision:'REVOKE'});
   await check('revoked-connection-denies-new-proposal',()=>assert.rejects(()=>send(sign({...propose,intentKey:'new'}))));
   result.canonicalMission=await inspect(missionId);assert.equal(result.canonicalMission.state,'PLANNING');assert.equal(result.canonicalMission.spentUsd,0);
