@@ -105,6 +105,11 @@ try {
   await writeFile(join(parent, 'qualification-owner.json'), JSON.stringify({ schema: 'local-qualification-owner/v1', fixtureId, admissionDigest: localBinding.digest, root }), { mode: 0o600 });
   state.repositoryAdmission = admission;
   const repositoryId = await step('repository', () => mutate('localQualificationRepositories:register', {}));
+  if (hybridProvider) db.setEnvironment('MC_LOCAL_DELEGATION_QUALIFICATION', JSON.stringify({
+    schema: 'local-delegation-host-admission/v1', tenantId: admission.tenantId, projectId: admission.projectId,
+    operatorId: admission.operatorId, repositoryId, admissionDigest: localBinding.digest,
+    expiresAt: admission.expiresAt, qualification: hybridProvider.qualification,
+  }));
   const createAdapter = () => createIsolatedFactoryHarness({ backendBundlePath: join(build, 'bundles/backend.mjs'), dockerExecutable, version: '3',
     authority: async request => {
       if (request.lease.workerId !== hostId || request.lease.sessionId !== sessionId) return false;
