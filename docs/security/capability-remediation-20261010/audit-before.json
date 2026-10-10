@@ -1,0 +1,333 @@
+{
+  "actions": [
+    {
+      "action": "update",
+      "resolves": [
+        {
+          "id": 1193660,
+          "path": ".>@taskmasterai/cli>@ai-sdk/anthropic>@ai-sdk/provider-utils",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "module": "@ai-sdk/anthropic",
+      "target": "2.0.109",
+      "depth": 3
+    },
+    {
+      "action": "update",
+      "resolves": [
+        {
+          "id": 1241209,
+          "path": ".>vitest>vite>postcss>source-map-js",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "module": "source-map-js",
+      "target": "1.2.2",
+      "depth": 5
+    },
+    {
+      "action": "update",
+      "resolves": [
+        {
+          "id": 1241210,
+          "path": "apps__orchestration-server>@modelcontextprotocol/sdk>express>proxy-addr",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "module": "proxy-addr",
+      "target": "2.0.8",
+      "depth": 4
+    },
+    {
+      "action": "update",
+      "resolves": [
+        {
+          "id": 1241332,
+          "path": ".>concurrently>shell-quote",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "module": "shell-quote",
+      "target": "1.12.0",
+      "depth": 3
+    },
+    {
+      "action": "review",
+      "module": "@modelcontextprotocol/sdk",
+      "resolves": [
+        {
+          "id": 1241339,
+          "path": "apps__orchestration-server>@modelcontextprotocol/sdk",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    }
+  ],
+  "advisories": {
+    "1193660": {
+      "findings": [
+        {
+          "version": "3.0.21",
+          "paths": [
+            ". > @taskmasterai/cli@1.1.4 > @ai-sdk/anthropic@2.0.66 > @ai-sdk/provider-utils@3.0.21",
+            ". > @taskmasterai/cli@1.1.4 > @ai-sdk/google@2.0.54 > @ai-sdk/provider-utils@3.0.21",
+            ". > @taskmasterai/cli@1.1.4 > @ai-sdk/openai@2.0.92 > @ai-sdk/provider-utils@3.0.21",
+            ". > @taskmasterai/cli@1.1.4 > @ai-sdk/perplexity@2.0.24 > @ai-sdk/provider-utils@3.0.21",
+            ". > @taskmasterai/cli@1.1.4 > ai@5.0.137 > @ai-sdk/gateway@2.0.43 > @ai-sdk/provider-utils@3.0.21",
+            ". > @taskmasterai/cli@1.1.4 > ai@5.0.137 > @ai-sdk/provider-utils@3.0.21"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://nvd.nist.gov/vuln/detail/CVE-2026-8769\n- https://gist.github.com/YLChen-007/fb1096bc8428bed9a428f764d9d103bb\n- https://vuldb.com/submit/811406\n- https://vuldb.com/vuln/364394\n- https://vuldb.com/vuln/364394/cti\n- https://github.com/vercel/ai/pull/16374\n- https://github.com/vercel/ai/commit/6a436e31d247d678ddaedfc6f61e73ac0595e4b4\n- https://github.com/vercel/ai/commit/b30e43ac3fae2432a40b4f4f27f844f3d78b119e\n- https://github.com/vercel/ai/commit/b85c4fbc603b8173cf50a9790823397aada908a9\n- https://github.com/vercel/ai/blob/main/packages/provider-utils/CHANGELOG.md#501\n- https://github.com/vercel/ai/releases/tag/@ai-sdk/provider-utils@3.0.28\n- https://github.com/vercel/ai/releases/tag/@ai-sdk/provider-utils@4.0.33\n- https://github.com/vercel/ai/releases/tag/@ai-sdk/provider-utils@5.0.1\n- https://github.com/advisories/GHSA-866g-f22w-33x8",
+      "created": "2026-05-18T00:31:37.000Z",
+      "id": 1193660,
+      "npm_advisory_id": null,
+      "overview": "Versions of `@ai-sdk/provider-utils` before 3.0.28, from 4.0.0 before 4.0.33, and from 5.0.0 before 5.0.1 are vulnerable to uncontrolled resource consumption. The `createJsonResponseHandler`, `createJsonErrorResponseHandler`, and `createStatusCodeErrorResponseHandler` functions in `packages/provider-utils/src/response-handler.ts` read response bodies without a shared size limit, allowing a remote attacker with low privileges to cause excessive memory consumption. The exploit has been publicly disclosed and may be utilized.",
+      "reported_by": null,
+      "title": "@ai-sdk/provider-utils has an Uncontrolled Resource Consumption issue",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-8769"
+      ],
+      "access": "public",
+      "severity": "low",
+      "module_name": "@ai-sdk/provider-utils",
+      "vulnerable_versions": "<3.0.28",
+      "github_advisory_id": "GHSA-866g-f22w-33x8",
+      "recommendation": "Upgrade to version 3.0.28 or later",
+      "patched_versions": ">=3.0.28",
+      "updated": "2026-09-08T16:16:51.000Z",
+      "cvss": {
+        "score": 4.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L"
+      },
+      "cwe": [
+        "CWE-400"
+      ],
+      "url": "https://github.com/advisories/GHSA-866g-f22w-33x8"
+    },
+    "1241209": {
+      "findings": [
+        {
+          "version": "1.2.1",
+          "paths": [
+            ". > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            ". > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "apps/mission-control-ui > @tailwindcss/vite@4.1.18 > @tailwindcss/node@4.1.18 > source-map-js@1.2.1",
+            "apps/mission-control-ui > @tailwindcss/vite@4.1.18 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "apps/mission-control-ui > @vitejs/plugin-react@4.7.0 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "apps/mission-control-ui > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "apps/mission-control-ui > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "apps/mission-control-ui > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/agent-runtime > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/agent-runtime > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/context-router > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/context-router > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/context-tools > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/context-tools > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/coordinator > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/coordinator > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/meetings > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/meetings > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/memory > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/memory > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/model-router > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/model-router > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/policy-engine > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/policy-engine > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/research-adapters > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/research-adapters > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/shared > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/shared > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/state-machine > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/state-machine > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/telegraph > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/telegraph > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/workflow-engine > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/workflow-engine > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://nvd.nist.gov/vuln/detail/CVE-2026-93749\n- https://github.com/7rulnik/source-map-js/issues/76\n- https://github.com/7rulnik/source-map-js\n- https://github.com/7rulnik/source-map-js/blob/c1cd8904bb7bd0c7fb5879fcda48134d82a27934/lib/source-node.js#L115-L118\n- https://www.vulncheck.com/advisories/source-map-js-through-1.2.1-event-loop-denial-of-service\n- https://github.com/7rulnik/source-map-js/pull/79\n- https://github.com/7rulnik/source-map-js/commit/cf7658058ceeaa8619d5ae0ec90be6905209d016\n- https://github.com/7rulnik/source-map-js/releases/tag/v1.2.2\n- https://github.com/advisories/GHSA-68fv-2mgg-jv7q",
+      "created": "2026-09-18T18:31:44.000Z",
+      "id": 1241209,
+      "npm_advisory_id": null,
+      "overview": "source-map-js through 1.2.1 fails to validate the per-section offset line value in indexed source maps, allowing attackers to specify arbitrary numeric values. Attackers can supply extremely large offset line values that cause synchronous event loop blocking for extended periods, preventing the service from handling other requests.",
+      "reported_by": null,
+      "title": "source-map-js allows event-loop denial of service through indexed source-map section offsets",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-93749"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "source-map-js",
+      "vulnerable_versions": ">=1.0.0 <1.2.2",
+      "github_advisory_id": "GHSA-68fv-2mgg-jv7q",
+      "recommendation": "Upgrade to version 1.2.2 or later",
+      "patched_versions": ">=1.2.2",
+      "updated": "2026-10-05T23:31:22.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-1284"
+      ],
+      "url": "https://github.com/advisories/GHSA-68fv-2mgg-jv7q"
+    },
+    "1241210": {
+      "findings": [
+        {
+          "version": "2.0.7",
+          "paths": [
+            ". > @taskmasterai/cli@1.1.4 > fastmcp@3.33.0 > @modelcontextprotocol/sdk@1.26.0 > express@5.2.1 > proxy-addr@2.0.7",
+            ". > @taskmasterai/cli@1.1.4 > fastmcp@3.33.0 > @modelcontextprotocol/sdk@1.26.0 > express-rate-limit@8.6.2 > express@5.2.1 > proxy-addr@2.0.7",
+            "apps/orchestration-server > @modelcontextprotocol/sdk@1.26.0 > express@5.2.1 > proxy-addr@2.0.7",
+            "apps/orchestration-server > @modelcontextprotocol/sdk@1.26.0 > express-rate-limit@8.6.2 > express@5.2.1 > proxy-addr@2.0.7"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/jshttp/proxy-addr/security/advisories/GHSA-jqcg-44mw-7w3h\n- https://nvd.nist.gov/vuln/detail/CVE-2026-90711\n- https://github.com/jshttp/proxy-addr/commit/780911d84d18e2c5fa008ed0c0d387631ec11965\n- https://cna.openjsf.org/security-advisories.html\n- https://github.com/jshttp/proxy-addr/releases/tag/v2.0.8\n- https://github.com/advisories/GHSA-jqcg-44mw-7w3h",
+      "created": "2026-10-05T23:30:26.000Z",
+      "id": 1241210,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\n`proxy-addr` determines which network hops are trusted proxies so that `X-Forwarded-For` can be believed. When an application configures a trust subnet as an IPv4-mapped IPv6 address with a short prefix, such as `::ffff:10.0.0.0/8` (the correct spelling is `::ffff:10.0.0.0/104`), the subnet compiles with all-zero leading bits and matches every IPv4 address instead of the block it names. The same happens for any IPv6 trust subnet with zero leading bits, such as `::/1`.\n\nEvery unauthenticated client is then trusted as a proxy at hop 0, so `proxyaddr(req, trust)`, and therefore `req.ip` and `req.ips` in Express, returns whatever the client sends in `X-Forwarded-For`. This defeats IP-based access control, rate limiting, geolocation, and audit logging. The misconfiguration compiles without any error, and the same block written correctly behaves correctly, so the difference is not visible from the configuration.\n\n### Patches\n\nUpgrade to `proxy-addr` 2.0.8. An IPv4 address now matches an IPv6 trust subnet only when that subnet is a genuine IPv4-mapped subnet whose prefix covers the mapped marker.\n\n### Workarounds\n\nWrite IPv4 trust subnets in plain IPv4 notation (for example `10.0.0.0/8`). If IPv4-mapped IPv6 notation is required, use the full form so the prefix covers the mapped marker (for example `::ffff:10.0.0.0/104` for the `10.0.0.0/8` block).",
+      "reported_by": null,
+      "title": "proxy-addr vulnerable to IP spoofing via IPv4-mapped IPv6 trust subnet",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-90711"
+      ],
+      "access": "public",
+      "severity": "critical",
+      "module_name": "proxy-addr",
+      "vulnerable_versions": ">=1.1.0 <2.0.8",
+      "github_advisory_id": "GHSA-jqcg-44mw-7w3h",
+      "recommendation": "Upgrade to version 2.0.8 or later",
+      "patched_versions": ">=2.0.8",
+      "updated": "2026-10-05T23:30:27.000Z",
+      "cvss": {
+        "score": 9.1,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"
+      },
+      "cwe": [
+        "CWE-290",
+        "CWE-348",
+        "CWE-697"
+      ],
+      "url": "https://github.com/advisories/GHSA-jqcg-44mw-7w3h"
+    },
+    "1241332": {
+      "findings": [
+        {
+          "version": "1.10.0",
+          "paths": [
+            ". > concurrently@8.2.2 > shell-quote@1.10.0"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/ljharb/shell-quote/security/advisories/GHSA-pqg4-j6r4-53mv\n- https://nvd.nist.gov/vuln/detail/CVE-2026-102422\n- https://github.com/ljharb/shell-quote/commit/6002b2ed90c6b83095eb272b6b0adaf3a172b0bc\n- https://github.com/advisories/GHSA-pqg4-j6r4-53mv",
+      "created": "2026-10-06T13:40:36.000Z",
+      "id": 1241332,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\n`quote()` emits a `{ comment }` token as `#` followed by its text, which comments out the rest of the shell line, including the opening quote of any later string token. A line terminator in that later string ends the comment, and the rest of the string is parsed as shell input:\n\n```js\nquote(['echo', 'ok', { comment: 'x' }, 'a\\nid;#']);\n// echo ok #x 'a\n// id;#'\n```\n\nPassed to `sh`, `bash`, `dash`, `ksh`, or `zsh`, this runs `id`.\n\n`parse()` emits a comment token for a `#` in the middle of a word (for example `http://example.com/#frag`), so callers that combine `parse()` output with another untrusted string, such as `quote(parse(untrustedCommand).concat(untrustedArg))`, are affected. The fix for CVE-2026-9277 rejected line terminators in the comment's own text, but not in the tokens after it.\n\nExploitation requires an attacker-controlled string containing a line terminator that follows a `{ comment }` token in the same `quote()` call.\n\n### Patches\n\nFixed in v1.11.0: `quote()` throws a `TypeError` when a string after a `{ comment }` token contains a line terminator (`\\n`, `\\r`, U+2028, or U+2029).\n\n### Workarounds\n\nDrop every token after a `{ comment }` token before calling `quote()`, or reject line terminators in untrusted strings. Separately, do not append other shell text after `quote()` output that contains a comment, since the comment swallows it.",
+      "reported_by": null,
+      "title": "shell-quote: `quote()` command injection via a line terminator in a token after a `{ comment }` token",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-102422"
+      ],
+      "access": "public",
+      "severity": "critical",
+      "module_name": "shell-quote",
+      "vulnerable_versions": ">=1.8.4 <1.11.0",
+      "github_advisory_id": "GHSA-pqg4-j6r4-53mv",
+      "recommendation": "Upgrade to version 1.11.0 or later",
+      "patched_versions": ">=1.11.0",
+      "updated": "2026-10-06T13:40:37.000Z",
+      "cvss": {
+        "score": 8.1,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+      },
+      "cwe": [
+        "CWE-78"
+      ],
+      "url": "https://github.com/advisories/GHSA-pqg4-j6r4-53mv"
+    },
+    "1241339": {
+      "findings": [
+        {
+          "version": "1.26.0",
+          "paths": [
+            ". > @taskmasterai/cli@1.1.4 > fastmcp@3.33.0 > @modelcontextprotocol/sdk@1.26.0",
+            "apps/orchestration-server > @modelcontextprotocol/sdk@1.26.0"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/modelcontextprotocol/typescript-sdk/security/advisories/GHSA-6qxp-vccf-f47h\n- https://github.com/modelcontextprotocol/typescript-sdk/pull/2887\n- https://github.com/modelcontextprotocol/typescript-sdk/commit/edd12e282620ebf770d67316f19cf91d4112a1bd\n- https://github.com/modelcontextprotocol/typescript-sdk/releases/tag/v2.2.0\n- https://github.com/advisories/GHSA-6qxp-vccf-f47h",
+      "created": "2026-10-06T15:35:44.000Z",
+      "id": 1241339,
+      "npm_advisory_id": null,
+      "overview": "### Summary\nIn affected versions, the SDK's OAuth client let the MCP server decide which authorization server received the client's OAuth credentials. Credentials were not tied to the authorization server they belong to.\n\nA malicious or compromised MCP server could name its own authorization server. With no user interaction, the client would send it:\n\n- the `refresh_token` and `client_secret` stored from an earlier sign-in\n- the `client_secret` or signed assertion configured on a bundled provider\n\n### Am I affected?\nYes, if both of these hold:\n\n- your application uses the SDK's OAuth client over HTTP, through any of:\n    - an `authProvider` on a transport\n    - the `withOAuth()` middleware\n    - direct calls to `auth()` or `fetchToken()`\n- it may connect to an MCP server you do not fully trust while holding credentials for a legitimate authorization server\n\nAffected versions:\n\n- `@modelcontextprotocol/sdk` 1.12.0 through 1.30.1\n- `@modelcontextprotocol/client` 2.0.0 through 2.1.0, only for:\n    - bundled providers without `expectedIssuer`\n    - credentials stored or supplied without `issuer`\n    - direct calls to `fetchToken()`\n    - providers that read storage back through `OAuthTokensSchema` or `OAuthClientInformationSchema`\n\nNot affected:\n\n- MCP servers built with the SDK\n- stdio clients\n\n### Fix\nUpgrade to:\n\n- 1.x: `@modelcontextprotocol/sdk` 1.31.0 or later\n- 2.x: `@modelcontextprotocol/client` 2.2.0 or later, and `@modelcontextprotocol/core` 2.2.0 or later if you import it directly\n\nThe client now records the authorization server as `issuer` on saved credentials and does not send them to a different one. The user signs in again, or the call throws.\n\nIn the following cases, upgrading to the patched version is not enough. You also need to make a change:\n\n- **Bundled providers** (`ClientCredentialsProvider`, `PrivateKeyJwtProvider`, `StaticPrivateKeyJwtProvider`, `CrossAppAccessProvider`): pass `expectedIssuer`, for example `expectedIssuer: 'https://auth.example.com'`. Without it they still use whichever authorization server the MCP server names.\n- **Credentials saved without `issuer`:** tokens and client information your `OAuthClientProvider` persisted (file, keychain, database) before upgrading, including everything 1.x saved before 1.31.0. They still go to whichever authorization server is named at first use. Add `issuer` to them, or clear them so users sign in again.\n- **Your own `OAuthClientProvider`:** save exactly what `saveTokens()` and `saveClientInformation()` are given, including `issuer`. For pre-registered credentials, include `issuer` in what `clientInformation()` returns.\n\nNot covered by this fix:\n\n- a new interactive sign-in, which still goes to the authorization server the MCP server names. Only complete sign-ins for servers you trust.\n- `refreshAuthorization()` and `exchangeAuthorization()` called directly\n- 2.x with `skipIssuerMetadataValidation: true`\n\nIf an affected client may have connected to an untrusted MCP server, rotate its client secret or signing key and revoke its tokens.\n\nIf you cannot upgrade yet, connect OAuth clients only to MCP servers you trust. 2.0.0 and 2.1.0 already accept `expectedIssuer`.",
+      "reported_by": null,
+      "title": "MCP TypeScript SDK: OAuth client could send credentials to an authorization server chosen by the MCP server",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-104850"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "@modelcontextprotocol/sdk",
+      "vulnerable_versions": ">=1.12.0 <1.31.0",
+      "github_advisory_id": "GHSA-6qxp-vccf-f47h",
+      "recommendation": "Upgrade to version 1.31.0 or later",
+      "patched_versions": ">=1.31.0",
+      "updated": "2026-10-06T15:35:44.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"
+      },
+      "cwe": [
+        "CWE-345",
+        "CWE-522"
+      ],
+      "url": "https://github.com/advisories/GHSA-6qxp-vccf-f47h"
+    }
+  },
+  "muted": [],
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 1,
+      "moderate": 0,
+      "high": 2,
+      "critical": 2
+    },
+    "dependencies": 839,
+    "devDependencies": 0,
+    "optionalDependencies": 0,
+    "totalDependencies": 839
+  }
+}

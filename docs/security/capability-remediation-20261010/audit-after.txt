@@ -1,0 +1,2 @@
+PASS production dependency audit: critical=0 high=0 moderate=0 low=0; accepted-moderate=none
+PASS all dependency audit: critical=0 high=0 moderate=0 low=1; accepted-moderate=none

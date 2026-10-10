@@ -23,7 +23,7 @@
     "@mission-control/memory": "workspace:*",
     "@mission-control/shared": "workspace:*",
     "@mission-control/workflow-engine": "workspace:*",
-    "@modelcontextprotocol/sdk": "1.26.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "ajv": "8.18.0",
     "ajv-formats": "3.0.1",
     "canonicalize": "2.1.0",
