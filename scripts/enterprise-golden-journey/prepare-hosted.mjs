@@ -28,7 +28,10 @@ if (['delegated-execution', 'hybrid-mission'].includes(suite)) {
   await checkout('MyFactory', lock.myFactory, partner);
   run('npm', ['ci', '--prefix', partner, '--ignore-scripts', '--no-audit', '--no-fund']);
   run('git', ['init', '--bare', fixture]);
-  run('git', ['--git-dir=' + fixture, 'fetch', '--depth=1', 'https://github.com/jaydubya818/MyFactory.git', lock.myFactoryFixtureSource]);
+  // The provider bundles this revision from a second repository. A shallow
+  // source rejects that ref update, so retain its complete pinned ancestry.
+  run('git', ['--git-dir=' + fixture, 'fetch', '--no-tags', 'https://github.com/jaydubya818/MyFactory.git', `${lock.myFactoryFixtureSource}:refs/heads/fixture`]);
+  assert.equal(execFileSync('git', ['--git-dir=' + fixture, 'rev-parse', 'refs/heads/fixture'], { encoding: 'utf8' }).trim(), lock.myFactoryFixtureSource);
   await set('MC_LOCAL_MYFACTORY_ROOT', partner); await set('MYFACTORY_FIXTURE_GIT', fixture);
   run('docker', ['pull', lock.providerImage]); run('docker', ['pull', lock.postgresImage]);
   run('docker', ['tag', lock.postgresImage, 'postgres:17']);
