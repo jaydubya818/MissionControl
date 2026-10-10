@@ -1547,25 +1547,27 @@ export const requestCorrectiveWork = mutation({
   },
 });
 
+export async function acceptMission(ctx: MutationCtx, args: { missionId: Id<"missions">; acceptedBy: string; idempotencyKey: string }) {
+  const scopedMission = await ctx.db.get(args.missionId);
+  const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, scopedMission?.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
+  const mission = await ctx.db.get(args.missionId);
+  if (!mission) throw new Error("Mission not found");
+  assertAuthorizedDeliveryRecord(deliveryAccess, mission);
+  const duplicate = await ctx.db.query("missionEvents").withIndex("by_idempotency", (q) => q.eq("idempotencyKey", args.idempotencyKey)).first();
+  if (duplicate) return { mission, created: false };
+  if (mission.state !== "AWAITING_ACCEPTANCE") throw new Error(`Mission cannot be accepted while ${mission.state}`);
+  const acceptance = (await loadMissionExecutionState(ctx, mission._id)).acceptance;
+  if (!acceptance.eligible) throw new Error(`Mission cannot be accepted (${acceptance.blockingReasons.join("; ")})`);
+  const now = Date.now();
+  await ctx.db.patch(mission._id, { state: "DONE", acceptedAt: now, updatedAt: now, requiredHumanAction: undefined, blockingReason: undefined });
+  const updated = await ctx.db.get(mission._id);
+  if (updated) await logMissionEvent(ctx, { mission: updated, eventType: "MISSION_ACCEPTED", actorType: "HUMAN", actorId: args.acceptedBy, summary: "Mission accepted with complete validation coverage", idempotencyKey: args.idempotencyKey });
+  return { mission: updated, created: true };
+}
+
 export const accept = mutation({
   args: { missionId: v.id("missions"), acceptedBy: v.string(), idempotencyKey: v.string() },
-  handler: async (ctx, args) => {
-    const scopedMission = await ctx.db.get(args.missionId);
-    const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, scopedMission?.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
-    const mission = await ctx.db.get(args.missionId);
-    if (!mission) throw new Error("Mission not found");
-    assertAuthorizedDeliveryRecord(deliveryAccess, mission);
-    const duplicate = await ctx.db.query("missionEvents").withIndex("by_idempotency", (q) => q.eq("idempotencyKey", args.idempotencyKey)).first();
-    if (duplicate) return { mission, created: false };
-    if (mission.state !== "AWAITING_ACCEPTANCE") throw new Error(`Mission cannot be accepted while ${mission.state}`);
-    const acceptance = (await loadMissionExecutionState(ctx, mission._id)).acceptance;
-    if (!acceptance.eligible) throw new Error(`Mission cannot be accepted (${acceptance.blockingReasons.join("; ")})`);
-    const now = Date.now();
-    await ctx.db.patch(mission._id, { state: "DONE", acceptedAt: now, updatedAt: now, requiredHumanAction: undefined, blockingReason: undefined });
-    const updated = await ctx.db.get(mission._id);
-    if (updated) await logMissionEvent(ctx, { mission: updated, eventType: "MISSION_ACCEPTED", actorType: "HUMAN", actorId: args.acceptedBy, summary: "Mission accepted with complete validation coverage", idempotencyKey: args.idempotencyKey });
-    return { mission: updated, created: true };
-  },
+  handler: acceptMission,
 });
 
 export const recordHandoff = mutation({

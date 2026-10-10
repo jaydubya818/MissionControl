@@ -1,3 +1,4 @@
+import { prepareOwnerReviewFixture } from "./sofie-owner-review.mjs";
 import { SofieEnterpriseContractFixture } from '../enterprise-golden-journey/sofie-contract.mjs';
 import { pathToFileURL } from 'node:url';
 import { finalizeHybridSpec } from './native-hybrid-spec.mjs';
@@ -48,6 +49,7 @@ async function step(name: string, operation: () => Promise<any>) {
 }
 let hybridProvider: any;
 let resultConsumer: any;
+let ownerReview: any;
 let adapter: any, worker: FactoryAttemptWorker | undefined;
 try {
   const s = db.seed; state.seed = s;
@@ -209,12 +211,13 @@ try {
   if (mode === 'prepare') console.log(JSON.stringify({ preparation: 'PASS', nativeExecution: 'NOT_RUN' }));
   else executionQualification: {
     const author = db.client('user_SyntheticPlanAuthorQualification');
+    if (mode === 'hybrid' && process.env.MC_OWNER_REVIEW_QUALIFICATION === '1') ownerReview = await prepareOwnerReviewFixture(db);
     const sofie = new SofieEnterpriseContractFixture({
-      createDraft: (args: any) => mutate('missions:createDraft', args),
+      createDraft: (args: any) => ownerReview ? ownerReview.createMission(args) : mutate('missions:createDraft', args),
       get: (missionId: string) => query('missions:get', { missionId }),
-      accept: (args: any) => mutate('missions:accept', args),
+      accept: (args: any) => ownerReview ? ownerReview.accept(args.missionId) : mutate('missions:accept', args),
     });
-    await step('sofieProposal', async () => sofie.propose('Build an Agentic HR platform.'));
+    await step('sofieProposal', async () => ownerReview ? ownerReview.propose() : sofie.propose('Build an Agentic HR platform.'));
     const missionArgs = { projectId: s.projectId, idempotencyKey: 'native-successor-mission',
       title: mode === 'hybrid' ? 'Build the Employee Core, Recruiting and Onboarding foundation.' : 'Native successor executed settlement', objective: mode === 'hybrid' ? 'Execute native and delegated WorkOrders and independently verify an exact downstream integration proof.' : 'Render and independently verify one exact unpublished synthetic document.',
       context: 'Isolated qualification only.', constraints: ['No paid inference', 'No publication', 'No production authority'],
@@ -533,13 +536,16 @@ try {
       await step('missionReadIsolation', async () => ({ crossTenant: 'DENIED', anonymous: 'DENIED',
         sameTenantOtherOwner: 'DENIED', strictOwnerIsolation: 'PASS' }));
       const missionAcceptance = await step('hybridMissionAcceptance', () => sofie.accept(missionId, s.operatorId));
-      assert.equal(missionAcceptance.mission.state, 'DONE');
+      const ownerRejected = Boolean(ownerReview && process.env.MC_OWNER_REVIEW_DECISION === 'REJECT');
+      assert.equal(missionAcceptance.mission.state, ownerRejected ? 'BLOCKED' : 'DONE');
+      if (ownerRejected) await assert.rejects(() => mutate('missions:accept', { missionId, acceptedBy:s.operatorId, idempotencyKey:'reject-cannot-accept' }));
+      if (ownerReview) await step('linkedOwnerReview', async () => ownerReview.report());
       await db.restart();
       const finalAccounting = await step('hybridDurableAccounting', () => query('factory/nativeAccounting:readback', { workflowRunId: integrationDispatch.run._id }));
       assert.equal(finalAccounting.projectExposureMicrousd, 0);
       const durableMission = await step('sofieDurableReadback', () => sofie.readback(missionId));
-      assert.equal(durableMission.state, 'DONE');
-      assert.equal(durableMission.needsYou, null);
+      assert.equal(durableMission.state, ownerRejected ? 'BLOCKED' : 'DONE');
+      if (ownerRejected) assert.ok(durableMission.needsYou); else assert.equal(durableMission.needsYou, null);
       assert.equal(durableMission.workOrders.length, 3);
       assert.ok(durableMission.workOrders.every((wo: any) => wo.state === 'DONE'));
       assert.ok(durableMission.assertions.every((a: any) => a.status === 'PASS' && a.verificationReceiptId));
@@ -555,7 +561,8 @@ try {
         return { crossTenant: 'DENIED', sameTenantOtherOwner: 'DENIED', anonymous: 'DENIED', afterRestart: true };
       });
       state.sofieContract = 'PASS'; state.liveSofieIntegration = 'NOT_RUN';
-      state.hybridMission = 'PASS'; state.nativeDelegatedAccounting = 'PASS';
+      state.hybridMission = ownerRejected ? 'OWNER_REJECTED' : 'PASS'; state.nativeDelegatedAccounting = 'PASS';
+      if (ownerRejected) state.ownerResultRejection = 'PASS';
     }
 
     await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n');
