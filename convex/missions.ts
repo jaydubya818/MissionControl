@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -657,8 +657,7 @@ export const getScoped = query({
   },
 });
 
-export const createDraft = mutation({
-  args: {
+const missionDraftArgs = v.object({
     projectId: v.optional(v.id("projects")), idempotencyKey: v.optional(v.string()), title: v.string(), objective: v.string(),
     context: v.optional(v.string()), constraints: v.optional(v.array(v.string())), sourceOfTruthRefs: v.optional(v.array(sourceRef)),
     owner: v.optional(v.string()), budgetUsd: v.optional(v.number()), stopCondition: v.string(),
@@ -666,7 +665,10 @@ export const createDraft = mutation({
     repositoryId: v.optional(v.id("workspaceRepositories")), codeScopeIds: v.optional(v.array(v.id("repositoryCodeScopes"))),
     executionEnvironment: v.optional(v.union(v.literal("LOCAL"), v.literal("CLOUD"), v.literal("REMOTE"), v.literal("POLICY_SELECTED"))),
     maxReadOnlyConcurrency: v.optional(v.number()), maxCorrectiveIterations: v.optional(v.number()), metadata: v.optional(v.any()),
-  },
+  });
+
+export const createDraft = mutation({
+  args: missionDraftArgs,
   handler: async (ctx, args) => {
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, args.projectId, COMPANY_PERMISSIONS.UPDATE_DELIVERY);
     assertAuthorizedDeliveryRecord(deliveryAccess, {
@@ -710,49 +712,60 @@ export const createDraft = mutation({
       }
     }
     const operator = await resolveOperator(ctx);
-    const now = Date.now();
-    const missionId = await ctx.db.insert("missions", {
-      tenantId: project?.tenantId, projectId: args.projectId, idempotencyKey: args.idempotencyKey,
-      title: args.title, objective: args.objective, context: args.context, constraints: args.constraints,
-      sourceOfTruthRefs: args.sourceOfTruthRefs, owner: ownerMember?.name ?? args.owner,
-      ownerMemberId: args.ownerMemberId, owningTeamId: args.owningTeamId, repositoryId: args.repositoryId,
-      codeScopeIds: args.codeScopeIds ?? [], requestedByOperatorId: requestingOperatorId,
-      executionEnvironment: args.executionEnvironment,
-      state: "DRAFT", executionPolicy: "SERIAL_MUTATIONS",
-      maxReadOnlyConcurrency: args.maxReadOnlyConcurrency ?? 2, maxCorrectiveIterations: args.maxCorrectiveIterations ?? 2,
-      correctiveIterations: 0, stopCondition: args.stopCondition, budgetUsd: args.budgetUsd, spentUsd: 0,
-      createdAt: now, updatedAt: now, metadata: args.metadata,
-    });
-    const mission = await ctx.db.get(missionId);
-    if (!mission) throw new Error("Mission creation failed");
-    if (args.ownerMemberId && args.owningTeamId && project?.tenantId) {
-      await ctx.db.insert("missionAssignments", {
-        tenantId: project.tenantId,
-        projectId: project._id,
-        missionId: mission._id,
-        memberId: args.ownerMemberId,
-        teamId: args.owningTeamId,
-        role: "OWNER",
-        activeFrom: now,
-        active: true,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: requestingOperatorId,
-        updatedBy: requestingOperatorId,
-      });
-    }
-    await logMissionEvent(ctx, {
-      mission,
-      eventType: "MISSION_CREATED",
-      actorType: "HUMAN",
-      actorId: operator.actorId,
-      summary: `Created mission ${args.title}`,
-      idempotencyKey: args.idempotencyKey ? `${args.idempotencyKey}:created` : undefined,
-      metadata: { actorSource: operator.actorSource },
-    });
-    return { mission, created: true };
+    return createAuthorizedMissionDraft(ctx, args, { project, ownerMember, requestingOperatorId, operator });
   },
 });
+
+export async function createAuthorizedMissionDraft(
+  ctx: MutationCtx,
+  args: Infer<typeof missionDraftArgs>,
+  scope: { project: Doc<"projects"> | null; ownerMember: Doc<"orgMembers"> | null;
+    requestingOperatorId?: Id<"operators">; operator: { actorId: string; actorSource: string } },
+) {
+  validateMissionDraftInput(args);
+  const { project, ownerMember, requestingOperatorId, operator } = scope;
+  const now = Date.now();
+  const missionId = await ctx.db.insert("missions", {
+    tenantId: project?.tenantId, projectId: args.projectId, idempotencyKey: args.idempotencyKey,
+    title: args.title, objective: args.objective, context: args.context, constraints: args.constraints,
+    sourceOfTruthRefs: args.sourceOfTruthRefs, owner: ownerMember?.name ?? args.owner,
+    ownerMemberId: args.ownerMemberId, owningTeamId: args.owningTeamId, repositoryId: args.repositoryId,
+    codeScopeIds: args.codeScopeIds ?? [], requestedByOperatorId: requestingOperatorId,
+    executionEnvironment: args.executionEnvironment,
+    state: "DRAFT", executionPolicy: "SERIAL_MUTATIONS",
+    maxReadOnlyConcurrency: args.maxReadOnlyConcurrency ?? 2, maxCorrectiveIterations: args.maxCorrectiveIterations ?? 2,
+    correctiveIterations: 0, stopCondition: args.stopCondition, budgetUsd: args.budgetUsd, spentUsd: 0,
+    createdAt: now, updatedAt: now, metadata: args.metadata,
+  });
+  const mission = await ctx.db.get(missionId);
+  if (!mission) throw new Error("Mission creation failed");
+  if (args.ownerMemberId && args.owningTeamId && project?.tenantId) {
+    await ctx.db.insert("missionAssignments", {
+      tenantId: project.tenantId,
+      projectId: project._id,
+      missionId: mission._id,
+      memberId: args.ownerMemberId,
+      teamId: args.owningTeamId,
+      role: "OWNER",
+      activeFrom: now,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: requestingOperatorId,
+      updatedBy: requestingOperatorId,
+    });
+  }
+  await logMissionEvent(ctx, {
+    mission,
+    eventType: "MISSION_CREATED",
+    actorType: "HUMAN",
+    actorId: operator.actorId,
+    summary: `Created mission ${args.title}`,
+    idempotencyKey: args.idempotencyKey ? `${args.idempotencyKey}:created` : undefined,
+    metadata: { actorSource: operator.actorSource },
+  });
+  return { mission, created: true };
+}
 
 export const updateDraft = mutation({
   args: {

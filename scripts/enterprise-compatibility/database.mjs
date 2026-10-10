@@ -61,6 +61,7 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
       await cp(join(repo, "convex"), join(root, "convex"), { recursive: true, filter: source =>
         !source.includes("/__tests__") && !/\/(crons|http|auth.config)\.[jt]s$/.test(source) });
       await copyClosure("convex/lib/serviceCommandAuth.ts");
+      await copyClosure("convex/sofieEnterprise.ts");
       await copyClosure("convex/lib/factoryMemory.ts");
       await copyFile(join(repo, "scripts/qualification/native-fixture.js"), join(root, "convex/nativeFixture.js"));
     }
@@ -90,7 +91,7 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
     const seed = await owner.mutation(nativeExecution ? "nativeFixture:seed" : "fixtureSeed:seed", {});
     return { root, seed, owner, other, peer: client("fixture-peer"), anonymous: new ConvexHttpClient(url), stop,
       ...(nativeExecution ? { client, setEnvironment(name, value) {
-        if (!["MC_LOCAL_REPOSITORY_ADMISSION", "MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID", "MISSION_CONTROL_SERVICE_ID", "MISSION_CONTROL_SERVICE_COMMAND_SECRET"].includes(name)) throw Error("Unapproved native fixture environment field");
+        if (!["MC_LOCAL_REPOSITORY_ADMISSION", "MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID", "MISSION_CONTROL_SERVICE_ID", "MISSION_CONTROL_SERVICE_COMMAND_SECRET", "MC_SOFIE_READINESS_ENVIRONMENT_ID", "MC_SOFIE_APPLICATION_SECRET", "MC_SOFIE_APPLICATION_KEY_ID", "MC_SOFIE_APPLICATION_OWNER_ID"].includes(name)) throw Error("Unapproved native fixture environment field");
         try { execFileSync(process.execPath, [cli, "env", "set", name, value, "--url", url, "--admin-key", key],
           { cwd: root, env, encoding: "utf8", timeout: 20000, stdio: "pipe" }); }
         catch { throw Error(`Disposable environment setup failed: ${name}`); }
