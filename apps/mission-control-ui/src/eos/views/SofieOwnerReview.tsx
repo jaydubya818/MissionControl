@@ -31,7 +31,8 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
   const params = new URLSearchParams(location.search),
     proposalId = params.get("proposal"),
     digest = params.get("proposalDigest");
-  const rows = useQuery(api.sofieOwnerReview.list, { projectId });
+  const proposalList = useQuery(api.sofieOwnerReview.list, { projectId });
+  const rows = proposalList?.proposals;
   const inspect = useMutation(api.sofieOwnerReview.inspect),
     decide = useMutation(api.sofieEnterprise.decide);
   const authorizeResult = useMutation(api.sofieOwnerReview.authorizeResultRead),
@@ -81,6 +82,11 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
     action: "AUTHORIZE_DRAFT" | "REVOKE" | "READ" | "ACCEPT" | "REJECT",
   ) => {
     if (!review || pending.current) return;
+    if (
+      ["READ", "ACCEPT", "REJECT"].includes(action) &&
+      review.status !== "CREATED"
+    )
+      return;
     pending.current = true;
     setBusy(true);
     setError("");
@@ -168,7 +174,11 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
       {rows === undefined ? (
         <p role="status">Loading proposals…</p>
       ) : rows.length === 0 ? (
-        <p>No linked proposals in this workspace.</p>
+        <p>
+          {proposalList?.truncated
+            ? "No linked proposals in this limited list."
+            : "No linked proposals in this workspace."}
+        </p>
       ) : (
         <ul className="flex flex-wrap gap-2">
           {rows.map((p) => (
@@ -179,6 +189,12 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
             </li>
           ))}
         </ul>
+      )}
+      {proposalList?.truncated && (
+        <p role="status">
+          This proposal list is limited. To review a proposal that is not
+          listed, open its owner review link from Sofie.
+        </p>
       )}
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
@@ -195,6 +211,15 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
           <h3 className="font-semibold">{review.proposal.title}</h3>
           <p>{review.proposal.objective}</p>
           <p>Proposal: {review.status}</p>
+          {(review.status === "REJECTED" || review.status === "EXPIRED") && (
+            <p role="status">
+              {review.status === "REJECTED"
+                ? "This proposal was rejected."
+                : "This proposal has expired."}{" "}
+              Result authorization and decisions are unavailable for this
+              proposal.
+            </p>
+          )}
           <ul className="list-disc ps-5">
             {review.proposal.workstreams.map((w) => (
               <li key={w}>{w}</li>
@@ -286,39 +311,40 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
                   </li>
                 ))}
               </ul>
-              {!review.sofieResultAuthorized && (
+              {review.status === "CREATED" && !review.sofieResultAuthorized && (
                 <Button disabled={busy} onClick={() => void act("READ")}>
                   Allow Sofie to read this Result
                 </Button>
               )}
-              {review.detail?.mission.state === "AWAITING_ACCEPTANCE" && (
-                <>
-                  <label className="block">
-                    Decision reason
-                    <textarea
-                      className="mt-1 block w-full rounded border border-line bg-surface-2 p-2"
-                      value={reason}
-                      maxLength={2000}
-                      disabled={busy}
-                      onChange={(e) => setReason(e.target.value)}
-                    />
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      disabled={busy || !currentResult}
-                      onClick={() => void act("ACCEPT")}
-                    >
-                      Accept enterprise Result
-                    </Button>
-                    <Button
-                      disabled={busy || !currentResult || !reason.trim()}
-                      onClick={() => void act("REJECT")}
-                    >
-                      Reject enterprise Result
-                    </Button>
-                  </div>
-                </>
-              )}
+              {review.status === "CREATED" &&
+                review.detail?.mission.state === "AWAITING_ACCEPTANCE" && (
+                  <>
+                    <label className="block">
+                      Decision reason
+                      <textarea
+                        className="mt-1 block w-full rounded border border-line bg-surface-2 p-2"
+                        value={reason}
+                        maxLength={2000}
+                        disabled={busy}
+                        onChange={(e) => setReason(e.target.value)}
+                      />
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        disabled={busy || !currentResult}
+                        onClick={() => void act("ACCEPT")}
+                      >
+                        Accept enterprise Result
+                      </Button>
+                      <Button
+                        disabled={busy || !currentResult || !reason.trim()}
+                        onClick={() => void act("REJECT")}
+                      >
+                        Reject enterprise Result
+                      </Button>
+                    </div>
+                  </>
+                )}
             </section>
           )}
         </>

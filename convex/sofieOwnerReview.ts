@@ -81,7 +81,7 @@ export const list = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
     const project = await ctx.db.get(projectId);
-    if (!project?.tenantId) return [];
+    if (!project?.tenantId) return { proposals: [], truncated: false };
     const access = await requireWorkspaceAccess(
       ctx,
       project.tenantId,
@@ -92,7 +92,7 @@ export const list = query({
       access.membership.mode !== "AUTHENTICATED" ||
       !access.membership.operatorId
     )
-      return [];
+      return { proposals: [], truncated: false };
     const connections = await ctx.db
       .query("enterpriseAppConnections")
       .withIndex("by_owner", (q) =>
@@ -100,6 +100,7 @@ export const list = query({
       )
       .take(51);
     const rows = [];
+    let truncated = connections.length > 50;
     for (const connection of connections.slice(0, 50)) {
       if (
         connection.projectId !== projectId ||
@@ -108,12 +109,14 @@ export const list = query({
         connection.expiresAt <= Date.now()
       )
         continue;
-      for (const p of await ctx.db
+      const proposals = await ctx.db
         .query("enterpriseMissionProposals")
         .withIndex("by_connection_intent", (q) =>
           q.eq("connectionId", connection._id),
         )
-        .take(51)) {
+        .take(51);
+      truncated ||= proposals.length > 50;
+      for (const p of proposals.slice(0, 50)) {
         if (
           p.ownerId === access.membership.operatorId &&
           p.projectId === projectId &&
@@ -127,7 +130,10 @@ export const list = query({
           });
       }
     }
-    return rows.slice(0, 100);
+    return {
+      proposals: rows.slice(0, 100),
+      truncated: truncated || rows.length > 100,
+    };
   },
 });
 

@@ -29,6 +29,10 @@ try {
       "result",
       "expired",
       "denied",
+      "rejected-proposal",
+      "expired-proposal",
+      "truncated-list",
+      "truncated-empty",
     ]) {
       await page.goto(
         `http://127.0.0.1:5188/?scenario=${scenario}&theme=${theme}&proposal=proposal-ui-fixture&proposalDigest=sha256:fixture`,
@@ -49,6 +53,45 @@ try {
             .isDisabled(),
           true,
         );
+      if (scenario === "rejected-proposal" || scenario === "expired-proposal") {
+        await page
+          .getByText(
+            scenario === "rejected-proposal"
+              ? /This proposal was rejected/
+              : /This proposal has expired/,
+          )
+          .waitFor();
+        for (const name of [
+          "Allow Sofie to read this Result",
+          "Accept enterprise Result",
+          "Reject enterprise Result",
+        ])
+          assert.equal(await page.getByRole("button", { name }).count(), 0);
+        assert.equal(await page.getByLabel("Decision reason").count(), 0);
+        await page.getByRole("heading", { name: "Result / Proof" }).waitFor();
+      }
+      if (scenario === "truncated-list" || scenario === "truncated-empty") {
+        await page.getByText(/This proposal list is limited/).waitFor();
+        if (scenario === "truncated-list")
+          await page
+            .getByRole("button", { name: "Agentic HR platform" })
+            .waitFor();
+        else {
+          await page
+            .getByText("No linked proposals in this limited list.", {
+              exact: true,
+            })
+            .waitFor();
+          assert.equal(
+            await page
+              .getByText("No linked proposals in this workspace.", {
+                exact: true,
+              })
+              .count(),
+            0,
+          );
+        }
+      }
       await page.screenshot({
         path: `${output}/${theme}-${scenario}-before.png`,
         fullPage: true,
@@ -93,25 +136,34 @@ try {
     }
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(
-    "http://127.0.0.1:5188/?scenario=result&proposal=proposal-ui-fixture&proposalDigest=sha256:fixture",
-  );
-  await page.getByRole("heading", { name: "Result / Proof" }).waitFor();
-  assert.equal(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-    true,
-  );
-  await page.screenshot({
-    path: `${output}/mobile-result.png`,
-    fullPage: true,
-  });
-  await page.keyboard.press("Tab");
-  assert.equal(
-    await page.evaluate(() => document.activeElement !== document.body),
-    true,
-  );
+  for (const scenario of [
+    "result",
+    "rejected-proposal",
+    "expired-proposal",
+    "truncated-list",
+    "truncated-empty",
+  ]) {
+    await page.goto(
+      `http://127.0.0.1:5188/?scenario=${scenario}&proposal=proposal-ui-fixture&proposalDigest=sha256:fixture`,
+    );
+    await page.getByRole("heading", { name: "Result / Proof" }).waitFor();
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+    await page.screenshot({
+      path: `${output}/mobile-${scenario}.png`,
+      fullPage: true,
+    });
+    await page.keyboard.press("Tab");
+    assert.equal(
+      await page.evaluate(() => document.activeElement !== document.body),
+      true,
+    );
+    report.checks.push(`390px/${scenario}`);
+  }
   assert.deepEqual(errors, []);
   report.checks.push("390px-reflow", "keyboard-focus", "no-page-errors");
   report.status = "PASS";

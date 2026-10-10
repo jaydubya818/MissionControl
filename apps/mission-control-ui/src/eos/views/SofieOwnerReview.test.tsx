@@ -8,7 +8,15 @@ const state = vi.hoisted(() => ({
   decide: vi.fn(),
   authorize: vi.fn(),
   resultDecision: vi.fn(),
-  rows: [],
+  rows: {
+    proposals: [] as {
+      id: string;
+      digest: string;
+      title: string;
+      missionId: string | null;
+    }[],
+    truncated: false,
+  },
 }));
 vi.mock("../../auth/AuthRuntimeContext", () => ({
   useAuthRuntime: () => ({ mode: state.mode }),
@@ -77,6 +85,7 @@ function mount() {
 beforeEach(() => {
   vi.clearAllMocks();
   state.mode = "clerk";
+  state.rows = { proposals: [], truncated: false };
   state.inspect.mockResolvedValue(proposal);
   state.decide.mockResolvedValue({ authorized: true });
 });
@@ -155,5 +164,80 @@ describe("Sofie owner review", () => {
     );
     expect(await screen.findByRole("alert")).toHaveTextContent(/not confirmed/);
     expect(screen.queryByText(/Creation authorized/)).toBeNull();
+  });
+  it.each(["REJECTED", "EXPIRED"])(
+    "hides Result controls for a %s proposal with current evidence",
+    async (status) => {
+      state.inspect.mockResolvedValue({ ...completed(), status });
+      mount();
+      expect(
+        await screen.findByText(
+          status === "REJECTED"
+            ? /This proposal was rejected/
+            : /This proposal has expired/,
+        ),
+      ).toHaveTextContent(/Result authorization and decisions are unavailable/);
+      expect(
+        screen.getByRole("heading", { name: "Result / Proof" }),
+      ).toBeTruthy();
+      for (const name of [
+        "Allow Sofie to read this Result",
+        "Accept enterprise Result",
+        "Reject enterprise Result",
+      ])
+        expect(screen.queryByRole("button", { name })).toBeNull();
+      expect(screen.queryByLabelText("Decision reason")).toBeNull();
+      expect(state.authorize).not.toHaveBeenCalled();
+      expect(state.resultDecision).not.toHaveBeenCalled();
+    },
+  );
+  it("keeps Result authorization and acceptance available for a created proposal", async () => {
+    state.inspect.mockResolvedValue(completed());
+    mount();
+    expect(
+      await screen.findByRole("button", {
+        name: "Allow Sofie to read this Result",
+      }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Accept enterprise Result" }),
+    ).toBeEnabled();
+  });
+  it("identifies truncated lists while retaining listed proposal links", async () => {
+    state.rows = {
+      proposals: [
+        {
+          id: "other",
+          digest: "digest",
+          title: "Another proposal",
+          missionId: null,
+        },
+      ],
+      truncated: true,
+    };
+    mount();
+    expect(screen.getByText(/This proposal list is limited/)).toHaveTextContent(
+      /owner review link from Sofie/,
+    );
+    expect(
+      screen.getByRole("button", { name: "Another proposal" }),
+    ).toBeEnabled();
+    await screen.findByRole("button", { name: "Authorize Mission creation" });
+  });
+  it("does not claim an incomplete empty list means no linked proposals", async () => {
+    state.rows.truncated = true;
+    mount();
+    expect(
+      screen.getByText("No linked proposals in this limited list."),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText("No linked proposals in this workspace."),
+    ).toBeNull();
+    await screen.findByRole("button", { name: "Authorize Mission creation" });
+  });
+  it("does not show a limit notice for a complete list", async () => {
+    mount();
+    expect(screen.queryByText(/This proposal list is limited/)).toBeNull();
+    await screen.findByRole("button", { name: "Authorize Mission creation" });
   });
 });

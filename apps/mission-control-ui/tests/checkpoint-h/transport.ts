@@ -22,7 +22,12 @@ let review: any =
     ? proposal
     : {
         ...proposal,
-        status: "CREATED",
+        status:
+          scenario === "rejected-proposal"
+            ? "REJECTED"
+            : scenario === "expired-proposal"
+              ? "EXPIRED"
+              : "CREATED",
         missionId: "mission-ui-fixture",
         detail: {
           mission: { state: "AWAITING_ACCEPTANCE" },
@@ -33,7 +38,10 @@ let review: any =
           ],
         },
         resultDigest: "sha256:fixture-result",
-        sofieResultAuthorized: true,
+        sofieResultAuthorized: ![
+          "rejected-proposal",
+          "expired-proposal",
+        ].includes(scenario),
         result: {
           status: "AVAILABLE",
           ownerAcceptance: "PENDING",
@@ -83,7 +91,20 @@ const functions: Record<string, (...args: any[]) => Promise<any>> = {
   },
   "sofieOwnerReview:authorizeResultRead": async () => ({}),
 };
-const rows: any[] = [];
-export const useQuery = () => rows;
+const proposalList = {
+  proposals:
+    scenario === "truncated-list"
+      ? [
+          {
+            id: proposal.proposalId,
+            digest: proposal.digest,
+            title: proposal.proposal.title,
+            missionId: "mission-ui-fixture",
+          },
+        ]
+      : [],
+  truncated: scenario === "truncated-list" || scenario === "truncated-empty",
+};
+export const useQuery = () => proposalList;
 export const useMutation = (reference: any) =>
   functions[getFunctionName(reference)];
