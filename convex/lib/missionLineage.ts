@@ -29,7 +29,7 @@ export function missionLineage(db: QueryCtx["db"]) {
   function references(validator: Validator, value: any): string[] {
     if (value === undefined || value === null) return [];
     if (validator.type === "id") {
-      if (typeof value === "string") tableOf(value, validator.tableName);
+      if (typeof value === "string" && validator.tableName && Object.prototype.hasOwnProperty.call(validators, validator.tableName)) tableOf(value, validator.tableName);
       return scopedTables.has(validator.tableName!) && typeof value === "string" ? [value] : [];
     }
     if (validator.type === "object") return Object.entries(validator.value).flatMap(([key, field]: [string, any]) => references(field.fieldType, value[key]));

@@ -27,6 +27,22 @@ function fixture() {
 }
 afterEach(() => vi.unstubAllGlobals());
 
+it.each([
+  ['qcArtifacts', 'qcRunId', 'qcRuns', 'metadata'],
+  ['contextPackageVersions', 'packageId', 'contextPackages', 'compatibility'],
+])('does not scan user tables for typed storage references in %s', (table, parentField, parentTable, opaqueField) => {
+  const f = fixture(), parent = f.add(parentTable), storage = f.add('_storage');
+  const document = f.add(table, { [parentField]: parent, storageId: storage });
+  const row = f.rows.get(document);
+  expect(f.lineage.references(row, table)).toEqual([parent]);
+  expect(f.calls.filter(c => c.idString === storage)).toEqual([]);
+  expect(f.calls).toHaveLength(2); // The query row and its user-table parent.
+
+  // The same value in opaque content still follows the exhaustive fallback.
+  expect(f.lineage.references({ ...row, [opaqueField]: { parent: storage } }, table)).toEqual([parent]);
+  expect(f.calls.filter(c => c.idString === storage).map(c => c.table)).toEqual(tables);
+});
+
 it('validates schema and query-row hints once and preserves ordered opaque references', () => {
   const f = fixture(), tenant = f.add('tenants'), project = f.add('projects'), wo = f.add('workOrders');
   const foreign = f.add('missions'), document = f.add('factoryMemoryDocuments', {
