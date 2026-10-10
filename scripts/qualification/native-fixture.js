@@ -40,7 +40,7 @@ export const seed = mutation({ args: {}, handler: async ctx => {
 } });
 export const inspect = query({ args: { table: v.string() }, handler: async (ctx, { table }) => {
   await owner(ctx);
-  if (!["workflowRuns", "workOrders", "runArtifacts", "runEvents", "factoryWorkers", "verificationReceipts", "verificationRuns", "qualityGateDecisions", "evidenceEnvelopes", "serviceCommandReceipts"].includes(table)) throw Error("FIXTURE_TABLE_DENIED");
+  if (!["workflowRuns", "workOrders", "runArtifacts", "runEvents", "factoryWorkers", "verificationReceipts", "verificationRuns", "qualityGateDecisions", "evidenceEnvelopes", "serviceCommandReceipts", "missionHandoffs", "validationAssertions"].includes(table)) throw Error("FIXTURE_TABLE_DENIED");
   return ctx.db.query(table).collect();
 } });
 export const inspectRecord = query({ args: { id: v.string() }, handler: async (ctx, { id }) => {

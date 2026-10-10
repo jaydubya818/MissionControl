@@ -220,7 +220,7 @@ export async function syncMissionValidationReceipt(ctx: any, args: {
   const now = Date.now();
   await ctx.db.patch(assertion._id, {
     status: missionStatus,
-    validatorWorkflowRunId: isValidator ? args.workflowRun._id : undefined,
+    validatorWorkflowRunId: isValidator || serverDerivedIndependentVerification ? args.workflowRun._id : undefined,
     verificationReceiptId: args.verificationReceipt._id,
     waiverApprovalDecisionId: args.verificationReceipt.waiverApprovalDecisionId,
     updatedAt: now,

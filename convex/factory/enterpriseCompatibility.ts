@@ -1,3 +1,8 @@
+import { factoryVersionConfigurationDigest } from "../lib/factoryConfiguration";
+import { enterpriseMissionOwner } from "../lib/enterpriseMissionOwner";
+import { enterprisePlanApprovedByOwner, enterpriseDelegationApproval, DELEGATION_PREPARATION, LOCAL_DELEGATION_VERSION, LOCAL_DELEGATION_SOURCE } from "../lib/enterpriseDelegationAdmission";
+import { loadLocalRepositoryAdmission } from "../lib/localRepositoryAdmission";
+import { internal } from "../_generated/api";
 import { ingestEnterpriseQualityGate } from "../lib/enterpriseQualityGate";
 import { getCurrentVerificationRoutingOutcome } from "../lib/currentVerification";
 import { v } from "convex/values";
@@ -51,6 +56,44 @@ function eligible(row: Doc<"factoryDefinitions">, now: number) {
     || r.qualification !== "FIXTURE_QUALIFIED" || r.validUntil <= now) throw denied();
   return r;
 }
+/** Registers the preserved local compatibility composition in the existing
+ * Factory registry. It is never a native harness or a production activation. */
+export const registerLocalVersion = mutation({
+  args: { projectId: v.id("projects"), factoryDefinitionId: v.id("factoryDefinitions"), workflowId: v.id("workflows"),
+    policyEnvelopeId: v.id("policyEnvelopes"), sourceDigest: v.string(), configuration: v.any() },
+  handler: async (ctx, args) => {
+    const auth = await access(ctx, args.projectId, true);
+    if (process.env.MC_NATIVE_SUCCESSOR_QUALIFICATION !== "1" || !await enterpriseProject(ctx, args.projectId)) throw denied();
+    const factory = await scopedFactory(ctx, args.projectId, args.factoryDefinitionId);
+    const repository = await ctx.db.get(factory.repositoryId);
+    const local = await loadLocalRepositoryAdmission(ctx, repository, Date.now());
+    const workflow = await ctx.db.get(args.workflowId), policy = await ctx.db.get(args.policyEnvelopeId);
+    const c = args.configuration, profileDigest = canonicalHash(c);
+    if (auth.actorId !== local.admission.operatorId || !workflow?.active || workflow.projectId !== args.projectId
+      || !policy?.active || policy.projectId !== args.projectId || policy.tenantId !== factory.tenantId
+      || c?.local?.modelProvider !== "none" || c.local.evidenceClass !== "DETERMINISTIC"
+      || c.local.provider !== "local-docker" || c.executor !== "deterministic-qualification"
+      || canonicalHash({ sourceDigest: args.sourceDigest, configurationDigest: profileDigest }) !== LOCAL_DELEGATION_VERSION) throw denied();
+    const body = { tenantId: factory.tenantId, projectId: args.projectId, factoryDefinitionId: factory._id, version: 1,
+      repositoryId: factory.repositoryId, repositoryMode: "LOCAL_SYNTHETIC_QUALIFICATION" as const,
+      repositoryAdmissionDigest: local.digest, purpose: "SOFTWARE" as const, workflowId: workflow._id,
+      executor: { adapter: "myfactory-local-delegation", version: "1" }, executionProfileDigest: `sha256:${profileDigest}`,
+      executionProfileSnapshot: { sourceSha: LOCAL_DELEGATION_SOURCE, sourceDigest: args.sourceDigest, factoryVersion: LOCAL_DELEGATION_VERSION, configuration: c },
+      policyEnvelopeId: policy._id, environmentId: local.environment!._id,
+      codeScopeIds: [], agentBindings: [], budget: { maxCostUsd: 0.00008, maxRuntimeMinutes: 3, maxAttempts: 1 }, verifierIds: [], riskBoundary: "GREEN" as const,
+      recovery: { pause: false, cancel: true, retry: false, resume: false } };
+    const configurationDigest = factoryVersionConfigurationDigest(body);
+    const existing = await ctx.db.query("factoryDefinitionVersions").withIndex("by_factory", q => q.eq("factoryDefinitionId", factory._id)).collect();
+    if (existing.length) {
+      if (existing.length !== 1 || existing[0].configurationDigest !== configurationDigest) throw Error("LOCAL_VERSION_CONFLICT");
+      return existing[0]._id;
+    }
+    const id = await ctx.db.insert("factoryDefinitionVersions", { ...body, configurationDigest, createdBy: auth.actorId, createdAt: Date.now() });
+    await ctx.db.patch(factory._id, { latestVersion: 1, updatedAt: Date.now() });
+    await audit(ctx, args.projectId, factory.tenantId!, auth.actorId, factory._id, "LOCAL_DELEGATION_VERSION_REGISTERED");
+    return id;
+  },
+});
 export const register = mutation({
   args: { projectId: v.id("projects"), factoryDefinitionId: v.id("factoryDefinitions"), config: fixtureRegistrationConfig },
   handler: async (ctx, args) => {
@@ -121,7 +164,7 @@ export const initializeBudget = mutation({
 async function budgetFor(ctx: QueryCtx | MutationCtx, projectId: Id<"projects">, id: Id<"missions">) {
   const m = await scopedMission(ctx, projectId, id);
   if (await enterpriseProject(ctx, projectId)) {
-    if (m.owner !== (await access(ctx, projectId)).actorId) throw denied();
+    if (await enterpriseMissionOwner(ctx, m) !== (await access(ctx, projectId)).actorId) throw denied();
     return { mission: m, budget: null, canonical: true as const };
   }
   if (m.enterpriseFixtureBudget?.ownerActorId !== (await access(ctx, projectId)).actorId) throw denied();
@@ -145,7 +188,9 @@ async function validateLineage(ctx: MutationCtx | QueryCtx, b: FactoryDelegation
   const runId = ctx.db.normalizeId("workflowRuns", b.workflowRunId);
   const run = runId ? await ctx.db.get(runId) : null;
   if (!wo || !run || wo.tenantId !== mission.tenantId || wo.projectId !== mission.projectId || wo.missionId !== mission._id
-    || String(wo.repositoryId) !== b.repositoryId || wo.repository !== b.repository || wo.currentRevisionNumber !== b.workOrderRevisionNumber
+    || String(wo.repositoryId) !== b.repositoryId
+    || (run.executionManifest?.schema === DELEGATION_PREPARATION ? run.executionManifest.delegatedSourceRepository !== b.repository : wo.repository !== b.repository)
+    || wo.currentRevisionNumber !== b.workOrderRevisionNumber
     || String(wo.currentRevisionId) !== b.workOrderRevisionId || String(wo.missionPlanId) !== b.missionPlanId
     || wo.missionPlanRevision !== b.missionPlanRevision || wo.qualityContractDigest !== b.qualityContractDigest
     || String(mission.currentPlanId) !== b.missionPlanId || String(mission.currentSpecRevisionId) !== b.missionSpecRevisionId
@@ -171,11 +216,19 @@ export const admitTrial = mutation({
       || b.repositoryId !== String(factory.repositoryId) || registration.config.kind !== "MYFACTORY"
       || b.budgetReservationId !== b.delegationId || b.maxSpendMicrousd <= 0) throw denied();
     assertFactoryDelegationBindingMatches(b, b, now);
+    const preparedRun = await ctx.db.get(b.workflowRunId as Id<"workflowRuns">);
+    if (preparedRun?.executionManifest?.schema === DELEGATION_PREPARATION && !preparedRun.executionCostAuthorization) {
+      const preparedPlan = await ctx.db.get(b.missionPlanId as Id<"missionPlans">);
+      const approved = await enterpriseDelegationApproval(ctx, preparedPlan, b, preparedRun);
+      if (preparedRun.status !== "PENDING" || preparedRun.lease || preparedRun.enterpriseSettlement) throw denied();
+      await ctx.db.patch(preparedRun._id, { executionManifestDigest: b.executionManifestDigest,
+        metadata: { ...preparedRun.metadata, enterpriseDelegationId: b.delegationId, enterpriseDelegationApprovalId: approved.approvalDecisionId } });
+    }
     await validateLineage(ctx, b, mission);
     if (registration.config.executionProvider) {
       const plan = await ctx.db.get(b.missionPlanId as Id<"missionPlans">);
-      const approval = plan?.metadata?.enterpriseDelegationApprovals?.[b.delegationId] ?? plan?.metadata?.enterpriseDelegationApproval;
-      if (mission.owner !== auth.actorId || b.ownerScope !== auth.actorId || approval?.bindingDigest !== factoryDelegationBindingDigest(b)) throw denied();
+      const approval = await enterpriseDelegationApproval(ctx, plan, b);
+      if (await enterpriseMissionOwner(ctx, mission) !== auth.actorId || b.ownerScope !== auth.actorId || approval?.bindingDigest !== factoryDelegationBindingDigest(b)) throw denied();
     }
     const digest = factoryDelegationBindingDigest(b);
     const existing = await ctx.db.query("factoryDelegationTrials").withIndex("by_project_delegation", q => q.eq("projectId", args.projectId).eq("delegationId", b.delegationId)).unique();
@@ -198,8 +251,8 @@ export const admitTrial = mutation({
       const version = await ctx.db.get(registration.config.definitionVersionId);
       const policy = version?.policyEnvelopeId ? await ctx.db.get(version.policyEnvelopeId) : null;
       const plan = await ctx.db.get(b.missionPlanId as Id<"missionPlans">);
-      const approval = plan?.metadata?.enterpriseDelegationApprovals?.[b.delegationId] ?? plan?.metadata?.enterpriseDelegationApproval;
-      if (plan?.status !== "APPROVED" || plan.decidedActorSource !== "AUTHENTICATED" || plan.approvedBy !== auth.actorId
+      const approval = await enterpriseDelegationApproval(ctx, plan, b);
+      if (plan?.status !== "APPROVED" || plan.decidedActorSource !== "AUTHENTICATED" || !await enterprisePlanApprovedByOwner(ctx, plan, auth.actorId)
         || !plan.approvedAt || approval?.ownerActorId !== auth.actorId || approval.revokedAt !== undefined) throw denied();
       const tariff = approval.tariff ? verifyEngineeringTariff(b, approval.tariff, now) : undefined;
       if (!run || !version || registration.config.executionProvider !== "LOCAL_DOCKER_QUALIFICATION"
@@ -224,7 +277,7 @@ async function trialFor(ctx: QueryCtx | MutationCtx, projectId: Id<"projects">, 
   const factory = await scopedFactory(ctx, projectId, row.factoryDefinitionId);
   if (factory.enterpriseRegistration?.config.executionProvider) {
     const mission = await scopedMission(ctx, projectId, row.missionId);
-    if ((await access(ctx, projectId)).actorId !== mission.owner) throw denied();
+    if ((await access(ctx, projectId)).actorId !== await enterpriseMissionOwner(ctx, mission)) throw denied();
   }
   return row;
 }
@@ -248,6 +301,21 @@ export const claimTrial = mutation({
     await access(ctx, args.projectId, true);
     const t = await trialFor(ctx, args.projectId, args.trialId);
     if (t.state !== "RESERVED" || t.cancelRequested || t.closed) return false;
+    const pendingRun = await ctx.db.get(t.binding.workflowRunId as Id<"workflowRuns">);
+    if (pendingRun?.executionManifest?.schema === DELEGATION_PREPARATION) {
+      const owner = (await access(ctx, args.projectId, true)).actorId;
+      const approval = await enterpriseDelegationApproval(ctx, await ctx.db.get(t.binding.missionPlanId as Id<"missionPlans">), t.binding, pendingRun);
+      if (pendingRun.status !== "PENDING" || pendingRun.lease || pendingRun.cancellationRequestedAt !== undefined) throw denied();
+      await assertEnterpriseAttemptExecution(ctx, pendingRun, "local-docker");
+      const now = Date.now();
+      await ctx.db.patch(pendingRun._id, { status: "RUNNING", lease: { leaseId: approval.leaseId, ownerId: owner,
+        workerGeneration: t.binding.authorityGeneration, claimedAt: now, heartbeatAt: now, expiresAt: t.binding.deadline },
+        executionClaimedAt: now });
+      await ctx.runMutation(internal.workflowRuns.recordEventInternal, {
+        workflowRunId: pendingRun._id, eventType: "CHECKPOINT_CREATED", actor: owner, status: "RUNNING", startedAt: now,
+        idempotencyKey: `enterprise-delegation:${t.delegationId}:claimed`, commandSummary: "Authenticated isolated delegated execution claimed",
+        metadata: { leaseId: approval.leaseId, bindingDigest: t.bindingDigest, approvalDecisionId: approval.approvalDecisionId } });
+    }
     if ((await scopedFactory(ctx, args.projectId, t.factoryDefinitionId)).enterpriseRegistration?.config.executionProvider)
       await executionAuthority(ctx, args.projectId, t._id);
     const now = Date.now(), r = eligible(await scopedFactory(ctx, args.projectId, t.factoryDefinitionId), now);
@@ -330,10 +398,10 @@ async function executionAuthority(ctx: QueryCtx | MutationCtx, projectId: Id<"pr
   const plan = await ctx.db.get(binding.missionPlanId as Id<"missionPlans">);
   const workOrder = await ctx.db.get(binding.workOrderId as Id<"workOrders">);
   const revision = await ctx.db.get(binding.workOrderRevisionId as Id<"workOrderRevisions">);
-  const approval = plan?.metadata?.enterpriseDelegationApprovals?.[binding.delegationId] ?? plan?.metadata?.enterpriseDelegationApproval;
+  const approval = await enterpriseDelegationApproval(ctx, plan, binding, run);
   const registration = eligible(await scopedFactory(ctx, projectId, trial.factoryDefinitionId), Date.now());
   if (!approval || plan?.status !== "APPROVED" || plan.decidedActorSource !== "AUTHENTICATED"
-    || plan.approvedBy !== auth.actorId || !plan.approvedAt || mission.owner !== auth.actorId
+    || !await enterprisePlanApprovedByOwner(ctx, plan, auth.actorId) || !plan.approvedAt || await enterpriseMissionOwner(ctx, mission) !== auth.actorId
     || binding.ownerScope !== auth.actorId || registration.digest !== trial.registrationDigest
     || registration.config.executionProvider !== "LOCAL_DOCKER_QUALIFICATION"
     || approval.bindingDigest !== trial.bindingDigest || approval.ownerActorId !== auth.actorId
@@ -348,7 +416,7 @@ async function executionAuthority(ctx: QueryCtx | MutationCtx, projectId: Id<"pr
     || run.lease?.leaseId !== approval.leaseId || run.lease?.ownerId !== auth.actorId
     || run.lease?.workerGeneration !== binding.authorityGeneration || run.lease.expiresAt < binding.deadline
     || run.metadata?.enterpriseDelegationId !== binding.delegationId
-    || mission.activeWorkOrderId !== workOrder._id) throw denied();
+    || (run.executionManifest?.schema === DELEGATION_PREPARATION ? mission.state !== "IN_PROGRESS" : mission.activeWorkOrderId !== workOrder._id)) throw denied();
   assertFactoryDelegationBindingMatches(binding, binding, Date.now());
   return { trial, binding, mission, run, workOrder, approval };
 }

@@ -6,6 +6,8 @@ import { compilePolicyV2VerificationPlan } from "./policyV2Verification";
 import { persistPolicyV2Evaluation } from "./policyV2EvaluationPersistence";
 import { getCurrentVerificationRoutingOutcome, appendCurrentVerificationQualityGateDecision } from "./currentVerification";
 import { enterpriseProject } from "./enterpriseAttemptAccounting";
+import { internal } from "../_generated/api";
+import { DELEGATION_PREPARATION } from "./enterpriseDelegationAdmission";
 
 export async function ingestEnterpriseQualityGate(ctx: any, input: {
   workOrder: any; run: any; binding: any; trial: any; args: any; outcome: any; artifactId: any; now: number;
@@ -41,6 +43,7 @@ export async function ingestEnterpriseQualityGate(ctx: any, input: {
     verificationSubjectDigest: subject.digest };
   const scope = { tenantId: wo.tenantId, projectId: wo.projectId, missionId: wo.missionId, workOrderId: wo._id };
   const verificationAttemptId = await ctx.db.insert("workflowRuns", { ...scope,
+    missionRole: source.missionRole,
     runId: `${b.delegationId}:observed-verifier`, workflowId: "signed-factory-verifier-observation",
     workOrderRevisionId: source.workOrderRevisionId, workOrderRevisionNumber: b.workOrderRevisionNumber,
     attemptPurpose: "VERIFICATION", status: "COMPLETED", currentStepIndex: 0, totalSteps: 0, steps: [],
@@ -108,7 +111,10 @@ export async function ingestEnterpriseQualityGate(ctx: any, input: {
   await ctx.db.patch(source._id, { status: "COMPLETED", completedAt: now, lease: undefined, executionPhase: "TERMINAL",
     attemptPurpose: "IMPLEMENTATION", qualityContractDigest: b.qualityContractDigest, verificationSubject: subject,
     repositoryId: b.repositoryId, candidateReadyAt: now });
+  if (source.executionManifest?.schema === DELEGATION_PREPARATION) await ctx.scheduler.runAfter(0,
+    internal.factory.attempts.syncCompletedVerificationOutcomeInternal, { workflowRunId: verificationAttemptId,
+      verificationRunId, verdict: outcome.verdict });
   const current = await getCurrentVerificationRoutingOutcome(ctx, wo, now, "ACCEPTANCE", true);
-  const gate = await appendCurrentVerificationQualityGateDecision(ctx, wo, current, b.delegationId, now);
+  const gate = await appendCurrentVerificationQualityGateDecision(ctx, wo, current, b.delegationId, now, "ISOLATED_ENTERPRISE_QUALIFICATION");
   return gate._id;
 }

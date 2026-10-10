@@ -1,3 +1,5 @@
+import { enterpriseMissionOwner } from "./enterpriseMissionOwner";
+import { enterpriseDelegationApproval, enterprisePlanApprovedByOwner, DELEGATION_PREPARATION } from "./enterpriseDelegationAdmission";
 import { canonicalDigest, canonicalHash } from "@mission-control/shared";
 import { verificationContractDigest } from "@mission-control/workflow-engine/verification-identity";
 import { enterpriseProject } from "./enterpriseAttemptAccounting";
@@ -83,7 +85,7 @@ export async function getCurrentVerificationRoutingOutcome(
       const parent = verifier?.enterpriseAccountingParent;
       const artifact = envelope.artifactIds.length === 1 && await ctx.db.get(envelope.artifactIds[0]);
       const revision = binding && await ctx.db.get(binding.workOrderRevisionId);
-      const approval = plan?.metadata?.enterpriseDelegationApprovals?.[binding.delegationId] ?? plan?.metadata?.enterpriseDelegationApproval;
+      const approval = binding && await enterpriseDelegationApproval(ctx, plan, binding, source).catch(() => null);
       if (!trial || trial.projectId !== workOrder.projectId || trial.tenantId !== workOrder.tenantId
         || !artifact || artifact.projectId !== workOrder.projectId || artifact.tenantId !== workOrder.tenantId
         || artifact.workflowRunId !== source?._id || artifact.contentHash !== envelope.metadata.resultDigest
@@ -107,7 +109,10 @@ export async function getCurrentVerificationRoutingOutcome(
         || !["COMPLETED", "FAILED"].includes(trial.state) || trial.cancelRequested || trial.bindingDigest !== envelope.metadata.bindingDigest
         || binding.factoryVersion !== envelope.metadata.factoryVersion || binding.workOrderId !== workOrder._id
         || binding.qualityContractDigest !== workOrder.qualityContractDigest || binding.expiresAt <= now
-        || workOrder.currentExecutionRunId !== binding.workflowRunId || workOrder.approvalStatus !== "APPROVED"
+        || (source.executionManifest?.schema === DELEGATION_PREPARATION
+          ? (workOrder.currentExecutionRunId && ![source._id, verifier._id].includes(workOrder.currentExecutionRunId))
+            || attempts.some((a: any) => ["PENDING", "RUNNING", "PAUSED", "WAITING", "WAITING_FOR_APPROVAL"].includes(a.status))
+          : workOrder.currentExecutionRunId !== binding.workflowRunId) || workOrder.approvalStatus !== "APPROVED"
         || workOrder.verificationContractDigest !== verificationContractDigest(workOrder.verificationContract, workOrder.qualityContractDigest)
         || canonicalDigest("enterprise-verification-fields/v1", { requirements: workOrder.requirements ?? [], acceptanceCriteria: workOrder.acceptanceCriteria.map(({ status, ...criterion }: any) => criterion), negativeConstraints: workOrder.negativeConstraints, changeBudget: workOrder.changeBudget, verificationContract: workOrder.verificationContract })
           !== canonicalDigest("enterprise-verification-fields/v1", { requirements: approval?.verificationSpec?.requirements ?? [], acceptanceCriteria: approval?.verificationSpec?.acceptanceCriteria, negativeConstraints: approval?.verificationSpec?.negativeConstraints, changeBudget: approval?.verificationSpec?.changeBudget, verificationContract: approval?.verificationSpec?.verificationContract })
@@ -116,10 +121,10 @@ export async function getCurrentVerificationRoutingOutcome(
         || factory.enterpriseRegistration.qualification !== "FIXTURE_QUALIFIED"
         || factory.enterpriseRegistration.revokedAt !== undefined || factory.enterpriseRegistration.validUntil <= now
         || factory.enterpriseRegistration.config.factoryVersion !== binding.factoryVersion
-        || mission?.currentPlanId !== plan?._id || mission?.owner !== binding.ownerScope
+        || mission?.currentPlanId !== plan?._id || await enterpriseMissionOwner(ctx, mission) !== binding.ownerScope
         || plan?.status !== "APPROVED" || plan.revisionNumber !== binding.missionPlanRevision
         || canonicalDigest("mission-plan-fixture/v1", { revision: plan.revisionNumber, summary: plan.summary, blueprints: plan.workOrderBlueprints, assertions: plan.assertions ?? [] }) !== binding.missionPlanDigest
-        || plan.decidedActorSource !== "AUTHENTICATED" || plan.approvedBy !== binding.ownerScope || !plan.approvedAt
+        || plan.decidedActorSource !== "AUTHENTICATED" || !await enterprisePlanApprovedByOwner(ctx, plan, binding.ownerScope) || !plan.approvedAt
         || approval?.ownerActorId !== binding.ownerScope || plan.qualityContractDigest !== binding.qualityContractDigest
         || `sha256:${canonicalHash(plan.qualityContractProjection)}` !== binding.qualityContractDigest
         || approval?.bindingDigest !== trial.bindingDigest || approval.revokedAt !== undefined) continue;

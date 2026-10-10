@@ -27,3 +27,11 @@ Hybrid qualification uses one approved Mission with native and delegated predece
 3. Native gate/currentness and hybrid Mission with exact handoffs and independent verification. Fresh clone, CI, Bedrock comparison, independent security/architecture review, final checkpoint/report.
 
 Implementation is sequential. Review agents are read-only. Reuse existing isolated clone on codex/native-runtime-successor. Production integration NOT_RUN, paid operations 0, external-alpha changes 0, executable production grants 0, publication DISABLED, deployment NOT_AUTHORIZED. Do not modify MyFactory's qualified execution path or dependency PRs.
+
+## Canonical hybrid admission extension
+
+The accepted delegated harness seeded its predecessor Attempt and owner lease. Hybrid qualification must instead reuse canonical WorkOrder dispatch and approvalDecisions. Add an explicit isolated local-delegation preparation branch, then exact owner approval and the existing transactional admitTrial reservation. A pending preparation has no execution authority; authenticated claim creates the owner lease and durable claim event only after reservation. Resolve canonical member-backed ownership and authenticated Plan approver identity without rewriting those fields. Never mutate an approved Plan to append delegation approvals after native execution.
+
+Use the retained three-file synthetic MyFactory source snapshot (5cd13fa1f307a0c0f42f6317d966bb3179ad77c9) as the single local Mission repository. It fits the existing bounded local source admission. The local MyFactory request preserves its canonical source repository name. An explicit immutable preparation maps the admitted local repository ID to that exact name, commit and tree; the local provider's immutable configuration and FactoryVersion remain unchanged. No GitHub access, publication, or Vercel path is needed. All three WorkOrders remain in one repository and one approved Mission; downstream integration consumes exact predecessor handoff identities in a deterministic proof document.
+
+This extension touches dispatch, existing compatibility authority lookup and qualification scripts because fixture-created Attempts cannot establish canonical lifecycle qualification. It introduces no new registry, ledger, execution engine or Result system.

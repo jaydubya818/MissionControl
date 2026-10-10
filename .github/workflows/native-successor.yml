@@ -38,16 +38,16 @@ jobs:
       - name: Native successor contracts and exact runtime identity enforcement
         run: >-
           pnpm exec vitest run
+          convex/__tests__/enterpriseDelegationAdmission.test.ts
+          convex/__tests__/enterpriseMissionOwner.test.ts
           convex/__tests__/nativeEngineeringTariff.test.ts
           convex/__tests__/qualificationGateScope.test.ts
           convex/__tests__/offlineVerification.test.ts
           convex/__tests__/offlineEvidenceIngress.test.ts
           convex/__tests__/offlineAttemptEvidence.test.ts
           convex/__tests__/offlineExecutionProfile.test.ts
-          apps/orchestration-server/src/__tests__/isolatedInvocationAdapter.test.ts
-          apps/orchestration-server/src/__tests__/factoryHarnessComposition.test.ts
       - name: Adapter authentication contracts
-        run: pnpm --filter @mission-control/orchestration-server exec vitest run src/__tests__/myFactoryCompatibilityAdapter.test.ts
+        run: pnpm --filter @mission-control/orchestration-server exec vitest run src/__tests__/myFactoryCompatibilityAdapter.test.ts src/__tests__/isolatedInvocationAdapter.test.ts src/__tests__/factoryHarnessComposition.test.ts
       - name: Pin compatibility source and local database runtime
         run: |
           git init --bare "$RUNNER_TEMP/myfactory.git"

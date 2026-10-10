@@ -3106,8 +3106,23 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   const definitions = await ctx.db.query("factoryDefinitions")
     .withIndex("by_repository", (q: any) => q.eq("repositoryId", sourceAttempt.repositoryId))
     .collect();
-  const definition = definitions.find((candidate: any) => candidate.status === "ACTIVE"
+  let definition = definitions.find((candidate: any) => candidate.status === "ACTIVE"
     && candidate.purpose === "VERIFICATION" && candidate.activeVersionId);
+  if (sourceAttempt.executionManifest?.harness?.adapter === "isolated-invocation" && sourceAttempt.executionManifest.harness.version === "3") {
+    const producerVersion = await ctx.db.get(sourceAttempt.factoryDefinitionVersionId);
+    const eligible = [];
+    for (const candidate of definitions.filter((d: any) => d.status === "ACTIVE" && d.purpose === "VERIFICATION" && d.activeVersionId)) {
+      const candidateVersion = await ctx.db.get(candidate.activeVersionId);
+      if (candidateVersion?.executor?.adapter === "isolated-invocation" && candidateVersion.executor.version === "3"
+        && candidateVersion.executionBackend === "isolated-container"
+        && candidateVersion.harnessRuntimeArtifactDigest === producerVersion?.harnessRuntimeArtifactDigest
+        && candidateVersion.verifierIds.length > 0
+        && candidateVersion.verifierIds.length === producerVersion?.verifierIds.length
+        && candidateVersion.verifierIds.every((id: any) => producerVersion.verifierIds.includes(id))) eligible.push(candidate);
+    }
+    if (eligible.length !== 1) throw new Error("Exact native verification contract requires one matching qualified Verification Factory.");
+    definition = eligible[0];
+  }
   if (!definition) throw new Error("Candidate is ready, but no active Verification Factory is configured for this repository.");
   const version = await ctx.db.get(definition.activeVersionId);
   if (!version || version.factoryDefinitionId !== definition._id || version.purpose !== "VERIFICATION"
