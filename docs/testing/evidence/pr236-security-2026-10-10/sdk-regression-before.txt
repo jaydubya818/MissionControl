@@ -1,0 +1,31 @@
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl
+
+ ❯ convex/__tests__/governedMcp.test.ts (6 tests | 2 failed) 11ms
+   × binds new snapshots to the patched SDK and rejects old qualification identity 2ms
+   × binds new snapshots to the patched SDK and rejects old qualification identity 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  convex/__tests__/governedMcp.test.ts > binds new snapshots to the patched SDK and rejects old qualification identity
+ FAIL  convex/__tests__/governedMcp.test.ts > binds new snapshots to the patched SDK and rejects old qualification identity
+AssertionError: expected '1.26.0' to be '1.31.0' // Object.is equality
+
+Expected: "1.31.0"
+Received: "1.26.0"
+
+ ❯ convex/__tests__/governedMcp.test.ts:80:33
+     78|
+     79|  it.each([qualificationFixtureToolVersionSnapshot(implementationDigest…
+     80|    expect(snapshot.sdk.version).toBe("1.31.0");
+       |                                 ^
+     81|    expect(mcpToolVersionIssues({ ...snapshot, sdk: { ...snapshot.sdk, …
+     82|  });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  09:51:21
+   Duration  205ms (transform 76ms, setup 0ms, import 102ms, tests 11ms, environment 0ms)

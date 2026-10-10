@@ -1,0 +1,41 @@
+
+> mission-control@0.9.0 release:security /Users/jaywest/.codex/worktrees/f854/MissionControl
+> pnpm run security:audit && pnpm run security:authorization && pnpm run security:secrets && pnpm run docs:factory-check
+
+
+> mission-control@0.9.0 security:audit /Users/jaywest/.codex/worktrees/f854/MissionControl
+> node scripts/check-dependency-audit.mjs
+
+PASS production dependency audit: critical=0 high=0 moderate=0 low=0; accepted-moderate=none
+PASS all dependency audit: critical=0 high=0 moderate=0 low=1; accepted-moderate=none
+
+> mission-control@0.9.0 security:authorization /Users/jaywest/.codex/worktrees/f854/MissionControl
+> pnpm exec vitest run scripts/lib/convex-authorization-scan.test.mjs && node scripts/check-convex-authorization.mjs
+
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl
+
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  09:51:58
+   Duration  307ms (transform 55ms, setup 0ms, import 185ms, tests 17ms, environment 0ms)
+
+Convex public functions: 1003 total · 380 authorized · 0 declared-public · 623 unauthorized (baseline 624).
+
+1 function(s) left the unauthorized set — nice:
+  - workflowRuns:recordEvent
+
+Run `node scripts/check-convex-authorization.mjs --update` to lock the gain in.
+
+Convex authorization ratchet: PASS — no new unauthorized public functions.
+
+> mission-control@0.9.0 security:secrets /Users/jaywest/.codex/worktrees/f854/MissionControl
+> node scripts/check-repository-secrets.mjs
+
+PASS repository secret scan: 4293 tracked files checked; no credential material found
+
+> mission-control@0.9.0 docs:factory-check /Users/jaywest/.codex/worktrees/f854/MissionControl
+> node scripts/check-factory-docs.mjs
+
+PASS factory documentation consistency

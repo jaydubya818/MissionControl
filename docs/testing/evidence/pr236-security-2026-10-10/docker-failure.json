@@ -1,0 +1,265 @@
+{
+  "sends": 2,
+  "diagnostics": {
+    "provider": "factory/docker-bedrock-research-lab/v1",
+    "terminalState": "WORKLOAD_FAILURE",
+    "supervisorProcessRunning": false,
+    "exitCode": 0,
+    "failure": null,
+    "accountingReference": null,
+    "stderrTail": null,
+    "policyInspection": {
+      "image": "sha256:7a36977d9b1449d2dae436e4b184326f0ef48b5873019c583911f6d95d9afda8",
+      "user": "10001:10001",
+      "networkMode": "none",
+      "readonlyRootfs": true,
+      "capabilitiesDropped": [
+        "ALL"
+      ],
+      "securityOptions": [
+        "no-new-privileges"
+      ],
+      "pidMode": "",
+      "memory": 2147483648,
+      "cpu": 1000000000,
+      "pids": 64,
+      "tmpfs": {
+        "/tmp": "rw,nosuid,nodev,noexec,size=16777216,uid=10001,gid=10001,mode=0700",
+        "/var/lib/mission-control/attempt": "rw,nosuid,nodev,noexec,size=1073741824,uid=10001,gid=10001,mode=0700"
+      },
+      "mounts": [],
+      "privileged": false
+    }
+  },
+  "result": {
+    "schema": "factory-sandbox-result/v1",
+    "attemptId": "bedrock-fixture-run",
+    "workOrderId": "work-order-1",
+    "workOrderRevisionNumber": 1,
+    "workflowRunId": "bedrock-fixture-run",
+    "manifestDigest": "sha256:3bbc09388132fb935bc96ae7b1dab57a17bea4a673a42759cc63b475fe55f998",
+    "profileDigest": "sha256:7e0f97560cd14d3f133a1e755aadc25dc9bec99ea6b893a6e6f59ffc41e454ad",
+    "sourceSha": "9f5de91ef00d3050a39e0cf145ed01a2377255e5",
+    "supervisorVersion": "mission-control-supervisor/v1",
+    "harness": {
+      "adapter": "codex",
+      "version": "bedrock-v1",
+      "harnessId": "codex-cli",
+      "harnessVersion": "0.146.0",
+      "provider": "aws-bedrock",
+      "model": "anthropic.claude-sonnet-4-6",
+      "modelRouteDigest": "sha256:e6b343efabd7802dfb420b6eb92aafbf780ded63affb7e54c08505617a961907",
+      "providerRoute": "bedrock-us:58fee1a99def9d6cd4b477e8c3da17badc7788690a242f023328552bc8b408b1"
+    },
+    "environment": {
+      "provider": "DOCKER",
+      "image": "mission-control/local-large-repository@sha256:7a36977d9b1449d2dae436e4b184326f0ef48b5873019c583911f6d95d9afda8"
+    },
+    "startedAt": 1791651295272,
+    "finishedAt": 1791651302378,
+    "status": "FAILED",
+    "resultProvenance": {
+      "source": "OUTPUT_FILE",
+      "outputFile": {
+        "state": "VALID",
+        "byteLength": 297
+      },
+      "jsonl": {
+        "byteLength": 1319,
+        "lineCount": 7,
+        "malformedLineCount": 0,
+        "terminalCompletedCount": 1,
+        "terminalFailureCount": 0,
+        "validCandidateCount": 1
+      },
+      "context": {
+        "attemptId": "bedrock-fixture-run",
+        "manifestDigest": "sha256:3bbc09388132fb935bc96ae7b1dab57a17bea4a673a42759cc63b475fe55f998",
+        "sourceSha": "9f5de91ef00d3050a39e0cf145ed01a2377255e5"
+      }
+    },
+    "failure": {
+      "class": "NON_RETRYABLE_RESULT",
+      "code": "DETERMINISTIC_GATE_FAILURE",
+      "stage": "RESULT_VALIDATION",
+      "retryable": false,
+      "summary": "Executor returned FAILED: Independent verification required"
+    },
+    "structuredResult": {
+      "schema": "factory-result/v1",
+      "status": "FAILED",
+      "summary": "Offline fixture finished",
+      "completedAcceptanceCriterionIds": [
+        "ac-remote"
+      ],
+      "incompleteAcceptanceCriterionIds": [],
+      "unknownAcceptanceCriterionIds": [],
+      "verificationCommands": [],
+      "knownRisks": [],
+      "nextAction": "Independent verification required"
+    },
+    "changedFiles": [
+      "docs/operations/offline-container-probe.txt"
+    ],
+    "diff": {
+      "filesChanged": 1
+    },
+    "commandResults": [
+      {
+        "commandClass": "EXECUTOR",
+        "exitCode": 0,
+        "durationMs": 7106,
+        "timedOut": false
+      }
+    ],
+    "verificationInputs": {
+      "reportedCommands": []
+    },
+    "artifacts": [],
+    "events": [
+      {
+        "type": "SUPERVISOR_STARTED",
+        "occurredAt": 1791651295168
+      },
+      {
+        "type": "CONFIG_LOADED",
+        "occurredAt": 1791651295176
+      },
+      {
+        "type": "MANIFEST_VALIDATED",
+        "occurredAt": 1791651295270
+      },
+      {
+        "type": "REPOSITORY_VALIDATION_STARTED",
+        "occurredAt": 1791651295272
+      },
+      {
+        "type": "REPOSITORY_VALIDATED",
+        "occurredAt": 1791651295302
+      },
+      {
+        "type": "CODEX_SPAWN_STARTED",
+        "occurredAt": 1791651295305
+      },
+      {
+        "type": "CODEX_SPAWNED",
+        "occurredAt": 1791651295312
+      },
+      {
+        "type": "CODEX_FIRST_EVENT",
+        "occurredAt": 1791651296046
+      },
+      {
+        "type": "CODEX_TERMINAL",
+        "occurredAt": 1791651301966
+      },
+      {
+        "type": "EXECUTOR_OUTPUT_INSPECTED",
+        "occurredAt": 1791651301973
+      },
+      {
+        "type": "DIAGNOSTICS_WRITE_STARTED",
+        "occurredAt": 1791651301985
+      },
+      {
+        "type": "DIAGNOSTICS_WRITTEN",
+        "occurredAt": 1791651301987
+      },
+      {
+        "type": "RESULT_FINALIZATION_STARTED",
+        "occurredAt": 1791651302378
+      }
+    ],
+    "patch": {
+      "format": "GIT_BINARY_DIFF",
+      "encoding": "BASE64",
+      "byteLength": 326,
+      "digest": "sha256:20cf4fbac6bcea2bd22deaebbe4ff10b1960df9e805af5c8966c8c4c747d54ae",
+      "content": "ZGlmZiAtLWdpdCBhL2RvY3Mvb3BlcmF0aW9ucy9vZmZsaW5lLWNvbnRhaW5lci1wcm9iZS50eHQgYi9kb2NzL29wZXJhdGlvbnMvb2ZmbGluZS1jb250YWluZXItcHJvYmUudHh0Cm5ldyBmaWxlIG1vZGUgMTAwNjQ0CmluZGV4IDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAuLjVjODBmMzJkNzkwOGY5YzA3MzBjMDA5YzcwOTE1YWI1NjA3MjI3NzgKLS0tIC9kZXYvbnVsbAorKysgYi9kb2NzL29wZXJhdGlvbnMvb2ZmbGluZS1jb250YWluZXItcHJvYmUudHh0CkBAIC0wLDAgKzEgQEAKK2FmdGVyClwgTm8gbmV3bGluZSBhdCBlbmQgb2YgZmlsZQo="
+    },
+    "executor": {
+      "exitCode": 0,
+      "stdoutDigest": "sha256:6a7d47f0360868ba70436ebe815b8d046b7038e31b1c15d7ab76a91f00551924",
+      "stderrDigest": "sha256:19d0454315cc00c7390a92be657e3a7edffe3e21d1e0822922eea74f27c5ccd7",
+      "stdoutTail": "{\"type\":\"thread.started\",\"thread_id\":\"01a126bd-3395-7983-b678-1768972c016d\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"error\",\"message\":\"Model metadata for `anthropic.claude-sonnet-4-6` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.\"}}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/sh -lc 'printf after > docs/operations/offline-container-probe.txt'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/sh -lc 'printf after > docs/operations/offline-container-probe.txt'\",\"aggregated_output\":\"\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_2\",\"type\":\"agent_message\",\"text\":\"{\\\"schema\\\":\\\"factory-result/v1\\\",\\\"status\\\":\\\"FAILED\\\",\\\"summary\\\":\\\"Offline fixture finished\\\",\\\"completedAcceptanceCriterionIds\\\":[\\\"ac-remote\\\"],\\\"incompleteAcceptanceCriterionIds\\\":[],\\\"unknownAcceptanceCriterionIds\\\":[],\\\"verificationCommands\\\":[],\\\"knownRisks\\\":[],\\\"nextAction\\\":\\\"Independent verification required\\\"}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":10,\"reasoning_output_tokens\":0}}\n",
+      "stderrTail": "Reading additional input from stdin...\n",
+      "resultOutput": {
+        "state": "VALID",
+        "byteLength": 297,
+        "digest": "sha256:6f5e870cb34080368290e141a6a24a12ac2698603a318888c057977001131816",
+        "tail": "{\"schema\":\"factory-result/v1\",\"status\":\"FAILED\",\"summary\":\"Offline fixture finished\",\"completedAcceptanceCriterionIds\":[\"ac-remote\"],\"incompleteAcceptanceCriterionIds\":[],\"unknownAcceptanceCriterionIds\":[],\"verificationCommands\":[],\"knownRisks\":[],\"nextAction\":\"Independent verification required\"}",
+        "validationIssues": []
+      }
+    },
+    "usage": {
+      "providerCostUsd": null,
+      "inferenceCostUsd": null,
+      "inputTokens": 20,
+      "outputTokens": 10,
+      "observedAt": 1791651302378,
+      "providerRuntimeMs": 7106,
+      "enforcement": "OBSERVATION_ONLY"
+    },
+    "digest": "sha256:534c6c36f853be5bd0127aea83f5b2a1bc11e01aff6eb1c82a4b3bba68e39c11"
+  },
+  "holds": [
+    {
+      "requestId": "bedrock-fixture-run:1",
+      "requestDigest": "sha256:8d95fd88cc08ede23bdee5d13c30313c3f279d54dacda418017dd1f28465e8a9",
+      "attemptId": "bedrock-fixture-run",
+      "leaseId": "fixture-lease",
+      "generation": 1,
+      "maximumNanoUsd": 1004096,
+      "inputTokens": 10,
+      "maximumOutputTokens": 4096,
+      "preSendInputBound": {
+        "schema": "provider-pre-send-input-bound/v1",
+        "classification": "CONSERVATIVE_UPPER_BOUND",
+        "countTokensCapability": "UNSUPPORTED",
+        "maximumInputTokens": 1000000,
+        "serializedRequestBytes": 37666,
+        "derivation": "FULL_MODEL_CONTEXT_WINDOW",
+        "capabilityEvidenceDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidenceDigest": "sha256:14939fe64f752e7cc046058d4b397092f68bb83c1a8ce3be816a1846a1b59f6e"
+      },
+      "state": "SETTLED",
+      "receiptRevision": 1,
+      "classification": "ACTUAL",
+      "costClassification": "ESTIMATED",
+      "accountedNanoUsd": 15,
+      "providerRequestId": "offline-provider-1",
+      "usageId": "sha256:c4eea7558ed0f7af3f072cdc5e2493a5d60ab636482aaf75b87d6e0049bdd085",
+      "usageDigest": "sha256:ad3684f395c1358a11e24ebfcbc83981e43e615ff118c5f98d3275fcf135beea"
+    },
+    {
+      "requestId": "bedrock-fixture-run:2",
+      "requestDigest": "sha256:2002561689745a6ff0ab681d1dbb6fc6a512029a6027cfa14603ee33fa5d4e70",
+      "attemptId": "bedrock-fixture-run",
+      "leaseId": "fixture-lease",
+      "generation": 1,
+      "maximumNanoUsd": 1004096,
+      "inputTokens": 10,
+      "maximumOutputTokens": 4096,
+      "preSendInputBound": {
+        "schema": "provider-pre-send-input-bound/v1",
+        "classification": "CONSERVATIVE_UPPER_BOUND",
+        "countTokensCapability": "UNSUPPORTED",
+        "maximumInputTokens": 1000000,
+        "serializedRequestBytes": 38086,
+        "derivation": "FULL_MODEL_CONTEXT_WINDOW",
+        "capabilityEvidenceDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidenceDigest": "sha256:4168dfa351cee22c7bc8d6e64e9e508d3b881544eb73cefec06336082cd1cda2"
+      },
+      "state": "SETTLED",
+      "receiptRevision": 1,
+      "classification": "ACTUAL",
+      "costClassification": "ESTIMATED",
+      "accountedNanoUsd": 15,
+      "providerRequestId": "offline-provider-2",
+      "usageId": "sha256:d7ff69792149d9bd288f9ec66773d76e6b6f3813c52627b31100e87a79568c6f",
+      "usageDigest": "sha256:47cc647adaa6f581d80e1524128be4c851ce441e3ea06f1496c13179b11115c4"
+    }
+  ],
+  "evidenceKind": "OFFLINE_FIXTURE",
+  "paidInferenceCalls": 0
+}

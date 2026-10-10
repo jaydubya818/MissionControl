@@ -1,0 +1,83 @@
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server
+
+ ❯ src/__tests__/dockerBedrockBridge.test.ts (1 test | 1 failed) 720ms
+   × runs exact Codex Bedrock V3 through no-network Docker and bounded tool cycle 720ms
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: result and cleanup
+[factory-worker] Attempt factory-run-remote failed: Remote sandbox cleanup failed.
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: cancel and cleanup
+[factory-worker] Attempt factory-run-remote failed: Remote sandbox cleanup failed.
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: timeout and cleanup
+[factory-worker] Attempt factory-run-remote failed: Remote sandbox cleanup failed.
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: budget-denial and cleanup
+[factory-worker] Attempt factory-run-remote failed: Remote sandbox cleanup failed.
+
+stderr | src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: cleanup-failure and cleanup
+[factory-worker] Attempt factory-run-remote failed: Remote sandbox cleanup failed.
+
+ ❯ src/__tests__/dockerFactoryWorker.test.ts (7 tests | 6 failed) 4050ms
+   × dispatches through the real Factory worker into hardened Docker: result and cleanup 818ms
+   × dispatches through the real Factory worker into hardened Docker: cancel and cleanup 311ms
+   × dispatches through the real Factory worker into hardened Docker: timeout and cleanup 313ms
+   × dispatches through the real Factory worker into hardened Docker: budget-denial and cleanup 312ms
+   × dispatches through the real Factory worker into hardened Docker: cleanup-failure and cleanup 312ms
+   × reconciles Docker after actual worker process death 1672ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/dockerBedrockBridge.test.ts > runs exact Codex Bedrock V3 through no-network Docker and bounded tool cycle
+Error: Command failed: /Applications/Docker.app/Contents/Resources/bin/docker --host unix:///Users/jaywest/.docker/run/docker.sock image inspect mission-control/factory-docker-bedrock@sha256:11ea5f88493593ff48520222e1df3bca6303e92138847decf71d30e5cce92124
+Error response from daemon: No such image: mission-control/factory-docker-bedrock@sha256:11ea5f88493593ff48520222e1df3bca6303e92138847decf71d30e5cce92124
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: result and cleanup
+ FAIL  src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: cancel and cleanup
+ FAIL  src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: timeout and cleanup
+ FAIL  src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: budget-denial and cleanup
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/__tests__/dockerFactoryWorker.test.ts:82:107
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  src/__tests__/dockerFactoryWorker.test.ts > dispatches through the real Factory worker into hardened Docker: cleanup-failure and cleanup
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/__tests__/dockerFactoryWorker.test.ts:77:88
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  src/__tests__/dockerFactoryWorker.test.ts > reconciles Docker after actual worker process death
+Error: ENOENT: no such file or directory, open '/var/folders/1h/qb01w7v52bb72nzk2dh3szbc0000gn/T/mc-worker-death-8igW75/allocation.json'
+ ❯ src/__tests__/dockerFactoryWorker.test.ts:110:25
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  7 failed | 1 passed (8)
+   Start at  09:52:44
+   Duration  4.61s (transform 483ms, setup 0ms, import 805ms, tests 4.77s, environment 0ms)
+
+undefined
+/Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/__tests__/dockerFactoryWorker.test.ts src/__tests__/dockerBedrockBridge.test.ts

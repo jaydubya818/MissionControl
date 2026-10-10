@@ -63,8 +63,12 @@ for observed-cost reconciliation; README and OVERVIEW now match that source.
 - Complete workspace tests: pass, including 813 orchestration and 1,503 Convex.
   The subsequently added broker identity regression passed with all 17 broker tests.
 - Complete workspace typecheck: pass.
-- Opt-in Docker tests and exact-final-SHA CI: pending at this implementation checkpoint.
-- Independent review: initial identity finding fixed; final review pending.
+- Research Lab Docker: four full-repository synthetic lifecycle cases passed,
+  with cleanup confirmed. Standard-image checks are blocked by missing pinned
+  images; no image identity was substituted.
+- Independent review: APPROVE after the SDK identity finding was fixed,
+  conditional on passing final-SHA CI.
+- Exact-final-SHA CI is recorded in PR #236. See [local evidence](../testing/evidence/pr236-security-2026-10-10/README.md).
 
 The remaining low advisory is GHSA-866g-f22w-33x8 in Taskmaster's transitive
 @ai-sdk/provider-utils 3.0.21, patched at 3.0.28. It is outside the four approved
