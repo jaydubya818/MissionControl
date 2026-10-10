@@ -263,3 +263,12 @@ test('new registry capabilities inherit platform preference but require fresh ev
   assert.equal(item.preference, 'ENABLED');
   assert.equal(item.admissionEligible, false);
 });
+test('revocation and pause remain visible when setup is also incomplete', () => {
+  for (const lifecycle of ['REVOKED', 'PAUSED']) {
+    const facts = readyFacts(); facts.missioncontrol.lifecycle = lifecycle; facts.missioncontrol.setup = {};
+    const item = resolve(executionSnapshot({ facts })).missioncontrol;
+    assert.equal(item.label, lifecycle);
+    assert.equal(item.readiness, 'SETUP_REQUIRED');
+    assert.equal(item.admissionEligible, false);
+  }
+});

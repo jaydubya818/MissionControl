@@ -117,7 +117,8 @@ export function resolveCapabilities(registry: CapabilityRegistry, snapshot: Poli
     reasons.push(...grantReasons);
     const admissionEligible = availability === 'AVAILABLE' && readiness === 'READY' && preference === 'ENABLED'
       && lifecycle === 'ACTIVE' && authority === 'AUTHORIZED';
-    const label = preference === 'DISABLED' ? 'DISABLED'
+    const label = lifecycle === 'REVOKED' || lifecycle === 'PAUSED' ? lifecycle
+      : preference === 'DISABLED' ? 'DISABLED'
       : readiness !== 'READY' ? 'ENABLED — SETUP OR QUALIFICATION REQUIRED'
       : current && facts?.supported === true && facts.deployed === true && facts.entitled === true
         && facts.administrator === 'PENDING_APPROVAL' && lifecycle === 'ACTIVE' ? 'PENDING_APPROVAL'
