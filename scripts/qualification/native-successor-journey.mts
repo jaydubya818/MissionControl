@@ -257,7 +257,7 @@ try {
     await step('reservedBeforeExecution', () => query('factory/nativeAccounting:readback', { workflowRunId: dispatch.run._id }));
     const duplicate = await step('duplicateDispatch', () => mutate('workOrders:dispatch', dispatchArgs));
     if (duplicate.created || duplicate.run._id !== dispatch.run._id) throw Error('Duplicate native admission');
-    let lostExecutionAck = false, duplicateDeliveries = 0, restarted = false;
+    let lostExecutionAck = false, duplicateDeliveries = 0, restarted = false, recoveryInitialPollCompleted = false;
     const recoveryClient = new Proxy(db.owner, { get(target, name) {
       if (name === 'action') return async (reference: any, command: any) => {
         const result = await target.action(reference, command);
@@ -297,7 +297,14 @@ try {
         await step('executionRecovery', async () => ({ lostExecutionAck, duplicateDeliveries, restarted,
           executionsBeforeRecovery: executions, verifierStateBeforeRecovery: 'PENDING', freshAdapter: true, freshRegistry: true }));
       }
-      await reportHost(); await worker.tick();
+      await reportHost();
+      // Admit the producer once, then drain that controller without polling for
+      // newly queued verification work. The fresh controller must admit it after
+      // the lost ACK and restart; producer cleanup timing cannot change this cut.
+      if (mode !== 'recovery' || restarted || !recoveryInitialPollCompleted) {
+        await worker.tick();
+        recoveryInitialPollCompleted = true;
+      }
       runs = await query('nativeFixture:inspect', { table: 'workflowRuns' });
       const verifier = runs.find(r => r.attemptPurpose === 'VERIFICATION');
       if (verifier && ['COMPLETED', 'FAILED', 'CANCELED'].includes(verifier.status) && worker.status().activeRunIds.length === 0) break;
