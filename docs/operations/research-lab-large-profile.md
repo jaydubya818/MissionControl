@@ -76,3 +76,25 @@ session. Restore `fdlc-qualification` authentication and run the guarded read-on
 check before changing CountTokens or price qualification. Full live producer,
 independent verification, billing reconciliation and broader approval remain
 incomplete. The old reservation, failure and credential revocation are preserved.
+
+## Merge review, October 10
+
+PR #236 targets main. Runtime contract v61 includes the public
+`factory/attempts:reconcileObservedCost` mutation. Any later authorized release
+must deploy matching client and backend contracts together. This review does
+not apply v61 to a running environment.
+
+A fresh local run passed 1,501 Convex tests, 45 focused Docker admission and
+terminal-state tests, 12 runtime-contract guard tests, and Convex typechecking.
+The public contract guard now passes against main.
+
+Initial CI run 38067895667 failed Release Security Gates and System
+Qualification V2 on existing lockfile advisories for source-map-js, proxy-addr,
+shell-quote and @modelcontextprotocol/sdk. Package manifests and lockfile are
+unchanged from main. Dependency remediation and green candidate CI are merge
+blockers; AWS authentication, live qualification and budget authority remain
+separate deployment blockers. No check waiver is proposed.
+
+Vercel automatic deployment is disabled for main and this review branch. The
+image workflow does not publish on main pushes. CI has no Convex deployment
+step. Preserve those controls and all existing holds through review.
