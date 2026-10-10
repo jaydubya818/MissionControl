@@ -1,3 +1,4 @@
+import { requireWorkOrderCapabilityAdmission } from "./lib/capabilityAdmission";
 import { assertQualificationActivation } from "./lib/factoryQualificationScope";
 import { reserveOfflineAttemptBudget } from "./lib/offlineAttemptBudget";
 import { NO_INFERENCE_CONSTRAINT } from "./lib/offlineExecutionPolicy";
@@ -2437,9 +2438,12 @@ async function dispatchWorkOrder(
       if (existingEvent.workOrderId !== workOrder._id) {
         throw new Error("Idempotency key is already bound to another WorkOrder");
       }
+      await requireWorkOrderCapabilityAdmission(ctx, workOrder, true);
       const existingRun = await ctx.db.get(existingEvent.workflowRunId);
       return { created: false, run: existingRun, reason: "idempotent-replay" };
     }
+
+    await requireWorkOrderCapabilityAdmission(ctx, workOrder);
 
     if (workOrder.state === "SUPERSEDED") {
       throw new Error("Superseded WorkOrders cannot be dispatched");

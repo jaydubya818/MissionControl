@@ -1,3 +1,4 @@
+import { requireCapabilityAdmission } from "./lib/capabilityAdmission";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
@@ -1410,6 +1411,7 @@ export const start = mutation({
         throw new Error("Mission ownership must have exactly one matching active OWNER assignment before start");
       }
     }
+    await requireCapabilityAdmission(ctx, mission, mission.state === "IN_PROGRESS");
     if (mission.state === "IN_PROGRESS") return { mission, created: false };
     const releasedWorkOrder = await ctx.db
       .query("workOrders")
