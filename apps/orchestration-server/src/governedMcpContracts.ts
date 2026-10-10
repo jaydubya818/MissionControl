@@ -58,7 +58,7 @@ type McpOperation = {
 export type McpToolVersionSnapshot = {
   schema: typeof GOVERNED_MCP_SCHEMA;
   server: { key: string; version: string; implementationDigest: string; publishedContract?: { source: "NPM_RELEASE"; package: "@upstash/context7-mcp"; releaseTag: typeof CONTEXT7_RELEASE_TAG; releaseCommit: typeof CONTEXT7_RELEASE_COMMIT; artifactIntegrity: typeof CONTEXT7_NPM_INTEGRITY } };
-  sdk: { package: "@modelcontextprotocol/sdk"; version: "1.26.0" };
+  sdk: { package: "@modelcontextprotocol/sdk"; version: "1.31.0" };
   protocolVersion: typeof QUALIFICATION_PROTOCOL_VERSION;
   transport:
     | { kind: "STDIO"; destination: "LOCAL_PROCESS"; entrypoint: string; redirects: false }
@@ -96,7 +96,7 @@ export type GovernedMcpDenialCode = "CALL_ID_INVALID" | "REQUEST_TOO_LARGE" | "R
 export type GovernedMcpDecision = { allowed: true; requestDigest: string } | { allowed: false; code: GovernedMcpDenialCode; requestDigest: string };
 
 export function qualificationToolVersion(implementationDigest: string): McpToolVersionSnapshot {
-  return { schema: GOVERNED_MCP_SCHEMA, server: { key: QUALIFICATION_SERVER, version: QUALIFICATION_SERVER_VERSION, implementationDigest }, sdk: { package: "@modelcontextprotocol/sdk", version: "1.26.0" }, protocolVersion: QUALIFICATION_PROTOCOL_VERSION,
+  return { schema: GOVERNED_MCP_SCHEMA, server: { key: QUALIFICATION_SERVER, version: QUALIFICATION_SERVER_VERSION, implementationDigest }, sdk: { package: "@modelcontextprotocol/sdk", version: "1.31.0" }, protocolVersion: QUALIFICATION_PROTOCOL_VERSION,
     transport: { kind: "STDIO", destination: "LOCAL_PROCESS", entrypoint: QUALIFICATION_FIXTURE_RELATIVE_PATH, redirects: false },
     operation: { name: QUALIFICATION_OPERATION, description: "Read one public Mission Control authority-boundary doctrine excerpt.", sideEffect: "READ_ONLY", inputSchema: QUALIFICATION_INPUT_SCHEMA, inputSchemaDigest: canonicalHash(QUALIFICATION_INPUT_SCHEMA), outputSchema: QUALIFICATION_OUTPUT_SCHEMA, outputSchemaDigest: canonicalHash(QUALIFICATION_OUTPUT_SCHEMA), maxRequestBytes: 256, maxResponseBytes: 2_048, timeoutMs: 2_000 },
     dataClassification: "PUBLIC_FIXTURE", credentialClass: "NONE", lifecycle: { oneProcessPerCall: true, oneRequestPerProcess: true, terminateAfterCall: true }, admission: "QUALIFICATION_FIXTURE", authority: noAuthority() };
@@ -104,7 +104,7 @@ export function qualificationToolVersion(implementationDigest: string): McpToolV
 export function context7ToolVersion(): McpToolVersionSnapshot {
   const publishedContract = { source: "NPM_RELEASE" as const, package: "@upstash/context7-mcp" as const, releaseTag: CONTEXT7_RELEASE_TAG, releaseCommit: CONTEXT7_RELEASE_COMMIT, artifactIntegrity: CONTEXT7_NPM_INTEGRITY };
   const identity = { endpoint: CONTEXT7_ENDPOINT, protocolVersion: QUALIFICATION_PROTOCOL_VERSION, serverVersion: CONTEXT7_SERVER_VERSION, publishedContract, operation: CONTEXT7_OPERATION, inputSchema: CONTEXT7_INPUT_SCHEMA, outputSchema: CONTEXT7_OUTPUT_SCHEMA };
-  return { schema: GOVERNED_MCP_SCHEMA, server: { key: CONTEXT7_SERVER, version: CONTEXT7_SERVER_VERSION, implementationDigest: `sha256:${canonicalHash(identity)}`, publishedContract }, sdk: { package: "@modelcontextprotocol/sdk", version: "1.26.0" }, protocolVersion: QUALIFICATION_PROTOCOL_VERSION,
+  return { schema: GOVERNED_MCP_SCHEMA, server: { key: CONTEXT7_SERVER, version: CONTEXT7_SERVER_VERSION, implementationDigest: `sha256:${canonicalHash(identity)}`, publishedContract }, sdk: { package: "@modelcontextprotocol/sdk", version: "1.31.0" }, protocolVersion: QUALIFICATION_PROTOCOL_VERSION,
     transport: { kind: "STREAMABLE_HTTP", destination: CONTEXT7_DESTINATION, endpoint: CONTEXT7_ENDPOINT, tls: true, redirects: false, dnsPolicy: "PUBLIC_ONLY", maxTransportAttempts: 3 },
     operation: { name: CONTEXT7_OPERATION, description: "Query the approved public React documentation corpus through Context7.", sideEffect: "READ_ONLY", inputSchema: CONTEXT7_PERSISTED_INPUT_SCHEMA, inputSchemaDialect: CONTEXT7_INPUT_SCHEMA_DIALECT, inputSchemaDigest: canonicalHash(CONTEXT7_INPUT_SCHEMA), outputSchema: CONTEXT7_OUTPUT_SCHEMA, outputSchemaDigest: canonicalHash(CONTEXT7_OUTPUT_SCHEMA), maxRequestBytes: 256, maxResponseBytes: 65_536, timeoutMs: 10_000 },
     dataClassification: "PUBLIC", dataScope: { corpus: "CONTEXT7_PUBLIC_REACT_DOCUMENTATION", approvedArguments: CONTEXT7_ARGUMENTS, approvedArgumentsDigest: canonicalHash(CONTEXT7_ARGUMENTS) }, credentialClass: "NONE", lifecycle: { oneSessionPerCall: true, terminateAfterCall: true }, admission: "QUALIFIED_REAL_READ_ONLY_SERVICE", authority: noAuthority() };
